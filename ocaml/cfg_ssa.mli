@@ -11,6 +11,6 @@ val of_astcfg : Cfg.AST.G.t -> Cfg.SSA.G.t
 
 val of_ast : Ast.program -> Cfg.SSA.G.t
 
-val to_astcfg : Cfg.SSA.G.t -> Cfg.AST.G.t
+val to_astcfg : ?remove_temps:bool -> Cfg.SSA.G.t -> Cfg.AST.G.t
 
-val to_ast : Cfg.SSA.G.t -> Ast.program
+val to_ast : ?remove_temps:bool -> Cfg.SSA.G.t -> Ast.program

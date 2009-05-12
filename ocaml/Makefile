@@ -25,8 +25,8 @@ export SOURCES = \
 	prune_unreachable.ml \
 	cfg_pp.ml \
 	cfg_ast.mli cfg_ast.ml \
-	cfg_ssa.mli cfg_ssa.ml \
 	ssa_visitor.mli ssa_visitor.ml \
+	cfg_ssa.mli cfg_ssa.ml \
 	ast_visitor.mli ast_visitor.ml \
 	sccvn.ml \
 	deadcode.ml \

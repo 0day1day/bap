@@ -77,8 +77,6 @@ let type_of_exp = function
 
 (* share the strings in the variable names we create, to save memory *)
 let ssa_temp_name = "temp"
-let ssa_towrite_name = "towrite"
-let ssa_retval_name = "retval"
 
 (* @return a reversed lits of SSA stmts and an exp that is equivalent to
    the Ast expression *)
@@ -473,43 +471,87 @@ let rm_phis ?(attrs=[]) cfg =
   C.G.fold_vertex
     (fun b cfg -> C.set_stmts cfg b (List.rev(C.get_stmts cfg b)))
     cfg cfg
-    
 
-let value2ast = function
+
+type tm = Ssa.exp VH.t
+
+let create_tm c =
+  let tm = VH.create 5700 
+  and refd = VH.create 5700 in
+  let vis = object
+    inherit Ssa_visitor.nop
+    method visit_rvar v =
+      (try
+	 if VH.find refd v then
+	   VH.remove tm v
+	 else VH.replace refd v false
+       with Not_found -> VH.add refd v true);
+      `DoChildren
+
+    method visit_stmt = function
+      | Move(_, Phi _, _) ->
+	  `DoChildren
+      | Move(v,e,_) ->
+	  (* FIXME: should we check whether we introduced this var? *)
+	  if try VH.find refd v with Not_found -> true
+	  then VH.add tm v e;
+	  `DoChildren
+      | _ ->
+	  `DoChildren
+  end in
+  C.G.iter_vertex
+    (fun b -> ignore(Ssa_visitor.stmts_accept vis (C.get_stmts c b)))
+    c;
+  tm
+
+
+let rec value2ast tm = function
   | Int(i,t) -> Ast.Int(i,t)
   | Lab s -> Ast.Lab s
-  | Var l -> Ast.Var l
+  | Var l -> try exp2ast tm (VH.find tm l) with Not_found -> Ast.Var l
 
-let exp2ast = function
-  | BinOp(bo,v1,v2) -> Ast.BinOp(bo, value2ast v1, value2ast v2)
-  | UnOp(uo, v) -> Ast.UnOp(uo, value2ast v)
-  | Val v -> value2ast v
-  | Cast(ct,t,v) -> Ast.Cast(ct, t, value2ast v)
-  | Unknown(s,t) -> Ast.Unknown(s,t)
-  | Load(arr,idx,e, t) -> Ast.Load(value2ast arr, value2ast idx, value2ast e, t)
-  | Store(a,i,v, e, t) -> Ast.Store(value2ast a, value2ast i, value2ast v, value2ast e, t)
-  | Phi _ -> failwith "exp2ast cannot translate Phi expressions"
+and exp2ast tm =
+  let v2a = value2ast tm in
+  function
+    | BinOp(bo,v1,v2) -> Ast.BinOp(bo, v2a v1, v2a v2)
+    | UnOp(uo, v) -> Ast.UnOp(uo, v2a v)
+    | Val v -> v2a v
+    | Cast(ct,t,v) -> Ast.Cast(ct, t, v2a v)
+    | Unknown(s,t) -> Ast.Unknown(s,t)
+    | Load(arr,idx,e, t) -> Ast.Load(v2a arr, v2a idx, v2a e, t)
+    | Store(a,i,v, e, t) -> Ast.Store(v2a a, v2a i, v2a v, v2a e, t)
+    | Phi _ -> failwith "exp2ast cannot translate Phi expressions"
 
 (* Translates an SSA stmt back to Ast *)
-let rec stmt2ast = function
-  | Jmp(t,a) -> Ast.Jmp(value2ast t, a)
-  | CJmp(c,tt,tf,a) -> Ast.CJmp(value2ast c, value2ast tt, value2ast tf, a)
-  | Move(l,e,a) -> Ast.Move(l, exp2ast e, a)
-  | Label(l,a) -> Ast.Label(l,a)
-  | Comment(s,a) -> Ast.Comment(s,a)
-  | Assert(t,a) -> Ast.Assert(value2ast t, a)
-  | Halt(t,a) -> Ast.Halt(value2ast t, a)
+let stmt2ast tm =
+  let v2a = value2ast tm in
+  function
+    | Jmp(t,a) -> Ast.Jmp(v2a t, a)
+    | CJmp(c,tt,tf,a) -> Ast.CJmp(v2a c, v2a tt, v2a tf, a)
+    | Label(l,a) -> Ast.Label(l,a)
+    | Comment(s,a) -> Ast.Comment(s,a)
+    | Assert(t,a) -> Ast.Assert(v2a t, a)
+    | Halt(t,a) -> Ast.Halt(v2a t, a)
+    | Move(l,e,a) -> Ast.Move(l, exp2ast tm e, a)
 
-let stmts2ast = List.map stmt2ast
+let stmts2ast tm stmts =
+  let is_trash = function
+    | Move(l,_,_) when VH.mem tm l -> true
+    | _ -> false
+  in
+  ExtList.List.fold_right
+    (fun s ast -> if is_trash s then ast else stmt2ast tm s :: ast)
+    stmts []
 
 (** Convert an ssa cfg (with phis already removed) back to a ast cfg *)
-let cfg2ast cfg =
-  Cfg.map_ssa2ast stmts2ast cfg
+let cfg2ast tm cfg =
+  Cfg.map_ssa2ast (stmts2ast tm) cfg
 
 (** Convert an SSA CFG to an AST CFG. *)
-let to_astcfg c =
-  cfg2ast (rm_phis c)
+let to_astcfg ?(remove_temps=true) c =
+  let tm = if remove_temps then create_tm c else VH.create 1 in
+  cfg2ast tm (rm_phis c)
 
 (** Convert an SSA CFG to an AST program. *)
-let to_ast c =
-  Cfg_ast.to_prog (to_astcfg c)
+let to_ast ?(remove_temps=true) c =
+  Cfg_ast.to_prog (to_astcfg ~remove_temps c)
