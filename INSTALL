@@ -1,0 +1,71 @@
+
+*** Basic installation ****
+
+Note: we primarily build bap on 64-bit Debian Lenny. It will
+likely also work on ubuntu and 32-bit systems.
+
+To build BAP, do the following:
+  $ ./autogen.sh
+  $ ./configure
+  $ make
+
+Configure should report any dependencies you do not have.  You can
+satisfy most dependencies on debian lenny by running:
+
+  $ sudo aptitude install  ocaml ocaml-findlib libgdome2-ocaml-dev\
+    camlidl libocamlgraph-ocaml-dev libextlib-ocaml-dev sqlite3\
+    libsqlite3-ocaml-dev libsqlite3-dev libsqlite3-0\
+    libsqlite3-ocaml libsqlite3-ocaml-dev binutils-dev automake autoconf \
+    texlive-latex-extra texlive-fonts-recommended texlive-latex-base
+
+You may also need to (e.g., on Ubuntu 8.04):
+  $ sudo aptitude install  ocaml-native-compilers texlive-base \
+   texlive-latex-base texlive-fonts-recommended liblablgtk2-gnome-ocaml-dev
+
+Unfortunately, we require a more recent version of ocamlgraph than
+provided with Ubuntu 8.04.  You can download ocamlgraph from
+http://ocamlgraph.lri.fr/. Note you must install the findlib
+packages, e.g.,
+   $ make install-findlib
+(Note this requires the  liblablgtk2-gnome-ocaml-dev on my system).
+
+
+If you get an error that says there is an undefined reference to
+'__stack_chk_fail', either you need to reconfigure with gcc set to
+disable stack protection, or you have compiled part of the code 
+with the stack protector and part without it, in which case you 
+might have to enable it to finish compilation.
+You can enable/disable the stack protector in gcc in the following way:
+Disable: ./configure CC="gcc -fno-stack-protector" 
+Enable: ./configure CC="gcc -fstack-protector"
+Doing make clean first, will ensure that the whole platform gets 
+compiled with the same flag
+
+
+*** Valgrind's VEX library ****
+
+BAP requires Valgrind's VEX library. We have included a patched
+version of the VEX library in this distribution.   We have included
+information on our patch under VEX/BAP.README.  We recommend you use
+the version of VEX that is included.
+
+It is possible to use a different version of VEX.  To do so, build
+VEX, then use the --with-vex=<vex dir> configure option.
+
+
+
+*** Optional: Making the documentation ***
+
+Optionally you can also make the documentation by running: 'make doc'
+in the ocaml directory.  The documentation will be generated under
+ocaml/doc/bap/.  Note that ocaml documentation requires that the ocaml
+source files be built properly first.
+
+We have also provided a command line to view the ocaml file
+dependencies. Run:
+  $ make bap.dot
+in the ocaml directory. The resulting file is a graphviz dot file
+which can help you visualize how modules are related, e.g., run:
+  $ dot -Tpdf bap.dot > bap.pdf
+  $ xpdf bap.pdf
+

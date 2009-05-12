@@ -1,0 +1,1214 @@
+Index: priv/main/vex_main.c
+===================================================================
+--- priv/main/vex_main.c	(revision 1857)
++++ priv/main/vex_main.c	(working copy)
+@@ -365,7 +365,7 @@
+ 
+       case VexArchARM:
+          preciseMemExnsFn = guest_arm_state_requires_precise_mem_exns;
+-         disInstrFn       = NULL; /* HACK */
++         disInstrFn       = disInstr_ARM;
+          specHelper       = guest_arm_spechelper;
+          guest_sizeB      = sizeof(VexGuestARMState);
+          guest_word_type  = Ity_I32;
+@@ -558,6 +558,12 @@
+       vex_printf("\n");
+    }
+ 
++   /* if host_bytes is null, it means the caller didn't want it */
++   if (!vta->host_bytes) {
++     if (vta->host_bytes_used)
++       *(vta->host_bytes_used) = 0;
++     return VexTransOK;
++   }
+    /* HACK */
+    if (0) { *(vta->host_bytes_used) = 0; return VexTransOK; }
+    /* end HACK */
+Index: priv/guest-arm/ghelpers.c
+===================================================================
+--- priv/guest-arm/ghelpers.c	(revision 1857)
++++ priv/guest-arm/ghelpers.c	(working copy)
+@@ -190,7 +190,7 @@
+ 
+ 
+ 
+-
++#if 0
+ /* CALLED FROM GENERATED CODE: CLEAN HELPER */
+ /* Calculate all the 4 flags from the supplied thunk parameters. */
+ UInt armg_calculate_flags_all ( UInt cc_op, 
+@@ -288,8 +288,8 @@
+       vpanic("armg_calculate_condition(ARM)");
+    }
+ }
++#endif
+ 
+-
+ /* Used by the optimiser to try specialisations.  Returns an
+    equivalent expression, or NULL if none. */
+ 
+@@ -333,15 +333,18 @@
+ /* VISIBLE TO LIBVEX CLIENT */
+ UInt LibVEX_GuestARM_get_flags ( /*IN*/VexGuestARMState* vex_state )
+ {
+-   UInt flags;
++  //UInt flags;
+    vassert(0); // FIXME
+ 
+-   flags = armg_calculate_flags_all(
++   /*   flags = armg_calculate_flags_all(
+               vex_state->guest_CC_OP,
+               vex_state->guest_CC_DEP1,
+               vex_state->guest_CC_DEP2
+            );
++	   
+    return flags;
++   */
++   return vex_state->guest_CC;
+ }
+ 
+ /* VISIBLE TO LIBVEX CLIENT */
+@@ -364,15 +367,14 @@
+    vex_state->guest_R14 = 0;
+    vex_state->guest_R15 = 0;
+ 
+-   // CAB: Want this?
+-   //vex_state->guest_SYSCALLNO = 0;
+-
++   /*
+    vex_state->guest_CC_OP   = 0;// CAB: ? ARMG_CC_OP_COPY;
+    vex_state->guest_CC_DEP1 = 0;
+    vex_state->guest_CC_DEP2 = 0;
++   */
++   vex_state->guest_CC = 0;
+ 
+-   // CAB: Want this?   
+-   //vex_state->guest_EMWARN = 0;
++   vex_state->guest_EMWARN = 0;
+ 
+    vex_state->guest_SYSCALLNO = 0;
+ }
+@@ -443,7 +445,7 @@
+              meaning of thunk fields. */
+ 
+           .alwaysDefd 
+-             = { /*  0 */ ALWAYSDEFD(guest_CC_OP),
++             = { /*  0 */ ALWAYSDEFD(guest_CC),
+                  /*  1 */ ALWAYSDEFD(guest_SYSCALLNO)
+                }
+         };
+Index: priv/guest-arm/toIR.c
+===================================================================
+--- priv/guest-arm/toIR.c	(revision 1857)
++++ priv/guest-arm/toIR.c	(working copy)
+@@ -118,35 +118,22 @@
+ #define OFFB_R15      offsetof(VexGuestARMState,guest_R15)
+ 
+ // CAB: ? guest_SYSCALLNO;
+-
++/*
+ #define OFFB_CC_OP    offsetof(VexGuestARMState,guest_CC_OP)
+ #define OFFB_CC_DEP1  offsetof(VexGuestARMState,guest_CC_DEP1)
+ #define OFFB_CC_DEP2  offsetof(VexGuestARMState,guest_CC_DEP2)
++*/
++#define OFFB_CC    offsetof(VexGuestARMState,guest_CC)
++#define OFFB_EMWARN   offsetof(VexGuestARMState,guest_EMWARN)
+ 
+-// CAB: ? guest_EMWARN;
++// the register number for the PC, R15
++#define R_PC 15
+ 
+-
+ /*------------------------------------------------------------*/
+ /*--- Disassemble an entire basic block                    ---*/
+ /*------------------------------------------------------------*/
+ 
+-/* The results of disassembling an instruction.  There are three
+-   possible outcomes.  For Dis_Resteer, the disassembler _must_
+-   continue at the specified address.  For Dis_StopHere, the
+-   disassembler _must_ terminate the BB.  For Dis_Continue, we may at
+-   our option either disassemble the next insn, or terminate the BB;
+-   but in the latter case we must set the bb's ->next field to point
+-   to the next instruction.  */
+ 
+-typedef
+-   enum { 
+-      Dis_StopHere, /* this insn terminates the BB; we must stop. */
+-      Dis_Continue, /* we can optionally continue into the next insn */
+-      Dis_Resteer   /* followed a branch; continue at the spec'd addr */
+-   }
+-   DisResult;
+-
+-
+ /* forward decls .. */
+ static IRExpr* mkU32 ( UInt i );
+ static void stmt ( IRStmt* st );
+@@ -160,14 +147,14 @@
+    resteer into, returns False.  */
+    
+ static DisResult disInstr ( /*IN*/  Bool    resteerOK,
+-                            /*IN*/  Bool    (*resteerOkFn) ( Addr64 ),
+-                            /*IN*/  Long    delta, 
+-                            /*OUT*/ Int*    size,
+-                            /*OUT*/ Addr64* whereNext );
++                            /*IN*/  Bool    (*resteerOkFn) ( void*, Addr64 ),
++			    /*IN*/  void*   callback_opaque,
++                            /*IN*/  Long    delta);
+ 
+ 
+ /* This is the main (only, in fact) entry point for this module. */
+ 
++#if 0
+ /* Disassemble a complete basic block, starting at guest_pc_start, and
+    dumping the IR into global irsb.  Returns the size, in bytes, of
+    the basic block.  
+@@ -176,13 +163,13 @@
+                    Addr64           guest_pc_start, 
+                    VexGuestExtents* vge,
+                    Bool             (*byte_accessible)(Addr64),
+-                   Bool             (*chase_into_ok)(Addr64),
++                   Bool             (*chase_into_ok)(void*, Addr64),
++		   void*            callback_opaque,
+                    Bool             host_bigendian,
+                    VexArchInfo*     archinfo_guest )
+ {
+    Long       delta;
+-   Int        i, n_instrs, size, first_stmt_idx;
+-   Addr64     guest_next;
++   Int        i, n_instrs, first_stmt_idx;
+    Bool       resteerOK;
+    DisResult  dres;
+    static Int n_resteers = 0;
+@@ -217,7 +204,7 @@
+    while (True) {
+       vassert(n_instrs < vex_control.guest_max_insns);
+ 
+-      guest_next = 0;
++      dres.continueAt = 0;
+       resteerOK = toBool(n_instrs < vex_control.guest_chase_thresh);
+       first_stmt_idx = irsb->stmts_used;
+ 
+@@ -227,8 +214,7 @@
+          stmt( IRStmt_Put( OFFB_R15, mkU32(toUInt(guest_pc_bbstart + delta))) );
+       }
+ 
+-      dres = disInstr( resteerOK, chase_into_ok, 
+-                       delta, &size, &guest_next );
++      dres = disInstr( resteerOK, chase_into_ok, callback_opaque, delta );
+ 
+       /* Print the resulting IR, if needed. */
+       if (vex_traceflags & VEX_TRACE_FE) {
+@@ -239,7 +225,7 @@
+          }
+       }
+    
+-      if (dres == Dis_StopHere) {
++      if (dres.whatNext == Dis_StopHere) {
+          vassert(irsb->next != NULL);
+          if (vex_traceflags & VEX_TRACE_FE) {
+             vex_printf("              ");
+@@ -251,18 +237,18 @@
+          }
+       }
+ 
+-      delta += size;
+-      vge->len[vge->n_used-1] = toUShort(vge->len[vge->n_used-1] + size);
++      delta += dres.len;
++      vge->len[vge->n_used-1] = toUShort(vge->len[vge->n_used-1] + dres.len);
+       n_instrs++;
+       DIP("\n");
+ 
+-      vassert(size > 0 && size <= 18);
++      vassert(dres.len > 0 && dres.len <= 18);
+       if (!resteerOK) 
+-         vassert(dres != Dis_Resteer);
+-      if (dres != Dis_Resteer) 
+-         vassert(guest_next == 0);
++         vassert(dres.whatNext != Dis_Resteer);
++      if (dres.whatNext != Dis_Resteer) 
++         vassert(dres.continueAt == 0);
+ 
+-      switch (dres) {
++      switch (dres.whatNext) {
+       case Dis_Continue:
+          vassert(irsb->next == NULL);
+          if (n_instrs < vex_control.guest_max_insns) {
+@@ -280,20 +266,20 @@
+          /* need to add code here to start a new extent ... */
+          vassert(irsb->next == NULL);
+          /* figure out a new delta to continue at. */
+-         vassert(chase_into_ok(guest_next));
+-         delta = guest_next - guest_pc_start;
++         vassert(chase_into_ok(dres.continueAt));
++         delta = dres.continueAt - guest_pc_start;
+          n_resteers++;
+          d_resteers++;
+          if (0 && (n_resteers & 0xFF) == 0)
+             vex_printf("resteer[%d,%d] to %p (delta = %lld)\n",
+                        n_resteers, d_resteers,
+-                       ULong_to_Ptr(guest_next), delta);
++                       ULong_to_Ptr(dres.continueAt), delta);
+          break;
+       }
+    }
+ }
++#endif
+ 
+-
+ /*------------------------------------------------------------*/
+ /*--- Helper bits and pieces for deconstructing the        ---*/
+ /*--- ARM insn stream.                                     ---*/
+@@ -475,12 +461,20 @@
+    vpanic("integerGuestRegOffset(arm,le)"); /*notreached*/
+ }
+ 
++static IRExpr* getPC()
++{
++  return IRExpr_Get(integerGuestRegOffset(R_PC), Ity_I32);
++}
++
+ static IRExpr* getIReg ( UInt archreg )
+ {
+    vassert(archreg < 16);
++   if (R_PC == archreg) /* 2 instructions after the instruction being executed ARM A1.1.1 */
++     return IRExpr_Binop(Iop_Add32, getPC(), mkU32(8));
+    return IRExpr_Get( integerGuestRegOffset(archreg), Ity_I32 );
+ }
+ 
++
+ /* Ditto, but write to a reg instead. */
+ static void putIReg ( UInt archreg, IRExpr* e )
+ {
+@@ -628,23 +622,14 @@
+    CC_OP/CC_DEP1/CC_DEP2/CC_NDEP.  Returns an expression :: Ity_I32. */
+ static IRExpr* mk_armg_calculate_flags_c ( void )
+ {
+-   IRExpr** args
+-      = mkIRExprVec_3( IRExpr_Get(OFFB_CC_OP,   Ity_I32),
+-                       IRExpr_Get(OFFB_CC_DEP1, Ity_I32),
+-                       IRExpr_Get(OFFB_CC_DEP2, Ity_I32) );
+-   IRExpr* call
+-      = mkIRExprCCall(
+-           Ity_I32,
+-           0/*regparm*/, 
+-           "armg_calculate_flags_c", &armg_calculate_flags_c,
+-           args
+-        );
+-   /* Exclude OP from definedness checking.  We're only
+-      interested in DEP1 and DEP2. */
+-   call->Iex.CCall.cee->mcx_mask = 1;
+-   return call;
++  return IRExpr_Get(OFFB_CC, Ity_I32);
++  //return binop(Iop_And32, IRExpr_Get(OFFB_CC, Ity_I32), mkU32(ARMG_CC_MASK_C));
+ }
+ 
++static IRExpr* bitextract32(IRExpr *from, UInt bit)
++{
++  return unop(Iop_32to1, binop(Iop_Shr32, from, mkU8(bit)));
++}
+ 
+ /* Build IR to calculate some particular condition from stored
+    CC_OP/CC_DEP1/CC_DEP2.  Returns an expression
+@@ -652,6 +637,7 @@
+ */
+ static IRExpr* mk_armg_calculate_condition ( ARMCondcode cond )
+ {
++#if 0
+    IRExpr** args
+       = mkIRExprVec_4( mkU32(cond),
+                        IRExpr_Get(OFFB_CC_OP,  Ity_I32),
+@@ -669,6 +655,79 @@
+       checking.  We're only interested in DEP1 and DEP2. */
+    call->Iex.CCall.cee->mcx_mask = (1<<0) | (1<<1);
+    return unop(Iop_32to1, call);
++#endif
++   UInt inv = cond & 1;
++   // TODO: check that the optimizer can deal with this
++   IRExpr *nzvc =IRExpr_Get(OFFB_CC, Ity_I32);
++   switch (cond) {
++   case ARMCondEQ:    // Z=1         => z
++     return bitextract32(nzvc, ARMG_CC_SHIFT_Z);
++   case ARMCondNE:    // Z=0
++     return unop(Iop_Not1, bitextract32(nzvc, ARMG_CC_SHIFT_Z));
++
++   case ARMCondHS:    // C=1         => c
++     return bitextract32(nzvc, ARMG_CC_SHIFT_C);
++   case ARMCondLO:    // C=0
++     return unop(Iop_Not1, bitextract32(nzvc, ARMG_CC_SHIFT_C));
++
++   case ARMCondMI:    // N=1         => n
++     return bitextract32(nzvc, ARMG_CC_SHIFT_N);
++   case ARMCondPL:    // N=0
++     return unop(Iop_Not1, bitextract32(nzvc, ARMG_CC_SHIFT_N));
++
++   case ARMCondVS:    // V=1         => v
++     return bitextract32(nzvc, ARMG_CC_SHIFT_V);
++   case ARMCondVC:    // V=0
++     return unop(Iop_Not1, bitextract32(nzvc, ARMG_CC_SHIFT_V));
++
++   case ARMCondHI:    // C=1 && Z=0   => c & ~z
++   case ARMCondLS:    // C=0 || Z=1
++     return unop(Iop_32to1,
++		 binop(Iop_Xor32, mkU32(inv),
++		       binop(Iop_And32,
++			     binop(Iop_Shr32, nzvc, mkU8(ARMG_CC_SHIFT_C)),
++			     unop(Iop_Not32, binop(Iop_Shr32, nzvc, mkU8(ARMG_CC_SHIFT_Z)))
++			     )));
++     /*      cf = nzvc >> ARMG_CC_SHIFT_C;
++      zf = nzvc >> ARMG_CC_SHIFT_Z;
++      return 1 & (inv ^ (cf & ~zf));*/
++
++   case ARMCondGE:    // N=V          => ~(n^v)
++   case ARMCondLT:    // N!=V
++     return unop(Iop_32to1,
++		 binop(Iop_Xor32, mkU32(!inv),
++		       binop(Iop_Xor32,
++			     binop(Iop_Shr32, nzvc, mkU8(ARMG_CC_SHIFT_N)),
++			     binop(Iop_Shr32, nzvc, mkU8(ARMG_CC_SHIFT_V))
++			     )));
++     /*
++      nf = nzvc >> ARMG_CC_SHIFT_N;
++      vf = nzvc >> ARMG_CC_SHIFT_V;
++      return 1 & (inv ^ ~(nf ^ vf));*/
++
++   case ARMCondGT:    // Z=0 && N=V   => (~z & ~(n^v)  =>  ~(z | (n^v)
++   case ARMCondLE:    // Z=1 || N!=V
++     return unop(Iop_32to1,
++		 binop(Iop_Xor32, mkU32(!inv),
++		       binop(Iop_Or32,
++			     binop(Iop_Shr32, nzvc, mkU8(ARMG_CC_SHIFT_Z)),
++			     binop(Iop_Xor32,
++				   binop(Iop_Shr32, nzvc, mkU8(ARMG_CC_SHIFT_N)),
++				   binop(Iop_Shr32, nzvc, mkU8(ARMG_CC_SHIFT_V))
++				   ))));
++     /*      nf = nzvc >> ARMG_CC_SHIFT_N;
++      vf = nzvc >> ARMG_CC_SHIFT_V;
++      zf = nzvc >> ARMG_CC_SHIFT_Z;
++      return 1 & (inv ^ ~(zf | (nf ^ vf)));*/
++
++   case ARMCondAL:   // should never get here: Always => no flags to calc
++   case ARMCondNV:   // should never get here: Illegal instr
++   default:
++      /* shouldn't really make these calls from generated code */
++     // um, this isn't generated code
++      vex_printf("armg_calculate_condition(ARM)( %u )\n", cond);
++      vpanic("armg_calculate_condition(ARM)");
++   }
+ }
+ 
+ 
+@@ -741,84 +800,62 @@
+    vpanic("narrowTo(ARM)");
+ }
+ 
++#define ARMG_CC_MASK_NZVC (ARMG_CC_MASK_N|ARMG_CC_MASK_Z|ARMG_CC_MASK_V|ARMG_CC_MASK_C)
++#define ARMG_CC_MASK_NZC (ARMG_CC_MASK_N|ARMG_CC_MASK_Z|ARMG_CC_MASK_C)
++#define FLAGS_NF(Rd) \
++  (binop(Iop_And32, Rd, mkU32(ARMG_CC_MASK_N)))
++#define FLAGS_ZF(Rd) \
++  (binop(Iop_Shl32, unop(Iop_1Uto32, binop(Iop_CmpEQ32, Rd, mkU32(0))), mkU8(ARMG_CC_SHIFT_Z)))
+ 
+-/* Set the flags thunk OP, DEP1 and DEP2 fields.  The supplied op is
+-   auto-sized up to the real op. */
+ 
+-static 
+-void setFlags_DEP1_DEP2 ( IROp op, IRTemp dep1, IRTemp dep2 )
++static void set_flags_logic(IRExpr *Rd, IRExpr *carry_out)
+ {
+-   stmt( IRStmt_Put( OFFB_CC_OP,   mkU32(op)) );
+-   stmt( IRStmt_Put( OFFB_CC_DEP1, widenUto32(mkexpr(dep1))) );
+-   stmt( IRStmt_Put( OFFB_CC_DEP2, widenUto32(mkexpr(dep2))) );
++  IRExpr *nf,*zf,*cf,*res;
++  nf = FLAGS_NF(Rd);  zf = FLAGS_ZF(Rd);
++  // d2=carry_out, where only the lowest bit can be set
++  cf = binop(Iop_Shl32, carry_out, mkU8(ARMG_CC_SHIFT_C));
++  // vf is unaffected
++  res = binop(Iop_Or32, nf, binop(Iop_Or32, zf, cf));
++  res = binop(Iop_Or32, res,
++	      binop(Iop_And32, IRExpr_Get(OFFB_CC,Ity_I32),
++		    mkU32(~ARMG_CC_MASK_NZC)));
++  stmt( IRStmt_Put(OFFB_CC, res) );
+ }
+ 
++static void set_flags_add(IRExpr *Rd, IRExpr *argl, IRExpr *argr)
++{
++  IRExpr *nf,*zf,*cf,*vf, *res;
++  nf = FLAGS_NF(Rd);  zf = FLAGS_ZF(Rd);
++  
++  // FIXME: this is what ACTIONS_ADD() did, but it doesn't seem right
++  cf = binop(Iop_Shl32, unop(Iop_1Uto32, binop(Iop_CmpLT32U, argl, argr)), mkU8(ARMG_CC_SHIFT_C));
+ 
+-/* Set the OP and DEP1 fields only, and write zero to DEP2. */
+-
+-#if 0
+-static 
+-void setFlags_DEP1 ( IROp op, IRTemp dep1 )
+-{
+-   stmt( IRStmt_Put( OFFB_CC_OP,   mkU32(op)) );
+-   stmt( IRStmt_Put( OFFB_CC_DEP1, widenUto32(mkexpr(dep1))) );
+-   stmt( IRStmt_Put( OFFB_CC_DEP2, mkU32(0)) );
++  // TODO: double check that Not32 means bitwise not
++  vf = unop(Iop_Not32, binop(Iop_Xor32, argl, argr));
++  vf = binop(Iop_And32, vf, binop(Iop_Xor32, argl, Rd));
++  vf = binop(Iop_And32, binop(Iop_Shr32, vf, mkU8(32-ARMG_CC_SHIFT_V)), mkU32(ARMG_CC_MASK_V));
++    
++  res = binop(Iop_Or32, nf, binop(Iop_Or32, zf, binop(Iop_Or32, vf, cf)));
++  stmt( IRStmt_Put(OFFB_CC, res) );
+ }
+-#endif
+-
+-#if 0
+-/* For shift operations, we put in the result and the undershifted
+-   result.  Except if the shift amount is zero, the thunk is left
+-   unchanged. */
+-
+-static void setFlags_DEP1_DEP2_shift ( IROp    op,
+-                                       IRTemp  res,
+-                                       IRTemp  resUS,
+-                                       IRTemp  guard )
++static void set_flags_sub(IRExpr *Rd, IRExpr *argl, IRExpr *argr)
+ {
+-   vassert(guard);
+-   
+-   /* DEP1 contains the result, DEP2 contains the undershifted value. */
+-   stmt( IRStmt_Put( OFFB_CC_OP,
+-                     IRExpr_Mux0X( mkexpr(guard),
+-                                   IRExpr_Get(OFFB_CC_OP,Ity_I32),
+-                                   mkU32(op))) );
+-   stmt( IRStmt_Put( OFFB_CC_DEP1,
+-                     IRExpr_Mux0X( mkexpr(guard),
+-                                   IRExpr_Get(OFFB_CC_DEP1,Ity_I32),
+-                                   widenUto32(mkexpr(res)))) );
+-   stmt( IRStmt_Put( OFFB_CC_DEP2, 
+-                     IRExpr_Mux0X( mkexpr(guard),
+-                                   IRExpr_Get(OFFB_CC_DEP2,Ity_I32),
+-                                   widenUto32(mkexpr(resUS)))) );
+-}
+-#endif
++  IRExpr *nf,*zf,*cf,*vf, *res;
++  nf = FLAGS_NF(Rd);  zf = FLAGS_ZF(Rd);
+ 
++  cf = binop(Iop_Shl32, unop(Iop_1Uto32, binop(Iop_CmpLT32U, argl, argr)), mkU8(ARMG_CC_SHIFT_C));
+ 
+-
+-
+-
+-#if 0
+-/* Multiplies are pretty much like add and sub: DEP1 and DEP2 hold the
+-   two arguments. */
+-
+-static
+-void setFlags_MUL ( IRTemp arg1, IRTemp arg2, UInt op )
+-{
+-   stmt( IRStmt_Put( OFFB_CC_OP, mkU32(op) ) );
+-   stmt( IRStmt_Put( OFFB_CC_DEP1, widenUto32(mkexpr(arg1)) ));
+-   stmt( IRStmt_Put( OFFB_CC_DEP2, widenUto32(mkexpr(arg2)) ));
++  // TODO: double check that Not32 means bitwise not
++  vf = unop(Iop_Not32, binop(Iop_Xor32, argl, argr));
++  vf = binop(Iop_And32, vf, binop(Iop_Xor32, argl, Rd));
++  vf = binop(Iop_And32, binop(Iop_Shr32, vf, mkU8(32-ARMG_CC_SHIFT_V)), mkU32(ARMG_CC_MASK_V));
++  
++  res = binop(Iop_Or32, nf, binop(Iop_Or32, zf, binop(Iop_Or32, vf, cf)));
++  stmt( IRStmt_Put(OFFB_CC, res) );
+ }
+-#endif
+ 
+ 
+ 
+-
+-
+-
+-
+-
+-
+ /* -------------- Condition codes. -------------- */
+ 
+ /* Condition codes, using the ARM encoding.  */
+@@ -1016,12 +1053,13 @@
+                decode_ok=False;
+                break;
+             }
+-            
++	    
++            data = newTemp(Ity_I32);
+             assign( data, loadLE(Ity_I32, binop(Iop_Add32,
+                                                 mkexpr(start_addr),
+                                                 mkU32(offset))) );
+-            if (reg_idx == 15) {
+-               // assuming architecture < 5: See ARM ARM A4-31
++            if (reg_idx == R_PC) {
++               // assuming architecture < 5: See ARM A4.1.20 
+                putIReg( reg_idx, binop(Iop_And32, mkexpr(data), mkU32(0xFFFFFFFC)) );
+             } else {
+                putIReg( reg_idx, mkexpr(data) );
+@@ -1110,15 +1148,14 @@
+    HChar buf3[20];
+    buf3[0] = '\0';
+    
+-   if (Rn_addr == 15) {
+-      if (P==1 && W==0) { // offset addressing
+-         // CAB: This right?
+-         assign( Rn, binop(Iop_And32, getIReg(15), mkU32(8)) );
+-      } else {                        // Unpredictable - ARM ARM A5-25,29...
+-         vex_printf("dis_loadstore_w_ub_address(arm): Unpredictable - Rn_addr==15\n");
+-         return False;
+-      }
++   if (Rn_addr == R_PC && (P!=1 || W!=0)) {
++     // Unpredictable - ARM ARM A5-25,29...
++     vex_printf("dis_loadstore_w_ub_address(arm): Unpredictable - Rn_addr==15\n");
++     return False;
+    } else {
++     /* Note: The address used when storing to R_PC in with STR or STM is
++	implementation defined to either be 12 or 8 bytes after the current
++	instruction. ARM A2.4.3 getIReg will add 8 for us */
+       assign( Rn, getIReg(Rn_addr) );
+    }
+    
+@@ -1126,7 +1163,7 @@
+      Retrieve / Calculate reg_offset
+    */
+    if (is_reg) {
+-      if (Rm_addr == 15) {               // Unpredictable - ARM ARM A5-21
++      if (Rm_addr == R_PC) {               // Unpredictable - ARM ARM A5-21
+          vex_printf("dis_loadstore_w_ub_address(arm): Unpredictable - Rm_addr==15\n");
+          return False;
+       }
+@@ -1177,7 +1214,7 @@
+                // op = Rm >> 1, carry flag replacing vacated bit position.  
+                // scaled_index = (c_flag << 31) | (Rm >> 1)
+                assign( scaled_index, binop(Iop_Or32,
+-                                           binop(Iop_Shl32, mkexpr(oldFlagC), mkU32(31)),
++                                           binop(Iop_Shl32, mkexpr(oldFlagC), mkU8(31)),
+                                            binop(Iop_Shr32, mkexpr(Rm),  mkU8(1))) );
+                
+             } else { // ROR
+@@ -1187,7 +1224,7 @@
+                        binop(Iop_Or32,
+                              binop(Iop_Shr32, mkexpr(Rm), mkU8(shift_imm)),
+                              binop(Iop_Shl32, mkexpr(Rm),
+-                                   binop(Iop_Sub8, mkU8(32), mkU32(shift_imm)))) );
++                                   binop(Iop_Sub8, mkU8(32), mkU8(shift_imm)))) );
+             }
+             break;
+             
+@@ -1259,9 +1296,12 @@
+    
+    IRTemp value      = newTemp(Ity_I32);
+    IRTemp data       = newTemp(Ity_I32);
++   IRTemp data_ror_by= newTemp(Ity_I8);
++   /*
+    IRTemp data_ror8  = newTemp(Ity_I32);
+    IRTemp data_ror16 = newTemp(Ity_I32);
+    IRTemp data_ror24 = newTemp(Ity_I32);
++   */
+    IRExpr* expr_addr_10;
+    HChar* cond_name = name_ARMCondcode( (theInstr >> 28) & 0xF );
+    HChar dis_buf[50];
+@@ -1285,43 +1325,50 @@
+    */
+    if (L==1) { // LOAD
+       if (B==1) {  // unsigned byte (LDRB): ARM ARM A4-40
+-         if (Rd_addr == 15) {  // Unpredictable - ARM ARM A4-40
++         if (Rd_addr == R_PC) {  // Unpredictable - ARM ARM A4-40
+             vex_printf("dis_loadstore_w_ub(arm): Unpredictable - Rd_addr==15\n");
+             return False;
+          }
+-         putIReg( Rd_addr, loadLE( Ity_I8, mkexpr( address ) ) );
++         putIReg( Rd_addr, unop(Iop_8Uto32, loadLE(Ity_I8, mkexpr(address))) );
+       }
+       else {       // word (LDR): ARM ARM A4-38
+          expr_addr_10 = binop(Iop_And32, mkexpr(address), mkU32(0x3));
+-         
++         assign( data_ror_by, unop(Iop_32to8,
++				   binop( Iop_Shl32, expr_addr_10, mkU8(3) )));
+          /*
+            CAB TODO
+            if (Rd_addr == 15 && address[1:0] == 0) => Unpredictable
+            How to bomb out using IR?
++	   irsb->jumpkind = Ijk_EmFail
++	   irsb->next = ?
+          */
+          
+          /* LOAD memory data (4 bytes) */
+          assign( data, loadLE( Ity_I32, mkexpr( address ) ) );
+          
++         assign( value,
++                 binop( Iop_Or32,
++                        binop( Iop_Shr32, mkexpr(data), mkexpr(data_ror_by) ),
++                        binop( Iop_Shl32,
++			       mkexpr(data),
++			       binop( Iop_Sub8, mkU8(32), mkexpr(data_ror_by) ))));
++#if 0
+          // data ROR 8
+-         assign( data_ror8, binop(Iop_Sub8, mkU8(32), mkU32(8)) ); 
+          assign( data_ror8,
+                  binop( Iop_Or32,
+                         binop( Iop_Shr32, mkexpr(data), mkU8(8) ),
+-                        binop( Iop_Shl32, mkexpr(data), mkexpr(data_ror8) )));
++                        binop( Iop_Shl32, mkexpr(data), mkU8(24) )));
+          // data ROR 16
+-         assign( data_ror16, binop(Iop_Sub8, mkU8(32), mkU32(16)) );
+          assign( data_ror16,
+                  binop( Iop_Or32,
+                         binop( Iop_Shr32, mkexpr(data), mkU8(16) ),
+-                        binop( Iop_Shl32, mkexpr(data), mkexpr(data_ror16) )));
++                        binop( Iop_Shl32, mkexpr(data), mkU8(16) )));
+          
+          // data ROR 24
+-         assign( data_ror24, binop(Iop_Sub8, mkU8(32), mkU32(24)) );
+          assign( data_ror24,
+                  binop( Iop_Or32,
+                         binop( Iop_Shr32, mkexpr(data), mkU8(24) ),
+-                        binop( Iop_Shl32, mkexpr(data), mkexpr(data_ror24) )));
++                        binop( Iop_Shl32, mkexpr(data), mkU8(8) )));
+          
+          /* switch (address[1:0]) {
+             0x0: value = data;
+@@ -1338,14 +1385,14 @@
+                           mkexpr(data_ror16) ),
+                        mkexpr(data_ror8) ),
+                     mkexpr(data) ) );
+-         
+-         if (Rd_addr == 15) {
++#endif
++         if (Rd_addr == R_PC) {
+             // assuming architecture < 5: See ARM ARM A4-28
+             putIReg( Rd_addr, binop(Iop_And32, mkexpr(value), mkU32(0xFFFFFFFC)) );
+             
+             // CAB: Need to tell vex we're doing a jump here?
+-            // irsb->jumpkind = Ijk_Boring;
+-            // irsb->next     = mkexpr(value);
++	    irsb->jumpkind = Ijk_Boring;
++	    irsb->next     = mkexpr(value);
+          } else {
+             putIReg( Rd_addr, mkexpr(value) );
+          }
+@@ -1353,18 +1400,20 @@
+       }
+    } else { // STORE: ARM ARM A4-88
+       if (B==1) {  // unsigned byte
+-         if (Rd_addr == 15) {  // Unpredictable - ARM ARM A4-90
++         if (Rd_addr == R_PC) {  // Unpredictable - ARM ARM A4-90
+             vex_printf("dis_loadstore_w_ub(arm): Unpredictable - Rd_addr==15\n");
+             return False;
+          }
+          storeLE( mkexpr(address), unop(Iop_32to8, getIReg(Rd_addr)) );   // Rd[7:0]
+       } else {     // word
+          
+-         if (Rd_addr == 15) {  // Implementation Defined - ARM ARM A4-88
++	/* if (Rd_addr == R_PC) {  // Implementation Defined - ARM ARM A4-88
+             vex_printf("dis_loadstore_w_ub(arm): Implementation Defined - Rd_addr==15\n");
+             return False;
+             // CAB TODO: What to do here?
+-         }
++	    }*/
++	// if Rd == 15, implementation defined as 8 or 12 bytes past the current
++	// PC, we use 8 because that's simpler to implement.
+          storeLE( mkexpr(address), getIReg(Rd_addr) );
+       }
+    }
+@@ -1419,8 +1468,8 @@
+    if (by_reg) {  // Register Shift
+       assign( Rm, getIReg(Rm_addr) );
+       
+-      if (Rd_addr == 15 || Rm_addr == 15 ||
+-          Rn_addr == 15 || Rs_addr == 15) {   // Unpredictable (ARM ARM A5-10)
++      if (Rd_addr == R_PC || Rm_addr == R_PC ||
++          Rn_addr == R_PC || Rs_addr == R_PC) {   // Unpredictable (ARM ARM A5-10)
+          vex_printf("dis_shift(arm): Unpredictable - Rd|Rm|Rn|Rs == R15\n");
+          *decode_ok = False;
+          return mkU32(0);
+@@ -1437,7 +1486,7 @@
+       switch (shift_op) {
+       case 0x1: // LSL(reg)
+          assign( mux_false, mkU32(0) );
+-         assign( carry_shift, binop(Iop_Add8, mkU8(32), mkexpr(shift_amt)) );
++         assign( carry_shift, binop(Iop_Sub8, mkU8(32), mkexpr(shift_amt)) );
+          break;
+          
+       case 0x3: // LSR(reg)
+@@ -1449,8 +1498,8 @@
+          // Rs[31] == 0 ? 0x0 : 0xFFFFFFFF
+          assign( mux_false,
+                  IRExpr_Mux0X(
+-                    binop(Iop_CmpLT32U, mkexpr(Rs), mkU32(0x80000000)),
+-                    mkU32(0xFFFFFFFF), mkU32(0) ) );
++		    unop(Iop_1Uto8, binop(Iop_CmpLT32U, mkexpr(Rs), mkU32(0x80000000))),
++                    mkU32(0), mkU32(0xFFFFFFFF) ) );
+          assign( carry_shift,
+                  binop(Iop_Sub8, mkexpr(shift_amt), mkU8(1)) );
+          break;
+@@ -1462,29 +1511,31 @@
+       }
+       
+       expr = IRExpr_Mux0X( 
+-         binop(Iop_CmpLT32U, widenUto32(mkexpr(shift_amt)), mkU32(32)),
+-         mkexpr(mux_false),
+-         binop(op, mkexpr(Rm), mkexpr(shift_amt)) );
++			  unop(Iop_1Uto8, binop(Iop_CmpLT32U,
++				 widenUto32(mkexpr(shift_amt)), mkU32(32)) ),
++         binop(op, mkexpr(Rm), mkexpr(shift_amt)),
++         mkexpr(mux_false) );
+       
+       // shift_amt == 0 ? old_flag_c : Rm >> x
++      /*
+       assign( *carry_out,
+               IRExpr_Mux0X(
+                  binop(Iop_CmpEQ8, mkexpr(shift_amt), mkU8(0)),
+                  binop(Iop_Shr32, mkexpr(Rm), mkexpr(carry_shift)),
+                  mkexpr(oldFlagC) ) );
+-      
++      */
++      assign( *carry_out,
++              IRExpr_Mux0X(
++		 mkexpr(shift_amt),
++                 mkexpr(oldFlagC),
++                 binop(Iop_Shr32, mkexpr(Rm), mkexpr(carry_shift)) ) );
++            
+       DIS(buf, "R%d, %s R%d", Rm_addr, name_ARMShiftOp(shift_op, 0), Rs_addr);
+    }
+    else {  // Immediate shift
+       
+-      // CAB: This right?
+-      // "the value used is the address of the current intruction plus 8"
+-      if (Rm_addr == 15 || Rn_addr == 15) {        // ARM ARM A5-9
+-         assign( Rm, binop(Iop_Add32, getIReg(15), mkU32(8)) );
+-      } else {
+-         assign( Rm, getIReg(Rm_addr) );
+-      }
+-      
++     assign( Rm, getIReg(Rm_addr) );
++
+       if (shift_imm == 0) {
+          switch (shift_op) {
+          case 0x0: case 0x8: // LSL(imm)
+@@ -1516,7 +1567,8 @@
+       } else {
+          expr = binop(op, mkexpr(Rm), mkU8(shift_imm));
+          assign( *carry_out, binop(op, mkexpr(Rm),
+-                                   binop(Iop_Sub32, mkU32(shift_imm), mkU32(1)) ) );
++				   //FIXME: constant fold
++                                   binop(Iop_Sub8, mkU8(shift_imm), mkU8(1)) ) );
+ 
+          DIS(buf, "R%d, %s #%d", Rm_addr, name_ARMShiftOp(shift_op, 0), shift_imm);
+       }
+@@ -1553,8 +1605,8 @@
+    if (by_reg) {  // Register rotate
+       assign( Rm, getIReg(Rm_addr) );
+       
+-      if (Rd_addr == 15 || Rm_addr == 15 ||
+-          Rn_addr == 15 || Rs_addr == 15) {    // Unpredictable (ARM ARM A5-10)
++      if (Rd_addr == R_PC || Rm_addr == R_PC ||
++          Rn_addr == R_PC || Rs_addr == R_PC) {    // Unpredictable (ARM ARM A5-10)
+          vex_printf("dis_rotate(arm): Unpredictable - Rd|Rm|Rn|Rs == R15\n");
+          *decode_ok = False;
+          return mkU32(0);
+@@ -1590,13 +1642,7 @@
+    }
+    else {  // Immediate rotate
+ 
+-      // CAB: This right?
+-      // "the value used is the address of the current intruction plus 8"
+-      if (Rm_addr == 15 || Rn_addr == 15) {        // ARM ARM A5-9
+-         assign( Rm, binop(Iop_Add32, getIReg(15), mkU32(8)) );
+-      } else {
+-         assign( Rm, getIReg(Rm_addr) );
+-      }
++      assign( Rm, getIReg(Rm_addr) );
+       
+       // Rm >> rot-1: carry = R[0]
+       assign( *carry_out, binop(Iop_Shr32, mkexpr(Rm),
+@@ -1607,6 +1653,7 @@
+          // op = Rm >> 1, carry flag replacing vacated bit position.  
+          
+          // CAB: This right?
++	// FIXME: doesn't look right
+          expr = binop(Iop_Or32,
+                       binop(Iop_Shl32, mkexpr(oldFlagC), mkU8(31)),
+                       binop(Iop_Shr32, mkexpr(Rm), mkU8(1)));
+@@ -1817,24 +1864,37 @@
+    }
+ 
+    if (!testing_instr) {
+-      if ( Rd_addr == 15) { // dest reg == PC
+-         // CPSR = SPSR: Unpredictable in User | System mode (no SPSR!)
+-         // Unpredictable - We're only supporting user mode...
+-         vex_printf("dis_dataproc(arm): Unpredictable - Rd_addr==15\n");
+-         return False;
++      if ( Rd_addr == R_PC ) {
++	if (set_flags) {
++	  // CPSR = SPSR: Unpredictable in User | System mode (no SPSR!)
++	  // Unpredictable - We're only supporting user mode...
++	  vex_printf("dis_dataproc(arm): Unpredictable - Rd_addr==15\n");
++	  return False;
++	}
++	irsb->jumpkind = Ijk_Boring;
++	irsb->next     = mkexpr(alu_out);
+       }
+       putIReg( Rd_addr, mkexpr(alu_out) );
+    }
+    
+    if (set_flags) {
+-      if (op_set_flags == ARMG_CC_OP_LOGIC) {
+-         setFlags_DEP1_DEP2( op_set_flags, alu_out, carry_out );
+-      } else {
++     switch (op_set_flags) {
++     case ARMG_CC_OP_LOGIC:
++       set_flags_logic(mkexpr(alu_out), mkexpr(carry_out));
++       break;
++     case ARMG_CC_OP_ADD:
++       set_flags_add(mkexpr(Rd), mkexpr(Rn), mkexpr(shifter_op));
++       break;
++     case ARMG_CC_OP_SUB:
+          if (opc == 0x3) {
+-            setFlags_DEP1_DEP2( op_set_flags, shifter_op, Rn );
++	   set_flags_sub(mkexpr(Rd), mkexpr(shifter_op), mkexpr(Rn));
+          } else {
+-            setFlags_DEP1_DEP2( op_set_flags, Rn, shifter_op );
++	   set_flags_sub(mkexpr(Rd), mkexpr(Rn), mkexpr(shifter_op));
+          }
++	 break;
++     default:
++       vex_printf("dis_dataproc(ARM)( op_set_flags = %u )\n",  op_set_flags);
++      vpanic("dis_dataproc(ARM)");
+       }
+    }
+    return decode_ok;
+@@ -1855,13 +1915,13 @@
+    IRTemp dest = newTemp(Ity_I32);
+    
+    if (link) { // LR (R14) = addr of instr after branch instr
+-      assign( addr, binop(Iop_Add32, getIReg(15), mkU32(4)) );
++      assign( addr, binop(Iop_Add32, getPC(), mkU32(4)) );
+       putIReg( 14, mkexpr(addr) );
+    }
+    
+    // PC = PC + (SignExtend(signed_immed_24) << 2)
+    branch_offset = extend_s_24to32( signed_immed_24 ) << 2;
+-   assign( dest, binop(Iop_Add32, getIReg(15), mkU32(branch_offset)) );
++   assign( dest, binop(Iop_Add32, getPC(), mkU32(branch_offset)) );
+    
+    irsb->jumpkind = link ? Ijk_Call : Ijk_Boring;
+    irsb->next     = mkexpr(dest);
+@@ -1901,10 +1961,9 @@
+    is False, disInstr may not return Dis_Resteer. */
+    
+ static DisResult disInstr ( /*IN*/  Bool    resteerOK,
+-                            /*IN*/  Bool    (*resteerOkFn) ( Addr64 ),
+-                            /*IN*/  Long    delta, 
+-                            /*OUT*/ Int*    size,
+-                            /*OUT*/ Addr64* whereNext )
++                            /*IN*/  Bool    (*resteerOkFn) ( void*, Addr64 ),
++			    /*IN*/  void*   callback_opaque,
++                            /*IN*/  Long    delta )
+ {
+    //   IRType    ty;
+    //  IRTemp    addr, t1, t2;
+@@ -1914,10 +1973,12 @@
+    //  UInt      d32;
+    // UChar     dis_buf[50];
+    // Int       am_sz, d_sz;
+-   DisResult whatNext = Dis_Continue;
++   DisResult dres;
+    UInt      theInstr;
+-   
+ 
++   dres.whatNext = Dis_Continue;
++   dres.continueAt = 0;
++
+    /* At least this is simple on ARM: insns are all 4 bytes long, and
+       4-aligned.  So just fish the whole thing out of memory right now
+       and have done. */
+@@ -1925,8 +1986,9 @@
+    /* We will set *size to 4 if the insn is successfully decoded.
+       Setting it to 0 by default makes bbToIR_ARM abort if we fail the
+       decode. */
+-   *size = 0;
++   dres.len = 0;
+ 
++
+    theInstr = *(UInt*)(&guest_code[delta]);
+ 
+ //   vex_printf("START: 0x%x, %,b\n", theInstr, theInstr );
+@@ -1962,12 +2024,12 @@
+          // uh ... I'll figure this out later.  possibly r0 = client_request(r0) */
+          DIP("?CAB? = client_request ( ?CAB? )\n");
+          
+-         *size = 24;
++         dres.len = 24;
+          
+          irsb->next     = mkU32(toUInt(guest_pc_bbstart+delta));
+          irsb->jumpkind = Ijk_ClientReq;
+          
+-         whatNext = Dis_StopHere;
++         dres.whatNext = Dis_StopHere;
+          goto decode_success;
+       }
+    }
+@@ -2142,7 +2204,7 @@
+    case 0xA: case 0xB:  // B, BL
+       // B(L): L=1 => return address stored in link register (R14)
+       dis_branch(theInstr);
+-      whatNext = Dis_StopHere;
++      dres.whatNext = Dis_StopHere;
+       break;
+       
+       
+@@ -2168,10 +2230,12 @@
+       
+    default:
+    decode_failure:
+-   /* All decode failures end up here. */
+-   vex_printf("disInstr(arm): unhandled instruction: "
+-              "0x%x\n", theInstr);
+-   vpanic("armToIR: unimplemented insn");
++     /* All decode failures end up here. */
++     vex_printf("disInstr(arm): unhandled instruction: "
++		"0x%x\n", theInstr);
++     stmt( IRStmt_Put(OFFB_EMWARN, mkU32(EmWarn_Unimplemented)) );
++     irsb->jumpkind = Ijk_EmFail;
++     //vpanic("armToIR: unimplemented insn");
+    
+    } /* switch (opc) for the main (primary) opcode switch. */
+    
+@@ -2179,14 +2243,65 @@
+    /* All decode successes end up here. */
+ //   vex_printf("disInstr(arm): success");
+    DIP("\n");
++
++   if (irsb->next && irsb->jumpkind == Ijk_Boring) {
++     dres.whatNext = Dis_StopHere;
++   }
+    
+-   *size = 4;
+-   return whatNext;
++   dres.len = 4;
++   return dres;
+ }
+ 
+ #undef DIP
+ #undef DIS
+ 
++
++
++
++/*------------------------------------------------------------*/
++/*--- Top-level fn                                         ---*/
++/*------------------------------------------------------------*/
++
++/* Disassemble a single instruction into IR.  The instruction
++   is located in host memory at &guest_code[delta]. */
++
++DisResult disInstr_ARM ( IRSB*        irsb_IN,
++			 Bool         put_IP,
++			 Bool         (*resteerOkFn) ( void*, Addr64 ),
++			 void*        callback_opaque,
++			 UChar*       guest_code_IN,
++			 Long         delta,
++			 Addr64       guest_IP,
++			 VexArch      guest_arch,
++			 VexArchInfo* archinfo,
++			 VexAbiInfo*  abiinfo,
++			 Bool         host_bigendian_IN )
++{
++   DisResult dres;
++
++   /* Set globals (see top of this file) */
++   vassert(guest_arch == VexArchARM);
++   guest_code           = guest_code_IN;
++   irsb                 = irsb_IN;
++   host_is_bigendian    = host_bigendian_IN;
++   //guest_RIP_curr_instr = guest_IP;
++   guest_pc_bbstart    = guest_IP - delta;
++
++
++   /*
++   dres = disInstr_ARM_WRK ( put_IP, resteerOkFn, callback_opaque,
++			     delta, archinfo, abiinfo );
++   */
++   dres = disInstr ( put_IP, resteerOkFn, callback_opaque, delta );
++
++
++   return dres;
++}
++
++
++
++
++
+ /*--------------------------------------------------------------------*/
+ /*--- end                                         guest-arm/toIR.c ---*/
+ /*--------------------------------------------------------------------*/
+Index: priv/guest-arm/gdefs.h
+===================================================================
+--- priv/guest-arm/gdefs.h	(revision 1857)
++++ priv/guest-arm/gdefs.h	(working copy)
+@@ -49,12 +49,28 @@
+ #ifndef __LIBVEX_GUEST_ARM_DEFS_H
+ #define __LIBVEX_GUEST_ARM_DEFS_H
+ 
++#include "guest-generic/bb_to_IR.h"
+ 
+ /*---------------------------------------------------------*/
+ /*--- arm to IR conversion                              ---*/
+ /*---------------------------------------------------------*/
+ 
++/* Convert one ARM insn to IR.  See the type DisOneInstrFn in
++   bb_to_IR.h. */
+ extern
++DisResult disInstr_ARM ( IRSB*        irbb,
++			 Bool         put_IP,
++                         Bool         (*resteerOkFn) ( void*, Addr64 ),
++                         void*        callback_opaque,
++                         UChar*       guest_code,
++                         Long         delta,
++                         Addr64       guest_IP,
++                         VexArch      guest_arch,
++                         VexArchInfo* archinfo,
++                         VexAbiInfo*  abiinfo,
++                         Bool         host_bigendian );
++/* is this needed?
++extern
+ IRSB* bbToIR_ARM ( UChar*           armCode, 
+                    Addr64           eip, 
+                    VexGuestExtents* vge,
+@@ -62,7 +78,7 @@
+                    Bool             (*resteerOkFn)(Addr64),
+                    Bool             host_bigendian,
+                    VexArchInfo*     archinfo_guest );
+-
++*/
+ /* Used by the optimiser to specialise calls to helpers. */
+ extern
+ IRExpr* guest_arm_spechelper ( HChar* function_name,
+@@ -113,48 +129,19 @@
+ #define ARMG_CC_MASK_V    (1 << ARMG_CC_SHIFT_V)
+ #define ARMG_CC_MASK_C    (1 << ARMG_CC_SHIFT_C)
+ 
+-/* Flag thunk descriptors.  A three-word thunk is used to record
+-   details of the most recent flag-setting operation, so the flags can
+-   be computed later if needed.
++/* Flag thunk descriptors.
++   
++   Unlike on x86, we don't defer computation of condition codes. The reason
++   we don't need to, is that while x86 updates the condition codes on almost
++   every instruction, ARM instructions have bit which indicates whether
++   CC updates are desired or not. GCC only sets the bit when the CCs would
++   be used subsequently, so we mostly only compute them when we would need
++   them anyways.
+ 
+-   The three words are:
+-
+-      CC_OP, which describes the operation.
+-
+-      CC_DEP1 and CC_DEP2.  These are arguments to the operation.
+-         We want Memcheck to believe that the resulting flags are
+-         data-dependent on both CC_DEP1 and CC_DEP2, hence the 
+-         name DEP.
+-
+-   When building the thunk, it is always necessary to write words into
+-   CC_DEP1 and CC_DEP2, even if those args are not used given the
+-   CC_OP field.  This is important because otherwise Memcheck could
+-   give false positives as it does not understand the relationship
+-   between the CC_OP field and CC_DEP1 and CC_DEP2, and so believes
+-   that the definedness of the stored flags always depends on both
+-   CC_DEP1 and CC_DEP2.
+-
+-   A summary of the field usages is:
+-   TODO: make this right
+-
+-   Operation          DEP1               DEP2               NDEP
+-   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-
+-   and/or/xor         result             shift_carry_out
+-   tst/teq/bic        result             shift_carry_out
+-   mov/mvn            result             shift_carry_out
+-
+-   add/cmn            first arg          second arg
+-   sub/cmp            first arg          second arg
+-
+-   ...
+-
+-
+-   Therefore Memcheck will believe the following:
+-
+-   * ...
+-
++   We use this enum only for the call to setFlags_DEP1_DEP2, so that we can
++   generate the flag setting code in one place.
+ */
++
+ enum {
+    ARMG_CC_OP_COPY,    /* DEP1 = current flags, DEP2 = 0 */
+                        /* just copy DEP1 to output */
+@@ -167,12 +154,8 @@
+    ARMG_CC_OP_NUMBER
+ };
+ 
+-/* requires further study */
++/* Defines conditions which we can ask for (ARM sec A3.2) */
+ 
+-
+-
+-/* Defines conditions which we can ask for (ARM ARM 2e page A3-6) */
+-
+ typedef
+    enum {
+       ARMCondEQ     = 0,  /* equal                               : Z=1 */
+Index: priv/host-amd64/isel.c
+===================================================================
+--- priv/host-amd64/isel.c	(revision 1857)
++++ priv/host-amd64/isel.c	(working copy)
+@@ -3571,6 +3571,7 @@
+       IRType    tyd = typeOfIRExpr(env->type_env, stmt->Ist.Store.data);
+       IREndness end = stmt->Ist.Store.end;
+ 
++      // FIXME: This isn't necesarily true when host_arch != guest_arch
+       if (tya != Ity_I64 || end != Iend_LE) 
+          goto stmt_fail;
+ 
+Index: pub/libvex_guest_arm.h
+===================================================================
+--- pub/libvex_guest_arm.h	(revision 1857)
++++ pub/libvex_guest_arm.h	(working copy)
+@@ -88,9 +88,13 @@
+ 
+       /* 3-word thunk used to calculate N(sign) Z(zero) C(carry,
+          unsigned overflow) and V(signed overflow) flags. */
++  /*
+       UInt  guest_CC_OP;
+       UInt  guest_CC_DEP1;
+       UInt  guest_CC_DEP2;
++  */
++      /* We don't need the thunks on ARM */
++      UInt guest_CC;
+ 
+       /* Emulation warnings */
+       UInt   guest_EMWARN;
+Index: pub/libvex_emwarn.h
+===================================================================
+--- pub/libvex_emwarn.h	(revision 1857)
++++ pub/libvex_emwarn.h	(working copy)
+@@ -94,6 +94,9 @@
+       EmWarn_PPC64_redir_overflow,
+       EmWarn_PPC64_redir_underflow,
+ 
++      /* Used with Ijk_EmFail for unsupported instructions */
++      EmWarn_Unimplemented,
++
+       EmWarn_NUMBER
+    }
+    VexEmWarn;
+Index: Makefile
+===================================================================
+--- Makefile	(revision 1857)
++++ Makefile	(working copy)
+@@ -76,7 +76,7 @@
+ CCFLAGS = -Wall -Wmissing-prototypes -Wshadow \
+ 		-Wpointer-arith -Wbad-function-cast -Wcast-qual \
+ 		-Wcast-align -Wmissing-declarations \
+-		$(EXTRA_CFLAGS) -g -O2 -fstrict-aliasing
++		$(EXTRA_CFLAGS) -g -O2 -fstrict-aliasing -fPIC
+ 
+ #CC = icc
+ #CCFLAGS = -g -Wall -wd981 -wd279 -wd1287 -wd869 -wd111 -wd188 -wd186

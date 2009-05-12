@@ -1,0 +1,27 @@
+Missing features:
+* CFG coalescing
+* (Re)implement constant propagation, possibly in SCCVN.
+* Rebuild compond expressions when converting back from SSA.
+* SMT-LIB output.
+
+
+Disassembly stuff:
+* .plt disassembles poorly. Into this.
+* Include symbols in disassembly
+* Include section names in disassembly
+* Handle unsupported instructions better, particularly hlt.
+
+
+Design issues:
+* Finish visit_action.
+* Do we want to leave visit_binding in there?
+
+Other:
+* Fix up documentation.
+* Write more .mli files.
+* Test on/port to OSX
+
+Bigger projects:
+* Move VEX2IL translation into ocaml. (leaving only a small shim layer for bfd)
+* Add support for AMD64 binaries. (after completing the previous item)
+* Update the Vine regression tests to work with BAP and/or write new ones.
