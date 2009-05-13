@@ -108,8 +108,7 @@ let get_expid info =
     | Val v -> Const v
     | BinOp((PLUS|TIMES|AND|OR|XOR|EQ|NEQ) as op,v1,v2) ->
 	let (h1,h2) = (vn v1, vn v2) in
-	(* FIXME: Should this be h1 < h2? *)
-	if v1 < v2 then Bin(op, h1, h2) else Bin(op, h2, h1)
+	if h1 <= h2 then Bin(op, h1, h2) else Bin(op, h2, h1)
     | BinOp(op,v1,v2) -> Bin(op, vn v1, vn v2)
     | UnOp(op, v) -> Un(op, vn v)
     | Cast(ct, t, v) -> Cst(ct,t, vn v)
