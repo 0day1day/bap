@@ -28,6 +28,7 @@ export SOURCES = \
 	ssa_visitor.mli ssa_visitor.ml \
 	cfg_ssa.mli cfg_ssa.ml \
 	ast_visitor.mli ast_visitor.ml \
+	arithmetic.ml \
 	sccvn.ml \
 	deadcode.ml \
 	libasmir.idl \
