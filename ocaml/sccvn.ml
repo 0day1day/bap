@@ -4,8 +4,31 @@
     "SCC-Based Value Numbering" by Keith Cooper and Taylor Simpson.
     http://citeseer.ist.psu.edu/41805.html
 
+    TODO: This has been hacked on a bit and could use some cleanup. (Removing
+    silly things and making it easier to understand.)
+
     @author Ivan Jager
 *)
+
+(* Big picture:
+
+   vn_h maps vars to their value numbers (VN). Vars which map to the same
+   VN are belived to be congruent. Everything starts off at T, except
+   free variables which are assumed to be unique.
+
+   The [lookup] function tries to find a matching (same operator and
+   congruent operants) expression in a hashtable (eid2vn). If none is present
+   it adds the expression with a new VN, thereby creating a new equivalence
+   class.
+
+   The RPO algorithm works by calling [lookup] for each variable, updating
+   vn_h with the new VN, until it reaches a fixed point. At this point,
+   if two variables have the same VN, they are equivalent.
+
+   The latice looks like this: Top -> HInt (constant) -> Hash (variable, corresponds to bottom in the CP lattice)
+
+*)
+
 
 open Type
 open Ssa
@@ -21,25 +44,50 @@ open D
 module Dom = Dominator.Make(G)
     
 
-
-
-type hash = Top | Hash of Ssa.var
+type vn = Top | Hash of Ssa.var | HInt of (int64 * typ)
 let top = Top
 type expid = 
   | Const of Ssa.value (* Except Var *)
-  | Bin of binop_type * hash * hash
-  | Un of unop_type * hash
-  | Cst of cast_type * typ * hash
-  | Unique of var
-  | Ld of hash * hash * hash * typ
-  | St of hash * hash * hash * hash * typ
-  | Ph of hash list
+  | Bin of binop_type * vn * vn
+  | Un of unop_type * vn
+  | Cst of cast_type * typ * vn
+  | Unique of var (* for free variables and unknowns *)
+  | Ld of vn * vn * vn * typ
+  | St of vn * vn * vn * vn * typ
+  | Ph of vn list
       
 type rpoinfo = { (* private to the SCCVN module *)
-  vn_h : hash VH.t; (* maps vars to value numbers *)
-  eid2vn : (expid, hash) Hashtbl.t; (* maps expids to value numbers *)
-  vn2eid : (hash, expid) Hashtbl.t; (* inverse of eid2vn *)
+  vn_h : vn VH.t; (* maps vars to value numbers *)
+  eid2vn : (expid, vn) Hashtbl.t; (* maps expids to value numbers *)
+  vn2eid : expid VH.t; (* inverse of eid2vn *)
+  (* vn2eid is expid VH.t rather than (vn, expid) Hashtbl.t, since top is
+     never used as a key, and the map from HInt is trivial. *)
 }
+
+let vn2eid info = function
+  | Top -> raise Not_found
+  | HInt(i,t) -> Const(Int(i,t))
+  | Hash v -> VH.find info.vn2eid v
+
+let hash_to_string = function
+  | Top -> "T"
+  | Hash v -> "<"^Pp.var_to_string v^">"
+  | HInt(i,t) -> Int64.to_string i ^":"^ Pp.typ_to_string t
+
+let meet a b = match (a,b) with
+  | (Top, x)
+  | (x, Top) ->
+      Some x
+  | (HInt _, HInt _) when a = b ->
+      Some a
+  | (Hash x, Hash y) when x == y ->
+      Some a
+  | (Hash _, Hash _)
+  | (HInt _, HInt _) ->
+      None
+  | ((Hash _ as x), _)
+  | (_, (Hash _ as x)) ->
+      Some x
 
 
 (** [node_sdom cfg a b] returns true if position [a] strictly dominates
@@ -70,31 +118,28 @@ let defsite cfg =
   )
 
 
-
-
-    
-let add_eid =
+let add_const =
   let name = "fake var for constant"
   and typ = Array(TMem REG_1, TMem REG_1) (* BS type *) in
-  (fun info eid ->
-     let h = Hash(Var.newvar name typ) in
+  (fun info c ->
+     let eid = Const c in
+     let h = match c with
+       | Int(i,t) ->
+	   HInt(i,t)
+       | _ ->
+	   let v = Var.newvar name typ in
+	   VH.add info.vn2eid v eid;
+	   Hash v
+     in
      Hashtbl.add info.eid2vn eid h;
-     Hashtbl.add info.vn2eid h eid;
      h )
-
-let add_hash info var eid =
-  let h = Hash var in
-  Hashtbl.add info.eid2vn eid h;
-  Hashtbl.add info.vn2eid h eid;
-  VH.replace info.vn_h var h;
-  h
 
 let get_expid info =
   let vn = function
     | (Int _ | Lab _) as v -> (
 	try Hashtbl.find info.eid2vn (Const v)
 	with Not_found ->
-	  add_eid info (Const v)
+	  add_const info v
       )
     | Var x -> (
 	try VH.find info.vn_h x
@@ -104,7 +149,7 @@ let get_expid info =
   in
   fun var -> function
     | Val(Var _ as v) ->
-	Hashtbl.find info.vn2eid (vn v) 
+	vn2eid info (vn v) 
     | Val v -> Const v
     | BinOp((PLUS|TIMES|AND|OR|XOR|EQ|NEQ) as op,v1,v2) ->
 	let (h1,h2) = (vn v1, vn v2) in
@@ -116,16 +161,45 @@ let get_expid info =
     | Load(m,i,e,t) -> Ld(vn m, vn i, vn e, t)
     | Store(m,i,v,e,t) -> St(vn m, vn i, vn v, vn e, t)
     | Phi vars -> Ph(List.map (fun v -> vn (Var v)) vars)
-	
-let lookup info var exp =
+
+(* Perform some simplifications on an expid, using constant folding
+   and some identities. *)
+let opt_expid get_expid info var exp =
+  match get_expid info var exp with
+  | Bin(op, HInt v1, HInt v2) ->
+      let (i,t) = Arithmetic.binop op v1 v2 in
+      Const(Int(i,t))
+  | Un(op, HInt v) ->
+      let (i,t) = Arithmetic.unop op v in
+      Const(Int(i,t))
+  | Ph(x::xs) as eid -> (
+      match
+	List.fold_left
+	  (function Some x -> meet x | None -> (fun _ -> None))
+	  (Some x) xs
+      with
+      | None -> eid
+      | Some(HInt(i,t)) -> Const(Int(i,t))
+      | Some(Hash _ as vn) -> vn2eid info vn
+      | Some Top -> eid (* FIXME: what to do here? *)
+    )
+  | x -> x
+
+
+
+let lookup ~opt info var exp =
   try
-    let eid = get_expid info var exp in
+    let eid = opt get_expid info var exp in
     try Hashtbl.find info.eid2vn eid
     with Not_found ->
       match eid with
       | Const(Var _) -> top
+      | Const(Int(i,t)) -> HInt(i,t)
       | _ ->
-	  add_hash info var eid
+	  let h = Hash var in
+	  Hashtbl.add info.eid2vn eid h;
+	  VH.add info.vn2eid var eid;
+	  h
   with Not_found -> (* no VNs for subexpressions yet *)
     top
       
@@ -139,11 +213,11 @@ let fold_postfix_component f g v i=
   !acc
 
     
-let rpo cfg =
+let rpo ~cp cfg =
   let info = {
     vn_h = VH.create 57;
     eid2vn = Hashtbl.create 57;
-    vn2eid = Hashtbl.create 57;
+    vn2eid = VH.create 57;
   }
   in
   (* Contrary to the paper, only assigned SSA variables should have
@@ -168,7 +242,11 @@ let rpo cfg =
       method visit_rvar x =
 	if not(VH.mem info.vn_h x) then (
 	  dprintf "Adding uninitialized variable %s" (Pp.var_to_string x);
-	  ignore(add_hash info x (Unique x));
+	  let h = Hash x
+	  and eid = Unique x in
+	  VH.add info.vn_h x h;
+	  VH.add info.vn2eid x eid;
+	  Hashtbl.add info.eid2vn eid h;
 	);
 	`DoChildren
     end
@@ -181,16 +259,21 @@ let rpo cfg =
     try VH.find info.vn_h x
     with Not_found -> failwith("vn: Unknown var: "^Pp.var_to_string x)
   in
-  let lookup = lookup info in
+  let lookup = lookup ~opt:(if cp then opt_expid else Util.id) info in
+  let count = ref 0 in
   let changed = ref true in
   while !changed do
     changed := false;
+    dprintf "Starting iteration %d" !count;
+    incr count;
     List.iter
       (fun (v,e) ->
 	 let oldvn = vn v in
 	 let temp = lookup v e in
-	 if oldvn <> temp && temp <> top then (
+	 if oldvn <> temp (*&& temp <> top*) then (
+	   assert(temp <> top); (* FIXME: prove this is always true *)
 	   changed := true;
+	   dprintf "Updating %s -> %s" (Pp.var_to_string v) (hash_to_string temp);
 	   VH.replace info.vn_h v temp
 	 ) )
       moves
@@ -199,14 +282,17 @@ let rpo cfg =
   let inverse = Hashtbl.create (VH.length info.vn_h) in
   let () = VH.iter (fun k v -> Hashtbl.add inverse v k) info.vn_h in
   let hash2equiv = Hashtbl.find_all inverse in
-  let vn2eid = Hashtbl.find info.vn2eid in
-  (*	let () =
-	if debug then (
-	List.iter
-	(fun (v,_) -> pdebug (List.fold_left (fun s v -> s^var_to_string v^" ") "[" (hash2equiv(vn v)) ^"]"))
+  let vn2eid = vn2eid info in
+  let () =
+    if debug then (
+      List.iter
+	(fun (v,_) ->
+	   let h = vn v in
+	   let v2s = Pp.var_to_string in
+	   pdebug (v2s v^" = "^hash_to_string h^" "^List.fold_left (fun s v -> s^v2s v^" ") "[" (hash2equiv h) ^"]"))
 	moves
-	)
-	in *)
+    )
+  in
   (vn,hash2equiv,vn2eid)
 
 
@@ -259,9 +345,9 @@ let hash_replacement hash2equiv vn2eid defsite psdom =
 	| None -> None
 
 
-let replacer cfg =
+let replacer ?(cp=true) cfg =
   let () = pdebug "Running rpo algorithm" in
-  let (vn,hash2equiv,vn2eid) = rpo cfg in
+  let (vn,hash2equiv,vn2eid) = rpo ~cp cfg in
   let () = pdebug "Compting dominators" in
   let psdom = pos_sdom cfg in
   let () = pdebug "Computing defsites" in
@@ -321,7 +407,7 @@ let replacer cfg =
 
 
 let aliased cfg =
-  let (vn, _, _) = rpo cfg in
+  let (vn, _, _) = rpo ~cp:false cfg in
   fun x y -> match (x,y) with
   | (Int(i,_), Int(i',_)) ->
       Some(i = i')
