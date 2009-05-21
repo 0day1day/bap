@@ -30,7 +30,7 @@ export SOURCES = \
 	ast_visitor.mli ast_visitor.ml \
 	arithmetic.ml \
 	sccvn.mli sccvn.ml \
-	deadcode.ml \
+	deadcode.mli deadcode.ml \
 	libasmir.idl \
 	asmir.mli asmir.ml \
 	grammar.mly lexer.mll \

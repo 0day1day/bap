@@ -37,10 +37,15 @@ let def_uses s =
   (lv, !uses)
 
 
-(** in SSA, a variable is live at its definition site iff its list of
-    uses is not empty. Therefore, calculating live variables is really
-    just a matter of calculating whether or not a variable has any
-    uses. (p445  ML Tiger book ) *)
+(* in SSA, a variable is live at its definition site iff its list of
+   uses is not empty. Therefore, calculating live variables is really
+   just a matter of calculating whether or not a variable has any
+   uses. (p445  ML Tiger book ) *)
+(** Performs dead code elimination, returning the new CFG and a bool
+    indicating whether anything changed.
+
+    @param globals a list of variables to be considered live out.
+*)
 let do_dce ?(globals=[]) graph =
   let (var_to_deps: Ssa.var list VH.t) = VH.create 57 in
   let (var_to_defsite: site VH.t) = VH.create 57 in
