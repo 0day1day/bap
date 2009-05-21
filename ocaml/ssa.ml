@@ -8,9 +8,6 @@
 open ExtList
 open Type
 
-module D = Debug.Make(struct let name = "SSA" and default=`Debug end)
-open D
-
 type var = Var.t
 
 type value =

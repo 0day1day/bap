@@ -189,7 +189,7 @@ let to_prog c =
     then match C.G.succ c src with
 	| [d] ->
 	    assert (C.G.V.equal dst d);
-	    let j = Jmp(expr_of_lab (get_label dst), []) in
+	    let j = Jmp(exp_of_lab (get_label dst), []) in
 	    BH.replace hrevstmts src (j::get_revstmts src)
 	| _ ->
 	    failwith("Cfg_ast.to_prog: no jump at end of block with > 1 succ: "

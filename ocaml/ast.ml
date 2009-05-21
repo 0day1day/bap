@@ -11,11 +11,7 @@
 open ExtList
 open Type
 
-module D = Debug.Make(struct let name = "AST" and default=`Debug end)
-open D
-
 type var = Var.t
-type decl = var
 
 type exp = 
   | Load of exp * exp * exp * typ  (** Load(arr,idx,endian, t) *)
@@ -45,12 +41,14 @@ type stmt =
 
 type program = stmt list
 
-
-let expr_of_lab = function
+(** Make an expression corresponding to the given label, for use as the
+    target of a [Jmp]. *)
+let exp_of_lab = function
   | Name s -> Lab s
   | Addr a -> Int(a, REG_64)
 
-
+(** If possible, make a label that would be refered to by the given
+    expression. *)
 let lab_of_exp = function
   | Lab s -> Some(Name s)
   | Int(i, t) ->
@@ -66,10 +64,12 @@ let lab_of_exp = function
       Some(Addr(Int64.logand i (Int64.pred(Int64.shift_left 1L bits))))
   | _ -> None
     
-
+(** False constant. (If convenient, refer to this rather than building your own.) *)
 let exp_false = Int(0L, REG_1)
+(** True constant. *)
 let exp_true = Int(1L, REG_1)
 
+(** More convenience functions for building common expressions. *)
 let exp_and e1 e2 = BinOp(AND, e1, e2)
 let exp_or e1 e2 = BinOp(OR, e1, e2)
 let exp_not e = UnOp(NOT, e)

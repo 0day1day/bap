@@ -1,3 +1,5 @@
+(** Visitor for the AST *)
+
 open Type
 open Ast
 

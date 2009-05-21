@@ -22,7 +22,7 @@ export SOURCES = \
 	pp.ml \
 	typecheck.ml \
 	cfg.mli cfg.ml \
-	prune_unreachable.ml \
+	prune_unreachable.mli prune_unreachable.ml \
 	cfg_pp.ml \
 	cfg_ast.mli cfg_ast.ml \
 	ssa_visitor.mli ssa_visitor.ml \
@@ -36,7 +36,7 @@ export SOURCES = \
 	grammar.mly lexer.mll \
 	parser.ml \
 	input.mli input.ml \
-	gcl.ml \
+	gcl.mli gcl.ml \
 	wp.ml \
 	stp.ml \
 

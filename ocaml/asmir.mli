@@ -45,7 +45,7 @@ val tr_vine_blocks_t :
 *)
 
 
-val decls_for_arch : arch -> Ast.decl list
+val decls_for_arch : arch -> Ast.var list
 val gamma_for_arch : arch -> varctx
 
 val get_asmprogram_arch : asmprogram -> arch

@@ -231,7 +231,7 @@ let tr_vine_blocks_t g asmp bs =
 
 
 
-let x86_regs : decl list =
+let x86_regs : var list =
   List.map (fun (n,t) -> Var.newvar n t)
     [
   (* 32 bit regs *)
@@ -284,10 +284,10 @@ let x86_regs : decl list =
 
 
 (* exectrace needs fixing if this is REG_64 *)
-let x86_mem :decl = Var.newvar "mem" (TMem(REG_32))
+let x86_mem = Var.newvar "mem" (TMem(REG_32))
 
 
-let arm_regs : decl list =
+let arm_regs =
   List.map (fun n -> Var.newvar n REG_32)
     [ "R0";     
       "R1";     
