@@ -6,6 +6,7 @@
 
     TODO: This has been hacked on a bit and could use some cleanup. (Removing
     silly things and making it easier to understand.)
+    TODO: canonicalize constants in HInt
 
     @author Ivan Jager
 *)
@@ -165,13 +166,21 @@ let get_expid info =
 (* Perform some simplifications on an expid, using constant folding
    and some identities. *)
 let opt_expid get_expid info var exp =
-  match get_expid info var exp with
+  let toconst (i,t) = Const(Int(i,t)) in
+  let eid = get_expid info var exp in
+  let sameas = function
+    | Top -> eid
+    | vn -> vn2eid info vn
+  in
+  match eid with
+  (* constant folding *)
   | Bin(op, HInt v1, HInt v2) ->
-      let (i,t) = Arithmetic.binop op v1 v2 in
-      Const(Int(i,t))
+      toconst (Arithmetic.binop op v1 v2)
   | Un(op, HInt v) ->
-      let (i,t) = Arithmetic.unop op v in
-      Const(Int(i,t))
+      toconst (Arithmetic.unop op v)
+  | Cst(ct, t, HInt v) ->
+      toconst (Arithmetic.cast ct v t)
+  (* phis can be constant*)
   | Ph(x::xs) as eid -> (
       match
 	List.fold_left
@@ -179,12 +188,47 @@ let opt_expid get_expid info var exp =
 	  (Some x) xs
       with
       | None -> eid
-      | Some(HInt(i,t)) -> Const(Int(i,t))
+      | Some(HInt v) -> toconst v
       | Some(Hash _ as vn) -> vn2eid info vn
       | Some Top -> eid (* FIXME: what to do here? *)
     )
+  (* identities on binops *)
+  | Bin(AND, _, (HInt(0L,t) as v)) ->
+      sameas v
+  | Bin(AND, x, HInt(i,t)) when Arithmetic.tos64 (i,t) = -1L ->
+      sameas x
+  | Bin(OR, x, HInt(0L,_)) ->
+      sameas x
+  | Bin(OR, _, (HInt(i,t) as v)) when Arithmetic.tos64 (i,t) = -1L ->
+      sameas v
+  | Bin(XOR, x, HInt(0L,_))
+  | Bin(PLUS, x, HInt(0L,_))
+  | Bin(LSHIFT, x, HInt(0L,_))
+  | Bin(RSHIFT, x, HInt(0L,_))
+  | Bin(ARSHIFT, x, HInt(0L,_))
+  | Bin(TIMES, x, HInt(1L,_))
+  | Bin(DIVIDE, x, HInt(1L,_))
+  | Bin(SDIVIDE, x, HInt(1L,_)) ->
+      sameas x
+  | Bin(AND, x, y)
+  | Bin(OR, x, y)
+      when x = y ->
+      sameas x
+  | Bin(XOR, x, y) when x = y ->
+      Const(Int(0L, Var.typ var))
+  | Bin(LT, _, HInt(0L,_)) ->
+      Const(Ssa.val_false)
+  | Bin(LE, _, HInt(i,t)) when Arithmetic.tos64 (i,t) = -1L ->
+      Const(Ssa.val_true)
+	(* TODO: add SLT and SLE. Requires canonicalized ints *)
   | x -> x
 
+(* simplifications in vine_opt which we don't (yet) do here:
+   associative optimizations
+   a - b = a + -b
+   !(a-1) = -a
+   redundant casts
+*)
 
 
 let lookup ~opt info var exp =
@@ -283,7 +327,7 @@ let rpo ~cp cfg =
   let () = VH.iter (fun k v -> Hashtbl.add inverse v k) info.vn_h in
   let hash2equiv = Hashtbl.find_all inverse in
   let vn2eid = vn2eid info in
-  let () =
+(*  let () =
     if debug then (
       List.iter
 	(fun (v,_) ->
@@ -292,7 +336,7 @@ let rpo ~cp cfg =
 	   pdebug (v2s v^" = "^hash_to_string h^" "^List.fold_left (fun s v -> s^v2s v^" ") "[" (hash2equiv h) ^"]"))
 	moves
     )
-  in
+  in*)
   (vn,hash2equiv,vn2eid)
 
 
