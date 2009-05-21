@@ -6,6 +6,7 @@
 
     TODO: This has been hacked on a bit and could use some cleanup. (Removing
     silly things and making it easier to understand.)
+
     TODO: canonicalize constants in HInt
 
     @author Ivan Jager
@@ -165,7 +166,7 @@ let get_expid info =
 
 (* Perform some simplifications on an expid, using constant folding
    and some identities. *)
-let opt_expid get_expid info var exp =
+let opt_expid info var exp =
   let toconst (i,t) = Const(Int(i,t)) in
   let eid = get_expid info var exp in
   let sameas = function
@@ -232,8 +233,9 @@ let opt_expid get_expid info var exp =
 
 
 let lookup ~opt info var exp =
+  let get_eid = if opt then opt_expid else get_expid in
   try
-    let eid = opt get_expid info var exp in
+    let eid = get_eid info var exp in
     try Hashtbl.find info.eid2vn eid
     with Not_found ->
       match eid with
@@ -257,7 +259,7 @@ let fold_postfix_component f g v i=
   !acc
 
     
-let rpo ~cp cfg =
+let rpo ~opt cfg =
   let info = {
     vn_h = VH.create 57;
     eid2vn = Hashtbl.create 57;
@@ -303,7 +305,7 @@ let rpo ~cp cfg =
     try VH.find info.vn_h x
     with Not_found -> failwith("vn: Unknown var: "^Pp.var_to_string x)
   in
-  let lookup = lookup ~opt:(if cp then opt_expid else Util.id) info in
+  let lookup = lookup ~opt info in
   let count = ref 0 in
   let changed = ref true in
   while !changed do
@@ -388,10 +390,16 @@ let hash_replacement hash2equiv vn2eid defsite psdom =
 	| Some v -> Some(Var v)
 	| None -> None
 
+(** Use SCCVN to elliminate redundant expressions, replacing them with a
+    previously computed value. Some variables will no longer be used after
+    this, so it may be beneficial to run dead code elimination after.
 
-let replacer ?(cp=true) cfg =
+    @param opt Enable constant folding and algebraic simplifications.
+    @return the new CFG and a bool indicating whether anything changed.
+*)
+let replacer ?(opt=true) cfg =
   let () = pdebug "Running rpo algorithm" in
-  let (vn,hash2equiv,vn2eid) = rpo ~cp cfg in
+  let (vn,hash2equiv,vn2eid) = rpo ~opt cfg in
   let () = pdebug "Compting dominators" in
   let psdom = pos_sdom cfg in
   let () = pdebug "Computing defsites" in
@@ -449,9 +457,12 @@ let replacer ?(cp=true) cfg =
   (cfg, !somechange)
 
 
-
+(** [aliased cfg] returns a function [f] to tell whether two values are
+    aliased. [f x y] returns: Some true when [x=y], Some false when [x<>y],
+    or None when it could not statically determine whether [x=y].
+*)
 let aliased cfg =
-  let (vn, _, _) = rpo ~cp:false cfg in
+  let (vn, _, _) = rpo ~opt:false cfg in
   fun x y -> match (x,y) with
   | (Int(i,_), Int(i',_)) ->
       Some(i = i')

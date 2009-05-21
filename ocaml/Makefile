@@ -29,7 +29,7 @@ export SOURCES = \
 	cfg_ssa.mli cfg_ssa.ml \
 	ast_visitor.mli ast_visitor.ml \
 	arithmetic.ml \
-	sccvn.ml \
+	sccvn.mli sccvn.ml \
 	deadcode.ml \
 	libasmir.idl \
 	asmir.mli asmir.ml \
