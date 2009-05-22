@@ -78,6 +78,8 @@ let speclist =
      "Apply Strongly Connected Component based Value Numbering")
   ::("-deadcode", uadd(TransformSsa deadcode),
      "Perform dead code ellimination.")
+  ::("-ssa-simp", uadd(TransformSsa Ssa_simp.simp_cfg),
+     "Perform all supported optimizations on SSA")
   :: Bap.Input.speclist
 
 let anon x = raise(Arg.Bad("Unexpected argument: '"^x^"'"))

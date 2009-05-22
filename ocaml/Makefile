@@ -31,6 +31,7 @@ export SOURCES = \
 	arithmetic.ml \
 	sccvn.mli sccvn.ml \
 	deadcode.mli deadcode.ml \
+	ssa_simp.ml \
 	libasmir.idl \
 	asmir.mli asmir.ml \
 	grammar.mly lexer.mll \
