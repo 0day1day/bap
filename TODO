@@ -1,10 +1,11 @@
 Missing features:
 * CFG coalescing
-* (Re)implement constant propagation, possibly in SCCVN.
 * Rebuild compond expressions when converting back from SSA. (mostly (overly?) done)
 * SMT-LIB input/output.
 * C output.
 * Forward symbolic evaluator.
+* VSA (value set analysis)
+* Constant cjmps
 
 Disassembly stuff:
 * .plt disassembles poorly. Into this.
@@ -16,6 +17,7 @@ Disassembly stuff:
 Design issues:
 * Finish visit_action.
 * Do we want to leave visit_binding in there?
+* Change REG_N to Reg of int? (Or maybe Bv of int?)
 
 Other:
 * Fix up documentation.
