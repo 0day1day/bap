@@ -92,7 +92,11 @@ object (self)
 
   method attr = function
     | Asm s -> pp "@asm \""; pp s; pp "\""
-    | _ -> ()
+    | Address a -> printf "@address \"0x%Lx\"" a;
+    | Liveout -> pp "@set \"liveout\""
+    | StrAttr s -> pp "@str \""; pp s; pc '\"'
+    | ExnAttr _ (* we could try to print something using Printexc.to_string *)
+    | Pos _ -> () (* ignore position attrs *)
 
   (* prec tells us how much parenthization we need. 0 means it doesn't need
      to be parenthesized. Larger numbers means it has higher precedence.

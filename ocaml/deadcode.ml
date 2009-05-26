@@ -19,10 +19,11 @@ type site = C.G.V.t * Ssa.stmt
    for correctness, since double-counting will be symmetrical
    when incrementing and decrementing use-counts *)
 let def_uses s =
-  let lv = 
+  let lv, liveout = 
     match s with
-    | Move (lv, _, _) -> [lv]
-    | _ -> []
+    | Move (lv, _, a) when List.mem Type.Liveout a -> ([lv],[lv])
+    | Move (lv, _, _) -> ([lv],[])
+    | _ -> ([],[])
   in
   let uses = ref [] in
   let vis =  object(self)
@@ -34,7 +35,7 @@ let def_uses s =
   end
   in
   ignore (Ssa_visitor.stmt_accept vis s);
-  (lv, !uses)
+  (lv, !uses, liveout)
 
 
 (* in SSA, a variable is live at its definition site iff its list of
@@ -42,9 +43,10 @@ let def_uses s =
    just a matter of calculating whether or not a variable has any
    uses. (p445  ML Tiger book ) *)
 (** Performs dead code elimination, returning the new CFG and a bool
-    indicating whether anything changed.
+    indicating whether anything changed. Any move with the [Liveout]
+    attribute will be assumed to be live.
 
-    @param globals a list of variables to be considered live out.
+    @param globals a list of additional variables to be considered live out.
 *)
 let do_dce ?(globals=[]) graph =
   let (var_to_deps: Ssa.var list VH.t) = VH.create 57 in
@@ -65,7 +67,7 @@ let do_dce ?(globals=[]) graph =
        List.iter
 	 (fun s ->
 	    let site = (bb, s) in
-            let defs, deps = def_uses s in
+            let defs, deps, liveout = def_uses s in
             
             (* iterate over defs, updating maps *)
             List.iter
@@ -80,6 +82,8 @@ let do_dce ?(globals=[]) graph =
             
             (* update usecounts mapping *)
             List.iter (fun v -> incr (usecount v)) deps;
+	    (* increment liveout vars by one, so they are never dead *)
+            List.iter (fun v -> incr (usecount v)) liveout;
 	 )
          stmts
     )

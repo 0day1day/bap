@@ -68,7 +68,9 @@ type attribute =
   | Pos of pos  (** The position of a statement in the source file *)
   | Asm of string
   | Address of int64
-
+  | Liveout (** the variable assigned in this move should be considered live *)
+  | StrAttr of string (** Generic printable and parseable attribute *)
+  | ExnAttr of exn (** Generic extensible attribute, but no parsing *)
 
 type attributes = attribute list
 

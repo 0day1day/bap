@@ -72,6 +72,8 @@ let mk_attr lab string =
   match lab with
   | "asm" -> Asm string
   | "address" -> Address(Int64.of_string string)
+  | "set" when string = "liveout" -> Liveout
+  | "str" -> StrAttr string
   | _ -> err ("Unknown attribute @"^lab)
 
 let typ_of_string = function
