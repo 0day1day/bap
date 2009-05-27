@@ -18,13 +18,16 @@ Design issues:
 * Finish visit_action.
 * Do we want to leave visit_binding in there?
 * Change REG_N to Reg of int? (Or maybe Bv of int?)
+* Change attributes from attribute list to a set of attribute.
 
 Other:
 * Fix up documentation.
 * Write more .mli files.
 * Test on/port to OSX
 * Examples/demo.
-* Redo the patched VEX thing properly.
+* Redo the patched VEX thing properly. (using a vendor branch)
+* Improve Cfg_ast.to_prog with regards to adding BB_Entry to a trace. See
+  wp_test_3.il for an example where it is not ideal.
 
 Bigger projects:
 * Move VEX2IL translation into ocaml. (leaving only a small shim layer for bfd)

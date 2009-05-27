@@ -345,6 +345,7 @@ let rec trans_cfg cfg =
 	     (fun s v ->
 		let (p,vs) = Hashtbl.find phis (bbid,v) in
 		assert(vs <> []);
+		(* FIXME: do something reasonable with attributes *)
 		Move(p,Phi(vs), [])::s )
 	     stmts
 	     vars
@@ -536,6 +537,7 @@ let stmt2ast tm =
 
 let stmts2ast tm stmts =
   let is_trash = function
+    | Move(l,_,a) when List.mem Liveout a -> false
     | Move(l,_,_) when VH.mem tm l -> true
     | _ -> false
   in
