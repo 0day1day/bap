@@ -1,7 +1,8 @@
 (** Translations between AST programs and AST CFGs.
 
 
-    TODO: coalescing, edges to indirect targets
+    TODO: Coalescing; Use BB_Entry when making traces, but avoid joining that
+    trace with the trace containing BB_Exit.
 *)
 
 open Type
@@ -209,11 +210,7 @@ let to_prog c =
   (* add jumps for edges that need them *)
   C.G.iter_vertex 
     (fun b -> 
-       C.G.iter_succ
-	 (fun s ->
-	    try if BH.find joined b <> s then ensure_jump b s
-	    with Not_found -> () )
-	 c b
+       C.G.iter_succ (fun s -> if not(BH.mem joined b) then ensure_jump b s) c b
     )
     c;
   let revordered_heads, exittrace =
