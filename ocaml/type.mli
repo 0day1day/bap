@@ -11,11 +11,7 @@ type label =
 
 (** The IR type of a BAP expression *)
 type typ =
-  | REG_1   (** a boolean *)
-  | REG_8   (** an 8-bit byte *)
-  | REG_16  (** a 16-bit int *)
-  | REG_32  (** a 32-bit int *)
-  | REG_64  (** a 64-bit int *)
+  | Reg of int (** an N-bit bitvector (use 1 for booleans). Currently supported values: 1,8,16,32,64 *)
   | TMem of typ (** Memory of given index type and endianness*)
   | Array  of typ * typ (** Array of index type, element type. *)
 

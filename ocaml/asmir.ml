@@ -30,11 +30,11 @@ let tr_unop = function
 
 (** Translate a type *)
 let tr_regtype = function
-  | Libasmir.REG_1   -> REG_1 
-  | Libasmir.REG_8   -> REG_8 
-  | Libasmir.REG_16  -> REG_16
-  | Libasmir.REG_32  -> REG_32
-  | Libasmir.REG_64  -> REG_64
+  | Libasmir.REG_1   -> reg_1 
+  | Libasmir.REG_8   -> reg_8 
+  | Libasmir.REG_16  -> reg_16
+  | Libasmir.REG_32  -> reg_32
+  | Libasmir.REG_64  -> reg_64
 
 
 (* maps a string variable to the var we are using for it *)
@@ -61,7 +61,7 @@ let gamma_extend = Hashtbl.add
 let gamma_unextend = Hashtbl.remove
 
 (* This should really be elsewhere... *)
-let little_endian = Int(0L, REG_1)
+let little_endian = Int(0L, reg_1)
 
 (* Translate a string label into a name or address label as approriate *)
 let tr_label s =
@@ -106,7 +106,7 @@ let rec tr_exp g e =
     | NAME ->
 	(match tr_label (name_string e) with
 	 | Name n -> Lab n
-	 | Addr i -> Int(i, REG_64)
+	 | Addr i -> Int(i, reg_64)
 	)
     | UNKNOWN ->
         Unknown(unknown_str e, tr_regtype(unknown_regtype e))
@@ -235,60 +235,60 @@ let x86_regs : var list =
   List.map (fun (n,t) -> Var.newvar n t)
     [
   (* 32 bit regs *)
-  ("R_EBP", REG_32);
-  ("R_ESP", REG_32);
-  ("R_ESI", REG_32);
-  ("R_EDI", REG_32);
-  ("R_EIP", REG_32);
-  ("R_EAX", REG_32);
-  ("R_EBX", REG_32);
-  ("R_ECX", REG_32);
-  ("R_EDX", REG_32);
-  ("EFLAGS", REG_32);
+  ("R_EBP", reg_32);
+  ("R_ESP", reg_32);
+  ("R_ESI", reg_32);
+  ("R_EDI", reg_32);
+  ("R_EIP", reg_32);
+  ("R_EAX", reg_32);
+  ("R_EBX", reg_32);
+  ("R_ECX", reg_32);
+  ("R_EDX", reg_32);
+  ("EFLAGS", reg_32);
 
   (* condition flag bits *)
-  ("R_CF", REG_1);
-  ("R_PF", REG_1);
-  ("R_AF", REG_1);
-  ("R_ZF", REG_1);
-  ("R_SF", REG_1);
-  ("R_OF", REG_1);
+  ("R_CF", reg_1);
+  ("R_PF", reg_1);
+  ("R_AF", reg_1);
+  ("R_ZF", reg_1);
+  ("R_SF", reg_1);
+  ("R_OF", reg_1);
 
   (* VEX left-overs from calc'ing condition flags *)
-  ("R_CC_OP", REG_32);
-  ("R_CC_DEP1", REG_32);
-  ("R_CC_DEP2", REG_32);
-  ("R_CC_NDEP", REG_32);
+  ("R_CC_OP", reg_32);
+  ("R_CC_DEP1", reg_32);
+  ("R_CC_DEP2", reg_32);
+  ("R_CC_NDEP", reg_32);
 
   (* more status flags *)
-  ("R_DFLAG", REG_32);
-  ("R_IDFLAG", REG_32);
-  ("R_ACFLAG", REG_32);
-  ("R_EMWARN", REG_32);
-  ("R_LDT", REG_32); 
-  ("R_GDT", REG_32); 
+  ("R_DFLAG", reg_32);
+  ("R_IDFLAG", reg_32);
+  ("R_ACFLAG", reg_32);
+  ("R_EMWARN", reg_32);
+  ("R_LDT", reg_32); 
+  ("R_GDT", reg_32); 
 
   (* segment regs *)
-  ("R_CS", REG_16); 
-  ("R_DS", REG_16); 
-  ("R_ES", REG_16); 
-  ("R_FS", REG_16); 
-  ("R_GS", REG_16); 
-  ("R_SS", REG_16); 
+  ("R_CS", reg_16); 
+  ("R_DS", reg_16); 
+  ("R_ES", reg_16); 
+  ("R_FS", reg_16); 
+  ("R_GS", reg_16); 
+  ("R_SS", reg_16); 
 
   (* floating point *)
-  ("R_FTOP", REG_32);
-  ("R_FPROUND", REG_32);
-  ("R_FC3210", REG_32);
+  ("R_FTOP", reg_32);
+  ("R_FPROUND", reg_32);
+  ("R_FC3210", reg_32);
 ]
 
 
-(* exectrace needs fixing if this is REG_64 *)
-let x86_mem = Var.newvar "mem" (TMem(REG_32))
+(* exectrace needs fixing if this is reg_64 *)
+let x86_mem = Var.newvar "mem" (TMem(reg_32))
 
 
 let arm_regs =
-  List.map (fun n -> Var.newvar n REG_32)
+  List.map (fun n -> Var.newvar n reg_32)
     [ "R0";     
       "R1";     
       "R2";     

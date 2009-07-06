@@ -21,15 +21,11 @@ let check_subt t1 t2 f =
     terror (Printf.sprintf f (Pp.typ_to_string t1) (Pp.typ_to_string t2))
 
 let is_integer_type = function
-  | REG_1 | REG_8 | REG_16 | REG_32 | REG_64 -> true
+  | Reg _ -> true
   | TMem _ | Array _ -> false
 
 let bits_of_width = function
-  | REG_1 -> 1
-  | REG_8 -> 8
-  | REG_16 -> 16
-  | REG_32 -> 32
-  | REG_64 -> 64
+  | Reg n -> n
   | _ -> invalid_arg "bits_of_width"
 
 
@@ -43,12 +39,12 @@ let rec infer_ast ?(check=true) = function
   | BinOp(o, e1,e2) ->
       (* FIXME: checking *)
       (match o with
-       | EQ | NEQ | LT | LE | SLT | SLE -> REG_1
+       | EQ | NEQ | LT | LE | SLT | SLE -> reg_1
        | _ -> infer_ast e1
       )
   | Lab s ->
       (* FIXME: no type for labels yet *)
-      REG_64
+      reg_64
   | Int(_,t)
   | Unknown(_,t) ->
       t
@@ -74,7 +70,7 @@ and check_idx arr idx endian t =
   let ta = infer_ast arr
   and ti = infer_ast idx
   and te = infer_ast endian in
-  if te <> REG_1 then terror "Endian must be a boolean";
+  if te <> reg_1 then terror "Endian must be a boolean";
   if not(is_integer_type ti) then terror "Index must be a register type";
   match ta with
   | Array(i,e) ->

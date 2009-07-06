@@ -41,6 +41,6 @@ type stmt =
   | Comment of string * attrs (** A comment to be ignored *)
   (* | Special of string * attrs (** A "special" statement. (does magic) *) *)
 
-let val_false = Int(0L, REG_1)
-let val_true = Int(1L, REG_1)
+let val_false = Int(0L, Ast.reg_1)
+let val_true = Int(1L, Ast.reg_1)
 

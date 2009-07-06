@@ -8,11 +8,12 @@ module VH = Var.VarHash
 module F = Format
 
 let rec typ_to_string = function
-  | REG_1 -> "bool"
-  | REG_8 -> "u8"
-  | REG_16 -> "u16"
-  | REG_32 -> "u32"
-  | REG_64 -> "u64"
+  | Reg 1 -> "bool"
+  | Reg 8 -> "u8"
+  | Reg 16 -> "u16"
+  | Reg 32 -> "u32"
+  | Reg 64 -> "u64"
+  | Reg n -> Printf.sprintf "u%u" n
   | TMem t -> "?" ^ typ_to_string t 
   | Array(idx,e) -> typ_to_string e ^ "?" ^ typ_to_string idx
 
@@ -165,9 +166,9 @@ object (self)
      | Ast.Lab s ->
 	 (* FIXME: quote s? *)
 	 pp "\""; pp s; pp "\"";
-     | Ast.Int(0L, REG_1) ->
+     | Ast.Int(0L, Reg 1) ->
 	 pp "false"
-     | Ast.Int(1L, REG_1) ->
+     | Ast.Int(1L, Reg 1) ->
 	 pp "true"
      | Ast.Int(i,t) ->
 	 pp (Int64.to_string i); pp ":"; self#typ t
@@ -190,9 +191,9 @@ object (self)
     cls();
 
   method ast_endian = function
-    | Ast.Int(0L, REG_1) ->
+    | Ast.Int(0L, Reg 1) ->
 	pp "e_little";
-    | Ast.Int(1L, REG_1) ->
+    | Ast.Int(1L, Reg 1) ->
 	pp "e_big"
     | x -> self#ast_exp x
 
@@ -256,8 +257,8 @@ object (self)
 	pc '"'; pp lab; pc '"'
 
   method ssa_endian = function
-    | Ssa.Int(0L, REG_1) -> pp "e_little";
-    | Ssa.Int(1L, REG_1) -> pp "e_big"
+    | Ssa.Int(0L, Reg 1) -> pp "e_little";
+    | Ssa.Int(1L, Reg 1) -> pp "e_big"
     | x -> self#ssa_value x
 
 

@@ -45,29 +45,27 @@ type program = stmt list
     target of a [Jmp]. *)
 let exp_of_lab = function
   | Name s -> Lab s
-  | Addr a -> Int(a, REG_64)
+  | Addr a -> Int(a, Reg 64)
 
 (** If possible, make a label that would be refered to by the given
     expression. *)
 let lab_of_exp = function
   | Lab s -> Some(Name s)
-  | Int(i, t) ->
-      (* FIXME: figure out where the bits_of_with function should live *)
-      let bits = match t with
-	| REG_1 -> 1
-	| REG_8 -> 8
-	| REG_16 -> 16
-	| REG_32 -> 32
-	| REG_64 -> 64
-	| _ -> invalid_arg "bits_of_width"
-      in
+  | Int(i, Reg bits) ->
       Some(Addr(Int64.logand i (Int64.pred(Int64.shift_left 1L bits))))
   | _ -> None
     
+
+let reg_1 = Reg 1
+and reg_8 = Reg 8
+and reg_16 = Reg 16
+and reg_32 = Reg 32
+and reg_64 = Reg 64
+
 (** False constant. (If convenient, refer to this rather than building your own.) *)
-let exp_false = Int(0L, REG_1)
+let exp_false = Int(0L, reg_1)
 (** True constant. *)
-let exp_true = Int(1L, REG_1)
+let exp_true = Int(1L, reg_1)
 
 (** More convenience functions for building common expressions. *)
 let exp_and e1 e2 = BinOp(AND, e1, e2)

@@ -40,8 +40,8 @@ let to_val t i =
     (Int64.logand mask i, t)
 
 let exp_bool =
-  let t = (1L, REG_1)
-  and f = (0L, REG_1) in
+  let t = (1L, Ast.reg_1)
+  and f = (0L, Ast.reg_1) in
   (fun b -> if b then t else f)
 
 (** [binop operand lhs lhst rhs rhst] *)

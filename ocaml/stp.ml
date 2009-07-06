@@ -55,7 +55,7 @@ class pp ft =
   and space = Format.pp_print_space ft
   and cut = Format.pp_print_cut ft
   and force_newline = Format.pp_force_newline ft
-  and printf = Format.fprintf ft
+  and printf f = Format.fprintf ft f
   and opn  = Format.pp_open_box ft
   and cls = Format.pp_close_box ft in
   let var2s (Var.V(num,name,_)) =
@@ -97,11 +97,7 @@ object (self)
   
 
   method typ = function
-    | REG_1 ->	pp "BITVECTOR(1)"
-    | REG_8 ->	pp "BITVECTOR(8)"
-    | REG_16 ->	pp "BITVECTOR(16)"
-    | REG_32 ->	pp "BITVECTOR(32)"
-    | REG_64 ->	pp "BITVECTOR(64)"
+    | Reg n ->	printf "BITVECTOR(%u)" n
     | Array(idx,elmt) -> pp "ARRAY "; self#typ idx; pp " OF "; self#typ elmt
     | TMem _ ->	failwith "TMem unsupported by STP"
 
@@ -117,11 +113,12 @@ object (self)
     (match e with
      | Int(i,t) ->
 	 let format = match t with
-	   | REG_1  -> format_of_string "0bin%Ld"
-	   | REG_8  -> format_of_string "0hex%02Lx"
-	   | REG_16 -> format_of_string "0hex%04Lx"
-	   | REG_32 -> format_of_string "0hex%08Lx"
-	   | REG_64 -> format_of_string "0hex%016Lx"
+	   | Reg 1  -> format_of_string "0bin%Ld"
+	   | Reg 8  -> format_of_string "0hex%02Lx"
+	   | Reg 16 -> format_of_string "0hex%04Lx"
+	   | Reg 32 -> format_of_string "0hex%08Lx"
+	   | Reg 64 -> format_of_string "0hex%016Lx"
+	   | Reg _ -> failwith "unimplemented bitvector length"
 	   | _ -> invalid_arg "Only constant integers supported"
 	 in
 	 let maskedval = Int64.logand i

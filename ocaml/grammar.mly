@@ -77,11 +77,11 @@ let mk_attr lab string =
   | _ -> err ("Unknown attribute @"^lab)
 
 let typ_of_string = function
-  | "bool" -> REG_1
-  | "u8" -> REG_8
-  | "u16" -> REG_16
-  | "u32" -> REG_32
-  | "u64" -> REG_64
+  | "bool" -> reg_1
+  | "u8" -> reg_8
+  | "u16" -> reg_16
+  | "u32" -> reg_32
+  | "u64" -> reg_64
   | s -> err ("Unexpected type '"^s^"'")
 
 let casttype_of_string = function
@@ -90,9 +90,6 @@ let casttype_of_string = function
   | "high"    -> CAST_HIGH    
   | "low"     -> CAST_LOW     
   | s -> err("Unexpected cast type '"^s^"'")
-
-let exp_true = Int(1L, REG_1)
-let exp_false = Int(0L, REG_1)
 
 %}
 
