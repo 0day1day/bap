@@ -34,8 +34,10 @@ let prog =
 
 let post = Bap.Parser.exp_from_string !post
 
+let cfg = Bap.Cfg_ast.of_prog prog
+let cfg = Bap.Prune_unreachable.prune_unreachable_ast cfg
 
-let wp = compute_wp (Bap.Cfg_ast.of_prog prog) post
+let wp = compute_wp cfg post
 
 ;;
 match !irout with
