@@ -9,6 +9,7 @@
 #include <bfd.h>
 #include "irtoir.h"
 #include "asm_program.h"
+#include "irtoir-internal.h"
 
 vine_blocks_t * asmir_asmprogram_to_vine(asm_program_t *prog) {
   vector<vine_block_t *> *res = new vector<vine_block_t *>();

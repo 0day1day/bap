@@ -1,23 +1,29 @@
 
+
 let inputs = ref []
 
-
-
 let speclist =
-  let addinput i = inputs := i :: !inputs
-  (*and set_int64 ref s =
-    try ref := Int64.of_string s
-    with Failure "int_of_string" ->
-      raise(Arg.Bad("Could not parse \""^s^"\" as int64"))*)
+  let addinput i = inputs := i :: !inputs in
+  let toint64 s =
+    try Int64.of_string s
+    with Failure "int_of_string" -> raise(Arg.Bad("invalid int64: "^s))
   in
+  let setint64 r s =  r := toint64 s in
   [
     ("-bin",
      Arg.String(fun s-> addinput (`Bin s)),
      "<file> Convert a binary to the IL");
+    ("-binrange",
+     Arg.Tuple(let f = ref ""
+               and s = ref 0L in
+               [Arg.Set_string f; Arg.String(setint64 s);
+                Arg.String(fun e->addinput(`Binrange(!f, !s, toint64 e)))]),
+     "<file> <start> <end> Convert the given range of a binary to the IL");
     ("-ir",
      Arg.String(fun s -> addinput (`Ir s)),
      "<file> Read input from an IR file.");
   ]
+
 
 
 let get_program () =
@@ -28,6 +34,9 @@ let get_program () =
     | `Bin f ->
 	let p = Asmir.open_program f in
 	Asmir.asmprogram_to_vine p
+    | `Binrange (f, s, e) ->
+	let p = Asmir.open_program f in
+	Asmir.asmprogram_to_vine_range p s e
   in
   let rec cat p = function
     | [] -> p

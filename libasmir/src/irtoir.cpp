@@ -1315,7 +1315,9 @@ void generate_vine_ir_block( asm_program_t *prog, vine_block_t *block )
 {
   static unsigned int ir_addr = 100; // Argh, this is dumb
 
-  
+  // Set the global everyone else will look at.
+  guest_arch = vexarch_of_prog(prog);
+
   // Translate the block
   if (is_special(block->inst)) 
     block->vine_ir = translate_special(block->inst);
@@ -1349,9 +1351,6 @@ vector<vine_block_t *>
 generate_vine_ir( asm_program_t *prog, vector<vine_block_t *> vblocks )
 {
     unsigned int vblocksize = vblocks.size();
-
-    // Set the global everyone else will look at.
-    guest_arch = vexarch_of_prog(prog);
 
     for ( int i = 0; i < vblocksize; i++ )
     {

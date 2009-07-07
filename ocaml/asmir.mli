@@ -56,3 +56,5 @@ val asmprogram_to_vine : ?init_mem:bool -> asmprogram -> Ast.program
 val asm_addr_to_vine :
   varctx -> asmprogram -> Libasmir.address_t -> Ast.program
 
+val asmprogram_to_vine_range :
+  asmprogram -> Libasmir.address_t -> Libasmir.address_t  -> Ast.program

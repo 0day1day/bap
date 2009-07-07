@@ -349,3 +349,15 @@ let asm_addr_to_vine g prog addr =
   let ir = tr_vine_block_t g prog block in
   let () = destroy_vine_block block in
   ir
+
+
+let asmprogram_to_vine_range asmp st en=
+  let arch = get_asmprogram_arch asmp in
+  let g = gamma_for_arch arch in
+  let ir = ref [] in
+  let i = ref st in
+  while !i <= en do
+    ir := asm_addr_to_vine g asmp !i :: !ir;
+    i := Int64.add !i (Int64.of_int(asmir_get_instr_length asmp !i));
+  done;
+  List.flatten(List.rev !ir)

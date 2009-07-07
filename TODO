@@ -17,8 +17,8 @@ Disassembly stuff:
 Design issues:
 * Finish visit_action.
 * Do we want to leave visit_binding in there?
-* Change REG_N to Reg of int? (Or maybe Bv of int?)
 * Change attributes from attribute list to a set of attribute.
+* When optimizing code, try to keep the more meaningful variable names.
 
 Other:
 * Fix up documentation.

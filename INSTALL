@@ -12,11 +12,11 @@ To build BAP, do the following:
 Configure should report any dependencies you do not have.  You can
 satisfy most dependencies on debian lenny by running:
 
-  $ sudo aptitude install  ocaml ocaml-findlib libgdome2-ocaml-dev\
+  $ sudo aptitude install ocaml ocaml-findlib libgdome2-ocaml-dev\
     camlidl libocamlgraph-ocaml-dev libextlib-ocaml-dev sqlite3\
     libsqlite3-ocaml-dev libsqlite3-dev libsqlite3-0\
     libsqlite3-ocaml libsqlite3-ocaml-dev binutils-dev automake autoconf \
-    texlive-latex-extra texlive-fonts-recommended texlive-latex-base
+    texlive-latex-extra texlive-fonts-recommended texlive-latex-base g++
 
 You may also need to (e.g., on Ubuntu 8.04):
   $ sudo aptitude install  ocaml-native-compilers texlive-base \
