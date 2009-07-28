@@ -1,8 +1,3 @@
-/*
- Owned and copyright BitBlaze, 2007. All rights reserved.
- Do not copy, disclose, or distribute without explicit written
- permission.
-*/
 //======================================================================
 //
 // This file contains the functions for memory management needed by 

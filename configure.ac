@@ -74,11 +74,16 @@ fi
 AC_ARG_WITH(vex-revision, 
     [  --with-vex-revision=<num>    Vex version],
 [
-        VEX_VERSION=$withval,
+        VEX_VERSION=$withval
 ],
 [
         VEX_VERSION=`svn info ${VEX_DIR} | grep Revision | awk '{print $2}'`
 ])
++
+if test -e "${VEX_DIR}/priv/main/vex_svnversion.h"; then
+    VEX_VERSION=`tr -d \" <"${VEX_DIR}/priv/main/vex_svnversion.h"`
+fi
+
 if test "${VEX_VERSION}" = ""; then
     echo "Could not determine VEX version (override with --with-vex-revision=<num>)"
     exit -1

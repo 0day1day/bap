@@ -21,6 +21,7 @@ Design issues:
 * When optimizing code, try to keep the more meaningful variable names.
 
 Other:
+* Have example demos of the tools.
 * Fix up documentation.
 * Write more .mli files.
 * Test on/port to OSX
@@ -28,6 +29,7 @@ Other:
 * Redo the patched VEX thing properly. (using a vendor branch)
 * Improve Cfg_ast.to_prog with regards to adding BB_Entry to a trace. See
   wp_test_3.il for an example where it is not ideal.
+
 
 Bigger projects:
 * Move VEX2IL translation into ocaml. (leaving only a small shim layer for bfd)

@@ -1,9 +1,3 @@
-/*
- Owned and copyright BitBlaze, 2008. All rights reserved.
- Do not copy, disclose, or distribute without explicit written
- permission.
-*/
-
 #include "irtoir-internal.h"
 #include "libvex_guest_arm.h"
 #include <assert.h>
