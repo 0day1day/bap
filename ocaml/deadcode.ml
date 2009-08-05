@@ -46,7 +46,8 @@ let def_uses s =
     indicating whether anything changed. Any move with the [Liveout]
     attribute will be assumed to be live.
 
-    @param globals a list of additional variables to be considered live out.
+    @param globals a list of additional variables to be considered
+    live out. The safe default is to declare all variables live-out. 
 *)
 let do_dce ?(globals=[]) graph =
   let (var_to_deps: Ssa.var list VH.t) = VH.create 57 in
