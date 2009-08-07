@@ -47,6 +47,13 @@ let output_ssa_bbids f p =
   close_out oc;
   p
 
+let output_ssa_cdg f p =
+  let oc = open_out f in 
+  let cdg = Pdg.CDG_SSA.compute_cdg p in 
+    Cfg_pp.SsaBBidDot.output_graph oc cdg;
+    close_out oc;
+    p
+
 let sccvn p =
   fst(Sccvn.replacer p)
 let deadcode p =
@@ -80,6 +87,8 @@ let speclist =
      "Perform dead code ellimination.")
   ::("-ssa-simp", uadd(TransformSsa Ssa_simp.simp_cfg),
      "Perform all supported optimizations on SSA")
+  ::("-pp-ssa-cdg", Arg.String (fun f -> add(TransformSsa(output_ssa_cdg f))),
+     "Output the SSA CDG (bbid's)")
   :: Bap.Input.speclist
 
 let anon x = raise(Arg.Bad("Unexpected argument: '"^x^"'"))
