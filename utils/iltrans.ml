@@ -49,7 +49,7 @@ let output_ssa_bbids f p =
 
 let output_ssa_cdg f p =
   let oc = open_out f in 
-  let cdg = Pdg.CDG_SSA.compute_cdg p in 
+  let cdg = Depgraphs.CDG_SSA.compute_cdg p in 
     Cfg_pp.SsaBBidDot.output_graph oc cdg;
     close_out oc;
     p

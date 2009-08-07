@@ -40,7 +40,7 @@ export SOURCES = \
 	gcl.mli gcl.ml \
 	wp.ml \
 	stp.ml \
-	pdg.ml \ 
+	depgraphs.ml \ 
 
 
 RESULT = bap
