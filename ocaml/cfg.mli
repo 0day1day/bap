@@ -31,7 +31,10 @@ sig
 
   type lang
 
-  (** Finds a vertex by a label in it's stmts *)
+  (** Finds a vertex by a bbid *)
+  val find_vertex : G.t -> G.V.label -> G.V.t
+
+  (** Finds a vertex by a label in its stmts *)
   val find_label : G.t -> Type.label -> G.V.t
 
   (** Gets the statements from a basic block *)

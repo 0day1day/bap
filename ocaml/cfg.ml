@@ -50,6 +50,7 @@ sig
   
   type lang
 
+  val find_vertex : G.t -> G.V.label -> G.V.t
   val find_label : G.t -> Type.label -> G.V.t
   val get_stmts : G.t -> G.V.t -> lang
   val set_stmts : G.t -> G.V.t -> lang -> G.t
@@ -148,6 +149,10 @@ struct
 
 
     (* Extra stuff to make this a CFG *)
+
+    let find_vertex c id = 
+      let v = V.create id in 
+	if mem_vertex c v then v else raise Not_found
       
     let find_label c l = LM.find l c.l
 
@@ -216,7 +221,7 @@ struct
   let remove_edge = G.remove_edge
   let remove_edge_e = G.remove_edge_e
 
-
+  let find_vertex = G.find_vertex 
   let find_label = G.find_label
   let get_stmts = G.get_stmts
   let set_stmts = G.set_stmts
