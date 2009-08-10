@@ -273,13 +273,14 @@ let int64_ucompare x y =
 
 (** Unsigned int64 division *)
 let int64_udiv x y =
-  (*is there a better way to do this? *)
-  if y < 0L then 0L
+  (* Reference: Hacker's Delight (Warren, 2002) Section 9.3 *)
+  if y < 0L
+  then if int64_ucompare x y < 0 then 0L else 1L
   else if x < 0L
   then let all_but_last_bit =
     Int64.shift_left (Int64.div (Int64.shift_right_logical x 1) y) 1
   in
-    if int64_ucompare (Int64.sub x (Int64.mul all_but_last_bit y)) y > 0 then
+    if int64_ucompare (Int64.sub x (Int64.mul all_but_last_bit y)) y >= 0 then
       Int64.succ all_but_last_bit
     else
       all_but_last_bit
