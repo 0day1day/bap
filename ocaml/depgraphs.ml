@@ -50,8 +50,8 @@ struct
     (* Note that we don't add an extra entry node, so everything is control
        dependent on the entry node of the CFG *)
     let cfg' = C.copy cfg in 
-    let entry_node = G.V.create BB_Entry in 
-    let exit_node = G.V.create BB_Exit in 
+    let entry_node = C.find_vertex cfg' BB_Entry in 
+    let exit_node = C.find_vertex cfg' BB_Exit in 
     let cfg' = if G.mem_edge cfg' entry_node exit_node then cfg' 
                else C.add_edge cfg' entry_node exit_node in 
     let () = dprintf "compute_cdg: computing idom" in
@@ -60,14 +60,6 @@ struct
     let dom_tree = D.idom_to_dom_tree cfg' idom in
     let () = dprintf "compute_cdg: computing dom frontier" in
       D.compute_dom_frontier cfg' dom_tree idom 
-(*    let vertices =  G.fold_vertex (fun v g -> add_vertex g v) cfg' empty in
-      G.fold_vertex
-	(fun v g ->
-	   if G.in_degree cfg v > 0
-	   then List.fold_left (fun g v' -> add_edge g v' v) g (df v)
-	   else g (* can't compute DF for lonely nodes *)
-	)
-	cfg' vertices *)
 
 (** computes the control dependence graph (cdg), which turns the
     result of [compute_cd] below into a graph*)
@@ -91,8 +83,153 @@ module CDG_SSA = MakeCDG(Cfg.SSA)
 module CDG_AST = MakeCDG(Cfg.AST)
 
 
+module DDG_SSA = 
+struct
 
-(** A Data-Dependency Graph for SSA *)
+  (** a location in the CFG program.  *)
+  type location = Cfg.SSA.G.V.t * int
+
+  module Dbg = Debug.Make(struct let name = "DDG" and default=`NoDebug end)
+  open Dbg
+  module VH = Var.VarHash
+  module VS = Var.VarSet
+
+  (** [compute_dd cfg] the tuple vars,fd,fu. vars is the set of
+      variables used by the graph.  fd is a hashtbl from vars to the
+      definition location.  fu is a hashtbl from vars to their use
+      locations.  Unlike graphs such as DDG and PDG (below), we do not
+      assume that vars are defined on entry and used on exit.  *)
+  let compute_dd cfg = 
+    let defs:(location) VH.t = VH.create 65535 in 
+    let uses = VH.create 65535 in 
+    let vars = ref VS.empty in 
+    let update_def_uses s (loc:SSA.G.V.t * int) =
+      let () = 
+	match s with
+	  | Ssa.Move (lv, _, _) -> VH.add defs lv loc
+	  | _ -> ()
+      in
+      let stmt_uses = ref VS.empty in 
+      let vis =  object(self)
+	inherit Ssa_visitor.nop
+	method visit_rvar v = stmt_uses := VS.add v !stmt_uses; `DoChildren
+	method visit_value v = 
+	  match v with
+	      Ssa.Var(v') -> vars := VS.add v' !vars; `DoChildren
+	    | _ -> `DoChildren
+      end
+      in
+	ignore (Ssa_visitor.stmt_accept vis s);
+	VS.iter (fun v -> 
+		   let prev = try VH.find uses v with Not_found -> [] in 
+		     VH.replace uses v (loc::prev)
+		) !stmt_uses
+    in
+      SSA.G.iter_vertex 
+	(fun v ->
+	   ignore(List.fold_left 
+		    (fun idx s -> update_def_uses s (v,idx); idx+1)
+		    0 (SSA.get_stmts cfg v)
+		 )
+	) cfg;
+      (!vars,defs,uses)
+
+  let compute_ddg cfg = 
+    let vars,defs,uses = compute_dd cfg in 
+      (* the following 2 statements copy only the cfg verticies  *)
+    let ddg = SSA.copy cfg in 
+    let ddg = SSA.G.fold_edges 
+	(fun src dst cfg' -> 
+	    let s = SSA.find_vertex cfg' (SSA.G.V.label src) in 
+	    let d = SSA.find_vertex cfg' (SSA.G.V.label dst) in 
+	      SSA.remove_edge cfg' s d
+	) cfg ddg
+    in
+    let entryv = SSA.find_vertex ddg BB_Entry in 
+      (* fd and fu implement assumption all vars are defined on entry
+	 and used on exit *)
+    let fd v = try VH.find defs v with Not_found -> (entryv,0) in 
+    let cfg_to_ddg_vertex ddg cfg_vertex : SSA.G.V.t = 
+      let lbl = SSA.G.V.label cfg_vertex in 
+	SSA.find_vertex ddg lbl
+    in
+      VH.fold
+	(fun var uselst ddg -> 
+	   let (cfg_dv,_) = fd var in 
+	   let ddg_dv = cfg_to_ddg_vertex ddg cfg_dv in
+	     List.fold_left 
+	       (fun ddg (cfg_uv,_) -> 
+		  SSA.add_edge ddg 
+		    (cfg_to_ddg_vertex ddg cfg_uv) ddg_dv) ddg uselst 
+	) uses ddg 
+
+
+  (** convert a cfg whose nodes contain any number of SSA stmts, to a
+      cfg whose nodes contain a single SSA stmt in the node stmt
+      list. This will make subsequent graphs more precise as an edge
+      corresponds to a def/use statement, instead of a def/use block.
+  *)
+  let stmtlist_to_single_stmt cfg = 
+    let translate_block old_v g : SSA.G.t= 
+      let v = (SSA.find_vertex g (SSA.G.V.label old_v)) in 
+      match (SSA.get_stmts g v)  with
+	  [] -> g
+	| s::[] -> g (* the first element in the list gets the original
+			block id. Thus, we need to do nothing. *)
+	| s::ss -> 
+	    let origsucclst = SSA.G.succ g v in 
+	    let g' = List.fold_left 
+	      (fun g' dst -> SSA.remove_edge g' v dst) g origsucclst 
+	    in 
+	    let v',g' = 
+	      List.fold_left 
+		(fun (pred,g') s ->
+		   let g',v' = SSA.create_vertex g' [s] in 
+		   let () = dprintf "Created vertex %s for %s"
+		     (bbid_to_string (SSA.G.V.label v'))
+		     (Pp.ssa_stmt_to_string s) in 
+		   let g' = SSA.add_edge g' pred v' in 
+		     (v',g')
+		) (v,g') ss 
+	    in
+	    let g' = SSA.set_stmts g' v [s] in 
+	      List.fold_left
+		(fun g' dst -> SSA.add_edge g' v' dst) g'  origsucclst
+    in
+    let g = SSA.copy  cfg in 
+      SSA.G.fold_vertex translate_block cfg g
+end
+
+(* module PDG =  *)
+(* struct *)
+
+(*   type dependence = [`True | `Control] *)
+ 
+(*   let compute_pdg cfg =  *)
+(*     let vars,defs,uses = SSA_DDG.compute_dd cfg in  *)
+(*     let cd  = SSA_CDG.compute_cd cfg in  *)
+(*     let fd v = try VH.find defs v with Not_found -> (entryv,0) in  *)
+(*     let pdg = SSA.copy cfg in  *)
+(*     let pdg = SSA.G.fold_edges  *)
+(* 	(fun src dst cfg' ->  *)
+(* 	    let s = SSA.find_vertex cfg' (SSA.G.V.label src) in  *)
+(* 	    let d = SSA.find_vertex cfg' (SSA.G.V.label dst) in  *)
+(* 	      SSA.remove_edge cfg' s d *)
+(* 	) cfg pdg *)
+(*     in *)
+(*     let add_dependencies v g =  *)
+(*       let g =  *)
+(* 	if C.G.in_degree cfg v > 0 then *)
+(* 	  List.fold_left (fun g v' ->  *)
+(* 			    let edge = SSA.G.E.create v' `Control v)  g (df v) *)
+(* 	else g  *)
+(*       in  *)
+(* 	g *)
+(*     in *)
+(*       SSA.fold_vertex add_dependencies cfg pdg *)
+
+(* end *)
+
 (* module SSA_DDG = *)
 (* struct *)
 (*   module S = Var.VarSet *)
