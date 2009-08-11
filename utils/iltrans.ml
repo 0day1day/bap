@@ -54,6 +54,13 @@ let output_ssa_cdg f p =
     close_out oc;
     p
 
+let output_ssa_ddg f p = 
+  let oc = open_out f in 
+  let ddg = Depgraphs.DDG_SSA.compute_ddg p in 
+    Cfg_pp.SsaStmtsDot.output_graph oc ddg;
+    close_out oc;
+    p
+
 let sccvn p =
   fst(Sccvn.replacer p)
 let deadcode p =
@@ -75,6 +82,10 @@ let speclist =
      "<file> Pretty print SSA graph to <file> (in Graphviz format)")
   ::("-pp-ssa-bbids", Arg.String(fun f -> add(TransformSsa(output_ssa_bbids f))),
      "<file> Pretty print SSA graph to <file> (in Graphviz format) (no stmts)")
+  ::("-pp-ssa-cdg", Arg.String (fun f -> add(TransformSsa(output_ssa_cdg f))),
+     "Output the SSA CDG (bbid's)")
+  ::("-pp-ssa-ddg", Arg.String (fun f -> add(TransformSsa(output_ssa_ddg f))),
+     "Output the SSA DDG (bbid's)")
   ::("-to-cfg", uadd(ToCfg),
      "Convert to an AST CFG.")
   ::("-to-ast", uadd(ToAst),
@@ -87,8 +98,10 @@ let speclist =
      "Perform dead code ellimination.")
   ::("-ssa-simp", uadd(TransformSsa Ssa_simp.simp_cfg),
      "Perform all supported optimizations on SSA")
-  ::("-pp-ssa-cdg", Arg.String (fun f -> add(TransformSsa(output_ssa_cdg f))),
-     "Output the SSA CDG (bbid's)")
+  ::("-ssa-to-single-stmt", 
+     uadd(TransformSsa Depgraphs.DDG_SSA.stmtlist_to_single_stmt),
+     "Create new graph where every node has at most 1 SSA statement"
+    )
   :: Bap.Input.speclist
 
 let anon x = raise(Arg.Bad("Unexpected argument: '"^x^"'"))
