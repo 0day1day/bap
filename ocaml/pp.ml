@@ -386,3 +386,5 @@ let pp2string f v =
 let value_to_string = pp2string (fun p -> p#ssa_value)
 
 let ssa_exp_to_string = pp2string (fun p -> p#ssa_exp)
+
+let ssa_stmt_to_string = pp2string (fun p -> p#ssa_stmt)
