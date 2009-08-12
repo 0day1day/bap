@@ -13,28 +13,15 @@
  (* if true, we keep slashy star star slashy comments *)
  let flag_keep_blkcomments = ref true;;
 
- let track_line_numbers = ref false;;
+ let track_line_numbers = ref true;;
 
- let set_line_tracking b = 
-   track_line_numbers := b
-
-
-     
 
  let get = Lexing.lexeme
 
- let lend = lexeme_end
-
- let lstart = Lexing.lexeme_start
 
  let incr_linenum lexbuf =
-   let pos = lexbuf.Lexing.lex_curr_p in
-     lexbuf.Lexing.lex_curr_p <- { pos with
-				     Lexing.pos_lnum = pos.Lexing.pos_lnum + 1;
-				     Lexing.pos_bol = pos.Lexing.pos_cnum;
-				 }
-
- let fileoffset = ref 0;;
+   if !track_line_numbers then 
+     Lexing.new_line lexbuf
 
 
 (* quoted string handling code taken from:
@@ -62,11 +49,9 @@
 
 
  let in_comment = ref 0;;
- let comment_pos = ref 0;;
- let comment_start yypos =
+ let comment_start () =
    assert(!in_comment = 0);
    in_comment := 1;
-   comment_pos := yypos;
    reset_string_buffer()  
  let enter_comment () = 
    in_comment := !in_comment + 1
@@ -111,8 +96,7 @@ let singlecomment = "//"[^'\n' '\n']*nl
 rule token = parse
   | eof          { eof() }
   | (ws)+        { token lexbuf }
-  | nl           { if !track_line_numbers then 
-		   incr_linenum lexbuf; token lexbuf }
+  | nl           { incr_linenum lexbuf; token lexbuf }
 
 (* keywords *)
   | "cjmp"       { CJMP }
@@ -175,14 +159,13 @@ rule token = parse
 		      STRING(s)
 	         }
 
-  | "/*"         { comment_start(lstart lexbuf);
+  | "/*"         { comment_start();
 		   blkcomment lexbuf;
 		   if !flag_keep_blkcomments then 
 		     COMMENT(get_stored_string())
 		   else
 		     token lexbuf 
 		 }
-  | "#"           { cpptoken lexbuf }
   | singlecomment { if !flag_keep_linecomments then
 		      let s = get lexbuf in 
 			(* -3 to remove the newline *)
@@ -190,6 +173,7 @@ rule token = parse
 		    else
 		      token lexbuf 
 		  } 
+  | "#"           { cpptoken lexbuf }
   | id           { ID(get lexbuf) }
   | digit+ | hexinteger { 
       try INT(Int64.of_string(get lexbuf))
@@ -223,9 +207,9 @@ and scan_str = parse
   | _  as c   {  store_string_char c; scan_str lexbuf }
 			   
 and cpptoken = parse
-  | digit+ { if !track_line_numbers then (
+  | digit+ { (* if !track_line_numbers then (
 	       fileoffset := (Pervasives.int_of_string (get lexbuf));
-	     );
+	     );*)
              cpptoken lexbuf
            }
   | fname { 
