@@ -21,7 +21,10 @@ struct
     type t = G.t
     module V = G.V
 
-    let pred = G.succ 
+    let pred c n = 
+      match G.V.label n with
+	  BB_Entry -> (C.find_vertex c BB_Exit)::(G.succ c n)
+	| _ -> G.succ c n 
     let succ = G.pred
     let nb_vertex = G.nb_vertex
     let fold_vertex = G.fold_vertex
@@ -49,17 +52,13 @@ struct
   let compute_cd cfg =
     (* Note that we don't add an extra entry node, so everything is control
        dependent on the entry node of the CFG *)
-    let cfg' = C.copy cfg in 
-    let entry_node = C.find_vertex cfg' BB_Entry in 
-    let exit_node = C.find_vertex cfg' BB_Exit in 
-    let cfg' = if G.mem_edge cfg' entry_node exit_node then cfg' 
-               else C.add_edge cfg' entry_node exit_node in 
+    let exit_node = C.find_vertex cfg  BB_Exit in 
     let () = dprintf "compute_cdg: computing idom" in
-    let idom = D.compute_idom cfg' exit_node in
+    let idom = D.compute_idom cfg exit_node in
     let () = dprintf "compute_cdg: computing dom tree" in
-    let dom_tree = D.idom_to_dom_tree cfg' idom in
+    let dom_tree = D.idom_to_dom_tree cfg idom in
     let () = dprintf "compute_cdg: computing dom frontier" in
-      D.compute_dom_frontier cfg' dom_tree idom 
+      D.compute_dom_frontier cfg dom_tree idom 
 
 (** computes the control dependence graph (cdg), which turns the
     result of [compute_cd] below into a graph*)

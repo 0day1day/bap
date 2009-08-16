@@ -18,10 +18,19 @@
 
  let get = Lexing.lexeme
 
+   (* this function is present in ocaml 3.11, but not in Debian
+      lenny's ocaml *)
+ let new_line lexbuf = 
+   let lcp = lexbuf.lex_curr_p in 
+     lexbuf.lex_curr_p <- {lcp with
+			     pos_lnum = lcp.pos_lnum + 1;
+			     pos_bol = lcp.pos_cnum;
+			  }
+ ;;
 
  let incr_linenum lexbuf =
    if !track_line_numbers then 
-     Lexing.new_line lexbuf
+     new_line lexbuf
 
 
 (* quoted string handling code taken from:
