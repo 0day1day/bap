@@ -6,6 +6,7 @@ Missing features:
 * Forward symbolic evaluator.
 * VSA (value set analysis)
 * Constant cjmps
+* Update target on indirect constant jumps
 
 Disassembly stuff:
 * .plt disassembles poorly. Into this.

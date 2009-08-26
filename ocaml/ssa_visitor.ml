@@ -15,10 +15,10 @@ class type t = object
   (** Called when visiting a value *)
   method visit_value : value -> value visit_action
 
-  (** Called when visiting a referenced variable *)
+  (** Called when visiting a referenced variable. See also {!visit_avar}. *)
   method visit_rvar : var -> var visit_action
 
-  (** Called when visiting assigned variable.
+  (** Called when visiting an assigned variable.
       Note that in a Move(), referenced variables will be visited first, so
       that this can be used to add the assigned variable to your context.
   *)

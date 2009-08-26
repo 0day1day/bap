@@ -29,6 +29,15 @@ BadEg1:
 -    bar in
 
 
+* Don't put a space between a constructor and it's parethesized arguments.
+    This is not mentioned in the regular guidelines, and goes against the
+    examples, but it makes some sense, since unlike a function, a constructor
+    is not valid without it's arguments.
+
+Eg:
+  let x = Foo(bar, baz, quux) in
+  let y = Bar x in
+  let z = Baz(f x) in
 
 ***Pattern matching***:
 
@@ -77,6 +86,10 @@ BadEg:
 
 * Prefer parentheses over begin/end.    
 * Prefer "ignore" over "let _".
+* Since we no longer indent after "in", use ";" rather than "let () = ... in"
+* Don't explicitly ascribe types that could be infered. It makes the code
+  harder to change later.
+* Don't overparenthesize unless there is some possible way it may be ambiguous.
 
 *** Editors ***:
 
@@ -86,7 +99,10 @@ Install tuareg-mode, and use
 	'(tuareg-in-indent 0)
 	'(tuareg-with-indent 0))
 
-
+Note: Comments in ocaml start with a (* and end with a *) and can
+contain nested comments. Apparently this is too complicated for emacs'
+comment-region, which does retarded things instead, as it tries to
+individually comment each line and escape internal comments.
 
 Vim:
 Someone who uses vim please update this.

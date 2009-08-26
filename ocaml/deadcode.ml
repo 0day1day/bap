@@ -28,8 +28,6 @@ let def_uses s =
   let uses = ref [] in
   let vis =  object(self)
     inherit Ssa_visitor.nop
-    val mutable ctx = []
-    method get_ctx = ctx
     method visit_rvar v = uses := v :: !uses;
       `DoChildren
   end
