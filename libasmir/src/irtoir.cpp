@@ -273,7 +273,7 @@ Exp *translate_64HLto64( Exp *high, Exp *low )
     assert(low);
 
     high = new BinOp( LSHIFT, high, ex_const(32) );
-    high = new BinOp( BITAND, high, ex_const(REG_64, 0xffffffff00000000L) );
+    high = new BinOp( BITAND, high, ex_const(REG_64, 0xffffffff00000000LL) );
     low = new BinOp( BITAND, low, ex_const(REG_64, 0xffffffffL) );
 
     return new BinOp( BITOR, high, low );
