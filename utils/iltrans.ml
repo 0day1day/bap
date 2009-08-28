@@ -135,16 +135,18 @@ let rec apply_cmd prog = function
       match prog with
       | Ast p -> AstCfg(Cfg_ast.of_prog p)
       | Ssa p -> AstCfg(Cfg_ssa.to_astcfg p)
-      | AstCfg _ as p -> prerr_endline "Warning: null transformation"; p
+      | AstCfg _ -> prerr_endline "Warning: null transformation"; prog
     )
   | ToAst -> (
       match prog with
       | AstCfg p -> Ast(Cfg_ast.to_prog p)
+      | Ast _ -> prerr_endline "Warning: null transformation"; prog
       | p -> apply_cmd (apply_cmd p ToCfg) ToAst
     )
   | ToSsa -> (
       match prog with
       | AstCfg p -> Ssa(Cfg_ssa.of_astcfg p)
+      | Ssa _ -> prerr_endline "Warning: null transformation"; prog
       | p -> apply_cmd (apply_cmd p ToCfg) ToSsa
     )
 ;;
