@@ -15,7 +15,7 @@ export SOURCES = \
 	util.mli util.ml \
 	dominator.ml \
 	graphDataflow.mli graphDataflow.ml \
-	type.mli \
+	type.ml type.mli \
 	var.mli var.ml \
 	ast.ml \
 	ssa.ml \
