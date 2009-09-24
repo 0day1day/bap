@@ -27,6 +27,7 @@ end
 class nop : t
 
 
+val stmt_accept : #t -> stmt -> stmt
 val exp_accept : #t -> exp -> exp
 val rvar_accept : #t -> var -> var
 val avar_accept : #t -> var -> var

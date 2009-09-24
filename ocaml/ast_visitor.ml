@@ -97,3 +97,25 @@ and binding_accept visitor =
     (v', e')
   in
   action vischil visitor#visit_binding
+
+and stmt_accept visitor = 
+  let vischil = function 
+      (* TODO: attributes? *)
+    | Jmp(l, a) -> Jmp(exp_accept visitor l, a) 
+    | CJmp(c, l1, l2, a) -> 
+	let c' = exp_accept visitor c in
+	let l1' = exp_accept visitor l1 in
+	let l2' = exp_accept visitor l2 in
+	CJmp(c', l1', l2', a)
+    | Move(lv, e, a) ->
+	let e = exp_accept visitor e in
+	let lv = avar_accept visitor lv in
+	Move(lv, e, a)
+    | Label _ as s -> s
+    | Comment _ as s-> s
+    | Assert(e,a) -> Assert(exp_accept visitor e, a)
+    | Halt(e,a) -> Halt(exp_accept visitor e, a)
+    | Special _ as s -> s
+  in
+  action (wrap vischil) (visitor#visit_stmt)
+

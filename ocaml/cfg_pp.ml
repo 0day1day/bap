@@ -115,9 +115,29 @@ struct
 
   let edge_attributes = edge_labels_ssa
 end
+
+module PrintAstStmts =
+struct
+  let print g b =
+    let stmts = CA.get_stmts g b in
+    let buf = Buffer.create (20*(List.length stmts+1)) in
+    let ft = Format.formatter_of_buffer buf in
+    let pp = new Pp.pp ft in
+    let pr = Buffer.add_string buf in
+    pr(Cfg.bbid_to_string (CA.G.V.label b));
+    pr "\n";
+    pp#ast_program stmts;
+    Format.pp_print_flush ft ();
+    Buffer.contents buf
+
+  let edge_attributes = edge_labels_ast
+end
+
 module SsaStmtsPrinter = MakeCfgPrinter (CS.G) (PrintSsaStmts)
 module SsaStmtsDot = Graph.Graphviz.Dot(SsaStmtsPrinter)
 
+module AstStmtsPrinter = MakeCfgPrinter (CA.G) (PrintAstStmts)
+module AstStmtsDot = Graph.Graphviz.Dot (AstStmtsPrinter)
 
 module SsaBBidPrinter =
 struct
