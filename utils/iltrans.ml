@@ -36,6 +36,20 @@ let output_ast_bbids f p =
   close_out oc;
   p
 
+let output_ast_cdg f p =
+  let oc = open_out f in 
+  let cdg = Depgraphs.CDG_AST.compute_cdg p in 
+    Cfg_pp.AstBBidDot.output_graph oc cdg;
+    close_out oc;
+    p
+ 
+let output_ast_pdg f p = 
+  let oc = open_out f in 
+  let pdg = Depgraphs.PDG_AST.compute_pdg p in 
+    Cfg_pp.AstStmtsDot.output_graph oc pdg;
+    close_out oc;
+    p 
+
 let output_ssa f p =
   let oc = open_out f in
   Cfg_pp.SsaStmtsDot.output_graph oc p;
@@ -66,6 +80,20 @@ let sccvn p =
 let deadcode p =
   fst(Deadcode.do_dce p)
 
+(* Chop code added *)
+let srcbb = ref 0
+let srcn = ref 0
+let trgbb = ref 0
+let trgn = ref 0
+
+let chd r n = r := n
+
+let chop p = Depgraphs.CHOP_AST.chop p !srcbb !srcn !trgbb !trgn
+
+(* Evaluation code added *)
+let eval_ast_cfg p = 
+  Depgraphs.Eval_AST.eval_program p ;
+  p 
 
 let add c =
   pipeline := c :: !pipeline
@@ -78,6 +106,16 @@ let speclist =
    "<file> Pretty print AST to <file>.")
   ::("-pp-ast-bbids", Arg.String(fun f -> add(TransformAstCfg(output_ast_bbids f))),
      "<file> Pretty print AST graph to <file> (in Graphviz format) (no stmts)")
+  ::("-pp-ast-cdg", Arg.String (fun f -> add(TransformAstCfg(output_ast_cdg f))),
+     "Output the AST CDG (bbid's)")
+  ::("-ast-eval", uadd(TransformAst eval_ast_cfg),
+     "Evaluate an AST and print variable values on exit")
+  ::("-pp-ast-pdg", Arg.String (fun f -> add(TransformAstCfg(output_ast_pdg f))),
+     "Output the AST DDG (bbid's)")
+  ::("-pp-ast-chop", 
+      Arg.Tuple [Arg.Set_int srcbb ; Arg.Set_int srcn ;
+                 Arg.Set_int trgbb ; Arg.Set_int trgn ; uadd(TransformAstCfg chop) ],
+     "<src-bb> <src-num> <trg-bb> <trg-num> Calculate the chop of an AST")
   ::("-pp-ssa", Arg.String(fun f -> add(TransformSsa(output_ssa f))),
      "<file> Pretty print SSA graph to <file> (in Graphviz format)")
   ::("-pp-ssa-bbids", Arg.String(fun f -> add(TransformSsa(output_ssa_bbids f))),
@@ -135,18 +173,16 @@ let rec apply_cmd prog = function
       match prog with
       | Ast p -> AstCfg(Cfg_ast.of_prog p)
       | Ssa p -> AstCfg(Cfg_ssa.to_astcfg p)
-      | AstCfg _ -> prerr_endline "Warning: null transformation"; prog
+      | AstCfg _ as p -> prerr_endline "Warning: null transformation"; p
     )
   | ToAst -> (
       match prog with
       | AstCfg p -> Ast(Cfg_ast.to_prog p)
-      | Ast _ -> prerr_endline "Warning: null transformation"; prog
       | p -> apply_cmd (apply_cmd p ToCfg) ToAst
     )
   | ToSsa -> (
       match prog with
       | AstCfg p -> Ssa(Cfg_ssa.of_astcfg p)
-      | Ssa _ -> prerr_endline "Warning: null transformation"; prog
       | p -> apply_cmd (apply_cmd p ToCfg) ToSsa
     )
 ;;
