@@ -104,9 +104,66 @@ let efficient_wp ?(simp=Util.id) (p:Gcl.t) =
 		   (fun q2 -> wlp_f s1
 		      (fun q3 -> k(simp(exp_and q1 (exp_or q2 q3)))) ))
     | Assign _ -> 
-	raise (Invalid_argument("efficient_wp requires an assignment-free program"))
+	invalid_arg "efficient_wp requires an assignment-free program"
   in
   let q0 = wlp_f p (fun x -> x) in 
   let qpr = wp_t p (fun x -> x) in 
   (fun q -> simp(exp_and qpr (exp_or q0 q)))
 
+
+
+let aij_wp ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (p:Gcl.t) =
+  let size e = 3 in (* FIXME *)
+  let variableify v e =
+    if size e > k then
+      let x = Var.newvar "x" (Typecheck.infer_ast e) in
+      let xe = Var x in
+      (BinOp(EQ, xe, e) :: v, xe)
+    else
+      (v, e)
+  in
+  let g (v, n, w) =
+    let rec g' v ns ws fn fw =
+      match (ns,ws) with
+      | (n::ns, w::ws) ->
+	  let (v,n) = variableify v n in
+	  g' v ns ws (exp_and n fn) (exp_or w (exp_and n fw))
+      | ([],[]) ->
+	  (v, fn, fw)
+      | _ -> failwith "n and w are supposed to have the same length"
+    in
+    match (n,w) with
+    | (n::ns, w::ws) -> let (v,n) = variableify v n in g' v ns ws n w
+    | ([],[]) -> (v, exp_true, exp_false)
+    | _ -> failwith "n and w are supposed to have the same length"
+  in
+  let rec f ((v,n,w) as vnw) s = match s with
+    | Assert e ->
+	let (v,e) = if less_duplication then variableify v e else (v,e) in
+	(v, e::n, exp_not e :: w)
+    | Assume e ->
+	(v, e::n, exp_false::w)
+    | Seq(a, b) ->
+	let vnw' = f vnw a in (* FIXME: do we need tail recursion?*)
+	f vnw' b
+    | Choice(a, b) ->
+	let (v,na,wa) = f (v,[],[]) a in
+	let (v,nb,wb) = f (v,[],[]) b in
+	let (v,na,wa) = g (v,na,wa) in
+	let (v,nb,wb) = g (v,nb,wb) in
+	(v, (exp_or na nb)::n, (exp_or wa wb)::w)
+    | Skip ->
+	vnw
+    | Assign _ ->
+	invalid_arg "aij_wp requires an assignment-free program"
+  in
+  let assignments_to_exp v =
+    let rec h e = function
+      | a::rest -> h (exp_and a e) rest
+      | [] -> e
+    in
+    h exp_true v
+  in
+  let (v,n,w) = g (f ([],[],[]) p) in
+  let v = assignments_to_exp v in
+  (fun q -> exp_and v (exp_and (exp_not w) (exp_implies n w)))
