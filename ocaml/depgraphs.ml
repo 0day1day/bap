@@ -429,7 +429,7 @@ struct
     try 
       let g' = AST.set_stmts g node [List.nth (AST.get_stmts g node) n] in
       (print_var var) ^ " " ^ (Cfg_pp.PrintAstStmts.print g' node)
-    with _ -> "Failure!! " ^ (string_of_int n) ^ " -> " ^ (Cfg_pp.PrintAstStmts.print g node)
+    with Failure "nth" -> "Failure!! " ^ (string_of_int n) ^ " -> " ^ (Cfg_pp.PrintAstStmts.print g node)
 
  (* prints a relation *)
   let print_rel g rel = 
@@ -455,10 +455,13 @@ struct
             let use = ref [none] in
             let vis = object(self)
               inherit Ast_visitor.nop
-               method visit_avar var = def := Var var ; 
-                                     Hashtbl.add du (!def,v,line) (Gamma,v,line) ;
-                                     `DoChildren
-	       method visit_rvar var = use := (Var var) :: !use ; `DoChildren
+               method visit_avar var = 
+                 def := Var var ; 
+                 Hashtbl.add du (!def,v,line) (Gamma,v,line) ;
+                 `DoChildren
+	       method visit_rvar var = 
+                 use := (Var var) :: !use ; 
+                 `DoChildren
               end
             in
              ignore (Ast_visitor.stmt_accept vis s) ;
@@ -468,15 +471,17 @@ struct
           ignore (List.fold_left 
             (fun id s -> 
               (match get_def_use s id Novar with
-                | Novar, l -> List.iter (fun x -> 
-                                          if x != Novar 
-                                          then Hashtbl.add du (Novar,v,id) (x,v,id)) l
+                | Novar, l -> 
+                  List.iter (fun x -> 
+                                if x != Novar 
+                                then Hashtbl.add du (Novar,v,id) (x,v,id)
+                             ) l
                 | var, [Novar] -> Hashtbl.add du (var,v,id) (Novar,v,id)
                 | var, l -> 
                   List.iter 
-                    (fun u -> match u with 
-                                | Novar -> () 
-                                | nv -> Hashtbl.add du (var,v,id) (nv,v,id)
+                    (function 
+                       | Novar -> () 
+                       | nv -> Hashtbl.add du (var,v,id) (nv,v,id)
                     ) l 
               ) ;
               id + 1) 0 stmts)
@@ -710,7 +715,7 @@ struct
                 ) 0 stmts2
               )
           | _ -> ()
-         with _ -> ()
+         with Failure "hd" -> ()
       ) cfg
 
   let get_dds cfg =

@@ -81,14 +81,8 @@ let deadcode p =
   fst(Deadcode.do_dce p)
 
 (* Chop code added *)
-let srcbb = ref 0
-let srcn = ref 0
-let trgbb = ref 0
-let trgn = ref 0
-
-let chd r n = r := n
-
-let chop p = Depgraphs.CHOP_AST.chop p !srcbb !srcn !trgbb !trgn
+let chop srcbb srcn trgbb trgn p = 
+  Depgraphs.CHOP_AST.chop p srcbb srcn trgbb trgn
 
 (* Evaluation code added *)
 let eval_ast_cfg p = 
@@ -113,8 +107,12 @@ let speclist =
   ::("-pp-ast-pdg", Arg.String (fun f -> add(TransformAstCfg(output_ast_pdg f))),
      "Output the AST DDG (bbid's)")
   ::("-pp-ast-chop", 
-      Arg.Tuple [Arg.Set_int srcbb ; Arg.Set_int srcn ;
-                 Arg.Set_int trgbb ; Arg.Set_int trgn ; uadd(TransformAstCfg chop) ],
+      Arg.Tuple 
+        (let srcbb = ref 0 and srcn = ref 0 
+         and trgbb = ref 0 and trgn = ref 0 in
+         [Arg.Set_int srcbb ; Arg.Set_int srcn ;
+          Arg.Set_int trgbb ; Arg.Set_int trgn ; 
+               uadd(TransformAstCfg(chop !srcbb !srcn !trgbb !trgn)) ]),
      "<src-bb> <src-num> <trg-bb> <trg-num> Calculate the chop of an AST")
   ::("-pp-ssa", Arg.String(fun f -> add(TransformSsa(output_ssa f))),
      "<file> Pretty print SSA graph to <file> (in Graphviz format)")
