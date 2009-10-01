@@ -44,3 +44,10 @@ type stmt =
 let val_false = Int(0L, Ast.reg_1)
 let val_true = Int(1L, Ast.reg_1)
 
+(** If possible, make a label that would be refered to by the given
+    expression. *)
+let val_of_exp = function
+  | Lab s -> Some(Name s)
+  | Int(i, Reg bits) ->
+      Some(Addr(Int64.logand i (Int64.pred(Int64.shift_left 1L bits))))
+  | _ -> None

@@ -79,6 +79,8 @@ let sccvn p =
   fst(Sccvn.replacer p)
 let deadcode p =
   fst(Deadcode.do_dce p)
+let jumpelim p =
+  Deadcode.cfg_jumpelim p
 
 (* Chop code added *)
 let chop srcbb srcn trgbb trgn p = 
@@ -132,6 +134,8 @@ let speclist =
      "Apply Strongly Connected Component based Value Numbering")
   ::("-deadcode", uadd(TransformSsa deadcode),
      "Perform dead code ellimination.")
+  ::("-jumpelim", uadd(TransformSsa jumpelim),
+     "Control flow optimization.")
   ::("-ssa-simp", uadd(TransformSsa Ssa_simp.simp_cfg),
      "Perform all supported optimizations on SSA")
   ::("-ssa-to-single-stmt", 
