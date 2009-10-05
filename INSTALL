@@ -4,10 +4,12 @@
 Note: we primarily build bap on 64-bit Debian Lenny. It will
 likely also work on ubuntu and 32-bit systems.
 
-To build BAP, do the following:
+To build BAP on x86, do the following:
   $ ./autogen.sh
   $ ./configure
   $ make
+
+On x86_64, instead of ./configure you may need ./configure CFLAGS=-DAMD64.
 
 Configure should report any dependencies you do not have.  You can
 satisfy most dependencies on debian lenny by running:
