@@ -389,4 +389,6 @@ let ssa_exp_to_string = pp2string (fun p -> p#ssa_exp)
 
 let ssa_stmt_to_string = pp2string (fun p -> p#ssa_stmt)
 
+let ast_exp_to_string = pp2string (fun p -> p#ast_exp ~prec:0)
+
 let ast_stmt_to_string = pp2string (fun p -> p#ast_stmt)

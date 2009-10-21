@@ -36,13 +36,13 @@ export SOURCES = \
 	asmir.mli asmir.ml \
 	grammar.mly lexer.mll \
 	parser.ml \
+	memory2array.ml \
 	input.mli input.ml \
 	gcl.mli gcl.ml \
 	wp.ml \
 	stp.ml \
 	depgraphs.ml \
 	vsa.ml \
-
 
 RESULT = bap
 DOC_FILES := $(filter %.mli, $(SOURCES)) $(filter %.ml, $(SOURCES))

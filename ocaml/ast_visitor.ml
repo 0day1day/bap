@@ -119,3 +119,6 @@ and stmt_accept visitor =
   in
   action (wrap vischil) (visitor#visit_stmt)
 
+and prog_accept visitor prog =
+  List.map (fun instmt -> stmt_accept visitor instmt) prog
+  
