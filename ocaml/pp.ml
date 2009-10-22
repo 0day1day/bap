@@ -178,7 +178,7 @@ object (self)
 	 pp "("; self#ast_exp e; pp ")"
      | Ast.Let(v,e1,e2) ->
 	 lparen 5;
-	 pp "let "; self#var v; pp " =";
+	 pp "let "; self#var v; pp " :=";
 	 opn 2; space();
 	 self#ast_exp e1; space(); 
 	 cls();
