@@ -191,7 +191,7 @@ styp:
 
 
 letstart:
-| LET ID COLON typ ASSIGN expr { (Scope.add $2 $4, $6) }
+| LET ID COLON typ ASSIGN expr { (Scope.add_push $2 $4, $6) }
 
 expr:
 | LPAREN expr RPAREN { $2 }
