@@ -71,16 +71,22 @@ class memory2array_visitor hash
   object (self)
     inherit Ast_visitor.nop
 	
+      (* djb: visit_stmt not needed. Inherited from nop*)
     method visit_stmt stmt =
       `DoChildren
 	
     method visit_avar avar =
       match Var.typ(avar) with
-      |	TMem(_) ->
+      |	TMem(idxt) ->
 	  let array =
 	    try VarHash.find hash avar
 	    with Not_found -> 
-	      let newarrvar = newvar (Var.name avar) (Array(Reg(bitwidth), (getelementtype (Var.typ avar))))
+	      (* djb: we want the indx type to be the same. The
+		 element type changes *)
+	      (* let newarrvar = newvar (Var.name avar)
+		 (Array(Reg(bitwidth), (getelementtype (Var.typ
+		 avar)))) *)
+	      let newarrvar = newvar (Var.name avar) (Array(idxt,Reg(bitwidth))) 
 	      in
 	      VarHash.add hash avar newarrvar;
 	      newarrvar
@@ -90,11 +96,15 @@ class memory2array_visitor hash
 	
     method visit_rvar rvar =
       match Var.typ(rvar) with
-      |	TMem(_) ->
+      |	TMem(idxt) ->
 	  let array =
 	    try VarHash.find hash rvar
 	    with Not_found -> 
-	      let newarrvar = newvar (Var.name rvar) (Array(Reg(bitwidth), (getelementtype (Var.typ rvar))))
+	      (* djb: again, i think this is incorrect *)
+	      (* let newarrvar = newvar (Var.name rvar)
+		(Array(Reg(bitwidth), (getelementtype (Var.typ rvar)))) *)
+	      let newarrvar = newvar (Var.name rvar) (Array(idxt,Reg(bitwidth))) 	      
+
 	      in
 	      VarHash.add hash rvar newarrvar;
 	      newarrvar
@@ -124,6 +134,7 @@ class memory2array_visitor2 hash
 	      let newexpr = split_loads arr idx t endian 
 	      in
 	      Printf.printf "New Load %s\n" (Pp.ast_exp_to_string newexpr);
+	      (* djb: still need to descend into children *)
 	      `ChangeTo newexpr)
       | Store(arr,idx,data,endian,t) -> (Printf.printf "Store %s %s %s Reg%d\n" (Pp.ast_exp_to_string arr) (Pp.ast_exp_to_string idx) (Pp.ast_exp_to_string data) (getwidth t);
           let width = (getwidth t) in

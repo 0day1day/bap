@@ -213,7 +213,7 @@ object (self)
 		("(0bin"^String.make (bits-bits1) '0'^" @ ", ")")
 	  in
 	  pp pre;
-	  self#ast_exp e;
+	  self#ast_exp e1;
 	  pp post
       | Unknown(s,t) ->
 	  pp "unknown_"; pi unknown_counter; pp" %"; pp s; force_newline();
