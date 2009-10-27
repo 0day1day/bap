@@ -34,6 +34,7 @@ let split_load array index eletype endian bytenum =
   let indexplus = BinOp(PLUS, index, Int(Int64.of_int(bytenum), eletype)) in
   let exp = Load(array, indexplus, endian, newtype) in
   let exp = Cast(CAST_UNSIGNED, eletype, exp) in
+  (* djb: you also need to mask the value *)
   let exp = BinOp(LSHIFT, exp, Int(Int64.of_int((elesize - bytenum - 1) * bitwidth), eletype)) in
   exp
  
@@ -48,11 +49,13 @@ let split_write array index eletype endian data bytenum =
   let elesize = getwidth eletype in
   let newtype = Reg(bitwidth) in
   let indexplus = BinOp(PLUS, index, Int(Int64.of_int(bytenum), eletype)) in
+  (* djb: you also need to mask the value *)
   let exp = BinOp(RSHIFT, data, Int(Int64.of_int((elesize - bytenum - 1) * bitwidth), eletype)) in
   let exp = Cast(CAST_LOW, newtype, exp) in
   let exp = Store(array, indexplus, exp, endian, newtype) in
   exp
       
+(* djb: writes and read indexes appear backwards. double check *)
 let split_writes array index eletype endian data =
   assert (endian = exp_false);
   let inftype = Typecheck.infer_ast array in
