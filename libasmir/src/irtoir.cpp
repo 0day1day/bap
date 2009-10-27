@@ -1249,6 +1249,8 @@ vector<vine_block_t *> generate_vex_ir(asm_program_t *prog,
 {
   vector<vine_block_t *> results;
   address_t inst;
+  assert(prog);
+  translate_init();
   for(inst = start; inst < end; inst += asmir_get_instr_length(prog, inst)){
     vine_block_t *vblock = generate_vex_ir(prog, inst);
     results.push_back(vblock);

@@ -13,8 +13,21 @@ vine_blocks_t * asmir_asmprogram_to_vine(asm_program_t *prog) {
   return res;
 }
 
+
+vine_blocks_t *asmir_asmprogram_range_to_vine(asm_program_t *prog, 
+					address_t start,
+					address_t end)
+{
+  vector<vine_block_t *> *res = new vector<vine_block_t *>();
+  // eww, references
+  *res = generate_vex_ir(prog, start, end);
+  generate_vine_ir(prog, *res);
+  return res;
+}
+
 int asmir_vine_blocks_size(vine_blocks_t *bs) {
   return bs->size();
+
 }
 
 vine_block_t * asmir_vine_blocks_get(vine_blocks_t *bs, int i) {

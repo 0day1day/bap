@@ -189,6 +189,7 @@ enum bfd_architecture asmir_get_asmp_arch(asm_program_t prog);
 
 
 vine_blocks_t asmir_asmprogram_to_vine(asm_program_t prog);
+vine_blocks_t asmir_asmprogram_range_to_vine(asm_program_t prog, address_t start, address_t end);
 vine_block_t asmir_addr_to_vine(asm_program_t p, address_t addr);
 int asmir_get_instr_length(asm_program_t p, address_t addr);
 int asmir_vine_blocks_size(vine_blocks_t bs);

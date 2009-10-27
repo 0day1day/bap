@@ -119,6 +119,11 @@ vine_block_t* generate_vex_ir(asm_program_t *prog, address_t inst);
 //
 vector<vine_block_t *> generate_vex_ir( asm_program_t *prog );
 
+// Same as generate_vex_ir, but only for an address range
+vector<vine_block_t *> generate_vex_ir(asm_program_t *prog,
+					address_t start,
+					address_t end);
+
 // Take a vine block that has gone through VEX translation and translate it
 // to Vine IR.
 void generate_vine_ir_block( asm_program_t *prog, vine_block_t *block );
@@ -165,6 +170,7 @@ extern "C" {
   */
 
   extern vine_blocks_t * asmir_asmprogram_to_vine(asm_program_t *prog);
+  extern vine_blocks_t * asmir_asmprogram_range_to_vine(asm_program_t *prog, address_t start, address_t end);
   extern asm_program_t* byte_insn_to_asmp(bfd_architecture arch, address_t addr, unsigned char *bb_bytes, unsigned int len);
   extern vine_block_t* asmir_addr_to_vine(asm_program_t *p, address_t addr);
 

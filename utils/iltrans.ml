@@ -142,6 +142,10 @@ let speclist =
      uadd(TransformSsa Depgraphs.DDG_SSA.stmtlist_to_single_stmt),
      "Create new graph where every node has at most 1 SSA statement"
     )
+  :: ("-normalize-mem",
+      uadd(TransformAst Memory2array.coerce_prog),
+      "Normalize memory accesses as array accesses"
+     )
   :: Input.speclist
 
 let anon x = raise(Arg.Bad("Unexpected argument: '"^x^"'"))
