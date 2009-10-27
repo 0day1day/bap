@@ -1,7 +1,7 @@
 let usage = "Usage: "^Sys.argv.(0)^" <input options> [transformations and outputs]\n\
              Transform BAP IL programs. "
 
-open Bap
+(* open Bap*)
 
 type ast = Ast.program
 type astcfg = Cfg.AST.G.t
@@ -25,7 +25,7 @@ let pipeline = ref []
 
 let output_ast f p =
   let oc = open_out f in
-  let pp = new Bap.Pp.pp_oc oc in
+  let pp = new Pp.pp_oc oc in
   pp#ast_program p;
   pp#close;
   p
@@ -142,7 +142,7 @@ let speclist =
      uadd(TransformSsa Depgraphs.DDG_SSA.stmtlist_to_single_stmt),
      "Create new graph where every node has at most 1 SSA statement"
     )
-  :: Bap.Input.speclist
+  :: Input.speclist
 
 let anon x = raise(Arg.Bad("Unexpected argument: '"^x^"'"))
 let () = Arg.parse speclist anon usage
@@ -150,7 +150,7 @@ let () = Arg.parse speclist anon usage
 let pipeline = List.rev !pipeline
 
 let prog =
-  try Bap.Input.get_program()
+  try Input.get_program()
   with Arg.Bad s ->
     Arg.usage speclist (s^"\n"^usage);
     exit 1

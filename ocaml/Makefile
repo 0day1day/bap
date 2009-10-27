@@ -7,7 +7,7 @@ include $(LIBASMIR)/makefile.inc
 #export EXTLIBDIRS += ../stp ../stp/ocaml
 #export LIBS += stpvc
 
-export LIB_PACK_NAME = bap
+#export LIB_PACK_NAME = bap
 
 # common sources
 export SOURCES = \
@@ -60,7 +60,7 @@ export LDFLAGS = $(LIBASMIR_LDFLAGS)
 export CLIBFLAGS= $(LDFLAGS)
 export LIBDIRS = $(LIBASMIR)/src # ../appreplay ../stp ../stp/ocaml
 
-OCAMLFLAGS = -warn-error Aelz  -for-pack Bap #-w A
+OCAMLFLAGS = -warn-error Aelz # -for-pack Bap #-w A
 # merge everything but descriptions.
 OCAMLDOCFLAGS = -m avlsoper
 
