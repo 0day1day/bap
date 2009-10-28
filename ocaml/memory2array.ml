@@ -29,13 +29,12 @@ let getwidth regtyp =
   | _ -> failwith "Only support register indices!"
 
 let split_load array index eletype endian bytenum =
-  let elesize = getwidth eletype in
   let newtype = Reg(bitwidth) in
   let indexplus = BinOp(PLUS, index, Int(Int64.of_int(bytenum), eletype)) in
   let exp = Load(array, indexplus, endian, newtype) in
   let exp = Cast(CAST_UNSIGNED, eletype, exp) in
   (* djb: you also need to mask the value *)
-  let exp = BinOp(LSHIFT, exp, Int(Int64.of_int((elesize - bytenum - 1) * bitwidth), eletype)) in
+  let exp = BinOp(LSHIFT, exp, Int(Int64.of_int((bytenum) * bitwidth), eletype)) in
   exp
  
 let split_loads array index eletype endian =
@@ -46,16 +45,14 @@ let split_loads array index eletype endian =
   orexp
 
 let split_write array index eletype endian data bytenum =
-  let elesize = getwidth eletype in
   let newtype = Reg(bitwidth) in
   let indexplus = BinOp(PLUS, index, Int(Int64.of_int(bytenum), eletype)) in
   (* djb: you also need to mask the value *)
-  let exp = BinOp(RSHIFT, data, Int(Int64.of_int((elesize - bytenum - 1) * bitwidth), eletype)) in
+  let exp = BinOp(RSHIFT, data, Int(Int64.of_int((bytenum) * bitwidth), eletype)) in
   let exp = Cast(CAST_LOW, newtype, exp) in
   let exp = Store(array, indexplus, exp, endian, newtype) in
   exp
       
-(* djb: writes and read indexes appear backwards. double check *)
 let split_writes array index eletype endian data =
   assert (endian = exp_false);
   let inftype = Typecheck.infer_ast array in
@@ -74,10 +71,6 @@ class memory2array_visitor hash
   object (self)
     inherit Ast_visitor.nop
 	
-      (* djb: visit_stmt not needed. Inherited from nop*)
-    method visit_stmt stmt =
-      `DoChildren
-	
     method visit_avar avar =
       match Var.typ(avar) with
       |	TMem(idxt) ->
@@ -86,9 +79,6 @@ class memory2array_visitor hash
 	    with Not_found -> 
 	      (* djb: we want the indx type to be the same. The
 		 element type changes *)
-	      (* let newarrvar = newvar (Var.name avar)
-		 (Array(Reg(bitwidth), (getelementtype (Var.typ
-		 avar)))) *)
 	      let newarrvar = newvar (Var.name avar) (Array(idxt,Reg(bitwidth))) 
 	      in
 	      VarHash.add hash avar newarrvar;
@@ -104,10 +94,7 @@ class memory2array_visitor hash
 	    try VarHash.find hash rvar
 	    with Not_found -> 
 	      (* djb: again, i think this is incorrect *)
-	      (* let newarrvar = newvar (Var.name rvar)
-		(Array(Reg(bitwidth), (getelementtype (Var.typ rvar)))) *)
 	      let newarrvar = newvar (Var.name rvar) (Array(idxt,Reg(bitwidth))) 	      
-
 	      in
 	      VarHash.add hash rvar newarrvar;
 	      newarrvar
@@ -128,25 +115,24 @@ class memory2array_visitor2 hash
     method visit_exp exp =
 (*       Printf.printf "Visiting expression %s\n" (Pp.ast_exp_to_string exp); *)
       match exp with
-      | Load(arr,idx,endian,t) -> (Printf.printf "Load %s\n" (Pp.ast_exp_to_string exp);
+      | Load(arr,idx,endian,t) -> ((* Printf.printf "Load %s\n" (Pp.ast_exp_to_string exp); *)
 	  let width = (getwidth t) in
 	  match width with
-	  | 1 -> Printf.printf "Cool\n";
+	  | 1 -> (* Printf.printf "Cool\n"; *)
 	      `DoChildren
-	  | _ -> Printf.printf "Need to split\n";
+	  | _ -> (* Printf.printf "Need to split\n"; *)
 	      let newexpr = split_loads arr idx t endian 
 	      in
-	      Printf.printf "New Load %s\n" (Pp.ast_exp_to_string newexpr);
+	      (* Printf.printf "New Load %s\n" (Pp.ast_exp_to_string newexpr); *)
 	      (* djb: still need to descend into children *)
 	      `ChangeTo newexpr)
-      | Store(arr,idx,data,endian,t) -> (Printf.printf "Store %s %s %s Reg%d\n" (Pp.ast_exp_to_string arr) (Pp.ast_exp_to_string idx) (Pp.ast_exp_to_string data) (getwidth t);
+      | Store(arr,idx,data,endian,t) -> ((* Printf.printf "Store %s %s %s Reg%d\n" (Pp.ast_exp_to_string arr) (Pp.ast_exp_to_string idx) (Pp.ast_exp_to_string data) (getwidth t); *)
           let width = (getwidth t) in
           match width with
-          | 1 -> Printf.printf "Cool!\n";
+          | 1 -> (* Printf.printf "Cool!\n"; *)
 	      `DoChildren
-          | _ -> (Printf.printf "Need to split\n";
+          | _ -> ( (* Printf.printf "Need to split\n"; *)
                   let newexpr = split_writes arr idx t endian data in
-		  Printf.printf "New store: %s\n" (Pp.ast_exp_to_string newexpr);
 		  `ChangeTo newexpr
                     ))
       | _ -> `DoChildren              
@@ -166,6 +152,5 @@ let coerce_prog prog =
   let prog = Ast_visitor.prog_accept visitor prog in
   let prog = Ast_visitor.prog_accept visitor2 prog
   in
-  Printf.printf "We are here!\n";
   prog
   
