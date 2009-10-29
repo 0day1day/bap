@@ -19,9 +19,12 @@ let speclist =
                [Arg.Set_string f; Arg.String(setint64 s);
                 Arg.String(fun e->addinput(`Binrange(!f, !s, toint64 e)))]),
      "<file> <start> <end> Convert the given range of a binary to the IL");
-    ("-ir",
-     Arg.String(fun s -> addinput (`Ir s)),
-     "<file> Read input from an IR file.");
+    ("-il",
+     Arg.String(fun s -> addinput (`Il s)),
+     "<file> Read input from an IL file.");
+    ("-ir", (* to be removed in next versions *)
+     Arg.String(fun s -> addinput (`Il s)),
+     "<file> Read input from an IL file. (deprecated)");
   ]
 
 
@@ -29,7 +32,7 @@ let speclist =
 let get_program () =
   if !inputs = [] then raise(Arg.Bad "No input specified");
   let get_one = function
-    | `Ir f ->
+    | `Il f ->
 	Parser.program_from_file f
     | `Bin f ->
 	let p = Asmir.open_program f in
