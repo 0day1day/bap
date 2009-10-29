@@ -45,7 +45,7 @@ type t =
     A straightline trace cannot have any CJmps, and any Jmps it might have must
     jump to the label following them. (Ie, any jump must be a no-op)
 *)
-let rec of_straightline ?(acc=Skip) trace =
+let rec of_rev_straightline ?(acc=Skip) trace =
   let rec prepend g = function
     | Move(l,e,_) -> Seq(Assign(l,e), g)
     | CJmp _
@@ -61,8 +61,9 @@ let rec of_straightline ?(acc=Skip) trace =
   in
   (* fold_left of reversed list, rather than fold_right, because
    * fold_right is not tail recursive *)
-  List.fold_left prepend acc (List.rev trace)
+  List.fold_left prepend acc trace
 
+let of_straightline trace = of_rev_straightline(List.rev trace)
 
 
 
@@ -180,7 +181,7 @@ let of_astcfg ?entry ?exit cfg =
 	let bb_s = CA.get_stmts cfg b in
 	match List.rev bb_s with
 	| [] -> Skip
-	| (Jmp _ | CJmp _)::rest -> of_straightline rest
+	| (Jmp _ | CJmp _)::rest -> of_rev_straightline rest
 	| _ -> of_straightline bb_s
   in
 
