@@ -69,14 +69,14 @@ void print_prog_insns( asm_program_t *prog )
 }
 
 
-void print_vex_ir(asm_program_t *prog, vector<vine_block_t *> vblocks )
+void print_vex_ir(asm_program_t *prog, vector<bap_block_t *> vblocks )
 {
 
     unsigned int i;
 
     for ( i = 0; i < vblocks.size(); i++ )
     {
-        vine_block_t *block = vblocks.at(i);
+        bap_block_t *block = vblocks.at(i);
         assert(block);
 
         cout << endl << "VEX Block " << i << endl;
@@ -97,11 +97,11 @@ void print_vex_ir(asm_program_t *prog, vector<vine_block_t *> vblocks )
 
 void print_prog_ir(asm_program_t *prog)
 {
-  vector<vine_block_t *> vine_blocks = generate_vex_ir(prog);    
-  vine_blocks = generate_vine_ir(prog, vine_blocks);
+  vector<bap_block_t *> bap_blocks = generate_vex_ir(prog);    
+  bap_blocks = generate_bap_ir(prog, bap_blocks);
 
   //print_globals();
-  print_vine_ir(prog, vine_blocks);
+  print_bap_ir(prog, bap_blocks);
 }
 
 //======================================================================
@@ -127,7 +127,7 @@ int main(int argc, char *argv[])
         print_option = *(argv[2]);
     }
 
-    vector<vine_block_t *> vine_blocks;
+    vector<bap_block_t *> bap_blocks;
 
     //
     // Disassemble the program 
@@ -148,7 +148,7 @@ int main(int argc, char *argv[])
     cerr << "Translating asm to VEX IR." << endl;
     if ( print_option > '0' )
     {
-        vine_blocks = generate_vex_ir(prog);
+        bap_blocks = generate_vex_ir(prog);
     }
 
     //
@@ -157,7 +157,7 @@ int main(int argc, char *argv[])
     cerr << "Translating VEX IR to Vine IR." << endl;
     if ( print_option > '1' )
     {
-      vine_blocks = generate_vine_ir(prog, vine_blocks);
+      bap_blocks = generate_bap_ir(prog, bap_blocks);
     }
 
     cerr << "Printing output:" << endl;
@@ -171,13 +171,13 @@ int main(int argc, char *argv[])
     // Print the VEX IR output
     //
     else if ( print_option == '1' )
-      print_vex_ir(prog, vine_blocks);
+      print_vex_ir(prog, bap_blocks);
 
     //
     // Print the Vine IR output
     //
     else if ( print_option == '2' )
-      print_vine_ir(prog, vine_blocks);
+      print_bap_ir(prog, bap_blocks);
 
 
     //

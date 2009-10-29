@@ -32,5 +32,5 @@ using namespace std;
 // Uncomment to enable typechecking.
 //#define NOTYPECHECKING
 void print_globals();
-void print_vine_ir(asm_program_t *prog, vector<vine_block_t *> vblocks );
+void print_bap_ir(asm_program_t *prog, vector<bap_block_t *> vblocks );
 #endif

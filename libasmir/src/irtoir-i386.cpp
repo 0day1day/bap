@@ -1132,7 +1132,7 @@ vector<Stmt *> *translate_special( Instruction *inst )
 
 
 /*
-static void add_special_returns(vine_block_t *block)
+static void add_special_returns(bap_block_t *block)
 {
   if(block->inst == NULL) return;
   // If this is a return statement, make note of it
@@ -1140,8 +1140,8 @@ static void add_special_returns(vine_block_t *block)
      block->inst->opcode[0] == 0xC3 ||
      block->inst->opcode[0] == 0xCA ||
      block->inst->opcode[0] == 0xCB){
-    block->vine_ir->push_back(new Special("ret"));
-    block->vine_ir->push_back(mk_label());
+    block->bap_ir->push_back(new Special("ret"));
+    block->bap_ir->push_back(mk_label());
   }
 
 }
@@ -2399,11 +2399,11 @@ static void modify_eflags_helper( string op, reg_t type, vector<Stmt *> *ir, int
     }
 }
 
-void i386_modify_flags( asm_program_t *prog, vine_block_t *block )
+void i386_modify_flags( asm_program_t *prog, bap_block_t *block )
 {
     assert(block);
 
-    vector<Stmt *> *ir = block->vine_ir;    
+    vector<Stmt *> *ir = block->bap_ir;    
 
     // Look for occurrence of CC_OP assignment
     // These will have the indices of the CC_OP stmts

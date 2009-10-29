@@ -111,7 +111,7 @@ let of_astcfg ?entry ?exit cfg =
     | CSeq [] -> g
     | CSeq [x] -> x
     | CSeq sl ->
-	(* <@ is the composition operator from vine_util. This
+	(* <@ is the composition operator from bap_util. This
 	   recursively goes through sl and calls remove_skips on
 	   each list item, along with the filtering. *)
 	CSeq(list_filter_some

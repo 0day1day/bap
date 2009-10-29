@@ -9,8 +9,8 @@
 typedef [abstract] void* Exp;
 typedef [abstract] void* Stmt;
 typedef [abstract] void* asm_program_t;
-typedef [abstract] void* vine_block_t;
-typedef [abstract] void* vine_blocks_t;
+typedef [abstract] void* bap_block_t;
+typedef [abstract] void* bap_blocks_t;
 
 
 #include "../libasmir/config.h"
@@ -188,21 +188,21 @@ void asmir_close(asm_program_t p);
 enum bfd_architecture asmir_get_asmp_arch(asm_program_t prog);
 
 
-vine_blocks_t asmir_asmprogram_to_vine(asm_program_t prog);
-vine_blocks_t asmir_asmprogram_range_to_vine(asm_program_t prog, address_t start, address_t end);
-vine_block_t asmir_addr_to_vine(asm_program_t p, address_t addr);
+bap_blocks_t asmir_asmprogram_to_bap(asm_program_t prog);
+bap_blocks_t asmir_asmprogram_range_to_bap(asm_program_t prog, address_t start, address_t end);
+bap_block_t asmir_addr_to_bap(asm_program_t p, address_t addr);
 int asmir_get_instr_length(asm_program_t p, address_t addr);
-int asmir_vine_blocks_size(vine_blocks_t bs);
-vine_block_t asmir_vine_blocks_get(vine_blocks_t bs, int i);
-void destroy_vine_block(vine_block_t bs);
-void destroy_vine_blocks(vine_blocks_t bs);
-int asmir_vine_block_size(vine_block_t b);
-Stmt asmir_vine_block_get(vine_block_t b, int i);
-address_t asmir_vine_block_address(vine_block_t b);
+int asmir_bap_blocks_size(bap_blocks_t bs);
+bap_block_t asmir_bap_blocks_get(bap_blocks_t bs, int i);
+void destroy_bap_block(bap_block_t bs);
+void destroy_bap_blocks(bap_blocks_t bs);
+int asmir_bap_block_size(bap_block_t b);
+Stmt asmir_bap_block_get(bap_block_t b, int i);
+address_t asmir_bap_block_address(bap_block_t b);
 
 
 /*
-vine_block_t
+bap_block_t
 byte_insn_to_ir_c(address_t addr, [size_is(len)] char *bb_bytes, int len);
 */
 

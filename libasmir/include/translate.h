@@ -54,11 +54,11 @@ extern "C" {
 
   extern instmap_t * filename_to_instmap(const char *filename);
 
-  extern vine_blocks_t *instmap_translate_address_range(instmap_t *insts,
+  extern bap_blocks_t *instmap_translate_address_range(instmap_t *insts,
 							address_t start,
 							address_t end);
 
-  extern vine_block_t *instmap_translate_address(instmap_t *insts,
+  extern bap_block_t *instmap_translate_address(instmap_t *insts,
 						 address_t addr);
 
   extern int instmap_has_address(instmap_t *insts,

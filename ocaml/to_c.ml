@@ -42,7 +42,7 @@ object(self)
  (** Pretty print a program using the given formater *)
   method ast_program ?(name="bap_program") sl =
     opn 0;
-    pp "#include <vine_helpers.h>\n";
+    pp "#include <bap_helpers.h>\n";
     newline();
     pp "int64_t ";
     pp name;
@@ -373,7 +373,7 @@ end
 let unlet (dl,sl) = 
   let  unlet_vis =
 object(self)
-  inherit nop_vine_visitor
+  inherit nop_bap_visitor
     
   val mutable new_decls = []
   val mutable new_stmts = []

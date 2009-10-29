@@ -67,7 +67,7 @@ struct
   let top k = (1L, mini k, maxi k)
 
   let single x = (0L,x,x)
-  let of_vine_int i t = single (extend (bits_of_width t) i)
+  let of_bap_int i t = single (extend (bits_of_width t) i)
 
   let zero = single 0L
   let one = single 1L
@@ -383,7 +383,7 @@ struct
 	      let find v = VM.find v l in
 	      let do_find v =  try find v with Not_found -> top v  in
 	      let val2si = function
-		| Int(i,t) -> SI.of_vine_int i t
+		| Int(i,t) -> SI.of_bap_int i t
 		| Lab _ -> raise(Unimplemented "No SI for labels (should be a constant)")
 		| Var v -> do_find v
 	      in
@@ -508,7 +508,7 @@ struct
     | _ -> `VSarb
 
   let single x = [(global, SI.single x)]
-  let of_vine_int i t = [(global, SI.of_vine_int i t)]
+  let of_bap_int i t = [(global, SI.of_bap_int i t)]
 
   let zero = [(global, SI.zero)]
   let one = [(global, SI.one)]
@@ -645,7 +645,7 @@ struct
 	      let find v = VM.find v l in
 	      let do_find v =  try find v with Not_found -> VS.top in
 	      let val2vs = function
-		| Int(i,t) -> VS.of_vine_int i t
+		| Int(i,t) -> VS.of_bap_int i t
 		| Lab _ -> raise(Unimplemented "No VS for labels (should be a constant)")
 		| Var v -> do_find v
 	      in
@@ -781,7 +781,7 @@ module AbsEnv = struct
     with Not_found -> VS.top
 
   let ssaval2vs ae = function
-    | Int(i,t) -> VS.of_vine_int i t
+    | Int(i,t) -> VS.of_bap_int i t
     | Lab _ -> raise(Unimplemented "No VS for labels (should be a constant)")
     | Var v -> do_find_vs ae v
 
@@ -855,7 +855,7 @@ struct
 	      in
 	      let val2vs = function
 		| Int(i,t)->
-		      VS.of_vine_int i t
+		      VS.of_bap_int i t
 		| Lab _ -> raise(Unimplemented "No VS for labels (should be a constant)")
 		| Var v -> do_find v
 	      in

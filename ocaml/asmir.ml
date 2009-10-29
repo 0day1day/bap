@@ -203,14 +203,14 @@ let rec tr_stmt g s =
     | FUNCTION ->
 	failwith "Unsupported statement type"
 
-(** Translate a whole vine_block_t (as returned by
-    Libasmir.asmir_vine_blocks_get) into a list of statements *)
-let tr_vine_block_t g asmp b = 
-  let size = Libasmir.asmir_vine_block_size b - 1 in
-  let addr = Libasmir.asmir_vine_block_address b in
+(** Translate a whole bap_block_t (as returned by
+    Libasmir.asmir_bap_blocks_get) into a list of statements *)
+let tr_bap_block_t g asmp b = 
+  let size = Libasmir.asmir_bap_block_size b - 1 in
+  let addr = Libasmir.asmir_bap_block_address b in
   let asm = Libasmir.asmir_string_of_insn asmp addr in
   let (decs,stmts) =
-    foldn (fun (ds,ss) n -> let s = asmir_vine_block_get b n in
+    foldn (fun (ds,ss) n -> let s = asmir_bap_block_get b n in
 	     match Libasmir.stmt_type s with
 		 VARDECL -> (s::ds,ss)
 	       | _ -> (ds,s::ss) )
@@ -222,11 +222,11 @@ let tr_vine_block_t g asmp b =
   unextend();
   stmts
 
-(** Translate a vine_blocks_t (as returned by
-    Libasmir.asmir_asmprogram_to_vine) into a list of statements *)
-let tr_vine_blocks_t g asmp bs = 
-  let size = Libasmir.asmir_vine_blocks_size bs -1 in
-    foldn (fun i n -> tr_vine_block_t g asmp (asmir_vine_blocks_get bs n)@i) [] size
+(** Translate a bap_blocks_t (as returned by
+    Libasmir.asmir_asmprogram_to_bap) into a list of statements *)
+let tr_bap_blocks_t g asmp bs = 
+  let size = Libasmir.asmir_bap_blocks_size bs -1 in
+    foldn (fun i n -> tr_bap_block_t g asmp (asmir_bap_blocks_get bs n)@i) [] size
 
 
 
@@ -333,28 +333,28 @@ let open_program filename =
   prog
 
 (** Translate an entire Libasmir.asm_program_t into a Vine program *)
-let asmprogram_to_vine ?(init_mem=false) asmp = 
-  let vine_blocks = Libasmir.asmir_asmprogram_to_vine asmp in
+let asmprogram_to_bap ?(init_mem=false) asmp = 
+  let bap_blocks = Libasmir.asmir_asmprogram_to_bap asmp in
   let arch = get_asmprogram_arch asmp in
   let g = gamma_for_arch arch in
-  let ir = tr_vine_blocks_t g asmp vine_blocks in
-  let () = destroy_vine_blocks vine_blocks in
+  let ir = tr_bap_blocks_t g asmp bap_blocks in
+  let () = destroy_bap_blocks bap_blocks in
   ir
 
 
 
 (** Translate only one address of a  Libasmir.asm_program_t to Vine *)
-let asm_addr_to_vine g prog addr =
-  let block= Libasmir.asmir_addr_to_vine prog addr in
-  let ir = tr_vine_block_t g prog block in
-  let () = destroy_vine_block block in
+let asm_addr_to_bap g prog addr =
+  let block= Libasmir.asmir_addr_to_bap prog addr in
+  let ir = tr_bap_block_t g prog block in
+  let () = destroy_bap_block block in
   ir
 
 
-let asmprogram_to_vine_range ?(init_mem = false) asmp st en=
-  let vine_blocks = Libasmir.asmir_asmprogram_range_to_vine asmp st en in
+let asmprogram_to_bap_range ?(init_mem = false) asmp st en=
+  let bap_blocks = Libasmir.asmir_asmprogram_range_to_bap asmp st en in
   let arch = get_asmprogram_arch asmp in
   let g = gamma_for_arch arch in
-  let ir = tr_vine_blocks_t g asmp vine_blocks in
-  let () = destroy_vine_blocks vine_blocks in
+  let ir = tr_bap_blocks_t g asmp bap_blocks in
+  let () = destroy_bap_blocks bap_blocks in
   ir

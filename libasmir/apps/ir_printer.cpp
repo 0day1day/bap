@@ -28,16 +28,16 @@ void print_globals(){
 }
 */
 
-void print_vine_ir(asm_program_t *prog, vector<vine_block_t *> vblocks )
+void print_bap_ir(asm_program_t *prog, vector<bap_block_t *> vblocks )
 {
     unsigned int i, j;
     
     for ( i = 0; i < vblocks.size(); i++ )
     {
-        vine_block_t *block = vblocks.at(i);
+        bap_block_t *block = vblocks.at(i);
         assert(block);
         
-        vector<Stmt *> *inner = block->vine_ir;
+        vector<Stmt *> *inner = block->bap_ir;
 
 	//        cout << "Vine Block " << i << endl;
         cout << "  {" << endl;

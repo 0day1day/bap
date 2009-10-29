@@ -224,7 +224,7 @@ let opt_expid info var exp =
 	(* TODO: add SLT and SLE. Requires canonicalized ints *)
   | x -> x
 
-(* simplifications in vine_opt which we don't (yet) do here:
+(* simplifications in bap_opt which we don't (yet) do here:
    associative optimizations
    a - b = a + -b
    !(a-1) = -a

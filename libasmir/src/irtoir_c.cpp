@@ -5,69 +5,69 @@
 #include "asm_program.h"
 #include "irtoir-internal.h"
 
-vine_blocks_t * asmir_asmprogram_to_vine(asm_program_t *prog) {
-  vector<vine_block_t *> *res = new vector<vine_block_t *>();
+bap_blocks_t * asmir_asmprogram_to_bap(asm_program_t *prog) {
+  vector<bap_block_t *> *res = new vector<bap_block_t *>();
   // eww, references
   *res = generate_vex_ir(prog);
-  generate_vine_ir(prog, *res);
+  generate_bap_ir(prog, *res);
   return res;
 }
 
 
-vine_blocks_t *asmir_asmprogram_range_to_vine(asm_program_t *prog, 
+bap_blocks_t *asmir_asmprogram_range_to_bap(asm_program_t *prog, 
 					address_t start,
 					address_t end)
 {
-  vector<vine_block_t *> *res = new vector<vine_block_t *>();
+  vector<bap_block_t *> *res = new vector<bap_block_t *>();
   // eww, references
   *res = generate_vex_ir(prog, start, end);
-  generate_vine_ir(prog, *res);
+  generate_bap_ir(prog, *res);
   return res;
 }
 
-int asmir_vine_blocks_size(vine_blocks_t *bs) {
+int asmir_bap_blocks_size(bap_blocks_t *bs) {
   return bs->size();
 
 }
 
-vine_block_t * asmir_vine_blocks_get(vine_blocks_t *bs, int i) {
+bap_block_t * asmir_bap_blocks_get(bap_blocks_t *bs, int i) {
   return bs->at(i);
 }
 
-void destroy_vine_block(vine_block_t *b) {
+void destroy_bap_block(bap_block_t *b) {
   // FIXME: inst seems to be a pointer into the asm_program_t,
   // so we don't need to free it?
   // FIXME: stuff in vex_ir seems to be allocated in VEX's own heap?
   // If so, should provide a way to free that memory too?
   //free(b->vex_ir);
-  for (vector<Stmt*>::iterator j = b->vine_ir->begin();
-       j != b->vine_ir->end(); j++) {
+  for (vector<Stmt*>::iterator j = b->bap_ir->begin();
+       j != b->bap_ir->end(); j++) {
     Stmt::destroy(*j);
   }
-  delete b->vine_ir;
+  delete b->bap_ir;
   delete b;
 }
 
-void destroy_vine_blocks(vine_blocks_t *bs) {
-  for (vector<vine_block_t *>::iterator i = bs->begin(); i != bs->end(); i++) {
-    destroy_vine_block(*i);
+void destroy_bap_blocks(bap_blocks_t *bs) {
+  for (vector<bap_block_t *>::iterator i = bs->begin(); i != bs->end(); i++) {
+    destroy_bap_block(*i);
   }
   delete bs;
 }
 
 
 
-address_t asmir_vine_block_address(vine_block_t *b)
+address_t asmir_bap_block_address(bap_block_t *b)
 {
   return b->inst;
 }
 
-int asmir_vine_block_size(vine_block_t *b) {
-  return b->vine_ir->size();
+int asmir_bap_block_size(bap_block_t *b) {
+  return b->bap_ir->size();
 }
 
-Stmt * asmir_vine_block_get(vine_block_t *b, int i) {
-  return b->vine_ir->at(i);
+Stmt * asmir_bap_block_get(bap_block_t *b, int i) {
+  return b->bap_ir->at(i);
 }
 
 
@@ -104,10 +104,10 @@ byte_insn_to_asmp(bfd_architecture arch, address_t addr, unsigned char *bb_bytes
 
 
 // moved from ir_program.cpp
-vine_block_t* asmir_addr_to_vine(asm_program_t *p, address_t addr)
+bap_block_t* asmir_addr_to_bap(asm_program_t *p, address_t addr)
 {
   translate_init();
-  vine_block_t * vine_block = generate_vex_ir(p, addr);
-  generate_vine_ir_block(p, vine_block);
-  return vine_block;
+  bap_block_t * bap_block = generate_vex_ir(p, addr);
+  generate_bap_ir_block(p, bap_block);
+  return bap_block;
 }

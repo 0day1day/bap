@@ -37,11 +37,11 @@ val tr_vardecl : varctx -> Libasmir.stmt -> Var.t * (unit -> unit)
 val tr_vardecls :
   varctx -> Libasmir.stmt list -> Var.t list * (unit -> unit)
 val tr_stmt : varctx -> Libasmir.stmt -> Ast.stmt
-val tr_vine_block_t :
-  varctx -> asmprogram -> Libasmir.vine_block_t -> Ast.stmt list
-val tr_vine_blocks_t :
+val tr_bap_block_t :
+  varctx -> asmprogram -> Libasmir.bap_block_t -> Ast.stmt list
+val tr_bap_blocks_t :
   varctx ->
-  asmprogram -> Libasmir.vine_blocks_t -> Ast.stmt list
+  asmprogram -> Libasmir.bap_blocks_t -> Ast.stmt list
 *)
 
 
@@ -52,9 +52,9 @@ val get_asmprogram_arch : asmprogram -> arch
 
 
 val open_program : string -> asmprogram
-val asmprogram_to_vine : ?init_mem:bool -> asmprogram -> Ast.program
-val asm_addr_to_vine :
+val asmprogram_to_bap : ?init_mem:bool -> asmprogram -> Ast.program
+val asm_addr_to_bap :
   varctx -> asmprogram -> Libasmir.address_t -> Ast.program
 
-val asmprogram_to_vine_range : ?init_mem:bool ->
+val asmprogram_to_bap_range : ?init_mem:bool ->
   asmprogram -> Libasmir.address_t -> Libasmir.address_t  -> Ast.program

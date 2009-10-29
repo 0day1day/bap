@@ -19,7 +19,7 @@ bool use_eflags_thunks = 0;
 bool translate_calls_and_returns = 0;
 
 // Guest architecture we are translating from.
-// Set in generate_vine_ir, accessed all over...
+// Set in generate_bap_ir, accessed all over...
 // It might be cleaner to pass this around, but that would require a lot of
 // refactoring.
 VexArch guest_arch = VexArch_INVALID;
@@ -42,10 +42,10 @@ Exp * count_opnd = NULL;
 // Forward declarations
 //======================================================================
 Exp *emit_mux0x( vector<Stmt *> *irout, reg_t type, Exp *cond, Exp *exp0, Exp *expX );
-void modify_flags( asm_program_t *prog, vine_block_t *block );
+void modify_flags( asm_program_t *prog, bap_block_t *block );
 //string inst_to_str(asm_program_t *prog, Instruction *inst );
-//static void add_special_returns(vine_block_t *block);
-static void insert_specials(vine_block_t * block);
+//static void add_special_returns(bap_block_t *block);
+static void insert_specials(bap_block_t * block);
 void do_cleanups_before_processing();
 
 //======================================================================
@@ -152,7 +152,7 @@ Exp *translate_ccall( IRExpr *expr, IRSB *irbb, vector<Stmt *> *irout )
     }
 }
 
-void modify_flags( asm_program_t *prog, vine_block_t *block )
+void modify_flags( asm_program_t *prog, bap_block_t *block )
 {
     assert(block);
     switch (guest_arch) {
@@ -1222,9 +1222,9 @@ VexArch vexarch_of_prog(asm_program_t *prog) {
 
 // TODO: It might be worth optimizing get_section_of to work fast for
 // consecutive addressess
-vine_block_t* generate_vex_ir(asm_program_t *prog, address_t inst)
+bap_block_t* generate_vex_ir(asm_program_t *prog, address_t inst)
 {
-  vine_block_t *vblock = new vine_block_t;
+  bap_block_t *vblock = new bap_block_t;
   VexArch guest = vexarch_of_prog(prog);
 
   vblock->inst = inst;
@@ -1242,17 +1242,17 @@ vine_block_t* generate_vex_ir(asm_program_t *prog, address_t inst)
 
 //----------------------------------------------------------------------
 // Take a vector of instrs function and translate it into VEX IR blocks
-// and store them in the vector of vine blocks
+// and store them in the vector of bap blocks
 //----------------------------------------------------------------------
-vector<vine_block_t *> generate_vex_ir(asm_program_t *prog,
+vector<bap_block_t *> generate_vex_ir(asm_program_t *prog,
 				       address_t start, address_t end)
 {
-  vector<vine_block_t *> results;
+  vector<bap_block_t *> results;
   address_t inst;
   assert(prog);
   translate_init();
   for(inst = start; inst < end; inst += asmir_get_instr_length(prog, inst)){
-    vine_block_t *vblock = generate_vex_ir(prog, inst);
+    bap_block_t *vblock = generate_vex_ir(prog, inst);
     results.push_back(vblock);
   }
   return results;
@@ -1261,20 +1261,20 @@ vector<vine_block_t *> generate_vex_ir(asm_program_t *prog,
 
 //----------------------------------------------------------------------
 // Take a disassembled program and translate it into VEX IR blocks
-// and store them in the vector of vine blocks
+// and store them in the vector of bap blocks
 //----------------------------------------------------------------------
-vector<vine_block_t *> generate_vex_ir( asm_program_t *prog )
+vector<bap_block_t *> generate_vex_ir( asm_program_t *prog )
 {
   assert(prog);
   
   // Init the translation library
   translate_init();
   
-  vector<vine_block_t *> results;
+  vector<bap_block_t *> results;
 
   for (section_t *sec = prog->segs; sec; sec = sec->next)
     if (sec->is_code) {
-      vector<vine_block_t *> tmp = generate_vex_ir(prog, sec->start_addr, sec->end_addr);
+      vector<bap_block_t *> tmp = generate_vex_ir(prog, sec->start_addr, sec->end_addr);
       results.insert(results.end(), tmp.begin(), tmp.end());
     }
 
@@ -1286,7 +1286,7 @@ vector<vine_block_t *> generate_vex_ir( asm_program_t *prog )
  * Insert both special("call") and special("ret") into the code.
  * This function should be replacing add_special_returns()
  */
-void insert_specials(vine_block_t * block) {
+void insert_specials(bap_block_t * block) {
     IRSB* bb = block->vex_ir;
     if (bb == NULL)
         return;
@@ -1294,12 +1294,12 @@ void insert_specials(vine_block_t * block) {
     switch (kind) {
         case Ijk_Call:
 	  if(!translate_calls_and_returns)
-            block->vine_ir->push_back(new Special("call"));
+            block->bap_ir->push_back(new Special("call"));
 	  break;
         case Ijk_Ret:
 	  if(!translate_calls_and_returns) {
-            block->vine_ir->push_back(new Special("ret"));
-	    block->vine_ir->push_back(mk_label());
+            block->bap_ir->push_back(new Special("ret"));
+	    block->bap_ir->push_back(mk_label());
 	  }
 	  break;
         default:
@@ -1310,7 +1310,7 @@ void insert_specials(vine_block_t * block) {
 
 
 // Translate a single block to Vine. guest_arch must be set already
-void generate_vine_ir_block( asm_program_t *prog, vine_block_t *block )
+void generate_bap_ir_block( asm_program_t *prog, bap_block_t *block )
 {
   static unsigned int ir_addr = 100; // Argh, this is dumb
 
@@ -1319,12 +1319,12 @@ void generate_vine_ir_block( asm_program_t *prog, vine_block_t *block )
 
   // Translate the block
   if (is_special(block->inst)) 
-    block->vine_ir = translate_special(block->inst);
+    block->bap_ir = translate_special(block->inst);
   else
-    block->vine_ir = translate_irbb( block->vex_ir );
+    block->bap_ir = translate_irbb( block->vex_ir );
 
-  assert(block->vine_ir);
-  vector<Stmt *> *vir = block->vine_ir;
+  assert(block->bap_ir);
+  vector<Stmt *> *vir = block->bap_ir;
   
   // Go through block and add Special's for ret
   //add_special_returns(block);
@@ -1335,7 +1335,7 @@ void generate_vine_ir_block( asm_program_t *prog, vine_block_t *block )
     modify_flags(prog, block);
   
   // Delete EFLAGS get thunks
-  //del_get_thunk(block->vine_ir);
+  //del_get_thunk(block->bap_ir);
   
   // Add the asm and ir addresses
   for ( int j = 0; j < vir->size(); j++ )
@@ -1346,15 +1346,15 @@ void generate_vine_ir_block( asm_program_t *prog, vine_block_t *block )
     }
 }
 
-vector<vine_block_t *>
-generate_vine_ir( asm_program_t *prog, vector<vine_block_t *> vblocks )
+vector<bap_block_t *>
+generate_bap_ir( asm_program_t *prog, vector<bap_block_t *> vblocks )
 {
     unsigned int vblocksize = vblocks.size();
 
     for ( int i = 0; i < vblocksize; i++ )
     {
-        vine_block_t *block = vblocks.at(i);
-	generate_vine_ir_block(prog, block);
+        bap_block_t *block = vblocks.at(i);
+	generate_bap_ir_block(prog, block);
     }
     return vblocks;
 }
