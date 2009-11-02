@@ -84,6 +84,8 @@ type 'a visit_action =
                            the children changes (use == test) *)
     | `ChangeTo of 'a  (** Replace the expression with the given
                            one *)
+    | `ChangeToAndDoChildren of 'a (** Replace the expression with the
+				   given one and do children  *)
 (* FIXME: ChangeDoChildrenPost is fugly... find a better solution.
     | `DoChildrenPost of 'a -> 'a
 	(** Continue on to the children, rebuild the node if changed, and apply

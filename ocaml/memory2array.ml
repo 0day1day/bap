@@ -84,7 +84,7 @@ class memory2array_visitor hash
 	      VarHash.add hash avar newarrvar;
 	      newarrvar
 	  in
-          `ChangeTo array
+          `ChangeToAndDoChildren array (* Do we need to recurse on the avar? *)
       |	_ ->  `DoChildren
 	
     method visit_rvar rvar =
@@ -99,7 +99,7 @@ class memory2array_visitor hash
 	      VarHash.add hash rvar newarrvar;
 	      newarrvar
 	  in
-          `ChangeTo array
+          `ChangeToAndDoChildren array
       |	_ -> `DoChildren
   end
 
@@ -125,7 +125,7 @@ class memory2array_visitor2 hash
 	      in
 	      (* Printf.printf "New Load %s\n" (Pp.ast_exp_to_string newexpr); *)
 	      (* djb: still need to descend into children *)
-	      `ChangeTo newexpr)
+	      `ChangeToAndDoChildren newexpr)
       | Store(arr,idx,data,endian,t) -> ((* Printf.printf "Store %s %s %s Reg%d\n" (Pp.ast_exp_to_string arr) (Pp.ast_exp_to_string idx) (Pp.ast_exp_to_string data) (getwidth t); *)
           let width = (getwidth t) in
           match width with
@@ -133,7 +133,7 @@ class memory2array_visitor2 hash
 	      `DoChildren
           | _ -> ( (* Printf.printf "Need to split\n"; *)
                   let newexpr = split_writes arr idx t endian data in
-		  `ChangeTo newexpr
+		  `ChangeToAndDoChildren newexpr
                     ))
       | _ -> `DoChildren              
       
