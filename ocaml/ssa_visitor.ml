@@ -39,6 +39,7 @@ let rec action vischil startvisit node=
   | `SkipChildren -> node
   | `ChangeTo x -> x (* FIXME: warn if x = node *)
   | `DoChildren -> vischil node
+  | _ -> failwith "Action not implemented"
 (*  | `DoChildrenPost f -> f (vischil node)
   | `ChangeDoChildrenPost(x,f) -> f (vischil x)*)
 (*  | `Combine(a,b) ->

@@ -44,6 +44,7 @@ let rec action vischil startvisit node=
   | `SkipChildren -> node
   | `ChangeTo x -> x (* FIXME: warn if x = node *)
   | `DoChildren -> vischil node
+  | `ChangeToAndDoChildren x -> x; vischil x
 
 (* this really should be a more shallow comparison, otherwise it will
    be slow when there is a deeply nested change *)
