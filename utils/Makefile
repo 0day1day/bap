@@ -7,7 +7,7 @@ export LIBS = ../ocaml/bap
 export INCDIRS = $(BAP_OCAMLDIR)
 
 # Include sources from ../ocaml in the automatically generated dependencies.
-export SOURCE_DIRS = $(BAP_OCAMLDIR)
+export SOURCE_DIRS_IN = $(BAP_OCAMLDIR)
 
 # default subprojects to build
 ifndef SUBPROJS

@@ -416,7 +416,7 @@ NCDIDIR  := ._ncdi
 FILTER_EXTNS := %.mli %.ml %.mll %.mly %.idl %.oxridl %.c %.m %.$(EXT_CXX) %.rep %.zog %.glade
 
 FILTERED     := $(filter $(FILTER_EXTNS), $(SOURCES))
-SOURCE_DIRS  := $(filter-out ./, $(sort $(dir $(FILTERED))))
+SOURCE_DIRS  := $(filter-out ./, $(sort $(dir $(FILTERED)))) $(SOURCE_DIRS_IN)
 
 FILTERED_REP := $(filter %.rep, $(FILTERED))
 DEP_REP      := $(FILTERED_REP:%.rep=$(MLDEPDIR)/%.d)
