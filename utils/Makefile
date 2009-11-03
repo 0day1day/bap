@@ -3,19 +3,16 @@ export OCAMLMAKEFILE=$(BAP_OCAMLDIR)/OCamlMakefile
 
 # ocamlfind packages required
 export PACKS = str ocamlgraph extlib unix sqlite3
-export LIBS = bap 
+export LIBS = ../ocaml/bap 
 export INCDIRS = $(BAP_OCAMLDIR)
 
 # Include sources from ../ocaml in the automatically generated dependencies.
 export SOURCE_DIRS = $(BAP_OCAMLDIR)
 
-
 # default subprojects to build
 ifndef SUBPROJS
 	export SUBPROJS = toil iltrans topredicate
 endif
-
-
 
 define PROJ_toil
 	RESULT=toil

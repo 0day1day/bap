@@ -624,7 +624,6 @@ ifndef REAL_OCAMLC
   # just include the ones with slashes in their names.
   EXTRADEPS := $(addsuffix .cma,$(foreach i,$(LIBS),$(if $(findstring /,$(i)),$(i))))
 
-
   ifndef LIB_PACK_NAME
     SPECIAL_OCAMLFLAGS := $(OCAMLBCFLAGS)
   else	
