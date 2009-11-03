@@ -94,7 +94,7 @@ let of_prog p =
     let dst = lab_of_exp t in
     let tgt = match dst with
       | None -> indirect
-      | Some l -> try (C.find_label c l) with Not_found -> error
+      | Some l -> try (C.find_label c l) with Not_found -> Printf.printf "Warning: Jumping to unknown label\n"; error
       (* FIXME: should jumping to an unknown address be an error or indirect? *)
     in
     C.add_edge_e c (C.G.E.create v lab tgt)
