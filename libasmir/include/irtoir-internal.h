@@ -49,6 +49,7 @@ Exp  *i386_translate_get( IRExpr *expr, IRSB *irbb, vector<Stmt *> *irout );
 Stmt *i386_translate_put( IRStmt *stmt, IRSB *irbb, vector<Stmt *> *irout );
 Exp  *i386_translate_ccall( IRExpr *expr, IRSB *irbb, vector<Stmt *> *irout );
 void  i386_modify_flags( asm_program_t *prog, bap_block_t *block );
+void del_get_thunk( vector<Stmt *> *ir );
 
 // defined in irtoir-arm.cpp
 vector<VarDecl *> arm_get_reg_decls();

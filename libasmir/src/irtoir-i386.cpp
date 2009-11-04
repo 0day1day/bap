@@ -1467,7 +1467,9 @@ vector<Stmt *> mod_eflags_add( reg_t type, Exp *arg1, Exp *arg2 )
                     _ex_shr( _ex_and( ex_xor(arg1, arg2, &c_N1), ex_xor(arg1, res) ), ecl(&c_TYPE_SIZE_LESS_1) )) );
     set_flag(&irout, type, OF, condOF);
 
-    set_eflags_bits(&irout, CF, PF, AF, ZF, SF, OF);
+    // We construct EFLAGS in total only in case that
+    // instructions directly need EFLAGS as a complete register such as pushf.
+    //set_eflags_bits(&irout, CF, PF, AF, ZF, SF, OF);
 
     return irout;
 }
@@ -1521,7 +1523,9 @@ vector<Stmt *> mod_eflags_sub( reg_t type, Exp *arg1, Exp *arg2 )
                     _ex_shr( _ex_and( ex_xor(arg1, arg2), ex_xor(arg1, res) ), ecl(&c_TYPE_SIZE_LESS_1) )) );
     set_flag(&irout, type, OF, condOF);
 
-    set_eflags_bits(&irout, CF, PF, AF, ZF, SF, OF);
+    // We construct EFLAGS in total only in case that
+    // instructions directly need EFLAGS as a complete register such as pushf.
+    //set_eflags_bits(&irout, CF, PF, AF, ZF, SF, OF);
 
     return irout;
 }
@@ -1607,7 +1611,9 @@ vector<Stmt *> mod_eflags_adc( reg_t type, Exp *arg1, Exp *arg2, Exp *arg3 )
                     _ex_shr( _ex_and( ex_xor(arg1, arg2, &c_N1), ex_xor(arg1, res) ), ecl(&c_TYPE_SIZE_LESS_1) )) );
     set_flag(&irout, type, OF, condOF);
 
-    set_eflags_bits(&irout, CF, PF, AF, ZF, SF, OF);
+    // We construct EFLAGS in total only in case that
+    // instructions directly need EFLAGS as a complete register such as pushf.
+    //set_eflags_bits(&irout, CF, PF, AF, ZF, SF, OF);
 
     delete arg2;
     delete arg3;
@@ -1690,7 +1696,9 @@ vector<Stmt *> mod_eflags_sbb( reg_t type, Exp *arg1, Exp *arg2, Exp *arg3 )
                     _ex_shr( _ex_and( ex_xor(arg1, arg2), ex_xor(arg1, res) ), ecl(&c_TYPE_SIZE_LESS_1) )) );
     set_flag(&irout, type, OF, condOF);
 
-    set_eflags_bits(&irout, CF, PF, AF, ZF, SF, OF);
+    // We construct EFLAGS in total only in case that
+    // instructions directly need EFLAGS as a complete register such as pushf.
+    //set_eflags_bits(&irout, CF, PF, AF, ZF, SF, OF);
 
     delete arg2;
     delete arg3;
@@ -1741,7 +1749,9 @@ vector<Stmt *> mod_eflags_logic( reg_t type, Exp *arg1, Exp *arg2 )
 
     irout.push_back( new Move(OF, Constant::f.clone()) );    
 
-    set_eflags_bits(&irout, CF, PF, AF, ZF, SF, OF);
+    // We construct EFLAGS in total only in case that
+    // instructions directly need EFLAGS as a complete register such as pushf.
+    //set_eflags_bits(&irout, CF, PF, AF, ZF, SF, OF);
 
     return irout;
 }
@@ -1813,7 +1823,9 @@ vector<Stmt *> mod_eflags_inc( reg_t type, Exp *arg1, Exp *arg2, Exp *arg3 )
     Exp *condOF = _ex_eq( ex_and(res, &c_DATA_MASK), ecl(&c_SIGN_MASK) );
     set_flag(&irout, type, OF, condOF);
 
-    set_eflags_bits(&irout, CF, PF, AF, ZF, SF, OF);
+    // We construct EFLAGS in total only in case that
+    // instructions directly need EFLAGS as a complete register such as pushf.
+    //set_eflags_bits(&irout, CF, PF, AF, ZF, SF, OF);
 
     delete argL;
 
@@ -1873,7 +1885,9 @@ vector<Stmt *> mod_eflags_dec( reg_t type, Exp *arg1, Exp *arg2, Exp *arg3 )
     Exp *condOF = _ex_eq( ex_and(res, &c_DATA_MASK), ex_sub(&c_SIGN_MASK, &c_1) );
     set_flag(&irout, type, OF, condOF);
 
-    set_eflags_bits(&irout, CF, PF, AF, ZF, SF, OF);
+    // We construct EFLAGS in total only in case that
+    // instructions directly need EFLAGS as a complete register such as pushf.
+    //set_eflags_bits(&irout, CF, PF, AF, ZF, SF, OF);
 
     delete argL;
 
@@ -1939,7 +1953,9 @@ vector<Stmt *> mod_eflags_shl( reg_t type, Exp *arg1, Exp *arg2 )
     Exp *condOF = _ex_and(_ex_l_cast(_ex_shr(ex_xor(arg1, arg2), ecl(&c_TYPE_SIZE_LESS_1)), REG_1), Constant::t.clone());
     set_flag(&irout, type, OF, condOF);
 
-    set_eflags_bits(&irout, CF, PF, AF, ZF, SF, OF);
+    // We construct EFLAGS in total only in case that
+    // instructions directly need EFLAGS as a complete register such as pushf.
+    //set_eflags_bits(&irout, CF, PF, AF, ZF, SF, OF);
 
     if (!use_eflags_thunks)
 	irout.push_back (ifcountn0);
@@ -2008,7 +2024,9 @@ vector<Stmt *> mod_eflags_shr( reg_t type, Exp *arg1, Exp *arg2 )
     Exp *condOF = _ex_and(_ex_l_cast(_ex_shr(ex_xor(arg1, arg2), ecl(&c_TYPE_SIZE_LESS_1)), REG_1), Constant::t.clone());
     set_flag(&irout, type, OF, condOF);
 
-    set_eflags_bits(&irout, CF, PF, AF, ZF, SF, OF);
+    // We construct EFLAGS in total only in case that
+    // instructions directly need EFLAGS as a complete register such as pushf.
+    //set_eflags_bits(&irout, CF, PF, AF, ZF, SF, OF);
 
     if (!use_eflags_thunks) 
 	irout.push_back (ifcountn0);
@@ -2055,14 +2073,16 @@ vector<Stmt *> mod_eflags_rol( reg_t type, Exp *arg1, Exp *arg2, Exp *arg3 )
     //							    ex_shl(arg1, &c_11))),
     //					  REG_1));
 
-    // set only CF and OF (which were cleared above)
-    Temp EFLAGS(REG_32,"EFLAGS");
-    irout.push_back( new Move( new Temp(EFLAGS),
-			       ex_or( oldFlags, 
-                                      // don't shift CF becaus it's pos 1
-                                      _ex_or(_ex_u_cast(CF, REG_32),
-                                             _ex_shl(_ex_u_cast(OF, REG_32),
-                                                     ex_const(REG_32, OF_POS))))));
+    // We construct EFLAGS in total only in case that
+    // instructions directly need EFLAGS as a complete register such as pushf.
+//    // set only CF and OF (which were cleared above)
+//    Temp EFLAGS(REG_32,"EFLAGS");
+//    irout.push_back( new Move( new Temp(EFLAGS),
+//			       ex_or( oldFlags, 
+//                                      // don't shift CF becaus it's pos 1
+//                                      _ex_or(_ex_u_cast(CF, REG_32),
+//                                             _ex_shl(_ex_u_cast(OF, REG_32),
+//                                                     ex_const(REG_32, OF_POS))))));
 
 //    destroy(oldFlags);
 //    destroy(CF);
@@ -2106,14 +2126,16 @@ vector<Stmt *> mod_eflags_ror( reg_t type, Exp *arg1, Exp *arg2, Exp *arg3 )
 						  REG_1)
 				       ));
 
+    // We construct EFLAGS in total only in case that
+    // instructions directly need EFLAGS as a complete register such as pushf.
     // set only CF and OF (which were cleared above)
-    Temp EFLAGS(REG_32,"EFLAGS");
-    irout.push_back( new Move( new Temp(EFLAGS),
-			       ex_or( oldFlags, 
-                                      // don't shift CF becaus it's pos 1
-                                      _ex_or(_ex_u_cast(CF, REG_32),
-                                             _ex_shl(_ex_u_cast(OF, REG_32),
-                                                     ex_const(REG_32, OF_POS))))));
+//    Temp EFLAGS(REG_32,"EFLAGS");
+//    irout.push_back( new Move( new Temp(EFLAGS),
+//			       ex_or( oldFlags, 
+//                                      // don't shift CF becaus it's pos 1
+//                                      _ex_or(_ex_u_cast(CF, REG_32),
+//                                             _ex_shl(_ex_u_cast(OF, REG_32),
+//                                                     ex_const(REG_32, OF_POS))))));
 
 
 //    destroy(oldFlags);
@@ -2194,7 +2216,9 @@ vector<Stmt *> mod_eflags_umul( reg_t type, Exp *arg1, Exp *arg2 )
     Temp *OF = mk_reg("OF", REG_1);
     irout.push_back( new Move(OF, new Temp(*CF)) );
 
-    set_eflags_bits(&irout, CF, PF, AF, ZF, SF, OF);
+    // We construct EFLAGS in total only in case that
+    // instructions directly need EFLAGS as a complete register such as pushf.
+    //set_eflags_bits(&irout, CF, PF, AF, ZF, SF, OF);
 
     return irout;
 }
@@ -2272,7 +2296,9 @@ vector<Stmt *> mod_eflags_smul( reg_t type, Exp *arg1, Exp *arg2 )
     Temp *OF = mk_reg("OF", REG_1);
     irout.push_back( new Move(OF, new Temp(*CF)) );
 
-    set_eflags_bits(&irout, CF, PF, AF, ZF, SF, OF);
+    // We construct EFLAGS in total only in case that
+    // instructions directly need EFLAGS as a complete register such as pushf.
+    //set_eflags_bits(&irout, CF, PF, AF, ZF, SF, OF);
 
     return irout;
 }
@@ -2306,11 +2332,14 @@ int del_put_thunk(vector<Stmt *> *ir,
                      || temp->name.find("CC_DEP2") != string::npos 
                      || temp->name.find("CC_NDEP") != string::npos )
                 {
-                  // XXX: don't delete for now.
-                  // remove and Free the Stmt
-                  //                  Stmt::destroy(rv.back());
-                  //                  rv.pop_back();
-                  //                  len--;
+                  //// XXX: don't delete for now.
+                  //// remove and Free the Stmt
+                  // CC_OP, CC_DEP1, CC_DEP2, CC_NDEP are never set unless use_eflags_thunks is true.
+                  if(!use_eflags_thunks) {
+                    Stmt::destroy(rv.back());
+                    rv.pop_back();
+                    len--;
+                  }
                   end = len;
                 }
             }

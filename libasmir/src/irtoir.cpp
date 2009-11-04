@@ -1331,11 +1331,12 @@ void generate_bap_ir_block( asm_program_t *prog, bap_block_t *block )
   insert_specials(block);
   
   // Go through the block and add on eflags modifications
-  if(!use_eflags_thunks)
-    modify_flags(prog, block);
+  //if(!use_eflags_thunks)
+  modify_flags(prog, block);
   
   // Delete EFLAGS get thunks
-  //del_get_thunk(block->bap_ir);
+  if(!use_eflags_thunks)
+    del_get_thunk(block->bap_ir);
   
   // Add the asm and ir addresses
   for ( int j = 0; j < vir->size(); j++ )
