@@ -1059,15 +1059,23 @@ Stmt *translate_jumpkind( IRSB *irbb, vector<Stmt *> *irout )
   Stmt *result = NULL;
 
   Exp *dest = NULL;
-  if ( irbb->next->tag == Iex_Const )
+  if ( irbb->next->tag == Iex_Const ) {
     dest = mk_dest_name( irbb->next->Iex.Const.con->Ico.U32 );
+ 
+    // removing the insignificant jump statment 
+    // that actually goes to the next instruction
+    // except for conditional jump cases
+    if ( irbb->stmts[irbb->stmts_used-1]->tag != Ist_Exit )     
+      if ( irbb->stmts[0]->Ist.IMark.addr + irbb->stmts[0]->Ist.IMark.len 
+            == irbb->next->Iex.Const.con->Ico.U32 )
+        return NULL;
+  }
   else
     dest = translate_expr( irbb->next, irbb, irout );
 
   switch ( irbb->jumpkind )
     {
     case Ijk_Boring: 
-      return NULL;      // not interesting case (goto next instruction)
     case Ijk_Yield:
       result = new Jmp(dest);
       break; 
