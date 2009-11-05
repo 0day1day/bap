@@ -1067,6 +1067,7 @@ Stmt *translate_jumpkind( IRSB *irbb, vector<Stmt *> *irout )
   switch ( irbb->jumpkind )
     {
     case Ijk_Boring: 
+      return NULL;      // not interesting case (goto next instruction)
     case Ijk_Yield:
       result = new Jmp(dest);
       break; 
@@ -1192,7 +1193,8 @@ vector<Stmt *> *translate_irbb( IRSB *irbb )
         st = new Special( "Untranslated Jump out of BB. Cause: ' + string(e) + '" );
     }
 
-    irout->push_back(st);
+    if (st != NULL)
+        irout->push_back(st);
 
     return irout;
 }
