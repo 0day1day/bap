@@ -494,7 +494,9 @@ let create_tm c =
 	  `DoChildren
       | Move(v,e,_) ->
 	  (* FIXME: should we check whether we introduced this var? *)
-	  if try VH.find refd v with Not_found -> true
+          (* FIX: we introduced it if it is named "temp" *)
+	  if (try VH.find refd v with Not_found -> true) 
+              && (Var.name v = ssa_temp_name)
 	  then VH.add tm v e;
 	  `DoChildren
       | _ ->
