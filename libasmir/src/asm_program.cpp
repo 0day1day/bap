@@ -5,13 +5,6 @@
 #include "asm_program.h"
 #include "libiberty.h"
 
-// Argh, these functions are documented at
-// http://sourceware.org/binutils/docs/bfd/Opening-and-Closing.html
-// but don't seem to be in the header files...
-extern void *bfd_alloc (bfd *abfd, bfd_size_type wanted);
-extern void *bfd_alloc2 (bfd *abfd, bfd_size_type nmemb, bfd_size_type size);
-
-
 
 static void initialize_sections(asm_program_t *p);
 static bfd* initialize_bfd(const char *filename);
@@ -44,7 +37,7 @@ bfd_byte *asmir_get_ptr_to_instr(asm_program_t *prog, bfd_vma addr)
 asm_program_t *
 asmir_open_file(const char *filename)
 {
-  asm_program_t *prog = malloc(sizeof(asm_program_t));
+  asm_program_t *prog = (asm_program_t *)malloc(sizeof(asm_program_t));
   if (!prog)
     return NULL;
   bfd *abfd = initialize_bfd(filename);
@@ -91,7 +84,7 @@ my_read_memory (bfd_vma memaddr,
   int ret = buffer_read_memory(memaddr,myaddr,length,info);
 
   if (EIO == ret) {
-    section_t *seg = get_section_of(info->application_data, memaddr);
+    section_t *seg = get_section_of((asm_program_t *)(info->application_data), memaddr);
     if (NULL == seg)
       return EIO;
 
@@ -150,9 +143,9 @@ initialize_sections(asm_program_t *prog)
 
     if(datasize == 0) continue;
 
-    data = bfd_alloc2(abfd, datasize, sizeof(bfd_byte));
+    data = (bfd_byte *)bfd_alloc2(abfd, datasize, sizeof(bfd_byte));
     bfd_get_section_contents(abfd, section, data, 0, datasize);
-    seg = bfd_alloc(abfd, sizeof(section_t));
+    seg = (section_t *)bfd_alloc(abfd, sizeof(section_t));
     seg->data = data;
     seg->datasize = datasize;
     seg->start_addr = section->vma;
@@ -270,7 +263,7 @@ enum bfd_architecture asmir_get_asmp_arch(asm_program_t *prog) {
 asm_program_t* asmir_new_asmp_for_arch(enum bfd_architecture arch)
 {
   int machine = 0; // TODO: pick based on arch
-  asm_program_t *prog = malloc(sizeof(asm_program_t));
+  asm_program_t *prog = (asm_program_t *)malloc(sizeof(asm_program_t));
   
   prog->abfd = bfd_openw("/dev/null", NULL);
   assert(prog->abfd);
@@ -280,4 +273,79 @@ asm_program_t* asmir_new_asmp_for_arch(enum bfd_architecture arch)
   bfd_set_arch_info(prog->abfd, bfd_lookup_arch(arch, machine));
   init_disasm_info(prog);
   return prog;
+}
+
+void destroy_memory_data(memory_data_t *md) {
+    if (md) {
+        for (vector<memory_cell_data_t*>::iterator j = md->begin();
+             j != md->end(); j++) {
+            free(*j);
+        }
+        delete md;
+    }
+}
+
+address_t memory_cell_data_address(memory_cell_data_t *md) {
+    return md->address;
+}
+
+int memory_cell_data_value(memory_cell_data_t *md) {
+    return md->value;
+}
+
+int memory_data_size(memory_data_t *md) {
+    return md->size();
+}
+
+memory_cell_data_t * memory_data_get(memory_data_t *md, int i) {
+    return md->at(i);
+}
+
+/**
+ * Obtain data from the section with readonly flags.
+ * I.e. ALLOC, READONLY, and LOAD flags are set.
+ * FIXME: Use a reasonable data structure.
+ */
+memory_data_t *
+get_rodata(asm_program_t *prog) {
+    vector<memory_cell_data_t *> *rodata = new vector<memory_cell_data_t *>();
+
+    bfd *abfd = prog->abfd;
+
+    unsigned int opb = bfd_octets_per_byte(abfd);
+    assert(opb == 1);
+
+    for(asection *section = abfd->sections;
+        section != (asection *)  NULL; section = section->next){
+
+        if(!((section->flags & SEC_READONLY) &&
+             (section->flags & SEC_ALLOC) &&
+             (section->flags & SEC_LOAD))
+            ) continue;
+        bfd_byte *data = NULL;
+        bfd_vma datasize = bfd_get_section_size_before_reloc(section);
+        if(datasize == 0) continue;
+        data = (bfd_byte *) calloc((size_t) datasize, (size_t) sizeof(bfd_byte));
+        if (data == NULL) {
+            perror("memory allocation failed\n");
+            exit(EXIT_FAILURE);
+        }
+        bfd_get_section_contents(abfd, section, data, 0, datasize);
+        bfd_vma start_addr = section->vma;
+        bfd_vma end_addr = start_addr + datasize/opb;
+        for (bfd_vma itr = start_addr; itr < end_addr; itr++) {
+            memory_cell_data_t *mcd = (memory_cell_data_t *)
+                calloc((size_t) 1, (size_t) sizeof(memory_cell_data_t));
+            if (mcd == NULL) {
+                perror("memory allocation failed\n");
+                exit(EXIT_FAILURE);
+            }
+            mcd->address = itr;
+            mcd->value = data[itr-start_addr];
+            rodata->push_back(mcd);
+        }
+        free(data);
+    }
+    /* FIXMEO: close the BFD */
+    return rodata;
 }

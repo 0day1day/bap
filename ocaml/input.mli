@@ -12,3 +12,5 @@ val speclist : (key * spec * doc) list
 
 (** Get the program as specified by the commandline. *)
 val get_program : unit -> Ast.program
+
+val init_ro : bool ref

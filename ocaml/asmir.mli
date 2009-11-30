@@ -52,9 +52,9 @@ val get_asmprogram_arch : asmprogram -> arch
 
 
 val open_program : string -> asmprogram
-val asmprogram_to_bap : ?init_mem:bool -> asmprogram -> Ast.program
+val asmprogram_to_bap : ?init_ro:bool -> asmprogram -> Ast.program
 val asm_addr_to_bap :
   varctx -> asmprogram -> Libasmir.address_t -> Ast.program
 
-val asmprogram_to_bap_range : ?init_mem:bool ->
+val asmprogram_to_bap_range : ?init_ro:bool ->
   asmprogram -> Libasmir.address_t -> Libasmir.address_t  -> Ast.program

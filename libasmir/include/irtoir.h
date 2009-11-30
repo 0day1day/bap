@@ -10,6 +10,9 @@
 typedef struct bap_block_s bap_block_t;
 
 
+#include "asm_program.h"
+#include "vexmem.h"
+
 //
 // VEX headers (inside Valgrind/VEX/pub)
 //
@@ -17,9 +20,6 @@ typedef struct bap_block_s bap_block_t;
 extern "C"
 {
 #endif
-
-#include "asm_program.h"
-#include "vexmem.h"
 
 #include "libvex.h"
 

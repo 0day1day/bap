@@ -324,6 +324,24 @@ let gamma_for_arch = function
 
 let get_asmprogram_arch = Libasmir.asmir_get_asmp_arch
 
+let fold_memory_data f md acc =
+  let size = Libasmir.memory_data_size md - 1 in
+    foldn (fun a n ->
+            let mcd = Libasmir.memory_data_get md n in
+              f 
+              (Libasmir.memory_cell_data_address mcd)
+              (Libasmir.memory_cell_data_value mcd) 
+              a)
+      acc size
+
+let get_rodata_assignments ?(prepend_to=[]) mem prog =
+  let rodata = Libasmir.get_rodata prog in
+  fold_memory_data
+    (fun a v acc -> 
+        let m_addr = Int(a, Reg 32) in
+        let m_val = Int(Int64.of_int v, Reg 8) in
+        Move(mem, Store(Var mem, m_addr, m_val, little_endian, Reg 8), []) :: acc)
+    rodata prepend_to
 
 (** Open a binary file for translation *)
 let open_program filename =
@@ -333,13 +351,20 @@ let open_program filename =
   prog
 
 (** Translate an entire Libasmir.asm_program_t into a Vine program *)
-let asmprogram_to_bap ?(init_mem=false) asmp = 
+let asmprogram_to_bap ?(init_ro=false) asmp = 
   let bap_blocks = Libasmir.asmir_asmprogram_to_bap asmp in
   let arch = get_asmprogram_arch asmp in
   let g = gamma_for_arch arch in
   let ir = tr_bap_blocks_t g asmp bap_blocks in
   let () = destroy_bap_blocks bap_blocks in
-  ir
+  let ir = 
+    if init_ro then (
+      let m = gamma_lookup g "$mem" in
+        get_rodata_assignments ~prepend_to:ir m asmp
+    )
+    else ir
+  in
+    ir
 
 
 
@@ -351,7 +376,7 @@ let asm_addr_to_bap g prog addr =
   ir
 
 
-let asmprogram_to_bap_range ?(init_mem = false) asmp st en=
+let asmprogram_to_bap_range ?(init_ro = false) asmp st en=
   let bap_blocks = Libasmir.asmir_asmprogram_range_to_bap asmp st en in
   let arch = get_asmprogram_arch asmp in
   let g = gamma_for_arch arch in

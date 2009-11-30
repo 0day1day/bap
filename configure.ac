@@ -8,7 +8,7 @@
 
 AC_PREREQ(2.59)
 AC_INIT(Bap, 0.1, dbrumley@cmu.edu)
-AC_CONFIG_SRCDIR([libasmir/src/asm_program.c])
+AC_CONFIG_SRCDIR([libasmir/src/asm_program.cpp])
 AC_CONFIG_HEADER([libasmir/config.h])
 
 AM_INIT_AUTOMAKE

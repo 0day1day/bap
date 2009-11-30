@@ -11,6 +11,8 @@ typedef [abstract] void* Stmt;
 typedef [abstract] void* asm_program_t;
 typedef [abstract] void* bap_block_t;
 typedef [abstract] void* bap_blocks_t;
+typedef [abstract] void* memory_cell_data_t;
+typedef [abstract] void* memory_data_t;
 
 
 #include "../libasmir/config.h"
@@ -187,6 +189,12 @@ void asmir_close(asm_program_t p);
 [string] char* asmir_string_of_insn(asm_program_t prog, address_t inst);
 enum bfd_architecture asmir_get_asmp_arch(asm_program_t prog);
 
+address_t memory_cell_data_address(memory_cell_data_t md);
+int memory_cell_data_value(memory_cell_data_t md);
+memory_data_t get_rodata(asm_program_t prog);
+int memory_data_size(memory_data_t md);
+memory_cell_data_t memory_data_get(memory_data_t md, int i); 
+void destroy_memory_data(memory_data_t md);
 
 bap_blocks_t asmir_asmprogram_to_bap(asm_program_t prog);
 bap_blocks_t asmir_asmprogram_range_to_bap(asm_program_t prog, address_t start, address_t end);
