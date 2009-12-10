@@ -110,13 +110,14 @@ let efficient_wp ?(simp=Util.id) (p:Gcl.t) =
   let qpr = wp_t p (fun x -> x) in 
   (fun q -> simp(exp_and qpr (exp_or q0 q)))
 
+let dwp_name = "dwptemp"
 
-
-let aij_wp ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (p:Gcl.t) =
+(** Generates a 1st order logic VC using the DWP algorithm. *)
+let dwp_1st ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (p:Gcl.t) =
   let size e = 3 in (* FIXME *)
   let variableify v e =
     if size e > k then
-      let x = Var.newvar "x" (Typecheck.infer_ast e) in
+      let x = Var.newvar dwp_name (Typecheck.infer_ast e) in
       let xe = Var x in
       (BinOp(EQ, xe, e) :: v, xe)
     else
@@ -157,13 +158,20 @@ let aij_wp ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (p:Gcl.t) =
     | Assign _ ->
 	invalid_arg "aij_wp requires an assignment-free program"
   in
-  let assignments_to_exp v =
-    let rec h e = function
-      | a::rest -> h (exp_and a e) rest
-      | [] -> e
-    in
-    h exp_true v
+  let assignments_to_exp = function
+    | [] -> None
+    | v::vs ->
+	let rec h e = function
+	  | a::rest -> h (exp_and a e) rest
+	  | [] -> e
+	in
+	Some(h v vs)
   in
-  let (v,n,w) = g (f ([],[],[]) p) in
-  let v = assignments_to_exp v in
-  (fun q -> exp_and v (exp_and (exp_not w) (exp_implies n w)))
+  let (vs,n,w) = g (f ([],[],[]) p) in
+  match assignments_to_exp vs with
+  | Some v ->
+      let vars = List.map (function BinOp(EQ, Var x, _)->x |_-> failwith "no") vs in
+      (fun q -> (vars, exp_implies v (exp_and (exp_not w) (exp_implies n q))))
+  | None ->
+      (fun q -> ([], exp_and (exp_not w) (exp_implies n q)))
+
