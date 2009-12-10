@@ -1,0 +1,13 @@
+- Store additional information in the trace header.
+  * Will need the base addresses of all modules loaded during the trace.
+    + Wonder if there will be any problems with module A unloading and
+      module B replacing its address space?
+
+- Gather operand information.
+
+- Try to figure out trace file size, and how to cut it down. Refer to iDNA
+  again.
+
+- Capture exceptions too?
+
+- Start working on caches: instruction-address cache, register and memory cache.
