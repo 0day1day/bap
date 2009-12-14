@@ -112,11 +112,21 @@ let efficient_wp ?(simp=Util.id) (p:Gcl.t) =
 
 let dwp_name = "dwptemp"
 
+let ast_size e =
+  let s = ref 0 in
+  let vis = object
+    inherit Ast_visitor.nop
+    method visit_exp _ =
+      incr s;
+      `DoChildren
+  end in
+  ignore(Ast_visitor.exp_accept vis e);
+  !s
+
 (** Generates a 1st order logic VC using the DWP algorithm. *)
 let dwp_1st ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (p:Gcl.t) =
-  let size e = 3 in (* FIXME *)
   let variableify v e =
-    if size e > k then
+    if ast_size e > k then
       let x = Var.newvar dwp_name (Typecheck.infer_ast e) in
       let xe = Var x in
       (BinOp(EQ, xe, e) :: v, xe)
