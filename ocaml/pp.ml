@@ -97,6 +97,7 @@ object (self)
     | Liveout -> pp "@set \"liveout\""
     | StrAttr s -> pp "@str \""; pp s; pc '\"'
     | ExnAttr _ (* we could try to print something using Printexc.to_string *)
+    | Context _ (* enabling printing might be useful for debugging - ethan *)
     | Pos _ -> () (* ignore position attrs *)
 
   (* prec tells us how much parenthization we need. 0 means it doesn't need

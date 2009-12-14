@@ -66,6 +66,10 @@ type attribute =
   | Address of int64
   | Liveout (** the variable assigned in this move should be considered live *)
   | StrAttr of string (** Generic printable and parseable attribute *)
+  | Context of string (** An attribute containing the concrete values and     *
+                        * taint status of the instruction operands. It can be *
+                        * merged with `StrAttr' but it seems more flexible to *
+                        * create a separate attribute. - ethan                *)
   | ExnAttr of exn (** Generic extensible attribute, but no parsing *)
 
 type attributes = attribute list

@@ -67,6 +67,9 @@ let little_endian = Int(0L, reg_1)
 let tr_label s =
   Name s (* FIXME: treating them all as names for now *)
 
+let tr_attribute = function
+  | "" -> []
+  | attribute -> [Context attribute]
 
 (** Translate an expression *)
 let rec tr_exp g e =
@@ -193,7 +196,8 @@ let rec tr_stmt g s =
     | COMMENT ->
 	Comment(Libasmir.comment_string s, [])
     | LABEL ->
-	Label(tr_label (Libasmir.label_string s), [])
+	Label(tr_label (Libasmir.label_string s),
+          tr_attribute (Libasmir.stmt_attribute s))
     | ASSERT ->
 	Assert(tr_exp g (Libasmir.assert_cond s), [])
     | VARDECL
