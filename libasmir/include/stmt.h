@@ -32,7 +32,8 @@ class Stmt {
   static void destroy(Stmt *s);
 
   Stmt(stmt_type_t st, address_t asm_ad, address_t ir_ad)
-    { asm_address = asm_ad; ir_address = ir_ad; stmt_type = st; };
+    { asm_address = asm_ad; ir_address = ir_ad; 
+      stmt_type = st; attribute = string(""); };
   
   /// Make a deep copy of the stmt
   virtual Stmt *clone() const = 0;
@@ -46,6 +47,9 @@ class Stmt {
   /// object, e.g., translation keeps a counter.
   address_t ir_address;
   stmt_type_t stmt_type;
+  void setAttribute(string attribute);
+  // a generic string attribute
+  string attribute;
 };
 
 class VarDecl : public Stmt {
@@ -224,6 +228,7 @@ extern "C" {
   extern Exp* move_lhs(Stmt*);
   extern Exp* move_rhs(Stmt*);
   extern const char* label_string(Stmt*);
+  extern const char* stmt_attribute(Stmt*);
   extern const char* special_string(Stmt*);
   extern const char* comment_string(Stmt*);
   extern Exp* jmp_target(Stmt*);

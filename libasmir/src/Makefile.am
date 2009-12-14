@@ -11,6 +11,12 @@ libasmir_a_SOURCES = \
 	./old_ir/stmt_c.cpp \
 	./old_ir/exp.cpp \
 	./old_ir/exp_c.cpp \
+	./traces/readtrace.cpp \
+	./traces/trace.cpp \
+	./traces/trace_v40.cpp \
+	./traces/trace_v41.cpp \
+	./traces/trace_v50.cpp \
+	./traces/reg_mapping.cpp \
 	asm_program.c \
 	irtoir_c.cpp \
 	irtoir.cpp \

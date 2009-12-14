@@ -34,7 +34,8 @@ static string binopnames[] = {
   "LT",
   "GE",
   "LE",
-  "SDIVIDE"
+  "SDIVIDE",
+  "SMOD"
 };
 static string strs[] = {
   "+",
@@ -58,7 +59,8 @@ static string strs[] = {
   "<",
   ">=",
   "<=",
-  "/$" 
+  "/$",
+  "%$"
 };
 
 uint64_t

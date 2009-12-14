@@ -19,6 +19,9 @@ Exp* move_rhs(Stmt *s) {
 const char* label_string(Stmt *s) {
   return ((Label*)s)->label.c_str();
 }
+const char* stmt_attribute(Stmt *s) {
+  return s->attribute.c_str();
+}
 const char* special_string(Stmt *s) {
   return ((Special*)s)->special.c_str();
 }
