@@ -153,6 +153,7 @@ enum stmt_type_t stmt_type([in] Stmt s);
 Exp move_lhs([in] Stmt s);
 Exp move_rhs([in] Stmt s);
 [string] char* label_string([in] Stmt s);
+[string] char* stmt_attribute([in] Stmt s);
 [string] char* special_string([in] Stmt s);
 [string] char* comment_string([in] Stmt s);
 Exp jmp_target([in] Stmt s);
@@ -199,6 +200,7 @@ void destroy_bap_blocks(bap_blocks_t bs);
 int asmir_bap_block_size(bap_block_t b);
 Stmt asmir_bap_block_get(bap_block_t b, int i);
 address_t asmir_bap_block_address(bap_block_t b);
+bap_blocks_t asmir_bap_from_trace_file([in,string] char * filename, boolean atts);
 
 
 /*

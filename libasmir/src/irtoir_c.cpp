@@ -1,6 +1,9 @@
 #include <string.h>
 
 #include <bfd.h>
+// maybe all the header files should be moved to 
+// libasmir/include? - ethan
+#include "./traces/readtrace.h"
 #include "irtoir.h"
 #include "asm_program.h"
 #include "irtoir-internal.h"
@@ -111,3 +114,10 @@ bap_block_t* asmir_addr_to_bap(asm_program_t *p, address_t addr)
   generate_bap_ir_block(p, bap_block);
   return bap_block;
 }
+
+bap_blocks_t * asmir_bap_from_trace_file(char * filename, bool atts) 
+{
+  bap_blocks_t * b = read_trace_from_file(string(filename), 0, false, atts);
+  return b;
+}
+

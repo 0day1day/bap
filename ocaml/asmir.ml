@@ -205,10 +205,9 @@ let rec tr_stmt g s =
 
 (** Translate a whole bap_block_t (as returned by
     Libasmir.asmir_bap_blocks_get) into a list of statements *)
-let tr_bap_block_t g asmp b = 
+let tr_bap_block_aux g b =
   let size = Libasmir.asmir_bap_block_size b - 1 in
   let addr = Libasmir.asmir_bap_block_address b in
-  let asm = Libasmir.asmir_string_of_insn asmp addr in
   let (decs,stmts) =
     foldn (fun (ds,ss) n -> let s = asmir_bap_block_get b n in
 	     match Libasmir.stmt_type s with
@@ -218,7 +217,18 @@ let tr_bap_block_t g asmp b =
   in
   let decls, unextend = tr_vardecls g decs in
   let stmts = List.map (tr_stmt g) stmts in
+  (stmts, addr, unextend)
+
+let tr_bap_block_t g asmp b = 
+  let stmts, addr, unextend = tr_bap_block_aux g b in
+  let asm = Libasmir.asmir_string_of_insn asmp addr in
   let stmts = Label(Addr addr, [Asm asm])::stmts in 
+  unextend();
+  stmts
+
+let tr_bap_block_t_no_asm g b = 
+  let stmts, addr, unextend = tr_bap_block_aux g b in
+  let stmts = Label(Addr addr, [])::stmts in
   unextend();
   stmts
 
@@ -228,8 +238,9 @@ let tr_bap_blocks_t g asmp bs =
   let size = Libasmir.asmir_bap_blocks_size bs -1 in
     foldn (fun i n -> tr_bap_block_t g asmp (asmir_bap_blocks_get bs n)@i) [] size
 
-
-
+let tr_bap_blocks_t_no_asm g bs = 
+  let size = Libasmir.asmir_bap_blocks_size bs -1 in
+    foldn (fun i n -> tr_bap_block_t_no_asm g (asmir_bap_blocks_get bs n)@i) [] size
 
 let x86_regs : var list =
   List.map (fun (n,t) -> Var.newvar n t)
@@ -358,3 +369,11 @@ let asmprogram_to_bap_range ?(init_mem = false) asmp st en=
   let ir = tr_bap_blocks_t g asmp bap_blocks in
   let () = destroy_bap_blocks bap_blocks in
   ir
+
+let bap_from_trace_file ?(atts = true) filename = 
+  let bap_blocks = Libasmir.asmir_bap_from_trace_file filename atts in
+  let g = gamma_create x86_mem x86_regs in
+  let ir = tr_bap_blocks_t_no_asm g bap_blocks in
+  let () = destroy_bap_blocks bap_blocks in
+  ir
+

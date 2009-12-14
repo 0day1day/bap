@@ -58,3 +58,6 @@ val asm_addr_to_bap :
 
 val asmprogram_to_bap_range : ?init_mem:bool ->
   asmprogram -> Libasmir.address_t -> Libasmir.address_t  -> Ast.program
+
+val bap_from_trace_file : ?atts:bool -> string -> Ast.program
+
