@@ -123,51 +123,33 @@ let ast_size e =
   ignore(Ast_visitor.exp_accept vis e);
   !s
 
-(** Generates a 1st order logic VC using the DWP algorithm. *)
-let dwp_1st ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (p:Gcl.t) =
-  let variableify v e =
+
+(* helper for dwp *)
+let variableify k v e =
     if ast_size e > k then
       let x = Var.newvar dwp_name (Typecheck.infer_ast e) in
       let xe = Var x in
       (BinOp(EQ, xe, e) :: v, xe)
     else
       (v, e)
-  in
+
+let dwp_help ?(simp=Util.id) ?(k=1) f (p:Gcl.t) =
   let g (v, n, w) =
     let rec g' v ns ws fn fw =
       match (ns,ws) with
       | (n::ns, w::ws) ->
-	  let (v,n) = variableify v n in
+	  let (v,n) = variableify k v n in
 	  g' v ns ws (exp_and n fn) (exp_or w (exp_and n fw))
       | ([],[]) ->
 	  (v, fn, fw)
       | _ -> failwith "n and w are supposed to have the same length"
     in
     match (n,w) with
-    | (n::ns, w::ws) -> let (v,n) = variableify v n in g' v ns ws n w
+    | (n::ns, w::ws) -> let (v,n) = variableify k v n in g' v ns ws n w
     | ([],[]) -> (v, exp_true, exp_false)
     | _ -> failwith "n and w are supposed to have the same length"
   in
-  let rec f ((v,n,w) as vnw) s = match s with
-    | Assert e ->
-	let (v,e) = if less_duplication then variableify v e else (v,e) in
-	(v, e::n, exp_not e :: w)
-    | Assume e ->
-	(v, e::n, exp_false::w)
-    | Seq(a, b) ->
-	let vnw' = f vnw a in (* FIXME: do we need tail recursion?*)
-	f vnw' b
-    | Choice(a, b) ->
-	let (v,na,wa) = f (v,[],[]) a in
-	let (v,nb,wb) = f (v,[],[]) b in
-	let (v,na,wa) = g (v,na,wa) in
-	let (v,nb,wb) = g (v,nb,wb) in
-	(v, (exp_or na nb)::n, (exp_or wa wb)::w)
-    | Skip ->
-	vnw
-    | Assign _ ->
-	invalid_arg "aij_wp requires an assignment-free program"
-  in
+
   let assignments_to_exp = function
     | [] -> None
     | v::vs ->
@@ -177,11 +159,72 @@ let dwp_1st ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (p:Gcl.t) =
 	in
 	Some(h v vs)
   in
-  let (vs,n,w) = g (f ([],[],[]) p) in
-  match assignments_to_exp vs with
+  let (vs,n,w) = g (f g ([],[],[]) p) in
+  (assignments_to_exp vs, vs, n, w)
+
+
+(** Generates a 1st order logic VC using the DWP algorithm. *)
+let dwp_1st ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (p:Gcl.t) =
+  let f' g =
+    let rec f ((v,n,w) as vnw) s = match s with
+      | Assert e ->
+	  let (v,e) = if less_duplication then variableify k v e else (v,e) in
+	  (v, e::n, exp_not e :: w)
+      | Assume e ->
+	  (v, e::n, exp_false::w)
+      | Seq(a, b) ->
+	  let vnw' = f vnw a in (* FIXME: do we need tail recursion?*)
+	  f vnw' b
+      | Choice(a, b) ->
+	  let (v,na,wa) = f (v,[],[]) a in
+	  let (v,nb,wb) = f (v,[],[]) b in
+	  let (v,na,wa) = g (v,na,wa) in
+	  let (v,nb,wb) = g (v,nb,wb) in
+	  (v, (exp_or na nb)::n, (exp_or wa wb)::w)
+      | Skip ->
+	  vnw
+      | Assign _ ->
+	  invalid_arg "aij_wp requires an assignment-free program"
+    in
+    f
+  in
+  let (vo, vs, n, w) = dwp_help ~simp ~k f' p in
+  match vo with
   | Some v ->
       let vars = List.map (function BinOp(EQ, Var x, _)->x |_-> failwith "no") vs in
       (fun q -> (vars, exp_implies v (exp_and (exp_not w) (exp_implies n q))))
   | None ->
       (fun q -> ([], exp_and (exp_not w) (exp_implies n q)))
 
+
+(** Generates a predicate logic VC using the DWP algorithm. *)
+let dwp ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (p:Gcl.t) =
+  let f' g =
+    let rec f ((v,n,w) as vnw) s = match s with
+      | Assert e ->
+	  let (v,e) = if less_duplication then variableify k v e else (v,e) in
+	  (v, e::n, exp_not e :: w)
+      | Assume e ->
+	  (v, e::n, exp_false::w)
+      | Seq(a, b) ->
+	  let vnw' = f vnw a in (* FIXME: do we need tail recursion?*)
+	  f vnw' b
+      | Choice(a, b) ->
+	  let (v,na,wa) = f (v,[],[]) a in
+	  let (v,nb,wb) = f (v,[],[]) b in
+	  let (v,na,wa) = g (v,na,wa) in
+	  let (v,nb,wb) = g (v,nb,wb) in
+	  (v, (exp_or na nb)::n, (exp_or wa wb)::w)
+      | Skip ->
+	  vnw
+      | Assign _ ->
+	  invalid_arg "aij_wp requires an assignment-free program"
+    in
+    f
+  in
+  let (vo, _, n, w) = dwp_help ~simp ~k f' p in
+  match vo with
+  | Some v ->
+      (fun q -> (exp_and v (exp_and (exp_not w) (exp_and n q))))
+  | None ->
+      (fun q -> (exp_and (exp_not w) (exp_and n q)))

@@ -17,11 +17,17 @@ let rename_astexp f =
   end in
   Ast_visitor.exp_accept vis
 
-let compute_dwp cfg post =
+let compute_dwp1 cfg post =
   let (gcl, foralls, tossa) = Gcl.passified_of_astcfg cfg in
   let p = rename_astexp tossa post in
   let (moreforalls, wp) = Wp.dwp_1st gcl p in
   (wp, moreforalls@foralls)
+
+
+let compute_dwp cfg post =
+  let (gcl, _, tossa) = Gcl.passified_of_astcfg cfg in
+  let p = rename_astexp tossa post in
+  (Wp.dwp gcl p, [])
 
 
 let compute_wp = ref compute_wp_boring
@@ -41,7 +47,9 @@ let speclist =
      "<exp> Use <exp> as the postcondition (defaults to \"true\")")
   ::("-dwp", Arg.Unit(fun()-> compute_wp := compute_dwp),
      "Use efficient directionless weakest precondition instead of the default")
-  :: Input.speclist
+  ::("-dwp1", Arg.Unit(fun()-> compute_wp := compute_dwp1),
+     "Use 1st order efficient directionless weakest precondition")
+    :: Input.speclist
 
 let anon x = raise(Arg.Bad("Unexpected argument: '"^x^"'"))
 let () = Arg.parse speclist anon usage
