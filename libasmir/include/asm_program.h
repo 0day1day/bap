@@ -1,8 +1,3 @@
-/*
- Owned and copyright BitBlaze, 2007. All rights reserved.
- Do not copy, disclose, or distribute without explicit written
- permission.
-*/
 #ifndef _ASM_PROGRAM_H
 #define _ASM_PROGRAM_H
 
@@ -22,8 +17,6 @@ extern "C"
 }
 #endif
 
-#include <vector>
-using namespace std;
 
 typedef struct section
 {
@@ -46,20 +39,26 @@ typedef struct asm_program {
   section_t *segs; // linked list of segments
 } asm_program_t;
 
-  // Structure for rodata
-typedef struct memory_cell_data {
-address_t address;
-int value; // suppose to have 256 possible byte values
-} memory_cell_data_t;
 
-
+typedef struct memory_cell_data memory_cell_data_t;
 
 #ifdef __cplusplus
-extern "C" 
+#include <vector>
+using namespace std;
+typedef struct vector<memory_cell_data_t *> memory_data_t;
+
+extern "C"
+{
+#else
+typedef struct memory_data memory_data_t;
+#endif
+
+#ifdef __cplusplus
+}
+extern "C"
 {
 #endif
 
-typedef struct vector<memory_cell_data_t *> memory_data_t;
 
 extern asm_program_t *asmir_open_file(const char *filename);
 extern asm_program_t* asmir_new_asmp_for_arch(enum bfd_architecture arch);
@@ -71,11 +70,6 @@ extern int asmir_get_instr_length(asm_program_t *prog, bfd_vma addr);
 extern char* asmir_string_of_insn(asm_program_t *prog, bfd_vma inst);
 extern enum bfd_architecture asmir_get_asmp_arch(asm_program_t *prog);
 
-// Argh, these functions are documented at
-// http://sourceware.org/binutils/docs/bfd/Opening-and-Closing.html
-// but don't seem to be in the header files...
-extern void *bfd_alloc (bfd *abfd, bfd_size_type wanted);
-extern void *bfd_alloc2 (bfd *abfd, bfd_size_type nmemb, bfd_size_type size);
 
   // get_rodata
 extern void destroy_memory_data(memory_data_t *md);

@@ -11,7 +11,8 @@ libasmir_a_SOURCES = \
 	./old_ir/stmt_c.cpp \
 	./old_ir/exp.cpp \
 	./old_ir/exp_c.cpp \
-	asm_program.cpp \
+	asm_program.c \
+	memory_data.cpp \
 	irtoir_c.cpp \
 	irtoir.cpp \
 	irtoir-i386.cpp \
