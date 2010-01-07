@@ -46,8 +46,8 @@ type varctx = (string,Var.t) Hashtbl.t
 *)
 let gamma_create mem decls : varctx =
   let h = Hashtbl.create 57 in
-  let () = List.iter (fun (Var.V(_,nm,_) as var) -> Hashtbl.add h nm var) decls in
-  let () = Hashtbl.add h "$mem" mem in
+  List.iter (fun (Var.V(_,nm,_) as var) -> Hashtbl.add h nm var) decls;
+  Hashtbl.add h "$mem" mem;
   h
 
 let gamma_lookup (g:varctx) s =
@@ -159,14 +159,14 @@ let tr_vardecl (g:varctx) s =
   assert(Libasmir.stmt_type s = VARDECL);
   let nm = Libasmir.vardecl_name s in 
   let var = Var.newvar nm (tr_regtype(Libasmir.vardecl_type s)) in
-    gamma_extend g nm var;
-    (var, fun () -> gamma_unextend g nm)
+  gamma_extend g nm var;
+  (var, fun () -> gamma_unextend g nm)
     
 (** Translate a list of vardecls, adding them to the context.
     @return vardecls and a function to restore the context *)
 let tr_vardecls g ss =
   let decls,unextends = List.split(List.map (tr_vardecl g) ss) in
-    (decls, fun x -> List.iter (fun f -> f x) unextends)
+  (decls, fun x -> List.iter (fun f -> f x) unextends)
 
 (** Translate a statement *)
 let rec tr_stmt g s =
@@ -347,7 +347,7 @@ let get_rodata_assignments ?(prepend_to=[]) mem prog =
 let open_program filename =
   let prog = Libasmir.asmir_open_file filename in
     (* tell the GC how to free resources associated with prog *)
-  let () = Gc.finalise Libasmir.asmir_close prog in
+  Gc.finalise Libasmir.asmir_close prog;
   prog
 
 (** Translate an entire Libasmir.asm_program_t into a Vine program *)
@@ -356,15 +356,12 @@ let asmprogram_to_bap ?(init_ro=false) asmp =
   let arch = get_asmprogram_arch asmp in
   let g = gamma_for_arch arch in
   let ir = tr_bap_blocks_t g asmp bap_blocks in
-  let () = destroy_bap_blocks bap_blocks in
-  let ir = 
-    if init_ro then (
-      let m = gamma_lookup g "$mem" in
-        get_rodata_assignments ~prepend_to:ir m asmp
-    )
-    else ir
-  in
-    ir
+  destroy_bap_blocks bap_blocks;
+  if init_ro then
+    let m = gamma_lookup g "$mem" in
+    get_rodata_assignments ~prepend_to:ir m asmp
+  else ir
+
 
 
 
@@ -372,7 +369,7 @@ let asmprogram_to_bap ?(init_ro=false) asmp =
 let asm_addr_to_bap g prog addr =
   let block= Libasmir.asmir_addr_to_bap prog addr in
   let ir = tr_bap_block_t g prog block in
-  let () = destroy_bap_block block in
+  destroy_bap_block block;
   ir
 
 
@@ -381,5 +378,5 @@ let asmprogram_to_bap_range ?(init_ro = false) asmp st en=
   let arch = get_asmprogram_arch asmp in
   let g = gamma_for_arch arch in
   let ir = tr_bap_blocks_t g asmp bap_blocks in
-  let () = destroy_bap_blocks bap_blocks in
+  destroy_bap_blocks bap_blocks;
   ir

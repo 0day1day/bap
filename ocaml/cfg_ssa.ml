@@ -115,9 +115,9 @@ let rec exp2ssaexp (ctx:Ctx.t) ~(revstmts:stmt list) ?(attrs=[]) e : stmt list *
       let v' = Var.renewvar v in
       let (revstmts,e1) = exp2ssaexp ctx revstmts e1 in
       let revstmts = Move(v',e1, attrs)::revstmts in
-      let () = Ctx.letextend ctx v v' in
+      Ctx.letextend ctx v v';
       let (revstmts,e2) = exp2ssaexp ctx revstmts e2 in
-      let () = Ctx.letunextend ctx v in
+      Ctx.letunextend ctx v;
       (revstmts, e2)
 
 
@@ -221,11 +221,11 @@ let rec trans_cfg cfg =
   let cfg = Prune_unreachable.prune_unreachable_ast (CA.copy cfg) in
   pdebug "Creating new cfg";
   let ssa = Cfg.map_ast2ssa (fun _ -> []) cfg in
-  let () = pdebug "Computing defsites" in
+  pdebug "Computing defsites";
   let (defsites, globals) = defsites cfg in
     (* keep track of where we need to insert phis *)
   let phis : (bbid * var, var * var list) Hashtbl.t = Hashtbl.create 57 in
-  let () = pdebug "Computing dominators" in
+  pdebug "Computing dominators";
   let {Dom.dom_tree=dom_tree; Dom.dom_frontier=df} =
     Dom.compute_all ssa (C.G.V.create BB_Entry)
   in
@@ -237,7 +237,7 @@ let rec trans_cfg cfg =
     *)
     (* let () = dprintf "Adding phis for variable '%s'" (var_to_string v) in *)
     let rec do_work = function
-	[] -> ()
+      | [] -> ()
       | n::worklist ->
 	  let worklist =
 	    List.fold_left
@@ -255,17 +255,17 @@ let rec trans_cfg cfg =
     in
       do_work (defsites v)
   in
-  let () = dprintf "Adding phis" in
-  let () = List.iter add_phis_for_var globals in
-  let () = dprintf "Added %d phis" (Hashtbl.length phis) in
+  dprintf "Adding phis";
+  List.iter add_phis_for_var globals;
+  dprintf "Added %d phis" (Hashtbl.length phis);
     (* we now have an entry in phis for every phi expression
        we need to add, although we still don't have the RHS and LHS. *)
-  let () = dprintf "Grouping phis by block" in
+  dprintf "Grouping phis by block";
   let blockphis =
     (* returns the phis for a given block *)
     let h = Hashtbl.create 57 in
-    let () = Hashtbl.iter (fun (n,v) _ -> Hashtbl.add h n v) phis in
-      Hashtbl.find_all h
+    Hashtbl.iter (fun (n,v) _ -> Hashtbl.add h n v) phis;
+    Hashtbl.find_all h
   in
   let exitctx = VH.create 57 in (* context at end of exit node *)
   let (vh_ctx,to_oldvar,stacks) as ctx = Ctx.create() in
@@ -291,11 +291,11 @@ let rec trans_cfg cfg =
     let ssa = 
       (* rename variables *)
       let stmts = CA.get_stmts cfg cfgb in
-      let () = dprintf "translating stmts" in
+      dprintf "translating stmts";
       let stmts' = stmts2ssa ctx stmts in
-	C.set_stmts ssa b stmts'
+      C.set_stmts ssa b stmts'
     in
-    let () = dprintf "going on to children" in
+    dprintf "going on to children";
       (* rename children *)
     let ssa = List.fold_left rename_block ssa (dom_tree b) in
     let () =
@@ -317,16 +317,15 @@ let rec trans_cfg cfg =
 	)
 	(C.G.succ ssa b)
     in
-    let () = (* save context for exit node *)
-      if bbid = BB_Exit then
-	VH.iter (fun k v -> VH.replace exitctx k v) vh_ctx
-    in
+    (* save context for exit node *)
+    (if bbid = BB_Exit then
+       VH.iter (fun k v -> VH.replace exitctx k v) vh_ctx);
     (* restore context *)
     Ctx.pop ctx;
     ssa
   in
   let ssa = rename_block ssa (C.G.V.create BB_Entry) in
-  let () = dprintf "Adding %d phis to the CFG" (Hashtbl.length phis) in
+  dprintf "Adding %d phis to the CFG" (Hashtbl.length phis);
   let rec split_labels revlabels stmts =
     match stmts with
       | ((Label _ | Comment _) as s)::ss ->
@@ -354,13 +353,13 @@ let rec trans_cfg cfg =
       )
       ssa ssa
   in
-  let () = dprintf "Done translating to SSA" in
-    {cfg=ssa; to_astvar=VH.find to_oldvar; to_ssavar=VH.find exitctx}
+  dprintf "Done translating to SSA";
+  {cfg=ssa; to_astvar=VH.find to_oldvar; to_ssavar=VH.find exitctx}
 
 (** Translates a CFG into SSA form. *)
 let of_astcfg cfg =
   let {cfg=ssa} = trans_cfg cfg in
-    ssa
+  ssa
 
 (** Translates an AST program into an SSA CFG. *)
 let of_ast p = 
@@ -374,8 +373,8 @@ let uninitialized cfg =
   and add sr v = sr := VS.add v !sr in
   let process stmts =
     let rec f_s = function
-	| Move(v, e, _) -> add assnd v; f_e e
-	| _ -> ()
+      | Move(v, e, _) -> add assnd v; f_e e
+      | _ -> ()
     and f_e = function
       | Load(v1,v2,v3,_) -> f_v v1; f_v v2; f_v v3
       | Store(v1,v2,v3,v4,_) -> f_v v1; f_v v2; f_v v3; f_v v4
@@ -451,7 +450,7 @@ let rm_phis ?(attrs=[]) cfg =
     let move = Move(l,Val(Var p), attrs) in
     C.set_stmts cfg b
       (match C.get_stmts cfg b with
-	 (Jmp _ as j)::stmts
+       | (Jmp _ as j)::stmts
        | (CJmp _ as j)::stmts ->
 	   j::move::stmts
        | stmts ->
