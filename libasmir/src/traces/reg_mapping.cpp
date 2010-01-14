@@ -3,7 +3,6 @@
 #include <assert.h>
 #include <exp.h>
 #include <stmt.h>
-#include <disasm.h>
 #include "reg_mapping.h"
 
 static

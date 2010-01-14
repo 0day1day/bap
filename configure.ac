@@ -154,6 +154,5 @@ AC_CHECK_FUNCS([bzero memset strstr strtoul])
 AC_CONFIG_FILES([Makefile
                  libasmir/Makefile
                  libasmir/apps/Makefile
-                 libasmir/src/Makefile
-                 libasmir/src/traces/Makefile])
+                 libasmir/src/Makefile])
 AC_OUTPUT

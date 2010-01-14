@@ -1,37 +1,9 @@
 #ifndef _TRACE_H_
 #define _TRACE_H_
 
-#include "disasm.h"
 #include <inttypes.h>
 
-/* Size of buffer to store instructions */
-#define FILEBUFSIZE 104857600
-
-/* Trace header values */
-#define VERSION_NUMBER 50
 #define MAGIC_NUMBER 0xFFFFFFFF
-
-/* Taint origins */
-#define TAINT_SOURCE_NIC_IN 0
-#define TAINT_SOURCE_KEYBOARD_IN 1
-#define TAINT_SOURCE_FILE_IN 2
-#define TAINT_SOURCE_NETWORK_OUT 3
-#define TAINT_SOURCE_API_TIME_IN 4
-#define TAINT_SOURCE_API_FILE_IN 5
-#define TAINT_SOURCE_API_REGISTRY_IN 6
-#define TAINT_SOURCE_API_HOSTNAME_IN 7
-#define TAINT_SOURCE_API_FILE_INFO_IN 8
-#define TAINT_SOURCE_API_SOCK_INFO_IN 9
-#define TAINT_SOURCE_API_STR_IN 10
-#define TAINT_SOURCE_API_SYS_IN 11
-#define TAINT_SOURCE_HOOKAPI 12
-#define TAINT_SOURCE_LOOP_IV 13
-#define TAINT_SOURCE_MODULE 14
-
-/* Starting origin for network connections */
-#define TAINT_ORIGIN_START_TCP_NIC_IN 10000
-#define TAINT_ORIGIN_START_UDP_NIC_IN 11000
-#define TAINT_ORIGIN_MODULE           20000
 
 /* Taint propagation definitions */
 #define TP_NONE 0           // No taint propagation
@@ -56,6 +28,8 @@
 #define INT32 4
 #define INT64 8
 
+enum OpType { TNone = 0, TRegister, TMemLoc, TImmediate, TJump, TFloatRegister, TMemAddress };
+
 enum OpUsage { unknown = 0, esp, counter, membase, memindex, memsegment,
   memsegent0, memsegent1 };
 
@@ -69,7 +43,6 @@ typedef struct _taint_byte_record {
 
 #define TAINT_RECORD_FIXED_SIZE 4
 
-// taint record is OK
 typedef struct _taint_record {
   uint16_t taint_propag;
   uint16_t numRecords;          // How many TaintByteRecord currently used
@@ -89,8 +62,6 @@ typedef struct _operand_val {
   uint32_t addr;
   uint32_t value;
   uint64_t tainted;
-  // operand val OK up to here
-  //uint8_t access; /* xed_operand_action_enum_t */
   taint_record_t records[MAX_OPERAND_LEN];
   enum OpAccess acc;
 } OperandVal;
@@ -133,7 +104,6 @@ typedef struct _entry_header {
   uint32_t atr;
   uint32_t aidt;
   OperandVal oper;
-// entry header OK up to here
   OperandVal operand[MAX_NUM_OPERANDS];
   OperandVal memregs[MAX_NUM_MEMREGS][MAX_NUM_MEMREGS]; // 1-dim MAX_NUM_OPERANDS -> MAX_NUM_MEMREGS
   unsigned char rawbytes[MAX_INSN_BYTES];
@@ -155,7 +125,6 @@ typedef struct _module_record {
 } ModuleRecord;
 
 #define TRACE_HEADER_FIXED_SIZE 12
-// trace header OK
 typedef struct _trace_header {
   uint32_t magicnumber;
   uint32_t version;
@@ -163,25 +132,6 @@ typedef struct _trace_header {
   uint32_t gdt_base;
   uint32_t idt_base;
 } TraceHeader;
-
-/* Exported variables */
-extern int received_tainted_data;
-extern int has_page_fault;
-extern int access_user_mem;
-extern int insn_already_written;
-extern int regmapping[];
-extern long insn_counter_traced; // Instruction counter in trace
-extern char filebuf[FILEBUFSIZE];
-extern int trace_do_not_write;
-extern int header_already_written;
-
-/* Exported Functions */
-int get_regnum(OperandVal op);
-int getOperandOffset (OperandVal *op);
-void decode_address(uint32_t address, EntryHeader *eh, int ignore_taint);
-unsigned int write_insn(FILE *stream, EntryHeader *eh);
-void print_stats();
-void xed2_init();
 
 #endif // _TRACE_H_
 

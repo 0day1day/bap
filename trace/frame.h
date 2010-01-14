@@ -12,6 +12,8 @@
 
 #define MAX_CACHEMASK_BTYES 2
 
+#define MAX_OPND_COUNT 5
+
 // TODO: Make these values something proper.
 #define MAX_FRAME_MEMSIZE sizeof(StdFrame)
 #define MAX_FRAME_DISKSIZE 1024
