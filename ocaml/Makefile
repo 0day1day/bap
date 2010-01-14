@@ -43,6 +43,7 @@ export SOURCES = \
 	stp.ml \
 	depgraphs.ml \
 	vsa.ml \
+	eval.ml
 
 RESULT = bap
 DOC_FILES := $(filter %.mli, $(SOURCES)) $(filter %.ml, $(SOURCES))

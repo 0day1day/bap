@@ -88,7 +88,7 @@ let chop srcbb srcn trgbb trgn p =
 
 (* Evaluation code added *)
 let eval_ast_cfg p = 
-  Depgraphs.Eval_AST.eval_program p ;
+  Eval.eval_ast_program p ;
   p 
 
 let add c =
