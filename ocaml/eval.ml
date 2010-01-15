@@ -240,7 +240,7 @@
         let v = eval_expr (delta,e) in
         if v = Val exp_false then failwith ("assertion failed "^(Int64.to_string pc))
         else (delta,Int64.succ pc,halt)
-      | Comment _ -> (delta,Int64.succ pc,halt)
+      | Comment _ | Label _ -> (delta,Int64.succ pc,halt)
       | Special _ -> failwith "Specials not handled yet!"
     in
     let (delta',pc',halt) as c = 
