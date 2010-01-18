@@ -370,7 +370,7 @@ let ft =
   let out = Buffer.add_substring buf
   and spaces _ = Buffer.add_char buf ' ' in
   let ft = Format.formatter_of_buffer buf in
-  Format.set_all_formatter_output_functions ~out ~flush:ignore ~spaces ~newline:ignore;
+  Format.pp_set_all_formatter_output_functions ft ~out ~flush:ignore ~spaces ~newline:ignore;
   ft
 let strpp = new pp ft
 
