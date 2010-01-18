@@ -81,6 +81,8 @@ let deadcode p =
   fst(Deadcode.do_dce p)
 let jumpelim p =
   Deadcode.cfg_jumpelim p
+let ast_coalesce = Coalesce.AST_Coalesce.coalesce
+let ssa_coalesce = Coalesce.SSA_Coalesce.coalesce
 
 (* Chop code added *)
 let chop srcbb srcn trgbb trgn p = 
@@ -134,6 +136,10 @@ let speclist =
      "Apply Strongly Connected Component based Value Numbering")
   ::("-deadcode", uadd(TransformSsa deadcode),
      "Perform dead code ellimination.")
+  ::("-ast-coalesce", uadd(TransformAstCfg ast_coalesce),
+     "Perform coalescing on the AST.")
+  ::("-ssa-coalesce", uadd(TransformSsa ssa_coalesce),
+     "Perform coalescing on the SSA.")
   ::("-jumpelim", uadd(TransformSsa jumpelim),
      "Control flow optimization.")
   ::("-ssa-simp", uadd(TransformSsa Ssa_simp.simp_cfg),
