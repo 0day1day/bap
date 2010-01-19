@@ -1,6 +1,7 @@
 
 #include <iostream>
 #include <stdint.h>
+#include <string.h>
 
 #include "frame.h"
 
@@ -23,8 +24,8 @@ Frame *Frame::unserialize(istream &in, bool noskip)
    type = (FrameType) packed_type;
 
    if (!noskip) {
-      printf("Skipping frame, %d bytes.\n", size - 8);
-      in.ignore(size - 8);
+      printf("Skipping frame, %d bytes.\n", size - 3);
+      in.ignore(size - 3);
       return NULL;
    }
 
@@ -55,7 +56,7 @@ Frame *Frame::unserialize(istream &in, bool noskip)
 ostream &Frame::serialize(ostream &out, uint16_t sz)
 {
 
-   sz += 5;                     // 3 == sizeof((char) type) + sizeof(sz)
+   sz += 3;                     // 3 == sizeof((char) type) + sizeof(sz)
 
    // Compress type value into a single byte.
    unsigned char packed_type = (char) type;
@@ -66,12 +67,22 @@ ostream &Frame::serialize(ostream &out, uint16_t sz)
 
 }
 
+void StdFrame::clearCache()
+{ 
+   memset((void *) &cachemask, 0, MAX_CACHEMASK_BTYES); 
+}
+
 ostream &StdFrame::serialize(ostream &out, uint16_t sz)
 {
+
+
+   // Note: ((x-1) >> 3) + 1 === ceil(x / 8.0)
+   uint32_t masklen = ((values_count - 1) >> 3) + 1;
 
    // 9 = sizeof(addr) + sizeof(tid) + sizeof(lengths)
    sz += 9
       + (insn_length * sizeof(char))
+      + masklen
       + (values_count * sizeof(uint32_t));
    
    ostream &out2 = Frame::serialize(out, sz);
@@ -90,11 +101,7 @@ ostream &StdFrame::serialize(ostream &out, uint16_t sz)
    WRITE(out2, lengths);
    
    out2.write((const char *) &rawbytes, insn_length * sizeof(char));
-
-   // Note: ((x-1) >> 3) + 1 === ceil(x / 8.0)
-   out2.write((const char *) &cachemask, 
-              ((values_count - 1) >> 3) + 1);
-
+   out2.write((const char *) &cachemask, masklen);
    out2.write((const char *) &values, values_count * sizeof(uint32_t));
 
    return out2;
@@ -176,3 +183,27 @@ istream &KeyFrame::unserializePart(istream &in)
    return in;
       
 }
+
+#if 0
+int main(int argc, char **argv)
+{
+
+   StdFrame f;
+   f.clearCache();
+
+   f.setCached(2);
+   f.setCached(3);
+   f.unsetCached(7);
+   f.setCached(7);
+
+   for(unsigned int i = 0; i < MAX_VALUES_COUNT; i++) {
+      cout << i << ": ";
+      if (f.isCached(i))
+         cout << "cached.";
+      else
+         cout << "not cached.";
+      cout << endl;
+   }
+
+}
+#endif

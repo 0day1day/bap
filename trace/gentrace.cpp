@@ -8,17 +8,39 @@
 
 #include "frame.h"
 #include "trace.h"
+#include "cache.h"
 
 #include "frame.cpp"
 #include "trace.cpp"
 
 #define BUFFER_SIZE 1024
 
+#define USE_CACHING
+
+KNOB<string> KnobOut(KNOB_MODE_WRITEONCE, "pintool",
+                     "out", "out.bpt",
+                     "Trace file to output to.");
+
+
+// Value specifier type.
+#define VT_NONE     0x0
+#define VT_REG32    0x1
+#define VT_REG16    0x2
+#define VT_REG8     0x3
+#define VT_MEM32    0x11
+#define VT_MEM16    0x12
+#define VT_MEM8     0x13
+
+struct ValSpecRec {
+   uint32_t type;               // Type of value specifier.
+   uint32_t loc;                // Location of this value.
+   uint32_t value;              // Actual value.
+};
+
 struct FrameBuf {
    uint32_t addr;
    uint32_t tid;
    uint32_t insn_length;
-   uint32_t opnd_count;
 
    // The raw instruction bytes will be stored as 16 bytes placed over 4
    // integers. The conversion is equivalent to the casting of a char[16]
@@ -29,15 +51,8 @@ struct FrameBuf {
    uint32_t rawbytes2;
    uint32_t rawbytes3;
 
-   uint32_t opnd0base;
-   uint32_t opnd0index;
-   uint32_t opnd0value;
-   uint32_t opnd1base;
-   uint32_t opnd1index;
-   uint32_t opnd1value;
-   uint32_t opnd2base;
-   uint32_t opnd2index;
-   uint32_t opnd2value;
+   uint32_t values_count;
+   ValSpecRec valspecs[MAX_VALUES_COUNT];
 
 };
 
@@ -46,19 +61,17 @@ TraceWriter *g_tw;
 FrameBuf g_buffer[BUFFER_SIZE];
 uint32_t g_bufidx;
 
-// We need a pointer to a zero value as the dummy value for operands which
-// have no "value".
-uint32_t g_zero = 0;
-uint32_t *g_zeroptr = &g_zero;
+// Caches.
+RegCache g_regcache;
+MemCache g_memcache;
 
 //
-// Appends "count" to the buffer index, and then returns true if the
-// index exceeds the maximum size of the buffer.
+// Returns true if the buffer index with count added to it exceeds the
+// maximum size of the buffer.
 //
 ADDRINT CheckBuffer(UINT32 count)
 {
-   g_bufidx += count;
-   return g_bufidx >= BUFFER_SIZE;
+   return (g_bufidx + count) >= BUFFER_SIZE;
 }
 
 //
@@ -67,33 +80,142 @@ ADDRINT CheckBuffer(UINT32 count)
 //
 VOID FlushBuffer()
 {
-#if 0
+
    for(uint32_t i = 0; i < g_bufidx; i++) {
+      
+      // TODO: Implement caching.
 
       StdFrame f;
       f.addr = g_buffer[i].addr;
       f.tid = g_buffer[i].tid;
       f.insn_length = g_buffer[i].insn_length;
-      f.opnd_count = g_buffer[i].opnd_count;
+
+      if (f.insn_length > MAX_INSN_BYTES) {
+         LOG("Error! f.insn_length is too long!\n");
+      }
 
       memcpy((char *) f.rawbytes, (char *) &(g_buffer[i].rawbytes0), f.insn_length);
 
-      f.opnds[0].base = g_buffer[i].opnd0base;
-      f.opnds[0].index = g_buffer[i].opnd0index;
-      f.opnds[0].value = g_buffer[i].opnd0value;
+      f.clearCache();
 
-      f.opnds[1].base = g_buffer[i].opnd1base;
-      f.opnds[1].index = g_buffer[i].opnd1index;
-      f.opnds[1].value = g_buffer[i].opnd1value;
+      uint32_t newcnt = 0;
 
-      f.opnds[2].base = g_buffer[i].opnd2base;
-      f.opnds[2].index = g_buffer[i].opnd2index;
-      f.opnds[2].value = g_buffer[i].opnd2value;
-     
+      // Go through each value and remove the ones that are cached.
+
+      for (uint32_t j = 0; j < g_buffer[i].values_count; j++) {
+
+         ValSpecRec &v = g_buffer[i].valspecs[j];
+
+         switch (v.type) {
+         case VT_REG32:
+#ifdef USE_CACHING
+            if (g_regcache.elem32((REG) v.loc).full == v.value) {
+               f.setCached(j);
+            } else {
+               g_regcache.elem32((REG) v.loc).full = v.value;
+#endif
+               f.values[newcnt] = v.value;
+               newcnt++;
+#ifdef USE_CACHING
+            }
+#endif
+            break;
+
+         case VT_REG16:
+#ifdef USE_CACHING
+            if (((uint32_t) g_regcache.elem16((REG) v.loc).full) == v.value) {
+               f.setCached(j);
+            } else {
+#endif
+               g_regcache.elem16((REG) v.loc).full = (uint16_t) v.value;
+               f.values[newcnt] = v.value;
+               newcnt++;
+#ifdef USE_CACHING
+            }
+#endif
+            break;
+
+         case VT_REG8:
+#ifdef USE_CACHING
+            if (((uint32_t) g_regcache.elem8((REG) v.loc)) != v.value) {
+               f.setCached(j);
+            } else {
+               g_regcache.elem8((REG) v.loc) = (uint8_t) v.value;
+#endif
+               f.values[newcnt] = v.value;
+               newcnt++;
+#ifdef USE_CACHING
+            }
+#endif
+            break;
+
+         case VT_MEM32:
+#ifdef USE_CACHING
+            if (g_memcache.elem32(v.loc) == v.value) {
+               f.setCached(j);
+               LOG(hexstr(f.addr) + ": " +
+                   "cached: " + hexstr(v.loc) + 
+                   " has value " + hexstr(g_memcache.elem32(v.loc)) +
+                   "\n");
+            } else {
+               LOG(hexstr(f.addr) + ": " +
+                   "not cached: " + hexstr(v.loc) + 
+                   " has value " + hexstr(v.value) +
+                   ", cache is " + hexstr(g_memcache.elem32(v.loc)) +
+                   "\n");
+
+               g_memcache.elem32(v.loc) = v.value;
+#endif
+               f.values[newcnt] = v.value;
+               newcnt++;
+#ifdef USE_CACHING
+            }
+#endif
+            break;
+
+         case VT_MEM16:
+#ifdef USE_CACHING
+            if (((uint32_t) g_memcache.elem16(v.loc)) == v.value) {
+               f.setCached(j);
+            } else {
+               g_memcache.elem16(v.loc) = (uint16_t) v.value;
+#endif
+               f.values[newcnt] = v.value;
+               newcnt++;
+#ifdef USE_CACHING
+            }
+#endif
+            break;
+
+         case VT_MEM8:
+#ifdef USE_CACHING
+            if (((uint32_t) g_memcache.elem8(v.loc)) == v.value) {
+               f.setCached(j);
+            } else {
+               g_memcache.elem8(v.loc) = (uint8_t) v.value;
+#endif
+               f.values[newcnt] = v.value;
+               newcnt++;
+#ifdef USE_CACHING
+            }
+#endif
+            break;
+
+         default:
+            // TODO: Figure out what to do here.
+
+            f.values[newcnt] = v.value;
+            newcnt++;
+            
+         }
+
+      }
+
+      f.values_count = newcnt;
+
       g_tw->add(f);
 
    }
-#endif
 
    g_bufidx = 0;
 
@@ -102,97 +224,167 @@ VOID FlushBuffer()
 VOID AppendBuffer(ADDRINT addr,
                   THREADID tid,
                   UINT32 insn_length,
-                  UINT32 opnd_count,
 
                   UINT32 rawbytes0,
                   UINT32 rawbytes1,
                   UINT32 rawbytes2,
                   UINT32 rawbytes3,
 
-                  UINT32 opnd0base,
-                  UINT32 opnd0index,
-                  ADDRINT opnd0addr,
+                  // NOTE: We assume here that MAX_VALUES_COUNT == 15.
+                  UINT32 valspec0_type,
+                  UINT32 valspec0_loc,
+                  UINT32 valspec0_spec,
 
-                  UINT32 opnd1base,
-                  UINT32 opnd1index,
-                  ADDRINT opnd1addr,
+                  UINT32 valspec1_type,
+                  UINT32 valspec1_loc,
+                  UINT32 valspec1_spec,
 
-                  UINT32 opnd2base,
-                  UINT32 opnd2index,
-                  ADDRINT opnd2addr)
+                  UINT32 valspec2_type,
+                  UINT32 valspec2_loc,
+                  UINT32 valspec2_spec,
+
+                  UINT32 valspec3_type,
+                  UINT32 valspec3_loc,
+                  UINT32 valspec3_spec,
+
+                  UINT32 valspec4_type,
+                  UINT32 valspec4_loc,
+                  UINT32 valspec4_spec,
+
+                  UINT32 valspec5_type,
+                  UINT32 valspec5_loc,
+                  UINT32 valspec5_spec,
+
+                  UINT32 valspec6_type,
+                  UINT32 valspec6_loc,
+                  UINT32 valspec6_spec,
+
+                  UINT32 valspec7_type,
+                  UINT32 valspec7_loc,
+                  UINT32 valspec7_spec,
+
+                  UINT32 valspec8_type,
+                  UINT32 valspec8_loc,
+                  UINT32 valspec8_spec,
+
+                  UINT32 valspec9_type,
+                  UINT32 valspec9_loc,
+                  UINT32 valspec9_spec,
+
+                  UINT32 valspec10_type,
+                  UINT32 valspec10_loc,
+                  UINT32 valspec10_spec,
+
+                  UINT32 valspec11_type,
+                  UINT32 valspec11_loc,
+                  UINT32 valspec11_spec,
+
+                  UINT32 valspec12_type,
+                  UINT32 valspec12_loc,
+                  UINT32 valspec12_spec,
+
+                  UINT32 valspec13_type,
+                  UINT32 valspec13_loc,
+                  UINT32 valspec13_spec,
+
+                  UINT32 valspec14_type,
+                  UINT32 valspec14_loc,
+                  UINT32 valspec14_spec,
+
+                  // This is the last argument because often we don't know
+                  // how many values there will be until after we've built
+                  // up the preceding arguments in the argument list.
+                  UINT32 values_count
+                  )
 {
-#if 1
+
    g_buffer[g_bufidx].addr = addr;
    g_buffer[g_bufidx].tid = tid;
    g_buffer[g_bufidx].insn_length = insn_length;
-   g_buffer[g_bufidx].opnd_count = opnd_count;
 
    g_buffer[g_bufidx].rawbytes0 = rawbytes0;
    g_buffer[g_bufidx].rawbytes1 = rawbytes1;
    g_buffer[g_bufidx].rawbytes2 = rawbytes2;
    g_buffer[g_bufidx].rawbytes3 = rawbytes3;
 
-   g_buffer[g_bufidx].opnd0base = opnd0base;
-   g_buffer[g_bufidx].opnd0index = opnd0index;
-   g_buffer[g_bufidx].opnd0value = *((uint32_t *) opnd0addr);
+   g_buffer[g_bufidx].values_count = values_count;
 
-   /**
-   PIN_SafeCopy(&(g_buffer[g_bufidx].opnd0value), 
-                (const VOID *) opnd0addr, 
-                sizeof(uint32_t));
-   **/
+#define BUILD_VALSPEC(i)                                                \
+   if (i >= values_count) goto _exit;                                   \
+   g_buffer[g_bufidx].valspecs[i].type = valspec##i##_type;             \
+   g_buffer[g_bufidx].valspecs[i].loc = valspec##i##_loc;               \
+   switch(valspec##i##_type) {                                          \
+   case VT_REG32:                                                       \
+   case VT_REG16:                                                       \
+   case VT_REG8:                                                        \
+      g_buffer[g_bufidx].valspecs[i].value = valspec##i##_spec;         \
+      break;                                                            \
+   case VT_MEM32:                                                       \
+   case VT_MEM16:                                                       \
+   case VT_MEM8:                                                        \
+      if (valspec##i##_spec == 1) {                                     \
+         g_buffer[g_bufidx].valspecs[i].value =                         \
+            (uint32_t) *((uint8_t *) valspec##i##_loc);                 \
+         g_buffer[g_bufidx].valspecs[i].type = VT_MEM8;                 \
+      } else if (valspec##i##_spec == 2) {                              \
+         g_buffer[g_bufidx].valspecs[i].value =                         \
+            (uint32_t) *((uint16_t *) valspec##i##_loc);                \
+         g_buffer[g_bufidx].valspecs[i].type = VT_MEM16;                \
+      } else if (valspec##i##_spec == 4) {                              \
+         g_buffer[g_bufidx].valspecs[i].value =                         \
+            *((uint32_t *) valspec##i##_loc);                           \
+         g_buffer[g_bufidx].valspecs[i].type = VT_MEM32;                \
+      }                                                                 \
+      break;                                                            \
+   }
+   
+   BUILD_VALSPEC(0);
+   BUILD_VALSPEC(1);
+   BUILD_VALSPEC(2);
+   BUILD_VALSPEC(3);
+   BUILD_VALSPEC(4);
+   BUILD_VALSPEC(5);
+   BUILD_VALSPEC(6);
+   BUILD_VALSPEC(7);
+   BUILD_VALSPEC(8);
+   BUILD_VALSPEC(9);
+   BUILD_VALSPEC(10);
+   BUILD_VALSPEC(11);
+   BUILD_VALSPEC(12);
+   BUILD_VALSPEC(13);
+   BUILD_VALSPEC(14);
+#undef BUILD_VALSPEC
 
-   g_buffer[g_bufidx].opnd1base = opnd1base;
-   g_buffer[g_bufidx].opnd1index = opnd1index;
-   g_buffer[g_bufidx].opnd1value = *((uint32_t *) opnd1addr);
-   /**
-   PIN_SafeCopy(&(g_buffer[g_bufidx].opnd1value), 
-                (const VOID *) opnd1addr, 
-                sizeof(uint32_t));
-   **/
+ _exit:
 
-   g_buffer[g_bufidx].opnd2base = opnd2base;
-   g_buffer[g_bufidx].opnd2index = opnd2index;
+   g_bufidx++;
+   return;
 
-   LOG("opnd2addr = " + hexstr(opnd2addr) + "\n");
-
-   //g_buffer[g_bufidx].opnd2value = *((uint32_t *) opnd2addr);
-   /**
-   PIN_SafeCopy(&(g_buffer[g_bufidx].opnd2value), 
-                (const VOID *) opnd2addr, 
-                sizeof(uint32_t));
-   **/
-#endif
 }
 
 VOID InstrBlock(BBL bbl)
 {
 
    uint32_t icount = 0;
-#if 1
+
    for (INS ins = BBL_InsHead(bbl); INS_Valid(ins); ins = INS_Next(ins)) {
       // Add instrumentation call to insert instruction into buffer.
 
       // The argument list to be passed into the instruction analysis call.
       IARGLIST arglist = IARGLIST_Alloc();
 
-      // TODO: Need to assert that opnd_count <= MAX_OPND_COUNT.
-      uint32_t opnd_count = INS_OperandCount(ins);
-
       // The first few arguments to AppendBuffer.
       IARGLIST_AddArguments(arglist,
                             IARG_ADDRINT, INS_Address(ins), 
                             IARG_THREAD_ID,
                             IARG_UINT32, INS_Size(ins),
-                            IARG_UINT32, opnd_count,
                             IARG_END);
 
       // Now we need to gather the instruction bytes.
 
-      uint32_t rawbytes_i[4];
-
       // Wastes a copy, but required because the instruction may not be
       // 32-bit aligned, and we want to respect word alignment requirements.
+      uint32_t rawbytes_i[4];
       memcpy((char *) rawbytes_i, (char *) INS_Address(ins), INS_Size(ins));
 
       IARGLIST_AddArguments(arglist,
@@ -202,80 +394,111 @@ VOID InstrBlock(BBL bbl)
                             IARG_UINT32, rawbytes_i[3],
                             IARG_END);
 
-      // Now we need to get the operand information.
+      // Now we need to get the values.
+
+      uint32_t valcount = 0;
      
-      for(uint32_t i = 0; i < opnd_count; i++) {
+      for(uint32_t i = 0; i < INS_OperandCount(ins); i++) {
 
-         if (INS_OperandRead(ins, i)) {
+         if (INS_OperandIsReg(ins, i) && INS_OperandRead(ins, i)) {
 
-            if (INS_OperandIsReg(ins, i)) {
+            // TODO: Check for segment register.
+
+            REG r = INS_OperandReg(ins, i);
+
+            uint32_t ty;
+            if (REG_is_gr32(r)) ty = VT_REG32;
+            else if (REG_is_gr16(r)) ty = VT_REG16;
+            else if (REG_is_gr8(r)) ty = VT_REG8;
+            else {
+               // TODO: Handle more cases, and decide if this catchall is
+               // a really bad idea.
+               ty = VT_REG32;
+            }
+            
+            IARGLIST_AddArguments(arglist,
+                                  IARG_UINT32, ty,
+                                  IARG_UINT32, r,
+                                  IARG_REG_VALUE, r,
+                                  IARG_END);
+            valcount++;
+
+         } else if (INS_OperandIsMemory(ins, i)) {
+            
+            // TODO: Check for segment register.
+
+            REG basereg = INS_OperandMemoryBaseReg(ins, i);
+            if (basereg != REG_INVALID()) {
+
+               uint32_t ty;
+               if (REG_is_gr32(basereg)) ty = VT_REG32;
+               else if (REG_is_gr16(basereg)) ty = VT_REG16;
+               else if (REG_is_gr8(basereg)) ty = VT_REG8;
+               else {
+                  // TODO: Handle more cases, and decide if this catchall is
+                  // a really bad idea.
+                  ty = VT_REG32;
+               }
 
                IARGLIST_AddArguments(arglist,
-                                     IARG_REG_VALUE, INS_OperandReg(ins, i),
-                                     IARG_UINT32, 0,
-                                     IARG_ADDRINT, g_zeroptr,
+                                     IARG_UINT32, ty,
+                                     IARG_UINT32, basereg,
+                                     IARG_REG_VALUE, basereg,
                                      IARG_END);
+               valcount++;
+            }
 
-            } else if (INS_OperandIsMemory(ins, i)) {
+            REG idxreg = INS_OperandMemoryIndexReg(ins, i);
+            if (idxreg != REG_INVALID()) {
 
-               REG basereg = INS_OperandMemoryBaseReg(ins, i);
-               REG idxreg = INS_OperandMemoryIndexReg(ins, i);
-
-               if (basereg != REG_INVALID()) {
-                  IARGLIST_AddArguments(arglist,
-                                        IARG_REG_VALUE, basereg,
-                                        IARG_END);
-               } else {
-                  IARGLIST_AddArguments(arglist,
-                                        IARG_UINT32, 0,
-                                        IARG_END);
+               uint32_t ty;
+               if (REG_is_gr32(idxreg)) ty = VT_REG32;
+               else if (REG_is_gr16(idxreg)) ty = VT_REG16;
+               else if (REG_is_gr8(idxreg)) ty = VT_REG8;
+               else {
+                  // TODO: Handle more cases, and decide if this catchall is
+                  // a really bad idea.
+                  ty = VT_REG32;
                }
-
-               if (idxreg != REG_INVALID()) {
-                  IARGLIST_AddArguments(arglist,
-                                        IARG_REG_VALUE, idxreg,
-                                        IARG_END);
-               } else {
-                  IARGLIST_AddArguments(arglist,
-                                        IARG_UINT32, 0,
-                                        IARG_END);
-               }
-
-               if (INS_IsMemoryRead(ins)) {
-                  IARGLIST_AddArguments(arglist,
-                                        IARG_MEMORYREAD_EA,
-                                        IARG_END);
-               } else {
-                  IARGLIST_AddArguments(arglist,
-                                        IARG_ADDRINT, g_zeroptr,
-                                        IARG_END);
-                  LOG("???: " + INS_Disassemble(ins) + "\n");
-               }
-
-            } else {
-               
-               // We can ignore immediates. Any other cases we need to
-               // handle?
 
                IARGLIST_AddArguments(arglist,
-                                     IARG_UINT32, 0,
-                                     IARG_UINT32, 0,
-                                     IARG_ADDRINT, g_zeroptr,
+                                     IARG_UINT32, ty,
+                                     IARG_UINT32, idxreg,
+                                     IARG_REG_VALUE, idxreg,
                                      IARG_END);
-               
+               valcount++;
             }
 
          }
 
       }
 
-      for (uint32_t i = opnd_count; i < MAX_OPND_COUNT; i++) {
+      if (INS_IsMemoryRead(ins)) {
+
          IARGLIST_AddArguments(arglist,
+                               IARG_UINT32, VT_MEM32,
+                               IARG_MEMORYREAD_EA,
+                               IARG_MEMORYREAD_SIZE,
+                               IARG_END);
+         valcount++;
+      }
+
+      // TODO: Check for second memory read.
+
+      // TODO: Check if valcount has exceed the maximum number of
+      // values. Also, figure out what to do if so.
+
+      for (uint32_t i = valcount; i < MAX_VALUES_COUNT; i++) {
+         IARGLIST_AddArguments(arglist,
+                               IARG_UINT32, VT_NONE,
                                IARG_UINT32, 0,
                                IARG_UINT32, 0,
-                               IARG_ADDRINT, g_zeroptr,
                                IARG_END);
       }
+
+      IARGLIST_AddArguments(arglist,
+                            IARG_UINT32, valcount,
+                            IARG_END);
       
       // The argument list has been built, time to insert the call.
 
@@ -287,7 +510,7 @@ VOID InstrBlock(BBL bbl)
       icount++;
 
    }
-#endif
+
    // Add instrumentation call to check if buffer needs to be flushed.
    BBL_InsertIfCall(bbl, IPOINT_BEFORE,
                     (AFUNPTR) CheckBuffer,
@@ -323,7 +546,7 @@ int main(int argc, char *argv[])
    TRACE_AddInstrumentFunction(InstrTrace, 0);
    PIN_AddFiniFunction(Fini, 0);
 
-   g_tw = new TraceWriter("test.bpt");
+   g_tw = new TraceWriter(KnobOut.Value().c_str());
 
    g_bufidx = 0;
 

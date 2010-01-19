@@ -12,8 +12,6 @@
 
 #define MAX_CACHEMASK_BTYES 2
 
-#define MAX_OPND_COUNT 5
-
 // TODO: Make these values something proper.
 #define MAX_FRAME_MEMSIZE sizeof(StdFrame)
 #define MAX_FRAME_DISKSIZE 1024
@@ -109,6 +107,9 @@ struct Frame {
  *     If this instruction is a memory read:
  *        Store the value of the memory location being read.
  *     EndIf
+ *     If this instruction has any subsequent memory reads:
+ *        Store the values of the memory locations being red.
+ *     EndIf
  *
  *   i.e. the values array will start with the values of all registers
  *   that will be read by the processor, whether to use the value in an
@@ -151,17 +152,31 @@ struct StdFrame : public Frame {
    virtual std::ostream &serialize(std::ostream &out, uint16_t sz = 0);
    virtual std::istream &unserializePart(std::istream &in);
 
-   void clearCache()
-   { memset((void *) &cachemask, 0, MAX_CACHEMASK_BTYES); }
+   void clearCache();
 
-   // TODO: Check that this piece of magic works!
+   // TODO: Removing the bounds checking in the functions below might
+   // lead to some speedups. Test and see if the risk is worth it.
+
    // Note: x & 7 === x % 8
    bool isCached(uint32_t pos)
-   { return (cachemask[pos >> 3] >> (pos & 7)) == 1; }
+   { 
+      if (pos < MAX_VALUES_COUNT)
+         return (cachemask[pos >> 3] >> (pos & 7)) & 1; 
+      else
+         return false;
+   }
 
-   // TODO: Check that this piece of magic works too!
-   void setCached(uint32_t pos, uint32_t val = 1)
-   { cachemask[pos >> 3] |= (val << (pos & 7)); }
+   void setCached(uint32_t pos)
+   { 
+      if (pos < MAX_VALUES_COUNT)
+         cachemask[pos >> 3] |= (1 << (pos & 7)); 
+   }
+
+   void unsetCached(uint32_t pos)
+   {
+      if (pos < MAX_VALUES_COUNT)
+         cachemask[pos >> 3] &= ~(1 << (pos & 7));
+   }
 
 };
 

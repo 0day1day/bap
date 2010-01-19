@@ -7,6 +7,8 @@ int main(int argc, char **argv) {
 
    TraceReader tr(argv[1]);
 
+   printf("Frame count: %d\n", tr.count());
+
    while(tr.pos() < tr.count()) {
       
       Frame *f = tr.next();
@@ -19,7 +21,7 @@ int main(int argc, char **argv) {
             printf("Addr: 0x%x\n", sf->addr);
             printf("TID: %d\n", sf->tid);
             printf("Insn length: %d\n", sf->insn_length);
-            printf("Opnd count: %d\n", sf->opnd_count);
+            printf("Values count: %d\n", sf->values_count);
 
             printf("Insn bytes: ");
 

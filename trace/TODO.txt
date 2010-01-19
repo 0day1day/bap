@@ -3,11 +3,23 @@
     + Wonder if there will be any problems with module A unloading and
       module B replacing its address space?
 
-- Gather operand information.
+- (DONE) Gather operand information.
 
 - Try to figure out trace file size, and how to cut it down. Refer to iDNA
   again.
 
 - Capture exceptions too?
 
-- Start working on caches: instruction-address cache, register and memory cache.
+- (DONE) Start working on caches: instruction-address cache, register and memory cache.
+
+=================================
+
+gentrace.cpp:
+
+- (DONE) Implement data caching.
+- Implement keyframes.
+- Test to see if using different analysis functions for common numbers of
+  values will help improve performance. e.g. an analysis function that
+  accepts 3 values because majority of instructions only have 3
+  values. Will have to determine empirically what is the most common
+  number of values.
