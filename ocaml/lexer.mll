@@ -133,9 +133,9 @@ rule token = parse
   | '-'          { MINUS }
   | '*'          { TIMES }
   | '/'          { DIVIDE }
-  | "/$"         { SDIVIDE }
+  | "$/"         { SDIVIDE }
   | '%'          { MOD }
-  | "%$"         { SMOD }
+  | "$%"         { SMOD }
   | "<<"         { LSHIFT }
   | ">>"         { RSHIFT }
   | "$>>"        { ARSHIFT }
@@ -189,7 +189,9 @@ rule token = parse
       with Failure "int_of_string" -> 
 	raise(LexError "Error converting integer");
     }
-  | _ as s    { raise(LexError("Unrecognized char '"^Char.escaped s^"'")) }
+  | _ as s    { raise(LexError("line "^
+                               (string_of_int lexbuf.lex_curr_p.pos_lnum)
+                               ^": Unrecognized char '"^Char.escaped s^"'")) }
 
 
 (* probably not the best way to implement this, but the lack of block comments
