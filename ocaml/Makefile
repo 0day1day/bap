@@ -44,7 +44,10 @@ export SOURCES = \
 	depgraphs.ml \
 	vsa.ml \
 	eval.ml \
-	coalesce.ml
+	coalesce.ml \
+	symbeval.ml \
+	traces.ml \
+    search.ml
 
 RESULT = bap
 DOC_FILES := $(filter %.mli, $(SOURCES)) $(filter %.ml, $(SOURCES))

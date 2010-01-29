@@ -19,8 +19,30 @@ Exp* move_rhs(Stmt *s) {
 const char* label_string(Stmt *s) {
   return ((Label*)s)->label.c_str();
 }
-const char* stmt_attribute(Stmt *s) {
-  return s->attribute.c_str();
+conc_map_vec* stmt_attributes(Stmt *s) {
+  return s->attributes;
+}
+int conc_map_size(conc_map_vec *v) {
+  if (v == NULL) return 0;
+  return v->size();
+}
+conc_map* get_attr(conc_map_vec *v, int i) {
+  return v->at(i);
+}
+const char* attr_name(conc_map *m) {
+  return m->name.c_str();
+}
+const_val_t attr_value(conc_map *m) {
+  return m->value;
+}
+const_val_t attr_ind(conc_map *m) {
+  return m->index;
+}
+bool attr_mem(conc_map *m) {
+  return m->mem;
+}
+attr_type_t attr_type(conc_map *m) {
+  return m->type;
 }
 const char* special_string(Stmt *s) {
   return ((Special*)s)->special.c_str();

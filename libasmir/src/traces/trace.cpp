@@ -91,38 +91,66 @@ void Trace::consume_header(TraceHeader * hdr)
         read_procs(hdr) ;
 }
 
+attr_type_t Trace::opsize_to_type(int size){
+        switch(size) {
+                case 1: return BOOL;
+                case 8: return CHR;
+                case 16: return INT_16;
+                case 32: return INT_32;
+                case 64: return INT_64;
+                default:  return NONE;
+        }
+}
+
 /* Creates a string representation of the contents (during *
  * the execution of the instruction for the following      *
  * contexts:                                               *
  * Delta: mapping an instruction operand to a value        *
  * Tau: mapping an instruction operand to its taint status */
-string Trace::operand_status(EntryHeader * eh)
+conc_map_vec * Trace::operand_status(EntryHeader * eh)
 {
-        ostringstream os;
-        int i;
+        conc_map_vec * concrete_pairs = new vector<conc_map *>();
+        int i, type; bool mem;
+        string name;
+        const_val_t index, value;
+        conc_map * map;
         for ( i = 0 ; i < eh->num_operands ; i ++ )
         {
+                type = opsize_to_type(eh->operand[i].length<<3);
                 switch (eh->operand[i].type)
                 { 
                         case TRegister: 
-                                os << " " << register_name(eh->operand[i].addr) << " = " ;
-                                os << eh->operand[i].value << ", " ;
-                                os << eh->operand[i].tainted << " ; " ;
+                                name = register_name(eh->operand[i].addr);
+                                mem = false;
+                                value = eh->operand[i].value ;
+                                //os << eh->operand[i].tainted << " ; " ;
+                                map = new ConcPair(name,mem,static_cast<attr_type_t>(type),index,value);
+                                concrete_pairs->push_back(map);
                                 break;
                         case TMemLoc: 
-                                os << " mem[" << eh->operand[i].addr << "] = " ; 
-                                os << eh->operand[i].value << ", " ;
-                                os << eh->operand[i].tainted << " ; " ;
+                                /* Creating an IL representation of the Delta, Mu contexts */
+                                /* TODO: we only support one 32bit-addressable memory... */
+                                name = "mem";
+                                mem = true;
+                                index = eh->operand[i].addr ;
+                                value = eh->operand[i].value ;
+                                //os << eh->operand[i].tainted << " ; " ;
+                                map = new ConcPair(name,mem,static_cast<attr_type_t>(type),index,value);
+                                concrete_pairs->push_back(map);
                                 break ;
                         case TImmediate : 
                         case TJump : 
                         case TFloatRegister : 
+                                /* FIXME: temporarily silenced */
+                                // cerr << "the trace contains unhandled info" << endl ;
                                 // we do not extract information from such operands
                                 break ;
                         case TMemAddress:
-                                os << " addr[" << eh->operand[i].addr << "] = " ; 
+                                // cerr << "the trace contains unhandled info" << endl ;
+                        /*      memory addresses are not supported yet
+                         *      os << " addr[" << eh->operand[i].addr << "] = " ; 
                                 os << eh->operand[i].value << ", " ;
-                                os << eh->operand[i].tainted << " ; " ;
+                                os << eh->operand[i].tainted << " ; " ; */
                                 break ;
 
                         default : 
@@ -130,7 +158,6 @@ string Trace::operand_status(EntryHeader * eh)
                                 assert(0) ;
                 }
         }
-        os << endl;
-        return os.str();
+        return concrete_pairs;
 }
 

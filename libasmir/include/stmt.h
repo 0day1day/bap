@@ -8,6 +8,7 @@
 #include "irvisitor.h"
 #include "exp.h"
 
+enum attr_type_t {NONE, BOOL, CHR, INT_16, INT_32, INT_64};
 enum stmt_type_t {JMP,CJMP, SPECIAL, MOVE,  COMMENT,  LABEL, EXPSTMT, VARDECL,
                   CALL, RETURN, FUNCTION, ASSERT};
 
@@ -22,6 +23,17 @@ typedef struct Stmt Stmt;
 #include <vector>
 using namespace std;
 
+typedef struct ConcPair {
+  string name;
+  bool mem;
+  attr_type_t type;
+  const_val_t index;
+  const_val_t value;
+  ConcPair(string str, bool m, attr_type_t typ, const_val_t ind, const_val_t val){
+    name = str; mem = m; type = typ; index = ind; value = val;
+  };
+} conc_map;
+typedef vector<conc_map *> conc_map_vec;
 
 class Stmt {
  public:
@@ -33,7 +45,7 @@ class Stmt {
 
   Stmt(stmt_type_t st, address_t asm_ad, address_t ir_ad)
     { asm_address = asm_ad; ir_address = ir_ad; 
-      stmt_type = st; attribute = string(""); };
+      stmt_type = st; attributes = NULL; };
   
   /// Make a deep copy of the stmt
   virtual Stmt *clone() const = 0;
@@ -49,7 +61,7 @@ class Stmt {
   stmt_type_t stmt_type;
   void setAttribute(string attribute);
   // a generic string attribute
-  string attribute;
+  conc_map_vec * attributes;
 };
 
 class VarDecl : public Stmt {
@@ -228,7 +240,14 @@ extern "C" {
   extern Exp* move_lhs(Stmt*);
   extern Exp* move_rhs(Stmt*);
   extern const char* label_string(Stmt*);
-  extern const char* stmt_attribute(Stmt*);
+  extern conc_map_vec* stmt_attributes(Stmt*);
+  extern int conc_map_size(conc_map_vec*);
+  extern conc_map* get_attr(conc_map_vec*,int);
+  extern const char* attr_name(conc_map*);
+  extern const_val_t attr_value(conc_map*);
+  extern bool attr_mem(conc_map*);
+  extern const_val_t attr_ind(conc_map*);
+  extern attr_type_t attr_type(conc_map*);
   extern const char* special_string(Stmt*);
   extern const char* comment_string(Stmt*);
   extern Exp* jmp_target(Stmt*);

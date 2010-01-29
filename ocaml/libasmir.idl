@@ -11,6 +11,8 @@ typedef [abstract] void* Stmt;
 typedef [abstract] void* asm_program_t;
 typedef [abstract] void* bap_block_t;
 typedef [abstract] void* bap_blocks_t;
+typedef [abstract] void* attr;
+typedef [abstract] void* conc_map_vec;
 
 
 #include "../libasmir/config.h"
@@ -123,6 +125,7 @@ enum cast_t {
 
 enum stmt_type_t {  JMP,   CJMP, SPECIAL, MOVE,  COMMENT,  LABEL, EXPSTMT, VARDECL, CALL, RETURN, FUNCTION, ASSERT};
 
+enum attr_type_t {NONE, BOOL, CHR, INT_16, INT_32, INT_64};
 
 enum exp_type_t exp_type( [in] Exp e);
 enum binop_type_t binop_type([in] Exp e);
@@ -153,7 +156,6 @@ enum stmt_type_t stmt_type([in] Stmt s);
 Exp move_lhs([in] Stmt s);
 Exp move_rhs([in] Stmt s);
 [string] char* label_string([in] Stmt s);
-[string] char* stmt_attribute([in] Stmt s);
 [string] char* special_string([in] Stmt s);
 [string] char* comment_string([in] Stmt s);
 Exp jmp_target([in] Stmt s);
@@ -164,6 +166,14 @@ Exp expstmt_exp([in] Stmt s);
 [string] char* vardecl_name([in]Stmt s);
 enum reg_t vardecl_type([in]Stmt s);
 
+conc_map_vec stmt_attributes([in] Stmt s);
+int conc_map_size(conc_map_vec v);
+attr get_attr(conc_map_vec v, int i);
+[string] char* attr_name(attr m);
+const_val_t attr_value(attr m);
+const_val_t attr_ind(attr m);
+boolean attr_mem(attr m);
+enum attr_type_t attr_type(attr m);
 
 boolean call_has_lval([in] Stmt s);
 Exp call_lval_opt([in] Stmt s);

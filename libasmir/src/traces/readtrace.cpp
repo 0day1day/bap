@@ -54,11 +54,8 @@ bap_blocks_t * read_trace_from_file(const string &filename, int offset, bool pri
                             bblock->vex_ir = translate_insn(arch, eh.rawbytes, eh.address);
                             // and then to BAP IL
                             generate_bap_ir_block(prog, bblock);
-
-                            if (atts) {
-                                    string attributes = trc->operand_status(&eh) ;
-                                    bblock->bap_ir->front()->attribute = attributes;
-                            }
+                            if (atts) 
+                                bblock->bap_ir->front()->attributes = trc->operand_status(&eh) ;
                             // append to result
                             result->push_back(bblock);
                             int i;

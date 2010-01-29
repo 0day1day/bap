@@ -67,10 +67,6 @@ let little_endian = Int(0L, reg_1)
 let tr_label s =
   Name s (* FIXME: treating them all as names for now *)
 
-let tr_attribute = function
-  | "" -> []
-  | attribute -> [Context attribute]
-
 (** Translate an expression *)
 let rec tr_exp g e =
   match Libasmir.exp_type e with
@@ -171,6 +167,30 @@ let tr_vardecls g ss =
   let decls,unextends = List.split(List.map (tr_vardecl g) ss) in
     (decls, fun x -> List.iter (fun f -> f x) unextends)
 
+let attr_type_to_typ = function
+ | NONE -> 
+   prerr_endline "concrete expression with no type in lifted trace" ;
+   reg_32        
+ | BOOL -> reg_1
+ | CHR -> reg_8
+ | INT_16 -> reg_16
+ | INT_32 -> reg_32
+ | INT_64 -> reg_64
+
+let tr_context_tup attr =
+  Context {name=Libasmir.attr_name attr;
+           mem=Libasmir.attr_mem attr;
+           t=attr_type_to_typ (Libasmir.attr_type attr);
+           index=Libasmir.attr_ind attr;
+           value=Libasmir.attr_value attr}
+
+let tr_attributes s =
+  let attr_vec = Libasmir.stmt_attributes s in
+  let size = Libasmir.conc_map_size attr_vec in
+   if size = 0 then [] 
+   else
+    foldn (fun i n -> (tr_context_tup (Libasmir.get_attr attr_vec n))::i) [] (size-1)
+
 (** Translate a statement *)
 let rec tr_stmt g s =
   match Libasmir.stmt_type s with
@@ -197,7 +217,7 @@ let rec tr_stmt g s =
 	Comment(Libasmir.comment_string s, [])
     | LABEL ->
 	Label(tr_label (Libasmir.label_string s),
-          tr_attribute (Libasmir.stmt_attribute s))
+          tr_attributes s)
     | ASSERT ->
 	Assert(tr_exp g (Libasmir.assert_cond s), [])
     | VARDECL

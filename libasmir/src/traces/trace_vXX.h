@@ -22,8 +22,9 @@ public:
 	virtual void read_records(taint_record_t records[MAX_OPERAND_LEN], uint32_t length, uint64_t tainted);
 	virtual void read_operand(OperandVal * operand);
 	virtual void consume_header(TraceHeader * hdr);
-    string operand_status(EntryHeader * eh);
+    conc_map_vec * operand_status(EntryHeader * eh);
 private:
+    attr_type_t opsize_to_type(int size);
 protected:
 	ifstream * trace;
 	void read_taint_byte_record(TaintByteRecord * byte_rec);
