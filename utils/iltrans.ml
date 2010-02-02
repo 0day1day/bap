@@ -81,6 +81,8 @@ let deadcode p =
   fst(Deadcode.do_dce p)
 let jumpelim p =
   Deadcode.cfg_jumpelim p
+let memory2scalar p =
+  Memory2scalar.convert_g p
 
 (* Chop code added *)
 let chop srcbb srcn trgbb trgn p = 
@@ -136,6 +138,8 @@ let speclist =
      "Perform dead code ellimination.")
   ::("-jumpelim", uadd(TransformSsa jumpelim),
      "Control flow optimization.")
+  ::("-memtoscalar", uadd(TransformAst memory2scalar),
+     "Convert memory accesses to scalars.")
   ::("-ssa-simp", uadd(TransformSsa Ssa_simp.simp_cfg),
      "Perform all supported optimizations on SSA")
   ::("-ssa-to-single-stmt", 
