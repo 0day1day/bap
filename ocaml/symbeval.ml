@@ -84,6 +84,10 @@ type mem = Ast.exp AddrMap.t * Var.t (* addr -> val + initial name *)
    | Symbolic e -> e
    | _ -> failwith "this is not a symbolic expression"
 
+  let symb_to_string = function
+   | Symbolic e -> "Symbolic "^(Pp.ast_exp_to_string e)
+   | ConcreteMem m -> "Memory"
+
   module type MemLookup =
   sig
     val lookup_var : (varval VH.t) -> VH.key -> varval
@@ -95,6 +99,9 @@ type mem = Ast.exp AddrMap.t * Var.t (* addr -> val + initial name *)
 
 module Make(MemL: MemLookup) = 
 struct
+
+   let byte_type = reg_8
+   let index_type = reg_32
  
 (* Context functions (lookup, update etc) *)
   let context_update = VH.replace
@@ -164,13 +171,15 @@ struct
   (* Evaluate an expression in a context Delta,Mu *)
   let rec eval_expr delta expr =
    let get_address mem offset = 
-    let index = Int(Int64.of_int offset, Reg 64) in
+    let index = Int(Int64.of_int offset, index_type) in
     let mem_index = BinOp (PLUS,mem,index) in
     symb_to_exp (eval_expr delta mem_index)
    in
    let eval = function 
     | Var v -> 
-      lookup_var delta v
+      (*let n = *)lookup_var delta v (*in
+      prerr_endline ((Var.name v) ^ " = " ^ (symb_to_string n)) ;
+      n*)
     | Int _ as value -> 
       Symbolic value
     | Lab _ as labl ->
@@ -231,17 +240,21 @@ struct
          let bytes = get_bytes 0 [] in
          (* changing the order according to the endianness *)
          let loaded = if is_false_val endian then bytes else List.rev bytes
-         and byte_size = Int(8L,Reg 64) in
+         and byte_size = Int(8L,byte_type) in
          (* calculating the loaded value *)
-         let value = 
-          List.fold_left
-           (fun v n_byte ->
-             let shl = (BinOp(LSHIFT,v,byte_size)) in
-             (BinOp(OR,shl,n_byte))
-           ) (Int(0L,Reg bits)) loaded 
-         in
-         if List.for_all is_concrete loaded then eval_expr delta value
-         else (prerr_endline "symbolic!" ; Symbolic value)
+	 (match loaded with
+	  | [v] -> Symbolic v
+	  | v1::vs ->
+              let value = 
+		List.fold_left
+		  (fun v n_byte ->
+		     let padded_byte = Cast(CAST_UNSIGNED, t, n_byte) in
+		     BinOp(OR, BinOp(LSHIFT,v,byte_size), padded_byte)
+		  ) (Cast(CAST_UNSIGNED,t,v1)) loaded 
+              in
+              eval_expr delta value (* try to evaluate the expression further *)
+	  | [] -> failwith "impossible aneotuha"
+	 )
        | Array _ ->
          failwith "loading array currently unsupported"
        | _ -> failwith "not a loadable type"
@@ -256,8 +269,7 @@ struct
          let mem_arr = symb_to_exp ind
          and endian = eval_expr delta endian
          and store_val = symb_to_exp value
-         and n = bits/8  (* FIXME: 1-bit stores? *)
-         and lsb = 0xffL in
+         and n = bits/8 in (* FIXME: 1-bit stores? *)
          let endian_exp = symb_to_exp endian in
          (* Break the value down to bytes *)
          let rec get_bytes offset (pos,vals) =
@@ -265,8 +277,8 @@ struct
           else 
            let address = get_address mem_arr offset in
            let shift = Int64.mul (Int64.of_int offset) 8L in
-           let value' = (BinOp (RSHIFT,store_val,Int(shift,Reg 64))) in
-           let byte = BinOp (AND,value',Int(lsb,Reg 64)) in
+           let value' = (BinOp (RSHIFT,store_val,Int(shift,byte_type))) in
+           let byte = Cast (CAST_UNSIGNED,byte_type, value') in
            let ebyte = symb_to_exp (eval_expr delta byte)
            in
            get_bytes (offset+1) (address :: pos,ebyte :: vals)

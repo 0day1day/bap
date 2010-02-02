@@ -44,6 +44,9 @@ bool attr_mem(conc_map *m) {
 attr_type_t attr_type(conc_map *m) {
   return m->type;
 }
+int attr_taint(conc_map *m) {
+  return m->taint;
+}
 const char* special_string(Stmt *s) {
   return ((Special*)s)->special.c_str();
 }

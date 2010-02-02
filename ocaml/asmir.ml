@@ -177,12 +177,18 @@ let attr_type_to_typ = function
  | INT_32 -> reg_32
  | INT_64 -> reg_64
 
+(* TODO: needs to be refined for bytes *)
+let int_to_taint = function 
+ | 0 -> Untaint
+ | _ -> Taint
+
 let tr_context_tup attr =
   Context {name=Libasmir.attr_name attr;
            mem=Libasmir.attr_mem attr;
            t=attr_type_to_typ (Libasmir.attr_type attr);
            index=Libasmir.attr_ind attr;
-           value=Libasmir.attr_value attr}
+           value=Libasmir.attr_value attr;
+           taint=int_to_taint (Libasmir.attr_taint attr)}
 
 let tr_attributes s =
   let attr_vec = Libasmir.stmt_attributes s in

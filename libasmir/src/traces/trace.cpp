@@ -110,7 +110,7 @@ attr_type_t Trace::opsize_to_type(int size){
 conc_map_vec * Trace::operand_status(EntryHeader * eh)
 {
         conc_map_vec * concrete_pairs = new vector<conc_map *>();
-        int i, type; bool mem;
+        int i, type, taint; bool mem;
         string name;
         const_val_t index, value;
         conc_map * map;
@@ -123,8 +123,8 @@ conc_map_vec * Trace::operand_status(EntryHeader * eh)
                                 name = register_name(eh->operand[i].addr);
                                 mem = false;
                                 value = eh->operand[i].value ;
-                                //os << eh->operand[i].tainted << " ; " ;
-                                map = new ConcPair(name,mem,static_cast<attr_type_t>(type),index,value);
+                                taint = eh->operand[i].tainted ;
+                                map = new ConcPair(name,mem,static_cast<attr_type_t>(type),index,value,taint);
                                 concrete_pairs->push_back(map);
                                 break;
                         case TMemLoc: 
@@ -134,8 +134,8 @@ conc_map_vec * Trace::operand_status(EntryHeader * eh)
                                 mem = true;
                                 index = eh->operand[i].addr ;
                                 value = eh->operand[i].value ;
-                                //os << eh->operand[i].tainted << " ; " ;
-                                map = new ConcPair(name,mem,static_cast<attr_type_t>(type),index,value);
+                                taint = eh->operand[i].tainted ;
+                                map = new ConcPair(name,mem,static_cast<attr_type_t>(type),index,value,taint);
                                 concrete_pairs->push_back(map);
                                 break ;
                         case TImmediate : 

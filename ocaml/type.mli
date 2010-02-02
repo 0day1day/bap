@@ -60,11 +60,15 @@ type pos = (string * int)
     about a statement can be saved by wrapping the statement inside an Attr
     statement.
  *)
+
+type taint_type = Taint | Untaint
+
 type context = {name:string;
                 mem:bool;
                 t:typ;
                 index:int64;
-                value:int64}
+                value:int64;
+                taint:taint_type}
  
 type attribute = 
   | Pos of pos  (** The position of a statement in the source file *)
