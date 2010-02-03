@@ -29,6 +29,23 @@ let compute_dwp cfg post =
   let p = rename_astexp tossa post in
   (Wp.dwp gcl p, [])
 
+(* FIXME: Why did I think we needed SSA here? *)
+let compute_fse cfg post =
+  let {Cfg_ssa.cfg=ssa; to_ssavar=tossa} = Cfg_ssa.trans_cfg cfg in
+  let ast = Cfg_ssa.to_ast ssa in
+  let p = rename_astexp tossa post in
+  (Eval.fse p ast, [])
+
+let compute_fse_bfs cfg post =
+  (* FIXME: avoid converting to cfg *)
+  let ast = Cfg_ast.to_prog cfg in
+  (Symbeval_search.bfs_ast_program ast post, [])
+
+let compute_fse_bfs_maxdepth i cfg post =
+  (* FIXME: avoid converting to cfg *)
+  let ast = Cfg_ast.to_prog cfg in
+  (Symbeval_search.bfs_maxdepth_ast_program i ast post, [])
+
 
 let compute_wp = ref compute_wp_boring
 let irout = ref(Some stdout)
@@ -49,6 +66,12 @@ let speclist =
      "Use efficient directionless weakest precondition instead of the default")
   ::("-dwp1", Arg.Unit(fun()-> compute_wp := compute_dwp1),
      "Use 1st order efficient directionless weakest precondition")
+  ::("-fse", Arg.Unit(fun()-> compute_wp := compute_fse),
+     "Use naive forward symbolic execution (no loops)")
+  ::("-fse-bfs", Arg.Unit(fun()-> compute_wp := compute_fse_bfs),
+     "Use naive forward symbolic execution with breath first search")
+  ::("-fse-bfs-maxdepth", Arg.Int(fun i-> compute_wp := compute_fse_bfs_maxdepth i),
+     "<n> FSE with breath first search, limiting search depth to n.")
     :: Input.speclist
 
 let anon x = raise(Arg.Bad("Unexpected argument: '"^x^"'"))
@@ -79,6 +102,11 @@ match !irout with
 match !stpout with
 | None -> ()
 | Some oc ->
+    let m2a = new Memory2array.memory2array_visitor () in
+    let wp = Ast_visitor.exp_accept m2a wp in
+    let foralls = List.map (Ast_visitor.rvar_accept m2a) foralls in
     let p = new Stp.pp_oc oc in
     let () = p#assert_ast_exp_with_foralls foralls wp in
     p#close
+;;
+

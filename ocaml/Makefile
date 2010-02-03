@@ -43,8 +43,11 @@ export SOURCES = \
 	stp.ml \
 	depgraphs.ml \
 	vsa.ml \
+	memory2scalar.ml \
 	eval.ml \
-	memory2scalar.ml
+	symbeval.ml \
+	symbeval_search.ml \
+
 
 RESULT = bap
 DOC_FILES := $(filter %.mli, $(SOURCES)) $(filter %.ml, $(SOURCES))

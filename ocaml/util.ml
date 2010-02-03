@@ -103,6 +103,10 @@ let list_pop l =
   | x::xs -> l := xs; x
   | [] -> failwith "hd"
 
+(** Push an element onto the front of a list ref. *)
+let list_push l v =
+  l := v :: !l
+
 (** @return the last element of a list *)
 let rec list_last = function
   | [x] -> x

@@ -88,10 +88,11 @@ let memory2scalar p =
 let chop srcbb srcn trgbb trgn p = 
   Depgraphs.CHOP_AST.chop p srcbb srcn trgbb trgn
 
-(* Evaluation code added *)
+(*
 let eval_ast_cfg p = 
   Eval.eval_ast_program p ;
   p 
+*)
 
 let add c =
   pipeline := c :: !pipeline
@@ -106,8 +107,8 @@ let speclist =
      "<file> Pretty print AST graph to <file> (in Graphviz format) (no stmts)")
   ::("-pp-ast-cdg", Arg.String (fun f -> add(TransformAstCfg(output_ast_cdg f))),
      "Output the AST CDG (bbid's)")
-  ::("-ast-eval", uadd(TransformAst eval_ast_cfg),
-     "Evaluate an AST and print variable values on exit")
+(*  ::("-ast-eval", uadd(TransformAst eval_ast_cfg),
+     "Evaluate an AST and print variable values on exit") *)
   ::("-pp-ast-pdg", Arg.String (fun f -> add(TransformAstCfg(output_ast_pdg f))),
      "Output the AST DDG (bbid's)")
   ::("-pp-ast-chop", 

@@ -23,6 +23,7 @@ val union_find : ('a -> 'b list) -> 'a list -> 'a list list
 
 val list_foldl : ('a -> 'b -> 'b) -> 'a list -> 'b -> 'b
 val list_pop : 'a list ref -> 'a
+val list_push : 'a list ref -> 'a -> unit
 val list_last : 'a list -> 'a
 val list_partition_last : 'a list -> 'a list * 'a
 val list_last_option : 'a list -> 'a option

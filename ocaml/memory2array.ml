@@ -66,8 +66,8 @@ let split_writes array index eletype endian data =
 
 
 (** This visitor maps each TMem to an array *)
-class memory2array_visitor hash
-    =
+class memory2array_visitor () =
+  let hash = VarHash.create 1000 in
   object (self)
     inherit Ast_visitor.nop
 	
@@ -87,30 +87,9 @@ class memory2array_visitor hash
           `ChangeToAndDoChildren array (* Do we need to recurse on the avar? *)
       |	_ ->  `DoChildren
 	
-    method visit_rvar rvar =
-      match Var.typ(rvar) with
-      |	TMem(idxt) ->
-	  let array =
-	    try VarHash.find hash rvar
-	    with Not_found -> 
-	      (* djb: again, i think this is incorrect *)
-	      let newarrvar = newvar (Var.name rvar) (Array(idxt,Reg(bitwidth))) 	      
-	      in
-	      VarHash.add hash rvar newarrvar;
-	      newarrvar
-	  in
-          `ChangeToAndDoChildren array
-      |	_ -> `DoChildren
-  end
 
-(** This visitor changes each load and store to byte-level operations *)
-class memory2array_visitor2 hash
-    =
-  object (self)
-    inherit Ast_visitor.nop
+    method visit_rvar = self#visit_avar
 
-    method visit_stmt stmt =
-      `DoChildren
 	
     method visit_exp exp =
 (*       Printf.printf "Visiting expression %s\n" (Pp.ast_exp_to_string exp); *)
@@ -121,6 +100,7 @@ class memory2array_visitor2 hash
 	  | 1 -> (* Printf.printf "Cool\n"; *)
 	      `DoChildren
 	  | _ -> (* Printf.printf "Need to split\n"; *)
+	      let arr = Ast_visitor.exp_accept self arr in
 	      let newexpr = split_loads arr idx t endian 
 	      in
 	      (* Printf.printf "New Load %s\n" (Pp.ast_exp_to_string newexpr); *)
@@ -131,13 +111,12 @@ class memory2array_visitor2 hash
           match width with
           | 1 -> (* Printf.printf "Cool!\n"; *)
 	      `DoChildren
-          | _ -> ( (* Printf.printf "Need to split\n"; *)
-                  let newexpr = split_writes arr idx t endian data in
-		  `ChangeToAndDoChildren newexpr
-                    ))
+          | _ -> (* Printf.printf "Need to split\n"; *)
+	      let arr = Ast_visitor.exp_accept self arr in
+              let newexpr = split_writes arr idx t endian data in
+	      `ChangeToAndDoChildren newexpr
+        )
       | _ -> `DoChildren              
-      
-
   end
 
 
@@ -145,12 +124,5 @@ class memory2array_visitor2 hash
     broken down to byte-level reads and writes using array variables
     with the same name as the old memory variables.  *)
 let coerce_prog prog = 
-  let hash = VarHash.create 1000 in
-  let visitor = new memory2array_visitor hash
-  and visitor2 = new memory2array_visitor2 hash
-  in
-  let prog = Ast_visitor.prog_accept visitor prog in
-  let prog = Ast_visitor.prog_accept visitor2 prog
-  in
-  prog
-  
+  let visitor = new memory2array_visitor () in
+  Ast_visitor.prog_accept visitor prog
