@@ -40,9 +40,8 @@ struct
  let remove_unreachable g v =
    let u = unreachable g v in
    let count = ref 0 in
-   let g = List.fold_left (fun a v -> incr count; B.remove_vertex a v) g u
-   in
-   D.dprintf "removed %d\n%!" !count;
+   let g = List.fold_left (fun a v -> incr count; B.remove_vertex a v) g u in
+   D.dprintf "removed %d" !count;
    g
 
 end
