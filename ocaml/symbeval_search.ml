@@ -28,7 +28,7 @@ struct
 	      let pred = Ast.exp_and q s.pred in
 	      ([], pred :: predicates)
 	  | AssertFailed {pc=pc} ->
-	      wprintf "failed assertion at %Ld\n" pc;
+	      wprintf "failed assertion at %d\n" pc;
 	      ([], predicates)  (* try other branches *)
 	in
 	let q = S.add_next_states q st d newstates in
@@ -72,11 +72,10 @@ module UnboundedBFS = MakeSearch(
     type t = ctx Q.t
     type data = unit
     type initdata = unit
+    let start_at s () = Q.enqueue Q.empty s
     let pop_next q = match Q.dequeue_o q with
       | Some(st,q) -> Some((st,()),q)
       | None -> None
-
-    let start_at s () = Q.enqueue Q.empty s
     let add_next_states q st () newstates = Q.enqueue_all q newstates
   end)
 
@@ -85,27 +84,74 @@ let bfs_ast_program p q = UnboundedBFS.eval_ast_program () p q
 
 module MaxdepthBFS = MakeSearch(
   struct
-    type t = (ctx * int) Q.t
     type data = int
     type initdata = int
-
-    let pop_next = Q.dequeue_o
+    type t = (ctx * data) Q.t
     let start_at s i = Q.enqueue Q.empty (s,i)
+    let pop_next = Q.dequeue_o
     let add_next_states q st i newstates =
       if i > 0 then
 	List.fold_left (fun q c -> Q.enqueue q (c, i-1)) q newstates
       else
 	q
-  
   end)
 
 let bfs_maxdepth_ast_program = MaxdepthBFS.eval_ast_program
 
-let rec unbounded_dfs st = 
-  List.iter unbounded_dfs (Symbeval.eval st)
+module UnboundedDFS = MakeSearch(
+  struct
+    type t = ctx list
+    type data = unit
+    type initdata = unit
+    let start_at s () = [s]
+    let pop_next = function
+      | st::rest -> Some((st,()),rest)
+      | [] -> None
+    let add_next_states q st () newstates = newstates @ q
+  end)
+let dfs_ast_program p q = UnboundedDFS.eval_ast_program () p q
 
-let dfs_ast_program p = 
-  let ctx = Symbeval.build_default_context p in
-  unbounded_dfs ctx
+module MaxdepthDFS = MakeSearch(
+  struct
+    type data = int
+    type initdata = int
+    type t = (ctx * data) list
+    let start_at s i = [(s,i)]
+    let pop_next = function
+      | st::rest -> Some(st,rest)
+      | [] -> None
+    let add_next_states q st i newstates =
+      if i <= 0 then q
+      else
+	let ni = i-1 in
+	List.fold_left (fun q s -> (s,ni)::q) q newstates
+  end)
+let dfs_maxdepth_ast_program = MaxdepthDFS.eval_ast_program
 
 
+module EdgeMap = Map.Make(struct type t = int * int let compare = compare end)
+
+(* DFS excluding paths that visit the same point more than N times. *)
+module MaxrepeatDFS = MakeSearch(
+  struct
+    type data = int EdgeMap.t
+    type initdata = int
+    type t = (ctx * data) list * int
+    let start_at s i = ([(s,EdgeMap.empty)], i)
+    let pop_next = function
+      | (st::rest, i) -> Some(st,(rest,i))
+      | ([], _) -> None
+    let add_next_states ((q,i) as l) st m = function
+      | [] -> l
+      | [st] -> ((st,m)::q, i)
+      | newstates ->
+	  let addedge nst =
+	    let edge = (st.pc, nst.pc) in
+	    let count = try EdgeMap.find edge m with Not_found -> 0 in
+	    if count >= i then None
+	    else Some(nst, EdgeMap.add edge (count+1) m)
+	  in
+	  let newstates = Util.list_map_some addedge newstates in
+	  (newstates@q, i)
+  end)
+let maxrepeat_ast_program = MaxrepeatDFS.eval_ast_program

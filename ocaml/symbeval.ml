@@ -30,10 +30,9 @@ module AddrMap = Map.Make(Int64)
 type mem = Ast.exp AddrMap.t * Var.t (* addr -> val + initial name *)
 (* Some useful types *)
   type addr = int64
+  type pc = int
   type instr = stmt
-  type varid = Ast.exp
   type varval = Symbolic of Ast.exp | ConcreteMem of mem
-  type label_kind = label
 
 (* Exceptions *)
   exception ExcState of string * addr
@@ -48,9 +47,9 @@ type mem = Ast.exp AddrMap.t * Var.t (* addr -> val + initial name *)
   type ctx = {
    pred: Ast.exp;
    delta: varval VH.t;
-   sigma: (addr, instr) Hashtbl.t;
-   lambda: (label_kind, addr) Hashtbl.t;
-   pc: addr; (* Should be int *)
+   sigma: (pc, instr) Hashtbl.t;
+   lambda: (label, pc) Hashtbl.t;
+   pc: pc;
   }
 
   (* Program halted, with optional halt value, and with given execution context. *)
@@ -143,10 +142,10 @@ type mem = Ast.exp AddrMap.t * Var.t (* addr -> val + initial name *)
 
  (* Initializers *)
   let build_default_context prog_stmts =
-    let sigma : (addr, instr) Hashtbl.t = Hashtbl.create 5700 
-    and pc = Int64.zero 
+    let sigma  = Hashtbl.create 5700 
+    and pc = 0
     and delta : varval VH.t = VH.create 5700
-    and lambda : (label_kind, addr) Hashtbl.t = Hashtbl.create 5700 in
+    and lambda = Hashtbl.create 5700 in
     (* Initializing Sigma and Lambda *)
     ignore 
       (List.fold_left
@@ -156,7 +155,7 @@ type mem = Ast.exp AddrMap.t * Var.t (* addr -> val + initial name *)
             | Label (lab,_) -> Hashtbl.add lambda lab pc
             | _ -> () 
           ) ;
-          Int64.succ pc
+          succ pc
         ) pc prog_stmts ) ; 
     {pred=exp_true; delta=delta; sigma=sigma; lambda=lambda; pc=pc}
  
@@ -324,7 +323,7 @@ type mem = Ast.exp AddrMap.t * Var.t (* addr -> val + initial name *)
       | None -> failwith "not a valid label"
       | Some lab -> label_decode lambda lab
     in
-    let next_pc = Int64.succ pc in
+    let next_pc = succ pc in
     let eval = function
       | Move (v,e,_) ->
         let ev = eval_expr delta e in
@@ -375,7 +374,7 @@ type mem = Ast.exp AddrMap.t * Var.t (* addr -> val + initial name *)
      (*pdebug (Pp.ast_stmt_to_string stmt) ; *)
      eval_stmt state stmt
    with Failure str -> 
-     wprintf "Evaluation aborted at stmt No-%Ld" state.pc;
+     wprintf "Evaluation aborted at stmt No-%d" state.pc;
      wprintf "reason: %s" str;
      (try wprintf "Stmt: %s" (Pp.ast_stmt_to_string (inst_fetch state.sigma state.pc))
       with Not_found -> () );

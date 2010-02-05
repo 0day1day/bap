@@ -46,6 +46,11 @@ let compute_fse_bfs_maxdepth i cfg post =
   let ast = Cfg_ast.to_prog cfg in
   (Symbeval_search.bfs_maxdepth_ast_program i ast post, [])
 
+let compute_fse_maxrepeat i cfg post =
+  (* FIXME: avoid converting to cfg *)
+  let ast = Cfg_ast.to_prog cfg in
+  (Symbeval_search.maxrepeat_ast_program i ast post, [])
+
 
 let compute_wp = ref compute_wp_boring
 let irout = ref(Some stdout)
@@ -72,6 +77,8 @@ let speclist =
      "Use naive forward symbolic execution with breath first search")
   ::("-fse-bfs-maxdepth", Arg.Int(fun i-> compute_wp := compute_fse_bfs_maxdepth i),
      "<n> FSE with breath first search, limiting search depth to n.")
+  ::("-fse-maxrepeat", Arg.Int(fun i-> compute_wp := compute_fse_maxrepeat i),
+     "<n> FSE excluding walks that visit a point more than n times.")
     :: Input.speclist
 
 let anon x = raise(Arg.Bad("Unexpected argument: '"^x^"'"))
