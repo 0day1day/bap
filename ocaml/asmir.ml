@@ -380,3 +380,63 @@ let asmprogram_to_bap_range ?(init_ro = false) asmp st en=
   let ir = tr_bap_blocks_t g asmp bap_blocks in
   destroy_bap_blocks bap_blocks;
   ir
+
+
+(* internal only *)
+let get_symbols p =
+  let (arr,err) = asmir_get_symbols p in
+  if err <= 0 then failwith "get_symbols";
+  arr
+
+
+let (<<) = (lsl)
+
+let bsf_debugging = 1 << 2
+let bsf_function = 1 << 3
+
+
+let get_function_ranges p =
+  let symb = get_symbols p in
+  ignore p; (* does this ensure p is live til here? *)
+  let is_function s =
+    s.bfd_symbol_flags land bsf_function <> 0
+  and symb_to_tuple s =
+    (* FIXME: section_end doesn't seem to get the right values... *)
+    let section_end sec = Int64.add sec.bfd_section_vma sec.bfd_section_size in
+    (Int64.add s.bfd_symbol_value s.bfd_symbol_section.bfd_section_vma,
+     section_end s.bfd_symbol_section,
+     s.bfd_symbol_name)
+  in
+  let starts =
+    Array.fold_left
+      (fun l s -> if is_function s then symb_to_tuple s :: l else l)
+      [] symb
+  in
+  let starts = Array.of_list starts in
+  (* FIXME: probably should do unsigned comparison *)
+  Array.fast_sort compare starts;
+  (*let ranges = Array.mapi
+    (fun i (s,e,name) ->
+       let e' =
+	 try let (s,_,_) = starts.(i+1) in s
+	 with Invalid_argument "index out of bounds" -> e
+       in
+       if e' < e || e = s then (name,s,e') else (name,s,e)
+    ) starts
+  *)
+  let ranges = Array.mapi
+    (fun i (s,e,name) ->
+       let e' =
+	 try let (s,_,_) = starts.(i+1) in s
+	 with Invalid_argument "index out of bounds" -> s
+       in
+       (name,s,e') (* section_end doesn't work *)
+    ) starts
+  in
+  let unfiltered = Array.to_list ranges in
+  (* filter out functions that start at 0 *)
+  List.filter (function 
+		 |(_,0L,_) -> false
+		 |("_init",_,_) -> false
+		 | _ -> true)
+    unfiltered

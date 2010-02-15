@@ -99,6 +99,36 @@ enum bfd_architecture
   bfd_arch_last
 };
 
+struct bfd;
+
+struct bfd_section {
+  [string] const char *name;
+  int id;
+  int index;
+  [ignore] struct bfd_section *next, *prev;
+  int flags;
+  int user_set_vma;
+  int bitfields;
+  address_t vma;
+  address_t lma;
+  address_t size, rawsize;
+  // more stuff we don't care about
+};
+
+struct bfd_symbol {
+  [ignore] struct bfd *the_bfd;
+  [string] const char *name;
+  __int64 value;
+  int flags;
+  [ref] struct bfd_section *section;
+  // more stuff, but we don't care
+};
+
+typedef [ref] struct bfd_symbol *asymbol;
+
+[length_is(*num)] asymbol*
+asmir_get_symbols(asm_program_t prog,
+		  [out] long *num);
 
 
 enum exp_type_t {
@@ -184,7 +214,7 @@ Exp assert_cond(Stmt s);
 //[null_terminated] Stmt* gen_eflags_helpers_c();
 
 
-[unique] asm_program_t asmir_open_file([string] char *filename);
+asm_program_t asmir_open_file([string] char *filename);
 void asmir_close(asm_program_t p);
 [string] char* asmir_string_of_insn(asm_program_t prog, address_t inst);
 enum bfd_architecture asmir_get_asmp_arch(asm_program_t prog);
@@ -207,6 +237,8 @@ void destroy_bap_blocks(bap_blocks_t bs);
 int asmir_bap_block_size(bap_block_t b);
 Stmt asmir_bap_block_get(bap_block_t b, int i);
 address_t asmir_bap_block_address(bap_block_t b);
+
+
 
 
 /*

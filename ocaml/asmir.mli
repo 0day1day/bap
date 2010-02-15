@@ -11,6 +11,7 @@
    some variables I added. --aij
 *)
 
+open Libasmir
 
 type asmprogram = Libasmir.asm_program_t
 
@@ -54,7 +55,9 @@ val get_asmprogram_arch : asmprogram -> arch
 val open_program : string -> asmprogram
 val asmprogram_to_bap : ?init_ro:bool -> asmprogram -> Ast.program
 val asm_addr_to_bap :
-  varctx -> asmprogram -> Libasmir.address_t -> Ast.program
+  varctx -> asmprogram -> address_t -> Ast.program
 
 val asmprogram_to_bap_range : ?init_ro:bool ->
-  asmprogram -> Libasmir.address_t -> Libasmir.address_t  -> Ast.program
+  asmprogram -> address_t -> address_t  -> Ast.program
+
+val get_function_ranges : asmprogram -> (string * address_t * address_t) list

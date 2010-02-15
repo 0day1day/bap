@@ -79,6 +79,14 @@ extern int memory_data_size(memory_data_t *md);
 extern memory_cell_data_t * memory_data_get(memory_data_t *md, int i);
 extern memory_data_t * get_rodata (asm_program_t *prog);
 
+
+// Argh, these functions are documented at
+// http://sourceware.org/binutils/docs/bfd/Opening-and-Closing.html
+// but don't seem to be in the header files...
+extern void *bfd_alloc (bfd *abfd, bfd_size_type wanted);
+extern void *bfd_alloc2 (bfd *abfd, bfd_size_type nmemb, bfd_size_type size);
+
+
 #ifdef __cplusplus
 }
 #endif

@@ -12,6 +12,7 @@ libasmir_a_SOURCES = \
 	./old_ir/exp.cpp \
 	./old_ir/exp_c.cpp \
 	asm_program.c \
+	symbols.c \
 	memory_data.cpp \
 	irtoir_c.cpp \
 	irtoir.cpp \

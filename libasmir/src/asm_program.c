@@ -5,12 +5,6 @@
 #include "asm_program.h"
 #include "libiberty.h"
 
-// Argh, these functions are documented at
-// http://sourceware.org/binutils/docs/bfd/Opening-and-Closing.html
-// but don't seem to be in the header files...
-extern void *bfd_alloc (bfd *abfd, bfd_size_type wanted);
-extern void *bfd_alloc2 (bfd *abfd, bfd_size_type nmemb, bfd_size_type size);
-
 
 
 static void initialize_sections(asm_program_t *p);

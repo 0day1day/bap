@@ -11,7 +11,7 @@ export SOURCE_DIRS_IN = $(BAP_OCAMLDIR)
 
 # default subprojects to build
 ifndef SUBPROJS
-	export SUBPROJS = toil iltrans topredicate
+	export SUBPROJS = toil iltrans topredicate get_functions
 endif
 
 define PROJ_toil
@@ -34,6 +34,13 @@ define PROJ_topredicate
 	DOC_FILES=$(SOURCES)
 endef
 export PROJ_topredicate
+
+define PROJ_get_functions
+	RESULT=get_functions
+	SOURCES = get_functions.ml
+	DOC_FILES=$(SOURCES)
+endef
+export PROJ_get_functions
 
 
 # suffix for bytecode (which when we make all is debug code)
