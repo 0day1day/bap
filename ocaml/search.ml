@@ -46,7 +46,11 @@ let rec bfs post predicates q =
 
 let dfs_ast_program p = 
   let ctx = Symbolic.build_default_context p in
-  unbounded_dfs ctx
+  try unbounded_dfs ctx
+  with Symbeval.Halted(_,state) ->
+    Symbolic.print_values state.delta;
+    Symbolic.print_mem state.delta;
+    ()
 
 let bfs_ast_program p q =
   let ctx = Symbolic.build_default_context p in

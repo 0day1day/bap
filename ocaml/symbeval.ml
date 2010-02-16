@@ -69,9 +69,6 @@ type mem = Ast.exp AddrMap.t * Var.t (* addr -> val + initial name *)
   let is_concrete = function
    | Int _ -> true
    | _ -> false
-  let is_symbolic_store = function
-   | Store _ -> true
-   | _ -> false
   let concrete_val_tuple = function
    | Symbolic (Int (v,t)) -> (v,t)
    | Symbolic e -> 
@@ -82,7 +79,7 @@ type mem = Ast.exp AddrMap.t * Var.t (* addr -> val + initial name *)
 (* Unwrapping functions *)
   let symb_to_exp = function
    | Symbolic e -> e
-   | _ -> failwith "this is not a symbolic expression"
+   | ConcreteMem _ -> failwith "this is not a symbolic expression"
 
   let symb_to_string = function
    | Symbolic e -> "Symbolic "^(Pp.ast_exp_to_string e)
@@ -97,7 +94,12 @@ type mem = Ast.exp AddrMap.t * Var.t (* addr -> val + initial name *)
     val lookup_mem : varval -> Ast.exp -> Ast.exp -> Ast.exp
   end
 
-module Make(MemL: MemLookup) = 
+  module type SymbMem =
+  sig
+    val is_symbolic_store : Ast.exp -> bool 
+  end
+
+module Make(MemL: MemLookup)(SMem: SymbMem) = 
 struct
 
    let byte_type = reg_8
@@ -106,6 +108,8 @@ struct
 (* Context functions (lookup, update etc) *)
   let context_update = VH.replace
   let context_copy = VH.copy
+
+  let is_symbolic_store = SMem.is_symbolic_store
 
 (* Lookup functions for basic contexts *)
   let inst_fetch sigma pc =
@@ -170,10 +174,9 @@ struct
 
   (* Evaluate an expression in a context Delta,Mu *)
   let rec eval_expr delta expr =
-   let get_address mem offset = 
-    let index = Int(Int64.of_int offset, index_type) in
-    let mem_index = BinOp (PLUS,mem,index) in
-    symb_to_exp (eval_expr delta mem_index)
+   let symb_mem mem = if is_symbolic_store mem then 
+                      (pdebug "symb mem!" ; Symbolic mem)
+                      else eval_expr delta mem 
    in
    let eval = function 
     | Var v -> 
@@ -220,75 +223,35 @@ struct
       let v2 = eval_expr delta' e2 in
       v2
     | Load (mem,ind,endian,t) ->
-      let mem = if is_symbolic_store mem then Symbolic mem
-                else eval_expr delta mem 
-      and ind = eval_expr delta ind
-      and endian = eval_expr delta endian in
       (match t with
-       | Reg bits ->
-         let n = bits/8  (* FIXME: 1-bit loads? *)
-         (* loading the bytes *)
-         and mem_arr = symb_to_exp ind 
+       | Reg 8 ->
+         let mem = symb_mem mem 
+         and ind = eval_expr delta ind
+         and endian = eval_expr delta endian in
+         let mem_arr = symb_to_exp ind 
          and endian_exp = symb_to_exp endian in
-         let rec get_bytes offset acc =
-          if offset = n then acc
-          else 
-           let address = get_address mem_arr offset in
-           let byte = lookup_mem mem address endian_exp in
-           get_bytes (offset+1) (byte::acc)
-         in
-         let bytes = get_bytes 0 [] in
-         (* changing the order according to the endianness *)
-         let loaded = if is_false_val endian then bytes else List.rev bytes
-         and byte_size = Int(8L,byte_type) in
-         (* calculating the loaded value *)
-	 (match loaded with
-	  | [v] -> Symbolic v
-	  | v1::vs ->
-              let value = 
-		List.fold_left
-		  (fun v n_byte ->
-		     let padded_byte = Cast(CAST_UNSIGNED, t, n_byte) in
-		     BinOp(OR, BinOp(LSHIFT,v,byte_size), padded_byte)
-		  ) (Cast(CAST_UNSIGNED,t,v1)) loaded 
-              in
-              eval_expr delta value (* try to evaluate the expression further *)
-	  | [] -> failwith "impossible aneotuha"
-	 )
+         Symbolic (lookup_mem mem mem_arr endian_exp)
+       | Reg _ -> eval_expr delta (Memory2array.split_loads mem ind t endian)
        | Array _ ->
          failwith "loading array currently unsupported"
        | _ -> failwith "not a loadable type"
       )
     | Store (mem,ind,value,endian,t) ->
-      let mem = if is_symbolic_store mem then Symbolic mem
-                else eval_expr delta mem
-      and ind = eval_expr delta ind 
-      and value = eval_expr delta value in
+      let index = symb_to_exp (eval_expr delta ind)
+      and value = symb_to_exp (eval_expr delta value)
+      and endian = symb_to_exp (eval_expr delta endian) in
       (match t with
-       | Reg bits -> 
-         let mem_arr = symb_to_exp ind
-         and endian = eval_expr delta endian
-         and store_val = symb_to_exp value
-         and n = bits/8 in (* FIXME: 1-bit stores? *)
-         let endian_exp = symb_to_exp endian in
-         (* Break the value down to bytes *)
-         let rec get_bytes offset (pos,vals) =
-          if offset = n then (pos,vals)
-          else 
-           let address = get_address mem_arr offset in
-           let shift = Int64.mul (Int64.of_int offset) 8L in
-           let value' = (BinOp (RSHIFT,store_val,Int(shift,byte_type))) in
-           let byte = Cast (CAST_UNSIGNED,byte_type, value') in
-           let ebyte = symb_to_exp (eval_expr delta byte)
-           in
-           get_bytes (offset+1) (address :: pos,ebyte :: vals)
-         in
-         let poss,vals = get_bytes 0 ([],[]) in
-         (* Changing the indices based on endianness *)
-         let poss = if is_false_val endian then poss else List.rev poss in
-         List.fold_left2 
-           (fun mem pos value -> update_mem mem pos value endian_exp) 
-           mem poss vals
+       | Reg 8 -> 
+         let mem = symb_mem mem in
+         update_mem mem index value endian
+       | Reg _ -> 
+       (*   let byte_writes,_,_ = Memory2array.split_write_list mem index t endian value in
+          let stored_bytes = List.map (eval_expr delta) byte_writes in
+          if List.exists is_symbolic stored_bytes then *)
+        if not (is_symbolic_store mem) && is_concrete index
+        then eval_expr delta (Memory2array.split_writes mem index t endian value)
+        else symb_mem (Memory2array.split_writes mem index t endian value)
+       (*   else eval_expr delta (Memory2array.split_writes mem index t endian value)*)
        | Array _ -> 
          failwith "storing array currently unsupported"
        | _ -> failwith "not a storable type"
@@ -417,6 +380,20 @@ let lookup_var delta var =
    | ConcreteMem(m,v),_ -> lookup_mem (conc2symb m v) index endian
 end
 
-module Symbolic = Make(Std)
+module FullSubst =
+struct
+  let is_symbolic_store = function
+   | Store _ (*| Let _*) -> true
+   | _ -> false
+end
+
+module PartialSubst =
+struct
+  let is_symbolic_store = function
+   | Store _ | Let _ -> true
+   | _ -> false
+end
+
+module Symbolic = Make(Std)(FullSubst)
 
 let eval_expr = Symbolic.eval_expr

@@ -9,6 +9,8 @@ open D
 
   (*let init () = VH.create 5*)
   let def = {name=""; mem=true; t=reg_1; index=0L; value=0L; taint=Untaint}
+  let gdt = {name="R_GDT"; mem=false; t=reg_32; index=0L; value=100L; taint=Untaint}
+  let ldt = {name="R_LDT"; mem=false; t=reg_32; index=0L; value=220L; taint=Untaint}
   let concrete: (string, Ast.exp) Hashtbl.t = Hashtbl.create 5 (*ref = ref (init())*)
   let concrete_mem: (int64, Ast.exp) Hashtbl.t = Hashtbl.create 5 (*ref = ref (init())*)
 
@@ -32,7 +34,7 @@ struct
      | _ -> Symbolic.lookup_mem mu index endian
 end
 
-module Trace = Symbeval.Make(TaintLookup)
+module Trace = Symbeval.Make(TaintLookup)(PartialSubst)
 
 (*
   let shorten stmts =
@@ -58,6 +60,30 @@ module Trace = Symbeval.Make(TaintLookup)
     Eval.eval_and_print_contexts extended ;
     stmts
   *)  
+
+  let rec get_next_address = function
+   | [] -> raise Not_found
+   | (Ast.Label ((Addr n),_))::_ -> 
+       Name ("pc_"^(Int64.format "0x%Lx" n))
+   | _::xs -> get_next_address xs
+
+  let rec cjmps_to_asserts acc = function
+   | [] -> List.rev acc
+   | (Ast.CJmp (e,l1,l2,atts) as x)::xs ->
+     pdebug (Pp.ast_exp_to_string e) ;
+     let newstmt = 
+    (match lab_of_exp l1 with
+     | Some (Name s as a) when not (String.contains s 'L') ->
+       (try if get_next_address xs = a 
+            then [Ast.Assert(e,atts); Ast.Jmp(l1,[])]
+            else [Ast.Assert(UnOp(NOT,e),atts); Ast.Jmp(l2,[])]
+        with Not_found -> [Ast.Assert(UnOp(NOT,e),atts); Ast.Jmp(l2,[])] )
+     | _ -> [x]
+    )
+     in
+     cjmps_to_asserts (newstmt@acc) xs
+   | x::xs -> cjmps_to_asserts (x::acc) xs
+
   let eval state = 
     try
      let stmt = Trace.inst_fetch state.sigma state.pc in
@@ -76,18 +102,25 @@ module Trace = Symbeval.Make(TaintLookup)
              first_bind_to_ctx concrete_mem index (Int(byte,reg_8)) ;
              add_mem (Int64.succ index) value limit (n-1)
      in
-     let add_to_conc {name=name; mem=mem; index=index; value=value; t=typ} =
+     let add_to_conc {name=name; mem=mem; index=index; value=value; t=typ; taint=taint} =
+      if taint = Untaint then
        if mem then
         let limit = typ_to_bytes typ in
         add_mem index value limit limit 
        else
         first_bind_to_ctx concrete name (Int(value,typ))
      in
+     let init_taint_tables () =
+       Hashtbl.clear concrete;
+       Hashtbl.clear concrete_mem;
+       add_to_conc gdt;
+       add_to_conc ldt
+     in
      (match stmt with
        | Label (_,atts) -> 
          let conc_atts = List.filter (function Context _ -> true | _ -> false) atts in
          let conc_atts = List.map (function Context c -> c | _ -> def) conc_atts in
-         if conc_atts != [] then (Hashtbl.clear concrete;Hashtbl.clear concrete_mem);
+         if conc_atts != [] then init_taint_tables ();
          List.iter add_to_conc conc_atts
        | _ -> ()
      );
@@ -99,12 +132,24 @@ module Trace = Symbeval.Make(TaintLookup)
       let prev = Trace.inst_fetch state.sigma (Int64.pred state.pc) in
       failwith (fail^"\nprev: "^(Pp.ast_stmt_to_string prev))
       with Failure _ -> failwith (fail^" no prev"))
+         | Halted _ -> 
+    let oc = open_out "predicate.txt" in
+    let wp = state.pred in
+    let m2a = new Memory2array.memory2array_visitor () in
+    let wp = Ast_visitor.exp_accept m2a wp in
+    let foralls = List.map (Ast_visitor.rvar_accept m2a) [] in
+    let p = new Stp.pp_oc oc in
+    let () = p#assert_ast_exp_with_foralls foralls wp in
+    p#close;
+              failwith "success!!!!"
   
 let rec unbounded_dfs st = 
   List.iter unbounded_dfs (eval st)
 
 let dfs_ast_program p = 
+  let p = Util.take p 253 in
   let no_jumps = List.filter (function Ast.Jmp _ | Special _ -> false | _ -> true) p in
-  let trace = no_jumps@[Ast.Halt (exp_true, [])] in
+  let no_cjumps = cjmps_to_asserts [] no_jumps in
+  let trace = no_cjumps@[Ast.Halt (exp_true, [])] in
   let ctx = Symbolic.build_default_context trace in
   unbounded_dfs ctx

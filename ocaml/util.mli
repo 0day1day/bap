@@ -63,3 +63,5 @@ val int64_umin : int64 -> int64 -> int64
 
 val run_with_remapped_fd :
   Unix.file_descr -> Unix.file_descr -> (unit -> 'a) -> 'a
+
+val take : 'a list -> int -> 'a list

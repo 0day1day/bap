@@ -253,17 +253,38 @@ object (self)
     );
     cls();
 
-  method assert_ast_exp e =
+
+
+  method forall = function
+    | [] -> ()
+    | v::vars ->
+	let var_type  (Var.V(_,_,t) as v) =
+	  self#var v; pp " : "; self#typ t
+	in
+	opn 2;
+	pp "FORALL (";space();
+	  (* TODO: group by type *)
+	List.iter (fun v -> var_type v; pc ','; space()) vars;
+	var_type v;
+	pp "):";
+	cls();space();
+
+  method assert_ast_exp_with_foralls foralls e =
     opn 0;
     self#declare_new_freevars e;
     force_newline();
-    pp "ASSERT( 0bin1 =";
+    pp "ASSERT(";
+    space();
+    self#forall foralls;
+    pp "0bin1 =";
     force_newline();
     self#ast_exp e;
     force_newline();
     pp ");";
     cls();
 
+  method assert_ast_exp e =
+    self#assert_ast_exp_with_foralls [] e
 
 
   method close =

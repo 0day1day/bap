@@ -37,12 +37,16 @@ let split_load array index eletype endian bytenum =
   let exp = BinOp(LSHIFT, exp, Int(Int64.of_int((bytenum) * bitwidth), eletype)) in
   exp
  
-let split_loads array index eletype endian =
+let split_load_list array index eletype endian =
   assert (endian = exp_false);
   let elesize = getwidth eletype in
-  let singlereads = Util.mapn (split_load array index eletype endian) (elesize - 1) in
+  let mvar = newvar "loadnorm" eletype in
+  (Util.mapn (split_load (Var mvar) index eletype endian) (elesize - 1), mvar)
+
+let split_loads array index eletype endian =
+  let (singlereads, mvar) = split_load_list array index eletype endian in
   let orexp = List.fold_left exp_or (List.hd singlereads) (List.tl singlereads) in
-  orexp
+  Let(mvar, array, orexp)
 
 let split_write array index eletype endian data bytenum =
   let newtype = Reg(bitwidth) in
@@ -53,21 +57,24 @@ let split_write array index eletype endian data bytenum =
   let exp = Store(array, indexplus, exp, endian, newtype) in
   exp
       
-let split_writes array index eletype endian data =
+let split_write_list array index eletype endian data =
   assert (endian = exp_false);
   let inftype = Typecheck.infer_ast array in
-  let tempvar = newvar "tempmem" inftype in
-  let tempastvar = Var(tempvar) in
+  let tempmemvar = newvar "tempmem" inftype in
+  let tempvalvar = newvar "tempval" eletype in
   let elesize = getwidth eletype in
-  let singlewrites = Util.mapn (split_write tempastvar index eletype endian data) (elesize - 2) in
-  let singlewrites = singlewrites @ [(split_write array index eletype endian data (elesize - 1))] in
-   let letexp = List.fold_left (fun expr new_expr -> Let(tempvar, new_expr, expr)) tempastvar singlewrites in
-  letexp
+  let singlewrites = Util.mapn (split_write (Var tempmemvar) index eletype endian (Var tempvalvar)) (elesize - 2) in
+  (singlewrites @ [(split_write array index eletype endian (Var tempvalvar) (elesize - 1))], tempmemvar, tempvalvar)
+
+let split_writes array index eletype endian data =
+  let (singlewrites, tempmemvar, tempvalvar) = split_write_list array index eletype endian data in
+  let letexp = List.fold_left (fun expr new_expr -> Let(tempmemvar, new_expr, expr)) (Var tempmemvar) singlewrites in
+  Let(tempvalvar, data, letexp)
 
 
 (** This visitor maps each TMem to an array *)
-class memory2array_visitor hash
-    =
+class memory2array_visitor () =
+  let hash = VarHash.create 1000 in
   object (self)
     inherit Ast_visitor.nop
 	
@@ -145,9 +152,8 @@ class memory2array_visitor2 hash
     broken down to byte-level reads and writes using array variables
     with the same name as the old memory variables.  *)
 let coerce_prog prog = 
-  let hash = VarHash.create 1000 in
-  let visitor = new memory2array_visitor hash
-  and visitor2 = new memory2array_visitor2 hash
+  let visitor = new memory2array_visitor ()
+  and visitor2 = new memory2array_visitor2 ()
   in
   let prog = Ast_visitor.prog_accept visitor prog in
   let prog = Ast_visitor.prog_accept visitor2 prog
