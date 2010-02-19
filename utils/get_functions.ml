@@ -39,11 +39,19 @@ let doit = match !rangeonly with
       (fun (n,s,e) -> Printf.printf "%s\t0x%Lx 0x%Lx\n" n s e)
   | false ->
       (fun (n,s,e) ->
+	 try
 	 let ir = Asmir.asmprogram_to_bap_range p s e in
+	 let ir = Hacks.ret_to_jmp ir in
+	 let cfg = Cfg_ast.of_prog ir in
+	 let cfg = Prune_unreachable.prune_unreachable_ast cfg in
+	 let cfg = Hacks.remove_backedges cfg in
+	 let ir = Cfg_ast.to_prog cfg in
 	 let oc = open_out (!prefix ^ n ^ ".il") in
 	 let pp = new Pp.pp_oc oc in
 	 pp#ast_program ir;
 	 pp#close;
+	 with _ ->
+	   Printf.eprintf "Warning: problem with %s (0x%Lx-0x%Lx)" n s e
       )
 ;;
 (* Fixme: only for given functions *)

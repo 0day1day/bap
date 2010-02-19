@@ -99,6 +99,10 @@ object (self)
     | ExnAttr _ (* we could try to print something using Printexc.to_string *)
     | Pos _ -> () (* ignore position attrs *)
 
+  method label = function
+    | Name s -> pp "label "; pp s
+    | Addr x -> printf "addr 0x%Lx" x
+
   (* prec tells us how much parenthization we need. 0 means it doesn't need
      to be parenthesized. Larger numbers means it has higher precedence.
      Maximum prec before paretheses are added are as follows:
@@ -216,10 +220,7 @@ object (self)
 	self#ast_exp f;
 	self#attrs a
     | Ast.Label(l,a) ->
-	(match l with
-	 | Name s -> pp "label "; pp s
-	 | Addr x -> printf "addr 0x%Lx" x
-	);
+	self#label l;
 	self#attrs a
     | Ast.Halt(e,a) ->
 	pp "halt ";
@@ -384,11 +385,8 @@ let pp2string f v =
 
 
 let value_to_string = pp2string (fun p -> p#ssa_value)
-
+let label_to_string = pp2string (fun p -> p#label)
 let ssa_exp_to_string = pp2string (fun p -> p#ssa_exp)
-
 let ssa_stmt_to_string = pp2string (fun p -> p#ssa_stmt)
-
 let ast_exp_to_string = pp2string (fun p -> p#ast_exp ~prec:0)
-
 let ast_stmt_to_string = pp2string (fun p -> p#ast_stmt)
