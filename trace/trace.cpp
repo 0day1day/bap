@@ -1,10 +1,6 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <stdint.h>
-#include <sys/types.h>
-#include <string.h>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 
 #include "frame.h"
 #include "trace.h"
@@ -49,7 +45,7 @@ bool TraceReader::seek(uint32_t offset)
 
    while (frm_pos < offset)
       next(false);
-   
+
    return true;
 
 }
@@ -58,14 +54,15 @@ bool TraceReader::seek(uint32_t offset)
 // pointer to the next frame.
 Frame *TraceReader::next(bool noskip)
 {
-   
+
    Frame *f = Frame::unserialize(infile, noskip);
-   frm_pos++;
+   if(++frm_pos >= header.frame_count) // we are at the eof.
+      return NULL;
 
    if (f->type == FRM_STD) {
 
       StdFrame *sf = (StdFrame *) f;
-      
+
       uint32_t ipos = sf->addr & TRACE_ICACHE_MASK;
 
       if (sf->insn_length == 0) {
@@ -88,14 +85,15 @@ Frame *TraceReader::next(bool noskip)
 bool TraceReader::eof() const
 { return frm_pos >= header.frame_count; }
 
+
 // Creates a new TraceWriter that outputs the trace to the file named
 // "filename". Will truncate the file.
 TraceWriter::TraceWriter(const char *filename)
    : frm_count(0)
 {
 
-   outfile.open(filename, 
-                ios_base::out | 
+   outfile.open(filename,
+                ios_base::out |
                 ios_base::trunc);
 
    // Write in a temporary trace header.
@@ -117,7 +115,7 @@ uint32_t TraceWriter::count() const
 {
    return frm_count;
 }
-   
+
 // Adds a new frame to the trace.
 void TraceWriter::add(Frame &frm)
 {
@@ -128,7 +126,7 @@ void TraceWriter::add(Frame &frm)
       StdFrame &sf = (StdFrame &) frm;
 
       uint32_t ipos = sf.addr & TRACE_ICACHE_MASK;
-      
+
       if (memcmp(icache[ipos], sf.rawbytes, sf.insn_length) == 0) {
          // Instruction was previously cached, don't save it in trace.
          sf.insn_length = 0;
@@ -173,7 +171,7 @@ int main(int argc, char **argv) {
 
 
    TraceWriter tw("/tmp/blah");
-   
+
    StdFrame *frm = new StdFrame;
    frm->addr = 0x12345678;
    frm->tid = 0xabababab;
@@ -195,7 +193,7 @@ int main(int argc, char **argv) {
    tr.seek(1);
 
    while(tr.pos() < tr.count()) {
-      
+
       Frame *f = tr.next();
 
       switch(f->type) {

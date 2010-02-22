@@ -75,7 +75,7 @@ TOOLS = $(TOOL_ROOTS:%=$(OBJDIR)%$(PINTOOL_SUFFIX))
 #
 ##############################################################
 
-all: tools
+all: tools reader
 tools: $(OBJDIR) $(TOOLS) $(OBJDIR)cp-pin.exe
 test: $(OBJDIR) $(TOOL_ROOTS:%=%.test)
 
@@ -88,8 +88,17 @@ $(OBJDIR)cp-pin.exe:
 $(OBJDIR):
 	mkdir -p $(OBJDIR)
 
-$(OBJDIR)gentrace.o : gentrace.cpp frame.cpp trace.cpp
+$(OBJDIR)gentrace.o : gentrace.cpp frame.o trace.o
 	$(CXX) -c $(CXXFLAGS) $(PIN_CXXFLAGS) ${OUTOPT}$@ $<
+
+$(OBJDIR)frame.o : frame.cpp frame.h
+	$(CXX) -c $(CXXFLAGS) $(PIN_CXXFLAGS) ${OUTOPT}$@ $<
+
+$(OBJDIR)trace.o : trace.cpp trace.h
+	$(CXX) -c $(CXXFLAGS) $(PIN_CXXFLAGS) ${OUTOPT}$@ $<
+
+reader: readtrace.cpp frame.o trace.o
+	$(CXX) -o $@ $^ $(CXXFLAGS)
 
 $(TOOLS): $(PIN_LIBNAMES)
 
@@ -99,4 +108,4 @@ $(TOOLS): %$(PINTOOL_SUFFIX) : %.o
 
 ## cleaning
 clean:
-	-rm -rf $(OBJDIR) *.out *.tested *.failed makefile.copy
+	-rm -rf $(OBJDIR) *.out *.tested *.failed makefile.copy reader

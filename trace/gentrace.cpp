@@ -2,9 +2,8 @@
 
 #include <iostream>
 #include <fstream>
+#include <cstring>
 #include <stdint.h>
-#include <string.h>
-#include <time.h>
 
 #include "frame.h"
 #include "trace.h"
@@ -82,7 +81,7 @@ VOID FlushBuffer()
 {
 
    for(uint32_t i = 0; i < g_bufidx; i++) {
-      
+
       // TODO: Implement caching.
 
       StdFrame f;
@@ -154,12 +153,12 @@ VOID FlushBuffer()
             if (g_memcache.elem32(v.loc) == v.value) {
                f.setCached(j);
                LOG(hexstr(f.addr) + ": " +
-                   "cached: " + hexstr(v.loc) + 
+                   "cached: " + hexstr(v.loc) +
                    " has value " + hexstr(g_memcache.elem32(v.loc)) +
                    "\n");
             } else {
                LOG(hexstr(f.addr) + ": " +
-                   "not cached: " + hexstr(v.loc) + 
+                   "not cached: " + hexstr(v.loc) +
                    " has value " + hexstr(v.value) +
                    ", cache is " + hexstr(g_memcache.elem32(v.loc)) +
                    "\n");
@@ -206,7 +205,7 @@ VOID FlushBuffer()
 
             f.values[newcnt] = v.value;
             newcnt++;
-            
+
          }
 
       }
@@ -337,7 +336,7 @@ VOID AppendBuffer(ADDRINT addr,
       }                                                                 \
       break;                                                            \
    }
-   
+
    BUILD_VALSPEC(0);
    BUILD_VALSPEC(1);
    BUILD_VALSPEC(2);
@@ -375,7 +374,7 @@ VOID InstrBlock(BBL bbl)
 
       // The first few arguments to AppendBuffer.
       IARGLIST_AddArguments(arglist,
-                            IARG_ADDRINT, INS_Address(ins), 
+                            IARG_ADDRINT, INS_Address(ins),
                             IARG_THREAD_ID,
                             IARG_UINT32, INS_Size(ins),
                             IARG_END);
@@ -397,7 +396,7 @@ VOID InstrBlock(BBL bbl)
       // Now we need to get the values.
 
       uint32_t valcount = 0;
-     
+
       for(uint32_t i = 0; i < INS_OperandCount(ins); i++) {
 
          if (INS_OperandIsReg(ins, i) && INS_OperandRead(ins, i)) {
@@ -415,7 +414,7 @@ VOID InstrBlock(BBL bbl)
                // a really bad idea.
                ty = VT_REG32;
             }
-            
+
             IARGLIST_AddArguments(arglist,
                                   IARG_UINT32, ty,
                                   IARG_UINT32, r,
@@ -424,7 +423,7 @@ VOID InstrBlock(BBL bbl)
             valcount++;
 
          } else if (INS_OperandIsMemory(ins, i)) {
-            
+
             // TODO: Check for segment register.
 
             REG basereg = INS_OperandMemoryBaseReg(ins, i);
@@ -499,14 +498,14 @@ VOID InstrBlock(BBL bbl)
       IARGLIST_AddArguments(arglist,
                             IARG_UINT32, valcount,
                             IARG_END);
-      
+
       // The argument list has been built, time to insert the call.
 
       INS_InsertCall(ins, IPOINT_BEFORE,
                      (AFUNPTR) AppendBuffer,
                      IARG_IARGLIST, arglist,
                      IARG_END);
-      
+
       icount++;
 
    }
@@ -552,7 +551,7 @@ int main(int argc, char *argv[])
 
    // Start the program, never returns
    PIN_StartProgram();
-   
+
    return 0;
 
 }

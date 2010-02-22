@@ -26,7 +26,7 @@ enum FrameType {
 
    // "Regular" frame. Sufficient to handle majority of x86 instructions.
    FRM_STD = 2,
-   
+
 };
 
 /**
@@ -38,7 +38,7 @@ struct Frame {
 
    Frame(FrameType ty) : type(ty) {}
 
-   // 
+   //
    // Serializes the frame and outputs to the ostream. 'sz' is the size of
    // the "child" frame, i.e. the size of all data that comes after this
    // frame's data.
@@ -159,17 +159,17 @@ struct StdFrame : public Frame {
 
    // Note: x & 7 === x % 8
    bool isCached(uint32_t pos)
-   { 
+   {
       if (pos < MAX_VALUES_COUNT)
-         return (cachemask[pos >> 3] >> (pos & 7)) & 1; 
+         return (cachemask[pos >> 3] >> (pos & 7)) & 1;
       else
          return false;
    }
 
    void setCached(uint32_t pos)
-   { 
+   {
       if (pos < MAX_VALUES_COUNT)
-         cachemask[pos >> 3] |= (1 << (pos & 7)); 
+         cachemask[pos >> 3] |= (1 << (pos & 7));
    }
 
    void unsetCached(uint32_t pos)

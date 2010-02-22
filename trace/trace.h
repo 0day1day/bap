@@ -4,7 +4,6 @@
 
 #include <iostream>
 #include <fstream>
-#include <stdint.h>
 
 #include "frame.h"
 
@@ -87,7 +86,7 @@ private:
    uint32_t frm_count;
 
 protected:
-   
+
    std::ofstream outfile;
 
    char icache[TRACE_ICACHE_SIZE][MAX_INSN_BYTES];
@@ -100,7 +99,7 @@ public:
 
    // Returns the current number of frames in the trace.
    uint32_t count() const;
-   
+
    // Adds a new frame to the trace.
    void add(Frame &frm);
 

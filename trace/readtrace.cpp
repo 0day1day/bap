@@ -1,7 +1,10 @@
 #include <iostream>
+#include <cstdio>
 
 #include "frame.h"
 #include "trace.h"
+
+using namespace std;
 
 int main(int argc, char **argv) {
 
@@ -10,7 +13,7 @@ int main(int argc, char **argv) {
    printf("Frame count: %d\n", tr.count());
 
    while(tr.pos() < tr.count()) {
-      
+
       Frame *f = tr.next();
 
       switch(f->type) {
@@ -25,7 +28,7 @@ int main(int argc, char **argv) {
 
             printf("Insn bytes: ");
 
-            unsigned int len = 
+            unsigned int len =
                (sf->insn_length == 0) ? MAX_INSN_BYTES : sf->insn_length;
 
             for (unsigned int i = 0; i < len; i++) {

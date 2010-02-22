@@ -1,7 +1,6 @@
-
 #include <iostream>
-#include <stdint.h>
-#include <string.h>
+#include <cstdio>
+#include <cstring>
 
 #include "frame.h"
 
@@ -17,7 +16,7 @@ Frame *Frame::unserialize(istream &in, bool noskip)
    FrameType type;
    uint16_t size;
    Frame *f = NULL;
-   
+
    READ(in, packed_type);
    READ(in, size);
 
@@ -30,19 +29,19 @@ Frame *Frame::unserialize(istream &in, bool noskip)
    }
 
    switch(type) {
-   case FRM_STD: 
+   case FRM_STD:
       f = new StdFrame;
       break;
-   case FRM_KEY: 
+   case FRM_KEY:
       f = new KeyFrame;
       break;
-   case FRM_NONE: 
+   case FRM_NONE:
    default:
       // TODO: Error handling here.
       printf("ERROR: Unknown frame type %d!\n", type);
       break;
    }
-      
+
    f->unserializePart(in);
    return f;
 
@@ -68,8 +67,8 @@ ostream &Frame::serialize(ostream &out, uint16_t sz)
 }
 
 void StdFrame::clearCache()
-{ 
-   memset((void *) &cachemask, 0, MAX_CACHEMASK_BTYES); 
+{
+   memset((void *) &cachemask, 0, MAX_CACHEMASK_BTYES);
 }
 
 ostream &StdFrame::serialize(ostream &out, uint16_t sz)
@@ -84,7 +83,7 @@ ostream &StdFrame::serialize(ostream &out, uint16_t sz)
       + (insn_length * sizeof(char))
       + masklen
       + (values_count * sizeof(uint32_t));
-   
+
    ostream &out2 = Frame::serialize(out, sz);
 
    WRITE(out2, addr);
@@ -99,13 +98,13 @@ ostream &StdFrame::serialize(ostream &out, uint16_t sz)
    uint8_t lengths = (values_count & 0xf) | (insn_length << 4);
 
    WRITE(out2, lengths);
-   
+
    out2.write((const char *) &rawbytes, insn_length * sizeof(char));
    out2.write((const char *) &cachemask, masklen);
    out2.write((const char *) &values, values_count * sizeof(uint32_t));
 
    return out2;
-     
+
 }
 
 istream &StdFrame::unserializePart(istream &in)
@@ -157,7 +156,7 @@ ostream &KeyFrame::serialize(ostream &out, uint16_t sz)
    WRITE(out2, gs);
 
    return out2;
-      
+
 }
 
 istream &KeyFrame::unserializePart(istream &in)
@@ -181,7 +180,7 @@ istream &KeyFrame::unserializePart(istream &in)
    READ(in, gs);
 
    return in;
-      
+
 }
 
 #if 0
