@@ -15,14 +15,32 @@ sig
   val add_next_states : t -> ctx -> data -> ctx list -> t
 end
 
-module MakeSearch(S:STRATEGY) =
+module type Symb =
+sig 
+  val init : Ast.stmt list -> ctx
+  val eval : ctx -> ctx list
+end
+
+module NaiveSymb =
+struct
+  let init = Symbolic.build_default_context
+  let eval = Symbolic.eval
+end
+
+module FastSymb =
+struct
+  let init = SymbolicFast.build_default_context
+  let eval = SymbolicFast.eval
+end
+
+module MakeSearch(S:STRATEGY)(Symbolic:Symb) =
 struct
   let rec search post predicates q =
     match S.pop_next q with
     | None -> predicates
     | Some ((st,d),q) ->
 	let (newstates, predicates) =
-	  try (Symbeval.eval st, predicates) with
+	  try (Symbolic.eval st, predicates) with
 	  | Halted(v,s) ->
 	      let q = symb_to_exp (eval_expr s.delta post) in
 	      let pred = Ast.exp_and q s.pred in
@@ -35,7 +53,7 @@ struct
 	search post predicates q
 
   let eval_ast_program initdata prog post =
-    let ctx = Symbeval.build_default_context prog in
+    let ctx = Symbolic.init prog in
     let predicates = search post [] (S.start_at ctx initdata) in
     if debug then dprintf "Explored %d paths." (List.length predicates);
     Util.list_join Ast.exp_or predicates
@@ -78,8 +96,11 @@ module UnboundedBFS = MakeSearch(
       | None -> None
     let add_next_states q st () newstates = Q.enqueue_all q newstates
   end)
-
-let bfs_ast_program p q = UnboundedBFS.eval_ast_program () p q
+  (* Perhaps these can be automated *)
+module UnboundedBFSNaive = UnboundedBFS(NaiveSymb)
+module UnboundedBFSFast = UnboundedBFS(FastSymb)
+let bfs_ast_program p q = UnboundedBFSNaive.eval_ast_program () p q
+let bfs_ast_program_fast p q = UnboundedBFSFast.eval_ast_program () p q
 
 
 module MaxdepthBFS = MakeSearch(
@@ -95,8 +116,10 @@ module MaxdepthBFS = MakeSearch(
       else
 	q
   end)
-
-let bfs_maxdepth_ast_program = MaxdepthBFS.eval_ast_program
+module MaxdepthBFSNaive = MaxdepthBFS(NaiveSymb)
+module MaxdepthBFSFast = MaxdepthBFS(FastSymb)
+let bfs_maxdepth_ast_program = MaxdepthBFSNaive.eval_ast_program
+let bfs_maxdepth_ast_program_fast = MaxdepthBFSFast.eval_ast_program
 
 module UnboundedDFS = MakeSearch(
   struct
@@ -109,7 +132,10 @@ module UnboundedDFS = MakeSearch(
       | [] -> None
     let add_next_states q st () newstates = newstates @ q
   end)
-let dfs_ast_program p q = UnboundedDFS.eval_ast_program () p q
+module UnboundedDFSNaive = UnboundedDFS(NaiveSymb)
+module UnboundedDFSFast = UnboundedDFS(FastSymb)
+let dfs_ast_program p q = UnboundedDFSNaive.eval_ast_program () p q
+let dfs_ast_program_fast p q = UnboundedDFSFast.eval_ast_program () p q
 
 module MaxdepthDFS = MakeSearch(
   struct
@@ -126,7 +152,10 @@ module MaxdepthDFS = MakeSearch(
 	let ni = i-1 in
 	List.fold_left (fun q s -> (s,ni)::q) q newstates
   end)
-let dfs_maxdepth_ast_program = MaxdepthDFS.eval_ast_program
+module MaxdepthDFSNaive = MaxdepthDFS(NaiveSymb)
+module MaxdepthDFSFast = MaxdepthDFS(FastSymb)
+let dfs_maxdepth_ast_program = MaxdepthDFSNaive.eval_ast_program
+let dfs_maxdepth_ast_program_fast = MaxdepthDFSFast.eval_ast_program
 
 
 module EdgeMap = Map.Make(struct type t = int * int let compare = compare end)
@@ -154,4 +183,7 @@ module MaxrepeatDFS = MakeSearch(
 	  let newstates = Util.list_map_some addedge newstates in
 	  (newstates@q, i)
   end)
-let maxrepeat_ast_program = MaxrepeatDFS.eval_ast_program
+module MaxrepeatDFSNaive = MaxrepeatDFS(NaiveSymb)
+module MaxrepeatDFSFast = MaxrepeatDFS(FastSymb)
+let maxrepeat_ast_program = MaxrepeatDFSNaive.eval_ast_program
+let maxrepeat_ast_program_fast = MaxrepeatDFSFast.eval_ast_program

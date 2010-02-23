@@ -30,12 +30,9 @@ module AddrMap = Map.Make(Int64)
 type mem = Ast.exp AddrMap.t * Var.t (* addr -> val + initial name *)
 (* Some useful types *)
   type addr = int64
-  type pc = int
   type instr = stmt
+  type pc = int
   type varval = Symbolic of Ast.exp | ConcreteMem of mem
-
-(* Exceptions *)
-  exception ExcState of string * addr
 
 (* Evaluator Contexts *)
 (* Symbol meanings:                              *
@@ -52,6 +49,8 @@ type mem = Ast.exp AddrMap.t * Var.t (* addr -> val + initial name *)
    pc: pc;
   }
 
+(* Exceptions *)
+  exception ExcState of string * addr
   (* Program halted, with optional halt value, and with given execution context. *)
   exception Halted of varval option * ctx
 
@@ -69,15 +68,38 @@ type mem = Ast.exp AddrMap.t * Var.t (* addr -> val + initial name *)
   let is_concrete = function
    | Int _ -> true
    | _ -> false
-  let is_symbolic_store = function
-   | Store _ -> true
-   | _ -> false
   let concrete_val_tuple = function
    | Symbolic (Int (v,t)) -> (v,t)
    | Symbolic e -> 
      failwith ("expression cannot be evaluated concretely:\n"
                ^(Pp.ast_exp_to_string e))
    | _ -> failwith "tried to perform memory operations"
+
+(* Unwrapping functions *)
+  let symb_to_exp = function
+   | Symbolic e -> e
+   | ConcreteMem _ -> failwith "this is not a symbolic expression"
+
+  let symb_to_string = function
+   | Symbolic e -> "Symbolic "^(Pp.ast_exp_to_string e)
+   | ConcreteMem m -> "Memory"
+
+  module type MemLookup =
+  sig
+    val lookup_var : (varval VH.t) -> VH.key -> varval
+    val conc2symb : Ast.exp AddrMap.t -> Ast.var -> varval
+    val normalize : int64 -> Type.typ -> int64
+    val update_mem : varval -> Ast.exp -> Ast.exp -> Ast.exp -> varval
+    val lookup_mem : varval -> Ast.exp -> Ast.exp -> Ast.exp
+  end
+
+  module type SymbMem =
+  sig
+    val is_symbolic_store : Ast.exp -> bool 
+  end
+
+module Make(MemL: MemLookup)(SMem: SymbMem) = 
+struct
 
    let byte_type = reg_8
    let index_type = reg_32
@@ -86,64 +108,29 @@ type mem = Ast.exp AddrMap.t * Var.t (* addr -> val + initial name *)
   let context_update = VH.replace
   let context_copy = VH.copy
 
+  let is_symbolic_store = SMem.is_symbolic_store
+
 (* Lookup functions for basic contexts *)
   let inst_fetch sigma pc =
     Hashtbl.find sigma pc 
 
   let label_decode lambda lab =
    try Hashtbl.find lambda lab
-   with Not_found -> failwith "jump to inexistent label"
+   with Not_found -> 
+     match lab with
+      | Name s -> failwith ("jump to inexistent label "^s)
+      | Addr x -> failwith ("jump to inexistent label "^(Int64.to_string x))
 
-  let lookup_var delta var =
-   try VH.find delta var
-   with Not_found ->
-    match Var.typ var with
-    | TMem _ ->
-	empty_mem var
-    | Reg _ ->
-	Symbolic(Var var)
-    | _ -> failwith "Arrays not handled yet"
-
-  (* Converting concrete memory to symbolic *)
-  let conc2symb memory v =
-   (* FIXME: a better symbolism for uninitialized memories *)
-   let init = Var v in
-   Symbolic (AddrMap.fold
-	       (fun k v m -> Store (m,Int(k,index_type),v,exp_false,byte_type))
-	       memory init)
-
-  (* Normalize a memory address, setting high bits to 0. *)
-  let normalize i t = Arithmetic.to64 (i,t)
-
-  let rec update_mem mu pos value endian = 
-  match mu with
-   | Symbolic m -> Symbolic (Store(m,pos,value,endian,byte_type))
-   | ConcreteMem (m,v) ->
-       match pos with
-       | Int(p,t) ->
-	   ConcreteMem(AddrMap.add (normalize p t) value m, v)
-       | _ -> update_mem (conc2symb m v) pos value endian
-
-  let rec lookup_mem mu index endian = 
-  match mu, index with
-   | ConcreteMem(m,v), Int(i,t) ->
-    (try AddrMap.find (normalize i t) m
-     with Not_found ->
-       Load(Var v, index, endian, byte_type) (* FIXME: handle endian and type? *)
-    )
-    (* perhaps we should introduce a symbolic variable *)
-   | Symbolic mem, _ -> Load (mem,index,endian,byte_type)
-   | ConcreteMem(m,v),_ -> lookup_mem (conc2symb m v) index endian
-
-(* Unwrapping functions *)
-  let symb_to_exp = function
-   | Symbolic e -> e
-   | _ -> failwith "this is not a symbolic expression"
+  let lookup_var = MemL.lookup_var
+  let conc2symb = MemL.conc2symb
+  let normalize = MemL.normalize
+  let update_mem = MemL.update_mem
+  let lookup_mem = MemL.lookup_mem
 
  (* Initializers *)
   let build_default_context prog_stmts =
-    let sigma  = Hashtbl.create 5700 
-    and pc = 0
+    let sigma = Hashtbl.create 5700 
+    and pc = 0 
     and delta : varval VH.t = VH.create 5700
     and lambda = Hashtbl.create 5700 in
     (* Initializing Sigma and Lambda *)
@@ -186,10 +173,9 @@ type mem = Ast.exp AddrMap.t * Var.t (* addr -> val + initial name *)
 
   (* Evaluate an expression in a context Delta,Mu *)
   let rec eval_expr delta expr =
-   let get_address mem offset = 
-    let index = Int(Int64.of_int offset, index_type) in
-    let mem_index = BinOp (PLUS,mem,index) in
-    symb_to_exp (eval_expr delta mem_index)
+   let symb_mem mem = if is_symbolic_store mem then 
+                      (pdebug "symb mem!" ; Symbolic mem)
+                      else eval_expr delta mem 
    in
    let eval = function 
     | Var v -> 
@@ -234,75 +220,35 @@ type mem = Ast.exp AddrMap.t * Var.t (* addr -> val + initial name *)
       let v2 = eval_expr delta' e2 in
       v2
     | Load (mem,ind,endian,t) ->
-      let mem = if is_symbolic_store mem then Symbolic mem
-                else eval_expr delta mem 
-      and ind = eval_expr delta ind
-      and endian = eval_expr delta endian in
       (match t with
-       | Reg bits ->
-         let n = bits/8  (* FIXME: 1-bit loads? *)
-         (* loading the bytes *)
-         and mem_arr = symb_to_exp ind 
+       | Reg 8 ->
+         let mem = symb_mem mem 
+         and ind = eval_expr delta ind
+         and endian = eval_expr delta endian in
+         let mem_arr = symb_to_exp ind 
          and endian_exp = symb_to_exp endian in
-         let rec get_bytes offset acc =
-          if offset = n then acc
-          else 
-           let address = get_address mem_arr offset in
-           let byte = lookup_mem mem address endian_exp in
-           get_bytes (offset+1) (byte::acc)
-         in
-         let bytes = get_bytes 0 [] in
-         (* changing the order according to the endianness *)
-         let loaded = if is_false_val endian then bytes else List.rev bytes
-         and byte_size = Int(8L,byte_type) in
-         (* calculating the loaded value *)
-	 (match loaded with
-	  | [v] -> Symbolic v
-	  | v1::vs ->
-              let value = 
-		List.fold_left
-		  (fun v n_byte ->
-		     let padded_byte = Cast(CAST_UNSIGNED, t, n_byte) in
-		     BinOp(OR, BinOp(LSHIFT,v,byte_size), padded_byte)
-		  ) (Cast(CAST_UNSIGNED,t,v1)) loaded 
-              in
-              eval_expr delta value (* try to evaluate the expression further *)
-	  | [] -> failwith "impossible aneotuha"
-	 )
+         Symbolic (lookup_mem mem mem_arr endian_exp)
+       | Reg _ -> eval_expr delta (Memory2array.split_loads mem ind t endian)
        | Array _ ->
          failwith "loading array currently unsupported"
        | _ -> failwith "not a loadable type"
       )
     | Store (mem,ind,value,endian,t) ->
-      let mem = if is_symbolic_store mem then Symbolic mem
-                else eval_expr delta mem
-      and ind = eval_expr delta ind 
-      and value = eval_expr delta value in
+      let index = symb_to_exp (eval_expr delta ind)
+      and value = symb_to_exp (eval_expr delta value)
+      and endian = symb_to_exp (eval_expr delta endian) in
       (match t with
-       | Reg bits -> 
-         let mem_arr = symb_to_exp ind
-         and endian = eval_expr delta endian
-         and store_val = symb_to_exp value
-         and n = bits/8 in (* FIXME: 1-bit stores? *)
-         let endian_exp = symb_to_exp endian in
-         (* Break the value down to bytes *)
-         let rec get_bytes offset (pos,vals) =
-          if offset = n then (pos,vals)
-          else 
-           let address = get_address mem_arr offset in
-           let shift = Int64.mul (Int64.of_int offset) 8L in
-           let value' = (BinOp (RSHIFT,store_val,Int(shift,byte_type))) in
-           let byte = Cast (CAST_LOW,byte_type, value') in
-           let ebyte = symb_to_exp (eval_expr delta byte)
-           in
-           get_bytes (offset+1) (address :: pos,ebyte :: vals)
-         in
-         let poss,vals = get_bytes 0 ([],[]) in
-         (* Changing the indices based on endianness *)
-         let poss = if is_false_val endian then poss else List.rev poss in
-         List.fold_left2 
-           (fun mem pos value -> update_mem mem pos value endian_exp) 
-           mem poss vals
+       | Reg 8 -> 
+         let mem = symb_mem mem in
+         update_mem mem index value endian
+       | Reg _ -> 
+       (*   let byte_writes,_,_ = Memory2array.split_write_list mem index t endian value in
+          let stored_bytes = List.map (eval_expr delta) byte_writes in
+          if List.exists is_symbolic stored_bytes then *)
+        if not (is_symbolic_store mem) && is_concrete index
+        then eval_expr delta (Memory2array.split_writes mem index t endian value)
+        else symb_mem (Memory2array.split_writes mem index t endian value)
+       (*   else eval_expr delta (Memory2array.split_writes mem index t endian value)*)
        | Array _ -> 
          failwith "storing array currently unsupported"
        | _ -> failwith "not a storable type"
@@ -320,7 +266,7 @@ type mem = Ast.exp AddrMap.t * Var.t (* addr -> val + initial name *)
     let get_label e =
       let v = eval_expr delta e in
       match lab_of_exp (symb_to_exp v) with
-      | None -> failwith "not a valid label"
+      | None -> failwith ("not a valid label "^(Pp.ast_exp_to_string (symb_to_exp v)))
       | Some lab -> label_decode lambda lab
     in
     let next_pc = succ pc in
@@ -388,3 +334,68 @@ type mem = Ast.exp AddrMap.t * Var.t (* addr -> val + initial name *)
        (* The only way inst_fetch would fail is if pc falls off the end, right? *)
        raise (Halted(None, state))
 
+end
+
+module Std = 
+struct 
+let lookup_var delta var =
+   try VH.find delta var
+   with Not_found ->
+    match Var.typ var with
+    | TMem _ ->
+	empty_mem var
+    | Reg _ ->
+	Symbolic(Var var)
+    | _ -> failwith "Arrays not handled yet"
+
+  (* Converting concrete memory to symbolic *)
+  let conc2symb memory v =
+   (* FIXME: a better symbolism for uninitialized memories *)
+   let init = Var v in
+   Symbolic (AddrMap.fold
+	       (fun k v m -> Store (m,Int(k,reg_64),v,exp_false,reg_8))
+	       memory init)
+
+  (* Normalize a memory address, setting high bits to 0. *)
+  let normalize i t = Arithmetic.to64 (i,t)
+
+  let rec update_mem mu pos value endian = 
+  match mu with
+   | Symbolic m -> Symbolic (Store(m,pos,value,endian,reg_8))
+   | ConcreteMem (m,v) ->
+       match pos with
+       | Int(p,t) ->
+	   ConcreteMem(AddrMap.add (normalize p t) value m, v)
+       | _ -> update_mem (conc2symb m v) pos value endian
+
+  let rec lookup_mem mu index endian = 
+  match mu, index with
+   | ConcreteMem(m,v), Int(i,t) ->
+    (try AddrMap.find (normalize i t) m
+     with Not_found ->
+       Load(Var v, index, endian, reg_8) (* FIXME: handle endian and type? *)
+    )
+    (* perhaps we should introduce a symbolic variable *)
+   | Symbolic mem, _ -> Load (mem,index,endian,reg_8)
+   | ConcreteMem(m,v),_ -> lookup_mem (conc2symb m v) index endian
+end
+
+module FullSubst =
+struct
+  let is_symbolic_store = function
+   | Store _ -> true
+   | _ -> false
+end
+
+module PartialSubst =
+struct
+  let is_symbolic_store = function
+   | Store _ | Let _ -> true
+   | _ -> false
+end
+
+module Symbolic = Make(Std)(FullSubst)
+module SymbolicFast = Make(Std)(PartialSubst)
+
+let eval_expr = Symbolic.eval_expr
+let eval_expr = SymbolicFast.eval_expr

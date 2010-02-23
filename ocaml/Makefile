@@ -48,6 +48,8 @@ export SOURCES = \
 	symbeval.ml \
 	symbeval_search.ml \
 	hacks.ml \
+	coalesce.ml \
+	traces.ml
 
 
 RESULT = bap

@@ -67,7 +67,6 @@ let little_endian = Int(0L, reg_1)
 let tr_label s =
   Name s (* FIXME: treating them all as names for now *)
 
-
 (** Translate an expression *)
 let rec tr_exp g e =
   match Libasmir.exp_type e with
@@ -168,6 +167,36 @@ let tr_vardecls g ss =
   let decls,unextends = List.split(List.map (tr_vardecl g) ss) in
   (decls, fun x -> List.iter (fun f -> f x) unextends)
 
+let attr_type_to_typ = function
+ | NONE -> 
+   prerr_endline "concrete expression with no type in lifted trace" ;
+   reg_32        
+ | BOOL -> reg_1
+ | CHR -> reg_8
+ | INT_16 -> reg_16
+ | INT_32 -> reg_32
+ | INT_64 -> reg_64
+
+(* TODO: needs to be refined for bytes *)
+let int_to_taint = function 
+ | 0 -> Untaint
+ | _ -> Taint
+
+let tr_context_tup attr =
+  Context {name=Libasmir.attr_name attr;
+           mem=Libasmir.attr_mem attr;
+           t=attr_type_to_typ (Libasmir.attr_type attr);
+           index=Libasmir.attr_ind attr;
+           value=Libasmir.attr_value attr;
+           taint=int_to_taint (Libasmir.attr_taint attr)}
+
+let tr_attributes s =
+  let attr_vec = Libasmir.stmt_attributes s in
+  let size = Libasmir.conc_map_size attr_vec in
+   if size = 0 then [] 
+   else
+    foldn (fun i n -> (tr_context_tup (Libasmir.get_attr attr_vec n))::i) [] (size-1)
+
 (** Translate a statement *)
 let rec tr_stmt g s =
   match Libasmir.stmt_type s with
@@ -193,7 +222,8 @@ let rec tr_stmt g s =
     | COMMENT ->
 	Comment(Libasmir.comment_string s, [])
     | LABEL ->
-	Label(tr_label (Libasmir.label_string s), [])
+	Label(tr_label (Libasmir.label_string s),
+          tr_attributes s)
     | ASSERT ->
 	Assert(tr_exp g (Libasmir.assert_cond s), [])
     | VARDECL
@@ -205,10 +235,9 @@ let rec tr_stmt g s =
 
 (** Translate a whole bap_block_t (as returned by
     Libasmir.asmir_bap_blocks_get) into a list of statements *)
-let tr_bap_block_t g asmp b = 
+let tr_bap_block_aux g b =
   let size = Libasmir.asmir_bap_block_size b - 1 in
   let addr = Libasmir.asmir_bap_block_address b in
-  let asm = Libasmir.asmir_string_of_insn asmp addr in
   let (decs,stmts) =
     foldn (fun (ds,ss) n -> let s = asmir_bap_block_get b n in
 	     match Libasmir.stmt_type s with
@@ -218,7 +247,18 @@ let tr_bap_block_t g asmp b =
   in
   let decls, unextend = tr_vardecls g decs in
   let stmts = List.map (tr_stmt g) stmts in
+  (stmts, addr, unextend)
+
+let tr_bap_block_t g asmp b = 
+  let stmts, addr, unextend = tr_bap_block_aux g b in
+  let asm = Libasmir.asmir_string_of_insn asmp addr in
   let stmts = Label(Addr addr, [Asm asm])::stmts in 
+  unextend();
+  stmts
+
+let tr_bap_block_t_no_asm g b = 
+  let stmts, addr, unextend = tr_bap_block_aux g b in
+  let stmts = Label(Addr addr, [])::stmts in
   unextend();
   stmts
 
@@ -228,8 +268,9 @@ let tr_bap_blocks_t g asmp bs =
   let size = Libasmir.asmir_bap_blocks_size bs -1 in
     foldn (fun i n -> tr_bap_block_t g asmp (asmir_bap_blocks_get bs n)@i) [] size
 
-
-
+let tr_bap_blocks_t_no_asm g bs = 
+  let size = Libasmir.asmir_bap_blocks_size bs -1 in
+    foldn (fun i n -> tr_bap_block_t_no_asm g (asmir_bap_blocks_get bs n)@i) [] size
 
 let x86_regs : var list =
   List.map (fun (n,t) -> Var.newvar n t)
@@ -381,6 +422,13 @@ let asmprogram_to_bap_range ?(init_ro = false) asmp st en=
   destroy_bap_blocks bap_blocks;
   ir
 
+let bap_from_trace_file ?(atts = true) filename = 
+  let bap_blocks = Libasmir.asmir_bap_from_trace_file filename atts in
+  let g = gamma_create x86_mem x86_regs in
+  let ir = tr_bap_blocks_t_no_asm g bap_blocks in
+  let () = destroy_bap_blocks bap_blocks in
+  ir
+
 
 (* internal only *)
 let get_symbols p =
@@ -440,3 +488,4 @@ let get_function_ranges p =
 		 |("_init",_,_) -> false
 		 | _ -> true)
     unfiltered
+

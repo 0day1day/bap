@@ -182,6 +182,8 @@ extern "C" {
   extern address_t asmir_bap_block_address(bap_block_t *b);
   extern Stmt * asmir_bap_block_get(bap_block_t *b, int i);
   extern char* string_blockinsn(asm_program_t *prog, bap_block_t *block);
+  extern bap_blocks_t * asmir_bap_from_trace_file(char *filename, bool atts);
+
 
 #ifdef __cplusplus
 }

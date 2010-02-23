@@ -96,7 +96,12 @@ object (self)
     | Address a -> printf "@address \"0x%Lx\"" a;
     | Liveout -> pp "@set \"liveout\""
     | StrAttr s -> pp "@str \""; pp s; pc '\"'
+    | Context {name=s; mem=mem; value=v; index=i; taint=t} -> 
+      let ts = if t = Taint then "tainted" else "untainted" in
+      let ind = if mem then "["^(Int64.format "%Lx" i)^"]" else "" in
+      pp "@str \""; pp (s^ ind ^" = "^(Int64.format "%Lx" v)^ ", " ^ ts); pc '\"'
     | ExnAttr _ (* we could try to print something using Printexc.to_string *)
+   (* | Context _ (* enabling printing might be useful for debugging - ethan *)*)
     | Pos _ -> () (* ignore position attrs *)
 
   method label = function

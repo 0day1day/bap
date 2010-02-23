@@ -36,26 +36,36 @@ let compute_fse cfg post =
   let p = rename_astexp tossa post in
   (Eval.fse p ast, [])
 
-let compute_fse_bfs cfg post =
-  (* FIXME: avoid converting to cfg *)
-  let ast = Cfg_ast.to_prog cfg in
-  (Symbeval_search.bfs_ast_program ast post, [])
-
-let compute_fse_bfs_maxdepth i cfg post =
-  (* FIXME: avoid converting to cfg *)
-  let ast = Cfg_ast.to_prog cfg in
-  (Symbeval_search.bfs_maxdepth_ast_program i ast post, [])
-
-let compute_fse_maxrepeat i cfg post =
-  (* FIXME: avoid converting to cfg *)
-  let ast = Cfg_ast.to_prog cfg in
-  (Symbeval_search.maxrepeat_ast_program i ast post, [])
-
-
 let compute_wp = ref compute_wp_boring
 let irout = ref(Some stdout)
 let stpout = ref None
 let post = ref "true"
+let fast_fse = ref false
+
+let compute_fse_bfs cfg post =
+  (* FIXME: avoid converting to cfg *)
+  let ast = Cfg_ast.to_prog cfg in
+  let bfs = if !fast_fse then Symbeval_search.bfs_ast_program_fast
+            else Symbeval_search.bfs_ast_program 
+  in 
+  (bfs ast post, [])
+
+let compute_fse_bfs_maxdepth i cfg post =
+  (* FIXME: avoid converting to cfg *)
+  let ast = Cfg_ast.to_prog cfg in
+  let bfs = if !fast_fse then Symbeval_search.bfs_maxdepth_ast_program_fast
+            else Symbeval_search.bfs_maxdepth_ast_program 
+  in 
+  (bfs i ast post, [])
+
+let compute_fse_maxrepeat i cfg post =
+  (* FIXME: avoid converting to cfg *)
+  let ast = Cfg_ast.to_prog cfg in
+  let maxrepeat = if !fast_fse then Symbeval_search.maxrepeat_ast_program_fast
+            else Symbeval_search.maxrepeat_ast_program 
+  in 
+  (maxrepeat i ast post, [])
+
 
 
 let speclist =
@@ -79,6 +89,8 @@ let speclist =
      "<n> FSE with breath first search, limiting search depth to n.")
   ::("-fse-maxrepeat", Arg.Int(fun i-> compute_wp := compute_fse_maxrepeat i),
      "<n> FSE excluding walks that visit a point more than n times.")
+  ::("-fast-fse", Arg.Unit(fun () -> fast_fse := true),
+     "Perform FSE without full substitution.")
     :: Input.speclist
 
 let anon x = raise(Arg.Bad("Unexpected argument: '"^x^"'"))

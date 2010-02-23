@@ -54,6 +54,7 @@ sig
   val find_label : G.t -> Type.label -> G.V.t
   val get_stmts : G.t -> G.V.t -> lang
   val set_stmts : G.t -> G.V.t -> lang -> G.t
+  val join_stmts : lang -> lang -> lang
   (*val newid : G.t -> bbid*)
   val create_vertex : G.t -> lang -> G.t * G.V.t
 
@@ -72,10 +73,16 @@ type ('a,'b,'c) pcfg =
       nextid : int
     }
     
-
+module type Language =
+sig 
+  type t 
+  val default : t 
+  val join : t -> t -> t
+  val iter_labels : (label->unit) -> t -> unit 
+end
 
 (* Begin persistent implementation *)
-module MakeP (Lang : sig type t val default : t val iter_labels : (label->unit) -> t -> unit end) =
+module MakeP (Lang: Language) =
 struct
   (* A simple implementation for now... We can worry about optimizing later. *)
   (* FIXME: we really want a labeled bidirectional graph *)
@@ -142,7 +149,8 @@ struct
     let remove_edge c v1 v2 = { c with g = G'.remove_edge c.g v1 v2 }
     let remove_edge_e c e   = { c with g = G'.remove_edge_e c.g e }
     let add_vertex c v      = { c with g = G'.add_vertex c.g v }
-
+    
+    let join_stmts = Lang.join
 
 
 
@@ -160,7 +168,6 @@ struct
       try BM.find v c.s
       with Not_found -> Lang.default
 
-
     (* helper *)
     let fold_labels f l a =
       let r = ref a in
@@ -176,7 +183,6 @@ struct
       let sm = BM.add v s c.s in
       let lm = fold_labels (fun l lm -> LM.add l v lm) s c.l in
       { c with l=lm; s=sm }
-
 
     let newid c =
       let id = c.nextid in
@@ -225,6 +231,7 @@ struct
   let find_label = G.find_label
   let get_stmts = G.get_stmts
   let set_stmts = G.set_stmts
+  let join_stmts = G.join_stmts
   let newid = G.newid
   let create_vertex = G.create_vertex
 end
@@ -236,6 +243,7 @@ module LangAST =
 struct
   type t = Ast.stmt list
   let default = []
+  let join = List.append
   let iter_labels f =
     List.iter (function Ast.Label(l, _) -> f l  | _ -> () )
 end
@@ -244,6 +252,7 @@ module LangSSA =
 struct
   type t = Ssa.stmt list
   let default = []
+  let join = List.append
   let iter_labels f =
     (* optimization: assume labels are at the beginning *)
     let rec g = function
@@ -267,9 +276,8 @@ sig
     and type G.E.label = bool option
     and type G.t = (G'.t, lang BM.t, G'.V.t LM.t) pcfg
 
-  val get_stmts : G.t -> G.V.t -> lang
-  val set_stmts : G.t -> G.V.t -> lang -> G.t
-
+  val get_stmts  : G.t -> G.V.t -> lang
+  val set_stmts  : G.t -> G.V.t -> lang -> G.t
 end
 
 module MkMap(A:CFG_PRIV)(B:CFG_PRIV) =

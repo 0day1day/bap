@@ -60,12 +60,30 @@ type pos = (string * int)
     about a statement can be saved by wrapping the statement inside an Attr
     statement.
  *)
+
+type taint_type = Taint | Untaint
+
+type context = 
+ {
+   name:string;
+   mem:bool;
+   t:typ;
+   index:int64;
+   value:int64;
+   taint:taint_type
+ }
+ 
 type attribute = 
   | Pos of pos  (** The position of a statement in the source file *)
   | Asm of string
   | Address of int64
   | Liveout (** the variable assigned in this move should be considered live *)
   | StrAttr of string (** Generic printable and parseable attribute *)
+  | Context of context         (** An attribute containing the concrete values
+                                * and taint status of the instruction operands.
+                                * It can be merged with `StrAttr' but it seems 
+                                * more flexible to create a separate attribute. 
+                                * - ethan *)
   | ExnAttr of exn (** Generic extensible attribute, but no parsing *)
 
 type attributes = attribute list

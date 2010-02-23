@@ -60,4 +60,7 @@ val asm_addr_to_bap :
 val asmprogram_to_bap_range : ?init_ro:bool ->
   asmprogram -> address_t -> address_t  -> Ast.program
 
+val bap_from_trace_file : ?atts:bool -> string -> Ast.program
+
 val get_function_ranges : asmprogram -> (string * address_t * address_t) list
+

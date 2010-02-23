@@ -43,6 +43,9 @@ sig
   (** Sets the statements for a basic block *)
   val set_stmts : G.t -> G.V.t -> lang -> G.t
 
+  (** Joins two statement lists *)
+  val join_stmts : lang -> lang -> lang
+
   (** Generate a new ID that wasn't previously generated for the given graph *)
   (* val newid : G.t -> bbid *)
 

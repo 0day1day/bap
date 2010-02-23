@@ -20,6 +20,9 @@ let speclist =
                [Arg.Set_string f; Arg.String(setint64 s);
                 Arg.String(fun e->addinput(`Binrange(!f, !s, toint64 e)))]),
      "<file> <start> <end> Convert the given range of a binary to the IL");
+    ("-trace",
+     Arg.String(fun s-> addinput (`Trace s)),
+     "<file> Read in a trace and lift it to the IL");
     ("-il",
      Arg.String(fun s -> addinput (`Il s)),
      "<file> Read input from an IL file.");
@@ -41,6 +44,8 @@ let get_program () =
     | `Binrange (f, s, e) ->
 	let p = Asmir.open_program f in
 	Asmir.asmprogram_to_bap_range ~init_ro:!init_ro p s e
+    | `Trace f ->
+    Asmir.bap_from_trace_file f
   in
   let rec cat p = function
     | [] -> p
