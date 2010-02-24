@@ -56,7 +56,7 @@ Frame *TraceReader::next(bool noskip)
 {
 
    Frame *f = Frame::unserialize(infile, noskip);
-   if(++frm_pos >= header.frame_count) // we are at the eof.
+   if(++frm_pos > header.frame_count) // we are at the eof.
       return NULL;
 
    if (f->type == FRM_STD) {
@@ -67,11 +67,14 @@ Frame *TraceReader::next(bool noskip)
 
       if (sf->insn_length == 0) {
          // The instruction bytes are to be found in the cache.
+         // The instruction length must be set again
          memcpy(sf->rawbytes, icache[ipos], MAX_INSN_BYTES);
+         memcpy(&sf->insn_length, icache[ipos] + MAX_INSN_BYTES, 1);
 
       } else {
          // Update cache with current instruction bytes.
          memcpy(icache[ipos], sf->rawbytes, sf->insn_length);
+         memcpy(icache[ipos] + MAX_INSN_BYTES, &sf->insn_length, 1);
 
       }
 
@@ -131,7 +134,7 @@ void TraceWriter::add(Frame &frm)
          // Instruction was previously cached, don't save it in trace.
          sf.insn_length = 0;
       } else {
-         // Add to the cache.
+         // Add to the cache. (raw value)
          memcpy(icache[ipos], sf.rawbytes, sf.insn_length);
       }
 

@@ -49,8 +49,8 @@ private:
 protected:
    std::ifstream infile;
    TraceHeader header;
-
-   char icache[TRACE_ICACHE_SIZE][MAX_INSN_BYTES];
+   // MAX instruction byte + instruction length (1 byte)
+   char icache[TRACE_ICACHE_SIZE][MAX_INSN_BYTES + 1];
 
 public:
    TraceReader(const char *filename);

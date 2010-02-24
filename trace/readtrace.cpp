@@ -13,6 +13,7 @@ int main(int argc, char **argv) {
    printf("Frame count: %d\n", tr.count());
 
    while(tr.pos() < tr.count()) {
+      printf("No: %u\n", tr.pos());
 
       Frame *f = tr.next();
 
@@ -55,7 +56,6 @@ int main(int argc, char **argv) {
       default:
          break;
       }
-
 
    }
    return 0;
