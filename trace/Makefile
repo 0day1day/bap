@@ -97,7 +97,7 @@ $(OBJDIR)pin_frame.o : pin_frame.cpp pin_frame.h
 $(OBJDIR)pin_trace.o : pin_trace.cpp pin_trace.h
 	$(CXX) -c $(CXXFLAGS) $(PIN_CXXFLAGS) ${OUTOPT}$@ $<
 
-reader: readtrace.cpp frame.o pin_trace.o
+reader: readtrace.cpp pin_frame.o pin_trace.o
 	$(CXX) -o $@ $^ $(CXXFLAGS)
 
 $(TOOLS): $(PIN_LIBNAMES)
