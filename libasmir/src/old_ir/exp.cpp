@@ -8,6 +8,7 @@
 #include <iostream>
 #include <map>
 #include <cassert>
+#include <cstdio>
 
 using namespace std;
 

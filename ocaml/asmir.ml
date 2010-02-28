@@ -400,8 +400,8 @@ let asmprogram_to_bap_range ?(init_mem = false) asmp st en=
   let () = destroy_bap_blocks bap_blocks in
   ir
 
-let bap_from_trace_file ?(atts = true) filename = 
-  let bap_blocks = Libasmir.asmir_bap_from_trace_file filename atts in
+let bap_from_trace_file ?(atts = true) ?(pin = false) filename =
+  let bap_blocks = Libasmir.asmir_bap_from_trace_file filename atts pin in
   let g = gamma_create x86_mem x86_regs in
   let ir = tr_bap_blocks_t_no_asm g bap_blocks in
   let () = destroy_bap_blocks bap_blocks in

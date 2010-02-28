@@ -211,7 +211,7 @@ void destroy_bap_blocks(bap_blocks_t bs);
 int asmir_bap_block_size(bap_block_t b);
 Stmt asmir_bap_block_get(bap_block_t b, int i);
 address_t asmir_bap_block_address(bap_block_t b);
-bap_blocks_t asmir_bap_from_trace_file([in,string] char * filename, boolean atts);
+bap_blocks_t asmir_bap_from_trace_file([in,string] char * filename, boolean atts, [in] boolean pintrace);
 
 
 /*

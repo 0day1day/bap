@@ -101,7 +101,7 @@ byte_insn_to_asmp(bfd_architecture arch, address_t addr, unsigned char *bb_bytes
   disasm_info->buffer_vma = addr;
   disasm_info->buffer_length = len;
   disasm_info->section = NULL;
-      
+
   return prog;
 }
 
@@ -115,9 +115,9 @@ bap_block_t* asmir_addr_to_bap(asm_program_t *p, address_t addr)
   return bap_block;
 }
 
-bap_blocks_t * asmir_bap_from_trace_file(char * filename, bool atts) 
+bap_blocks_t * asmir_bap_from_trace_file(char * filename, bool atts, bool pintrace)
 {
-  bap_blocks_t * b = read_trace_from_file(string(filename), 0, false, atts);
+  bap_blocks_t * b = read_trace_from_file(string(filename), 0, false, atts, pintrace);
   return b;
 }
 

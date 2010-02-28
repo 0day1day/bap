@@ -1,6 +1,7 @@
 
 
 let inputs = ref []
+and pintrace = ref false
 
 let speclist =
   let addinput i = inputs := i :: !inputs in
@@ -28,6 +29,9 @@ let speclist =
     ("-ir", (* to be removed in next versions *)
      Arg.String(fun s -> addinput (`Il s)),
      "<file> Read input from an IL file. (deprecated)");
+    ("-pin", (* enable pin trace *)
+     Arg.Set pintrace,
+     "Enable pin trace");
   ]
 
 
@@ -44,7 +48,7 @@ let get_program () =
 	let p = Asmir.open_program f in
 	Asmir.asmprogram_to_bap_range p s e
     | `Trace f ->
-    Asmir.bap_from_trace_file f
+    Asmir.bap_from_trace_file ~pin:!pintrace f
   in
   let rec cat p = function
     | [] -> p
