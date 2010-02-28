@@ -1,26 +1,25 @@
 #include <iostream>
 #include <cstdio>
 
-#include "frame.h"
-#include "trace.h"
+#include "pin_trace.h"
 
 using namespace std;
 
 int main(int argc, char **argv) {
 
-   TraceReader tr(argv[1]);
+   pintrace::TraceReader tr(argv[1]);
 
    printf("Frame count: %d\n", tr.count());
 
    while(tr.pos() < tr.count()) {
       printf("No: %u\n", tr.pos());
 
-      Frame *f = tr.next();
+      pintrace::Frame *f = tr.next();
 
       switch(f->type) {
       case FRM_STD:
          {
-            StdFrame *sf = (StdFrame *) f;
+            pintrace::StdFrame *sf = (pintrace::StdFrame *) f;
             printf("Standard frame.\n");
             printf("Addr: 0x%x\n", sf->addr);
             printf("TID: %d\n", sf->tid);
@@ -45,7 +44,7 @@ int main(int argc, char **argv) {
          }
       case FRM_KEY:
          {
-            KeyFrame *kf = (KeyFrame *) f;
+            pintrace::KeyFrame *kf = (pintrace::KeyFrame *) f;
             printf("Keyframe.\n");
             printf("eax = 0x%x\n", kf->eax);
             printf("ebx = 0x%x\n", kf->ebx);

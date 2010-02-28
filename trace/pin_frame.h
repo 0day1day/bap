@@ -29,6 +29,8 @@ enum FrameType {
 
 };
 
+namespace pintrace { // Use namespace to avoid conflict
+
 /**
  * Frame: Base struct for all frame objects.
  */
@@ -206,3 +208,5 @@ struct KeyFrame : public Frame {
    virtual std::istream &unserializePart(std::istream &in);
 
 };
+
+}; // End of namespace

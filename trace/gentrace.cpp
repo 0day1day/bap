@@ -5,12 +5,12 @@
 #include <cstring>
 #include <stdint.h>
 
-#include "frame.h"
-#include "trace.h"
+#include "pin_frame.h"
+#include "pin_trace.h"
 #include "cache.h"
 
-#include "frame.cpp"
-#include "trace.cpp"
+#include "pin_frame.cpp"
+#include "pin_trace.cpp"
 
 #define BUFFER_SIZE 1024
 
@@ -507,6 +507,9 @@ VOID InstrBlock(BBL bbl)
                      IARG_END);
 
       icount++;
+
+      // Free the memory
+      IARGLIST_Free(arglist);
 
    }
 

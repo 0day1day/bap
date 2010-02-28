@@ -2,10 +2,11 @@
 #include <cstdlib>
 #include <cstring>
 
-#include "frame.h"
-#include "trace.h"
+#include "pin_frame.h"
+#include "pin_trace.h"
 
 using namespace std;
+using namespace pintrace;
 
 TraceReader::TraceReader(const char *filename)
    : frm_pos(0)

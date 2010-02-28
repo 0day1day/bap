@@ -2,9 +2,10 @@
 #include <cstdio>
 #include <cstring>
 
-#include "frame.h"
+#include "pin_frame.h"
 
 using namespace std;
+using namespace pintrace;
 
 #define READ(in, val) in.read((char *) &val, (streamsize) sizeof(val))
 #define WRITE(out, val) out.write((const char *) &val, (streamsize) sizeof(val))

@@ -5,7 +5,7 @@
 #include <iostream>
 #include <fstream>
 
-#include "frame.h"
+#include "pin_frame.h"
 
 #define TRACE_MAGIC 0x43525442
 
@@ -31,6 +31,9 @@
 /**
  * Standard header prefixing a trace file.
  */
+
+namespace pintrace { // We will use namespace to avoid collision
+
 struct TraceHeader {
    uint32_t magic;
    uint32_t frame_count;
@@ -108,3 +111,5 @@ public:
    void finalize(bool buildTOC = true);
 
 };
+
+}; // End of namespace
