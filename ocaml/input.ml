@@ -52,7 +52,7 @@ let get_program () =
   in
   let rec cat p = function
     | [] -> p
-    | arg::args -> cat ((get_one arg)@p) args
+    | arg::args -> cat (List.rev_append (List.rev (get_one arg)) p) args
   in
   cat [] !inputs
 
