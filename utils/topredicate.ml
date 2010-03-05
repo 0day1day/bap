@@ -24,7 +24,7 @@ let compute_dwp1 cfg post =
   (wp, moreforalls@foralls)
 
 
-let compute_dwp cfg post =
+let compute_dwp ?(k=1) cfg post =
   let (gcl, _, tossa) = Gcl.passified_of_astcfg cfg in
   let p = rename_astexp tossa post in
   (Wp.dwp gcl p, [])
@@ -78,6 +78,8 @@ let speclist =
   ::("-post", Arg.Set_string post,
      "<exp> Use <exp> as the postcondition (defaults to \"true\")")
   ::("-dwp", Arg.Unit(fun()-> compute_wp := compute_dwp),
+     "Use efficient directionless weakest precondition instead of the default")
+  ::("-dwpk", Arg.Int(fun i-> compute_wp := compute_dwp ~k:i),
      "Use efficient directionless weakest precondition instead of the default")
   ::("-dwp1", Arg.Unit(fun()-> compute_wp := compute_dwp1),
      "Use 1st order efficient directionless weakest precondition")
