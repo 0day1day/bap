@@ -1,6 +1,6 @@
 /* A simple interface to lift traces without invoking   *
  * the OCaml frontend - ethan                           */
-
+#include <stdlib.h>
 #include "readtrace.h"
 #include <iostream>
 #include <getopt.h>

@@ -1,4 +1,4 @@
-
+#include <stdlib.h>
 #include "readtrace.h"
 
 using namespace std;
