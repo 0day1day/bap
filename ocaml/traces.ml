@@ -139,7 +139,7 @@ module Trace = Symbeval.Make(TaintLookup)(PartialSubst)
     let wp = Ast_visitor.exp_accept m2a wp in
     let foralls = List.map (Ast_visitor.rvar_accept m2a) [] in
     let p = new Stp.pp_oc oc in
-    let () = p#assert_ast_exp_with_foralls foralls wp in
+    let () = p#assert_ast_exp_with_foralls foralls wp true in
     p#close;
               failwith "success!!!!"
   

@@ -103,6 +103,7 @@ object (self)
     | ExnAttr _ (* we could try to print something using Printexc.to_string *)
    (* | Context _ (* enabling printing might be useful for debugging - ethan *)*)
     | Pos _ -> () (* ignore position attrs *)
+    | InitRO -> pp "@set \"initro\""
 
   method label = function
     | Name s -> pp "label "; pp s

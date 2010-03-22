@@ -39,6 +39,7 @@ let rec action vischil startvisit node=
   | `SkipChildren -> node
   | `ChangeTo x -> x (* FIXME: warn if x = node *)
   | `DoChildren -> vischil node
+  | `ChangeToAndDoChildren x -> x; vischil x
   | _ -> failwith "Action not implemented"
 (*  | `DoChildrenPost f -> f (vischil node)
   | `ChangeDoChildrenPost(x,f) -> f (vischil x)*)
@@ -121,3 +122,10 @@ and stmt_accept visitor =
 
 let stmts_accept vis stmts =
   List.map (stmt_accept vis) stmts
+
+let prog_accept vis p =
+  Cfg.SSA.G.fold_vertex
+    (fun abb g ->
+       let oldstmts = Cfg.SSA.get_stmts g abb in
+       let newstmts = stmts_accept vis oldstmts in
+       Cfg.SSA.set_stmts g abb newstmts) p p

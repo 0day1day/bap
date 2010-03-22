@@ -48,7 +48,7 @@ let freevars e =
   freevis#get_found
 
 
-class pp ft =
+class pp ?suffix:(s="") ft =
   let pp = Format.pp_print_string ft
   and pc = Format.pp_print_char ft
   and pi = Format.pp_print_int ft
@@ -59,7 +59,7 @@ class pp ft =
   and opn  = Format.pp_open_box ft
   and cls = Format.pp_close_box ft in
   let var2s (Var.V(num,name,_)) =
-    name^"_"^string_of_int num
+    name^"_"^(string_of_int num)^s
   in
 
 object (self)
@@ -104,7 +104,7 @@ object (self)
 
   method decl (Var.V(_,_,t) as v) =
     self#extend v (var2s v);
-    self#var v; pp " : "; self#typ t; pp ";"; space()
+    self#var v; pp " : "; self#typ t; pp ";"; force_newline();
 
 
 
@@ -269,18 +269,18 @@ object (self)
 	pp "):";
 	cls();space();
 
-  method assert_ast_exp_with_foralls foralls e =
+  method assert_ast_exp_with_foralls foralls e a =
     opn 0;
     self#declare_new_freevars e;
     force_newline();
-    pp "ASSERT(";
+    if a then pp "ASSERT(";
     space();
     self#forall foralls;
-    pp "0bin1 =";
+    if a then pp "0bin1 =";
     force_newline();
     self#ast_exp e;
     force_newline();
-    pp ");";
+    if a then pp ");";
     cls();
 
   method assert_ast_exp e =
@@ -293,10 +293,10 @@ object (self)
 end
 
 
-class pp_oc fd =
+class pp_oc ?suffix:(s="") fd =
   let ft = Format.formatter_of_out_channel fd in
 object
-  inherit pp ft as super
+  inherit pp ~suffix:s ft as super
   method close =
     super#close;
     close_out fd

@@ -381,7 +381,7 @@ let get_rodata_assignments ?(prepend_to=[]) mem prog =
     (fun a v acc -> 
         let m_addr = Int(a, Reg 32) in
         let m_val = Int(Int64.of_int v, Reg 8) in
-        Move(mem, Store(Var mem, m_addr, m_val, little_endian, Reg 8), []) :: acc)
+        Move(mem, Store(Var mem, m_addr, m_val, little_endian, Reg 8), [InitRO]) :: acc)
     rodata prepend_to
 
 (** Open a binary file for translation *)

@@ -37,10 +37,12 @@ let compute_fse cfg post =
   (Eval.fse p ast, [])
 
 let compute_wp = ref compute_wp_boring
-let irout = ref(Some stdout)
-let stpout = ref None
-let post = ref "true"
 let fast_fse = ref false
+let irout = ref(Some stdout)
+let post = ref "true"
+let stpout = ref None
+let pstpout = ref None
+let suffix = ref ""
 
 let compute_fse_bfs cfg post =
   (* FIXME: avoid converting to cfg *)
@@ -73,10 +75,14 @@ let speclist =
    "<file> Print output to <file> rather than stdout.")
   ::("-stp-out", Arg.String (fun f -> stpout := Some(open_out f)),
    "<file> Print output to <file> rather than stdout.")
+  ::("-pstp-out", Arg.String (fun f -> pstpout := Some(open_out f)),
+   "<file> Print WP expression without assertion to <file>.")
   ::("-q", Arg.Unit (fun () -> irout := None),
    "Quiet: Supress outputting the WP in the BAP IL.")
   ::("-post", Arg.Set_string post,
      "<exp> Use <exp> as the postcondition (defaults to \"true\")")
+  ::("-suffix", Arg.String (fun str -> suffix := str),
+     "<suffix> Add <suffix> to each variable name.")
   ::("-dwp", Arg.Unit(fun()-> compute_wp := compute_dwp),
      "Use efficient directionless weakest precondition instead of the default")
   ::("-dwpk", Arg.Int(fun i-> compute_wp := compute_dwp ~k:i),
@@ -126,8 +132,18 @@ match !stpout with
     let m2a = new Memory2array.memory2array_visitor () in
     let wp = Ast_visitor.exp_accept m2a wp in
     let foralls = List.map (Ast_visitor.rvar_accept m2a) foralls in
-    let p = new Stp.pp_oc oc in
-    let () = p#assert_ast_exp_with_foralls foralls wp in
+    let p = new Stp.pp_oc ~suffix:!suffix oc in
+    let () = p#assert_ast_exp_with_foralls foralls wp true in
+    p#close
+;;
+match !pstpout with
+| None -> ()
+| Some oc ->
+    let m2a = new Memory2array.memory2array_visitor () in
+    let wp = Ast_visitor.exp_accept m2a wp in
+    let foralls = List.map (Ast_visitor.rvar_accept m2a) foralls in
+    let p = new Stp.pp_oc ~suffix:!suffix oc in
+    let () = p#assert_ast_exp_with_foralls foralls wp false in
     p#close
 ;;
 

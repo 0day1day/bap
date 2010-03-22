@@ -85,7 +85,7 @@ type attribute =
                                 * more flexible to create a separate attribute. 
                                 * - ethan *)
   | ExnAttr of exn (** Generic extensible attribute, but no parsing *)
-
+  | InitRO (** The memory in this assignment is stored in the binary *)
 type attributes = attribute list
 
 

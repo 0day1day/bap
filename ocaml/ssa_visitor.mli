@@ -37,3 +37,4 @@ val avar_accept : #t -> var -> var
 val value_accept : #t -> value -> value
 val stmt_accept : #t -> stmt -> stmt
 val stmts_accept : #t -> stmt list -> stmt list
+val prog_accept : #t -> Cfg.SSA.G.t -> Cfg.SSA.G.t
