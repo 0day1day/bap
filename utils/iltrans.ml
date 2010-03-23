@@ -113,14 +113,6 @@ let speclist =
      "Evaluate an AST and print variable values on exit") *)
   ::("-pp-ast-pdg", Arg.String (fun f -> add(TransformAstCfg(output_ast_pdg f))),
      "Output the AST DDG (bbid's)")
-  ::("-pp-ast-chop", 
-      Arg.Tuple 
-        (let srcbb = ref 0 and srcn = ref 0 
-         and trgbb = ref 0 and trgn = ref 0 in
-         [Arg.Set_int srcbb ; Arg.Set_int srcn ;
-          Arg.Set_int trgbb ; Arg.Set_int trgn ; 
-               uadd(TransformAstCfg(chop !srcbb !srcn !trgbb !trgn)) ]),
-     "<src-bb> <src-num> <trg-bb> <trg-num> Calculate the chop of an AST")
   ::("-pp-ssa", Arg.String(fun f -> add(TransformSsa(output_ssa f))),
      "<file> Pretty print SSA graph to <file> (in Graphviz format)")
   ::("-pp-ssa-bbids", Arg.String(fun f -> add(TransformSsa(output_ssa_bbids f))),
@@ -135,6 +127,14 @@ let speclist =
      "Convert to the AST.")
   ::("-to-ssa", uadd(ToSsa),
      "Convert to SSA.")
+  ::("-ast-chop", 
+      Arg.Tuple 
+        (let srcbb = ref 0 and srcn = ref 0 
+         and trgbb = ref 0 and trgn = ref 0 in
+         [Arg.Set_int srcbb ; Arg.Set_int srcn ;
+          Arg.Set_int trgbb ; Arg.Set_int trgn ; 
+               uadd(TransformAstCfg(chop !srcbb !srcn !trgbb !trgn)) ]),
+     "<src-bb> <src-num> <trg-bb> <trg-num> Calculate the chop of an AST")
   ::("-sccvn", uadd(TransformSsa sccvn),
      "Apply Strongly Connected Component based Value Numbering")
   ::("-deadcode", uadd(TransformSsa deadcode),
@@ -151,9 +151,19 @@ let speclist =
      uadd(TransformSsa Depgraphs.DDG_SSA.stmtlist_to_single_stmt),
      "Create new graph where every node has at most 1 SSA statement"
     )
+  :: ("-ssa-coalesce",
+      uadd(TransformSsa Coalesce.SSA_Coalesce.coalesce),
+      "Perform coalescing on a SSA-CFG graph")
   :: ("-normalize-mem",
       uadd(TransformAst Memory2array.coerce_prog),
       "Normalize memory accesses as array accesses"
+     )
+  :: ("-canonicalize",
+      uadd(TransformAst Traces.canonicalize),
+      "Convert an input trace to a valid IL program")
+  :: ("-detect-attack",
+      uadd(TransformAst Traces.detect_attack),
+      "Detect the time of attack and output the shortened trace"
      )
   :: Input.speclist
 

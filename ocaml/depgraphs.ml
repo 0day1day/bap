@@ -409,221 +409,13 @@ struct
     
 end
 
+(* A module to perform chopping on ASTs *)
 
-(* A module to perform chopping on an AST *)
-
-module CHOP_AST = 
+module CHOP_AST =
 struct
 
- (* First implementation based on the paper:  *
-  * `Chopping as a Generalization of Slicing` *)
-
-  let print_var var = 
-    match var with
-      | Var v -> Var.name v 
-      | Novar -> "_|_" 
-      | Gamma -> "g"
-
- (* prints a variable instance *)
-  let print_instance g (var,node,n) =
-    try 
-      let g' = AST.set_stmts g node [List.nth (AST.get_stmts g node) n] in
-      (print_var var) ^ " " ^ (Cfg_pp.PrintAstStmts.print g' node)
-    with Failure "nth" -> "Failure!! " ^ (string_of_int n) ^ " -> " ^ (Cfg_pp.PrintAstStmts.print g node)
-
- (* prints a relation *)
-  let print_rel g rel = 
-    Hashtbl.iter
-     (fun i1 i2 ->
-       let st = (print_instance g i1) ^ " -> " ^ (print_instance g i2) in
-       Printf.printf "%s\n" st 
-     ) rel
-
-(* In order to perform any chopping we need to calculate 3 relations *
- * on variable instances.                                            *
- * @ Variable instance = varname * cfgnode * stmt num                *
- * - cd: models control dependences                                  *
- * - ud: models data dependences (use-def chains)                    *
- * - du: holds def-use associations of each stmt                     *)
-
-  let compute_du cfg =
-    let du = Hashtbl.create 5700 in
-      AST.G.iter_vertex
-        (fun v -> 
-          let get_def_use s line none =
-            let def = ref none in
-            let use = ref [none] in
-            let vis = object(self)
-              inherit Ast_visitor.nop
-               method visit_avar var = 
-                 def := Var var ; 
-                 Hashtbl.add du (!def,v,line) (Gamma,v,line) ;
-                 `DoChildren
-	       method visit_rvar var = 
-                 use := (Var var) :: !use ; 
-                 `DoChildren
-              end
-            in
-             ignore (Ast_visitor.stmt_accept vis s) ;
-             (!def,!use)
-          in
-          let stmts = AST.get_stmts cfg v in
-          ignore (List.fold_left 
-            (fun id s -> 
-              (match get_def_use s id Novar with
-                | Novar, l -> 
-                  List.iter (fun x -> 
-                                if x != Novar 
-                                then Hashtbl.add du (Novar,v,id) (x,v,id)
-                             ) l
-                | var, [Novar] -> Hashtbl.add du (var,v,id) (Novar,v,id)
-                | var, l -> 
-                  List.iter 
-                    (function 
-                       | Novar -> () 
-                       | nv -> Hashtbl.add du (var,v,id) (nv,v,id)
-                    ) l 
-              ) ;
-              id + 1) 0 stmts)
-        ) cfg ;
-      du
-
-  let compute_cd cfg cdg = 
-    let cd = Hashtbl.create 5700 in
-    AST.G.iter_edges
-      (fun v2 v1 ->
-        let used = ref [Novar] in
-        let get_used_vars node =
-          let vis = object(self)
-               inherit Ast_visitor.nop
-	         method visit_rvar var = used := (Var var) :: !used ; `DoChildren
-              end
-          in
-          match AST.get_stmts cfg node with
-            | [] -> !used
-            | stmts ->
-                (match List.hd (List.rev stmts) with
-                   | Ast.CJmp (op,_,_,_) ->
-                      ignore (Ast_visitor.exp_accept vis op) ;
-                      !used
-                   | _ -> 
-                      !used)
-        in
-        let num = List.length (AST.get_stmts cfg v2) - 1 in
-        List.iter 
-          (fun u -> 
-             if u != Novar 
-             then ignore (List.fold_left
-                     (fun id _ -> 
-                        Hashtbl.add cd (Gamma,v1,id) (u,v2,num) ;
-                        id + 1
-                     ) 0 (AST.get_stmts cfg v1)
-                         ) 
-          ) (get_used_vars v2)
-      ) cdg ;
-    cd
-
-  (* performs the union of two relations *)
-  let join_tbls tb1 tb2 =
-    let tb = Hashtbl.create 65537 in
-    Hashtbl.iter (fun k v -> Hashtbl.add tb k v) tb1 ;
-    Hashtbl.iter (fun k v -> Hashtbl.add tb k v) tb2 ;
-    tb
-
-  (* combining two relations to create a new one *)
-  let assoc tb1 tb2 tb =
-    Hashtbl.fold
-     (fun k1 v1 found ->
-         let v2l = Hashtbl.find_all tb2 v1 in
-         let vs = Hashtbl.find_all tb k1 in
-           List.fold_left
-             (fun found v ->
-                if List.mem v vs then found
-                else (Hashtbl.add tb k1 v ; true)
-             ) found v2l
-     ) tb1 false
-
-  (* the inverse of a relation *)
-  let rev tb =
-    let r = Hashtbl.create 65537 in
-    Hashtbl.iter (fun k v -> Hashtbl.add r v k) tb ;
-    r
-
-  (* the transitive closure of a relation *)
-  let trans_closure tb =
-    let rec close tb notover =
-      if notover
-      then close tb (assoc tb tb tb)
-      else ()
-    in
-    close tb true
-
-  (* Calculating a chop:                              *
-   * Chop := UU(sink) <| ucd |> DD~(source)           *)
-  let cchop src sink uu dd' ucd g =
-    let chopped = Hashtbl.create 5700 in
-    let find_values key h =
-          Hashtbl.find_all h key
-    in
-    (*Printf.printf "printing the DD~(source)\n" ;
-    List.iter (fun x -> Printf.printf "%s\n" (print_instance g x)) (find_values src dd') ;
-    Printf.printf "printing the UU(sink)\n" ;
-    List.iter (fun x -> Printf.printf "%s\n" (print_instance g x)) (find_values sink uu) ;*)
-    let uusink = find_values sink uu in
-    let ddsrc = find_values src dd' in
-    Hashtbl.iter
-      (fun v1 v2 ->
-        if List.mem v1 uusink && List.mem v2 ddsrc
-        then Hashtbl.add chopped v1 v2
-      ) ucd ;
-    chopped
-      
-
-(*    let _ucd = join_tbls _ud _cd in
-
-    let _uu = Hashtbl.create 65537 in
-    ignore (assoc _ucd _du _uu) ;
-    trans_closure _uu ;
-    let _dd = Hashtbl.create 65537 in
-    ignore (assoc _du _ucd _dd) ;
-    trans_closure _dd ;
-    let _dd' = rev _dd in
-    Printf.printf "UU:\n" ;
-    print_rel cfg _uu ;
-    (* printing the relations *)
-  (*  Printf.printf "ucd:\n" ;
-    print_rel cfg _ucd ;
-    Printf.printf "dd':\n" ;
-    print_rel cfg _dd' ;
-    Printf.printf "uu:\n" ;
-    print_rel cfg _uu ; *)
-
-    Printf.printf "cd size: %d\n" (Hashtbl.length _cd) ;
-    Printf.printf "ud size: %d\n" (Hashtbl.length _ud) ;
-    Printf.printf "du size: %d\n" (Hashtbl.length _du) ;
-    Printf.printf "ucd size: %d\n" (Hashtbl.length _ucd) ;
-    Printf.printf "uu size: %d\n" (Hashtbl.length _uu) ;
-    Printf.printf "dd size: %d\n" (Hashtbl.length _dd) ;
-    let src = (Var(Var.var 58 "k" (Type.Reg 32)),AST.find_vertex ddg (BB 0),2) in
-    let sink = (Var(Var.var 57 "j" (Type.Reg 32)),AST.find_vertex ddg (BB 6),1) in
-    Printf.printf "1: %s\n" (print_instance cfg (None,AST.find_vertex ddg (BB 0),0)) ;
-    Printf.printf "2: %s\n" (print_instance cfg (None,AST.find_vertex ddg (BB 6),1)) ;
-    let _chopped = chop src sink _uu _dd' _ucd cfg in
-    print_rel cfg _chopped ;
-
-    Printf.printf "chopped size: %d\n" (Hashtbl.length _chopped) ;
-    print_rel cfg _chopped ; *) 
-
-  type relation = (var * Cfg.AST.G.vertex * int, var * Cfg.AST.G.vertex * int) Hashtbl.t 
-
- (* UU and DD relation computation:      *
-  * - UU = (ucd o du)*                   *
-  * - DD = (du o ucd)*                   *)
-(*    let _cd = compute_cd cfg cdg in
-    let _du = compute_du cfg in*) 
-
-
  (* Test-printing of ASTs TODO:remove *)
+ (* TODO: Create a new file only for chopping *)
 
   module TG =
   struct 
@@ -635,153 +427,149 @@ struct
     let fold_succ = Cfg.AST.G.fold_succ
   end
 
-  module Traverse = Graph.Traverse.Dfs(TG)
+ module Traverse = Graph.Traverse.Dfs(TG)
 
   let print_cfg cfg = 
-    let print_stmts v =
-      let stmts = AST.get_stmts cfg v in
-      List.iter
-        (fun s -> 
-          Printf.printf "%s\n" (Pp.ast_stmt_to_string s)
-        ) stmts
-    in
-    Traverse.prefix print_stmts cfg
+   let print_stmts v =
+    let stmts = AST.get_stmts cfg v in
+    List.iter
+     (fun s -> 
+       Printf.printf "%s\n" (Pp.ast_stmt_to_string s)
+     ) stmts
+   in
+   Traverse.prefix print_stmts cfg
     
-  (* Simple chopping implementation *)
+(* Simple chopping implementation *)
 
-  module SG =
-  struct
-    type t = Cfg.AST.G.t
-    module V = Cfg.AST.G.V
-    let iter_vertex = Cfg.AST.G.iter_vertex
-    let iter_succ = Cfg.AST.G.iter_succ
-  end
+module SG =
+struct
+ type t = Cfg.AST.G.t
+ module V = Cfg.AST.G.V
+ let iter_vertex = Cfg.AST.G.iter_vertex
+ let iter_succ = Cfg.AST.G.iter_succ
+end
 
-  module Comp = Graph.Components.Make(SG);;
+module Comp = Graph.Components.Make(SG);;
 
-  (* Calculating the strongly connected component *)
-  let get_scc cfg src trg = 
-     (* Adding a temporary back-edge *)
-     let (edgeadded,cfg) = 
-       if AST.G.mem_edge cfg trg src
-       then (false,cfg)
-       else (true,AST.add_edge cfg trg src) in
-     (* Keeping the strongly connected component *)
-     let sccs = Comp.scc_list cfg in
-     let scclist = List.find (fun cc -> List.mem src cc) sccs in
-     if not (List.mem trg scclist) then failwith "sink node unreachable" ;
-     let scc = 
-       AST.G.fold_vertex 
-         (fun v g -> 
-           if not (List.mem v scclist) 
-           then AST.remove_vertex g v
-           else g
-         ) cfg cfg
-     in
-     (* Removing the back-edge *)
-     if edgeadded then AST.remove_edge scc trg src else scc
+(* Calculating the strongly connected component *)
+ let get_scc cfg src trg = 
+ (* Adding a temporary back-edge *)
+  let (edgeadded,cfg) = 
+   if AST.G.mem_edge cfg trg src then (false,cfg)
+   else (true,AST.add_edge cfg trg src) in
+   (* Keeping the strongly connected component *)
+   let sccs = Comp.scc_list cfg in
+   let scclist = List.find (List.mem src) sccs in
+   if not (List.mem trg scclist) then failwith "sink node unreachable" ;
+   let scc = 
+    AST.G.fold_vertex 
+     (fun v g -> 
+       if not (List.mem v scclist) then AST.remove_vertex g v
+       else g
+     ) cfg cfg
+   in
+   (* Removing the back-edge *)
+   if edgeadded then AST.remove_edge scc trg src else scc
 
-  let compute_cds cfg h =
-    let cdg = CDG_AST.compute_cdg cfg in
-    Cfg.AST.G.iter_edges
-      (fun v1 v2 ->
-        let ss1 = AST.get_stmts cfg v1 in
-        let ss2 = AST.get_stmts cfg v2 in
-        let num = (List.length ss1) - 1 in
-        ignore 
-          (List.fold_left
-            (fun id _ ->
-              Hashtbl.add h (v2,id) (v1,num) ;
-              id + 1
-            ) 0 ss2
-          )
-      ) cdg
+ let compute_cds cfg h =
+  let cdg = CDG_AST.compute_cdg cfg in
+   Cfg.AST.G.iter_edges
+    (fun v1 v2 ->
+      let ss1 = AST.get_stmts cfg v1 in
+      let ss2 = AST.get_stmts cfg v2 in
+      let num = (List.length ss1) - 1 in
+      ignore 
+       (List.fold_left
+        (fun id _ ->
+          Hashtbl.add h (v2,id) (v1,num) ;
+          id + 1
+        ) 0 ss2
+       )
+    ) cdg
 
-  let add_jmp_stmts cfg dds =
-    Cfg.AST.G.iter_edges
-      (fun v1 v2 ->
-       try
-        let stmts1 = AST.get_stmts cfg v1 in
-        match List.hd (List.rev stmts1) with
-          | Ast.CJmp _ ->
-            let num = List.length stmts1 - 1 in
-            let stmts2 = AST.get_stmts cfg v2 in
-            ignore
-              (List.fold_left
-                (fun id s ->
-                  match s with 
-                    | Ast.Jmp _ -> Hashtbl.add dds (v2,id) (v1,num) ; id + 1
-                    | _ -> id + 1
-                ) 0 stmts2
-              )
-          | _ -> ()
-         with Failure "hd" -> ()
-      ) cfg
+(* Adding jump stmts that are not directly control-dependent
+ * on conditional jumps to get a more precise slice.
+ * We use the conservative algorithm presented in Figure 13 of
+ * 'On Slicing Programs with Jump Statements'
+ * --> http://portal.acm.org/citation.cfm?id=178456            *)
+ let add_jmp_stmts cfg dds =
+  Cfg.AST.G.iter_edges
+   (fun v1 v2 ->
+     try
+      let stmts1 = AST.get_stmts cfg v1 in
+      match List.hd (List.rev stmts1) with
+      | Ast.CJmp _ ->
+        let num = List.length stmts1 - 1 in
+        let stmts2 = AST.get_stmts cfg v2 in
+        ignore
+        (List.fold_left
+         (fun id s ->
+           match s with 
+           | Ast.Jmp _ -> Hashtbl.add dds (v2,id) (v1,num) ; id + 1
+           | _ -> id + 1
+         ) 0 stmts2
+        )
+      | _ -> ()
+     with Failure "hd" -> ()
+   ) cfg
 
-  let get_dds cfg =
-    let dds = Hashtbl.create 5700 in
-    DDG_AST.compute_dds cfg dds ;
-    compute_cds cfg dds ;
-    add_jmp_stmts cfg dds ;
-    dds
+ let get_dds cfg =
+  let dds = Hashtbl.create 5700 in
+  DDG_AST.compute_dds cfg dds ;
+  compute_cds cfg dds ;
+  add_jmp_stmts cfg dds ;
+  dds
   
   (* Slicing the cfg *)
   let slice cfg node stmt =
-    let deps = get_dds cfg in
-    let rec get_reachable visited wl =
-      match wl with
-        | [] -> 
-          visited
-        | x::worklist ->
-          if SS.mem x visited
-          then get_reachable visited worklist
-          else 
-            let next = Hashtbl.find_all deps x in
-            get_reachable (SS.add x visited) (next@worklist)
-    in
-    let vis = get_reachable SS.empty [(node,stmt)] in
-    let not_changable stmt =
-      match stmt with
-        | Ast.Label _ | Ast.Comment _ -> true
-        | _ -> false
-    in
-    let tmp = AST.G.fold_vertex
-      (fun v g ->
-        let _,newstmts = 
-          List.fold_left
-            (fun (id,acc) s -> 
-              if not_changable s || SS.mem (v,id) vis
-              then (id+1,s::acc)
-              else (id+1,acc)
-            ) (0,[]) (AST.get_stmts cfg v)
-        in
-        AST.set_stmts g v (List.rev newstmts)
-      ) cfg cfg
-    in
-    print_cfg tmp ;
-    tmp
-    
+   let deps = get_dds cfg in
+   let rec get_reachable visited wl =
+    match wl with
+    | [] -> 
+      visited
+    | x::worklist ->
+      if SS.mem x visited then get_reachable visited worklist
+      else 
+       let next = Hashtbl.find_all deps x in
+       get_reachable (SS.add x visited) (next@worklist)
+   in
+   let vis = get_reachable SS.empty [(node,stmt)] in
+   let not_changable = function
+    | Ast.Label _ | Ast.Comment _ -> true
+    | _ -> false
+   in
+   let tmp = AST.G.fold_vertex
+    (fun v g ->
+      let _,newstmts = 
+       List.fold_left
+        (fun (id,acc) s -> 
+         if not_changable s || SS.mem (v,id) vis then (id+1,s::acc)
+         else (id+1,acc)
+        ) (0,[]) (AST.get_stmts cfg v)
+      in
+      AST.set_stmts g v (List.rev newstmts)
+    ) cfg cfg
+   in
+   print_cfg tmp ;
+   tmp
 
   (* Performing chopping from a source to a sink *)
-  let chop cfg srcbb _srcn trgbb trgn = 
-     let get_v num = 
-       try AST.find_vertex cfg (BB num)
-       with Not_found -> 
-         failwith "input does not correspond to basic blocks"
-     in
-     let src = get_v srcbb 
-     and trg = get_v trgbb in
-     let scc = get_scc cfg src trg in
-     (* Adding entry and exit nodes *)
-     let entry = AST.find_vertex cfg BB_Entry
-     and exit = AST.find_vertex cfg BB_Exit in
-     let scc = AST.add_vertex scc entry in
-     let scc = AST.add_vertex scc exit in
-     let scc = AST.add_edge scc entry src in
-     let scc = AST.add_edge scc trg exit in
-     slice scc trg trgn
-
- 
+ let chop cfg srcbb _srcn trgbb trgn = 
+  let get_v num = 
+   try AST.find_vertex cfg (BB num)
+   with Not_found -> 
+    failwith "input does not correspond to basic blocks"
+  in
+  let src = get_v srcbb 
+  and trg = get_v trgbb in
+  let scc = get_scc cfg src trg in
+ (* Adding entry and exit nodes *)
+  let entry = AST.find_vertex cfg BB_Entry 
+  and exit = AST.find_vertex cfg BB_Exit in
+  let scc = AST.add_vertex scc entry in
+  let scc = AST.add_vertex scc exit in
+  let scc = AST.add_edge scc entry src in
+  let scc = AST.add_edge scc trg exit in
+  slice scc trg trgn
 end
-
 

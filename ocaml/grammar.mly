@@ -74,7 +74,7 @@ let mk_attr lab string =
   | "address" -> Address(Int64.of_string string)
   | "set" when string = "liveout" -> Liveout
   | "set" when string = "initro" -> InitRO
-  | "str" -> StrAttr string
+  | "str" | "attr" -> StrAttr string
   | _ -> err ("Unknown attribute @"^lab)
 
 let typ_of_string = function

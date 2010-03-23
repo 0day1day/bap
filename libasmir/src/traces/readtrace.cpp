@@ -43,6 +43,8 @@ bap_blocks_t * read_trace_from_file(const string &filename, int offset, bool pri
             while(!trace.eof()) {
                     // Reading each entry header
                     trc->read_entry_header(&eh);
+                    // Fix for TEMU: the last block is garbled
+                    if (trace.eof()) break;
 
                     counter ++ ;
                     if (counter > offset) {
