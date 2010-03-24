@@ -12,6 +12,15 @@ module D = Debug.Make(struct let name = "WP" and default=`Debug end)
 open D
 
 
+let exp_or a b =
+  if a == exp_false then b
+  else if b == exp_false then a
+  else exp_or a b
+
+let exp_and a b =
+  if a == exp_false || b == exp_false then exp_false
+  else exp_and a b
+
 
 (** wp(p,q), applying simp to simplify each intermediate expression
     during the calculation.  See "A Discipline of Programming" by
@@ -111,6 +120,7 @@ let efficient_wp ?(simp=Util.id) (p:Gcl.t) =
   (fun q -> simp(exp_and qpr (exp_or q0 q)))
 
 let dwp_name = "dwptemp"
+let dwp_name = "t"
 
 let ast_size e =
   let s = ref 0 in

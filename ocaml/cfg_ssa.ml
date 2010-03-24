@@ -393,12 +393,70 @@ let uninitialized cfg =
   C.G.iter_vertex (fun b -> process (C.get_stmts cfg b)) cfg;
   VS.diff !refd !assnd
 
+
+(* Hack to make a "unique" label *)
+let rec mklabel =
+  let r = ref 0
+  and n = "autolabel" in
+  let has_label c l =
+    try ignore(C.find_label c l); true
+     with Not_found -> false
+  in
+  (fun c ->
+     let l = n ^ string_of_int !r in
+     incr r;
+     if has_label c (Name l) then mklabel c else l
+  )
+
+(** Perform edge splitting on the CFG.
+    After edge splitting, it is guaranteed that every edge has either a unique
+    predecessor or a unique successor.
+*)
+let split_edges c =
+  let module E = C.G.E in
+  let split_edge c e =
+    let s = E.src e and d = E.dst e in
+    (* s has multiple successors and d has multiple predecesors *)
+    let revs = List.rev (C.get_stmts c s) in
+    let cjmp = List.hd revs in
+    let (cond,t1,t2,attrs) = match cjmp with
+      | CJmp(c, t1, t2, a) -> (c,t1,t2,a)
+      | _ -> failwith("Missing cjmp at end of node with multiple successors: "^Pp.ssa_stmt_to_string cjmp)
+    in
+    let newl = mklabel c in
+    let el = E.label e in
+    let (t1,t2,tf) = match el with
+      | Some true -> (Lab newl, t2, t1)
+      | Some false -> (t1, Lab newl, t2)
+      | None -> failwith "Unlabeled edges from cjmp"
+    in
+    let revs = CJmp(cond, t1, t2, attrs) :: List.tl revs in
+    let (c,v) = C.create_vertex c [Label(Name newl, [])] in
+    let e' = C.G.E.create s el v in
+    let c = C.add_edge_e c e' in
+    let c = C.add_edge c v d in
+    let c = C.remove_edge_e c e in
+    C.set_stmts c s (List.rev revs)
+    
+  in
+  let edges_to_split =
+    C.G.fold_edges_e
+      (fun e es ->
+	 if C.G.out_degree c (E.src e) > 1 && C.G.in_degree c (E.dst e) > 1
+	 then e::es
+	 else es
+      )
+      c []
+  in
+  List.fold_left split_edge c edges_to_split
+
+
 let list_count p =
   List.fold_left (fun a e -> if p e then a+1 else a) 0
 
 
 (* FIXME: It might be good to have a different type for a CFG with phis removed *)
-let rm_phis ?(attrs=[]) cfg =
+let rm_phis ?(dsa=false) ?(attrs=[]) cfg =
   let size = C.G.fold_vertex
     (fun b a ->
        a + list_count (function Move _->true | _->false) (C.get_stmts cfg b) )
@@ -420,6 +478,8 @@ let rm_phis ?(attrs=[]) cfg =
   let entry = C.G.V.create BB_Entry in
     (* fake assignments for globals at the entry node *)
   Var.VarSet.iter (fun v -> VH.add assn v entry) (uninitialized cfg);
+  (* split edges if needed *)
+  let cfg = if dsa then split_edges cfg else cfg in
   let cfg, phis =
     (* Remove all the phis from all the BBs *)
     (* FIXME: make this readable *)
@@ -457,6 +517,28 @@ let rm_phis ?(attrs=[]) cfg =
 	   move::stmts )
   in
   let cfg =
+    if dsa then (
+      let idom = Dom.compute_idom cfg entry in
+      (* add an assignment for l to the end of v *)
+      let dsa_push (l,vars) cfg bb =
+	let rec find_var bb = (* walk up idom tree starting at bb *)
+	  try List.find (fun v -> bb = (VH.find assn v)) vars
+	  with Not_found -> find_var (idom bb)
+	in
+	let v = find_var bb in
+	append_move bb l v cfg
+      in
+      (* assign the variable the phi assigns at the end of each of it's
+	 predecessors *)
+      List.fold_left
+	(fun cfg ((l, vars) as p) -> 
+	   dprintf "rm_phis: adding assignments for %s" (Pp.var_to_string l);
+	   List.fold_left (dsa_push p) cfg (C.G.pred cfg (VH.find assn l))
+	)
+	cfg
+	phis
+    )
+    else (
     (* assingn the variables the phi assigns at the end of each block a variable
        the phi references is assigned. *)
     List.fold_left
@@ -466,12 +548,12 @@ let rm_phis ?(attrs=[]) cfg =
       )
       cfg
       phis
+    )
   in
   (* put statements back in forward order *)
   C.G.fold_vertex
     (fun b cfg -> C.set_stmts cfg b (List.rev(C.get_stmts cfg b)))
     cfg cfg
-
 
 type tm = Ssa.exp VH.t
 
@@ -551,9 +633,9 @@ let cfg2ast tm cfg =
   Cfg.map_ssa2ast (stmts2ast tm) cfg
 
 (** Convert an SSA CFG to an AST CFG. *)
-let to_astcfg ?(remove_temps=true) c =
+let to_astcfg ?(remove_temps=true) ?(dsa=false) c =
   let tm = if remove_temps then create_tm c else VH.create 1 in
-  cfg2ast tm (rm_phis c)
+  cfg2ast tm (rm_phis ~dsa:dsa c)
 
 (** Convert an SSA CFG to an AST program. *)
 let to_ast ?(remove_temps=true) c =

@@ -27,7 +27,7 @@ let compute_dwp1 cfg post =
 let compute_dwp ?(k=1) cfg post =
   let (gcl, _, tossa) = Gcl.passified_of_astcfg cfg in
   let p = rename_astexp tossa post in
-  (Wp.dwp gcl p, [])
+  (Wp.dwp ~k gcl p, [])
 
 (* FIXME: Why did I think we needed SSA here? *)
 let compute_fse cfg post =
