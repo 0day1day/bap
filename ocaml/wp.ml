@@ -136,7 +136,7 @@ let ast_size e =
 
 (* helper for dwp *)
 let variableify k v e =
-    if ast_size e > k then
+    if k <= 1 || ast_size e > k then
       let x = Var.newvar dwp_name (Typecheck.infer_ast e) in
       let xe = Var x in
       (BinOp(EQ, xe, e) :: v, xe)
@@ -170,6 +170,7 @@ let dwp_help ?(simp=Util.id) ?(k=1) f (p:Gcl.t) =
 	Some(h v vs)
   in
   let (vs,n,w) = g (f g ([],[],[]) p) in
+  (* FIXME: move vars that are only referenced once *)
   (assignments_to_exp vs, vs, n, w)
 
 

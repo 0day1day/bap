@@ -25,8 +25,11 @@ let compute_dwp1 cfg post =
 
 
 let compute_dwp ?(k=1) cfg post =
-  let (gcl, _, tossa) = Gcl.passified_of_astcfg cfg in
+  let {Cfg_ssa.cfg=cfg; to_ssavar=tossa} = Cfg_ssa.trans_cfg cfg in
   let p = rename_astexp tossa post in
+  let vars = Stp.freevars p in
+  let cfg = Ssa_simp.simp_cfg ~liveout:vars cfg in
+  let (gcl, _) = Gcl.passified_of_ssa cfg in
   (Wp.dwp ~k gcl p, [])
 
 (* FIXME: Why did I think we needed SSA here? *)

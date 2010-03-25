@@ -42,7 +42,7 @@ let doit = match !rangeonly with
 	 try
 	 let ir = Asmir.asmprogram_to_bap_range p s e in
 	 let ir = Hacks.ret_to_jmp ir in
-	 let ir = Hacks.assert_noof ir in
+	 (*let ir = Hacks.assert_noof ir in *)
 	 let cfg = Cfg_ast.of_prog ir in
 	 let cfg = Prune_unreachable.prune_unreachable_ast cfg in
 	 let cfg = Hacks.remove_backedges cfg in

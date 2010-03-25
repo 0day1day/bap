@@ -74,3 +74,9 @@ let exp_eq e1 e2 = BinOp(EQ, e1, e2)
 let exp_not e = UnOp(NOT, e)
 let exp_implies e1 e2 = exp_or (exp_not e1) e2
 
+let (exp_shl, exp_shr) =
+  let s dir e1 = function
+    | Int(0L,_) -> e1
+    | e2 -> BinOp(dir, e1, e2)
+  in
+  (s LSHIFT, s RSHIFT)
