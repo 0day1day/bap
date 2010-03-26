@@ -11,6 +11,7 @@ open Gcl
 module D = Debug.Make(struct let name = "WP" and default=`Debug end)
 open D
 
+module VH = Var.VarHash
 
 let exp_or a b =
   if a == exp_false then b
@@ -139,9 +140,44 @@ let variableify k v e =
     if k <= 1 || ast_size e > k then
       let x = Var.newvar dwp_name (Typecheck.infer_ast e) in
       let xe = Var x in
-      (BinOp(EQ, xe, e) :: v, xe)
+      ((x, e) :: v, xe)
     else
       (v, e)
+
+let rm_useless_vars vs n w =
+  (* FIXME: remove vars that are only referenced once *)
+  let l = List.length vs in
+  let h = VH.create l
+  and c = VH.create l in  
+  List.iter (fun (v,e) -> VH.add h v e; VH.add c v (ref 0)) vs;
+  let inc v = try incr (VH.find c v) with Not_found -> () in
+  let counter =
+    object(self)
+      inherit Ast_visitor.nop
+	(* FIXME: worry about Let? *)
+      method visit_rvar r =
+	inc r;
+	`DoChildren
+    end
+  in
+  ignore(Ast_visitor.exp_accept counter n);
+  ignore(Ast_visitor.exp_accept counter w);
+  List.iter (fun(v,e)-> ignore(Ast_visitor.exp_accept counter e)) vs;
+  let to_remove v = try !(VH.find c v) <= 1 with Not_found -> false in
+  let vs = List.filter (fun p -> not(to_remove (fst p))) vs in
+  let subst =
+    object(self)
+      inherit Ast_visitor.nop
+      method visit_exp = function
+	| Var v when to_remove v ->
+	    `ChangeToAndDoChildren(VH.find h v)
+	| _ -> `DoChildren
+    end
+  in
+  let n = Ast_visitor.exp_accept subst n
+  and w = Ast_visitor.exp_accept subst w
+  and vs = List.map (fun (v,e) -> (v, Ast_visitor.exp_accept subst e)) vs in
+  (vs,n,w)
 
 let dwp_help ?(simp=Util.id) ?(k=1) f (p:Gcl.t) =
   let g (v, n, w) =
@@ -163,14 +199,17 @@ let dwp_help ?(simp=Util.id) ?(k=1) f (p:Gcl.t) =
   let assignments_to_exp = function
     | [] -> None
     | v::vs ->
+	let p2e (v,e) = BinOp(EQ, Var v, e) in
 	let rec h e = function
-	  | a::rest -> h (exp_and a e) rest
+	  | a::rest -> h (exp_and (p2e a) e) rest
 	  | [] -> e
 	in
-	Some(h v vs)
+	Some(h (p2e v) vs)
   in
   let (vs,n,w) = g (f g ([],[],[]) p) in
-  (* FIXME: move vars that are only referenced once *)
+  (* Surprisingly enough, this is a toss up. It makes some formulas
+     much easier for CVC and others much harder. *)
+  (* let (vs,n,w) = rm_useless_vars vs n w in *)
   (assignments_to_exp vs, vs, n, w)
 
 
@@ -202,7 +241,7 @@ let dwp_1st ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (p:Gcl.t) =
   let (vo, vs, n, w) = dwp_help ~simp ~k f' p in
   match vo with
   | Some v ->
-      let vars = List.map (function BinOp(EQ, Var x, _)->x |_-> failwith "no") vs in
+      let vars = List.map fst vs in
       (fun q -> (vars, exp_implies v (exp_and (exp_not w) (exp_implies n q))))
   | None ->
       (fun q -> ([], exp_and (exp_not w) (exp_implies n q)))

@@ -49,6 +49,7 @@ let remove_backedges cfg =
   let module C = Cfg.AST in
   let a = [StrAttr "added by remove_backedeges"] in
   let assert_false = Assert(exp_false, a) in
+  let exit = C.find_vertex cfg Cfg.BB_Exit in
   let handle_backedge cfg e =
     let s = C.G.E.src e in
     let revstmts = List.rev (C.get_stmts cfg s) in
@@ -65,7 +66,8 @@ let remove_backedges cfg =
       | rest -> assert_false::rest
     in
     let cfg = C.set_stmts cfg s (List.rev revstmts) in
-    C.remove_edge_e cfg e
+    let cfg = C.remove_edge_e cfg e in
+    if C.G.succ cfg s = [] then C.add_edge cfg s exit else cfg
   in
   let find_backedges cfg =
     let module H = Hashtbl.Make(Cfg.BBid) in
