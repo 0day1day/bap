@@ -87,8 +87,10 @@ let memory2scalariroptir p =
   Memory2scalar.convert_g p Memory2scalar.IndirectROPTIR
 
 (* Chop code added *)
-let chop srcbb srcn trgbb trgn p = 
-  Depgraphs.CHOP_AST.chop p !srcbb !srcn !trgbb !trgn
+let ast_chop srcbb srcn trgbb trgn p = 
+  Ast_slice.CHOP_AST.chop p !srcbb !srcn !trgbb !trgn
+let ssa_chop srcbb srcn trgbb trgn p = 
+  Ssa_slice.CHOP_SSA.chop p !srcbb !srcn !trgbb !trgn
 
 let add c =
   pipeline := c :: !pipeline
@@ -127,7 +129,15 @@ let speclist =
          and trgbb = ref 0 and trgn = ref 0 in
          [Arg.Set_int srcbb ; Arg.Set_int srcn ;
           Arg.Set_int trgbb ; Arg.Set_int trgn ; 
-               uadd(TransformAstCfg(chop srcbb srcn trgbb trgn)) ]),
+               uadd(TransformAstCfg(ast_chop srcbb srcn trgbb trgn)) ]),
+     "<src-bb> <src-num> <trg-bb> <trg-num> Calculate the chop of an AST")
+  ::("-ssa-chop", 
+      Arg.Tuple 
+        (let srcbb = ref 0 and srcn = ref 0 
+         and trgbb = ref 0 and trgn = ref 0 in
+         [Arg.Set_int srcbb ; Arg.Set_int srcn ;
+          Arg.Set_int trgbb ; Arg.Set_int trgn ; 
+               uadd(TransformSsa(ssa_chop srcbb srcn trgbb trgn)) ]),
      "<src-bb> <src-num> <trg-bb> <trg-num> Calculate the chop of an AST")
   ::("-sccvn", uadd(TransformSsa sccvn),
      "Apply Strongly Connected Component based Value Numbering")

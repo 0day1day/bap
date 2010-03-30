@@ -49,8 +49,12 @@ export SOURCES = \
 	symbeval_search.ml \
 	hacks.ml \
 	coalesce.ml \
-	traces.ml
-
+	traces.ml \
+	stpexec.ml \
+	ast_slice.ml \
+	ssa_slice.ml \
+	comparelib.ml 
+	
 
 RESULT = bap
 DOC_FILES := $(filter %.mli, $(SOURCES)) $(filter %.ml, $(SOURCES))
@@ -107,3 +111,4 @@ include $(OCAMLMAKEFILE)
 
 bap.dot: $(DOC_FILES)
 	 ocamlfind ocamldoc -I /usr/lib/ocaml/3.10.2/ -package str,ocamlgraph,extlib,unix,sqlite3 -dot -o bap.dot -m avlsoper $(DOC_FILES)
+

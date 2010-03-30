@@ -57,6 +57,7 @@ class pp ?suffix:(s="") ft =
   and force_newline = Format.pp_force_newline ft
   and printf f = Format.fprintf ft f
   and opn  = Format.pp_open_box ft
+  and flush = Format.pp_print_flush ft
   and cls = Format.pp_close_box ft in
   let var2s (Var.V(num,name,_)) =
     name^"_"^(string_of_int num)^s
@@ -70,6 +71,9 @@ object (self)
   val mutable unknown_counter = 0;
 
   val mutable let_counter = 0;
+
+  method flush () =
+    flush();
 
   method extend v s =
     assert(not(Hashtbl.mem used_vars s));
@@ -93,9 +97,9 @@ object (self)
     let fvs = freevars e in 
     List.iter (fun v -> if not(VH.mem ctx v) then self#decl v) fvs;
     pp "% end free variables."; force_newline();
-    cls()
-  
-
+    cls();
+    flush();
+       
   method typ = function
     | Reg n ->	printf "BITVECTOR(%u)" n
     | Array(idx,elmt) -> pp "ARRAY "; self#typ idx; pp " OF "; self#typ elmt
@@ -271,6 +275,7 @@ object (self)
 
   method assert_ast_exp_with_foralls foralls e a =
     opn 0;
+    if a then
     self#declare_new_freevars e;
     force_newline();
     if a then pp "ASSERT(";

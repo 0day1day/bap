@@ -66,3 +66,6 @@ val run_with_remapped_fd :
   Unix.file_descr -> Unix.file_descr -> (unit -> 'a) -> 'a
 
 val take : 'a list -> int -> 'a list
+
+val list_firstindex : ?s:int -> 'a list -> ('a -> bool) -> int
+val list_insert : 'a list -> 'a list -> int -> 'a list

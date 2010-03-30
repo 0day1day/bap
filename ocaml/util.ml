@@ -325,3 +325,27 @@ let rec take_aux acc = function
  | (x::xs, n) -> take_aux (x::acc) (xs,n-1)
 
 let take l n = take_aux [] (l, n)
+
+(* list_firstindex l pred returns the index of the first list element
+   that pred returns true on *)
+let rec list_firstindex ?s:(s=0) l pred =
+  if List.length l = 0 then 
+    raise Not_found
+  else if (pred (List.hd l)) then
+    s
+  else
+    list_firstindex (List.tl l) pred ~s:s+1
+
+(* Insert elements in li to l before position n *)
+let list_insert l li n =
+  let rec list_split hl tl n =
+    if n = 0 then 
+      (List.rev hl,tl) 
+    else
+      let hl' = (List.hd tl) :: hl in
+      let tl' = List.tl tl in
+      let n' = n-1 in
+      list_split hl' tl' n'
+  in
+  let hd,tl = list_split [] l n in
+  hd @ li @ tl
