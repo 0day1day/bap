@@ -1,3 +1,5 @@
+open Ast
+open Type
 
 let usage = "Usage: "^Sys.argv.(0)^" <input options> [-o output]\n\
              Translate programs to the IL. "
@@ -39,6 +41,29 @@ let compute_fse cfg post =
   let p = rename_astexp tossa post in
   (Eval.fse p ast, [])
 
+let extract_vars e =
+  let rec h v = function
+    | BinOp(AND, BinOp(EQ,Var v1, e1), BinOp(EQ,Var v2, e2)) ->
+	((v2,e2)::(v1,e1)::v, None)
+    | BinOp(AND, BinOp(EQ,Var v1, e1), rest)
+    | BinOp(AND, rest, BinOp(EQ,Var v1, e1)) ->
+	h ((v1,e1)::v) rest
+    | BinOp(AND, e1, e2) ->
+	(match h v e1 with
+	 | (v, None) ->
+	     h v e2
+	 | (v, Some e1) ->
+	     match h v e2 with
+	     | (v, None) -> (v, Some e1)
+	     | (v, Some e2) -> (v, Some(exp_and e1 e2))
+	)
+    | e -> (v, Some e)
+  in
+  match h [] e with
+  | (v, Some e) -> (v,e)
+  | (v, None) -> (v, exp_true)
+
+
 let compute_wp = ref compute_wp_boring
 let fast_fse = ref false
 let irout = ref(Some stdout)
@@ -46,6 +71,7 @@ let post = ref "true"
 let stpout = ref None
 let pstpout = ref None
 let suffix = ref ""
+let assert_vars = ref false
 
 let compute_fse_bfs cfg post =
   (* FIXME: avoid converting to cfg *)
@@ -92,6 +118,8 @@ let speclist =
      "Use efficient directionless weakest precondition instead of the default")
   ::("-dwp1", Arg.Unit(fun()-> compute_wp := compute_dwp1),
      "Use 1st order efficient directionless weakest precondition")
+  ::("-extract-vars", Arg.Set assert_vars,
+     "Put vars in separate asserts")
   ::("-fse", Arg.Unit(fun()-> compute_wp := compute_fse),
      "Use naive forward symbolic execution (no loops)")
   ::("-fse-bfs", Arg.Unit(fun()-> compute_wp := compute_fse_bfs),
@@ -100,7 +128,7 @@ let speclist =
      "<n> FSE with breath first search, limiting search depth to n.")
   ::("-fse-maxrepeat", Arg.Int(fun i-> compute_wp := compute_fse_maxrepeat i),
      "<n> FSE excluding walks that visit a point more than n times.")
-  ::("-fast-fse", Arg.Unit(fun () -> fast_fse := true),
+  ::("-fast-fse", Arg.Set fast_fse,
      "Perform FSE without full substitution.")
     :: Input.speclist
 
@@ -136,7 +164,14 @@ match !stpout with
     let wp = Ast_visitor.exp_accept m2a wp in
     let foralls = List.map (Ast_visitor.rvar_accept m2a) foralls in
     let p = new Stp.pp_oc ~suffix:!suffix oc in
-    let () = p#assert_ast_exp_with_foralls foralls wp true in
+    if !assert_vars then (
+      let (vars,wp') = extract_vars wp in
+      (*List.iter (fun (v,e) -> p#assert_eq v e) vars;*)
+      List.iter (fun (v,e) -> p#assert_ast_exp (BinOp(EQ, Var v, e))) vars;
+      p#assert_ast_exp_with_foralls foralls wp'
+    )
+    else
+      p#assert_ast_exp_with_foralls foralls wp;
     p#close
 ;;
 match !pstpout with
@@ -146,7 +181,8 @@ match !pstpout with
     let wp = Ast_visitor.exp_accept m2a wp in
     let foralls = List.map (Ast_visitor.rvar_accept m2a) foralls in
     let p = new Stp.pp_oc ~suffix:!suffix oc in
-    let () = p#assert_ast_exp_with_foralls foralls wp false in
+    p#forall foralls;
+    p#ast_exp wp;
     p#close
 ;;
 

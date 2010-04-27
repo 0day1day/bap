@@ -273,19 +273,29 @@ object (self)
 	pp "):";
 	cls();space();
 
-  method assert_ast_exp_with_foralls foralls e a =
+  method assert_eq v e =
     opn 0;
-    if a then
+    self#declare_new_freevars (BinOp(EQ, Var v, e));
+    force_newline();
+    pp "ASSERT(";
+    self#var v;
+    pc '=';
+    self#ast_exp e;
+    pp ");";
+    cls()
+
+  method assert_ast_exp_with_foralls foralls e =
+    opn 0;
     self#declare_new_freevars e;
     force_newline();
-    if a then pp "ASSERT(";
+    pp "ASSERT(";
     space();
     self#forall foralls;
-    if a then pp "0bin1 =";
+    pp "0bin1 =";
     force_newline();
     self#ast_exp e;
     force_newline();
-    if a then pp ");";
+    pp ");";
     cls();
 
   method assert_ast_exp e =

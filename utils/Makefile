@@ -11,7 +11,7 @@ export SOURCE_DIRS_IN = $(BAP_OCAMLDIR)
 
 # default subprojects to build
 ifndef SUBPROJS
-	export SUBPROJS = toil iltrans topredicate get_functions compare
+	export SUBPROJS = toil iltrans topredicate get_functions compare split
 endif
 
 define PROJ_toil
@@ -48,6 +48,14 @@ define PROJ_compare
 	DOC_FILES=$(SOURCES)
 endef
 export PROJ_compare
+
+define PROJ_split
+	RESULT=split_disjunction
+	SOURCES = split_disjunction.ml
+	DOC_FILES=$(SOURCES)
+endef
+export PROJ_split
+
 
 # suffix for bytecode (which when we make all is debug code)
 export BCSUFFIX = .dbg
