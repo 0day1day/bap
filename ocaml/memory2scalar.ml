@@ -48,6 +48,11 @@
   -- Ed Schwartz
 *)
 
+(*
+  Known bugs: If the same address is requested with different types,
+  we screw up.  We should probably add a check for this.
+*)
+
 module C = Cfg.SSA
 module G = C.G
 module D = Debug.Make(struct let name = "memtoscalar" and default=`Debug end)
@@ -246,7 +251,7 @@ let convert_g p mode =
 	  if isssavalconst bph idx then 
 	    begin
 	      let nv = getnewvar arr idx t in
-(* 	      dprintf "Read %s" (Pp.var_to_string nv); *)
+(*  	      dprintf "Read %s: %s" (Pp.var_to_string nv) (Pp.ssa_exp_to_string e); *)
 	      `ChangeToAndDoChildren (Val (Ssa.Var nv))
 	    end 
 	  else

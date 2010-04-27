@@ -334,7 +334,9 @@ let rec list_firstindex ?s:(s=0) l pred =
   else if (pred (List.hd l)) then
     s
   else
-    list_firstindex (List.tl l) pred ~s:s+1
+    let tl = List.tl l in
+    let next = s+1 in
+    list_firstindex tl pred ~s:next
 
 (* Insert elements in li to l before position n *)
 let list_insert l li n =

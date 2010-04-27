@@ -32,3 +32,4 @@ val exp_accept : #t -> exp -> exp
 val rvar_accept : #t -> var -> var
 val avar_accept : #t -> var -> var
 val prog_accept : #t -> program -> program
+val cfg_accept : #t -> Cfg.AST.G.t -> Cfg.AST.G.t

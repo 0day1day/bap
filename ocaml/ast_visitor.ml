@@ -122,4 +122,10 @@ and stmt_accept visitor =
 
 and prog_accept visitor prog =
   List.map (fun instmt -> stmt_accept visitor instmt) prog
-  
+
+and cfg_accept vis p =
+  Cfg.AST.G.fold_vertex
+    (fun abb g ->
+       let oldstmts = Cfg.AST.get_stmts g abb in
+       let newstmts = prog_accept vis oldstmts in
+       Cfg.AST.set_stmts g abb newstmts) p p

@@ -187,3 +187,10 @@ module MaxrepeatDFSNaive = MaxrepeatDFS(NaiveSymb)
 module MaxrepeatDFSFast = MaxrepeatDFS(FastSymb)
 let maxrepeat_ast_program = MaxrepeatDFSNaive.eval_ast_program
 let maxrepeat_ast_program_fast = MaxrepeatDFSFast.eval_ast_program
+
+let rec conceval_ast_program ctx =
+  try
+    match (Symbolic.eval ctx) with
+    | [next] -> conceval_ast_program next
+    | _ -> failwith "More than one state returned in concrete execution!"
+  with _ -> ctx

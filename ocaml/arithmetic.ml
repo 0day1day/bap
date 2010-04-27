@@ -95,3 +95,7 @@ let cast ct ((_,t) as v) t2 =
 	    ((Int64.lognot(Int64.shift_left (-1L) bits))) )
   )
 
+let is_zero ((i,t) as v) =
+  let zero = 0L in
+  let i64 = to64 v in
+  zero = i64
