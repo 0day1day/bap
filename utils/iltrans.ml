@@ -117,6 +117,8 @@ let speclist =
      "Output the SSA CDG (bbid's)")
   ::("-pp-ssa-ddg", Arg.String (fun f -> add(TransformSsa(output_ssa_ddg f))),
      "Output the SSA DDG (bbid's)")
+  ::("-pp-novarnums", Arg.Unit (fun () -> Pp.output_varnums := false),
+     "Print variables without variable ID numbers")
   ::("-to-cfg", uadd(ToCfg),
      "Convert to an AST CFG.")
   ::("-to-ast", uadd(ToAst),

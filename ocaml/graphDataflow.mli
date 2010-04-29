@@ -58,7 +58,7 @@ module type DATAFLOW =
 
     (** the initial value for analysis. This is what s0 should start
 	out with. All other nodes start out with Top *)
-    val init : L.t
+    val init : G.t -> L.t
 
     (** the dataflow direction *)
     val dir : direction
@@ -70,6 +70,6 @@ module type DATAFLOW =
 module Make :
   functor (D : DATAFLOW) ->
     sig
-      val worklist_iterate : ?init:D.L.t ->
+      val worklist_iterate : ?init:(D.G.t -> D.L.t) ->
         D.G.t -> (D.G.V.t -> D.L.t) * (D.G.V.t -> D.L.t)
     end

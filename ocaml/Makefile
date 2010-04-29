@@ -28,6 +28,7 @@ export SOURCES = \
 	ssa_visitor.mli ssa_visitor.ml \
 	cfg_ssa.mli cfg_ssa.ml \
 	ast_visitor.mli ast_visitor.ml \
+	debug_snippets.ml \
 	arithmetic.ml \
 	sccvn.mli sccvn.ml \
 	deadcode.mli deadcode.ml \
@@ -53,8 +54,8 @@ export SOURCES = \
 	stpexec.ml \
 	ast_slice.ml \
 	ssa_slice.ml \
-	comparelib.ml 
-	
+	comparelib.ml \
+	gadgetlib.ml
 
 RESULT = bap
 DOC_FILES := $(filter %.mli, $(SOURCES)) $(filter %.ml, $(SOURCES))

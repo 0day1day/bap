@@ -337,7 +337,7 @@ struct
 	  x y
     end
     let s0 = G.V.create Cfg.BB_Entry
-    let init = L.top
+    let init g = L.top
     let dir = GraphDataflow.Forward
 
     let binop_to_si_function = function
@@ -604,7 +604,7 @@ struct
 	  x y
     end
     let s0 =  G.V.create Cfg.BB_Entry
-    let init =
+    let init g =
 	VM.add sp [(sp, SI.zero)] L.top (* stack region *)
 
     let dir = GraphDataflow.Forward
@@ -832,7 +832,7 @@ struct
     let init_vars vars =
       List.fold_left (fun vm x -> VM.add x (`Scalar [(x, SI.zero)]) vm) L.top vars
 
-    let init =
+    let init g =
       init_vars [sp]
 
     let dir = GraphDataflow.Forward

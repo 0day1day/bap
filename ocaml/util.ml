@@ -166,6 +166,12 @@ let split_common_suffix la lb =
 (** a composition operator. [(f <@ g) x] = [f(g x)] *)
 let (<@) f g = (fun x -> f(g x))
 
+(** Given Some(a), returns a. Given None, raises Not_found *)
+let option_unwrap o =
+  match o with
+  | Some(x) -> x
+  | None -> raise Not_found
+
 (** Maps an ['a option] to a ['b option], given a function [f : 'a -> 'b] *)
 let option_map f = function
   | None -> None
@@ -351,3 +357,16 @@ let list_insert l li n =
   in
   let hd,tl = list_split [] l n in
   hd @ li @ tl
+
+(* Remove r elements in l starting at position s *)
+let list_remove l s r =
+  let aftere = s + r in
+  let _,revl = List.fold_left
+    (fun (i,l) e ->
+       if i >= s && i < aftere then
+	 (i+1,l)
+       else
+	 (i+1, e::l)
+    ) (0,[]) l
+  in
+  List.rev revl

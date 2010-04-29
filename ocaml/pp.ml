@@ -7,6 +7,8 @@ open Type
 module VH = Var.VarHash
 module F = Format
 
+let output_varnums = ref true
+
 let rec typ_to_string = function
   | Reg 1 -> "bool"
   | Reg 8 -> "u8"
@@ -56,7 +58,7 @@ type varctx = string VH.t * (string,unit) Hashtbl.t
 let var_to_string ?ctx (Var.V(id,name,t) as v) =
   match ctx with
   | None ->
-       name ^ "_" ^ string_of_int id ^ ":" ^ typ_to_string t
+	name ^ "_" ^ string_of_int id ^ ":" ^ typ_to_string t
   | Some(vars,names) ->
       try VH.find vars v
       with Not_found ->
@@ -72,7 +74,6 @@ let var_to_string ?ctx (Var.V(id,name,t) as v) =
 	let rec more x = (x^"_", `F more) in
 	trystring (name, `F (fun _ -> (name ^ "_" ^ string_of_int id, `F more)))
 
-
 class pp ft =
   let pp = F.pp_print_string ft
   and pc = F.pp_print_char ft
@@ -81,10 +82,15 @@ class pp ft =
   and opn  = F.pp_open_box ft
   and cls = F.pp_close_box ft in
   let comma () = pp ","; space() in
+  let vctx = (VH.create 100, Hashtbl.create 100) in
 object (self)
 
 
-  method var v = pp (var_to_string v)
+  method var v = 
+    if !output_varnums then
+      pp (var_to_string v)
+    else
+      pp (var_to_string ~ctx:vctx v)
 
   method typ t = pp (typ_to_string t)
 

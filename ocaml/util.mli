@@ -40,6 +40,7 @@ val list_directory : ?sort_files:bool -> string -> string list
 val split_common_prefix : 'a list -> 'a list -> 'a list * 'a list * 'a list
 val split_common_suffix : 'a list -> 'a list -> 'a list * 'a list * 'a list
 
+val option_unwrap : ('a option) -> 'a
 val option_map : ('a -> 'b) -> 'a option -> 'b option
 val apply_option : ('a -> 'a) option -> 'a -> 'a
 
@@ -69,3 +70,4 @@ val take : 'a list -> int -> 'a list
 
 val list_firstindex : ?s:int -> 'a list -> ('a -> bool) -> int
 val list_insert : 'a list -> 'a list -> int -> 'a list
+val list_remove: 'a list -> int -> int -> 'a list

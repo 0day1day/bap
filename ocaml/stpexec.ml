@@ -118,3 +118,26 @@ let runstp ?(timeout=60) file =
 (*       | _ -> failwith "Unexpected termination" *)
 
 (*     ) *)
+
+let compute_wp_boring cfg post =
+  let gcl = Gcl.of_astcfg cfg in
+  (Wp.wp gcl post, [])
+
+(** Write formula for AST CFG out to random filename and return the filename *)
+let writeformula p =
+    let name, oc = Filename.open_temp_file "formula" ".stp" in
+    dprintf "Using temporary file %s" name;  
+    let p = Prune_unreachable.prune_unreachable_ast p in
+    let post = Ast.exp_true in
+    let (wp, foralls) = compute_wp_boring p post in
+    let m2a = new Memory2array.memory2array_visitor () in
+    let wp = Ast_visitor.exp_accept m2a wp in
+    let foralls = List.map (Ast_visitor.rvar_accept m2a) foralls in
+    let pp = new Stp.pp_oc oc in
+    
+    pp#assert_ast_exp_with_foralls foralls wp;
+    pp#flush ();
+    output_string oc "QUERY(FALSE); COUNTEREXAMPLE;\n";
+    pp#close;
+    name
+

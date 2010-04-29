@@ -3,7 +3,11 @@
     dependence graph (CDG). 
 *)
 
+module VS = Var.VarSet
+module VH = Var.VarHash
 open Cfg
+
+
 
 module MakeCDG (C: CFG) = 
 struct
@@ -524,3 +528,309 @@ struct
     
 end
 
+(** Module for computing usedef chains/reaching definitions *)
+module UseDef_AST =
+struct
+
+  module C = Cfg.AST
+  module VM = Var.VarMap
+    
+  (** Define the location type *)
+  module LocationType =
+  struct
+    
+    type t = 
+	(* Missing definitions are implicitly assumed to be top *)
+      | Undefined (* There is proof that of an undefined definition *)
+      | Loc of Cfg.AST.G.V.t * int (* Location of a definition *)
+    
+    let compare = compare
+    
+    let to_string loc =
+      match loc with
+      | Undefined -> "Undefined"
+      | Loc(bb,line) ->
+	  let bbs = (Cfg.bbid_to_string (C.G.V.label bb))
+	  in Printf.sprintf "(%s,%d)" bbs line
+	       
+  end
+  module LS = Set.Make(LocationType)
+
+  (* Helpers *)
+
+  let get_map m k =
+    try 
+      VM.find k m
+    with Not_found -> 
+      LS.empty
+  
+  let add_map m k v =
+    let old = get_map m k in
+    let newer = LS.union v old in
+    VM.add k newer m
+    
+  module UseDefL(*:GraphDataflow.BOUNDED_MEET_SEMILATTICE*) =
+  struct
+
+    (* Map a variable to a set of definitions *)
+    type t = LS.t VM.t
+
+    let to_string l =
+      VM.fold
+	(fun k v s ->
+	   let defs =
+	     LS.fold
+	       (fun loc s ->
+		  s ^ " " ^ LocationType.to_string loc
+	       ) v "" in
+
+	     s ^ (Printf.sprintf "Use: %s -> Def: [%s]\n"
+		    (Pp.var_to_string k) defs)
+	       
+	) l ""
+
+    let top = VM.empty
+    and meet x y = 
+      let m' = VM.fold
+	(fun k v m ->
+	   (* Add k,v to m *)
+	   add_map m k v
+	) x y
+      in
+      m'
+    and equal m1 m2 = 
+      let e = VM.equal
+	(fun a b ->
+	   a = b) m1 m2
+      in
+      e
+  end
+
+  module UseDefSpec(*:GraphDataflow.DATAFLOW*) =
+  struct
+
+    module G = Cfg.AST.G
+    module L = UseDefL
+
+    let transfer_function (g:G.t) (bb:G.V.t) (l:L.t) =
+      let lref = ref l in
+      let line = ref 0 in
+      let v = object(self)
+	inherit Ast_visitor.nop
+    	method visit_avar v =
+	  let s = LS.empty in
+	  let s = LS.add (LocationType.Loc (bb,!line)) s in
+	  lref := VM.add v s !lref;
+	  `DoChildren
+      end
+      in
+      let stmts = Cfg.AST.get_stmts g bb in
+      List.iter
+	(fun stmt ->
+	   ignore(Ast_visitor.stmt_accept v stmt);
+	   line := !line + 1
+	) stmts;
+      !lref
+    
+    let s0 = Cfg.AST.G.V.create Cfg.BB_Entry
+
+    (* Set each variable to undefined at the starting point *)
+    let init (g:G.t) = 
+      let defs p =
+	let vars = ref VS.empty in
+	let visitor = object(self)
+	  inherit Ast_visitor.nop
+	    (* Add each variable to vars *)
+	  method visit_avar v =
+	    vars := VS.add v !vars;
+	    (* 	Printf.printf "Def: We are adding %s_%d\n" (Var.name v) (Var.id v); *)
+	    `DoChildren
+	  method visit_rvar v =
+	    vars := VS.add v !vars;
+	    (* 	Printf.printf "Def: We are adding %s_%d\n" (Var.name v) (Var.id v); *)
+	    `DoChildren
+	end 
+	in
+	ignore(Ast_visitor.cfg_accept visitor p);
+	!vars
+      in
+      let m = VM.empty in
+      VS.fold
+	(fun v m' ->
+	   let s = LS.empty in
+	   let s = LS.add LocationType.Undefined s in
+	   VM.add v s m'
+	) (defs g) m
+
+    let dir = GraphDataflow.Forward
+  end
+
+  module DF = GraphDataflow.Make(UseDefSpec)
+
+  let worklist = DF.worklist_iterate
+
+  (** 
+      Given a program, returns 1) a hash function mapping locations to
+      the definitions available at that location 2) a function that
+      returns the definitions for a (variable, location) pair 
+  *)
+  let usedef p =
+    let dfin,_ = worklist p in
+    let h = Hashtbl.create 1000 in
+    Cfg.AST.G.iter_vertex
+      (fun bb ->
+	 let (m:UseDefSpec.L.t) = dfin bb in
+	 let stmts = Cfg.AST.get_stmts p bb in
+	 let lref = ref m in
+	 let line = ref 0 in
+	 let v = object(self)
+	   inherit Ast_visitor.nop
+    	   method visit_avar v =
+	     let s = LS.empty in
+	     let s = LS.add (LocationType.Loc (bb,!line)) s in
+	     lref := VM.add v s !lref;
+	     `DoChildren
+	 end
+	 in
+	 List.iter
+	   (fun stmt ->
+	      (* Add the defs before this line *)
+	      Hashtbl.add h (bb,!line) !lref;
+	      ignore(Ast_visitor.stmt_accept v stmt);
+	      line := !line + 1
+	   ) stmts
+      ) p;
+    let find (bb,line) var =
+      let m = Hashtbl.find h (bb,line) in
+      VM.find var m
+    in
+    h, find
+end
+
+(** Returns defined vars and referenced variables that are never
+    defined. *)
+module DEFS_AST =
+struct
+
+  module LS = UseDef_AST.LS
+
+  (** Return variables that might be referenced before they are
+      defined. The output of this function is a good starting point when
+      trying to find inputs of a program. *)
+  let undefined p =
+    let _,deflookup = UseDef_AST.usedef p in    
+    
+    (* Line and bb will point to the current location *)
+    let line = ref 0 in
+    let bbr = ref (Cfg.AST.G.V.create BB_Entry) in     
+
+
+    (* Outputs *)
+    let alwaysud = VH.create 100 in
+    let maybeud = VH.create 100 in
+
+    let v = object(self)
+      inherit Ast_visitor.nop
+      method visit_rvar v =
+	(* See if v is undefined here *)
+	let defs = deflookup (!bbr,!line) v in
+	
+	(* If some definition is undefined, then put var in maybeud *)
+	if LS.mem UseDef_AST.LocationType.Undefined defs then
+	  begin
+	    VH.add maybeud v (!bbr,!line);
+	    
+	    (* This is the only definition! Put int alwaysud *)
+	    if LS.cardinal defs = 1 then
+	      VH.add alwaysud v (!bbr, !line);	    
+	    
+	  end;
+	
+	`DoChildren
+    end
+    in
+    Cfg.AST.G.iter_vertex
+      (fun bb ->
+	 let stmts = Cfg.AST.get_stmts p bb in
+	 line := 0;
+	 bbr := bb;
+	 List.iter
+	   (fun stmt ->
+	      ignore(Ast_visitor.stmt_accept v stmt);
+	      line := !line + 1;
+	   ) stmts
+      ) p;
+
+    alwaysud, maybeud
+
+  (** Returns (defined variables, "free" variables) *)
+  let defs p =
+    let definedvars = ref VS.empty in
+    let refvars = ref VS.empty in
+    let visitor = object(self)
+      inherit Ast_visitor.nop
+	(* Add each variable to definedvars *)
+      method visit_avar v =
+	definedvars := VS.add v !definedvars;
+	(* 	Printf.printf "Def: We are adding %s_%d\n" (Var.name v) (Var.id v); *)
+	`DoChildren
+	  
+      method visit_rvar v =
+	refvars := VS.add v !refvars;
+	(* 	Printf.printf "Ref: We are adding %s_%d\n" (Var.name v) (Var.id v); *)
+	`DoChildren
+    end 
+    in
+    ignore(Ast_visitor.cfg_accept visitor p);
+    (!definedvars, VS.diff !refvars !definedvars)
+
+  (** Returns all variables *)
+  let vars p =
+    let vars = ref VS.empty in
+    let visitor = object(self)
+      inherit Ast_visitor.nop
+	(* Add each variable to definedvars *)
+      method visit_avar v =
+	vars := VS.add v !vars;
+	(* 	Printf.printf "Def: We are adding %s_%d\n" (Var.name v) (Var.id v); *)
+	`DoChildren
+	  
+      method visit_rvar v =
+	vars := VS.add v !vars;
+	(* 	Printf.printf "Ref: We are adding %s_%d\n" (Var.name v) (Var.id v); *)
+	`DoChildren
+    end 
+    in
+    ignore(Ast_visitor.cfg_accept visitor p);
+    !vars
+
+
+end
+
+(** Returns defined vars and referenced variables that are never
+    defined *)
+module DEFS_SSA =
+struct
+
+  (** Returns (defined variables, "free" variables) *)
+  let defs p =
+    let definedvars = ref VS.empty in
+    let refvars = ref VS.empty in
+    let visitor = object(self)
+      inherit Ssa_visitor.nop
+	(* Add each variable to definedvars *)
+      method visit_avar v =
+	definedvars := VS.add v !definedvars;
+	(* 	Printf.printf "Def: We are adding %s_%d\n" (Var.name v) (Var.id v); *)
+	`DoChildren
+	  
+      method visit_rvar v =
+	refvars := VS.add v !refvars;
+	(* 	Printf.printf "Ref: We are adding %s_%d\n" (Var.name v) (Var.id v); *)
+	`DoChildren
+    end 
+    in
+    ignore(Ssa_visitor.prog_accept visitor p);
+    (!definedvars, VS.diff !refvars !definedvars)
+
+end
