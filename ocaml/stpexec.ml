@@ -45,7 +45,7 @@ let runstp ?(timeout=60) file =
 
   try
     (
-      let cmdstr = Printf.sprintf "stp -sv %s" file in
+      let cmdstr = Printf.sprintf "cvc3 +unknown-check-model %s" file in
       let stpout,stperr,pstatus = syscall cmdstr
       in
       
@@ -63,6 +63,7 @@ let runstp ?(timeout=60) file =
 	      
 	| _ -> true
       in
+      let fail = fail or ExtString.String.exists stperr "Fatal" in
       let isinvalid = ExtString.String.exists stpout "Invalid." in
       let isvalid = ExtString.String.exists stpout "Valid." in
       
@@ -82,7 +83,7 @@ let runstp ?(timeout=60) file =
   with
     Alarm_signal -> 
       (* Another HUGE hack *)
-      ignore(Unix.system "killall -9 stp");      
+      ignore(Unix.system "killall -9 stp; killall -9 cvc3");      
       Timeout ;;
 
 (* let runstp ?(timeout=60) file = *)
@@ -121,23 +122,23 @@ let runstp ?(timeout=60) file =
 
 let compute_wp_boring cfg post =
   let gcl = Gcl.of_astcfg cfg in
-  (Wp.wp gcl post, [])
+    (Wp.wp gcl post, [])
 
 (** Write formula for AST CFG out to random filename and return the filename *)
-let writeformula p =
+let writeformula ?(exists=[]) ?(foralls=[]) p  =
     let name, oc = Filename.open_temp_file "formula" ".stp" in
     dprintf "Using temporary file %s" name;  
     let p = Prune_unreachable.prune_unreachable_ast p in
     let post = Ast.exp_true in
-    let (wp, foralls) = compute_wp_boring p post in
+    let (wp, _foralls) = compute_wp_boring p post in
     let m2a = new Memory2array.memory2array_visitor () in
     let wp = Ast_visitor.exp_accept m2a wp in
     let foralls = List.map (Ast_visitor.rvar_accept m2a) foralls in
     let pp = new Stp.pp_oc oc in
     
-    pp#assert_ast_exp_with_foralls foralls wp;
+    pp#valid_ast_exp ~exists:exists ~foralls:foralls wp;
     pp#flush ();
-    output_string oc "QUERY(FALSE); COUNTEREXAMPLE;\n";
+(*     output_string oc "QUERY(FALSE); COUNTEREXAMPLE;\n"; *)
     pp#close;
     name
 

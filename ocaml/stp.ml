@@ -214,7 +214,9 @@ object (self)
 		("", "["^string_of_int(bits1-1)^":"^string_of_int(bits1-bits)^"]")
 	    | CAST_UNSIGNED  ->
 		if bits = bits1 then ("","") else
-		("(0bin"^String.make (bits-bits1) '0'^" @ ", ")")
+		  (* @ does not work right in CVC3, so using BVPLUS
+		  ("(0bin"^String.make (bits-bits1) '0'^" @ ", ")") *)
+		  ("(BVPLUS(" ^ string_of_int bits ^ ",", ",0bin0))")
 	  in
 	  pp pre;
 	  self#ast_exp e1;
@@ -273,6 +275,20 @@ object (self)
 	pp "):";
 	cls();space();
 
+  method exists = function
+    | [] -> ()
+    | v::vars ->
+	let var_type  (Var.V(_,_,t) as v) =
+	  self#var v; pp " : "; self#typ t
+	in
+	opn 2;
+	pp "EXISTS (";space();
+	  (* TODO: group by type *)
+	List.iter (fun v -> var_type v; pc ','; space()) vars;
+	var_type v;
+	pp "):";
+	cls();space();
+
   method assert_eq v e =
     opn 0;
     self#declare_new_freevars (BinOp(EQ, Var v, e));
@@ -297,6 +313,22 @@ object (self)
     force_newline();
     pp ");";
     cls();
+
+  (** Is e a valid expression (always true)? *)
+  method valid_ast_exp ?(exists=[]) ?(foralls=[]) e =
+    opn 0;
+    self#declare_new_freevars e;
+    force_newline();
+    pp "QUERY(";
+    space();    
+    self#exists exists;
+    self#forall foralls;
+    pp "0bin1 =";
+    force_newline();
+    self#ast_exp e;
+    force_newline();
+    pp ");";
+    cls();    
 
   method assert_ast_exp e =
     self#assert_ast_exp_with_foralls [] e
