@@ -15,3 +15,6 @@ let print_ast p =
   in
   ignore(Ast_visitor.cfg_accept v p)
 
+let intv_to_string (i,t) =
+  let e = Ast.Int(i,t) in
+  Printf.sprintf "%s" (Pp.ast_exp_to_string e)
