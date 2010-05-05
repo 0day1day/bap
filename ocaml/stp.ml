@@ -125,9 +125,7 @@ object (self)
 	   | Reg _ -> failwith "unimplemented bitvector length"
 	   | _ -> invalid_arg "Only constant integers supported"
 	 in
-	 let maskedval = Int64.logand i
-	   (Int64.pred(Int64.shift_left Int64.one (bits_of_width t)))
-	 in
+	 let maskedval = Arithmetic.to64 (i,t) in
 	 printf format maskedval
      | Var v ->
 	 self#var v

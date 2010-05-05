@@ -28,7 +28,10 @@ let bits_of_width = function
   | Reg n -> n
   | _ -> invalid_arg "bits_of_width"
 
-
+let bytes_of_width t =
+  let b = bits_of_width t in
+  assert ((b mod 8) = 0);
+  b / 8
 
 let rec infer_ast ?(check=true) = function
   | Var v ->
