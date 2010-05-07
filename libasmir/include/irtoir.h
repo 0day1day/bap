@@ -176,6 +176,7 @@ extern "C" {
 
   extern int asmir_bap_blocks_size(bap_blocks_t *bs);
   extern bap_block_t * asmir_bap_blocks_get(bap_blocks_t *bs, int i);
+  extern bool asmir_bap_blocks_error(bap_blocks_t *bs);
   extern void destroy_bap_blocks(bap_blocks_t *bs);
   extern void destroy_bap_block(bap_block_t *bs);
   extern int asmir_bap_block_size(bap_block_t *b);

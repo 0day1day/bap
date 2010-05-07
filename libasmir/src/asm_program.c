@@ -275,3 +275,65 @@ asm_program_t* asmir_new_asmp_for_arch(enum bfd_architecture arch)
   init_disasm_info(prog);
   return prog;
 }
+
+/*
+ * Get the starting memory address of the section named sectionname.
+ */  
+bfd_vma asmir_get_sec_startaddr(asm_program_t *prog, const char *sectionname) {
+  section_t* section;
+  asection* asection;
+
+  assert(prog);
+  assert(sectionname);
+
+  section = prog->segs;
+
+  /* Traverse the linked list of sections */
+  while (section != NULL) {
+    asection = section->section; /* Get the BFD section struct */
+    if (strcmp(asection->name, sectionname) == 0) {
+      /* Got it */
+      return section->start_addr;
+    }
+
+    section = section->next;
+  }
+
+  /* We didn't find it.
+   *
+   * I doubt the start or end address will be -1, so, this will
+   * hopefully not cause any problems.
+   */
+  return -1;
+}
+
+/*
+ * Get the ending memory address of the section named sectionname.
+ */  
+bfd_vma asmir_get_sec_endaddr(asm_program_t *prog, const char *sectionname) {
+  section_t* section;
+  asection* asection;
+
+  assert(prog);
+  assert(sectionname);
+
+  section = prog->segs;
+
+  /* Traverse the linked list of sections */
+  while (section != NULL) {
+    asection = section->section; /* Get the BFD section struct */
+    if (strcmp(asection->name, sectionname) == 0) {
+      /* Got it */
+      return section->end_addr;
+    }
+
+    section = section->next;
+  }
+
+  /* We didn't find it.
+   *
+   * I doubt the start or end address will be -1, so, this will
+   * hopefully not cause any problems.
+   */
+  return -1;
+}

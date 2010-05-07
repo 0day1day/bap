@@ -1997,11 +1997,16 @@ vector<Stmt *> mod_eflags_shr( reg_t type, Exp *arg1, Exp *arg2 )
 	if (count_opnd) {
 	    Constant c0 (REG_8, 0);
 	    Exp *cond = ex_eq (count_opnd, &c0); 
-	    irout.push_back(new CJmp(cond, ex_name(ifcountn0->label), 
-				     ex_name(ifcount0->label))); 
-	    irout.push_back (ifcount0);
-	} else 
-	    assert (0);
+	    irout.push_back(new CJmp(cond, ex_name(ifcount0->label), 
+				     ex_name(ifcountn0->label))); 
+	    irout.push_back (ifcountn0);
+	} else {
+          /* If the count is an immediate that is 0 modulo 32, then
+             VEX never performs a binop, and thus never sets
+             count_opnd.  I am assuming that if this happens the count
+             is 0. */
+          irout.push_back(new Jmp(ex_name(ifcount0->label)));
+        }
     }
 
 
@@ -2029,7 +2034,7 @@ vector<Stmt *> mod_eflags_shr( reg_t type, Exp *arg1, Exp *arg2 )
     //set_eflags_bits(&irout, CF, PF, AF, ZF, SF, OF);
 
     if (!use_eflags_thunks) 
-	irout.push_back (ifcountn0);
+	irout.push_back (ifcount0);
     return irout;
 }
 

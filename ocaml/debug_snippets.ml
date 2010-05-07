@@ -9,7 +9,7 @@ let print_ast p =
     inherit Ast_visitor.nop
       (* Add each variable to definedvars *)
     method visit_stmt stmt =
-      Printf.printf "Stmt: %s\n" (Pp.ast_stmt_to_string stmt);
+      Printf.fprintf stderr "Stmt: %s\n" (Pp.ast_stmt_to_string stmt);
       `SkipChildren
   end 
   in

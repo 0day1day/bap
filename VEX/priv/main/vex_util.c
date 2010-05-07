@@ -50,6 +50,9 @@
 #include "vex_globals.h"
 #include "vex_util.h"
 
+/* Jump buffer used to return from VEX errors */
+jmp_buf vex_error;
+char jmp_buf_set = 0;
 
 /*---------------------------------------------------------*/
 /*--- Storage                                           ---*/
@@ -224,6 +227,11 @@ __attribute__ ((noreturn))
 void vpanic ( HChar* str )
 {
    vex_printf("\nvex: the `impossible' happened:\n   %s\n", str);
+
+   /* Try to longjmp back to BAP */
+   if (jmp_buf_set) {
+     longjmp(vex_error, -1);
+   }
    (*vex_failure_exit)();
 }
 

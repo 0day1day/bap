@@ -12,6 +12,8 @@ open Type
 open Ast
 open Util
 
+exception Disassembly_error;;
+
 type asmprogram = Libasmir.asm_program_t
 
 type arch = Libasmir.bfd_architecture
@@ -416,6 +418,8 @@ let asm_addr_to_bap g prog addr =
 
 let asmprogram_to_bap_range ?(init_ro = false) asmp st en=
   let bap_blocks = Libasmir.asmir_asmprogram_range_to_bap asmp st en in
+  if Libasmir.asmir_bap_blocks_error bap_blocks = true then
+    raise Disassembly_error;
   let arch = get_asmprogram_arch asmp in
   let g = gamma_for_arch arch in
   let ir = tr_bap_blocks_t g asmp bap_blocks in
@@ -489,3 +493,8 @@ let get_function_ranges p =
 		 | _ -> true)
     unfiltered
 
+let get_section_startaddr p sectionname =
+  Libasmir.asmir_get_sec_startaddr p sectionname
+
+let get_section_endaddr p sectionname =
+  Libasmir.asmir_get_sec_endaddr p sectionname

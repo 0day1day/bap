@@ -7,6 +7,8 @@
 #ifndef __IRTOIR_INTERNAL_H
 #define __IRTOIR_INTERNAL_H
 
+#include <setjmp.h>
+
 #include "irtoir.h"
 
 // functions internal to irtoir.cpp and irtoir-*.cpp
@@ -37,7 +39,6 @@ int match_mux0x(vector<Stmt*> *ir, unsigned int i,
 
 extern bool use_eflags_thunks;
 extern Exp * count_opnd;
-
 
 //
 // arch specific functions used in irtoir.cpp

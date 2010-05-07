@@ -13,6 +13,8 @@
 
 open Libasmir
 
+exception Disassembly_error
+
 type asmprogram = Libasmir.asm_program_t
 
 type arch
@@ -64,3 +66,5 @@ val bap_from_trace_file : ?atts:bool -> string -> Ast.program
 
 val get_function_ranges : asmprogram -> (string * address_t * address_t) list
 
+val get_section_startaddr : asmprogram -> string -> address_t
+val get_section_endaddr : asmprogram -> string -> address_t
