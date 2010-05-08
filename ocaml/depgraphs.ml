@@ -601,7 +601,7 @@ struct
     and equal m1 m2 = 
       let e = VM.equal
 	(fun a b ->
-	   a = b) m1 m2
+	   LS.equal a b) m1 m2
       in
       e
   end
