@@ -7,6 +7,8 @@
 
 (* TODO: Handle different endianness.  Use the type of the array expression *)
 
+(* XXX: What should we do when there is a 1 bit access? *)
+
 module D = Debug.Make(struct let name="memory2array" and default=`Debug end)
 
 open D
@@ -25,7 +27,7 @@ let getelementtype tmem =
 
 let getwidth regtyp =
   match regtyp with
-  | Reg(n) -> n/bitwidth
+  | Reg(n) -> assert (n mod bitwidth = 0); n/bitwidth
   | _ -> failwith "Only support register indices!"
 
 let split_load array index eletype endian bytenum =
@@ -33,7 +35,6 @@ let split_load array index eletype endian bytenum =
   let indexplus = BinOp(PLUS, index, Int(Int64.of_int(bytenum), eletype)) in
   let exp = Load(array, indexplus, endian, newtype) in
   let exp = Cast(CAST_UNSIGNED, eletype, exp) in
-  (* djb: you also need to mask the value *)
   let exp = exp_shl exp (Int(Int64.of_int((bytenum) * bitwidth), eletype)) in
   exp
  
@@ -51,7 +52,6 @@ let split_loads array index eletype endian =
 let split_write array index eletype endian data bytenum =
   let newtype = Reg(bitwidth) in
   let indexplus = BinOp(PLUS, index, Int(Int64.of_int(bytenum), eletype)) in
-  (* djb: you also need to mask the value *)
   let exp = exp_shr data (Int(Int64.of_int((bytenum) * bitwidth), eletype)) in
   let exp = Cast(CAST_LOW, newtype, exp) in
   let exp = Store(array, indexplus, exp, endian, newtype) in

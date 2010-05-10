@@ -125,12 +125,13 @@ let compute_wp_boring cfg post =
     (Wp.wp gcl post, [])
 
 (** Write formula for AST CFG out to random filename and return the filename *)
-let writeformula ?(exists=[]) ?(foralls=[]) p  =
+let writeformula ?(exists=[]) ?(foralls=[]) ?(remove=true) p  =
     let name, oc = Filename.open_temp_file "formula" ".stp" in
     at_exit (fun () -> 
-      try 
-	Unix.unlink name
-      with _ -> ());
+	       if remove then
+		 try 
+		   Unix.unlink name
+		 with _ -> ());
     dprintf "Using temporary file %s" name;  
     let p = Prune_unreachable.prune_unreachable_ast p in
     let post = Ast.exp_true in

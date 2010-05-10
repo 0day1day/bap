@@ -14388,6 +14388,7 @@ DisResult disInstr_X86_WRK (
       EIP should be up-to-date since it made so at the start of each
       insn, but nevertheless be paranoid and update it again right
       now. */
+   vpanic("EJS: Not returning bad decoding.  Someone should do something more intelligent here.");
    stmt( IRStmt_Put( OFFB_EIP, mkU32(guest_EIP_curr_instr) ) );
    if (unlock_bus_after_insn)
       stmt( IRStmt_MBE(Imbe_BusUnlock) );
