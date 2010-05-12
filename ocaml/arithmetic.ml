@@ -6,6 +6,8 @@
     @author Ivan Jager
  *)
 
+module D = Debug.Make(struct let name = "Arithmetic" and default = `Debug end)
+open D
 open Type
 
 let bits_of_width = Typecheck.bits_of_width
@@ -30,7 +32,7 @@ let toshift shiftedt v =
     if i <= Int64.of_int max && i >= 0L
     then Int64.to_int i
     else
-      (prerr_endline("Warning: shifting "^string_of_int max^"-bit value by "
+      (pwarn("Warning: shifting "^string_of_int max^"-bit value by "
 		    ^Int64.to_string i);
        max)
 
