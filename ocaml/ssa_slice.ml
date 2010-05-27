@@ -9,17 +9,7 @@ struct
  (* Test-printing of ASTs TODO:remove *)
  (* TODO: Create a new file only for chopping *)
 
-  module TG =
-  struct 
-    type t = Cfg.SSA.G.t
-    module V = Cfg.SSA.G.V
-    let iter_vertex = Cfg.SSA.G.iter_vertex
-    let fold_vertex = Cfg.SSA.G.fold_vertex
-    let iter_succ = Cfg.SSA.G.iter_succ
-    let fold_succ = Cfg.SSA.G.fold_succ
-  end
-
- module Traverse = Graph.Traverse.Dfs(TG)
+ module Traverse = Graph.Traverse.Dfs(Cfg.SSA.G)
 
   let print_cfg cfg = 
    let print_stmts v =
