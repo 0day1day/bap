@@ -45,14 +45,18 @@ let doit = match !rangeonly with
 	 (*let ir = Hacks.assert_noof ir in *)
 	 let cfg = Cfg_ast.of_prog ir in
 	 let cfg = Prune_unreachable.prune_unreachable_ast cfg in
+	 let structs = Structural_analysis.structural_analysis cfg in
 	 let cfg = Hacks.remove_backedges cfg in
 	 let ir = Cfg_ast.to_prog cfg in
 	 let oc = open_out (!prefix ^ n ^ ".il") in
 	 let pp = new Pp.pp_oc oc in
 	 pp#ast_program ir;
 	 pp#close;
-	 with _ ->
-	   Printf.eprintf "Warning: problem with %s (0x%Lx-0x%Lx)" n s e
+	 with 
+	 | Failure err ->
+	     Printf.eprintf "Warning: failure with %s (0x%Lx-0x%Lx): %s\n" n s e err
+	 | _ ->
+	     Printf.eprintf "Warning: problem with %s (0x%Lx-0x%Lx)\n" n s e
       )
 ;;
 (* Fixme: only for given functions *)

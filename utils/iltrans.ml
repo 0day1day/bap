@@ -75,6 +75,13 @@ let output_ssa_ddg f p =
     close_out oc;
     p
 
+let output_structanal p =
+  let cfg = Prune_unreachable.prune_unreachable_ast p in
+  let _ = Structural_analysis.structural_analysis cfg in
+  (* FIXME: print a pretty graph or something. For now the debugging
+     output is useful enough... *)
+  p
+
 let sccvn p =
   fst(Sccvn.replacer p)
 let deadcode p =
@@ -119,6 +126,8 @@ let speclist =
      "Output the SSA DDG (bbid's)")
   ::("-pp-novarnums", Arg.Unit (fun () -> Pp.output_varnums := false),
      "Print variables without variable ID numbers")
+  ::("-struct", Arg.Unit (fun () -> add(TransformAstCfg(output_structanal))),
+     "Structural analysis.")
   ::("-to-cfg", uadd(ToCfg),
      "Convert to an AST CFG.")
   ::("-to-ast", uadd(ToAst),

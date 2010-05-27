@@ -179,6 +179,20 @@ let rm_useless_vars vs n w =
   and vs = List.map (fun (v,e) -> (v, Ast_visitor.exp_accept subst e)) vs in
   (vs,n,w)
 
+
+
+let assignments_to_exp = function
+  | [] -> None
+  | v::vs ->
+      let p2e (v,e) = BinOp(EQ, Var v, e) in
+      let rec h e = function
+	| a::rest ->
+	    if true then h (exp_and e (p2e a)) rest
+	    else h (exp_and (p2e a) e) rest
+	| [] -> e
+      in
+      Some(h (p2e v) vs)
+
 let dwp_help ?(simp=Util.id) ?(k=1) f (p:Gcl.t) =
   let g (v, n, w) =
     let rec g' v ns ws fn fw =
@@ -194,19 +208,6 @@ let dwp_help ?(simp=Util.id) ?(k=1) f (p:Gcl.t) =
     | (n::ns, w::ws) -> let (v,n) = variableify k v n in g' v ns ws n w
     | ([],[]) -> (v, exp_true, exp_false)
     | _ -> failwith "n and w are supposed to have the same length"
-  in
-
-  let assignments_to_exp = function
-    | [] -> None
-    | v::vs ->
-	let p2e (v,e) = BinOp(EQ, Var v, e) in
-	let rec h e = function
-	  | a::rest ->
-	      if true then h (exp_and e (p2e a)) rest
-	      else h (exp_and (p2e a) e) rest
-	  | [] -> e
-	in
-	Some(h (p2e v) vs)
   in
   let (vs,n,w) = g (f g ([],[],[]) p) in
   (* Surprisingly enough, this is a toss up. It makes some formulas
@@ -294,3 +295,50 @@ let dwp_let ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (p:Gcl.t) =
   )
 
 (*let dwp = dwp_let*)
+
+
+
+(*let flanagansaxe_dumb ?(simp=Util.id) (p:Gcl.t) =
+  let rec n = function
+    | Assert e -> e
+    | Assume e -> e
+    | Seq(a,b) -> exp_and (n a) (n b)
+    | Choice(a,b) -> exp_or (n a) (n b)
+  in
+  let rec w = function
+    | Assert e -> exp_not e
+    | Assume e -> exp_false
+    | Seq(a,b) -> exp_or (w a) (exp_and (n a) (w b))
+    | Choice(a,b) -> exp_or (w a) (w b)
+  in
+  let ws = w p and ns = n p in
+  (fun q ->
+     exp_and (exp_not ws) (exp_implies ns q)
+  )
+*)
+
+let flanagansaxe ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (p:Gcl.t) =
+  let rec nw v = function
+    | Assume e -> (e, exp_false, v)
+    | Assert e ->
+	let (v,e) = if less_duplication then variableify k v e else (v,e) in
+	(e, exp_not e, v)
+    | Choice(a,b) ->
+	let (na,wa,v) = nw v a in
+	let (nb,wb,v) = nw v b in
+	(exp_or na nb, exp_or wa wb, v)
+    | Seq(a,b) ->
+	let (na,wa,v) = nw v a in
+	let (v,na) = variableify k v na in
+	let (nb,wb,v) = nw v b in
+	(exp_and na nb, exp_or wa (exp_and na wb), v)
+    | Assign _ -> failwith "gcl should be passified"
+    | Skip -> (exp_true, exp_false, v)
+  in
+  let (ns,ws,v) = nw [] p in
+  match assignments_to_exp v with
+  | None ->
+      (fun q ->	 exp_and (exp_not ws) (exp_implies ns q) )
+  | Some v ->
+      (fun q ->	 exp_and v (exp_and (exp_not ws) (exp_implies ns q)) )
+

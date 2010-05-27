@@ -34,6 +34,14 @@ let compute_dwp ?(k=1) cfg post =
   let (gcl, _) = Gcl.passified_of_ssa cfg in
   (Wp.dwp ~k gcl p, [])
 
+let compute_flanagansaxe ?(k=1) cfg post =
+  let {Cfg_ssa.cfg=cfg; to_ssavar=tossa} = Cfg_ssa.trans_cfg cfg in
+  let p = rename_astexp tossa post in
+  let vars = Stp.freevars p in
+  let cfg = Ssa_simp.simp_cfg ~liveout:vars cfg in
+  let (gcl, _) = Gcl.passified_of_ssa cfg in
+  (Wp.flanagansaxe ~k gcl p, [])
+
 (* FIXME: Why did I think we needed SSA here? *)
 let compute_fse cfg post =
   let {Cfg_ssa.cfg=ssa; to_ssavar=tossa} = Cfg_ssa.trans_cfg cfg in
@@ -112,12 +120,16 @@ let speclist =
      "<exp> Use <exp> as the postcondition (defaults to \"true\")")
   ::("-suffix", Arg.String (fun str -> suffix := str),
      "<suffix> Add <suffix> to each variable name.")
+  ::("-wp", Arg.Unit(fun()-> compute_wp := compute_wp_boring),
+     "Use Dijkstra's WP, except with let instead of substitution.")
   ::("-dwp", Arg.Unit(fun()-> compute_wp := compute_dwp),
      "Use efficient directionless weakest precondition instead of the default")
   ::("-dwpk", Arg.Int(fun i-> compute_wp := compute_dwp ~k:i),
      "Use efficient directionless weakest precondition instead of the default")
   ::("-dwp1", Arg.Unit(fun()-> compute_wp := compute_dwp1),
      "Use 1st order efficient directionless weakest precondition")
+  ::("-flanagansaxe", Arg.Unit(fun()-> compute_wp := compute_flanagansaxe),
+     "Use Flanagan & Saxe's algorithm instead of the default WP.")
   ::("-extract-vars", Arg.Set assert_vars,
      "Put vars in separate asserts")
   ::("-fse", Arg.Unit(fun()-> compute_wp := compute_fse),

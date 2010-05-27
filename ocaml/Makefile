@@ -55,7 +55,9 @@ export SOURCES = \
 	ast_slice.ml \
 	ssa_slice.ml \
 	comparelib.ml \
-	gadgetlib.ml
+	gadgetlib.ml \
+	structural_analysis.ml \
+
 
 RESULT = bap
 DOC_FILES := $(filter %.mli, $(SOURCES)) $(filter %.ml, $(SOURCES))
