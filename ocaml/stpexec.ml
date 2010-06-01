@@ -23,7 +23,7 @@ let alarm_handler i =
 let split_cmdstr cmdstr =
   let slist = ExtString.String.nsplit cmdstr " " in
   let cmd = List.hd slist in
-  let args = Array.of_list (List.tl slist) in
+  let args = Array.of_list slist in
   cmd, args
 
 let syscall cmd =
