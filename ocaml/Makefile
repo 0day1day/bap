@@ -48,7 +48,6 @@ export SOURCES = \
 	eval.ml \
 	symbeval.ml \
 	symbeval_search.ml \
-	hacks.ml \
 	coalesce.ml \
 	traces.ml \
 	stpexec.ml \
@@ -57,6 +56,7 @@ export SOURCES = \
 	comparelib.ml \
 	gadgetlib.ml \
 	structural_analysis.ml \
+	hacks.ml \
 
 
 RESULT = bap
