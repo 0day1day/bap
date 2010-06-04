@@ -122,7 +122,7 @@ let runstp ?(timeout=60) file =
       let stpout,stperr,pstatus = syscall cmdstr
       in
 
-      dprintf "ok: %s %s" stpout stperr;
+(*       dprintf "ok: %s %s" stpout stperr; *)
       
       (* Turn the alarm off *)
       ignore(alarm 0);
@@ -131,7 +131,7 @@ let runstp ?(timeout=60) file =
 	| WEXITED(c) ->
 	    
 	    if c > 0 then (
-	      dprintf "FAIL code: %d" c;
+(* 	      dprintf "FAIL code: %d" c; *)
 	      true 
 	    )
 	    else false
@@ -142,7 +142,7 @@ let runstp ?(timeout=60) file =
       let isinvalid = ExtString.String.exists stpout "Invalid." in
       let isvalid = ExtString.String.exists stpout "Valid." in
       
-      dprintf "fail: %b %b %b" fail isinvalid isvalid;
+(*       dprintf "fail: %b %b %b" fail isinvalid isvalid; *)
       
       if isvalid then
 	Valid
@@ -202,7 +202,7 @@ let compute_wp_boring cfg post =
 
 (** Write formula for AST CFG out to random filename and return the filename *)
 let writeformula ?(exists=[]) ?(foralls=[]) ?(remove=true) p  =
-    let name, oc = Filename.open_temp_file "formula" ".stp" in
+    let name, oc = Filename.open_temp_file ("formula" ^ (string_of_int (getpid ())))  ".stp" in
     at_exit (fun () -> 
 	       if remove then
 		 try 

@@ -531,7 +531,9 @@ end
 (** Module for computing usedef chains/reaching definitions *)
 module UseDef_AST =
 struct
-
+  
+  module D = Debug.Make(struct let name = "UseDef_AST" and default=`Debug end)
+  open D
   module C = Cfg.AST
   module VM = Var.VarMap
     
@@ -702,7 +704,14 @@ struct
       ) p;
     let find (bb,line) var =
       let m = Hashtbl.find h (bb,line) in
-      VM.find var m
+      try
+	VM.find var m
+      with Not_found -> 
+	(* What should we do if we don't find a value?  This probably
+	   means there was a disconnected graph and the information never
+	   propagated... *)
+	wprintf "Reached variable reference for %s with no definitions (including undefined!) This probably means this location is unreachable. Returning an empty set" (Pp.var_to_string var);
+	LS.empty
     in
     h, find
 end
