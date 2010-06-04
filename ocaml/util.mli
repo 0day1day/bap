@@ -3,7 +3,7 @@ val curry : ('a * 'b -> 'c) -> 'a -> 'b -> 'c
 val uncurry : ('a -> 'b -> 'c) -> ('a * 'b -> 'c)
 val ( <@ ) : ('a -> 'b) -> ('c -> 'a) -> 'c -> 'b
 
-val foldn : ('a -> int -> 'a) -> 'a -> int -> 'a
+val foldn : ?t:int -> ('a -> int -> 'a) -> 'a -> int -> 'a
 val mapn : (int -> 'a) -> int -> 'a list
 
 (* Use decr and incr instead

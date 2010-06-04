@@ -162,24 +162,23 @@ let speclist =
      "Convert memory accesses to scalars (IndirectROPTIR mode).")
   ::("-ssa-simp", uadd(TransformSsa Ssa_simp.simp_cfg),
      "Perform all supported optimizations on SSA")
-  ::("-ssa-to-single-stmt", 
+  ::("-ssa-to-single-stmt",
      uadd(TransformSsa Depgraphs.DDG_SSA.stmtlist_to_single_stmt),
-     "Create new graph where every node has at most 1 SSA statement"
-    )
-  :: ("-ssa-coalesce",
-      uadd(TransformSsa Coalesce.SSA_Coalesce.coalesce),
+     "Create new graph where every node has at most 1 SSA statement")
+  :: ("-ssa-coalesce", uadd(TransformSsa Coalesce.SSA_Coalesce.coalesce),
       "Perform coalescing on a SSA-CFG graph")
-  :: ("-normalize-mem",
-      uadd(TransformAst Memory2array.coerce_prog),
-      "Normalize memory accesses as array accesses"
-     )
-  :: ("-canonicalize",
-      uadd(TransformAst Traces.canonicalize),
+  :: ("-normalize-mem", uadd(TransformAst Memory2array.coerce_prog),
+      "Normalize memory accesses as array accesses")
+  :: ("-canonicalize", uadd(TransformAst Traces.canonicalize),
       "Convert an input trace to a valid IL program")
-  :: ("-detect-attack",
-      uadd(TransformAst Traces.detect_attack),
-      "Detect the time of attack and output the shortened trace"
-     )
+  :: ("-detect-attack", uadd(TransformAst Traces.detect_attack),
+      "Detect the time of attack and output the shortened trace")
+  :: ("-prune-cfg",
+      uadd(TransformAstCfg Prune_unreachable.prune_unreachable_ast),
+      "Prune unreachable nodes from an AST CFG")
+  :: ("-unroll",
+      Arg.Int (fun i -> add (TransformAstCfg(Unroll.unroll_loops ~count:i))),
+      "<n> Unroll loops n times")
   :: Input.speclist
 
 let anon x = raise(Arg.Bad("Unexpected argument: '"^x^"'"))

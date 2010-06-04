@@ -175,6 +175,7 @@ let structural_analysis c =
 	failwith("structural_analysis: indirect jumps unsupported yet: "^node2s node)
   in
   let minimize_improper g node nset =
+    printg g;
     failwith "structural_analysis: minimize_improper unimplemented"
   in
   let cyclic_region_type g node nset =
@@ -201,7 +202,6 @@ let structural_analysis c =
     let module PC = Graph.Path.Check(G) in
     let module Op = Graph.Oper.I(G) in
     (*let gm = Op.mirror (G.copy g) in*)
-    let path = PC.check_path (PC.create g) in
     let backedges = find_backedges g !entry in
     let is_backedge a b =
       (* FIXME: There's a better way to check for backedgeness, isn't there?. *)
@@ -212,6 +212,7 @@ let structural_analysis c =
     dprintf "get_reachunder: %s backpreds: %s" (node2s n) (nodes2s backpreds);
     let g' = G.copy g in
     G.remove_vertex g' n;
+    let path = PC.check_path (PC.create g') in
     n :: G.fold_vertex (fun m l -> if List.exists (fun k -> path m k) backpreds then m::l else l) g' []
   in
 

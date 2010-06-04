@@ -17,9 +17,9 @@ let curry f = fun x y -> f(x,y)
 let uncurry f = fun (x,y) -> f x y
 
 (** [foldn f i n] is f (... (f (f i n) (n-1)) ...) 0 *)
-let rec foldn f i = function
+let rec foldn ?(t=0) f i n =  match n-t with
   | 0 -> f i 0
-  | n when n>0 -> foldn f (f i n) (n-1)
+  | _ when n>t -> foldn f (f i n) (n-1)
   | -1 -> i
   | _ -> raise (Invalid_argument "negative index number in foldn")
 

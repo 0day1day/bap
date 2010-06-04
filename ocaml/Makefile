@@ -56,6 +56,7 @@ export SOURCES = \
 	comparelib.ml \
 	gadgetlib.ml \
 	structural_analysis.ml \
+	unroll.ml \
 	hacks.ml \
 
 
