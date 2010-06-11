@@ -137,7 +137,9 @@ istream &StdFrame::unserializePart(istream &in)
 ostream &KeyFrame::serialize(ostream &out, uint16_t sz)
 {
 
-   ostream &out2 = Frame::serialize(out, sz + 48);
+   ostream &out2 = Frame::serialize(out, sz + 56);
+   
+   WRITE(out2, pos);
 
    WRITE(out2, eax);
    WRITE(out2, ebx);
@@ -163,6 +165,8 @@ ostream &KeyFrame::serialize(ostream &out, uint16_t sz)
 istream &KeyFrame::unserializePart(istream &in)
 {
 
+   READ(in, pos);
+
    READ(in, eax);
    READ(in, ebx);
    READ(in, ecx);
@@ -183,6 +187,93 @@ istream &KeyFrame::unserializePart(istream &in)
    return in;
 
 }
+
+void KeyFrame::setAll(uint32_t eax, uint32_t ebx, uint32_t ecx, uint32_t edx,
+                      uint32_t esi, uint32_t edi, uint32_t esp, uint32_t ebp,
+                      uint32_t eflags,
+                      uint16_t cs, uint16_t ds, uint16_t ss,
+                      uint16_t es, uint16_t fs, uint16_t gs)
+{
+
+   this->eax = eax;
+   this->ebx = ebx;
+   this->ecx = ecx;
+   this->edx = edx;
+   this->esi = esi;
+   this->edi = edi;
+   this->esp = esp;
+   this->ebp = ebp;
+   this->eflags = eflags;
+
+   this->cs = cs;
+   this->ds = ds;
+   this->ss = ss;
+   this->es = es;
+   this->fs = fs;
+   this->gs = gs;
+
+}
+
+
+ostream &LoadModuleFrame::serialize(ostream &out, uint16_t sz)
+{
+
+   ostream &out2 = Frame::serialize(out, sz + 80);
+
+   WRITE(out2, low_addr);
+   WRITE(out2, high_addr);
+   WRITE(out2, start_addr);
+   WRITE(out2, load_offset);
+   WRITE(out2, name);
+
+   return out2;
+
+}
+
+istream &LoadModuleFrame::unserializePart(istream &in)
+{
+
+   READ(in, low_addr);
+   READ(in, high_addr);
+   READ(in, start_addr);
+   READ(in, load_offset);
+   READ(in, name);
+
+   return in;
+
+}
+
+
+ostream &SyscallFrame::serialize(ostream &out, uint16_t sz)
+{
+   
+   ostream &out2 = Frame::serialize(out, sz + 12 + 4*MAX_SYSCALL_ARGS);
+
+   WRITE(out2, addr);
+   WRITE(out2, tid);
+   WRITE(out2, callno);
+
+   for (int i = 0; i < MAX_SYSCALL_ARGS; i++)
+      WRITE(out2, args[i]);
+
+   return out2;
+
+}
+
+istream &SyscallFrame::unserializePart(istream &in)
+{
+
+   READ(in, addr);
+   READ(in, tid);
+   READ(in, callno);
+
+   for (int i = 0; i < MAX_SYSCALL_ARGS; i++)
+      READ(in, args[i]);
+
+   return in;
+
+}
+
 
 #if 0
 int main(int argc, char **argv)

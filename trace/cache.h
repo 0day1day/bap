@@ -100,6 +100,31 @@ public:
    reg16 &elem16(REG r) { return *((reg16 *) _mapping[r]); }
    reg8 &elem8(REG r) { return *(_mapping[r]); }
 
+   void setAll(uint32_t eax, uint32_t ebx, uint32_t ecx, uint32_t edx,
+               uint32_t esi, uint32_t edi, uint32_t esp, uint32_t ebp,
+               uint32_t eflags,
+               uint16_t cs, uint16_t ds, uint16_t ss,
+               uint16_t es, uint16_t fs, uint16_t gs)
+   {
+      this->eax.full = eax;
+      this->ebx.full = ebx;
+      this->ecx.full = ecx;
+      this->edx.full = edx;
+      this->esi.full = esi;
+      this->edi.full = edi;
+      this->esp.full = esp;
+      this->ebp.full = ebp;
+      this->eflags.full = eflags;
+      
+      this->cs.full = cs;
+      this->ds.full = ds;
+      this->ss.full = ss;
+      this->es.full = es;
+      this->fs.full = fs;
+      this->gs.full = gs;
+
+   }
+
    void clearAll()
    {
 
