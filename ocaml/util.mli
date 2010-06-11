@@ -71,3 +71,4 @@ val take : 'a list -> int -> 'a list
 val list_firstindex : ?s:int -> 'a list -> ('a -> bool) -> int
 val list_insert : 'a list -> 'a list -> int -> 'a list
 val list_remove: 'a list -> int -> int -> 'a list
+val list_compare: ('a -> 'a -> int) -> ('a list) -> ('a list) -> int

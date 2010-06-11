@@ -370,3 +370,20 @@ let list_remove l s r =
     ) (0,[]) l
   in
   List.rev revl
+
+(** Compare two lists using f.  Compares pairs from both lists
+    starting from the first elements using f, and returns the first
+    non-zero result. If there is no non-zero result, zero is returned. *)
+let list_compare f l1 l2 =
+  let v = List.fold_left2
+    (fun s e1 e2 ->
+       match s with
+       | Some(x) -> Some(x)
+       | None -> 
+	   let c = f e1 e2 in
+	   (* If c is not zero, keep it *)
+	   if c <> 0 then Some(c) else None
+    ) None l1 l2 in
+  match v with
+  | None -> 0 (* Equal *)
+  | Some(x) -> x (* Not equal *)
