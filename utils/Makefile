@@ -56,12 +56,12 @@ define PROJ_split
 endef
 export PROJ_split
 
-define PROJ_split
+define PROJ_gadget
 	RESULT=gadget
 	SOURCES = gadget.ml
 	DOC_FILES=$(SOURCES)
 endef
-export PROJ_split
+export PROJ_gadget
 
 
 # suffix for bytecode (which when we make all is debug code)
