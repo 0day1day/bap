@@ -72,3 +72,5 @@ val list_firstindex : ?s:int -> 'a list -> ('a -> bool) -> int
 val list_insert : 'a list -> 'a list -> int -> 'a list
 val list_remove: 'a list -> int -> int -> 'a list
 val list_compare: ('a -> 'a -> int) -> ('a list) -> ('a list) -> int
+val list_cart_prod2: ('a -> 'b -> unit) -> ('a list) -> ('b list) -> unit
+val list_existssome: ('a -> 'b option) -> ('a list) -> 'b option

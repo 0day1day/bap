@@ -387,3 +387,24 @@ let list_compare f l1 l2 =
   match v with
   | None -> 0 (* Equal *)
   | Some(x) -> x (* Not equal *)
+
+(** Given two lists, calls f with every possible combination *)
+let list_cart_prod2 f l1 l2 =
+  List.iter
+    (fun x ->
+       List.iter
+	 (fun y ->
+	    f x y
+	 ) l2
+    ) l1
+
+(** Calls f on each element of l, and returns the first Some(x)
+    returned.  If no Some(x) are returned, None is returned. *)
+let list_existssome f l =
+  List.fold_left
+    (fun state ele ->
+       match state with
+       | Some _ as x -> x (* Already found it *)
+       | None -> f ele
+    ) None l
+	   
