@@ -413,7 +413,7 @@ let list_existssome f l =
 let list_delete l e = 
   let rec delete_aux acc = function
     | [] -> List.rev acc
-    | x::xs when x = e -> (List.rev acc)@xs
+    | x::xs when e == x -> (List.rev acc)@xs
     | x::xs -> delete_aux (x::acc) xs
   in
     delete_aux [] l
