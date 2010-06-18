@@ -408,3 +408,13 @@ let list_existssome f l =
        | None -> f ele
     ) None l
 	   
+(** Deletes the first occurrence of e (if it exists) in the list
+    and returns the updated list *)
+let list_delete l e = 
+  let rec delete_aux acc = function
+    | [] -> List.rev acc
+    | x::xs when x = e -> (List.rev acc)@xs
+    | x::xs -> delete_aux (x::acc) xs
+  in
+    delete_aux [] l
+
