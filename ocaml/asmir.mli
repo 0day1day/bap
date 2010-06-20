@@ -66,6 +66,8 @@ val bap_from_trace_file : ?atts:bool -> string -> Ast.program
 
 val get_function_ranges : asmprogram -> (string * address_t * address_t) list
 
+val get_symbols_hash : ?all:bool -> asmprogram -> (string, Libasmir.asymbol) Hashtbl.t
+
 val get_section_startaddr : asmprogram -> string -> address_t
 val get_section_endaddr : asmprogram -> string -> address_t
 val get_asm_instr_string_range : asmprogram -> address_t -> address_t -> string

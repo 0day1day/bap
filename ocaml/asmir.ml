@@ -441,6 +441,14 @@ let get_symbols ?(all=false) p =
   if err <= 0 then failwith "get_symbols";
   arr
 
+let get_symbols_hash ?(all=false) p =
+  let syms = get_symbols ~all:all p in
+  let h = Hashtbl.create 1000 in
+  Array.iter
+    (fun s ->
+       Hashtbl.add h s.bfd_symbol_name s
+    ) syms;
+  h
 
 let (<<) = (lsl)
 
