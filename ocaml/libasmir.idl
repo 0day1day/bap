@@ -132,6 +132,9 @@ typedef [ref] struct bfd_symbol *asymbol;
 asmir_get_symbols(asm_program_t prog,
 		  [out] long *num);
 
+[length_is(*num)] asymbol*
+asmir_get_all_symbols(asm_program_t prog,
+		  [out] long *num);
 
 enum exp_type_t {
   BINOP, UNOP, CONSTANT, MEM, TEMP, PHI, CAST,

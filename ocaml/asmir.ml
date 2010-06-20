@@ -435,8 +435,9 @@ let bap_from_trace_file ?(atts = true) filename =
 
 
 (* internal only *)
-let get_symbols p =
-  let (arr,err) = asmir_get_symbols p in
+let get_symbols ?(all=false) p =
+  let f = if all then asmir_get_all_symbols else asmir_get_symbols in
+  let (arr,err) = f p in
   if err <= 0 then failwith "get_symbols";
   arr
 
