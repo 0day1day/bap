@@ -9,6 +9,8 @@
 
 #define TRACE_MAGIC 0x43525442
 
+#define TRACE_VERSION 3
+
 #define TRACE_ICACHE_SIZE 1024
 #define TRACE_ICACHE_MASK 0x3ff
 
@@ -23,93 +25,120 @@
  *
  * The trace might also contain a table of contents (TOC), which can be
  * used to quickly seek to a particular frame. The start of the table can
- * be found using the TraceHeader.toc_offset value. Currently the format
- * of the TOC has not been defined.
+ * be found using the TraceHeader.toc_offset value.
  *
- */
-
-/**
- * Standard header prefixing a trace file.
+ * TOC FORMAT:
+ *
+ * The TOC consists of a header, followed by an array of unsigned 32-bit
+ * integers, where each integer refers to an offset in the trace file. The
+ * header contains only a single unsigned 32-bit integer, which represents
+ * the length of the array that follows it. TOC.array[n] (i.e. the nth
+ * element of the TOC array) is the offset into the trace file where the
+ * nth keyframe can be found.
+ * i.e.: TOC ==> [N] [pos 0] [pos 1] ... [pos N-1]
+ *
  */
 
 namespace pintrace { // We will use namespace to avoid collision
 
-struct TraceHeader {
-   uint32_t magic;
-   uint32_t frame_count;
-   uint32_t toc_offset;
-};
+   class TraceExn {
+   public:
+      const std::string msg;
+      TraceExn(const std::string &m) : msg(m) {}
+   };
 
-/**
- * TraceReader: Allows playback of a trace file.
- */
-class TraceReader {
+   /**
+    * Standard header prefixing a trace file.
+    */
+   struct TraceHeader {
+      uint32_t magic;
+      uint32_t version;
+      uint64_t frame_count;
+      uint64_t toc_offset;
+   };
 
-private:
+   /**
+    * TraceReader: Allows playback of a trace file.
+    */
+   class TraceReader {
 
-   uint32_t frm_pos;
+   private:
 
-protected:
-   std::ifstream infile;
-   TraceHeader header;
-   // MAX instruction byte + instruction length (1 byte)
-   char icache[TRACE_ICACHE_SIZE][MAX_INSN_BYTES + 1];
+      uint64_t frm_pos;
 
-public:
-   TraceReader(const char *filename);
+   protected:
+      std::ifstream infile;
+      TraceHeader header;
+      // MAX instruction byte + instruction length (1 byte)
+      char icache[TRACE_ICACHE_SIZE][MAX_INSN_BYTES + 1];
 
-   // Returns total number of frames in the trace.
-   uint32_t count() const;
+   public:
+      TraceReader(const char *filename);
 
-   // Returns current frame position in the trace.
-   uint32_t pos() const;
+      // Returns total number of frames in the trace.
+      uint32_t count() const;
 
-   // Move frame pointer to the specified offset. Returns true iff
-   // successful.
-   bool seek(uint32_t offset);
+      // Returns current frame position in the trace.
+      uint32_t pos() const;
 
-   // Returns the current frame being pointed to and advances the frame
-   // pointer to the next frame.
-   // If noskip is false, the current frame is skipped and NULL is returned
-   // instead.
-   Frame *next(bool noskip = true);
+      // Move frame pointer to the specified offset. Returns true iff
+      // successful.
+      bool seek(uint32_t offset);
 
-   // Returns true iff the frame pointer is beyond the last frame.
-   bool eof() const;
+      // Returns the current frame being pointed to and advances the frame
+      // pointer to the next frame.
+      // If noskip is false, the current frame is skipped and NULL is returned
+      // instead.
+      Frame *next(bool noskip = true);
 
-};
+      // Returns true iff the frame pointer is beyond the last frame.
+      bool eof() const;
 
-/**
- * TraceWriter: Creates a new trace file.
- */
-class TraceWriter {
+   };
 
-private:
+   /**
+    * TraceWriter: Creates a new trace file.
+    */
+   class TraceWriter {
 
-   uint32_t frm_count;
+   private:
+      
+      uint64_t frm_count;
 
-protected:
+   protected:
+      
+      std::ofstream outfile;
 
-   std::ofstream outfile;
+      char icache[TRACE_ICACHE_SIZE][MAX_INSN_BYTES];
 
-   char icache[TRACE_ICACHE_SIZE][MAX_INSN_BYTES];
+   public:
 
-public:
+      // Creates a new TraceWriter that outputs the trace to the file named
+      // "filename". Will truncate the file.
+      TraceWriter(const char *filename);
 
-   // Creates a new TraceWriter that outputs the trace to the file named
-   // "filename". Will truncate the file.
-   TraceWriter(const char *filename);
+      // Returns the current number of frames in the trace.
+      uint32_t count() const;
 
-   // Returns the current number of frames in the trace.
-   uint32_t count() const;
+      // Adds a new frame to the trace.
+      void add(Frame &frm);
 
-   // Adds a new frame to the trace.
-   void add(Frame &frm);
+      // Finalizes the trace file. Will update header values if necessary,
+      // and then add a TOC to the file as specified by the array
+      // 'toc'. If 'toc' is NULL, then no TOC will be added, unless
+      // buildTOC is true, in which case the entire trace will be
+      // traversed to build the TOC structure. The file is then closed.
+      // NOTE: 'toc' must be in the TOC format as specified above.
+      void finalize(uint32_t *toc, bool buildTOC = false);
 
-   // Finalizes the trace file by updating header values if necessary,
-   // building the TOC if requested, and then closing the file.
-   void finalize(bool buildTOC = true);
 
-};
+      // Returns the current position of the output file's put pointer,
+      // i.e. the offset at which the next frame will be written into.
+      // This is a helper function that can be used to determine keyframe
+      // offsets, to aid in building the TOC.
+      uint32_t offset()
+      { return outfile.tellp(); }
+
+   };
 
 }; // End of namespace

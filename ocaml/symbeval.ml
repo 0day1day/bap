@@ -150,24 +150,27 @@ struct
 
 (* Printing the contents of Delta *)
   let print_values delta =
-    Printf.printf "contents of variables:\n" ;
+    pdebug "contents of variables" ;
     VH.iter 
      (fun k v ->
        match k,v with 
        | var,Symbolic e -> 
-         Printf.printf "%s = %s\n" (Var.name var) (Pp.ast_exp_to_string e)
+         pdebug ((Var.name var) ^ " = " ^ (Pp.ast_exp_to_string e))
        | _ -> ()
      ) delta
 
   let print_mem delta =
-    Printf.printf "contents of memories:\n" ;
+    pdebug "contents of memories" ;
     VH.iter 
      (fun k v ->
        match k,v with 
        | var, ConcreteMem(mem,_) -> 
-         Printf.printf "memory %s:\n" (Var.name var) ; 
+         pdebug ("memory " ^ (Var.name var)) ; 
          AddrMap.iter
-           (fun i v -> Printf.printf "%Lx -> %s\n" i (Pp.ast_exp_to_string v))
+           (fun i v -> 
+	      pdebug((Printf.sprintf "%Lx" i) 
+		     ^ " -> " ^ (Pp.ast_exp_to_string v))
+	   )
 	   mem
        | _ -> ()
      ) delta
@@ -231,7 +234,8 @@ struct
          let mem_arr = symb_to_exp ind 
          and endian_exp = symb_to_exp endian in
          Symbolic (lookup_mem mem mem_arr endian_exp)
-       | Reg _ -> eval_expr delta (Memory2array.split_loads mem ind t endian)
+       | Reg _ -> 
+	   eval_expr delta (Memory2array.split_loads mem ind t endian)
        | Array _ ->
          failwith "loading array currently unsupported"
        | _ -> failwith "not a loadable type"
@@ -245,16 +249,20 @@ struct
          let mem = symb_mem mem in
          update_mem mem index value endian
        | Reg _ -> 
-       (*   let byte_writes,_,_ = Memory2array.split_write_list mem index t endian value in
-          let stored_bytes = List.map (eval_expr delta) byte_writes in
-          if List.exists is_symbolic stored_bytes then *)
-        if not (is_symbolic_store mem) && is_concrete index
-        then eval_expr delta (Memory2array.split_writes mem index t endian value)
-        else symb_mem (Memory2array.split_writes mem index t endian value)
-       (*   else eval_expr delta (Memory2array.split_writes mem index t endian value)*)
+	   (* let byte_writes,_,_ = 
+	      Memory2array.split_write_list mem index t endian value in
+              let stored_bytes = List.map (eval_expr delta) byte_writes in
+              if List.exists is_symbolic stored_bytes then *)
+           if not (is_symbolic_store mem) && is_concrete index
+           then eval_expr delta 
+	     (Memory2array.split_writes mem index t endian value)
+           else symb_mem 
+	     (Memory2array.split_writes mem index t endian value)
+	     (* else eval_expr delta (Memory2array.split_writes mem index t endian value)*)
        | Array _ -> 
          failwith "storing array currently unsupported"
-       | _ -> failwith "not a storable type"
+       | _ -> 
+	   failwith "not a storable type"
       )
     | Unknown _ as u -> Symbolic u (*failwith "unknown value encountered"*)
    in 

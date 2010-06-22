@@ -322,4 +322,4 @@ let rec take_aux acc = function
  | (_, 0) | ([],_) -> List.rev acc
  | (x::xs, n) -> take_aux (x::acc) (xs,n-1)
 
-let take l n = take_aux [] (l, n)
+let take n l = take_aux [] (l, n)

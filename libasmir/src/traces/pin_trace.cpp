@@ -16,11 +16,18 @@ TraceReader::TraceReader(const char *filename)
 
    infile.read((char *) &header, sizeof(TraceHeader));
 
-   // Setup the cache.
-   memset(icache, 0, TRACE_ICACHE_SIZE * MAX_INSN_BYTES);
+   if (header.magic != TRACE_MAGIC) {
+      throw TraceExn("Bad magic value.");
+   }
 
-   // TODO: Check magic value.
+   if (header.version != TRACE_VERSION) {
+      throw TraceExn("Bad version.");
+   }
+
    // TODO: Read in and build the TOC structure.
+
+   // Setup the cache.
+   memset(icache, 0, TRACE_ICACHE_SIZE * (MAX_INSN_BYTES + 1));
 
 }
 
@@ -104,6 +111,7 @@ TraceWriter::TraceWriter(const char *filename)
 
    TraceHeader hdr;
    hdr.magic = 0;
+   hdr.version = 0;
    hdr.frame_count = 0;
    hdr.toc_offset = 0;
 
@@ -149,19 +157,35 @@ void TraceWriter::add(Frame &frm)
    frm_count++;
 }
 
-// Finalizes the trace file by updating header values if necessary,
-// building the TOC if requested, and then closing the file.
-void TraceWriter::finalize(bool buildTOC)
+// Finalizes the trace file. Will update header values if necessary, and
+// then add a TOC to the file as specified by the array 'toc'. If 'toc' is
+// NULL, then no TOC will be added, unless buildTOC is true, in which case
+// the entire trace will be traversed to build the TOC structure. The file
+// is then closed.
+void TraceWriter::finalize(uint32_t *toc, bool buildTOC)
 {
 
-   // TODO: Build the TOC.
+   uint64_t toc_offset = 0;
+
+   if (toc != NULL) {
+
+      toc_offset = (uint64_t) outfile.tellp();
+
+      uint32_t toc_len = *toc;
+
+      outfile.write((const char *) toc, (toc_len + 1) * sizeof(uint32_t));
+
+   } else if (buildTOC) {
+      // TODO: Build the TOC.
+   }
 
    // Write the real header to the file.
 
    TraceHeader hdr;
    hdr.magic = TRACE_MAGIC;
+   hdr.version = TRACE_VERSION;
    hdr.frame_count = frm_count;
-   hdr.toc_offset = 0;
+   hdr.toc_offset = toc_offset;
 
    outfile.seekp(0);
    outfile.write((const char *) &hdr, sizeof(TraceHeader));

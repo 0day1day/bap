@@ -61,7 +61,7 @@ type pos = (string * int)
     statement.
  *)
 
-type taint_type = Taint | Untaint
+type taint_type = Taint of int
 
 type context = 
  {

@@ -148,6 +148,12 @@ let speclist =
      uadd(TransformSsa Depgraphs.DDG_SSA.stmtlist_to_single_stmt),
      "Create new graph where every node has at most 1 SSA statement"
     )
+  ::("-trace-cut", Arg.Int(fun i -> add(TransformAst(Util.take i))),
+     "<n>  Get the first <n> instructions of the trace")
+  ::("-trace-concrete", 
+     uadd(TransformAst Traces.concolic),
+     "Execute the trace concretely and gather constraints"
+    )
   :: ("-normalize-mem",
       uadd(TransformAst Memory2array.coerce_prog),
       "Normalize memory accesses as array accesses"

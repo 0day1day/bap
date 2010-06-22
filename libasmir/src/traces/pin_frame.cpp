@@ -36,6 +36,12 @@ Frame *Frame::unserialize(istream &in, bool noskip)
    case FRM_KEY:
       f = new KeyFrame;
       break;
+   case FRM_LOADMOD:
+      f = new LoadModuleFrame;
+      break;
+   case FRM_SYSCALL:
+      f = new SyscallFrame;
+      break;
    case FRM_NONE:
    default:
       // TODO: Error handling here.
@@ -103,6 +109,9 @@ ostream &StdFrame::serialize(ostream &out, uint16_t sz)
    out2.write((const char *) &rawbytes, insn_length * sizeof(char));
    out2.write((const char *) &cachemask, masklen);
    out2.write((const char *) &values, values_count * sizeof(uint32_t));
+   out2.write((const char *) &types, values_count * sizeof(uint32_t));
+   out2.write((const char *) &locs, values_count * sizeof(uint32_t));
+   out2.write((const char *) &tainted, values_count * sizeof(uint32_t));
 
    return out2;
 
@@ -128,16 +137,62 @@ istream &StdFrame::unserializePart(istream &in)
    // Note: ((x-1) >> 3) + 1 === ceil(x / 8.0)
    in.read((char *) &cachemask, ((values_count - 1) >> 3) + 1);
 
-   in.read((char *) &values, values_count * sizeof(uint32_t));
+	 in.read((char *) &values, values_count * sizeof(uint32_t));
+   in.read((char *) &types, values_count * sizeof(uint32_t));
+   in.read((char *) &locs, values_count * sizeof(uint32_t));
+   in.read((char *) &tainted, values_count * sizeof(uint32_t));
 
    return in;
 
 }
 
+conc_map_vec * StdFrame::getOperands()
+{
+        conc_map_vec * concrete_pairs = new vector<conc_map *>();
+        int i, type, taint; bool mem;
+        string name;
+        const_val_t index, value;
+        conc_map * map;
+        for ( i = 0 ; i < values_count ; i ++ )
+        {
+                switch (types[i])
+                { 
+                        case VT_REG32: 
+                        case VT_REG16: 
+                        case VT_REG8: 
+                                name = pin_register_name(locs[i]);
+                                mem = false;
+                                value = values[i] ;
+                                taint = tainted[i] ;
+                                map = new ConcPair(name,mem,get_type(types[i]),index,value,taint);
+                                concrete_pairs->push_back(map);
+                                break;
+                        case VT_MEM32: 
+                        case VT_MEM16: 
+                        case VT_MEM8: 
+                                name = "mem";
+                                mem = true;
+                                index = locs[i] ;
+                                value = values[i] ;
+                                taint = tainted[i] ;
+                                map = new ConcPair(name,mem,get_type(types[i]),index,value,taint);
+                                concrete_pairs->push_back(map);
+                                break ;
+                        default : 
+                                cerr << "type: " << types[i] << endl ; 
+                                assert(0) ;
+                }
+        }
+        return concrete_pairs;
+}
+
+
 ostream &KeyFrame::serialize(ostream &out, uint16_t sz)
 {
 
-   ostream &out2 = Frame::serialize(out, sz + 48);
+   ostream &out2 = Frame::serialize(out, sz + 56);
+   
+   WRITE(out2, pos);
 
    WRITE(out2, eax);
    WRITE(out2, ebx);
@@ -163,6 +218,8 @@ ostream &KeyFrame::serialize(ostream &out, uint16_t sz)
 istream &KeyFrame::unserializePart(istream &in)
 {
 
+   READ(in, pos);
+
    READ(in, eax);
    READ(in, ebx);
    READ(in, ecx);
@@ -183,6 +240,116 @@ istream &KeyFrame::unserializePart(istream &in)
    return in;
 
 }
+
+void KeyFrame::setAll(uint32_t eax, uint32_t ebx, uint32_t ecx, uint32_t edx,
+                      uint32_t esi, uint32_t edi, uint32_t esp, uint32_t ebp,
+                      uint32_t eflags,
+                      uint16_t cs, uint16_t ds, uint16_t ss,
+                      uint16_t es, uint16_t fs, uint16_t gs)
+{
+
+   this->eax = eax;
+   this->ebx = ebx;
+   this->ecx = ecx;
+   this->edx = edx;
+   this->esi = esi;
+   this->edi = edi;
+   this->esp = esp;
+   this->ebp = ebp;
+   this->eflags = eflags;
+
+   this->cs = cs;
+   this->ds = ds;
+   this->ss = ss;
+   this->es = es;
+   this->fs = fs;
+   this->gs = gs;
+
+}
+
+
+ostream &LoadModuleFrame::serialize(ostream &out, uint16_t sz)
+{
+
+   ostream &out2 = Frame::serialize(out, sz + 80);
+
+   WRITE(out2, low_addr);
+   WRITE(out2, high_addr);
+   WRITE(out2, start_addr);
+   WRITE(out2, load_offset);
+   WRITE(out2, name);
+
+   return out2;
+
+}
+
+istream &LoadModuleFrame::unserializePart(istream &in)
+{
+
+   READ(in, low_addr);
+   READ(in, high_addr);
+   READ(in, start_addr);
+   READ(in, load_offset);
+   READ(in, name);
+
+   return in;
+
+}
+
+
+ostream &SyscallFrame::serialize(ostream &out, uint16_t sz)
+{
+   
+   ostream &out2 = Frame::serialize(out, sz + 12 + 4*MAX_SYSCALL_ARGS);
+
+   WRITE(out2, addr);
+   WRITE(out2, tid);
+   WRITE(out2, callno);
+
+   for (int i = 0; i < MAX_SYSCALL_ARGS; i++)
+      WRITE(out2, args[i]);
+
+   return out2;
+
+}
+
+istream &SyscallFrame::unserializePart(istream &in)
+{
+
+   READ(in, addr);
+   READ(in, tid);
+   READ(in, callno);
+
+   for (int i = 0; i < MAX_SYSCALL_ARGS; i++)
+      READ(in, args[i]);
+
+   return in;
+
+}
+
+conc_map_vec * SyscallFrame::getOperands()
+{
+        conc_map_vec * concrete_pairs = new vector<conc_map *>();
+        int type, taint; bool mem;
+        string name;
+        const_val_t index, value;
+        conc_map * map;
+        uint32_t bytes = callno;
+        uint32_t i;
+        for ( i = 0 ; i < callno ; i ++ )
+				{
+								name = "mem";
+								mem = true;
+								index = args[1] + i ;
+								value = 0;
+								taint = i ;
+								map = new ConcPair(name,mem,get_type(VT_MEM8),index,value,taint);
+								concrete_pairs->push_back(map);
+				}
+        return concrete_pairs;
+}
+
+
 
 #if 0
 int main(int argc, char **argv)

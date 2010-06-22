@@ -178,9 +178,7 @@ let attr_type_to_typ = function
  | INT_64 -> reg_64
 
 (* TODO: needs to be refined for bytes *)
-let int_to_taint = function 
- | 0 -> Untaint
- | _ -> Taint
+let int_to_taint n = Taint n
 
 let tr_context_tup attr =
   Context {name=Libasmir.attr_name attr;
