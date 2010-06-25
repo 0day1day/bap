@@ -398,6 +398,20 @@ let list_cart_prod2 f l1 l2 =
 	 ) l2
     ) l1
 
+(** Given three lists, calls f with every possible combination *)
+let list_cart_prod3 f l1 l2 l3 =
+  List.iter
+    (fun x ->
+       List.iter
+	 (fun y ->
+	    List.iter
+	      (fun z ->
+		 f x y z
+	      ) l3
+	 ) l2
+    ) l1
+
+
 (** Calls f on each element of l, and returns the first Some(x)
     returned.  If no Some(x) are returned, None is returned. *)
 let list_existssome f l =

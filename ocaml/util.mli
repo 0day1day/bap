@@ -74,4 +74,5 @@ val list_remove: 'a list -> int -> int -> 'a list
 val list_delete: 'a list -> 'a -> 'a list
 val list_compare: ('a -> 'a -> int) -> ('a list) -> ('a list) -> int
 val list_cart_prod2: ('a -> 'b -> unit) -> ('a list) -> ('b list) -> unit
+val list_cart_prod3: ('a -> 'b -> 'c -> unit) -> ('a list) -> ('b list) -> ('c list) -> unit
 val list_existssome: ('a -> 'b option) -> ('a list) -> 'b option
