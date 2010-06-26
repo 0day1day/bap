@@ -20,7 +20,7 @@ open Type
   
 module VH = Var.VarHash
   
-module D = Debug.Make(struct let name = "SymbEval" and default=`Debug end)
+module D = Debug.Make(struct let name = "SymbEval" and default=`NoDebug end)
 open D
 
 (* For now, we'll map every byte. Later it may be better to map larger
@@ -54,6 +54,8 @@ type mem = Ast.exp AddrMap.t * Var.t (* addr -> val + initial name *)
   exception ExcState of string * addr
   (* Program halted, with optional halt value, and with given execution context. *)
   exception Halted of varval option * ctx
+    
+  exception UnknownLabel
 
   exception AssertFailed of ctx
 
@@ -119,33 +121,43 @@ struct
    try Hashtbl.find lambda lab
    with Not_found -> 
      match lab with
-      | Name s -> failwith ("jump to inexistent label "^s)
-      | Addr x -> failwith ("jump to inexistent label "^(Int64.to_string x))
+      | Name _ (*-> failwith ("jump to inexistent label "^s)*)
+      | Addr _ -> raise UnknownLabel (*failwith ("jump to inexistent label "^
+			      (Printf.sprintf "%Lx" x)) *)
 
   let lookup_var = MemL.lookup_var
   let conc2symb = MemL.conc2symb
   let normalize = MemL.normalize
   let update_mem = MemL.update_mem
   let lookup_mem = MemL.lookup_mem
-
- (* Initializers *)
-  let build_default_context prog_stmts =
+    
+  (* Initializers *)
+  let create_state () = 
     let sigma : (addr, instr) Hashtbl.t = Hashtbl.create 5700 
     and pc = Int64.zero 
     and delta : varval VH.t = VH.create 5700
     and lambda : (label_kind, addr) Hashtbl.t = Hashtbl.create 5700 in
+      {pred=exp_true; delta=delta; sigma=sigma; lambda=lambda; pc=pc} 
+
+  let initialize_prog state prog_stmts =
+    Hashtbl.clear state.sigma ;
+    Hashtbl.clear state.lambda ;
     (* Initializing Sigma and Lambda *)
     ignore 
       (List.fold_left
-        (fun pc s ->
-          Hashtbl.add sigma pc s ;
-          (match s with
-            | Label (lab,_) -> Hashtbl.add lambda lab pc
-            | _ -> () 
-          ) ;
-          Int64.succ pc
-        ) pc prog_stmts ) ; 
-    {pred=exp_true; delta=delta; sigma=sigma; lambda=lambda; pc=pc}
+         (fun pc s ->
+          Hashtbl.add state.sigma pc s ;
+            (match s with
+               | Label (lab,_) -> Hashtbl.add state.lambda lab pc
+               | _ -> () 
+            ) ;
+            Int64.succ pc
+         ) state.pc prog_stmts )
+      
+  let build_default_context prog_stmts =
+    let state = create_state() in
+      initialize_prog state prog_stmts ;
+      state
  
 
 (* Printing the contents of Delta *)
@@ -311,6 +323,7 @@ struct
         (match eval_expr delta e with
          | v when is_symbolic v -> 
            let pred' = BinOp (AND,symb_to_exp v, pred) in
+	     pdebug("Adding assertion: " ^ (Pp.ast_exp_to_string pred')) ;  
            [{ctx with pred=pred'; pc=next_pc}]
          | v when is_false_val v ->
 	     raise (AssertFailed ctx)

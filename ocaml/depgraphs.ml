@@ -633,6 +633,7 @@ struct
     let fold_vertex = Cfg.AST.G.fold_vertex
     let iter_succ = Cfg.AST.G.iter_succ
     let fold_succ = Cfg.AST.G.fold_succ
+    let is_directed = true
   end
 
   module Traverse = Graph.Traverse.Dfs(TG)

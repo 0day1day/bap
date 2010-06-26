@@ -35,6 +35,7 @@ export SOURCES = \
 	libasmir.idl \
 	asmir.mli asmir.ml \
 	grammar.mly lexer.mll \
+	stp_grammar.mly stp_lexer.mll \
 	parser.ml \
 	memory2array.ml \
 	input.mli input.ml \

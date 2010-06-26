@@ -446,32 +446,32 @@ string pin_register_name(uint32_t id)
 {
 
 switch (id) {
-    case REG_INVALID_ :
-    case REG_NONE :
-    case REG_FIRST:
+    //case REG_INVALID_ :
+    //case REG_NONE :
+    //case REG_FIRST:
 
     // immediate operand
     //case REG_IMM8 :
     //case REG_IMM_BASE:
-    case REG_IMM:
-    case REG_IMM32:
+    //case REG_IMM:
+    //case REG_IMM32:
     //case REG_IMM_LAST:
 
     // memory operand
-    case REG_MEM:
+    //case REG_MEM:
     //case REG_MEM_BASE:
-    case REG_MEM_OFF8:
-    case REG_MEM_OFF32:
+    //case REG_MEM_OFF8:
+    //case REG_MEM_OFF32:
     //case REG_MEM_LAST:
 
     // memory-address offset operand
-    case REG_OFF8:
+    //case REG_OFF8:
     //case REG_OFF_BASE:
-    case REG_OFF:
-    case REG_OFF32:
+    //case REG_OFF:
+    //case REG_OFF32:
     //case REG_OFF_LAST:
 
-    case REG_MODX:
+    //case REG_MODX:
 
     // base for all kinds of registers (application: machine: pin)
     //case REG_RBASE: 
@@ -563,21 +563,21 @@ switch (id) {
     //case REG_GR_LAST:
     //case REG_EAX:
     
-    case REG_SEG_BASE:
+    //case REG_SEG_BASE:
     //case REG_SEG_CS:
     //case REG_SEG_BASE:
-    case REG_SEG_SS:
-    case REG_SEG_DS:
-    case REG_SEG_ES:
-    case REG_SEG_FS:
-    case REG_SEG_GS:
+    //case REG_SEG_SS:
+    //case REG_SEG_DS:
+    //case REG_SEG_ES:
+    //case REG_SEG_FS:
+    //case REG_SEG_GS:
     //case REG_SEG_LAST:
     //case REG_SEG_GS:
 
     case REG_EFLAGS:  return string("EFLAGS");
     //case REG_GFLAGS:
     //case REG_EFLAGS:
-    case REG_EIP:
+    //case REG_EIP:
     //case REG_INST_PTR:
     //case REG_EIP:
 //#endif
@@ -586,29 +586,29 @@ switch (id) {
     //case REG_INST_PTR:
 
     // partial registers common to both the IA-32 and Intel(R) 64 architectures.
-    case REG_AL:
-    case REG_AH:
-    case REG_AX:
+    case REG_AL:  return string("R_EAX");
+    //case REG_AH:
+    //case REG_AX:
     
-    case REG_CL:
-    case REG_CH:
-    case REG_CX:
+    case REG_CL:  return string("R_ECX");
+    //case REG_CH:
+    //case REG_CX:
     
-    case REG_DL:
-    case REG_DH:
-    case REG_DX:
+    //case REG_DL:
+    //case REG_DH:
+    //case REG_DX:
     
-    case REG_BL:
-    case REG_BH:
-    case REG_BX:
+    //case REG_BL:
+    //case REG_BH:
+    //case REG_BX:
 
-    case REG_BP:
-    case REG_SI:
-    case REG_DI:
+    //case REG_BP:
+    //case REG_SI:
+    //case REG_DI:
 
-    case REG_SP:
-    case REG_FLAGS:
-    case REG_IP:
+    //case REG_SP:
+    //case REG_FLAGS:
+    //case REG_IP:
     
 /*#if defined(TARGET_IA32E)
     // partial registers in the Intel(R) 64 architecture
@@ -822,8 +822,9 @@ switch (id) {
     case REG_MACHINE_LAST = case REG_FPST_LAST:
     
     case REG_STATUS_FLAGS:
-    case REG_DF_FLAG:
-    
+*/
+    case REG_DF_FLAG: return string("R_DFLAG");
+/*    
     case REG_AGGcase REGATE_BASE:
     case REG_FPST_ALL = case REG_AGGcase REGATE_BASE:
     case REG_AGGcase REGATE_LAST = case REG_FPST_ALL:

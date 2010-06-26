@@ -1,4 +1,4 @@
-export BAP_OCAMLDIR=../ocaml
+export BAP_OCAMLDIR = ../ocaml/
 export OCAMLMAKEFILE=$(BAP_OCAMLDIR)/OCamlMakefile
 
 # ocamlfind packages required
@@ -7,12 +7,12 @@ export LIBS = bap
 export INCDIRS = $(BAP_OCAMLDIR)
 
 # Include sources from ../ocaml in the automatically generated dependencies.
-export SOURCE_DIRS = $(BAP_OCAMLDIR)
+export SOURCE_DIRS_IN = $(BAP_OCAMLDIR)
 
 
 # default subprojects to build
 ifndef SUBPROJS
-	export SUBPROJS = toil iltrans topredicate
+	export SUBPROJS = toil iltrans topredicate formula
 endif
 
 
@@ -38,6 +38,12 @@ define PROJ_topredicate
 endef
 export PROJ_topredicate
 
+define PROJ_formula
+	RESULT=formula
+	SOURCES = formula.ml
+	DOC_FILES=$(SOURCES)
+endef
+export PROJ_formula
 
 # suffix for bytecode (which when we make all is debug code)
 export BCSUFFIX = .dbg

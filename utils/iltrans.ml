@@ -151,8 +151,12 @@ let speclist =
   ::("-trace-cut", Arg.Int(fun i -> add(TransformAst(Util.take i))),
      "<n>  Get the first <n> instructions of the trace")
   ::("-trace-concrete", 
+     uadd(TransformAst Traces.concrete),
+     "Execute the trace concretely and obtain a straightline trace"
+    )
+  ::("-trace-concolic", 
      uadd(TransformAst Traces.concolic),
-     "Execute the trace concretely and gather constraints"
+     "Execute the trace symbolically and generate the formula"
     )
   :: ("-normalize-mem",
       uadd(TransformAst Memory2array.coerce_prog),
