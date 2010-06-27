@@ -158,6 +158,10 @@ let speclist =
      uadd(TransformAst Traces.concolic),
      "Execute the trace symbolically and generate the formula"
     )
+  ::("-trace-formula", 
+     Arg.String(fun f -> add(TransformAst(Traces.output_formula f))),
+     "<file> Output the STP trace formula to <file>"
+    )
   :: ("-normalize-mem",
       uadd(TransformAst Memory2array.coerce_prog),
       "Normalize memory accesses as array accesses"

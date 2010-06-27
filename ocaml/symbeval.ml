@@ -20,7 +20,7 @@ open Type
   
 module VH = Var.VarHash
   
-module D = Debug.Make(struct let name = "SymbEval" and default=`NoDebug end)
+module D = Debug.Make(struct let name = "SymbEval" and default=`Debug end)
 open D
 
 (* For now, we'll map every byte. Later it may be better to map larger
@@ -186,6 +186,18 @@ struct
 	   mem
        | _ -> ()
      ) delta
+
+  let print_var delta name =
+    VH.iter
+      (fun var exp ->
+	 match exp with
+	   | Symbolic e ->
+	       let varname = Var.name var in
+		 if varname = name then
+		   pdebug (varname ^ " = " 
+			   ^ (Pp.ast_exp_to_string e))
+	   | _ -> ()
+      ) delta
 
   (* Evaluate an expression in a context Delta,Mu *)
   let rec eval_expr delta expr =
