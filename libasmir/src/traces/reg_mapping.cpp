@@ -566,7 +566,7 @@ switch (id) {
     //case REG_SEG_BASE:
     //case REG_SEG_CS:
     //case REG_SEG_BASE:
-    //case REG_SEG_SS:
+    case REG_SEG_SS:  return string("SS");
     //case REG_SEG_DS:
     //case REG_SEG_ES:
     //case REG_SEG_FS:

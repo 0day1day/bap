@@ -158,6 +158,10 @@ let speclist =
      uadd(TransformAst Traces.concolic),
      "Execute the trace symbolically and generate the formula"
     )
+   ::("-trace-target", 
+     Arg.String (fun i -> add(TransformAst(Traces.convert i))),
+     "<addr> Provide the target address <addr>"
+    )   
   ::("-trace-formula", 
      Arg.String(fun f -> add(TransformAst(Traces.output_formula f))),
      "<file> Output the STP trace formula to <file>"

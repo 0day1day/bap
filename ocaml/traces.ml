@@ -450,10 +450,10 @@ let symbolic_run trace =
 	   (*pdebug (Pp.ast_stmt_to_string stmt);
 	   (match stmt with
 	      | Ast.Label (_,atts) when filter_taint atts != [] -> 
-		  pdebug ("block no: " ^ (string_of_int !counter));
-		  counter := !counter + 1 ;
-	      | _ -> ());
-	   *)
+		  TraceSymbolic.print_var state.delta "R_ESP" 
+		  (*pdebug ("block no: " ^ (string_of_int !counter));
+		  counter := !counter + 1 ;*)
+	      | _ -> ());*)
 	   match TraceSymbolic.eval_stmt state stmt with
 	     | [next] -> next
 	     | _ -> failwith "Jump in a straightline program"
@@ -474,11 +474,12 @@ let symbolic_run trace =
 	  state.pred
 	    
 (* Substituting the last jump with assertions *)
-let convert trace = 
+let convert addr trace = 
+  let target = Int64.of_string ("0x"^addr) in
   let rec sub = function
     | [] -> failwith "no jump found"
     | (Ast.Jmp(e, atts))::rest ->
-	let e' = BinOp(EQ,e,Int(0x08048554L,reg_32)) in
+	let e' = BinOp(EQ,e,Int(target,reg_32)) in
 	(Ast.Assert(e', atts))::rest
     | _::rest -> sub rest
   in
@@ -490,7 +491,6 @@ let convert trace =
 	
 
 let concolic trace = 
-  let trace = convert trace in
   let trace = concrete trace in
   ignore (symbolic_run trace) ;
   trace
@@ -501,7 +501,6 @@ let concolic trace =
 (*************************************************************)
 
 let generate_formula trace = 
-  let trace = convert trace in
   let trace = concrete trace in
     symbolic_run trace
  
