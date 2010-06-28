@@ -411,6 +411,22 @@ let list_cart_prod3 f l1 l2 l3 =
 	 ) l2
     ) l1
 
+(** Given four lists, calls f with every possible combination *)
+let list_cart_prod4 f l1 l2 l3 l4 =
+  List.iter
+    (fun x ->
+       List.iter
+	 (fun y ->
+	    List.iter
+	      (fun z ->
+		 List.iter
+		   (fun w ->
+		      f x y z w
+		   ) l4
+	      ) l3
+	 ) l2
+    ) l1
+
 
 (** Calls f on each element of l, and returns the first Some(x)
     returned.  If no Some(x) are returned, None is returned. *)
