@@ -2,7 +2,7 @@
   open Stp_grammar
 }
 
-let digit = ['0'-'9']
+let digit = ['0'-'9''A'-'F''a'-'f']
 let varname = ['A'-'Z''a'-'z']['A'-'Z''a'-'z''0'-'9''_']*
 
 rule token = parse
