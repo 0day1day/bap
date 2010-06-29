@@ -20,7 +20,7 @@ open Type
   
 module VH = Var.VarHash
   
-module D = Debug.Make(struct let name = "SymbEval" and default=`Debug end)
+module D = Debug.Make(struct let name = "SymbEval" and default=`NoDebug end)
 open D
 
 (* For now, we'll map every byte. Later it may be better to map larger

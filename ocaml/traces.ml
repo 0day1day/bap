@@ -423,29 +423,30 @@ end
 module TraceSymbolic = Symbeval.Make(TaintSymbolic)(FullSubst)
 
       
-let add_symbolic_seeds header state =
-  let atts,_ = get_first_atts [header] in
-  List.iter
-    (fun {index=index; taint=Taint taint} ->
-       let newvarname = "symb_" ^ (string_of_int taint) in
-       let sym_var = Var (Var.newvar newvarname reg_8) in
-	 pdebug ("Introducing symbolic: " 
-		 ^(Printf.sprintf "%Lx" index)
-		 ^" -> "
-		 ^(Pp.ast_exp_to_string sym_var));
-	 add_symbolic index sym_var
-    ) atts
-
+let add_symbolic_seeds header =
+  try 
+    let atts,_ = get_first_atts [header] in
+      List.iter
+	(fun {index=index; taint=Taint taint} ->
+	   let newvarname = "symb_" ^ (string_of_int taint) in
+	   let sym_var = Var (Var.newvar newvarname reg_8) in
+	     pdebug ("Introducing symbolic: " 
+		     ^(Printf.sprintf "%Lx" index)
+		     ^" -> "
+		     ^(Pp.ast_exp_to_string sym_var));
+	     add_symbolic index sym_var
+	) atts
+  with _ -> ()
+	
+	  
 let symbolic_run trace = 
   counter := 1 ;
-  let trace = List.tl trace in
-  let header, trace = hd_tl trace in
   let trace = append_halt trace in
   let state = TraceSymbolic.build_default_context trace in
-  add_symbolic_seeds header state ;
     try 
       let state = List.fold_left 
 	(fun state stmt ->
+	   add_symbolic_seeds stmt;
 	   update_concrete stmt ;
 	   (*pdebug (Pp.ast_stmt_to_string stmt);
 	   (match stmt with
