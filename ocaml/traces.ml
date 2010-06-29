@@ -422,10 +422,10 @@ end
 
 module TraceSymbolic = Symbeval.Make(TaintSymbolic)(FullSubst)
 
+let is_seed_label = (=) "Read Syscall"
       
-let add_symbolic_seeds header =
-  try 
-    let atts,_ = get_first_atts [header] in
+let add_symbolic_seeds = function
+  | Ast.Label (Name s,atts) when is_seed_label s ->
       List.iter
 	(fun {index=index; taint=Taint taint} ->
 	   let newvarname = "symb_" ^ (string_of_int taint) in
@@ -435,8 +435,8 @@ let add_symbolic_seeds header =
 		     ^" -> "
 		     ^(Pp.ast_exp_to_string sym_var));
 	     add_symbolic index sym_var
-	) atts
-  with _ -> ()
+	) (filter_taint atts)
+  | _ -> ()
 	
 	  
 let symbolic_run trace = 
