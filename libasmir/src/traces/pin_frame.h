@@ -19,6 +19,14 @@
 
 #define MAX_SYSCALL_ARGS 5
 
+/***************** Syscalls ***************/
+// FIXME: use the ones from /usr/include/asm/unistd.h
+     
+#define __NR_read		  3
+#define __NR_open		  5
+#define __NR_execve		 11
+
+/********************************************/
 
 enum FrameType {
 
@@ -36,6 +44,9 @@ enum FrameType {
 
    // Frame containing information about a system call.
    FRM_SYSCALL = 4,
+
+   // Frame taint information
+   FRM_TAINT = 5,
 
 };
 
@@ -299,6 +310,19 @@ namespace pintrace { // Use namespace to avoid conflict
       uint32_t args[MAX_SYSCALL_ARGS];
       
       SyscallFrame() : Frame(FRM_SYSCALL) {}
+      virtual std::ostream &serialize(std::ostream &out, uint16_t sz = 0);
+      virtual std::istream &unserializePart(std::istream &in);
+      conc_map_vec * getOperands();
+      
+   };
+
+   struct TaintFrame : public Frame {
+
+      uint32_t id;
+      uint32_t length;
+      uint32_t addr;
+      
+      TaintFrame() : Frame(FRM_TAINT) {}
       virtual std::ostream &serialize(std::ostream &out, uint16_t sz = 0);
       virtual std::istream &unserializePart(std::istream &in);
       conc_map_vec * getOperands();

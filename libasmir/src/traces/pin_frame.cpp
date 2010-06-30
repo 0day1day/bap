@@ -42,6 +42,9 @@ Frame *Frame::unserialize(istream &in, bool noskip)
    case FRM_SYSCALL:
       f = new SyscallFrame;
       break;
+   case FRM_TAINT:
+      f = new TaintFrame;
+      break;
    case FRM_NONE:
    default:
       // TODO: Error handling here.
@@ -329,26 +332,73 @@ istream &SyscallFrame::unserializePart(istream &in)
 
 conc_map_vec * SyscallFrame::getOperands()
 {
-        conc_map_vec * concrete_pairs = new vector<conc_map *>();
-        int type, taint; bool mem;
-        string name;
-        const_val_t index, value;
-        conc_map * map;
-        uint32_t bytes = callno;
-        uint32_t i;
-        for ( i = 0 ; i < callno ; i ++ )
-				{
-								name = "mem";
-								mem = true;
-								index = args[1] + i ;
-								value = 0;
-								taint = i ;
-								map = new ConcPair(name,mem,get_type(VT_MEM8),index,value,taint);
-								concrete_pairs->push_back(map);
-				}
-        return concrete_pairs;
+	conc_map_vec * concrete_pairs = new vector<conc_map *>();
+	int type, taint; bool mem;
+	string name;
+	const_val_t index, value;
+	conc_map * map;
+	uint32_t bytes = callno;
+	uint32_t i;
+	for ( i = 0 ; i < callno ; i ++ )
+	{
+		name = "mem";
+		mem = true;
+		index = args[1] + i ;
+		value = 0;
+		taint = i ;
+		map = new ConcPair(name,mem,get_type(VT_MEM8),index,value,taint);
+		concrete_pairs->push_back(map);
+	}
+	return concrete_pairs;
 }
 
+
+ostream &TaintFrame::serialize(ostream &out, uint16_t sz)
+{
+   
+   ostream &out2 = Frame::serialize(out, sz + 12);
+
+   WRITE(out2, id);
+   WRITE(out2, length);
+   WRITE(out2, addr);
+
+   return out2;
+
+}
+
+istream &TaintFrame::unserializePart(istream &in)
+{
+
+   READ(in, id);
+   READ(in, length);
+   READ(in, addr);
+
+   return in;
+
+}
+
+
+conc_map_vec * TaintFrame::getOperands()
+{
+	conc_map_vec * concrete_pairs = new vector<conc_map *>();
+	int type, taint; bool mem;
+	string name;
+	const_val_t index, value;
+	conc_map * map;
+	uint32_t bytes = length;
+	uint32_t i;
+	for ( i = 0 ; i < length ; i ++ )
+	{
+		name = "mem";
+		mem = true;
+		index = addr + i ;
+		value = 0;
+		taint = i ;
+		map = new ConcPair(name,mem,get_type(VT_MEM8),index,value,taint);
+		concrete_pairs->push_back(map);
+	}
+	return concrete_pairs;
+}
 
 
 #if 0
