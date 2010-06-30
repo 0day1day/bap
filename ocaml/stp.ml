@@ -150,8 +150,17 @@ object (self)
      | BinOp(ARSHIFT, e1, Int(i,_)) -> (* Same sort of deal :( *)
 	 let t = infer_ast ~check:false e1 in
 	 let bits = string_of_int (bits_of_width t) in
-	 pp "SX("; self#ast_exp e1; pp " >> "; pp (Int64.to_string i);
-	 pp ", "; pp bits; pc ')'
+	 let gethigh = Int64.sub (Int64.of_int (bits_of_width t)) i in
+	 let gethigh = Int64.sub gethigh 1L in
+	 if gethigh >= 0L then (
+	   pp "SX(("; self#ast_exp e1; 
+	   pp " >> "; pp (Int64.to_string i);
+	   pp ")["; pp (Int64.to_string gethigh); pp ":0], "; pp bits; pc ')'
+	 ) else (
+	   let b = Int64.sub (Int64.of_int (bits_of_width t)) 1L in
+	   pp "SX("; self#ast_exp e1; pp "["; pp (Int64.to_string b);
+	   pp ":"; pp (Int64.to_string b); pp "], "; pp bits; pc ')';
+	 )
       | BinOp((LSHIFT|RSHIFT|ARSHIFT) as bop, e1, e2) ->
 	  let t2 = infer_ast ~check:false e2 in
 	  let const n = Int(Int64.of_int n,t2) in
