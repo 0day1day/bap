@@ -7,7 +7,6 @@
 #include "irtoir-internal.h"
 #include "libvex_guest_x86.h"
 
-
 //
 // Register offsets, copied from VEX/priv/guest_x86/toIR.c
 //
@@ -1161,11 +1160,23 @@ static void add_special_returns(bap_block_t *block)
 //
 //----------------------------------------------------------------------
 
-void del_get_thunk( vector<Stmt *> *ir )
+void del_get_thunk( asm_program_t *prog, bap_block_t *block )
 {
-    assert(ir);
+    assert(block);
 
     vector<Stmt *> rv;
+    vector<Stmt *> *ir = block->bap_ir;
+    string op = get_op_str(prog, block->inst);
+
+    if (i386_op_is_very_broken(op)) {
+
+      // cerr << "Not deleting get thunks" << endl;
+      
+      return;
+    }
+
+    assert(ir);
+    
     for (vector<Stmt*>::iterator
            i = ir->begin(); i != ir->end(); i++)
     {
@@ -1217,8 +1228,8 @@ void get_thunk_index(vector<Stmt *> *ir,
 	Temp *temp = (Temp *)((Move*)stmt)->lhs;
 	if ( temp->name.find("CC_OP") != string::npos ) {
 	  *op = i;
-	  if (match_mux0x(ir, i-6, NULL, NULL, NULL, NULL) >= 0)
-	    *mux0x = i-6;
+	  if (match_mux0x(ir, (i-MUX_SUB), NULL, NULL, NULL, NULL) >= 0)
+	    *mux0x = (i-MUX_SUB);
 	}
 	else if ( temp->name.find("CC_DEP1") != string::npos )
 	  *dep1 = i;
@@ -1996,7 +2007,7 @@ vector<Stmt *> mod_eflags_shr( reg_t type, Exp *arg1, Exp *arg2 )
     if (!use_eflags_thunks) {
 	if (count_opnd) {
 	    Constant c0 (REG_8, 0);
-	    Exp *cond = ex_eq (count_opnd, &c0); 
+	    Exp *cond = ex_eq (count_opnd, &c0);
 	    irout.push_back(new CJmp(cond, ex_name(ifcount0->label), 
 				     ex_name(ifcountn0->label))); 
 	    irout.push_back (ifcountn0);
@@ -2029,6 +2040,8 @@ vector<Stmt *> mod_eflags_shr( reg_t type, Exp *arg1, Exp *arg2 )
     Exp *condOF = _ex_and(_ex_l_cast(_ex_shr(ex_xor(arg1, arg2), ecl(&c_TYPE_SIZE_LESS_1)), REG_1), Constant::t.clone());
     set_flag(&irout, type, OF, condOF);
 
+    
+    
     // We construct EFLAGS in total only in case that
     // instructions directly need EFLAGS as a complete register such as pushf.
     //set_eflags_bits(&irout, CF, PF, AF, ZF, SF, OF);
@@ -2308,52 +2321,96 @@ vector<Stmt *> mod_eflags_smul( reg_t type, Exp *arg1, Exp *arg2 )
     return irout;
 }
 
-int del_put_thunk(vector<Stmt *> *ir,
-		   int opi, int dep1, int dep2, int ndep, int mux0x)
+int del_put_thunk(vector<Stmt*> *ir,
+                  string op_string, int opi, int dep1, int dep2, int ndep, int mux0x)
 {
-    assert(ir);
-    assert(opi >= 0 && dep1 >= 0 && dep2 >= 0 && ndep >= 0);
 
-    int end = -1;
-    int len = 0;
+  assert(ir);
+  assert(opi >= 0 && dep1 >= 0 && dep2 >= 0 && ndep >= 0);
+  
+  
+  vector<Stmt *> rv;
+  
+  // int end = -1;
+  int len = 0;
+  int j = 0;
+  string op;
+    
+  // cout << "opi " << opi << " dep1 " << dep1 << " dep2 " << dep2 << " ndep " << ndep << " mux0x " << mux0x << endl;
+  
+  // assert(ndep >= dep2 && dep2 >= dep1 && dep1 >= opi && opi >= mux0x);
+  
+  // Delete statements assigning to flag thunk temps
+  for (vector<Stmt*>::iterator
+         i = ir->begin(); i != ir->end(); i++, j++)
+  {
+    Stmt *stmt = (*i);
+    rv.push_back(stmt);
+    
+    len++;
+    
+    // cout << "debug " << j << " " << stmt->tostring() << endl;
+    
+    if (i386_op_is_very_broken(op_string)) {
+      cerr << "Warning: Broken op detected.  Not removing thunks.  Please fix this part of libasmir eventually." << endl;
+    
+    
+    } else {
 
-    // Delete statements assigning to flag thunk temps
-    vector<Stmt *> rv;
-    for (vector<Stmt*>::iterator
-           i = ir->begin(); i != ir->end(); i++)
-    {
-      Stmt *stmt = (*i);
-      rv.push_back(stmt);
-      len++;
+      // /* NEW deletion code */
+      // if ((j >= mux0x) && (j <= ndep)) {
+      //   cout << "here we are..." << j << stmt->tostring() << endl;
+      //   Stmt::destroy(rv.back());
+      //   rv.pop_back();
+      //   len--;
+      //   // end = len;
+      // } 
 
-        if ( stmt->stmt_type == MOVE )
+      // /* NEW deletion code */
+      // if (((j >= mux0x) && (j < (mux0x + MUX_LENGTH + MUX_OFFSET)))
+      //     || j == opi
+      //     || j == dep1
+      //     || j == dep2
+      //     || j == ndep) {
+      //   cout << "here we are..." << j << stmt->tostring() << endl;
+      //     Stmt::destroy(rv.back());
+      //     rv.pop_back();
+      //     len--;
+      //     // end = len;
+      // }
+    
+      /* OLD deletion code */
+      if ( stmt->stmt_type == MOVE )
+      {
+        Move *move = (Move *)stmt;
+        if ( move->lhs->exp_type == TEMP )
         {
-            Move *move = (Move *)stmt;
-            if ( move->lhs->exp_type == TEMP )
-            {
-              Temp *temp = (Temp *)(move->lhs);
-                if (    temp->name.find("CC_OP") != string::npos 
-                     || temp->name.find("CC_DEP1") != string::npos 
-                     || temp->name.find("CC_DEP2") != string::npos 
-                     || temp->name.find("CC_NDEP") != string::npos )
-                {
-                  //// XXX: don't delete for now.
-                  //// remove and Free the Stmt
-                  // CC_OP, CC_DEP1, CC_DEP2, CC_NDEP are never set unless use_eflags_thunks is true.
-                  if(!use_eflags_thunks) {
-                    Stmt::destroy(rv.back());
-                    rv.pop_back();
-                    len--;
-                  }
-                  end = len;
-                }
+          Temp *temp = (Temp *)(move->lhs);
+          if (    temp->name.find("CC_OP") != string::npos 
+                  || temp->name.find("CC_DEP1") != string::npos 
+                  || temp->name.find("CC_DEP2") != string::npos 
+                  || temp->name.find("CC_NDEP") != string::npos )
+          {
+            //// XXX: don't delete for now.
+            //// remove and Free the Stmt
+            // CC_OP, CC_DEP1, CC_DEP2, CC_NDEP are never set unless use_eflags_thunks is true.
+            if(!use_eflags_thunks) {
+              // cout << "old code would delete " << j << stmt->tostring() << endl;
+              Stmt::destroy(rv.back());
+              rv.pop_back();
+              len--;
             }
+            //end = len;
+          }
         }
-    }
-    assert(end >= 0);
-    ir->clear();
-    ir->insert(ir->begin(), rv.begin(), rv.end());
-    return end;
+      }
+    }        
+  }
+  
+  assert(len >= 0);
+  ir->clear();
+  ir->insert(ir->begin(), rv.begin(), rv.end());
+  return len;
 }
 
 
@@ -2367,6 +2424,7 @@ typedef vector<Stmt *> Mod_Func_3 (reg_t, Exp *, Exp *, Exp *);
 
 static void modify_eflags_helper( string op, reg_t type, vector<Stmt *> *ir, int argnum, Mod_Func_0 *mod_eflags_func )
 {
+
     assert(ir);
     assert(argnum == 2 || argnum == 3);
     assert(mod_eflags_func);
@@ -2403,21 +2461,22 @@ static void modify_eflags_helper( string op, reg_t type, vector<Stmt *> *ir, int
             Mod_Func_3 *mod_func = (Mod_Func_3 *)mod_eflags_func;
             mods = mod_func(type, arg1, arg2, arg3);
         }
-	
-	if (mux0x != -1) {
-	  Exp *cond, *exp0, *expx, *res;
-	  match_mux0x(ir, mux0x, &cond, &exp0, &expx, &res);
-	  Label *mod = mk_label();
-	  Label *nomod = mk_label();
-	  mods.insert(mods.begin(), mod);
-	  mods.insert(mods.begin(),
-		      new CJmp(ecl(cond),
-			       new Name(mod->label), new Name(nomod->label)) );
-	  mods.push_back(nomod);
-	}
+
+        // I don't think this is needed anymore --ed
+	// if (mux0x != -1) {
+	//   Exp *cond, *exp0, *expx, *res;
+	//   match_mux0x(ir, mux0x, &cond, &exp0, &expx, &res);
+	//   Label *mod = mk_label();
+	//   Label *nomod = mk_label();
+	//   mods.insert(mods.begin(), mod);
+	//   mods.insert(mods.begin(),
+	// 	      new CJmp(ecl(cond),
+	// 		       new Name(mod->label), new Name(nomod->label)) );
+	//   mods.push_back(nomod);
+	// }
 
         // Delete the thunk
-	int pos = del_put_thunk(ir, opi, dep1, dep2, ndep, mux0x);
+        int pos = del_put_thunk(ir, op, opi, dep1, dep2, ndep, mux0x);
         // Insert the eflags mods in this position
         ir->insert( ir->begin()+pos, mods.begin(), mods.end() );
         ir->insert( ir->begin()+pos, new Comment("eflags thunk: "+op));
@@ -2431,6 +2490,21 @@ static void modify_eflags_helper( string op, reg_t type, vector<Stmt *> *ir, int
       }
       //      panic("No EFLAGS thunk was found for \"" + op + "\"!");
     }
+}
+
+/* List of operations we should not delete thunks for.
+ *
+ * Or, put another way, a list of operations for which the eflags code
+ * is COMPLETELY BROKEN.
+ */
+bool i386_op_is_very_broken(string op_string) {
+  if (op_string.find("shr",0) == 0
+      || op_string.find("sar",0) == 0) {
+    return true;
+  }
+  else {
+    return false;
+  }
 }
 
 void i386_modify_flags( asm_program_t *prog, bap_block_t *block )
