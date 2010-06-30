@@ -308,13 +308,21 @@ let run_block state block =
       | _ -> false
     in
     executed := (stmt,result) :: !executed ; 
-    match TraceConcrete.eval_stmt state stmt with
-      | [newstate] ->
-	  let next = TraceConcrete.inst_fetch newstate.sigma newstate.pc in
-	    (*pdebug ("pc: " ^ (Int64.to_string newstate.pc)) ;*)
-	    eval_block newstate next
-      | _ -> 
-	  failwith "multiple targets..."
+    try 
+      (match TraceConcrete.eval_stmt state stmt with
+	 | [newstate] ->
+	     let next = TraceConcrete.inst_fetch newstate.sigma newstate.pc in
+	       (*pdebug ("pc: " ^ (Int64.to_string newstate.pc)) ;*)
+	       eval_block newstate next
+	 | _ -> 
+	    failwith "multiple targets..."
+      )
+    with
+	(* Ignore failed assertions -- assuming that we introduced them *)
+      | AssertFailed _ -> 
+	  pdebug "ignoring failed assertion";
+	  let next = TraceConcrete.inst_fetch state.sigma (Int64.succ state.pc) in
+	    eval_block state next
   in
     try
       eval_block state init
@@ -448,12 +456,12 @@ let symbolic_run trace =
 	(fun state stmt ->
 	   add_symbolic_seeds stmt;
 	   update_concrete stmt ;
-	   (*pdebug (Pp.ast_stmt_to_string stmt);
-	   (match stmt with
+	   (*pdebug (Pp.ast_stmt_to_string stmt);*)
+	   (*(match stmt with
 	      | Ast.Label (_,atts) when filter_taint atts != [] -> 
-		  TraceSymbolic.print_var state.delta "R_ESP" 
-		  (*pdebug ("block no: " ^ (string_of_int !counter));
-		  counter := !counter + 1 ;*)
+		  TraceSymbolic.print_var state.delta "R_ESP" ;
+		  pdebug ("block no: " ^ (string_of_int !counter));
+		  counter := !counter + 1 ;
 	      | _ -> ());*)
 	   match TraceSymbolic.eval_stmt state stmt with
 	     | [next] -> next
@@ -467,6 +475,9 @@ let symbolic_run trace =
 	  state.pred
       | Halted (_,state) -> 
 	  pdebug "Symbolic Run ... Successful!";
+	  state.pred
+      | AssertFailed _ ->
+	  pdebug "Failed assertion ..." ;
 	  state.pred
       | _ -> 
 	  pdebug "Symbolic Run: Early Abort";

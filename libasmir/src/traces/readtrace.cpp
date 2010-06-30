@@ -20,7 +20,6 @@ bap_blocks_t * read_trace_from_file(const string &filename, int offset, bool pri
 
         // Initializations
         translate_init();
-        bool taint_info = false;
         while(tr.pos() < tr.count()) { // Reading each instruction
             pintrace::Frame *f = tr.next();
             counter += 1;
@@ -56,18 +55,15 @@ bap_blocks_t * read_trace_from_file(const string &filename, int offset, bool pri
                         bap_block_t *bblock = new bap_block_t;
                         bblock->bap_ir = new vector<Stmt *>();
                         bblock->inst = tf->id;
-                        if (taint_info) {
-                          
-                           //generate_bap_ir_block(prog, bblock);
-                           Label * label = new Label("Read Syscall");
-                           if (atts)
-                               label->attributes = tf->getOperands() ;
-                           bblock->bap_ir->push_back(label);
-                           bblock->vex_ir = NULL;
-                           result->push_back(bblock);
-                        }
+                        //generate_bap_ir_block(prog, bblock);
+                        Label * label = new Label("Read Syscall");
+                        if (atts)
+                            label->attributes = tf->getOperands() ;
+                        bblock->bap_ir->push_back(label);
+                        bblock->vex_ir = NULL;
+                        result->push_back(bblock);
+                        
                         //cerr << sf->callno << " " << sf->args[0] << " " << sf->args[4] << endl;
-                        taint_info = true;
                         //for (int i = 0 ; i < bblock->bap_ir->size() ; i ++)
                         //    cout << bblock->bap_ir->at(i)->tostring() << endl ;
                         break;
