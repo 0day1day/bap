@@ -109,7 +109,6 @@ struct bfd_section {
   int index;
   [ignore] struct bfd_section *next, *prev;
   int flags;
-  int user_set_vma;
   int bitfields;
   address_t vma;
   address_t lma;
