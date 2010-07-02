@@ -451,16 +451,28 @@ let get_symbols_hash ?(all=false) p =
     ) syms;
   h
 
-let find_symbol_address h name =
-  let sym = Hashtbl.find h name in
-  let base = Int64.shift_right sym.bfd_symbol_section.bfd_section_vma 32 in
-  let off = sym.bfd_symbol_value in
-  Int64.add base off
-
 let get_all_sections p =
   let arr,err = Libasmir.asmir_get_all_sections p in
   if err <= 0 then failwith "get_all_sections";
   arr
+
+let get_sections_hash p =
+  let secs = get_all_sections p in
+  let h = Hashtbl.create 100 in
+  Array.iter
+    (fun sec ->
+       Hashtbl.add h sec.bfd_section_name sec
+    ) secs;
+  h
+
+let fix_symbol_address i =
+  Int64.shift_right i 32
+
+let find_symbol_address h name =
+  let sym = Hashtbl.find h name in
+  let base = (fix_symbol_address sym.bfd_symbol_section.bfd_section_vma) in
+  let off = sym.bfd_symbol_value in
+  Int64.add base off
 
 let (<<) = (lsl)
 

@@ -68,9 +68,12 @@ val get_function_ranges : asmprogram -> (string * address_t * address_t) list
 
 val get_symbols_hash : ?all:bool -> asmprogram -> (string, Libasmir.asymbol) Hashtbl.t
 
+(** Some VMAs are shifted left by 32 bits for some reason. This function "fixes" that. *)
+val fix_symbol_address : int64 -> int64
 val find_symbol_address : (string, Libasmir.asymbol) Hashtbl.t -> string -> int64
 
 val get_all_sections : asmprogram -> Libasmir.section_ptr array
+val get_sections_hash : asmprogram -> (string, Libasmir.section_ptr) Hashtbl.t
 
 val get_section_startaddr : asmprogram -> string -> address_t
 val get_section_endaddr : asmprogram -> string -> address_t
