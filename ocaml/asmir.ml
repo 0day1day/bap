@@ -465,12 +465,9 @@ let get_sections_hash p =
     ) secs;
   h
 
-let fix_symbol_address i =
-  Int64.shift_right i 32
-
 let find_symbol_address h name =
   let sym = Hashtbl.find h name in
-  let base = (fix_symbol_address sym.bfd_symbol_section.bfd_section_vma) in
+  let base = sym.bfd_symbol_section.bfd_section_vma in
   let off = sym.bfd_symbol_value in
   Int64.add base off
 
