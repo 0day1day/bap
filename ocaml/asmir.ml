@@ -8,6 +8,7 @@
 *)
 
 open Libasmir
+open Asmirconsts
 open Type
 open Ast
 open Util
@@ -450,30 +451,18 @@ let get_symbols_hash ?(all=false) p =
     ) syms;
   h
 
+let find_symbol_address h name =
+  let sym = Hashtbl.find h name in
+  let base = Int64.shift_right sym.bfd_symbol_section.bfd_section_vma 32 in
+  let off = sym.bfd_symbol_value in
+  Int64.add base off
+
+let get_all_sections p =
+  let arr,err = Libasmir.asmir_get_all_sections p in
+  if err <= 0 then failwith "get_all_sections";
+  arr
+
 let (<<) = (lsl)
-
-(* bfd defs *)
-
-let bsf_debugging = 1 << 2
-let bsf_function = 1 << 3
-
-(** no flags *)
-let bsec_no_flags = 0x000
-(** allocate space when loading *)
-let bsec_alloc = 0x001
-(** load the section during loading *)
-let bsec_load = 0x002
-(** section has reloc info *)
-let bsec_reloc = 0x004
-(** read only *)
-let bsec_readonly = 0x008
-(** code *)
-let bsec_code = 0x010
-(** data *)
-let bsec_data = 0x020
-(** ROM *)
-let bsec_rom = 0x040
-(* others .... *)
 
 let get_function_ranges p =
   let symb = get_symbols p in

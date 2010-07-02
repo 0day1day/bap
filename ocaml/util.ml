@@ -447,4 +447,3 @@ let list_delete l e =
     | x::xs -> delete_aux (x::acc) xs
   in
     delete_aux [] l
-

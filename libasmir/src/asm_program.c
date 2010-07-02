@@ -337,3 +337,48 @@ bfd_vma asmir_get_sec_endaddr(asm_program_t *prog, const char *sectionname) {
    */
   return -1;
 }
+
+/*
+ * Return a list of all sections
+ *
+ * XXX: Does not free memory
+ */  
+asection** asmir_get_all_sections(asm_program_t *prog, long *out) {
+  section_t* section;
+  /* asection* asection; */
+  asection** sectionarray;
+  asection** sectionptr;
+  *out = 0;
+  
+  assert(prog);
+  assert(out);
+  
+  section = prog->segs;
+
+  /* Traverse the linked list of sections to count how many there are */
+  while (section != NULL) {
+    (*out)++;
+    section = section->next;
+  }
+
+  /* Now, allocate space for an array of pointers */
+  sectionarray = bfd_alloc(prog->abfd, (*out * sizeof(asection*)));
+  if (sectionarray == 0) goto error;  
+
+  /* Traverse the linked list again, and add the ptrs to each section
+   * to the array. */
+  section = prog->segs;
+  sectionptr = sectionarray;
+  while (section != NULL) {
+    *(sectionptr++) = section->section;
+    section = section->next;
+  }
+
+  return sectionarray;
+  
+  error:
+
+  *out = 0;
+  return NULL;
+}
+

@@ -68,6 +68,10 @@ val get_function_ranges : asmprogram -> (string * address_t * address_t) list
 
 val get_symbols_hash : ?all:bool -> asmprogram -> (string, Libasmir.asymbol) Hashtbl.t
 
+val find_symbol_address : (string, Libasmir.asymbol) Hashtbl.t -> string -> int64
+
+val get_all_sections : asmprogram -> Libasmir.section_ptr array
+
 val get_section_startaddr : asmprogram -> string -> address_t
 val get_section_endaddr : asmprogram -> string -> address_t
 val get_asm_instr_string_range : asmprogram -> address_t -> address_t -> string
