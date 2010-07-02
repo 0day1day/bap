@@ -110,6 +110,7 @@ object (self)
    (* | Context _ (* enabling printing might be useful for debugging - ethan *)*)
     | Pos _ -> () (* ignore position attrs *)
     | InitRO -> pp "@set \"initro\""
+    | Synthetic -> pp "@set \"synthetic\""
 
   method label = function
     | Name s -> pp "label "; pp s

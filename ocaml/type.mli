@@ -86,6 +86,7 @@ type attribute =
                                 * - ethan *)
   | ExnAttr of exn (** Generic extensible attribute, but no parsing *)
   | InitRO (** The memory in this assignment is stored in the binary *)
+  | Synthetic (** Operation was added by an analysis *)
 type attributes = attribute list
 
 
