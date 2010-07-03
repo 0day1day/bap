@@ -591,7 +591,7 @@ switch (id) {
     //case REG_AX:
     
     case REG_CL:  return string("R_ECX");
-    //case REG_CH:
+    case REG_CH:  return string("R_CH");
     //case REG_CX:
     
     case REG_DL:  return string("R_EDX");

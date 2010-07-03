@@ -1,9 +1,10 @@
 {
   open Stp_grammar
+  (* TODO: add support for memories *)
 }
 
 let digit = ['0'-'9''A'-'F''a'-'f']
-let varname = ['A'-'Z''a'-'z']['A'-'Z''a'-'z''0'-'9''_']*
+let varname = ['A'-'Z''a'-'z']['A'-'Z''a'-'z''0'-'9''_''['']']*
 
 rule token = parse
   | [' ' '\t' '\n']  { token lexbuf }

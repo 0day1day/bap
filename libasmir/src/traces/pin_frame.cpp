@@ -385,6 +385,7 @@ conc_map_vec * TaintFrame::getOperands()
 	string name;
 	const_val_t index, value;
 	conc_map * map;
+        int source = 1;
 	uint32_t bytes = length;
 	uint32_t i;
 	for ( i = 0 ; i < length ; i ++ )
@@ -393,7 +394,7 @@ conc_map_vec * TaintFrame::getOperands()
 		mem = true;
 		index = addr + i ;
 		value = 0;
-		taint = i ;
+		taint = source ++;
 		map = new ConcPair(name,mem,get_type(VT_MEM8),index,value,taint);
 		concrete_pairs->push_back(map);
 	}

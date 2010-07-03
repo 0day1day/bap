@@ -62,6 +62,9 @@ let concrete_val name = (var_lookup name).exp
 let concrete_mem index = (mem_lookup index).exp
 let symbolic_mem = Hashtbl.find global.symbolic
 
+let taint_val name = (var_lookup name).tnt
+let taint_mem index = (mem_lookup index).tnt
+
 let bound = Hashtbl.mem global.vars
 let in_memory = Hashtbl.mem global.memory
 
@@ -132,7 +135,12 @@ let add_eflags eflags taint =
   add_var 
     "R_CF" 
     (Int(num_to_bit (Int64.logand eflags 0x01L), reg_1))
+    taint;
+  add_var
+    "R_DFLAG"
+    (Int(num_to_bit (Int64.logand eflags 0x400L), reg_32))
     taint
+    
  (* TODO: handle more EFLAGS registers *)
 	  
 (* Store the concrete taint info in the global environment *)
@@ -158,8 +166,15 @@ let add_to_conc  {name=name; mem=mem; index=index;
 	add_to_mem index value taint limit limit 
     else
       (* assert (Hashtbl.mem concrete name = false) ; *)
-      add_new_var name (Int(value,typ)) taint ;
-    if name = "EFLAGS" then add_eflags value taint
+      match name with
+	| "EFLAGS" ->
+	    add_eflags value taint;
+	    add_new_var name (Int(value,typ)) taint
+	| "R_CH" ->
+	    add_new_var "R_ECX" (Int(Int64.shift_left value 8,typ)) taint
+	| _ ->
+	    add_new_var name (Int(value,typ)) taint
+    
       
 (* Updating the lookup tables with the concrete values *)
 let update_concrete = function
@@ -376,21 +391,17 @@ let concrete trace =
 (********************  Concolic Execution  *******************)
 (*************************************************************)
 
+(* Concretizing as much as possible *)
+
 module TaintSymbolic = 
 struct 
   let lookup_var delta var = 
-    (* Check if we know anything about var *)
-    try VH.find delta var
-    with Not_found -> 
-      (* else it HAS to be concrete *)
-      let name = Var.name var in
-	pdebug ("need the concrete value of " ^ name) ;
-	(try Symbolic(concrete_val name)
-	 with Not_found ->
-	   (* worst case: create a symbolic variable *)
-	   pdebug ("var not found " ^ name);
-	   Symbolic.lookup_var delta var
-	)
+    let name = Var.name var in
+    let tainted = try taint_val name with Not_found -> true in
+      if tainted then
+	Symbolic.lookup_var delta var
+      else
+	Symbolic(concrete_val name)
 	  
   let conc2symb = Symbolic.conc2symb
   let normalize = Symbolic.normalize
@@ -399,8 +410,8 @@ struct
   (* TODO: add a memory initializer *)
 
   let lookup_mem mu index endian = 
-    match mu, index with
-      | ConcreteMem(m,v), Int(n,t) ->
+    match index with
+      | Int(n,_) ->
 	  (try 
 	     (* Check if this is a symbolic seed *)
 	     let var = symbolic_mem n in
@@ -411,20 +422,16 @@ struct
 	   with Not_found ->
 	     (* Check if we know something about this memory location *)
 	     (*pdebug ("not found in symb_mem "^(Printf.sprintf "%Lx" n)) ;*)
-	     (try AddrMap.find (normalize n t) m
-	      with Not_found ->
-		(* otherwise it HAS to be concrete *)
-		(try concrete_mem n
-		 with Not_found -> 
-		   pdebug ("memory not found at "
-			   ^(Printf.sprintf "%Lx" n));
-		   Symbolic.lookup_mem mu index endian
-		)
-	     )
+	     let tainted = try taint_mem n with Not_found -> true in
+	       if tainted then
+		 Symbolic.lookup_mem mu index endian
+	       else
+		 concrete_mem n
 	  )
-      | _, _ ->
-	  pdebug ("Symbolic mem: index at " 
+      | _ ->
+	  pdebug ("Symbolic memory index at " 
 		  ^ (Pp.ast_exp_to_string index)) ;
+	  (*pdebug "Forced to concretize accesses" ;*)
 	  Symbolic.lookup_mem mu index endian
 end
 
@@ -456,13 +463,21 @@ let symbolic_run trace =
 	(fun state stmt ->
 	   add_symbolic_seeds stmt;
 	   update_concrete stmt ;
-	   (*pdebug (Pp.ast_stmt_to_string stmt);*)
-	   (*(match stmt with
+	   pdebug (Pp.ast_stmt_to_string stmt);
+	   (match stmt with
 	      | Ast.Label (_,atts) when filter_taint atts != [] -> 
+		  TraceSymbolic.print_var state.delta "R_EAX" ;
+		  TraceSymbolic.print_var state.delta "R_EBX" ;
+		  TraceSymbolic.print_var state.delta "R_ECX" ;
+		  TraceSymbolic.print_var state.delta "R_EDX" ;
+		  TraceSymbolic.print_var state.delta "R_ESI" ;
+		  TraceSymbolic.print_var state.delta "R_EDI" ;
 		  TraceSymbolic.print_var state.delta "R_ESP" ;
+		  TraceSymbolic.print_var state.delta "R_EBP" ;
+		  (*TraceSymbolic.print_var state.delta "R_EDI" ;*)
 		  pdebug ("block no: " ^ (string_of_int !counter));
 		  counter := !counter + 1 ;
-	      | _ -> ());*)
+	      | _ -> ());
 	   match TraceSymbolic.eval_stmt state stmt with
 	     | [next] -> next
 	     | _ -> failwith "Jump in a straightline program"
@@ -479,12 +494,12 @@ let symbolic_run trace =
       | AssertFailed _ ->
 	  pdebug "Failed assertion ..." ;
 	  state.pred
-      | _ -> 
+ (*     | _ -> 
 	  pdebug "Symbolic Run: Early Abort";
 	  (*TraceSymbolic.print_values state.delta;*)
 	  (*pdebug ("Reason: "^(Pp.ast_stmt_to_string stmt));*)
 	  state.pred
-	    
+ *)	    
 (* Substituting the last jump with assertions *)
 let convert addr trace = 
   let target = Int64.of_string ("0x"^addr) in

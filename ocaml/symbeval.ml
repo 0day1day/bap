@@ -20,7 +20,7 @@ open Type
   
 module VH = Var.VarHash
   
-module D = Debug.Make(struct let name = "SymbEval" and default=`NoDebug end)
+module D = Debug.Make(struct let name = "SymbEval" and default=`Debug end)
 open D
 
 (* For now, we'll map every byte. Later it may be better to map larger
@@ -385,8 +385,9 @@ let lookup_var delta var =
   let conc2symb memory v =
    (* FIXME: a better symbolism for uninitialized memories *)
    let init = Var v in
+     pdebug "The point of no return" ;
    Symbolic (AddrMap.fold
-	       (fun k v m -> Store (m,Int(k,reg_64),v,exp_false,reg_8))
+	       (fun k v m -> Store (m,Int(k,reg_32),v,exp_false,reg_8))
 	       memory init)
 
   (* Normalize a memory address, setting high bits to 0. *)
