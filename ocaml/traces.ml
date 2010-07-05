@@ -142,6 +142,28 @@ let add_eflags eflags taint =
     taint
     
  (* TODO: handle more EFLAGS registers *)
+
+(********************************************************)
+(*  REG MAPPING: TODO -> move this in a separate file   *)
+(********************************************************)
+
+let regs = Hashtbl.create 32
+let () = 
+  List.iter (fun (k,v) -> Hashtbl.add regs k v) 
+    [
+      ("R_AL",("R_EAX",0,reg_32));
+      ("R_BL",("R_EBX",0,reg_32));
+      ("R_CL",("R_ECX",0,reg_32));
+      ("R_DL",("R_EDX",0,reg_32));
+
+      ("R_AH",("R_EAX",8,reg_32));
+      ("R_BH",("R_EBX",8,reg_32));
+      ("R_CH",("R_ECX",8,reg_32));
+      ("R_DH",("R_EDX",8,reg_32));
+    ]
+
+
+(********************************************************)
 	  
 (* Store the concrete taint info in the global environment *)
 let add_to_conc  {name=name; mem=mem; index=index; 
@@ -166,16 +188,16 @@ let add_to_conc  {name=name; mem=mem; index=index;
 	add_to_mem index value taint limit limit 
     else
       (* assert (Hashtbl.mem concrete name = false) ; *)
-      match name with
-	| "EFLAGS" ->
-	    add_eflags value taint;
-	    add_new_var name (Int(value,typ)) taint
-	| "R_CH" ->
-	    add_new_var "R_ECX" (Int(Int64.shift_left value 8,typ)) taint
-	| _ ->
-	    add_new_var name (Int(value,typ)) taint
-    
-      
+      let fullname, shift, typ = 
+	try Hashtbl.find regs name
+	with Not_found -> (name, 0,typ)
+      in
+      let fullvalue = Int(Int64.shift_left value shift,typ) in
+	(add_new_var fullname fullvalue taint ;
+	 
+	 (* Special case EFLAGS *)
+	 if name = "EFLAGS" then add_eflags value taint)
+	
 (* Updating the lookup tables with the concrete values *)
 let update_concrete = function
   | Label (_,atts) -> 
