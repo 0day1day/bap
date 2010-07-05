@@ -159,8 +159,16 @@ let speclist =
      "Execute the trace symbolically and generate the formula"
     )
    ::("-trace-target", 
-     Arg.String (fun i -> add(TransformAst(Traces.convert i))),
+     Arg.String (fun i -> add(TransformAst(Traces.control_flow i))),
      "<addr> Provide the target address <addr>"
+    )   
+   ::("-trace-payload", 
+     Arg.String (fun p -> add(TransformAst(Traces.add_payload p))),
+     "<hexstring> Provide a payload to be inserted past the return address"
+    )   
+   ::("-trace-shell", 
+     Arg.Int (fun off -> add(TransformAst(Traces.inject_shellcode off))),
+     "<nopsled> Insert shellcode with a nopsled of the given size"
     )   
   ::("-trace-formula", 
      Arg.String(fun f -> add(TransformAst(Traces.output_formula f))),
