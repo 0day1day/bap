@@ -437,7 +437,22 @@ let list_existssome f l =
        | Some _ as x -> x (* Already found it *)
        | None -> f ele
     ) None l
-	   
+
+(** Calls f on each element of l and if there is Some() value returned
+    for each list member, returns Some(unwrapped list). If at least
+    one returns None, None is returned instead. *)
+let list_for_allsome f l =
+  let b = List.fold_left
+    (fun state ele ->
+       match state with
+       | false -> false
+       | true -> (match f ele with
+		  | Some _ -> true
+		  | None -> false)
+    ) true l
+  in
+  if b then Some(List.map (fun x -> option_unwrap (f x)) l) else None
+
 (** Deletes the first occurrence of e (if it exists) in the list
     and returns the updated list *)
 let list_delete l e = 

@@ -77,3 +77,4 @@ val list_cart_prod2: ('a -> 'b -> unit) -> ('a list) -> ('b list) -> unit
 val list_cart_prod3: ('a -> 'b -> 'c -> unit) -> ('a list) -> ('b list) -> ('c list) -> unit
 val list_cart_prod4: ('a -> 'b -> 'c -> 'd -> unit) -> ('a list) -> ('b list) -> ('c list) -> ('d list) -> unit
 val list_existssome: ('a -> 'b option) -> ('a list) -> 'b option
+val list_for_allsome: ('a -> 'b option) -> ('a list) -> 'b list option
