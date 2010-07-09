@@ -140,7 +140,7 @@ istream &StdFrame::unserializePart(istream &in)
    // Note: ((x-1) >> 3) + 1 === ceil(x / 8.0)
    in.read((char *) &cachemask, ((values_count - 1) >> 3) + 1);
 
-	 in.read((char *) &values, values_count * sizeof(uint32_t));
+   in.read((char *) &values, values_count * sizeof(uint32_t));
    in.read((char *) &types, values_count * sizeof(uint32_t));
    in.read((char *) &locs, values_count * sizeof(uint32_t));
    in.read((char *) &tainted, values_count * sizeof(uint32_t));
