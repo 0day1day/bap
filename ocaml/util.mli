@@ -65,3 +65,4 @@ val run_with_remapped_fd :
   Unix.file_descr -> Unix.file_descr -> (unit -> 'a) -> 'a
 
 val take : int -> 'a list -> 'a list
+val fast_append : 'a list -> 'a list -> 'a list

@@ -323,3 +323,5 @@ let rec take_aux acc = function
  | (x::xs, n) -> take_aux (x::acc) (xs,n-1)
 
 let take n l = take_aux [] (l, n)
+
+let fast_append l1 l2 = List.rev_append (List.rev l1) l2

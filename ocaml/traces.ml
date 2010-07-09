@@ -259,7 +259,7 @@ let remove_specials =
 (* Appends a Halt instruction to the end of the trace *)
 let append_halt trace = 
   let halt = Ast.Halt (exp_true, []) in
-    trace@[halt]
+    Util.fast_append trace [halt]
       
 (** A trace is a sequence of instructions. This function
     takes a list of ast statements and returns a list of
@@ -489,14 +489,14 @@ let symbolic_run trace =
 	   pdebug (Pp.ast_stmt_to_string stmt);
 	   (match stmt with
 	      | Ast.Label (_,atts) when filter_taint atts != [] -> 
-		  TraceSymbolic.print_var state.delta "R_EAX" ;
+		  (*TraceSymbolic.print_var state.delta "R_EAX" ;
 		  TraceSymbolic.print_var state.delta "R_EBX" ;
 		  TraceSymbolic.print_var state.delta "R_ECX" ;
 		  TraceSymbolic.print_var state.delta "R_EDX" ;
 		  TraceSymbolic.print_var state.delta "R_ESI" ;
 		  TraceSymbolic.print_var state.delta "R_EDI" ;
 		  TraceSymbolic.print_var state.delta "R_ESP" ;
-		  TraceSymbolic.print_var state.delta "R_EBP" ;
+		  TraceSymbolic.print_var state.delta "R_EBP" ;*)
 		  (*TraceSymbolic.print_var state.delta "R_EDI" ;*)
 		  pdebug ("block no: " ^ (string_of_int !counter));
 		  counter := !counter + 1 ;
@@ -601,7 +601,7 @@ let inject_payload start payload trace =
 
 let add_payload payload trace = 
   let trace, assertions = inject_payload 0L payload trace in
-    trace @ assertions
+    Util.fast_append trace assertions
 
 
 (* Performing shellcode injection *)
@@ -627,7 +627,7 @@ let inject_shellcode nops trace =
   let target_addr = Int64.add target_addr pin_offset in
   let trace, assertion = hijack_control target_addr trace in
   let _, shell = inject_payload 4L payload trace in
-    trace @ shell @ [assertion]
+    Util.fast_append trace (shell @ [assertion])
 
 
 (*************************************************************)
