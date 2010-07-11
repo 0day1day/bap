@@ -115,9 +115,15 @@ bap_block_t* asmir_addr_to_bap(asm_program_t *p, address_t addr)
   return bap_block;
 }
 
-bap_blocks_t * asmir_bap_from_trace_file(char * filename, bool atts, bool pintrace)
+bap_blocks_t * asmir_bap_from_trace_file(char * filename, 
+					 bool atts,
+					 bool pintrace)
 {
-  bap_blocks_t * b = read_trace_from_file(string(filename), 0, false, atts, pintrace);
+  bap_blocks_t * b = read_trace_from_file(string(filename), 
+					  0, 
+					  false,
+					  atts, 
+					  pintrace);
   return b;
 }
 

@@ -334,6 +334,7 @@ let run_block state block =
   let block = strip_jmp block in
   (*print_block block ;*)
   TraceConcrete.initialize_prog state block ;
+  TraceConcrete.cleanup_delta state ;
   let init = TraceConcrete.inst_fetch state.sigma state.pc in
   let executed = ref [] in
   let rec eval_block state stmt = 

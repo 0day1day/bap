@@ -193,7 +193,10 @@ let tr_attributes s =
   let size = Libasmir.conc_map_size attr_vec in
    if size = 0 then [] 
    else
-    foldn (fun i n -> (tr_context_tup (Libasmir.get_attr attr_vec n))::i) [] (size-1)
+     foldn 
+       (fun i n -> 
+	  (tr_context_tup (Libasmir.get_attr attr_vec n))::i
+       ) [] (size-1)
 
 (** Translate a statement *)
 let rec tr_stmt g s =
@@ -236,7 +239,7 @@ let rec tr_stmt g s =
 let tr_bap_block_aux g b =
   let size = Libasmir.asmir_bap_block_size b - 1 in
   let addr = Libasmir.asmir_bap_block_address b in
-  let (decs,stmts) =
+  let (decs,types) =
     foldn (fun (ds,ss) n -> let s = asmir_bap_block_get b n in
 	     match Libasmir.stmt_type s with
 		 VARDECL -> (s::ds,ss)
@@ -244,19 +247,20 @@ let tr_bap_block_aux g b =
       ([],[]) size
   in
   let decls, unextend = tr_vardecls g decs in
-  let stmts = List.map (tr_stmt g) stmts in
-  (stmts, addr, unextend)
+  let stmts = List.map (tr_stmt g) types in
+  (stmts, types, addr, unextend)
 
 let tr_bap_block_t g asmp b = 
-  let stmts, addr, unextend = tr_bap_block_aux g b in
+  let stmts, _, addr, unextend = tr_bap_block_aux g b in
   let asm = Libasmir.asmir_string_of_insn asmp addr in
   let stmts = Label(Addr addr, [Asm asm])::stmts in 
   unextend();
   stmts
 
 let tr_bap_block_t_no_asm g b = 
-  let stmts, addr, unextend = tr_bap_block_aux g b in
-  let stmts = Label(Addr addr, [])::stmts in
+  let stmts, types, addr, unextend = tr_bap_block_aux g b in
+  let asm = Libasmir.asm_string_from_stmt (List.hd types) in
+  let stmts = Label(Addr addr, [Asm asm])::stmts in
   unextend();
   stmts
 

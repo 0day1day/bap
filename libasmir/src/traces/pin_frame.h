@@ -1,3 +1,4 @@
+
 // -*- c++ -*-
 
 #pragma once
@@ -179,6 +180,8 @@ namespace pintrace { // Use namespace to avoid conflict
       virtual std::istream &unserializePart(std::istream &in);
 
       void clearCache();
+ 
+      conc_map_vec * getOperands();
 
       // TODO: Removing the bounds checking in the functions below might
       // lead to some speedups. Test and see if the risk is worth it.
@@ -197,8 +200,6 @@ namespace pintrace { // Use namespace to avoid conflict
          if (pos < MAX_VALUES_COUNT)
             cachemask[pos >> 3] |= (1 << (pos & 7));
       }
- 
-      conc_map_vec * getOperands();
 
       void unsetCached(uint32_t pos)
       {

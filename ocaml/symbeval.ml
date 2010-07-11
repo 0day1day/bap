@@ -153,6 +153,9 @@ struct
             ) ;
             Int64.succ pc
          ) state.pc prog_stmts )
+
+  let cleanup_delta state =
+    VH.clear state.delta
       
   let build_default_context prog_stmts =
     let state = create_state() in

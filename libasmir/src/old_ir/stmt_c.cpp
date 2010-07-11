@@ -47,6 +47,9 @@ attr_type_t attr_type(conc_map *m) {
 int attr_taint(conc_map *m) {
   return m->taint;
 }
+const char* asm_string_from_stmt(Stmt*s) {
+  return s->assembly.c_str();
+}
 const char* special_string(Stmt *s) {
   return ((Special*)s)->special.c_str();
 }

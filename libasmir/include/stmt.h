@@ -62,9 +62,9 @@ class Stmt {
   /// object, e.g., translation keeps a counter.
   address_t ir_address;
   stmt_type_t stmt_type;
-  void setAttribute(string attribute);
-  // a generic string attribute
+  // The attributes containing the concrete values
   conc_map_vec * attributes;
+  string assembly;
 };
 
 class VarDecl : public Stmt {
@@ -252,6 +252,8 @@ extern "C" {
   extern const_val_t attr_ind(conc_map*);
   extern attr_type_t attr_type(conc_map*);
   extern int attr_taint(conc_map*);
+  extern void setAttribute(string);
+  extern const char* asm_string_from_stmt(Stmt*);
   extern const char* special_string(Stmt*);
   extern const char* comment_string(Stmt*);
   extern Exp* jmp_target(Stmt*);

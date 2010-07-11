@@ -189,7 +189,6 @@ conc_map_vec * StdFrame::getOperands()
         return concrete_pairs;
 }
 
-
 ostream &KeyFrame::serialize(ostream &out, uint16_t sz)
 {
 
