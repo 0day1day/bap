@@ -1,4 +1,4 @@
--include ../utils-proj/Makefile
+-include ../../utils-proj/Makefile
 
 export BAP_OCAMLDIR=../ocaml
 export OCAMLMAKEFILE=$(BAP_OCAMLDIR)/OCamlMakefile
@@ -14,7 +14,7 @@ export SOURCE_DIRS_IN = $(BAP_OCAMLDIR) $(BAP_PROJ_OCAMLDIR)
 
 # default subprojects to build
 ifndef SUBPROJS
-	export SUBPROJS = toil iltrans topredicate get_functions compare split gadget $(PROJUTILS)
+	export SUBPROJS = $(PROJUTILS) toil iltrans topredicate get_functions compare split
 endif
 
 define PROJ_toil
@@ -58,14 +58,6 @@ define PROJ_split
 	DOC_FILES=$(SOURCES)
 endef
 export PROJ_split
-
-define PROJ_gadget
-	RESULT=gadget
-	SOURCES = gadget.ml
-	DOC_FILES=$(SOURCES)
-endef
-export PROJ_gadget
-
 
 # suffix for bytecode (which when we make all is debug code)
 export BCSUFFIX = .dbg

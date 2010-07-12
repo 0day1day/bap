@@ -3,7 +3,7 @@
 export OCAMLMAKEFILE=OCamlMakefile
 export LIBASMIR=../libasmir
 include $(LIBASMIR)/makefile.inc
--include ../ocaml-proj/Makefile
+-include ../../ocaml-proj/Makefile
 
 #export INCDIRS += ../stp ../stp/ocaml
 #export EXTLIBDIRS += ../stp ../stp/ocaml
@@ -56,7 +56,6 @@ export SOURCES = \
 	ast_slice.ml \
 	ssa_slice.ml \
 	comparelib.ml \
-	gadgetlib.ml \
 	structural_analysis.ml \
 	unroll.ml \
 	hacks.ml \
