@@ -3,6 +3,8 @@
 export OCAMLMAKEFILE=OCamlMakefile
 export LIBASMIR=../libasmir
 include $(LIBASMIR)/makefile.inc
+-include ../ocaml-proj/Makefile
+
 #export INCDIRS += ../stp ../stp/ocaml
 #export EXTLIBDIRS += ../stp ../stp/ocaml
 #export LIBS += stpvc
@@ -58,6 +60,7 @@ export SOURCES = \
 	structural_analysis.ml \
 	unroll.ml \
 	hacks.ml \
+	$(PROJSOURCES) \
 
 
 RESULT = bap
@@ -81,6 +84,7 @@ OCAMLFLAGS = -warn-error Aelz # -for-pack Bap #-w A
 OCAMLDOCFLAGS = -m avlsoper
 
 all: dcl ncl #top
+	@echo $(PROJSOURCES)
 
 bap_lib_doc: all htdoc
 
