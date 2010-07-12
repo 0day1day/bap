@@ -1,2 +1,2 @@
 This is an example project-specific directory.  To add it to bap,
-rename it to ocaml-proj.
+move it to bap-dir/../ocaml-proj.
