@@ -41,7 +41,7 @@ let split_load array index eletype endian bytenum =
 let split_load_list array index eletype endian =
   assert (endian = exp_false);
   let elesize = getwidth eletype in
-  let mvar = newvar "loadnorm" eletype in
+  let mvar = newvar "loadnorm" (Array(eletype, Reg(bitwidth))) in
   (Util.mapn (split_load (Var mvar) index eletype endian) (elesize - 1), mvar)
 
 let split_loads array index eletype endian =
