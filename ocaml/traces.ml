@@ -82,6 +82,9 @@ let cleanup () =
   Hashtbl.clear global.vars;
   Hashtbl.clear global.memory
 
+let conc_mem_fold f = 
+  Hashtbl.fold f global.memory
+
 
 (*************************************************************)
 (*********************  Helper Functions  ********************)
@@ -287,6 +290,10 @@ let strip_jmp block =
 let print_block =
   List.iter (fun s -> pdebug (Pp.ast_stmt_to_string s))
 
+let trace_length trace = 
+  Printf.printf "Trace length: %d\n" (List.length trace) ;
+  trace
+
 (*************************************************************)
 (********************  Concrete Execution  *******************)
 (*************************************************************)
@@ -416,6 +423,18 @@ let concrete trace =
 (*************************************************************)
 
 (* Concretizing as much as possible *)
+let allow_symbolic_indices = ref false
+  
+(* Assumptions for the concretization process to be sound:
+   - We can have at most one memory load/store on each 
+   asm instruction
+   - We are doing the lookups/stores in little-endian order
+*)
+
+(*
+let get_indices () = (* TODO: unfinished *)
+  conc_mem_fold (fun acc index _ -> index::acc) []
+*)
 
 module TaintSymbolic = 
 struct 
@@ -429,7 +448,12 @@ struct
 	  
   let conc2symb = Symbolic.conc2symb
   let normalize = Symbolic.normalize
-  let update_mem = Symbolic.update_mem 
+  let update_mem mu pos value endian =
+    if is_concrete pos || !allow_symbolic_indices then
+      Symbolic.update_mem mu pos value endian
+    else
+      (* we have a symbolic write, let's concretize *)
+      Symbolic.update_mem mu pos value endian
     
   (* TODO: add a memory initializer *)
 
@@ -453,10 +477,13 @@ struct
 		 concrete_mem n
 	  )
       | _ ->
-	  pdebug ("Symbolic memory index at " 
-		  ^ (Pp.ast_exp_to_string index)) ;
-	  (*pdebug "Forced to concretize accesses" ;*)
-	  Symbolic.lookup_mem mu index endian
+	  if !allow_symbolic_indices then
+	    (pdebug ("Symbolic memory index at " 
+		     ^ (Pp.ast_exp_to_string index)) ;
+	     (*pdebug "Forced to concretize accesses" ;*)
+	     Symbolic.lookup_mem mu index endian)
+	  else
+	    Symbolic.lookup_mem mu index endian
 end
 
 module TraceSymbolic = Symbeval.Make(TaintSymbolic)(FullSubst)
@@ -653,3 +680,40 @@ let output_formula file trace =
     pdebug "STP formula generated.";
     trace
       
+(*************************************************************)
+(**************** Type Inference on Traces  ******************)
+(*************************************************************)
+
+open Var
+
+let add_assignments trace = 
+  let get_vars_from_stmt stmt = 
+    let varset = ref VarSet.empty in
+    let var_visitor = object(self)
+      inherit Ast_visitor.nop
+      method visit_rvar v = 
+	varset := VarSet.add v !varset ;
+	`DoChildren
+    end
+    in
+      ignore (Ast_visitor.stmt_accept var_visitor stmt) ;
+      !varset
+  in
+    (* TODO: (if needed) we can introduce assignments 
+       only when it is absolutely necessary (undefined var)*)
+  let rec add_assign acc = function
+    | [] -> List.rev acc
+    | s::stmts ->
+	update_concrete s ;
+	let vars = get_vars_from_stmt s in
+	let assignments = VarSet.fold
+	  (fun var acc ->
+	     let name = Var.name var in
+	       try let value = concrete_val name in
+		 (Ast.Move (var, value, []))::acc 
+	       with Not_found -> acc
+	  ) vars []
+	in
+	  add_assign (assignments@(s::acc)) stmts
+  in
+    add_assign [] trace

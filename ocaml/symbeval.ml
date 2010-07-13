@@ -20,7 +20,7 @@ open Type
   
 module VH = Var.VarHash
   
-module D = Debug.Make(struct let name = "SymbEval" and default=`NoDebug end)
+module D = Debug.Make(struct let name = "SymbEval" and default=`Debug end)
 open D
 
 (* For now, we'll map every byte. Later it may be better to map larger
@@ -338,7 +338,7 @@ struct
         (match eval_expr delta e with
          | v when is_symbolic v -> 
            let pred' = BinOp (AND,symb_to_exp v, pred) in
-	     (*pdebug("Adding assertion: " ^ (Pp.ast_exp_to_string pred')) ;*)
+	     pdebug("Adding assertion: " ^ (Pp.ast_exp_to_string pred')) ;
            [{ctx with pred=pred'; pc=next_pc}]
          | v when is_false_val v ->
 	     raise (AssertFailed ctx)
