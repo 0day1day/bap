@@ -1329,6 +1329,13 @@ void insert_specials(bap_block_t * block) {
         return;
     IRJumpKind kind = bb->jumpkind;
     switch (kind) {
+        case Ijk_Sys_syscall:
+        case Ijk_Sys_int32:
+        case Ijk_Sys_int128:
+        case Ijk_Sys_sysenter:
+	  if(!translate_calls_and_returns)
+            block->bap_ir->push_back(new Special("syscall"));
+	  break;
         case Ijk_Call:
 	  if(!translate_calls_and_returns)
             block->bap_ir->push_back(new Special("call"));
