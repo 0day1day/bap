@@ -44,7 +44,7 @@ let rec action vischil startvisit node=
   | `SkipChildren -> node
   | `ChangeTo x -> x (* FIXME: warn if x = node *)
   | `DoChildren -> vischil node
-  | `ChangeToAndDoChildren x -> x; vischil x
+  | `ChangeToAndDoChildren x -> vischil x
 
 (* XXX: Where does this belong? *)
 (** A quick test to see if expressions are probably equal. Useful if
