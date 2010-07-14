@@ -44,12 +44,63 @@ let rec action vischil startvisit node=
   | `SkipChildren -> node
   | `ChangeTo x -> x (* FIXME: warn if x = node *)
   | `DoChildren -> vischil node
-  | `ChangeToAndDoChildren x -> x; vischil x
+  | `ChangeToAndDoChildren x -> vischil x
+
+(* XXX: Where does this belong? *)
+(** A quick test to see if expressions are probably equal. Useful if
+    you need to know whether to copy or not. *)
+let quick_exp_eq e1 e2 =
+  let num = function
+    | Load _ -> 0
+    | Store _ -> 1
+    | BinOp _ -> 2
+    | UnOp _ -> 3
+    | Var _ -> 4
+    | Lab _ -> 5
+    | Int _ -> 6
+    | Cast _ -> 7
+    | Let _ -> 8
+    | Unknown _ -> 9
+  in
+  (* Returns elist, tlist, btlist, utlist, vlist, slist, ilist, clist *)
+  let getargs = function
+    | Load(e1,e2,e3,t1) -> [e1;e2;e3], [t1], [], [], [], [], [], []
+    | Store(e1,e2,e3,e4,t1) -> [e1;e2;e3;e4], [t1], [], [], [], [], [], []
+    | BinOp(bt,e1,e2) -> [e1;e2], [], [bt], [], [], [], [], []
+    | UnOp(ut,e1) -> [e1], [], [], [ut], [], [], [], []
+    | Var(v1) -> [], [], [], [], [v1], [], [], []
+    | Lab(s1) -> [], [], [], [], [], [s1], [], []
+    | Int(i1,t1) -> [], [t1], [], [], [], [], [i1], []
+    | Cast(c1,t1,e1) -> [e1], [t1], [], [], [], [], [], [c1]
+    | Let(v1,e1,e2) -> [e1;e2], [], [], [], [v1], [], [], []
+    | Unknown(s1,t1) -> [], [t1], [], [], [], [s1], [], []
+  in
+  if (num e1) <> (num e2) then false else
+    let l1,l2,l3,l4,l5,l6,l7,l8 = getargs e1 in
+    let r1,r2,r3,r4,r5,r6,r7,r8 = getargs e2 in
+    let b1 = List.for_all2 (==) l1 r1 in
+    let b2 = List.for_all2 (==) l2 r2 in
+    let b3 = List.for_all2 (==) l3 r3 in
+    let b4 = List.for_all2 (==) l4 r4 in
+    let b5 = List.for_all2 (==) l5 r5 in
+    let b6 = List.for_all2 (==) l6 r6 in
+    let b7 = List.for_all2 (==) l7 r7 in
+    let b8 = List.for_all2 (==) l8 r8 in
+    if b1 & b2 & b3 & b4 & b5 & b6 & b7 & b8 then
+      true else false
+
+(* (\* this really should be a more shallow comparison, otherwise it will *)
+(*    be slow when there is a deeply nested change *\) *)
+(* (\* FIXMEEEE *\) *)
+(* let wrap f v = f v (\*in if v = v' then v else v'*\) *)
 
 (* this really should be a more shallow comparison, otherwise it will
    be slow when there is a deeply nested change *)
-(* FIXMEEEE *)
-let wrap f v = f v (*in if v = v' then v else v'*)
+let wrap f v = let v' = f v in if v = v' then v else v'
+
+let wrapexp f v = 
+  let v' = f v in if quick_exp_eq v v' then v else v'
+
 
 let rec exp_accept visitor = 
   let vischil = function
@@ -84,7 +135,7 @@ let rec exp_accept visitor =
 	let e2' = exp_accept visitor e2 in
 	Let(v', e1', e2')
   in
-  action (wrap vischil) visitor#visit_exp
+  action (wrapexp vischil) visitor#visit_exp
 
 
 and avar_accept visitor =
