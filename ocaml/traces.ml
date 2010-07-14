@@ -324,6 +324,7 @@ struct
       | _ ->
 	  (*pdebug "symbolic memory??" ;*)
 	  Symbolic.lookup_mem mu index endian
+  let assign = Symbolic.assign
 end
   
 module TraceConcrete = Symbeval.Make(TaintConcrete)(FullSubst)
@@ -424,6 +425,8 @@ let concrete trace =
 
 (* Concretizing as much as possible *)
 let allow_symbolic_indices = ref false
+
+let full_symbolic = ref false
   
 (* Assumptions for the concretization process to be sound:
    - We can have at most one memory load/store on each 
@@ -431,10 +434,40 @@ let allow_symbolic_indices = ref false
    - We are doing the lookups/stores in little-endian order
 *)
 
-(*
-let get_indices () = (* TODO: unfinished *)
-  conc_mem_fold (fun acc index _ -> index::acc) []
-*)
+(* A quick and dirty way to estimate the formula size *)
+let formula_size formula =
+  let _max n1 n2 = if n1 > n2 then n1 else n2 in
+  let (+) = Int64.add in
+  let rec size = function
+    | Ast.BinOp(_,e1,e2) -> Int64.one + (size e1) + (size e2)
+    | Ast.UnOp(_,e) -> Int64.one + size e
+    | Ast.Var _ -> Int64.one
+    | Ast.Lab _ -> Int64.one
+    | Ast.Int (n,_) -> Int64.one
+    | Ast.Cast (_, _, e) -> Int64.one + size e
+    | Ast.Unknown _ -> Int64.one
+    | Ast.Load (ea, ei,  _, _) -> Int64.one + (size ea) + (size ei)
+    | Ast.Store (ea, ei, ev, _, _) -> Int64.one + (size ea) + (size ei) + (size ev)
+    | Ast.Let (_, el, eb) -> Int64.one + (size el) + (size eb)
+  in
+    size formula
+
+module IntSet = Set.Make(Int64)
+let memory_indices = ref IntSet.empty
+let empty_mem_ind = memory_indices := IntSet.empty
+
+let get_indices () = 
+  let indices = conc_mem_fold (fun index _ acc -> index::acc) [] in
+  List.iter 
+    (fun index ->
+       memory_indices := IntSet.add index !memory_indices
+    ) indices
+
+let get_concrete_index () =
+  let el = IntSet.min_elt !memory_indices in
+    memory_indices := IntSet.remove el !memory_indices ;
+    Int(el, reg_32)
+
 
 module TaintSymbolic = 
 struct 
@@ -442,9 +475,13 @@ struct
     let name = Var.name var in
     let tainted = try taint_val name with Not_found -> true in
       if tainted then
-	Symbolic.lookup_var delta var
+	if !full_symbolic then
+	  Symbolic (Var var)
+	else
+	  Symbolic.lookup_var delta var
       else
 	Symbolic(concrete_val name)
+
 	  
   let conc2symb = Symbolic.conc2symb
   let normalize = Symbolic.normalize
@@ -453,7 +490,8 @@ struct
       Symbolic.update_mem mu pos value endian
     else
       (* we have a symbolic write, let's concretize *)
-      Symbolic.update_mem mu pos value endian
+      let conc_index = get_concrete_index () in
+	Symbolic.update_mem mu conc_index value endian
     
   (* TODO: add a memory initializer *)
 
@@ -480,10 +518,19 @@ struct
 	  if !allow_symbolic_indices then
 	    (pdebug ("Symbolic memory index at " 
 		     ^ (Pp.ast_exp_to_string index)) ;
-	     (*pdebug "Forced to concretize accesses" ;*)
 	     Symbolic.lookup_mem mu index endian)
 	  else
-	    Symbolic.lookup_mem mu index endian
+	    (* Let's concretize everything *)
+	    let conc_index = get_concrete_index () in
+	    Symbolic.lookup_mem mu conc_index endian
+
+  let assign v ev ({delta=delta; pred=pred; pc=pc} as ctx) =
+    if !full_symbolic then
+      let eq = BinOp (EQ, Var v, symb_to_exp ev) in
+      let pred' = BinOp (AND, eq, pred) in
+	[{ctx with pred=pred'; pc=Int64.succ pc}]
+    else
+      Symbolic.assign v ev ctx
 end
 
 module TraceSymbolic = Symbeval.Make(TaintSymbolic)(FullSubst)
@@ -527,6 +574,8 @@ let symbolic_run trace =
 		  TraceSymbolic.print_var state.delta "R_EBP" ;*)
 		  (*TraceSymbolic.print_var state.delta "R_EDI" ;*)
 		  pdebug ("block no: " ^ (string_of_int !counter));
+		  TraceSymbolic.print_mem state.delta ;
+		  get_indices();
 		  counter := !counter + 1 ;
 	      | _ -> ());
 	   match TraceSymbolic.eval_stmt state stmt with
@@ -612,8 +661,9 @@ let inject_payload start payload trace =
       (arr_ind, List.rev rev)
   in
   let bytes = ref [] in
+  let char_to_int64 c = Int64.of_int (int_of_char c) in
     String.iter 
-      (fun c -> bytes := (Int64.of_int (int_of_char c))::!bytes) payload ;
+      (fun c -> bytes := ((char_to_int64 c)::!bytes)) payload ;
     bytes := List.rev !bytes ;
     let (mem,ind), trace = get_last_load_exp trace in
     let _,assertions = 
@@ -665,14 +715,16 @@ let inject_shellcode nops trace =
 let generate_formula trace = 
   let trace = concrete trace in
     symbolic_run trace
- 
+
 let output_formula file trace = 
   let formula = generate_formula trace in
+    dprintf "formula size: %Ld\n" (formula_size formula) ;
   let oc = open_out file in
     (* pdebug (Pp.ast_exp_to_string state.pred) ; *)
   let m2a = new Memory2array.memory2array_visitor () in
   let formula = Ast_visitor.exp_accept m2a formula in
   let foralls = List.map (Ast_visitor.rvar_accept m2a) [] in
+    dprintf "%s" (Pp.ast_exp_to_string formula) ;
   let p = new Stp.pp_oc oc in
   let () = p#assert_ast_exp_with_foralls foralls formula in
   let () = p#counterexample () in
@@ -687,33 +739,30 @@ let output_formula file trace =
 open Var
 
 let add_assignments trace = 
-  let get_vars_from_stmt stmt = 
-    let varset = ref VarSet.empty in
+  let varset = Hashtbl.create 100 in
+  let get_vars_from_stmt = 
     let var_visitor = object(self)
       inherit Ast_visitor.nop
       method visit_rvar v = 
-	varset := VarSet.add v !varset ;
-	`DoChildren
+	let name = Var.name v in
+	  (try
+	     let value = concrete_val name in
+	       if not (Hashtbl.mem varset name) then
+		 Hashtbl.add varset name (v,value)
+	   with Not_found -> ());
+	  `DoChildren
     end
     in
-      ignore (Ast_visitor.stmt_accept var_visitor stmt) ;
-      !varset
+      Ast_visitor.stmt_accept var_visitor
   in
-    (* TODO: (if needed) we can introduce assignments 
-       only when it is absolutely necessary (undefined var)*)
-  let rec add_assign acc = function
-    | [] -> List.rev acc
-    | s::stmts ->
-	update_concrete s ;
-	let vars = get_vars_from_stmt s in
-	let assignments = VarSet.fold
-	  (fun var acc ->
-	     let name = Var.name var in
-	       try let value = concrete_val name in
-		 (Ast.Move (var, value, []))::acc 
-	       with Not_found -> acc
-	  ) vars []
-	in
-	  add_assign (assignments@(s::acc)) stmts
-  in
-    add_assign [] trace
+  List.iter 
+    (fun s -> 
+       update_concrete s ;
+       ignore (get_vars_from_stmt s)
+    ) trace;
+    let assignments = Hashtbl.fold
+      (fun _ (var,value) acc ->
+	 (Ast.Move (var, value, []))::acc 
+      ) varset []
+    in
+      assignments @ trace

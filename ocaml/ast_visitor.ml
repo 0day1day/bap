@@ -48,7 +48,8 @@ let rec action vischil startvisit node=
 
 (* this really should be a more shallow comparison, otherwise it will
    be slow when there is a deeply nested change *)
-let wrap f v = let v' = f v in if v = v' then v else v'
+(* FIXMEEEE *)
+let wrap f v = f v (*in if v = v' then v else v'*)
 
 let rec exp_accept visitor = 
   let vischil = function

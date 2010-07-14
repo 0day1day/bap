@@ -78,6 +78,10 @@ type mem = Ast.exp AddrMap.t * Var.t (* addr -> val + initial name *)
                ^(Pp.ast_exp_to_string e))
    | _ -> failwith "tried to perform memory operations"
 
+(* Context functions (lookup, update etc) *)
+  let context_update = VH.replace
+  let context_copy = VH.copy
+
 (* Unwrapping functions *)
   let symb_to_exp = function
    | Symbolic e -> e
@@ -94,6 +98,7 @@ type mem = Ast.exp AddrMap.t * Var.t (* addr -> val + initial name *)
     val normalize : int64 -> Type.typ -> int64
     val update_mem : varval -> Ast.exp -> Ast.exp -> Ast.exp -> varval
     val lookup_mem : varval -> Ast.exp -> Ast.exp -> Ast.exp
+    val assign : Var.t -> varval -> ctx -> ctx list
   end
 
   module type SymbMem =
@@ -106,10 +111,6 @@ struct
 
    let byte_type = reg_8
    let index_type = reg_32
- 
-(* Context functions (lookup, update etc) *)
-  let context_update = VH.replace
-  let context_copy = VH.copy
 
   let is_symbolic_store = SMem.is_symbolic_store
 
@@ -126,10 +127,11 @@ struct
 			      (Printf.sprintf "%Lx" x)) *)
 
   let lookup_var = MemL.lookup_var
-  let conc2symb = MemL.conc2symb
-  let normalize = MemL.normalize
+  let conc2symb  = MemL.conc2symb
+  let normalize  = MemL.normalize
   let update_mem = MemL.update_mem
   let lookup_mem = MemL.lookup_mem
+  let assign     = MemL.assign
     
   (* Initializers *)
   let create_state () = 
@@ -309,10 +311,9 @@ struct
     in
     let next_pc = Int64.succ pc in
     let eval = function
-      | Move (v,e,_) ->
-        let ev = eval_expr delta e in
-        context_update delta v ev ;
-        [{ctx with pc=next_pc}]
+      | Move (v,e,_) -> 
+	  let ev = eval_expr delta e in
+	  assign v ev ctx
       | Halt (e, _) ->
 	  let e = eval_expr delta e in
 	  raise (Halted(Some e, ctx))
@@ -396,25 +397,30 @@ let lookup_var delta var =
   (* Normalize a memory address, setting high bits to 0. *)
   let normalize i t = Arithmetic.to64 (i,t)
 
-  let rec update_mem mu pos value endian = 
-  match mu with
-   | Symbolic m -> Symbolic (Store(m,pos,value,endian,reg_8))
-   | ConcreteMem (m,v) ->
-       match pos with
-       | Int(p,t) ->
-	   ConcreteMem(AddrMap.add (normalize p t) value m, v)
-       | _ -> update_mem (conc2symb m v) pos value endian
+  let rec update_mem mu pos value endian = match mu with
+    | Symbolic m -> Symbolic (Store(m,pos,value,endian,reg_8))
+    | ConcreteMem (m,v) ->
+	match pos with
+	  | Int(p,t) ->
+	      ConcreteMem(AddrMap.add (normalize p t) value m, v)
+	  | _ -> update_mem (conc2symb m v) pos value endian
+	      
+  let rec lookup_mem mu index endian = match mu, index with
+    | ConcreteMem(m,v), Int(i,t) ->
+	(try AddrMap.find (normalize i t) m
+	 with Not_found ->
+	   Load(Var v, index, endian, reg_8)
+	     (* FIXME: handle endian and type? *)
+	)
+	  (* perhaps we should introduce a symbolic variable *)
+    | Symbolic mem, _ -> Load (mem,index,endian,reg_8)
+    | ConcreteMem(m,v),_ -> lookup_mem (conc2symb m v) index endian
 
-  let rec lookup_mem mu index endian = 
-  match mu, index with
-   | ConcreteMem(m,v), Int(i,t) ->
-    (try AddrMap.find (normalize i t) m
-     with Not_found ->
-       Load(Var v, index, endian, reg_8) (* FIXME: handle endian and type? *)
-    )
-    (* perhaps we should introduce a symbolic variable *)
-   | Symbolic mem, _ -> Load (mem,index,endian,reg_8)
-   | ConcreteMem(m,v),_ -> lookup_mem (conc2symb m v) index endian
+  let assign v ev ({delta=delta; pred=pred; pc=pc} as ctx) =
+    context_update delta v ev ;
+    (*let eq = BinOp (EQ, v, symb_to_exp ev) in
+    let pred' = BinOp (AND, eq, pred) in*)
+      [{ctx with pc=Int64.succ pc}]
 end
 
 module FullSubst =
