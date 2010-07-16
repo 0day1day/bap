@@ -327,7 +327,7 @@ struct
   let assign = Symbolic.assign
 end
   
-module TraceConcrete = Symbeval.Make(TaintConcrete)(FullSubst)
+module TraceConcrete = Symbeval.Make(TaintConcrete)(FullSubst)(StdForm)
 
 let counter = ref 1
       
@@ -426,7 +426,7 @@ let concrete trace =
 (* Concretizing as much as possible *)
 let allow_symbolic_indices = ref false
 
-let full_symbolic = ref false
+let full_symbolic = ref true
   
 (* Assumptions for the concretization process to be sound:
    - We can have at most one memory load/store on each 
@@ -457,6 +457,7 @@ let memory_indices = ref IntSet.empty
 let empty_mem_ind = memory_indices := IntSet.empty
 
 let get_indices () = 
+  memory_indices := IntSet.empty ;
   let indices = conc_mem_fold (fun index _ acc -> index::acc) [] in
   List.iter 
     (fun index ->
@@ -469,13 +470,55 @@ let get_concrete_index () =
     Int(el, reg_32)
 
 
+module LetBind =
+struct
+(*
+  module Expression = 
+  struct 
+    type t = Ast.exp
+    let equal = (==)
+    let hash = Hashtbl.hash
+  end
+
+  module ExpHash = Hashtbl.Make(Expression)
+  (* A hashtable to hold the let bindings for several
+     different predicates. FIXME: for now it is just a list
+     but this should really be changed *)
+  let bindings : form list ExpHash.t = ExpHash.create 10
+*)  
+  type form = And of Ast.exp | Let of (Var.t * Ast.exp)
+  let bindings = ref []
+    
+  let add_to_formula formula expression typ =
+    (match expression, typ with
+      | _, Equal -> 
+	  bindings := (And expression) :: !bindings
+      | BinOp(EQ, Var v, value), Rename -> 
+	  bindings := (Let (v,value)) :: !bindings
+      | _ -> failwith "internal error: adding malformed constraint to formula"
+    );
+    StdForm.add_to_formula formula expression typ
+
+  let output_formula () =
+    let rec create_formula acc = function
+      | [] -> acc
+      | (And e1)::rest ->
+	  let acc = BinOp(AND, e1, acc) in
+	    create_formula acc rest
+      | (Let (v,e))::rest ->
+	  let acc = Ast.Let(v, e, acc) in
+	    create_formula acc rest
+    in
+      create_formula exp_true !bindings
+end
+
 module TaintSymbolic = 
 struct 
   let lookup_var delta var = 
     let name = Var.name var in
     let tainted = try taint_val name with Not_found -> true in
       if tainted then
-	if !full_symbolic then
+	if !full_symbolic && not (VH.mem delta var) then
 	  Symbolic (Var var)
 	else
 	  Symbolic.lookup_var delta var
@@ -490,12 +533,14 @@ struct
       Symbolic.update_mem mu pos value endian
     else
       (* we have a symbolic write, let's concretize *)
-      let conc_index = get_concrete_index () in
-	Symbolic.update_mem mu conc_index value endian
+      try 
+	let conc_index = get_concrete_index () in
+	  Symbolic.update_mem mu conc_index value endian
+      with Not_found -> Symbolic.update_mem mu pos value endian
     
   (* TODO: add a memory initializer *)
 
-  let lookup_mem mu index endian = 
+  let rec lookup_mem mu index endian = 
     match index with
       | Int(n,_) ->
 	  (try 
@@ -522,18 +567,21 @@ struct
 	  else
 	    (* Let's concretize everything *)
 	    let conc_index = get_concrete_index () in
-	    Symbolic.lookup_mem mu conc_index endian
+	      lookup_mem mu conc_index endian
+	    (*Symbolic.lookup_mem mu conc_index endian*)
 
   let assign v ev ({delta=delta; pred=pred; pc=pc} as ctx) =
     if !full_symbolic then
-      let eq = BinOp (EQ, Var v, symb_to_exp ev) in
-      let pred' = BinOp (AND, eq, pred) in
+      let expr = symb_to_exp ev in
+      let constr = BinOp (EQ, Var v, expr) in
+	pdebug ((Var.name v) ^ " = " ^ (Pp.ast_exp_to_string expr)) ;
+      let pred' = LetBind.add_to_formula pred constr Rename in
 	[{ctx with pred=pred'; pc=Int64.succ pc}]
     else
       Symbolic.assign v ev ctx
 end
 
-module TraceSymbolic = Symbeval.Make(TaintSymbolic)(FullSubst)
+module TraceSymbolic = Symbeval.Make(TaintSymbolic)(FullSubst)(LetBind)
 
 let is_seed_label = (=) "Read Syscall"
       
@@ -561,7 +609,7 @@ let symbolic_run trace =
 	(fun state stmt ->
 	   add_symbolic_seeds stmt;
 	   update_concrete stmt ;
-	   pdebug (Pp.ast_stmt_to_string stmt);
+	   (*pdebug (Pp.ast_stmt_to_string stmt);*)
 	   (match stmt with
 	      | Ast.Label (_,atts) when filter_taint atts != [] -> 
 		  (*TraceSymbolic.print_var state.delta "R_EAX" ;
@@ -574,7 +622,7 @@ let symbolic_run trace =
 		  TraceSymbolic.print_var state.delta "R_EBP" ;*)
 		  (*TraceSymbolic.print_var state.delta "R_EDI" ;*)
 		  pdebug ("block no: " ^ (string_of_int !counter));
-		  TraceSymbolic.print_mem state.delta ;
+		  (*TraceSymbolic.print_mem state.delta ;*)
 		  get_indices();
 		  counter := !counter + 1 ;
 	      | _ -> ());
@@ -714,7 +762,8 @@ let inject_shellcode nops trace =
 
 let generate_formula trace = 
   let trace = concrete trace in
-    symbolic_run trace
+    ignore(symbolic_run trace) ;
+    TraceSymbolic.output_formula ()
 
 let output_formula file trace = 
   let formula = generate_formula trace in
