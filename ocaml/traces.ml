@@ -4,7 +4,7 @@ open Symbeval
 open Type
 open Ast
 
-module D = Debug.Make(struct let name = "TraceEval" and default=`Debug end)
+module D = Debug.Make(struct let name = "TraceEval" and default=`NoDebug end)
 open D
 
 (** So here's how we will do partial symbolic execution on
@@ -286,6 +286,10 @@ let strip_jmp block =
   match List.rev block with
 	 | (Ast.Jmp _)::rest -> List.rev rest
 	 | _ -> block
+
+(*************************************************************)
+(*************************  Printers  ************************)
+(*************************************************************)
 	     
 let print_block =
   List.iter (fun s -> pdebug (Pp.ast_stmt_to_string s))
@@ -293,6 +297,17 @@ let print_block =
 let trace_length trace = 
   Printf.printf "Trace length: %d\n" (List.length trace) ;
   trace
+
+module StatusPrinter =
+struct
+  let total = ref 0
+
+  let init size = total := size
+
+  let update counter = 
+    Printf.printf "Status: %d%%\r" (counter * 100 / !total)
+end
+
 
 (*************************************************************)
 (********************  Concrete Execution  *******************)
@@ -535,6 +550,8 @@ struct
       (* we have a symbolic write, let's concretize *)
       try 
 	let conc_index = get_concrete_index () in
+	  let extra = BinOp(EQ, pos, conc_index) in
+	  ignore (LetBind.add_to_formula exp_true extra Equal) ;
 	  Symbolic.update_mem mu conc_index value endian
       with Not_found -> Symbolic.update_mem mu pos value endian
     
@@ -567,6 +584,8 @@ struct
 	  else
 	    (* Let's concretize everything *)
 	    let conc_index = get_concrete_index () in
+	    let extra = BinOp(EQ, index, conc_index) in
+	      ignore (LetBind.add_to_formula exp_true extra Equal) ;
 	      lookup_mem mu conc_index endian
 	    (*Symbolic.lookup_mem mu conc_index endian*)
 
@@ -599,9 +618,11 @@ let add_symbolic_seeds = function
 	) (filter_taint atts)
   | _ -> ()
 	
+let status = ref 0
 	  
 let symbolic_run trace = 
-  counter := 1 ;
+  status := 1 ;
+  StatusPrinter.init !counter ;
   let trace = append_halt trace in
   let state = TraceSymbolic.build_default_context trace in
     try 
@@ -621,10 +642,11 @@ let symbolic_run trace =
 		  TraceSymbolic.print_var state.delta "R_ESP" ;
 		  TraceSymbolic.print_var state.delta "R_EBP" ;*)
 		  (*TraceSymbolic.print_var state.delta "R_EDI" ;*)
-		  pdebug ("block no: " ^ (string_of_int !counter));
+		  pdebug ("block no: " ^ (string_of_int !status));
 		  (*TraceSymbolic.print_mem state.delta ;*)
 		  get_indices();
-		  counter := !counter + 1 ;
+		  status := !status + 1 ;
+		  StatusPrinter.update !status ;
 	      | _ -> ());
 	   match TraceSymbolic.eval_stmt state stmt with
 	     | [next] -> next
@@ -685,14 +707,19 @@ let hijack_control target trace =
 	(exp, List.rev rev)
   in
   let ((e, atts), trace) = get_last_jmp_exp trace in
-  let ret_constraint = BinOp(EQ,e,Int(target,reg_32)) in
+  let ret_constraint = BinOp(EQ,e,target) in
     trace, Ast.Assert(ret_constraint, atts)
       
 let control_flow addr trace = 
   let target = Int64.of_string ("0x"^addr) in
+  let target = Int(target,reg_32) in
   let trace, assertion = hijack_control target trace in
-    trace@[assertion]
+    trace @ [assertion]
 
+let limited_control trace = 
+  let target = Var (Var.newvar "jump_target" reg_32) in
+  let trace, assertion = hijack_control target trace in
+    trace @ [assertion]
 
 (* Injecting a payload after the return address *)
 let inject_payload start payload trace = 
@@ -751,6 +778,7 @@ let inject_shellcode nops trace =
   let payload = (nopsled nops) ^ shellcode in
   let target_addr = get_stack_address trace in
   let target_addr = Int64.add target_addr pin_offset in
+  let target_addr = Int(target_addr, reg_32) in
   let trace, assertion = hijack_control target_addr trace in
   let _, shell = inject_payload 4L payload trace in
     Util.fast_append trace (shell @ [assertion])
@@ -773,7 +801,7 @@ let output_formula file trace =
   let m2a = new Memory2array.memory2array_visitor () in
   let formula = Ast_visitor.exp_accept m2a formula in
   let foralls = List.map (Ast_visitor.rvar_accept m2a) [] in
-    dprintf "%s" (Pp.ast_exp_to_string formula) ;
+    (*dprintf "%s" (Pp.ast_exp_to_string formula) ;*)
   let p = new Stp.pp_oc oc in
   let () = p#assert_ast_exp_with_foralls foralls formula in
   let () = p#counterexample () in

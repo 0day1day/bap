@@ -162,6 +162,10 @@ let speclist =
      Arg.String (fun i -> add(TransformAst(Traces.control_flow i))),
      "<addr> Provide the target address <addr>"
     )   
+   ::("-trace-symbolic-target", 
+     uadd(TransformAst Traces.limited_control),
+     "Use a symbolic jump target (to determine the amount of control we have)"
+    )   
    ::("-trace-payload", 
      Arg.String (fun p -> add(TransformAst(Traces.add_payload p))),
      "<hexstring> Provide a payload to be inserted past the return address"
