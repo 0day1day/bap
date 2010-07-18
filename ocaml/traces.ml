@@ -298,16 +298,7 @@ let trace_length trace =
   Printf.printf "Trace length: %d\n" (List.length trace) ;
   trace
 
-module StatusPrinter =
-struct
-  let total = ref 0
-
-  let init size = total := size
-
-  let update counter = 
-    Printf.printf "Status: %d%%\r" (counter * 100 / !total)
-end
-
+module Status = Util.StatusPrinter
 
 (*************************************************************)
 (********************  Concrete Execution  *******************)
@@ -355,6 +346,8 @@ let run_block state block =
   let _ = update_concrete info in
   let block = append_halt block in 
   let block = strip_jmp block in
+    Status.inc() ;   
+    Status.inc() ;
   (*print_block block ;*)
   TraceConcrete.initialize_prog state block ;
   TraceConcrete.cleanup_delta state ;
@@ -363,6 +356,7 @@ let run_block state block =
   let rec eval_block state stmt = 
     (*pdebug (Pp.ast_stmt_to_string stmt);*)
     (*    Hashtbl.iter (fun k v -> pdebug (Printf.sprintf "%Lx -> %s" k (Pp.ast_exp_to_string v))) concrete_mem ;*)
+    Status.inc();
     let result = match stmt with
       | Ast.CJmp (cond, _, _, _) ->
 	  TraceConcrete.eval_expr state.delta cond = val_true
@@ -398,14 +392,16 @@ let run_block state block =
       | Halted _ -> 
 	  ((addr,false)::(info,false)::List.rev (List.tl !executed))
 
-let run_blocks blocks =
+let run_blocks blocks length =
   counter := 1 ;
+  Status.init "Concrete Run" length ;
   let state = TraceConcrete.create_state () in
   let rev_trace = List.fold_left 
     (fun acc block -> 
        (run_block state block)::acc
     ) [] blocks
   in
+    Status.stop () ;
     List.flatten (List.rev rev_trace)
  
 (** Converting cjmps to asserts. We use the results of
@@ -429,7 +425,8 @@ let concrete trace =
   let no_specials = remove_specials trace in
   let blocks = trace_to_blocks no_specials in
   (*pdebug ("blocks: " ^ (string_of_int (List.length blocks)));*)
-  let actual_trace = run_blocks blocks in
+  let length = List.length no_specials in
+  let actual_trace = run_blocks blocks length in
   let straightline = cjmps_to_asserts actual_trace in
   let no_jumps = remove_jumps straightline in
     no_jumps
@@ -574,7 +571,7 @@ struct
 	       if tainted then
 		 Symbolic.lookup_mem mu index endian
 	       else
-		 concrete_mem n
+		   concrete_mem n
 	  )
       | _ ->
 	  if !allow_symbolic_indices then
@@ -582,12 +579,15 @@ struct
 		     ^ (Pp.ast_exp_to_string index)) ;
 	     Symbolic.lookup_mem mu index endian)
 	  else
-	    (* Let's concretize everything *)
-	    let conc_index = get_concrete_index () in
-	    let extra = BinOp(EQ, index, conc_index) in
-	      ignore (LetBind.add_to_formula exp_true extra Equal) ;
-	      lookup_mem mu conc_index endian
-	    (*Symbolic.lookup_mem mu conc_index endian*)
+	    try 
+	      (* Let's concretize everything *)
+	      let conc_index = get_concrete_index () in
+	      let extra = BinOp(EQ, index, conc_index) in
+		ignore (LetBind.add_to_formula exp_true extra Equal) ;
+		lookup_mem mu conc_index endian
+		  (*Symbolic.lookup_mem mu conc_index endian*)
+	    with Not_found ->
+	      Symbolic.lookup_mem mu index endian
 
   let assign v ev ({delta=delta; pred=pred; pc=pc} as ctx) =
     if !full_symbolic then
@@ -621,32 +621,22 @@ let add_symbolic_seeds = function
 let status = ref 0
 	  
 let symbolic_run trace = 
-  status := 1 ;
-  StatusPrinter.init !counter ;
+  Status.init "Symbolic Run" (List.length trace) ;
   let trace = append_halt trace in
   let state = TraceSymbolic.build_default_context trace in
+  let formula = 
     try 
       let state = List.fold_left 
 	(fun state stmt ->
+	   Status.inc() ;
 	   add_symbolic_seeds stmt;
 	   update_concrete stmt ;
 	   (*pdebug (Pp.ast_stmt_to_string stmt);*)
 	   (match stmt with
 	      | Ast.Label (_,atts) when filter_taint atts != [] -> 
-		  (*TraceSymbolic.print_var state.delta "R_EAX" ;
-		  TraceSymbolic.print_var state.delta "R_EBX" ;
-		  TraceSymbolic.print_var state.delta "R_ECX" ;
-		  TraceSymbolic.print_var state.delta "R_EDX" ;
-		  TraceSymbolic.print_var state.delta "R_ESI" ;
-		  TraceSymbolic.print_var state.delta "R_EDI" ;
-		  TraceSymbolic.print_var state.delta "R_ESP" ;
-		  TraceSymbolic.print_var state.delta "R_EBP" ;*)
-		  (*TraceSymbolic.print_var state.delta "R_EDI" ;*)
 		  pdebug ("block no: " ^ (string_of_int !status));
-		  (*TraceSymbolic.print_mem state.delta ;*)
 		  get_indices();
 		  status := !status + 1 ;
-		  StatusPrinter.update !status ;
 	      | _ -> ());
 	   match TraceSymbolic.eval_stmt state stmt with
 	     | [next] -> next
@@ -664,12 +654,9 @@ let symbolic_run trace =
       | AssertFailed _ ->
 	  pdebug "Failed assertion ..." ;
 	  state.pred
- (*     | _ -> 
-	  pdebug "Symbolic Run: Early Abort";
-	  (*TraceSymbolic.print_values state.delta;*)
-	  (*pdebug ("Reason: "^(Pp.ast_stmt_to_string stmt));*)
-	  state.pred
- *)	    
+  in
+    Status.stop () ;
+    formula
 
 let concolic trace = 
   let trace = concrete trace in

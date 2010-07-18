@@ -4,7 +4,7 @@ open Type
 open Ast
 open Typecheck
 
-module D = Debug.Make(struct let name = "STP" and default=`Debug end)
+module D = Debug.Make(struct let name = "STP" and default=`NoDebug end)
 open D
 
 

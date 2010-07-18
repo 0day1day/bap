@@ -66,3 +66,10 @@ val run_with_remapped_fd :
 
 val take : int -> 'a list -> 'a list
 val fast_append : 'a list -> 'a list -> 'a list
+
+module StatusPrinter :
+  sig
+    val init : string -> int -> unit
+    val inc  : unit -> unit
+    val stop : unit -> unit
+  end

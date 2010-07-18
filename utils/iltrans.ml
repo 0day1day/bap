@@ -186,6 +186,14 @@ let speclist =
      uadd(TransformAst(Traces.trace_length)),
      "Output the length of the trace"
     )
+  ::("-no-let-bindings", 
+     Arg.Clear Traces.full_symbolic,
+     "Disable the usage of let bindings during formula generation"
+    )
+  ::("-trace-symbolic-indices", 
+     Arg.Set Traces.allow_symbolic_indices,
+     "Allow the existence of symbolic indices during formula generation"
+    )
   :: ("-normalize-mem",
       uadd(TransformAst Memory2array.coerce_prog),
       "Normalize memory accesses as array accesses"

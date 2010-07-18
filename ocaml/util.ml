@@ -325,3 +325,31 @@ let rec take_aux acc = function
 let take n l = take_aux [] (l, n)
 
 let fast_append l1 l2 = List.rev_append (List.rev l1) l2
+
+
+module StatusPrinter =
+struct
+  let total = ref 0
+  let current = ref 0
+  let last = ref 0
+  let message = ref "Status"
+    
+  let init msg size = 
+    current := 0 ;
+    last := -1 ;
+    message := msg ;
+    total := size
+      
+  let update () = 
+    Printf.printf "%s: %d%%\r" !message !last ;
+    flush stdout
+      
+  let inc () =
+    current := !current + 1 ;
+    let last' = (!current * 100) / !total in
+      if (last' != !last) then
+	(last := last'; update ())
+	
+  let stop () =
+    Printf.printf "%s: Done!\n" !message
+end
