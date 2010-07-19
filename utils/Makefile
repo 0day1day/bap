@@ -12,7 +12,7 @@ export SOURCE_DIRS_IN = $(BAP_OCAMLDIR)
 
 # default subprojects to build
 ifndef SUBPROJS
-	export SUBPROJS = toil iltrans topredicate formula
+	export SUBPROJS = toil iltrans topredicate formula snort_parse
 endif
 
 
@@ -44,6 +44,14 @@ define PROJ_formula
 	DOC_FILES=$(SOURCES)
 endef
 export PROJ_formula
+
+define PROJ_snort_parse
+	RESULT=snort_parse
+	SOURCES = snort_parse.ml
+	DOC_FILES=$(SOURCES)
+endef
+export PROJ_snort_parse
+
 
 # suffix for bytecode (which when we make all is debug code)
 export BCSUFFIX = .dbg
