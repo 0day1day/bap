@@ -178,6 +178,10 @@ let speclist =
      Arg.String(fun f -> add(TransformAst(Traces.output_formula f))),
      "<file> Output the STP trace formula to <file>"
     )
+  ::("-trace-exploit", 
+     Arg.String(fun f -> add(TransformAst(Traces.output_exploit f))),
+     "<file> Output the exploit string to <file>"
+    )
   ::("-trace-assignments", 
      uadd(TransformAst(Traces.add_assignments)),
      "Explicitly assign the concrete values to the trace variables"

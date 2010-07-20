@@ -218,8 +218,9 @@ object (self)
       | Unknown(s,t) ->
 	  pp "unknown_"; pi unknown_counter; pp" %"; pp s; force_newline();
 	  unknown_counter <- unknown_counter + 1;
-      | Lab _ ->
-	  failwith "STP: don't know how to handle label names"
+      | Lab lab ->
+	  failwith ("STP: don't know how to handle label names "
+		      ^ (Pp.ast_exp_to_string e))
       | Let(v, e1, e2) ->
 	  pp "(LET ";
 	  (* v isn't allowed to shadow anything *)

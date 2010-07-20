@@ -351,5 +351,6 @@ struct
 	(last := last'; update ())
 	
   let stop () =
-    Printf.printf "%s: Done!\n" !message
+    Printf.printf "%s: Done!\n" !message ;
+    flush stdout
 end

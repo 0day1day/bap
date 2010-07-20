@@ -290,13 +290,25 @@ let strip_jmp block =
 (*************************************************************)
 (*************************  Printers  ************************)
 (*************************************************************)
+
+let print = Printf.printf
 	     
 let print_block =
   List.iter (fun s -> pdebug (Pp.ast_stmt_to_string s))
 
 let trace_length trace = 
-  Printf.printf "Trace length: %d\n" (List.length trace) ;
+  print "Trace length: %d\n" (List.length trace) ;
   trace
+
+let print_formula file formula =
+  let oc = open_out file in
+  let m2a = new Memory2array.memory2array_visitor () in
+  let formula = Ast_visitor.exp_accept m2a formula in
+  let foralls = List.map (Ast_visitor.rvar_accept m2a) [] in
+  let p = new Stp.pp_oc oc in
+  let () = p#assert_ast_exp_with_foralls foralls formula in
+  let () = p#counterexample () in
+    p#close
 
 module Status = Util.StatusPrinter
 
@@ -477,7 +489,7 @@ let get_indices () =
     ) indices
 
 let get_concrete_index () =
-  let el = IntSet.min_elt !memory_indices in
+  let el = IntSet.max_elt !memory_indices in
     memory_indices := IntSet.remove el !memory_indices ;
     Int(el, reg_32)
 
@@ -631,12 +643,14 @@ let symbolic_run trace =
 	   Status.inc() ;
 	   add_symbolic_seeds stmt;
 	   update_concrete stmt ;
-	   (*pdebug (Pp.ast_stmt_to_string stmt);*)
 	   (match stmt with
 	      | Ast.Label (_,atts) when filter_taint atts != [] -> 
-		  pdebug ("block no: " ^ (string_of_int !status));
+		  (*Printf.printf "%s\n" ("block no: " ^ (string_of_int !status));
+		  Printf.printf "%s\n" (Pp.ast_stmt_to_string stmt);*)
 		  get_indices();
 		  status := !status + 1 ;
+		  (*let formula = TraceSymbolic.output_formula () in
+		  print_formula ("form_" ^ (string_of_int !status)) formula*)
 	      | _ -> ());
 	   match TraceSymbolic.eval_stmt state stmt with
 	     | [next] -> next
@@ -701,12 +715,12 @@ let control_flow addr trace =
   let target = Int64.of_string ("0x"^addr) in
   let target = Int(target,reg_32) in
   let trace, assertion = hijack_control target trace in
-    trace @ [assertion]
+    Util.fast_append trace [assertion]
 
 let limited_control trace = 
   let target = Var (Var.newvar "jump_target" reg_32) in
   let trace, assertion = hijack_control target trace in
-    trace @ [assertion]
+    Util.fast_append trace [assertion]
 
 (* Injecting a payload after the return address *)
 let inject_payload start payload trace = 
@@ -782,20 +796,59 @@ let generate_formula trace =
 
 let output_formula file trace = 
   let formula = generate_formula trace in
-    dprintf "formula size: %Ld\n" (formula_size formula) ;
-  let oc = open_out file in
-    (* pdebug (Pp.ast_exp_to_string state.pred) ; *)
-  let m2a = new Memory2array.memory2array_visitor () in
-  let formula = Ast_visitor.exp_accept m2a formula in
-  let foralls = List.map (Ast_visitor.rvar_accept m2a) [] in
-    (*dprintf "%s" (Pp.ast_exp_to_string formula) ;*)
-  let p = new Stp.pp_oc oc in
-  let () = p#assert_ast_exp_with_foralls foralls formula in
-  let () = p#counterexample () in
-    p#close;
-    pdebug "STP formula generated.";
+    (*dprintf "formula size: %Ld\n" (formula_size formula) ;*)
+    print "Printing out formula\n" ; flush stdout ;
+    print_formula file formula ;
     trace
       
+(*************************************************************)
+(****************  Exploit String Generation  ****************)
+(*************************************************************)
+
+let formula_storage = ".formula"
+let answer_storage = ".answer"
+
+let solution_from_stp_formula file =
+  let cin = open_in file in
+  let lexbuf = Lexing.from_channel cin in
+    Stp_grammar.main Stp_lexer.token lexbuf
+      
+let solve_formula input output =
+  print "Querying STP for a satisfying answer\n" ; 
+  flush stdout ;
+  let cmd = "stp < " ^ input ^ " > " ^ output in
+    match Unix.system cmd with
+      | Unix.WEXITED 0 -> ()
+      | _ -> failwith "STP call failed"
+
+let output_exploit file trace = 
+  ignore (output_formula formula_storage trace) ;
+  solve_formula formula_storage answer_storage ;
+  let var_vals = solution_from_stp_formula answer_storage in
+    (* The variables that we care about *)
+  let is_input v = String.sub v 0 4 = "symb" in
+    (* A special function to sort interesting variables by name *)
+  let sort = 
+    let underscore = Str.regexp_string "_" in
+    let sort_aux (var1, _) (var2,_) =
+      let ss1 = Str.split underscore var1 
+      and ss2 = Str.split underscore var2 in
+	compare (List.nth ss1 2) (List.nth ss2 2)
+    in  
+      List.sort sort_aux
+  in
+  let symb_var_vals = List.filter (fun (v,_) -> is_input v) var_vals in
+  let _, input = List.split (sort symb_var_vals) in
+  let input = List.map Int64.to_int input in
+    (* Let's output the exploit string *)
+  let cout = open_out file in
+    List.iter (output_byte cout) input ;
+    print "Exploit string was written out to file \"%s\"\n" file ;
+    flush stdout ;
+    trace    
+
+
+
 (*************************************************************)
 (**************** Type Inference on Traces  ******************)
 (*************************************************************)

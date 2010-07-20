@@ -45,6 +45,7 @@ let split_load_list array index eletype endian =
 
 let split_loads array index eletype endian =
   let (singlereads, mvar) = split_load_list array index eletype endian in
+  let singlereads = List.rev singlereads in
   let orexp = List.fold_left exp_or (List.hd singlereads) (List.tl singlereads) in
   Let(mvar, array, orexp)
 
