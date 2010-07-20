@@ -693,36 +693,39 @@ let nopsled n = String.make n nop
 (* TODO: find a way to determine PIN's offset *)
 let pin_offset = 400L
 
+(* The last jump of the trace *)
+let get_last_jmp_exp stmts = 
+  let rev = List.rev stmts in
+  let rec get_exp = function
+    | [] -> failwith "no jump found"
+    | (Ast.Jmp(e, atts))::rest ->
+	((e,atts), rest)
+    | _::rest -> get_exp rest
+  in
+  let (exp, rev) = get_exp rev in
+    (exp, List.rev rev)
 
 (* Substituting the last jump with assertions *)
 let hijack_control target trace = 
-  let get_last_jmp_exp stmts = 
-    let rev = List.rev stmts in
-    let rec get_exp = function
-      | [] -> failwith "no jump found"
-      | (Ast.Jmp(e, atts))::rest ->
-	  ((e,atts), rest)
-      | _::rest -> get_exp rest
-    in
-      let (exp, rev) = get_exp rev in
-	(exp, List.rev rev)
-  in
   let ((e, atts), trace) = get_last_jmp_exp trace in
   let ret_constraint = BinOp(EQ,e,target) in
     trace, Ast.Assert(ret_constraint, atts)
       
+(* Setting the return address to an arbitrary value *)
 let control_flow addr trace = 
   let target = Int64.of_string ("0x"^addr) in
   let target = Int(target,reg_32) in
   let trace, assertion = hijack_control target trace in
     Util.fast_append trace [assertion]
 
+(* Making the final jump target a symbolic variable. This
+   should be useful for enumerating all possible jump targets *)  
 let limited_control trace = 
   let target = Var (Var.newvar "jump_target" reg_32) in
   let trace, assertion = hijack_control target trace in
     Util.fast_append trace [assertion]
 
-(* Injecting a payload after the return address *)
+(* Injecting a payload at an offset past the return address *)
 let inject_payload start payload trace = 
   (* TODO: A simple dataflow is missing here *)
   let get_last_load_exp stmts = 
@@ -730,18 +733,18 @@ let inject_payload start payload trace =
     let rec get_load = function
       | [] -> failwith "no load found"
       | (Ast.Move(_,Ast.Load(array,index,_,_),_))::rest ->
-	  ((array,index), rest)
+	  (array,index)
       | _::rest -> get_load rest
     in
-    let (arr_ind, rev) = get_load rev in
-      (arr_ind, List.rev rev)
+      get_load rev
   in
   let bytes = ref [] in
   let char_to_int64 c = Int64.of_int (int_of_char c) in
     String.iter 
       (fun c -> bytes := ((char_to_int64 c)::!bytes)) payload ;
     bytes := List.rev !bytes ;
-    let (mem,ind), trace = get_last_load_exp trace in
+    let _m, trace = get_last_jmp_exp trace in
+    let mem, ind = get_last_load_exp trace in
     let _,assertions = 
       List.fold_left 
 	(fun (i,acc) value ->
@@ -751,12 +754,12 @@ let inject_payload start payload trace =
 	     (Int64.succ i, (Ast.Assert(constr, [])::acc))
 	) (start, []) !bytes
     in
-      trace, assertions
+      trace, List.rev assertions
 
+(* Add an arbitrary payload after the return address *)
 let add_payload payload trace = 
   let trace, assertions = inject_payload 0L payload trace in
     Util.fast_append trace assertions
-
 
 (* Performing shellcode injection *)
 let inject_shellcode nops trace = 
@@ -819,7 +822,8 @@ let solve_formula input output =
   let cmd = "stp < " ^ input ^ " > " ^ output in
     match Unix.system cmd with
       | Unix.WEXITED 0 -> ()
-      | _ -> failwith "STP call failed"
+      | _ -> failwith ("STP query failed, consider increasing"
+			 ^ " the stack with ulimit")
 
 let output_exploit file trace = 
   ignore (output_formula formula_storage trace) ;
@@ -882,4 +886,4 @@ let add_assignments trace =
 	 (Ast.Move (var, value, []))::acc 
       ) varset []
     in
-      assignments @ trace
+      Util.fast_append assignments trace
