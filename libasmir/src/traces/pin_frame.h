@@ -172,6 +172,7 @@ namespace pintrace { // Use namespace to avoid conflict
       char cachemask[MAX_CACHEMASK_BTYES];
       uint32_t values[MAX_VALUES_COUNT];
       uint32_t types[MAX_VALUES_COUNT];
+      uint32_t usages[MAX_VALUES_COUNT];
       uint32_t locs[MAX_VALUES_COUNT];
       uint32_t tainted[MAX_VALUES_COUNT];
 

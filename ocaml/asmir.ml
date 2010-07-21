@@ -177,6 +177,15 @@ let attr_type_to_typ = function
  | INT_32 -> reg_32
  | INT_64 -> reg_64
 
+let get_attr_usage = function
+  | 0x01 -> RD
+  | 0x10 -> WR
+  | 0x11 -> RW
+  | _ -> 
+      prerr_endline "expression with no usage info" ;
+      RD
+      
+
 (* TODO: needs to be refined for bytes *)
 let int_to_taint n = Taint n
 
@@ -186,6 +195,7 @@ let tr_context_tup attr =
            t=attr_type_to_typ (Libasmir.attr_type attr);
            index=Libasmir.attr_ind attr;
            value=Libasmir.attr_value attr;
+	   usage=get_attr_usage(Libasmir.attr_usage attr);
            taint=int_to_taint (Libasmir.attr_taint attr)}
 
 let tr_attributes s =

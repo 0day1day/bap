@@ -113,6 +113,7 @@ ostream &StdFrame::serialize(ostream &out, uint16_t sz)
    out2.write((const char *) &cachemask, masklen);
    out2.write((const char *) &values, values_count * sizeof(uint32_t));
    out2.write((const char *) &types, values_count * sizeof(uint32_t));
+   out2.write((const char *) &usages, values_count * sizeof(uint32_t));
    out2.write((const char *) &locs, values_count * sizeof(uint32_t));
    out2.write((const char *) &tainted, values_count * sizeof(uint32_t));
 
@@ -142,6 +143,7 @@ istream &StdFrame::unserializePart(istream &in)
 
    in.read((char *) &values, values_count * sizeof(uint32_t));
    in.read((char *) &types, values_count * sizeof(uint32_t));
+   in.read((char *) &usages, values_count * sizeof(uint32_t));
    in.read((char *) &locs, values_count * sizeof(uint32_t));
    in.read((char *) &tainted, values_count * sizeof(uint32_t));
 
@@ -151,42 +153,46 @@ istream &StdFrame::unserializePart(istream &in)
 
 conc_map_vec * StdFrame::getOperands()
 {
-        conc_map_vec * concrete_pairs = new vector<conc_map *>();
-        int i, type, taint; bool mem;
-        string name;
-        const_val_t index, value;
-        conc_map * map;
-        for ( i = 0 ; i < values_count ; i ++ )
-        {
-                switch (types[i])
-                { 
-                        case VT_REG32: 
-                        case VT_REG16: 
-                        case VT_REG8: 
-                                name = pin_register_name(locs[i]);
-                                mem = false;
-                                value = values[i] ;
-                                taint = tainted[i] ;
-                                map = new ConcPair(name,mem,get_type(types[i]),index,value,taint);
-                                concrete_pairs->push_back(map);
-                                break;
-                        case VT_MEM32: 
-                        case VT_MEM16: 
-                        case VT_MEM8: 
-                                name = "mem";
-                                mem = true;
-                                index = locs[i] ;
-                                value = values[i] ;
-                                taint = tainted[i] ;
-                                map = new ConcPair(name,mem,get_type(types[i]),index,value,taint);
-                                concrete_pairs->push_back(map);
-                                break ;
-                        default : 
-                                cerr << "type: " << types[i] << endl ; 
-                                assert(0) ;
-                }
-        }
-        return concrete_pairs;
+  conc_map_vec * concrete_pairs = new vector<conc_map *>();
+  int i, type, taint, usage; bool mem;
+  string name;
+  const_val_t index, value;
+  conc_map * map;
+  for ( i = 0 ; i < values_count ; i ++ )
+    {
+      switch (types[i])
+	{ 
+	case VT_REG32: 
+	case VT_REG16: 
+	case VT_REG8: 
+	  name = pin_register_name(locs[i]);
+	  mem = false;
+	  value = values[i] ;
+	  usage = usages[i] ;
+	  taint = tainted[i] ;
+	  map = new ConcPair(name,mem,get_type(types[i]),index,
+			     value,usage,taint);
+	  concrete_pairs->push_back(map);
+	  break;
+	case VT_MEM32: 
+	case VT_MEM16: 
+	case VT_MEM8: 
+	  name = "mem";
+	  mem = true;
+	  index = locs[i] ;
+	  value = values[i] ;
+	  usage = usages[i] ;
+	  taint = tainted[i] ;
+	  map = new ConcPair(name,mem,get_type(types[i]),index,
+			     value,usage,taint);
+	  concrete_pairs->push_back(map);
+	  break ;
+	default : 
+	  cerr << "type: " << types[i] << endl ; 
+	  assert(0) ;
+	}
+    }
+  return concrete_pairs;
 }
 
 ostream &KeyFrame::serialize(ostream &out, uint16_t sz)
@@ -331,24 +337,26 @@ istream &SyscallFrame::unserializePart(istream &in)
 
 conc_map_vec * SyscallFrame::getOperands()
 {
-	conc_map_vec * concrete_pairs = new vector<conc_map *>();
-	int type, taint; bool mem;
-	string name;
-	const_val_t index, value;
-	conc_map * map;
-	uint32_t bytes = callno;
-	uint32_t i;
-	for ( i = 0 ; i < callno ; i ++ )
-	{
-		name = "mem";
-		mem = true;
-		index = args[1] + i ;
-		value = 0;
-		taint = i ;
-		map = new ConcPair(name,mem,get_type(VT_MEM8),index,value,taint);
-		concrete_pairs->push_back(map);
-	}
-	return concrete_pairs;
+  conc_map_vec * concrete_pairs = new vector<conc_map *>();
+  int type, usage, taint; bool mem;
+  string name;
+  const_val_t index, value;
+  conc_map * map;
+  uint32_t bytes = callno;
+  uint32_t i;
+  for ( i = 0 ; i < callno ; i ++ )
+    {
+      name = "mem";
+      mem = true;
+      index = args[1] + i ;
+      value = 0;
+      usage = 0;
+      taint = i ;
+      map = new ConcPair(name,mem,get_type(VT_MEM8),index,
+			 value,usage,taint);
+      concrete_pairs->push_back(map);
+    }
+  return concrete_pairs;
 }
 
 
@@ -380,13 +388,14 @@ istream &TaintFrame::unserializePart(istream &in)
 conc_map_vec * TaintFrame::getOperands()
 {
 	conc_map_vec * concrete_pairs = new vector<conc_map *>();
-	int type, taint; bool mem;
+	int type, usage, taint; bool mem;
 	string name;
 	const_val_t index, value;
 	conc_map * map;
         int source = 1;
 	uint32_t bytes = length;
 	uint32_t i;
+	usage = 0;
 	for ( i = 0 ; i < length ; i ++ )
 	{
 		name = "mem";
@@ -394,7 +403,8 @@ conc_map_vec * TaintFrame::getOperands()
 		index = addr + i ;
 		value = 0;
 		taint = source ++;
-		map = new ConcPair(name,mem,get_type(VT_MEM8),index,value,taint);
+		map = new ConcPair(name,mem,get_type(VT_MEM8),index,
+				   value,usage,taint);
 		concrete_pairs->push_back(map);
 	}
 	return concrete_pairs;

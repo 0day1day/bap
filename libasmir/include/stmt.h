@@ -29,11 +29,15 @@ typedef struct ConcPair {
   attr_type_t type;
   const_val_t index;
   const_val_t value;
+  int usage;
   int taint;
   ConcPair(string str, bool m, attr_type_t typ, 
-           const_val_t ind, const_val_t val, int tnt){
-    name = str; mem = m; type = typ; 
-    index = ind; value = val; taint = tnt;
+           const_val_t ind, const_val_t val, 
+	   int usg,int tnt){
+    name = str; mem = m; 
+    type = typ; index = ind; 
+    value = val; usage = usg;
+    taint = tnt;
   };
 } conc_map;
 typedef vector<conc_map *> conc_map_vec;
@@ -251,6 +255,7 @@ extern "C" {
   extern bool attr_mem(conc_map*);
   extern const_val_t attr_ind(conc_map*);
   extern attr_type_t attr_type(conc_map*);
+  extern int attr_usage(conc_map*);
   extern int attr_taint(conc_map*);
   extern void setAttribute(string);
   extern const char* asm_string_from_stmt(Stmt*);

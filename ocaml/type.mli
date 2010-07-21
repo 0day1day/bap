@@ -62,15 +62,17 @@ type pos = (string * int)
  *)
 
 type taint_type = Taint of int
+type usage = RD | WR | RW
 
 type context = 
  {
-   name:string;
-   mem:bool;
-   t:typ;
-   index:int64;
-   value:int64;
-   taint:taint_type
+   name  : string;
+   mem   : bool;
+   t     : typ;
+   index : int64;
+   value : int64;
+   usage : usage;
+   taint : taint_type
  }
  
 type attribute = 

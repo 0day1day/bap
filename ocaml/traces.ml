@@ -33,8 +33,9 @@ open D
 (* A type for all concrete values *)
 type value = 
 {
-  exp: Ast.exp;
-  tnt: bool;
+  exp   : Ast.exp;
+  usg   : usage;
+  tnt   : bool;
 }
 
 type environment =
@@ -68,15 +69,21 @@ let taint_mem index = (mem_lookup index).tnt
 let bound = Hashtbl.mem global.vars
 let in_memory = Hashtbl.mem global.memory
 
-let add_var var value taint = 
-  Hashtbl.add global.vars var {exp=value;tnt=taint;}
-let add_mem index value taint =
-  Hashtbl.add global.memory index {exp=value;tnt=taint;}
+let add_var var value usage taint = 
+  Hashtbl.add global.vars var 
+    {exp=value;
+     usg=usage;
+     tnt=taint;}
+let add_mem index value usage taint =
+  Hashtbl.add global.memory index 
+    {exp=value;
+     usg=usage;
+     tnt=taint;}
 let add_symbolic = Hashtbl.add global.symbolic
   
-let add_new_var var value taint = 
+let add_new_var var value usage taint = 
   if not (bound var) then 
-    add_var var value taint
+    add_var var value usage taint
 
 let cleanup () =
   Hashtbl.clear global.vars;
@@ -84,6 +91,8 @@ let cleanup () =
 
 let conc_mem_fold f = 
   Hashtbl.fold f global.memory
+let conc_mem_iter f = 
+  Hashtbl.iter f global.memory
 
 
 (*************************************************************)
@@ -130,18 +139,21 @@ let hd_tl = function
 (* Unfortunately we need to special-case the EFLAGS registers
    since PIN does not provide us with separate registers for 
    the zero, carry etc flags *)
-let add_eflags eflags taint =
+let add_eflags eflags usage taint =
   add_var 
     "R_ZF" 
     (Int(num_to_bit (Int64.logand eflags 0x40L), reg_1))
+    usage
     taint;
   add_var 
     "R_CF" 
     (Int(num_to_bit (Int64.logand eflags 0x01L), reg_1))
+    usage
     taint;
   add_var
     "R_DFLAG"
     (Int(num_to_bit (Int64.logand eflags 0x400L), reg_32))
+    usage
     taint
     
  (* TODO: handle more EFLAGS registers *)
@@ -169,8 +181,8 @@ let () =
 (********************************************************)
 	  
 (* Store the concrete taint info in the global environment *)
-let add_to_conc  {name=name; mem=mem; index=index; 
-		  value=value; t=typ; taint=Taint taint} =
+let add_to_conc {name=name; mem=mem; index=index; value=value; 
+		 t=typ; usage=usage; taint=Taint taint} =
   (* Stores the concrete (known) memory bytes in the global 
      environment in little endian order *)
   let add_to_mem index value taint limit = 
@@ -180,7 +192,7 @@ let add_to_conc  {name=name; mem=mem; index=index;
       | n -> 
 	  let byte = get_byte (limit-n+1) value in
             if not (in_memory index) then
-	      add_mem index (Int(byte,reg_8)) taint ;
+	      add_mem index (Int(byte,reg_8)) usage taint ;
             add_mem_aux (Int64.succ index) (n-1)
     in
       add_mem_aux index
@@ -196,10 +208,10 @@ let add_to_conc  {name=name; mem=mem; index=index;
 	with Not_found -> (name, 0,typ)
       in
       let fullvalue = Int(Int64.shift_left value shift,typ) in
-	(add_new_var fullname fullvalue taint ;
+	(add_new_var fullname fullvalue usage taint ;
 	 
 	 (* Special case EFLAGS *)
-	 if name = "EFLAGS" then add_eflags value taint)
+	 if name = "EFLAGS" then add_eflags value usage taint)
 	
 (* Updating the lookup tables with the concrete values *)
 let update_concrete = function
@@ -477,20 +489,31 @@ let formula_size formula =
     size formula
 
 module IntSet = Set.Make(Int64)
-let memory_indices = ref IntSet.empty
-let empty_mem_ind = memory_indices := IntSet.empty
-
+let memory_read = ref IntSet.empty
+let memory_write = ref IntSet.empty
+let empty_mem_ind () = 
+  memory_read  := IntSet.empty; 
+  memory_write := IntSet.empty
+  
 let get_indices () = 
-  memory_indices := IntSet.empty ;
-  let indices = conc_mem_fold (fun index _ acc -> index::acc) [] in
-  List.iter 
-    (fun index ->
-       memory_indices := IntSet.add index !memory_indices
-    ) indices
+  empty_mem_ind () ;
+  conc_mem_iter 
+    (fun index value -> match value.usg with
+       | RD -> memory_read := IntSet.add index !memory_read
+       | WR -> memory_write := IntSet.add index !memory_write
+       | RW -> (* Read-Write -> let's store both *)
+	   memory_read := IntSet.add index !memory_read ;
+	   memory_write := IntSet.add index !memory_write
+    )
 
-let get_concrete_index () =
-  let el = IntSet.max_elt !memory_indices in
-    memory_indices := IntSet.remove el !memory_indices ;
+let get_concrete_read_index () =
+  let el = IntSet.max_elt !memory_read in
+    memory_read := IntSet.remove el !memory_read ;
+    Int(el, reg_32)
+
+let get_concrete_write_index () =
+  let el = IntSet.max_elt !memory_write in
+    memory_write := IntSet.remove el !memory_write ;
     Int(el, reg_32)
 
 
@@ -558,7 +581,7 @@ struct
     else
       (* we have a symbolic write, let's concretize *)
       try 
-	let conc_index = get_concrete_index () in
+	let conc_index = get_concrete_write_index () in
 	  let extra = BinOp(EQ, pos, conc_index) in
 	  ignore (LetBind.add_to_formula exp_true extra Equal) ;
 	  Symbolic.update_mem mu conc_index value endian
@@ -593,7 +616,7 @@ struct
 	  else
 	    try 
 	      (* Let's concretize everything *)
-	      let conc_index = get_concrete_index () in
+	      let conc_index = get_concrete_read_index () in
 	      let extra = BinOp(EQ, index, conc_index) in
 		ignore (LetBind.add_to_formula exp_true extra Equal) ;
 		lookup_mem mu conc_index endian
