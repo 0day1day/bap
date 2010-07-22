@@ -48,8 +48,9 @@ export SOURCES = \
 	coalesce.ml \
 	symbeval.ml \
 	traces.ml \
+	payload.ml \
 	search.ml \
-	snort_grammar.mly snort_lexer.mll
+	snort_grammar.mly snort_lexer.mll\
 
 RESULT = bap
 DOC_FILES := $(filter %.mli, $(SOURCES)) $(filter %.ml, $(SOURCES))

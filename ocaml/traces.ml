@@ -826,6 +826,7 @@ let output_formula file trace =
     print "Printing out formula\n" ; flush stdout ;
     print_formula file formula ;
     trace
+
       
 (*************************************************************)
 (****************  Exploit String Generation  ****************)
