@@ -416,7 +416,7 @@ NCDIDIR  := ._ncdi
 FILTER_EXTNS := %.mli %.ml %.mll %.mly %.idl %.oxridl %.c %.m %.$(EXT_CXX) %.rep %.zog %.glade
 
 FILTERED     := $(filter $(FILTER_EXTNS), $(SOURCES))
-SOURCE_DIRS  := $(filter-out ./, $(sort $(dir $(FILTERED))))
+SOURCE_DIRS  := $(filter-out ./, $(sort $(dir $(FILTERED)))) $(SOURCE_DIRS_IN)
 
 FILTERED_REP := $(filter %.rep, $(FILTERED))
 DEP_REP      := $(FILTERED_REP:%.rep=$(MLDEPDIR)/%.d)
@@ -623,7 +623,6 @@ ifndef REAL_OCAMLC
   # the path since I don't know the paths built into the compiler, so
   # just include the ones with slashes in their names.
   EXTRADEPS := $(addsuffix .cma,$(foreach i,$(LIBS),$(if $(findstring /,$(i)),$(i))))
-
 
   ifndef LIB_PACK_NAME
     SPECIAL_OCAMLFLAGS := $(OCAMLBCFLAGS)
