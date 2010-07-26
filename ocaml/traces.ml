@@ -838,10 +838,12 @@ let answer_storage = ".answer"
 let solution_from_stp_formula file =
   let cin = open_in file in
   let lexbuf = Lexing.from_channel cin in
-    Stp_grammar.main Stp_lexer.token lexbuf
+  let o = Stp_grammar.main Stp_lexer.token lexbuf in
+  let () = close_in cin in
+  o
       
 let solve_formula input output =
-  print "Querying STP for a satisfying answer\n" ; 
+  (* print "Querying STP for a satisfying answer\n" ;  *)
   flush stdout ;
   let cmd = "stp < " ^ input ^ " > " ^ output in
     match Unix.system cmd with

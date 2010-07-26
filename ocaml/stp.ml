@@ -116,6 +116,8 @@ object (self)
       self#extend v s; (* FIXME: is this really what we want? *)
       pp s
 
+  method varname v =
+    VH.find ctx v
 
   method declare_new_freevars e =
     opn 0;
