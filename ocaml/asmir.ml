@@ -178,7 +178,7 @@ let attr_type_to_typ = function
  | INT_64 -> reg_64
 
 let get_attr_usage = function
-  | 0x01 -> RD
+  | 0x00 | 0x01 -> RD
   | 0x10 -> WR
   | 0x11 -> RW
   | _ -> 

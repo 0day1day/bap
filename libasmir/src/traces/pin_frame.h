@@ -318,6 +318,8 @@ namespace pintrace { // Use namespace to avoid conflict
       
    };
 
+   static int source = 1;
+  
    struct TaintFrame : public Frame {
 
       uint32_t id;

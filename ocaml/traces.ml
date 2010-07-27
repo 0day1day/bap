@@ -79,7 +79,7 @@ let add_mem index value usage taint =
     {exp=value;
      usg=usage;
      tnt=taint;}
-let add_symbolic = Hashtbl.add global.symbolic
+let add_symbolic = Hashtbl.replace global.symbolic
   
 let add_new_var var value usage taint = 
   if not (bound var) then 
@@ -136,23 +136,37 @@ let hd_tl = function
   | [] -> failwith "empty list"
   | x::xs -> x, xs
 
+let is_temp var = 
+  (String.length var > 2) &&
+    (String.sub var 0 2 = "T_")
+
 (* Unfortunately we need to special-case the EFLAGS registers
    since PIN does not provide us with separate registers for 
    the zero, carry etc flags *)
 let add_eflags eflags usage taint =
+  add_var 
+    "R_CF" 
+    (Int(num_to_bit (Int64.logand eflags 0x01L), reg_1))
+    usage
+    taint;
   add_var 
     "R_ZF" 
     (Int(num_to_bit (Int64.logand eflags 0x40L), reg_1))
     usage
     taint;
   add_var 
-    "R_CF" 
-    (Int(num_to_bit (Int64.logand eflags 0x01L), reg_1))
+    "R_SF" 
+    (Int(num_to_bit (Int64.logand eflags 0x80L), reg_1))
     usage
     taint;
   add_var
     "R_DFLAG"
     (Int(num_to_bit (Int64.logand eflags 0x400L), reg_32))
+    usage
+    false;
+  add_var
+    "R_OF"
+    (Int(num_to_bit (Int64.logand eflags 0x800L), reg_32))
     usage
     taint
     
@@ -563,15 +577,27 @@ module TaintSymbolic =
 struct 
   let lookup_var delta var = 
     let name = Var.name var in
-    let tainted = try taint_val name with Not_found -> true in
-      if tainted then
-	if !full_symbolic && not (VH.mem delta var) then
-	  Symbolic (Var var)
-	else
-	  Symbolic.lookup_var delta var
-      else
-	Symbolic(concrete_val name)
-
+    let unknown = !full_symbolic && not (VH.mem delta var) in
+     try 
+       (match taint_val name with
+	  | true when unknown ->
+	      (* if its tainted and we know nothing about it *)
+	      Symbolic (Var var)
+	  | true ->
+	      (* if its tainted but we have to know something *)
+	      Symbolic.lookup_var delta var
+	  | false ->
+	      (* if its untainted gimme the concrete value *)
+	      Symbolic(concrete_val name)
+       )
+     with Not_found ->
+       if unknown then
+	 (* We can't do anything, make it symbolic *)
+	 Symbolic (Var var)
+       else
+	 (* We have no concrete info about it -- its probably temporary *)
+	 Symbolic.lookup_var delta var
+	   
 	  
   let conc2symb = Symbolic.conc2symb
   let normalize = Symbolic.normalize
@@ -627,10 +653,12 @@ struct
   let assign v ev ({delta=delta; pred=pred; pc=pc} as ctx) =
     if !full_symbolic then
       let expr = symb_to_exp ev in
-      let constr = BinOp (EQ, Var v, expr) in
-	pdebug ((Var.name v) ^ " = " ^ (Pp.ast_exp_to_string expr)) ;
-      let pred' = LetBind.add_to_formula pred constr Rename in
-	[{ctx with pred=pred'; pc=Int64.succ pc}]
+      let is_worth_storing = (*is_concrete expr &&*) is_temp (Var.name v) in
+	if is_worth_storing then context_update delta v ev ;
+	let constr = BinOp (EQ, Var v, expr) in
+	  pdebug ((Var.name v) ^ " = " ^ (Pp.ast_exp_to_string expr)) ;
+	  let pred' = LetBind.add_to_formula pred constr Rename in
+	    [{ctx with pred=pred'; pc=Int64.succ pc}]
     else
       Symbolic.assign v ev ctx
 end
@@ -654,6 +682,7 @@ let add_symbolic_seeds = function
   | _ -> ()
 	
 let status = ref 0
+let count = ref 0
 	  
 let symbolic_run trace = 
   Status.init "Symbolic Run" (List.length trace) ;
@@ -666,14 +695,20 @@ let symbolic_run trace =
 	   Status.inc() ;
 	   add_symbolic_seeds stmt;
 	   update_concrete stmt ;
+	   (*(if !status >= 1012 && !status <= 1013 then
+	      (count := !count + 1;
+	      let formula = TraceSymbolic.output_formula () in
+		print_formula ("form_" ^ (string_of_int !count)) formula))
+	     ;*)
 	   (match stmt with
 	      | Ast.Label (_,atts) when filter_taint atts != [] -> 
 		  (*Printf.printf "%s\n" ("block no: " ^ (string_of_int !status));
 		  Printf.printf "%s\n" (Pp.ast_stmt_to_string stmt);*)
 		  get_indices();
 		  status := !status + 1 ;
-		  (*let formula = TraceSymbolic.output_formula () in
-		  print_formula ("form_" ^ (string_of_int !status)) formula*)
+		  (*if !status > 12230 then 
+		    let formula = TraceSymbolic.output_formula () in
+		    print_formula ("form_" ^ (string_of_int !status)) formula*)
 	      | _ -> ());
 	   match TraceSymbolic.eval_stmt state stmt with
 	     | [next] -> next
