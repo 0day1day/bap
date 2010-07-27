@@ -643,8 +643,8 @@ struct
 	    try 
 	      (* Let's concretize everything *)
 	      let conc_index = get_concrete_read_index () in
-	      let extra = BinOp(EQ, index, conc_index) in
-		ignore (LetBind.add_to_formula exp_true extra Equal) ;
+	      (*let extra = BinOp(EQ, index, conc_index) in
+		ignore (LetBind.add_to_formula exp_true extra Equal) ;*)
 		lookup_mem mu conc_index endian
 		  (*Symbolic.lookup_mem mu conc_index endian*)
 	    with Not_found ->
@@ -654,11 +654,14 @@ struct
     if !full_symbolic then
       let expr = symb_to_exp ev in
       let is_worth_storing = (*is_concrete expr &&*) is_temp (Var.name v) in
-	if is_worth_storing then context_update delta v ev ;
-	let constr = BinOp (EQ, Var v, expr) in
-	  pdebug ((Var.name v) ^ " = " ^ (Pp.ast_exp_to_string expr)) ;
-	  let pred' = LetBind.add_to_formula pred constr Rename in
-	    [{ctx with pred=pred'; pc=Int64.succ pc}]
+      let pred' =
+	if is_worth_storing then (context_update delta v ev ; pred)
+	else
+	  let constr = BinOp (EQ, Var v, expr) in
+	    pdebug ((Var.name v) ^ " = " ^ (Pp.ast_exp_to_string expr)) ;
+	    LetBind.add_to_formula pred constr Rename 
+      in
+	[{ctx with pred=pred'; pc=Int64.succ pc}]
     else
       Symbolic.assign v ev ctx
 end
