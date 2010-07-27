@@ -85,6 +85,8 @@ let add_new_var var value usage taint =
   if not (bound var) then 
     add_var var value usage taint
 
+let del_symbolic = Hashtbl.remove global.symbolic
+
 let cleanup () =
   Hashtbl.clear global.vars;
   Hashtbl.clear global.memory
@@ -602,17 +604,23 @@ struct
   let conc2symb = Symbolic.conc2symb
   let normalize = Symbolic.normalize
   let update_mem mu pos value endian =
-    if is_concrete pos || !allow_symbolic_indices then
-      Symbolic.update_mem mu pos value endian
-    else
-      (* we have a symbolic write, let's concretize *)
-      try 
-	let conc_index = get_concrete_write_index () in
-	  let extra = BinOp(EQ, pos, conc_index) in
-	  ignore (LetBind.add_to_formula exp_true extra Equal) ;
-	  Symbolic.update_mem mu conc_index value endian
-      with Not_found -> Symbolic.update_mem mu pos value endian
-    
+    match is_concrete pos with
+      | true ->
+	  (match pos with
+	     | Int (n, _) -> del_symbolic n
+	     | _ -> ());
+	  Symbolic.update_mem mu pos value endian
+      | _ when !allow_symbolic_indices ->
+	  Symbolic.update_mem mu pos value endian
+      | false ->
+	  (* we have a symbolic write, let's concretize *)
+	  try 
+	    let conc_index = get_concrete_write_index () in
+	    let extra = BinOp(EQ, pos, conc_index) in
+	      ignore (LetBind.add_to_formula exp_true extra Equal) ;
+	      Symbolic.update_mem mu conc_index value endian
+	  with Not_found -> Symbolic.update_mem mu pos value endian
+	    
   (* TODO: add a memory initializer *)
 
   let rec lookup_mem mu index endian = 
