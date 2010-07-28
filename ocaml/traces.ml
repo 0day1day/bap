@@ -883,10 +883,15 @@ let answer_storage = ".answer"
 
 let solution_from_stp_formula file =
   let cin = open_in file in
-  let lexbuf = Lexing.from_channel cin in
-  let o = Stp_grammar.main Stp_lexer.token lexbuf in
-  let () = close_in cin in
-  o
+  try
+    let lexbuf = Lexing.from_channel cin in
+    let o = Stp_grammar.main Stp_lexer.token lexbuf in
+    Lexing.flush_input lexbuf;
+    close_in cin;
+    o
+  with _ as e -> (* Make sure that we close oc if there is a parse exception *)
+    close_in cin;
+    raise e
       
 let solve_formula input output =
   (* print "Querying STP for a satisfying answer\n" ;  *)
