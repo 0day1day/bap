@@ -153,8 +153,7 @@ object (self)
 	   | Reg _ -> failwith "unimplemented bitvector length"
 	   | _ -> invalid_arg "Only constant integers supported"
 	 in
-	 let maskedval = Int64.logand i
-	   (Int64.pred(Int64.shift_left Int64.one (bits_of_width t)))
+	 let maskedval = Arithmetic.to64(i,t)
 	 in
 	 printf format maskedval
      | Var v ->
@@ -202,6 +201,8 @@ object (self)
 	  put_all 0;
       | BinOp(bop, e1, e2) ->
 	  let t = infer_ast ~check:false e1 in
+	  let t' = infer_ast ~check:false e2 in
+	  assert (t = t') ;
 	  let bits = if is_integer_type t then  bits_of_width t else -1 in
 	  let sw = string_of_int bits in
 	  let (pre,mid,post) = match bop with

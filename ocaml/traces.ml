@@ -403,6 +403,7 @@ let run_block state block =
       | _ -> false
     in
     executed := (stmt,result) :: !executed ; 
+      (*print_endline (Pp.ast_stmt_to_string stmt) ;*)
     try 
       (match TraceConcrete.eval_stmt state stmt with
 	 | [newstate] ->
@@ -590,6 +591,10 @@ struct
 	      Symbolic.lookup_var delta var
 	  | false ->
 	      (* if its untainted gimme the concrete value *)
+	      (*(match concrete_val name with
+		 | Int (n, _) ->
+		     Printf.printf "%s -> %Lx\n" name n 
+		 | _ -> ()) ;*)
 	      Symbolic(concrete_val name)
        )
      with Not_found ->
@@ -661,6 +666,7 @@ struct
   let assign v ev ({delta=delta; pred=pred; pc=pc} as ctx) =
     if !full_symbolic then
       let expr = symb_to_exp ev in
+      (*print_endline ((Var.name v) ^ " <- " ^ (Pp.ast_exp_to_string expr));*)
       let is_worth_storing = (*is_concrete expr &&*) is_temp (Var.name v) in
       let pred' =
 	if is_worth_storing then (context_update delta v ev ; pred)
@@ -706,8 +712,10 @@ let symbolic_run trace =
 	   Status.inc() ;
 	   add_symbolic_seeds stmt;
 	   update_concrete stmt ;
-	   (*(if !status >= 1012 && !status <= 1013 then
+	   (*(if !status >= 4300 then
 	      (count := !count + 1;
+	       (*print_endline (Pp.ast_stmt_to_string stmt) ;*)
+	       (*TraceSymbolic.print_var state.delta "R_EAX" ;*)
 	      let formula = TraceSymbolic.output_formula () in
 		print_formula ("form_" ^ (string_of_int !count)) formula))
 	     ;*)
@@ -717,7 +725,7 @@ let symbolic_run trace =
 		  Printf.printf "%s\n" (Pp.ast_stmt_to_string stmt);*)
 		  get_indices();
 		  status := !status + 1 ;
-		  (*if !status > 12230 then 
+		  (*if !status mod 10 = 0 && !status > 3700 && !status < 3800 then 
 		    let formula = TraceSymbolic.output_formula () in
 		    print_formula ("form_" ^ (string_of_int !status)) formula*)
 	      | _ -> ());

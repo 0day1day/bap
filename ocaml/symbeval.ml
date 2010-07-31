@@ -20,7 +20,7 @@ open Type
   
 module VH = Var.VarHash
   
-module D = Debug.Make(struct let name = "SymbEval" and default=`NoDebug end)
+module D = Debug.Make(struct let name = "SymbEval" and default=`Debug end)
 open D
 
 (* For now, we'll map every byte. Later it may be better to map larger
@@ -242,6 +242,13 @@ struct
       | Lab _ as labl ->
 	  Symbolic labl
       | BinOp (op,e1,e2) ->
+	  (*let  t1 = Typecheck.infer_ast ~check:false e1 in
+	  let  t2 = Typecheck.infer_ast ~check:false e2 in
+	    if op = PLUS then 
+	      (if t1 != t2 then 
+		 (print_endline ((Pp.ast_exp_to_string e1) ^ " " ^  (Pp.ast_exp_to_string e2)) ;
+				 assert false)
+	      ) ;*)
 	  let v1 = eval_expr delta e1
 	  and v2 = eval_expr delta e2 in
 	    if is_symbolic v1 || is_symbolic v2 then 
@@ -285,8 +292,8 @@ struct
 		 let mem_arr = symb_to_exp ind 
 		 and endian_exp = symb_to_exp endian in
 		   Symbolic (lookup_mem mem mem_arr endian_exp)
-	     | Reg _ -> 
-		 eval_expr delta (Memory2array.split_loads mem ind t endian)
+	     | Reg _ ->  (* we only care about 32bit *)
+		 eval_expr delta (Memory2array.split_loads mem ind reg_32 endian)
 	     | Array _ ->
 		 failwith "loading array currently unsupported"
 	     | _ -> failwith "not a loadable type"
@@ -301,10 +308,10 @@ struct
 		     update_mem mem index value endian
 	       | Reg _ -> 
 		   if not (is_symbolic_store mem) && is_concrete index
-		   then eval_expr delta 
-		     (Memory2array.split_writes mem index t endian value)
+		   then eval_expr delta (* we only care about 32bit *)
+		     (Memory2array.split_writes mem index reg_32 endian value)
 		   else symb_mem 
-		     (Memory2array.split_writes mem index t endian value)
+		     (Memory2array.split_writes mem index reg_32 endian value)
 	       | Array _ -> 
 		   failwith "storing array currently unsupported"
 	       | _ -> 
@@ -418,7 +425,7 @@ struct
   let normalize i t = Arithmetic.to64 (i,t)
     
   let rec update_mem mu pos value endian = 
-    pdebug "Update mem" ;
+    (*pdebug "Update mem" ;*)
     match mu with
       | Symbolic m -> Symbolic (Store(m,pos,value,endian,reg_8))
       | ConcreteMem (m,v) ->
@@ -428,7 +435,7 @@ struct
 	    | _ -> update_mem (conc2symb m v) pos value endian
 		
   let rec lookup_mem mu index endian =
-    pdebug "Lookup mem" ;
+    (*pdebug "Lookup mem" ;*)
     match mu, index with
       | ConcreteMem(m,v), Int(i,t) ->
 	  (try AddrMap.find (normalize i t) m
