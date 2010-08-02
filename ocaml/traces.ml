@@ -700,13 +700,14 @@ let add_symbolic_seeds = function
 		     ^(Printf.sprintf "%Lx" index)
 		     ^" -> "
 		     ^(Pp.ast_exp_to_string sym_var));
-	     add_symbolic index sym_var ;
+	     add_symbolic index sym_var(* ;
 	     (* symbolic variable *)
 	     (* XXX + TODO + FIXME + HACK *)
 	     let mem = Asmir.x86_mem_external in
 	     let store = Store(mem, Int(index, reg_32), sym_var, exp_false, reg_8) in
 	     let constr = BinOp (EQ, mem, store) in
 	       ignore (LetBind.add_to_formula exp_true constr Rename)
+				       *)
 	) (filter_taint atts)
   | _ -> ()
 	
@@ -905,10 +906,10 @@ let solution_from_stp_formula file =
   let cin = open_in file in
   try
     let lexbuf = Lexing.from_channel cin in
-    let o = Stp_grammar.main Stp_lexer.token lexbuf in
+    let solution = Stp_grammar.main Stp_lexer.token lexbuf in
     Lexing.flush_input lexbuf;
     close_in cin;
-    o
+    solution
   with _ as e -> (* Make sure that we close oc if there is a parse exception *)
     close_in cin;
     raise e
@@ -929,21 +930,36 @@ let output_exploit file trace =
     (* The variables that we care about *)
   let is_input v = String.sub v 0 4 = "symb" in
     (* A special function to sort interesting variables by name *)
+  let underscore = Str.regexp_string "_" in
+  let split_var = Str.split underscore in
+  let var_to_string_num var = List.nth (split_var var) 2 in
+  let var_to_num var = int_of_string (var_to_string_num var) in
   let sort = 
-    let underscore = Str.regexp_string "_" in
     let sort_aux (var1, _) (var2,_) =
-      let ss1 = Str.split underscore var1 
-      and ss2 = Str.split underscore var2 in
-	compare (List.nth ss1 2) (List.nth ss2 2)
+	compare (var_to_string_num var1) (var_to_string_num var2)
     in  
       List.sort sort_aux
   in
+    (* Padding unused symbolic bytes *)
+  let pad_unused =
+    let rec pad n acc = function
+      | [] -> List.rev acc
+      | ((var,_) as first)::rest when var_to_num var = n ->
+	  pad (n+1) (first::acc) rest
+      | more ->
+	  pad (n+1) (("",1L)::acc) more
+    in
+      pad 1 []
+  in	  
   let symb_var_vals = List.filter (fun (v,_) -> is_input v) var_vals in
-  let _, input = List.split (sort symb_var_vals) in
+  let sorted = sort symb_var_vals in
+  let padded = pad_unused sorted in
+  let _, input = List.split padded in
   let input = List.map Int64.to_int input in
     (* Let's output the exploit string *)
   let cout = open_out file in
     List.iter (output_byte cout) input ;
+    close_out cout;
     print "Exploit string was written out to file \"%s\"\n" file ;
     flush stdout ;
     trace    
