@@ -339,6 +339,7 @@ let x86_regs : var list =
 (* exectrace needs fixing if this is reg_64 *)
 let x86_mem = Var.newvar "mem" (TMem(reg_32))
 
+let x86_mem_external = Ast.Var (x86_mem)
 
 let arm_regs =
   List.map (fun n -> Var.newvar n reg_32)

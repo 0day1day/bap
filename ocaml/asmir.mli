@@ -50,6 +50,7 @@ val gamma_for_arch : arch -> varctx
 
 val get_asmprogram_arch : asmprogram -> arch
 
+val x86_mem_external : Ast.exp
 
 val open_program : string -> asmprogram
 val asmprogram_to_bap : ?init_mem:bool -> asmprogram -> Ast.program

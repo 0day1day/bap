@@ -700,7 +700,13 @@ let add_symbolic_seeds = function
 		     ^(Printf.sprintf "%Lx" index)
 		     ^" -> "
 		     ^(Pp.ast_exp_to_string sym_var));
-	     add_symbolic index sym_var
+	     add_symbolic index sym_var ;
+	     (* symbolic variable *)
+	     (* XXX + TODO + FIXME + HACK *)
+	     let mem = Asmir.x86_mem_external in
+	     let store = Store(mem, Int(index, reg_32), sym_var, exp_false, reg_8) in
+	     let constr = BinOp (EQ, mem, store) in
+	       ignore (LetBind.add_to_formula exp_true constr Rename)
 	) (filter_taint atts)
   | _ -> ()
 	
