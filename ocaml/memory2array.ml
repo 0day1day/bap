@@ -28,48 +28,60 @@ let getwidth regtyp =
   | Reg(n) -> n/bitwidth
   | _ -> failwith "Only support register indices!"
 
-let split_load array index eletype endian bytenum =
+let split_load array index indextype eletype endian bytenum =
   let newtype = Reg(bitwidth) in
-  let indexplus = BinOp(PLUS, index, Int(Int64.of_int(bytenum), eletype)) in
+  let indexplus = BinOp(PLUS, index, Int(Int64.of_int(bytenum), indextype)) in
   let exp = Load(array, indexplus, endian, newtype) in
   let exp = Cast(CAST_UNSIGNED, eletype, exp) in
   (* djb: you also need to mask the value *)
   let exp = BinOp(LSHIFT, exp, Int(Int64.of_int((bytenum) * bitwidth), eletype)) in
   exp
  
-let split_load_list array index eletype endian =
+let split_load_list array index indextype eletype endian =
   assert (endian = exp_false);
   let elesize = getwidth eletype in
   let mvar = newvar "loadnorm" (Array (reg_32, reg_8)) in
-  (Util.mapn (split_load (Var mvar) index eletype endian) (elesize - 1), mvar)
+  (Util.mapn (split_load (Var mvar) index indextype eletype endian) (elesize - 1), mvar)
 
-let split_loads array index eletype endian =
-  let (singlereads, mvar) = split_load_list array index eletype endian in
+let split_loads array index indextype eletype endian =
+  let (singlereads, mvar) = split_load_list array index indextype eletype endian in
   let singlereads = List.rev singlereads in
   let orexp = List.fold_left exp_or (List.hd singlereads) (List.tl singlereads) in
   Let(mvar, array, orexp)
 
-let split_write array index eletype endian data bytenum =
+let split_write array index indextype eletype endian data bytenum =
   let newtype = Reg(bitwidth) in
-  let indexplus = BinOp(PLUS, index, Int(Int64.of_int(bytenum), eletype)) in
+  let indexplus = BinOp(PLUS, index, Int(Int64.of_int(bytenum), indextype)) in
   (* djb: you also need to mask the value *)
   let exp = BinOp(RSHIFT, data, Int(Int64.of_int((bytenum) * bitwidth), eletype)) in
   let exp = Cast(CAST_LOW, newtype, exp) in
   let exp = Store(array, indexplus, exp, endian, newtype) in
   exp
       
-let split_write_list array index eletype endian data =
+let split_write_list array index indextype eletype endian data =
   assert (endian = exp_false);
   let inftype = Typecheck.infer_ast array in
   let tempmemvar = newvar "tempmem" inftype in
   let tempvalvar = newvar "tempval" eletype in
   let elesize = getwidth eletype in
-  let singlewrites = Util.mapn (split_write (Var tempmemvar) index eletype endian (Var tempvalvar)) (elesize - 2) in
-  (singlewrites @ [(split_write array index eletype endian (Var tempvalvar) (elesize - 1))], tempmemvar, tempvalvar)
+  let singlewrites = 
+    Util.mapn 
+      (split_write (Var tempmemvar) index indextype eletype endian (Var tempvalvar)) 
+      (elesize - 2) 
+  in
+  (singlewrites @ 
+     [(split_write array index indextype eletype endian (Var tempvalvar) (elesize - 1))], 
+   tempmemvar, tempvalvar)
 
-let split_writes array index eletype endian data =
-  let (singlewrites, tempmemvar, tempvalvar) = split_write_list array index eletype endian data in
-  let letexp = List.fold_left (fun expr new_expr -> Let(tempmemvar, new_expr, expr)) (Var tempmemvar) singlewrites in
+let split_writes array index indextype eletype endian data =
+  let (singlewrites, tempmemvar, tempvalvar) = 
+    split_write_list array index indextype eletype endian data in
+  let letexp = 
+    List.fold_left 
+      (fun expr new_expr -> 
+	 Let(tempmemvar, new_expr, expr)) 
+      (Var tempmemvar) singlewrites 
+  in
   Let(tempvalvar, data, letexp)
 
 
@@ -129,7 +141,7 @@ class memory2array_visitor2 hash
 	  | 1 -> (* Printf.printf "Cool\n"; *)
 	      `DoChildren
 	  | _ -> (* Printf.printf "Need to split\n"; *)
-	      let newexpr = split_loads arr idx t endian 
+	      let newexpr = split_loads arr idx reg_32 t endian 
 	      in
 	      (* Printf.printf "New Load %s\n" (Pp.ast_exp_to_string newexpr); *)
 	      (* djb: still need to descend into children *)
@@ -140,7 +152,7 @@ class memory2array_visitor2 hash
           | 1 -> (* Printf.printf "Cool!\n"; *)
 	      `DoChildren
           | _ -> ( (* Printf.printf "Need to split\n"; *)
-                  let newexpr = split_writes arr idx t endian data in
+                  let newexpr = split_writes arr idx reg_32 t endian data in
 		  `ChangeToAndDoChildren newexpr
                     ))
       | _ -> `DoChildren              
