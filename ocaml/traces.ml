@@ -142,6 +142,12 @@ let is_temp var =
   (String.length var > 2) &&
     (String.sub var 0 2 = "T_")
 
+(* This is a total HACK due to VEX's handling of the direction flag *)
+let direction_flag eflags = 
+  match num_to_bit (Int64.logand eflags 0x400L) with
+    | 0L -> 1L
+    | _ -> 0xFFFFFFFFL
+
 (* Unfortunately we need to special-case the EFLAGS registers
    since PIN does not provide us with separate registers for 
    the zero, carry etc flags *)
@@ -163,12 +169,12 @@ let add_eflags eflags usage taint =
     taint;
   add_var
     "R_DFLAG"
-    (Int(num_to_bit (Int64.logand eflags 0x400L), reg_32))
+    (Int(direction_flag eflags, reg_32))
     usage
     false;
   add_var
     "R_OF"
-    (Int(num_to_bit (Int64.logand eflags 0x800L), reg_32))
+    (Int(num_to_bit (Int64.logand eflags 0x800L), reg_1))
     usage
     taint
     
@@ -712,7 +718,7 @@ let symbolic_run trace =
 	   Status.inc() ;
 	   add_symbolic_seeds stmt;
 	   update_concrete stmt ;
-	   (*(if !status >= 4300 then
+	   (*(if !status >= 3770 && !status <= 3771 then
 	      (count := !count + 1;
 	       (*print_endline (Pp.ast_stmt_to_string stmt) ;*)
 	       (*TraceSymbolic.print_var state.delta "R_EAX" ;*)
@@ -725,7 +731,7 @@ let symbolic_run trace =
 		  Printf.printf "%s\n" (Pp.ast_stmt_to_string stmt);*)
 		  get_indices();
 		  status := !status + 1 ;
-		  (*if !status mod 10 = 0 && !status > 3700 && !status < 3800 then 
+		  (*if !status > 3770 && !status < 3780 then 
 		    let formula = TraceSymbolic.output_formula () in
 		    print_formula ("form_" ^ (string_of_int !status)) formula*)
 	      | _ -> ());
