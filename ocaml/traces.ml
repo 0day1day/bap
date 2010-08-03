@@ -487,6 +487,8 @@ let allow_symbolic_indices = ref false
 
 let full_symbolic = ref true
   
+let padding = ref false
+
 (* Assumptions for the concretization process to be sound:
    - We can have at most one memory load/store on each 
    asm instruction
@@ -953,7 +955,7 @@ let output_exploit file trace =
   in	  
   let symb_var_vals = List.filter (fun (v,_) -> is_input v) var_vals in
   let sorted = sort symb_var_vals in
-  let padded = pad_unused sorted in
+  let padded = if !padding then pad_unused sorted else sorted in
   let _, input = List.split padded in
   let input = List.map Int64.to_int input in
     (* Let's output the exploit string *)

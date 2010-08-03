@@ -194,6 +194,10 @@ let speclist =
      uadd(TransformAst(Traces.trace_length)),
      "Output the length of the trace"
     )
+  ::("-trace-padding", 
+     Arg.Set Traces.padding,
+     "Apply padding for symbolic unused bytes."
+    )   
   ::("-no-let-bindings", 
      Arg.Clear Traces.full_symbolic,
      "Disable the usage of let bindings during formula generation"
