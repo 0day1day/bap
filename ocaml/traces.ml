@@ -702,14 +702,14 @@ let add_symbolic_seeds = function
 		     ^(Printf.sprintf "%Lx" index)
 		     ^" -> "
 		     ^(Pp.ast_exp_to_string sym_var));
-	     add_symbolic index sym_var(* ;
+	     add_symbolic index sym_var ;
 	     (* symbolic variable *)
 	     (* XXX + TODO + FIXME + HACK *)
 	     let mem = Asmir.x86_mem_external in
 	     let store = Store(mem, Int(index, reg_32), sym_var, exp_false, reg_8) in
 	     let constr = BinOp (EQ, mem, store) in
 	       ignore (LetBind.add_to_formula exp_true constr Rename)
-				       *)
+				       
 	) (filter_taint atts)
   | _ -> ()
 	
@@ -830,26 +830,48 @@ let inject_payload start payload trace =
     in
       get_load rev
   in
+  let _m, trace = get_last_jmp_exp trace in
+  let mem, ind = get_last_load_exp trace in
+   (* Let's convert to Int64 *)
+  let payload = List.map Int64.of_int payload in
+  let _,assertions = 
+    List.fold_left 
+      (fun (i,acc) value ->
+	 let index = Ast.BinOp(PLUS, ind, Int(i,reg_32)) in
+	 let load = Ast.Load(mem, index, exp_false, reg_8) in
+	 let constr = Ast.BinOp(EQ, load, Int(value, reg_8)) in
+	   (Int64.succ i, (Ast.Assert(constr, [])::acc))
+      ) (start, []) payload
+  in
+    trace, List.rev assertions
+
+(* Convert a string to a list of bytes *)
+let string_to_bytes payload =
   let bytes = ref [] in
-  let char_to_int64 c = Int64.of_int (int_of_char c) in
     String.iter 
-      (fun c -> bytes := ((char_to_int64 c)::!bytes)) payload ;
-    bytes := List.rev !bytes ;
-    let _m, trace = get_last_jmp_exp trace in
-    let mem, ind = get_last_load_exp trace in
-    let _,assertions = 
-      List.fold_left 
-	(fun (i,acc) value ->
-	   let index = Ast.BinOp(PLUS, ind, Int(i,reg_32)) in
-	   let load = Ast.Load(mem, index, exp_false, reg_8) in
-	   let constr = Ast.BinOp(EQ, load, Int(value, reg_8)) in
-	     (Int64.succ i, (Ast.Assert(constr, [])::acc))
-	) (start, []) !bytes
-    in
-      trace, List.rev assertions
+      (fun c -> bytes := ((int_of_char c)::!bytes)) payload ;
+    List.rev !bytes
 
 (* Add an arbitrary payload after the return address *)
 let add_payload payload trace = 
+  let payload = string_to_bytes payload in
+  let trace, assertions = inject_payload 0L payload trace in
+    Util.fast_append trace assertions
+
+(* Return a list of bytes read from a file *)
+let bytes_from_file file =
+  let cin = open_in file in
+  let bytes = ref [] in
+  let rec get_bytes () = 
+    bytes := (input_byte cin)::!bytes ;
+    get_bytes ()
+  in
+    try get_bytes () with End_of_file -> () ;
+    close_in cin;
+    List.rev !bytes
+
+let add_payload_from_file file trace = 
+  let payload = bytes_from_file file in
   let trace, assertions = inject_payload 0L payload trace in
     Util.fast_append trace assertions
 
@@ -876,6 +898,7 @@ let inject_shellcode nops trace =
   let target_addr = Int64.add target_addr pin_offset in
   let target_addr = Int(target_addr, reg_32) in
   let trace, assertion = hijack_control target_addr trace in
+  let payload = string_to_bytes payload in
   let _, shell = inject_payload 4L payload trace in
     Util.fast_append trace (shell @ [assertion])
 
@@ -938,7 +961,7 @@ let output_exploit file trace =
   let var_to_num var = int_of_string (var_to_string_num var) in
   let sort = 
     let sort_aux (var1, _) (var2,_) =
-	compare (var_to_string_num var1) (var_to_string_num var2)
+	compare (var_to_num var1) (var_to_num var2)
     in  
       List.sort sort_aux
   in
@@ -949,7 +972,7 @@ let output_exploit file trace =
       | ((var,_) as first)::rest when var_to_num var = n ->
 	  pad (n+1) (first::acc) rest
       | more ->
-	  pad (n+1) (("symb_1111_2222",1L)::acc) more
+	  pad (n+1) (("",1L)::acc) more
     in
       pad 1 []
   in	  
