@@ -934,7 +934,7 @@ let output_exploit file trace =
     (* A special function to sort interesting variables by name *)
   let underscore = Str.regexp_string "_" in
   let split_var = Str.split underscore in
-  let var_to_string_num var = List.nth (split_var var) 2 in
+  let var_to_string_num var = List.nth (split_var var) 1 in
   let var_to_num var = int_of_string (var_to_string_num var) in
   let sort = 
     let sort_aux (var1, _) (var2,_) =
@@ -949,7 +949,7 @@ let output_exploit file trace =
       | ((var,_) as first)::rest when var_to_num var = n ->
 	  pad (n+1) (first::acc) rest
       | more ->
-	  pad (n+1) (("",1L)::acc) more
+	  pad (n+1) (("symb_1111_2222",1L)::acc) more
     in
       pad 1 []
   in	  

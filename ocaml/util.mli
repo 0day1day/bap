@@ -73,3 +73,5 @@ module StatusPrinter :
     val inc  : unit -> unit
     val stop : unit -> unit
   end
+
+val has_some : 'a option -> bool

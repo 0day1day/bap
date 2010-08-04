@@ -354,3 +354,8 @@ struct
     Printf.printf "%s: Done!\n" !message ;
     flush stdout
 end
+
+let has_some o =
+  match o with
+  | Some _ -> true
+  | None -> false
