@@ -1092,7 +1092,7 @@ Stmt *translate_jumpkind( IRSB *irbb, vector<Stmt *> *irout )
     // removing the insignificant jump statment 
     // that actually goes to the next instruction
     // except for conditional jump cases
-    if ( irbb->stmts[irbb->stmts_used-1]->tag != Ist_Exit )     
+    if ( irbb->jumpkind == Ijk_Boring && irbb->stmts[irbb->stmts_used-1]->tag != Ist_Exit )     
       if ( irbb->stmts[0]->Ist.IMark.addr + irbb->stmts[0]->Ist.IMark.len 
             == irbb->next->Iex.Const.con->Ico.U32 )
         return NULL;
