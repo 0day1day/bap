@@ -236,6 +236,20 @@ let rec tr_stmt g s =
     | FUNCTION ->
 	failwith "Unsupported statement type"
 
+
+(* convert certain specials into attributes *)
+let rec handle_specials = 
+  let reta = StrAttr "ret"
+  and calla = StrAttr "call" in
+  function
+    | Jmp(t,a) :: Special("ret", _) :: stmts ->
+      Jmp(t, reta::a) :: stmts
+    | Jmp(t,a) :: Special("call", _) :: stmts ->
+      Jmp(t, calla::a) :: stmts
+    | x::xs -> x :: handle_specials xs
+    | [] -> []
+      
+
 (** Translate a whole bap_block_t (as returned by
     Libasmir.asmir_bap_blocks_get) into a list of statements *)
 let tr_bap_block_aux g b =
@@ -250,6 +264,7 @@ let tr_bap_block_aux g b =
   in
   let decls, unextend = tr_vardecls g decs in
   let stmts = List.map (tr_stmt g) stmts in
+  let stmts = handle_specials stmts in
   (stmts, addr, unextend)
 
 let tr_bap_block_t g asmp b = 

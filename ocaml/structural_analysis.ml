@@ -249,7 +249,9 @@ let structural_analysis c =
        if !progress then doit()
        else (
 	 printg g;
-	 failwith "Stopped making progress. This shouldn't be possible any more.";
+	 wprintf "Stopped making progress. Implement Proper/Improper intervals to fix this.";
+	 let p = reduce g Proper (G.fold_vertex (fun x y-> x::y) g []) in
+	 entry := p;
        )
       )
   in
