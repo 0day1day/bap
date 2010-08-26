@@ -1,13 +1,17 @@
 // -*- c++ -*-
 
+/**** TODO: Add verbosity ****/
+
 #pragma once
 
 #include <iostream>
 #include <fstream>
 #include <map>
-#include "pin_frame.h"
+#include <set>
+#include <vector>
+#include <string.h>
 #include "pin.H"
-
+#include "pin_frame.h"
 
 // TODO: we need a type for the mapping to variables/registers
 typedef uint32_t var;
@@ -29,68 +33,148 @@ typedef uint32_t t;
 
 typedef std::map<var,t> context;
 
-// Value specifier type.
-#define VT_NONE     0x0
-#define VT_REG32    0x1
-#define VT_REG16    0x2
-#define VT_REG8     0x3
-#define VT_MEM32    0x11
-#define VT_MEM16    0x12
-#define VT_MEM8     0x13
-
 // Some bit masks
 #define LOW8   0xff
 #define HIGH8  0xff000000
 #define LOW16  0xffff
 #define HIGH16 0xffff0000
 
+
+/***************** Syscalls ***************/
+// FIXME: use the ones from /usr/include/asm/unistd.h
+     
+#define __NR_read		  3
+#define __NR_open		  5
+#define __NR_close		  6
+#define __NR_execve		 11
+#define __NR_mmap		 90
+#define __NR_socketcall	102
+#define __NR_mmap2		192
+
+
+/********************************************/
+
+// socket specific calls
+#define _A1_socket     0x1
+#define _A1_bind       0x2
+#define _A1_listen     0x4
+#define _A1_accept     0x5
+#define _A1_send       0x9
+#define _A1_recv       0xa
+#define _A1_setsockopt 0xe
+
+/********************************************/
+
+/*********** IDs for taint sources **********/
+
+#define ARG_ID 2
+#define ENV_ID 2
+
+/*************  Operand Usage  **************/
+
+#define RD 0x01
+#define WR 0x10
+#define RW 0x11
+
+/********************************************/
+
+
 struct ValSpecRec {
-   uint32_t type;               // Type of value specifier.
-   uint32_t loc;                // Location of this value.
-   uint32_t value;              // Actual value.
-   uint32_t isWrite;              // Taint status of the value
-   uint32_t taint;
+  uint32_t type;               // Type of value specifier.
+  uint32_t loc;                // Location of this value.
+  PIN_REGISTER value;          // Actual value.
+  uint32_t usage;              // Operand usage (R, RW, W, etc)
+  uint32_t taint;              // Taint status of the value
 };
 
 namespace pintrace { // We will use namespace to avoid collision
 
+  
    // Tracking the taint during program flow
    class TaintTracker {
 
    public:
 
-      TaintTracker();
+      TaintTracker(ValSpecRec *env);
 
       // A function to introduce taint in the contexts
       bool taintStart(uint32_t callno, uint32_t * args);
-      void taintIntroduction(uint32_t bytes, uint32_t * args);
+
+      bool taintIntroduction(uint32_t bytes, 
+                             uint32_t * args, 
+                             uint32_t &addr,
+                             uint32_t &length);
+
+      std::vector<TaintFrame> taintArgs(int args, char **argv);
+
+      std::vector<TaintFrame> taintEnv(char **env);
+
       // A function to propagate taint
-      void taintPropagation(ValSpecRec values[MAX_VALUES_COUNT],
-                            uint32_t count);
+      void taintPropagation();
+
       // A function to apply taint policies
       bool taintChecking();
 
+      void setTaintContext();
+
+      void setCount(uint32_t cnt);
+
+      void setTaintArgs(bool taint);
+
+      void setTaintEnv(string env_var);
+      
+      void trackFile(string file);
+
+      void setTaintStdin();
+      
+      void setTaintNetwork();
+
       // Helpers
       // A function to check whether the instruction arguments are tainted
-      uint32_t getReadTaint(ValSpecRec values[MAX_VALUES_COUNT],
-                            uint32_t count);
-      bool hasTaint(ValSpecRec values[MAX_VALUES_COUNT],
-                    uint32_t count);
+      uint32_t getReadTaint();
+
+      bool hasTaint();
+
+      bool propagatedTaint(bool branch);
+      
+      void printMem();
+
+      void printRegs();
+
    private:
 
       // A flag to denote a syscall in progress
-      bool readSys;
+      uint32_t syscall;
+
       // The taint source (producing taint tags)
       uint32_t source;
+
       // a context defining a map from registers to taint
       context delta;
+
       // We can use a byte-centric approach, each byte maps to taint
       // a context defining a map from memory locations to taint
       context memory;
 
-      void addTaintToWritten(ValSpecRec values[MAX_VALUES_COUNT],
-                             uint32_t tag,
-                             uint32_t count);
+      // The table containing the values of the current instruction
+      ValSpecRec *values;
+
+      // How many values are being used
+      uint32_t count;
+
+
+     /********** Syscall-specific vars ***********/
+     std::set<string> taint_files;
+     std::set<uint32_t> fds;
+     bool taint_net;
+     bool taint_args;
+     std::set<string> taint_env;
+
+     /********************************************/
+
+
+
+      void addTaintToWritten(uint32_t tag);
       
       bool isReg(uint32_t type);
 
@@ -109,10 +193,6 @@ namespace pintrace { // We will use namespace to avoid collision
       bool isValid(uint32_t type);
 
       void setTaint(context &ctx, uint32_t key, uint32_t tag);
-
-      void printRegs();
-      
-      void printMem();
 
    };
 

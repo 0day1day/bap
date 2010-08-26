@@ -2,6 +2,7 @@
 #define _REG_MAPPING_H
 
 #include <stmt.h>
+#include "pin_frame.h" // for VT_REGx...
 
 uint32_t regid_to_full(uint32_t id);
 string regid_to_fullname(uint32_t id);
@@ -19,16 +20,6 @@ Exp* read_reg(uint32_t id);
 // but only 8 bits of it (in lowest 8 bits of the expression)
 // offset 0 is least significant byte
 Exp* read_reg(uint32_t id, int offset);
-
-// Value specifier type.
-#define VT_NONE     0x0
-#define VT_REG32    0x1
-#define VT_REG16    0x2
-#define VT_REG8     0x3
-#define VT_MEM32    0x11
-#define VT_MEM16    0x12
-#define VT_MEM8     0x13
-
 
 /****************************** Intel-386 Operations ***************************/
 

@@ -1,11 +1,24 @@
-
 // -*- c++ -*-
 
 #pragma once
 
 #include <iostream>
 #include <stdint.h>
+
+/*
+ * It turns out that if you try to include the get operands code in
+ * the experimental pin tool, the BAP backend and pin.H both define
+ * BOOL.  There did not seem to be an easy way of solving this, and so
+ * I am adding a define to optionally pull in the BAP code needed for
+ * get operands.  Previously this was done using multiple versions of
+ * pin_frame and pin_trace, which was not fun to maintain.
+ *
+ * -ejs
+ */
+
+#ifdef GET_OPERANDS
 #include "trace_vXX.h"
+#endif
 
 // As defined by Intel.
 #define MAX_INSN_BYTES 15
@@ -25,9 +38,28 @@
      
 #define __NR_read		  3
 #define __NR_open		  5
+#define __NR_close		  6
 #define __NR_execve		 11
+#define __NR_mmap		 90
+#define __NR_socketcall	102
+#define __NR_mmap2		192
 
-/********************************************/
+#define REG_BASE 0x1
+#define MEM_BASE 0x50
+#define REGTYPE_LAST (MEM_BASE-1)
+
+// Value specifier type.
+#define VT_NONE     0x0
+#define VT_REG8     (REG_BASE+0x0)
+#define VT_REG16    (REG_BASE+0x1)
+#define VT_REG32    (REG_BASE+0x2)
+#define VT_REG64    (REG_BASE+0x3)
+#define VT_REG128   (REG_BASE+0x4)
+#define VT_MEM8     (MEM_BASE+0x0)
+#define VT_MEM16    (MEM_BASE+0x1)
+#define VT_MEM32    (MEM_BASE+0x2)
+#define VT_MEM64    (MEM_BASE+0x3)
+#define VT_MEM128   (MEM_BASE+0x4)
 
 enum FrameType {
 
@@ -53,6 +85,8 @@ enum FrameType {
 
 namespace pintrace { // Use namespace to avoid conflict
 
+  static int source = 1;
+  
    /**
     * Frame: Base struct for all frame objects.
     */
@@ -174,16 +208,18 @@ namespace pintrace { // Use namespace to avoid conflict
       uint32_t types[MAX_VALUES_COUNT];
       uint32_t usages[MAX_VALUES_COUNT];
       uint32_t locs[MAX_VALUES_COUNT];
-      uint32_t tainted[MAX_VALUES_COUNT];
+      uint32_t taint[MAX_VALUES_COUNT];
 
       StdFrame() : Frame(FRM_STD) {}
       virtual std::ostream &serialize(std::ostream &out, uint16_t sz = 0);
       virtual std::istream &unserializePart(std::istream &in);
 
       void clearCache();
- 
-      conc_map_vec * getOperands();
 
+#ifdef GET_OPERANDS
+      conc_map_vec * getOperands();
+#endif
+     
       // TODO: Removing the bounds checking in the functions below might
       // lead to some speedups. Test and see if the risk is worth it.
 
@@ -314,12 +350,11 @@ namespace pintrace { // Use namespace to avoid conflict
       SyscallFrame() : Frame(FRM_SYSCALL) {}
       virtual std::ostream &serialize(std::ostream &out, uint16_t sz = 0);
       virtual std::istream &unserializePart(std::istream &in);
-      conc_map_vec * getOperands();
-      
+#ifdef GET_OPERANDS
+     conc_map_vec * getOperands();
+#endif     
    };
 
-   static int source = 1;
-  
    struct TaintFrame : public Frame {
 
       uint32_t id;
@@ -329,8 +364,9 @@ namespace pintrace { // Use namespace to avoid conflict
       TaintFrame() : Frame(FRM_TAINT) {}
       virtual std::ostream &serialize(std::ostream &out, uint16_t sz = 0);
       virtual std::istream &unserializePart(std::istream &in);
-      conc_map_vec * getOperands();
-      
+#ifdef GET_OPERANDS
+     conc_map_vec * getOperands();
+#endif     
    };
 
 
