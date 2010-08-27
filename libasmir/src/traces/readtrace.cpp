@@ -4,20 +4,6 @@
 
 using namespace std;
 
-int read_bytes_wrapper(bfd_vma memaddr, 
-		       bfd_byte *myaddr, 
-		       unsigned int length, 
-		       struct disassemble_info *info)
-{
-  assert (memaddr == cur_frm->addr &&
-	  "Reading bytes from the wrong frame");
-  int i;
-  cerr << "Length: " << length << endl;
-  for (i = 0 ; i < length ; i++ )
-    myaddr[i] = cur_frm->rawbytes[i];
-  return length;
-}
-
 bap_blocks_t * read_trace_from_file(const string &filename,
 				    int offset, 
 				    bool print, 
@@ -26,7 +12,7 @@ bap_blocks_t * read_trace_from_file(const string &filename,
 {
   // a block to accumulate the lifted traces
   bap_blocks_t * result = new bap_blocks_t;
-  uint32_t counter = 0 ;
+  uint32_t counter = 0;
   
   if(pintrace) {
     
@@ -44,9 +30,9 @@ bap_blocks_t * read_trace_from_file(const string &filename,
       counter += 1;
       
       switch(f->type) {
-      case FRM_STD: // TODO: We should consider key frame
+          case pintrace::FRM_STD: // TODO: We should consider key frame
 	{
-	  cur_frm = (pintrace::StdFrame *) f;
+          pintrace::StdFrame *cur_frm = (pintrace::StdFrame *) f;
 	  bap_block_t *bblock = new bap_block_t;
 	  bblock->bap_ir = new vector<Stmt *>();
 	  bblock->inst = cur_frm->addr;
@@ -68,11 +54,35 @@ bap_blocks_t * read_trace_from_file(const string &filename,
 	  //    cout << bblock->bap_ir->at(i)->tostring() << endl ;
 	  break;
 	}
-      case FRM_SYSCALL: 
+          case pintrace::FRM_STD2: // TODO: We should consider key frame
+	{
+          pintrace::StdFrame2 *cur_frm = (pintrace::StdFrame2 *) f;
+	  bap_block_t *bblock = new bap_block_t;
+	  bblock->bap_ir = new vector<Stmt *>();
+	  bblock->inst = cur_frm->addr;
+	  bblock->vex_ir = translate_insn(arch,
+					  (unsigned char *)cur_frm->rawbytes,
+					  cur_frm->addr);
+	  prog = byte_insn_to_asmp(bfd_arch, 
+				   cur_frm->addr,
+				   (unsigned char *)cur_frm->rawbytes,
+				   MAX_INSN_BYTES);
+	  generate_bap_ir_block(prog, bblock);
+	  string assembly(asmir_string_of_insn(prog, cur_frm->addr));
+	  bblock->bap_ir->front()->assembly = assembly;
+	  if (atts)
+	    bblock->bap_ir->front()->attributes = cur_frm->getOperands() ;
+	  
+	  result->push_back(bblock);
+	  //for (int i = 0 ; i < bblock->bap_ir->size() ; i ++)
+	  //    cout << bblock->bap_ir->at(i)->tostring() << endl ;
+	  break;
+	}
+          case pintrace::FRM_SYSCALL: 
 	{
 	  break;
 	}
-      case FRM_TAINT:
+          case pintrace::FRM_TAINT:
 	{
 	  pintrace::TaintFrame * tf = (pintrace::TaintFrame *) f;
 	  bap_block_t *bblock = new bap_block_t;

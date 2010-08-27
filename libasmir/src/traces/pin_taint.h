@@ -82,7 +82,7 @@ typedef std::map<var,t> context;
 struct ValSpecRec {
   uint32_t type;               // Type of value specifier.
   uint32_t loc;                // Location of this value.
-  PIN_REGISTER value;          // Actual value.
+  pintrace::PIN_REGISTER value;// Actual value.
   uint32_t usage;              // Operand usage (R, RW, W, etc)
   uint32_t taint;              // Taint status of the value
 };

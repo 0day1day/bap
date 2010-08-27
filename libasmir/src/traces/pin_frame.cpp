@@ -1,4 +1,5 @@
 #include <iostream>
+#include <cassert>
 #include <cstdio>
 #include <cstring>
 
@@ -9,6 +10,50 @@ using namespace pintrace;
 
 #define READ(in, val) in.read((char *) &val, (streamsize) sizeof(val))
 #define WRITE(out, val) out.write((const char *) &val, (streamsize) sizeof(val))
+
+// Returns the number of bits in a VT type
+uint32_t bitsOfType(uint32_t t) {
+  switch(t) {
+      case VT_REG8:
+      case VT_MEM8:
+        return 8;
+        break;
+        
+      case VT_REG16:
+      case VT_MEM16:
+        return 16;
+        break;
+
+      case VT_REG32:
+      case VT_MEM32:
+        return 32;
+        break;
+
+      case VT_REG64:
+      case VT_MEM64:
+        return 64;
+        break;
+
+      case VT_REG128:
+      case VT_MEM128:
+        return 128;
+        break;
+
+      default:
+        cerr << "Invalid type" << endl;
+        assert(false);
+        
+  }
+  
+  return 0;
+}
+
+// Return the number of bytes needed to store type t
+uint32_t bytesOfType(uint32_t t) {
+  uint32_t b = bitsOfType(t);
+  assert((b % 8) == 0);
+  return (b / 8);
+}
 
 Frame *Frame::unserialize(istream &in, bool noskip)
 {
@@ -30,25 +75,29 @@ Frame *Frame::unserialize(istream &in, bool noskip)
    }
 
    switch(type) {
-   case FRM_STD:
-      f = new StdFrame;
-      break;
-   case FRM_KEY:
-      f = new KeyFrame;
-      break;
-   case FRM_LOADMOD:
-      f = new LoadModuleFrame;
-      break;
-   case FRM_SYSCALL:
-      f = new SyscallFrame;
-      break;
-   case FRM_TAINT:
-      f = new TaintFrame;
-      break;
-   case FRM_NONE:
-   default:
+       case FRM_STD:
+         f = new StdFrame;
+         break;
+       case FRM_STD2:
+         f = new StdFrame2;
+         break;
+       case FRM_KEY:
+         f = new KeyFrame;
+         break;
+       case FRM_LOADMOD:
+         f = new LoadModuleFrame;
+         break;
+       case FRM_SYSCALL:
+         f = new SyscallFrame;
+         break;
+       case FRM_TAINT:
+         f = new TaintFrame;
+         break;
+       case FRM_NONE:
+       default:
       // TODO: Error handling here.
       printf("ERROR: Unknown frame type %d!\n", type);
+      assert(false);
       break;
    }
 
@@ -77,6 +126,11 @@ ostream &Frame::serialize(ostream &out, uint16_t sz)
 }
 
 void StdFrame::clearCache()
+{
+   memset((void *) &cachemask, 0, MAX_CACHEMASK_BTYES);
+}
+
+void StdFrame2::clearCache()
 {
    memset((void *) &cachemask, 0, MAX_CACHEMASK_BTYES);
 }
@@ -186,6 +240,134 @@ conc_map_vec * StdFrame::getOperands()
               mem = true;
               index = locs[i] ;
               value = values[i] ;
+              usage = usages[i] ;
+              t = taint[i] ;
+              map = new ConcPair(name,mem,get_type(types[i]),index,
+                                 value,usage,t);
+              concrete_pairs->push_back(map);
+              break ;
+            default : 
+              cerr << "type: " << types[i] << endl ; 
+              assert(0) ;
+	}
+    }
+  return concrete_pairs;
+}
+#endif
+
+ostream &StdFrame2::serialize(ostream &out, uint16_t sz)
+{
+   // Note: ((x-1) >> 3) + 1 === ceil(x / 8.0)
+   uint32_t masklen = ((values_count - 1) >> 3) + 1;
+
+   // 9 = sizeof(addr) + sizeof(tid) + sizeof(lengths)
+   sz += 9
+     + (insn_length * sizeof(char))
+     + masklen;
+
+   for (int i = 0; i < values_count; i++) {
+     sz += bytesOfType(types[i]);
+   }
+
+   ostream &out2 = Frame::serialize(out, sz);
+
+   WRITE(out2, addr);
+   WRITE(out2, tid);
+
+   // The two length values (insn_length and values_count) are packed into a
+   // single byte like so:
+   // |7654|3210|
+   //    |    \-- values_count
+   //    \------- insn_length
+
+   uint8_t lengths = (values_count & 0xf) | (insn_length << 4);
+
+   WRITE(out2, lengths);
+
+   out2.write((const char *) &rawbytes, insn_length * sizeof(char));
+   out2.write((const char *) &cachemask, masklen);
+   out2.write((const char *) &types, values_count * sizeof(uint32_t));
+   out2.write((const char *) &usages, values_count * sizeof(uint32_t));
+   out2.write((const char *) &locs, values_count * sizeof(uint32_t));
+   out2.write((const char *) &taint, values_count * sizeof(uint32_t));
+
+   for (int i = 0; i < values_count; i++) {
+     out2.write((const char *) &(values[i]), bytesOfType(types[i]));
+   }
+
+   return out2;
+
+}
+
+istream &StdFrame2::unserializePart(istream &in)
+{
+
+   READ(in, addr);
+   READ(in, tid);
+
+   uint8_t lengths;
+   READ(in, lengths);
+
+   insn_length = lengths >> 4;
+   values_count = lengths & 0xf;
+
+   // Be a bit paranoid.
+   if (insn_length > MAX_INSN_BYTES) insn_length = MAX_INSN_BYTES;
+
+   in.read((char *) &rawbytes, insn_length * sizeof(char));
+
+   // Note: ((x-1) >> 3) + 1 === ceil(x / 8.0)
+   in.read((char *) &cachemask, ((values_count - 1) >> 3) + 1);
+
+   in.read((char *) &types, values_count * sizeof(uint32_t));
+   in.read((char *) &usages, values_count * sizeof(uint32_t));
+   in.read((char *) &locs, values_count * sizeof(uint32_t));
+   in.read((char *) &taint, values_count * sizeof(uint32_t));
+
+   // Read in the values
+   for (int i = 0; i < values_count; i++) {
+     in.read((char *) &(values[i]), bytesOfType(types[i]));
+   }
+   
+   return in;
+
+}
+
+#ifdef GET_OPERANDS
+conc_map_vec * StdFrame2::getOperands()
+{
+  conc_map_vec * concrete_pairs = new vector<conc_map *>();
+  int i, type, t, usage; bool mem;
+  string name;
+  const_val_t index, value;
+  conc_map * map;
+  for ( i = 0 ; i < values_count ; i ++ )
+    {
+      switch (types[i])
+	{
+            case VT_REG128:
+            case VT_REG64:
+            case VT_REG32: 
+            case VT_REG16: 
+            case VT_REG8: 
+              name = pin_register_name(locs[i]);
+              mem = false;
+              value = values[i].qword[0] ; // XXX: Blah, what about > 64bit?
+              usage = usages[i] ;
+              t = taint[i] ;
+              map = new ConcPair(name,mem,get_type(types[i]),index,
+                                 value,usage,t);
+              concrete_pairs->push_back(map);
+              break;
+            case VT_MEM128:
+            case VT_MEM64:
+            case VT_MEM32: 
+            case VT_MEM16: 
+            case VT_MEM8: 
+              name = "mem";
+              mem = true;
+              index = locs[i] ;
+              value = values[i].qword[0] ;
               usage = usages[i] ;
               t = taint[i] ;
               map = new ConcPair(name,mem,get_type(types[i]),index,

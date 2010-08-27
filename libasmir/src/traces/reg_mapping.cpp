@@ -1112,16 +1112,24 @@ default: return "Unknown";
 attr_type_t get_type(uint32_t typ)
 {
    switch (typ) {
-      case VT_REG32: 
-      case VT_MEM32: 
+       case VT_REG64:
+       case VT_MEM64:
+         return INT_64;
+         break;
+       case VT_REG32: 
+       case VT_MEM32: 
          return INT_32;
+         break;
       case VT_REG16: 
       case VT_MEM16: 
          return INT_16;
+         break;
       case VT_REG8: 
       case VT_MEM8: 
          return CHR;
+         break;
       default:
-         return NONE; 
+        assert(false);
    }
+   return NONE;
 }

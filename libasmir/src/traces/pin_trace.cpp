@@ -164,7 +164,6 @@ void TraceWriter::add(Frame &frm)
 // is then closed.
 void TraceWriter::finalize(uint32_t *toc, bool buildTOC)
 {
-
    uint64_t toc_offset = 0;
 
    if (toc != NULL) {

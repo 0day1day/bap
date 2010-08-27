@@ -13,9 +13,6 @@
 #include "irtoir.h"
 #include "pin_trace.h"
 
-
-static pintrace::StdFrame * cur_frm;
-
 extern "C" bap_blocks_t * read_trace_from_file(const string &filename,
 					       int offset,
 					       bool print,
