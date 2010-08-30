@@ -24,6 +24,12 @@ open D
 
 *)
 
+(** Optional consistency check between trace and bap evaluation.
+    Tainted values should always be equal in the BAP evaluation and the
+    trace.  Non-tainted values do not have to match, since their values
+    are assumed to be constant. *)
+let consistency_check = false;;
+
 (*************************************************************)
 (**********************  Datastructures  *********************)
 (*************************************************************)
@@ -199,6 +205,13 @@ let () =
       ("R_DH",("R_EDX",8,reg_32));
     ]
 
+    (** Keep track of registers not always updated in BAP.  *)
+let badregs = Hashtbl.create 32
+let () =
+  List.iter (fun r -> Hashtbl.add badregs r ())
+    [
+      ("EFLAGS")
+    ]
 
 (********************************************************)
 	  
@@ -381,22 +394,47 @@ end
   
 module TraceConcrete = Symbeval.Make(TaintConcrete)(FullSubst)(StdForm)
 
+(** Check all variables in delta to make sure they agree with operands
+    loaded from a trace. We should be able to find bugs in BAP and the
+    trace code using this. *)
+let check_delta state =
+  let check_var var evalval =
+    try
+      let traceval = concrete_val (Var.name var) in
+      let evalval = match evalval with
+	| Symbolic e -> e
+	| _ -> failwith "Uh oh"
+      in
+      let tainted = taint_val (Var.name var) in
+      if (traceval <> evalval && tainted && not (Hashtbl.mem badregs (Var.name var))) then 
+	wprintf "Difference between tainted BAP and trace values in previous instruction: %s Trace=%s Eval=%s" (Var.name var) (Pp.ast_exp_to_string traceval) (Pp.ast_exp_to_string evalval)
+    (* If we can't find concrete value, it's probably just a BAP temporary *)
+    with Not_found -> ()
+  in
+  VH.iter check_var state.delta
+
 let counter = ref 1
-      
+
 (** Running each block separately *)
 let run_block state block = 
-  pdebug ("Running block: " ^ (string_of_int !counter));
-  counter := !counter + 1 ;
   let addr, block = hd_tl block in
+  pdebug ("Running block: " ^ (string_of_int !counter) ^ " " ^ (Pp.ast_stmt_to_string addr));
   let info, block = hd_tl block in
+  counter := !counter + 1 ;
   let _ = update_concrete info in
+  if consistency_check then
+    check_delta state ;
   let block = append_halt block in 
   let block = strip_jmp block in
     Status.inc() ;   
     Status.inc() ;
   (*print_block block ;*)
   TraceConcrete.initialize_prog state block ;
-  TraceConcrete.cleanup_delta state ;
+  (* If we are performing a consistency check, we should not empty out
+  delta. However, if delta grows indefinitely, trace operations become
+  slow. *)
+  if not consistency_check then
+    TraceConcrete.cleanup_delta state ;
   let init = TraceConcrete.inst_fetch state.sigma state.pc in
   let executed = ref [] in
   let rec eval_block state stmt = 

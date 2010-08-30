@@ -195,7 +195,7 @@ struct
       (fun k v ->
 	 match k,v with 
 	   | var,Symbolic e -> 
-               pdebug ((Var.name var) ^ " = " ^ (Pp.ast_exp_to_string e))
+               pdebug ((Pp.var_to_string var) ^ " = " ^ (Pp.ast_exp_to_string e))
 	   | _ -> ()
       ) delta
 
