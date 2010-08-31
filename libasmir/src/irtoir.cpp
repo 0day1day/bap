@@ -1102,38 +1102,41 @@ Stmt *translate_jumpkind( IRSB *irbb, vector<Stmt *> *irout )
 
   switch ( irbb->jumpkind )
     {
-    case Ijk_Boring: 
-    case Ijk_Yield:
-      result = new Jmp(dest);
-      break; 
-    case Ijk_Call:
-      if(!translate_calls_and_returns)
-	result = new Jmp(dest);
-      else
-	result = new Call(NULL, dest, vector<Exp *>());
-      break;
-    case Ijk_Ret:
-      if(!translate_calls_and_returns)
-	result = new Jmp(dest);
-      else
-	result = new Return(NULL);
-      break;
-    case Ijk_Sys_int128:
-      irout->push_back( new Special("int 0x80") );
-      irout->push_back(mk_label());
-      result = new Jmp(dest);
-      break;
-    case Ijk_NoDecode:
-      result = new Special("VEX decode error");
-      break;
-    default:
-      //
-      // TODO:
-      // It's occurred to me that whenever we throw due to an
-      // unrecognized something, the unused objects created above
-      // are leaked, e.g. dest in this case.
-      //
-      throw "Unrecognized jump kind";    
+        case Ijk_Boring: 
+        case Ijk_Yield:
+          result = new Jmp(dest);
+          break; 
+        case Ijk_Call:
+          if(!translate_calls_and_returns)
+            result = new Jmp(dest);
+          else
+            result = new Call(NULL, dest, vector<Exp *>());
+          break;
+        case Ijk_Ret:
+          if(!translate_calls_and_returns)
+            result = new Jmp(dest);
+          else
+            result = new Return(NULL);
+          break;
+        case Ijk_NoDecode:
+          result = new Special("VEX decode error");
+          break;
+        case Ijk_Sys_syscall:
+        case Ijk_Sys_int32:
+        case Ijk_Sys_int128:
+        case Ijk_Sys_sysenter:
+          // Since these will create a special (insert_specials), we
+          // won't translate these as a jump here.
+          return NULL;
+          break;
+        default:
+          //
+          // TODO:
+          // It's occurred to me that whenever we throw due to an
+          // unrecognized something, the unused objects created above
+          // are leaked, e.g. dest in this case.
+          //
+          throw "Unrecognized jump kind";    
     }
 
   assert(result);
@@ -1225,7 +1228,7 @@ vector<Stmt *> *translate_irbb( IRSB *irbb )
     catch ( const char *e )
     {
       //        st = new Comment( "Untranslated Jump out of BB. Cause: \"" + string(e) + "\"" );
-        st = new Special( "Untranslated Jump out of BB. Cause: ' + string(e) + '" );
+        st = new Special( "Untranslated Jump out of BB. Cause: " + string(e) );
     }
 
     if (st != NULL)
@@ -1371,7 +1374,6 @@ void generate_bap_ir_block( asm_program_t *prog, bap_block_t *block )
   vector<Stmt *> *vir = block->bap_ir;
   
   // Go through block and add Special's for ret
-  //  add_special_returns(block);
   insert_specials(block);
   
   // Go through the block and add on eflags modifications
