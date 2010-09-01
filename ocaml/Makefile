@@ -47,6 +47,8 @@ export SOURCES = \
 	eval.ml \
 	coalesce.ml \
 	symbeval.ml \
+	template.ml \
+	interpreter.ml \
 	traces.ml \
 	payload.ml \
 	search.ml \

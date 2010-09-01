@@ -14,30 +14,30 @@ open Type
 type var = Var.t
 
 type exp = 
-  | Load of exp * exp * exp * typ  (** Load(arr,idx,endian, t) *)
-  | Store of exp * exp * exp * exp * typ  (** Store(arr,idx,val, endian, t) *)
-  | BinOp of binop_type * exp * exp
-  | UnOp of unop_type * exp
+  | Load of (exp * exp * exp * typ)  (** Load(arr,idx,endian, t) *)
+  | Store of (exp * exp * exp * exp * typ)  (** Store(arr,idx,val, endian, t) *)
+  | BinOp of (binop_type * exp * exp)
+  | UnOp of (unop_type * exp)
   | Var of var
   | Lab of string
-  | Int of int64 * typ
-  | Cast of cast_type * typ * exp (** Cast to a new type. *)
-  | Let of var * exp * exp
-  | Unknown of string * typ
+  | Int of (int64 * typ)
+  | Cast of (cast_type * typ * exp) (** Cast to a new type. *)
+  | Let of (var * exp * exp)
+  | Unknown of (string * typ)
 
 type attrs = Type.attributes
 
 type stmt =
-  | Move of var * exp * attrs  (** Assign the value on the right to the
+  | Move of (var * exp * attrs)  (** Assign the value on the right to the
 				      var on the left *)
-  | Jmp of exp * attrs (** Jump to a label/address *)
-  | CJmp of exp * exp * exp * attrs
+  | Jmp of (exp * attrs) (** Jump to a label/address *)
+  | CJmp of (exp * exp * exp * attrs)
       (** Conditional jump. If e1 is true, jumps to e2, otherwise jumps to e3 *)
-  | Label of label * attrs (** A label we can jump to *)
-  | Halt of exp * attrs
-  | Assert of exp * attrs
-  | Comment of string * attrs (** A comment to be ignored *)
-  | Special of string * attrs (** A "special" statement. (does magic) *)
+  | Label of (label * attrs) (** A label we can jump to *)
+  | Halt of (exp * attrs)
+  | Assert of (exp * attrs)
+  | Comment of (string * attrs) (** A comment to be ignored *)
+  | Special of (string * attrs) (** A "special" statement. (does magic) *)
 
 type program = stmt list
 

@@ -210,6 +210,9 @@ let speclist =
      Arg.Set Traces.allow_symbolic_indices,
      "Allow the existence of symbolic indices during formula generation"
     )
+  ::("-exec",
+     uadd(TransformAst Interpreter.execute),
+     "Concretely execute the IL")
   :: ("-normalize-mem",
       uadd(TransformAst Memory2array.coerce_prog),
       "Normalize memory accesses as array accesses"
