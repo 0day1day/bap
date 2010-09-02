@@ -140,7 +140,9 @@ let del_var = VH.remove
 
 (************************* Labels *************************)
 
-let get_lab = Hashtbl.find
+let get_lab lambda addr = 
+  try Hashtbl.find lambda addr
+  with Not_found -> raise Unknown_label
 
 let goto e env st = match e with
   | Int(n,_) -> 
@@ -160,9 +162,23 @@ let inc_pc st = st.MyTypes.pc <- add st.MyTypes.pc 1L
 
 let load_mem m a = 
   try AddrMap.find a m
-  with Not_found -> def_mem_val
+  with Not_found -> 
+(    dprintf "mem[%Lx] = ?\n" a ;
+     (*ignore (Pervasives.input_char Pervasives.stdin );*)
+    def_mem_val )
 
 let store_mem m a v = AddrMap.add a v m
+
+let get_string m a = 
+  let rec get_byte acc a = function 
+    | Scalar(0L,_) -> acc
+    | Scalar(n,_) -> 
+	let c = Char.escaped (char_of_int (Int64.to_int n)) in
+	let next = add a one in
+	get_byte (acc^c) next (load_mem m next)
+    | _ -> failwith "found non-scalar in memory"
+  in
+    get_byte "" a (load_mem m a)
 
 (***********************************************************)
 (************************ Specials *************************)
@@ -170,6 +186,8 @@ let store_mem m a v = AddrMap.add a v m
 
 module Specials =
 struct
+
+  let fdcount = ref 4L
 
   let interrupt st = 
     let get_reg name = 
@@ -198,8 +216,11 @@ struct
 	    (
 	      (* File Descriptor *)
 	      let ebx = get_reg "R_EBX" in
-	      let fd = Hashtbl.find st.MyTypes.filesystem ebx in
-		(* Buffer *)
+	      let fd = 
+		try Hashtbl.find st.MyTypes.filesystem ebx
+		with Not_found -> failwith "unknown file descriptor"
+	      in
+	      (* Buffer *)
 	      let ecx = get_reg "R_ECX" in
 		(* Count *)
 	      let edx = get_reg "R_EDX" in
@@ -242,7 +263,7 @@ struct
 	      let mem = get_mem () in
 	      let print_byte b = output_char fs (char_of_int (Int64.to_int b)) in
 	      let rec write_bytes addr = function
-		| 0L -> ecx
+		| 0L -> edx
 		| n ->
 		    let byte = fst (unwrap_scalar (load_mem mem addr)) in
 		      print_byte byte ;
@@ -253,7 +274,58 @@ struct
 		  let eax = var_by_name st.MyTypes.delta "R_EAX" in
 		    set_var st.MyTypes.delta eax (Scalar (byte_num, reg_32))
 	    )
-	| _ -> failwith "unsupported"
+	| 5L -> (* OPEN *)
+	    (* the path string *)
+	    let ebx = get_reg "R_EBX" in
+	      (* the flags *)
+	    let ecx = get_reg "R_ECX" in
+	    let mem = get_mem () in
+	    let file = get_string mem ebx in
+	    let mode = match Int64.logand 3L ecx with (* keep the lowest bits *)
+	      | 0L -> O_RDONLY
+	      | 1L -> O_WRONLY
+	      | 2L -> O_RDWR
+	      | _ -> failwith ("unsupported mode " ^ (Int64.to_string ecx))
+	    in
+	    let fd = Unix.openfile file [mode] 0o755 in
+	      Hashtbl.add st.MyTypes.filesystem !fdcount fd ;
+	      let eax = var_by_name st.MyTypes.delta "R_EAX" in
+		set_var st.MyTypes.delta eax (Scalar (!fdcount, reg_32)) ;
+		fdcount := add !fdcount one ;
+	      pdebug ("opening " ^ file)
+	| 122L -> (* UNAME *)
+	    let eax = var_by_name st.MyTypes.delta "R_EAX" in
+	      set_var st.MyTypes.delta eax (Scalar (0L, reg_32))
+	| 146L -> (* WRITEV *)
+	    (* file descriptor *)
+	    (*let ebx = get_reg "R_EBX" in
+	    let fs = 
+	      try 
+		let fd = Hashtbl.find st.MyTypes.filesystem ebx in
+		  out_channel_of_descr fd
+	      with Not_found -> failwith "trying to writev to a closed fd"
+	    in
+	      (* the iovecs *)
+	    let ecx = get_reg "R_ECX" in
+	      (* the iovec count *)
+	    let edx = get_reg "R_EDX" in
+	    let print_byte b = output_char fs (char_of_int (Int64.to_int b)) in
+	    let rec write_buf num addr = function
+		| 0L -> num
+		| n ->
+		    print_byte n ;
+		    let addr' = add addr one in
+		    let next = fst (unwrap_scalar (load_mem mem addr')) in
+		      write_buf (add num one) addr' next
+	    in
+	    let rec write_bufs nbytes vec = function 
+	      | 0L -> nbytes
+	      | n -> 
+		  let bytes = write_buf zero addr (load_mem mem addr) in
+		    write_bufs (nbytes + bytes) (sub n one)
+	    in
+	      write_bufs *)()
+	| _ -> failwith ("unsupported eax = " ^ (Int64.to_string eax))
 
   let handle s st = match String.sub s 0 3 with
     | "cal" | "ret" -> ()
