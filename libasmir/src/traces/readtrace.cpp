@@ -1,6 +1,9 @@
 
-#include "readtrace.h"
 #include <cstdlib>
+#include <string>
+#include <iostream>
+#include "readtrace.h"
+
 
 using namespace std;
 
@@ -115,7 +118,7 @@ bap_blocks_t * read_trace_from_file(const string &filename,
     trace.open(filename.c_str());
     
     if (!trace.is_open()) {
-      cerr << "Couldn't open " << filename.c_str() << endl;
+      cerr << "Couldn't open " << filename << endl;
       exit(1);
     }
     

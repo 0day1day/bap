@@ -33,7 +33,7 @@ namespace pintrace { // Use namespace to avoid conflict
 #define MAX_FRAME_MEMSIZE sizeof(StdFrame)
 #define MAX_FRAME_DISKSIZE 1024
 
-#define MAX_SYSCALL_ARGS 5
+#define MAX_SYSCALL_ARGS 6
 
 /* Register definition: copied from Pin's types_vampi.TLH */
 

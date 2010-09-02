@@ -13,6 +13,9 @@
 #include "pin.H"
 #include "pin_frame.h"
 
+// Size of temporary buffers
+#define BUFSIZE 128
+
 // TODO: we need a type for the mapping to variables/registers
 typedef uint32_t var;
 // We only consider 32-bit memory addresses
@@ -51,6 +54,11 @@ typedef std::map<var,t> context;
 #define __NR_socketcall	102
 #define __NR_mmap2		192
 
+// Windows system calls @ http://code.google.com/p/miscellaneouz/source/browse/trunk/winsyscalls?spec=svn26&r=26
+// FIXME: We should really handle different versions of Windows better
+// These are for win7
+#define __NR_createfilewin	0x0042
+#define __NR_readfilewin 0x0111
 
 /********************************************/
 
