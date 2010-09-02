@@ -11,7 +11,9 @@ using namespace pintrace;
 int pintrace::source = 1;
 
 #define READ(in, val) in.read((char *) &val, (streamsize) sizeof(val))
-#define WRITE(out, val) out.write((const char *) &val, (streamsize) sizeof(val))
+#define WRITE(out, val)                                         \
+  cerr << #val << " is " << sizeof(val) << endl;             \
+  out.write((const char *) &val, (streamsize) sizeof(val))
 
 // Returns the number of bits in a VT type
 uint32_t bitsOfType(uint32_t t) {
@@ -70,6 +72,8 @@ Frame *Frame::unserialize(istream &in, bool noskip)
 
    type = (FrameType) packed_type;
 
+   cerr << "type " << type << " size " << size << endl;
+   
    if (!noskip) {
       printf("Skipping frame, %d bytes.\n", size - 3);
       in.ignore(size - 3);
@@ -504,8 +508,9 @@ ostream &SyscallFrame::serialize(ostream &out, uint16_t sz)
    WRITE(out2, tid);
    WRITE(out2, callno);
 
-   for (int i = 0; i < MAX_SYSCALL_ARGS; i++)
+   for (int i = 0; i < MAX_SYSCALL_ARGS; i++) {
       WRITE(out2, args[i]);
+   }
 
    return out2;
 
@@ -518,8 +523,9 @@ istream &SyscallFrame::unserializePart(istream &in)
    READ(in, tid);
    READ(in, callno);
 
-   for (int i = 0; i < MAX_SYSCALL_ARGS; i++)
+   for (int i = 0; i < MAX_SYSCALL_ARGS; i++) {
       READ(in, args[i]);
+   }
 
    return in;
 
