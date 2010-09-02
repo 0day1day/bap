@@ -6,24 +6,23 @@
 #include <cassert>
 
 #ifdef _WIN32
-/* Now, you'd think it wouldn't be that hard to include a couple of Windows header files to define common windows structures.  Well, you'd be wrong.  The header files for DDK are generally incompatible with those from VC++.  So, I am copying and pasting the relevant parts here.  Don't try to include the header files directly, it's a waste of time.  If you do want to try, try to get DDK/Wdm.h and Stdint.h to coexist.  Good luck. */
+/**
+ * Getting WDK header files to include is a nightmare.  If you need to
+ * change this, talk to me.
+ *
+ * -ejs
+ */
 namespace WINDOWS {
-
-//const long STATUS_SUCCESS = 0L;
-
-
-#define _X86_
-//#include "api/ntdef.h"
+  // Define a target architecture for WDK
+#define _X86_ 
 #include "Wdm.h"
 #undef _X86_
-
-
 }
 
+// Needed for STATUS_SUCCESS to work
 typedef WINDOWS::NTSTATUS NTSTATUS;
 
 #endif
-
 
 using namespace std;
 using namespace pintrace;
@@ -69,7 +68,7 @@ void TaintTracker::setTaintStdin()
 #ifndef _WIN32
   fds.insert(STDIN_FILENO);
 #else
-	assert(FALSE);
+  assert(FALSE);
 #endif
 }
 
@@ -262,76 +261,76 @@ bool TaintTracker::taintStart(uint32_t callno, uint32_t * args)
   char filename[128];
   switch (callno) {
 #ifndef _WIN32
-  case __NR_open:
-    // FIXME: use PIN_SafeCopy
-    strncpy(filename, (char *)args[0],128); 
-    if (taint_files.find(string(filename)) != taint_files.end()) {
-      cerr << "Opening tainted file: " << string(filename) << endl;
-      syscall = __NR_open;
-    }
-    break;
-  case __NR_close:
-    syscall = __NR_close;
-    break;
-    // TODO: do we care about the offset?
-  case __NR_mmap:
-  case __NR_mmap2:
-    if (fds.find(args[4]) != fds.end())
-      syscall = __NR_mmap2;
-    break;
-  case __NR_read: 
-    if (fds.find(args[0]) != fds.end()) {
-      syscall = __NR_read;
-      reading_tainted = true;
-    }
-    break;
-  case __NR_socketcall:
-    // TODO: do we need to distinguish between sockets?
-    if (taint_net) {
-      syscall = __NR_socketcall;
-      if (args[0] == _A1_recv)
-	reading_tainted = true;
-    }
-    break;
-  case __NR_execve:
-    break;
+      case __NR_open:
+        // FIXME: use PIN_SafeCopy
+        strncpy(filename, (char *)args[0],128); 
+        if (taint_files.find(string(filename)) != taint_files.end()) {
+          cerr << "Opening tainted file: " << string(filename) << endl;
+          syscall = __NR_open;
+        }
+        break;
+      case __NR_close:
+        syscall = __NR_close;
+        break;
+        // TODO: do we care about the offset?
+      case __NR_mmap:
+      case __NR_mmap2:
+        if (fds.find(args[4]) != fds.end())
+          syscall = __NR_mmap2;
+        break;
+      case __NR_read: 
+        if (fds.find(args[0]) != fds.end()) {
+          syscall = __NR_read;
+          reading_tainted = true;
+        }
+        break;
+      case __NR_socketcall:
+        // TODO: do we need to distinguish between sockets?
+        if (taint_net) {
+          syscall = __NR_socketcall;
+          if (args[0] == _A1_recv)
+            reading_tainted = true;
+        }
+        break;
+      case __NR_execve:
+        break;
 #else /* windows */
-  case __NR_createfilewin:
-	  {
-		  char tempstr[BUFSIZE];
-		  WINDOWS::POBJECT_ATTRIBUTES pattr = reinterpret_cast<WINDOWS::POBJECT_ATTRIBUTES> (args[2]);		  
-		  assert(pattr);
-		  assert(pattr->ObjectName);
-		  errno_t e;
-		  WINDOWS::PWSTR fname = pattr->ObjectName->Buffer;
-		  size_t origsize = wcslen(fname) + 1;
-		  size_t convertedChars = 0;
-		  wcstombs_s(&convertedChars, tempstr, origsize, fname, BUFSIZE-1);
-		  if (convertedChars < origsize) {
-			  cerr << "Warning: Could not convert all characters" << endl;
-		  }
-
-		  if (taint_files.find(string(tempstr)) != taint_files.end()) {
-			  cerr << "Opening tainted file: " << string(tempstr) << endl;
-			  syscall = __NR_createfilewin;
-		  }
-
-		  break;
-	  }
-  case __NR_readfilewin:
-	  {    
-		  if (fds.find(args[0]) != fds.end()) {
-			  syscall = __NR_read;
-			  reading_tainted = true;
-			  cerr << "found a t-read " << endl;
-			  syscall = __NR_readfilewin;
-		  }
-		  break;
-	  }
+      case __NR_createfilewin:
+      {
+        char tempstr[BUFSIZE];
+        WINDOWS::POBJECT_ATTRIBUTES pattr = reinterpret_cast<WINDOWS::POBJECT_ATTRIBUTES> (args[2]);		  
+        assert(pattr);
+        assert(pattr->ObjectName);
+        errno_t e;
+        WINDOWS::PWSTR fname = pattr->ObjectName->Buffer;
+        size_t origsize = wcslen(fname) + 1;
+        size_t convertedChars = 0;
+        wcstombs_s(&convertedChars, tempstr, origsize, fname, BUFSIZE-1);
+        if (convertedChars < origsize) {
+          cerr << "Warning: Could not convert all characters" << endl;
+        }
+        
+        if (taint_files.find(string(tempstr)) != taint_files.end()) {
+          cerr << "Opening tainted file: " << string(tempstr) << endl;
+          syscall = __NR_createfilewin;
+        }
+        
+        break;
+      }
+      case __NR_readfilewin:
+      {    
+        if (fds.find(args[0]) != fds.end()) {
+          syscall = __NR_read;
+          reading_tainted = true;
+          cerr << "found a t-read " << endl;
+          syscall = __NR_readfilewin;
+        }
+        break;
+      }
 #endif
-  default:
-	  cerr << "Unknown system call " << callno << endl;
-    break;
+      default:
+        //cerr << "Unknown system call " << callno << endl;
+        break;
   }
   return reading_tainted;
 }
@@ -347,97 +346,88 @@ bool TaintTracker::taintIntroduction(uint32_t bytes,
   //cout << hex << " " << args[i] ;
   //cout << endl ;
   switch (syscall) {
-#ifdef _WIN32
-  case __NR_createfilewin:
-
-	  // If opened
-	  if (bytes == STATUS_SUCCESS) {
-		  WINDOWS::PHANDLE p = reinterpret_cast<WINDOWS::PHANDLE> (args[0]);
-		  uint32_t fd = reinterpret_cast<uint32_t> (*p);
-		  cerr << "Tainting file descriptor " << fd << endl;
-		  fds.insert(fd);
-	  }
-	  break;
-  case __NR_readfilewin:
-	  if (bytes == STATUS_SUCCESS) {
-		  WINDOWS::PIO_STATUS_BLOCK psb = reinterpret_cast<WINDOWS::PIO_STATUS_BLOCK> (args[4]);
-		  uint32_t length;
-		  assert(psb);
-		  assert(psb->Information);
-		  length = psb->Information;
-		  /*cerr << "sigh" <<
-			  args[0] << " " <<
-			  args[1] << " " <<
-			  args[2] << " " <<
-			  args[3] << " " <<
-			  args[4] << " " <<
-			  args[5] << " " << 
-			  args[6] << " " <<
-			  endl;*/
-		  addr = args[5];
-		  assert(addr);
-		  cerr << "Tainting " 
-			  << length 
-			  << "bytes from read @" << addr << endl;
-		  for (uint32_t i = 0 ; i < length ; i ++)
-			  setTaint(memory, addr + i, source++);
-		  return true;
-	  }
-	  break;
-#else
-  case __NR_socketcall:
-    switch (args[0]) {
-    case _A1_recv:
-      addr = ((uint32_t *)args[1])[1];
-      length = bytes;
-      cerr << "Tainting " 
-	   << bytes 
-	   << "bytes from socket" << endl;
-      for (uint32_t i = 0 ; i < length ; i ++)
-	setTaint(memory, addr + i, source++);
-      return true;
-    case _A1_accept:
-      cerr << "Accepting an incoming connection" << endl;
-      fds.insert(bytes);
-      break;
-    case _A1_socket:
-      cerr << "Opening a tainted socket " << bytes << endl;
-      fds.insert(bytes);
-      break;
-	default:
-      break;
-    }
-    break;
-  case __NR_open:
-    // "bytes" contains the file descriptor
-    fds.insert(bytes);
-    break;
-  case __NR_close:
-    fds.erase(args[0]);
-    break;
-  case __NR_mmap:
-  case __NR_mmap2:
-    addr = bytes;
-    length = args[1];
-    cerr << "Tainting " 
-	 << length 
-	 << "bytes from mmap" << endl;
-    for (uint32_t i = 0 ; i < length ; i ++)
-      setTaint(memory, addr + i, source++);
-    return true;
-    break;
-  case __NR_read:
-    addr = args[1];
-    length = bytes;
-    cerr << "Tainting " 
-	 << length 
-	 << "bytes from read" << endl;
-    for (uint32_t i = 0 ; i < length ; i ++)
-      setTaint(memory, addr + i, source++);
-    return true;
+#ifndef _WIN32 /* unix */
+      case __NR_socketcall:
+        switch (args[0]) {
+            case _A1_recv:
+              addr = ((uint32_t *)args[1])[1];
+              length = bytes;
+              cerr << "Tainting " 
+                   << bytes 
+                   << "bytes from socket" << endl;
+              for (uint32_t i = 0 ; i < length ; i ++)
+                setTaint(memory, addr + i, source++);
+              return true;
+            case _A1_accept:
+              cerr << "Accepting an incoming connection" << endl;
+              fds.insert(bytes);
+              break;
+            case _A1_socket:
+              cerr << "Opening a tainted socket " << bytes << endl;
+              fds.insert(bytes);
+              break;
+            default:
+              break;
+        }
+        break;
+      case __NR_open:
+        // "bytes" contains the file descriptor
+        fds.insert(bytes);
+        break;
+      case __NR_close:
+        fds.erase(args[0]);
+        break;
+      case __NR_mmap:
+      case __NR_mmap2:
+        addr = bytes;
+        length = args[1];
+        cerr << "Tainting " 
+             << length 
+             << "bytes from mmap" << endl;
+        for (uint32_t i = 0 ; i < length ; i ++)
+          setTaint(memory, addr + i, source++);
+        return true;
+        break;
+      case __NR_read:
+        addr = args[1];
+        length = bytes;
+        cerr << "Tainting " 
+             << length 
+             << " bytes from read at " << addr << endl;
+        for (uint32_t i = 0 ; i < length ; i ++)
+          setTaint(memory, addr + i, source++);
+        return true;
+#else /* windows */
+      case __NR_createfilewin:
+        
+        // If opened
+        if (bytes == STATUS_SUCCESS) {
+          WINDOWS::PHANDLE p = reinterpret_cast<WINDOWS::PHANDLE> (args[0]);
+          uint32_t fd = reinterpret_cast<uint32_t> (*p);
+          cerr << "Tainting file descriptor " << fd << endl;
+          fds.insert(fd);
+        }
+        break;
+      case __NR_readfilewin:
+        if (bytes == STATUS_SUCCESS) {
+          WINDOWS::PIO_STATUS_BLOCK psb = reinterpret_cast<WINDOWS::PIO_STATUS_BLOCK> (args[4]);
+          uint32_t length;
+          assert(psb);
+          assert(psb->Information);
+          length = psb->Information;
+          addr = args[5];
+          assert(addr);
+          cerr << "Tainting " 
+               << length 
+               << " bytes from read @" << addr << endl;
+          for (uint32_t i = 0 ; i < length ; i ++)
+            setTaint(memory, addr + i, source++);
+          return true;
+        }
+        break;
 #endif
-  default:
-    break;
+      default:
+        break;
   }
   return false;
 }
@@ -462,6 +452,12 @@ void TaintTracker::setTaintContext()
     }
   }
   
+}
+
+// Reset the taint status of registers and memory
+void TaintTracker::resetTaint() {
+  delta.clear();
+  memory.clear();
 }
 
 // 

@@ -120,7 +120,8 @@ enum FrameType {
 
 
   // Counter for the taint source
-  static int source = 1;
+
+  extern int source;
   
    /**
     * Frame: Base struct for all frame objects.

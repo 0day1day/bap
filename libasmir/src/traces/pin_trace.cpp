@@ -8,29 +8,40 @@
 using namespace std;
 using namespace pintrace;
 
-TraceReader::TraceReader(const char *filename)
-   : frm_pos(0)
+TraceReader::TraceReader(void)
 {
-
-   infile.open(filename, ios::in);
-
-   infile.read((char *) &header, sizeof(TraceHeader));
-
-   if (header.magic != TRACE_MAGIC) {
-      throw TraceExn("Bad magic value.");
-   }
-
-   if (header.version != TRACE_VERSION) {
-      throw TraceExn("Bad version.");
-   }
-
-   // TODO: Read in and build the TOC structure.
-
-   // Setup the cache.
-   memset(icache, 0, TRACE_ICACHE_SIZE * (MAX_INSN_BYTES + 1));
 
 }
 
+TraceReader::TraceReader(const char *filename)
+{
+  open(filename);
+}
+
+void TraceReader::open(const char *filename)
+{
+
+  frm_pos = 0;
+  
+  infile.open(filename, ios::in);
+  
+  infile.read((char *) &header, sizeof(TraceHeader));
+  
+  if (header.magic != TRACE_MAGIC) {
+    throw TraceExn("Bad magic value.");
+  }
+  
+  if (header.version != TRACE_VERSION) {
+    throw TraceExn("Bad version.");
+  }
+  
+  // TODO: Read in and build the TOC structure.
+  
+  // Setup the cache.
+  memset(icache, 0, TRACE_ICACHE_SIZE * (MAX_INSN_BYTES + 1));
+    
+}
+    
 uint32_t TraceReader::count() const
 {
    return header.frame_count;

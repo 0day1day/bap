@@ -103,72 +103,74 @@ namespace pintrace { // We will use namespace to avoid collision
 
    public:
 
-      TaintTracker(ValSpecRec *env);
+     TaintTracker(ValSpecRec *env);
 
-      // A function to introduce taint in the contexts
-      bool taintStart(uint32_t callno, uint32_t * args);
+     // A function to introduce taint in the contexts
+     bool taintStart(uint32_t callno, uint32_t * args);
 
-      bool taintIntroduction(uint32_t bytes, 
-                             uint32_t * args, 
-                             uint32_t &addr,
-                             uint32_t &length);
+     bool taintIntroduction(uint32_t bytes, 
+                            uint32_t * args, 
+                            uint32_t &addr,
+                            uint32_t &length);
 
-      std::vector<TaintFrame> taintArgs(int args, char **argv);
+     std::vector<TaintFrame> taintArgs(int args, char **argv);
 
-      std::vector<TaintFrame> taintEnv(char **env);
+     std::vector<TaintFrame> taintEnv(char **env);
 
-      // A function to propagate taint
-      void taintPropagation();
+     // A function to propagate taint
+     void taintPropagation();
 
-      // A function to apply taint policies
-      bool taintChecking();
+     // A function to apply taint policies
+     bool taintChecking();
 
-      void setTaintContext();
+     void setTaintContext();
 
-      void setCount(uint32_t cnt);
+     void resetTaint();
+     
+     void setCount(uint32_t cnt);
 
-      void setTaintArgs(bool taint);
+     void setTaintArgs(bool taint);
 
-      void setTaintEnv(string env_var);
+     void setTaintEnv(string env_var);
       
-      void trackFile(string file);
+     void trackFile(string file);
 
-      void setTaintStdin();
+     void setTaintStdin();
       
-      void setTaintNetwork();
+     void setTaintNetwork();
 
-      // Helpers
-      // A function to check whether the instruction arguments are tainted
-      uint32_t getReadTaint();
+     // Helpers
+     // A function to check whether the instruction arguments are tainted
+     uint32_t getReadTaint();
 
-      bool hasTaint();
+     bool hasTaint();
 
-      bool propagatedTaint(bool branch);
+     bool propagatedTaint(bool branch);
       
-      void printMem();
+     void printMem();
 
-      void printRegs();
+     void printRegs();
 
    private:
 
-      // A flag to denote a syscall in progress
-      uint32_t syscall;
+     // A flag to denote a syscall in progress
+     uint32_t syscall;
 
-      // The taint source (producing taint tags)
-      uint32_t source;
+     // The taint source (producing taint tags)
+     uint32_t source;
 
-      // a context defining a map from registers to taint
-      context delta;
+     // a context defining a map from registers to taint
+     context delta;
 
-      // We can use a byte-centric approach, each byte maps to taint
-      // a context defining a map from memory locations to taint
-      context memory;
+     // We can use a byte-centric approach, each byte maps to taint
+     // a context defining a map from memory locations to taint
+     context memory;
 
-      // The table containing the values of the current instruction
-      ValSpecRec *values;
+     // The table containing the values of the current instruction
+     ValSpecRec *values;
 
-      // How many values are being used
-      uint32_t count;
+     // How many values are being used
+     uint32_t count;
 
 
      /********** Syscall-specific vars ***********/
@@ -182,25 +184,25 @@ namespace pintrace { // We will use namespace to avoid collision
 
 
 
-      void addTaintToWritten(uint32_t tag);
+     void addTaintToWritten(uint32_t tag);
       
-      bool isReg(uint32_t type);
+     bool isReg(uint32_t type);
 
-      uint32_t getRegTaint(uint32_t reg_int);
+     uint32_t getRegTaint(uint32_t reg_int);
 
-      uint32_t getMemTaint(uint32_t addr, uint32_t type);
+     uint32_t getMemTaint(uint32_t addr, uint32_t type);
 
-      uint32_t combineTaint(uint32_t oldtag, uint32_t newtag);
+     uint32_t combineTaint(uint32_t oldtag, uint32_t newtag);
 
-      uint32_t exists(context ctx, uint32_t elem);
+     uint32_t exists(context ctx, uint32_t elem);
 
-      uint32_t getTaint(context ctx, uint32_t elem);
+     uint32_t getTaint(context ctx, uint32_t elem);
 
-      uint32_t getSize(uint32_t type);
+     uint32_t getSize(uint32_t type);
 
-      bool isValid(uint32_t type);
+     bool isValid(uint32_t type);
 
-      void setTaint(context &ctx, uint32_t key, uint32_t tag);
+     void setTaint(context &ctx, uint32_t key, uint32_t tag);
 
    };
 

@@ -16,11 +16,18 @@ bap_blocks_t * read_trace_from_file(const string &filename,
   // a block to accumulate the lifted traces
   bap_blocks_t * result = new bap_blocks_t;
   uint32_t counter = 0;
+  pintrace::TraceReader tr;
   
   if(pintrace) {
-    
-    pintrace::TraceReader tr(filename.c_str());
-    
+
+    try {
+      tr.open(filename.c_str());
+    }
+    catch (pintrace::TraceExn& e) {
+      cerr << "Trace exception: " << e.msg << endl;
+      throw e;
+    }
+
     // FIXME: Currently only x86
     VexArch arch = VexArchX86;
     bfd_architecture bfd_arch = bfd_arch_i386;

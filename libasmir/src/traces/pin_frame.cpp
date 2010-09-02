@@ -8,6 +8,8 @@
 using namespace std;
 using namespace pintrace;
 
+int pintrace::source = 1;
+
 #define READ(in, val) in.read((char *) &val, (streamsize) sizeof(val))
 #define WRITE(out, val) out.write((const char *) &val, (streamsize) sizeof(val))
 

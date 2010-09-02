@@ -73,8 +73,12 @@ namespace pintrace { // We will use namespace to avoid collision
       char icache[TRACE_ICACHE_SIZE][MAX_INSN_BYTES + 1];
 
    public:
-      TraceReader(const char *filename);
-
+     TraceReader(const char *filename);
+     TraceReader();
+     
+     // Open a new file
+     void open(const char *filename);
+     
       // Returns total number of frames in the trace.
       uint32_t count() const;
 
