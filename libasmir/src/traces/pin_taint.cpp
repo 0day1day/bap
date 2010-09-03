@@ -376,12 +376,12 @@ bool TaintTracker::taintIntroduction(uint32_t bytes,
         break;
       case __NR_open:
         // "bytes" contains the file descriptor
-		  if (bytes != -1) { /* -1 == error */
+        if (bytes != (uint32_t)(-1)) { /* -1 == error */
 			  fds.insert(bytes);
 		  }
 		  break;
       case __NR_close:
-		  if (bytes == UNIX_SUCCESS && fds.find(args[0]) != fds.end()) {
+        if (bytes == (uint32_t)(UNIX_SUCCESS) && fds.find(args[0]) != fds.end()) {
 			  cerr << "closed tainted fd " << args[0] << endl;
 			  fds.erase(args[0]);
 		  }
