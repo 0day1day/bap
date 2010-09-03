@@ -10,10 +10,8 @@ using namespace pintrace;
 
 int pintrace::source = 1;
 
-#define READ(in, val) in.read((char *) &val, (streamsize) sizeof(val))
-#define WRITE(out, val)                                         \
-  cerr << #val << " is " << sizeof(val) << endl;             \
-  out.write((const char *) &val, (streamsize) sizeof(val))
+#define READ(__in, val) __in.read((char *) &val, (streamsize) sizeof(val))
+#define WRITE(__out, val)  __out.write((char *) (&val), (streamsize) sizeof(val))
 
 // Returns the number of bits in a VT type
 uint32_t bitsOfType(uint32_t t) {
@@ -501,7 +499,6 @@ istream &LoadModuleFrame::unserializePart(istream &in)
 
 ostream &SyscallFrame::serialize(ostream &out, uint16_t sz)
 {
-   
    ostream &out2 = Frame::serialize(out, sz + 12 + 4*MAX_SYSCALL_ARGS);
 
    WRITE(out2, addr);

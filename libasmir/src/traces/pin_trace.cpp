@@ -23,7 +23,7 @@ void TraceReader::open(const char *filename)
 
   frm_pos = 0;
   
-  infile.open(filename, ios::in);
+  infile.open(filename, ios::in | ios::binary);
   
   infile.read((char *) &header, sizeof(TraceHeader));
   
@@ -116,7 +116,8 @@ TraceWriter::TraceWriter(const char *filename)
 
    outfile.open(filename,
                 ios_base::out |
-                ios_base::trunc);
+                ios_base::trunc |
+				ios_base::binary);
 
    // Write in a temporary trace header.
 

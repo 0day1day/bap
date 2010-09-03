@@ -21,7 +21,8 @@ namespace WINDOWS {
 
 // Needed for STATUS_SUCCESS to work
 typedef WINDOWS::NTSTATUS NTSTATUS;
-
+#else
+const int UNIX_SUCCESS = 0;
 #endif
 
 using namespace std;
@@ -260,7 +261,7 @@ bool TaintTracker::taintStart(uint32_t callno, uint32_t * args)
   bool reading_tainted = false;
   char filename[128];
   switch (callno) {
-#ifndef _WIN32
+#ifndef _WIN32 /* unix */
       case __NR_open:
         // FIXME: use PIN_SafeCopy
         strncpy(filename, (char *)args[0],128); 
@@ -327,6 +328,9 @@ bool TaintTracker::taintStart(uint32_t callno, uint32_t * args)
         }
         break;
       }
+	  case __NR_closewin:
+		syscall = __NR_closewin;
+		break;
 #endif
       default:
         //cerr << "Unknown system call " << callno << endl;
@@ -372,10 +376,15 @@ bool TaintTracker::taintIntroduction(uint32_t bytes,
         break;
       case __NR_open:
         // "bytes" contains the file descriptor
-        fds.insert(bytes);
-        break;
+		  if (bytes != -1) { /* -1 == error */
+			  fds.insert(bytes);
+		  }
+		  break;
       case __NR_close:
-        fds.erase(args[0]);
+		  if (bytes == UNIX_SUCCESS && fds.find(args[0]) != fds.end()) {
+			  cerr << "closed tainted fd " << args[0] << endl;
+			  fds.erase(args[0]);
+		  }
         break;
       case __NR_mmap:
       case __NR_mmap2:
@@ -411,7 +420,6 @@ bool TaintTracker::taintIntroduction(uint32_t bytes,
       case __NR_readfilewin:
         if (bytes == STATUS_SUCCESS) {
           WINDOWS::PIO_STATUS_BLOCK psb = reinterpret_cast<WINDOWS::PIO_STATUS_BLOCK> (args[4]);
-          uint32_t length;
           assert(psb);
           assert(psb->Information);
           length = psb->Information;
@@ -424,6 +432,11 @@ bool TaintTracker::taintIntroduction(uint32_t bytes,
             setTaint(memory, addr + i, source++);
           return true;
         }
+		case __NR_closewin:
+			if (bytes == STATUS_SUCCESS && fds.find(args[0]) != fds.end()) {
+				cerr << "closed tainted fd " << args[0] << endl;
+				fds.erase(args[0]);
+			}
         break;
 #endif
       default:

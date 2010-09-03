@@ -59,6 +59,7 @@ typedef std::map<var,t> context;
 // These are for win7
 #define __NR_createfilewin	0x0042
 #define __NR_readfilewin 0x0111
+#define __NR_closewin 0x0032
 
 /********************************************/
 
