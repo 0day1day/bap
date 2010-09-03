@@ -213,9 +213,10 @@ std::vector<TaintFrame> TaintTracker::taintArgs(int argc, char **argv)
     cerr << "Tainting command-line arguments" << endl;
     for ( int i = 1 ; i < argc ; i++ ) {
       uint32_t len = strlen(argv[i]);
-      for (uint32_t j = 0 ; j < len ; j++)
-	setTaint(memory, (uint32_t)(argv[i]+j), source++);
-      TaintFrame frm;
+      for (uint32_t j = 0 ; j < len ; j++) {
+		  setTaint(memory, (uint32_t)(argv[i]+j), source++);
+	  }
+	TaintFrame frm;
       frm.id = ARG_ID;
       frm.addr = (uint32_t)argv[i];
       frm.length = len;
