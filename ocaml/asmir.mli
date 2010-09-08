@@ -11,11 +11,12 @@
    some variables I added. --aij
 *)
 
+open Libbfd
 open Libasmir
 
 exception Disassembly_error
 
-type asmprogram = Libasmir.asm_program_t
+type asmprogram
 
 type arch
 val arch_i386 : arch
@@ -66,12 +67,12 @@ val bap_from_trace_file : ?atts:bool -> string -> Ast.program
 
 val get_function_ranges : asmprogram -> (string * address_t * address_t) list
 
-val get_symbols_hash : ?all:bool -> asmprogram -> (string, Libasmir.asymbol) Hashtbl.t
+val get_symbols_hash : ?all:bool -> asmprogram -> (string, asymbol) Hashtbl.t
 
-val find_symbol_address : (string, Libasmir.asymbol) Hashtbl.t -> string -> int64
+val find_symbol_address : (string, asymbol) Hashtbl.t -> string -> int64
 
-val get_all_sections : asmprogram -> Libasmir.section_ptr array
-val get_sections_hash : asmprogram -> (string, Libasmir.section_ptr) Hashtbl.t
+val get_all_sections : asmprogram -> section_ptr array
+val get_sections_hash : asmprogram -> (string, section_ptr) Hashtbl.t
 
 val get_section_startaddr : asmprogram -> string -> address_t
 val get_section_endaddr : asmprogram -> string -> address_t

@@ -67,6 +67,9 @@ let exp_false = Int(0L, reg_1)
 (** True constant. *)
 let exp_true = Int(1L, reg_1)
 
+let little_endian = exp_false
+let big_endian = exp_true
+
 (** More convenience functions for building common expressions. *)
 let exp_and e1 e2 = BinOp(AND, e1, e2)
 let exp_or e1 e2 = BinOp(OR, e1, e2)

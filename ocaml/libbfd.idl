@@ -1,0 +1,133 @@
+
+#include "../libasmir/config.h"
+#if SIZEOF_BFD_VMA == 4
+typedef [int64] unsigned long address_t;
+#else
+typedef  unsigned long long int address_t; 
+#endif
+
+// From bfd.h
+enum bfd_architecture
+{
+  bfd_arch_unknown,   /* File arch not known.  */
+  bfd_arch_obscure,   /* Arch known, not one of these.  */
+  bfd_arch_m68k,      /* Motorola 68xxx */
+  bfd_arch_vax,       /* DEC Vax */
+  bfd_arch_i960,      /* Intel 960 */
+  bfd_arch_or32,      /* OpenRISC 32 */
+  bfd_arch_sparc,     /* SPARC */
+  bfd_arch_spu,       /* PowerPC SPU */
+  bfd_arch_mips,      /* MIPS Rxxxx */
+  bfd_arch_i386,      /* Intel 386 */
+  bfd_arch_we32k,     /* AT&T WE32xxx */
+  bfd_arch_tahoe,     /* CCI/Harris Tahoe */
+  bfd_arch_i860,      /* Intel 860 */
+  bfd_arch_i370,      /* IBM 360/370 Mainframes */
+  bfd_arch_romp,      /* IBM ROMP PC/RT */
+  bfd_arch_convex,    /* Convex */
+  bfd_arch_m88k,      /* Motorola 88xxx */
+  bfd_arch_m98k,      /* Motorola 98xxx */
+  bfd_arch_pyramid,   /* Pyramid Technology */
+  bfd_arch_h8300,     /* Renesas H8/300 (formerly Hitachi H8/300) */
+  bfd_arch_pdp11,     /* DEC PDP-11 */
+  bfd_arch_powerpc,   /* PowerPC */
+  bfd_arch_rs6000,    /* IBM RS/6000 */
+  bfd_arch_hppa,      /* HP PA RISC */
+  bfd_arch_d10v,      /* Mitsubishi D10V */
+  bfd_arch_d30v,      /* Mitsubishi D30V */
+  bfd_arch_dlx,       /* DLX */
+  bfd_arch_m68hc11,   /* Motorola 68HC11 */
+  bfd_arch_m68hc12,   /* Motorola 68HC12 */
+  bfd_arch_z8k,       /* Zilog Z8000 */
+  bfd_arch_h8500,     /* Renesas H8/500 (formerly Hitachi H8/500) */
+  bfd_arch_sh,        /* Renesas / SuperH SH (formerly Hitachi SH) */
+  bfd_arch_alpha,     /* Dec Alpha */
+  bfd_arch_arm,       /* Advanced Risc Machines ARM.  */
+  bfd_arch_ns32k,     /* National Semiconductors ns32000 */
+  bfd_arch_w65,       /* WDC 65816 */
+  bfd_arch_tic30,     /* Texas Instruments TMS320C30 */
+  bfd_arch_tic4x,     /* Texas Instruments TMS320C3X/4X */
+  bfd_arch_tic54x,    /* Texas Instruments TMS320C54X */
+  bfd_arch_tic80,     /* TI TMS320c80 (MVP) */
+  bfd_arch_v850,      /* NEC V850 */
+  bfd_arch_arc,       /* ARC Cores */
+  bfd_arch_m32c,     /* Renesas M16C/M32C.  */
+  bfd_arch_m32r,      /* Renesas M32R (formerly Mitsubishi M32R/D) */
+  bfd_arch_mn10200,   /* Matsushita MN10200 */
+  bfd_arch_mn10300,   /* Matsushita MN10300 */
+  bfd_arch_fr30,
+  bfd_arch_frv,
+  bfd_arch_mcore,
+  bfd_arch_mep,
+  bfd_arch_ia64,      /* HP/Intel ia64 */
+  bfd_arch_ip2k,      /* Ubicom IP2K microcontrollers. */
+  bfd_arch_iq2000,     /* Vitesse IQ2000.  */
+  bfd_arch_mt,
+  bfd_arch_pj,
+  bfd_arch_avr,       /* Atmel AVR microcontrollers.  */
+  bfd_arch_bfin,        /* ADI Blackfin */
+  bfd_arch_cr16,       /* National Semiconductor CompactRISC (ie CR16). */
+  bfd_arch_cr16c,       /* National Semiconductor CompactRISC. */
+  bfd_arch_crx,       /*  National Semiconductor CRX.  */
+  bfd_arch_cris,      /* Axis CRIS */
+  bfd_arch_s390,      /* IBM s390 */
+  bfd_arch_score,     /* Sunplus score */ 
+  bfd_arch_openrisc,  /* OpenRISC */
+  bfd_arch_mmix,      /* Donald Knuth's educational processor.  */
+  bfd_arch_xstormy16,
+  bfd_arch_msp430,    /* Texas Instruments MSP430 architecture.  */
+  bfd_arch_xc16x,     /* Infineon's XC16X Series.               */
+  bfd_arch_xtensa,    /* Tensilica's Xtensa cores.  */
+  bfd_arch_maxq,     /* Dallas MAXQ 10/20 */
+  bfd_arch_z80,
+  bfd_arch_last
+};
+
+struct bfd;
+
+typedef [abstract] struct bfd* bfdp;
+
+struct bfd_section {
+  [string] const char *name;
+  int id;
+  int index;
+  [ignore] struct bfd_section *next, *prev;
+  int flags;
+  int bitfields;
+  address_t vma;
+  address_t lma;
+  address_t size, rawsize;
+  // more stuff we don't care about
+};
+
+
+
+struct bfd_symbol {
+  [ignore] bfdp the_bfd;
+  [string] const char *name;
+  __int64 value;
+  int flags;
+  [ref] struct bfd_section *section;
+  // more stuff, but we don't care
+};
+
+typedef [ref] struct bfd_symbol *asymbol;
+
+typedef struct bfd_section *asection;
+
+
+
+typedef [ref] struct bfd_section *section_ptr;
+
+
+
+asection bfd_sections( bfdp abfd);
+asection bfd_next_section( asection *s);
+
+typedef int bfd_boolean;
+typedef long file_ptr;
+typedef unsigned long bfd_size_type;
+
+bfd_boolean bfd_get_section_contents
+(bfdp abfd, asection *section, [out, length_is(count)] char location[], file_ptr offset,
+ bfd_size_type count);

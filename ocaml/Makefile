@@ -35,7 +35,10 @@ export SOURCES = \
 	sccvn.mli sccvn.ml \
 	deadcode.mli deadcode.ml \
 	ssa_simp.ml \
+	libbfd.idl \
 	libasmir.idl \
+	disasm_i386.ml \
+	disasm.ml \
 	asmirconsts.ml asmir.mli asmir.ml \
 	grammar.mly lexer.mll \
 	parser.ml \

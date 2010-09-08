@@ -20,6 +20,7 @@ libasmir_a_SOURCES = \
 	irtoir-arm.cpp \
 	vexir.c \
 	vexmem.c \
+	ocaml_helpers.c \
 	./traces/readtrace.cpp \
 	./traces/trace.cpp \
 	./traces/trace_v40.cpp \

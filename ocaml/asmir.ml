@@ -7,6 +7,7 @@
     @author Ivan Jager
 *)
 
+open Libbfd
 open Libasmir
 open Asmirconsts
 open Type
@@ -15,12 +16,12 @@ open Util
 
 exception Disassembly_error;;
 
-type asmprogram = Libasmir.asm_program_t
+type asmprogram = Libasmir.asm_program_t (* will add more bits here *)
 
-type arch = Libasmir.bfd_architecture
+type arch = Libbfd.bfd_architecture
 
-let arch_i386 = Libasmir.Bfd_arch_i386
-let arch_arm  = Libasmir.Bfd_arch_arm
+let arch_i386 = Bfd_arch_i386
+let arch_arm  = Bfd_arch_arm
 (*more to come later when we support them*)
 
 module D = Debug.Make(struct let name = "ASMIR" and default=`Debug end)
@@ -62,9 +63,6 @@ let gamma_extend = Hashtbl.add
 
 
 let gamma_unextend = Hashtbl.remove
-
-(* This should really be elsewhere... *)
-let little_endian = Int(0L, reg_1)
 
 (* Translate a string label into a name or address label as approriate *)
 let tr_label s =
@@ -290,61 +288,8 @@ let tr_bap_blocks_t_no_asm g bs =
   let size = Libasmir.asmir_bap_blocks_size bs -1 in
     foldn (fun i n -> tr_bap_block_t_no_asm g (asmir_bap_blocks_get bs n)@i) [] size
 
-let x86_regs : var list =
-  List.map (fun (n,t) -> Var.newvar n t)
-    [
-  (* 32 bit regs *)
-  ("R_EBP", reg_32);
-  ("R_ESP", reg_32);
-  ("R_ESI", reg_32);
-  ("R_EDI", reg_32);
-  ("R_EIP", reg_32);
-  ("R_EAX", reg_32);
-  ("R_EBX", reg_32);
-  ("R_ECX", reg_32);
-  ("R_EDX", reg_32);
-  ("EFLAGS", reg_32);
-
-  (* condition flag bits *)
-  ("R_CF", reg_1);
-  ("R_PF", reg_1);
-  ("R_AF", reg_1);
-  ("R_ZF", reg_1);
-  ("R_SF", reg_1);
-  ("R_OF", reg_1);
-
-  (* VEX left-overs from calc'ing condition flags *)
-  ("R_CC_OP", reg_32);
-  ("R_CC_DEP1", reg_32);
-  ("R_CC_DEP2", reg_32);
-  ("R_CC_NDEP", reg_32);
-
-  (* more status flags *)
-  ("R_DFLAG", reg_32);
-  ("R_IDFLAG", reg_32);
-  ("R_ACFLAG", reg_32);
-  ("R_EMWARN", reg_32);
-  ("R_LDT", reg_32); 
-  ("R_GDT", reg_32); 
-
-  (* segment regs *)
-  ("R_CS", reg_16); 
-  ("R_DS", reg_16); 
-  ("R_ES", reg_16); 
-  ("R_FS", reg_16); 
-  ("R_GS", reg_16); 
-  ("R_SS", reg_16); 
-
-  (* floating point *)
-  ("R_FTOP", reg_32);
-  ("R_FPROUND", reg_32);
-  ("R_FC3210", reg_32);
-]
-
-
-(* exectrace needs fixing if this is reg_64 *)
-let x86_mem = Var.newvar "mem" (TMem(reg_32))
-
+let x86_regs = Disasm_i386.regs
+let x86_mem = Disasm_i386.mem
 
 let arm_regs =
   List.map (fun n -> Var.newvar n reg_32)
@@ -393,6 +338,7 @@ let fold_memory_data f md acc =
               a)
       acc size
 
+(* FIXME: use bfd_get_section_contents instead of this crazy memory_data thing *)
 let get_rodata_assignments ?(prepend_to=[]) mem prog =
   let rodata = Libasmir.get_rodata prog in
   fold_memory_data
@@ -426,7 +372,7 @@ let asmprogram_to_bap ?(init_ro=false) asmp =
 
 (** Translate only one address of a  Libasmir.asm_program_t to Vine *)
 let asm_addr_to_bap g prog addr =
-  let block= Libasmir.asmir_addr_to_bap prog addr in
+  let (block, next) = Libasmir.asmir_addr_to_bap prog addr in
   let ir = tr_bap_block_t g prog block in
   destroy_bap_block block;
   ir
