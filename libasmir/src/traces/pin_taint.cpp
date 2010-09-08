@@ -206,13 +206,55 @@ uint32_t TaintTracker::getReadTaint()
 /******** Taint Introduction **********/
 
 //
+#ifdef _WIN32
+std::vector<TaintFrame> TaintTracker::taintArgs(char *cmdA, wchar_t *cmdW)
+{
+  std::vector<TaintFrame> frms;
+  if (taint_args) {
+    size_t lenA = strlen(cmdA);
+    size_t lenW = wcslen(cmdW);
+    cerr << "Tainting multibyte command-line arguments: " << (lenA*sizeof(char)) << " bytes @ " << (unsigned int)(cmdA) << endl;
+    
+    /* Taint multibyte command line */
+    for (size_t i = 0; i < lenA; i++) {      
+      for (size_t j = 0; j < sizeof(char); j++) {
+	setTaint(memory, ((uint32_t)(cmdA+i)) + j, source++);
+      }
+    }
+
+    TaintFrame frmA;
+    frmA.id = ARG_ID;
+    frmA.addr = (uint32_t)cmdA;
+    frmA.length = lenA;
+    frms.push_back(frmA);
+
+    cerr << "Tainting wide command-line arguments: " << (lenW*sizeof(wchar_t)) << " bytes @ " << (unsigned int)(cmdW) << endl;
+    /* Taint wide command line... todo */
+    for (size_t i = 0; i < lenW; i++) {      
+      for (size_t j = 0; j < sizeof(wchar_t); j++) {
+	setTaint(memory, ((uint32_t)(cmdA+i)) + j, source++);
+      }
+    }
+
+    TaintFrame frmW;
+    frmW.id = ARG_ID;
+    frmW.addr = (uint32_t)cmdW;
+    frmW.length = lenW;
+    frms.push_back(frmW);
+
+
+  }
+  return frms;
+}
+#else
 std::vector<TaintFrame> TaintTracker::taintArgs(int argc, char **argv)
 {
   std::vector<TaintFrame> frms;
   if (taint_args) {
     cerr << "Tainting command-line arguments" << endl;
     for ( int i = 1 ; i < argc ; i++ ) {
-      uint32_t len = strlen(argv[i]);
+		cerr << "Tainting " << argv[i] << endl;
+      size_t len = strlen(argv[i]);
       for (uint32_t j = 0 ; j < len ; j++) {
 		  setTaint(memory, (uint32_t)(argv[i]+j), source++);
 	  }
@@ -223,8 +265,11 @@ std::vector<TaintFrame> TaintTracker::taintArgs(int argc, char **argv)
       frms.push_back(frm);
     }
   }
+  
+  // XXX: Is this even safe?
   return frms;
 }
+#endif
 
 //
 std::vector<TaintFrame> TaintTracker::taintEnv(char **env)
@@ -235,9 +280,9 @@ std::vector<TaintFrame> TaintTracker::taintEnv(char **env)
     int equal = var.find('=');
     var = var.substr(0,equal);
     if (taint_env.find(var) != taint_env.end()) {
-      cerr << "Tainting environment variable: " << var << endl;
       uint32_t len = strlen(env[i]) - var.size();
       uint32_t addr = (uint32_t)env[i]+equal+1;
+      cerr << "Tainting environment variable: " << var << " @" << (int)addr << endl;
       for (uint32_t j = 0 ; j < len ; j++)
 	setTaint(memory, (addr+j), source++);
       TaintFrame frm;

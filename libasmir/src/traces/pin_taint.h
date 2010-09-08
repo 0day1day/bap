@@ -114,7 +114,11 @@ namespace pintrace { // We will use namespace to avoid collision
                             uint32_t &addr,
                             uint32_t &length);
 
+#ifdef _WIN32
+     std::vector<TaintFrame> taintArgs(char *cmdA, wchar_t *cmdW);
+#else
      std::vector<TaintFrame> taintArgs(int args, char **argv);
+#endif
 
      std::vector<TaintFrame> taintEnv(char **env);
 
