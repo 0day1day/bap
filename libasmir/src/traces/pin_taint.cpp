@@ -28,6 +28,25 @@ const int UNIX_SUCCESS = 0;
 using namespace std;
 using namespace pintrace;
 
+/**************** Helper **********************/
+
+/** Convert a wide string to a narrow one
+ */
+auto_ptr<string> GetNarrowOfWide(wchar_t *in) {
+  /* Our output */
+  //  string *out = new string;
+  auto_ptr<string> out (new string);
+
+  for (int i = 0; i < wcslen(in); i++) {
+    const ctype<wchar_t> &ct = use_facet<ctype<wchar_t> > (std::locale(""));
+    out->push_back(
+		   use_facet<ctype<wchar_t> >(std::locale("")).narrow(in[i])
+		   );
+  }
+
+  return out;
+}
+
 /**************** Initializers ****************/
 
 //
@@ -272,6 +291,68 @@ std::vector<TaintFrame> TaintTracker::taintArgs(int argc, char **argv)
 #endif
 
 //
+#ifdef _WIN32
+std::vector<TaintFrame> TaintTracker::taintEnv(char *env, wchar_t *wenv)
+{
+  /* See MSDN docs here: http://msdn.microsoft.com/en-us/library/ms683187(VS.85).aspx 
+   * Basically, env is a pointer to
+   * var=val\x00
+   * var2=val2\x00
+   * ...
+   * \x00\x00
+   */
+  std::vector<TaintFrame> frms;
+
+  // /* Multibyte strings */
+  // for ( ; *env != '\x00'; env += (strlen(env) + 1 /* null */)) {
+  //   string var(env);
+  //   int equal = var.find('=');
+  //   var = var.substr(0, equal);
+  //   if (taint_env.find(var) != taint_env.end()) {
+  //     uint32_t len = strlen(env) - var.size();
+  //     uint32_t addr = (uint32_t)env+equal+1;
+  //     cerr << "Tainting environment variable: " << var << " @" << (int)addr << " " << len << " bytes" << endl;
+  //     for (uint32_t j = 0 ; j < len ; j++) {
+  // 	setTaint(memory, (addr+j), source++);
+  //     }
+  //     TaintFrame frm;
+  //     frm.id = ENV_ID;
+  //     frm.addr = addr;
+  //     frm.length = len;
+  //     frms.push_back(frm);
+  //   }
+  // }
+
+  /* Wide strings */
+  if (wenv) {
+    for ( ; *wenv != '\x00'; wenv += (wcslen(wenv) + 1 /* null */)) {
+      string ns = *GetNarrowOfWide(wenv);
+      wstring wvar(wenv);
+      string var(ns);
+      int equal = var.find('=');
+      var = var.substr(0, equal);
+      
+      if (taint_env.find(var) != taint_env.end()) {
+        uint32_t numChars = wcslen(wenv) - var.size();
+	uint32_t numBytes = numChars * sizeof(wchar_t);
+        uint32_t addr = (uint32_t) (wenv+equal+1);
+        cerr << "Tainting environment variable: " << var << " @" << (int)addr << " " << numChars << " bytes" << endl;
+        for (uint32_t j = 0 ; j < numBytes ; j++) {
+	  setTaint(memory, (addr+j), source++);
+        }
+        TaintFrame frm;
+        frm.id = ENV_ID;
+        frm.addr = addr;
+        frm.length = numBytes;
+        frms.push_back(frm);
+      }
+    }
+  }
+
+
+  return frms;
+}
+#else /* unix */
 std::vector<TaintFrame> TaintTracker::taintEnv(char **env)
 {
   std::vector<TaintFrame> frms;
@@ -294,6 +375,7 @@ std::vector<TaintFrame> TaintTracker::taintEnv(char **env)
   }
   return frms;
 }
+#endif
 
 /** This function is called right before a system call. */
 bool TaintTracker::taintStart(uint32_t callno, uint32_t * args)

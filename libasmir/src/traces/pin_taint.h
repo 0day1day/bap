@@ -120,7 +120,11 @@ namespace pintrace { // We will use namespace to avoid collision
      std::vector<TaintFrame> taintArgs(int args, char **argv);
 #endif
 
+#ifdef _WIN32
+     std::vector<TaintFrame> taintEnv(char *env, wchar_t *wenv);
+#else
      std::vector<TaintFrame> taintEnv(char **env);
+#endif
 
      // A function to propagate taint
      void taintPropagation();
