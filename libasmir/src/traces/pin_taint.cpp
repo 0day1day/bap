@@ -232,33 +232,30 @@ std::vector<TaintFrame> TaintTracker::taintArgs(char *cmdA, wchar_t *cmdW)
   if (taint_args) {
     size_t lenA = strlen(cmdA);
     size_t lenW = wcslen(cmdW);
-    cerr << "Tainting multibyte command-line arguments: " << (lenA*sizeof(char)) << " bytes @ " << (unsigned int)(cmdA) << endl;
+    size_t bytesA = lenA*sizeof(char);
+    size_t bytesW = lenW*sizeof(wchar_t);
+    cerr << "Tainting multibyte command-line arguments: " << bytesA << " bytes @ " << (unsigned int)(cmdA) << endl;
     
     /* Taint multibyte command line */
-    for (size_t i = 0; i < lenA; i++) {      
-      for (size_t j = 0; j < sizeof(char); j++) {
-	setTaint(memory, ((uint32_t)(cmdA+i)) + j, source++);
-      }
+    for (size_t i = 0; i < bytesA; i++) {      
+      setTaint(memory, (uint32_t)(cmdA)+i, source++);
     }
 
     TaintFrame frmA;
     frmA.id = ARG_ID;
     frmA.addr = (uint32_t)cmdA;
-    frmA.length = lenA;
+    frmA.length = bytesA;
     frms.push_back(frmA);
 
-    cerr << "Tainting wide command-line arguments: " << (lenW*sizeof(wchar_t)) << " bytes @ " << (unsigned int)(cmdW) << endl;
-    /* Taint wide command line... todo */
-    for (size_t i = 0; i < lenW; i++) {      
-      for (size_t j = 0; j < sizeof(wchar_t); j++) {
-	setTaint(memory, ((uint32_t)(cmdA+i)) + j, source++);
-      }
+    cerr << "Tainting wide command-line arguments: " << bytesW << " bytes @ " << (unsigned int)(cmdW) << endl;
+    for (size_t i = 0; i < bytesW; i++) {      
+      setTaint(memory, (uint32_t)(cmdW)+i, source++);      
     }
 
     TaintFrame frmW;
     frmW.id = ARG_ID;
     frmW.addr = (uint32_t)cmdW;
-    frmW.length = lenW;
+    frmW.length = bytesW;
     frms.push_back(frmW);
 
 
