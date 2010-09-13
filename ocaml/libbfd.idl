@@ -87,7 +87,7 @@ struct bfd;
 
 typedef [abstract] struct bfd* bfdp;
 
-struct bfd_section {
+struct bfd_section /*{
   [string] const char *name;
   int id;
   int index;
@@ -98,36 +98,40 @@ struct bfd_section {
   address_t lma;
   address_t size, rawsize;
   // more stuff we don't care about
+  }*/;
+typedef [abstract,ref] struct bfd_section *section_ptr;
+
+struct notreally {
+  [string] const char * name;
 };
 
-
-
 struct bfd_symbol {
-  [ignore] bfdp the_bfd;
+  /*[ignore]*/ bfdp the_bfd;
   [string] const char *name;
   __int64 value;
   int flags;
-  [ref] struct bfd_section *section;
+  section_ptr section;
   // more stuff, but we don't care
 };
 
 typedef [ref] struct bfd_symbol *asymbol;
 
+
+/*
 typedef struct bfd_section *asection;
-
-
-
-typedef [ref] struct bfd_section *section_ptr;
-
-
-
 asection bfd_sections( bfdp abfd);
 asection bfd_next_section( asection *s);
+*/
 
 typedef int bfd_boolean;
 typedef long file_ptr;
-typedef unsigned long bfd_size_type;
+typedef [int64] unsigned long bfd_size_type;
 
 bfd_boolean bfd_get_section_contents
-(bfdp abfd, asection *section, [out, length_is(count)] char location[], file_ptr offset,
+(bfdp abfd, section_ptr section, [out, length_is(count)] char location[], file_ptr offset,
  bfd_size_type count);
+
+address_t bfd_section_get_vma(section_ptr s);
+bfd_size_type bfd_section_get_size(section_ptr s);
+
+[string] const char* bfd_section_get_name(section_ptr s);

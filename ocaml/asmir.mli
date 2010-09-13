@@ -58,7 +58,7 @@ val get_asmprogram_arch : asmprogram -> arch
 val open_program : string -> asmprogram
 val asmprogram_to_bap : ?init_ro:bool -> asmprogram -> Ast.program
 val asm_addr_to_bap :
-  varctx -> asmprogram -> address_t -> Ast.program
+  (*varctx ->*) asmprogram -> address_t -> Ast.program * address_t
 
 val asmprogram_to_bap_range : ?init_ro:bool ->
   asmprogram -> address_t -> address_t  -> Ast.program
@@ -70,10 +70,11 @@ val get_function_ranges : asmprogram -> (string * address_t * address_t) list
 val get_symbols_hash : ?all:bool -> asmprogram -> (string, asymbol) Hashtbl.t
 
 val find_symbol_address : (string, asymbol) Hashtbl.t -> string -> int64
-
+(*
 val get_all_sections : asmprogram -> section_ptr array
 val get_sections_hash : asmprogram -> (string, section_ptr) Hashtbl.t
 
 val get_section_startaddr : asmprogram -> string -> address_t
 val get_section_endaddr : asmprogram -> string -> address_t
 val get_asm_instr_string_range : asmprogram -> address_t -> address_t -> string
+*)

@@ -16,9 +16,9 @@ open Util
 
 exception Disassembly_error;;
 
-type asmprogram = Libasmir.asm_program_t (* will add more bits here *)
-
 type arch = Libbfd.bfd_architecture
+type asmprogram = {asmp:Libasmir.asm_program_t; arch : arch; get : int64 -> char }
+
 
 let arch_i386 = Bfd_arch_i386
 let arch_arm  = Bfd_arch_arm
@@ -326,7 +326,7 @@ let gamma_for_arch = function
   | _ -> failwith "gamma_for_arch: unsupported arch"
 
 
-let get_asmprogram_arch = Libasmir.asmir_get_asmp_arch
+let get_asmprogram_arch {arch=arch}= arch
 
 let fold_memory_data f md acc =
   let size = Libasmir.memory_data_size md - 1 in
@@ -339,7 +339,7 @@ let fold_memory_data f md acc =
       acc size
 
 (* FIXME: use bfd_get_section_contents instead of this crazy memory_data thing *)
-let get_rodata_assignments ?(prepend_to=[]) mem prog =
+let get_rodata_assignments ?(prepend_to=[]) mem {asmp=prog} =
   let rodata = Libasmir.get_rodata prog in
   fold_memory_data
     (fun a v acc -> 
@@ -348,45 +348,84 @@ let get_rodata_assignments ?(prepend_to=[]) mem prog =
         Move(mem, Store(Var mem, m_addr, m_val, little_endian, Reg 8), [InitRO]) :: acc)
     rodata prepend_to
 
+let get_all_sections p =
+  let arr,err = Libasmir.asmir_get_all_sections p in
+  if err <= 0 then failwith "get_all_sections";
+  arr
+
+let bfd_section_size = Libbfd.bfd_section_get_size
+let bfd_section_vma = Libbfd.bfd_section_get_vma
+let bfd_section_name = Libbfd.bfd_section_get_name
+
+let section_contents prog =
+  let secs = get_all_sections prog  in
+  let bfd = Libasmir.asmir_get_bfd prog in
+  let sc l s =
+    let size = bfd_section_size s and vma = bfd_section_vma s in
+    dprintf "Reading section at %Lx with size %Ld" vma size;
+    (* FIXME: we proabbly need to make sure to pass the original section and not
+       a reconstructed one... *)
+    let (ok, a) = Libbfd.bfd_get_section_contents bfd s 0 size in
+    if ok <> 0 then (vma, a)::l else l
+  in
+  let bits = Array.fold_left sc [] secs in
+  let get a =
+    (* let open Int64 in *)
+    let (-) = Int64.sub and (+) = Int64.add in
+    let rec f a = function [] -> raise Not_found
+      | (s,arr)::_ when a - s >= 0L && a - s < s + Int64.of_int(Array.length arr)  ->
+	arr.(Int64.to_int(a-s))
+      | _::b -> f a b
+    in
+    f a bits
+  in
+  get
+
+
 (** Open a binary file for translation *)
 let open_program filename =
   let prog = Libasmir.asmir_open_file filename in
     (* tell the GC how to free resources associated with prog *)
   Gc.finalise Libasmir.asmir_close prog;
-  prog
+  let get = section_contents prog in
+
+  {asmp=prog; arch=Libasmir.asmir_get_asmp_arch prog; get=get}
 
 (** Translate an entire Libasmir.asm_program_t into a Vine program *)
-let asmprogram_to_bap ?(init_ro=false) asmp = 
+let asmprogram_to_bap ?(init_ro=false) ({asmp=asmp;arch=arch} as prog) = 
   let bap_blocks = Libasmir.asmir_asmprogram_to_bap asmp in
-  let arch = get_asmprogram_arch asmp in
   let g = gamma_for_arch arch in
   let ir = tr_bap_blocks_t g asmp bap_blocks in
   destroy_bap_blocks bap_blocks;
   if init_ro then
     let m = gamma_lookup g "$mem" in
-    get_rodata_assignments ~prepend_to:ir m asmp
+    get_rodata_assignments ~prepend_to:ir m prog
   else ir
 
 
 
 
 (** Translate only one address of a  Libasmir.asm_program_t to Vine *)
-let asm_addr_to_bap g prog addr =
-  let (block, next) = Libasmir.asmir_addr_to_bap prog addr in
-  let ir = tr_bap_block_t g prog block in
-  destroy_bap_block block;
-  ir
-
-
-let asmprogram_to_bap_range ?(init_ro = false) asmp st en=
-  let bap_blocks = Libasmir.asmir_asmprogram_range_to_bap asmp st en in
-  if Libasmir.asmir_bap_blocks_error bap_blocks = true then
-    raise Disassembly_error;
-  let arch = get_asmprogram_arch asmp in
+let asm_addr_to_bap {asmp=prog; arch=arch; get=get} addr =
   let g = gamma_for_arch arch in
-  let ir = tr_bap_blocks_t g asmp bap_blocks in
-  destroy_bap_blocks bap_blocks;
-  ir
+  try Disasm.disasm_instr arch get addr
+  with Disasm.Unimplemented | Failure _ ->
+    dprintf "Dissasembling %Lx through VEX" addr;
+    let (block, next) = Libasmir.asmir_addr_to_bap prog addr in
+    let ir = tr_bap_block_t g prog block in
+    destroy_bap_block block;
+    (ir, next)
+
+
+let asmprogram_to_bap_range ?(init_ro = false) p st en =
+  let rec f l s =
+    let (ir, n) = asm_addr_to_bap p s in
+    if n >= en then List.flatten (List.rev (ir::l))
+    else f (ir::l) n
+  in
+  f [] st
+
+
 
 let bap_from_trace_file ?(atts = true) filename = 
   let bap_blocks = Libasmir.asmir_bap_from_trace_file filename atts in
@@ -397,7 +436,7 @@ let bap_from_trace_file ?(atts = true) filename =
 
 
 (* internal only *)
-let get_symbols ?(all=false) p =
+let get_symbols ?(all=false) {asmp=p} =
   let f = if all then asmir_get_all_symbols else asmir_get_symbols in
   let (arr,err) = f p in
   if err <= 0 then failwith "get_symbols";
@@ -412,23 +451,19 @@ let get_symbols_hash ?(all=false) p =
     ) syms;
   h
 
-let get_all_sections p =
-  let arr,err = Libasmir.asmir_get_all_sections p in
-  if err <= 0 then failwith "get_all_sections";
-  arr
 
 let get_sections_hash p =
   let secs = get_all_sections p in
   let h = Hashtbl.create 100 in
   Array.iter
     (fun sec ->
-       Hashtbl.add h sec.bfd_section_name sec
+       Hashtbl.add h (bfd_section_name sec) sec
     ) secs;
   h
 
 let find_symbol_address h name =
   let sym = Hashtbl.find h name in
-  let base = sym.bfd_symbol_section.bfd_section_vma in
+  let base = bfd_section_vma sym.bfd_symbol_section in
   let off = sym.bfd_symbol_value in
   Int64.add base off
 
@@ -441,9 +476,11 @@ let get_function_ranges p =
     s.bfd_symbol_flags land bsf_function <> 0
   and symb_to_tuple s =
     (* FIXME: section_end doesn't seem to get the right values... *)
-    let section_end sec = Int64.add sec.bfd_section_vma sec.bfd_section_size in
-    (Int64.add s.bfd_symbol_value s.bfd_symbol_section.bfd_section_vma,
-     section_end s.bfd_symbol_section,
+    (* did this fix it? --aij *)
+    let sec = s.bfd_symbol_section in
+    let vma = bfd_section_vma sec in
+    (Int64.add s.bfd_symbol_value vma,
+     Int64.add vma (bfd_section_size sec),
      s.bfd_symbol_name)
   in
   let starts =
@@ -480,6 +517,7 @@ let get_function_ranges p =
 		 | _ -> true)
     unfiltered
 
+(*
 let get_section_startaddr p sectionname =
   Libasmir.asmir_get_sec_startaddr p sectionname
 
@@ -497,3 +535,4 @@ let get_asm_instr_string_range p s e =
     s := Int64.add !s len
   done;
   !str
+*)

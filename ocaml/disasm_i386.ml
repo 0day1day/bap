@@ -140,4 +140,4 @@ let disasm_instr g addr =
   let pref, a = get_prefixes addr in
   let op, a = get_opcode a in
   let ir = opcode2ir pref op in
-  add_labels addr ir
+  (add_labels addr ir, a)
