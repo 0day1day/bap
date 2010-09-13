@@ -353,6 +353,9 @@ let get_all_sections p =
   if err <= 0 then failwith "get_all_sections";
   arr
 
+let get_all_asections p =
+  get_all_sections p.asmp
+
 let bfd_section_size = Libbfd.bfd_section_get_size
 let bfd_section_vma = Libbfd.bfd_section_get_vma
 let bfd_section_name = Libbfd.bfd_section_get_name
@@ -453,7 +456,7 @@ let get_symbols_hash ?(all=false) p =
 
 
 let get_sections_hash p =
-  let secs = get_all_sections p in
+  let secs = get_all_asections p in
   let h = Hashtbl.create 100 in
   Array.iter
     (fun sec ->
@@ -517,22 +520,23 @@ let get_function_ranges p =
 		 | _ -> true)
     unfiltered
 
-(*
+
 let get_section_startaddr p sectionname =
-  Libasmir.asmir_get_sec_startaddr p sectionname
+  Libasmir.asmir_get_sec_startaddr p.asmp sectionname
 
 let get_section_endaddr p sectionname =
-  Libasmir.asmir_get_sec_endaddr p sectionname
+  Libasmir.asmir_get_sec_endaddr p.asmp sectionname
+
 
 let get_asm_instr_string_range p s e =
   let s = ref s in
   let str = ref "" in
   while !s < e do
 
-    str := !str ^ "; " ^ (Libasmir.asmir_string_of_insn p !s);
+    str := !str ^ "; " ^ (Libasmir.asmir_string_of_insn p.asmp !s);
     
-    let len = Int64.of_int (Libasmir.asmir_get_instr_length p !s) in
+    let len = Int64.of_int (Libasmir.asmir_get_instr_length p.asmp !s) in
     s := Int64.add !s len
   done;
   !str
-*)
+

@@ -462,3 +462,8 @@ let list_delete l e =
     | x::xs -> delete_aux (x::acc) xs
   in
     delete_aux [] l
+
+(** Some -> true, None -> false *)
+let has_some = function
+  | Some _ -> true
+  | None _ -> false
