@@ -44,7 +44,7 @@ type operand =
 type opcode =
   | Retn
   | Mov of operand * operand (* dst, src *)
-
+  | Call of operand * int64 (* Oimm is relative, int64 is RA *)
 
 let unimplemented s  = failwith ("disasm_i386: unimplemented feature: "^s)
 
@@ -123,6 +123,7 @@ let load t a =
   Load(e_mem, a, little_endian, t)
 
 let (+*) a b = BinOp(PLUS, a, b)
+let (-*) a b = BinOp(MINUS, a, b)
 let (<<*) a b = BinOp(LSHIFT, a, b)
 let (>>*) a b = BinOp(RSHIFT, a, b)
 let (>>>*) a b = BinOp(ARSHIFT, a, b)
@@ -149,6 +150,9 @@ let assn t v e =
   | Oaddr a -> store t a e
   | Oimm _ -> failwith "disasm_i386: Can't assign to an immediate value"
 
+let reta = [StrAttr "ret"]
+and calla = [StrAttr "call"]
+
 let to_ir pref = function
   | Retn when pref = [] ->
     let t = Var.newvar "ra" r32 in
@@ -158,6 +162,11 @@ let to_ir pref = function
     ]
   | Mov(dst,src) when pref = [] ->
     [assn r32 dst (op2e r32 src)] (* FIXME: r32 *)
+  | Call(Oimm i, ra) when pref = [] ->
+    [move esp (e_esp -* i32 4);
+     store r32 e_esp (l32 ra);
+     Jmp(l32(Int64.add i ra), calla)]
+    
   | _ -> unimplemented "to_ir"
 
 let add_labels a ir =
@@ -232,11 +241,13 @@ let disasm_instr g addr =
       if ss = 0 then (base +* idx, na)
       else (base +* (idx <<* i32 ss), na)
   in
-  let parse_modrm32 a =
+  let parse_modrm32ext a =
     (* ISR 2.1.5 Table 2-2 *)
-    let b = Char.code (g a) in
-    let r = bits2reg32 ((b>>3) & 7) in
-    let m = b >> 6 and rm = b & 7 in
+    let b = Char.code (g a)
+    and na = s a in
+    let r = (b>>3) & 7
+    and m = b >> 6
+    and rm = b & 7 in
     match m with (* MOD *)
     | 0 -> (match rm with
       | 4 -> let (sib, na) = parse_sib m (s a) in (r, Oaddr sib, na)
@@ -244,23 +255,37 @@ let disasm_instr g addr =
       | n -> (r, Oaddr(bits2reg32e n), s a)
     )
     | 1 | 2 ->
-      let (base, na) = if 4 = rm then parse_sib m (s a) else (bits2reg32e rm, a) in
+      let (base, na) = if 4 = rm then parse_sib m na else (bits2reg32e rm, na) in
       let (disp, na) = if m = 1 then parse_disp8 na else (*2*) parse_disp32 na in
       (r, Oaddr(base +* l32 disp), na)
     | 3 -> (r, Oreg(bits2reg32 rm), s a)
     | _ -> failwith "Impossible"
   in
-  let get_opcode a = match Char.code (g a) with
-    | 0xc3 -> (Retn, s a)
+  let parse_modrm32 a =
+    let (r, rm, na) = parse_modrm32ext a in
+    (bits2reg32 r, rm, na)
+  in
+
+  let get_opcode a =
+    let b1 = Char.code (g a)
+    and na = s a in
+    match b1 with
+    | 0xc3 -> (Retn, na)
       (* FIXME: operand widths *)
-    | 0x89 -> let (r, rm, n) = parse_modrm32 (s a) in
-	      (Mov(rm, Oreg r), n)
-    | 0x8b -> let (r, rm, n) = parse_modrm32 (s a) in
-	      (Mov(Oreg r, rm), n)
-    | 0xc7 -> let (_, rm, n) = parse_modrm32 (s a) in
-	      let (i,n) = parse_disp32 n in
-	      dprintf "c7 read imm %Lx ending at %Lx" i n;
-	      (Mov(rm, Oimm i), n)
+    | 0x89 -> let (r, rm, na) = parse_modrm32 na in
+	      (Mov(rm, Oreg r), na)
+    | 0x8b -> let (r, rm, na) = parse_modrm32 na in
+	      (Mov(Oreg r, rm), na)
+    | 0xc7 -> let (_, rm, na) = parse_modrm32 na in
+	      let (i,na) = parse_disp32 na in
+	      dprintf "c7 read imm %Lx ending at %Lx" i na;
+	      (Mov(rm, Oimm i), na)
+    | 0xe8 -> let (i,na) = parse_disp32 na in
+	      (Call(Oimm i, na), na)
+    | 0xff -> let (r, rm, na) = parse_modrm32ext na in
+	      (match r with
+	      | _ -> unimplemented (Printf.sprintf "unsupported opcode: ff/%d" r)
+	      )
     | n -> unimplemented (Printf.sprintf "unsupported opcode: %x" n)
 
   in
