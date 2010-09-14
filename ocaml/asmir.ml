@@ -411,8 +411,9 @@ let asmprogram_to_bap ?(init_ro=false) ({asmp=asmp;arch=arch} as prog) =
 (** Translate only one address of a  Libasmir.asm_program_t to Vine *)
 let asm_addr_to_bap {asmp=prog; arch=arch; get=get} addr =
   let g = gamma_for_arch arch in
-  try Disasm.disasm_instr arch get addr
-  with Disasm.Unimplemented | Failure _ ->
+  try try Disasm.disasm_instr arch get addr
+    with Failure s -> dprintf "disasm_instr %Lx: %s" addr s; raise Disasm.Unimplemented
+  with Disasm.Unimplemented ->
     dprintf "Dissasembling %Lx through VEX" addr;
     let (block, next) = Libasmir.asmir_addr_to_bap prog addr in
     let ir = tr_bap_block_t g prog block in
