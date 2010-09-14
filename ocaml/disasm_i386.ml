@@ -234,7 +234,7 @@ let disasm_instr g addr =
     match m with (* MOD *)
     | 0 -> (match rm with
       | 4 -> let (sib, na) = parse_sib m (s a) in (r, Oaddr sib, na)
-      | 5 -> unimplemented"parse_modrm32 0" (*parse_disp32 (s a)*)
+      | 5 -> let (disp, na) = parse_disp32 (s a) in (r, Oaddr(l32 disp), na)
       | n -> (r, Oaddr(bits2reg32e n), s a)
     )
     | 1 | 2 ->
@@ -246,11 +246,11 @@ let disasm_instr g addr =
   in
   let get_opcode a = match Char.code (g a) with
     | 0xc3 -> (Retn, s a)
-    | 0x88 -> let (r, rm, n) = parse_modrm32 (s a) in
-	      (Mov(Oreg r, rm), n)
     | 0x89 -> let (r, rm, n) = parse_modrm32 (s a) in
 	      (Mov(rm, Oreg r), n)
-    | _ -> unimplemented"unsupported opcode"
+    | 0x8b -> let (r, rm, n) = parse_modrm32 (s a) in
+	      (Mov(Oreg r, rm), n)
+    | n -> unimplemented (Printf.sprintf "unsupported opcode: %x" n)
 
   in
   let pref, a = get_prefixes addr in
