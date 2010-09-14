@@ -2,6 +2,9 @@ open Int64
 open Ast
 open Type
 
+module D = Debug.Make(struct let name = "Disasm_i386" and default=`Debug end)
+open D
+
 (* To help understand this file, please refer to the
    Intel Instruction Set Reference. For consistency, any section numbers
    here are wrt Order Number: 253666-035US June 2010 and 253667-035US.
@@ -36,6 +39,7 @@ type prefix =
 type operand =
   | Oreg of Var.t
   | Oaddr of Ast.exp
+  | Oimm of int64
 
 type opcode =
   | Retn
@@ -137,11 +141,13 @@ let store t a e =
 let op2e t = function
   | Oreg r -> Var r
   | Oaddr e -> load t e
+  | Oimm i -> Int(i, t)
 
 let assn t v e =
   match v with
   | Oreg r -> move r e
   | Oaddr a -> store t a e
+  | Oimm _ -> failwith "disasm_i386: Can't assign to an immediate value"
 
 let to_ir pref = function
   | Retn when pref = [] ->
@@ -207,11 +213,11 @@ let disasm_instr g addr =
   let parse_disp8 a =
     (Int64.of_int (Char.code (g a)), s a)
   and parse_disp32 a =
-    let r n = Int64.shift_left (Int64.of_int (Char.code (g (Int64.add a (Int64.of_int n))))) n in
+    let r n = Int64.shift_left (Int64.of_int (Char.code (g (Int64.add a (Int64.of_int n))))) (8*n) in
     let d = r 0 in
-    let d = Int64.logand d (r 1) in
-    let d = Int64.logand d (r 2) in
-    let d = Int64.logand d (r 3) in
+    let d = Int64.logor d (r 1) in
+    let d = Int64.logor d (r 2) in
+    let d = Int64.logor d (r 3) in
     (d, (Int64.add a 4L))
   in
   let parse_sib m a =
@@ -246,10 +252,15 @@ let disasm_instr g addr =
   in
   let get_opcode a = match Char.code (g a) with
     | 0xc3 -> (Retn, s a)
+      (* FIXME: operand widths *)
     | 0x89 -> let (r, rm, n) = parse_modrm32 (s a) in
 	      (Mov(rm, Oreg r), n)
     | 0x8b -> let (r, rm, n) = parse_modrm32 (s a) in
 	      (Mov(Oreg r, rm), n)
+    | 0xc7 -> let (_, rm, n) = parse_modrm32 (s a) in
+	      let (i,n) = parse_disp32 n in
+	      dprintf "c7 read imm %Lx ending at %Lx" i n;
+	      (Mov(rm, Oimm i), n)
     | n -> unimplemented (Printf.sprintf "unsupported opcode: %x" n)
 
   in
