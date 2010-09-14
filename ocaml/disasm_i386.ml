@@ -59,16 +59,16 @@ let ebp = nv "R_EBP" r32
 and esp = nv "R_ESP" r32
 and esi = nv "R_ESI" r32
 and edi = nv "R_EDI" r32
-and eip = nv "R_EIP" r32
+and eip = nv "R_EIP" r32 (* why is eip in here? *)
 and eax = nv "R_EAX" r32
 and ebx = nv "R_EBX" r32
 and ecx = nv "R_ECX" r32
-and edx = nv "R_EdX" r32
+and edx = nv "R_EDX" r32
 and eflags = nv "R_EFLAGS" r32
 
 
 let regs : var list =
-  ebp::esp::esi::edi::eip::eax::ebx::ecx::eflags::
+  ebp::esp::esi::edi::eip::eax::ebx::ecx::edx::eflags::
   List.map (fun (n,t) -> Var.newvar n t)
     [
   (* condition flag bits *)
@@ -123,6 +123,7 @@ let (<<*) a b = BinOp(LSHIFT, a, b)
 let (>>*) a b = BinOp(RSHIFT, a, b)
 let (>>>*) a b = BinOp(ARSHIFT, a, b)
 
+let l32 i = Int(i, r32)
 let i32 i = Int(Int64.of_int i, r32)
 
 
@@ -204,7 +205,14 @@ let disasm_instr g addr =
     f [] a
   in
   let parse_disp8 a =
-    (Char.code (g a), s a)
+    (Int64.of_int (Char.code (g a)), s a)
+  and parse_disp32 a =
+    let r n = Int64.shift_left (Int64.of_int (Char.code (g (Int64.add a (Int64.of_int n))))) n in
+    let d = r 0 in
+    let d = Int64.logand d (r 1) in
+    let d = Int64.logand d (r 2) in
+    let d = Int64.logand d (r 3) in
+    (d, (Int64.add a 4L))
   in
   let parse_sib m a =
     (* ISR 2.1.5 Table 2-3 *)
@@ -229,12 +237,12 @@ let disasm_instr g addr =
       | 5 -> unimplemented"parse_modrm32 0" (*parse_disp32 (s a)*)
       | n -> (r, Oaddr(bits2reg32e n), s a)
     )
-    | 1 ->
+    | 1 | 2 ->
       let (base, na) = if 4 = rm then parse_sib m (s a) else (bits2reg32e rm, a) in
-      let (disp, na) = parse_disp8 na in
-      (r, Oaddr(base +* i32 disp), na)
+      let (disp, na) = if m = 1 then parse_disp8 na else (*2*) parse_disp32 na in
+      (r, Oaddr(base +* l32 disp), na)
     | 3 -> (r, Oreg(bits2reg32 rm), s a)
-    | _ -> unimplemented"parse_modrm32 2"
+    | _ -> failwith "Impossible"
   in
   let get_opcode a = match Char.code (g a) with
     | 0xc3 -> (Retn, s a)
