@@ -64,7 +64,7 @@ and eax = nv "R_EAX" r32
 and ebx = nv "R_EBX" r32
 and ecx = nv "R_ECX" r32
 and edx = nv "R_EDX" r32
-and eflags = nv "R_EFLAGS" r32
+and eflags = nv "EFLAGS" r32
 
 
 let regs : var list =
