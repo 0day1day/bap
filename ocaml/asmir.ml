@@ -368,8 +368,8 @@ let section_contents prog =
     dprintf "Reading section at %Lx with size %Ld" vma size;
     (* FIXME: we proabbly need to make sure to pass the original section and not
        a reconstructed one... *)
-    let (ok, a) = Libbfd.bfd_get_section_contents bfd s 0 size in
-    if ok <> 0 then (vma, a)::l else l
+    let (ok, a) = Libbfd.bfd_get_section_contents bfd s 0L size in
+    if ok <> 0 then (vma, a)::l else (dprintf "failed."; l)
   in
   let bits = Array.fold_left sc [] secs in
   let get a =

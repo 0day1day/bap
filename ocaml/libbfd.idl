@@ -124,8 +124,8 @@ asection bfd_next_section( asection *s);
 */
 
 typedef int bfd_boolean;
-typedef long file_ptr;
-typedef [int64] unsigned long bfd_size_type;
+typedef [int64] long long file_ptr;
+typedef [int64] unsigned long long bfd_size_type;
 
 bfd_boolean bfd_get_section_contents
 (bfdp abfd, section_ptr section, [out, length_is(count)] char location[], file_ptr offset,
