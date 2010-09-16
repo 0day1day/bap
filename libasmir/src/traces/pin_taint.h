@@ -45,7 +45,8 @@ typedef std::map<var,t> context;
 
 /***************** Syscalls ***************/
 // FIXME: use the ones from /usr/include/asm/unistd.h
-     
+
+#define __NR_nosyscall            0     
 #define __NR_read		  3
 #define __NR_open		  5
 #define __NR_close		  6
@@ -106,13 +107,16 @@ namespace pintrace { // We will use namespace to avoid collision
 
      TaintTracker(ValSpecRec *env);
 
-     // A function to introduce taint in the contexts
-     bool taintStart(uint32_t callno, uint32_t * args);
+     /** A function to introduce taint in the contexts. Writes
+	 information to state; this state must be passed to
+	 taintIntro */
+     bool taintStart(uint32_t callno, uint32_t * args, uint32_t &state);
 
-     bool taintIntroduction(uint32_t bytes, 
+     bool taintIntroduction(const uint32_t bytes, 
                             uint32_t * args, 
                             uint32_t &addr,
-                            uint32_t &length);
+                            uint32_t &length,
+			    const uint32_t state);
 
 #ifdef _WIN32
      std::vector<TaintFrame> taintArgs(char *cmdA, wchar_t *cmdW);
@@ -160,10 +164,11 @@ namespace pintrace { // We will use namespace to avoid collision
 
      void printRegs();
 
-   private:
+     void acceptHelper(uint32_t fd);
 
-     // A flag to denote a syscall in progress
-     uint32_t syscall;
+     void recvHelper(uint32_t fd, void *ptr, size_t len);
+
+   private:
 
      // The taint source (producing taint tags)
      uint32_t source;

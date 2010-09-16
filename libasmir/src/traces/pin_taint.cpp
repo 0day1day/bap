@@ -1,5 +1,6 @@
 #include "pin.H"
 #include "pin_taint.h"
+#include "winsyscalls.h"
 #ifndef _WIN32
 #include <unistd.h>
 #endif
@@ -51,8 +52,7 @@ auto_ptr<string> GetNarrowOfWide(wchar_t *in) {
 
 //
 TaintTracker::TaintTracker(ValSpecRec * env) 
-  : syscall(0),
-    source(1),
+  : source(1),
     values(env),
     taint_net(false),
     taint_args(false)
@@ -99,6 +99,25 @@ void TaintTracker::setTaintNetwork()
 }
 
 /**************** Helper Functions ****************/
+
+
+void TaintTracker::acceptHelper(uint32_t fd) {
+  fds.insert(fd);
+}
+
+void TaintTracker::recvHelper(uint32_t fd, void *ptr, size_t len) {
+  uint32_t addr = reinterpret_cast<uint32_t> (ptr);
+
+  if (fds.find(fd) != fds.end()) {
+
+    cerr << "Tainting " << len << " bytes of recv @" << addr << endl;
+
+    for (size_t i = 0; i < len; i++) {
+      setTaint(memory, addr+i, source++);
+    }
+  }
+
+}
 
 //
 bool TaintTracker::isValid(uint32_t type)
@@ -375,13 +394,13 @@ std::vector<TaintFrame> TaintTracker::taintEnv(char **env)
 #endif
 
 /** This function is called right before a system call. */
-bool TaintTracker::taintStart(uint32_t callno, uint32_t * args)
+bool TaintTracker::taintStart(uint32_t callno, uint32_t *args, /* out */ uint32_t &state)
 {
   //cout << "Syscall no: " << callno << endl << "Args:" ;
   //for ( int i = 0 ; i < MAX_SYSCALL_ARGS ; i ++ )
   //  cout << hex << " " << args[i] ;
   //cout << endl ;
-  syscall = 0;
+  state = __NR_nosyscall;
 
   bool reading_tainted = false;
   char filename[128];
@@ -392,28 +411,28 @@ bool TaintTracker::taintStart(uint32_t callno, uint32_t * args)
         strncpy(filename, (char *)args[0],128); 
         if (taint_files.find(string(filename)) != taint_files.end()) {
           cerr << "Opening tainted file: " << string(filename) << endl;
-          syscall = __NR_open;
+          state = __NR_open;
         }
         break;
       case __NR_close:
-        syscall = __NR_close;
+        state = __NR_close;
         break;
         // TODO: do we care about the offset?
       case __NR_mmap:
       case __NR_mmap2:
         if (fds.find(args[4]) != fds.end())
-          syscall = __NR_mmap2;
+          state = __NR_mmap2;
         break;
       case __NR_read: 
         if (fds.find(args[0]) != fds.end()) {
-          syscall = __NR_read;
+          state = __NR_read;
           reading_tainted = true;
         }
         break;
       case __NR_socketcall:
         // TODO: do we need to distinguish between sockets?
         if (taint_net) {
-          syscall = __NR_socketcall;
+          state = __NR_socketcall;
           if (args[0] == _A1_recv)
             reading_tainted = true;
         }
@@ -438,7 +457,7 @@ bool TaintTracker::taintStart(uint32_t callno, uint32_t * args)
         
         if (taint_files.find(string(tempstr)) != taint_files.end()) {
           cerr << "Opening tainted file: " << string(tempstr) << endl;
-          syscall = __NR_createfilewin;
+          state = __NR_createfilewin;
         }
         
         break;
@@ -446,35 +465,37 @@ bool TaintTracker::taintStart(uint32_t callno, uint32_t * args)
       case __NR_readfilewin:
       {    
         if (fds.find(args[0]) != fds.end()) {
-          syscall = __NR_read;
+          state = __NR_read;
           reading_tainted = true;
           cerr << "found a t-read " << endl;
-          syscall = __NR_readfilewin;
+          state = __NR_readfilewin;
         }
         break;
       }
 	  case __NR_closewin:
-		syscall = __NR_closewin;
+		state = __NR_closewin;
 		break;
 #endif
-      default:
-        //cerr << "Unknown system call " << callno << endl;
-        break;
+
+  default:
+    //cerr << "Unknown system call " << *(get_name(callno)) << endl;
+    break;
   }
   return reading_tainted;
 }
 
 /** This function is called immediately following a function call. */
-bool TaintTracker::taintIntroduction(uint32_t bytes, 
+bool TaintTracker::taintIntroduction(const uint32_t bytes, 
                                      uint32_t * args,
                                      uint32_t &addr,
-                                     uint32_t &length)
+                                     uint32_t &length,
+				     const uint32_t state)
 {
   //cout << "ret Syscall no: " << bytes << endl << "Args:" ;
   //for ( int i = 0 ; i < MAX_SYSCALL_ARGS ; i ++ )
   //cout << hex << " " << args[i] ;
   //cout << endl ;
-  switch (syscall) {
+  switch (state) {
 #ifndef _WIN32 /* unix */
       case __NR_socketcall:
         switch (args[0]) {
@@ -678,6 +699,3 @@ bool TaintTracker::taintChecking()
       return false;
   return true;
 }
-
-
-
