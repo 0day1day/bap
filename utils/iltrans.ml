@@ -210,6 +210,10 @@ let speclist =
      Arg.Set Traces.allow_symbolic_indices,
      "Allow the existence of symbolic indices during formula generation"
     )
+  ::("-trace-check",
+     Arg.Set Traces.consistency_check,
+     "Perform extra consistency checks"
+    )
   ::("-exec",
      uadd(TransformAst Interpreter.execute),
      "Concretely execute the IL")

@@ -70,8 +70,6 @@ Frame *Frame::unserialize(istream &in, bool noskip)
 
    type = (FrameType) packed_type;
 
-   cerr << "type " << type << " size " << size << endl;
-   
    if (!noskip) {
       printf("Skipping frame, %d bytes.\n", size - 3);
       in.ignore(size - 3);

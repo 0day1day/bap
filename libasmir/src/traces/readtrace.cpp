@@ -41,8 +41,8 @@ bap_blocks_t * read_trace_from_file(const string &filename,
       
       switch(f->type) {
           case pintrace::FRM_STD: // TODO: We should consider key frame
-	{
-          pintrace::StdFrame *cur_frm = (pintrace::StdFrame *) f;
+          {
+            pintrace::StdFrame *cur_frm = (pintrace::StdFrame *) f;
 	  bap_block_t *bblock = new bap_block_t;
 	  bblock->bap_ir = new vector<Stmt *>();
 	  bblock->inst = cur_frm->addr;
@@ -92,12 +92,32 @@ bap_blocks_t * read_trace_from_file(const string &filename,
 	{
 	  break;
 	}
+
+          case pintrace::FRM_LOADMOD:
+          {
+            std::stringstream ss;
+            pintrace::LoadModuleFrame *lf = (pintrace::LoadModuleFrame*) f;
+            bap_block_t *bblock = new bap_block_t;
+            bblock->bap_ir = new vector<Stmt *>();
+            bblock->inst = NULL;
+            
+            /* Build string */
+            ss.flags ( ios::hex );
+            ss << "Loaded module " << lf->name << " at " << lf->low_addr
+               << " to " << lf->high_addr;
+            
+            Special *special = new Special(ss.str());
+            bblock->bap_ir->push_back(special);
+            bblock->vex_ir = NULL;
+            result->push_back(bblock);
+            break;
+          }
           case pintrace::FRM_TAINT:
 	{
 	  pintrace::TaintFrame * tf = (pintrace::TaintFrame *) f;
 	  bap_block_t *bblock = new bap_block_t;
 	  bblock->bap_ir = new vector<Stmt *>();
-	  bblock->inst = tf->id;
+          bblock->inst = tf->id;
 	  //generate_bap_ir_block(prog, bblock);
 	  Label * label = new Label("Read Syscall");
 	  if (atts)
@@ -116,6 +136,9 @@ bap_blocks_t * read_trace_from_file(const string &filename,
 	break;
 
       }
+
+      /* After all this, delete the frame */
+      delete f;
 
     }
     

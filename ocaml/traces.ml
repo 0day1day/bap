@@ -28,7 +28,7 @@ open D
     Tainted values should always be equal in the BAP evaluation and the
     trace.  Non-tainted values do not have to match, since their values
     are assumed to be constant. *)
-let consistency_check = false;;
+let consistency_check = ref false;;
 
 (*************************************************************)
 (**********************  Datastructures  *********************)
@@ -242,7 +242,8 @@ let add_to_conc {name=name; mem=mem; index=index; value=value;
 	try Hashtbl.find regs name
 	with Not_found -> (name, 0,typ)
       in
-      let fullvalue = Int(Int64.shift_left value shift,typ) in
+      let bits = Arithmetic.to64 (Int64.shift_left value shift,typ) in
+      let fullvalue = Int(bits,typ) in
 	(add_new_var fullname fullvalue usage taint ;
 	 
 	 (* Special case EFLAGS *)
@@ -371,7 +372,12 @@ struct
     with Not_found ->
       (* otherwise do a symbolic lookup *)
       (*pdebug ("did not find concrete for "  ^ name) ;*)
-      Symbolic.lookup_var delta var
+      let l = Symbolic.lookup_var delta var in
+      (match l with
+      | Symbolic(Int _) -> ()
+      | ConcreteMem _ -> ()
+      | _ -> wprintf "Unknown value during eval: %s" (Var.name var));
+      l
 	  
   let conc2symb = Symbolic.conc2symb
   let normalize = Symbolic.normalize
@@ -422,7 +428,7 @@ let run_block state block =
   let info, block = hd_tl block in
   counter := !counter + 1 ;
   let _ = update_concrete info in
-  if consistency_check then
+  if !consistency_check then
     check_delta state ;
   let block = append_halt block in 
   let block = strip_jmp block in
@@ -433,7 +439,7 @@ let run_block state block =
   (* If we are performing a consistency check, we should not empty out
   delta. However, if delta grows indefinitely, trace operations become
   slow. *)
-  if not consistency_check then
+  if not !consistency_check then
     TraceConcrete.cleanup_delta state ;
   let init = TraceConcrete.inst_fetch state.sigma state.pc in
   let executed = ref [] in
@@ -468,9 +474,12 @@ let run_block state block =
     try
       eval_block state init
     with 
-      |	Failure s -> 
+      |	Failure s as e -> 
 	  pdebug ("block evaluation failed :(\nReason: "^s) ;
 	  List.iter (fun s -> pdebug (Pp.ast_stmt_to_string s)) block ;
+	  if !consistency_check then (
+	    raise e
+	  ) else
 	  ((addr,false)::(info,false)::(List.tl !executed))
       | UnknownLabel ->
 	  ((addr,false)::(info,false)::List.rev !executed)
