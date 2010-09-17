@@ -36,6 +36,7 @@ int match_mux0x(vector<Stmt*> *ir, unsigned int i,
 		Exp **cond, Exp **exp0,	Exp **expx, Exp **res);
 
 extern bool use_eflags_thunks;
+extern bool use_simple_segments;
 extern Exp * count_opnd;
 
 

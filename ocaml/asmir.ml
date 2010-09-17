@@ -329,6 +329,14 @@ let x86_regs : var list =
   ("R_GS", reg_16); 
   ("R_SS", reg_16); 
 
+  (* segment bases *)
+  ("R_CS_BASE", reg_32);
+  ("R_DS_BASE", reg_32);
+  ("R_ES_BASE", reg_32);
+  ("R_FS_BASE", reg_32);
+  ("R_GS_BASE", reg_32);
+  ("R_SS_BASE", reg_32);
+
   (* floating point *)
   ("R_FTOP", reg_32);
   ("R_FPROUND", reg_32);

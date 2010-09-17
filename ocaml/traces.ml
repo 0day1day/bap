@@ -428,8 +428,11 @@ let run_block state block =
   let info, block = hd_tl block in
   counter := !counter + 1 ;
   let _ = update_concrete info in
-  if !consistency_check then
-    check_delta state ;
+  if !consistency_check then (
+    check_delta state;
+    (* TraceConcrete.print_values state.delta; *)
+    (* TraceConcrete.print_mem state.delta; *)
+  );
   let block = append_halt block in 
   let block = strip_jmp block in
     Status.inc() ;   

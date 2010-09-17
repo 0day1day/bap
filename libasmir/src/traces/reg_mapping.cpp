@@ -974,9 +974,10 @@ switch (id) {
 
     // Virtual registers reg holding memory addresses pointed by GS/FS registers
     // These registers are visible for tool writers
-    case REG_SEG_GS_BASE: ///< Base address for GS segment
-    case REG_SEG_FS_BASE: ///< Base address for FS segment
-
+    */
+    case REG_SEG_GS_BASE: return string("R_GS_BASE"); ///< Base address for GS segment
+    case REG_SEG_FS_BASE: return string("R_FS_BASE");///< Base address for FS segment
+      /*
     // ISA-independent Pin virtual regs needed for instrumentation
     // These are pin registers visible to the pintool writers.
     case REG_INST_BASE:
