@@ -105,7 +105,7 @@ void TaintTracker::acceptHelper(uint32_t fd) {
   fds.insert(fd);
 }
 
-void TaintTracker::recvHelper(uint32_t fd, void *ptr, size_t len) {
+bool TaintTracker::recvHelper(uint32_t fd, void *ptr, size_t len) {
   uint32_t addr = reinterpret_cast<uint32_t> (ptr);
 
   if (fds.find(fd) != fds.end()) {
@@ -115,8 +115,10 @@ void TaintTracker::recvHelper(uint32_t fd, void *ptr, size_t len) {
     for (size_t i = 0; i < len; i++) {
       setTaint(memory, addr+i, source++);
     }
+    return true;
+  } else {
+    return false;
   }
-
 }
 
 //

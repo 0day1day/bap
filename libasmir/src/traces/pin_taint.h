@@ -166,7 +166,7 @@ namespace pintrace { // We will use namespace to avoid collision
 
      void acceptHelper(uint32_t fd);
 
-     void recvHelper(uint32_t fd, void *ptr, size_t len);
+     bool recvHelper(uint32_t fd, void *ptr, size_t len);
 
    private:
 
