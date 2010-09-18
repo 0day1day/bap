@@ -345,11 +345,12 @@ struct
     flush stdout
       
   let inc () =
-    current := !current + 1 ;
+    if !total != 0 then (
+      current := !current + 1 ;
     let last' = (!current * 100) / !total in
       if (last' != !last) then
-	(last := last'; update ())
-	
+	(last := last'; update ()))
+	  
   let stop () =
     Printf.printf "%s: Done!\n" !message ;
     flush stdout

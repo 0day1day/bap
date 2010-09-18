@@ -158,6 +158,10 @@ let speclist =
      uadd(TransformAst Traces.concolic),
      "Execute the trace symbolically and generate the formula"
     )
+  ::("-trace-debug", 
+     uadd(TransformAst Traces.valid_to_invalid),
+     "Formula debugging. Prints to files form_val and form_inv"
+    )
    ::("-trace-target", 
      Arg.String (fun i -> add(TransformAst(Traces.control_flow i))),
      "<addr> Provide the target address <addr>"

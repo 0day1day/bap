@@ -958,6 +958,7 @@ let inject_shellcode nops trace =
 (*************************************************************)
 
 let generate_formula trace = 
+  LetBind.bindings := [] ;  (*  XXX: temporary hack *)
   let trace = concrete trace in
     ignore(symbolic_run trace) ;
     TraceSymbolic.output_formula ()
@@ -1075,3 +1076,28 @@ let add_assignments trace =
       ) varset []
     in
       Util.fast_append assignments trace
+
+(*************************************************************)
+(******************* Formula Debugging  **********************)
+(*************************************************************)
+
+let valid_to_invalid trace = 
+  let length = List.length trace in
+  let rec test l u =
+    Printf.printf "testing %d %d\n" l u ;
+    if l >= u - 1 then (l,u)
+    else 
+      let middle = (l + u) / 2 in
+      let trace = Util.take middle trace in
+	ignore (output_formula "temp" trace) ;
+	try let _ = solution_from_stp_formula "temp" in 
+	  Printf.printf "going higher\n";
+	  test middle u
+	with Parsing.Parse_error ->
+	  (Printf.printf "going lower\n";
+	   test l middle)
+  in
+    let (l,u) = test 1 length in
+      ignore (output_formula "form_val" (Util.take l trace)) ;
+      ignore (output_formula "form_inv" (Util.take u trace)) ;
+      trace
