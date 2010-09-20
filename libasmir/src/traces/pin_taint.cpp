@@ -133,7 +133,7 @@ bool TaintTracker::isReg(uint32_t type)
 }
 
 // 
-uint32_t TaintTracker::exists(context ctx, uint32_t elem)
+uint32_t TaintTracker::exists(context &ctx, uint32_t elem)
 {
   return (ctx.find(elem) != ctx.end());
 }
@@ -166,7 +166,7 @@ uint32_t TaintTracker::combineTaint(uint32_t oldtag, uint32_t newtag)
 }
 
 // 
-void TaintTracker::printRegs()
+void TaintTracker::printRegs(context &delta)
 {
   cerr << hex << endl << " ----------- Tainted Regs ------------ " << endl;
   for (context::iterator it = delta.begin(), ie = delta.end() ; it != ie ; ++it)
@@ -193,7 +193,7 @@ void TaintTracker::setTaint(context &ctx, uint32_t key, uint32_t tag)
 
 
 // 
-uint32_t TaintTracker::getTaint(context ctx, uint32_t elem)
+uint32_t TaintTracker::getTaint(context &ctx, uint32_t elem)
 {
   if (exists(ctx, elem))
     return ctx[elem];
@@ -214,7 +214,7 @@ uint32_t TaintTracker::getMemTaint(uint32_t addr, uint32_t type)
 }
 
 // 
-uint32_t TaintTracker::getRegTaint(uint32_t reg)
+uint32_t TaintTracker::getRegTaint(context &delta, uint32_t reg)
 {
   // cout << "Partial register: " << REG_StringShort((REG)reg) << endl;
   REG temp = REG_FullRegName((REG)reg);
@@ -223,7 +223,7 @@ uint32_t TaintTracker::getRegTaint(uint32_t reg)
 }
 
 // 
-uint32_t TaintTracker::getReadTaint()
+uint32_t TaintTracker::getReadTaint(context &delta)
 {
   uint32_t tag = NOTAINT, tmp_tag = NOTAINT;
   for (uint32_t i = 0 ; i < count ; i++) {
@@ -231,7 +231,7 @@ uint32_t TaintTracker::getReadTaint()
       // this is a read
       if (isReg(values[i].type) 
 	  && (values[i].loc != REG_EFLAGS)) // FIXME: no control-flow taint
-	tmp_tag = getRegTaint(values[i].loc);
+	tmp_tag = getRegTaint(delta, values[i].loc);
       else if (isValid(values[i].type))
 	tmp_tag = getMemTaint(values[i].loc, values[i].type);
       tag = combineTaint(tag, tmp_tag);
@@ -459,7 +459,9 @@ bool TaintTracker::taintStart(uint32_t callno, uint32_t *args, /* out */ uint32_
         if (taint_files.find(string(tempstr)) != taint_files.end()) {
           cerr << "Opening tainted file: " << string(tempstr) << endl;
           state = __NR_createfilewin;
-        }
+        } else {
+	  cerr << "Not opening " << string(tempstr) << endl;
+	}
         
         break;
       }
@@ -479,7 +481,8 @@ bool TaintTracker::taintStart(uint32_t callno, uint32_t *args, /* out */ uint32_
 #endif
 
   default:
-    //cerr << "Unknown system call " << *(get_name(callno)) << endl;
+    //    LOG(string("Unknown system call") + *(get_name(callno)) + string("\n"));
+    //    cerr << "Unknown system call " << *(get_name(callno)) << endl;
     break;
   }
   return reading_tainted;
@@ -595,12 +598,12 @@ bool TaintTracker::taintIntroduction(const uint32_t bytes,
 /******** Taint Propagation **********/
 
 //     
-void TaintTracker::setTaintContext()
+void TaintTracker::setTaintContext(context &delta)
 {
   uint32_t tag;
   for (uint32_t i = 0 ; i < count ; i++) {
     if (isReg(values[i].type)) {
-      if ((tag = getRegTaint(values[i].loc)) != NOTAINT) {
+      if ((tag = getRegTaint(delta, values[i].loc)) != NOTAINT) {
 	// cerr << "register: " << REG_StringShort((REG)values[i].loc) << " is tainted" << endl;
 	values[i].taint = tag;
       }
@@ -615,13 +618,13 @@ void TaintTracker::setTaintContext()
 }
 
 // Reset the taint status of registers and memory
-void TaintTracker::resetTaint() {
+void TaintTracker::resetTaint(context &delta) {
   delta.clear();
   memory.clear();
 }
 
 // 
-void TaintTracker::addTaintToWritten(uint32_t tag)
+void TaintTracker::addTaintToWritten(context &delta, uint32_t tag)
 {
   uint32_t loc;
   cerr <<hex ;
@@ -630,7 +633,7 @@ void TaintTracker::addTaintToWritten(uint32_t tag)
       if (isReg(values[i].type)) {
 	loc = REG_FullRegName((REG)values[i].loc);
 	setTaint(delta,loc,tag);
-	values[i].taint = getRegTaint(loc);
+	values[i].taint = getRegTaint(delta, loc);
 	//cerr << "new " << REG_StringShort((REG)values[i].loc) 
 	//     << " taint: " << values[i].taint << endl;
       } else if (isValid(values[i].type)) {
@@ -649,23 +652,23 @@ void TaintTracker::addTaintToWritten(uint32_t tag)
 }
 
 // 
-void TaintTracker::taintPropagation()
+void TaintTracker::taintPropagation(context &delta)
 {
   //printMem();
   //printRegs();
-  uint32_t taint_tag = getReadTaint();
-  addTaintToWritten(taint_tag);
+  uint32_t taint_tag = getReadTaint(delta);
+  addTaintToWritten(delta, taint_tag);
 }
 
 /******** Taint Checking **********/
 
 // 
-bool TaintTracker::hasTaint()
+bool TaintTracker::hasTaint(context &delta)
 {
   cerr << hex ;
   for (uint32_t i = 0 ; i < count ; i++) {
     if (isReg(values[i].type)) {
-      if (getRegTaint(values[i].loc) != NOTAINT) {
+      if (getRegTaint(delta, values[i].loc) != NOTAINT) {
 	//cerr << "Tainted: " << REG_StringShort((REG)values[i].loc) << endl;
 	return true;
       }

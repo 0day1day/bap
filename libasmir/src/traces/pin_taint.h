@@ -131,14 +131,14 @@ namespace pintrace { // We will use namespace to avoid collision
 #endif
 
      // A function to propagate taint
-     void taintPropagation();
+     void taintPropagation(context &delta);
 
      // A function to apply taint policies
      bool taintChecking();
 
-     void setTaintContext();
+     void setTaintContext(context &delta);
 
-     void resetTaint();
+     void resetTaint(context &delta);
      
      void setCount(uint32_t cnt);
 
@@ -154,15 +154,15 @@ namespace pintrace { // We will use namespace to avoid collision
 
      // Helpers
      // A function to check whether the instruction arguments are tainted
-     uint32_t getReadTaint();
+     uint32_t getReadTaint(context &delta);
 
-     bool hasTaint();
+     bool hasTaint(context &delta);
 
      bool propagatedTaint(bool branch);
       
      void printMem();
 
-     void printRegs();
+     void printRegs(context &delta);
 
      void acceptHelper(uint32_t fd);
 
@@ -174,7 +174,8 @@ namespace pintrace { // We will use namespace to avoid collision
      uint32_t source;
 
      // a context defining a map from registers to taint
-     context delta;
+     // this is maintainted externally now
+     //context delta;
 
      // We can use a byte-centric approach, each byte maps to taint
      // a context defining a map from memory locations to taint
@@ -198,19 +199,19 @@ namespace pintrace { // We will use namespace to avoid collision
 
 
 
-     void addTaintToWritten(uint32_t tag);
+     void addTaintToWritten(context &delta, uint32_t tag);
       
      bool isReg(uint32_t type);
 
-     uint32_t getRegTaint(uint32_t reg_int);
+     uint32_t getRegTaint(context &delta, uint32_t reg_int);
 
      uint32_t getMemTaint(uint32_t addr, uint32_t type);
 
      uint32_t combineTaint(uint32_t oldtag, uint32_t newtag);
 
-     uint32_t exists(context ctx, uint32_t elem);
+     uint32_t exists(context &ctx, uint32_t elem);
 
-     uint32_t getTaint(context ctx, uint32_t elem);
+     uint32_t getTaint(context &ctx, uint32_t elem);
 
      uint32_t getSize(uint32_t type);
 
