@@ -38,10 +38,9 @@ auto_ptr<string> GetNarrowOfWide(wchar_t *in) {
   //  string *out = new string;
   auto_ptr<string> out (new string);
 
-  for (int i = 0; i < wcslen(in); i++) {
-    const ctype<wchar_t> &ct = use_facet<ctype<wchar_t> > (std::locale(""));
+  for (unsigned int i = 0; i < wcslen(in); i++) {
     out->push_back(
-		   use_facet<ctype<wchar_t> >(std::locale("")).narrow(in[i])
+      use_facet<ctype<wchar_t> >(std::locale("")).narrow(in[i], '?')
 		   );
   }
 

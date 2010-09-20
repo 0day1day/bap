@@ -3,7 +3,7 @@
 
 #include <memory>
 #include <string>
-#include <cstdint>
+#include <stdint.h>
 
 enum os_t {
     OS_NT_SP3,
@@ -26,8 +26,8 @@ enum os_t {
 };
 
 struct SCENTRY {
-    char* name;
-    int   x[17];
+    const char* name;
+    unsigned int   x[17];
 };
 
 extern struct SCENTRY syscalls[];
