@@ -76,7 +76,7 @@ let bound = Hashtbl.mem global.vars
 let in_memory = Hashtbl.mem global.memory
 
 let add_var var value usage taint = 
-  Hashtbl.add global.vars var 
+  Hashtbl.replace global.vars var 
     {exp=value;
      usg=usage;
      tnt=taint;}
@@ -88,7 +88,7 @@ let add_mem index value usage taint =
 let add_symbolic = Hashtbl.replace global.symbolic
   
 let add_new_var var value usage taint = 
-  if not (bound var) then 
+(*  if not (bound var) then *)
     add_var var value usage taint
 
 let del_symbolic = Hashtbl.remove global.symbolic
@@ -203,6 +203,15 @@ let () =
       ("R_BH",("R_EBX",8,reg_32));
       ("R_CH",("R_ECX",8,reg_32));
       ("R_DH",("R_EDX",8,reg_32));
+
+      ("R_AX",("R_EAX",0,reg_32));
+      ("R_BX",("R_EBX",0,reg_32));
+      ("R_CX",("R_ECX",0,reg_32));
+      ("R_DX",("R_EDX",0,reg_32));
+      ("R_BP",("R_EBP",0,reg_32));
+      ("R_SI",("R_ESI",0,reg_32));
+      ("R_DI",("R_EDI",0,reg_32));
+      ("R_SP",("R_ESP",0,reg_32));
     ]
 
     (** Keep track of registers not always updated in BAP.  *)
@@ -661,7 +670,12 @@ struct
 	 Symbolic (Var var)
        else
 	 (* We have no concrete info about it -- its probably temporary *)
-	 Symbolic.lookup_var delta var
+	 (let l = Symbolic.lookup_var delta var in
+	  (match l with
+	   | Symbolic(Int _) -> ()
+	   | ConcreteMem _ -> ()
+	   | _ -> wprintf "Unknown value during eval: %s" (Var.name var));
+	  l)	
 	   
 	  
   let conc2symb = Symbolic.conc2symb
@@ -1089,15 +1103,20 @@ let valid_to_invalid trace =
     else 
       let middle = (l + u) / 2 in
       let trace = Util.take middle trace in
-	ignore (output_formula "temp" trace) ;
-	try let _ = solution_from_stp_formula "temp" in 
+	try 
+	  ignore (output_formula "temp" trace) ;
+          ignore (solve_formula "temp" "tempout") ;
+	  let _ = solution_from_stp_formula "tempout" in 
 	  Printf.printf "going higher\n";
 	  test middle u
 	with Parsing.Parse_error ->
 	  (Printf.printf "going lower\n";
 	   test l middle)
+	| Symbeval.UnknownLabel ->
+	    (Printf.printf "going a little higher\n";
+	     test l (u-1))
   in
-    let (l,u) = test 1 length in
+  let (l,u) = test 1 length in
       ignore (output_formula "form_val" (Util.take l trace)) ;
       ignore (output_formula "form_inv" (Util.take u trace)) ;
       trace

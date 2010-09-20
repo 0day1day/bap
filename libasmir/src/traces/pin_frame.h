@@ -540,5 +540,4 @@ enum FrameType {
 #endif     
    };
 
-
 }; // END of namespace

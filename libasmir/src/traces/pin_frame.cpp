@@ -354,7 +354,9 @@ conc_map_vec * StdFrame2::getOperands()
             case VT_REG8: 
               name = pin_register_name(locs[i]);
               mem = false;
-              value = values[i].qword[0] ; // XXX: Blah, what about > 64bit?
+              value = 0;
+              memcpy(&value, &(values[i].qword[0]), bytesOfType(types[i]));
+              //value = values[i].qword[0] ; // XXX: Blah, what about > 64bit?
               usage = usages[i] ;
               t = taint[i] ;
               map = new ConcPair(name,mem,get_type(types[i]),index,
