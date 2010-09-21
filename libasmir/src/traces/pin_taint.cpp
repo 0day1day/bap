@@ -470,7 +470,7 @@ bool TaintTracker::taintStart(uint32_t callno, uint32_t *args, /* out */ uint32_
         if (fds.find(args[0]) != fds.end()) {
           state = __NR_read;
           reading_tainted = true;
-          cerr << "found a t-read " << endl;
+          cerr << "found a t-read " << "len " << args[6] << " off " << args[7] << endl;
           state = __NR_readfilewin;
         }
         break;
@@ -482,7 +482,7 @@ bool TaintTracker::taintStart(uint32_t callno, uint32_t *args, /* out */ uint32_
 
   default:
     //    LOG(string("Unknown system call") + *(get_name(callno)) + string("\n"));
-    //    cerr << "Unknown system call " << *(get_name(callno)) << endl;
+    //cerr << "Unknown system call " << *(get_name(callno)) << endl;
     break;
   }
   return reading_tainted;
