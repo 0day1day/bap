@@ -11,9 +11,11 @@ typedef [abstract] void* Stmt;
 typedef [abstract] void* asm_program_t;
 typedef [abstract] void* bap_block_t;
 typedef [abstract] void* bap_blocks_t;
-typedef [abstract] void* attr;
-typedef [abstract] void* conc_map_vec;
+typedef [abstract] void* cval;
+/*typedef [abstract] void* conc_map_vec;*/
+typedef [abstract] void* trace_attrs;
 
+typedef int threadid_t;
 
 #include "../libasmir/config.h"
 #if SIZEOF_BFD_VMA == 4
@@ -125,7 +127,7 @@ enum cast_t {
 
 enum stmt_type_t {  JMP,   CJMP, SPECIAL, MOVE,  COMMENT,  LABEL, EXPSTMT, VARDECL, CALL, RETURN, FUNCTION, ASSERT};
 
-enum attr_type_t {NONE, BOOL, CHR, INT_16, INT_32, INT_64};
+enum cval_type_t {NONE, BOOL, CHR, INT_16, INT_32, INT_64};
 
 enum exp_type_t exp_type( [in] Exp e);
 enum binop_type_t binop_type([in] Exp e);
@@ -166,16 +168,17 @@ Exp expstmt_exp([in] Stmt s);
 [string] char* vardecl_name([in]Stmt s);
 enum reg_t vardecl_type([in]Stmt s);
 
-conc_map_vec stmt_attributes([in] Stmt s);
-int conc_map_size(conc_map_vec v);
-attr get_attr(conc_map_vec v, int i);
-[string] char* attr_name(attr m);
-const_val_t attr_value(attr m);
-const_val_t attr_ind(attr m);
-boolean attr_mem(attr m);
-enum attr_type_t attr_type(attr m);
-int attr_usage(attr m);
-int attr_taint(attr m);
+trace_attrs stmt_attributes([in] Stmt s);
+threadid_t trace_tid(trace_attrs ta);
+int conc_map_size(trace_attrs ta);
+cval get_cval(trace_attrs ta, int i);
+[string] char* cval_name(cval m);
+const_val_t cval_value(cval m);
+const_val_t cval_ind(cval m);
+boolean cval_mem(cval m);
+enum cval_type_t cval_type(cval m);
+int cval_usage(cval m);
+int cval_taint(cval m);
 
 boolean call_has_lval([in] Stmt s);
 Exp call_lval_opt([in] Stmt s);

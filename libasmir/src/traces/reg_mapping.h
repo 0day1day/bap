@@ -9,7 +9,7 @@ string regid_to_fullname(uint32_t id);
 reg_t regid_to_type(uint32_t id);
 string register_name(uint32_t id);
 string pin_register_name(uint32_t id);
-attr_type_t get_type(uint32_t typ);
+cval_type_t get_type(uint32_t typ);
 
 Move* write_reg(uint32_t id, Exp* val, int offset=-1);
 

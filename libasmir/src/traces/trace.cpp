@@ -91,7 +91,7 @@ void Trace::consume_header(TraceHeader * hdr)
         read_procs(hdr) ;
 }
 
-attr_type_t Trace::opsize_to_type(int size){
+cval_type_t Trace::opsize_to_type(int size){
         switch(size) {
                 case 1: return BOOL;
                 case 8: return CHR;
@@ -126,7 +126,7 @@ conc_map_vec * Trace::operand_status(EntryHeader * eh)
 	  mem = false;
 	  value = eh->operand[i].value ;
 	  taint = eh->operand[i].tainted ;
-	  map = new ConcPair(name,mem,static_cast<attr_type_t>(type),
+	  map = new ConcPair(name,mem,static_cast<cval_type_t>(type),
 			     index,value,usage,taint);
 	  concrete_pairs->push_back(map);
 	  break;
@@ -138,7 +138,7 @@ conc_map_vec * Trace::operand_status(EntryHeader * eh)
 	  index = eh->operand[i].addr ;
 	  value = eh->operand[i].value ;
 	  taint = eh->operand[i].tainted ;
-	  map = new ConcPair(name,mem,static_cast<attr_type_t>(type),
+	  map = new ConcPair(name,mem,static_cast<cval_type_t>(type),
 			     index,value,usage,taint);
 	  concrete_pairs->push_back(map);
 	  break ;

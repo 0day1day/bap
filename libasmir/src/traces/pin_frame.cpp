@@ -371,7 +371,8 @@ conc_map_vec * StdFrame2::getOperands()
               name = "mem";
               mem = true;
               index = locs[i] ;
-              value = values[i].qword[0] ;
+              value = 0;
+              memcpy(&value, &(values[i].qword[0]), bytesOfType(types[i]));
               usage = usages[i] ;
               t = taint[i] ;
               map = new ConcPair(name,mem,get_type(types[i]),index,

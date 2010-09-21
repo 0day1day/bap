@@ -86,6 +86,7 @@ type attribute =
                                 * It can be merged with `StrAttr' but it seems 
                                 * more flexible to create a separate attribute. 
                                 * - ethan *)
+  | ThreadId of int
   | ExnAttr of exn (** Generic extensible attribute, but no parsing *)
 
 type attributes = attribute list

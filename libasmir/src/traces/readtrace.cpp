@@ -57,7 +57,8 @@ bap_blocks_t * read_trace_from_file(const string &filename,
 	  string assembly(asmir_string_of_insn(prog, cur_frm->addr));
 	  bblock->bap_ir->front()->assembly = assembly;
 	  if (atts)
-	    bblock->bap_ir->front()->attributes = cur_frm->getOperands() ;
+	    bblock->bap_ir->front()->attributes.cv = cur_frm->getOperands();
+          bblock->bap_ir->front()->attributes.tid = cur_frm->tid;
 	  
 	  result->push_back(bblock);
 	  //for (int i = 0 ; i < bblock->bap_ir->size() ; i ++)
@@ -81,8 +82,9 @@ bap_blocks_t * read_trace_from_file(const string &filename,
 	  string assembly(asmir_string_of_insn(prog, cur_frm->addr));
 	  bblock->bap_ir->front()->assembly = assembly;
 	  if (atts)
-	    bblock->bap_ir->front()->attributes = cur_frm->getOperands() ;
-	  
+	    bblock->bap_ir->front()->attributes.cv = cur_frm->getOperands() ;
+          bblock->bap_ir->front()->attributes.tid = cur_frm->tid;
+          
 	  result->push_back(bblock);
 	  //for (int i = 0 ; i < bblock->bap_ir->size() ; i ++)
 	  //    cout << bblock->bap_ir->at(i)->tostring() << endl ;
@@ -121,8 +123,8 @@ bap_blocks_t * read_trace_from_file(const string &filename,
 	  //generate_bap_ir_block(prog, bblock);
 	  Label * label = new Label("Read Syscall");
 	  if (atts)
-	    label->attributes = tf->getOperands() ;
-	  bblock->bap_ir->push_back(label);
+	    label->attributes.cv = tf->getOperands() ;
+          bblock->bap_ir->push_back(label);
 	  bblock->vex_ir = NULL;
 	  result->push_back(bblock);
           
@@ -191,7 +193,7 @@ bap_blocks_t * read_trace_from_file(const string &filename,
 	  // and then to BAP IL
 	  generate_bap_ir_block(prog, bblock);
 	  if (atts)
-	    bblock->bap_ir->front()->attributes = trc->operand_status(&eh) ;
+	    bblock->bap_ir->front()->attributes.cv = trc->operand_status(&eh) ;
 	  // append to result
 	  result->push_back(bblock);
 	  int i;

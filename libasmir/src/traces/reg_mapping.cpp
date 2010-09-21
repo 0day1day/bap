@@ -1110,7 +1110,7 @@ default: return "Unknown";
 
 }
 
-attr_type_t get_type(uint32_t typ)
+cval_type_t get_type(uint32_t typ)
 {
    switch (typ) {
        case VT_REG64:

@@ -108,8 +108,8 @@ object (self)
       pp "@str \""; pp (s^ ind ^" = "^(Int64.format "%Lx" v)^ ", " ^ ts
 			  ^", u"
 		       ^ (string_of_int (bits_of_width tp))); pc '\"'
+    | ThreadId i -> pp "@tid "; pp (string_of_int i);
     | ExnAttr _ (* we could try to print something using Printexc.to_string *)
-   (* | Context _ (* enabling printing might be useful for debugging - ethan *)*)
     | Pos _ -> () (* ignore position attrs *)
 
   (* prec tells us how much parenthization we need. 0 means it doesn't need

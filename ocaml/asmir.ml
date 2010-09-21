@@ -167,7 +167,7 @@ let tr_vardecls g ss =
   let decls,unextends = List.split(List.map (tr_vardecl g) ss) in
     (decls, fun x -> List.iter (fun f -> f x) unextends)
 
-let attr_type_to_typ = function
+let cval_type_to_typ = function
  | NONE -> 
    prerr_endline "concrete expression with no type in lifted trace" ;
    reg_32        
@@ -177,7 +177,7 @@ let attr_type_to_typ = function
  | INT_32 -> reg_32
  | INT_64 -> reg_64
 
-let get_attr_usage = function
+let get_cval_usage = function
   | 0x00 | 0x01 -> RD
   | 0x10 -> WR
   | 0x11 -> RW
@@ -189,24 +189,29 @@ let get_attr_usage = function
 (* TODO: needs to be refined for bytes *)
 let int_to_taint n = Taint n
 
-let tr_context_tup attr =
-  Context {name=Libasmir.attr_name attr;
-           mem=Libasmir.attr_mem attr;
-           t=attr_type_to_typ (Libasmir.attr_type attr);
-           index=Libasmir.attr_ind attr;
-           value=Libasmir.attr_value attr;
-	   usage=get_attr_usage(Libasmir.attr_usage attr);
-           taint=int_to_taint (Libasmir.attr_taint attr)}
+let tr_context_tup cval =
+  Context {name=Libasmir.cval_name cval;
+           mem=Libasmir.cval_mem cval;
+           t=cval_type_to_typ (Libasmir.cval_type cval);
+           index=Libasmir.cval_ind cval;
+           value=Libasmir.cval_value cval;
+	   usage=get_cval_usage(Libasmir.cval_usage cval);
+           taint=int_to_taint (Libasmir.cval_taint cval)}
 
 let tr_attributes s =
   let attr_vec = Libasmir.stmt_attributes s in
   let size = Libasmir.conc_map_size attr_vec in
-   if size = 0 then [] 
-   else
-     foldn 
-       (fun i n -> 
-	  (tr_context_tup (Libasmir.get_attr attr_vec n))::i
-       ) [] (size-1)
+  let cvals =
+    if size = 0 then [] 
+    else
+      foldn 
+	(fun i n -> 
+	   (tr_context_tup (Libasmir.get_cval attr_vec n))::i
+	) [] (size-1) in
+  let tid = Libasmir.trace_tid attr_vec in
+  let tidattr = ThreadId tid in
+  if tid = -1 then cvals else
+  tidattr :: cvals
 
 (** Translate a statement *)
 let rec tr_stmt g s =
