@@ -65,15 +65,11 @@ val asmprogram_to_bap_range : ?init_ro:bool ->
 
 val bap_from_trace_file : ?atts:bool -> string -> Ast.program
 
+val get_symbols : ?all:bool -> asmprogram -> asymbol array
+
 val get_function_ranges : asmprogram -> (string * address_t * address_t) list
 
-val get_symbols_hash : ?all:bool -> asmprogram -> (string, asymbol) Hashtbl.t
-
-val find_symbol_address : (string, asymbol) Hashtbl.t -> string -> int64
-
 val get_all_asections : asmprogram -> section_ptr array
-val get_sections_hash : asmprogram -> (string, section_ptr) Hashtbl.t
-
 
 val get_section_startaddr : asmprogram -> string -> address_t
 val get_section_endaddr : asmprogram -> string -> address_t

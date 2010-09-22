@@ -438,38 +438,11 @@ let bap_from_trace_file ?(atts = true) filename =
   let () = destroy_bap_blocks bap_blocks in
   ir
 
-
-(* internal only *)
 let get_symbols ?(all=false) {asmp=p} =
   let f = if all then asmir_get_all_symbols else asmir_get_symbols in
   let (arr,err) = f p in
   if err <= 0 then failwith "get_symbols";
   arr
-
-let get_symbols_hash ?(all=false) p =
-  let syms = get_symbols ~all:all p in
-  let h = Hashtbl.create 1000 in
-  Array.iter
-    (fun s ->
-       Hashtbl.add h s.bfd_symbol_name s
-    ) syms;
-  h
-
-
-let get_sections_hash p =
-  let secs = get_all_asections p in
-  let h = Hashtbl.create 100 in
-  Array.iter
-    (fun sec ->
-       Hashtbl.add h (bfd_section_name sec) sec
-    ) secs;
-  h
-
-let find_symbol_address h name =
-  let sym = Hashtbl.find h name in
-  let base = bfd_section_vma sym.bfd_symbol_section in
-  let off = sym.bfd_symbol_value in
-  Int64.add base off
 
 let (<<) = (lsl)
 
