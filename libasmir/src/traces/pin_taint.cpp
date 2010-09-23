@@ -568,7 +568,7 @@ bool TaintTracker::taintIntroduction(const uint32_t bytes,
         }
         break;
       case __NR_readfilewin:
-        if (bytes == STATUS_SUCCESS) {
+	if (bytes == STATUS_SUCCESS) {
           WINDOWS::PIO_STATUS_BLOCK psb = reinterpret_cast<WINDOWS::PIO_STATUS_BLOCK> (args[4]);
           assert(psb);
           assert(psb->Information);
@@ -581,7 +581,7 @@ bool TaintTracker::taintIntroduction(const uint32_t bytes,
           for (uint32_t i = 0 ; i < length ; i ++)
             setTaint(memory, addr + i, source++);
           return true;
-        }
+	}
 		case __NR_closewin:
 			if (bytes == STATUS_SUCCESS && fds.find(args[0]) != fds.end()) {
 				cerr << "closed tainted fd " << args[0] << endl;
