@@ -262,10 +262,12 @@ ostream &StdFrame2::serialize(ostream &out, uint16_t sz)
    // Note: ((x-1) >> 3) + 1 === ceil(x / 8.0)
    uint32_t masklen = ((values_count - 1) >> 3) + 1;
 
-   // 9 = sizeof(addr) + sizeof(tid) + sizeof(lengths)
+   // 9 = sizeof(addr) + sizeof(tid) + sizeof(lengths) +
+   // sizeof(types, usages, locs, taint)
    sz += 9
      + (insn_length * sizeof(char))
-     + masklen;
+     + masklen
+     + (values_count * sizeof(uint32_t) * 4);
 
    for (int i = 0; i < values_count; i++) {
      sz += bytesOfType(types[i]);
