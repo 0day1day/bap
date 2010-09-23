@@ -475,9 +475,9 @@ bool TaintTracker::taintStart(uint32_t callno, uint32_t *args, /* out */ uint32_
         }
         break;
       }
-	  case __NR_closewin:
-		state = __NR_closewin;
-		break;
+  case __NR_closewin:
+    state = __NR_closewin;
+    break;
 #endif
 
   default:
