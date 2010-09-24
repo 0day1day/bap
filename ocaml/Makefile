@@ -18,6 +18,7 @@ export SOURCES = \
 	dominator.ml \
 	graphDataflow.mli graphDataflow.ml \
 	type.ml type.mli \
+	arithmetic.ml \
 	var.mli var.ml \
 	ast.ml \
 	ssa.ml \
@@ -31,7 +32,6 @@ export SOURCES = \
 	cfg_ssa.mli cfg_ssa.ml \
 	ast_visitor.mli ast_visitor.ml \
 	debug_snippets.ml \
-	arithmetic.ml \
 	sccvn.mli sccvn.ml \
 	deadcode.mli deadcode.ml \
 	ssa_simp.ml \

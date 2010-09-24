@@ -10,7 +10,9 @@ module D = Debug.Make(struct let name = "Arithmetic" and default = `Debug end)
 open D
 open Type
 
-let bits_of_width = Typecheck.bits_of_width
+let bits_of_width = function
+  | Reg n -> n
+  | _ -> failwith "Expected register type"
 
 (* drop high bits *)
 let to64 (i,t) =
@@ -42,8 +44,8 @@ let to_val t i =
     (Int64.logand mask i, t)
 
 let exp_bool =
-  let t = (1L, Ast.reg_1)
-  and f = (0L, Ast.reg_1) in
+  let t = (1L, Reg(1))
+  and f = (0L, Reg(1)) in
   (fun b -> if b then t else f)
 
 (** [binop operand lhs lhst rhs rhst] *)
