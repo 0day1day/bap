@@ -71,7 +71,7 @@ Frame *Frame::unserialize(istream &in, bool noskip)
    type = (FrameType) packed_type;
 
    if (!noskip) {
-      printf("Skipping frame, %d bytes.\n", size - 3);
+     //      printf("Skipping frame, %d bytes.\n", size - 3);
       in.ignore(size - 3);
       return NULL;
    }
@@ -284,6 +284,7 @@ ostream &StdFrame2::serialize(ostream &out, uint16_t sz)
    //    |    \-- values_count
    //    \------- insn_length
 
+   assert (values_count < (1 << 4));
    uint8_t lengths = (values_count & 0xf) | (insn_length << 4);
 
    WRITE(out2, lengths);
@@ -349,7 +350,7 @@ conc_map_vec * StdFrame2::getOperands()
     {
       switch (types[i])
 	{
-            case VT_REG128:
+          //            case VT_REG128:
             case VT_REG64:
             case VT_REG32: 
             case VT_REG16: 
@@ -357,6 +358,7 @@ conc_map_vec * StdFrame2::getOperands()
               name = pin_register_name(locs[i]);
               mem = false;
               value = 0;
+              assert (bytesOfType(types[i]) <= sizeof(const_val_t));
               memcpy(&value, &(values[i].qword[0]), bytesOfType(types[i]));
               //value = values[i].qword[0] ; // XXX: Blah, what about > 64bit?
               usage = usages[i] ;
@@ -365,7 +367,7 @@ conc_map_vec * StdFrame2::getOperands()
                                  value,usage,t);
               concrete_pairs->push_back(map);
               break;
-            case VT_MEM128:
+              //            case VT_MEM128:
             case VT_MEM64:
             case VT_MEM32: 
             case VT_MEM16: 
@@ -374,6 +376,7 @@ conc_map_vec * StdFrame2::getOperands()
               mem = true;
               index = locs[i] ;
               value = 0;
+              assert (bytesOfType(types[i]) <= sizeof(const_val_t));
               memcpy(&value, &(values[i].qword[0]), bytesOfType(types[i]));
               usage = usages[i] ;
               t = taint[i] ;
@@ -382,8 +385,9 @@ conc_map_vec * StdFrame2::getOperands()
               concrete_pairs->push_back(map);
               break ;
             default : 
-              cerr << "type: " << types[i] << endl ; 
-              assert(0) ;
+              //cerr << "WARNING: Ignoring operand of type: " << types[i] << endl ; 
+              //              assert(0) ;
+              break;
 	}
     }
   return concrete_pairs;

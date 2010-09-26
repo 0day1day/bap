@@ -56,17 +56,18 @@ uint32_t TraceReader::pos() const
 // successful.
 bool TraceReader::seek(uint32_t offset)
 {
-
-   // TODO: Make use of the TOC.
-
-   if (offset >= header.frame_count)
-      return false;
-
-   while (frm_pos < offset)
-      next(false);
-
-   return true;
-
+  // TODO: Make use of the TOC.
+  
+  frm_pos = 0;
+  
+  if (offset >= header.frame_count)
+    return false;
+  
+  while (frm_pos < offset)
+    next(false);
+  
+  return true;
+  
 }
 
 // Returns the current frame being pointed to and advances the frame
@@ -78,7 +79,7 @@ Frame *TraceReader::next(bool noskip)
    if(++frm_pos > header.frame_count) // we are at the eof.
       return NULL;
 
-   if (f->type == FRM_STD) {
+   if (noskip && (f->type == FRM_STD)) {
 
       StdFrame *sf = (StdFrame *) f;
 

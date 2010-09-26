@@ -20,6 +20,8 @@ let arch_i386 = Libasmir.Bfd_arch_i386
 let arch_arm  = Libasmir.Bfd_arch_arm
 (*more to come later when we support them*)
 
+let trace_blocksize = ref 1000L
+
 module D = Debug.Make(struct let name = "ASMIR" and default=`Debug end)
 open D
 
@@ -427,9 +429,23 @@ let asmprogram_to_bap_range ?(init_mem = false) asmp st en=
   ir
 
 let bap_from_trace_file ?(atts = true) ?(pin = false) filename =
-  let bap_blocks = Libasmir.asmir_bap_from_trace_file filename atts pin in
   let g = gamma_create x86_mem x86_regs in
-  let ir = tr_bap_blocks_t_no_asm g bap_blocks in
-  let () = destroy_bap_blocks bap_blocks in
-  ir
+  let ir = ref [] in
+  let off = ref 0L in
+  let c = ref true in
+  (* might be better to just grab the length of the trace in advance :*( *)
+  while !c do
+    (*dprintf "Calling the trace again.... ";*)
+    let bap_blocks = Libasmir.asmir_bap_from_trace_file filename !off !trace_blocksize atts pin in
+    let numblocks = Libasmir.asmir_bap_blocks_size bap_blocks in
+    if numblocks = -1 then (
+      c := false
+    ) else (
+      let moreir = tr_bap_blocks_t_no_asm g bap_blocks in
+      let () = destroy_bap_blocks bap_blocks in
+      ir := Util.fast_append !ir moreir;
+      off := Int64.add !off !trace_blocksize
+    )
+  done;
+  !ir
 

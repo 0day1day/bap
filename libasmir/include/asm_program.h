@@ -18,7 +18,8 @@ extern "C"
 
 #include "common.h"
 
-
+#define MAX_INSN_BYTES 15
+  
 typedef struct section
 {
   bfd_byte *data;
@@ -48,7 +49,10 @@ extern void asmir_close(asm_program_t *p);
 extern bfd_byte *asmir_get_ptr_to_instr(asm_program_t *prog, bfd_vma addr);
 extern int asmir_get_instr_length(asm_program_t *prog, bfd_vma addr);
 
-  // dissassemble an instruction and return the asm string
+// helper for disassembling bytes in traces
+extern void set_trace_bytes(void *bytes, size_t len, bfd_vma addr);
+  
+// dissassemble an instruction and return the asm string
 extern char* asmir_string_of_insn(asm_program_t *prog, bfd_vma inst);
 
 

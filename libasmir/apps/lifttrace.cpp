@@ -92,7 +92,7 @@ int main(int argc, char *argv[])
     return -1;
   }
 
-  read_trace_from_file(tracename, offset, print, atts, false);
+  read_trace_from_file(tracename, offset, 0LL, print, atts, false);
 
   return 0;
 }

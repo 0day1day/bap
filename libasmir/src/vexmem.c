@@ -119,7 +119,7 @@ void *vx_Alloc( Int nbytes )
 
 void vx_FreeAll()
 {
-    next_free = huge_block;    
+  next_free = huge_block;    
 }
 
 

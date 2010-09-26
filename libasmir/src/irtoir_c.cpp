@@ -29,8 +29,11 @@ bap_blocks_t *asmir_asmprogram_range_to_bap(asm_program_t *prog,
 }
 
 int asmir_bap_blocks_size(bap_blocks_t *bs) {
-  return bs->size();
-
+  if (bs) {
+    return bs->size();
+  } else {
+    return -1;
+  }
 }
 
 bap_block_t * asmir_bap_blocks_get(bap_blocks_t *bs, int i) {
@@ -84,9 +87,11 @@ byte_insn_to_asmp(bfd_architecture arch, address_t addr, unsigned char *bb_bytes
 {
   asm_program_t *prog = asmir_new_asmp_for_arch(arch);
   unsigned char *bytes = (unsigned char*)bfd_alloc(prog->abfd, len);
+  assert(bytes);
   // copy the string, because the old one is freed when we return
   memcpy(bytes, bb_bytes, len);
   section_t *sec = (section_t*)bfd_alloc(prog->abfd, sizeof(section_t));
+  assert(sec);
   
   sec->start_addr = addr;
   sec->datasize = len;
@@ -116,14 +121,16 @@ bap_block_t* asmir_addr_to_bap(asm_program_t *p, address_t addr)
 }
 
 bap_blocks_t * asmir_bap_from_trace_file(char * filename, 
-					 bool atts,
+                                         uint64_t offset,
+                                         uint64_t numisns,
+                                         bool atts,
 					 bool pintrace)
 {
   bap_blocks_t * b = read_trace_from_file(string(filename), 
-					  0, 
+					  offset,
+                                          numisns,
 					  false,
 					  atts, 
 					  pintrace);
   return b;
 }
-

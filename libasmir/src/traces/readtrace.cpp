@@ -3,20 +3,23 @@
 #include <string>
 #include <iostream>
 #include "readtrace.h"
-
+#include "asm_program.h"
 
 using namespace std;
 
 bap_blocks_t * read_trace_from_file(const string &filename,
-				    int offset, 
+				    uint64_t offset,
+                                    uint64_t numisns,
 				    bool print, 
 				    bool atts, 
 				    bool pintrace)
 {
   // a block to accumulate the lifted traces
   bap_blocks_t * result = new bap_blocks_t;
-  uint32_t counter = 0;
+  uint64_t counter = 0LL;
   pintrace::TraceReader tr;
+
+  //cerr << "offset " << offset << endl;
   
   if(pintrace) {
 
@@ -32,55 +35,83 @@ bap_blocks_t * read_trace_from_file(const string &filename,
     VexArch arch = VexArchX86;
     bfd_architecture bfd_arch = bfd_arch_i386;
     asm_program_t * prog = asmir_new_asmp_for_arch(bfd_arch);
+    assert(prog);
+    assert(prog->abfd);
     
     // Initializations
     translate_init();
-    while(tr.pos() < tr.count()) { // Reading each instruction
+
+    // First, skip 'offset' frames in the trace.
+    if (offset > tr.count()) {
+      return NULL;
+    }
+    assert(tr.seek(offset));
+    
+    while(
+      (tr.pos() < tr.count()) && // Don't go past the end of the trace
+      ((numisns == 0) ? true : counter < numisns) // Count numisns
+          ) {
+
+      // Reading each instruction
       pintrace::Frame *f = tr.next();
       counter += 1;
       
       switch(f->type) {
           case pintrace::FRM_STD: // TODO: We should consider key frame
           {
-            pintrace::StdFrame *cur_frm = (pintrace::StdFrame *) f;
-	  bap_block_t *bblock = new bap_block_t;
-	  bblock->bap_ir = new vector<Stmt *>();
-	  bblock->inst = cur_frm->addr;
-	  bblock->vex_ir = translate_insn(arch,
-					  (unsigned char *)cur_frm->rawbytes,
-					  cur_frm->addr);
-	  prog = byte_insn_to_asmp(bfd_arch, 
-				   cur_frm->addr,
-				   (unsigned char *)cur_frm->rawbytes,
-				   MAX_INSN_BYTES);
-	  generate_bap_ir_block(prog, bblock);
-	  string assembly(asmir_string_of_insn(prog, cur_frm->addr));
-	  bblock->bap_ir->front()->assembly = assembly;
-	  if (atts)
-	    bblock->bap_ir->front()->attributes.cv = cur_frm->getOperands();
-          bblock->bap_ir->front()->attributes.tid = cur_frm->tid;
+          //   pintrace::StdFrame *cur_frm = (pintrace::StdFrame *) f;
+	  // bap_block_t *bblock = new bap_block_t;
+	  // bblock->bap_ir = new vector<Stmt *>();
+	  // bblock->inst = cur_frm->addr;
+	  // bblock->vex_ir = translate_insn(arch,
+	  //       			  (unsigned char *)cur_frm->rawbytes,
+	  //       			  cur_frm->addr);
+	  // prog = byte_insn_to_asmp(bfd_arch, 
+	  //       		   cur_frm->addr,
+	  //       		   (unsigned char *)cur_frm->rawbytes,
+	  //       		   MAX_INSN_BYTES);
+	  // generate_bap_ir_block(prog, bblock);
+	  // string assembly(asmir_string_of_insn(prog, cur_frm->addr));
+	  // bblock->bap_ir->front()->assembly = assembly;
+	  // if (atts)
+	  //   bblock->bap_ir->front()->attributes.cv = cur_frm->getOperands();
+          // bblock->bap_ir->front()->attributes.tid = cur_frm->tid;
 	  
-	  result->push_back(bblock);
-	  //for (int i = 0 ; i < bblock->bap_ir->size() ; i ++)
-	  //    cout << bblock->bap_ir->at(i)->tostring() << endl ;
-	  break;
-	}
+	  // result->push_back(bblock);
+	  // //for (int i = 0 ; i < bblock->bap_ir->size() ; i ++)
+	  // //    cout << bblock->bap_ir->at(i)->tostring() << endl ;
+	  // break;
+            assert(false);
+            break;
+          }
           case pintrace::FRM_STD2: // TODO: We should consider key frame
 	{
+          //static int num = 0;
+          //cerr << "Raising frame " << num++ << endl;
           pintrace::StdFrame2 *cur_frm = (pintrace::StdFrame2 *) f;
-	  bap_block_t *bblock = new bap_block_t;
+
+          /* Set up the trace_read_memory function so the
+           * disassembler is happy. */
+          set_trace_bytes(cur_frm->rawbytes, cur_frm->insn_length, cur_frm->addr);
+          
+          bap_block_t *bblock = new bap_block_t;
 	  bblock->bap_ir = new vector<Stmt *>();
 	  bblock->inst = cur_frm->addr;
 	  bblock->vex_ir = translate_insn(arch,
 					  (unsigned char *)cur_frm->rawbytes,
 					  cur_frm->addr);
-	  prog = byte_insn_to_asmp(bfd_arch, 
-				   cur_frm->addr,
-				   (unsigned char *)cur_frm->rawbytes,
-				   MAX_INSN_BYTES);
+	  // prog = byte_insn_to_asmp(bfd_arch, 
+	  //       		   cur_frm->addr,
+	  //       		   (unsigned char *)cur_frm->rawbytes,
+	  //       		   MAX_INSN_BYTES);
 	  generate_bap_ir_block(prog, bblock);
-	  string assembly(asmir_string_of_insn(prog, cur_frm->addr));
-	  bblock->bap_ir->front()->assembly = assembly;
+
+          // free internal VEX memory...
+          vx_FreeAll();
+
+          string assembly(asmir_string_of_insn(prog, (bfd_vma)(cur_frm->addr)));
+          //string assembly("ed has disabled this; fix it");
+          bblock->bap_ir->front()->assembly = assembly;
 	  if (atts)
 	    bblock->bap_ir->front()->attributes.cv = cur_frm->getOperands() ;
           bblock->bap_ir->front()->attributes.tid = cur_frm->tid;
