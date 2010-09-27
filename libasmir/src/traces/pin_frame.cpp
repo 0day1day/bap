@@ -343,6 +343,7 @@ conc_map_vec * StdFrame2::getOperands()
 {
   conc_map_vec * concrete_pairs = new vector<conc_map *>();
   int i, type, t, usage; bool mem;
+  size_t bytes;
   string name;
   const_val_t index, value;
   conc_map * map;
@@ -350,44 +351,52 @@ conc_map_vec * StdFrame2::getOperands()
     {
       switch (types[i])
 	{
-          //            case VT_REG128:
-            case VT_REG64:
-            case VT_REG32: 
-            case VT_REG16: 
-            case VT_REG8: 
-              name = pin_register_name(locs[i]);
-              mem = false;
-              value = 0;
-              assert (bytesOfType(types[i]) <= sizeof(const_val_t));
-              memcpy(&value, &(values[i].qword[0]), bytesOfType(types[i]));
-              //value = values[i].qword[0] ; // XXX: Blah, what about > 64bit?
-              usage = usages[i] ;
-              t = taint[i] ;
-              map = new ConcPair(name,mem,get_type(types[i]),index,
-                                 value,usage,t);
-              concrete_pairs->push_back(map);
-              break;
-              //            case VT_MEM128:
-            case VT_MEM64:
-            case VT_MEM32: 
-            case VT_MEM16: 
-            case VT_MEM8: 
-              name = "mem";
-              mem = true;
-              index = locs[i] ;
-              value = 0;
-              assert (bytesOfType(types[i]) <= sizeof(const_val_t));
-              memcpy(&value, &(values[i].qword[0]), bytesOfType(types[i]));
-              usage = usages[i] ;
-              t = taint[i] ;
-              map = new ConcPair(name,mem,get_type(types[i]),index,
-                                 value,usage,t);
-              concrete_pairs->push_back(map);
-              break ;
-            default : 
-              //cerr << "WARNING: Ignoring operand of type: " << types[i] << endl ; 
-              //              assert(0) ;
-              break;
+	case VT_REG128:
+	case VT_REG64:
+	case VT_REG32: 
+	case VT_REG16: 
+	case VT_REG8: 
+	  bytes = bytesOfType(types[i]);
+	  name = pin_register_name(locs[i]);
+	  mem = false;
+	  value = 0;
+	  if (bytes > sizeof(const_val_t)) {
+	    value = -1;
+	  } else {
+	    memcpy(&value, &(values[i].qword[0]), bytes);
+	  }
+
+	  usage = usages[i] ;
+	  t = taint[i] ;
+	  map = new ConcPair(name,mem,get_type(types[i]),index,
+			     value,usage,t);
+	  concrete_pairs->push_back(map);
+	  break;
+	case VT_MEM128:
+	case VT_MEM64:
+	case VT_MEM32: 
+	case VT_MEM16: 
+	case VT_MEM8: 
+	  bytes = bytesOfType(types[i]);
+	  name = "mem";
+	  mem = true;
+	  index = locs[i] ;
+	  value = 0;
+	  if (bytes > sizeof(const_val_t)) {
+	    value = -1;
+	  } else {
+	    memcpy(&value, &(values[i].qword[0]), bytes);
+	  }
+	  usage = usages[i] ;
+	  t = taint[i] ;
+	  map = new ConcPair(name,mem,get_type(types[i]),index,
+			     value,usage,t);
+	  concrete_pairs->push_back(map);
+	  break ;
+	default : 
+	  //cerr << "WARNING: Ignoring operand of type: " << types[i] << endl ; 
+	  //              assert(0) ;
+	  break;
 	}
     }
   return concrete_pairs;

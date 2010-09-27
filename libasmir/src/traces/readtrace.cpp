@@ -110,8 +110,8 @@ bap_blocks_t * read_trace_from_file(const string &filename,
           vx_FreeAll();
 
           string assembly(asmir_string_of_insn(prog, (bfd_vma)(cur_frm->addr)));
-          //string assembly("ed has disabled this; fix it");
-          bblock->bap_ir->front()->assembly = assembly;
+          ////string assembly("ed has disabled this; fix it");
+	  bblock->bap_ir->front()->assembly = assembly;
 	  if (atts)
 	    bblock->bap_ir->front()->attributes.cv = cur_frm->getOperands() ;
           bblock->bap_ir->front()->attributes.tid = cur_frm->tid;

@@ -1113,6 +1113,11 @@ default: return "Unknown";
 cval_type_t get_type(uint32_t typ)
 {
    switch (typ) {
+   case VT_REG128:
+   case VT_MEM128:
+     return INT_128;
+     break;
+
        case VT_REG64:
        case VT_MEM64:
          return INT_64;

@@ -20,7 +20,7 @@ let arch_i386 = Libasmir.Bfd_arch_i386
 let arch_arm  = Libasmir.Bfd_arch_arm
 (*more to come later when we support them*)
 
-let trace_blocksize = ref 1000L
+let trace_blocksize = ref 10000L
 
 module D = Debug.Make(struct let name = "ASMIR" and default=`Debug end)
 open D
@@ -37,7 +37,6 @@ let tr_regtype = function
   | Libasmir.REG_16  -> reg_16
   | Libasmir.REG_32  -> reg_32
   | Libasmir.REG_64  -> reg_64
-
 
 (* maps a string variable to the var we are using for it *)
 type varctx = (string,Var.t) Hashtbl.t
@@ -178,6 +177,7 @@ let cval_type_to_typ = function
  | INT_16 -> reg_16
  | INT_32 -> reg_32
  | INT_64 -> reg_64
+ | INT_128 -> Reg 128
 
 let get_cval_usage = function
   | 0x00 | 0x01 -> RD
@@ -443,9 +443,10 @@ let bap_from_trace_file ?(atts = true) ?(pin = false) filename =
     ) else (
       let moreir = tr_bap_blocks_t_no_asm g bap_blocks in
       let () = destroy_bap_blocks bap_blocks in
-      ir := Util.fast_append !ir moreir;
-      off := Int64.add !off !trace_blocksize
+	(* Build ir backwards *)
+	ir := List.rev_append moreir !ir;
+	off := Int64.add !off !trace_blocksize
     )
   done;
-  !ir
+  List.rev !ir
 
