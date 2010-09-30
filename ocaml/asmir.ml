@@ -450,3 +450,21 @@ let bap_from_trace_file ?(atts = true) ?(pin = false) filename =
   done;
   List.rev !ir
 
+(** Get one statement at a time.
+
+    XXX: Use an internal buffer
+*)
+let bap_get_stmt_from_trace_file ?(atts = true) ?(pin = false) filename off =
+  let off = Int64.of_int off in (* blah, Stream.from does not use int64 *)
+  let g = gamma_create x86_mem x86_regs in
+  let bap_blocks = Libasmir.asmir_bap_from_trace_file filename off 1L atts pin in
+  let numblocks = Libasmir.asmir_bap_blocks_size bap_blocks in
+  let ir = tr_bap_blocks_t_no_asm g bap_blocks in
+  let () = destroy_bap_blocks bap_blocks in
+  match numblocks with
+  | -1 -> None
+  | _ -> Some(ir)
+  
+(** Return stream of trace instructions raised to the IL *)
+let bap_stream_from_trace_file ?(atts = true) ?(pin = false) filename =
+  Stream.from (bap_get_stmt_from_trace_file ~atts:atts ~pin:pin filename)

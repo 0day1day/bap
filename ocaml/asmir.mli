@@ -62,3 +62,4 @@ val asmprogram_to_bap_range : ?init_mem:bool ->
 
 val bap_from_trace_file : ?atts:bool -> ?pin:bool -> string -> Ast.program
 
+val bap_stream_from_trace_file : ?atts:bool -> ?pin:bool -> string -> (Ast.stmt list) Stream.t

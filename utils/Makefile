@@ -11,7 +11,7 @@ export SOURCE_DIRS_IN = $(BAP_OCAMLDIR)
 
 # default subprojects to build
 ifndef SUBPROJS
-	export SUBPROJS = toil iltrans topredicate formula snort_parse
+	export SUBPROJS = toil iltrans streamtrans topredicate formula snort_parse
 endif
 
 define PROJ_toil
@@ -27,6 +27,13 @@ define PROJ_iltrans
 	DOC_FILES=$(SOURCES)
 endef
 export PROJ_iltrans
+
+define PROJ_streamtrans
+	RESULT=streamtrans
+	SOURCES = streamtrans.ml
+	DOC_FILES=$(SOURCES)
+endef
+export PROJ_streamtrans
 
 define PROJ_topredicate
 	RESULT=topredicate

@@ -587,24 +587,24 @@ switch (id) {
 
     // partial registers common to both the IA-32 and Intel(R) 64 architectures.
     case REG_AL:  return string("R_AL");
-    //case REG_AH:
+    case REG_AH:  return string("R_AH");
     case REG_AX:  return string("R_AX");
     
     case REG_CL:  return string("R_CL");
     case REG_CH:  return string("R_CH");
-    //case REG_CX:
+    case REG_CX:  return string("R_CX");
     
     case REG_DL:  return string("R_DL");
-    //case REG_DH:
-    //case REG_DX:
+    case REG_DH:  return string("R_DH");
+    case REG_DX:  return string("R_DX");
     
     case REG_BL:  return string("R_BL");
-    //case REG_BH:
+    case REG_BH:  
     case REG_BX:  return string("R_BX");
 
-    //case REG_BP:
+    case REG_BP:  return string("R_BP");
     case REG_SI:  return string("R_SI");
-    //case REG_DI:
+    case REG_DI:  return string("R_DI");
 
     //case REG_SP:
     //case REG_FLAGS:

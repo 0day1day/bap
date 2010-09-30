@@ -182,6 +182,11 @@ let add_eflags eflags usage taint =
     "R_OF"
     (Int(num_to_bit (Int64.logand eflags 0x800L), reg_1))
     usage
+    taint;
+  add_var
+    "R_PF"
+    (Int(num_to_bit (Int64.logand eflags 0x4L), reg_1))
+    usage
     taint
     
  (* TODO: handle more EFLAGS registers *)
@@ -385,7 +390,7 @@ struct
       (match l with
       | Symbolic(Int _) -> ()
       | ConcreteMem _ -> ()
-      | _ -> wprintf "Unknown value during eval: %s" (Var.name var));
+      | _ -> dprintf "Unknown value during eval: %s" (Var.name var));
       l
 	  
   let conc2symb = Symbolic.conc2symb
@@ -674,7 +679,7 @@ struct
 	  (match l with
 	   | Symbolic(Int _) -> ()
 	   | ConcreteMem _ -> ()
-	   | _ -> wprintf "Unknown value during eval: %s" (Var.name var));
+	   | _ -> dprintf "Unknown value during eval: %s" (Var.name var));
 	  l)	
 	   
 	  
@@ -982,6 +987,7 @@ let output_formula file trace =
     (*dprintf "formula size: %Ld\n" (formula_size formula) ;*)
     print "Printing out formula\n" ; flush stdout ;
     print_formula file formula ;
+    print "Done printing out formula\n";
     trace
 
       

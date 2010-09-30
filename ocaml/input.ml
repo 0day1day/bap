@@ -1,7 +1,20 @@
 
 
 let inputs = ref []
+and streaminputs = ref None
 and pintrace = ref false
+
+let stream_speclist =
+  (* let addinput i = streaminputs := i :: !streaminputs in *)
+  [
+    ("-tracestream",
+     Arg.String(fun s -> streaminputs := Some(`Tracestream s)),
+     "<file> Read a trace to be processed as a stream.");
+    
+    ("-pin",
+     Arg.Set pintrace,
+     "Enable pin trace.");
+  ]
 
 let speclist =
   let addinput i = inputs := i :: !inputs in
@@ -21,7 +34,7 @@ let speclist =
                 Arg.String(fun e->addinput(`Binrange(!f, !s, toint64 e)))]),
      "<file> <start> <end> Convert the given range of a binary to the IL");
     ("-trace",
-     Arg.String(fun s-> addinput (`Trace s)),
+     Arg.String(fun s -> addinput (`Trace s)),
      "<file> Read in a trace and lift it to the IL");
     ("-il",
      Arg.String(fun s -> addinput (`Il s)),
@@ -55,5 +68,10 @@ let get_program () =
     | arg::args -> cat (List.rev_append (List.rev (get_one arg)) p) args
   in
   cat [] !inputs
+
+let get_stream_program () = match !streaminputs with
+  | None -> raise(Arg.Bad "No input specified")
+  | Some(`Tracestream f) -> Asmir.bap_stream_from_trace_file ~pin:!pintrace f
+    
 
 (*  with fixme -> raise(Arg.Bad "Could not open input file")*)
