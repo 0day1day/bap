@@ -13,8 +13,9 @@ type prog =
 type cmd = 
   | TransformAst of (ast -> ast)
 
-let pipeline = ref []
+let concrete_state = Traces.TraceConcrete.create_state ()
 
+let pipeline = ref []
 
 let add c =
   pipeline := c :: !pipeline
@@ -22,16 +23,31 @@ let add c =
 let uadd c =
   Arg.Unit(fun()-> add c)
 
+(** Prints the block *)
 let prints block =
+  Printf.printf "new block\n";
   List.iter
     (fun stmt ->
        Printf.printf "Stmt: %s\n" (Pp.ast_stmt_to_string stmt)
     ) block;
+  Printf.printf "end block\n";
   block
+
+(** Concretely executes a block *)
+let concrete block =
+  let no_specials = Traces.remove_specials block in
+  let trace = try
+    Traces.run_block concrete_state no_specials 
+  with Failure "empty list" -> (*Printf.printf "run blocks failed\n";*) [] in
+  let straightline = Traces.cjmps_to_asserts trace in
+  let no_jumps = Traces.remove_jumps straightline in
+  no_jumps
 
 let speclist =
   ("-print", uadd(TransformAst(prints)),
      "Print each statement in the trace.")
+  ::("-concrete", uadd(TransformAst(concrete)),
+     "Concretely execute each block.")
   :: Input.stream_speclist
 
 let anon x = raise(Arg.Bad("Unexpected argument: '"^x^"'"))

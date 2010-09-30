@@ -514,17 +514,21 @@ let run_blocks blocks length =
   in
     Status.stop () ;
     List.flatten (List.rev rev_trace)
- 
+
 (** Converting cjmps to asserts. We use the results of
     the concrete execution of the trace in order to 
     determine the jump targets. *)
 let cjmps_to_asserts = 
   let rec cjmps_to_asserts acc = function
     | [] -> List.rev acc
-    | (Ast.CJmp (e,_,_,atts1),true)::(Ast.Label (_,_) as l,_)::xs ->
-	cjmps_to_asserts ([l ; Ast.Assert(e,atts1)]@acc) xs
-    | (Ast.CJmp (e,_,_,atts1),false)::(Ast.Label (_,_) as l,_)::xs ->
-	cjmps_to_asserts ([l ; Ast.Assert(UnOp(NOT,e),atts1)]@acc) xs
+    (* | (Ast.CJmp (e,_,_,atts1),true)::(Ast.Label (_,_) as l,_)::xs -> *)
+    (* 	cjmps_to_asserts ([l ; Ast.Assert(e,atts1)]@acc) xs *)
+    | (Ast.CJmp (e,_,_,atts1),true)::xs ->
+	cjmps_to_asserts ([Ast.Assert(e,atts1)]@acc) xs
+    (* | (Ast.CJmp (e,_,_,atts1),false)::(Ast.Label (_,_) as l,_)::xs -> *)
+    (* 	cjmps_to_asserts ([l ; Ast.Assert(UnOp(NOT,e),atts1)]@acc) xs *)
+    | (Ast.CJmp (e,_,_,atts1),false)::xs ->
+	cjmps_to_asserts ([Ast.Assert(UnOp(NOT,e),atts1)]@acc) xs
     | (x,_)::xs ->
 	cjmps_to_asserts (x::acc) xs
   in
