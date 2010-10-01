@@ -45,6 +45,7 @@ type opcode =
   | Retn
   | Mov of operand * operand (* dst, src *)
   | Call of operand * int64 (* Oimm is relative, int64 is RA *)
+  | Shift of binop_type * typ * operand * operand
 
 let unimplemented s  = failwith ("disasm_i386: unimplemented feature: "^s)
 
@@ -54,6 +55,9 @@ and (<<) = (lsl)
 
 
 (* register widths *)
+let r1 = Ast.reg_1
+let r8 = Ast.reg_8
+let r16 = Ast.reg_16
 let r32 = Ast.reg_32
 
 let nv = Var.newvar
@@ -69,19 +73,19 @@ and ebx = nv "R_EBX" r32
 and ecx = nv "R_ECX" r32
 and edx = nv "R_EDX" r32
 and eflags = nv "EFLAGS" r32
+  (* condition flag bits *)
+and cf = nv "R_CF" r1
+and pf = nv "R_PF" r1
+and af = nv "R_AF" r1
+and zf = nv "R_ZF" r1
+and sf = nv "R_SF" r1
+and oF = nv "R_OF" r1
 
 
 let regs : var list =
-  ebp::esp::esi::edi::eip::eax::ebx::ecx::edx::eflags::
+  ebp::esp::esi::edi::eip::eax::ebx::ecx::edx::eflags::cf::pf::af::zf::sf::oF::
   List.map (fun (n,t) -> Var.newvar n t)
     [
-  (* condition flag bits *)
-  ("R_CF", reg_1);
-  ("R_PF", reg_1);
-  ("R_AF", reg_1);
-  ("R_ZF", reg_1);
-  ("R_SF", reg_1);
-  ("R_OF", reg_1);
 
   (* VEX left-overs from calc'ing condition flags *)
   ("R_CC_OP", reg_32);
@@ -113,31 +117,47 @@ let regs : var list =
 
 
 
-let e_esp = Var esp
+let esp_e = Var esp
 
 let mem = nv "mem" (TMem(r32))
-let e_mem = Var mem
+let mem_e = Var mem
+and cf_e = Var cf
+and pf_e = Var pf
+and af_e = Var af
+and zf_e = Var zf
+and sf_e = Var sf
+and of_e = Var oF
+
 
 (* exp helpers *)
 let load t a =
-  Load(e_mem, a, little_endian, t)
+  Load(mem_e, a, little_endian, t)
+
 
 let (+*) a b = BinOp(PLUS, a, b)
 let (-*) a b = BinOp(MINUS, a, b)
 let (<<*) a b = BinOp(LSHIFT, a, b)
 let (>>*) a b = BinOp(RSHIFT, a, b)
 let (>>>*) a b = BinOp(ARSHIFT, a, b)
+let (&*) a b = BinOp(AND, a, b)
+let (|*) a b = BinOp(OR, a, b)
+let (^*) a b = BinOp(XOR, a, b)
+let (=*) a b = BinOp(EQ, a, b)
+
+let ite t b e1 e2 = (* FIXME: were we going to add a native if-then-else thing? *)
+  (Cast(CAST_SIGNED, t, b) &* e1) |*  (Cast(CAST_SIGNED, t, exp_not b) &* e2) 
 
 let l32 i = Int(i, r32)
 let i32 i = Int(Int64.of_int i, r32)
 
+module ToIR = struct
 
 (* stmt helpers *)
 let move v e =
   Move(v, e, [])
 
 let store t a e =
-  move mem (Store(e_mem, a, e, little_endian, t))
+  move mem (Store(mem_e, a, e, little_endian, t))
 
 let op2e t = function
   | Oreg r -> Var r
@@ -150,23 +170,55 @@ let assn t v e =
   | Oaddr a -> store t a e
   | Oimm _ -> failwith "disasm_i386: Can't assign to an immediate value"
 
+
 let reta = [StrAttr "ret"]
 and calla = [StrAttr "call"]
 
+let compute_sf result = Cast(CAST_HIGH, r1, result)
+let compute_zf t result = Int(0L, t) =* result
+let compute_pf result = Cast(CAST_LOW, r1, result)
+
 let to_ir pref = function
   | Retn when pref = [] ->
-    let t = Var.newvar "ra" r32 in
-    [move t (load r32 e_esp);
-     move esp (e_esp +* (i32 4));
+    let t = nv "ra" r32 in
+    [move t (load r32 esp_e);
+     move esp (esp_e +* (i32 4));
      Jmp(Var t, [StrAttr "ret"])
     ]
   | Mov(dst,src) when pref = [] ->
     [assn r32 dst (op2e r32 src)] (* FIXME: r32 *)
   | Call(Oimm i, ra) when pref = [] ->
-    [move esp (e_esp -* i32 4);
-     store r32 e_esp (l32 ra);
+    [move esp (esp_e -* i32 4);
+     store r32 esp_e (l32 ra);
      Jmp(l32(Int64.add i ra), calla)]
-    
+  | Shift(st, s, o1, o2) when pref = [] || pref = [Op_size] ->
+    assert (List.mem s [r8; r16; r32]);
+    (* FIXME: how should we deal with undefined state? *)
+    let t1 = nv "t1" s and tmpDEST = nv "tmpDEST" s
+    and bits = Arithmetic.bits_of_width s
+    and s_f = match st with LSHIFT -> (<<*) | RSHIFT -> (>>*) | ARSHIFT -> (>>>*)
+      | _ -> failwith "invalid shift type"
+    and count = (op2e r32 o2) &* i32 31
+    and e1 = op2e s o1 in
+    let ifzero = ite r1 (count =* i32 0)
+    and our_of = match st with
+      | LSHIFT -> Cast(CAST_HIGH, r1, e1) ^* cf_e
+      | RSHIFT -> Cast(CAST_HIGH, r1, Var tmpDEST)
+      | ARSHIFT -> exp_false
+      | _ -> failwith "imposible"
+    in
+    [move tmpDEST e1;
+     if st = LSHIFT then
+       move t1 (e1 >>* (i32 bits -* count))
+      else
+       move t1 (e1 <<* (count -* i32 1));
+     move cf (ifzero cf_e (Cast(CAST_LOW, r1, Var t1)));
+     assn s o1 (s_f e1 count);
+     move oF (ifzero of_e (ite r1 (count =* i32 1) (our_of) (Unknown("OF <- undefined", r1))));
+     move sf (ifzero sf_e (compute_sf e1));
+     move zf (ifzero zf_e (compute_zf s e1));
+     move pf (ifzero pf_e (compute_pf e1))
+    ]
   | _ -> unimplemented "to_ir"
 
 let add_labels a ir =
@@ -174,7 +226,7 @@ let add_labels a ir =
   ::Label(Name(Printf.sprintf "pc_0x%Lx" a),[])
   ::ir
 
-
+end (* ToIR *)
 
 
 (* converts a register number to the corresponding 32bit register variable *)
@@ -265,8 +317,15 @@ let disasm_instr g addr =
     let (r, rm, na) = parse_modrm32ext a in
     (bits2reg32 r, rm, na)
   in
+  let parse_imm8 a =
+    let (l,na) = parse_disp8 a in
+    (Oimm l, na)
+  and parse_imm32 a =
+    let (l,na) = parse_disp32 a in
+    (Oimm l, na)
+  in
 
-  let get_opcode a =
+  let get_opcode opsize a =
     let b1 = Char.code (g a)
     and na = s a in
     match b1 with
@@ -277,19 +336,36 @@ let disasm_instr g addr =
     | 0x8b -> let (r, rm, na) = parse_modrm32 na in
 	      (Mov(Oreg r, rm), na)
     | 0xc7 -> let (_, rm, na) = parse_modrm32 na in
-	      let (i,na) = parse_disp32 na in
-	      dprintf "c7 read imm %Lx ending at %Lx" i na;
-	      (Mov(rm, Oimm i), na)
-    | 0xe8 -> let (i,na) = parse_disp32 na in
-	      (Call(Oimm i, na), na)
+	      let (i,na) = parse_imm32 na in
+	      (Mov(rm, i), na)
+    | 0xe8 -> let (i,na) = parse_imm32 na in
+	      (Call(i, na), na)
+    | 0xc0 | 0xc1
+    | 0xd0 | 0xd1 | 0xd2
+    | 0xd3 -> let (r, rm, na) = parse_modrm32ext na in
+	      let opsize = if (b1 & 1) = 0 then r8 else opsize in
+	      let (amt, na) = match b1 & 0xfe with
+		| 0xc0 -> parse_imm8 na
+		| 0xd0 -> (Oimm 1L, na)
+		| 0xd2 -> (Oreg ecx, na)
+		| _ -> failwith "impossible"
+	      in
+	      (match r with (* Grp 2 *)
+	      | 4 -> (Shift(LSHIFT, opsize, rm, amt), na)
+	      | 5 -> (Shift(RSHIFT, opsize, rm, amt), na)
+	      | 7 -> (Shift(ARSHIFT, opsize, rm, amt), na)
+	      | _ -> unimplemented "Grp 2: rolls"
+	      )
+						 
     | 0xff -> let (r, rm, na) = parse_modrm32ext na in
-	      (match r with
+	      (match r with (* Grp 5 *)
 	      | _ -> unimplemented (Printf.sprintf "unsupported opcode: ff/%d" r)
 	      )
     | n -> unimplemented (Printf.sprintf "unsupported opcode: %x" n)
 
   in
   let pref, a = get_prefixes addr in
-  let op, a = get_opcode a in
-  let ir = to_ir pref op in
-  (add_labels addr ir, a)
+  let opsize = if List.mem Op_size pref then r16 else r32 in
+  let op, a = get_opcode opsize a in
+  let ir = ToIR.to_ir pref op in
+  (ToIR.add_labels addr ir, a)
