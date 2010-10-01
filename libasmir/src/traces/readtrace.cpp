@@ -41,11 +41,10 @@ bap_blocks_t * read_trace_from_file(const string &filename,
     // Initializations
     translate_init();
 
-    // First, skip 'offset' frames in the trace.
-    if (offset > tr.count()) {
+    if (!tr.seek(offset)) {
+      /* Couldn't seek there! */
       return NULL;
     }
-    assert(tr.seek(offset));
     
     while(
       (tr.pos() < tr.count()) && // Don't go past the end of the trace

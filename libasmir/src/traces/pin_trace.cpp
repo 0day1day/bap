@@ -1,3 +1,4 @@
+#include <cassert>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -13,6 +14,11 @@ TraceReader::TraceReader(void)
 
 }
 
+TraceReader::~TraceReader()
+{
+
+}
+
 TraceReader::TraceReader(const char *filename)
 {
   open(filename);
@@ -20,7 +26,7 @@ TraceReader::TraceReader(const char *filename)
 
 void TraceReader::open(const char *filename)
 {
-
+  
   frm_pos = 0;
   
   infile.open(filename, ios::in | ios::binary);
@@ -35,11 +41,41 @@ void TraceReader::open(const char *filename)
     throw TraceExn("Bad version.");
   }
   
-  // TODO: Read in and build the TOC structure.
+  // Read in and build the TOC structure.
+  if (header.toc_offset) {
+    uint32_t offset;
+    uint64_t frameno;
+    uint32_t toc_size;
+    KeyFrame *f;
+    
+    //    cerr << "header offset " << header.toc_offset << endl;
+    infile.seekg(header.toc_offset);
+    infile.read((char*)(&toc_size), sizeof(toc_size));
+    //    cerr << "TOC size " << toc_size << endl;
+
+    //    toc = new uint32_t[toc_size];
+    toc.reset(new std::map<uint64_t, uint64_t>);
+    
+    // read in the toc entries
+    for (uint64_t i = 0; i < toc_size; i++) {
+      // read in the offset
+      infile.read((char*)(&offset), sizeof(offset));
+      infile.seekg(offset);
+      f = dynamic_cast<KeyFrame*> (Frame::unserialize(infile, true));
+      frameno = f->pos;
+      delete f;
+      //infile.read((char*)(&frameno), sizeof(frameno));
+      //      cerr << "frame " << frameno << " is at position " << offset << endl;
+      (*toc)[frameno] = offset;
+    }
+  }
   
   // Setup the cache.
   memset(icache, 0, TRACE_ICACHE_SIZE * (MAX_INSN_BYTES + 1));
-    
+
+  // Seek to the first frame
+  infile.seekg(sizeof(TraceHeader));
+  
 }
     
 uint32_t TraceReader::count() const
@@ -56,12 +92,27 @@ uint32_t TraceReader::pos() const
 // successful.
 bool TraceReader::seek(uint32_t offset)
 {
-  // TODO: Make use of the TOC.
-  
   frm_pos = 0;
-  
+
   if (offset >= header.frame_count)
     return false;
+ 
+  /* Find the greatest keyframe that is less than or equal to the
+   * specified offset frame number. */
+  for (toc_map::iterator i = (*toc).begin(); i != (*toc).end(); i++) {
+    if (i->first <= offset && i->second > frm_pos) {
+      /* We have a new best hit */
+      frm_pos = i->first;
+    }
+  }
+
+  /* Now, go to that key frame (or if we didn't find one, go to frame
+   * zero. */
+  if (frm_pos == 0) {
+    infile.seekg(sizeof(TraceHeader));
+  } else {
+    infile.seekg((*toc)[frm_pos]);
+  }
   
   while (frm_pos < offset)
     next(false);

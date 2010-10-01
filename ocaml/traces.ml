@@ -107,6 +107,10 @@ let conc_mem_iter f =
 (*********************  Helper Functions  ********************)
 (*************************************************************)
 
+(** Get the expression for a symbolic value *)
+let symbtoexp = function
+  | Symbolic e -> e
+  | _ -> failwith "Not a symbolic expression"
   
 (* The number of bytes needed to represent each type *) 
 let typ_to_bytes = function 
@@ -381,34 +385,60 @@ module Status = Util.StatusPrinter
 module TaintConcrete = 
 struct 
   let lookup_var delta var = 
-    (* Check if we know the concrete value *)
-    try Symbolic(concrete_val (Var.name var)) 
+
+    (* We must first see if we can find the correct value in delta.
+       This is necessary because if we have an updated operand (say, ESP
+       = ESP+4), then any later references should be from the delta
+       context rather than the value we have in the trace. *)
+    try VH.find delta var
     with Not_found ->
-      (* otherwise do a symbolic lookup *)
-      (*pdebug ("did not find concrete for "  ^ name) ;*)
-      let l = Symbolic.lookup_var delta var in
-      (match l with
-      | Symbolic(Int _) -> ()
-      | ConcreteMem _ -> ()
-      | _ -> dprintf "Unknown value during eval: %s" (Var.name var));
-      l
+
+      (* We didn't find the variable in the delta context.  This could
+	 be the first time we are accessing it, and maybe it should
+	 come from the trace. *)
+
+      try Symbolic(concrete_val (Var.name var)) 
+      with Not_found ->
+
+	(* If the variable is memory, it's okay (we'll complain during
+	   lookup_mem if we can't find a value). If not, we're in
+	   trouble! *)
+	
+	match Var.typ var with
+	| TMem _ ->
+            empty_mem var
+	| Reg _ ->
+	    dprintf "Unknown variable during eval: %s" (Var.name var);
+            Symbolic(Int(0L, (Var.typ var)))
+	| _ -> failwith "Arrays not handled yet"
+	   
 	  
   let conc2symb = Symbolic.conc2symb
   let normalize = Symbolic.normalize
   let update_mem = Symbolic.update_mem 
   let lookup_mem mu index endian = 
     (*pdebug ("index at " ^ (Pp.ast_exp_to_string index)) ;*)
-    match index with
-      | Int(n,t) ->
-	  (try concrete_mem n
-	   with Not_found ->
-	     (*pdebug ("memory not found at "
-	       ^ (Printf.sprintf "%Lx" n));*)
-	     Symbolic.lookup_mem mu index endian
-	  )
-      | _ ->
-	  (*pdebug "symbolic memory??" ;*)
-	  Symbolic.lookup_mem mu index endian
+
+    (* Look for the data in mu *)
+    match mu, index with
+      | ConcreteMem(m,v), Int(i,t) ->
+          (try AddrMap.find (normalize i t) m
+           with Not_found ->
+
+	     (* Couldn't find it.  Oh well, let's check if we know
+		this one from the trace. *)
+	     try concrete_mem i
+	     with Not_found ->
+
+	       (* Well, this isn't good... Just make something up
+		  :( *)
+	       dprintf "Unknown memory value during eval: addr %Ld" i;
+	       Int(0L, reg_8)
+          )
+            (* perhaps we should introduce a symbolic variable *)
+      | Symbolic mem, _ -> (*Load (mem,index,endian,reg_8)*) failwith "Concrete evaluation should never have a symbolic memory"
+      | ConcreteMem(m,v),_ -> (*lookup_mem (conc2symb m v) index endian*) failwith "Concrete evaluation should never have a symbolic address"
+
   let assign = Symbolic.assign
 end
   
@@ -434,6 +464,19 @@ let check_delta state =
   VH.iter check_var state.delta
 
 let counter = ref 1
+
+(** Transformations needed for traces. *)
+let trace_transform_stmt ctaken stmt = 
+  let s = Printf.sprintf "Removed: %s" (Pp.ast_stmt_to_string stmt) in
+  let com = Ast.Comment(s, []) in
+  match stmt, ctaken with
+    | (Ast.CJmp (e,tl,_,atts1)), true ->
+    	[com; Ast.Assert(e,atts1)]
+    | (Ast.CJmp (e,_,fl,atts1)), false ->
+    	[com; Ast.Assert(UnOp(NOT,e),atts1)]
+    | (Ast.Jmp _), _ ->
+	[com]
+    | s,_ -> [s]
 
 (** Running each block separately *)
 let run_block state block = 
@@ -461,16 +504,18 @@ let run_block state block =
   let init = TraceConcrete.inst_fetch state.sigma state.pc in
   let executed = ref [] in
   let rec eval_block state stmt = 
-    (*pdebug (Pp.ast_stmt_to_string stmt);*)
+    (* pdebug (Pp.ast_stmt_to_string stmt); *)
     (*    Hashtbl.iter (fun k v -> pdebug (Printf.sprintf "%Lx -> %s" k (Pp.ast_exp_to_string v))) concrete_mem ;*)
     Status.inc();
-    let result = match stmt with
-      | Ast.CJmp (cond, _, _, _) ->
-	  TraceConcrete.eval_expr state.delta cond = val_true
+    let cbranchtaken = match stmt with
+      | Ast.CJmp (cond, _, _, _) -> TraceConcrete.eval_expr state.delta cond = val_true
       | _ -> false
     in
-    executed := (stmt,result) :: !executed ; 
-      (*print_endline (Pp.ast_stmt_to_string stmt) ;*)
+    executed := Util.fast_append (trace_transform_stmt cbranchtaken stmt) !executed ; 
+    (*print_endline (Pp.ast_stmt_to_string stmt) ;*)
+    
+	     
+
     try 
       (match TraceConcrete.eval_stmt state stmt with
 	 | [newstate] ->
@@ -482,26 +527,27 @@ let run_block state block =
       )
     with
 	(* Ignore failed assertions -- assuming that we introduced them *)
-      | AssertFailed _ -> 
-	  pdebug "ignoring failed assertion";
-	  let new_pc = Int64.succ state.pc in
-	  let next = TraceConcrete.inst_fetch state.sigma new_pc in
-	    eval_block {state with pc=new_pc} next
+      | AssertFailed _ as e -> 
+	  pdebug "failed assertion";
+	  raise e;
+	  (* let new_pc = Int64.succ state.pc in *)
+	  (* let next = TraceConcrete.inst_fetch state.sigma new_pc in *)
+	  (* eval_block {state with pc=new_pc} next *)
   in
     try
       eval_block state init
     with 
       |	Failure s as e -> 
-	  pdebug ("block evaluation failed :(\nReason: "^s) ;
+	  pwarn ("block evaluation failed :(\nReason: "^s) ;
 	  List.iter (fun s -> pdebug (Pp.ast_stmt_to_string s)) block ;
-	  if !consistency_check then (
+	  (*if !consistency_check then ( *)
 	    raise e
-	  ) else
-	  ((addr,false)::(info,false)::(List.tl !executed))
+	  (* ) else 
+	  ((addr,false)::(info,false)::(List.tl !executed)) *)
       | UnknownLabel ->
-	  ((addr,false)::(info,false)::List.rev !executed)
+	  ((addr)::(info)::List.rev (!executed))
       | Halted _ -> 
-	  ((addr,false)::(info,false)::List.rev (List.tl !executed))
+	  ((addr)::(info)::List.rev (List.tl !executed))
 
 let run_blocks blocks length =
   counter := 1 ;
@@ -512,27 +558,8 @@ let run_blocks blocks length =
        (run_block state block)::acc
     ) [] blocks
   in
-    Status.stop () ;
-    List.flatten (List.rev rev_trace)
-
-(** Converting cjmps to asserts. We use the results of
-    the concrete execution of the trace in order to 
-    determine the jump targets. *)
-let cjmps_to_asserts = 
-  let rec cjmps_to_asserts acc = function
-    | [] -> List.rev acc
-    (* | (Ast.CJmp (e,_,_,atts1),true)::(Ast.Label (_,_) as l,_)::xs -> *)
-    (* 	cjmps_to_asserts ([l ; Ast.Assert(e,atts1)]@acc) xs *)
-    | (Ast.CJmp (e,_,_,atts1),true)::xs ->
-	cjmps_to_asserts ([Ast.Assert(e,atts1)]@acc) xs
-    (* | (Ast.CJmp (e,_,_,atts1),false)::(Ast.Label (_,_) as l,_)::xs -> *)
-    (* 	cjmps_to_asserts ([l ; Ast.Assert(UnOp(NOT,e),atts1)]@acc) xs *)
-    | (Ast.CJmp (e,_,_,atts1),false)::xs ->
-	cjmps_to_asserts ([Ast.Assert(UnOp(NOT,e),atts1)]@acc) xs
-    | (x,_)::xs ->
-	cjmps_to_asserts (x::acc) xs
-  in
-    cjmps_to_asserts []
+  Status.stop () ;
+  List.flatten (List.rev rev_trace)
 
 (** Perform concolic execution on the trace and
     output a set of constraints *)
@@ -542,9 +569,7 @@ let concrete trace =
   (*pdebug ("blocks: " ^ (string_of_int (List.length blocks)));*)
   let length = List.length no_specials in
   let actual_trace = run_blocks blocks length in
-  let straightline = cjmps_to_asserts actual_trace in
-  let no_jumps = remove_jumps straightline in
-    no_jumps
+    actual_trace
 
 (*************************************************************)
 (********************  Concolic Execution  *******************)

@@ -2,8 +2,10 @@
 
 #pragma once
 
+#include <map>
 #include <iostream>
 #include <fstream>
+#include <memory>
 
 #include "pin_frame.h"
 
@@ -41,6 +43,8 @@
 
 namespace pintrace { // We will use namespace to avoid collision
 
+  typedef std::map<uint64_t, uint64_t> toc_map;
+  
    class TraceExn {
    public:
       const std::string msg;
@@ -64,17 +68,20 @@ namespace pintrace { // We will use namespace to avoid collision
 
    private:
 
-      uint64_t frm_pos;
-
+     uint64_t frm_pos;
+     // toc is a map from frame number to offset
+     std::auto_ptr<toc_map> toc;
+     
    protected:
       std::ifstream infile;
       TraceHeader header;
       // MAX instruction byte + instruction length (1 byte)
-      char icache[TRACE_ICACHE_SIZE][MAX_INSN_BYTES + 1];
-
+      char icache[TRACE_ICACHE_SIZE][MAX_INSN_BYTES + 1];     
+     
    public:
      TraceReader(const char *filename);
      TraceReader();
+     ~TraceReader();
      
      // Open a new file
      void open(const char *filename);

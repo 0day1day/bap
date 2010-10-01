@@ -39,9 +39,7 @@ let concrete block =
   let trace = try
     Traces.run_block concrete_state no_specials 
   with Failure "empty list" -> (*Printf.printf "run blocks failed\n";*) [] in
-  let straightline = Traces.cjmps_to_asserts trace in
-  let no_jumps = Traces.remove_jumps straightline in
-  no_jumps
+  trace
 
 let speclist =
   ("-print", uadd(TransformAst(prints)),
