@@ -68,6 +68,7 @@ export CLIBS = asmir vex opcodes bfd iberty stdc++
 export CFLAGS = -g
 export LDFLAGS = $(LIBASMIR_LDFLAGS) 
 export CLIBFLAGS= $(LDFLAGS)
+export RESULTDEPS = $(LIBASMIR)/src/libasmir.a $(VEX_DIR)/libvex.a
 export LIBDIRS = $(LIBASMIR)/src # ../appreplay ../stp ../stp/ocaml
 
 OCAMLFLAGS = -warn-error Aelz # -for-pack Bap #-w A
