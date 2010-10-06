@@ -17,7 +17,10 @@ open Util
 exception Disassembly_error;;
 
 type arch = Libbfd.bfd_architecture
-type asmprogram = {asmp:Libasmir.asm_program_t; arch : arch; get : int64 -> char }
+type asmprogram = {asmp : Libasmir.asm_program_t;
+		   arch : arch;
+		   secs : section_ptr list;
+		   get : int64 -> char }
 
 
 let arch_i386 = Bfd_arch_i386
@@ -360,18 +363,15 @@ let bfd_section_size = Libbfd.bfd_section_get_size
 let bfd_section_vma = Libbfd.bfd_section_get_vma
 let bfd_section_name = Libbfd.bfd_section_get_name
 
-let section_contents prog =
-  let secs = get_all_sections prog  in
+let section_contents prog secs =
   let bfd = Libasmir.asmir_get_bfd prog in
   let sc l s =
     let size = bfd_section_size s and vma = bfd_section_vma s in
     dprintf "Reading section at %Lx with size %Ld" vma size;
-    (* FIXME: we proabbly need to make sure to pass the original section and not
-       a reconstructed one... *)
     let (ok, a) = Libbfd.bfd_get_section_contents bfd s 0L size in
     if ok <> 0 then (vma, a)::l else (dprintf "failed."; l)
   in
-  let bits = Array.fold_left sc [] secs in
+  let bits = List.fold_left sc [] secs in
   let get a =
     (* let open Int64 in *)
     let (-) = Int64.sub and (+) = Int64.add in
@@ -390,21 +390,9 @@ let open_program filename =
   let prog = Libasmir.asmir_open_file filename in
     (* tell the GC how to free resources associated with prog *)
   Gc.finalise Libasmir.asmir_close prog;
-  let get = section_contents prog in
-
-  {asmp=prog; arch=Libasmir.asmir_get_asmp_arch prog; get=get}
-
-(** Translate an entire Libasmir.asm_program_t into a Vine program *)
-let asmprogram_to_bap ?(init_ro=false) ({asmp=asmp;arch=arch} as prog) = 
-  let bap_blocks = Libasmir.asmir_asmprogram_to_bap asmp in
-  let g = gamma_for_arch arch in
-  let ir = tr_bap_blocks_t g asmp bap_blocks in
-  destroy_bap_blocks bap_blocks;
-  if init_ro then
-    let m = gamma_lookup g "$mem" in
-    get_rodata_assignments ~prepend_to:ir m prog
-  else ir
-
+  let secs = Array.to_list (get_all_sections prog)  in
+  let get = section_contents prog secs in
+  {asmp=prog; arch=Libasmir.asmir_get_asmp_arch prog; secs=secs; get=get}
 
 
 
@@ -428,6 +416,25 @@ let asmprogram_to_bap_range ?(init_ro = false) p st en =
     else f (ir::l) n
   in
   f [] st
+
+let asmprogram_section_to_bap p s =
+  let size = bfd_section_size s and vma = bfd_section_vma s in
+  asmprogram_to_bap_range p vma (Int64.add vma size)
+
+let is_code sec =
+  Int64.logand (Libbfd.bfd_section_get_flags sec) Libbfd.sEC_CODE <> 0L
+
+(** Translate an entire Libasmir.asm_program_t into a Vine program *)
+let asmprogram_to_bap ?(init_ro=false) p =
+  let irs = List.map (fun s -> if is_code s then asmprogram_section_to_bap p s else []) p.secs in
+  let ir = List.flatten irs in
+
+  if init_ro then
+  let g = gamma_for_arch p.arch in
+    let m = gamma_lookup g "$mem" in
+    get_rodata_assignments ~prepend_to:ir m p
+  else ir
+
 
 
 

@@ -1,4 +1,5 @@
 #include "asm_program.h"
+#include <stdint.h>
 
 asection* bfd_sections( bfd *abfd) {
   return abfd->sections;
@@ -25,4 +26,8 @@ bfd_size_type bfd_section_get_size(asection *s) {
 
 const char* bfd_section_get_name(asection *s) {
   return s->name;
+}
+
+int64_t bfd_section_get_flags(asection *s) {
+  return s->flags;
 }

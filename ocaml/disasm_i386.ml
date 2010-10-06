@@ -331,6 +331,11 @@ let disasm_instr g addr =
     match b1 with
     | 0xc3 -> (Retn, na)
       (* FIXME: operand widths *)
+    | 0x80 | 0x81 | 0x82
+    | 0x83 -> let (r, rm, na) = parse_modrm32ext na in
+	      (match r with (* Grp 1 *)
+	      | _ -> unimplemented (Printf.sprintf "unsupported opcode: %x/%d" b1 r)
+	      )
     | 0x89 -> let (r, rm, na) = parse_modrm32 na in
 	      (Mov(rm, Oreg r), na)
     | 0x8b -> let (r, rm, na) = parse_modrm32 na in
