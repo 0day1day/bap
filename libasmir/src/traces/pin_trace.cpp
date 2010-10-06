@@ -9,6 +9,8 @@
 using namespace std;
 using namespace pintrace;
 
+#define DONTUSETOC 1
+
 TraceReader::TraceReader(void)
 {
 
@@ -110,7 +112,7 @@ bool TraceReader::seek(uint32_t offset)
    * zero. */
   //  cerr << "form pos: " << frm_pos << endl;
 
-  if (frm_pos == 0) {
+  if (frm_pos == 0 || DONTUSETOC) {
     infile.seekg(sizeof(TraceHeader));
   } else {
     //    cerr << "seek: frame pos " << frm_pos << " is at " << (*toc)[frm_pos] << endl;

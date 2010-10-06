@@ -65,14 +65,14 @@ Frame *Frame::unserialize(istream &in, bool noskip)
    uint16_t size;
    Frame *f = NULL;
 
-   cerr << "unserialize at " << in.tellg();
+   //   cerr << "unserialize at " << in.tellg();
 
    READ(in, packed_type);
    READ(in, size);   
 
    type = (FrameType) packed_type;
 
-   cerr << " type " << type << " size " << size << endl;
+   //   cerr << " type " << type << " size " << size << endl;
 
    if (!noskip) {
      //      printf("Skipping frame, %d bytes.\n", size - 3);
