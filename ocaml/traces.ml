@@ -54,7 +54,7 @@ type environment =
 (* A global environment to keep the concrete and taint 
    information of the statement block that is analyzed *)
 let global = 
-{
+  {
   vars     = Hashtbl.create 10;
   memory   = Hashtbl.create 10;
   symbolic = Hashtbl.create 10;
@@ -69,8 +69,8 @@ let concrete_val name = (var_lookup name).exp
 let concrete_mem index = (mem_lookup index).exp
 let symbolic_mem = Hashtbl.find global.symbolic
 
-let taint_val name = (var_lookup name).tnt
-let taint_mem index = (mem_lookup index).tnt
+let taint_val name = try (var_lookup name).tnt with Not_found -> false
+let taint_mem index = try (mem_lookup index).tnt with Not_found -> false
 
 let bound = Hashtbl.mem global.vars
 let in_memory = Hashtbl.mem global.memory
@@ -90,6 +90,16 @@ let add_symbolic = Hashtbl.replace global.symbolic
 let add_new_var var value usage taint = 
 (*  if not (bound var) then *)
     add_var var value usage taint
+
+let del_var var =
+  while Hashtbl.mem global.vars var do
+    Hashtbl.remove global.vars var
+  done
+
+let del_mem index =
+  while Hashtbl.mem global.memory index do
+    Hashtbl.remove global.memory index
+  done
 
 let del_symbolic = Hashtbl.remove global.symbolic
 
@@ -116,7 +126,7 @@ let symbtoexp = function
 let typ_to_bytes = function 
   | Reg 1 | Reg 8 -> 1
   | Reg 16 -> 2
-  | Reg 32 -> 4
+   | Reg 32 -> 4
   | Reg 64 -> 8
   | _ -> failwith "not a register" 
 
@@ -152,6 +162,11 @@ let is_temp var =
   (String.length var > 2) &&
     (String.sub var 0 2 = "T_")
 
+let is_symbolic (Var.V(_,s,_)) =
+  try
+    String.sub s 0 5 = "symb_"
+  with _ -> false
+
 (* This is a total HACK due to VEX's handling of the direction flag *)
 let direction_flag eflags = 
   match num_to_bit (Int64.logand eflags 0x400L) with
@@ -162,6 +177,11 @@ let direction_flag eflags =
    since PIN does not provide us with separate registers for 
    the zero, carry etc flags *)
 let add_eflags eflags usage taint =
+  add_var 
+    "R_AF" 
+    (Int(num_to_bit (Int64.logand eflags 0x16L), reg_1))
+    usage
+    taint;
   add_var 
     "R_CF" 
     (Int(num_to_bit (Int64.logand eflags 0x01L), reg_1))
@@ -219,7 +239,7 @@ let () =
       ("R_DX",("R_EDX",0,reg_32));
       ("R_BP",("R_EBP",0,reg_32));
       ("R_SI",("R_ESI",0,reg_32));
-      ("R_DI",("R_EDI",0,reg_32));
+   ("R_DI",("R_EDI",0,reg_32));
       ("R_SP",("R_ESP",0,reg_32));
     ]
 
@@ -268,11 +288,14 @@ let add_to_conc {name=name; mem=mem; index=index; value=value;
 	 if name = "EFLAGS" then add_eflags value usage taint)
 	
 (* Updating the lookup tables with the concrete values *)
-let update_concrete = function
+let update_concrete s =
+  match s with
   | Label (_,atts) -> 
       let conc_atts = filter_taint atts in
-        if conc_atts != [] then cleanup ();
-        List.iter add_to_conc conc_atts
+        if conc_atts != [] then (
+	  cleanup ();
+          List.iter add_to_conc conc_atts
+	)
   | _ -> ()
 
 (** Get the address of the next instruction in the trace *)
@@ -324,7 +347,7 @@ let remove_specials =
     | _ -> true
   in
     List.filter no_specials
-
+   
 (* Appends a Halt instruction to the end of the trace *)
 let append_halt trace = 
   let halt = Ast.Halt (exp_true, []) in
@@ -386,24 +409,28 @@ module TaintConcrete =
 struct 
   let lookup_var delta var = 
 
+    (* dprintf "looking up %s" (Var.name var); *)
+
     (* We must first see if we can find the correct value in delta.
        This is necessary because if we have an updated operand (say, ESP
        = ESP+4), then any later references should be from the delta
        context rather than the value we have in the trace. *)
-    try VH.find delta var
+    try (* dprintf "trying delta";*) VH.find delta var
     with Not_found ->
 
       (* We didn't find the variable in the delta context.  This could
 	 be the first time we are accessing it, and maybe it should
 	 come from the trace. *)
 
-      try Symbolic(concrete_val (Var.name var)) 
+      try (*dprintf "trying trace";*) Symbolic(concrete_val (Var.name var))
       with Not_found ->
 
 	(* If the variable is memory, it's okay (we'll complain during
 	   lookup_mem if we can't find a value). If not, we're in
 	   trouble! *)
 	
+	(*dprintf "not found!!!!";*)
+
 	match Var.typ var with
 	| TMem _ ->
             empty_mem var
@@ -415,14 +442,20 @@ struct
 	  
   let conc2symb = Symbolic.conc2symb
   let normalize = Symbolic.normalize
-  let update_mem = Symbolic.update_mem 
+  let update_mem mu pos value endian = 
+    (match mu,pos with
+    | ConcreteMem(_), Int(i,t) ->
+	del_mem i
+    | _ -> failwith "Bad memory for concrete evaluation");
+    Symbolic.update_mem mu pos value endian
+
   let lookup_mem mu index endian = 
     (*pdebug ("index at " ^ (Pp.ast_exp_to_string index)) ;*)
 
     (* Look for the data in mu *)
     match mu, index with
       | ConcreteMem(m,v), Int(i,t) ->
-          (try AddrMap.find (normalize i t) m
+   (try AddrMap.find (normalize i t) m
            with Not_found ->
 
 	     (* Couldn't find it.  Oh well, let's check if we know
@@ -439,7 +472,9 @@ struct
       | Symbolic mem, _ -> (*Load (mem,index,endian,reg_8)*) failwith "Concrete evaluation should never have a symbolic memory"
       | ConcreteMem(m,v),_ -> (*lookup_mem (conc2symb m v) index endian*) failwith "Concrete evaluation should never have a symbolic address"
 
-  let assign = Symbolic.assign
+  let assign v ev ctx =
+    del_var (Var.name v);
+    Symbolic.assign v ev ctx
 end
   
 module TraceConcrete = Symbeval.Make(TaintConcrete)(FullSubst)(StdForm)
@@ -477,7 +512,7 @@ let trace_transform_stmt ctaken stmt =
     | (Ast.Jmp _), _ ->
 	[com]
     | s,_ -> [s]
-
+	
 (** Running each block separately *)
 let run_block state block = 
   let addr, block = hd_tl block in
@@ -507,7 +542,7 @@ let run_block state block =
     (* pdebug (Pp.ast_stmt_to_string stmt); *)
     (*    Hashtbl.iter (fun k v -> pdebug (Printf.sprintf "%Lx -> %s" k (Pp.ast_exp_to_string v))) concrete_mem ;*)
     Status.inc();
-    let cbranchtaken = match stmt with
+   let cbranchtaken = match stmt with
       | Ast.CJmp (cond, _, _, _) -> TraceConcrete.eval_expr state.delta cond = val_true
       | _ -> false
     in
@@ -527,7 +562,7 @@ let run_block state block =
       )
     with
 	(* Ignore failed assertions -- assuming that we introduced them *)
-      | AssertFailed _ as e -> 
+    | AssertFailed _ as e -> 
 	  pdebug "failed assertion";
 	  raise e;
 	  (* let new_pc = Int64.succ state.pc in *)
@@ -552,8 +587,8 @@ let run_block state block =
 let run_blocks blocks length =
   counter := 1 ;
   Status.init "Concrete Run" length ;
-  let state = TraceConcrete.create_state () in
-  let rev_trace = List.fold_left 
+   let state = TraceConcrete.create_state () in
+   let rev_trace = List.fold_left 
     (fun acc block -> 
        (run_block state block)::acc
     ) [] blocks
@@ -581,7 +616,7 @@ let allow_symbolic_indices = ref false
 let full_symbolic = ref true
   
 let padding = ref false
-
+  
 (* Assumptions for the concretization process to be sound:
    - We can have at most one memory load/store on each 
    asm instruction
@@ -660,7 +695,7 @@ struct
 	  bindings := (And expression) :: !bindings
       | BinOp(EQ, Var v, value), Rename -> 
 	  bindings := (Let (v,value)) :: !bindings
-      | _ -> failwith "internal error: adding malformed constraint to formula"
+   | _ -> failwith "internal error: adding malformed constraint to formula"
     );
     StdForm.add_to_formula formula expression typ
 
@@ -679,52 +714,125 @@ end
 
 module TaintSymbolic = 
 struct 
-  let lookup_var delta var = 
+
+  let dsa_map = VH.create 1000
+  let dsa_ctr = ref 0
+
+  (** Given a variable name, return a new DSA variable name suitable
+      for assignment *)
+  let dsa_var = 
+    (fun (Var.V(_,s,t)) ->
+       dsa_ctr := !dsa_ctr + 1;
+       assert (!dsa_ctr <> 0);
+       let s = Printf.sprintf "%sdsa%d" s !dsa_ctr in
+       Var.newvar s t
+    )
+
+  (** Given a variable name, return a new DSA name suitable for
+      assigning to that variable, and add it to the DSA mapping *)
+  let dsa_add_map v =
+    let newv = dsa_var v in
+    VH.replace dsa_map v newv;
+    dprintf "DSA: Mapping %s to %s" (Var.name v) (Var.name newv);
+    newv
+
+  (** Given a variable, retrieve the current DSA binding for it *)
+  let dsa_get_map v =
+    VH.find dsa_map v
+
+  (* let lookup_var delta var = *)
+  (*   let name = Var.name var in *)
+  (*   let unknown = !full_symbolic && not (VH.mem delta var) in *)
+  (*    try *)
+  (*      (match taint_val name with *)
+  (*         | true when unknown -> *)
+  (*             (\* if its tainted and we know nothing about it *\) *)
+  (*             Symbolic (Var var) *)
+  (*         | true -> *)
+  (*             (\* if its tainted but we have to know something *\) *)
+  (*             Symbolic.lookup_var delta var *)
+  (*         | false -> *)
+  (*             (\* if its untainted gimme the concrete value *\) *)
+  (*             (\*(match concrete_val name with *)
+  (*                | Int (n, _) -> *)
+  (*                    Printf.printf "%s -> %Lx\n" name n *)
+  (*                | _ -> ()) ;*\) *)
+  (*             Symbolic(concrete_val name) *)
+  (*      ) *)
+  (*    with Not_found -> *)
+  (*      if unknown then *)
+  (*        (\* We can't do anything, make it symbolic *\) *)
+  (*        Symbolic (Var var) *)
+  (*      else *)
+  (*        (\* We have no concrete info about it -- its probably temporary *\) *)
+  (*        (let l = Symbolic.lookup_var delta var in *)
+  (*         (match l with *)
+  (*          | Symbolic(Int _) -> () *)
+  (*          | ConcreteMem _ -> () *)
+  (*          | _ -> wprintf "Unknown value during eval: %s" (Var.name var)); *)
+  (*         l) *)
+
+  let lookup_var delta var =
+
     let name = Var.name var in
-    let unknown = !full_symbolic && not (VH.mem delta var) in
-     try 
-       (match taint_val name with
-	  | true when unknown ->
-	      (* if its tainted and we know nothing about it *)
-	      Symbolic (Var var)
-	  | true ->
-	      (* if its tainted but we have to know something *)
-	      Symbolic.lookup_var delta var
-	  | false ->
-	      (* if its untainted gimme the concrete value *)
-	      (*(match concrete_val name with
-		 | Int (n, _) ->
-		     Printf.printf "%s -> %Lx\n" name n 
-		 | _ -> ()) ;*)
-	      Symbolic(concrete_val name)
-       )
-     with Not_found ->
-       if unknown then
-	 (* We can't do anything, make it symbolic *)
-	 Symbolic (Var var)
-       else
-	 (* We have no concrete info about it -- its probably temporary *)
-	 (let l = Symbolic.lookup_var delta var in
-	  (match l with
-	   | Symbolic(Int _) -> ()
-	   | ConcreteMem _ -> ()
-	   | _ -> dprintf "Unknown value during eval: %s" (Var.name var));
-	  l)	
-	   
-	  
+    dprintf "looking up var %s" name;
+
+    (* We need to use DSA because we combine the delta context with
+       let-based renaming.  If we did not use DSA, then assignments to
+       new registers could shadow previous computations.  *)
+    let getdsa var =
+      try
+	dsa_get_map var 
+      with Not_found ->
+	wprintf "DSA failed on %s" name;
+	var (* Well, the first time we might need to use our original names.. *)
+    in
+
+    let unknown = !full_symbolic && not (VH.mem delta (getdsa var)) in
+      (match taint_val name with
+       | true when unknown ->
+  	   (* If the variable is tainted and we don't have a formula for it, it is symbolic *)
+  	   Symbolic (Var var)
+       | true ->
+  	   (* If the variable is tainted, but we do have a formula for it *)
+  	   VH.find delta (getdsa var)
+
+       | false when is_symbolic var ->
+	   (* If the variable is untainted, but is a symbolic byte that we introduced *)
+	   Symbolic(Var(var))
+
+       | false ->
+  	   (* Finally, if untainted try to use the concrete value.
+  	      Otherwise, see if we can find the value in delta; it's
+  	      probably a temporary. *)
+  	   try
+  	     Symbolic(concrete_val name)
+  	   with
+  	     Not_found ->
+  	       try VH.find delta (getdsa var)
+  	       with Not_found ->
+  		 match Var.typ var with
+  		 | TMem _ -> dprintf "new memory"; empty_smem var
+  		 | _ ->
+  		     wprintf "Variable not found during evaluation: %s" name;
+  		     Symbolic(Var(var))
+		       
+      )
+	
+	
   let conc2symb = Symbolic.conc2symb
   let normalize = Symbolic.normalize
   let update_mem mu pos value endian =
     match is_concrete pos with
-      | true ->
-	  (match pos with
-	     | Int (n, _) -> del_symbolic n
-	     | _ -> ());
-	  Symbolic.update_mem mu pos value endian
-      | _ when !allow_symbolic_indices ->
-	  Symbolic.update_mem mu pos value endian
-      | false ->
-	  (* we have a symbolic write, let's concretize *)
+    | true ->
+	(match pos with
+	 | Int (n, _) -> del_symbolic n
+	 | _ -> ());
+	Symbolic.update_mem mu pos value endian
+    | _ when !allow_symbolic_indices ->
+	Symbolic.update_mem mu pos value endian
+    | false ->
+	(* we have a symbolic write, let's concretize *)
 	  try 
 	    let conc_index = get_concrete_write_index () in
 	    let extra = BinOp(EQ, pos, conc_index) in
@@ -735,44 +843,49 @@ struct
   (* TODO: add a memory initializer *)
 
   let rec lookup_mem mu index endian = 
+    dprintf "I am lookup mem";
     match index with
-      | Int(n,_) ->
-	  (try 
-	     (* Check if this is a symbolic seed *)
-	     let var = symbolic_mem n in
-	       pdebug ("introducing symbolic: "^(Pp.ast_exp_to_string var)) ;
-	       (*update_mem mu index var endian;
-		 Hashtbl.remove n;*)
-	       var
-	   with Not_found ->
-	     (* Check if we know something about this memory location *)
-	     (*pdebug ("not found in symb_mem "^(Printf.sprintf "%Lx" n)) ;*)
-	     let tainted = try taint_mem n with Not_found -> true in
-	       if tainted then
-		 Symbolic.lookup_mem mu index endian
-	       else
-		   concrete_mem n
-	  )
-      | _ ->
-	  if !allow_symbolic_indices then
-	    (pdebug ("Symbolic memory index at " 
-		     ^ (Pp.ast_exp_to_string index)) ;
-	     Symbolic.lookup_mem mu index endian)
-	  else
-	    try 
-	      (* Let's concretize everything *)
-	      let conc_index = get_concrete_read_index () in
-	      (*let extra = BinOp(EQ, index, conc_index) in
-		ignore (LetBind.add_to_formula exp_true extra Equal) ;*)
-		lookup_mem mu conc_index endian
-		  (*Symbolic.lookup_mem mu conc_index endian*)
-	    with Not_found ->
-	      Symbolic.lookup_mem mu index endian
-
+    | Int(n,_) ->
+	(try 
+	   (* Check if this is a symbolic seed *)
+	   let var = symbolic_mem n in
+	   pdebug ("introducing symbolic: "^(Pp.ast_exp_to_string var)) ;
+	   (*update_mem mu index var endian;
+	     Hashtbl.remove n;*)
+	   var
+	 with Not_found ->
+	   (* Check if we know something about this memory location *)
+	   (*pdebug ("not found in symb_mem "^(Printf.sprintf "%Lx" n)) ;*)
+	   let tainted = taint_mem n in
+	   if tainted then
+	     Symbolic.lookup_mem mu index endian
+	   else
+	     concrete_mem n
+	)
+    | _ ->
+	if !allow_symbolic_indices then
+	  (pdebug ("Symbolic memory index at " 
+		   ^ (Pp.ast_exp_to_string index)) ;
+	   Symbolic.lookup_mem mu index endian)
+	else
+	  try 
+	    (* Let's concretize everything *)
+	    dprintf "concretizing!";
+	    let conc_index = get_concrete_read_index () in
+	    (*let extra = BinOp(EQ, index, conc_index) in
+	      ignore (LetBind.add_to_formula exp_true extra Equal) ;*)
+	    lookup_mem mu conc_index endian
+	      (*Symbolic.lookup_mem mu conc_index endian*)
+	  with Not_found ->
+	    Symbolic.lookup_mem mu index endian
+	      
   let assign v ev ({delta=delta; pred=pred; pc=pc} as ctx) =
+    (* XXX: Make sure to remove concrete value *)
+
+    let v = dsa_add_map v in
+
     if !full_symbolic then
       let expr = symb_to_exp ev in
-      (*print_endline ((Var.name v) ^ " <- " ^ (Pp.ast_exp_to_string expr));*)
       let is_worth_storing = (*is_concrete expr &&*) is_temp (Var.name v) in
       let pred' =
 	if is_worth_storing then (context_update delta v ev ; pred)
@@ -832,10 +945,11 @@ let symbolic_run trace =
 	      let formula = TraceSymbolic.output_formula () in
 		print_formula ("form_" ^ (string_of_int !count)) formula))
 	     ;*)
+	   dprintf "Evaluating stmt %s" (Pp.ast_stmt_to_string stmt);
 	   (match stmt with
 	      | Ast.Label (_,atts) when filter_taint atts != [] -> 
-		  (*Printf.printf "%s\n" ("block no: " ^ (string_of_int !status));
-		  Printf.printf "%s\n" (Pp.ast_stmt_to_string stmt);*)
+		  (* Printf.printf "%s\n" ("block no: " ^ (string_of_int !status)); *)
+		  (* Printf.printf "%s\n" (Pp.ast_stmt_to_string stmt); *)
 		  get_indices();
 		  status := !status + 1 ;
 		  (*if !status > 3770 && !status < 3780 then 
@@ -849,15 +963,17 @@ let symbolic_run trace =
       in
 	state.pred
     with 
-      | Failure fail -> 
+      | Failure fail as e -> 
 	  pdebug ("Symbolic Run Fail: "^fail);
-	  state.pred
+	  (*state.pred*)
+	  raise e
       | Halted (_,state) -> 
 	  pdebug "Symbolic Run ... Successful!";
 	  state.pred
-      | AssertFailed _ ->
+      | AssertFailed _ as e ->
 	  pdebug "Failed assertion ..." ;
-	  state.pred
+	  (*state.pred*)
+	  raise e
   in
     Status.stop () ;
     formula

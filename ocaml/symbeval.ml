@@ -66,6 +66,7 @@ exception AssertFailed of ctx
 
 (* Useful shorthands *)
 let empty_mem v = ConcreteMem(AddrMap.empty, v)
+let empty_smem v = Symbolic(Var(v))
 let val_true = Symbolic exp_true
 let val_false = Symbolic exp_false
 let is_true_val = (=) val_true
