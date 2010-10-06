@@ -29,8 +29,8 @@ void TraceReader::open(const char *filename)
   
   frm_pos = 0;
   
+  infile.exceptions(ios::eofbit | ios::failbit | ios::badbit);
   infile.open(filename, ios::in | ios::binary);
-  
   infile.read((char *) &header, sizeof(TraceHeader));
   
   if (header.magic != TRACE_MAGIC) {
@@ -48,23 +48,23 @@ void TraceReader::open(const char *filename)
     uint32_t toc_size;
     KeyFrame *f;
     
-    //    cerr << "header offset " << header.toc_offset << endl;
+    //    cerr << "toc offset " << header.toc_offset << endl;
     infile.seekg(header.toc_offset);
     infile.read((char*)(&toc_size), sizeof(toc_size));
     //    cerr << "TOC size " << toc_size << endl;
 
-    //    toc = new uint32_t[toc_size];
     toc.reset(new std::map<uint64_t, uint64_t>);
     
     // read in the toc entries
     for (uint64_t i = 0; i < toc_size; i++) {
       // read in the offset
+      //      cerr << "about to read " << sizeof(offset) << " at " << infile.tellg() << endl;
       infile.read((char*)(&offset), sizeof(offset));
+      //      cerr << "file offset at " << offset << endl;
       infile.seekg(offset);
       f = dynamic_cast<KeyFrame*> (Frame::unserialize(infile, true));
       frameno = f->pos;
       delete f;
-      //infile.read((char*)(&frameno), sizeof(frameno));
       //      cerr << "frame " << frameno << " is at position " << offset << endl;
       (*toc)[frameno] = offset;
     }
@@ -108,14 +108,19 @@ bool TraceReader::seek(uint32_t offset)
 
   /* Now, go to that key frame (or if we didn't find one, go to frame
    * zero. */
+  //  cerr << "form pos: " << frm_pos << endl;
+
   if (frm_pos == 0) {
     infile.seekg(sizeof(TraceHeader));
   } else {
+    //    cerr << "seek: frame pos " << frm_pos << " is at " << (*toc)[frm_pos] << endl;
     infile.seekg((*toc)[frm_pos]);
   }
   
-  while (frm_pos < offset)
+  while (frm_pos < offset) {
+    //    cerr << "at " << frm_pos << endl;
     next(false);
+  }
   
   return true;
   
@@ -129,6 +134,8 @@ Frame *TraceReader::next(bool noskip)
    Frame *f = Frame::unserialize(infile, noskip);
    if(++frm_pos > header.frame_count) // we are at the eof.
       return NULL;
+
+   //   cerr << "frame pos " << frm_pos << " of " << header.frame_count << endl;
 
    if (noskip && (f->type == FRM_STD)) {
 

@@ -19,8 +19,8 @@ bap_blocks_t * read_trace_from_file(const string &filename,
   uint64_t counter = 0LL;
   pintrace::TraceReader tr;
 
-  //cerr << "offset " << offset << endl;
-  
+  //cerr << "reading from offset " << offset << endl;
+
   if(pintrace) {
 
     try {
@@ -41,6 +41,8 @@ bap_blocks_t * read_trace_from_file(const string &filename,
     // Initializations
     translate_init();
 
+    //    cerr << "plz seek to " << offset << " of " << tr.count() << endl;
+
     if (!tr.seek(offset)) {
       /* Couldn't seek there! */
       return NULL;
@@ -53,7 +55,10 @@ bap_blocks_t * read_trace_from_file(const string &filename,
 
       // Reading each instruction
       pintrace::Frame *f = tr.next();
+      assert(f);
       counter += 1;
+
+      //      cerr << "pos " << tr.pos() << " of " << tr.count() << endl;
       
       switch(f->type) {
           case pintrace::FRM_STD: // TODO: We should consider key frame

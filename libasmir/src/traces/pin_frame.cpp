@@ -60,15 +60,19 @@ uint32_t bytesOfType(uint32_t t) {
 Frame *Frame::unserialize(istream &in, bool noskip)
 {
 
-   unsigned char packed_type;
+   uint8_t packed_type;
    FrameType type;
    uint16_t size;
    Frame *f = NULL;
 
+   cerr << "unserialize at " << in.tellg();
+
    READ(in, packed_type);
-   READ(in, size);
+   READ(in, size);   
 
    type = (FrameType) packed_type;
+
+   cerr << " type " << type << " size " << size << endl;
 
    if (!noskip) {
      //      printf("Skipping frame, %d bytes.\n", size - 3);
@@ -408,9 +412,9 @@ ostream &KeyFrame::serialize(ostream &out, uint16_t sz)
 
    ostream &out2 = Frame::serialize(out, sz + 56);
    
-   WRITE(out2, pos);
+   WRITE(out2, pos); // 8
 
-   WRITE(out2, eax);
+   WRITE(out2, eax); // 4*9
    WRITE(out2, ebx);
    WRITE(out2, ecx);
    WRITE(out2, edx);
@@ -420,7 +424,7 @@ ostream &KeyFrame::serialize(ostream &out, uint16_t sz)
    WRITE(out2, ebp);
    WRITE(out2, eflags);
 
-   WRITE(out2, cs);
+   WRITE(out2, cs); // 2*6
    WRITE(out2, ds);
    WRITE(out2, ss);
    WRITE(out2, es);
