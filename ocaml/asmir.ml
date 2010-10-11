@@ -30,6 +30,9 @@ let arch_arm  = Bfd_arch_arm
 module D = Debug.Make(struct let name = "ASMIR" and default=`Debug end)
 open D
 
+(* more verbose debugging *)
+module DV = Debug.Make(struct let name = "AsmirV" and default=`NoDebug end)
+
 (** Translate a unop *)
 let tr_unop = function
   | Libasmir.NEG -> NEG
@@ -399,10 +402,12 @@ let open_program filename =
 (** Translate only one address of a  Libasmir.asm_program_t to Vine *)
 let asm_addr_to_bap {asmp=prog; arch=arch; get=get} addr =
   let g = gamma_for_arch arch in
-  try try Disasm.disasm_instr arch get addr
-    with Failure s -> dprintf "disasm_instr %Lx: %s" addr s; raise Disasm.Unimplemented
+  try try let v = Disasm.disasm_instr arch get addr in
+	  DV.dprintf "Disassembled %Lx directly" addr;
+	  v
+    with Failure s -> DV.dprintf "disasm_instr %Lx: %s" addr s; raise Disasm.Unimplemented
   with Disasm.Unimplemented ->
-    dprintf "Dissasembling %Lx through VEX" addr;
+    DV.dprintf "Disassembling %Lx through VEX" addr;
     let (block, next) = Libasmir.asmir_addr_to_bap prog addr in
     let ir = tr_bap_block_t g prog block in
     destroy_bap_block block;

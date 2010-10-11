@@ -43,6 +43,7 @@ type operand =
 
 type opcode =
   | Retn
+  | Nop
   | Mov of operand * operand (* dst, src *)
   | Call of operand * int64 (* Oimm is relative, int64 is RA *)
   | Shift of binop_type * typ * operand * operand
@@ -179,6 +180,7 @@ let compute_zf t result = Int(0L, t) =* result
 let compute_pf result = Cast(CAST_LOW, r1, result)
 
 let to_ir pref = function
+  | Nop -> []
   | Retn when pref = [] ->
     let t = nv "ra" r32 in
     [move t (load r32 esp_e);
@@ -229,6 +231,20 @@ let add_labels a ir =
 end (* ToIR *)
 
 
+module ToStr = struct
+
+  let pref2str = function
+  | Lock -> "lock"
+  | Repnz -> "repnz"
+  | Repz -> "repz"
+  | Override _ | Hint_bnt | Hint_bt
+  | Op_size | Mandatory_0f
+  | Address_size -> failwith "finish pref2str"
+
+
+end (* ToStr *)
+
+
 (* converts a register number to the corresponding 32bit register variable *)
 let bits2reg32= function
   | 0 -> eax
@@ -243,7 +259,7 @@ let bits2reg32= function
 
 let bits2reg32e b = Var(bits2reg32 b)
 
-let disasm_instr g addr =
+let parse_instr g addr =
   let s = Int64.succ in
 
   let get_prefix = function
@@ -340,6 +356,7 @@ let disasm_instr g addr =
 	      (Mov(rm, Oreg r), na)
     | 0x8b -> let (r, rm, na) = parse_modrm32 na in
 	      (Mov(Oreg r, rm), na)
+    | 0x90 -> (Nop, na)
     | 0xc7 -> let (_, rm, na) = parse_modrm32 na in
 	      let (i,na) = parse_imm32 na in
 	      (Mov(rm, i), na)
@@ -372,5 +389,12 @@ let disasm_instr g addr =
   let pref, a = get_prefixes addr in
   let opsize = if List.mem Op_size pref then r16 else r32 in
   let op, a = get_opcode opsize a in
+  (pref, op, a)
+
+
+let disasm_instr g addr =
+  let (pref, op, a) = parse_instr g addr in
   let ir = ToIR.to_ir pref op in
   (ToIR.add_labels addr ir, a)
+
+
