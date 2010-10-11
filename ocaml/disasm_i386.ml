@@ -27,6 +27,11 @@ open D
    7:6 Scale
    5:3 Index
    2:0 Base
+
+
+   In order to get the most common unspported opcodes, you can run something like:
+   for f in bin/*; do BAP_DEBUG_MODULES=AsmirV ~/bap/trunk/utils/iltrans -bin $f ; done 2>&1  >/dev/null  | grep opcode | sed 's/.*opcode: //' | sort | uniq -c | sort -n
+
 *)
 
 type segment = CS | SS | DS | ES | FS | GS
@@ -45,6 +50,7 @@ type opcode =
   | Retn
   | Nop
   | Mov of operand * operand (* dst, src *)
+  | Lea of operand * Ast.exp
   | Call of operand * int64 (* Oimm is relative, int64 is RA *)
   | Shift of binop_type * typ * operand * operand
 
@@ -189,6 +195,8 @@ let to_ir pref = function
     ]
   | Mov(dst,src) when pref = [] ->
     [assn r32 dst (op2e r32 src)] (* FIXME: r32 *)
+  | Lea(r, a) when pref = [] ->
+    [assn r32 r a]
   | Call(Oimm i, ra) when pref = [] ->
     [move esp (esp_e -* i32 4);
      store r32 esp_e (l32 ra);
@@ -223,8 +231,9 @@ let to_ir pref = function
     ]
   | _ -> unimplemented "to_ir"
 
-let add_labels a ir =
-  Label(Addr a,[])
+let add_labels ?(asm) a ir =
+  let attr = match asm with None -> [] | Some s -> [Asm(s)] in
+  Label(Addr a, attr)
   ::Label(Name(Printf.sprintf "pc_0x%Lx" a),[])
   ::ir
 
@@ -241,7 +250,23 @@ module ToStr = struct
   | Op_size | Mandatory_0f
   | Address_size -> failwith "finish pref2str"
 
+  let rec prefs2str = function [] -> ""
+    | x::xs -> pref2str x ^ " " ^ prefs2str xs
 
+  let opr = function
+    | Oreg v -> Var.name v
+    | Oimm i -> Int64.to_string i
+    | Oaddr a -> Pp.ast_exp_to_string a
+
+  let op2str = function
+    | Retn -> "ret"
+    | Nop -> "nop"
+    | Mov(d,s) -> Printf.sprintf "mov %s, %s" (opr d) (opr s)
+    | Lea(r,a) -> Printf.sprintf "lea %s, %s" (opr r) (opr (Oaddr a))
+    | Call(a, ra) -> Printf.sprintf "call %s" (opr a)
+    | Shift _ -> "shift"
+
+  let to_string pref op = prefs2str pref ^ op2str op
 end (* ToStr *)
 
 
@@ -288,7 +313,7 @@ let parse_instr g addr =
     f [] a
   in
   let parse_disp8 a =
-    (Int64.of_int (Char.code (g a)), s a)
+    (Arithmetic.tos64 (Int64.of_int (Char.code (g a)), r8), s a)
   and parse_disp32 a =
     let r n = Int64.shift_left (Int64.of_int (Char.code (g (Int64.add a (Int64.of_int n))))) (8*n) in
     let d = r 0 in
@@ -331,11 +356,14 @@ let parse_instr g addr =
   in
   let parse_modrm32 a =
     let (r, rm, na) = parse_modrm32ext a in
-    (bits2reg32 r, rm, na)
+    (Oreg(bits2reg32 r), rm, na)
+  in
+  let parse_modrm opsize a = match opsize with
+    | Reg 32 -> parse_modrm32 a
+    | _ -> unimplemented "modrm other than 32"
   in
   let parse_imm8 a =
-    let (l,na) = parse_disp8 a in
-    (Oimm l, na)
+    (Oimm(Int64.of_int (Char.code (g a))), s a)
   and parse_imm32 a =
     let (l,na) = parse_disp32 a in
     (Oimm l, na)
@@ -353,9 +381,14 @@ let parse_instr g addr =
 	      | _ -> unimplemented (Printf.sprintf "unsupported opcode: %x/%d" b1 r)
 	      )
     | 0x89 -> let (r, rm, na) = parse_modrm32 na in
-	      (Mov(rm, Oreg r), na)
+	      (Mov(rm, r), na)
     | 0x8b -> let (r, rm, na) = parse_modrm32 na in
-	      (Mov(Oreg r, rm), na)
+	      (Mov(r, rm), na)
+    | 0x8d -> let (r, rm, na) = parse_modrm opsize na in
+	      (match rm with
+	      | Oaddr a -> (Lea(r, a), na)
+	      | _ -> failwith "invalid lea (must be address)"
+	      )
     | 0x90 -> (Nop, na)
     | 0xc7 -> let (_, rm, na) = parse_modrm32 na in
 	      let (i,na) = parse_imm32 na in
@@ -395,6 +428,7 @@ let parse_instr g addr =
 let disasm_instr g addr =
   let (pref, op, a) = parse_instr g addr in
   let ir = ToIR.to_ir pref op in
-  (ToIR.add_labels addr ir, a)
+  let asm = try ToStr.to_string pref op with Failure _ -> "fixme" in
+  (ToIR.add_labels ~asm addr ir, a)
 
 
