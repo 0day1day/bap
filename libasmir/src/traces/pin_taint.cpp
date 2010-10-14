@@ -101,6 +101,7 @@ void TaintTracker::setTaintNetwork()
 
 
 void TaintTracker::acceptHelper(uint32_t fd) {
+  cerr << "Tainting fd " << fd << endl;
   fds.insert(fd);
 }
 
