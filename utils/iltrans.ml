@@ -75,6 +75,10 @@ let output_ssa_ddg f p =
     close_out oc;
     p
 
+let to_dsa p =
+  let p,_ = Traces.to_dsa p in
+  p 
+
 let sccvn p =
   fst(Sccvn.replacer p)
 let deadcode p =
@@ -162,6 +166,9 @@ let speclist =
      uadd(TransformAst Traces.valid_to_invalid),
      "Formula debugging. Prints to files form_val and form_inv"
     )
+  ::("-trace-dsa",
+     uadd(TransformAst to_dsa),
+     "Convert to DSA form.")
    ::("-trace-target", 
      Arg.String (fun i -> add(TransformAst(Traces.control_flow i))),
      "<addr> Provide the target address <addr>"

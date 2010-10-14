@@ -296,7 +296,7 @@ struct
 	     | Reg _ ->  (* we only care about 32bit *)
 		 eval_expr delta (Memory2array.split_loads mem ind reg_32 t endian)
 	     | Array _ ->
-		 failwith "loading array currently unsupported"
+		 failwith ("loading array currently unsupported" ^ (Pp.typ_to_string t))
 	     | _ -> failwith "not a loadable type"
 	  )
       | Store (mem,ind,value,endian,t) ->
@@ -406,11 +406,11 @@ struct
     try VH.find delta var
     with Not_found ->
       match Var.typ var with
-	| TMem _ ->
+	| TMem _ 
+	| Array _ ->
 	    empty_mem var
 	| Reg _ ->
 	    Symbolic(Var var)
-	| _ -> failwith "Arrays not handled yet"
 	    
   (* Converting concrete memory to symbolic *)
   let conc2symb memory v =

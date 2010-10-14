@@ -686,11 +686,12 @@ bool TaintTracker::hasTaint(context &delta)
 bool TaintTracker::propagatedTaint(bool branch)
 {
   if (branch)
-    return true;
+    return false;
   for (uint32_t i = 0 ; i < count ; i++)
-    if ((values[i].usage == RD) 
-        && (values[i].loc != REG_EFLAGS) 
-        && values[i].taint)
+    if ((values[i].usage == RD)
+        && isReg(values[i].type)
+        && values[i].loc != REG_EFLAGS
+        && values[i].taint != NOTAINT)
       return true;
   return false;
 } 
@@ -699,7 +700,9 @@ bool TaintTracker::propagatedTaint(bool branch)
 bool TaintTracker::taintChecking()
 {
   for (uint32_t i = 0 ; i < count ; i++)
-    if ((values[i].loc == REG_INST_PTR) && values[i].taint)
+    if ((values[i].loc == REG_INST_PTR)
+        && isReg(values[i].type)
+        && values[i].taint != NOTAINT)
       return false;
   return true;
 }

@@ -17,6 +17,7 @@ rule token = parse
   | "ASSERT"         { ASSERT }
   | "Invalid"        { INVALID }
   | "0x"             { read_num lexbuf }
+  | "0b"             { read_num lexbuf }
   | varname as var   { VAR var }
   | eof              { EOF }
   | _                { token lexbuf }
@@ -24,3 +25,4 @@ rule token = parse
 and read_num = parse
   | digit+ as n      { VAL(Int64.of_string ("0x"^n)) }
   | _                { token lexbuf }
+

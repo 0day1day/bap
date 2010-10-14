@@ -18,15 +18,22 @@ class type t = object
   (** Called when visiting a referenced variable *)
   method visit_rvar : var -> var visit_action
 
-  (** Called when visiting assigned variable.
-      Note that in a Move(), referenced variables will be visited first, so
-      that this can be used to add the assigned variable to your context.
+  (** Called when visiting assigned variable.  
+
+      Note that in a Move() or Let(), referenced variables will be
+      visited first, so that this can be used to add the assigned
+      variable to your context.  
   *)
   method visit_avar : var -> var visit_action
 
-  (** Called on the binding when recursinig into a Let. This allows
+  (** Called when visiting a variable being unbound.  For instance,
+      variable x after visiting let x = y in z. *)
+  method visit_uvar: var -> var visit_action
+
+  (** Called on the binding when recursing into a Let. This allows
       doing stuff between the first and second expressions in a Let. *)
   method visit_binding: var * exp -> (var * exp) visit_action 
+
 
 end
 
@@ -36,6 +43,7 @@ class nop : t = object
   method visit_avar _  = `DoChildren
   method visit_rvar _  = `DoChildren
   method visit_binding _ = `DoChildren
+  method visit_uvar _ = `DoChildren
 end
 
 
@@ -133,6 +141,7 @@ let rec exp_accept visitor =
     | Let(v,e1,e2) ->
 	let (v',e1') = binding_accept visitor (v,e1) in
 	let e2' = exp_accept visitor e2 in
+	let v' = uvar_accept visitor v' in
 	Let(v', e1', e2')
   in
   action (wrapexp vischil) visitor#visit_exp
@@ -145,11 +154,19 @@ and rvar_accept visitor =
 
 and binding_accept visitor =
   let vischil (v,e) =
-    let v' = avar_accept visitor v in
     let e' = exp_accept visitor e in
+    let v' = avar_accept visitor v in
     (v', e')
   in
   action vischil visitor#visit_binding
+
+and uvar_accept visitor =
+  let vischil v = 
+    (* We already visited children in the binding, so we pretend we
+       have no children here. *)
+    v
+  in
+  action vischil visitor#visit_uvar
 
 and stmt_accept visitor = 
   let vischil = function 

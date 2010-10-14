@@ -9,8 +9,10 @@
 using namespace std;
 using namespace pintrace;
 
-#define DONTUSETOC 1
+namespace pintrace {
 
+  const bool use_toc = false;
+  
 TraceReader::TraceReader(void)
 {
 
@@ -44,25 +46,26 @@ void TraceReader::open(const char *filename)
   }
   
   // Read in and build the TOC structure.
-  if (header.toc_offset) {
+  if (use_toc && header.toc_offset) {
     uint32_t offset;
     uint64_t frameno;
     uint32_t toc_size;
     KeyFrame *f;
     
-    //    cerr << "toc offset " << header.toc_offset << endl;
+    //cerr << "toc offset " << header.toc_offset << endl;
     infile.seekg(header.toc_offset);
     infile.read((char*)(&toc_size), sizeof(toc_size));
-    //    cerr << "TOC size " << toc_size << endl;
+    //cerr << "TOC size " << toc_size << endl;
 
     toc.reset(new std::map<uint64_t, uint64_t>);
     
     // read in the toc entries
     for (uint64_t i = 0; i < toc_size; i++) {
       // read in the offset
-      //      cerr << "about to read " << sizeof(offset) << " at " << infile.tellg() << endl;
+      infile.seekg(header.toc_offset + sizeof(offset)*(i+1));
+      //cerr << "about to read " << sizeof(offset) << " at " << infile.tellg() << endl;
       infile.read((char*)(&offset), sizeof(offset));
-      //      cerr << "file offset at " << offset << endl;
+      //cerr << "file offset at " << offset << endl;
       infile.seekg(offset);
       f = dynamic_cast<KeyFrame*> (Frame::unserialize(infile, true));
       frameno = f->pos;
@@ -98,13 +101,16 @@ bool TraceReader::seek(uint32_t offset)
 
   if (offset >= header.frame_count)
     return false;
- 
-  /* Find the greatest keyframe that is less than or equal to the
-   * specified offset frame number. */
-  for (toc_map::iterator i = (*toc).begin(); i != (*toc).end(); i++) {
-    if (i->first <= offset && i->second > frm_pos) {
-      /* We have a new best hit */
-      frm_pos = i->first;
+
+  if (use_toc) {
+  
+    /* Find the greatest keyframe that is less than or equal to the
+     * specified offset frame number. */
+    for (toc_map::iterator i = (*toc).begin(); i != (*toc).end(); i++) {
+      if (i->first <= offset && i->second > frm_pos) {
+        /* We have a new best hit */
+        frm_pos = i->first;
+      }
     }
   }
 
@@ -112,7 +118,7 @@ bool TraceReader::seek(uint32_t offset)
    * zero. */
   //  cerr << "form pos: " << frm_pos << endl;
 
-  if (frm_pos == 0 || DONTUSETOC) {
+  if (frm_pos == 0) {
     infile.seekg(sizeof(TraceHeader));
   } else {
     //    cerr << "seek: frame pos " << frm_pos << " is at " << (*toc)[frm_pos] << endl;
@@ -323,3 +329,5 @@ int main(int argc, char **argv) {
    return 0;
 }
 #endif
+
+}

@@ -62,18 +62,67 @@ let global =
 
 (* Some wrappers to interface with the above datastructures *)
 
-let var_lookup = Hashtbl.find global.vars
-let mem_lookup = Hashtbl.find global.memory
+let var_lookup v = try Some(Hashtbl.find global.vars v) with Not_found -> None
+let mem_lookup i = try Some(Hashtbl.find global.memory i) with Not_found -> None
 
-let concrete_val name = (var_lookup name).exp
-let concrete_mem index = (mem_lookup index).exp
+(** This is a map from DSA variable names to standard variable names. *)
+let dsa_rev_map = ref None
+
+(** Convert a DSA var to a normal var *)
+let dsa_var dv =
+  match !dsa_rev_map with
+  | Some(map) ->
+      (try Some(VH.find map dv)
+       with Not_found -> None)
+  | None -> Some(dv)
+
+(** Get original variable name from DSA var *)
+let dsa_orig_name dv =
+  match dsa_var dv with
+  | Some(x) -> Some(Var.name x)
+  | None -> None
+
+(** Looks for concrete value information by a DSA name *)
+let dsa_var_lookup dv =
+  match dsa_var dv with
+  | Some(v) -> 
+      var_lookup (Var.name v)
+  | None -> None 
+
+let concrete_val name = match (var_lookup name) with
+  | Some(e) -> Some(e.exp)
+  | None -> None
+let dsa_concrete_val dv = match dsa_var_lookup dv with
+  | Some(e) -> Some(e.exp)
+  | None -> None
+let concrete_mem index = match (mem_lookup index) with
+  | Some(e) -> Some(e.exp)
+  | None -> None
 let symbolic_mem = Hashtbl.find global.symbolic
 
-let taint_val name = try (var_lookup name).tnt with Not_found -> false
-let taint_mem index = try (mem_lookup index).tnt with Not_found -> false
+let taint_val name = match (var_lookup name) with
+  | Some(x) -> Some(x.tnt)
+  | None -> None
+let dsa_taint_val dv = match (dsa_var_lookup dv) with
+  | Some(x) -> Some(x.tnt)
+  | None -> None
+let taint_mem index = match (mem_lookup index) with
+  | Some(x) -> Some(x.tnt)
+  | None -> None
 
 let bound = Hashtbl.mem global.vars
 let in_memory = Hashtbl.mem global.memory
+
+(* (\** Create a lookup for our variables *\) *)
+(* let gamma = Asmir.gamma_create Asmir.x86_mem Asmir.x86_regs *)
+
+(* (\** Convert name of a register to a var for that register *\) *)
+(* let name_to_var name = *)
+(*   try *)
+(*     Some(Asmir.gamma_lookup gamma var) *)
+(*   with Failure _ ->  *)
+(*     wprintf "Did not find %s in gamma" var; *)
+(*     None *)
 
 let add_var var value usage taint = 
   Hashtbl.replace global.vars var 
@@ -95,6 +144,11 @@ let del_var var =
   while Hashtbl.mem global.vars var do
     Hashtbl.remove global.vars var
   done
+
+let dsa_del_var dv =
+  match dsa_var dv with
+  | Some(v) -> del_var (Var.name v)
+  | None -> ()
 
 let del_mem index =
   while Hashtbl.mem global.memory index do
@@ -167,6 +221,14 @@ let is_symbolic (Var.V(_,s,_)) =
     String.sub s 0 5 = "symb_"
   with _ -> false
 
+(** remove temporaries from delta *)
+let clean_delta delta =
+  let clean_var v _ =
+    if is_temp (Var.name v) then
+      VH.remove delta v
+  in
+  VH.iter clean_var delta
+
 (* This is a total HACK due to VEX's handling of the direction flag *)
 let direction_flag eflags = 
   match num_to_bit (Int64.logand eflags 0x400L) with
@@ -179,7 +241,7 @@ let direction_flag eflags =
 let add_eflags eflags usage taint =
   add_var 
     "R_AF" 
-    (Int(num_to_bit (Int64.logand eflags 0x16L), reg_1))
+    (Int(num_to_bit (Int64.logand eflags 0x10L), reg_1))
     usage
     taint;
   add_var 
@@ -239,17 +301,26 @@ let () =
       ("R_DX",("R_EDX",0,reg_32));
       ("R_BP",("R_EBP",0,reg_32));
       ("R_SI",("R_ESI",0,reg_32));
-   ("R_DI",("R_EDI",0,reg_32));
+      ("R_DI",("R_EDI",0,reg_32));
       ("R_SP",("R_ESP",0,reg_32));
     ]
 
-    (** Keep track of registers not always updated in BAP.  *)
+(** Keep track of registers not always updated in BAP.  *)
 let badregs = Hashtbl.create 32
 let () =
   List.iter (fun r -> Hashtbl.add badregs r ())
-    [
-      ("EFLAGS")
-    ]
+    ("EFLAGS"
+     ::"R_FS"
+     ::"R_LDT"
+     ::"R_GDT"
+     ::"R_AF"
+     ::"R_CC_OP"
+     ::"R_CC_DEP1"
+     ::"R_CC_DEP2"
+     ::"R_CC_NDEP"
+     ::[])
+    
+let isbad v = Hashtbl.mem badregs (Var.name v)
 
 (********************************************************)
 	  
@@ -409,36 +480,35 @@ module TaintConcrete =
 struct 
   let lookup_var delta var = 
 
-    (* dprintf "looking up %s" (Var.name var); *)
+    dprintf "looking up %s" (Var.name var);
 
-    (* We must first see if we can find the correct value in delta.
-       This is necessary because if we have an updated operand (say, ESP
-       = ESP+4), then any later references should be from the delta
-       context rather than the value we have in the trace. *)
-    try (* dprintf "trying delta";*) VH.find delta var
-    with Not_found ->
+    match dsa_concrete_val var with
+    | Some(traceval) ->	
+    
+    (* First, look up in the trace. *)
+	Symbolic(traceval)
 
-      (* We didn't find the variable in the delta context.  This could
-	 be the first time we are accessing it, and maybe it should
-	 come from the trace. *)
-
-      try (*dprintf "trying trace";*) Symbolic(concrete_val (Var.name var))
-      with Not_found ->
-
-	(* If the variable is memory, it's okay (we'll complain during
-	   lookup_mem if we can't find a value). If not, we're in
-	   trouble! *)
+    | None ->
 	
-	(*dprintf "not found!!!!";*)
-
-	match Var.typ var with
-	| TMem _ ->
-            empty_mem var
-	| Reg _ ->
-	    dprintf "Unknown variable during eval: %s" (Var.name var);
-            Symbolic(Int(0L, (Var.typ var)))
-	| _ -> failwith "Arrays not handled yet"
-	   
+	(* If we can't find it there, then check in delta. Maybe we
+	   updated it (e.g., R_ESP = R_ESP+4) *)
+	
+	try dprintf "trying delta"; VH.find delta var
+	with Not_found ->
+	  
+	  (* If the variable is memory, it's okay (we'll complain during
+	     lookup_mem if we can't find a value). If not, we're in
+	     trouble! *)
+	  
+	  match Var.typ var with
+	  | TMem _
+	  | Array _ ->
+              empty_mem var
+	  | Reg _ ->
+	      if not (isbad var) then 
+		wprintf "Unknown variable during eval: %s" (Var.name var);
+              Symbolic(Int(0L, (Var.typ var)))
+	      
 	  
   let conc2symb = Symbolic.conc2symb
   let normalize = Symbolic.normalize
@@ -451,29 +521,32 @@ struct
 
   let lookup_mem mu index endian = 
     (*pdebug ("index at " ^ (Pp.ast_exp_to_string index)) ;*)
-
+    
     (* Look for the data in mu *)
     match mu, index with
-      | ConcreteMem(m,v), Int(i,t) ->
-   (try AddrMap.find (normalize i t) m
-           with Not_found ->
+    | ConcreteMem(m,v), Int(i,t) -> (
 
-	     (* Couldn't find it.  Oh well, let's check if we know
-		this one from the trace. *)
-	     try concrete_mem i
-	     with Not_found ->
+	(* First, search the trace memory *)
+	match concrete_mem i with
+	| Some(traceval) ->
+	    traceval
+	| None -> 
 
-	       (* Well, this isn't good... Just make something up
-		  :( *)
-	       dprintf "Unknown memory value during eval: addr %Ld" i;
-	       Int(0L, reg_8)
-          )
-            (* perhaps we should introduce a symbolic variable *)
-      | Symbolic mem, _ -> (*Load (mem,index,endian,reg_8)*) failwith "Concrete evaluation should never have a symbolic memory"
-      | ConcreteMem(m,v),_ -> (*lookup_mem (conc2symb m v) index endian*) failwith "Concrete evaluation should never have a symbolic address"
+	  (* If that doesn't work, check delta *)
+
+	    try AddrMap.find (normalize i t) m
+            with Not_found ->
+	      
+	      (* Well, this isn't good... Just make something up
+		 :( *)
+	      wprintf "Unknown memory value during eval: addr %Ld" i;
+	      Int(0L, reg_8)
+      )              
+	
+    | _ -> failwith "Concrete evaluation should never have symbolic memories"
 
   let assign v ev ctx =
-    del_var (Var.name v);
+    dsa_del_var v;
     Symbolic.assign v ev ctx
 end
   
@@ -483,18 +556,24 @@ module TraceConcrete = Symbeval.Make(TaintConcrete)(FullSubst)(StdForm)
     loaded from a trace. We should be able to find bugs in BAP and the
     trace code using this. *)
 let check_delta state =
+  (* let dsa_concrete_val v = concrete_val (Var.name v) in *)
+  (* let dsa_taint_val v = taint_val (Var.name v) in *)
   let check_var var evalval =
-    try
-      let traceval = concrete_val (Var.name var) in
-      let evalval = match evalval with
-	| Symbolic e -> e
-	| _ -> failwith "Uh oh"
-      in
-      let tainted = taint_val (Var.name var) in
-      if (traceval <> evalval && tainted && not (Hashtbl.mem badregs (Var.name var))) then 
-	wprintf "Difference between tainted BAP and trace values in previous instruction: %s Trace=%s Eval=%s" (Var.name var) (Pp.ast_exp_to_string traceval) (Pp.ast_exp_to_string evalval)
-    (* If we can't find concrete value, it's probably just a BAP temporary *)
-    with Not_found -> ()
+    match Var.typ var with
+    | Reg _ -> (
+	let dsavarname = dsa_orig_name var in
+	let traceval = dsa_concrete_val var in
+	let evalval = symbtoexp evalval in
+	let tainted = dsa_taint_val var in
+	match dsavarname, traceval, tainted with
+	| Some(dsavarname), Some(traceval), Some(tainted) -> 
+	    (dprintf "Doing check on %s" dsavarname;
+	     if (traceval <> evalval && tainted && not (Hashtbl.mem badregs (Var.name var))) then 
+	       wprintf "Difference between tainted BAP and trace values in previous instruction: %s Trace=%s Eval=%s" (dsavarname) (Pp.ast_exp_to_string traceval) (Pp.ast_exp_to_string evalval)
+		 (* If we can't find concrete value, it's probably just a BAP temporary *)
+	    )
+	| _ -> ( (* probably a temporary *) ))
+    | _ -> ( (* this is a memory *) )
   in
   VH.iter check_var state.delta
 
@@ -521,6 +600,8 @@ let run_block state block =
   counter := !counter + 1 ;
   let _ = update_concrete info in
   if !consistency_check then (
+    (* remove temps *)
+    clean_delta state.delta;
     check_delta state;
     (* TraceConcrete.print_values state.delta; *)
     (* TraceConcrete.print_mem state.delta; *)
@@ -596,13 +677,69 @@ let run_blocks blocks length =
   Status.stop () ;
   List.flatten (List.rev rev_trace)
 
+(** Convert a trace to DSA form 
+
+    @param p The AST program to convert to DSA form
+    @return A tuple of the DSA version of the program and a hash table
+    mapping DSA vars to the original vars.
+
+    @note Does not use DSA for 'mem'.
+*)
+let to_dsa p =
+  (* Maps vars to their dsa name *)
+  let h = VH.create 1000 in
+  let rh = VH.create 1000 in
+  (* Maps a dsa name to the original var name.  Needed for when we
+     want to lookup concrete values. *)
+  let dsa_ctr = ref 0 in
+  let new_name (Var.V(_,s,t) as v) = 
+    if v = Asmir.x86_mem then v else (
+      dsa_ctr := !dsa_ctr + 1;
+      assert (!dsa_ctr <> 0);
+      let s = Printf.sprintf "%sdsa%d" s !dsa_ctr in
+      Var.newvar s t
+      )
+  in
+  let replace_var v =
+    let newv = new_name v in
+    VH.add h v newv;
+    VH.add rh newv v;
+    newv
+  in
+  (* Rename all assigned vars *)
+  let av = object(self)
+    inherit Ast_visitor.nop
+    method visit_avar v =
+      `ChangeTo (replace_var v)
+
+    method visit_rvar v =
+      try
+	`ChangeTo (VH.find h v)
+      with Not_found ->
+	dprintf "Unable to find %s during DSA: probably an input" (Var.name v);
+	let nv = replace_var v in
+	`ChangeTo nv
+
+    method visit_uvar v =
+      VH.remove h v;
+      `DoChildren
+
+  end
+  in
+  (Ast_visitor.prog_accept av p, rh)
+
 (** Perform concolic execution on the trace and
     output a set of constraints *)
 let concrete trace = 
+  let trace = Memory2array.coerce_prog trace in
+  (* let trace,rh = to_dsa trace in *)
+  (* (\* Set the reverse lookup into place so dsa_lookup_var can map to original vars/names *\) *)
+  (* dsa_rev_map := rh; *)
   let no_specials = remove_specials trace in
   let blocks = trace_to_blocks no_specials in
   (*pdebug ("blocks: " ^ (string_of_int (List.length blocks)));*)
   let length = List.length no_specials in
+  
   let actual_trace = run_blocks blocks length in
     actual_trace
 
@@ -715,107 +852,44 @@ end
 module TaintSymbolic = 
 struct 
 
-  let dsa_map = VH.create 1000
-  let dsa_ctr = ref 0
-
-  (** Given a variable name, return a new DSA variable name suitable
-      for assignment *)
-  let dsa_var = 
-    (fun (Var.V(_,s,t)) ->
-       dsa_ctr := !dsa_ctr + 1;
-       assert (!dsa_ctr <> 0);
-       let s = Printf.sprintf "%sdsa%d" s !dsa_ctr in
-       Var.newvar s t
-    )
-
-  (** Given a variable name, return a new DSA name suitable for
-      assigning to that variable, and add it to the DSA mapping *)
-  let dsa_add_map v =
-    let newv = dsa_var v in
-    VH.replace dsa_map v newv;
-    dprintf "DSA: Mapping %s to %s" (Var.name v) (Var.name newv);
-    newv
-
-  (** Given a variable, retrieve the current DSA binding for it *)
-  let dsa_get_map v =
-    VH.find dsa_map v
-
-  (* let lookup_var delta var = *)
-  (*   let name = Var.name var in *)
-  (*   let unknown = !full_symbolic && not (VH.mem delta var) in *)
-  (*    try *)
-  (*      (match taint_val name with *)
-  (*         | true when unknown -> *)
-  (*             (\* if its tainted and we know nothing about it *\) *)
-  (*             Symbolic (Var var) *)
-  (*         | true -> *)
-  (*             (\* if its tainted but we have to know something *\) *)
-  (*             Symbolic.lookup_var delta var *)
-  (*         | false -> *)
-  (*             (\* if its untainted gimme the concrete value *\) *)
-  (*             (\*(match concrete_val name with *)
-  (*                | Int (n, _) -> *)
-  (*                    Printf.printf "%s -> %Lx\n" name n *)
-  (*                | _ -> ()) ;*\) *)
-  (*             Symbolic(concrete_val name) *)
-  (*      ) *)
-  (*    with Not_found -> *)
-  (*      if unknown then *)
-  (*        (\* We can't do anything, make it symbolic *\) *)
-  (*        Symbolic (Var var) *)
-  (*      else *)
-  (*        (\* We have no concrete info about it -- its probably temporary *\) *)
-  (*        (let l = Symbolic.lookup_var delta var in *)
-  (*         (match l with *)
-  (*          | Symbolic(Int _) -> () *)
-  (*          | ConcreteMem _ -> () *)
-  (*          | _ -> wprintf "Unknown value during eval: %s" (Var.name var)); *)
-  (*         l) *)
-
   let lookup_var delta var =
 
     let name = Var.name var in
-    dprintf "looking up var %s" name;
+    (* dprintf "looking up var %s" name; *)
 
     (* We need to use DSA because we combine the delta context with
        let-based renaming.  If we did not use DSA, then assignments to
        new registers could shadow previous computations.  *)
-    let getdsa var =
-      try
-	dsa_get_map var 
-      with Not_found ->
-	wprintf "DSA failed on %s" name;
-	var (* Well, the first time we might need to use our original names.. *)
-    in
 
-    let unknown = !full_symbolic && not (VH.mem delta (getdsa var)) in
-      (match taint_val name with
-       | true when unknown ->
+    let getdsa var = var in
+
+    let dsavar = getdsa var in
+    let unknown = !full_symbolic && not (VH.mem delta dsavar) in
+      (match dsa_taint_val var, dsa_concrete_val var with
+       | Some(true), _ when unknown ->
   	   (* If the variable is tainted and we don't have a formula for it, it is symbolic *)
-  	   Symbolic (Var var)
-       | true ->
+  	   Symbolic (Var dsavar)
+       | Some(true), _ ->
   	   (* If the variable is tainted, but we do have a formula for it *)
-  	   VH.find delta (getdsa var)
+  	   VH.find delta dsavar
 
-       | false when is_symbolic var ->
+       | _, _ when is_symbolic var ->
 	   (* If the variable is untainted, but is a symbolic byte that we introduced *)
 	   Symbolic(Var(var))
 
-       | false ->
+       | _, Some(cval) ->
   	   (* Finally, if untainted try to use the concrete value.
   	      Otherwise, see if we can find the value in delta; it's
   	      probably a temporary. *)
-  	   try
-  	     Symbolic(concrete_val name)
-  	   with
-  	     Not_found ->
-  	       try VH.find delta (getdsa var)
-  	       with Not_found ->
-  		 match Var.typ var with
-  		 | TMem _ -> dprintf "new memory"; empty_smem var
-  		 | _ ->
-  		     wprintf "Variable not found during evaluation: %s" name;
-  		     Symbolic(Var(var))
+  	     Symbolic(cval)
+       | _, _ ->
+  	   try VH.find delta var
+  	   with Not_found ->
+  	     match Var.typ dsavar with
+  	     | TMem _ -> (*dprintf "new memory";*) empty_smem var
+  	     | _ ->
+  		 wprintf "Variable not found during evaluation: %s" name;
+  		 Symbolic(Var(dsavar))
 		       
       )
 	
@@ -843,24 +917,28 @@ struct
   (* TODO: add a memory initializer *)
 
   let rec lookup_mem mu index endian = 
-    dprintf "I am lookup mem";
     match index with
     | Int(n,_) ->
 	(try 
 	   (* Check if this is a symbolic seed *)
 	   let var = symbolic_mem n in
-	   pdebug ("introducing symbolic: "^(Pp.ast_exp_to_string var)) ;
+	   (* pdebug ("introducing symbolic: "^(Pp.ast_exp_to_string var)) ; *)
 	   (*update_mem mu index var endian;
 	     Hashtbl.remove n;*)
 	   var
 	 with Not_found ->
 	   (* Check if we know something about this memory location *)
 	   (*pdebug ("not found in symb_mem "^(Printf.sprintf "%Lx" n)) ;*)
-	   let tainted = taint_mem n in
+	   let tainted = match taint_mem n with
+	     | Some(x) -> x
+	     | None -> false
+	   in
 	   if tainted then
 	     Symbolic.lookup_mem mu index endian
 	   else
-	     concrete_mem n
+	     match concrete_mem n with
+	     | Some(x) -> x
+	     | None -> failwith "Unable to locate concrete memory operand"
 	)
     | _ ->
 	if !allow_symbolic_indices then
@@ -870,7 +948,7 @@ struct
 	else
 	  try 
 	    (* Let's concretize everything *)
-	    dprintf "concretizing!";
+	    (* dprintf "concretizing!"; *)
 	    let conc_index = get_concrete_read_index () in
 	    (*let extra = BinOp(EQ, index, conc_index) in
 	      ignore (LetBind.add_to_formula exp_true extra Equal) ;*)
@@ -882,11 +960,13 @@ struct
   let assign v ev ({delta=delta; pred=pred; pc=pc} as ctx) =
     (* XXX: Make sure to remove concrete value *)
 
-    let v = dsa_add_map v in
+    (* let v = dsa_add_map v in *)
 
     if !full_symbolic then
       let expr = symb_to_exp ev in
-      let is_worth_storing = (*is_concrete expr &&*) is_temp (Var.name v) in
+      let is_worth_storing = (*is_concrete expr &&*) 
+	is_temp (Var.name v)
+      in
       let pred' =
 	if is_worth_storing then (context_update delta v ev ; pred)
 	else
@@ -930,6 +1010,8 @@ let count = ref 0
 let symbolic_run trace = 
   Status.init "Symbolic Run" (List.length trace) ;
   let trace = append_halt trace in
+(*  VH.clear TaintSymbolic.dsa_map; *)
+  cleanup ();
   let state = TraceSymbolic.build_default_context trace in
   let formula = 
     try 
@@ -945,11 +1027,13 @@ let symbolic_run trace =
 	      let formula = TraceSymbolic.output_formula () in
 		print_formula ("form_" ^ (string_of_int !count)) formula))
 	     ;*)
-	   dprintf "Evaluating stmt %s" (Pp.ast_stmt_to_string stmt);
+	   (* dprintf "Evaluating stmt %s" (Pp.ast_stmt_to_string stmt); *)
 	   (match stmt with
 	      | Ast.Label (_,atts) when filter_taint atts != [] -> 
 		  (* Printf.printf "%s\n" ("block no: " ^ (string_of_int !status)); *)
 		  (* Printf.printf "%s\n" (Pp.ast_stmt_to_string stmt); *)
+		  (* We have a new block *)
+		  clean_delta state.delta;
 		  get_indices();
 		  status := !status + 1 ;
 		  (*if !status > 3770 && !status < 3780 then 
@@ -978,7 +1062,8 @@ let symbolic_run trace =
     Status.stop () ;
     formula
 
-let concolic trace = 
+let concolic trace =
+  let trace,_ = to_dsa trace in
   let trace = concrete trace in
   ignore (symbolic_run trace) ;
   trace
@@ -1027,7 +1112,7 @@ let control_flow addr trace =
 (* Making the final jump target a symbolic variable. This
    should be useful for enumerating all possible jump targets *)  
 let limited_control trace = 
-  let target = Var (Var.newvar "jump_target" reg_32) in
+  let target = Var (Var.newvar "symb_jump_target" reg_32) in
   let trace, assertion = hijack_control target trace in
     Util.fast_append trace [assertion]
 
@@ -1124,8 +1209,11 @@ let inject_shellcode nops trace =
 let generate_formula trace = 
   LetBind.bindings := [] ;  (*  XXX: temporary hack *)
   let trace = concrete trace in
-    ignore(symbolic_run trace) ;
-    TraceSymbolic.output_formula ()
+  let trace,rh = to_dsa trace in
+  (* Set the reverse lookup into place so dsa_lookup_var can map to original vars/names *)
+  dsa_rev_map := Some(rh);
+  ignore(symbolic_run trace) ;
+  TraceSymbolic.output_formula ()
 
 let output_formula file trace = 
   let formula = generate_formula trace in
@@ -1221,9 +1309,12 @@ let add_assignments trace =
       method visit_rvar v = 
 	let name = Var.name v in
 	  (try
-	     let value = concrete_val name in
-	       if not (Hashtbl.mem varset name) then
-		 Hashtbl.add varset name (v,value)
+	     let value = match concrete_val name with
+	       | Some(x) -> x
+	       | None -> failwith "Unhandled"
+	     in
+	     if not (Hashtbl.mem varset name) then
+	       Hashtbl.add varset name (v,value)
 	   with Not_found -> ());
 	  `DoChildren
     end
@@ -1249,7 +1340,7 @@ let add_assignments trace =
 let valid_to_invalid trace = 
   let length = List.length trace in
   let rec test l u =
-    Printf.printf "testing %d %d\n" l u ;
+    Printf.printf "Searching %d %d\n" l u ;
     if l >= u - 1 then (l,u)
     else 
       let middle = (l + u) / 2 in
@@ -1257,6 +1348,7 @@ let valid_to_invalid trace =
 	try 
 	  ignore (output_formula "temp" trace) ;
           ignore (solve_formula "temp" "tempout") ;
+	  ignore(Unix.system("cat tempout"));
 	  let _ = solution_from_stp_formula "tempout" in 
 	  Printf.printf "going higher\n";
 	  test middle u
