@@ -1380,6 +1380,7 @@ let add_assignments trace =
 (******************* Formula Debugging  **********************)
 (*************************************************************)
 
+(* Binary search to check where things go wrong *)
 let valid_to_invalid trace = 
   let length = List.length trace in
   let rec test l u =
@@ -1403,6 +1404,34 @@ let valid_to_invalid trace =
 	     test l (u-1))
   in
   let (l,u) = test 1 length in
-      ignore (output_formula "form_val" (Util.take l trace)) ;
-      ignore (output_formula "form_inv" (Util.take u trace)) ;
-      trace
+    ignore (output_formula "form_val" (Util.take l trace)) ;
+    ignore (output_formula "form_inv" (Util.take u trace)) ;
+    trace
+      
+module NameSet = Set.Make(String)
+
+(* Wanna slice? *)
+let slice varname trace = 
+  let rev = List.rev trace in
+  let maps = ref (NameSet.singleton varname) in
+  let vis = object(self)
+    inherit Ast_visitor.nop
+    method visit_exp = function
+      | Ast.Var v -> maps := NameSet.add (Var.name v) !maps ; `DoChildren 
+      | _ -> `DoChildren
+  end
+  in
+  let run_all acc = function 
+    | Ast.Move(v, e, _) as s ->
+	let name = Var.name v in
+	  if NameSet.mem name !maps then
+	    (
+	      ignore( Ast_visitor.exp_accept vis e );
+	      maps := NameSet.remove name !maps
+	    ) ;
+	  s::acc
+    | _ -> acc
+  in
+    List.fold_left run_all [] rev
+		   
+	    
