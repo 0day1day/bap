@@ -88,6 +88,9 @@ typedef std::map<var,t> context;
 
 /********************************************/
 
+/*************** Syscall Regs ***************/
+#define SCOUTREG_WIN REG_EDX
+#define SCOUTREG_LIN REG_EAX
 
 struct ValSpecRec {
   uint32_t type;               // Type of value specifier.
@@ -163,6 +166,8 @@ namespace pintrace { // We will use namespace to avoid collision
      void printMem();
 
      void printRegs(context &delta);
+
+     void postSysCall(context &delta);
 
      void acceptHelper(uint32_t fd);
 

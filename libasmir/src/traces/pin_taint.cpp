@@ -99,28 +99,6 @@ void TaintTracker::setTaintNetwork()
 
 /**************** Helper Functions ****************/
 
-
-void TaintTracker::acceptHelper(uint32_t fd) {
-  cerr << "Tainting fd " << fd << endl;
-  fds.insert(fd);
-}
-
-bool TaintTracker::recvHelper(uint32_t fd, void *ptr, size_t len) {
-  uint32_t addr = reinterpret_cast<uint32_t> (ptr);
-
-  if (fds.find(fd) != fds.end()) {
-
-    cerr << "Tainting " << len << " bytes of recv @" << addr << endl;
-
-    for (size_t i = 0; i < len; i++) {
-      setTaint(memory, addr+i, source++);
-    }
-    return true;
-  } else {
-    return false;
-  }
-}
-
 //
 bool TaintTracker::isValid(uint32_t type)
 {
@@ -239,6 +217,41 @@ uint32_t TaintTracker::getReadTaint(context &delta)
     }
   }
   return tag;
+}
+
+/************* External Taint Hooks **************/
+
+/** Called after a system call to untaint the output register */
+void TaintTracker::postSysCall(context &delta) {
+
+  /* Windows uses EDX, and Linux uses EAX */
+
+#ifdef _WIN32
+  setTaint(delta, SCOUTREG_WIN, NOTAINT);
+#else /* linux */
+  setTaint(delta, SCOUTREG_LIN, NOTAINT);
+#endif
+}
+
+void TaintTracker::acceptHelper(uint32_t fd) {
+  cerr << "Tainting fd " << fd << endl;
+  fds.insert(fd);
+}
+
+bool TaintTracker::recvHelper(uint32_t fd, void *ptr, size_t len) {
+  uint32_t addr = reinterpret_cast<uint32_t> (ptr);
+
+  if (fds.find(fd) != fds.end()) {
+
+    cerr << "Tainting " << len << " bytes of recv @" << addr << endl;
+
+    for (size_t i = 0; i < len; i++) {
+      setTaint(memory, addr+i, source++);
+    }
+    return true;
+  } else {
+    return false;
+  }
 }
 
 /******************* Taint Analysis Rules ***************/
