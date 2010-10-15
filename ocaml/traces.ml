@@ -1427,9 +1427,10 @@ let slice varname trace =
 	  if NameSet.mem name !maps then
 	    (
 	      ignore( Ast_visitor.exp_accept vis e );
-	      maps := NameSet.remove name !maps
-	    ) ;
-	  s::acc
+	      maps := NameSet.remove name !maps ;
+	      s::acc
+	    )
+	  else acc
     | _ -> acc
   in
     List.fold_left run_all [] rev
