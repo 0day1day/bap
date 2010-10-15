@@ -62,6 +62,10 @@ let global =
 
 (* Some wrappers to interface with the above datastructures *)
 
+let print_vars () =
+  let printone k v = dprintf "Info for register %s" k in
+  Hashtbl.iter printone global.vars
+
 let var_lookup v = try Some(Hashtbl.find global.vars v) with Not_found -> None
 let mem_lookup i = try Some(Hashtbl.find global.memory i) with Not_found -> None
 
@@ -212,6 +216,14 @@ let hd_tl = function
   | [] -> failwith "empty list"
   | x::xs -> x, xs
 
+let is_mem (Var.V(_,var,t)) =
+  (String.length var >= 3) &&
+    (String.sub var 0 3 = "mem") &&
+  (match t with
+  | TMem _
+  | Array _ -> true
+  | Reg _ -> false)
+
 let is_temp var = 
   (String.length var > 2) &&
     (String.sub var 0 2 = "T_")
@@ -361,7 +373,7 @@ let add_to_conc {name=name; mem=mem; index=index; value=value;
 (* Updating the lookup tables with the concrete values *)
 let update_concrete s =
   match s with
-  | Label (_,atts) -> 
+  | Label (_,atts) ->
       let conc_atts = filter_taint atts in
         if conc_atts != [] then (
 	  cleanup ();
@@ -482,10 +494,16 @@ struct
 
     dprintf "looking up %s" (Var.name var);
 
+    (* print_vars (); *)
+
     match dsa_concrete_val var with
     | Some(traceval) ->	
     
-    (* First, look up in the trace. *)
+    (* First, look up in the trace. 
+
+       Also, we should update delta.
+    *)
+	VH.replace delta var (Symbolic(traceval));
 	Symbolic(traceval)
 
     | None ->
@@ -693,7 +711,7 @@ let to_dsa p =
      want to lookup concrete values. *)
   let dsa_ctr = ref 0 in
   let new_name (Var.V(_,s,t) as v) = 
-    if v = Asmir.x86_mem then v else (
+    if is_mem v then v else (
       dsa_ctr := !dsa_ctr + 1;
       assert (!dsa_ctr <> 0);
       let s = Printf.sprintf "%sdsa%d" s !dsa_ctr in
@@ -731,6 +749,7 @@ let to_dsa p =
 (** Perform concolic execution on the trace and
     output a set of constraints *)
 let concrete trace = 
+  dsa_rev_map := None;
   let trace = Memory2array.coerce_prog trace in
   (* let trace,rh = to_dsa trace in *)
   (* (\* Set the reverse lookup into place so dsa_lookup_var can map to original vars/names *\) *)
@@ -886,7 +905,7 @@ struct
   	   try VH.find delta var
   	   with Not_found ->
   	     match Var.typ dsavar with
-  	     | TMem _ -> (*dprintf "new memory";*) empty_smem var
+  	     | TMem _ -> dprintf "new memory %s" (Var.name var); empty_smem var
   	     | _ ->
   		 wprintf "Variable not found during evaluation: %s" name;
   		 Symbolic(Var(dsavar))
@@ -983,7 +1002,7 @@ module TraceSymbolic = Symbeval.Make(TaintSymbolic)(FullSubst)(LetBind)
 
 let is_seed_label = (=) "Read Syscall"
       
-let add_symbolic_seeds = function
+let add_symbolic_seeds memv = function
   | Ast.Label (Name s,atts) when is_seed_label s ->
       List.iter
 	(fun {index=index; taint=Taint taint} ->
@@ -996,7 +1015,7 @@ let add_symbolic_seeds = function
 	     add_symbolic index sym_var ;
 	     (* symbolic variable *)
 	     (* XXX + TODO + FIXME + HACK *)
-	     let mem = Asmir.x86_mem_external in
+	     let mem = Var(memv) in
 	     let store = Store(mem, Int(index, reg_32), sym_var, exp_false, reg_8) in
 	     let constr = BinOp (EQ, mem, store) in
 	       ignore (LetBind.add_to_formula exp_true constr Rename)
@@ -1007,18 +1026,42 @@ let add_symbolic_seeds = function
 let status = ref 0
 let count = ref 0
 	  
+(** Get the vars used in a program *)
+let allvars p =
+  let h = VH.create 570 in
+  let vis = object(self)
+    inherit Ast_visitor.nop
+
+    method visit_avar v =
+      VH.replace h v ();
+      `DoChildren
+
+    method visit_rvar = self#visit_avar
+  end 
+  in
+  ignore(Ast_visitor.prog_accept vis p);
+  VH.fold (fun k () a -> k::a) h []	
+
 let symbolic_run trace = 
   Status.init "Symbolic Run" (List.length trace) ;
   let trace = append_halt trace in
 (*  VH.clear TaintSymbolic.dsa_map; *)
   cleanup ();
   let state = TraceSymbolic.build_default_context trace in
+  (* Find the memory variable *)
+  let memv =
+    let vars = List.filter is_mem (allvars trace) in
+    List.iter (fun x -> dprintf "memvar: %s" (Var.name x)) vars;
+    assert ((List.length vars) = 1);
+    List.hd vars
+  in
+  dprintf "Memory variable: %s" (Var.name memv);
   let formula = 
     try 
       let state = List.fold_left 
 	(fun state stmt ->
 	   Status.inc() ;
-	   add_symbolic_seeds stmt;
+	   add_symbolic_seeds memv stmt;
 	   update_concrete stmt ;
 	   (*(if !status >= 3770 && !status <= 3771 then
 	      (count := !count + 1;
