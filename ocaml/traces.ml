@@ -29,6 +29,7 @@ open D
     trace.  Non-tainted values do not have to match, since their values
     are assumed to be constant. *)
 let consistency_check = ref false;;
+let formula_consistency_check = ref false;;
 
 (*************************************************************)
 (**********************  Datastructures  *********************)
@@ -62,9 +63,17 @@ let global =
 
 (* Some wrappers to interface with the above datastructures *)
 
-let print_vars () =
-  let printone k v = dprintf "Info for register %s" k in
-  Hashtbl.iter printone global.vars
+(** Create a lookup for our variables *)
+let gamma = Asmir.gamma_create Asmir.x86_mem Asmir.x86_regs
+
+(** Convert name of a register to a var for that register *)
+let name_to_var name =
+  try
+    Some(Asmir.gamma_lookup gamma name)
+  with Failure _ ->
+    wprintf "Did not find %s in gamma" name;
+    None
+      
 
 let var_lookup v = try Some(Hashtbl.find global.vars v) with Not_found -> None
 let mem_lookup i = try Some(Hashtbl.find global.memory i) with Not_found -> None
@@ -117,17 +126,6 @@ let taint_mem index = match (mem_lookup index) with
 let bound = Hashtbl.mem global.vars
 let in_memory = Hashtbl.mem global.memory
 
-(* (\** Create a lookup for our variables *\) *)
-(* let gamma = Asmir.gamma_create Asmir.x86_mem Asmir.x86_regs *)
-
-(* (\** Convert name of a register to a var for that register *\) *)
-(* let name_to_var name = *)
-(*   try *)
-(*     Some(Asmir.gamma_lookup gamma var) *)
-(*   with Failure _ ->  *)
-(*     wprintf "Did not find %s in gamma" var; *)
-(*     None *)
-
 let add_var var value usage taint = 
   Hashtbl.replace global.vars var 
     {exp=value;
@@ -174,6 +172,49 @@ let conc_mem_iter f =
 (*************************************************************)
 (*********************  Helper Functions  ********************)
 (*************************************************************)
+
+(** Keep track of registers not always updated in BAP.  *)
+let badregs = Hashtbl.create 32
+let () =
+  List.iter (fun r -> Hashtbl.add badregs r ())
+    ("EFLAGS"
+     ::"R_FS"
+     ::"R_LDT"
+     ::"R_GDT"
+     ::"R_AF"
+     ::"R_CC_OP"
+     ::"R_CC_DEP1"
+     ::"R_CC_DEP2"
+     ::"R_CC_NDEP"
+     ::[])
+    
+let isbad v = Hashtbl.mem badregs (Var.name v)
+
+let print_vars () =
+  let printone k v = dprintf "Info for register %s %s" k (Pp.ast_exp_to_string v.exp) in
+  Hashtbl.iter printone global.vars
+    
+(** Build a statement asserting that each operand is equal to its value in the trace
+
+    @param h Mapping of vars to dsa vars
+ *)
+let assert_vars h =
+  let addone k v a = 
+    match name_to_var k with
+    | Some(realv) -> 
+	(match taint_val (Var.name realv) with 
+	| Some(true) ->
+	    if not (isbad realv) then (
+	      try 
+		let dsav = VH.find h realv in
+		let eq = BinOp(EQ, Var(dsav), v.exp) in
+		BinOp(AND, eq, a)
+	      with Not_found -> a) else a
+	| _ -> a)
+    | None -> a
+  in
+  let bige = Hashtbl.fold addone global.vars exp_true in
+  Assert(bige, [])
 
 (** Get the expression for a symbolic value *)
 let symbtoexp = function
@@ -317,23 +358,6 @@ let () =
       ("R_SP",("R_ESP",0,reg_32));
     ]
 
-(** Keep track of registers not always updated in BAP.  *)
-let badregs = Hashtbl.create 32
-let () =
-  List.iter (fun r -> Hashtbl.add badregs r ())
-    ("EFLAGS"
-     ::"R_FS"
-     ::"R_LDT"
-     ::"R_GDT"
-     ::"R_AF"
-     ::"R_CC_OP"
-     ::"R_CC_DEP1"
-     ::"R_CC_DEP2"
-     ::"R_CC_NDEP"
-     ::[])
-    
-let isbad v = Hashtbl.mem badregs (Var.name v)
-
 (********************************************************)
 	  
 (* Store the concrete taint info in the global environment *)
@@ -377,9 +401,10 @@ let update_concrete s =
       let conc_atts = filter_taint atts in
         if conc_atts != [] then (
 	  cleanup ();
-          List.iter add_to_conc conc_atts
-	)
-  | _ -> ()
+          List.iter add_to_conc conc_atts;
+	  true
+	) else false
+  | _ -> false
 
 (** Get the address of the next instruction in the trace *)
 let rec get_next_address = function
@@ -494,7 +519,7 @@ struct
 
     dprintf "looking up %s" (Var.name var);
 
-    (* print_vars (); *)
+    print_vars ();
 
     match dsa_concrete_val var with
     | Some(traceval) ->	
@@ -616,7 +641,7 @@ let run_block state block =
   pdebug ("Running block: " ^ (string_of_int !counter) ^ " " ^ (Pp.ast_stmt_to_string addr));
   let info, block = hd_tl block in
   counter := !counter + 1 ;
-  let _ = update_concrete info in
+  let _ = ignore(update_concrete info) in
   if !consistency_check then (
     (* remove temps *)
     clean_delta state.delta;
@@ -745,6 +770,54 @@ let to_dsa p =
   end
   in
   (Ast_visitor.prog_accept av p, rh)
+
+(** Convert a stmt to DSA form 
+
+    @param s The AST program to convert to DSA form
+    @param h The map from original var names to most recent dsa var
+    @param rh The map from a dsa var back to the original var
+    @return The DSA'ified statement
+
+    @note Does not use DSA for 'mem'.
+*)
+let to_dsa_stmt s h rh =
+  let dsa_ctr = ref 0 in
+  let new_name (Var.V(_,s,t) as v) = 
+    if is_mem v then v else (
+      dsa_ctr := !dsa_ctr + 1;
+      assert (!dsa_ctr <> 0);
+      let s = Printf.sprintf "%sdsa%d" s !dsa_ctr in
+      Var.newvar s t
+      )
+  in
+  let replace_var v =
+    let newv = new_name v in
+    VH.add h v newv;
+    VH.add rh newv v;
+    newv
+  in
+  (* Rename all assigned vars *)
+  let av = object(self)
+    inherit Ast_visitor.nop
+    method visit_avar v =
+      `ChangeTo (replace_var v)
+
+    method visit_rvar v =
+      try
+	`ChangeTo (VH.find h v)
+      with Not_found ->
+	dprintf "Unable to find %s during DSA: probably an input" (Var.name v);
+	let nv = replace_var v in
+	`ChangeTo nv
+
+    method visit_uvar v =
+      VH.remove h v;
+      `DoChildren
+
+  end
+  in
+  Ast_visitor.stmt_accept av s
+
 
 (** Perform concolic execution on the trace and
     output a set of constraints *)
@@ -879,6 +952,7 @@ struct
     (* We need to use DSA because we combine the delta context with
        let-based renaming.  If we did not use DSA, then assignments to
        new registers could shadow previous computations.  *)
+    TraceConcrete.print_values delta;
 
     let getdsa var = var in
 
@@ -890,6 +964,7 @@ struct
   	   Symbolic (Var dsavar)
        | Some(true), _ ->
   	   (* If the variable is tainted, but we do have a formula for it *)
+	   dprintf "getting formula from delta: %s" (Var.name var);
   	   VH.find delta dsavar
 
        | _, _ when is_symbolic var ->
@@ -900,7 +975,9 @@ struct
   	   (* Finally, if untainted try to use the concrete value.
   	      Otherwise, see if we can find the value in delta; it's
   	      probably a temporary. *)
-  	     Symbolic(cval)
+	   VH.remove delta var;
+	   (*VH.replace delta var (Symbolic(cval));*)
+  	   Symbolic(cval)
        | _, _ ->
   	   try VH.find delta var
   	   with Not_found ->
@@ -1044,6 +1121,9 @@ let allvars p =
 
 let symbolic_run trace = 
   Status.init "Symbolic Run" (List.length trace) ;
+  let h = VH.create 1000 in (* vars to dsa vars *)
+  let rh = VH.create 10000 in (* dsa vars to vars *)
+  dsa_rev_map := Some(rh);
   let trace = append_halt trace in
 (*  VH.clear TaintSymbolic.dsa_map; *)
   cleanup ();
@@ -1060,9 +1140,16 @@ let symbolic_run trace =
     try 
       let state = List.fold_left 
 	(fun state stmt ->
+	   let stmt = to_dsa_stmt stmt h rh in
+	   let stmts = ref [stmt] in
+	   (* dprintf "Dsa'ified stmt: %s" (Pp.ast_stmt_to_string stmt); *)
 	   Status.inc() ;
 	   add_symbolic_seeds memv stmt;
-	   update_concrete stmt ;
+	   if update_concrete stmt && !formula_consistency_check then (
+	     let asrt = assert_vars h in
+	     stmts := [asrt; stmt];
+	     dprintf "assert stmt: %s" (Pp.ast_stmt_to_string asrt)
+	   );
 	   (*(if !status >= 3770 && !status <= 3771 then
 	      (count := !count + 1;
 	       (*print_endline (Pp.ast_stmt_to_string stmt) ;*)
@@ -1070,7 +1157,7 @@ let symbolic_run trace =
 	      let formula = TraceSymbolic.output_formula () in
 		print_formula ("form_" ^ (string_of_int !count)) formula))
 	     ;*)
-	   (* dprintf "Evaluating stmt %s" (Pp.ast_stmt_to_string stmt); *)
+	   dprintf "Evaluating stmt %s" (Pp.ast_stmt_to_string stmt);
 	   (match stmt with
 	      | Ast.Label (_,atts) when filter_taint atts != [] -> 
 		  (* Printf.printf "%s\n" ("block no: " ^ (string_of_int !status)); *)
@@ -1083,9 +1170,14 @@ let symbolic_run trace =
 		    let formula = TraceSymbolic.output_formula () in
 		    print_formula ("form_" ^ (string_of_int !status)) formula*)
 	      | _ -> ());
-	   match TraceSymbolic.eval_stmt state stmt with
-	     | [next] -> next
-	     | _ -> failwith "Jump in a straightline program"
+	   
+	   (* Double fold since we may have to add an assertion *)
+	   List.fold_left
+	     (fun state stmt ->
+		match TraceSymbolic.eval_stmt state stmt with
+		| [next] -> next
+		| _ -> failwith "Jump in a straightline program"
+	     ) state !stmts
 	) state trace
       in
 	state.pred
@@ -1102,8 +1194,9 @@ let symbolic_run trace =
 	  (*state.pred*)
 	  raise e
   in
-    Status.stop () ;
-    formula
+  Status.stop () ;
+  dsa_rev_map := None;  
+  formula
 
 let concolic trace =
   let trace,_ = to_dsa trace in
@@ -1252,9 +1345,9 @@ let inject_shellcode nops trace =
 let generate_formula trace = 
   LetBind.bindings := [] ;  (*  XXX: temporary hack *)
   let trace = concrete trace in
-  let trace,rh = to_dsa trace in
+  (*let trace,rh = to_dsa trace in*)
   (* Set the reverse lookup into place so dsa_lookup_var can map to original vars/names *)
-  dsa_rev_map := Some(rh);
+  (*dsa_rev_map := Some(rh);*)
   ignore(symbolic_run trace) ;
   TraceSymbolic.output_formula ()
 
@@ -1366,7 +1459,7 @@ let add_assignments trace =
   in
   List.iter 
     (fun s -> 
-       update_concrete s ;
+       ignore(update_concrete s) ;
        ignore (get_vars_from_stmt s)
     ) trace;
     let assignments = Hashtbl.fold
