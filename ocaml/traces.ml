@@ -29,7 +29,7 @@ open D
     trace.  Non-tainted values do not have to match, since their values
     are assumed to be constant. *)
 let consistency_check = ref false;;
-let formula_consistency_check = ref false;;
+let use_alt_assignment = ref false;;
 
 (*************************************************************)
 (**********************  Datastructures  *********************)
@@ -205,16 +205,35 @@ let assert_vars h =
 	(match taint_val (Var.name realv) with 
 	| Some(true) ->
 	    if not (isbad realv) then (
-	      try 
-		let dsav = VH.find h realv in
-		let eq = BinOp(EQ, Var(dsav), v.exp) in
+	      if VH.mem h realv then 
+		let eq = BinOp(EQ, Var(realv), v.exp) in
 		BinOp(AND, eq, a)
-	      with Not_found -> a) else a
+	      else a) else a
 	| _ -> a)
     | None -> a
   in
   let bige = Hashtbl.fold addone global.vars exp_true in
   Assert(bige, [])
+
+(** Build statements assigning operands
+
+    @param h Mapping of vars to dsa vars
+ *)
+let assign_vars () =
+  let addone k v a = 
+    match name_to_var k with
+    | Some(realv) -> 
+	(match taint_val (Var.name realv) with 
+	 | Some(false) ->
+	     (try 
+	       Move(realv, v.exp, [])::a
+	     with Not_found -> a)
+	 | _ -> a)
+    | None -> a
+  in
+  let bige = Hashtbl.fold addone global.vars [] in
+  bige
+
 
 (** Get the expression for a symbolic value *)
 let symbtoexp = function
@@ -250,6 +269,11 @@ let unwrap_taint = function
 let filter_taint atts = 
   let atts = List.filter keep_taint atts in
     List.map unwrap_taint atts     
+
+let get_int = function
+  | Int(v, t) -> let (i,_) = Arithmetic.to_val t v in
+    i
+  | _ -> failwith "Expected integer"
 
 let taint_to_bool n = n != 0
 
@@ -519,7 +543,7 @@ struct
 
     dprintf "looking up %s" (Var.name var);
 
-    print_vars ();
+    (* print_vars (); *)
 
     match dsa_concrete_val var with
     | Some(traceval) ->	
@@ -601,6 +625,15 @@ module TraceConcrete = Symbeval.Make(TaintConcrete)(FullSubst)(StdForm)
 let check_delta state =
   (* let dsa_concrete_val v = concrete_val (Var.name v) in *)
   (* let dsa_taint_val v = taint_val (Var.name v) in *)
+  let check_mem cm addr v =
+    if v.tnt then (
+      let tracebyte = get_int v.exp in
+      try
+	let evalbyte = get_int (AddrMap.find addr cm) in
+	if tracebyte <> evalbyte then wprintf "Consistency error: Tainted memory value (address %Lx, value %Lx) present in trace does not match value %Lx in in concrete evaluator" addr tracebyte evalbyte
+      with Not_found -> wprintf "Consistency error: Tainted memory value (address %Lx, value %Lx) present in trace but missing in concrete evaluator" addr tracebyte
+    )
+  in
   let check_var var evalval =
     match Var.typ var with
     | Reg _ -> (
@@ -610,13 +643,20 @@ let check_delta state =
 	let tainted = dsa_taint_val var in
 	match dsavarname, traceval, tainted with
 	| Some(dsavarname), Some(traceval), Some(tainted) -> 
-	    (dprintf "Doing check on %s" dsavarname;
+	    ((*dprintf "Doing check on %s" dsavarname;*)
 	     if (traceval <> evalval && tainted && not (Hashtbl.mem badregs (Var.name var))) then 
 	       wprintf "Difference between tainted BAP and trace values in previous instruction: %s Trace=%s Eval=%s" (dsavarname) (Pp.ast_exp_to_string traceval) (Pp.ast_exp_to_string evalval)
 		 (* If we can't find concrete value, it's probably just a BAP temporary *)
 	    )
 	| _ -> ( (* probably a temporary *) ))
-    | _ -> ( (* this is a memory *) )
+    | TMem _
+    | Array _ -> 
+	let cmem = match evalval with
+	  | ConcreteMem(cm, _) -> cm
+	  | _ -> failwith "Concrete execution only"
+	in
+	Hashtbl.iter (check_mem cmem) global.memory
+      
   in
   VH.iter check_var state.delta
 
@@ -663,7 +703,7 @@ let run_block state block =
   let init = TraceConcrete.inst_fetch state.sigma state.pc in
   let executed = ref [] in
   let rec eval_block state stmt = 
-    (* pdebug (Pp.ast_stmt_to_string stmt); *)
+    pdebug (Pp.ast_stmt_to_string stmt);
     (*    Hashtbl.iter (fun k v -> pdebug (Printf.sprintf "%Lx -> %s" k (Pp.ast_exp_to_string v))) concrete_mem ;*)
     Status.inc();
    let cbranchtaken = match stmt with
@@ -952,7 +992,7 @@ struct
     (* We need to use DSA because we combine the delta context with
        let-based renaming.  If we did not use DSA, then assignments to
        new registers could shadow previous computations.  *)
-    TraceConcrete.print_values delta;
+    (* TraceConcrete.print_values delta; *)
 
     let getdsa var = var in
 
@@ -975,9 +1015,14 @@ struct
   	   (* Finally, if untainted try to use the concrete value.
   	      Otherwise, see if we can find the value in delta; it's
   	      probably a temporary. *)
-	   VH.remove delta var;
-	   (*VH.replace delta var (Symbolic(cval));*)
-  	   Symbolic(cval)
+	   dprintf "Using concrete value";
+	   if !use_alt_assignment then (
+	     (* In the alternate scheme, all concretes are added right to the formula *)
+	     Symbolic(Var(dsavar))
+	   ) else (
+	     VH.remove delta var;
+  	     Symbolic(cval)
+	   )
        | _, _ ->
   	   try VH.find delta var
   	   with Not_found ->
@@ -1008,7 +1053,9 @@ struct
 	    let extra = BinOp(EQ, pos, conc_index) in
 	      ignore (LetBind.add_to_formula exp_true extra Equal) ;
 	      Symbolic.update_mem mu conc_index value endian
-	  with Not_found -> Symbolic.update_mem mu pos value endian
+	  with Not_found -> 
+	    wprintf "Write concretization failed %s" (Pp.ast_exp_to_string pos);
+	    Symbolic.update_mem mu pos value endian
 	    
   (* TODO: add a memory initializer *)
 
@@ -1051,6 +1098,7 @@ struct
 	    lookup_mem mu conc_index endian
 	      (*Symbolic.lookup_mem mu conc_index endian*)
 	  with Not_found ->
+	    wprintf "Read concretization failed! %s" (Pp.ast_exp_to_string index);
 	    Symbolic.lookup_mem mu index endian
 	      
   let assign v ev ({delta=delta; pred=pred; pc=pc} as ctx) =
@@ -1067,8 +1115,9 @@ struct
 	if is_worth_storing then (context_update delta v ev ; pred)
 	else
 	  let constr = BinOp (EQ, Var v, expr) in
-	    pdebug ((Var.name v) ^ " = " ^ (Pp.ast_exp_to_string expr)) ;
-	    LetBind.add_to_formula pred constr Rename 
+	  pdebug ((Var.name v) ^ " = " ^ (Pp.ast_exp_to_string expr)) ;
+	  VH.remove delta v; (* shouldn't matter because of dsa, but remove any old version anyway *)
+	  LetBind.add_to_formula pred constr Rename 
       in
 	[{ctx with pred=pred'; pc=Int64.succ pc}]
     else
@@ -1136,20 +1185,26 @@ let symbolic_run trace =
     List.hd vars
   in
   dprintf "Memory variable: %s" (Var.name memv);
+  let to_dsa stmt = to_dsa_stmt stmt h rh in
   let formula = 
     try 
       let state = List.fold_left 
 	(fun state stmt ->
-	   let stmt = to_dsa_stmt stmt h rh in
-	   let stmts = ref [stmt] in
+	   let stmts = ref [] in
 	   (* dprintf "Dsa'ified stmt: %s" (Pp.ast_stmt_to_string stmt); *)
 	   Status.inc() ;
 	   add_symbolic_seeds memv stmt;
-	   if update_concrete stmt && !formula_consistency_check then (
-	     let asrt = assert_vars h in
-	     stmts := [asrt; stmt];
-	     dprintf "assert stmt: %s" (Pp.ast_stmt_to_string asrt)
+	   let hasconc = update_concrete stmt in
+	   if hasconc && !consistency_check then (
+	     stmts := [(assert_vars h)]
 	   );
+	   if hasconc && !use_alt_assignment then (
+	     let assigns = assign_vars () in
+	     (* List.iter *)
+	     (*   (fun stmt -> dprintf "assign stmt: %s" (Pp.ast_stmt_to_string stmt)) assigns; *)
+	     stmts := !stmts @ assigns;
+	   );
+	   stmts := List.map to_dsa (!stmts @ [stmt]);
 	   (*(if !status >= 3770 && !status <= 3771 then
 	      (count := !count + 1;
 	       (*print_endline (Pp.ast_stmt_to_string stmt) ;*)
