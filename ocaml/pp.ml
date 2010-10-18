@@ -184,7 +184,7 @@ object (self)
      | Ast.Int(1L, Reg 1) ->
 	 pp "true"
      | Ast.Int(i,t) ->
-	 pp (Int64.to_string i); pp ":"; self#typ t
+	 pp (Printf.sprintf "%Lx" i); pp ":"; self#typ t
      | Ast.Cast(ct,t,e) ->
 	 pp (ct_to_string ct);
 	 pp ":"; self#typ t;

@@ -37,7 +37,8 @@ let allow_symbolic_indices = ref false
 let full_symbolic = ref true
   
 let padding = ref false
-  
+
+let memtype = reg_32  
 
 (*************************************************************)
 (**********************  Datastructures  *********************)
@@ -148,7 +149,8 @@ let add_symbolic = Hashtbl.replace global.symbolic
   
 let add_new_var var value usage taint = 
 (*  if not (bound var) then *)
-    add_var var value usage taint
+  dprintf "Adding value %s for %s" (Pp.ast_exp_to_string value) var;
+  add_var var value usage taint
 
 let del_var var =
   while Hashtbl.mem global.vars var do
@@ -227,7 +229,7 @@ let assert_vars h =
 
     @param h Mapping of vars to dsa vars
  *)
-let assign_vars () =
+let assign_vars memv =
   let addone k v a = 
     match name_to_var k with
     | Some(realv) -> 
@@ -239,7 +241,17 @@ let assign_vars () =
 	 | _ -> a)
     | None -> a
   in
+  let addmem k v a =
+    if not !allow_symbolic_indices then (
+      if not v.tnt then
+	Move(memv, Store(Var(memv), Int(k, memtype), v.exp, exp_false, reg_8), [])::a
+      else
+	a)
+    else
+      a
+  in
   let bige = Hashtbl.fold addone global.vars [] in
+  let bige = Hashtbl.fold addmem global.memory bige in
   bige
 
 
@@ -1056,7 +1068,8 @@ struct
   	     match Var.typ var with
   	     | TMem _ -> dprintf "new memory %s" (Var.name var); empty_smem var
   	     | _ ->
-  		 wprintf "Variable not found during evaluation: %s" name;
+		 if not (isbad var) then
+  		   wprintf "Variable not found during evaluation: %s" name;
   		 Symbolic(Var(var))
 		       
       )
@@ -1089,16 +1102,7 @@ struct
 	 with Not_found ->
 	   (* Check if we know something about this memory location *)
 	   (*pdebug ("not found in symb_mem "^(Printf.sprintf "%Lx" n)) ;*)
-     let tainted = match taint_mem n with
-	     | Some(x) -> x
-	     | None -> false
-	   in
-	   if tainted then
 	     Symbolic.lookup_mem mu index endian
-	   else
-	     match concrete_mem n with
-	     | Some(x) -> x
-	     | None -> failwith "Unable to locate concrete memory operand"
 	)
     | _ ->
 	  (pdebug ("Symbolic memory index at " 
@@ -1203,7 +1207,7 @@ let symbolic_run trace =
 	     stmts := [(assert_vars h)]
 	   );
 	   if hasconc && !use_alt_assignment then (
-	     let assigns = assign_vars () in
+	     let assigns = assign_vars memv in
 	     (* List.iter *)
 	     (*   (fun stmt -> dprintf "assign stmt: %s" (Pp.ast_stmt_to_string stmt)) assigns; *)
 	     stmts := !stmts @ assigns;
