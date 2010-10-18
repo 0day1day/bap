@@ -29,7 +29,15 @@ open D
     trace.  Non-tainted values do not have to match, since their values
     are assumed to be constant. *)
 let consistency_check = ref false;;
-let use_alt_assignment = ref false;;
+let use_alt_assignment = ref true;;
+
+(* Concretizing as much as possible *)
+let allow_symbolic_indices = ref false
+
+let full_symbolic = ref true
+  
+let padding = ref false
+  
 
 (*************************************************************)
 (**********************  Datastructures  *********************)
@@ -541,7 +549,7 @@ module TaintConcrete =
 struct 
   let lookup_var delta var = 
 
-    dprintf "looking up %s" (Var.name var);
+    dprintf "looking up %s (concrete)" (Var.name var);
 
     (* print_vars (); *)
 
@@ -663,17 +671,43 @@ let check_delta state =
 let counter = ref 1
 
 (** Transformations needed for traces. *)
-let trace_transform_stmt ctaken stmt = 
+let trace_transform_stmt stmt evalf = 
+  let exp = ref exp_true in
+  let cvis = object(self)
+    inherit Ast_visitor.nop
+    method visit_exp = function
+      | Load(mem, idx, endian, t) ->
+	  let cidx = evalf idx in
+	  exp := BinOp(AND, !exp, BinOp(EQ, cidx, idx));
+	  `ChangeToAndDoChildren(Load(mem, cidx, endian, t))
+      | Store(mem, idx, value, endian, t) ->
+	  let cidx = evalf idx in
+	  exp := BinOp(AND, !exp, BinOp(EQ, cidx, idx));
+	  `ChangeToAndDoChildren(Store(mem, cidx, value, endian, t))
+      | _ -> `DoChildren
+  end
+  in
+  (* Concretize memory addresses *)
+  let stmt =
+    if not !allow_symbolic_indices then
+      Ast_visitor.stmt_accept cvis stmt
+    else stmt
+  in
   let s = Printf.sprintf "Removed: %s" (Pp.ast_stmt_to_string stmt) in
   let com = Ast.Comment(s, []) in
-  match stmt, ctaken with
-    | (Ast.CJmp (e,tl,_,atts1)), true ->
+  let s = match stmt with
+    | (Ast.CJmp (e,tl,_,atts1)) when (evalf e) = exp_true ->
     	[com; Ast.Assert(e,atts1)]
-    | (Ast.CJmp (e,_,fl,atts1)), false ->
+    | (Ast.CJmp (e,_,fl,atts1)) when (evalf e) = exp_false ->
     	[com; Ast.Assert(UnOp(NOT,e),atts1)]
-    | (Ast.Jmp _), _ ->
+    | Ast.CJmp _ -> failwith "Evaluation failure!"
+    | (Ast.Jmp _) ->
 	[com]
-    | s,_ -> [s]
+    | s -> [s] in
+  if not !allow_symbolic_indices && !exp <> exp_true then
+    Assert(!exp, []) :: s 
+  else
+    s
 	
 (** Running each block separately *)
 let run_block state block = 
@@ -706,11 +740,11 @@ let run_block state block =
     pdebug (Pp.ast_stmt_to_string stmt);
     (*    Hashtbl.iter (fun k v -> pdebug (Printf.sprintf "%Lx -> %s" k (Pp.ast_exp_to_string v))) concrete_mem ;*)
     Status.inc();
-   let cbranchtaken = match stmt with
-      | Ast.CJmp (cond, _, _, _) -> TraceConcrete.eval_expr state.delta cond = val_true
-      | _ -> false
+    let evalf e = match TraceConcrete.eval_expr state.delta e with
+      | Symbolic(e) -> e
+      | _ -> failwith "Expected symbolic" 
     in
-    executed := Util.fast_append (trace_transform_stmt cbranchtaken stmt) !executed ; 
+    executed := Util.fast_append (trace_transform_stmt stmt evalf) !executed ; 
     (*print_endline (Pp.ast_stmt_to_string stmt) ;*)
     
 	     
@@ -879,13 +913,6 @@ let concrete trace =
 (********************  Concolic Execution  *******************)
 (*************************************************************)
 
-(* Concretizing as much as possible *)
-let allow_symbolic_indices = ref false
-
-let full_symbolic = ref true
-  
-let padding = ref false
-  
 (* Assumptions for the concretization process to be sound:
    - We can have at most one memory load/store on each 
    asm instruction
@@ -987,25 +1014,23 @@ struct
   let lookup_var delta var =
 
     let name = Var.name var in
-    (* dprintf "looking up var %s" name; *)
+    dprintf "looking up var %s" name;
 
     (* We need to use DSA because we combine the delta context with
        let-based renaming.  If we did not use DSA, then assignments to
        new registers could shadow previous computations.  *)
-    (* TraceConcrete.print_values delta; *)
+    TraceConcrete.print_values delta;
 
-    let getdsa var = var in
-
-    let dsavar = getdsa var in
-    let unknown = !full_symbolic && not (VH.mem delta dsavar) in
+    let unknown = !full_symbolic && not (VH.mem delta var) in
       (match dsa_taint_val var, dsa_concrete_val var with
        | Some(true), _ when unknown ->
   	   (* If the variable is tainted and we don't have a formula for it, it is symbolic *)
-  	   Symbolic (Var dsavar)
+	   dprintf "symbolic";
+  	   Symbolic (Var var)
        | Some(true), _ ->
   	   (* If the variable is tainted, but we do have a formula for it *)
 	   dprintf "getting formula from delta: %s" (Var.name var);
-  	   VH.find delta dsavar
+  	   VH.find delta var
 
        | _, _ when is_symbolic var ->
 	   (* If the variable is untainted, but is a symbolic byte that we introduced *)
@@ -1018,19 +1043,21 @@ struct
 	   dprintf "Using concrete value";
 	   if !use_alt_assignment then (
 	     (* In the alternate scheme, all concretes are added right to the formula *)
-	     Symbolic(Var(dsavar))
+	     VH.remove delta var;
+	     Symbolic(Var(var))
 	   ) else (
 	     VH.remove delta var;
   	     Symbolic(cval)
 	   )
        | _, _ ->
+	   dprintf "looking up in delta";
   	   try VH.find delta var
   	   with Not_found ->
-  	     match Var.typ dsavar with
+  	     match Var.typ var with
   	     | TMem _ -> dprintf "new memory %s" (Var.name var); empty_smem var
   	     | _ ->
   		 wprintf "Variable not found during evaluation: %s" name;
-  		 Symbolic(Var(dsavar))
+  		 Symbolic(Var(var))
 		       
       )
 	
@@ -1044,18 +1071,8 @@ struct
 	 | Int (n, _) -> del_symbolic n
 	 | _ -> ());
 	Symbolic.update_mem mu pos value endian
-    | _ when !allow_symbolic_indices ->
+    | _  ->
 	Symbolic.update_mem mu pos value endian
-    | false ->
-	(* we have a symbolic write, let's concretize *)
-	  try 
-	    let conc_index = get_concrete_write_index () in
-	    let extra = BinOp(EQ, pos, conc_index) in
-	      ignore (LetBind.add_to_formula exp_true extra Equal) ;
-	      Symbolic.update_mem mu conc_index value endian
-	  with Not_found -> 
-	    wprintf "Write concretization failed %s" (Pp.ast_exp_to_string pos);
-	    Symbolic.update_mem mu pos value endian
 	    
   (* TODO: add a memory initializer *)
 
@@ -1072,7 +1089,7 @@ struct
 	 with Not_found ->
 	   (* Check if we know something about this memory location *)
 	   (*pdebug ("not found in symb_mem "^(Printf.sprintf "%Lx" n)) ;*)
-	   let tainted = match taint_mem n with
+     let tainted = match taint_mem n with
 	     | Some(x) -> x
 	     | None -> false
 	   in
@@ -1084,22 +1101,9 @@ struct
 	     | None -> failwith "Unable to locate concrete memory operand"
 	)
     | _ ->
-	if !allow_symbolic_indices then
 	  (pdebug ("Symbolic memory index at " 
 		   ^ (Pp.ast_exp_to_string index)) ;
 	   Symbolic.lookup_mem mu index endian)
-	else
-	  try 
-	    (* Let's concretize everything *)
-	    (* dprintf "concretizing!"; *)
-	    let conc_index = get_concrete_read_index () in
-	    (*let extra = BinOp(EQ, index, conc_index) in
-	      ignore (LetBind.add_to_formula exp_true extra Equal) ;*)
-	    lookup_mem mu conc_index endian
-	      (*Symbolic.lookup_mem mu conc_index endian*)
-	  with Not_found ->
-	    wprintf "Read concretization failed! %s" (Pp.ast_exp_to_string index);
-	    Symbolic.lookup_mem mu index endian
 	      
   let assign v ev ({delta=delta; pred=pred; pc=pc} as ctx) =
     (* XXX: Make sure to remove concrete value *)
