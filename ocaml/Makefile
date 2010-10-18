@@ -39,14 +39,14 @@ export SOURCES = \
 	libasmir.idl \
 	disasm_i386.ml \
 	disasm.ml \
-	asmirconsts.ml asmir.mli asmir.ml \
 	grammar.mly lexer.mll \
 	parser.ml \
 	memory2array.ml \
-	input.mli input.ml \
 	gcl.mli gcl.ml \
 	wp.ml \
 	stp.ml \
+	asmirconsts.ml asmir.mli asmir.ml \
+	input.mli input.ml \
 	depgraphs.ml \
 	vsa.ml \
 	memory2scalar.ml \

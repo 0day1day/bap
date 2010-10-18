@@ -398,21 +398,54 @@ let open_program filename =
   {asmp=prog; arch=Libasmir.asmir_get_asmp_arch prog; secs=secs; get=get}
 
 
+let get_asm = function
+  | Label(_,[Asm s])::_ -> Some s
+  | _ -> None
+
+let check_equivalence a (ir1, next1) (ir2, next2) =
+  assert(next1 = next2);
+  try
+  let q = Var(Var.newvar "q" reg_1) in
+  let to_wp p = 
+    let p = Memory2array.coerce_prog p in
+    Wp.wp (Gcl.of_ast p) q
+  in
+  let wp1 = to_wp ir1
+  and wp2 = to_wp ir2 in
+  let e = BinOp(EQ, wp1, wp2) in
+  let name = Printf.sprintf "asmir_check_equivalence_%Lx.stp" a in
+  let pp = new Stp.pp_oc (open_out name) in
+  pp#assert_ast_exp e;
+  pp#close;
+  let size = (Unix.stat name).Unix.st_size in
+  DV.dprintf "Wrote %d bytes" size;
+  assert (size > 0)
+  with Failure s ->
+    match get_asm ir1 with (* Don't warn for known instructions *)
+    | Some "ret" -> ()
+    | _ -> DV.dprintf "Could not check equivalence for %Lx: %s" a s
+
 
 (** Translate only one address of a  Libasmir.asm_program_t to Vine *)
 let asm_addr_to_bap {asmp=prog; arch=arch; get=get} addr =
-  let g = gamma_for_arch arch in
-  try try let v = Disasm.disasm_instr arch get addr in
-	  DV.dprintf "Disassembled %Lx directly" addr;
-	  v
-    with Failure s -> DV.dprintf "disasm_instr %Lx: %s" addr s; raise Disasm.Unimplemented
-  with Disasm.Unimplemented ->
-    DV.dprintf "Disassembling %Lx through VEX" addr;
+  let fallback() = 
+    let g = gamma_for_arch arch in
     let (block, next) = Libasmir.asmir_addr_to_bap prog addr in
     let ir = tr_bap_block_t g prog block in
     destroy_bap_block block;
     (ir, next)
-
+  in
+  try let v = try  Disasm.disasm_instr arch get addr
+    with Failure s -> DV.dprintf "disasm_instr %Lx: %s" addr s; raise Disasm.Unimplemented
+      in
+      if DV.debug then (
+	DV.dprintf "Disassembled %Lx directly" addr;
+	check_equivalence addr v (fallback())
+      );
+      v
+  with Disasm.Unimplemented ->
+    DV.dprintf "Disassembling %Lx through VEX" addr;
+    fallback()
 
 let asmprogram_to_bap_range ?(init_ro = false) p st en =
   let rec f l s =

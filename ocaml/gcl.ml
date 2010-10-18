@@ -209,6 +209,10 @@ let of_astcfg ?entry ?exit cfg =
   cgcl_to_gcl (CSeq(get entry))
 
 
+let of_ast p =
+  of_astcfg (Prune_unreachable.prune_unreachable_ast (Cfg_ast.of_prog p))
+
+
 let rec remove_skips = function
   | Assume _
   | Assert _
