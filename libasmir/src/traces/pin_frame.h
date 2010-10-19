@@ -33,7 +33,14 @@ namespace pintrace { // Use namespace to avoid conflict
 #define MAX_FRAME_MEMSIZE sizeof(StdFrame)
 #define MAX_FRAME_DISKSIZE 1024
 
+  /** Total syscall args */
 #define MAX_SYSCALL_ARGS 9
+  /** Number to record on this platform */
+#ifdef _WIN32
+#define PLAT_SYSCALL_ARGS MAX_SYSCALL_ARGS
+#else
+#define PLAT_SYSCALL_ARGS 5
+#endif
 
 /* Register definition: copied from Pin's types_vampi.TLH */
 
@@ -80,7 +87,7 @@ union PIN_REGISTER
 #define REG_BASE 0x1
 #define MEM_BASE 0x50
 #define REGTYPE_LAST (MEM_BASE-1)
-
+#define MEMTYPE_LAST (MEM_BASE+0x50)
 // Value specifier type.
 #define VT_NONE     0x0
 #define VT_REG8     (REG_BASE+0x0)

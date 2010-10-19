@@ -1,5 +1,7 @@
 #include "pin.H"
 #include "pin_taint.h"
+#include "pin_frame.h"
+#include "pin_syscalls.h"
 #include "winsyscalls.h"
 #ifndef _WIN32
 #include <unistd.h>
@@ -108,7 +110,12 @@ bool TaintTracker::isValid(uint32_t type)
 // 
 bool TaintTracker::isReg(uint32_t type)
 {
-  return isValid(type) && (type <= REGTYPE_LAST);
+  return isValid(type) && (type >= REG_BASE) && (type <= REGTYPE_LAST);
+}
+
+bool TaintTracker::isMem(uint32_t type)
+{
+  return isValid(type) && (type >= MEM_BASE) && (type <= MEMTYPE_LAST);
 }
 
 // 
@@ -409,7 +416,7 @@ std::vector<TaintFrame> TaintTracker::taintEnv(char **env)
 #endif
 
 /** This function is called right before a system call. */
-bool TaintTracker::taintStart(uint32_t callno, uint32_t *args, /* out */ uint32_t &state)
+bool TaintTracker::taintPreSC(uint32_t callno, uint32_t *args, /* out */ uint32_t &state)
 {
   //cout << "Syscall no: " << callno << endl << "Args:" ;
   //for ( int i = 0 ; i < MAX_SYSCALL_ARGS ; i ++ )
@@ -502,8 +509,8 @@ bool TaintTracker::taintStart(uint32_t callno, uint32_t *args, /* out */ uint32_
   return reading_tainted;
 }
 
-/** This function is called immediately following a function call. */
-bool TaintTracker::taintIntroduction(const uint32_t bytes, 
+/** This function is called immediately following a system call. */
+bool TaintTracker::taintPostSC(const uint32_t bytes, 
                                      uint32_t * args,
                                      uint32_t &addr,
                                      uint32_t &length,
@@ -611,7 +618,7 @@ bool TaintTracker::taintIntroduction(const uint32_t bytes,
 
 /******** Taint Propagation **********/
 
-//     
+// Set taint of the current values based on taint context information
 void TaintTracker::setTaintContext(context &delta)
 {
   uint32_t tag;
@@ -637,7 +644,7 @@ void TaintTracker::resetTaint(context &delta) {
   memory.clear();
 }
 
-// 
+// Add taint 'tag' to all written operands
 void TaintTracker::addTaintToWritten(context &delta, uint32_t tag)
 {
   uint32_t loc;
@@ -665,7 +672,7 @@ void TaintTracker::addTaintToWritten(context &delta, uint32_t tag)
   }
 }
 
-// 
+// Propagate taint information to written operands
 void TaintTracker::taintPropagation(context &delta)
 {
   //printMem();
@@ -676,7 +683,7 @@ void TaintTracker::taintPropagation(context &delta)
 
 /******** Taint Checking **********/
 
-// 
+// Check if the current instruction has tainted operands
 bool TaintTracker::hasTaint(context &delta)
 {
   cerr << hex ;
@@ -697,20 +704,20 @@ bool TaintTracker::hasTaint(context &delta)
 }
 
 // 
-bool TaintTracker::propagatedTaint(bool branch)
-{
-  if (branch)
-    return false;
-  for (uint32_t i = 0 ; i < count ; i++)
-    if ((values[i].usage == RD)
-        && isReg(values[i].type)
-        && values[i].loc != REG_EFLAGS
-        && values[i].taint != NOTAINT)
-      return true;
-  return false;
-} 
+// bool TaintTracker::propagatedTaint(bool branch)
+// {
+//   if (branch)
+//     return false;
+//   for (uint32_t i = 0 ; i < count ; i++)
+//     if ((values[i].usage == RD)
+//         && isReg(values[i].type)
+//         && values[i].loc != REG_EFLAGS
+//         && values[i].taint != NOTAINT)
+//       return true;
+//   return false;
+// } 
 
-// 
+// Check of EIP is tainted
 bool TaintTracker::taintChecking()
 {
   for (uint32_t i = 0 ; i < count ; i++)

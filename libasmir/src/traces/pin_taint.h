@@ -42,39 +42,6 @@ typedef std::map<var,t> context;
 #define LOW16  0xffff
 #define HIGH16 0xffff0000
 
-
-/***************** Syscalls ***************/
-// FIXME: use the ones from /usr/include/asm/unistd.h
-
-#define __NR_nosyscall            0     
-#define __NR_read		  3
-#define __NR_open		  5
-#define __NR_close		  6
-#define __NR_execve		 11
-#define __NR_mmap		 90
-#define __NR_socketcall	102
-#define __NR_mmap2		192
-
-// Windows system calls @ http://code.google.com/p/miscellaneouz/source/browse/trunk/winsyscalls?spec=svn26&r=26
-// FIXME: We should really handle different versions of Windows better
-// These are for win7
-#define __NR_createfilewin	0x0042
-#define __NR_readfilewin 0x0111
-#define __NR_closewin 0x0032
-
-/********************************************/
-
-// socket specific calls
-#define _A1_socket     0x1
-#define _A1_bind       0x2
-#define _A1_listen     0x4
-#define _A1_accept     0x5
-#define _A1_send       0x9
-#define _A1_recv       0xa
-#define _A1_setsockopt 0xe
-
-/********************************************/
-
 /*********** IDs for taint sources **********/
 
 #define ARG_ID 2
@@ -88,10 +55,6 @@ typedef std::map<var,t> context;
 
 /********************************************/
 
-/*************** Syscall Regs ***************/
-#define SCOUTREG_WIN REG_EDX
-#define SCOUTREG_LIN REG_EAX
-
 struct ValSpecRec {
   uint32_t type;               // Type of value specifier.
   uint32_t loc;                // Location of this value.
@@ -101,7 +64,6 @@ struct ValSpecRec {
 };
 
 namespace pintrace { // We will use namespace to avoid collision
-
   
    // Tracking the taint during program flow
    class TaintTracker {
@@ -113,9 +75,9 @@ namespace pintrace { // We will use namespace to avoid collision
      /** A function to introduce taint in the contexts. Writes
 	 information to state; this state must be passed to
 	 taintIntro */
-     bool taintStart(uint32_t callno, uint32_t * args, uint32_t &state);
+     bool taintPreSC(uint32_t callno, uint32_t * args, uint32_t &state);
 
-     bool taintIntroduction(const uint32_t bytes, 
+     bool taintPostSC(const uint32_t bytes, 
                             uint32_t * args, 
                             uint32_t &addr,
                             uint32_t &length,
@@ -161,7 +123,7 @@ namespace pintrace { // We will use namespace to avoid collision
 
      bool hasTaint(context &delta);
 
-     bool propagatedTaint(bool branch);
+     //bool propagatedTaint(bool branch);
       
      void printMem();
 
@@ -173,6 +135,15 @@ namespace pintrace { // We will use namespace to avoid collision
 
      bool recvHelper(uint32_t fd, void *ptr, size_t len);
 
+     static uint32_t getSize(uint32_t type);
+
+     static bool isValid(uint32_t type);
+
+     static bool isReg(uint32_t type);
+
+     static bool isMem(uint32_t type);
+    
+     
    private:
 
      // The taint source (producing taint tags)
@@ -206,8 +177,6 @@ namespace pintrace { // We will use namespace to avoid collision
 
      void addTaintToWritten(context &delta, uint32_t tag);
       
-     bool isReg(uint32_t type);
-
      uint32_t getRegTaint(context &delta, uint32_t reg_int);
 
      uint32_t getMemTaint(uint32_t addr, uint32_t type);
@@ -217,10 +186,6 @@ namespace pintrace { // We will use namespace to avoid collision
      uint32_t exists(context &ctx, uint32_t elem);
 
      uint32_t getTaint(context &ctx, uint32_t elem);
-
-     uint32_t getSize(uint32_t type);
-
-     bool isValid(uint32_t type);
 
      void setTaint(context &ctx, uint32_t key, uint32_t tag);
 
