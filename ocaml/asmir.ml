@@ -405,25 +405,23 @@ let get_asm = function
 let check_equivalence a (ir1, next1) (ir2, next2) =
   assert(next1 = next2);
   try
-  let q = Var(Var.newvar "q" reg_1) in
-  let to_wp p = 
-    let p = Memory2array.coerce_prog p in
-    Wp.wp (Gcl.of_ast p) q
-  in
-  let wp1 = to_wp ir1
-  and wp2 = to_wp ir2 in
-  let e = BinOp(EQ, wp1, wp2) in
-  let name = Printf.sprintf "asmir_check_equivalence_%Lx.stp" a in
-  let pp = new Stp.pp_oc (open_out name) in
-  pp#assert_ast_exp e;
-  pp#close;
-  let size = (Unix.stat name).Unix.st_size in
-  DV.dprintf "Wrote %d bytes" size;
-  assert (size > 0)
+    let q = Var(Var.newvar "q" reg_1) in
+    let to_wp p = 
+      let p = Memory2array.coerce_prog p in
+      Wp.wp (Gcl.of_ast p) q
+    in
+    let wp1 = to_wp ir1
+    and wp2 = to_wp ir2 in
+    let e = BinOp(EQ, wp1, wp2) in
+    match Stpexec.query_formula e with
+    | Stpexec.Valid -> ()
+    | Stpexec.Invalid -> wprintf "formulas for %Lx not equivalent" a
+    | Stpexec.StpError -> failwith "StpError"
+    | Stpexec.Timeout -> failwith "Timeout"
   with Failure s ->
     match get_asm ir1 with (* Don't warn for known instructions *)
     | Some "ret" -> ()
-    | _ -> DV.dprintf "Could not check equivalence for %Lx: %s" a s
+    | _ -> wprintf "Could not check equivalence for %Lx: %s" a s
 
 
 (** Translate only one address of a  Libasmir.asm_program_t to Vine *)

@@ -45,6 +45,7 @@ export SOURCES = \
 	gcl.mli gcl.ml \
 	wp.ml \
 	stp.ml \
+	stpexec.mli stpexec.ml \
 	asmirconsts.ml asmir.mli asmir.ml \
 	input.mli input.ml \
 	depgraphs.ml \
@@ -55,7 +56,6 @@ export SOURCES = \
 	symbeval_search.ml \
 	coalesce.ml \
 	traces.ml \
-	stpexec.ml \
 	ast_slice.ml \
 	ssa_slice.ml \
 	comparelib.ml \

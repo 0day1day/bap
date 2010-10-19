@@ -200,8 +200,8 @@ let compute_wp_boring cfg post =
   let gcl = Gcl.of_astcfg cfg in
     (Wp.wp gcl post, [])
 
-(** Write formula for AST CFG out to random filename and return the filename *)
-let writeformula ?(exists=[]) ?(foralls=[]) ?(remove=true) p  =
+(** Write given formula out to random filename and return the filename *)
+let write_formula ?(exists=[]) ?(foralls=[]) ?(remove=true) f  =
     let name, oc = Filename.open_temp_file ("formula" ^ (string_of_int (getpid ())))  ".stp" in
     at_exit (fun () -> 
 	       if remove then
@@ -209,17 +209,25 @@ let writeformula ?(exists=[]) ?(foralls=[]) ?(remove=true) p  =
 		   Unix.unlink name
 		 with _ -> ());
     dprintf "Using temporary file %s" name;  
+    let pp = new Stp.pp_oc oc in
+    pp#valid_ast_exp ~exists:exists ~foralls:foralls f;
+    pp#flush ();
+(*     output_string oc "QUERY(FALSE); COUNTEREXAMPLE;\n"; *)
+    pp#close;
+    name
+
+(** Write formula for AST CFG out to random filename and return the filename *)
+let writeformula ?(exists=[]) ?(foralls=[]) ?remove p  =
     let p = Prune_unreachable.prune_unreachable_ast p in
     let post = Ast.exp_true in
     let (wp, _foralls) = compute_wp_boring p post in
     let m2a = new Memory2array.memory2array_visitor () in
     let wp = Ast_visitor.exp_accept m2a wp in
     let foralls = List.map (Ast_visitor.rvar_accept m2a) foralls in
-    let pp = new Stp.pp_oc oc in
-    
-    pp#valid_ast_exp ~exists:exists ~foralls:foralls wp;
-    pp#flush ();
-(*     output_string oc "QUERY(FALSE); COUNTEREXAMPLE;\n"; *)
-    pp#close;
-    name
+    (* FIXME: same for exists? *)
+    write_formula ~exists ~foralls ?remove wp
 
+
+let query_formula ?timeout ?exists ?foralls f =
+  let filename = write_formula ?exists ?foralls f in
+  runstp ?timeout filename
