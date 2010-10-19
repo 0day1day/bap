@@ -399,8 +399,8 @@ let open_program filename =
 
 
 let get_asm = function
-  | Label(_,[Asm s])::_ -> Some s
-  | _ -> None
+  | Label(_,[Asm s])::_ -> s
+  | _ -> ""
 
 let check_equivalence a (ir1, next1) (ir2, next2) =
   assert(next1 = next2);
@@ -415,12 +415,12 @@ let check_equivalence a (ir1, next1) (ir2, next2) =
     let e = BinOp(EQ, wp1, wp2) in
     match Stpexec.query_formula e with
     | Stpexec.Valid -> ()
-    | Stpexec.Invalid -> wprintf "formulas for %Lx not equivalent" a
+    | Stpexec.Invalid -> wprintf "formulas for %Lx (%s aka %s) not equivalent" a (get_asm ir1) (get_asm ir2)
     | Stpexec.StpError -> failwith "StpError"
     | Stpexec.Timeout -> failwith "Timeout"
   with Failure s ->
     match get_asm ir1 with (* Don't warn for known instructions *)
-    | Some "ret" -> ()
+    | "ret" -> ()
     | _ -> wprintf "Could not check equivalence for %Lx: %s" a s
 
 

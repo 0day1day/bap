@@ -35,19 +35,23 @@ let syscall cmd =
 (*   let ec = in_channel_of_descr stderrread in *)
   let cmdname, args = split_cmdstr cmd in
   let pid = create_process cmdname args stdinread stdoutwrite stderrwrite in
+  close stdoutwrite;
+  close stderrwrite;
+  close stdinread;
+  close stdinwrite;
   (try
      let obuf = Buffer.create 16 in
      let ebuf = Buffer.create 16 in
      let fdlist = [stdoutread; stderrread] in
-     List.iter (fun fd -> set_nonblock fd) fdlist;
+     List.iter set_nonblock fdlist;
      let wait = ref true in
      let estatus = ref None in
      let buf = String.create 1 in
      while !wait do    
        
        (* Read any new data from stdout/stderr *)
-       let rd () =
-	 let rl,_,_ = select fdlist [] fdlist select_timeout in
+       let rd timeout  =
+	 let rl,_,_ = select fdlist [] fdlist timeout in
 	 List.iter
 	   (fun fd ->
 	      let buffer = if fd=stdoutread then obuf else ebuf in
@@ -56,16 +60,17 @@ let syscall cmd =
 		  (match read fd buf 0 1 with
 		   | 1 ->
 		       Buffer.add_string buffer buf
+		   | 0 -> raise Exit
 		   | _ ->
 		       failwith "Assertion error");
 		done
-	      with Unix_error _ -> ()
+	      with Exit | Unix_error(EWOULDBLOCK,_,_) | Unix_error(EAGAIN,_,_) -> ()
 	   ) rl;
 (* 	 dprintf "Hmm: %d %d" (List.length rl) (List.length el); *)
        in
 
        (* Do a read *)
-       rd ();
+       rd select_timeout;
        
        (* Check if the process is dead yet *)
        let pid',estatus' = waitpid [WNOHANG] pid in
@@ -75,18 +80,16 @@ let syscall cmd =
        end;
        
        (* Do another read, in case the process died *)
-       rd();
+       rd 0.0;
        
      done;
      close stdoutread;
-     close stdoutwrite;
      close stderrread;
-     close stderrwrite;
-     close stdinread;
-     close stdinwrite;
      (Buffer.contents obuf), (Buffer.contents ebuf), Util.option_unwrap !estatus
    with Alarm_signal_internal ->
-     raise (Alarm_signal pid))
+     close stdoutread;
+     close stderrread;
+     raise (Alarm_signal pid) )
 
 
 (* let syscall' cmd = *)
