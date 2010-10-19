@@ -4,6 +4,7 @@
 
 #include <iostream>
 #include <stdint.h>
+#include "pin_common.h"
 
 /*
  * It turns out that if you try to include the get operands code in
@@ -21,26 +22,6 @@
 #endif
 
 namespace pintrace { // Use namespace to avoid conflict
-
-// As defined by Intel.
-#define MAX_INSN_BYTES 15
-
-#define MAX_VALUES_COUNT 15
-
-#define MAX_CACHEMASK_BTYES 2
-
-// TODO: Make these values something proper.
-#define MAX_FRAME_MEMSIZE sizeof(StdFrame)
-#define MAX_FRAME_DISKSIZE 1024
-
-  /** Total syscall args */
-#define MAX_SYSCALL_ARGS 9
-  /** Number to record on this platform */
-#ifdef _WIN32
-#define PLAT_SYSCALL_ARGS MAX_SYSCALL_ARGS
-#else
-#define PLAT_SYSCALL_ARGS 5
-#endif
 
 /* Register definition: copied from Pin's types_vampi.TLH */
 

@@ -1,4 +1,7 @@
-/** Misc. definitions that are related to system calls */
+#ifndef _PIN_SYSCALLS_H
+#define _PIN_SYSCALLS_H
+
+/* Misc. definitions that are related to system calls */
 
 /***************** Syscalls ***************/
 // FIXME: use the ones from /usr/include/asm/unistd.h
@@ -36,4 +39,4 @@
 #define SCOUTREG_WIN REG_EDX
 #define SCOUTREG_LIN REG_EAX
 
-
+#endif
