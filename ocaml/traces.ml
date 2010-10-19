@@ -791,12 +791,12 @@ let run_block state block =
       )
     with
 	(* Ignore failed assertions -- assuming that we introduced them *)
-    | AssertFailed _ as e -> 
-	  pdebug "failed assertion";
-	  raise e;
-	  (* let new_pc = Int64.succ state.pc in *)
-	  (* let next = TraceConcrete.inst_fetch state.sigma new_pc in *)
-	  (* eval_block {state with pc=new_pc} next *)
+    | AssertFailed _ as _e -> 
+	  wprintf "failed assertion: %s" (Pp.ast_stmt_to_string stmt);
+	  (* raise e; *)
+	  let new_pc = Int64.succ state.pc in
+	  let next = TraceConcrete.inst_fetch state.sigma new_pc in
+	  eval_block {state with pc=new_pc} next
   in
     try
       eval_block state init
