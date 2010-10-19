@@ -171,7 +171,8 @@ let del_symbolic = Hashtbl.remove global.symbolic
 
 let cleanup () =
   Hashtbl.clear global.vars;
-  Hashtbl.clear global.memory
+  Hashtbl.clear global.memory;
+  Hashtbl.clear global.symbolic
 
 let conc_mem_fold f = 
   Hashtbl.fold f global.memory
@@ -192,6 +193,11 @@ let () =
      ::"R_LDT"
      ::"R_GDT"
      ::"R_AF"
+     ::"R_CF"
+     ::"R_ZF"
+     ::"R_OF"
+     ::"R_SF"
+     ::"R_PF"
      ::"R_CC_OP"
      ::"R_CC_DEP1"
      ::"R_CC_DEP2"
@@ -404,6 +410,8 @@ let () =
 
 (********************************************************)
 	  
+let is_seed_label = (=) "Read Syscall"
+      
 (* Store the concrete taint info in the global environment *)
 let add_to_conc {name=name; mem=mem; index=index; value=value; 
 		 t=typ; usage=usage; taint=Taint taint} =
@@ -441,7 +449,17 @@ let add_to_conc {name=name; mem=mem; index=index; value=value;
 (* Updating the lookup tables with the concrete values *)
 let update_concrete s =
   match s with
+  | Label (Name s,atts) when is_seed_label s ->
+      (* Taint introduction *)
+      List.iter
+      	(fun {index=index; taint=Taint taint} ->
+      	   (* Mark the index as symbolic; we don't actually care about
+      	      the value *)
+      	   add_symbolic index (Int(0L, reg_8))
+      	) (filter_taint atts);
+      false
   | Label (_,atts) ->
+      (* Concrete operands *)
       let conc_atts = filter_taint atts in
         if conc_atts != [] then (
 	  cleanup ();
@@ -473,16 +491,16 @@ let rec get_first_atts = function
       get_first_atts rest 
       
 (** Initializing the trace contexts *)
-let init_trace trace ctx = 
-  let atts,_ = get_first_atts trace in
-    (* Create a memory to place the initial symbols *)
-  List.iter
-    (fun {index=index; taint=Taint taint} ->
-       let varname = "symb_"^(string_of_int taint) in
-       let newvar = Var (Var.newvar varname reg_8) in
-	 add_symbolic index newvar
-    ) atts;
-    pdebug "Added the initial symbolic seeds" 
+(* let init_trace trace ctx =  *)
+(*   let atts,_ = get_first_atts trace in *)
+(*     (\* Create a memory to place the initial symbols *\) *)
+(*   List.iter *)
+(*     (fun {index=index; taint=Taint taint} -> *)
+(*        let varname = "symb_"^(string_of_int taint) in *)
+(*        let newvar = Var (Var.newvar varname reg_8) in *)
+(* 	 add_symbolic index newvar *)
+(*     ) atts; *)
+(*     pdebug "Added the initial symbolic seeds"  *)
  
 (** Removing all jumps from the trace *)
 let remove_jumps =
@@ -650,7 +668,8 @@ let check_delta state =
       let tracebyte = get_int v.exp in
       try
 	let evalbyte = get_int (AddrMap.find addr cm) in
-	if tracebyte <> evalbyte then wprintf "Consistency error: Tainted memory value (address %Lx, value %Lx) present in trace does not match value %Lx in in concrete evaluator" addr tracebyte evalbyte
+	let issymb = Hashtbl.mem global.symbolic addr in
+	if tracebyte <> evalbyte && (not issymb) then wprintf "Consistency error: Tainted memory value (address %Lx, value %Lx) present in trace does not match value %Lx in in concrete evaluator" addr tracebyte evalbyte
       with Not_found -> wprintf "Consistency error: Tainted memory value (address %Lx, value %Lx) present in trace but missing in concrete evaluator" addr tracebyte
     )
   in
@@ -1134,8 +1153,6 @@ end
 
 module TraceSymbolic = Symbeval.Make(TaintSymbolic)(FullSubst)(LetBind)
 
-let is_seed_label = (=) "Read Syscall"
-      
 let add_symbolic_seeds memv = function
   | Ast.Label (Name s,atts) when is_seed_label s ->
       List.iter
@@ -1148,7 +1165,6 @@ let add_symbolic_seeds memv = function
 		     ^(Pp.ast_exp_to_string sym_var));
 	     add_symbolic index sym_var ;
 	     (* symbolic variable *)
-	     (* XXX + TODO + FIXME + HACK *)
 	     let mem = Var(memv) in
 	     let store = Store(mem, Int(index, reg_32), sym_var, exp_false, reg_8) in
 	     let constr = BinOp (EQ, mem, store) in
@@ -1201,8 +1217,8 @@ let symbolic_run trace =
 	   let stmts = ref [] in
 	   (* dprintf "Dsa'ified stmt: %s" (Pp.ast_stmt_to_string stmt); *)
 	   Status.inc() ;
-	   add_symbolic_seeds memv stmt;
 	   let hasconc = update_concrete stmt in
+	   add_symbolic_seeds memv stmt;
 	   if hasconc && !consistency_check then (
 	     stmts := [(assert_vars h)]
 	   );
