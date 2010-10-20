@@ -218,7 +218,7 @@ uint32_t TaintTracker::getReadTaint(context &delta)
       if (isReg(values[i].type) 
 	  && (values[i].loc != REG_EFLAGS)) // FIXME: no control-flow taint
 	tmp_tag = getRegTaint(delta, values[i].loc);
-      else if (isValid(values[i].type))
+      else if (isMem(values[i].type))
 	tmp_tag = getMemTaint(values[i].loc, values[i].type);
       tag = combineTaint(tag, tmp_tag);
     }
@@ -657,7 +657,7 @@ void TaintTracker::addTaintToWritten(context &delta, uint32_t tag)
 	values[i].taint = getRegTaint(delta, loc);
 	//cerr << "new " << REG_StringShort((REG)values[i].loc) 
 	//     << " taint: " << values[i].taint << endl;
-      } else if (isValid(values[i].type)) {
+      } else if (isMem(values[i].type)) {
 	//cerr << hex << "writing " << values[i].loc << " = " << tag << endl;
 	loc = values[i].loc;
 	uint32_t size = getSize(values[i].type);
@@ -722,8 +722,9 @@ bool TaintTracker::taintChecking()
 {
   for (uint32_t i = 0 ; i < count ; i++)
     if ((values[i].loc == REG_INST_PTR)
-        && isReg(values[i].type)
-        && values[i].taint != NOTAINT)
+        && (isReg(values[i].type))
+        && (values[i].taint != NOTAINT)) {
       return false;
+    }
   return true;
 }
