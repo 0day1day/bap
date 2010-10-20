@@ -4,7 +4,11 @@ let sort =
   let sort_aux (var1, _) (var2,_) =
     let ss1 = Str.split underscore var1 
     and ss2 = Str.split underscore var2 in
-      compare (List.nth ss1 2) (List.nth ss2 2)
+    let s1 = List.nth ss1 1 
+    and	s2 = List.nth ss2 1 in      
+      let s1i = int_of_string s1
+      and s2i = int_of_string s2 in
+      compare s1i s2i
   in  
   List.sort sort_aux
 
