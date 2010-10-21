@@ -20,7 +20,7 @@ let arch_i386 = Libasmir.Bfd_arch_i386
 let arch_arm  = Libasmir.Bfd_arch_arm
 (*more to come later when we support them*)
 
-let trace_blocksize = ref 10000L
+let trace_blocksize = ref 100000L
 
 module D = Debug.Make(struct let name = "ASMIR" and default=`Debug end)
 open D
