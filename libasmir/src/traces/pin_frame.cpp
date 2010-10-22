@@ -266,9 +266,9 @@ ostream &StdFrame2::serialize(ostream &out, uint16_t sz)
    // Note: ((x-1) >> 3) + 1 === ceil(x / 8.0)
    uint32_t masklen = ((values_count - 1) >> 3) + 1;
 
-   // 9 = sizeof(addr) + sizeof(tid) + sizeof(lengths) +
-   // sizeof(types, usages, locs, taint)
-   sz += 9
+   // 10 = sizeof(addr) + sizeof(tid) + sizeof(values_count) +
+   // sizeof(insn_length) + sizeof(types, usages, locs, taint)
+   sz += 10
      + (insn_length * sizeof(char))
      + masklen
      + (values_count * sizeof(uint32_t) * 4);
@@ -288,10 +288,10 @@ ostream &StdFrame2::serialize(ostream &out, uint16_t sz)
    //    |    \-- values_count
    //    \------- insn_length
 
-   assert (values_count < (1 << 4));
-   uint8_t lengths = (values_count & 0xf) | (insn_length << 4);
+   //uint8_t lengths = (values_count & 0xf) | (insn_length << 4);
 
-   WRITE(out2, lengths);
+   WRITE(out2, values_count);
+   WRITE(out2, insn_length);
 
    out2.write((const char *) &rawbytes, insn_length * sizeof(char));
    out2.write((const char *) &cachemask, masklen);
@@ -314,11 +314,8 @@ istream &StdFrame2::unserializePart(istream &in)
    READ(in, addr);
    READ(in, tid);
 
-   uint8_t lengths;
-   READ(in, lengths);
-
-   insn_length = lengths >> 4;
-   values_count = lengths & 0xf;
+   READ(in, values_count);
+   READ(in, insn_length);
 
    // Be a bit paranoid.
    if (insn_length > MAX_INSN_BYTES) insn_length = MAX_INSN_BYTES;
