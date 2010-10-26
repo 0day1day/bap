@@ -26,6 +26,7 @@ namespace WINDOWS {
 typedef WINDOWS::NTSTATUS NTSTATUS;
 #else
 const int UNIX_SUCCESS = 0;
+const int UNIX_FAILURE = -1;
 #endif
 
 using namespace std;
@@ -442,8 +443,10 @@ bool TaintTracker::taintPreSC(uint32_t callno, uint32_t *args, /* out */ uint32_
         // TODO: do we care about the offset?
       case __NR_mmap:
       case __NR_mmap2:
-        if (fds.find(args[4]) != fds.end())
-          state = __NR_mmap2;
+        if (fds.find(args[4]) != fds.end()) {
+          cerr << "mmapping " << args[0] << endl;
+	  state = __NR_mmap2;
+	}
         break;
       case __NR_read: 
         if (fds.find(args[0]) != fds.end()) {
@@ -529,17 +532,21 @@ bool TaintTracker::taintPostSC(const uint32_t bytes,
               length = bytes;
               cerr << "Tainting " 
                    << bytes 
-                   << "bytes from socket" << endl;
+                   << " bytes from socket" << endl;
               for (uint32_t i = 0 ; i < length ; i ++)
                 setTaint(memory, addr + i, source++);
               return true;
             case _A1_accept:
-              cerr << "Accepting an incoming connection" << endl;
-              fds.insert(bytes);
+	      if (bytes != (uint32_t)UNIX_FAILURE) {
+		cerr << "Accepting an incoming connection" << endl;
+		fds.insert(bytes);
+	      }
               break;
             case _A1_socket:
-              cerr << "Opening a tainted socket " << bytes << endl;
-              fds.insert(bytes);
+	      if (bytes != (uint32_t)UNIX_FAILURE) {
+		cerr << "Opening a tainted socket " << bytes << endl;
+		fds.insert(bytes);
+	      }
               break;
             default:
               break;
@@ -547,7 +554,7 @@ bool TaintTracker::taintPostSC(const uint32_t bytes,
         break;
       case __NR_open:
         // "bytes" contains the file descriptor
-        if (bytes != (uint32_t)(-1)) { /* -1 == error */
+        if (bytes != (uint32_t)(UNIX_FAILURE)) { /* -1 == error */
 			  fds.insert(bytes);
 		  }
 		  break;
