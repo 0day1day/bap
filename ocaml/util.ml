@@ -335,14 +335,10 @@ let take l n = take_aux [] (l, n)
 (* list_firstindex l pred returns the index of the first list element
    that pred returns true on *)
 let rec list_firstindex ?s:(s=0) l pred =
-  if List.length l = 0 then 
-    raise Not_found
-  else if (pred (List.hd l)) then
-    s
-  else
-    let tl = List.tl l in
-    let next = s+1 in
-    list_firstindex tl pred ~s:next
+  match l with
+  | [] -> raise Not_found
+  | x::_ when pred x -> s
+  | _::tl -> list_firstindex tl pred ~s:(s+1)
 
 (* Insert elements in li to l before position n *)
 let list_insert l li n =
@@ -392,66 +388,35 @@ let list_compare f l1 l2 =
 let list_cart_prod2 f l1 l2 =
   List.iter
     (fun x ->
-       List.iter
-	 (fun y ->
-	    f x y
-	 ) l2
+       List.iter (f x) l2
     ) l1
 
 (** Given three lists, calls f with every possible combination *)
 let list_cart_prod3 f l1 l2 l3 =
-  List.iter
-    (fun x ->
-       List.iter
-	 (fun y ->
-	    List.iter
-	      (fun z ->
-		 f x y z
-	      ) l3
-	 ) l2
-    ) l1
+  List.iter (fun x -> list_cart_prod2 (f x) l2 l3) l1
 
 (** Given four lists, calls f with every possible combination *)
 let list_cart_prod4 f l1 l2 l3 l4 =
-  List.iter
-    (fun x ->
-       List.iter
-	 (fun y ->
-	    List.iter
-	      (fun z ->
-		 List.iter
-		   (fun w ->
-		      f x y z w
-		   ) l4
-	      ) l3
-	 ) l2
-    ) l1
+  List.iter (fun x -> list_cart_prod3 (f x) l2 l3 l4) l1
 
 
 (** Calls f on each element of l, and returns the first Some(x)
     returned.  If no Some(x) are returned, None is returned. *)
 let list_existssome f l =
-  List.fold_left
-    (fun state ele ->
-       match state with
-       | Some _ as x -> x (* Already found it *)
-       | None -> f ele
-    ) None l
+  (* Maybe list_find_some should call this instead *)
+  try Some(list_find_some f l) with Not_found -> None
 
 (** Calls f on each element of l and if there is Some() value returned
     for each list member, returns Some(unwrapped list). If at least
     one returns None, None is returned instead. *)
 let list_for_allsome f l =
-  let b = List.fold_left
-    (fun state ele ->
-       match state with
-       | false -> false
-       | true -> (match f ele with
-		  | Some _ -> true
-		  | None -> false)
-    ) true l
+  let rec m r = function
+    | [] -> Some(List.rev r)
+    | x::xs -> match f x with
+      | None -> None
+      | Some x -> m (x::r) xs
   in
-  if b then Some(List.map (fun x -> option_unwrap (f x)) l) else None
+  m [] l
 
 (** Deletes the first occurrence of e (if it exists) in the list
     and returns the updated list *)
