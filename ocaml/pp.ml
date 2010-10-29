@@ -116,6 +116,17 @@ object (self)
     | Name s -> pp "label "; pp s
     | Addr x -> printf "addr 0x%Lx" x
 
+  method int i t =
+    match (Arithmetic.tos64 (i,t), t) with
+    | (0L, Reg 1) -> pp "false"
+    | (-1L, Reg 1) -> pp "true"
+    | (i,t) ->
+      if i < 10L && i > -10L
+      then pp (Int64.to_string i)
+      else printf "0x%Lx" i;
+      pp ":"; self#typ t
+
+
   (* prec tells us how much parenthization we need. 0 means it doesn't need
      to be parenthesized. Larger numbers means it has higher precedence.
      Maximum prec before paretheses are added are as follows:
@@ -183,12 +194,8 @@ object (self)
      | Ast.Lab s ->
 	 (* FIXME: quote s? *)
 	 pp "\""; pp s; pp "\"";
-     | Ast.Int(0L, Reg 1) ->
-	 pp "false"
-     | Ast.Int(1L, Reg 1) ->
-	 pp "true"
      | Ast.Int(i,t) ->
-	 pp (Int64.to_string i); pp ":"; self#typ t
+         self#int i t
      | Ast.Cast(ct,t,e) ->
 	 pp (ct_to_string ct);
 	 pp ":"; self#typ t;
@@ -264,7 +271,7 @@ object (self)
 
   method ssa_value = function
     | Ssa.Int(i,t) ->
-	pp(Int64.to_string i); pc ':'; self#typ t
+        self#int i t
     | Ssa.Var v ->
 	self#var v
     | Ssa.Lab lab ->

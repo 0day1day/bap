@@ -32,6 +32,7 @@ open D
 
 (* more verbose debugging *)
 module DV = Debug.Make(struct let name = "AsmirV" and default=`NoDebug end)
+module DCheck = Debug.Make(struct let name = "AsmirCheck" and default=`NoDebug end)
 
 (** Translate a unop *)
 let tr_unop = function
@@ -418,9 +419,10 @@ let check_equivalence a (ir1, next1) (ir2, next2) =
     | Stpexec.Invalid -> wprintf "formulas for %Lx (%s aka %s) not equivalent" a (get_asm ir1) (get_asm ir2)
     | Stpexec.StpError -> failwith "StpError"
     | Stpexec.Timeout -> failwith "Timeout"
-  with Failure s ->
+  with Failure s
+  | Invalid_argument s ->
     match get_asm ir1 with (* Don't warn for known instructions *)
-    | "ret" -> ()
+    | "ret" | "hlt"-> ()
     | _ -> wprintf "Could not check equivalence for %Lx: %s" a s
 
 
@@ -436,10 +438,9 @@ let asm_addr_to_bap {asmp=prog; arch=arch; get=get} addr =
   try let v = try  Disasm.disasm_instr arch get addr
     with Failure s -> DV.dprintf "disasm_instr %Lx: %s" addr s; raise Disasm.Unimplemented
       in
-      if DV.debug then (
-	DV.dprintf "Disassembled %Lx directly" addr;
-	check_equivalence addr v (fallback())
-      );
+      DV.dprintf "Disassembled %Lx directly" addr;
+      if DCheck.debug then
+	check_equivalence addr v (fallback());
       v
   with Disasm.Unimplemented ->
     DV.dprintf "Disassembling %Lx through VEX" addr;

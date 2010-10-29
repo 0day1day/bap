@@ -53,6 +53,8 @@ type opcode =
   | Lea of operand * Ast.exp
   | Call of operand * int64 (* Oimm is relative, int64 is RA *)
   | Shift of binop_type * typ * operand * operand
+  | Jump of operand
+  | Hlt
 
 let unimplemented s  = failwith ("disasm_i386: unimplemented feature: "^s)
 
@@ -154,7 +156,7 @@ let (=*) a b = BinOp(EQ, a, b)
 let ite t b e1 e2 = (* FIXME: were we going to add a native if-then-else thing? *)
   (Cast(CAST_SIGNED, t, b) &* e1) |*  (Cast(CAST_SIGNED, t, exp_not b) &* e2) 
 
-let l32 i = Int(i, r32)
+let l32 i = Int(Arithmetic.to64 (i,r32), r32)
 let i32 i = Int(Int64.of_int i, r32)
 
 module ToIR = struct
@@ -201,6 +203,8 @@ let to_ir pref = function
     [move esp (esp_e -* i32 4);
      store r32 esp_e (l32 ra);
      Jmp(l32(Int64.add i ra), calla)]
+  | Jump(o) ->
+    [ Jmp(op2e r32 o, [])]
   | Shift(st, s, o1, o2) when pref = [] || pref = [Op_size] ->
     assert (List.mem s [r8; r16; r32]);
     (* FIXME: how should we deal with undefined state? *)
@@ -229,6 +233,8 @@ let to_ir pref = function
      move zf (ifzero zf_e (compute_zf s e1));
      move pf (ifzero pf_e (compute_pf e1))
     ]
+  | Hlt ->
+    [Jmp(Lab "General_protection fault", [])]
   | _ -> unimplemented "to_ir"
 
 let add_labels ?(asm) a ir =
@@ -255,7 +261,7 @@ module ToStr = struct
 
   let opr = function
     | Oreg v -> Var.name v
-    | Oimm i -> Int64.to_string i
+    | Oimm i -> Printf.sprintf "$0x%Lx" i
     | Oaddr a -> Pp.ast_exp_to_string a
 
   let op2str = function
@@ -265,6 +271,8 @@ module ToStr = struct
     | Lea(r,a) -> Printf.sprintf "lea %s, %s" (opr r) (opr (Oaddr a))
     | Call(a, ra) -> Printf.sprintf "call %s" (opr a)
     | Shift _ -> "shift"
+    | Hlt -> "hlt"
+    | Jump a -> Printf.sprintf "jmp %s" (opr a)
 
   let to_string pref op = prefs2str pref ^ op2str op
 end (* ToStr *)
@@ -393,8 +401,10 @@ let parse_instr g addr =
     | 0xc7 -> let (_, rm, na) = parse_modrm32 na in
 	      let (i,na) = parse_imm32 na in
 	      (Mov(rm, i), na)
-    | 0xe8 -> let (i,na) = parse_imm32 na in
-	      (Call(i, na), na)
+    | 0xe8 -> let (i,na) = parse_disp32 na in
+	      (Call(Oimm i, na), na)
+    | 0xeb -> let (i,na) = parse_disp8 na in
+	      (Jump(Oimm(Int64.add i na)), na)
     | 0xc0 | 0xc1
     | 0xd0 | 0xd1 | 0xd2
     | 0xd3 -> let (r, rm, na) = parse_modrm32ext na in
@@ -411,7 +421,7 @@ let parse_instr g addr =
 	      | 7 -> (Shift(ARSHIFT, opsize, rm, amt), na)
 	      | _ -> unimplemented "Grp 2: rolls"
 	      )
-						 
+    | 0xf4 -> (Hlt, na)
     | 0xff -> let (r, rm, na) = parse_modrm32ext na in
 	      (match r with (* Grp 5 *)
 	      | _ -> unimplemented (Printf.sprintf "unsupported opcode: ff/%d" r)
