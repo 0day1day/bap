@@ -14,10 +14,61 @@ open Unix
 
 type result = Valid | Invalid | StpError | Timeout
 
+
+module type SOLVER_INFO =
+sig
+  val timeout : int (** Default timeout in seconds *)
+  val solvername : string (** Solver name *)
+  val cmdstr : string -> string (** Given a filename, produce a command string to invoke solver *)
+  val parse_result : string -> string -> Unix.process_status -> result (** Given output, decide the result *)
+end
+
+module type SOLVER =
+sig
+  val solve_formula_file : ?timeout:int -> string -> result (** Solve a formula in a file *)
+  val solve_formula_exp : ?timeout:int -> ?exists:(Ast.var list) -> ?foralls:(Ast.var list) -> Ast.exp -> result (** Solve a formula in an exp *)
+end
+
 let select_timeout = 0.1 (* seconds *)
 
 let alarm_handler i =
   raise Alarm_signal_internal
+
+let compute_wp_boring cfg post =
+  let gcl = Gcl.of_astcfg cfg in
+    (Wp.wp gcl post, [])
+
+(** Write given formula out to random filename and return the filename *)
+let write_formula ?(exists=[]) ?(foralls=[]) ?(remove=true) f  =
+    let name, oc = Filename.open_temp_file ("formula" ^ (string_of_int (getpid ())))  ".stp" in
+    at_exit (fun () -> 
+	       if remove then
+		 try 
+		   Unix.unlink name
+		 with _ -> ());
+    dprintf "Using temporary file %s" name;  
+    let pp = new Stp.pp_oc oc in
+    pp#valid_ast_exp ~exists:exists ~foralls:foralls f;
+    pp#flush ();
+(*     output_string oc "QUERY(FALSE); COUNTEREXAMPLE;\n"; *)
+    pp#close;
+    name
+
+(** Write formula for AST CFG out to random filename and return the filename *)
+let create_formula ?(exists=[]) ?(foralls=[]) ?remove p  =
+    let p = Prune_unreachable.prune_unreachable_ast p in
+    let post = Ast.exp_true in
+    let (wp, _foralls) = compute_wp_boring p post in
+    let m2a = new Memory2array.memory2array_visitor () in
+    let wp = Ast_visitor.exp_accept m2a wp in
+    let foralls = List.map (Ast_visitor.rvar_accept m2a) foralls in
+    (* FIXME: same for exists? *)
+    write_formula ~exists ~foralls ?remove wp
+
+
+(* let query_formula ?timeout ?exists ?foralls f = *)
+(*   let filename = write_formula ?exists ?foralls f in *)
+(*   runstp ?timeout filename *)
 
 (** Convert space delimited command string (command arg1 arg2 ... ) to a command and argument array *)
 let split_cmdstr cmdstr =
@@ -31,8 +82,6 @@ let syscall cmd =
   let (stdoutread,stdoutwrite) = pipe () in
   let (stderrread,stderrwrite) = pipe () in
   let (stdinread,stdinwrite) = pipe () in
-(*   let ic = in_channel_of_descr stdoutread in *)
-(*   let ec = in_channel_of_descr stderrread in *)
   let cmdname, args = split_cmdstr cmd in
   let pid = create_process cmdname args stdinread stdoutwrite stderrwrite in
   close stdoutwrite;
@@ -90,21 +139,6 @@ let syscall cmd =
      close stdoutread;
      close stderrread;
      raise (Alarm_signal pid) )
-
-
-(* let syscall' cmd = *)
-(*   let () = Sys.set_signal Sys.sigalrm (Sys.Signal_handle alarm_handler) in *)
-(*   let ic, oc, ec = Unix.open_process_full cmd (Unix.environment ()) in *)
-(*   let obuf = Buffer.create 16 in *)
-(*   let ebuf = Buffer.create 16 in *)
-(*   (try *)
-(*      while true do Buffer.add_channel obuf ic 1 done *)
-(*    with End_of_file -> ()); *)
-(*   (try *)
-(*      while true do Buffer.add_channel ebuf ec 1 done *)
-(*    with End_of_file -> ()); *)
-(*   let estatus = Unix.close_process_full (ic, oc, ec) in *)
-(*   (Buffer.contents obuf), (Buffer.contents ebuf), estatus *)
  
 let result_to_string result =
   match result with
@@ -113,124 +147,89 @@ let result_to_string result =
   | StpError -> "StpError"
   | Timeout -> "Timeout"
 
-let stp = "/home/ed/f09/stp-ver-0.1-11-18-2008/bin/stp"
-let sh = "/bin/bash"
+module Make = functor (S: SOLVER_INFO) ->
+  struct
+    let solve_formula_file ?(timeout=S.timeout) file =
+      ignore(alarm timeout);
+      let cmdline = S.cmdstr file in
 
-let runstp ?(timeout=60) file =
-  ignore(alarm timeout);
+      try
+	let sout,serr,pstatus = syscall cmdline in
+	
+	(* Turn the alarm off *)
+	ignore(alarm 0);
 
-  try
-    (
-      let cmdstr = Printf.sprintf "cvc3 +unknown-check-model %s" file in
-      let stpout,stperr,pstatus = syscall cmdstr
-      in
+	S.parse_result sout serr pstatus
 
-(*       dprintf "ok: %s %s" stpout stperr; *)
-      
-      (* Turn the alarm off *)
-      ignore(alarm 0);
-      
-      let fail = match pstatus with
-	| WEXITED(c) ->
-	    
-	    if c > 0 then (
-(* 	      dprintf "FAIL code: %d" c; *)
-	      true 
-	    )
-	    else false
-	      
-	| _ -> true
-      in
-      let fail = fail or ExtString.String.exists stperr "Fatal" in
-      let isinvalid = ExtString.String.exists stpout "Invalid." in
-      let isvalid = ExtString.String.exists stpout "Valid." in
-      
-(*       dprintf "fail: %b %b %b" fail isinvalid isvalid; *)
-      
-      if isvalid then
-	Valid
-      else if isinvalid then
-	Invalid
-      else if fail then (
-	dprintf "STP output: %s\nSTP error: %s" stpout stperr;  
-	StpError
-      )
-      else
-	failwith "Something weird happened."
+      with Alarm_signal(pid) ->
+	kill pid 9;
+	Timeout
+
+    let solve_formula_exp ?timeout ?exists ?foralls f =
+      let filename = write_formula ?exists ?foralls f in
+      solve_formula_file ?timeout filename
+
+  end;;
+
+module STP_INFO =
+struct
+  let timeout = 60
+  let solvername = "stp"
+  let cmdstr f = "stp -t " ^ f
+  let parse_result stdout stderr pstatus =
+    let failstat = match pstatus with
+      | WEXITED(c) -> c > 0
+      | _ -> true
+    in
+    let fail = failstat || ExtString.String.exists stderr "Fatal" in
+    let isinvalid = ExtString.String.exists stdout "Invalid." in
+    let isvalid = ExtString.String.exists stdout "Valid." in
+    
+    (*       dprintf "fail: %b %b %b" fail isinvalid isvalid; *)
+    
+    if isvalid then
+      Valid
+    else if isinvalid then
+      Invalid
+    else if fail then (
+      dprintf "STP output: %s\nSTP error: %s" stdout stderr;  
+      StpError
     )
-  with
-    Alarm_signal(pid) -> 
-      (* Another HUGE hack *)
-(*       ignore(Unix.system "killall -9 stp; killall -9 cvc3");       *)
-      kill pid 9;
-      Timeout ;;
+    else
+      failwith "Something weird happened."
+end
 
-(* let runstp ?(timeout=60) file = *)
-(*   let pid = fork () in *)
-(*   match pid with *)
-(*   | 0 -> ((\* child *\)       *)
-(* (\*       ignore(alarm timeout); *\) *)
-(*       (\* Yes, this is the biggest hack ever. *\) *)
-(*       let cmdstr = "perl -e 'alarm shift @ARGV; exec @ARGV' " ^ string_of_int timeout ^ " sh -c 'stp -sv " ^ file ^ " | grep Valid'" in *)
-(*       dprintf "Cmdstr: %s" cmdstr; *)
-(*       ignore(Unix.execv sh [| "sh"; "-c"; cmdstr |]); *)
-      
-(*       exit 2 *)
-(*     ) *)
+module STP = Make(STP_INFO)
 
-(*   | cpid -> ((\* parent *\) *)
-(*       let (pid,status) = (\* waitpid [] cpid *\) wait () in *)
-(*       dprintf "Pid %d exited" pid; *)
+module CVC3_INFO =
+struct
+  let timeout = 60
+  let solvername = "cvc3"
+  let cmdstr f = "cvc3 " ^ f
+  let parse_result stdout stderr pstatus =
+    let failstat = match pstatus with
+      | WEXITED(c) -> c > 0
+      | _ -> true
+    in
+    let fail = failstat || ExtString.String.exists stderr "Fatal" in
+    let isinvalid = ExtString.String.exists stdout "Invalid." in
+    let isvalid = ExtString.String.exists stdout "Valid." in
+    
+    (*       dprintf "fail: %b %b %b" fail isinvalid isvalid; *)
+    
+    if isvalid then
+      Valid
+    else if isinvalid then
+      Invalid
+    else if fail then (
+      dprintf "CVC output: %s\nCVC error: %s" stdout stderr;  
+      StpError
+    )
+    else
+      failwith "Something weird happened."
+end
 
-(*       (\* Another HUGE hack *\) *)
-(*       ignore(Unix.system "killall -9 stp"); *)
+module CVC3 = Make(CVC3_INFO)
 
-(*       (match status with *)
-(*       | WEXITED(code) -> dprintf "exit: %d" code *)
-(*       | WSIGNALED(signum) -> dprintf "signal: %d" signum *)
-(*       | _ -> dprintf "Wtf"); *)
-
-
-(*       match status with *)
-(*       | WEXITED(code) when code = 0 -> Valid *)
-(*       | WEXITED(code) when code = 1 -> Invalid *)
-(*       | WSIGNALED(signum) when signum = Sys.sigalrm -> Timeout *)
-(*       | _ -> failwith "Unexpected termination" *)
-
-(*     ) *)
-
-let compute_wp_boring cfg post =
-  let gcl = Gcl.of_astcfg cfg in
-    (Wp.wp gcl post, [])
-
-(** Write given formula out to random filename and return the filename *)
-let write_formula ?(exists=[]) ?(foralls=[]) ?(remove=true) f  =
-    let name, oc = Filename.open_temp_file ("formula" ^ (string_of_int (getpid ())))  ".stp" in
-    at_exit (fun () -> 
-	       if remove then
-		 try 
-		   Unix.unlink name
-		 with _ -> ());
-    dprintf "Using temporary file %s" name;  
-    let pp = new Stp.pp_oc oc in
-    pp#valid_ast_exp ~exists:exists ~foralls:foralls f;
-    pp#flush ();
-(*     output_string oc "QUERY(FALSE); COUNTEREXAMPLE;\n"; *)
-    pp#close;
-    name
-
-(** Write formula for AST CFG out to random filename and return the filename *)
-let writeformula ?(exists=[]) ?(foralls=[]) ?remove p  =
-    let p = Prune_unreachable.prune_unreachable_ast p in
-    let post = Ast.exp_true in
-    let (wp, _foralls) = compute_wp_boring p post in
-    let m2a = new Memory2array.memory2array_visitor () in
-    let wp = Ast_visitor.exp_accept m2a wp in
-    let foralls = List.map (Ast_visitor.rvar_accept m2a) foralls in
-    (* FIXME: same for exists? *)
-    write_formula ~exists ~foralls ?remove wp
-
-
-let query_formula ?timeout ?exists ?foralls f =
-  let filename = write_formula ?exists ?foralls f in
-  runstp ?timeout filename
+let runstp = STP.solve_formula_file
+let query_formula = STP.solve_formula_exp
