@@ -724,8 +724,10 @@ struct
   module LS = UseDef_AST.LS
 
   (** Return variables that might be referenced before they are
-      defined. The output of this function is a good starting point when
-      trying to find inputs of a program. *)
+      defined. The output of this function is a good starting point
+      when trying to find inputs of a program. Returns a hash of
+      values that are always undefined, and sometimes undefined
+      (depending on program path). *)
   let undefined p =
     let _,deflookup = UseDef_AST.usedef p in    
     
@@ -771,6 +773,18 @@ struct
       ) p;
 
     alwaysud, maybeud
+
+  (** Returns a set of always undefined variables, and sometimes
+      undefined variables. *)
+  let undefinedvars p =
+    let htos h =
+      VH.fold
+	(fun k v acc ->
+	   VS.add k acc
+	) h VS.empty
+    in
+    let alwaysh,maybeh = undefined p in
+    htos alwaysh, htos maybeh
 
   (** Returns (defined variables, "free" variables) *)
   let defs p =

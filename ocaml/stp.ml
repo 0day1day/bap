@@ -221,9 +221,9 @@ object (self)
 		("", "["^string_of_int(bits1-1)^":"^string_of_int(bits1-bits)^"]")
 	    | CAST_UNSIGNED  ->
 		if bits = bits1 then ("","") else
-		  (* @ does not work right in CVC3, so using BVPLUS
-		  ("(0bin"^String.make (bits-bits1) '0'^" @ ", ")") *)
-		  ("(BVPLUS(" ^ string_of_int bits ^ ",", ",0bin0))")
+		  ("(0bin"^String.make (bits-bits1) '0'^" @ ", ")")
+		  (* @ does not work right in CVC3, so using BVPLUS... I think they fixed it now -ed *)
+		  (* ("(BVPLUS(" ^ string_of_int bits ^ ",", ",0bin0))") *)
 	  in
 	  pp pre;
 	  self#ast_exp e1;
