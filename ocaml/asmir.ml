@@ -414,7 +414,7 @@ let check_equivalence a (ir1, next1) (ir2, next2) =
     let wp1 = to_wp ir1
     and wp2 = to_wp ir2 in
     let e = BinOp(EQ, wp1, wp2) in
-    match Stpexec.STP.solve_formula_exp e with
+    match Stpexec.CVC3.solve_formula_exp e with
     | Stpexec.Valid -> ()
     | Stpexec.Invalid -> wprintf "formulas for %Lx (%s aka %s) not equivalent" a (get_asm ir1) (get_asm ir2)
     | Stpexec.StpError -> failwith "StpError"
@@ -435,13 +435,18 @@ let asm_addr_to_bap {asmp=prog; arch=arch; get=get} addr =
     destroy_bap_block block;
     (ir, next)
   in
-  try let v = try  Disasm.disasm_instr arch get addr
+  try let (ir,na) as v = try  Disasm.disasm_instr arch get addr
     with Failure s -> DV.dprintf "disasm_instr %Lx: %s" addr s; raise Disasm.Unimplemented
       in
       DV.dprintf "Disassembled %Lx directly" addr;
       if DCheck.debug then
 	check_equivalence addr v (fallback());
-      v
+      (match ir with
+      | Label(l, [])::rest ->
+	  (Label(l, [Asm(Libasmir.asmir_string_of_insn prog addr)])::rest,
+	   na)
+      | _ -> v
+      )
   with Disasm.Unimplemented ->
     DV.dprintf "Disassembling %Lx through VEX" addr;
     fallback()

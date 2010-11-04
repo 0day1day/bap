@@ -35,11 +35,12 @@ open D
 *)
 
 type segment = CS | SS | DS | ES | FS | GS
-type prefix =
+(*type prefix =
   | Lock | Repnz | Repz
   | Override of segment | Hint_bnt | Hint_bt
   | Op_size | Mandatory_0f
   | Address_size
+*)
 
 type operand =
   | Oreg of Var.t
@@ -50,11 +51,29 @@ type opcode =
   | Retn
   | Nop
   | Mov of operand * operand (* dst, src *)
+  | Movdqa of operand * operand (* dst, src *)
   | Lea of operand * Ast.exp
   | Call of operand * int64 (* Oimm is relative, int64 is RA *)
   | Shift of binop_type * typ * operand * operand
   | Jump of operand
   | Hlt
+
+
+(* prefix names *)
+let pref_lock = 0xf0
+and repnz = 0xf2
+and repz = 0xf3
+and hint_bnt = 0x2e
+and hint_bt = 0x3e
+and pref_cs = 0x2e
+and pref_ss = 0x36
+and pref_ds = 0x3e
+and pref_es = 0x26
+and pref_fs = 0x64
+and pref_gs = 0x65
+and pref_opsize = 0x66
+and pref_addrsize = 0x67
+
 
 let unimplemented s  = failwith ("disasm_i386: unimplemented feature: "^s)
 
@@ -65,9 +84,13 @@ and (<<) = (lsl)
 
 (* register widths *)
 let r1 = Ast.reg_1
+let r4 = Reg 4
 let r8 = Ast.reg_8
 let r16 = Ast.reg_16
 let r32 = Ast.reg_32
+let r64 = Ast.reg_64
+let addr_t = r32
+let xmm_t = TMem r4 (* 128 bits that can be accessesed as different things *)
 
 let nv = Var.newvar
 (* registers *)
@@ -90,6 +113,7 @@ and zf = nv "R_ZF" r1
 and sf = nv "R_SF" r1
 and oF = nv "R_OF" r1
 
+let xmms = Array.init 8 (fun i -> nv (Printf.sprintf "XMM%d" i) xmm_t)
 
 let regs : var list =
   ebp::esp::esi::edi::eip::eax::ebx::ecx::edx::eflags::cf::pf::af::zf::sf::oF::
@@ -122,7 +146,8 @@ let regs : var list =
   ("R_FTOP", reg_32);
   ("R_FPROUND", reg_32);
   ("R_FC3210", reg_32);
-]
+    ]
+    @ Array.to_list xmms
 
 
 
@@ -139,9 +164,17 @@ and of_e = Var oF
 
 
 (* exp helpers *)
+let loadm m t a =
+  Load(Var m, a, little_endian, t)
+
 let load t a =
   Load(mem_e, a, little_endian, t)
 
+let binop op a b = match (a,b) with
+  | (Int(a, at), Int(b, bt)) when at = bt ->
+    let (i,t) = Arithmetic.binop op (a,at) (b,bt) in
+    Int(i,t)
+  | _ -> BinOp(op, a, b)
 
 let (+*) a b = BinOp(PLUS, a, b)
 let (-*) a b = BinOp(MINUS, a, b)
@@ -167,6 +200,9 @@ let move v e =
 
 let store t a e =
   move mem (Store(mem_e, a, e, little_endian, t))
+
+let storem m t a e =
+  move m (Store(Var m, a, e, little_endian, t))
 
 let op2e t = function
   | Oreg r -> Var r
@@ -197,6 +233,23 @@ let to_ir pref = function
     ]
   | Mov(dst,src) when pref = [] ->
     [assn r32 dst (op2e r32 src)] (* FIXME: r32 *)
+  | Movdqa(d,s) -> (
+    let zero = Int(0L,r4) and eight = Int(8L,r4) in
+    let (s0, s1, a1) = match s with
+      | Oreg r -> (loadm r r64 zero, loadm r r64 eight, [])
+      | Oaddr a -> (load r64 a, load r64 (a +* Int(8L, addr_t)), [a])
+      | Oimm _ -> failwith "invalid"
+    in
+    let (d0, d1, a2) = match d with
+      (* FIXME: should this be a single move with two stores? *)
+      | Oreg r -> (storem r r64 zero s0, storem r r64 eight s1, [])
+      | Oaddr a -> (store r64 a s0, store r64 (a +* Int(8L, addr_t)) s1, [a])
+      | Oimm _ -> failwith "invalid"
+    in
+    (List.map (fun a -> Assert( (a &* i32 15) =* i32 0, [])) (a1@a2))
+    @ [d0;d1;]
+
+  )
   | Lea(r, a) when pref = [] ->
     [assn r32 r a]
   | Call(Oimm i, ra) when pref = [] ->
@@ -205,7 +258,7 @@ let to_ir pref = function
      Jmp(l32(Int64.add i ra), calla)]
   | Jump(o) ->
     [ Jmp(op2e r32 o, [])]
-  | Shift(st, s, o1, o2) when pref = [] || pref = [Op_size] ->
+  | Shift(st, s, o1, o2) when pref = [] || pref = [pref_opsize] ->
     assert (List.mem s [r8; r16; r32]);
     (* FIXME: how should we deal with undefined state? *)
     let t1 = nv "t1" s and tmpDEST = nv "tmpDEST" s
@@ -249,12 +302,13 @@ end (* ToIR *)
 module ToStr = struct
 
   let pref2str = function
-  | Lock -> "lock"
+(*  | Lock -> "lock"
   | Repnz -> "repnz"
   | Repz -> "repz"
   | Override _ | Hint_bnt | Hint_bt
   | Op_size | Mandatory_0f
-  | Address_size -> failwith "finish pref2str"
+  | Address_size -> failwith "finish pref2str" *)
+    | _ -> unimplemented "pref2str"
 
   let rec prefs2str = function [] -> ""
     | x::xs -> pref2str x ^ " " ^ prefs2str xs
@@ -273,8 +327,11 @@ module ToStr = struct
     | Shift _ -> "shift"
     | Hlt -> "hlt"
     | Jump a -> Printf.sprintf "jmp %s" (opr a)
+    | _ -> unimplemented "op2str"
 
-  let to_string pref op = prefs2str pref ^ op2str op
+  let to_string pref op =
+    failwith "fallback to libdisasm"
+    (* prefs2str pref ^ op2str op *)
 end (* ToStr *)
 
 
@@ -290,26 +347,24 @@ let bits2reg32= function
   | 7 -> edi
   | _ -> failwith "bits2reg32 takes 3 bits"
 
+and reg2bits r = Util.list_firstindex [eax; ecx; edx; ebx; esp; ebp; esi; edi] ((==)r) 
+
 let bits2reg32e b = Var(bits2reg32 b)
+
+let bits2xmm b = xmms.(b)
+  
+let reg2xmm r =
+  bits2xmm (reg2bits r)
+  
 
 let parse_instr g addr =
   let s = Int64.succ in
 
-  let get_prefix = function
-    | '\xf0' -> Some Lock
-    | '\xf2' -> Some Repnz
-    | '\xf3' -> Some Repz
-    | '\x2e' -> Some(Override CS)
-    | '\x36' -> Some(Override SS)
-    | '\x3e' -> Some(Override DS)
-    | '\x26' -> Some(Override ES)
-    | '\x64' -> Some(Override FS)
-    | '\x65' -> Some(Override GS)
-(*    | '\x2e' -> Some Hint_bnt
-    | '\x3e' -> Some Hint_bt *)
-    | '\x66' -> Some Op_size
-    | '\x0f' -> Some Mandatory_0f
-    | '\x67' -> Some Address_size
+  let get_prefix c =
+    let i = Char.code c in
+    match i with
+    | 0xf0 | 0xf2 | 0xf3 | 0x2e | 0x36 | 0x3e | 0x26 | 0x64 | 0x65
+    | 0x66 | 0x67 -> Some i
     | _ -> None
   in
   let get_prefixes a =
@@ -320,6 +375,23 @@ let parse_instr g addr =
     in
     f [] a
   in
+(*  let int2prefix ?(jmp=false) = function
+    | 0xf0 -> Some Lock
+    | 0xf2 -> Some Repnz
+    | 0xf3 -> Some Repz
+    | 0x2e when jmp-> Some Hint_bnt
+    | 0x3e when jmp-> Some Hint_bt
+    | 0x2e -> Some(Override CS)
+    | 0x36 -> Some(Override SS)
+    | 0x3e -> Some(Override DS)
+    | 0x26 -> Some(Override ES)
+    | 0x64 -> Some(Override FS)
+    | 0x65 -> Some(Override GS)
+    | 0x66 -> Some Op_size
+    | 0x0f -> Some Mandatory_0f
+    | 0x67 -> Some Address_size
+    | _ -> None
+  in*)
   let parse_disp8 a =
     (Arithmetic.tos64 (Int64.of_int (Char.code (g a)), r8), s a)
   and parse_disp32 a =
@@ -365,6 +437,10 @@ let parse_instr g addr =
   let parse_modrm32 a =
     let (r, rm, na) = parse_modrm32ext a in
     (Oreg(bits2reg32 r), rm, na)
+  and parse_modrmxmm a =
+    let (r, rm, na) = parse_modrm32ext a in
+    let rm = match rm with Oreg r -> Oreg (reg2xmm r) | _ -> rm in
+    (Oreg(bits2xmm r), rm, na)
   in
   let parse_modrm opsize a = match opsize with
     | Reg 32 -> parse_modrm32 a
@@ -377,10 +453,10 @@ let parse_instr g addr =
     (Oimm l, na)
   in
 
-  let get_opcode opsize a =
+  let get_opcode pref opsize a =
     let b1 = Char.code (g a)
     and na = s a in
-    match b1 with
+    match b1 with (* Table A-2 *)
     | 0xc3 -> (Retn, na)
       (* FIXME: operand widths *)
     | 0x80 | 0x81 | 0x82
@@ -426,19 +502,29 @@ let parse_instr g addr =
 	      (match r with (* Grp 5 *)
 	      | _ -> unimplemented (Printf.sprintf "unsupported opcode: ff/%d" r)
 	      )
+    | 0x0f -> (
+      let b2 = Char.code (g na) and na = s na in
+      match b2 with (* Table A-3 *)
+      | 0x6f | 0x7f when pref = [0x66] -> (
+	let r, rm, na = parse_modrmxmm na in
+	let s,d = if b2 = 0x6f then rm, r else r, rm in
+	(Movdqa(d,s), na)
+      )
+      | _ -> unimplemented (Printf.sprintf "unsupported opcode: %x %x" b1 b2)
+    )
     | n -> unimplemented (Printf.sprintf "unsupported opcode: %x" n)
 
   in
   let pref, a = get_prefixes addr in
-  let opsize = if List.mem Op_size pref then r16 else r32 in
-  let op, a = get_opcode opsize a in
+  let opsize = if List.mem pref_opsize pref then r16 else r32 in
+  let op, a = get_opcode pref opsize a in
   (pref, op, a)
 
 
 let disasm_instr g addr =
   let (pref, op, a) = parse_instr g addr in
   let ir = ToIR.to_ir pref op in
-  let asm = try ToStr.to_string pref op with Failure _ -> "fixme" in
-  (ToIR.add_labels ~asm addr ir, a)
+  let asm = try Some(ToStr.to_string pref op) with Failure _ -> None in
+  (ToIR.add_labels ?asm addr ir, a)
 
 
