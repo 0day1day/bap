@@ -179,12 +179,20 @@ let speclist =
     )   
    ::("-trace-payload", 
      Arg.String (fun p -> add(TransformAst(Traces.add_payload p))),
-     "<binstring> Provide a payload to be inserted past the return address (BEWARE of null bytes)"
+     "<binstring> Provide a payload to be inserted at the return address (BEWARE of null bytes)"
     )   
    ::("-trace-payload-file", 
      Arg.String (fun p -> add(TransformAst(Traces.add_payload_from_file p))),
+     "<binfile> Provide a payload to be inserted at the return address"
+    )
+   ::("-trace-payload-after-file", 
+     Arg.String (fun p -> add(TransformAst(Traces.add_payload_from_file_after ~offset:4L p))),
      "<binfile> Provide a payload to be inserted past the return address"
     )
+   ::("-trace-payload-after", 
+     Arg.String (fun p -> add(TransformAst(Traces.add_payload_after ~offset:4L p))),
+     "<binstring> Provide a payload to be inserted past the return address (BEWARE of null bytes)"
+    )   
    ::("-trace-shell", 
      Arg.Int (fun off -> add(TransformAst(Traces.inject_shellcode off))),
      "<nopsled> Insert shellcode with a nopsled of the given size"

