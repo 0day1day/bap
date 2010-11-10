@@ -176,18 +176,21 @@ let binop op a b = match (a,b) with
     Int(i,t)
   | _ -> BinOp(op, a, b)
 
-let (+*) a b = BinOp(PLUS, a, b)
-let (-*) a b = BinOp(MINUS, a, b)
-let (<<*) a b = BinOp(LSHIFT, a, b)
-let (>>*) a b = BinOp(RSHIFT, a, b)
-let (>>>*) a b = BinOp(ARSHIFT, a, b)
-let (&*) a b = BinOp(AND, a, b)
-let (|*) a b = BinOp(OR, a, b)
-let (^*) a b = BinOp(XOR, a, b)
-let (=*) a b = BinOp(EQ, a, b)
+let (+*) a b   = binop PLUS a b
+let (-*) a b   = binop MINUS a b
+let (<<*) a b  = binop LSHIFT a b
+let (>>*) a b  = binop RSHIFT a b
+let (>>>*) a b = binop ARSHIFT a b
+let (&*) a b   = binop AND a b
+let (|*) a b   = binop OR a b
+let (^*) a b   = binop XOR a b
+let (=*) a b   = binop EQ a b
 
 let ite t b e1 e2 = (* FIXME: were we going to add a native if-then-else thing? *)
-  (Cast(CAST_SIGNED, t, b) &* e1) |*  (Cast(CAST_SIGNED, t, exp_not b) &* e2) 
+  if t = r1 then
+    (b &* e1) |*  (exp_not b &* e2) 
+  else
+    (Cast(CAST_SIGNED, t, b) &* e1) |*  (Cast(CAST_SIGNED, t, exp_not b) &* e2) 
 
 let l32 i = Int(Arithmetic.to64 (i,r32), r32)
 let i32 i = Int(Int64.of_int i, r32)
