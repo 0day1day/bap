@@ -19,26 +19,28 @@ struct
   let coalesce cfg =
    let entry_node = C.find_vertex cfg BB_Entry in
    let visited = ref GS.empty in
+   let isspecial v = match G.V.label v with BB _ -> false | _ -> true in
    let add_visited v = visited := GS.add v !visited in
    let rec fold_dfs g v =
+     (* FIXME: this should be linear time, rather than quadratic *)
      if GS.mem v !visited then g
      else
       let worklist, g = 
        match G.succ g v with
-       | [suc] as l ->
+       | [suc] as l -> 
          (* FIXME: consider substituting G.pred *)
          (match G.pred g suc with 
-           | [_] -> 
+           | [_] when not(isspecial suc) ->
              (* Joining the nodes *)
              let curstmts = C.get_stmts g v in
              let sucstmts = C.get_stmts g suc in
              let mrgstmts = C.join_stmts curstmts sucstmts in
              let g = C.set_stmts g v mrgstmts in
-             let sucsuc = G.succ g suc in
+             let sucsuc = G.succ_e g suc in
+             (* Adding the edges to the new successors *)
+             let g = List.fold_left (fun g e -> C.add_edge_e g (C.G.E.create v (C.G.E.label e) (C.G.E.dst e))) g sucsuc in
              (* Removing the successor *)
              let g = C.remove_vertex g suc in
-             (* Adding the edges to the new successors *)
-             let g = List.fold_left (fun g vs -> C.add_edge g v vs) g sucsuc in
              ([v], g)
            | _ -> add_visited v ; (l,g)
          )
