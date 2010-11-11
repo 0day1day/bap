@@ -139,8 +139,8 @@ let structural_analysis c =
       match G.succ g n with
       | [s] -> (match G.pred g s with
 		| [_] -> succchain s (s::nset)
-		| _ -> nset)
-      | _ -> nset
+		| _ -> List.rev nset)
+      | _ -> List.rev nset
     in
     let rec predchain n nset =
       match G.pred g n with
