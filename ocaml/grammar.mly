@@ -74,6 +74,7 @@ let mk_attr lab string =
   | "address" -> Address(Int64.of_string string)
   | "set" when string = "liveout" -> Liveout
   | "str" -> StrAttr string
+  | "tid" -> ThreadId(int_of_string string)
   | _ -> err ("Unknown attribute @"^lab)
 
 let typ_of_string = function
@@ -114,6 +115,7 @@ let casttype_of_string = function
 
 %type <Ast.program> program
 %type <Ast.exp > expr
+%type <Type.context> context
 %nonassoc LET IN
 %left WITH
 /* If the precedence for any of these changes, pp.ml needs to be updated
@@ -161,7 +163,13 @@ stmt:
 | COMMENT attrs { Comment($1, $2) }
 
 
+plusminusint:
+| INT { $1 }
+| MINUS INT { Int64.neg $2 }
 
+context:
+| ID LSQUARE INT RSQUARE EQUAL INT COMMA plusminusint COMMA styp { {name=$1; mem=true; t=$10; index=$3; value=$6; usage=RD; (* XXX fix me *) taint=Taint(Int64.to_int $8)} } /* memory */
+| ID EQUAL INT COMMA plusminusint COMMA typ { {name=$1; mem=false; t=$7; index=0L; value=$3; usage=RD; (* XXX fix me *) taint=Taint(Int64.to_int $5)} } /* non memory */
 
 attrs:
 |    { [] }
@@ -169,7 +177,7 @@ attrs:
 
 attr:
 | AT ID STRING { mk_attr $2 $3 }
-
+| AT ID context { Context($3) }
 
 lval:
 | ID opttyp { 

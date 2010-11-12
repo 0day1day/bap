@@ -103,12 +103,12 @@ object (self)
     | StrAttr s -> pp "@str \""; pp s; pc '\"'
     | Context {name=s; mem=mem; value=v; index=i; t=tp; taint=Taint t} -> 
 	let ts = string_of_int t in
-	  (*if t = Taint then "tainted" else "untainted" in*)
-      let ind = if mem then "["^(Int64.format "%Lx" i)^"]" else "" in
-      pp "@str \""; pp (s^ ind ^" = "^(Int64.format "%Lx" v)^ ", " ^ ts
-			  ^", u"
-		       ^ (string_of_int (bits_of_width tp))); pc '\"'
-    | ThreadId i -> pp "@tid "; pp (string_of_int i);
+	(*if t = Taint then "tainted" else "untainted" in*)
+	let ind = if mem then "[0x"^(Int64.format "%Lx" i)^"]" else "" in
+	pp "@context "; pp (s^ ind ^" = 0x"^(Int64.format "%Lx" v)^ ", " ^ ts
+			      ^", u"
+			      ^ (string_of_int (bits_of_width tp)))
+    | ThreadId i -> pp "@tid \""; pp (string_of_int i); pp "\""
     | ExnAttr _ (* we could try to print something using Printexc.to_string *)
     | Pos _ -> () (* ignore position attrs *)
 
@@ -184,7 +184,7 @@ object (self)
      | Ast.Int(1L, Reg 1) ->
 	 pp "true"
      | Ast.Int(i,t) ->
-	 pp (Printf.sprintf "%Lx" i); pp ":"; self#typ t
+	 pp (Printf.sprintf "0x%Lx" i); pp ":"; self#typ t
      | Ast.Cast(ct,t,e) ->
 	 pp (ct_to_string ct);
 	 pp ":"; self#typ t;

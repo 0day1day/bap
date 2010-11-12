@@ -410,7 +410,7 @@ let () =
 
 (********************************************************)
 	  
-let is_seed_label = (=) "Read Syscall"
+let is_seed_label = (=) "ReadSyscall"
       
 (* Store the concrete taint info in the global environment *)
 let add_to_conc {name=name; mem=mem; index=index; value=value; 

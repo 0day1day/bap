@@ -156,7 +156,7 @@ bap_blocks_t * read_trace_from_file(const string &filename,
 	  bblock->bap_ir = new vector<Stmt *>();
           bblock->inst = tf->id;
 	  //generate_bap_ir_block(prog, bblock);
-	  Label * label = new Label("Read Syscall");
+	  Label * label = new Label("ReadSyscall");
 	  if (atts)
 	    label->attributes.cv = tf->getOperands() ;
           bblock->bap_ir->push_back(label);
