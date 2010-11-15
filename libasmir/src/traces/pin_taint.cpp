@@ -242,8 +242,10 @@ void TaintTracker::postSysCall(context &delta) {
 }
 
 void TaintTracker::acceptHelper(uint32_t fd) {
-  cerr << "Tainting fd " << fd << endl;
-  fds.insert(fd);
+  if (taint_net) {
+    cerr << "Tainting fd " << fd << endl;
+    fds.insert(fd);
+  }
 }
 
 bool TaintTracker::recvHelper(uint32_t fd, void *ptr, size_t len) {
