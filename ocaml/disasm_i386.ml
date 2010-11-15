@@ -113,6 +113,8 @@ and zf = nv "R_ZF" r1
 and sf = nv "R_SF" r1
 and oF = nv "R_OF" r1
 
+and dflag = nv "R_DFLAG" r32 (* 1 if DF=0 or -1 if DF=1 *)
+
 let xmms = Array.init 8 (fun i -> nv (Printf.sprintf "XMM%d" i) xmm_t)
 
 let regs : var list =
@@ -127,7 +129,6 @@ let regs : var list =
   ("R_CC_NDEP", reg_32);
 
   (* more status flags *)
-  ("R_DFLAG", reg_32);
   ("R_IDFLAG", reg_32);
   ("R_ACFLAG", reg_32);
   ("R_EMWARN", reg_32);
@@ -164,6 +165,8 @@ and zf_e = Var zf
 and sf_e = Var sf
 and of_e = Var oF
 
+and dflag_e = Var dflag
+
 let esiaddr = Oaddr esi_e
 and ediaddr = Oaddr edi_e
 
@@ -182,6 +185,7 @@ let binop op a b = match (a,b) with
 
 let (+*) a b   = binop PLUS a b
 let (-*) a b   = binop MINUS a b
+let ( ** ) a b   = binop TIMES a b
 let (<<*) a b  = binop LSHIFT a b
 let (>>*) a b  = binop RSHIFT a b
 let (>>>*) a b = binop ARSHIFT a b
@@ -316,8 +320,8 @@ let to_ir addr pref = function
       move src1 (op2e t esiaddr)
       :: move src2 (op2e t ediaddr)
       :: move tmpres (Var src1 -* Var src2)
-      :: move esi (esi_e +* i32 (bits/8))
-      :: move edi (edi_e +* i32 (bits/8))
+      :: move esi (esi_e +* (dflag_e ** i32 (bits/8)))
+      :: move edi (edi_e +* (dflag_e ** i32 (bits/8)))
       :: set_flags_sub t (Var src1) (Var src2) (Var tmpres)
     in
     if pref = [] then
