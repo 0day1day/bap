@@ -118,7 +118,7 @@ and dflag = nv "R_DFLAG" r32 (* 1 if DF=0 or -1 if DF=1 *)
 let xmms = Array.init 8 (fun i -> nv (Printf.sprintf "XMM%d" i) xmm_t)
 
 let regs : var list =
-  ebp::esp::esi::edi::eip::eax::ebx::ecx::edx::eflags::cf::pf::af::zf::sf::oF::
+  ebp::esp::esi::edi::eip::eax::ebx::ecx::edx::eflags::cf::pf::af::zf::sf::oF::dflag::
   List.map (fun (n,t) -> Var.newvar n t)
     [
 
