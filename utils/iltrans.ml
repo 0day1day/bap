@@ -176,6 +176,8 @@ let speclist =
   :: ("-prune-cfg",
       uadd(TransformAstCfg Prune_unreachable.prune_unreachable_ast),
       "Prune unreachable nodes from an AST CFG")
+  :: ("-cfg-coalesce", uadd(TransformAstCfg Coalesce.AST_Coalesce.coalesce),
+      "Perform coalescing on an AST-CFG graph")
   :: ("-unroll",
       Arg.Int (fun i -> add (TransformAstCfg(Unroll.unroll_loops ~count:i))),
       "<n> Unroll loops n times")
