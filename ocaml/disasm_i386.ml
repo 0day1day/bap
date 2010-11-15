@@ -57,7 +57,7 @@ type opcode =
   | Shift of binop_type * typ * operand * operand
   | Jump of operand
   | Hlt
-
+  | Cmps of typ
 
 (* prefix names *)
 let pref_lock = 0xf0
@@ -152,6 +152,8 @@ let regs : var list =
 
 
 let esp_e = Var esp
+and esi_e = Var esi
+and edi_e = Var edi
 
 let mem = nv "mem" (TMem(r32))
 let mem_e = Var mem
@@ -162,6 +164,8 @@ and zf_e = Var zf
 and sf_e = Var sf
 and of_e = Var oF
 
+let esiaddr = Oaddr esi_e
+and ediaddr = Oaddr edi_e
 
 (* exp helpers *)
 let loadm m t a =
@@ -185,6 +189,7 @@ let (&*) a b   = binop AND a b
 let (|*) a b   = binop OR a b
 let (^*) a b   = binop XOR a b
 let (=*) a b   = binop EQ a b
+let (<*) a b   = binop LT a b
 
 let ite t b e1 e2 = (* FIXME: were we going to add a native if-then-else thing? *)
   if t = r1 then
@@ -226,7 +231,21 @@ let compute_sf result = Cast(CAST_HIGH, r1, result)
 let compute_zf t result = Int(0L, t) =* result
 let compute_pf result = Cast(CAST_LOW, r1, result)
 
-let to_ir pref = function
+let set_sf r = move sf (compute_sf r)
+let set_zf t r = move zf (compute_zf t r)
+let set_pf r = move pf (compute_pf r)
+
+let set_flags_sub t s1 s2 r =
+  set_sf r
+  ::set_zf t r
+  ::set_pf r
+  ::move cf (r <* s1)
+  ::move af ((r &* Int(7L,t)) <* (s1 &* Int(7L,t))) (* Is this right? *)
+  ::move oF (Cast(CAST_HIGH, r1, (s1 ^* s2) &* (s1 ^* r) ))
+  ::[]
+    
+
+let to_ir addr pref = function
   | Nop -> []
   | Retn when pref = [] ->
     let t = nv "ra" r32 in
@@ -291,6 +310,25 @@ let to_ir pref = function
     ]
   | Hlt ->
     [Jmp(Lab "General_protection fault", [])]
+  | Cmps(Reg bits as t) ->
+    let src1 = nv "src1" t and src2 = nv "scr2" t and tmpres = nv "tmp" t in
+    let stmts =
+      move src1 (op2e t esiaddr)
+      :: move src2 (op2e t ediaddr)
+      :: move tmpres (Var src1 -* Var src2)
+      :: move esi (esi_e +* i32 (bits/8))
+      :: move edi (edi_e +* i32 (bits/8))
+      :: set_flags_sub t (Var src1) (Var src2) (Var tmpres)
+    in
+    if pref = [] then
+      stmts
+    else if pref = [repz] then
+      stmts @ cjmp zf_e (Int(addr, r32))
+    else if pref = [repnz] then
+      stmts @ ncjmp zf_e (Int(addr, r32))
+    else
+      unimplemented "unsupported flags in cmps"
+
   | _ -> unimplemented "to_ir"
 
 let add_labels ?(asm) a ir =
@@ -477,6 +515,8 @@ let parse_instr g addr =
 	      | _ -> failwith "invalid lea (must be address)"
 	      )
     | 0x90 -> (Nop, na)
+    | 0xa6 -> (Cmps r8, na)
+    | 0xa7 -> (Cmps opsize, na)
     | 0xc7 -> let (_, rm, na) = parse_modrm32 na in
 	      let (i,na) = parse_imm32 na in
 	      (Mov(rm, i), na)
@@ -526,7 +566,7 @@ let parse_instr g addr =
 
 let disasm_instr g addr =
   let (pref, op, a) = parse_instr g addr in
-  let ir = ToIR.to_ir pref op in
+  let ir = ToIR.to_ir addr pref op in
   let asm = try Some(ToStr.to_string pref op) with Failure _ -> None in
   (ToIR.add_labels ?asm addr ir, a)
 

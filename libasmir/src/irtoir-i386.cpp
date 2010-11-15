@@ -1521,6 +1521,7 @@ vector<Stmt *> mod_eflags_sub( reg_t type, Exp *arg1, Exp *arg2 )
     Exp *condPF = CALC_COND_PF(PF8);
     set_flag(&irout, type, PF, condPF);
 
+    /* FIXME: (1 == ( 0x10 & foo)) is always false */
     Exp *condAF = _ex_eq( ecl(&c_1), _ex_and( ecl(&c_0x10), ex_xor( res, arg1, arg2) ));
     set_flag(&irout, type, AF, condAF);
 

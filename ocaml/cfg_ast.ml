@@ -114,13 +114,6 @@ let of_prog ?(special_error = true) p =
   (* FIXME: Colescing *)
   c
 
-let newlab =
-  let c = ref 0 in
-  (fun () ->
-     let i = !c in
-     c := i + 1;
-     Name("newlabel_"^string_of_int i))
-
 (** Convert a CFG back to an AST program.
     This is needed for printing in a way that can be parsed again.
 *)
