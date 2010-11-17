@@ -76,4 +76,5 @@ val get_section_endaddr : asmprogram -> string -> address_t
 
 val get_asm_instr_string_range : asmprogram -> address_t -> address_t -> string
 
-val byte_insn_to_bap : bfd_architecture -> address_t -> char array -> Ast.program
+val byte_insn_to_bap : 
+  bfd_architecture -> address_t -> char array -> Ast.program * int64
