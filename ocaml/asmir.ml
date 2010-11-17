@@ -557,9 +557,17 @@ let get_asm_instr_string_range p s e =
   while !s < e do
 
     str := !str ^ "; " ^ (Libasmir.asmir_string_of_insn p.asmp !s);
-    
+
     let len = Int64.of_int (Libasmir.asmir_get_instr_length p.asmp !s) in
     s := Int64.add !s len
   done;
   !str
 
+(* translate byte sequence to bap ir *)
+let byte_insn_to_bap arch addr byteinsn =
+  let prog = Libasmir.byte_insn_to_asmp arch addr byteinsn in
+  let get a = Array.get byteinsn (Int64.to_int (Int64.sub a addr))
+  in
+  let (pr, n) = asm_addr_to_bap {asmp=prog; arch=arch; secs=[]; get=get} addr
+  in
+  pr
