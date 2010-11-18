@@ -58,6 +58,7 @@ type opcode =
   | Jump of operand
   | Hlt
   | Cmps of typ
+  | Stos of typ
 
 (* prefix names *)
 let pref_lock = 0xf0
@@ -155,6 +156,7 @@ let regs : var list =
 let esp_e = Var esp
 and esi_e = Var esi
 and edi_e = Var edi
+and ecx_e = Var ecx
 
 let mem = nv "mem" (TMem(r32))
 let mem_e = Var mem
@@ -195,6 +197,8 @@ let (^*) a b   = binop XOR a b
 let (=*) a b   = binop EQ a b
 let (<*) a b   = binop LT a b
 
+let cast_low t e = Cast(CAST_LOW, t, e)
+
 let ite t b e1 e2 = (* FIXME: were we going to add a native if-then-else thing? *)
   if t = r1 then
     (b &* e1) |*  (exp_not b &* e2) 
@@ -217,7 +221,8 @@ let storem m t a e =
   move m (Store(Var m, a, e, little_endian, t))
 
 let op2e t = function
-  | Oreg r -> Var r
+  | Oreg r when Var.typ r = t -> Var r
+  | Oreg r -> cast_low t (Var r)
   | Oaddr e -> load t e
   | Oimm i -> Int(i, t)
 
@@ -227,6 +232,11 @@ let assn t v e =
   | Oaddr a -> store t a e
   | Oimm _ -> failwith "disasm_i386: Can't assign to an immediate value"
 
+let string_incr t v =
+  if t = r8 then
+    move v (Var v +* dflag_e)
+  else
+    move v (Var v +* (dflag_e ** i32 (Arithmetic.bits_of_width t / 8)))
 
 let reta = [StrAttr "ret"]
 and calla = [StrAttr "call"]
@@ -249,7 +259,7 @@ let set_flags_sub t s1 s2 r =
   ::[]
     
 
-let to_ir addr pref = function
+let to_ir addr next pref = function
   | Nop -> []
   | Retn when pref = [] ->
     let t = nv "ra" r32 in
@@ -320,8 +330,8 @@ let to_ir addr pref = function
       move src1 (op2e t esiaddr)
       :: move src2 (op2e t ediaddr)
       :: move tmpres (Var src1 -* Var src2)
-      :: move esi (esi_e +* (dflag_e ** i32 (bits/8)))
-      :: move edi (edi_e +* (dflag_e ** i32 (bits/8)))
+      :: string_incr t esi
+      :: string_incr t edi
       :: set_flags_sub t (Var src1) (Var src2) (Var tmpres)
     in
     if pref = [] then
@@ -332,7 +342,19 @@ let to_ir addr pref = function
       stmts @ ncjmp zf_e (Int(addr, r32))
     else
       unimplemented "unsupported flags in cmps"
-
+  | Stos(Reg bits as t) ->
+    let stmts = [store t edi_e (op2e t (Oreg eax));
+		 string_incr t edi]
+    in
+    if pref = [] then
+      stmts
+    else if pref = [repz] then
+      cjmp (ecx_e =* l32 0L) (l32 next)
+      @ move ecx (ecx_e -* i32 1)
+      :: stmts
+      @ [Jmp(l32 addr, [])]
+    else
+      unimplemented "unsupported prefix for stos"
   | _ -> unimplemented "to_ir"
 
 let add_labels ?(asm) a ir =
@@ -521,6 +543,8 @@ let parse_instr g addr =
     | 0x90 -> (Nop, na)
     | 0xa6 -> (Cmps r8, na)
     | 0xa7 -> (Cmps opsize, na)
+    | 0xaa -> (Stos r8, na)
+    | 0xab -> (Stos opsize, na)
     | 0xc7 -> let (_, rm, na) = parse_modrm32 na in
 	      let (i,na) = parse_imm32 na in
 	      (Mov(rm, i), na)
@@ -569,9 +593,9 @@ let parse_instr g addr =
 
 
 let disasm_instr g addr =
-  let (pref, op, a) = parse_instr g addr in
-  let ir = ToIR.to_ir addr pref op in
+  let (pref, op, na) = parse_instr g addr in
+  let ir = ToIR.to_ir addr na pref op in
   let asm = try Some(ToStr.to_string pref op) with Failure _ -> None in
-  (ToIR.add_labels ?asm addr ir, a)
+  (ToIR.add_labels ?asm addr ir, na)
 
 
