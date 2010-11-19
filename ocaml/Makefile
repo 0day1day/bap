@@ -25,6 +25,8 @@ export SOURCES = \
 	pp.ml \
 	typecheck.ml \
 	cfg.mli cfg.ml \
+	reachable.mli \
+	reachable.ml \
 	prune_unreachable.mli prune_unreachable.ml \
 	cfg_pp.ml \
 	cfg_ast.mli cfg_ast.ml \
