@@ -35,12 +35,6 @@ open D
 *)
 
 type segment = CS | SS | DS | ES | FS | GS
-(*type prefix =
-  | Lock | Repnz | Repz
-  | Override of segment | Hint_bnt | Hint_bt
-  | Op_size | Mandatory_0f
-  | Address_size
-*)
 
 type operand =
   | Oreg of Var.t
@@ -59,6 +53,7 @@ type opcode =
   | Hlt
   | Cmps of typ
   | Stos of typ
+  | Push of typ * operand
 
 (* prefix names *)
 let pref_lock = 0xf0
@@ -153,6 +148,15 @@ let regs : var list =
 
 
 
+let o_eax = Oreg eax
+and o_ecx = Oreg ecx
+and o_edx = Oreg edx
+and o_ebx = Oreg ebx
+and o_esp = Oreg esp
+and o_ebp = Oreg ebp
+and o_esi = Oreg esi
+and o_edi = Oreg edi
+
 let esp_e = Var esp
 and esi_e = Var esi
 and edi_e = Var edi
@@ -232,11 +236,15 @@ let assn t v e =
   | Oaddr a -> store t a e
   | Oimm _ -> failwith "disasm_i386: Can't assign to an immediate value"
 
+let bytes_of_width = function
+  | Reg x when x land 7 = 0 -> x/8
+  | _ -> failwith "bytes_of_width"
+
 let string_incr t v =
   if t = r8 then
     move v (Var v +* dflag_e)
   else
-    move v (Var v +* (dflag_e ** i32 (Arithmetic.bits_of_width t / 8)))
+    move v (Var v +* (dflag_e ** i32(bytes_of_width t)))
 
 let reta = [StrAttr "ret"]
 and calla = [StrAttr "call"]
@@ -355,6 +363,12 @@ let to_ir addr next pref = function
       @ [Jmp(l32 addr, [])]
     else
       unimplemented "unsupported prefix for stos"
+  | Push(t, o) ->
+    let tmp = nv "t" t in (* only really needed when o involves esp *)
+    move tmp (op2e t o)
+    :: move esp (esp_e -* i32 4)
+    :: store t esp_e (Var tmp)
+    :: []
   | _ -> unimplemented "to_ir"
 
 let add_labels ?(asm) a ir =
@@ -524,6 +538,10 @@ let parse_instr g addr =
     let b1 = Char.code (g a)
     and na = s a in
     match b1 with (* Table A-2 *)
+    | 0x53 -> (Push(opsize, o_ebx), na)
+    | 0x55 -> (Push(opsize, o_ebp), na)
+    | 0x56 -> (Push(opsize, o_esi), na)
+    | 0x57 -> (Push(opsize, o_edi), na)
     | 0xc3 -> (Retn, na)
       (* FIXME: operand widths *)
     | 0x80 | 0x81 | 0x82
@@ -571,6 +589,7 @@ let parse_instr g addr =
     | 0xf4 -> (Hlt, na)
     | 0xff -> let (r, rm, na) = parse_modrm32ext na in
 	      (match r with (* Grp 5 *)
+	      | 6 -> (Push(opsize, rm), na)
 	      | _ -> unimplemented (Printf.sprintf "unsupported opcode: ff/%d" r)
 	      )
     | 0x0f -> (
