@@ -2,6 +2,7 @@
 
 #include <assert.h>
 #include <stmt.h>
+#include "reg_mapping.h"
 
 static
 string regid_to_name(uint32_t id)

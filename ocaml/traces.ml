@@ -1367,6 +1367,26 @@ let get_last_load_exp stmts =
   in
   get_load rev
 
+(** Injecting a payload at an exp 
+
+    XXX: Consolidate other payload functions to use this one.
+*)
+let inject_payload_gen addr payload trace = 
+  (* XXX: This is probably inefficient. *)
+  let mem, _ = get_last_load_exp trace in
+  let payload = List.map Int64.of_int payload in
+  let _,assertions = 
+    List.fold_left 
+      (fun (i,acc) value ->
+	 let index = Ast.BinOp(PLUS, addr, Int(i,reg_32)) in
+	 let load = Ast.Load(mem, index, exp_false, reg_8) in
+	 let constr = Ast.BinOp(EQ, load, Int(value, reg_8)) in
+	   (Int64.succ i, (Ast.Assert(constr, [])::acc))
+      ) (0L, []) payload
+  in
+  List.rev assertions
+
+
 (* Injecting a payload at an offset past the return address *)
 let inject_payload start payload trace = 
   (* TODO: A simple dataflow is missing here *)
@@ -1442,6 +1462,15 @@ let inject_shellcode nops trace =
   let _, trace = get_last_jmp_exp trace in
   let trace, shell = inject_payload 4L payload trace in
     Util.fast_append trace (shell @ [assertion])
+
+(** Use pivot to create exploit *)
+let add_pivot gaddr maddr payload trace =
+  let gaddrexp = Int(gaddr, reg_32) in
+  let trace, assertion = hijack_control gaddrexp trace in
+  (* Concatenate the assertion and the gadget IL *)
+  let trace = Util.fast_append trace [assertion] in
+  let passerts = inject_payload_gen (Int(maddr, reg_32)) (string_to_bytes payload) trace in
+  Util.fast_append trace passerts
 
 
 (*************************************************************)

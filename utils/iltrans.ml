@@ -197,6 +197,17 @@ let speclist =
      Arg.Int (fun off -> add(TransformAst(Traces.inject_shellcode off))),
      "<nopsled> Insert shellcode with a nopsled of the given size"
     )   
+  ::("-trace-pivot",
+     Arg.Tuple(
+       let gaddr = ref 0L in       
+       let maddr = ref 0L in
+       [
+	 Arg.String (fun a -> gaddr := Int64.of_string a);
+	 Arg.String (fun a -> maddr := Int64.of_string a);
+	 Arg.String (fun a -> add(TransformAst(Traces.add_pivot !gaddr !maddr a)));
+       ]),
+     "<address> <filename> Use pivot at address with IL semantics stored in filename to create an exploit."
+    )
   ::("-trace-formula", 
      Arg.String(fun f -> add(TransformAst(Traces.output_formula f))),
      "<file> Output the STP trace formula to <file>"

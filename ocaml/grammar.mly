@@ -8,7 +8,7 @@ open Ast
 
 
 (** Whether or not to strip the trailing _number from variable names *)
-let strip_nums = ref false
+let strip_nums = ref true
 
 let parse_error str =
   let {Lexing.pos_fname=f; pos_lnum=sl; pos_bol=sb; pos_cnum=sc} =
@@ -26,7 +26,7 @@ let err s =
 let stripnum =
   let stripnum1 = Str.replace_first (Str.regexp "_[0-9]+$") "" in
   fun x ->
-    if !strip_nums then
+    if !strip_nums then 
       stripnum1 x
     else
       x
@@ -57,12 +57,14 @@ struct
       
 
   let get_lval n t =
+    let n = stripnum n in
     try
       let v = Hashtbl.find (fst !cur_scope) n in
       if t = None || t = Some(Var.typ v)
       then v
       else err ("Variable '"^n^"' used with inconsistent type")
     with Not_found ->
+      Printf.printf "%s not found\n" n;
       match t with
       | Some t -> add n t
       | None -> err ("Type was never declared for '"^n^"'")
