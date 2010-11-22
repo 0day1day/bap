@@ -135,6 +135,10 @@ namespace pintrace { // We will use namespace to avoid collision
 
      bool recvHelper(uint32_t fd, void *ptr, size_t len);
 
+     uint32_t getRegTaint(context &delta, uint32_t reg_int);
+
+     uint32_t getMemTaint(uint32_t addr, uint32_t type);
+
      static uint32_t getSize(uint32_t type);
 
      static bool isValid(uint32_t type);
@@ -177,10 +181,6 @@ namespace pintrace { // We will use namespace to avoid collision
 
      void addTaintToWritten(context &delta, uint32_t tag);
       
-     uint32_t getRegTaint(context &delta, uint32_t reg_int);
-
-     uint32_t getMemTaint(uint32_t addr, uint32_t type);
-
      uint32_t combineTaint(uint32_t oldtag, uint32_t newtag);
 
      uint32_t exists(context &ctx, uint32_t elem);
