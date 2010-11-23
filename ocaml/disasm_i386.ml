@@ -54,6 +54,7 @@ type opcode =
   | Cmps of typ
   | Stos of typ
   | Push of typ * operand
+  | Sub of typ * operand * operand
 
 (* prefix names *)
 let pref_lock = 0xf0
@@ -369,6 +370,11 @@ let to_ir addr next pref = function
     :: move esp (esp_e -* i32 4)
     :: store t esp_e (Var tmp)
     :: []
+  | Sub(t, o1, o2) ->
+    let tmp = nv "t" t in
+    move tmp (op2e t o1)
+    :: assn t o1 (op2e t o1 -* op2e t o2)
+    :: set_flags_sub t (Var tmp) (op2e t o2) (op2e t o1)
   | _ -> unimplemented "to_ir"
 
 let add_labels ?(asm) a ir =
@@ -533,7 +539,11 @@ let parse_instr g addr =
     let (l,na) = parse_disp32 a in
     (Oimm l, na)
   in
-
+  let parse_immz t a = match t with
+    | Reg 16 -> failwith "parse_imm16 a"
+    | Reg 32 | Reg 64 -> parse_imm32 a
+    | _ -> failwith "parse_immz unsupported size"
+  in
   let get_opcode pref opsize a =
     let b1 = Char.code (g a)
     and na = s a in
@@ -546,7 +556,12 @@ let parse_instr g addr =
       (* FIXME: operand widths *)
     | 0x80 | 0x81 | 0x82
     | 0x83 -> let (r, rm, na) = parse_modrm32ext na in
+	      let (o2, na) =
+		if b1 = 0x81 then parse_immz opsize na else parse_imm8 na
+	      in
+	      let opsize = if b1 land 1 = 0 then r8 else opsize in
 	      (match r with (* Grp 1 *)
+	      | 5 -> (Sub(opsize, rm, o2), na)
 	      | _ -> unimplemented (Printf.sprintf "unsupported opcode: %x/%d" b1 r)
 	      )
     | 0x89 -> let (r, rm, na) = parse_modrm32 na in
