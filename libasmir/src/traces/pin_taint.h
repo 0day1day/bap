@@ -139,6 +139,8 @@ namespace pintrace { // We will use namespace to avoid collision
 
      uint32_t getMemTaint(uint32_t addr, uint32_t type);
 
+     void untaintMem(uint32_t addr);
+
      static uint32_t getSize(uint32_t type);
 
      static bool isValid(uint32_t type);

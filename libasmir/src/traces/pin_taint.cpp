@@ -200,6 +200,10 @@ uint32_t TaintTracker::getMemTaint(uint32_t addr, uint32_t type)
   return tag;
 }
 
+void TaintTracker::untaintMem(uint32_t addr) {
+  setTaint(memory, addr, NOTAINT);
+}
+
 // 
 uint32_t TaintTracker::getRegTaint(context &delta, uint32_t reg)
 {
