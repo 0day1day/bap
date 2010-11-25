@@ -17,7 +17,9 @@
 %%
 
 main:
+  /* The result comes before or after the assertions depending on version. */
   assertions result EOF { $1 }
+| result assertions EOF { $2 }
   ;
 
 assertions:

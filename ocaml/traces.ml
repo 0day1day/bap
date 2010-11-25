@@ -40,6 +40,8 @@ let padding = ref false
 
 let memtype = reg_32  
 
+let endtrace = "This is the final trace block"
+
 (*************************************************************)
 (**********************  Datastructures  *********************)
 (*************************************************************)
@@ -534,6 +536,9 @@ let trace_to_blocks trace =
     | (Ast.Label (Addr _, _) as l)::rest ->
 	let block = List.rev current in
 	to_blocks (block::blocks) [l] rest
+    | (Ast.Comment (endtrace, _) as s)::rest ->
+	let block = List.rev current in
+	to_blocks (block::blocks) [s] rest
     | x::rest ->
 	to_blocks blocks (x::current) rest
   in
@@ -1472,6 +1477,29 @@ let add_pivot gaddr maddr payload trace =
   let passerts = inject_payload_gen (Int(maddr, reg_32)) (string_to_bytes payload) trace in
   Util.fast_append trace passerts
 
+(** Transfer control by overwriting sehaddr with gaddr. *)
+let add_seh_pivot gaddr sehaddr paddr payload trace =
+  let mem, _ = get_last_load_exp trace in
+  let gaddrexp = Int(gaddr, reg_32) in
+  let sehexp = Load(mem, Int(sehaddr, reg_32), exp_false, reg_32) in
+  let endtrace = Ast.Comment (endtrace, []) in
+  let assertion = Ast.Assert(BinOp(EQ, gaddrexp, sehexp), []) in
+  (* Concatenate the assertion and the gadget IL *)
+  let trace = Util.fast_append trace [endtrace; assertion] in
+  let passerts = inject_payload_gen (Int(paddr, reg_32)) (string_to_bytes payload) trace in
+  Util.fast_append trace passerts
+
+(** Transfer control by overwriting sehaddr with gaddr. *)
+let add_seh_pivot_file gaddr sehaddr paddr payloadfile trace =
+  let mem, _ = get_last_load_exp trace in
+  let gaddrexp = Int(gaddr, reg_32) in
+  let sehexp = Load(mem, Int(sehaddr, reg_32), exp_false, reg_32) in
+  let endtrace = Ast.Comment (endtrace, []) in
+  let assertion = Ast.Assert(BinOp(EQ, gaddrexp, sehexp), []) in
+  (* Concatenate the assertion and the gadget IL *)
+  let trace = Util.fast_append trace [endtrace; assertion] in
+  let passerts = inject_payload_gen (Int(paddr, reg_32)) (bytes_from_file payloadfile) trace in
+  Util.fast_append trace passerts
 
 (*************************************************************)
 (********************  Formula Generation  *******************)

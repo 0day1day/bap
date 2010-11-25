@@ -199,14 +199,40 @@ let speclist =
     )   
   ::("-trace-pivot",
      Arg.Tuple(
-       let gaddr = ref 0L in       
+       let gaddr = ref 0L in
        let maddr = ref 0L in
        [
-	 Arg.String (fun a -> gaddr := Int64.of_string a);
-	 Arg.String (fun a -> maddr := Int64.of_string a);
-	 Arg.String (fun a -> add(TransformAst(Traces.add_pivot !gaddr !maddr a)));
+   	 Arg.String (fun a -> gaddr := Int64.of_string a);
+  	 Arg.String (fun a -> maddr := Int64.of_string a);
+  	 Arg.String (fun a -> add(TransformAst(Traces.add_pivot !gaddr !maddr a)));
        ]),
-     "<address> <filename> Use pivot at address with IL semantics stored in filename to create an exploit."
+     "<gaddress> <maddress> <payload string> Use pivot at gaddress to transfer control to payload at maddress."
+    )
+  ::("-trace-seh-pivot",
+     Arg.Tuple(
+       let gaddr = ref 0L in
+       let maddr = ref 0L in
+       let sehaddr = ref 0L in
+       [
+  	 Arg.String (fun a -> gaddr := Int64.of_string a);
+  	 Arg.String (fun a -> maddr := Int64.of_string a);
+	 Arg.String (fun a -> sehaddr := Int64.of_string a);
+  	 Arg.String (fun a -> add(TransformAst(Traces.add_seh_pivot !gaddr !sehaddr !maddr a)));
+       ]),
+     "<gaddress> <maddress> <sehaddress> <payload string> Use pivot at gaddress to transfer control (by overwriting SEH handler at sehaddress) to payload at maddress."
+    )
+  ::("-trace-seh-pivot-file",
+     Arg.Tuple(
+       let gaddr = ref 0L in
+       let maddr = ref 0L in
+       let sehaddr = ref 0L in
+       [
+  	 Arg.String (fun a -> gaddr := Int64.of_string a);
+  	 Arg.String (fun a -> maddr := Int64.of_string a);
+	 Arg.String (fun a -> sehaddr := Int64.of_string a);
+  	 Arg.String (fun a -> add(TransformAst(Traces.add_seh_pivot_file !gaddr !sehaddr !maddr a)));
+       ]),
+     "<gaddress> <maddress> <sehaddress> <payload file> Use pivot at gaddress to transfer control (by overwriting SEH handler at sehaddress) to payload at maddress."
     )
   ::("-trace-formula", 
      Arg.String(fun f -> add(TransformAst(Traces.output_formula f))),
