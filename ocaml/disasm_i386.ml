@@ -55,6 +55,7 @@ type opcode =
   | Stos of typ
   | Push of typ * operand
   | Sub of typ * operand * operand
+  | Cmp of typ * operand * operand
 
 (* prefix names *)
 let pref_lock = 0xf0
@@ -375,6 +376,10 @@ let to_ir addr next pref = function
     move tmp (op2e t o1)
     :: assn t o1 (op2e t o1 -* op2e t o2)
     :: set_flags_sub t (Var tmp) (op2e t o2) (op2e t o1)
+  | Cmp(t, o1, o2) ->
+    let tmp = nv "t" t in
+    move tmp (op2e t o1 -* op2e t o2)
+    :: set_flags_sub t (op2e t o1) (op2e t o2) (Var tmp)
   | _ -> unimplemented "to_ir"
 
 let add_labels ?(asm) a ir =
@@ -562,6 +567,7 @@ let parse_instr g addr =
 	      let opsize = if b1 land 1 = 0 then r8 else opsize in
 	      (match r with (* Grp 1 *)
 	      | 5 -> (Sub(opsize, rm, o2), na)
+	      | 7 -> (Cmp(opsize, rm, o2), na)
 	      | _ -> unimplemented (Printf.sprintf "unsupported opcode: %x/%d" b1 r)
 	      )
     | 0x89 -> let (r, rm, na) = parse_modrm32 na in
