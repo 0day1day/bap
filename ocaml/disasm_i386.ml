@@ -380,12 +380,12 @@ let to_ir addr next pref = function
     :: move esp (esp_e -* i32 4)
     :: store t esp_e (Var tmp)
     :: []
-  | Sub(t, o1, o2) ->
+  | Sub(t, o1, o2) when pref = [] ->
     let tmp = nv "t" t in
     move tmp (op2e t o1)
     :: assn t o1 (op2e t o1 -* op2e t o2)
     :: set_flags_sub t (Var tmp) (op2e t o2) (op2e t o1)
-  | Cmp(t, o1, o2) ->
+  | Cmp(t, o1, o2) when pref = [] ->
     let tmp = nv "t" t in
     move tmp (op2e t o1 -* op2e t o2)
     :: set_flags_sub t (op2e t o1) (op2e t o2) (Var tmp)
