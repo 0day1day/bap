@@ -56,6 +56,7 @@ type opcode =
   | Push of typ * operand
   | Sub of typ * operand * operand
   | Cmp of typ * operand * operand
+  | And of typ * operand * operand
 
 (* prefix names *)
 let pref_lock = 0xf0
@@ -202,6 +203,7 @@ let (|*) a b   = binop OR a b
 let (^*) a b   = binop XOR a b
 let (=*) a b   = binop EQ a b
 let (<*) a b   = binop LT a b
+let (>*) a b   = binop LT b a
 
 let cast_low t e = Cast(CAST_LOW, t, e)
 
@@ -277,7 +279,7 @@ let set_flags_sub t s1 s2 r =
   set_sf r
   ::set_zf t r
   ::set_pf r
-  ::move cf (r <* s1)
+  ::move cf (r >* s1)
   ::move af ((r &* Int(7L,t)) <* (s1 &* Int(7L,t))) (* Is this right? *)
   ::move oF (Cast(CAST_HIGH, r1, (s1 ^* s2) &* (s1 ^* r) ))
   ::[]
@@ -579,6 +581,7 @@ let parse_instr g addr =
 	      in
 	      let opsize = if b1 land 1 = 0 then r8 else opsize in
 	      (match r with (* Grp 1 *)
+	      | 4 -> (And(opsize, rm, o2), na)
 	      | 5 -> (Sub(opsize, rm, o2), na)
 	      | 7 -> (Cmp(opsize, rm, o2), na)
 	      | _ -> unimplemented (Printf.sprintf "unsupported opcode: %x/%d" b1 r)
