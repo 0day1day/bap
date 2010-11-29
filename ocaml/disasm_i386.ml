@@ -248,6 +248,20 @@ let string_incr t v =
   else
     move v (Var v +* (dflag_e ** i32(bytes_of_width t)))
 
+let rep_wrap ?check_zf ~addr ~next stmts =
+  let endstmt = match check_zf with
+    | None -> Jmp(l32 addr, [])
+    | Some x when x = repz ->
+      CJmp(zf_e, l32 addr, l32 next, [])
+    | Some x when x = repnz ->
+      CJmp(zf_e, l32 next, l32 addr, [])
+    | _ -> failwith "invalid value for ?check_zf"
+  in
+  cjmp (ecx_e =* l32 0L) (l32 next)
+  @ move ecx (ecx_e -* i32 1)
+  :: stmts
+  @ [endstmt]
+ 
 let reta = [StrAttr "ret"]
 and calla = [StrAttr "call"]
 
@@ -346,10 +360,8 @@ let to_ir addr next pref = function
     in
     if pref = [] then
       stmts
-    else if pref = [repz] then
-      stmts @ cjmp zf_e (Int(addr, r32))
-    else if pref = [repnz] then
-      stmts @ ncjmp zf_e (Int(addr, r32))
+    else if pref = [repz] || pref = [repnz] then
+      rep_wrap ~check_zf:(List.hd pref) ~addr ~next stmts
     else
       unimplemented "unsupported flags in cmps"
   | Stos(Reg bits as t) ->
@@ -359,10 +371,7 @@ let to_ir addr next pref = function
     if pref = [] then
       stmts
     else if pref = [repz] then
-      cjmp (ecx_e =* l32 0L) (l32 next)
-      @ move ecx (ecx_e -* i32 1)
-      :: stmts
-      @ [Jmp(l32 addr, [])]
+      rep_wrap ~addr ~next stmts
     else
       unimplemented "unsupported prefix for stos"
   | Push(t, o) ->
