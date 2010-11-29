@@ -230,7 +230,7 @@ let op2e t = function
   | Oreg r when Var.typ r = t -> Var r
   | Oreg r -> cast_low t (Var r)
   | Oaddr e -> load t e
-  | Oimm i -> Int(i, t)
+  | Oimm i -> Int(Arithmetic.to64 (i,t), t)
 
 let assn t v e =
   match v with
@@ -547,8 +547,11 @@ let parse_instr g addr =
     | Reg 32 -> parse_modrm32 a
     | _ -> unimplemented "modrm other than 32"
   in
-  let parse_imm8 a =
+  let parse_imm8 a = (* not sign extended *)
     (Oimm(Int64.of_int (Char.code (g a))), s a)
+  and parse_simm8 a = (* sign extended *)
+    let (d, na) = parse_disp8 a in
+    (Oimm d, na)
   and parse_imm32 a =
     let (l,na) = parse_disp32 a in
     (Oimm l, na)
@@ -571,7 +574,8 @@ let parse_instr g addr =
     | 0x80 | 0x81 | 0x82
     | 0x83 -> let (r, rm, na) = parse_modrm32ext na in
 	      let (o2, na) =
-		if b1 = 0x81 then parse_immz opsize na else parse_imm8 na
+		(* for 0x83, imm8 needs to be sign extended *)
+		if b1 = 0x81 then parse_immz opsize na else parse_simm8 na
 	      in
 	      let opsize = if b1 land 1 = 0 then r8 else opsize in
 	      (match r with (* Grp 1 *)
