@@ -186,6 +186,15 @@ let conc_mem_iter f =
 (*********************  Helper Functions  ********************)
 (*************************************************************)
 
+let set_gc () =
+  Gc.set
+    {
+      (Gc.get ()) with 
+	Gc.minor_heap_size = 32000000; (* 128 mb *)
+	Gc.major_heap_increment = 16000000; (* 64 mb *)
+	Gc.max_overhead = 2000; (* compact after 2000% overhead *)
+    }      
+
 (** Keep track of registers not always updated in BAP.  *)
 let badregs = Hashtbl.create 32
 let () =
@@ -576,6 +585,40 @@ let print_formula file formula =
 
 module Status = Util.StatusPrinter
 
+(******************************************************************************)
+(*                         Trace Deadcode Elimination                         *)
+(******************************************************************************)
+(** In a nutshell, remove any computation that is not referenced
+    inside of an Assert. *)
+let trace_dce trace =
+  Status.init "Deadcode elimination" 0 ;
+  let rvh = VH.create 1000 in
+  (** This visitor traverses trace statements backwards.  Any variable
+      referenced in an Assert is considered live. *)
+  let rv = object(self)
+    inherit Ast_visitor.nop      
+    method visit_stmt = function
+	Assert _ -> `DoChildren
+      | Move (tv, _, _) as olds ->
+	  if VH.mem rvh tv then 
+	    (* Include this statement, and add referenced vars. *)
+	    `DoChildren
+	  else
+	    (* Remove this statement *)
+	    let str = Printf.sprintf "Removed by dce: %s" (Pp.ast_stmt_to_string olds) in
+	    let news = Comment (str, []) in
+	    `ChangeTo news
+      | _ -> `SkipChildren
+    method visit_rvar v =
+      VH.replace rvh v ();
+      `DoChildren
+  end in
+  let rev = Ast_visitor.prog_accept rv (List.rev trace) in
+  let final = List.rev rev in
+
+  Status.stop () ;
+  final
+    
 (*************************************************************)
 (********************  Concrete Execution  *******************)
 (*************************************************************)
@@ -823,14 +866,14 @@ let run_block state block =
 let run_blocks blocks length =
   counter := 1 ;
   Status.init "Concrete Run" length ;
-   let state = TraceConcrete.create_state () in
-   let rev_trace = List.fold_left 
+  let state = TraceConcrete.create_state () in
+  let rev_trace = List.fold_left 
     (fun acc block -> 
-       (run_block state block)::acc
+       List.rev_append (run_block state block) acc
     ) [] blocks
   in
   Status.stop () ;
-  List.flatten (List.rev rev_trace)
+  List.rev rev_trace
 
 (** Convert a trace to DSA form 
 
@@ -936,9 +979,6 @@ let to_dsa_stmt s h rh =
 let concrete trace = 
   dsa_rev_map := None;
   let trace = Memory2array.coerce_prog trace in
-  (* let trace,rh = to_dsa trace in *)
-  (* (\* Set the reverse lookup into place so dsa_lookup_var can map to original vars/names *\) *)
-  (* dsa_rev_map := rh; *)
   let no_specials = remove_specials trace in
   let blocks = trace_to_blocks no_specials in
   (*pdebug ("blocks: " ^ (string_of_int (List.length blocks)));*)
@@ -1508,19 +1548,18 @@ let add_seh_pivot_file gaddr sehaddr paddr payloadfile trace =
 let generate_formula trace = 
   LetBind.bindings := [] ;  (*  XXX: temporary hack *)
   let trace = concrete trace in
-  (*let trace,rh = to_dsa trace in*)
-  (* Set the reverse lookup into place so dsa_lookup_var can map to original vars/names *)
-  (*dsa_rev_map := Some(rh);*)
+  let trace = trace_dce trace in
   ignore(symbolic_run trace) ;
   TraceSymbolic.output_formula ()
 
 let output_formula file trace = 
+  set_gc () ;
   let formula = generate_formula trace in
     (*dprintf "formula size: %Ld\n" (formula_size formula) ;*)
-    print "Printing out formula\n" ; flush stdout ;
-    print_formula file formula ;
-    print "Done printing out formula\n";
-    trace
+  Status.init "Printing out formula" 0;
+  print_formula file formula ;
+  Status.stop () ;
+  trace
 
       
 (*************************************************************)
@@ -1546,10 +1585,12 @@ let solve_formula input output =
   (* print "Querying STP for a satisfying answer\n" ;  *)
   flush stdout ;
   let cmd = "stp < " ^ input ^ " > " ^ output in
-    match Unix.system cmd with
+  Status.init "Solving formula" 0 ;
+  (match Unix.system cmd with
       | Unix.WEXITED 0 -> ()
       | _ -> failwith ("STP query failed, consider increasing"
-			 ^ " the stack with ulimit")
+			 ^ " the stack with ulimit"));
+  Status.stop ()
 
 let output_exploit file trace = 
   ignore (output_formula formula_storage trace) ;

@@ -333,16 +333,22 @@ struct
   let current = ref 0
   let last = ref 0
   let message = ref "Status"
+  let starttime = ref 0.0
     
+  let update () = 
+    if !last = -1 then
+      Printf.printf "%s...\r" !message
+    else
+      Printf.printf "%s: %d%%\r" !message !last ;
+    flush stdout
+      
   let init msg size = 
     current := 0 ;
     last := -1 ;
     message := msg ;
-    total := size
-      
-  let update () = 
-    Printf.printf "%s: %d%%\r" !message !last ;
-    flush stdout
+    total := size ;
+    starttime := Unix.gettimeofday () ;
+    update ()
       
   let inc () =
     if !total != 0 then (
@@ -352,7 +358,7 @@ struct
 	(last := last'; update ()))
 	  
   let stop () =
-    Printf.printf "%s: Done!\n" !message ;
+    Printf.printf "%s: Done! (%f seconds)\n" !message (Unix.gettimeofday () -. !starttime) ;
     flush stdout
 end
 

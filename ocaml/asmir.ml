@@ -25,6 +25,8 @@ let trace_blocksize = ref 100000L
 module D = Debug.Make(struct let name = "ASMIR" and default=`Debug end)
 open D
 
+module Status = Util.StatusPrinter
+
 (** Translate a unop *)
 let tr_unop = function
   | Libasmir.NEG -> NEG
@@ -434,6 +436,7 @@ let bap_from_trace_file ?(atts = true) ?(pin = false) filename =
   let off = ref 0L in
   let c = ref true in
   (* might be better to just grab the length of the trace in advance :*( *)
+  Status.init "Lifting trace" 0 ;
   while !c do
     (*dprintf "Calling the trace again.... ";*)
     let bap_blocks = Libasmir.asmir_bap_from_trace_file filename !off !trace_blocksize atts pin in
@@ -448,7 +451,9 @@ let bap_from_trace_file ?(atts = true) ?(pin = false) filename =
 	off := Int64.add !off !trace_blocksize
     )
   done;
-  List.rev !ir
+  let r = List.rev !ir in
+  Status.stop () ;
+  r
 
 (** Get one statement at a time.
 
