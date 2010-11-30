@@ -275,6 +275,11 @@ let set_sf r = move sf (compute_sf r)
 let set_zf t r = move zf (compute_zf t r)
 let set_pf r = move pf (compute_pf r)
 
+let set_pszf t r =
+  [set_pf r;
+   set_sf r;
+   set_zf t r]
+
 let set_flags_sub t s1 s2 r =
   set_sf r
   ::set_zf t r
@@ -391,6 +396,12 @@ let to_ir addr next pref = function
     let tmp = nv "t" t in
     move tmp (op2e t o1 -* op2e t o2)
     :: set_flags_sub t (op2e t o1) (op2e t o2) (Var tmp)
+  | And(t, o1, o2) when pref = [] ->
+    assn t o1 (op2e t o1 -* op2e t o2)
+    :: move oF exp_false
+    :: move cf exp_false
+    :: move af (Unknown("AF is undefined after and", r1))
+    :: set_pszf t (op2e t o1)
   | _ -> unimplemented "to_ir"
 
 let add_labels ?(asm) a ir =
