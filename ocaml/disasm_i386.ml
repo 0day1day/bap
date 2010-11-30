@@ -44,7 +44,7 @@ type operand =
 type opcode =
   | Retn
   | Nop
-  | Mov of operand * operand (* dst, src *)
+  | Mov of typ * operand * operand (* dst, src *)
   | Movdqa of operand * operand (* dst, src *)
   | Lea of operand * Ast.exp
   | Call of operand * int64 (* Oimm is relative, int64 is RA *)
@@ -298,8 +298,8 @@ let to_ir addr next pref = function
      move esp (esp_e +* (i32 4));
      Jmp(Var t, [StrAttr "ret"])
     ]
-  | Mov(dst,src) when pref = [] ->
-    [assn r32 dst (op2e r32 src)] (* FIXME: r32 *)
+  | Mov(t, dst,src) when pref = [] ->
+    [assn t dst (op2e t src)]
   | Movdqa(d,s) -> (
     let zero = Int(0L,r4) and eight = Int(8L,r4) in
     let (s0, s1, a1) = match s with
@@ -435,7 +435,7 @@ module ToStr = struct
   let op2str = function
     | Retn -> "ret"
     | Nop -> "nop"
-    | Mov(d,s) -> Printf.sprintf "mov %s, %s" (opr d) (opr s)
+    | Mov(t, d,s) -> Printf.sprintf "mov %s, %s" (opr d) (opr s)
     | Lea(r,a) -> Printf.sprintf "lea %s, %s" (opr r) (opr (Oaddr a))
     | Call(a, ra) -> Printf.sprintf "call %s" (opr a)
     | Shift _ -> "shift"
@@ -574,6 +574,7 @@ let parse_instr g addr =
     | Reg 32 | Reg 64 -> parse_imm32 a
     | _ -> failwith "parse_immz unsupported size"
   in
+  let parse_immv = parse_immz in (* until we do amd64 *)
   let get_opcode pref opsize a =
     let b1 = Char.code (g a)
     and na = s a in
@@ -598,22 +599,33 @@ let parse_instr g addr =
 	      | _ -> unimplemented (Printf.sprintf "unsupported opcode: %x/%d" b1 r)
 	      )
     | 0x89 -> let (r, rm, na) = parse_modrm32 na in
-	      (Mov(rm, r), na)
+	      (Mov(opsize, rm, r), na)
     | 0x8b -> let (r, rm, na) = parse_modrm32 na in
-	      (Mov(r, rm), na)
+	      (Mov(opsize, r, rm), na)
     | 0x8d -> let (r, rm, na) = parse_modrm opsize na in
 	      (match rm with
 	      | Oaddr a -> (Lea(r, a), na)
 	      | _ -> failwith "invalid lea (must be address)"
 	      )
     | 0x90 -> (Nop, na)
+    | 0xa1 -> let (addr, na) = parse_disp32 na in
+	      (Mov(opsize, o_eax, Oaddr(l32 addr)), na)
+    | 0xa3 -> let (addr, na) = parse_disp32 na in
+	      (Mov(opsize, Oaddr(l32 addr), o_eax), na)
     | 0xa6 -> (Cmps r8, na)
     | 0xa7 -> (Cmps opsize, na)
     | 0xaa -> (Stos r8, na)
     | 0xab -> (Stos opsize, na)
+    | 0xb8 -> let (i, na) = parse_immv opsize na in
+	      (Mov(opsize, o_eax, i), na)
+    | 0xba -> let (i, na) = parse_immv opsize na in
+	      (Mov(opsize, o_edx, i), na)
+    | 0xbf -> let (i, na) = parse_immv opsize na in
+	      (Mov(opsize, o_edi, i), na)
+
     | 0xc7 -> let (_, rm, na) = parse_modrm32 na in
-	      let (i,na) = parse_imm32 na in
-	      (Mov(rm, i), na)
+	      let (i,na) = parse_immz opsize na in
+	      (Mov(opsize, rm, i), na)
     | 0xe8 -> let (i,na) = parse_disp32 na in
 	      (Call(Oimm i, na), na)
     | 0xeb -> let (i,na) = parse_disp8 na in
