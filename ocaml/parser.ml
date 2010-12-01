@@ -24,3 +24,11 @@ let exp_from_lexbuf l =
 
 let exp_from_string s =
   exp_from_lexbuf (Lexing.from_string s)
+
+let exp_from_file f =
+  let ic = open_in f in
+  let lb = Lexing.from_channel ic in
+  lb.Lexing.lex_curr_p <- { lb.Lexing.lex_curr_p with Lexing.pos_fname = f };
+  let e = exp_from_lexbuf lb in
+  close_in ic;
+  e

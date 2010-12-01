@@ -294,7 +294,7 @@ struct
 		 and endian_exp = symb_to_exp endian in
 		   Symbolic (lookup_mem mem mem_arr endian_exp)
 	     | Reg _ ->  (* we only care about 32bit *)
-		 eval_expr delta (Memory2array.split_loads mem ind reg_32 t endian)
+		 eval_expr delta (Memory2array.split_loads mem ind t endian)
 	     | Array _ ->
 		 failwith ("loading array currently unsupported" ^ (Pp.typ_to_string t))
 	     | _ -> failwith "not a loadable type"
@@ -310,9 +310,9 @@ struct
 	       | Reg _ -> 
 		   if not (is_symbolic_store mem) && is_concrete index
 		   then eval_expr delta (* we only care about 32bit *)
-		     (Memory2array.split_writes mem index reg_32 t endian value)
+		     (Memory2array.split_writes mem index t endian value)
 		   else symb_mem 
-		     (Memory2array.split_writes mem index reg_32 t endian value)
+		     (Memory2array.split_writes mem index t endian value)
 	       | Array _ -> 
 		   failwith "storing array currently unsupported"
 	       | _ -> 
@@ -476,5 +476,6 @@ struct
 end
   
 module Symbolic = Make(Std)(FullSubst)(StdForm)
+module SymbolicFast = Make(Std)(PartialSubst)(StdForm)
 
 let eval_expr = Symbolic.eval_expr

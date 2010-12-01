@@ -4,7 +4,7 @@ open Type
 open Ast
 open Typecheck
 
-module D = Debug.Make(struct let name = "STP" and default=`NoDebug end)
+module D = Debug.Make(struct let name = "STP" and default=`Debug end)
 open D
 
 
@@ -74,7 +74,7 @@ let myfreevars e =
   freevis e;
   get_found ()
 
-class pp ft =
+class pp ?suffix:(s="") ft =
   let pp = Format.pp_print_string ft
   and pc = Format.pp_print_char ft
   and pi = Format.pp_print_int ft
@@ -86,7 +86,7 @@ class pp ft =
   and flush = Format.pp_print_flush ft
   and cls = Format.pp_close_box ft in
   let var2s (Var.V(num,name,_)) =
-    name^"_"^string_of_int num
+    name^"_"^(string_of_int num)^s
   in
 
 object (self)
@@ -136,7 +136,7 @@ object (self)
 
   method decl (Var.V(_,_,t) as v) =
     self#extend v (var2s v);
-    self#var v; pp " : "; self#typ t; pp ";"; space()
+    self#var v; pp " : "; self#typ t; pp ";"; force_newline();
 
 
 
@@ -153,8 +153,7 @@ object (self)
 	   | Reg _ -> failwith "unimplemented bitvector length"
 	   | _ -> invalid_arg "Only constant integers supported"
 	 in
-	 let maskedval = Arithmetic.to64(i,t)
-	 in
+	 let maskedval = Arithmetic.to64 (i,t) in
 	 printf format maskedval
      | Var v ->
 	 self#var v
@@ -179,8 +178,17 @@ object (self)
      | BinOp(ARSHIFT, e1, Int(i,_)) -> (* Same sort of deal :( *)
 	 let t = infer_ast ~check:false e1 in
 	 let bits = string_of_int (bits_of_width t) in
-	 pp "SX("; self#ast_exp e1; pp " >> "; pp (Int64.to_string i);
-	 pp ", "; pp bits; pc ')'
+	 let gethigh = Int64.sub (Int64.of_int (bits_of_width t)) i in
+	 let gethigh = Int64.sub gethigh 1L in
+	 if gethigh >= 0L then (
+	   pp "SX(("; self#ast_exp e1; 
+	   pp " >> "; pp (Int64.to_string i);
+	   pp ")["; pp (Int64.to_string gethigh); pp ":0], "; pp bits; pc ')'
+	 ) else (
+	   let b = Int64.sub (Int64.of_int (bits_of_width t)) 1L in
+	   pp "SX("; self#ast_exp e1; pp "["; pp (Int64.to_string b);
+	   pp ":"; pp (Int64.to_string b); pp "], "; pp bits; pc ')';
+	 )
       | BinOp((LSHIFT|RSHIFT|ARSHIFT) as bop, e1, e2) ->
 	  let t2 = infer_ast ~check:false e2 in
 	  let const n = Int(Int64.of_int n,t2) in
@@ -243,7 +251,9 @@ object (self)
 		("", "["^string_of_int(bits1-1)^":"^string_of_int(bits1-bits)^"]")
 	    | CAST_UNSIGNED  ->
 		if bits = bits1 then ("","") else
-		("(0bin"^String.make (bits-bits1) '0'^" @ ", ")")
+		  ("(0bin"^String.make (bits-bits1) '0'^" @ ", ")")
+		  (* @ does not work right in CVC3, so using BVPLUS... I think they fixed it now -ed *)
+		  (* ("(BVPLUS(" ^ string_of_int bits ^ ",", ",0bin0))") *)
 	  in
 	  pp pre;
 	  self#ast_exp e1;
@@ -252,7 +262,7 @@ object (self)
 	  pp "unknown_"; pi unknown_counter; pp" %"; pp s; force_newline();
 	  unknown_counter <- unknown_counter + 1;
       | Lab lab ->
-	  failwith ("STP: don't know how to handle label names "
+	  failwith ("STP: don't know how to handle label names: "
 		      ^ (Pp.ast_exp_to_string e))
       | Let(v, e1, e2) ->
 	  pp "(LET ";
@@ -303,6 +313,31 @@ object (self)
 	pp "):";
 	cls();space();
 
+  method exists = function
+    | [] -> ()
+    | v::vars ->
+	let var_type  (Var.V(_,_,t) as v) =
+	  self#var v; pp " : "; self#typ t
+	in
+	opn 2;
+	pp "EXISTS (";space();
+	  (* TODO: group by type *)
+	List.iter (fun v -> var_type v; pc ','; space()) vars;
+	var_type v;
+	pp "):";
+	cls();space();
+
+  method assert_eq v e =
+    opn 0;
+    self#declare_new_freevars (BinOp(EQ, Var v, e));
+    force_newline();
+    pp "ASSERT(";
+    self#var v;
+    pc '=';
+    self#ast_exp e;
+    pp ");";
+    cls()
+
   method assert_ast_exp_with_foralls ?(fvars=true) foralls e =
     opn 0;
     if fvars then (
@@ -318,6 +353,22 @@ object (self)
     force_newline();
     pp ");";
     cls();
+
+  (** Is e a valid expression (always true)? *)
+  method valid_ast_exp ?(exists=[]) ?(foralls=[]) e =
+    opn 0;
+    self#declare_new_freevars e;
+    force_newline();
+    pp "QUERY(";
+    space();    
+    self#exists exists;
+    self#forall foralls;
+    pp "0bin1 =";
+    force_newline();
+    self#ast_exp e;
+    force_newline();
+    pp ");";
+    cls();    
 
   method assert_ast_exp e =
     self#assert_ast_exp_with_foralls [] e
@@ -335,10 +386,10 @@ object (self)
 end
 
 
-class pp_oc fd =
+class pp_oc ?suffix:(s="") fd =
   let ft = Format.formatter_of_out_channel fd in
 object
-  inherit pp ft as super
+  inherit pp ~suffix:s ft as super
   method close =
     super#close;
     close_out fd

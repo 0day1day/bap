@@ -209,6 +209,10 @@ let of_astcfg ?entry ?exit cfg =
   cgcl_to_gcl (CSeq(get entry))
 
 
+let of_ast p =
+  of_astcfg (Prune_unreachable.prune_unreachable_ast (Cfg_ast.of_prog p))
+
+
 let rec remove_skips = function
   | Assume _
   | Assert _
@@ -228,4 +232,39 @@ let rec remove_skips = function
     )
 
 
-  
+module C = Cfg.SSA
+
+let passified_of_ssa ?entry ?exit cfg =
+  let ast = Cfg_ssa.to_astcfg ~dsa:true cfg in
+  let convert = function
+    | Some v -> Some(CA.find_vertex ast (C.G.V.label v))
+    | None -> None
+  in
+  let entry = convert entry and exit = convert exit in
+  let gcl = of_astcfg ?entry ?exit ast in
+  let vars = ref [] in
+  let rec convert_gcl g = 
+    match g with
+    | Assign(v,e) ->
+	vars := v :: !vars;
+	Assume(exp_eq (Var v) e)
+    | Choice(a,b) ->
+	Choice(convert_gcl a, convert_gcl b)
+    | Seq(a,b) ->
+	Seq(convert_gcl a, convert_gcl b)
+    | Assume _ | Assert _ | Skip ->
+	g
+  in
+  let pgcl = convert_gcl gcl in
+  (pgcl, list_unique !vars)
+
+
+let passified_of_astcfg ?entry ?exit cfg =
+  let {Cfg_ssa.cfg=ssa; to_ssavar=tossa} = Cfg_ssa.trans_cfg cfg in
+  let convert = function
+    | Some v -> Some(C.find_vertex ssa (CA.G.V.label v))
+    | None -> None
+  in
+  let entry = convert entry and exit = convert exit in
+  let (g,v) = passified_of_ssa ?entry ?exit ssa in
+  (g,v,tossa)

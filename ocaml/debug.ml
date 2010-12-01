@@ -42,7 +42,7 @@ let (debug_string,debug_endline) =
   try
     let filename = Sys.getenv "BAP_LOGFILE" in
     let oc = open_out_gen [Open_append;Open_creat] 0o664 filename in
-      (output_string oc, output_endline oc)
+    (output_string oc, output_endline oc)
   with Not_found -> (debug_string,debug_endline)
 
 
@@ -57,18 +57,18 @@ let get_env_options varname defvalue =
 	    try String.index_from modules spos ':'
 	    with Not_found -> len
 	  in
-	    if npos = spos then true else
-	      let (sub, res) =
-		if String.get modules spos = '!'
-		then (String.sub modules (spos+1) (npos-spos-1), false)
-		else (String.sub modules spos (npos-spos), true)
-	      in
-		if sub = "" || sub = name then res
-		else if npos < len then f (npos+1) else defvalue
+	  if npos = spos then true else
+	    let (sub, res) =
+	      if String.get modules spos = '!'
+	      then (String.sub modules (spos+1) (npos-spos-1), false)
+	      else (String.sub modules spos (npos-spos), true)
+	    in
+	    if sub = "" || sub = name then res
+	    else if npos < len then f (npos+1) else defvalue
 	in
-	  f 0
+	f 0
       in
-	lookup
+      lookup
     with Not_found ->
       default
 
@@ -91,11 +91,11 @@ let dec_indent () = indent := !indent - 1
 let pindent () =
   let tab_is = 4 in (* number of "normal" indents *)
   let rec helper = function
-      0 -> ()
+    | 0 -> ()
     | n when n >= tab_is -> (debug_string "\t"; helper (n-tab_is))
     | n -> (debug_string "  "; helper (n-1))
   in
-    helper (!indent)
+  helper (!indent)
 
 
 
@@ -105,25 +105,25 @@ let ptime_unix() =
 let ptime_iso() =
   let secs = Unix.gettimeofday() in
   let t = Unix.localtime secs in
-    Printf.ksprintf debug_string "[%4d-%2d-%2d_%2d:%2d:%2d]"
-      t.Unix.tm_year t.Unix.tm_mon t.Unix.tm_mday
-      t.Unix.tm_hour t.Unix.tm_min t.Unix.tm_sec
+  Printf.ksprintf debug_string "[%4d-%2d-%2d_%2d:%2d:%2d]"
+    t.Unix.tm_year t.Unix.tm_mon t.Unix.tm_mday
+    t.Unix.tm_hour t.Unix.tm_min t.Unix.tm_sec
 
 let ptime_none() = ()
 
 let ptime =
   try
     match Sys.getenv "BAP_DEBUG_TIMESTAMPS" with
-	"" | "unix" | "Unix" -> ptime_unix
-      | "iso" | "ISO" -> ptime_iso
-      | "none" | "None" -> ptime_none
-      | "elapsed" ->
-	  let t0 = Unix.gettimeofday () in
-	    (fun () ->
-	      Printf.ksprintf debug_string "[%f]" ((Unix.gettimeofday ()) -. t0) )
-      | s ->
-	  prerr_endline("Warning: Unknown BAP_DEBUG_TIMESTAMPS value ("^s^")");
-	  ptime_unix
+    | "" | "unix" | "Unix" -> ptime_unix
+    | "iso" | "ISO" -> ptime_iso
+    | "none" | "None" -> ptime_none
+    | "elapsed" ->
+	let t0 = Unix.gettimeofday () in
+	(fun () ->
+	   Printf.ksprintf debug_string "[%f]" ((Unix.gettimeofday ()) -. t0) )
+    | s ->
+	prerr_endline("Warning: Unknown BAP_DEBUG_TIMESTAMPS value ("^s^")");
+	ptime_unix
   with Not_found ->
     ptime_none
       
@@ -195,12 +195,12 @@ struct
   let dprintf = if debug then dprintf else NoDebug.dprintf
 
   let dtrace ~before ~f ~after x =
-    let () = before x in
-    let () = inc_indent () in
+    before x;
+    inc_indent ();
     let r = f x in
-    let () = dec_indent () in
-    let () = after r in
-      r
+    dec_indent ();
+    after r;
+    r
  
   let dtrace = if debug then dtrace else NoDebug.dtrace
 
@@ -219,5 +219,3 @@ struct
   let wprintf = if warn then wprintf else NoDebug.wprintf
 
 end
-
-

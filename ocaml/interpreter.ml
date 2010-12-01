@@ -369,7 +369,7 @@ struct
       match t with
 	| Reg 8 -> load_mem m' (fst a)
 	| Reg _ ->
-	    let expr = Memory2array.split_loads m (Int a) reg_32 t (Int e) in
+	    let expr = Memory2array.split_loads m (Int a) t (Int e) in
 	      env.MyTypes.expr expr env st
         | _ -> failwith "unsupported memory load type"
 
@@ -382,7 +382,7 @@ struct
       | Reg 8 -> store_mem m' (fst a) (Scalar v)
       | Reg _ ->
 	  let expr = 
-	    Memory2array.split_writes m (Int a) reg_32 t (Int e) (Int v)
+	    Memory2array.split_writes m (Int a) t (Int e) (Int v)
 	  in
 	    unwrap_mem (env.MyTypes.expr expr env st)
       | _ -> failwith "unsupported memory store type"

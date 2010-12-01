@@ -12,12 +12,15 @@ libasmir_a_SOURCES = \
 	./old_ir/exp.cpp \
 	./old_ir/exp_c.cpp \
 	asm_program.c \
+	symbols.c \
+	memory_data.cpp \
 	irtoir_c.cpp \
 	irtoir.cpp \
 	irtoir-i386.cpp \
 	irtoir-arm.cpp \
 	vexir.c \
 	vexmem.c \
+	ocaml_helpers.c \
 	./traces/readtrace.cpp \
 	./traces/trace.cpp \
 	./traces/trace_v40.cpp \

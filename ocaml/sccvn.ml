@@ -87,9 +87,9 @@ let meet a b = match (a,b) with
   | (Hash _, Hash _)
   | (HInt _, HInt _) ->
       None
-  | ((Hash _ as x), _)
-  | (_, (Hash _ as x)) ->
-      Some x
+  | ((Hash _), _)
+  | (_, (Hash _)) ->
+      None (* A hash and a constant can not be simplified *)
 
 
 (** [node_sdom cfg a b] returns true if position [a] strictly dominates

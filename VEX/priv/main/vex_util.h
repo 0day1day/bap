@@ -48,7 +48,7 @@
 #define __VEX_UTIL_H
 
 #include "libvex_basictypes.h"
-
+#include "../../libasmir/include/jumpbuf.h"
 
 /* Misc. */
 

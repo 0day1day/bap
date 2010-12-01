@@ -761,17 +761,40 @@ Exp *emit_mux0x( vector<Stmt *> *irout, reg_t type,
     // to be cloned for each subsequent use. This keeps the expression tree
     // a tree instead of a graph.
 
+    size_t initialSize = irout->size();
+    
     Temp *temp = mk_temp(type,irout);
 
 #ifndef MUX_AS_CJMP
     // FIXME: modify match_mux0x to recognize this
     Exp *widened_cond;
     reg_t result_type;
-    //typecheck_exp(&result_type, NULL, cond);
-    //assert(result_type == REG_1); // conditions should be boolean
 
-    //typecheck_exp(&result_type, NULL, exp0);
-    //assert(result_type == type);
+    /*
+     *
+     *
+     *
+     *
+     * README
+     *
+     *
+     *
+     *
+     * IF YOU CHANGE THIS, MAKE SURE YOU CHANGE MATCH_MUX0X TOO.
+     *
+     *
+     *
+     *
+     *
+     *
+     * IF YOU DONT, THINGS WILL BREAK.
+     *
+     *
+     *
+     *
+     * THANK YOU.
+     */
+
     widened_cond = mk_temp(type,irout);
     irout->push_back(new Move(ecl(widened_cond),
 			      new Cast(cond, type,
@@ -782,11 +805,12 @@ Exp *emit_mux0x( vector<Stmt *> *irout, reg_t type,
 			      new BinOp(BITOR,
 					new BinOp(BITAND,
 						  ecl(exp0),
-						  ecl(widened_cond)),
+                                                  ecl(widened_cond)),
 					new BinOp(BITAND,
 						  ecl(expX),
 						  new UnOp(NOT, 
 							   widened_cond)))));
+
 #else // def MUX_AS_CJMP
 
     Label *labelX = mk_label();
@@ -801,6 +825,9 @@ Exp *emit_mux0x( vector<Stmt *> *irout, reg_t type,
     irout->push_back( done );
 #endif
 
+    /* Make sure that MUX_LENGTH is correct */
+    assert( (initialSize + MUX_LENGTH) == irout->size());
+    
     return temp;
 }
 
@@ -1062,45 +1089,57 @@ Stmt *translate_jumpkind( IRSB *irbb, vector<Stmt *> *irout )
   Stmt *result = NULL;
 
   Exp *dest = NULL;
-  if ( irbb->next->tag == Iex_Const )
+  if ( irbb->next->tag == Iex_Const ) {
     dest = mk_dest_name( irbb->next->Iex.Const.con->Ico.U32 );
+ 
+    // removing the insignificant jump statment 
+    // that actually goes to the next instruction
+    // except for conditional jump cases
+    if ( irbb->jumpkind == Ijk_Boring && irbb->stmts[irbb->stmts_used-1]->tag != Ist_Exit )     
+      if ( irbb->stmts[0]->Ist.IMark.addr + irbb->stmts[0]->Ist.IMark.len 
+            == irbb->next->Iex.Const.con->Ico.U32 )
+        return NULL;
+  }
   else
     dest = translate_expr( irbb->next, irbb, irout );
 
   switch ( irbb->jumpkind )
     {
-    case Ijk_Boring: 
-    case Ijk_Yield:
-      result = new Jmp(dest);
-      break; 
-    case Ijk_Call:
-      if(!translate_calls_and_returns)
-	result = new Jmp(dest);
-      else
-	result = new Call(NULL, dest, vector<Exp *>());
-      break;
-    case Ijk_Ret:
-      if(!translate_calls_and_returns)
-	result = new Jmp(dest);
-      else
-	result = new Return(NULL);
-      break;
-    case Ijk_Sys_int128:
-      irout->push_back( new Special("int 0x80") );
-      irout->push_back(mk_label());
-      result = new Jmp(dest);
-      break;
-    case Ijk_NoDecode:
-      result = new Special("VEX decode error");
-      break;
-    default:
-      //
-      // TODO:
-      // It's occurred to me that whenever we throw due to an
-      // unrecognized something, the unused objects created above
-      // are leaked, e.g. dest in this case.
-      //
-      throw "Unrecognized jump kind";    
+        case Ijk_Boring: 
+        case Ijk_Yield:
+          result = new Jmp(dest);
+          break; 
+        case Ijk_Call:
+          if(!translate_calls_and_returns)
+            result = new Jmp(dest);
+          else
+            result = new Call(NULL, dest, vector<Exp *>());
+          break;
+        case Ijk_Ret:
+          if(!translate_calls_and_returns)
+            result = new Jmp(dest);
+          else
+            result = new Return(NULL);
+          break;
+        case Ijk_NoDecode:
+          result = new Special("VEX decode error");
+          break;
+        case Ijk_Sys_syscall:
+        case Ijk_Sys_int32:
+        case Ijk_Sys_int128:
+        case Ijk_Sys_sysenter:
+          // Since these will create a special (insert_specials), we
+          // won't translate these as a jump here.
+          return NULL;
+          break;
+        default:
+          //
+          // TODO:
+          // It's occurred to me that whenever we throw due to an
+          // unrecognized something, the unused objects created above
+          // are leaked, e.g. dest in this case.
+          //
+          throw "Unrecognized jump kind";    
     }
 
   assert(result);
@@ -1170,7 +1209,7 @@ vector<Stmt *> *translate_irbb( IRSB *irbb )
 
         try
         {
-            st = translate_stmt(stmt, irbb, irout);
+          st = translate_stmt(stmt, irbb, irout);
         }
         catch ( const char *e )
         {
@@ -1192,10 +1231,11 @@ vector<Stmt *> *translate_irbb( IRSB *irbb )
     catch ( const char *e )
     {
       //        st = new Comment( "Untranslated Jump out of BB. Cause: \"" + string(e) + "\"" );
-        st = new Special( "Untranslated Jump out of BB. Cause: ' + string(e) + '" );
+        st = new Special( "Untranslated Jump out of BB. Cause: " + string(e) );
     }
 
-    irout->push_back(st);
+    if (st != NULL)
+        irout->push_back(st);
 
     return irout;
 }
@@ -1295,6 +1335,13 @@ void insert_specials(bap_block_t * block) {
         return;
     IRJumpKind kind = bb->jumpkind;
     switch (kind) {
+        case Ijk_Sys_syscall:
+        case Ijk_Sys_int32:
+        case Ijk_Sys_int128:
+        case Ijk_Sys_sysenter:
+	  if(!translate_calls_and_returns)
+            block->bap_ir->push_back(new Special("syscall"));
+	  break;
         case Ijk_Call:
 	  if(!translate_calls_and_returns)
             block->bap_ir->push_back(new Special("call"));
@@ -1330,15 +1377,15 @@ void generate_bap_ir_block( asm_program_t *prog, bap_block_t *block )
   vector<Stmt *> *vir = block->bap_ir;
   
   // Go through block and add Special's for ret
-  //add_special_returns(block);
   insert_specials(block);
   
   // Go through the block and add on eflags modifications
-  if(!use_eflags_thunks)
+  //if(!use_eflags_thunks)
     modify_flags(prog, block);
   
   // Delete EFLAGS get thunks
-  //del_get_thunk(block->bap_ir);
+  if(!use_eflags_thunks)
+    del_get_thunk(prog, block);
   
   // Add the asm and ir addresses
   for ( int j = 0; j < vir->size(); j++ )
@@ -1391,8 +1438,60 @@ string get_op_str(asm_program_t *prog, address_t inst )
 int match_mux0x(vector<Stmt*> *ir, unsigned int i,
 		Exp **cond, Exp **exp0,	Exp **expx, Exp **res)
 {
-  // this code depends on the order of statements from emit_mux0x()
 
+// this code depends on the order of statements from emit_mux0x()
+
+#ifndef MUX_AS_CJMP
+
+  if (i < 0
+      || i >= ir->size()
+      || ir->at(i+0)->stmt_type != VARDECL /* temp */
+      || ir->at(i+1)->stmt_type != VARDECL  /* widened_cond */
+      || ir->at(i+2)->stmt_type != MOVE
+      || ir->at(i+3)->stmt_type != MOVE)
+    return -1;
+
+  Move *s0 = (Move*)ir->at(i+2);
+  Move *s1 = (Move*)ir->at(i+3);
+
+  if (s0->lhs->exp_type != TEMP
+      || s1->lhs->exp_type != TEMP
+      || s0->rhs->exp_type != CAST
+      || s1->rhs->exp_type != BINOP)
+    return -1;
+  
+  Cast *e1 = static_cast<Cast*> (s0->rhs);
+  BinOp *e2 = static_cast<BinOp*> (s1->rhs);
+  if (e1->cast_type != CAST_SIGNED
+      || e2->binop_type != BITOR
+      || e2->lhs->exp_type != BINOP
+      || e2->rhs->exp_type != BINOP)
+    return -1;
+  
+  Exp *e3 = e1->exp; /* e3 is the condition */
+  BinOp *e4 = static_cast<BinOp*> (e2->lhs); /* e4 is the true branch */
+  BinOp *e5 = static_cast<BinOp*> (e2->rhs); /* e5 is the false branch */
+
+  if (e4->binop_type != BITAND
+      || e5->binop_type != BITAND)
+    return -1;
+
+  Exp *e6 = e4->lhs; /* this is exp0 */
+  Exp *e7 = e5->lhs; /* this is expX */
+  
+  if (cond)
+    *cond = e3;
+  if (exp0)
+    *exp0 = e6;
+  if (expx)
+    *expx = e7;
+  if (res)
+    *res = NULL; /* XXX: Not sure what to do here */
+
+  // cout << "MATCH!!!!" << endl;
+  
+#else
+  
   if (i < 0 || i >= ir->size()
       || ir->at(i)->stmt_type != MOVE
       || ir->at(i+3)->stmt_type != MOVE
@@ -1427,6 +1526,9 @@ int match_mux0x(vector<Stmt*> *ir, unsigned int i,
     *expx = s3->rhs;
   if (res)
     *res = s0->lhs;
+
+#endif
+
   return 0;
 }
 

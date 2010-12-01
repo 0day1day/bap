@@ -39,3 +39,4 @@ val avar_accept : #t -> var -> var
 val binding_accept : #t -> var * exp -> var * exp
 val uvar_accept : #t -> var -> var
 val prog_accept : #t -> program -> program
+val cfg_accept : #t -> Cfg.AST.G.t -> Cfg.AST.G.t

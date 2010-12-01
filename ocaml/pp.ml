@@ -7,6 +7,8 @@ open Type
 module VH = Var.VarHash
 module F = Format
 
+let output_varnums = ref true
+
 let rec typ_to_string = function
   | Reg 1 -> "bool"
   | Reg 8 -> "u8"
@@ -56,7 +58,7 @@ type varctx = string VH.t * (string,unit) Hashtbl.t
 let var_to_string ?ctx (Var.V(id,name,t) as v) =
   match ctx with
   | None ->
-       name ^ "_" ^ string_of_int id ^ ":" ^ typ_to_string t
+	name ^ "_" ^ string_of_int id ^ ":" ^ typ_to_string t
   | Some(vars,names) ->
       try VH.find vars v
       with Not_found ->
@@ -72,7 +74,6 @@ let var_to_string ?ctx (Var.V(id,name,t) as v) =
 	let rec more x = (x^"_", `F more) in
 	trystring (name, `F (fun _ -> (name ^ "_" ^ string_of_int id, `F more)))
 
-
 class pp ft =
   let pp = F.pp_print_string ft
   and pc = F.pp_print_char ft
@@ -81,10 +82,15 @@ class pp ft =
   and opn  = F.pp_open_box ft
   and cls = F.pp_close_box ft in
   let comma () = pp ","; space() in
+  let vctx = (VH.create 100, Hashtbl.create 100) in
 object (self)
 
 
-  method var v = pp (var_to_string v)
+  method var v = 
+    if !output_varnums then
+      pp (var_to_string v)
+    else
+      pp (var_to_string ~ctx:vctx v)
 
   method typ t = pp (typ_to_string t)
 
@@ -111,6 +117,23 @@ object (self)
     | ThreadId i -> pp "@tid \""; pp (string_of_int i); pp "\""
     | ExnAttr _ (* we could try to print something using Printexc.to_string *)
     | Pos _ -> () (* ignore position attrs *)
+    | InitRO -> pp "@set \"initro\""
+    | Synthetic -> pp "@set \"synthetic\""
+
+  method label = function
+    | Name s -> pp "label "; pp s
+    | Addr x -> printf "addr 0x%Lx" x
+
+  method int i t =
+    match (Arithmetic.tos64 (i,t), t) with
+    | (0L, Reg 1) -> pp "false"
+    | (-1L, Reg 1) -> pp "true"
+    | (i,t) ->
+      if i < 10L && i > -10L
+      then pp (Int64.to_string i)
+      else printf "0x%Lx" (Int64.logand i (Int64.pred (Int64.shift_left 1L (Arithmetic.bits_of_width t))));
+      pp ":"; self#typ t
+
 
   (* prec tells us how much parenthization we need. 0 means it doesn't need
      to be parenthesized. Larger numbers means it has higher precedence.
@@ -179,12 +202,8 @@ object (self)
      | Ast.Lab s ->
 	 (* FIXME: quote s? *)
 	 pp "\""; pp s; pp "\"";
-     | Ast.Int(0L, Reg 1) ->
-	 pp "false"
-     | Ast.Int(1L, Reg 1) ->
-	 pp "true"
      | Ast.Int(i,t) ->
-	 pp (Printf.sprintf "0x%Lx" i); pp ":"; self#typ t
+         self#int i t
      | Ast.Cast(ct,t,e) ->
 	 pp (ct_to_string ct);
 	 pp ":"; self#typ t;
@@ -229,10 +248,7 @@ object (self)
 	self#ast_exp f;
 	self#attrs a
     | Ast.Label(l,a) ->
-	(match l with
-	 | Name s -> pp "label "; pp s
-	 | Addr x -> printf "addr 0x%Lx" x
-	);
+	self#label l;
 	self#attrs a
     | Ast.Halt(e,a) ->
 	pp "halt ";
@@ -263,7 +279,7 @@ object (self)
 
   method ssa_value = function
     | Ssa.Int(i,t) ->
-	pp(Int64.to_string i); pc ':'; self#typ t
+        self#int i t
     | Ssa.Var v ->
 	self#var v
     | Ssa.Lab lab ->
@@ -383,7 +399,7 @@ let ft =
   let out = Buffer.add_substring buf
   and spaces _ = Buffer.add_char buf ' ' in
   let ft = Format.formatter_of_buffer buf in
-  Format.set_all_formatter_output_functions ~out ~flush:ignore ~spaces ~newline:ignore;
+  Format.pp_set_all_formatter_output_functions ft ~out ~flush:ignore ~spaces ~newline:ignore;
   ft
 let strpp = new pp ft
 
@@ -397,11 +413,8 @@ let pp2string f v =
 
 
 let value_to_string = pp2string (fun p -> p#ssa_value)
-
+let label_to_string = pp2string (fun p -> p#label)
 let ssa_exp_to_string = pp2string (fun p -> p#ssa_exp)
-
 let ssa_stmt_to_string = pp2string (fun p -> p#ssa_stmt)
-
 let ast_exp_to_string = pp2string (fun p -> p#ast_exp ~prec:0)
-
 let ast_stmt_to_string = pp2string (fun p -> p#ast_stmt)

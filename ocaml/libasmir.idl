@@ -6,100 +6,33 @@
 
 */
 
+// #include "libbfd.idl"
+import "libbfd.idl";
+
 typedef [abstract] void* Exp;
 typedef [abstract] void* Stmt;
 typedef [abstract] void* asm_program_t;
 typedef [abstract] void* bap_block_t;
 typedef [abstract] void* bap_blocks_t;
 typedef [abstract] void* cval;
-/*typedef [abstract] void* conc_map_vec;*/
 typedef [abstract] void* trace_attrs;
+typedef [abstract] void* memory_cell_data_t;
+typedef [abstract] void* memory_data_t;
 
 typedef int threadid_t;
 
-#include "../libasmir/config.h"
-#if SIZEOF_BFD_VMA == 4
-typedef [int64] unsigned long address_t;
-#else
-typedef  unsigned long long int address_t; 
-#endif
+[length_is(*num)] asymbol*
+asmir_get_symbols(asm_program_t prog,
+		  [out] long *num);
 
-// From bfd.h
-enum bfd_architecture
-{
-  bfd_arch_unknown,   /* File arch not known.  */
-  bfd_arch_obscure,   /* Arch known, not one of these.  */
-  bfd_arch_m68k,      /* Motorola 68xxx */
-  bfd_arch_vax,       /* DEC Vax */
-  bfd_arch_i960,      /* Intel 960 */
-  bfd_arch_or32,      /* OpenRISC 32 */
-  bfd_arch_sparc,     /* SPARC */
-  bfd_arch_spu,       /* PowerPC SPU */
-  bfd_arch_mips,      /* MIPS Rxxxx */
-  bfd_arch_i386,      /* Intel 386 */
-  bfd_arch_we32k,     /* AT&T WE32xxx */
-  bfd_arch_tahoe,     /* CCI/Harris Tahoe */
-  bfd_arch_i860,      /* Intel 860 */
-  bfd_arch_i370,      /* IBM 360/370 Mainframes */
-  bfd_arch_romp,      /* IBM ROMP PC/RT */
-  bfd_arch_convex,    /* Convex */
-  bfd_arch_m88k,      /* Motorola 88xxx */
-  bfd_arch_m98k,      /* Motorola 98xxx */
-  bfd_arch_pyramid,   /* Pyramid Technology */
-  bfd_arch_h8300,     /* Renesas H8/300 (formerly Hitachi H8/300) */
-  bfd_arch_pdp11,     /* DEC PDP-11 */
-  bfd_arch_powerpc,   /* PowerPC */
-  bfd_arch_rs6000,    /* IBM RS/6000 */
-  bfd_arch_hppa,      /* HP PA RISC */
-  bfd_arch_d10v,      /* Mitsubishi D10V */
-  bfd_arch_d30v,      /* Mitsubishi D30V */
-  bfd_arch_dlx,       /* DLX */
-  bfd_arch_m68hc11,   /* Motorola 68HC11 */
-  bfd_arch_m68hc12,   /* Motorola 68HC12 */
-  bfd_arch_z8k,       /* Zilog Z8000 */
-  bfd_arch_h8500,     /* Renesas H8/500 (formerly Hitachi H8/500) */
-  bfd_arch_sh,        /* Renesas / SuperH SH (formerly Hitachi SH) */
-  bfd_arch_alpha,     /* Dec Alpha */
-  bfd_arch_arm,       /* Advanced Risc Machines ARM.  */
-  bfd_arch_ns32k,     /* National Semiconductors ns32000 */
-  bfd_arch_w65,       /* WDC 65816 */
-  bfd_arch_tic30,     /* Texas Instruments TMS320C30 */
-  bfd_arch_tic4x,     /* Texas Instruments TMS320C3X/4X */
-  bfd_arch_tic54x,    /* Texas Instruments TMS320C54X */
-  bfd_arch_tic80,     /* TI TMS320c80 (MVP) */
-  bfd_arch_v850,      /* NEC V850 */
-  bfd_arch_arc,       /* ARC Cores */
-  bfd_arch_m32c,     /* Renesas M16C/M32C.  */
-  bfd_arch_m32r,      /* Renesas M32R (formerly Mitsubishi M32R/D) */
-  bfd_arch_mn10200,   /* Matsushita MN10200 */
-  bfd_arch_mn10300,   /* Matsushita MN10300 */
-  bfd_arch_fr30,
-  bfd_arch_frv,
-  bfd_arch_mcore,
-  bfd_arch_mep,
-  bfd_arch_ia64,      /* HP/Intel ia64 */
-  bfd_arch_ip2k,      /* Ubicom IP2K microcontrollers. */
-  bfd_arch_iq2000,     /* Vitesse IQ2000.  */
-  bfd_arch_mt,
-  bfd_arch_pj,
-  bfd_arch_avr,       /* Atmel AVR microcontrollers.  */
-  bfd_arch_bfin,        /* ADI Blackfin */
-  bfd_arch_cr16,       /* National Semiconductor CompactRISC (ie CR16). */
-  bfd_arch_cr16c,       /* National Semiconductor CompactRISC. */
-  bfd_arch_crx,       /*  National Semiconductor CRX.  */
-  bfd_arch_cris,      /* Axis CRIS */
-  bfd_arch_s390,      /* IBM s390 */
-  bfd_arch_score,     /* Sunplus score */ 
-  bfd_arch_openrisc,  /* OpenRISC */
-  bfd_arch_mmix,      /* Donald Knuth's educational processor.  */
-  bfd_arch_xstormy16,
-  bfd_arch_msp430,    /* Texas Instruments MSP430 architecture.  */
-  bfd_arch_xc16x,     /* Infineon's XC16X Series.               */
-  bfd_arch_xtensa,    /* Tensilica's Xtensa cores.  */
-  bfd_arch_maxq,     /* Dallas MAXQ 10/20 */
-  bfd_arch_z80,
-  bfd_arch_last
-};
+[length_is(*num)] asymbol*
+asmir_get_all_symbols(asm_program_t prog,
+                      [out] long *num);
+
+[length_is(*num)] section_ptr*
+asmir_get_all_sections(asm_program_t prog,
+                       [out] long *num);
+
 
 
 
@@ -198,15 +131,26 @@ Exp assert_cond(Stmt s);
 //[null_terminated] Stmt* gen_eflags_helpers_c();
 
 
-[unique] asm_program_t asmir_open_file([string] char *filename);
+asm_program_t asmir_open_file([string] char *filename);
 void asmir_close(asm_program_t p);
 [string] char* asmir_string_of_insn(asm_program_t prog, address_t inst);
 enum bfd_architecture asmir_get_asmp_arch(asm_program_t prog);
 
+/* How did this get revived? */
+address_t memory_cell_data_address(memory_cell_data_t md);
+int memory_cell_data_value(memory_cell_data_t md);
+memory_data_t get_rodata(asm_program_t prog);
+int memory_data_size(memory_data_t md);
+memory_cell_data_t memory_data_get(memory_data_t md, int i); 
+void destroy_memory_data(memory_data_t md);
+
 
 bap_blocks_t asmir_asmprogram_to_bap(asm_program_t prog);
 bap_blocks_t asmir_asmprogram_range_to_bap(asm_program_t prog, address_t start, address_t end);
-bap_block_t asmir_addr_to_bap(asm_program_t p, address_t addr);
+boolean asmir_bap_blocks_error(bap_blocks_t b);
+bap_block_t asmir_addr_to_bap(asm_program_t p, address_t addr, [out] address_t *next);
+address_t asmir_get_sec_startaddr(asm_program_t p, [string] const char *sectionname);
+address_t asmir_get_sec_endaddr(asm_program_t p, [string] const char *sectionname);
 int asmir_get_instr_length(asm_program_t p, address_t addr);
 int asmir_bap_blocks_size(bap_blocks_t bs);
 bap_block_t asmir_bap_blocks_get(bap_blocks_t bs, int i);
@@ -218,15 +162,17 @@ address_t asmir_bap_block_address(bap_block_t b);
 [string] const char* asm_string_from_stmt(Stmt s);
 bap_blocks_t asmir_bap_from_trace_file([in,string] char * filename, unsigned __int64 offset, unsigned __int64 numisns, boolean atts, boolean pintrace);
 
+
+bfdp asmir_get_bfd(asm_program_t p);
+
+
 /*
 bap_block_t
 byte_insn_to_ir_c(address_t addr, [size_is(len)] char *bb_bytes, int len);
 */
 
-/*
 // returns a special asm_program which contains only the given instruction
 // takes a char array for historical reasons
 asm_program_t
 byte_insn_to_asmp(enum bfd_architecture arch, address_t addr,
 		  [size_is(len)] char *bb_bytes, int len);
-*/

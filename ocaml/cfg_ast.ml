@@ -19,7 +19,7 @@ open D
 let v2s v = bbid_to_string(C.G.V.label v)
 
 (** Build a CFG from a program *)
-let of_prog p =
+let of_prog ?(special_error = true) p =
   let create c l stmts =
     let v = C.G.V.create l in
     let c = C.add_vertex c v in
@@ -57,18 +57,25 @@ let of_prog p =
      addpred: Some v when v should fall through to the next bb
   *)
   let f (c, cur,onlylabs, addpred) s =
+    let g () =
+      let (c,v) = add_new c (s::cur) addpred in
+      let for_later ?lab t = Hashtbl.add postponed_edges v (lab,t) in
+      let c = match s with
+	| Jmp(t, _) -> for_later t; c
+	| CJmp(_,t,f,_) -> for_later ~lab:true t; for_later ~lab:false f; c
+	| Special _ -> C.add_edge c v error
+	| Halt _ -> C.add_edge c v exit
+	| _ -> failwith "impossible"
+      in
+      (c, [], true, None)
+    in
     match s with
-    | Jmp _ | CJmp _ | Special _ | Halt _ ->
-	let (c,v) = add_new c (s::cur) addpred in
-	let for_later ?lab t = Hashtbl.add postponed_edges v (lab,t) in
-	let c = match s with
-	  | Jmp(t, _) -> for_later t; c
-	  | CJmp(_,t,f,_) -> for_later ~lab:true t; for_later ~lab:false f; c
-	  | Special _ -> C.add_edge c v error
-	  | Halt _ -> C.add_edge c v exit
-	  | _ -> failwith "impossible"
-	in
-	(c, [], true, None)
+    | Jmp _ | CJmp _ | Halt _ ->
+	g ()
+    | Special _ when special_error ->
+	g ()
+    | Special _ (* specials are not error *) ->
+	(c, s::cur, onlylabs, addpred)
     | Label(l,_) when onlylabs ->
 	add_indirect l;
 	(c, s::cur, true, addpred)
@@ -94,7 +101,11 @@ let of_prog p =
     let dst = lab_of_exp t in
     let tgt = match dst with
       | None -> indirect
-      | Some l -> try (C.find_label c l) with Not_found -> error
+      | Some l ->
+	  try (C.find_label c l)
+	  with Not_found ->
+	    wprintf "Jumping to unknown label: %s" (Pp.label_to_string l);
+	    error
       (* FIXME: should jumping to an unknown address be an error or indirect? *)
     in
     C.add_edge_e c (C.G.E.create v lab tgt)
@@ -102,13 +113,6 @@ let of_prog p =
   let c = Hashtbl.fold make_edge postponed_edges c in
   (* FIXME: Colescing *)
   c
-
-let newlab =
-  let c = ref 0 in
-  (fun () ->
-     let i = !c in
-     c := i + 1;
-     Name("newlabel_"^string_of_int i))
 
 (** Convert a CFG back to an AST program.
     This is needed for printing in a way that can be parsed again.

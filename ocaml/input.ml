@@ -1,5 +1,4 @@
-
-
+let init_ro = ref false
 let inputs = ref []
 and streaminputs = ref None
 and pintrace = ref false
@@ -34,6 +33,7 @@ let speclist =
   in
   let setint64 r s =  r := toint64 s in
   [
+    ("-init-ro", Arg.Set (init_ro), "Access rodata.");
     ("-bin",
      Arg.String(fun s-> addinput (`Bin s)),
      "<file> Convert a binary to the IL");
@@ -68,10 +68,10 @@ let get_program () =
 	Parser.program_from_file f
     | `Bin f ->
 	let p = Asmir.open_program f in
-	Asmir.asmprogram_to_bap p
+	Asmir.asmprogram_to_bap ~init_ro:!init_ro p
     | `Binrange (f, s, e) ->
 	let p = Asmir.open_program f in
-	Asmir.asmprogram_to_bap_range p s e
+	Asmir.asmprogram_to_bap_range ~init_ro:!init_ro p s e
     | `Trace f ->
     Asmir.bap_from_trace_file ~pin:!pintrace f
   in

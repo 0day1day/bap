@@ -1,5 +1,8 @@
-export BAP_OCAMLDIR = ../ocaml/
+-include ../../utils-proj/Makefile
+
+export BAP_OCAMLDIR=../ocaml
 export OCAMLMAKEFILE=$(BAP_OCAMLDIR)/OCamlMakefile
+
 
 # ocamlfind packages required
 export PACKS = str ocamlgraph extlib unix sqlite3
@@ -7,11 +10,11 @@ export LIBS = ../ocaml/bap
 export INCDIRS = $(BAP_OCAMLDIR)
 
 # Include sources from ../ocaml in the automatically generated dependencies.
-export SOURCE_DIRS_IN = $(BAP_OCAMLDIR)
+export SOURCE_DIRS_IN = $(BAP_OCAMLDIR) $(BAP_PROJ_OCAMLDIR)
 
 # default subprojects to build
 ifndef SUBPROJS
-	export SUBPROJS = toil iltrans streamtrans topredicate formula snort_parse
+	export SUBPROJS = $(PROJUTILS) toil iltrans streamtrans topredicate formula snort_parse get_functions compare split
 endif
 
 define PROJ_toil
@@ -49,6 +52,20 @@ define PROJ_formula
 endef
 export PROJ_formula
 
+define PROJ_get_functions
+	RESULT=get_functions
+	SOURCES = get_functions.ml
+	DOC_FILES=$(SOURCES)
+endef
+export PROJ_get_functions
+
+define PROJ_compare
+	RESULT=compareprogs
+	SOURCES = compareprogs.ml
+	DOC_FILES=$(SOURCES)
+endef
+export PROJ_compare
+
 define PROJ_snort_parse
 	RESULT=snort_parse
 	SOURCES = snort_parse.ml
@@ -56,6 +73,12 @@ define PROJ_snort_parse
 endef
 export PROJ_snort_parse
 
+define PROJ_split
+	RESULT=split_disjunction
+	SOURCES = split_disjunction.ml
+	DOC_FILES=$(SOURCES)
+endef
+export PROJ_split
 
 # suffix for bytecode (which when we make all is debug code)
 export BCSUFFIX = .dbg

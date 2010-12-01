@@ -6,9 +6,13 @@
     @author Ivan Jager
  *)
 
+module D = Debug.Make(struct let name = "Arithmetic" and default = `Debug end)
+open D
 open Type
 
-let bits_of_width = Typecheck.bits_of_width
+let bits_of_width = function
+  | Reg n -> n
+  | _ -> failwith "Expected register type"
 
 (* drop high bits *)
 let to64 (i,t) =
@@ -30,7 +34,7 @@ let toshift shiftedt v =
     if i <= Int64.of_int max && i >= 0L
     then Int64.to_int i
     else
-      (prerr_endline("Warning: shifting "^string_of_int max^"-bit value by "
+      (pwarn("Warning: shifting "^string_of_int max^"-bit value by "
 		    ^Int64.to_string i);
        max)
 
@@ -40,8 +44,8 @@ let to_val t i =
     (Int64.logand mask i, t)
 
 let exp_bool =
-  let t = (1L, Ast.reg_1)
-  and f = (0L, Ast.reg_1) in
+  let t = (1L, Reg(1))
+  and f = (0L, Reg(1)) in
   (fun b -> if b then t else f)
 
 (** [binop operand lhs lhst rhs rhst] *)
@@ -95,3 +99,7 @@ let cast ct ((_,t) as v) t2 =
 	    ((Int64.lognot(Int64.shift_left (-1L) bits))) )
   )
 
+let is_zero ((i,t) as v) =
+  let zero = 0L in
+  let i64 = to64 v in
+  zero = i64

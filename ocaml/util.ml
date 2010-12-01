@@ -17,9 +17,9 @@ let curry f = fun x y -> f(x,y)
 let uncurry f = fun (x,y) -> f x y
 
 (** [foldn f i n] is f (... (f (f i n) (n-1)) ...) 0 *)
-let rec foldn f i = function
-    0 -> f i 0
-  | n when n>0 -> foldn f (f i n) (n-1)
+let rec foldn ?(t=0) f i n =  match n-t with
+  | 0 -> f i 0
+  | _ when n>t -> foldn f (f i n) (n-1)
   | -1 -> i
   | _ -> raise (Invalid_argument "negative index number in foldn")
 
@@ -51,7 +51,7 @@ let list_does_intersect a b =
     one second. *)
 let shortest_first f a b =
   let (la, lb) = (List.length a, List.length b) in
-    if lb < la then f lb la else f la lb
+  if lb < la then f lb la else f la lb
     
 
 (** @return a - b, assuming a and b are sets *)
@@ -83,10 +83,10 @@ let union_find map items =
 	(fun (s,is) (s2,is2) -> (list_union s2 s, List.rev_append is2 is))
 	(set,[item]) joined
     in
-      joined::indep
+    joined::indep
   in
   let res = List.fold_left add_one [] items in
-    List.map snd res
+  List.map snd res
 
 
 
@@ -100,24 +100,26 @@ let list_foldl f l a = List.fold_left (fun i a -> f a i) a l
 (** Pop the first element off a list ref. *)
 let list_pop l =
   match !l with
-    | x::xs -> l := xs; x
-    | [] -> failwith "hd"
+  | x::xs -> l := xs; x
+  | [] -> failwith "hd"
+
+(** Push an element onto the front of a list ref. *)
+let list_push l v =
+  l := v :: !l
 
 (** @return the last element of a list *)
 let rec list_last = function
-    [x] -> x
+  | [x] -> x
   | _::x -> list_last x
   | [] -> raise (Invalid_argument("list_last expects non-empty list"))
 
 (** @return (lst,last) where [lst] is the input lst minus 
     the last element [last]. @raise Invalid_argument if [lst] is empty *)
 let list_partition_last lst = 
-  let lst = List.rev lst in 
-    match lst with
-      [x] -> ([],x)
-      | x::ys -> (List.rev ys,x)
-      | _ -> 
-	 raise (Invalid_argument "list_partition_last expects non-empty list")
+  match List.rev lst with
+  | [x] -> ([],x)
+  | x::ys -> (List.rev ys,x)
+  | _ -> raise (Invalid_argument "list_partition_last expects non-empty list")
 
 (** Like [list_last] but returns an option rather than failing *)
 let list_last_option = function [] -> None | x -> Some(list_last x)
@@ -125,15 +127,14 @@ let list_last_option = function [] -> None | x -> Some(list_last x)
 let list_filter_some f =
   let rec helper r l =
     match l with
-	x::xs -> helper (match f x with Some s -> s::r | None -> r) xs
-      | [] -> List.rev r
+    | x::xs -> helper (match f x with Some s -> s::r | None -> r) xs
+    | [] -> List.rev r
   in
-    helper []
+  helper []
 
-let rec list_find_some f =
-  function
-      x::xs -> (match f x with Some s -> s | None -> list_find_some f xs)
-    | [] -> raise Not_found
+let rec list_find_some f = function
+  | x::xs -> (match f x with Some s -> s | None -> list_find_some f xs)
+  | [] -> raise Not_found
 
 
 (** [list_count f l] counts the number of items in [l] for which the
@@ -145,43 +146,50 @@ let list_count f =
     duplicates. (uses [=] and [Hashtbl.hash])  *)
 let list_unique l =
   let h = Hashtbl.create (List.length l) in
-  let () = List.iter (fun x -> Hashtbl.replace h x ()) l in
-    Hashtbl.fold (fun k () ul -> k::ul) h [] 
+  List.iter (fun x -> Hashtbl.replace h x ()) l;
+  Hashtbl.fold (fun k () ul -> k::ul) h [] 
 
 let rec split_common_prefix la lb = 
   match la,lb with
-      [], _ -> ([], la, lb)
-    | _, [] -> ([], la, lb)
-    | h1::t1, h2::t2 -> if h1 = h2 then
-	match split_common_prefix t1 t2 with
-	    (a,b,c) -> (h1::a, b, c)
+  | [], _ -> ([], la, lb)
+  | _, [] -> ([], la, lb)
+  | h1::t1, h2::t2 ->
+      if h1 = h2 then
+	let (a,b,c) = split_common_prefix t1 t2 in
+	(h1::a, b, c)
       else ([], la, lb)
 
 let split_common_suffix la lb =
   let (s,rla,rlb) = split_common_prefix (List.rev la) (List.rev lb) in
-    (List.rev s, List.rev rla, List.rev rlb)
+  (List.rev s, List.rev rla, List.rev rlb)
 
 (** a composition operator. [(f <@ g) x] = [f(g x)] *)
 let (<@) f g = (fun x -> f(g x))
 
+(** Given Some(a), returns a. Given None, raises Not_found *)
+let option_unwrap o =
+  match o with
+  | Some(x) -> x
+  | None -> raise Not_found
+
 (** Maps an ['a option] to a ['b option], given a function [f : 'a -> 'b] *)
-let option_map f opt = match opt with
-    None -> None
+let option_map f = function
+  | None -> None
   | Some x -> Some(f x)
 
 (** Map Some items and drop others from the list.
 *)
 let list_map_some f =
-  let rec help res = 
-    function [] -> List.rev res
-      | x::xs -> help (match f x with Some i -> (i::res) | None -> res) xs
+  let rec help res = function
+    | [] -> List.rev res
+    | x::xs -> help (match f x with Some i -> (i::res) | None -> res) xs
   in
     help []
   
 
 let list_join f =
   function
-      x::(_::_ as xs) -> List.fold_left f x xs
+    | x::(_::_ as xs) -> List.fold_left f x xs
     | [x] -> x
     | [] -> raise(Invalid_argument "list_join on empty list")
 
@@ -249,12 +257,12 @@ let trim_newline s =
   
 let apply_option f k = 
   match f with
-      None -> k
-    | Some(f') -> f' k
+  | None -> k
+  | Some(f') -> f' k
 
 let rec print_separated_list ps sep lst = 
   let rec doit acc = function
-      [] -> acc^""
+    | [] -> acc^""
     | x::[] -> acc^(ps x)
     | x::y::zs -> let acc = (ps x)^sep in
 	(doit acc (y::zs))
@@ -326,7 +334,6 @@ let take n l = take_aux [] (l, n)
 
 let fast_append l1 l2 = List.rev_append (List.rev l1) l2
 
-
 module StatusPrinter =
 struct
   let total = ref 0
@@ -366,3 +373,102 @@ let has_some o =
   match o with
   | Some _ -> true
   | None -> false
+
+(* list_firstindex l pred returns the index of the first list element
+   that pred returns true on *)
+let rec list_firstindex ?s:(s=0) l pred =
+  match l with
+  | [] -> raise Not_found
+  | x::_ when pred x -> s
+  | _::tl -> list_firstindex tl pred ~s:(s+1)
+
+(* Insert elements in li to l before position n *)
+let list_insert l li n =
+  let rec list_split hl tl n =
+    if n = 0 then 
+      (List.rev hl,tl) 
+    else
+      let hl' = (List.hd tl) :: hl in
+      let tl' = List.tl tl in
+      let n' = n-1 in
+      list_split hl' tl' n'
+  in
+  let hd,tl = list_split [] l n in
+  hd @ li @ tl
+
+(* Remove r elements in l starting at position s *)
+let list_remove l s r =
+  let aftere = s + r in
+  let _,revl = List.fold_left
+    (fun (i,l) e ->
+       if i >= s && i < aftere then
+	 (i+1,l)
+       else
+	 (i+1, e::l)
+    ) (0,[]) l
+  in
+  List.rev revl
+
+(** Compare two lists using f.  Compares pairs from both lists
+    starting from the first elements using f, and returns the first
+    non-zero result. If there is no non-zero result, zero is returned. *)
+let list_compare f l1 l2 =
+  let v = List.fold_left2
+    (fun s e1 e2 ->
+       match s with
+       | Some(x) -> Some(x)
+       | None -> 
+	   let c = f e1 e2 in
+	   (* If c is not zero, keep it *)
+	   if c <> 0 then Some(c) else None
+    ) None l1 l2 in
+  match v with
+  | None -> 0 (* Equal *)
+  | Some(x) -> x (* Not equal *)
+
+(** Given two lists, calls f with every possible combination *)
+let list_cart_prod2 f l1 l2 =
+  List.iter
+    (fun x ->
+       List.iter (f x) l2
+    ) l1
+
+(** Given three lists, calls f with every possible combination *)
+let list_cart_prod3 f l1 l2 l3 =
+  List.iter (fun x -> list_cart_prod2 (f x) l2 l3) l1
+
+(** Given four lists, calls f with every possible combination *)
+let list_cart_prod4 f l1 l2 l3 l4 =
+  List.iter (fun x -> list_cart_prod3 (f x) l2 l3 l4) l1
+
+
+(** Calls f on each element of l, and returns the first Some(x)
+    returned.  If no Some(x) are returned, None is returned. *)
+let list_existssome f l =
+  (* Maybe list_find_some should call this instead *)
+  try Some(list_find_some f l) with Not_found -> None
+
+(** Calls f on each element of l and if there is Some() value returned
+    for each list member, returns Some(unwrapped list). If at least
+    one returns None, None is returned instead. *)
+let list_for_allsome f l =
+  let rec m r = function
+    | [] -> Some(List.rev r)
+    | x::xs -> match f x with
+      | None -> None
+      | Some x -> m (x::r) xs
+  in
+  m [] l
+
+(** Deletes the first occurrence of e (if it exists) in the list
+    and returns the updated list *)
+let list_delete l e = 
+  let rec delete_aux acc = function
+    | [] -> List.rev acc
+    | x::xs when e == x -> (List.rev acc)@xs
+    | x::xs -> delete_aux (x::acc) xs
+  in
+    delete_aux [] l
+
+(** Some -> true, None -> false *)
+let has_some x = x <> None

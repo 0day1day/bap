@@ -115,9 +115,9 @@ let rec exp2ssaexp (ctx:Ctx.t) ~(revstmts:stmt list) ?(attrs=[]) e : stmt list *
       let v' = Var.renewvar v in
       let (revstmts,e1) = exp2ssaexp ctx revstmts e1 in
       let revstmts = Move(v',e1, attrs)::revstmts in
-      let () = Ctx.letextend ctx v v' in
+      Ctx.letextend ctx v v';
       let (revstmts,e2) = exp2ssaexp ctx revstmts e2 in
-      let () = Ctx.letunextend ctx v in
+      Ctx.letunextend ctx v;
       (revstmts, e2)
 
 
@@ -221,11 +221,11 @@ let rec trans_cfg cfg =
   let cfg = Prune_unreachable.prune_unreachable_ast (CA.copy cfg) in
   pdebug "Creating new cfg";
   let ssa = Cfg.map_ast2ssa (fun _ -> []) cfg in
-  let () = pdebug "Computing defsites" in
+  pdebug "Computing defsites";
   let (defsites, globals) = defsites cfg in
     (* keep track of where we need to insert phis *)
   let phis : (bbid * var, var * var list) Hashtbl.t = Hashtbl.create 57 in
-  let () = pdebug "Computing dominators" in
+  pdebug "Computing dominators";
   let {Dom.dom_tree=dom_tree; Dom.dom_frontier=df} =
     Dom.compute_all ssa (C.G.V.create BB_Entry)
   in
@@ -237,7 +237,7 @@ let rec trans_cfg cfg =
     *)
     (* let () = dprintf "Adding phis for variable '%s'" (var_to_string v) in *)
     let rec do_work = function
-	[] -> ()
+      | [] -> ()
       | n::worklist ->
 	  let worklist =
 	    List.fold_left
@@ -255,17 +255,17 @@ let rec trans_cfg cfg =
     in
       do_work (defsites v)
   in
-  let () = dprintf "Adding phis" in
-  let () = List.iter add_phis_for_var globals in
-  let () = dprintf "Added %d phis" (Hashtbl.length phis) in
+  dprintf "Adding phis";
+  List.iter add_phis_for_var globals;
+  dprintf "Added %d phis" (Hashtbl.length phis);
     (* we now have an entry in phis for every phi expression
        we need to add, although we still don't have the RHS and LHS. *)
-  let () = dprintf "Grouping phis by block" in
+  dprintf "Grouping phis by block";
   let blockphis =
     (* returns the phis for a given block *)
     let h = Hashtbl.create 57 in
-    let () = Hashtbl.iter (fun (n,v) _ -> Hashtbl.add h n v) phis in
-      Hashtbl.find_all h
+    Hashtbl.iter (fun (n,v) _ -> Hashtbl.add h n v) phis;
+    Hashtbl.find_all h
   in
   let exitctx = VH.create 57 in (* context at end of exit node *)
   let (vh_ctx,to_oldvar,stacks) as ctx = Ctx.create() in
@@ -291,11 +291,11 @@ let rec trans_cfg cfg =
     let ssa = 
       (* rename variables *)
       let stmts = CA.get_stmts cfg cfgb in
-      let () = dprintf "translating stmts" in
+      dprintf "translating stmts";
       let stmts' = stmts2ssa ctx stmts in
-	C.set_stmts ssa b stmts'
+      C.set_stmts ssa b stmts'
     in
-    let () = dprintf "going on to children" in
+    dprintf "going on to children";
       (* rename children *)
     let ssa = List.fold_left rename_block ssa (dom_tree b) in
     let () =
@@ -317,16 +317,15 @@ let rec trans_cfg cfg =
 	)
 	(C.G.succ ssa b)
     in
-    let () = (* save context for exit node *)
-      if bbid = BB_Exit then
-	VH.iter (fun k v -> VH.replace exitctx k v) vh_ctx
-    in
+    (* save context for exit node *)
+    (if bbid = BB_Exit then
+       VH.iter (fun k v -> VH.replace exitctx k v) vh_ctx);
     (* restore context *)
     Ctx.pop ctx;
     ssa
   in
   let ssa = rename_block ssa (C.G.V.create BB_Entry) in
-  let () = dprintf "Adding %d phis to the CFG" (Hashtbl.length phis) in
+  dprintf "Adding %d phis to the CFG" (Hashtbl.length phis);
   let rec split_labels revlabels stmts =
     match stmts with
       | ((Label _ | Comment _) as s)::ss ->
@@ -354,13 +353,13 @@ let rec trans_cfg cfg =
       )
       ssa ssa
   in
-  let () = dprintf "Done translating to SSA" in
-    {cfg=ssa; to_astvar=VH.find to_oldvar; to_ssavar=VH.find exitctx}
+  dprintf "Done translating to SSA";
+  {cfg=ssa; to_astvar=VH.find to_oldvar; to_ssavar=VH.find exitctx}
 
 (** Translates a CFG into SSA form. *)
 let of_astcfg cfg =
   let {cfg=ssa} = trans_cfg cfg in
-    ssa
+  ssa
 
 (** Translates an AST program into an SSA CFG. *)
 let of_ast p = 
@@ -374,8 +373,8 @@ let uninitialized cfg =
   and add sr v = sr := VS.add v !sr in
   let process stmts =
     let rec f_s = function
-	| Move(v, e, _) -> add assnd v; f_e e
-	| _ -> ()
+      | Move(v, e, _) -> add assnd v; f_e e
+      | _ -> ()
     and f_e = function
       | Load(v1,v2,v3,_) -> f_v v1; f_v v2; f_v v3
       | Store(v1,v2,v3,v4,_) -> f_v v1; f_v v2; f_v v3; f_v v4
@@ -394,12 +393,70 @@ let uninitialized cfg =
   C.G.iter_vertex (fun b -> process (C.get_stmts cfg b)) cfg;
   VS.diff !refd !assnd
 
+
+(* Hack to make a "unique" label *)
+let rec mklabel =
+  let r = ref 0
+  and n = "autolabel" in
+  let has_label c l =
+    try ignore(C.find_label c l); true
+     with Not_found -> false
+  in
+  (fun c ->
+     let l = n ^ string_of_int !r in
+     incr r;
+     if has_label c (Name l) then mklabel c else l
+  )
+
+(** Perform edge splitting on the CFG.
+    After edge splitting, it is guaranteed that every edge has either a unique
+    predecessor or a unique successor.
+*)
+let split_edges c =
+  let module E = C.G.E in
+  let split_edge c e =
+    let s = E.src e and d = E.dst e in
+    (* s has multiple successors and d has multiple predecesors *)
+    let revs = List.rev (C.get_stmts c s) in
+    let cjmp = List.hd revs in
+    let (cond,t1,t2,attrs) = match cjmp with
+      | CJmp(c, t1, t2, a) -> (c,t1,t2,a)
+      | _ -> failwith("Missing cjmp at end of node with multiple successors: "^Pp.ssa_stmt_to_string cjmp)
+    in
+    let newl = mklabel c in
+    let el = E.label e in
+    let (t1,t2,tf) = match el with
+      | Some true -> (Lab newl, t2, t1)
+      | Some false -> (t1, Lab newl, t2)
+      | None -> failwith "Unlabeled edges from cjmp"
+    in
+    let revs = CJmp(cond, t1, t2, attrs) :: List.tl revs in
+    let (c,v) = C.create_vertex c [Label(Name newl, [])] in
+    let e' = C.G.E.create s el v in
+    let c = C.add_edge_e c e' in
+    let c = C.add_edge c v d in
+    let c = C.remove_edge_e c e in
+    C.set_stmts c s (List.rev revs)
+    
+  in
+  let edges_to_split =
+    C.G.fold_edges_e
+      (fun e es ->
+	 if C.G.out_degree c (E.src e) > 1 && C.G.in_degree c (E.dst e) > 1
+	 then e::es
+	 else es
+      )
+      c []
+  in
+  List.fold_left split_edge c edges_to_split
+
+
 let list_count p =
   List.fold_left (fun a e -> if p e then a+1 else a) 0
 
 
 (* FIXME: It might be good to have a different type for a CFG with phis removed *)
-let rm_phis ?(attrs=[]) cfg =
+let rm_phis ?(dsa=false) ?(attrs=[]) cfg =
   let size = C.G.fold_vertex
     (fun b a ->
        a + list_count (function Move _->true | _->false) (C.get_stmts cfg b) )
@@ -421,6 +478,8 @@ let rm_phis ?(attrs=[]) cfg =
   let entry = C.G.V.create BB_Entry in
     (* fake assignments for globals at the entry node *)
   Var.VarSet.iter (fun v -> VH.add assn v entry) (uninitialized cfg);
+  (* split edges if needed *)
+  let cfg = if dsa then split_edges cfg else cfg in
   let cfg, phis =
     (* Remove all the phis from all the BBs *)
     (* FIXME: make this readable *)
@@ -451,13 +510,35 @@ let rm_phis ?(attrs=[]) cfg =
     let move = Move(l,Val(Var p), attrs) in
     C.set_stmts cfg b
       (match C.get_stmts cfg b with
-	 (Jmp _ as j)::stmts
+       | (Jmp _ as j)::stmts
        | (CJmp _ as j)::stmts ->
 	   j::move::stmts
        | stmts ->
 	   move::stmts )
   in
   let cfg =
+    if dsa then (
+      let idom = Dom.compute_idom cfg entry in
+      (* add an assignment for l to the end of v *)
+      let dsa_push (l,vars) cfg bb =
+	let rec find_var bb = (* walk up idom tree starting at bb *)
+	  try List.find (fun v -> bb = (VH.find assn v)) vars
+	  with Not_found -> find_var (idom bb)
+	in
+	let v = find_var bb in
+	append_move bb l v cfg
+      in
+      (* assign the variable the phi assigns at the end of each of it's
+	 predecessors *)
+      List.fold_left
+	(fun cfg ((l, vars) as p) -> 
+	   dprintf "rm_phis: adding assignments for %s" (Pp.var_to_string l);
+	   List.fold_left (dsa_push p) cfg (C.G.pred cfg (VH.find assn l))
+	)
+	cfg
+	phis
+    )
+    else (
     (* assingn the variables the phi assigns at the end of each block a variable
        the phi references is assigned. *)
     List.fold_left
@@ -467,12 +548,12 @@ let rm_phis ?(attrs=[]) cfg =
       )
       cfg
       phis
+    )
   in
   (* put statements back in forward order *)
   C.G.fold_vertex
     (fun b cfg -> C.set_stmts cfg b (List.rev(C.get_stmts cfg b)))
     cfg cfg
-
 
 type tm = Ssa.exp VH.t
 
@@ -494,7 +575,9 @@ let create_tm c =
 	  `DoChildren
       | Move(v,e,_) ->
 	  (* FIXME: should we check whether we introduced this var? *)
-	  if try VH.find refd v with Not_found -> true
+          (* FIX: we introduced it if it is named "temp" *)
+	  if (try VH.find refd v with Not_found -> true) 
+              && (Var.name v == ssa_temp_name)
 	  then VH.add tm v e;
 	  `DoChildren
       | _ ->
@@ -550,9 +633,9 @@ let cfg2ast tm cfg =
   Cfg.map_ssa2ast (stmts2ast tm) cfg
 
 (** Convert an SSA CFG to an AST CFG. *)
-let to_astcfg ?(remove_temps=true) c =
+let to_astcfg ?(remove_temps=true) ?(dsa=false) c =
   let tm = if remove_temps then create_tm c else VH.create 1 in
-  cfg2ast tm (rm_phis c)
+  cfg2ast tm (rm_phis ~dsa:dsa c)
 
 (** Convert an SSA CFG to an AST program. *)
 let to_ast ?(remove_temps=true) c =

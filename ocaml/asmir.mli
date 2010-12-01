@@ -11,8 +11,12 @@
    some variables I added. --aij
 *)
 
+open Libbfd
+open Libasmir
 
-type asmprogram = Libasmir.asm_program_t
+exception Disassembly_error
+
+type asmprogram
 
 type arch
 val arch_i386 : arch
@@ -57,13 +61,27 @@ val x86_mem_external : Ast.exp
 val x86_regs : Var.t list
 
 val open_program : string -> asmprogram
-val asmprogram_to_bap : ?init_mem:bool -> asmprogram -> Ast.program
+val asmprogram_to_bap : ?init_ro:bool -> asmprogram -> Ast.program
 val asm_addr_to_bap :
-  varctx -> asmprogram -> Libasmir.address_t -> Ast.program
+  (*varctx ->*) asmprogram -> address_t -> Ast.program * address_t
 
-val asmprogram_to_bap_range : ?init_mem:bool ->
-  asmprogram -> Libasmir.address_t -> Libasmir.address_t  -> Ast.program
+val asmprogram_to_bap_range : ?init_ro:bool ->
+  asmprogram -> address_t -> address_t  -> Ast.program
 
 val bap_from_trace_file : ?atts:bool -> ?pin:bool -> string -> Ast.program
 
 val bap_stream_from_trace_file : ?atts:bool -> ?pin:bool -> string -> (Ast.stmt list) Stream.t
+
+val get_symbols : ?all:bool -> asmprogram -> asymbol array
+
+val get_function_ranges : asmprogram -> (string * address_t * address_t) list
+
+val get_all_asections : asmprogram -> section_ptr array
+
+val get_section_startaddr : asmprogram -> string -> address_t
+val get_section_endaddr : asmprogram -> string -> address_t
+
+val get_asm_instr_string_range : asmprogram -> address_t -> address_t -> string
+
+val byte_insn_to_bap : 
+  bfd_architecture -> address_t -> char array -> Ast.program * int64

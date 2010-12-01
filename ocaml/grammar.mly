@@ -75,7 +75,8 @@ let mk_attr lab string =
   | "asm" -> Asm string
   | "address" -> Address(Int64.of_string string)
   | "set" when string = "liveout" -> Liveout
-  | "str" -> StrAttr string
+  | "set" when string = "initro" -> InitRO
+  | "str" | "attr" -> StrAttr string
   | "tid" -> ThreadId(int_of_string string)
   | _ -> err ("Unknown attribute @"^lab)
 

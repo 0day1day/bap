@@ -97,11 +97,6 @@ let quick_exp_eq e1 e2 =
     if b1 & b2 & b3 & b4 & b5 & b6 & b7 & b8 then
       true else false
 
-(* (\* this really should be a more shallow comparison, otherwise it will *)
-(*    be slow when there is a deeply nested change *\) *)
-(* (\* FIXMEEEE *\) *)
-(* let wrap f v = f v (\*in if v = v' then v else v'*\) *)
-
 (* this really should be a more shallow comparison, otherwise it will
    be slow when there is a deeply nested change *)
 let wrap f v = let v' = f v in if v = v' then v else v'
@@ -191,4 +186,10 @@ and stmt_accept visitor =
 
 and prog_accept visitor prog =
   List.map (fun instmt -> stmt_accept visitor instmt) prog
-  
+
+and cfg_accept vis p =
+  Cfg.AST.G.fold_vertex
+    (fun abb g ->
+       let oldstmts = Cfg.AST.get_stmts g abb in
+       let newstmts = prog_accept vis oldstmts in
+       Cfg.AST.set_stmts g abb newstmts) p p

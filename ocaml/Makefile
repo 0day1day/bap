@@ -3,6 +3,8 @@
 export OCAMLMAKEFILE=OCamlMakefile
 export LIBASMIR=../libasmir
 include $(LIBASMIR)/makefile.inc
+-include ../../ocaml-proj/Makefile
+
 #export INCDIRS += ../stp ../stp/ocaml
 #export EXTLIBDIRS += ../stp ../stp/ocaml
 #export LIBS += stpvc
@@ -16,43 +18,58 @@ export SOURCES = \
 	dominator.ml \
 	graphDataflow.mli graphDataflow.ml \
 	type.ml type.mli \
+	arithmetic.ml \
 	var.mli var.ml \
 	ast.ml \
 	ssa.ml \
 	pp.ml \
 	typecheck.ml \
 	cfg.mli cfg.ml \
+	reachable.mli \
+	reachable.ml \
 	prune_unreachable.mli prune_unreachable.ml \
 	cfg_pp.ml \
 	cfg_ast.mli cfg_ast.ml \
 	ssa_visitor.mli ssa_visitor.ml \
 	cfg_ssa.mli cfg_ssa.ml \
 	ast_visitor.mli ast_visitor.ml \
-	arithmetic.ml \
+	debug_snippets.ml \
 	sccvn.mli sccvn.ml \
 	deadcode.mli deadcode.ml \
 	ssa_simp.ml \
+	libbfd.idl \
 	libasmir.idl \
-	asmir.mli asmir.ml \
+	disasm_i386.ml \
+	disasm.ml \
 	grammar.mly lexer.mll \
 	stp_grammar.mly stp_lexer.mll \
 	parser.ml \
 	memory2array.ml \
-	input.mli input.ml \
 	gcl.mli gcl.ml \
 	wp.ml \
 	stp.ml \
+	stpexec.mli stpexec.ml \
+	asmirconsts.ml asmir.mli asmir.ml \
+	input.mli input.ml \
 	depgraphs.ml \
 	vsa.ml \
+	memory2scalar.ml \
 	eval.ml \
+	symbeval.ml symbeval_search.ml \
+	ast_slice.ml \
+	ssa_slice.ml \
+	comparelib.ml \
+	structural_analysis.ml \
+	unroll.ml \
+	hacks.ml \
 	coalesce.ml \
-	symbeval.ml \
 	template.ml \
 	interpreter.ml \
 	traces.ml \
 	payload.ml \
 	search.ml \
 	snort_grammar.mly snort_lexer.mll\
+	$(PROJSOURCES) \
 
 RESULT = bap
 DOC_FILES := $(filter %.mli, $(SOURCES)) $(filter %.ml, $(SOURCES))
@@ -76,6 +93,7 @@ OCAMLFLAGS = -warn-error Aelz # -for-pack Bap #-w A
 OCAMLDOCFLAGS = -m avlsoper
 
 all: dcl ncl #top
+	@echo $(PROJSOURCES)
 
 bap_lib_doc: all htdoc
 
@@ -110,3 +128,4 @@ include $(OCAMLMAKEFILE)
 
 bap.dot: $(DOC_FILES)
 	 ocamlfind ocamldoc -I /usr/lib/ocaml/3.10.2/ -package str,ocamlgraph,extlib,unix,sqlite3 -dot -o bap.dot -m avlsoper $(DOC_FILES)
+

@@ -46,7 +46,7 @@ sig
 
   (** the initial value for analysis. This is what s0 should start
       out with. All other nodes start out with Top *)
-  val init : L.t
+  val init : G.t -> L.t
 
   (** the dataflow direction *)
   val dir : direction
@@ -81,7 +81,7 @@ struct
 	out
     in
     List.iter (fun n -> H.add htin n D.L.top) nodes;
-    H.replace htin D.s0 init;
+    H.replace htin D.s0 (init g);
     let rec do_work = function
       | [] -> ()
       | b::worklist ->  

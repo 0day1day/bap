@@ -79,6 +79,13 @@ let to_dsa p =
   let p,_ = Traces.to_dsa p in
   p 
 
+let output_structanal p =
+  let cfg = Prune_unreachable.prune_unreachable_ast p in
+  let _ = Structural_analysis.structural_analysis cfg in
+  (* FIXME: print a pretty graph or something. For now the debugging
+     output is useful enough... *)
+  p
+
 let sccvn p =
   fst(Sccvn.replacer p)
 let deadcode p =
@@ -87,10 +94,16 @@ let jumpelim p =
   Deadcode.cfg_jumpelim p
 let ast_coalesce = Coalesce.AST_Coalesce.coalesce
 let ssa_coalesce = Coalesce.SSA_Coalesce.coalesce
+let memory2scalardef p =
+  Memory2scalar.convert_g p Memory2scalar.Default
+let memory2scalariroptir p =
+  Memory2scalar.convert_g p Memory2scalar.IndirectROPTIR
 
 (* Chop code added *)
-let chop srcbb srcn trgbb trgn p = 
-  Depgraphs.CHOP_AST.chop p srcbb srcn trgbb trgn
+let ast_chop srcbb srcn trgbb trgn p = 
+  Ast_slice.CHOP_AST.chop p !srcbb !srcn !trgbb !trgn
+let ssa_chop srcbb srcn trgbb trgn p = 
+  Ssa_slice.CHOP_SSA.chop p !srcbb !srcn !trgbb !trgn
 
 (* Evaluation code added *)
 let eval_ast p = 
@@ -114,14 +127,6 @@ let speclist =
      "Evaluate an AST and print variable values on exit")
   ::("-pp-ast-pdg", Arg.String (fun f -> add(TransformAstCfg(output_ast_pdg f))),
      "Output the AST DDG (bbid's)")
-  ::("-pp-ast-chop", 
-      Arg.Tuple 
-        (let srcbb = ref 0 and srcn = ref 0 
-         and trgbb = ref 0 and trgn = ref 0 in
-         [Arg.Set_int srcbb ; Arg.Set_int srcn ;
-          Arg.Set_int trgbb ; Arg.Set_int trgn ; 
-               uadd(TransformAstCfg(chop !srcbb !srcn !trgbb !trgn)) ]),
-     "<src-bb> <src-num> <trg-bb> <trg-num> Calculate the chop of an AST")
   ::("-pp-ssa", Arg.String(fun f -> add(TransformSsa(output_ssa f))),
      "<file> Pretty print SSA graph to <file> (in Graphviz format)")
   ::("-pp-ssa-bbids", Arg.String(fun f -> add(TransformSsa(output_ssa_bbids f))),
@@ -130,12 +135,32 @@ let speclist =
      "Output the SSA CDG (bbid's)")
   ::("-pp-ssa-ddg", Arg.String (fun f -> add(TransformSsa(output_ssa_ddg f))),
      "Output the SSA DDG (bbid's)")
+  ::("-pp-novarnums", Arg.Unit (fun () -> Pp.output_varnums := false),
+     "Print variables without variable ID numbers")
+  ::("-struct", Arg.Unit (fun () -> add(TransformAstCfg(output_structanal))),
+     "Structural analysis.")
   ::("-to-cfg", uadd(ToCfg),
      "Convert to an AST CFG.")
   ::("-to-ast", uadd(ToAst),
      "Convert to the AST.")
   ::("-to-ssa", uadd(ToSsa),
      "Convert to SSA.")
+  ::("-ast-chop", 
+      Arg.Tuple 
+        (let srcbb = ref 0 and srcn = ref 0 
+         and trgbb = ref 0 and trgn = ref 0 in
+         [Arg.Set_int srcbb ; Arg.Set_int srcn ;
+          Arg.Set_int trgbb ; Arg.Set_int trgn ; 
+               uadd(TransformAstCfg(ast_chop srcbb srcn trgbb trgn)) ]),
+     "<src-bb> <src-num> <trg-bb> <trg-num> Calculate the chop of an AST")
+  ::("-ssa-chop", 
+      Arg.Tuple 
+        (let srcbb = ref 0 and srcn = ref 0 
+         and trgbb = ref 0 and trgn = ref 0 in
+         [Arg.Set_int srcbb ; Arg.Set_int srcn ;
+          Arg.Set_int trgbb ; Arg.Set_int trgn ; 
+               uadd(TransformSsa(ssa_chop srcbb srcn trgbb trgn)) ]),
+     "<src-bb> <src-num> <trg-bb> <trg-num> Calculate the chop of an AST")
   ::("-sccvn", uadd(TransformSsa sccvn),
      "Apply Strongly Connected Component based Value Numbering")
   ::("-deadcode", uadd(TransformSsa deadcode),
@@ -146,9 +171,13 @@ let speclist =
      "Perform coalescing on the SSA.")
   ::("-jumpelim", uadd(TransformSsa jumpelim),
      "Control flow optimization.")
+  ::("-memtoscalar", uadd(TransformSsa memory2scalardef),
+     "Convert memory accesses to scalars (default mode).")
+  ::("-memtoscalar-initro", uadd(TransformSsa memory2scalariroptir),
+     "Convert memory accesses to scalars (IndirectROPTIR mode).")
   ::("-ssa-simp", uadd(TransformSsa Ssa_simp.simp_cfg),
      "Perform all supported optimizations on SSA")
-  ::("-ssa-to-single-stmt", 
+  ::("-ssa-to-single-stmt",
      uadd(TransformSsa Depgraphs.DDG_SSA.stmtlist_to_single_stmt),
      "Create new graph where every node has at most 1 SSA statement"
     )
@@ -273,10 +302,16 @@ let speclist =
   ::("-exec",
      uadd(TransformAst Interpreter.execute),
      "Concretely execute the IL")
-  :: ("-normalize-mem",
-      uadd(TransformAst Memory2array.coerce_prog),
-      "Normalize memory accesses as array accesses"
-     )
+  :: ("-normalize-mem", uadd(TransformAst Memory2array.coerce_prog),
+      "Normalize memory accesses as array accesses")
+  :: ("-prune-cfg",
+      uadd(TransformAstCfg Prune_unreachable.prune_unreachable_ast),
+      "Prune unreachable nodes from an AST CFG")
+  :: ("-cfg-coalesce", uadd(TransformAstCfg Coalesce.AST_Coalesce.coalesce),
+      "Perform coalescing on an AST-CFG graph")
+  :: ("-unroll",
+      Arg.Int (fun i -> add (TransformAstCfg(Unroll.unroll_loops ~count:i))),
+      "<n> Unroll loops n times")
   :: Input.speclist
 
 let anon x = raise(Arg.Bad("Unexpected argument: '"^x^"'"))

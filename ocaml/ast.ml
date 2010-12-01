@@ -51,8 +51,9 @@ let exp_of_lab = function
     expression. *)
 let lab_of_exp = function
   | Lab s -> Some(Name s)
-  | Int(i, Reg bits) ->
-      Some(Addr(Int64.logand i (Int64.pred(Int64.shift_left 1L bits))))
+  | Int(i, t) ->
+      (* Some(Addr(Int64.logand i (Int64.pred(Int64.shift_left 1L bits)))) *)
+      Some(Addr(Arithmetic.to64 (i,t)))
   | _ -> None
     
 
@@ -67,9 +68,41 @@ let exp_false = Int(0L, reg_1)
 (** True constant. *)
 let exp_true = Int(1L, reg_1)
 
+let little_endian = exp_false
+let big_endian = exp_true
+
 (** More convenience functions for building common expressions. *)
 let exp_and e1 e2 = BinOp(AND, e1, e2)
 let exp_or e1 e2 = BinOp(OR, e1, e2)
+let exp_eq e1 e2 = BinOp(EQ, e1, e2)
 let exp_not e = UnOp(NOT, e)
 let exp_implies e1 e2 = exp_or (exp_not e1) e2
 
+let (exp_shl, exp_shr) =
+  let s dir e1 = function
+    | Int(0L,_) -> e1
+    | e2 -> BinOp(dir, e1, e2)
+  in
+  (s LSHIFT, s RSHIFT)
+
+
+let newlab =
+  let c = ref 0 in
+  (fun ?(pref="newlabel_") () ->
+     let i = !c in
+     c := i + 1;
+     Name(pref^string_of_int i))
+
+(** Create a single target cjmp. Uses a hopefully-unique label for the other. *)
+let cjmp c t =
+  let l = newlab ~pref:"nocjmp" () in
+  CJmp(c, t, exp_of_lab l, [])
+  :: Label(l, [])
+  :: []
+
+(** Create a single target cjmp with inverted condition.  Uses a hopefully-unique label for the other. *)
+let ncjmp c t =
+  let l = newlab ~pref:"nocjmp" () in
+  CJmp(c, exp_of_lab l, t, [])
+  :: Label(l, [])
+  :: []

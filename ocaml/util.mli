@@ -3,7 +3,7 @@ val curry : ('a * 'b -> 'c) -> 'a -> 'b -> 'c
 val uncurry : ('a -> 'b -> 'c) -> ('a * 'b -> 'c)
 val ( <@ ) : ('a -> 'b) -> ('c -> 'a) -> 'c -> 'b
 
-val foldn : ('a -> int -> 'a) -> 'a -> int -> 'a
+val foldn : ?t:int -> ('a -> int -> 'a) -> 'a -> int -> 'a
 val mapn : (int -> 'a) -> int -> 'a list
 
 (* Use decr and incr instead
@@ -23,6 +23,7 @@ val union_find : ('a -> 'b list) -> 'a list -> 'a list list
 
 val list_foldl : ('a -> 'b -> 'b) -> 'a list -> 'b -> 'b
 val list_pop : 'a list ref -> 'a
+val list_push : 'a list ref -> 'a -> unit
 val list_last : 'a list -> 'a
 val list_partition_last : 'a list -> 'a list * 'a
 val list_last_option : 'a list -> 'a option
@@ -31,6 +32,16 @@ val list_find_some : ('a -> 'b option) -> 'a list -> 'b
 val list_unique : 'a list -> 'a list
 val list_map_some : ('a -> 'b option) -> 'a list -> 'b list
 val list_join : ('a -> 'a -> 'a) -> 'a list -> 'a
+val list_firstindex : ?s:int -> 'a list -> ('a -> bool) -> int
+val list_insert : 'a list -> 'a list -> int -> 'a list
+val list_remove: 'a list -> int -> int -> 'a list
+val list_delete: 'a list -> 'a -> 'a list
+val list_compare: ('a -> 'a -> int) -> ('a list) -> ('a list) -> int
+val list_cart_prod2: ('a -> 'b -> unit) -> ('a list) -> ('b list) -> unit
+val list_cart_prod3: ('a -> 'b -> 'c -> unit) -> ('a list) -> ('b list) -> ('c list) -> unit
+val list_cart_prod4: ('a -> 'b -> 'c -> 'd -> unit) -> ('a list) -> ('b list) -> ('c list) -> ('d list) -> unit
+val list_existssome: ('a -> 'b option) -> ('a list) -> 'b option
+val list_for_allsome: ('a -> 'b option) -> ('a list) -> 'b list option
 
 val get_hash_keys : ?sort_keys:bool -> ('a, 'b) Hashtbl.t -> 'a list
 val change_ext : string -> string -> string
@@ -39,8 +50,10 @@ val list_directory : ?sort_files:bool -> string -> string list
 val split_common_prefix : 'a list -> 'a list -> 'a list * 'a list * 'a list
 val split_common_suffix : 'a list -> 'a list -> 'a list * 'a list * 'a list
 
+val option_unwrap : ('a option) -> 'a
 val option_map : ('a -> 'b) -> 'a option -> 'b option
 val apply_option : ('a -> 'a) option -> 'a -> 'a
+val has_some: 'a option -> bool
 
 val print_separated_list : ('a -> string) -> string -> 'a list -> string
 
@@ -74,4 +87,3 @@ module StatusPrinter :
     val stop : unit -> unit
   end
 
-val has_some : 'a option -> bool
