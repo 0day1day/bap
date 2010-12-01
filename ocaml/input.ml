@@ -4,6 +4,16 @@ let inputs = ref []
 and streaminputs = ref None
 and pintrace = ref false
 
+(* Set garbage collector options whenever we see -trace. *)
+let set_gc () =
+  Gc.set
+    {
+      (Gc.get ()) with 
+	Gc.minor_heap_size = 32000000; (* 128 mb *)
+	Gc.major_heap_increment = 16000000; (* 64 mb *)
+	Gc.max_overhead = 200; (* compact after 200% overhead *)
+    }      
+
 let stream_speclist =
   (* let addinput i = streaminputs := i :: !streaminputs in *)
   [
@@ -34,7 +44,9 @@ let speclist =
                 Arg.String(fun e->addinput(`Binrange(!f, !s, toint64 e)))]),
      "<file> <start> <end> Convert the given range of a binary to the IL");
     ("-trace",
-     Arg.String(fun s -> addinput (`Trace s)),
+     Arg.String(fun s -> 
+		  set_gc () ;
+		  addinput (`Trace s)),
      "<file> Read in a trace and lift it to the IL");
     ("-il",
      Arg.String(fun s -> addinput (`Il s)),

@@ -186,15 +186,6 @@ let conc_mem_iter f =
 (*********************  Helper Functions  ********************)
 (*************************************************************)
 
-let set_gc () =
-  Gc.set
-    {
-      (Gc.get ()) with 
-	Gc.minor_heap_size = 32000000; (* 128 mb *)
-	Gc.major_heap_increment = 16000000; (* 64 mb *)
-	Gc.max_overhead = 2000; (* compact after 2000% overhead *)
-    }      
-
 (** Keep track of registers not always updated in BAP.  *)
 let badregs = Hashtbl.create 32
 let () =
@@ -545,7 +536,7 @@ let trace_to_blocks trace =
     | (Ast.Label (Addr _, _) as l)::rest ->
 	let block = List.rev current in
 	to_blocks (block::blocks) [l] rest
-    | (Ast.Comment (endtrace, _) as s)::rest ->
+    | (Ast.Comment (c, _) as s)::rest when c = endtrace ->
 	let block = List.rev current in
 	to_blocks (block::blocks) [s] rest
     | x::rest ->
@@ -1553,7 +1544,6 @@ let generate_formula trace =
   TraceSymbolic.output_formula ()
 
 let output_formula file trace = 
-  set_gc () ;
   let formula = generate_formula trace in
     (*dprintf "formula size: %Ld\n" (formula_size formula) ;*)
   Status.init "Printing out formula" 0;
