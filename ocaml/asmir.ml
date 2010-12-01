@@ -421,9 +421,12 @@ let check_equivalence a (ir1, next1) (ir2, next2) =
     | Stpexec.Timeout -> failwith "Timeout"
   with Failure s
   | Invalid_argument s ->
-    match get_asm ir1 with (* Don't warn for known instructions *)
+    (match get_asm ir1 with (* Don't warn for known instructions *)
     | "ret" | "hlt"-> ()
     | _ -> wprintf "Could not check equivalence for %Lx: %s" a s
+    )
+  | Not_found ->
+    wprintf "Could not check equivalence for %Lx: Not_found" a
 
 
 (** Translate only one address of a  Libasmir.asm_program_t to Vine *)

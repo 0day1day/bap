@@ -50,6 +50,7 @@ type opcode =
   | Call of operand * int64 (* Oimm is relative, int64 is RA *)
   | Shift of binop_type * typ * operand * operand
   | Jump of operand
+  | Jcc of operand * Ast.exp
   | Hlt
   | Cmps of typ
   | Stos of typ
@@ -57,6 +58,7 @@ type opcode =
   | Sub of typ * operand * operand
   | Cmp of typ * operand * operand
   | And of typ * operand * operand
+  | Cld
 
 (* prefix names *)
 let pref_lock = 0xf0
@@ -325,6 +327,8 @@ let to_ir addr next pref = function
      Jmp(l32(Int64.add i ra), calla)]
   | Jump(o) ->
     [ Jmp(op2e r32 o, [])]
+  | Jcc(o, c) ->
+    cjmp c (op2e r32 o)
   | Shift(st, s, o1, o2) when pref = [] || pref = [pref_opsize] ->
     assert (List.mem s [r8; r16; r32]);
     (* FIXME: how should we deal with undefined state? *)
@@ -402,6 +406,8 @@ let to_ir addr next pref = function
     :: move cf exp_false
     :: move af (Unknown("AF is undefined after and", r1))
     :: set_pszf t (op2e t o1)
+  | Cld when pref = [] ->
+    [Move(dflag, i32 1, [])]
   | _ -> unimplemented "to_ir"
 
 let add_labels ?(asm) a ir =
@@ -583,6 +589,14 @@ let parse_instr g addr =
     | 0x55 -> (Push(opsize, o_ebp), na)
     | 0x56 -> (Push(opsize, o_esi), na)
     | 0x57 -> (Push(opsize, o_edi), na)
+    | 0x74
+    | 0x75 -> let (i,na) = parse_disp8 na in
+	      let cc = match b1 with
+		| 0x74 -> zf_e
+		| 0x75 -> exp_not zf_e
+		| _ -> failwith "impossible"
+	      in
+	      (Jcc(Oimm(Int64.add i na), cc), na)
     | 0xc3 -> (Retn, na)
       (* FIXME: operand widths *)
     | 0x80 | 0x81 | 0x82
@@ -647,6 +661,7 @@ let parse_instr g addr =
 	      | _ -> unimplemented "Grp 2: rolls"
 	      )
     | 0xf4 -> (Hlt, na)
+    | 0xfc -> (Cld, na)
     | 0xff -> let (r, rm, na) = parse_modrm32ext na in
 	      (match r with (* Grp 5 *)
 	      | 6 -> (Push(opsize, rm), na)
