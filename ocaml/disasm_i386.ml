@@ -401,7 +401,7 @@ let to_ir addr next pref = function
     move tmp (op2e t o1 -* op2e t o2)
     :: set_flags_sub t (op2e t o1) (op2e t o2) (Var tmp)
   | And(t, o1, o2) when pref = [] ->
-    assn t o1 (op2e t o1 -* op2e t o2)
+    assn t o1 (op2e t o1 &* op2e t o2)
     :: move oF exp_false
     :: move cf exp_false
     :: move af (Unknown("AF is undefined after and", r1))
