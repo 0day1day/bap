@@ -14,6 +14,7 @@ typedef struct bap_block_s bap_block_t;
 // VEX headers (inside Valgrind/VEX/pub)
 //
 
+#include "pin_frame.h"
 #include "asm_program.h"
 #include "vexmem.h"
 
@@ -184,10 +185,21 @@ extern "C" {
   extern int asmir_bap_block_size(bap_block_t *b);
   extern address_t asmir_bap_block_address(bap_block_t *b);
   extern Stmt * asmir_bap_block_get(bap_block_t *b, int i);
+  extern const char* asm_string_from_block(bap_block_t *b);
   extern char* string_blockinsn(asm_program_t *prog, bap_block_t *block);
   extern bap_blocks_t * asmir_bap_from_trace_file(char *filename, uint64_t offset, uint64_t numisns, bool atts, bool pintrace);
+  extern trace_frames_t * asmir_frames_from_trace_file(char *filename, uint64_t offset, uint64_t numisns);
+  extern void asmir_frames_destroy(trace_frames_t *tfs);
+  extern int asmir_frames_length(trace_frames_t *tfs);
+  extern trace_frame_t * asmir_frames_get(trace_frames_t *tfs, int index);
+  extern pintrace::FrameType asmir_frame_type(trace_frame_t *tf);
+  extern uint8_t * asmir_frame_get_insn_bytes(trace_frame_t *tf, uint64_t *addrout, int *len);
 
-
+  extern const char* asmir_frame_get_loadmod_info(trace_frame_t *tf, uint64_t *lowout, uint64_t *highout);
+  extern conc_map_vec * asmir_frame_get_operands(trace_frame_t *tf);
+  extern void asmir_frame_destroy_operands(conc_map_vec *cv);
+  extern int asmir_frame_operands_length(conc_map_vec *cv);
+  extern ConcPair* asmir_frame_get_operand(conc_map_vec *cv, int num);
 #ifdef __cplusplus
 }
 #endif

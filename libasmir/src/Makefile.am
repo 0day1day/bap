@@ -2,7 +2,7 @@
 RANLIB = @RANLIB@
 lib_LIBRARIES = libasmir.a
 #lib_LTLIBRARIES = libasmir.la
-AM_CFLAGS = -I@VEX_DIR@/pub -I../include -fPIC -DGET_OPERANDS
+AM_CFLAGS = -I@VEX_DIR@/pub -I../include -Itraces -fPIC -DGET_OPERANDS
 AM_CXXFLAGS = $(AM_CFLAGS)
 
 

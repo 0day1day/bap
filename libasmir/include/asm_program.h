@@ -63,6 +63,7 @@ extern "C"
 
 extern asm_program_t *asmir_open_file(const char *filename);
 extern asm_program_t* asmir_new_asmp_for_arch(enum bfd_architecture arch);
+extern asm_program_t* asmir_trace_asmp_for_arch(enum bfd_architecture arch);
 extern void asmir_close(asm_program_t *p);
 extern bfd_byte *asmir_get_ptr_to_instr(asm_program_t *prog, bfd_vma addr);
 extern int asmir_get_instr_length(asm_program_t *prog, bfd_vma addr);

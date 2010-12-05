@@ -151,7 +151,7 @@ trace_read_memory (bfd_vma memaddr,
   size_t offend = offstart + length;
   
   if (offstart > trace_instruction_size || offend > trace_instruction_size) {
-    fprintf(stderr, "WARNING: Disassembler looking for unknown address. Known base: %Lx Wanted: %Lx\n", trace_instruction_addr, memaddr);
+    fprintf(stderr, "WARNING: Disassembler looking for unknown address. Known base: %#Lx Wanted: %#Lx Length: %#x\n", trace_instruction_addr, memaddr, length);
   }
 
   memcpy(myaddr, trace_instruction_bytes+offstart, length);
@@ -294,6 +294,32 @@ enum bfd_architecture asmir_get_asmp_arch(asm_program_t *prog) {
 // from old translate.cpp fake_prog_for_arch()
 // Returns a fake asm_program_t for use when disassembling bits out of memory
 asm_program_t* asmir_new_asmp_for_arch(enum bfd_architecture arch)
+{
+  
+  int machine = 0; // TODO: pick based on arch
+  asm_program_t *prog = malloc(sizeof(asm_program_t));
+  assert(prog);
+  
+  prog->abfd = bfd_openw("/dev/null", NULL);
+  if (!prog->abfd) {
+    bfd_perror("Unable to open fake bfd");
+  }
+  
+  assert(prog->abfd);
+  bfd_set_arch_info(prog->abfd, bfd_lookup_arch(arch, machine));
+
+  //not in .h bfd_default_set_arch_mach(prog->abfd, arch, machine);
+  bfd_set_arch_info(prog->abfd, bfd_lookup_arch(arch, machine));
+  init_disasm_info(prog);
+
+  // Use a special read memory function
+  prog->disasm_info.read_memory_func = my_read_memory;
+
+  return prog;
+}
+
+/* Uses trace_read_memory, which assumes set_trace_bytes is used to update for each instruction. */
+asm_program_t* asmir_trace_asmp_for_arch(enum bfd_architecture arch)
 {
   
   int machine = 0; // TODO: pick based on arch

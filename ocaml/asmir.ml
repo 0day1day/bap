@@ -225,6 +225,24 @@ let tr_attributes s =
   if tid = -1 then cvals else
   tidattr :: cvals
 
+(** Given a trace frame, return the list of attrs. *)
+let tr_frame_attrs f =
+  let attr_vec = Libasmir.asmir_frame_get_operands f in
+  let size = Libasmir.asmir_frame_operands_length attr_vec in
+  let cvals =
+    if size = 0 || size = -1 then [] 
+    else
+      let attrs = foldn 
+	(fun i n -> 
+	   (tr_context_tup (Libasmir.asmir_frame_get_operand attr_vec n))::i
+	) [] (size-1) 
+      in
+      let () = Libasmir.asmir_frame_destroy_operands attr_vec 
+      in
+      attrs
+  in
+  cvals
+
 (** Translate a statement *)
 let rec tr_stmt g s =
   match Libasmir.stmt_type s with
@@ -299,9 +317,10 @@ let tr_bap_block_t g asmp b =
   unextend();
   stmts
 
-let tr_bap_block_t_no_asm g b = 
+let tr_bap_block_t_no_asm g b =
   let stmts, addr, unextend = tr_bap_block_aux g b in
-  let stmts = Label(Addr addr, [])::stmts in
+  let asm = Libasmir.asm_string_from_block b in
+  let stmts = Label(Addr addr, [Asm asm])::stmts in
   unextend();
   stmts
 
@@ -498,7 +517,79 @@ let asmprogram_to_bap ?(init_ro=false) p =
     get_rodata_assignments ~prepend_to:ir m p
   else ir
 
-let bap_from_trace_file ?(atts = true) ?(pin = false) filename =
+(* translate byte sequence to bap ir *)
+let byte_insn_to_bap arch addr byteinsn =
+  let prog = Libasmir.byte_insn_to_asmp arch addr byteinsn in
+  let get a = Array.get byteinsn (Int64.to_int (Int64.sub a addr)) in
+  let (pr, n) = asm_addr_to_bap {asmp=prog; arch=arch; secs=[]; get=get} addr in
+  pr, Int64.sub n addr
+
+(* Get stmts for a frame *)
+let trans_frame f =
+  let arch = Libbfd.Bfd_arch_i386 in
+  let t = Libasmir.asmir_frame_type f in
+  match t with
+  | Libasmir.FRM_STD2 -> 
+      let bytes, addr, _ = Libasmir.asmir_frame_get_insn_bytes f in
+      (* Array.iter (fun x -> dprintf "Byte: %x" (int_of_char x)) bytes; *)
+      let stmts, _ = byte_insn_to_bap arch addr bytes in
+      stmts
+  | Libasmir.FRM_TAINT -> 
+      [Label (Name("ReadSyscall"), [])]
+  | Libasmir.FRM_LOADMOD ->
+      let name, lowaddr, highaddr = Libasmir.asmir_frame_get_loadmod_info f in
+      [Special(Printf.sprintf "Loaded module '%s' at %#Lx to %#Lx" name lowaddr highaddr, [])]
+  | _ -> []
+
+let alt_bap_from_trace_file filename =
+  let add_operands stmts f =
+    let ops = tr_frame_attrs f in
+    match stmts with
+    | Label (l,a)::others ->
+	 Label (l,a@ops)::others
+    | others when ops <> [] -> Comment("Attrs without label.", ops)::others
+    | others -> others
+  in
+  let raise_frame f =
+    let stmts = trans_frame f in
+    add_operands stmts f
+  in
+  let ir = ref [] in
+  let off = ref 0L in
+  let c = ref true in
+  (* might be better to just grab the length of the trace in advance :*( *)
+  Status.init "Lifting trace" 0 ;
+  while !c do
+    (*dprintf "Calling the trace again.... ";*)
+    let trace_frames = Libasmir.asmir_frames_from_trace_file filename !off !trace_blocksize in
+    let numframes = Libasmir.asmir_frames_length trace_frames in
+    (*dprintf "Got %d frames" numframes;*)
+    if numframes = 0 || numframes = -1 then (
+      c := false
+    ) else (
+      let revstmts = Util.foldn
+	(fun acc n ->
+	   let frameno = numframes-1-n in
+	   (* dprintf "frame %d" frameno; *)
+	   let stmts = raise_frame (Libasmir.asmir_frames_get trace_frames frameno) in
+	   List.rev_append stmts acc) [] (numframes-1) in
+      ir := Util.fast_append revstmts !ir;
+
+      (* let moreir = tr_bap_blocks_t_no_asm g bap_blocks in *)
+	(* Build ir backwards *)
+	(* ir := List.rev_append moreir !ir; *)
+	off := Int64.add !off !trace_blocksize
+    );
+
+    asmir_frames_destroy trace_frames;
+
+  done;
+  let r = List.rev !ir in
+  Status.stop () ;
+  r
+
+(* deprecated *)  
+let old_bap_from_trace_file ?(atts = true) ?(pin = false) filename =
   let g = gamma_create x86_mem x86_regs in
   let ir = ref [] in
   let off = ref 0L in
@@ -522,6 +613,9 @@ let bap_from_trace_file ?(atts = true) ?(pin = false) filename =
   let r = List.rev !ir in
   Status.stop () ;
   r
+
+let bap_from_trace_file ?(atts = true) ?(pin = false) filename =
+  alt_bap_from_trace_file filename
 
 (** Get one statement at a time.
 
@@ -618,9 +712,3 @@ let get_asm_instr_string_range p s e =
   done;
   !str
 
-(* translate byte sequence to bap ir *)
-let byte_insn_to_bap arch addr byteinsn =
-  let prog = Libasmir.byte_insn_to_asmp arch addr byteinsn in
-  let get a = Array.get byteinsn (Int64.to_int (Int64.sub a addr)) in
-  let (pr, n) = asm_addr_to_bap {asmp=prog; arch=arch; secs=[]; get=get} addr in
-  pr, Int64.sub n addr

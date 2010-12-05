@@ -787,7 +787,7 @@ let run_block state block =
   pdebug ("Running block: " ^ (string_of_int !counter) ^ " " ^ (Pp.ast_stmt_to_string addr));
   let info, block = hd_tl block in
   counter := !counter + 1 ;
-  let _ = ignore(update_concrete info) in
+  let _ = ignore(update_concrete addr) in
   if !consistency_check then (
     (* remove temps *)
     clean_delta state.delta;

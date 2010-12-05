@@ -3,6 +3,7 @@
 #include <bfd.h>
 // maybe all the header files should be moved to 
 // libasmir/include? - ethan
+#include "./traces/pin_frame.h"
 #include "./traces/readtrace.h"
 #include "irtoir.h"
 #include "asm_program.h"
@@ -107,6 +108,9 @@ Stmt * asmir_bap_block_get(bap_block_t *b, int i) {
   return b->bap_ir->at(i);
 }
 
+const char* asm_string_from_block(bap_block_t *b) {
+  return b->bap_ir->front()->assembly.c_str();
+}
 
 // hmm, this isn't in bfd.h, but is in the documentation...
 extern "C" {
@@ -166,4 +170,125 @@ bap_blocks_t * asmir_bap_from_trace_file(char * filename,
 					  atts, 
 					  pintrace);
   return b;
+}
+
+trace_frames_t * asmir_frames_from_trace_file(char *filename,
+                                              uint64_t offset,
+                                              uint64_t numisns) {
+  return read_frames_from_file(string(filename),
+                               offset,
+                               numisns);
+}
+
+void asmir_frames_destroy(trace_frames_t *tfs) {
+  if (tfs)
+    destroy_trace_frames(tfs);
+}
+
+int asmir_frames_length(trace_frames_t *tfs) {
+  if (tfs == NULL) return -1;
+
+  return tfs->size();
+}
+
+trace_frame_t * asmir_frames_get(trace_frames_t *tfs, int index) {
+  assert(tfs);
+
+  return (*tfs)[index];
+}
+
+pintrace::FrameType asmir_frame_type(trace_frame_t *tf) {
+  assert(tf);
+
+  return tf->type;
+}
+
+uint8_t * asmir_frame_get_insn_bytes(trace_frame_t *tf, uint64_t *addrout, int *len) {
+  assert(tf);
+
+  /* Don't return anything for non-instruction frames */
+  if (tf->type != pintrace::FRM_STD2) {
+    *len = 0;
+    *addrout = 0;
+    return NULL;
+  } else {
+    /* Okay, let's get to business. */
+    pintrace::StdFrame2 * sf2 = dynamic_cast<pintrace::StdFrame2*> (tf);
+
+    *len = sf2->insn_length;
+    *addrout = sf2->addr;
+    /* Return a pointer to the data in the frame. Make sure we're done
+       with it before freeing the frame! */
+    return (uint8_t*) (sf2->rawbytes);
+  }
+
+  assert(false);
+  return NULL;
+}
+
+const char* asmir_frame_get_loadmod_info(trace_frame_t *tf, uint64_t *lowout, uint64_t *highout) {
+  assert(tf);
+  assert(tf->type = pintrace::FRM_LOADMOD);
+
+  pintrace::LoadModuleFrame *lf = dynamic_cast<pintrace::LoadModuleFrame*> (tf);
+  
+  *lowout = lf->low_addr;
+  *highout = lf->high_addr;
+  return lf->name;
+}
+
+conc_map_vec * asmir_frame_get_operands(trace_frame_t *tf) {
+  assert(tf);  
+  
+  switch (tf->type) {
+      case pintrace::FRM_STD2:
+      {
+        pintrace::StdFrame2 *f = dynamic_cast <pintrace::StdFrame2*> (tf);
+        return f->getOperands();
+        break;
+      }
+        
+      case pintrace::FRM_SYSCALL:
+      {
+        pintrace::SyscallFrame *f = dynamic_cast <pintrace::SyscallFrame*> (tf);
+        return f->getOperands();
+        break;
+      }
+      
+      case pintrace::FRM_TAINT:
+      { 
+        pintrace::TaintFrame *f = dynamic_cast <pintrace::TaintFrame*> (tf);
+        return f->getOperands();
+        break;
+      }
+      
+      default:
+        return NULL;
+        break;        
+  }
+}
+
+void asmir_frame_destroy_operands(conc_map_vec *cv) {
+  assert(cv);
+  conc_map_vec::iterator i;
+  
+  for (i = cv->begin(); i != cv->end(); i++) {
+    delete *i;
+  }
+  
+  delete cv;
+}
+
+int asmir_frame_operands_length(conc_map_vec *cv) {
+  if (cv) {
+   return cv->size();
+  } else {
+    return -1;
+  }
+}
+
+ConcPair* asmir_frame_get_operand(conc_map_vec *cv, int num) {
+  assert(cv);
+  assert(num >= 0);
+  return (*cv)[num];
 }

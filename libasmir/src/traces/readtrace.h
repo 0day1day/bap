@@ -13,11 +13,21 @@
 #include "irtoir.h"
 #include "pin_trace.h"
 
-extern "C" bap_blocks_t * read_trace_from_file(const string &filename,
-                                               uint64_t offset,
-                                               uint64_t numisns,
-					       bool print,
-					       bool atts,
-					       bool pintrace);
 
+extern "C" {
+
+  trace_frames_t* read_frames_from_file(const string &filename,
+                                        uint64_t offset,
+                                        uint64_t numisns);
+
+  bap_blocks_t * read_trace_from_file(const string &filename,
+                                      uint64_t offset,
+                                      uint64_t numisns,
+                                      bool print,
+                                      bool atts,
+                                      bool pintrace);
+
+  void destroy_trace_frames(trace_frames_t *v);
+}
+  
 #endif

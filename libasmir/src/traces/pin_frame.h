@@ -4,6 +4,7 @@
 
 #include <iostream>
 #include <stdint.h>
+#include <vector>
 #include "pin_common.h"
 
 /*
@@ -529,3 +530,6 @@ enum FrameType {
    };
 
 }; // END of namespace
+
+typedef pintrace::Frame trace_frame_t;
+typedef std::vector<trace_frame_t*> trace_frames_t;

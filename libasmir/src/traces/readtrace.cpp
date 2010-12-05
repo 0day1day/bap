@@ -1,4 +1,4 @@
-
+#include <cassert>
 #include <cstdlib>
 #include <string>
 #include <iostream>
@@ -6,6 +6,75 @@
 #include "asm_program.h"
 
 using namespace std;
+
+/* Read frames from trace to be pulled into ML.  This allows ML code to lift. */
+trace_frames_t * read_frames_from_file(const string &filename,
+                                       uint64_t offset,
+                                       uint64_t numisns)
+{
+  // a vector to store our frames in
+  trace_frames_t * result = new trace_frames_t;
+  
+  uint64_t counter = 0LL;
+  pintrace::TraceReader tr;
+
+  //cerr << "reading from offset " << offset << endl;
+
+    try {
+      tr.open(filename.c_str());
+    }
+    catch (pintrace::TraceExn& e) {
+      cerr << "Trace exception: " << e.msg << endl;
+      throw e;
+    }
+
+    // FIXME: Currently only x86
+    VexArch arch = VexArchX86;
+    bfd_architecture bfd_arch = bfd_arch_i386;
+    asm_program_t * prog = asmir_trace_asmp_for_arch(bfd_arch);
+    assert(prog);
+    assert(prog->abfd);
+    
+    // Initializations
+    translate_init();
+
+    //    cerr << "plz seek to " << offset << " of " << tr.count() << endl;
+
+    if (!tr.seek(offset)) {
+      /* Couldn't seek there! */
+      return NULL;
+    }
+    
+    while(
+      (tr.pos() < tr.count()) && // Don't go past the end of the trace
+      ((numisns == 0) ? true : counter < numisns) // Count numisns
+          ) {
+
+      // Reading each instruction
+      pintrace::Frame *f = tr.next();
+      assert(f);
+      counter += 1;
+
+      result->push_back(f);
+
+      /* XXX: Make sure we delete frames once we're done with them. */
+      
+    }
+      
+    return result;
+}
+
+void destroy_trace_frames(trace_frames_t *v) {
+  trace_frames_t::iterator i;
+
+  for (i = v->begin(); i != v->end(); i++) {
+    // Free the frame
+    delete *i;
+  }
+
+  // Free the vector
+  delete v;
+}
 
 bap_blocks_t * read_trace_from_file(const string &filename,
 				    uint64_t offset,
@@ -34,7 +103,7 @@ bap_blocks_t * read_trace_from_file(const string &filename,
     // FIXME: Currently only x86
     VexArch arch = VexArchX86;
     bfd_architecture bfd_arch = bfd_arch_i386;
-    asm_program_t * prog = asmir_new_asmp_for_arch(bfd_arch);
+    asm_program_t * prog = asmir_trace_asmp_for_arch(bfd_arch);
     assert(prog);
     assert(prog->abfd);
     
@@ -63,28 +132,6 @@ bap_blocks_t * read_trace_from_file(const string &filename,
       switch(f->type) {
           case pintrace::FRM_STD: // TODO: We should consider key frame
           {
-          //   pintrace::StdFrame *cur_frm = (pintrace::StdFrame *) f;
-	  // bap_block_t *bblock = new bap_block_t;
-	  // bblock->bap_ir = new vector<Stmt *>();
-	  // bblock->inst = cur_frm->addr;
-	  // bblock->vex_ir = translate_insn(arch,
-	  //       			  (unsigned char *)cur_frm->rawbytes,
-	  //       			  cur_frm->addr);
-	  // prog = byte_insn_to_asmp(bfd_arch, 
-	  //       		   cur_frm->addr,
-	  //       		   (unsigned char *)cur_frm->rawbytes,
-	  //       		   MAX_INSN_BYTES);
-	  // generate_bap_ir_block(prog, bblock);
-	  // string assembly(asmir_string_of_insn(prog, cur_frm->addr));
-	  // bblock->bap_ir->front()->assembly = assembly;
-	  // if (atts)
-	  //   bblock->bap_ir->front()->attributes.cv = cur_frm->getOperands();
-          // bblock->bap_ir->front()->attributes.tid = cur_frm->tid;
-	  
-	  // result->push_back(bblock);
-	  // //for (int i = 0 ; i < bblock->bap_ir->size() ; i ++)
-	  // //    cout << bblock->bap_ir->at(i)->tostring() << endl ;
-	  // break;
             assert(false);
             break;
           }
