@@ -248,7 +248,7 @@ extern "C" {
   extern conc_map* get_attr(conc_map_vec*,int);
   extern const char* attr_name(conc_map*);
   extern const_val_t attr_value(conc_map*);
-  extern bool attr_mem(conc_map*);
+  extern long attr_mem(conc_map*);
   extern const_val_t attr_ind(conc_map*);
   extern attr_type_t attr_type(conc_map*);
   extern int attr_taint(conc_map*);
@@ -261,17 +261,17 @@ extern "C" {
   extern Exp* expstmt_exp(Stmt*);
   extern const char* vardecl_name(Stmt*);
   extern reg_t vardecl_type(Stmt*);
-  extern int call_has_lval(Stmt*);
+  extern long call_has_lval(Stmt*);
   extern Exp* call_lval_opt(Stmt*);
   extern Exp* call_fnname(Stmt*);
   extern Exp** call_params(Stmt*);
-  extern int ret_has_exp(Stmt *s);
+  extern long ret_has_exp(Stmt *s);
   extern Exp* ret_exp(Stmt *s);
   extern const char* func_name(Stmt *s);
-  extern int func_has_rv(Stmt *s);
+  extern long func_has_rv(Stmt *s);
   extern reg_t func_rt(Stmt *s);
   extern Stmt** func_params(Stmt *s);
-  extern int func_is_external(Stmt *s);
+  extern long func_is_external(Stmt *s);
   extern Stmt** func_body(Stmt *s);
   extern Exp* assert_cond(Stmt*);
 #ifdef __cplusplus

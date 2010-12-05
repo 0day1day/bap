@@ -32,9 +32,6 @@ asmir_get_all_symbols(asm_program_t prog,
 asmir_get_all_sections(asm_program_t prog,
                        [out] long *num);
 
-
-
-
 enum exp_type_t {
   BINOP, UNOP, CONSTANT, MEM, TEMP, PHI, CAST,
   NAME, UNKNOWN, LET, EXTENSION };
