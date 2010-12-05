@@ -84,7 +84,7 @@ void destroy_bap_blocks(bap_blocks_t *bs) {
 }
 
 /* Check for an error (i.e., a NULL ptr */
-bool asmir_bap_blocks_error(bap_blocks_t *bs) {
+long asmir_bap_blocks_error(bap_blocks_t *bs) {
 
   if (bs == NULL) {
     return TRUE;
@@ -160,8 +160,8 @@ bap_block_t* asmir_addr_to_bap(asm_program_t *p, address_t addr, address_t *next
 bap_blocks_t * asmir_bap_from_trace_file(char * filename, 
                                          uint64_t offset,
                                          uint64_t numisns,
-                                         bool atts,
-					 bool pintrace)
+                                         long atts,
+					 long pintrace)
 {
   bap_blocks_t * b = read_trace_from_file(string(filename), 
 					  offset,

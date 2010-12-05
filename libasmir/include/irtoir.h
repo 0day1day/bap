@@ -179,7 +179,7 @@ extern "C" {
 
   extern int asmir_bap_blocks_size(bap_blocks_t *bs);
   extern bap_block_t * asmir_bap_blocks_get(bap_blocks_t *bs, int i);
-  extern bool asmir_bap_blocks_error(bap_blocks_t *bs);
+  extern long asmir_bap_blocks_error(bap_blocks_t *bs);
   extern void destroy_bap_blocks(bap_blocks_t *bs);
   extern void destroy_bap_block(bap_block_t *bs);
   extern int asmir_bap_block_size(bap_block_t *b);
@@ -187,7 +187,7 @@ extern "C" {
   extern Stmt * asmir_bap_block_get(bap_block_t *b, int i);
   extern const char* asm_string_from_block(bap_block_t *b);
   extern char* string_blockinsn(asm_program_t *prog, bap_block_t *block);
-  extern bap_blocks_t * asmir_bap_from_trace_file(char *filename, uint64_t offset, uint64_t numisns, bool atts, bool pintrace);
+  extern bap_blocks_t * asmir_bap_from_trace_file(char *filename, uint64_t offset, uint64_t numisns, long atts, long pintrace);
   extern trace_frames_t * asmir_frames_from_trace_file(char *filename, uint64_t offset, uint64_t numisns);
   extern void asmir_frames_destroy(trace_frames_t *tfs);
   extern int asmir_frames_length(trace_frames_t *tfs);

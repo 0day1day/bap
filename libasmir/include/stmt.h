@@ -261,7 +261,7 @@ extern "C" {
   extern conc_map* get_cval(TraceAttrs_t*,int);
   extern const char* cval_name(conc_map*);
   extern const_val_t cval_value(conc_map*);
-  extern bool cval_mem(conc_map*);
+  extern long cval_mem(conc_map*);
   extern const_val_t cval_ind(conc_map*);
   extern cval_type_t cval_type(conc_map*);
   extern int cval_usage(conc_map*);
@@ -277,17 +277,17 @@ extern "C" {
   extern Exp* expstmt_exp(Stmt*);
   extern const char* vardecl_name(Stmt*);
   extern reg_t vardecl_type(Stmt*);
-  extern int call_has_lval(Stmt*);
+  extern long call_has_lval(Stmt*);
   extern Exp* call_lval_opt(Stmt*);
   extern Exp* call_fnname(Stmt*);
   extern Exp** call_params(Stmt*);
-  extern int ret_has_exp(Stmt *s);
+  extern long ret_has_exp(Stmt *s);
   extern Exp* ret_exp(Stmt *s);
   extern const char* func_name(Stmt *s);
-  extern int func_has_rv(Stmt *s);
+  extern long func_has_rv(Stmt *s);
   extern reg_t func_rt(Stmt *s);
   extern Stmt** func_params(Stmt *s);
-  extern int func_is_external(Stmt *s);
+  extern long func_is_external(Stmt *s);
   extern Stmt** func_body(Stmt *s);
   extern Exp* assert_cond(Stmt*);
 #ifdef __cplusplus

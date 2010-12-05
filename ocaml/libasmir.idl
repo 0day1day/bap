@@ -36,7 +36,6 @@ asmir_get_all_symbols(asm_program_t prog,
 asmir_get_all_sections(asm_program_t prog,
                        [out] long *num);
 
-
 enum frame_type_t {
   FRM_NONE = 0, FRM_KEY, FRM_STD, FRM_LOADMOD, FRM_SYSCALL, FRM_TAINT, FRM_STD2 };
 

@@ -45,7 +45,7 @@ const_val_t cval_value(conc_map *m) {
 const_val_t cval_ind(conc_map *m) {
   return m->index;
 }
-bool cval_mem(conc_map *m) {
+long cval_mem(conc_map *m) {
   return m->mem;
 }
 cval_type_t cval_type(conc_map *m) {
@@ -87,7 +87,7 @@ const char* vardecl_name(Stmt *s) {
 reg_t vardecl_type(Stmt *s) {
   return ((VarDecl*)s)->typ;
 }
-int call_has_lval(Stmt *s) {
+long call_has_lval(Stmt *s) {
   return (((Call*)s)->lval_opt != NULL);
 }
 Exp* call_lval_opt(Stmt *s) {
@@ -118,7 +118,7 @@ Exp** call_params(Stmt *s) {
   return vec_to_list(((Call*)s)->params);
 }
 
-int ret_has_exp(Stmt *s) {
+long ret_has_exp(Stmt *s) {
   return (((Return*)s)->exp_opt != NULL);
 }
 
@@ -131,7 +131,7 @@ const char* func_name(Stmt *s) {
   return (((Func*)s)->fnname.c_str());
 }
 
-int func_has_rv(Stmt *s) {
+long func_has_rv(Stmt *s) {
   return (((Func*)s)->has_rv);
 }
 
@@ -148,7 +148,7 @@ Stmt** func_params(Stmt *s) {
   return vec_to_list(params);
 }
 
-int func_is_external(Stmt *s) {
+long func_is_external(Stmt *s) {
   return (((Func*)s)->external);
 }
 
