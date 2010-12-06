@@ -519,6 +519,18 @@ let remove_specials =
     | _ -> true
   in
     List.filter no_specials
+
+(** Removing all unknowns from the trace *)
+let remove_unknowns =
+  let v = object(self)
+    inherit Ast_visitor.nop
+    method visit_exp = function
+      | Unknown(s,t) ->
+	  dprintf "Removed unknown: %s" s;
+	  `ChangeTo (Int(0L,t))
+      | _ -> `DoChildren
+  end
+  in Ast_visitor.prog_accept v
    
 (* Appends a Halt instruction to the end of the trace *)
 let append_halt trace = 
@@ -809,7 +821,7 @@ let run_block state block =
   let init = TraceConcrete.inst_fetch state.sigma state.pc in
   let executed = ref [] in
   let rec eval_block state stmt = 
-    pdebug (Pp.ast_stmt_to_string stmt);
+    pdebug ("Executing: " ^ (Pp.ast_stmt_to_string stmt));
     (*    Hashtbl.iter (fun k v -> pdebug (Printf.sprintf "%Lx -> %s" k (Pp.ast_exp_to_string v))) concrete_mem ;*)
     Status.inc();
     let evalf e = match TraceConcrete.eval_expr state.delta e with
@@ -850,9 +862,9 @@ let run_block state block =
 	  (* ) else 
 	  ((addr,false)::(info,false)::(List.tl !executed)) *)
       | UnknownLabel ->
-	  ((addr)::(info)::List.rev (!executed))
+	  (addr::info::List.rev (!executed))
       | Halted _ -> 
-	  ((addr)::(info)::List.rev (List.tl !executed))
+	  (addr::info::List.rev (List.tl !executed))
 
 let run_blocks blocks length =
   counter := 1 ;
@@ -971,7 +983,8 @@ let concrete trace =
   dsa_rev_map := None;
   let trace = Memory2array.coerce_prog trace in
   let no_specials = remove_specials trace in
-  let blocks = trace_to_blocks no_specials in
+  let no_unknowns = remove_unknowns no_specials in
+  let blocks = trace_to_blocks no_unknowns in
   (*pdebug ("blocks: " ^ (string_of_int (List.length blocks)));*)
   let length = List.length no_specials in
   

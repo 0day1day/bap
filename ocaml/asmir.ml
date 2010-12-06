@@ -538,10 +538,10 @@ let trans_frame f =
       let stmts, _ = byte_insn_to_bap arch addr bytes in
       stmts
   | Libasmir.FRM_TAINT -> 
-      [Label (Name("ReadSyscall"), [])]
+      [Label (Name("ReadSyscall"), []); Comment("All blocks must have two statements", [])]
   | Libasmir.FRM_LOADMOD ->
       let name, lowaddr, highaddr = Libasmir.asmir_frame_get_loadmod_info f in
-      [Special(Printf.sprintf "Loaded module '%s' at %#Lx to %#Lx" name lowaddr highaddr, [])]
+      [Special(Printf.sprintf "Loaded module '%s' at %#Lx to %#Lx" name lowaddr highaddr, []); Special("All blocks must have two statements", [])]
   | _ -> []
 
 let alt_bap_from_trace_file filename =
