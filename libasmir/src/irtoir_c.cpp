@@ -203,6 +203,18 @@ pintrace::FrameType asmir_frame_type(trace_frame_t *tf) {
   return tf->type;
 }
 
+int asmir_frame_tid(trace_frame_t *tf) {
+  assert(tf);
+
+  switch (tf->type) {
+      case pintrace::FRM_STD2:
+        pintrace::StdFrame2 *sf = dynamic_cast<pintrace::StdFrame2*> (tf);
+        return sf->tid;
+  }
+
+  return -1;
+}
+
 uint8_t * asmir_frame_get_insn_bytes(trace_frame_t *tf, uint64_t *addrout, int *len) {
   assert(tf);
 

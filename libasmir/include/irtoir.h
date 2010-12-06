@@ -193,6 +193,7 @@ extern "C" {
   extern int asmir_frames_length(trace_frames_t *tfs);
   extern trace_frame_t * asmir_frames_get(trace_frames_t *tfs, int index);
   extern pintrace::FrameType asmir_frame_type(trace_frame_t *tf);
+  extern int asmir_frame_tid(trace_frame_t *tf);
   extern uint8_t * asmir_frame_get_insn_bytes(trace_frame_t *tf, uint64_t *addrout, int *len);
 
   extern const char* asmir_frame_get_loadmod_info(trace_frame_t *tf, uint64_t *lowout, uint64_t *highout);

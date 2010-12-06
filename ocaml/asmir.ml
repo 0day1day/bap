@@ -210,6 +210,7 @@ let tr_context_tup cval =
 	   usage=get_cval_usage(Libasmir.cval_usage cval);
            taint=int_to_taint (Libasmir.cval_taint cval)}
 
+(* deprecated *)
 let tr_attributes s =
   let attr_vec = Libasmir.stmt_attributes s in
   let size = Libasmir.conc_map_size attr_vec in
@@ -229,19 +230,25 @@ let tr_attributes s =
 let tr_frame_attrs f =
   let attr_vec = Libasmir.asmir_frame_get_operands f in
   let size = Libasmir.asmir_frame_operands_length attr_vec in
-  let cvals =
+  (* Add concrete operands *)
+  let attrs =
     if size = 0 || size = -1 then [] 
     else
-      let attrs = foldn 
+      let cattrs = foldn 
 	(fun i n -> 
 	   (tr_context_tup (Libasmir.asmir_frame_get_operand attr_vec n))::i
 	) [] (size-1) 
       in
       let () = Libasmir.asmir_frame_destroy_operands attr_vec 
       in
-      attrs
+      cattrs
   in
-  cvals
+  (* Add ThreadId *)
+  let attrs = match Libasmir.asmir_frame_tid f with
+    | -1 -> attrs
+    | n -> (Type.ThreadId n)::attrs
+  in
+  attrs
 
 (** Translate a statement *)
 let rec tr_stmt g s =
