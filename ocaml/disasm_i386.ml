@@ -385,7 +385,7 @@ let to_ir addr next pref = function
       rep_wrap ~addr ~next stmts
     else
       unimplemented "unsupported prefix for stos"
-  | Push(t, o) ->
+  | Push(t, o) when pref = [] ->
     let tmp = nv "t" t in (* only really needed when o involves esp *)
     move tmp (op2e t o)
     :: move esp (esp_e -* i32 4)
