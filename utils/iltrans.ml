@@ -191,6 +191,10 @@ let speclist =
      uadd(TransformAst Traces.concolic),
      "Execute the trace symbolically and generate the formula"
     )
+  ::("-trace-dce",
+     uadd(TransformAst Traces.trace_dce),
+     "Trace dead-code elimination."
+    )
   ::("-trace-debug", 
      uadd(TransformAst Traces.valid_to_invalid),
      "Formula debugging. Prints to files form_val and form_inv"

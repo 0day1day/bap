@@ -602,14 +602,14 @@ let trace_dce trace =
     inherit Ast_visitor.nop      
     method visit_stmt = function
 	Assert _ -> `DoChildren
-      | Move (tv, _, _) as olds ->
-	  if VH.mem rvh tv then 
-	    (* Include this statement, and add referenced vars. *)
-	    `DoChildren
-	  else
-	    (* Remove this statement *)
-	    let str = Printf.sprintf "Removed by dce: %s" (Pp.ast_stmt_to_string olds) in
-	    let news = Comment (str, []) in
+      | Move (tv, _, _) when VH.mem rvh tv ->
+	  (* Include this statement, and add referenced vars. *)
+	  VH.remove rvh tv;
+	  `DoChildren
+      | Move (tv, _, _) as olds when not (VH.mem rvh tv) ->
+	  (* Remove this statement *)
+	  let str = Printf.sprintf "Removed by dce: %s" (Pp.ast_stmt_to_string olds) in
+	  let news = Comment (str, []) in
 	    `ChangeTo news
       | _ -> `SkipChildren
     method visit_rvar v =
