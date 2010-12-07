@@ -789,7 +789,8 @@ let trace_transform_stmt stmt evalf =
 	[com]
     | s -> [s] in
   if not !allow_symbolic_indices && !exp <> exp_true then
-    Assert(!exp, []) :: s 
+    (* The assertion must come first, since the statement may modify value of the expression! *)
+    s @ [Assert(!exp, [])]
   else
     s
 	
