@@ -58,6 +58,7 @@ type opcode =
   | Sub of typ * operand * operand
   | Cmp of typ * operand * operand
   | And of typ * operand * operand
+  | Test of typ * operand * operand
   | Cld
 
 (* prefix names *)
@@ -232,13 +233,14 @@ let storem m t a e =
 
 let op2e t = function
   | Oreg r when Var.typ r = t -> Var r
-  | Oreg r -> cast_low t (Var r)
+  | Oreg r -> unimplemented "sub registers" (*cast_low t (Var r)*)
   | Oaddr e -> load t e
   | Oimm i -> Int(Arithmetic.to64 (i,t), t)
 
 let assn t v e =
   match v with
-  | Oreg r -> move r e
+  | Oreg(Var.V(_,_,vt) as r) when t = vt -> move r e
+  | Oreg _ -> unimplemented "assignment to sub registers"
   | Oaddr a -> store t a e
   | Oimm _ -> failwith "disasm_i386: Can't assign to an immediate value"
 
@@ -271,7 +273,9 @@ and calla = [StrAttr "call"]
 
 let compute_sf result = Cast(CAST_HIGH, r1, result)
 let compute_zf t result = Int(0L, t) =* result
-let compute_pf result = Cast(CAST_LOW, r1, result)
+let compute_pf r =
+  (* extra parens do not change semantics but do make it pretty print nicer *)
+  exp_not (Cast(CAST_LOW, r1, (((((((r >>* i32 7) ^* (r >>* i32 6)) ^* (r >>* i32 5)) ^* (r >>* i32 4)) ^* (r >>* i32 3)) ^* (r >>* i32 2)) ^* (r >>* i32 1)) ^* r))
 
 let set_sf r = move sf (compute_sf r)
 let set_zf t r = move zf (compute_zf t r)
@@ -406,6 +410,13 @@ let to_ir addr next pref = function
     :: move cf exp_false
     :: move af (Unknown("AF is undefined after and", r1))
     :: set_pszf t (op2e t o1)
+  | Test(t, o1, o2) when pref = [] ->
+    let tmp = nv "t" t in
+    move tmp (op2e t o1 &* op2e t o2)
+    :: move oF exp_false
+    :: move cf exp_false
+    :: move af (Unknown("AF is undefined after and", r1))
+    :: set_pszf t (Var tmp)
   | Cld when pref = [] ->
     [Move(dflag, i32 1, [])]
   | _ -> unimplemented "to_ir"
@@ -610,8 +621,12 @@ let parse_instr g addr =
 	      | 4 -> (And(opsize, rm, o2), na)
 	      | 5 -> (Sub(opsize, rm, o2), na)
 	      | 7 -> (Cmp(opsize, rm, o2), na)
-	      | _ -> unimplemented (Printf.sprintf "unsupported opcode: %x/%d" b1 r)
+	      | _ -> unimplemented (Printf.sprintf "unsupported opcode: %02x/%d" b1 r)
 	      )
+    | 0x84
+    | 0x85 -> let (r, rm, na) = parse_modrm32 na in
+	      let o = if b1 = 0x84 then r8 else opsize in
+	      (Test(o, rm, r), na)
     | 0x89 -> let (r, rm, na) = parse_modrm32 na in
 	      (Mov(opsize, rm, r), na)
     | 0x8b -> let (r, rm, na) = parse_modrm32 na in
@@ -675,9 +690,9 @@ let parse_instr g addr =
 	let s,d = if b2 = 0x6f then rm, r else r, rm in
 	(Movdqa(d,s), na)
       )
-      | _ -> unimplemented (Printf.sprintf "unsupported opcode: %x %x" b1 b2)
+      | _ -> unimplemented (Printf.sprintf "unsupported opcode: %02x %02x" b1 b2)
     )
-    | n -> unimplemented (Printf.sprintf "unsupported opcode: %x" n)
+    | n -> unimplemented (Printf.sprintf "unsupported opcode: %02x" n)
 
   in
   let pref, a = get_prefixes addr in
