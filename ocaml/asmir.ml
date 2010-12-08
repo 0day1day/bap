@@ -14,6 +14,8 @@ open Type
 open Ast
 open Util
 
+module BArray = Bigarray.Array1
+
 exception Disassembly_error;;
 
 type arch = Libbfd.bfd_architecture
@@ -380,8 +382,8 @@ let section_contents prog secs =
     (* let open Int64 in *)
     let (-) = Int64.sub and (+) = Int64.add in
     let rec f a = function [] -> raise Not_found
-      | (s,arr)::_ when a - s >= 0L && a - s < s + Int64.of_int(Array.length arr)  ->
-	arr.(Int64.to_int(a-s))
+      | (s,arr)::_ when a - s >= 0L && a - s < s + Int64.of_int(BArray.dim arr)  ->
+	arr.{Int64.to_int(a-s)}
       | _::b -> f a b
     in
     f a bits
