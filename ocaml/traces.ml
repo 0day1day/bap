@@ -250,13 +250,13 @@ let assign_vars memv =
     | None -> a
   in
   let addmem k v a =
-    if not !allow_symbolic_indices then (
-      if not v.tnt then
+    (* What should we do when we have symbolic indices? Should we
+       introduce concrete memory information? I am doing so for
+       now. *)
+    match v.tnt with
+    | false ->
 	Move(memv, Store(Var(memv), Int(k, memtype), v.exp, exp_false, reg_8), [])::a
-      else
-	a)
-    else
-      a
+    | _ -> a
   in
   let bige = Hashtbl.fold addone global.vars [] in
   let bige = Hashtbl.fold addmem global.memory bige in
@@ -1279,8 +1279,8 @@ let symbolic_run trace =
 	   );
 	   if hasconc && !use_alt_assignment then (
 	     let assigns = assign_vars memv in
-	     (* List.iter *)
-	     (*   (fun stmt -> dprintf "assign stmt: %s" (Pp.ast_stmt_to_string stmt)) assigns; *)
+	     List.iter
+	       (fun stmt -> dprintf "assign stmt: %s" (Pp.ast_stmt_to_string stmt)) assigns;
 	     stmts := !stmts @ assigns;
 	   );
 	   stmts := List.map to_dsa (!stmts @ [stmt]);
