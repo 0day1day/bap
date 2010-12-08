@@ -77,7 +77,7 @@ DOC_FILES := $(filter %.mli, $(SOURCES)) $(filter %.ml, $(SOURCES))
 
 
 # ocamlfind packages required
-export PACKS = str ocamlgraph extlib unix
+export PACKS = bigarray str ocamlgraph extlib unix
 export YFLAGS = -v
 
 
