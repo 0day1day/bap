@@ -1553,7 +1553,11 @@ let add_seh_pivot_file gaddr sehaddr paddr payloadfile trace =
 let generate_formula trace = 
   LetBind.bindings := [] ;  (*  XXX: temporary hack *)
   let trace = concrete trace in
-  let trace = trace_dce trace in
+  (* If we leave DCE on, it will screw up the consistency check. *)
+  let trace = match !consistency_check with
+    | false -> trace_dce trace
+    | true -> trace
+  in
   ignore(symbolic_run trace) ;
   TraceSymbolic.output_formula ()
 
@@ -1697,7 +1701,8 @@ let valid_to_invalid trace =
 	  let _ = solution_from_stp_formula "tempout" in 
 	  Printf.printf "going higher\n";
 	  test middle u
-	with Parsing.Parse_error ->
+	with Parsing.Parse_error
+	| Failure _ ->
 	  (Printf.printf "going lower\n";
 	   test l middle)
 	| Symbeval.UnknownLabel ->
