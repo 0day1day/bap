@@ -2,7 +2,7 @@
 RANLIB = @RANLIB@
 lib_LIBRARIES = libasmir.a
 #lib_LTLIBRARIES = libasmir.la
-AM_CFLAGS = -I@VEX_DIR@/pub -I../include -fPIC
+AM_CFLAGS = -I@VEX_DIR@/pub -I../include -Itraces -fPIC -DGET_OPERANDS
 AM_CXXFLAGS = $(AM_CFLAGS)
 
 
@@ -26,5 +26,6 @@ libasmir_a_SOURCES = \
 	./traces/trace_v40.cpp \
 	./traces/trace_v41.cpp \
 	./traces/trace_v50.cpp \
-	./traces/reg_mapping.cpp
-
+	./traces/reg_mapping.cpp \
+        ./traces/pin_frame.h ./traces/pin_frame.cpp \
+        ./traces/pin_trace.h ./traces/pin_trace.cpp

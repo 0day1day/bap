@@ -326,11 +326,46 @@ let run_with_remapped_fd fd_from fd_to f =
 
   rv
 
-let rec take_aux acc = function
- | (_, 0) | ([],_) -> List.rev acc
- | (x::xs, n) -> take_aux (x::acc) (xs,n-1)
+let take = ExtList.List.take
 
-let take l n = take_aux [] (l, n)
+let fast_append = ExtList.List.append
+
+module StatusPrinter =
+struct
+  let total = ref 0
+  let current = ref 0
+  let last = ref 0
+  let message = ref "Status"
+  let starttime = ref 0.0
+    
+  let update () = 
+    if !last = -1 then
+      Printf.printf "%s...\r" !message
+    else
+      Printf.printf "%s: %d%%\r" !message !last ;
+    flush stdout
+      
+  let init msg size = 
+    current := 0 ;
+    last := -1 ;
+    message := msg ;
+    total := size ;
+    starttime := Unix.gettimeofday () ;
+    update ()
+      
+  let inc () =
+    if !total != 0 then (
+      current := !current + 1 ;
+    let last' = (!current * 100) / !total in
+      if (last' != !last) then
+	(last := last'; update ()))
+	  
+  let stop () =
+    Printf.printf "%s: Done! (%f seconds)\n" !message (Unix.gettimeofday () -. !starttime) ;
+    flush stdout
+end
+
+let has_some o = o <> None
 
 (* list_firstindex l pred returns the index of the first list element
    that pred returns true on *)

@@ -75,6 +75,10 @@ let output_ssa_ddg f p =
     close_out oc;
     p
 
+let to_dsa p =
+  let p,_ = Traces.to_dsa p in
+  p 
+
 let output_structanal p =
   let cfg = Prune_unreachable.prune_unreachable_ast p in
   let _ = Structural_analysis.structural_analysis cfg in
@@ -88,6 +92,8 @@ let deadcode p =
   fst(Deadcode.do_dce p)
 let jumpelim p =
   Deadcode.cfg_jumpelim p
+let ast_coalesce = Coalesce.AST_Coalesce.coalesce
+let ssa_coalesce = Coalesce.SSA_Coalesce.coalesce
 let memory2scalardef p =
   Memory2scalar.convert_g p Memory2scalar.Default
 let memory2scalariroptir p =
@@ -98,6 +104,11 @@ let ast_chop srcbb srcn trgbb trgn p =
   Ast_slice.CHOP_AST.chop p !srcbb !srcn !trgbb !trgn
 let ssa_chop srcbb srcn trgbb trgn p = 
   Ssa_slice.CHOP_SSA.chop p !srcbb !srcn !trgbb !trgn
+
+(* Evaluation code added *)
+let eval_ast p = 
+  Search.dfs_ast_program p ;
+  p 
 
 let add c =
   pipeline := c :: !pipeline
@@ -112,8 +123,8 @@ let speclist =
      "<file> Pretty print AST graph to <file> (in Graphviz format) (no stmts)")
   ::("-pp-ast-cdg", Arg.String (fun f -> add(TransformAstCfg(output_ast_cdg f))),
      "Output the AST CDG (bbid's)")
-(*  ::("-ast-eval", uadd(TransformAst eval_ast_cfg),
-     "Evaluate an AST and print variable values on exit") *)
+  ::("-ast-eval", uadd(TransformAst eval_ast),
+     "Evaluate an AST and print variable values on exit")
   ::("-pp-ast-pdg", Arg.String (fun f -> add(TransformAstCfg(output_ast_pdg f))),
      "Output the AST DDG (bbid's)")
   ::("-pp-ssa", Arg.String(fun f -> add(TransformSsa(output_ssa f))),
@@ -154,6 +165,10 @@ let speclist =
      "Apply Strongly Connected Component based Value Numbering")
   ::("-deadcode", uadd(TransformSsa deadcode),
      "Perform dead code ellimination.")
+  ::("-ast-coalesce", uadd(TransformAstCfg ast_coalesce),
+     "Perform coalescing on the AST.")
+  ::("-ssa-coalesce", uadd(TransformSsa ssa_coalesce),
+     "Perform coalescing on the SSA.")
   ::("-jumpelim", uadd(TransformSsa jumpelim),
      "Control flow optimization.")
   ::("-memtoscalar", uadd(TransformSsa memory2scalardef),
@@ -164,15 +179,146 @@ let speclist =
      "Perform all supported optimizations on SSA")
   ::("-ssa-to-single-stmt",
      uadd(TransformSsa Depgraphs.DDG_SSA.stmtlist_to_single_stmt),
-     "Create new graph where every node has at most 1 SSA statement")
-  :: ("-ssa-coalesce", uadd(TransformSsa Coalesce.SSA_Coalesce.coalesce),
-      "Perform coalescing on a SSA-CFG graph")
+     "Create new graph where every node has at most 1 SSA statement"
+    )
+  ::("-trace-cut", Arg.Int(fun i -> add(TransformAst(Util.take i))),
+     "<n>  Get the first <n> instructions of the trace")
+  ::("-trace-concrete", 
+     uadd(TransformAst Traces.concrete),
+     "Execute the trace concretely and obtain a straightline trace"
+    )
+  ::("-trace-concolic", 
+     uadd(TransformAst Traces.concolic),
+     "Execute the trace symbolically and generate the formula"
+    )
+  ::("-trace-dce",
+     uadd(TransformAst Traces.trace_dce),
+     "Trace dead-code elimination."
+    )
+  ::("-trace-debug", 
+     uadd(TransformAst Traces.valid_to_invalid),
+     "Formula debugging. Prints to files form_val and form_inv"
+    )
+  ::("-trace-dsa",
+     uadd(TransformAst to_dsa),
+     "Convert to DSA form.")
+   ::("-trace-target", 
+     Arg.String (fun i -> add(TransformAst(Traces.control_flow i))),
+     "<addr> Provide the target address <addr>"
+    )   
+   ::("-trace-symbolic-target", 
+     uadd(TransformAst Traces.limited_control),
+     "Use a symbolic jump target (to determine the amount of control we have)"
+    )   
+   ::("-trace-payload", 
+     Arg.String (fun p -> add(TransformAst(Traces.add_payload p))),
+     "<binstring> Provide a payload to be inserted at the return address (BEWARE of null bytes)"
+    )   
+   ::("-trace-payload-file", 
+     Arg.String (fun p -> add(TransformAst(Traces.add_payload_from_file p))),
+     "<binfile> Provide a payload to be inserted at the return address"
+    )
+   ::("-trace-payload-after-file", 
+     Arg.String (fun p -> add(TransformAst(Traces.add_payload_from_file_after ~offset:4L p))),
+     "<binfile> Provide a payload to be inserted past the return address"
+    )
+   ::("-trace-payload-after", 
+     Arg.String (fun p -> add(TransformAst(Traces.add_payload_after ~offset:4L p))),
+     "<binstring> Provide a payload to be inserted past the return address (BEWARE of null bytes)"
+    )   
+   ::("-trace-shell", 
+     Arg.Int (fun off -> add(TransformAst(Traces.inject_shellcode off))),
+     "<nopsled> Insert shellcode with a nopsled of the given size"
+    )   
+  ::("-trace-pivot",
+     Arg.Tuple(
+       let gaddr = ref 0L in
+       let maddr = ref 0L in
+       [
+   	 Arg.String (fun a -> gaddr := Int64.of_string a);
+  	 Arg.String (fun a -> maddr := Int64.of_string a);
+  	 Arg.String (fun a -> add(TransformAst(Traces.add_pivot !gaddr !maddr a)));
+       ]),
+     "<gaddress> <maddress> <payload string> Use pivot at gaddress to transfer control to payload at maddress."
+    )
+  ::("-trace-pivot-file",
+     Arg.Tuple(
+       let gaddr = ref 0L in
+       let maddr = ref 0L in
+       [
+   	 Arg.String (fun a -> gaddr := Int64.of_string a);
+  	 Arg.String (fun a -> maddr := Int64.of_string a);
+  	 Arg.String (fun a -> add(TransformAst(Traces.add_pivot_file !gaddr !maddr a)));
+       ]),
+     "<gaddress> <maddress> <payload string> Use pivot at gaddress to transfer control to payload at maddress."
+    )
+  ::("-trace-seh-pivot",
+     Arg.Tuple(
+       let gaddr = ref 0L in
+       let maddr = ref 0L in
+       let sehaddr = ref 0L in
+       [
+  	 Arg.String (fun a -> gaddr := Int64.of_string a);
+  	 Arg.String (fun a -> maddr := Int64.of_string a);
+	 Arg.String (fun a -> sehaddr := Int64.of_string a);
+  	 Arg.String (fun a -> add(TransformAst(Traces.add_seh_pivot !gaddr !sehaddr !maddr a)));
+       ]),
+     "<gaddress> <maddress> <sehaddress> <payload string> Use pivot at gaddress to transfer control (by overwriting SEH handler at sehaddress) to payload at maddress."
+    )
+  ::("-trace-seh-pivot-file",
+     Arg.Tuple(
+       let gaddr = ref 0L in
+       let maddr = ref 0L in
+       let sehaddr = ref 0L in
+       [
+  	 Arg.String (fun a -> gaddr := Int64.of_string a);
+  	 Arg.String (fun a -> maddr := Int64.of_string a);
+	 Arg.String (fun a -> sehaddr := Int64.of_string a);
+  	 Arg.String (fun a -> add(TransformAst(Traces.add_seh_pivot_file !gaddr !sehaddr !maddr a)));
+       ]),
+     "<gaddress> <maddress> <sehaddress> <payload file> Use pivot at gaddress to transfer control (by overwriting SEH handler at sehaddress) to payload at maddress."
+    )
+  ::("-trace-formula", 
+     Arg.String(fun f -> add(TransformAst(Traces.output_formula f))),
+     "<file> Output the STP trace formula to <file>"
+    )
+  ::("-approx-formula", 
+     Arg.Unit(fun () -> add(TransformAst(Payload.sym_analyze))),
+     "Approximate formula"
+    )
+  ::("-trace-exploit", 
+     Arg.String(fun f -> add(TransformAst(Traces.output_exploit f))),
+     "<file> Output the exploit string to <file>"
+    )
+  ::("-trace-assignments", 
+     uadd(TransformAst(Traces.add_assignments)),
+     "Explicitly assign the concrete values to the trace variables"
+    )
+  ::("-trace-length", 
+     uadd(TransformAst(Traces.trace_length)),
+     "Output the length of the trace"
+    )
+  ::("-trace-padding", 
+     Arg.Set Traces.padding,
+     "Apply padding for symbolic unused bytes."
+    )   
+  ::("-no-let-bindings", 
+     Arg.Clear Traces.full_symbolic,
+     "Disable the usage of let bindings during formula generation"
+    )
+  ::("-trace-symbolic-indices", 
+     Arg.Set Traces.allow_symbolic_indices,
+     "Allow the existence of symbolic indices during formula generation"
+    )
+  ::("-trace-check",
+     Arg.Set Traces.consistency_check,
+     "Perform extra consistency checks"
+    )
+  ::("-exec",
+     uadd(TransformAst Interpreter.execute),
+     "Concretely execute the IL")
   :: ("-normalize-mem", uadd(TransformAst Memory2array.coerce_prog),
       "Normalize memory accesses as array accesses")
-  :: ("-canonicalize", uadd(TransformAst Traces.canonicalize),
-      "Convert an input trace to a valid IL program")
-  :: ("-detect-attack", uadd(TransformAst Traces.detect_attack),
-      "Detect the time of attack and output the shortened trace")
   :: ("-prune-cfg",
       uadd(TransformAstCfg Prune_unreachable.prune_unreachable_ast),
       "Prune unreachable nodes from an AST CFG")

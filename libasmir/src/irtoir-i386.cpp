@@ -281,9 +281,10 @@ vector<VarDecl *> i386_get_reg_decls()
   ret.push_back(new VarDecl("R_CC_NDEP", r32));  
 
   // other flags
-  ret.push_back(new VarDecl("R_DFLAG", r1));
-  ret.push_back(new VarDecl("R_IDFLAG", r1));
-  ret.push_back(new VarDecl("R_ACFLAG", r1));
+  ret.push_back(new VarDecl("R_DFLAG", r32)); // Direction Flag
+  ret.push_back(new VarDecl("R_IDFLAG", r1)); 
+        // Id flag (support for cpu id instruction)
+  ret.push_back(new VarDecl("R_ACFLAG", r1)); // Alignment check
   ret.push_back(new VarDecl("R_EMWARN", r32));
 
   // General purpose 32-bit registers
@@ -318,6 +319,14 @@ vector<VarDecl *> i386_get_reg_decls()
   ret.push_back(new VarDecl("R_BH", r8));  
   ret.push_back(new VarDecl("R_CH", r8));  
   ret.push_back(new VarDecl("R_DH", r8));  
+
+  // 32-bit segment base registers
+  ret.push_back(new VarDecl("R_CS_BASE", r32));
+  ret.push_back(new VarDecl("R_DS_BASE", r32));
+  ret.push_back(new VarDecl("R_ES_BASE", r32));
+  ret.push_back(new VarDecl("R_FS_BASE", r32));
+  ret.push_back(new VarDecl("R_GS_BASE", r32));
+  ret.push_back(new VarDecl("R_SS_BASE", r32));
   return ret;
 }
 
@@ -434,6 +443,35 @@ static Exp *translate_get_reg_8( int offset )
       Exp *value = new Cast(reg, REG_16, CAST_LOW);
       return new Cast(value, REG_8, CAST_HIGH);
     }
+}
+
+static Exp *translate_get_segreg_base( int offset )
+{
+    string name;
+    bool sub;
+    Exp *value = NULL;
+
+    switch ( offset )
+    {
+        // 
+        // These are regular 16 bit registers
+        //
+        case OFFB_CS:   name = "CS_BASE";  break;
+        case OFFB_DS:   name = "DS_BASE";  break;
+        case OFFB_ES:   name = "ES_BASE";  break;
+        case OFFB_FS:   name = "FS_BASE";  break;
+        case OFFB_GS:   name = "GS_BASE";  break;
+        case OFFB_SS:   name = "SS_BASE";  break;
+
+        default:
+            throw "Unrecognized register offset";
+    }
+
+    Temp *reg = mk_reg(name, REG_32);
+    value = reg;
+
+    return value;
+
 }
 
 static Exp *translate_get_reg_16( int offset )
@@ -639,6 +677,119 @@ Exp *i386_translate_ccall( IRExpr *expr, IRSB *irbb, vector<Stmt *> *irout )
 	// data structure defined in valgrind/VEX/pub/libvex_ir.h
 
 	irout->push_back(new Comment("x86g_use_seg_selector"));
+
+        if (use_simple_segments) {
+
+          /*
+           * This code replaces segment memory calcuations with a fake
+           * register, XS_BASE.  For instance, %fs:addr would be at
+           * FS_BASE + addr.
+           * 
+           * Here's what happens when you have a segment.
+           *    
+           *    t6 = GET:I16(286)
+           *    t5 = 16Uto32(t6)
+           *    t2 = GET:I32(292)
+           *    t3 = GET:I32(296)
+           *    t7 =
+           *    x86g_use_seg_selector{0x80c13a0}(t2,t3,t5,0x18:I32):I64
+           *
+           *    So, we are passed a temporary five.  We need to look
+           *    at t5, find t6, and that will tell us the segment
+           *    selector used in the statement.
+           */ 
+          
+          IRExpr* tempexp = expr->Iex.CCall.args[2];
+          IRExpr* uexp;
+          IRExpr* tempexp2;
+          IRExpr* segexp;
+          IRStmt* wrtmp = NULL;
+          IRTemp tempnum;
+          Exp* segbaseexp;
+          Exp* finaladdr;
+          Exp *virtual_addr = translate_expr(expr->Iex.CCall.args[3], irbb, irout);
+          
+          
+          /* temp is a reference to t5 */
+          
+          if (tempexp->tag != Iex_RdTmp) {
+            cerr << tempexp->tag << endl;
+            panic("Expected unop.");
+          }
+
+          tempnum = tempexp->Iex.RdTmp.tmp;
+
+          /* Now, loop through the block statements and find the
+           * statement that moves to our temporary. */
+          for (int i = 0; i < irbb->stmts_size; i++) {
+            IRStmt *s = irbb->stmts[i];
+
+            if (s->tag == Ist_WrTmp) {
+              /* Ahah, we found a write to a temporary. Is it our temporary? */
+              if (s->Ist.WrTmp.tmp == tempnum) {
+                /* Got it */
+                wrtmp = s;
+                break;
+              }              
+            }
+          }
+
+          if (wrtmp == NULL) {
+            panic("Unable to find write to temporary");
+          }
+
+          /* Now we should have a uniop expression */
+          uexp = wrtmp->Ist.WrTmp.data;
+
+          if (uexp->tag != Iex_Unop) {
+            panic("Expected unop");
+          }
+
+          /* This unop should reference another temp */
+          tempexp = uexp->Iex.Unop.arg;
+
+          if (tempexp->tag != Iex_RdTmp) {
+            panic("Expected read temp");
+          }
+
+          tempnum = tempexp->Iex.RdTmp.tmp;
+          wrtmp = NULL;
+          
+          /* Ok, again we need to look for an assignment to this
+           * temp. Then we finally have the segment selector. */
+          for (int i = 0; i < irbb->stmts_size; i++) {
+            IRStmt *s = irbb->stmts[i];
+
+            if (s->tag == Ist_WrTmp) {
+              /* Ahah, we found a write to a temporary. Is it our temporary? */
+              if (s->Ist.WrTmp.tmp == tempnum) {
+                /* Got it */
+                wrtmp = s;
+                break;
+              }              
+            }
+          }
+
+          if (wrtmp == NULL) {
+            panic("Unable to find write to temporary");
+          }
+
+          /* Finally, we should have the segment selector */
+          segexp = wrtmp->Ist.WrTmp.data;
+
+          if (segexp->tag != Iex_Get) {
+            panic("Expected get");
+          }
+
+          segbaseexp = translate_get_segreg_base(segexp->Iex.Get.offset);
+
+          finaladdr = _ex_add(segbaseexp, virtual_addr);
+          finaladdr = _ex_u_cast(finaladdr, REG_64);
+          
+        result = finaladdr;
+          
+        } else {
+
         Exp *ldt = translate_expr((IRExpr*)expr->Iex.CCall.args[0], 
                                   irbb, irout); 
 	Exp *gdt = translate_expr((IRExpr*)expr->Iex.CCall.args[1], 
@@ -721,6 +872,8 @@ Exp *i386_translate_ccall( IRExpr *expr, IRSB *irbb, vector<Stmt *> *irout )
 	// return an address, high 32 bits are zero, indicating success
 	
 	result = _ex_u_cast(addr, REG_64); 
+        }
+
     }
     else if ( func == "x86g_calculate_RCL" ) 
     {

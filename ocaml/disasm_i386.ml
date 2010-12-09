@@ -143,6 +143,8 @@ let regs : var list =
   ("R_ES", reg_16); 
   ("R_FS", reg_16); 
   ("R_GS", reg_16); 
+  ("R_FS_BASE", reg_32);
+  ("R_GS_BASE", reg_32);
   ("R_SS", reg_16); 
 
   (* floating point *)

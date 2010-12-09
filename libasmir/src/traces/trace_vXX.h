@@ -24,7 +24,7 @@ public:
 	virtual void consume_header(TraceHeader * hdr);
     conc_map_vec * operand_status(EntryHeader * eh);
 private:
-    attr_type_t opsize_to_type(int size);
+    cval_type_t opsize_to_type(int size);
 protected:
 	ifstream * trace;
 	void read_taint_byte_record(TaintByteRecord * byte_rec);

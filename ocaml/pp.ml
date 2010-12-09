@@ -97,17 +97,25 @@ object (self)
 
   method attrs a = List.iter (fun a -> space();self#attr a) a
 
-  method attr = function
+  method attr =
+    let bits_of_width = function
+      | Reg n -> n
+      | _ -> failwith "bits_of_width"
+    in
+      function
     | Asm s -> pp "@asm \""; pp s; pp "\""
     | Address a -> printf "@address \"0x%Lx\"" a;
     | Liveout -> pp "@set \"liveout\""
     | StrAttr s -> pp "@str \""; pp s; pc '\"'
-    | Context {name=s; mem=mem; value=v; index=i; taint=t} -> 
-      let ts = if t = Taint then "tainted" else "untainted" in
-      let ind = if mem then "["^(Int64.format "%Lx" i)^"]" else "" in
-      pp "@attr \""; pp (s^ ind ^" = "^(Int64.format "%Lx" v)^ ", " ^ ts); pc '\"'
+    | Context {name=s; mem=mem; value=v; index=i; t=tp; taint=Taint t} -> 
+	let ts = string_of_int t in
+	(*if t = Taint then "tainted" else "untainted" in*)
+	let ind = if mem then "[0x"^(Int64.format "%Lx" i)^"]" else "" in
+	pp "@context "; pp (s^ ind ^" = 0x"^(Int64.format "%Lx" v)^ ", " ^ ts
+			      ^", u"
+			      ^ (string_of_int (bits_of_width tp)))
+    | ThreadId i -> pp "@tid \""; pp (string_of_int i); pp "\""
     | ExnAttr _ (* we could try to print something using Printexc.to_string *)
-   (* | Context _ (* enabling printing might be useful for debugging - ethan *)*)
     | Pos _ -> () (* ignore position attrs *)
     | InitRO -> pp "@set \"initro\""
     | Synthetic -> pp "@set \"synthetic\""

@@ -606,6 +606,7 @@ struct
 	   LS.equal a b) m1 m2
       in
       e
+    let is_directed = true
   end
 
   module UseDefSpec(*:GraphDataflow.DATAFLOW*) =

@@ -79,7 +79,7 @@ AC_ARG_WITH(vex-revision,
 [
         VEX_VERSION=`svn info ${VEX_DIR} | grep Revision | awk '{print $2}'`
 ])
-+
+#+
 if test -e "${VEX_DIR}/priv/main/vex_svnversion.h"; then
     VEX_VERSION=`tr -d \" <"${VEX_DIR}/priv/main/vex_svnversion.h"`
 fi
@@ -117,7 +117,7 @@ AC_CHECK_LIB([vex], [LibVEX_Version])
 AC_SUBST(VEX_DIR)
 
 
-cp libasmir/makefile.inc.in libasmir/makefile.inc
+#cp libasmir/makefile.inc.in libasmir/makefile.inc
 echo "VEX_DIR=${VEX_DIR}" >> libasmir/makefile.inc
 echo "LIBASMIR_CXXFLAGS=-I${VEX_DIR}/pub -I`pwd`/src/include $CXXFLAGS" >> libasmir/makefile.inc
 echo "LIBASMIR_LDFLAGS=-L${VEX_DIR} -L`pwd`/src $LDFLAGS" >> libasmir/makefile.inc

@@ -20,6 +20,11 @@ object
     (** Called when visiting an assigned variable. (IE: On the LHS of a Move *)
     
   method visit_binding : var * exp -> (var * exp) visit_action
+    (** Called when mapping a variable in a let *)
+
+  method visit_uvar : var -> var visit_action
+    (** Called when unmapping a variable in a let *)
+
 end
 
 (** A nop visitor similar to [nop_bap_visitor].
@@ -31,5 +36,7 @@ val stmt_accept : #t -> stmt -> stmt
 val exp_accept : #t -> exp -> exp
 val rvar_accept : #t -> var -> var
 val avar_accept : #t -> var -> var
+val binding_accept : #t -> var * exp -> var * exp
+val uvar_accept : #t -> var -> var
 val prog_accept : #t -> program -> program
 val cfg_accept : #t -> Cfg.AST.G.t -> Cfg.AST.G.t

@@ -61,16 +61,18 @@ type pos = (string * int)
     statement.
  *)
 
-type taint_type = Taint | Untaint
+type taint_type = Taint of int
+type usage = RD | WR | RW
 
 type context = 
  {
-   name:string;
-   mem:bool;
-   t:typ;
-   index:int64;
-   value:int64;
-   taint:taint_type
+   name  : string;
+   mem   : bool;
+   t     : typ;
+   index : int64;
+   value : int64;
+   usage : usage;
+   taint : taint_type
  }
  
 type attribute = 
@@ -84,6 +86,7 @@ type attribute =
                                 * It can be merged with `StrAttr' but it seems 
                                 * more flexible to create a separate attribute. 
                                 * - ethan *)
+  | ThreadId of int
   | ExnAttr of exn (** Generic extensible attribute, but no parsing *)
   | InitRO (** The memory in this assignment is stored in the binary *)
   | Synthetic (** Operation was added by an analysis *)

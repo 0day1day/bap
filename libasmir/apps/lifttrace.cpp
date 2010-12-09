@@ -1,8 +1,9 @@
 /* A simple interface to lift traces without invoking   *
  * the OCaml frontend - ethan                           */
-#include <stdlib.h>
+
 #include "readtrace.h"
 #include <iostream>
+#include <cstdlib>
 #include <getopt.h>
 
 static const string help_message =
@@ -91,7 +92,7 @@ int main(int argc, char *argv[])
     return -1;
   }
 
-  read_trace_from_file(tracename, offset, print, atts);
+  read_trace_from_file(tracename, offset, 0LL, print, atts, false);
 
   return 0;
 }

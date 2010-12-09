@@ -32,6 +32,16 @@ val list_find_some : ('a -> 'b option) -> 'a list -> 'b
 val list_unique : 'a list -> 'a list
 val list_map_some : ('a -> 'b option) -> 'a list -> 'b list
 val list_join : ('a -> 'a -> 'a) -> 'a list -> 'a
+val list_firstindex : ?s:int -> 'a list -> ('a -> bool) -> int
+val list_insert : 'a list -> 'a list -> int -> 'a list
+val list_remove: 'a list -> int -> int -> 'a list
+val list_delete: 'a list -> 'a -> 'a list
+val list_compare: ('a -> 'a -> int) -> ('a list) -> ('a list) -> int
+val list_cart_prod2: ('a -> 'b -> unit) -> ('a list) -> ('b list) -> unit
+val list_cart_prod3: ('a -> 'b -> 'c -> unit) -> ('a list) -> ('b list) -> ('c list) -> unit
+val list_cart_prod4: ('a -> 'b -> 'c -> 'd -> unit) -> ('a list) -> ('b list) -> ('c list) -> ('d list) -> unit
+val list_existssome: ('a -> 'b option) -> ('a list) -> 'b option
+val list_for_allsome: ('a -> 'b option) -> ('a list) -> 'b list option
 
 val get_hash_keys : ?sort_keys:bool -> ('a, 'b) Hashtbl.t -> 'a list
 val change_ext : string -> string -> string
@@ -43,6 +53,7 @@ val split_common_suffix : 'a list -> 'a list -> 'a list * 'a list * 'a list
 val option_unwrap : ('a option) -> 'a
 val option_map : ('a -> 'b) -> 'a option -> 'b option
 val apply_option : ('a -> 'a) option -> 'a -> 'a
+val has_some: 'a option -> bool
 
 val print_separated_list : ('a -> string) -> string -> 'a list -> string
 
@@ -66,16 +77,13 @@ val int64_umin : int64 -> int64 -> int64
 val run_with_remapped_fd :
   Unix.file_descr -> Unix.file_descr -> (unit -> 'a) -> 'a
 
-val take : 'a list -> int -> 'a list
+val take : int -> 'a list -> 'a list
+val fast_append : 'a list -> 'a list -> 'a list
 
-val list_firstindex : ?s:int -> 'a list -> ('a -> bool) -> int
-val list_insert : 'a list -> 'a list -> int -> 'a list
-val list_remove: 'a list -> int -> int -> 'a list
-val list_delete: 'a list -> 'a -> 'a list
-val list_compare: ('a -> 'a -> int) -> ('a list) -> ('a list) -> int
-val list_cart_prod2: ('a -> 'b -> unit) -> ('a list) -> ('b list) -> unit
-val list_cart_prod3: ('a -> 'b -> 'c -> unit) -> ('a list) -> ('b list) -> ('c list) -> unit
-val list_cart_prod4: ('a -> 'b -> 'c -> 'd -> unit) -> ('a list) -> ('b list) -> ('c list) -> ('d list) -> unit
-val list_existssome: ('a -> 'b option) -> ('a list) -> 'b option
-val list_for_allsome: ('a -> 'b option) -> ('a list) -> 'b list option
-val has_some: 'a option -> bool
+module StatusPrinter :
+  sig
+    val init : string -> int -> unit
+    val inc  : unit -> unit
+    val stop : unit -> unit
+  end
+

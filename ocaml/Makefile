@@ -42,6 +42,7 @@ export SOURCES = \
 	disasm_i386.ml \
 	disasm.ml \
 	grammar.mly lexer.mll \
+	stp_grammar.mly stp_lexer.mll \
 	parser.ml \
 	memory2array.ml \
 	gcl.mli gcl.ml \
@@ -54,18 +55,20 @@ export SOURCES = \
 	vsa.ml \
 	memory2scalar.ml \
 	eval.ml \
-	symbeval.ml \
-	symbeval_search.ml \
-	coalesce.ml \
-	traces.ml \
+	symbeval.ml symbeval_search.ml \
 	ast_slice.ml \
 	ssa_slice.ml \
 	comparelib.ml \
 	structural_analysis.ml \
 	unroll.ml \
 	hacks.ml \
+	coalesce.ml \
+	template.ml \
+	interpreter.ml \
+	traces.ml \
+	payload.ml \
+	search.ml \
 	$(PROJSOURCES) \
-
 
 RESULT = bap
 DOC_FILES := $(filter %.mli, $(SOURCES)) $(filter %.ml, $(SOURCES))

@@ -20,11 +20,6 @@ open Var
 (** How big is normalized index? *)
 let bitwidth = 8
 
-let getelementtype tmem =
-  match tmem with
-  | TMem(elementtype) -> elementtype
-  | _ -> failwith "This is not an array"
-
 let getwidth regtyp =
   match regtyp with
   | Reg(n) -> assert (n mod bitwidth = 0); n/bitwidth
@@ -32,7 +27,8 @@ let getwidth regtyp =
 
 let split_load array index eletype endian bytenum =
   let newtype = Reg(bitwidth) in
-  let indexplus = BinOp(PLUS, index, Int(Int64.of_int(bytenum), eletype)) in
+  let indextype = Typecheck.infer_ast index in
+  let indexplus = BinOp(PLUS, index, Int(Int64.of_int(bytenum), indextype)) in
   let exp = Load(array, indexplus, endian, newtype) in
   let exp = Cast(CAST_UNSIGNED, eletype, exp) in
   let exp = exp_shl exp (Int(Int64.of_int((bytenum) * bitwidth), eletype)) in
@@ -51,7 +47,8 @@ let split_loads array index eletype endian =
 
 let split_write array index eletype endian data bytenum =
   let newtype = Reg(bitwidth) in
-  let indexplus = BinOp(PLUS, index, Int(Int64.of_int(bytenum), eletype)) in
+  let indextype = Typecheck.infer_ast index in
+  let indexplus = BinOp(PLUS, index, Int(Int64.of_int(bytenum), indextype)) in
   let exp = exp_shr data (Int(Int64.of_int((bytenum) * bitwidth), eletype)) in
   let exp = Cast(CAST_LOW, newtype, exp) in
   let exp = Store(array, indexplus, exp, endian, newtype) in

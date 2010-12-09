@@ -25,9 +25,11 @@ val arch_arm : arch
 
 
 type varctx
-(*
-val gamma_create : Ast.decl -> Ast.decl list -> varctx
+
+val gamma_create : Var.t -> Var.t list -> varctx
 val gamma_lookup : varctx -> string -> Var.t
+
+(*
 val gamma_extend : varctx -> string -> Ast.decl -> unit
 val gamma_unextend : varctx -> string -> unit
 *)
@@ -54,6 +56,8 @@ val gamma_for_arch : arch -> varctx
 
 val get_asmprogram_arch : asmprogram -> arch
 
+val x86_mem : Var.t
+val x86_regs : Var.t list
 
 val open_program : string -> asmprogram
 val asmprogram_to_bap : ?init_ro:bool -> asmprogram -> Ast.program
@@ -63,7 +67,9 @@ val asm_addr_to_bap :
 val asmprogram_to_bap_range : ?init_ro:bool ->
   asmprogram -> address_t -> address_t  -> Ast.program
 
-val bap_from_trace_file : ?atts:bool -> string -> Ast.program
+val bap_from_trace_file : ?atts:bool -> ?pin:bool -> string -> Ast.program
+
+val bap_stream_from_trace_file : ?atts:bool -> ?pin:bool -> string -> (Ast.stmt list) Stream.t
 
 val get_symbols : ?all:bool -> asmprogram -> asymbol array
 

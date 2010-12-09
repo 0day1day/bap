@@ -14,11 +14,15 @@ typedef [abstract] void* Stmt;
 typedef [abstract] void* asm_program_t;
 typedef [abstract] void* bap_block_t;
 typedef [abstract] void* bap_blocks_t;
+typedef [abstract] void* cval_t;
+typedef [abstract] void* trace_attrs;
+typedef [abstract] void* cval_vec_t;
 typedef [abstract] void* memory_cell_data_t;
 typedef [abstract] void* memory_data_t;
-typedef [abstract] void* attr;
-typedef [abstract] void* conc_map_vec;
+typedef [abstract] void* trace_frames_t;
+typedef [abstract] void* trace_frame_t;
 
+typedef int threadid_t;
 
 [length_is(*num)] asymbol*
 asmir_get_symbols(asm_program_t prog,
@@ -31,6 +35,9 @@ asmir_get_all_symbols(asm_program_t prog,
 [length_is(*num)] section_ptr*
 asmir_get_all_sections(asm_program_t prog,
                        [out] long *num);
+
+enum frame_type_t {
+  FRM_NONE = 0, FRM_KEY, FRM_STD, FRM_LOADMOD, FRM_SYSCALL, FRM_TAINT, FRM_STD2 };
 
 enum exp_type_t {
   BINOP, UNOP, CONSTANT, MEM, TEMP, PHI, CAST,
@@ -56,7 +63,7 @@ enum cast_t {
 
 enum stmt_type_t {  JMP,   CJMP, SPECIAL, MOVE,  COMMENT,  LABEL, EXPSTMT, VARDECL, CALL, RETURN, FUNCTION, ASSERT};
 
-enum attr_type_t {NONE, BOOL, CHR, INT_16, INT_32, INT_64};
+enum cval_type_t {NONE, BOOL, CHR, INT_16, INT_32, INT_64, INT_128};
 
 enum exp_type_t exp_type( [in] Exp e);
 enum binop_type_t binop_type([in] Exp e);
@@ -97,15 +104,18 @@ Exp expstmt_exp([in] Stmt s);
 [string] char* vardecl_name([in]Stmt s);
 enum reg_t vardecl_type([in]Stmt s);
 
-conc_map_vec stmt_attributes([in] Stmt s);
-int conc_map_size(conc_map_vec v);
-attr get_attr(conc_map_vec v, int i);
-[string] char* attr_name(attr m);
-const_val_t attr_value(attr m);
-const_val_t attr_ind(attr m);
-boolean attr_mem(attr m);
-enum attr_type_t attr_type(attr m);
-int attr_taint(attr m);
+// Trace attributes... deprecated.
+trace_attrs stmt_attributes([in] Stmt s);
+threadid_t trace_tid(trace_attrs ta);
+int conc_map_size(trace_attrs ta);
+cval_t get_cval(trace_attrs ta, int i);
+[string] char* cval_name(cval_t m);
+const_val_t cval_value(cval_t m);
+const_val_t cval_ind(cval_t m);
+boolean cval_mem(cval_t m);
+enum cval_type_t cval_type(cval_t m);
+int cval_usage(cval_t m);
+int cval_taint(cval_t m);
 
 boolean call_has_lval([in] Stmt s);
 Exp call_lval_opt([in] Stmt s);
@@ -153,11 +163,30 @@ void destroy_bap_blocks(bap_blocks_t bs);
 int asmir_bap_block_size(bap_block_t b);
 Stmt asmir_bap_block_get(bap_block_t b, int i);
 address_t asmir_bap_block_address(bap_block_t b);
-bap_blocks_t asmir_bap_from_trace_file([in,string] char * filename, boolean atts);
+[string] const char* asm_string_from_stmt(Stmt s);
+// deprecated, only for old traces code
+[string] const char* asm_string_from_block(bap_block_t b);
+bap_blocks_t asmir_bap_from_trace_file([in,string] char * filename, unsigned __int64 offset, unsigned __int64 numisns, boolean atts, boolean pintrace);
 
+// access trace frames
+trace_frames_t asmir_frames_from_trace_file([in,string] char * filename, unsigned __int64 offset, unsigned __int64 numisns);
+int asmir_frames_length(trace_frames_t tfs);
+trace_frame_t asmir_frames_get(trace_frames_t tfs, int index);
+void asmir_frames_destroy(trace_frames_t tfs);
+enum frame_type_t asmir_frame_type(trace_frame_t tf);
+threadid_t asmir_frame_tid(trace_frame_t tf);
+[length_is(*len)] char* asmir_frame_get_insn_bytes(trace_frame_t tf, [out] address_t *addrout, [out] int *len);
+
+[string] const char* asmir_frame_get_loadmod_info(trace_frame_t tf, [out] address_t *lowout, [out] address_t *highout);
+
+
+// frame operands
+cval_vec_t asmir_frame_get_operands(trace_frame_t tf);
+void asmir_frame_destroy_operands(cval_vec_t cv);
+int asmir_frame_operands_length(cval_vec_t cv);
+cval_t asmir_frame_get_operand(cval_vec_t cv, int num);
 
 bfdp asmir_get_bfd(asm_program_t p);
-
 
 /*
 bap_block_t

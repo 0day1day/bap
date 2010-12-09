@@ -1,6 +1,29 @@
 let init_ro = ref false
-
 let inputs = ref []
+and streaminputs = ref None
+and pintrace = ref false
+
+(* Set garbage collector options whenever we see -trace. *)
+let set_gc () =
+  Gc.set
+    {
+      (Gc.get ()) with 
+	Gc.minor_heap_size = 32000000; (* 128 mb *)
+	Gc.major_heap_increment = 16000000; (* 64 mb *)
+	Gc.max_overhead = 100; (* compact after 100% overhead *)
+    }      
+
+let stream_speclist =
+  (* let addinput i = streaminputs := i :: !streaminputs in *)
+  [
+    ("-tracestream",
+     Arg.String(fun s -> streaminputs := Some(`Tracestream s)),
+     "<file> Read a trace to be processed as a stream.");
+    
+    ("-pin",
+     Arg.Set pintrace,
+     "Enable pin trace.");
+  ]
 
 let speclist =
   let addinput i = inputs := i :: !inputs in
@@ -21,7 +44,9 @@ let speclist =
                 Arg.String(fun e->addinput(`Binrange(!f, !s, toint64 e)))]),
      "<file> <start> <end> Convert the given range of a binary to the IL");
     ("-trace",
-     Arg.String(fun s-> addinput (`Trace s)),
+     Arg.String(fun s -> 
+		  set_gc () ;
+		  addinput (`Trace s)),
      "<file> Read in a trace and lift it to the IL");
     ("-il",
      Arg.String(fun s -> addinput (`Il s)),
@@ -29,6 +54,9 @@ let speclist =
     ("-ir", (* to be removed in next versions *)
      Arg.String(fun s -> addinput (`Il s)),
      "<file> Read input from an IL file. (deprecated)");
+    ("-pin", (* enable pin trace *)
+     Arg.Set pintrace,
+     "Enable pin trace");
   ]
 
 
@@ -45,12 +73,17 @@ let get_program () =
 	let p = Asmir.open_program f in
 	Asmir.asmprogram_to_bap_range ~init_ro:!init_ro p s e
     | `Trace f ->
-    Asmir.bap_from_trace_file f
+    Asmir.bap_from_trace_file ~pin:!pintrace f
   in
   let rec cat p = function
     | [] -> p
-    | arg::args -> cat ((get_one arg)@p) args
+    | arg::args -> cat (List.rev_append (List.rev (get_one arg)) p) args
   in
   cat [] !inputs
+
+let get_stream_program () = match !streaminputs with
+  | None -> raise(Arg.Bad "No input specified")
+  | Some(`Tracestream f) -> Asmir.bap_stream_from_trace_file ~pin:!pintrace f
+    
 
 (*  with fixme -> raise(Arg.Bad "Could not open input file")*)

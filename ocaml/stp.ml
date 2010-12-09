@@ -47,6 +47,32 @@ let freevars e =
   ignore(Ast_visitor.exp_accept freevis e);
   freevis#get_found
 
+(** Returns a list of free variables in the given expression *)
+let myfreevars e =
+  let ctx = VH.create 570 
+  and found = VH.create 570 in
+  let get_found () =
+    dprintf "found %d freevars" (VH.length found);
+    VH.fold (fun k () a -> k::a) found []
+  in
+  let add_dec d = 
+    if not(VH.mem found d || VH.mem ctx d)
+    then VH.add found d ()
+    else dprintf "Not adding %s." (Pp.var_to_string d)
+  in
+  let rec freevis = function
+    | Let(v, e1, e2) -> freevis e1; VH.add ctx v (); freevis e2; VH.remove ctx v
+    | Var v -> add_dec v
+	(* Visit all children *)
+    | Load (e1,e2,e3,_) -> freevis e1; freevis e2; freevis e3
+    | Store (e1,e2,e3,e4,_) -> freevis e1; freevis e2; freevis e3; freevis e4
+    | BinOp (_,e1,e2) -> freevis e1; freevis e2
+    | UnOp (_, e) -> freevis e
+    | Cast (_,_,e) -> freevis e
+    | _ -> ()
+  in
+  freevis e;
+  get_found ()
 
 class pp ?suffix:(s="") ft =
   let pp = Format.pp_print_string ft
@@ -90,11 +116,13 @@ object (self)
       self#extend v s; (* FIXME: is this really what we want? *)
       pp s
 
+  method varname v =
+    VH.find ctx v
 
   method declare_new_freevars e =
     opn 0;
     pp "% free variables:"; force_newline();
-    let fvs = freevars e in 
+    let fvs = myfreevars e in 
     List.iter (fun v -> if not(VH.mem ctx v) then self#decl v) fvs;
     pp "% end free variables."; force_newline();
     cls();
@@ -181,6 +209,8 @@ object (self)
 	  put_all 0;
       | BinOp(bop, e1, e2) ->
 	  let t = infer_ast ~check:false e1 in
+	  let t' = infer_ast ~check:false e2 in
+	  assert (t = t') ;
 	  let bits = if is_integer_type t then  bits_of_width t else -1 in
 	  let sw = string_of_int bits in
 	  let (pre,mid,post) = match bop with
@@ -231,8 +261,9 @@ object (self)
       | Unknown(s,t) ->
 	  pp "unknown_"; pi unknown_counter; pp" %"; pp s; force_newline();
 	  unknown_counter <- unknown_counter + 1;
-      | Lab _ ->
-	  failwith "STP: don't know how to handle label names"
+      | Lab lab ->
+	  failwith ("STP: don't know how to handle label names: "
+		      ^ (Pp.ast_exp_to_string e))
       | Let(v, e1, e2) ->
 	  pp "(LET ";
 	  (* v isn't allowed to shadow anything *)
@@ -307,10 +338,12 @@ object (self)
     pp ");";
     cls()
 
-  method assert_ast_exp_with_foralls foralls e =
+  method assert_ast_exp_with_foralls ?(fvars=true) foralls e =
     opn 0;
-    self#declare_new_freevars e;
-    force_newline();
+    if fvars then (
+      self#declare_new_freevars e;
+      force_newline();
+    );
     pp "ASSERT(";
     space();
     self#forall foralls;
@@ -340,6 +373,12 @@ object (self)
   method assert_ast_exp e =
     self#assert_ast_exp_with_foralls [] e
 
+  method counterexample () =
+    force_newline();
+    pp "QUERY(FALSE);";
+    force_newline();
+    pp "COUNTEREXAMPLE;";
+    cls();
 
   method close =
     Format.pp_print_newline ft ();

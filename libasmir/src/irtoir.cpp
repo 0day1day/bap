@@ -16,6 +16,9 @@
 // this is for transitional purposes, and should be removed soon.
 bool use_eflags_thunks = 0;
 
+// Use R_XS_BASE registers instead of gdt/ldt
+bool use_simple_segments = 1;
+
 bool translate_calls_and_returns = 0;
 
 // Guest architecture we are translating from.

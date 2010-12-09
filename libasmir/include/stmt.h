@@ -8,7 +8,7 @@
 #include "irvisitor.h"
 #include "exp.h"
 
-enum attr_type_t {NONE, BOOL, CHR, INT_16, INT_32, INT_64};
+enum cval_type_t {NONE, BOOL, CHR, INT_16, INT_32, INT_64, INT_128};
 enum stmt_type_t {JMP,CJMP, SPECIAL, MOVE,  COMMENT,  LABEL, EXPSTMT, VARDECL,
                   CALL, RETURN, FUNCTION, ASSERT};
 
@@ -26,17 +26,29 @@ using namespace std;
 typedef struct ConcPair {
   string name;
   bool mem;
-  attr_type_t type;
+  cval_type_t type;
   const_val_t index;
   const_val_t value;
+  int usage;
   int taint;
-  ConcPair(string str, bool m, attr_type_t typ, 
-           const_val_t ind, const_val_t val, int tnt){
-    name = str; mem = m; type = typ; 
-    index = ind; value = val; taint = tnt;
+  ConcPair(string str, bool m, cval_type_t typ, 
+           const_val_t ind, const_val_t val, 
+	   int usg,int tnt){
+    name = str; mem = m; 
+    type = typ; index = ind; 
+    value = val; usage = usg;
+    taint = tnt;
   };
 } conc_map;
 typedef vector<conc_map *> conc_map_vec;
+
+typedef uint32_t threadid_t;
+
+typedef struct TraceAttrs_s {
+  TraceAttrs_s() { cv = NULL; tid = -1; }
+  conc_map_vec *cv;
+  threadid_t tid;
+} TraceAttrs_t;
 
 class Stmt {
  public:
@@ -46,9 +58,9 @@ class Stmt {
   static Stmt *clone(Stmt *s);
   static void destroy(Stmt *s);
 
-  Stmt(stmt_type_t st, address_t asm_ad, address_t ir_ad)
+  Stmt(stmt_type_t st, address_t asm_ad, address_t ir_ad, threadid_t tid = -1)
     { asm_address = asm_ad; ir_address = ir_ad; 
-      stmt_type = st; attributes = NULL; };
+      stmt_type = st; };
   
   /// Make a deep copy of the stmt
   virtual Stmt *clone() const = 0;
@@ -62,9 +74,9 @@ class Stmt {
   /// object, e.g., translation keeps a counter.
   address_t ir_address;
   stmt_type_t stmt_type;
-  void setAttribute(string attribute);
-  // a generic string attribute
-  conc_map_vec * attributes;
+  // The attributes containing the concrete values
+  TraceAttrs_t attributes;
+  string assembly;
 };
 
 class VarDecl : public Stmt {
@@ -243,15 +255,19 @@ extern "C" {
   extern Exp* move_lhs(Stmt*);
   extern Exp* move_rhs(Stmt*);
   extern const char* label_string(Stmt*);
-  extern conc_map_vec* stmt_attributes(Stmt*);
-  extern int conc_map_size(conc_map_vec*);
-  extern conc_map* get_attr(conc_map_vec*,int);
-  extern const char* attr_name(conc_map*);
-  extern const_val_t attr_value(conc_map*);
-  extern long attr_mem(conc_map*);
-  extern const_val_t attr_ind(conc_map*);
-  extern attr_type_t attr_type(conc_map*);
-  extern int attr_taint(conc_map*);
+  extern TraceAttrs_t* stmt_attributes(Stmt*);
+  extern threadid_t trace_tid(TraceAttrs_t*);
+  extern int conc_map_size(TraceAttrs_t*);
+  extern conc_map* get_cval(TraceAttrs_t*,int);
+  extern const char* cval_name(conc_map*);
+  extern const_val_t cval_value(conc_map*);
+  extern long cval_mem(conc_map*);
+  extern const_val_t cval_ind(conc_map*);
+  extern cval_type_t cval_type(conc_map*);
+  extern int cval_usage(conc_map*);
+  extern int cval_taint(conc_map*);
+  extern void setAttribute(string);
+  extern const char* asm_string_from_stmt(Stmt*);
   extern const char* special_string(Stmt*);
   extern const char* comment_string(Stmt*);
   extern Exp* jmp_target(Stmt*);

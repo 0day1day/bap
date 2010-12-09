@@ -19,33 +19,46 @@ Exp* move_rhs(Stmt *s) {
 const char* label_string(Stmt *s) {
   return ((Label*)s)->label.c_str();
 }
-conc_map_vec* stmt_attributes(Stmt *s) {
-  return s->attributes;
+TraceAttrs_t* stmt_attributes(Stmt *s) {
+  return &(s->attributes);
 }
-int conc_map_size(conc_map_vec *v) {
-  if (v == NULL) return 0;
-  return v->size();
+
+threadid_t trace_tid(TraceAttrs_t *ta) {
+  if (ta == NULL) return 0;
+  return ta->tid;
 }
-conc_map* get_attr(conc_map_vec *v, int i) {
-  return v->at(i);
+
+int conc_map_size(TraceAttrs_t *ta) {
+  if (ta == NULL || ta->cv == NULL) return 0;
+  return ta->cv->size();
 }
-const char* attr_name(conc_map *m) {
+conc_map* get_cval(TraceAttrs_t *ta, int i) {
+  if (ta == NULL || ta->cv == NULL) return NULL;
+  return ta->cv->at(i);
+}
+const char* cval_name(conc_map *m) {
   return m->name.c_str();
 }
-const_val_t attr_value(conc_map *m) {
+const_val_t cval_value(conc_map *m) {
   return m->value;
 }
-const_val_t attr_ind(conc_map *m) {
+const_val_t cval_ind(conc_map *m) {
   return m->index;
 }
-long attr_mem(conc_map *m) {
+long cval_mem(conc_map *m) {
   return m->mem;
 }
-attr_type_t attr_type(conc_map *m) {
+cval_type_t cval_type(conc_map *m) {
   return m->type;
 }
-int attr_taint(conc_map *m) {
+int cval_usage(conc_map *m) {
+  return m->usage;
+}
+int cval_taint(conc_map *m) {
   return m->taint;
+}
+const char* asm_string_from_stmt(Stmt*s) {
+  return s->assembly.c_str();
 }
 const char* special_string(Stmt *s) {
   return ((Special*)s)->special.c_str();

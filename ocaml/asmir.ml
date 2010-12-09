@@ -29,8 +29,12 @@ let arch_i386 = Bfd_arch_i386
 let arch_arm  = Bfd_arch_arm
 (*more to come later when we support them*)
 
+let trace_blocksize = ref 100000L
+
 module D = Debug.Make(struct let name = "ASMIR" and default=`Debug end)
 open D
+
+module Status = Util.StatusPrinter
 
 (* more verbose debugging *)
 module DV = Debug.Make(struct let name = "AsmirV" and default=`NoDebug end)
@@ -48,7 +52,6 @@ let tr_regtype = function
   | Libasmir.REG_16  -> reg_16
   | Libasmir.REG_32  -> reg_32
   | Libasmir.REG_64  -> reg_64
-
 
 (* maps a string variable to the var we are using for it *)
 type varctx = (string,Var.t) Hashtbl.t
@@ -177,7 +180,7 @@ let tr_vardecls g ss =
   let decls,unextends = List.split(List.map (tr_vardecl g) ss) in
   (decls, fun x -> List.iter (fun f -> f x) unextends)
 
-let attr_type_to_typ = function
+let cval_type_to_typ = function
  | NONE -> 
    prerr_endline "concrete expression with no type in lifted trace" ;
    reg_32        
@@ -186,26 +189,68 @@ let attr_type_to_typ = function
  | INT_16 -> reg_16
  | INT_32 -> reg_32
  | INT_64 -> reg_64
+ | INT_128 -> Reg 128
+
+let get_cval_usage = function
+  | 0x00 | 0x01 -> RD
+  | 0x10 -> WR
+  | 0x11 -> RW
+  | _ -> 
+      prerr_endline "expression with no usage info" ;
+      RD
+      
 
 (* TODO: needs to be refined for bytes *)
-let int_to_taint = function 
- | 0 -> Untaint
- | _ -> Taint
+let int_to_taint n = Taint n
 
-let tr_context_tup attr =
-  Context {name=Libasmir.attr_name attr;
-           mem=Libasmir.attr_mem attr;
-           t=attr_type_to_typ (Libasmir.attr_type attr);
-           index=Libasmir.attr_ind attr;
-           value=Libasmir.attr_value attr;
-           taint=int_to_taint (Libasmir.attr_taint attr)}
+let tr_context_tup cval =
+  Context {name=Libasmir.cval_name cval;
+           mem=Libasmir.cval_mem cval;
+           t=cval_type_to_typ (Libasmir.cval_type cval);
+           index=Libasmir.cval_ind cval;
+           value=Libasmir.cval_value cval;
+	   usage=get_cval_usage(Libasmir.cval_usage cval);
+           taint=int_to_taint (Libasmir.cval_taint cval)}
 
+(* deprecated *)
 let tr_attributes s =
   let attr_vec = Libasmir.stmt_attributes s in
   let size = Libasmir.conc_map_size attr_vec in
-   if size = 0 then [] 
-   else
-    foldn (fun i n -> (tr_context_tup (Libasmir.get_attr attr_vec n))::i) [] (size-1)
+  let cvals =
+    if size = 0 then [] 
+    else
+      foldn 
+	(fun i n -> 
+	   (tr_context_tup (Libasmir.get_cval attr_vec n))::i
+	) [] (size-1) in
+  let tid = Libasmir.trace_tid attr_vec in
+  let tidattr = ThreadId tid in
+  if tid = -1 then cvals else
+  tidattr :: cvals
+
+(** Given a trace frame, return the list of attrs. *)
+let tr_frame_attrs f =
+  let attr_vec = Libasmir.asmir_frame_get_operands f in
+  let size = Libasmir.asmir_frame_operands_length attr_vec in
+  (* Add concrete operands *)
+  let attrs =
+    if size = 0 || size = -1 then [] 
+    else
+      let cattrs = foldn 
+	(fun i n -> 
+	   (tr_context_tup (Libasmir.asmir_frame_get_operand attr_vec n))::i
+	) [] (size-1) 
+      in
+      let () = Libasmir.asmir_frame_destroy_operands attr_vec 
+      in
+      cattrs
+  in
+  (* Add ThreadId *)
+  let attrs = match Libasmir.asmir_frame_tid f with
+    | -1 -> attrs
+    | n -> (Type.ThreadId n)::attrs
+  in
+  attrs
 
 (** Translate a statement *)
 let rec tr_stmt g s =
@@ -281,7 +326,14 @@ let tr_bap_block_t g asmp b =
   unextend();
   stmts
 
-let tr_bap_block_t_no_asm g b = 
+let tr_bap_block_t_trace_asm g b =
+  let stmts, addr, unextend = tr_bap_block_aux g b in
+  let asm = Libasmir.asm_string_from_block b in
+  let stmts = Label(Addr addr, [Asm asm])::stmts in
+  unextend();
+  stmts
+
+let tr_bap_block_t_no_asm g b =
   let stmts, addr, unextend = tr_bap_block_aux g b in
   let stmts = Label(Addr addr, [])::stmts in
   unextend();
@@ -293,12 +345,17 @@ let tr_bap_blocks_t g asmp bs =
   let size = Libasmir.asmir_bap_blocks_size bs -1 in
     foldn (fun i n -> tr_bap_block_t g asmp (asmir_bap_blocks_get bs n)@i) [] size
 
+let tr_bap_blocks_t_trace_asm g bs = 
+  let size = Libasmir.asmir_bap_blocks_size bs -1 in
+    foldn (fun i n -> tr_bap_block_t_trace_asm g (asmir_bap_blocks_get bs n)@i) [] size
+
 let tr_bap_blocks_t_no_asm g bs = 
   let size = Libasmir.asmir_bap_blocks_size bs -1 in
     foldn (fun i n -> tr_bap_block_t_no_asm g (asmir_bap_blocks_get bs n)@i) [] size
 
 let x86_regs = Disasm_i386.regs
 let x86_mem = Disasm_i386.mem
+(* let x86_mem_external = Ast.Var (x86_mem) *)
 
 let arm_regs =
   List.map (fun n -> Var.newvar n reg_32)
@@ -482,23 +539,130 @@ let asmprogram_to_bap ?(init_ro=false) p =
     get_rodata_assignments ~prepend_to:ir m p
   else ir
 
+(* translate byte sequence to bap ir *)
+let byte_insn_to_bap arch addr byteinsn =
+  let prog = Libasmir.byte_insn_to_asmp arch addr byteinsn in
+  let get a = Array.get byteinsn (Int64.to_int (Int64.sub a addr)) in
+  let (pr, n) = asm_addr_to_bap {asmp=prog; arch=arch; secs=[]; get=get} addr in
+  pr, Int64.sub n addr
 
+(* Get stmts for a frame *)
+let trans_frame f =
+  let arch = Libbfd.Bfd_arch_i386 in
+  let t = Libasmir.asmir_frame_type f in
+  match t with
+  | Libasmir.FRM_STD2 -> 
+      let bytes, addr, _ = Libasmir.asmir_frame_get_insn_bytes f in
+      (* Array.iter (fun x -> dprintf "Byte: %x" (int_of_char x)) bytes; *)
+      let stmts, _ = byte_insn_to_bap arch addr bytes in
+      stmts
+  | Libasmir.FRM_TAINT -> 
+      [Label (Name("ReadSyscall"), []); Comment("All blocks must have two statements", [])]
+  | Libasmir.FRM_LOADMOD ->
+      let name, lowaddr, highaddr = Libasmir.asmir_frame_get_loadmod_info f in
+      [Special(Printf.sprintf "Loaded module '%s' at %#Lx to %#Lx" name lowaddr highaddr, []); Special("All blocks must have two statements", [])]
+  | _ -> []
 
+let alt_bap_from_trace_file filename =
+  let add_operands stmts f =
+    let ops = tr_frame_attrs f in
+    match stmts with
+    | Label (l,a)::others ->
+	 Label (l,a@ops)::others
+    | others when ops <> [] -> Comment("Attrs without label.", ops)::others
+    | others -> others
+  in
+  let raise_frame f =
+    let stmts = trans_frame f in
+    add_operands stmts f
+  in
+  let ir = ref [] in
+  let off = ref 0L in
+  let c = ref true in
+  (* might be better to just grab the length of the trace in advance :*( *)
+  Status.init "Lifting trace" 0 ;
+  while !c do
+    (*dprintf "Calling the trace again.... ";*)
+    let trace_frames = Libasmir.asmir_frames_from_trace_file filename !off !trace_blocksize in
+    let numframes = Libasmir.asmir_frames_length trace_frames in
+    (*dprintf "Got %d frames" numframes;*)
+    if numframes = 0 || numframes = -1 then (
+      c := false
+    ) else (
+      let revstmts = Util.foldn
+	(fun acc n ->
+	   let frameno = numframes-1-n in
+	   (* dprintf "frame %d" frameno; *)
+	   let stmts = raise_frame (Libasmir.asmir_frames_get trace_frames frameno) in
+	   List.rev_append stmts acc) [] (numframes-1) in
+      ir := Util.fast_append revstmts !ir;
 
-let bap_from_trace_file ?(atts = true) filename = 
-  let bap_blocks = Libasmir.asmir_bap_from_trace_file filename atts in
+      (* let moreir = tr_bap_blocks_t_no_asm g bap_blocks in *)
+	(* Build ir backwards *)
+	(* ir := List.rev_append moreir !ir; *)
+	off := Int64.add !off !trace_blocksize
+    );
+
+    asmir_frames_destroy trace_frames;
+
+  done;
+  let r = List.rev !ir in
+  Status.stop () ;
+  r
+
+(* deprecated *)  
+let old_bap_from_trace_file ?(atts = true) ?(pin = false) filename =
   let g = gamma_create x86_mem x86_regs in
-  let ir = tr_bap_blocks_t_no_asm g bap_blocks in
+  let ir = ref [] in
+  let off = ref 0L in
+  let c = ref true in
+  (* might be better to just grab the length of the trace in advance :*( *)
+  Status.init "Lifting trace" 0 ;
+  while !c do
+    (*dprintf "Calling the trace again.... ";*)
+    let bap_blocks = Libasmir.asmir_bap_from_trace_file filename !off !trace_blocksize atts pin in
+    let numblocks = Libasmir.asmir_bap_blocks_size bap_blocks in
+    if numblocks = -1 then (
+      c := false
+    ) else (
+      let moreir = tr_bap_blocks_t_trace_asm g bap_blocks in
+      let () = destroy_bap_blocks bap_blocks in
+	(* Build ir backwards *)
+	ir := List.rev_append moreir !ir;
+	off := Int64.add !off !trace_blocksize
+    )
+  done;
+  let r = List.rev !ir in
+  Status.stop () ;
+  r
+
+let bap_from_trace_file ?(atts = true) ?(pin = false) filename =
+  alt_bap_from_trace_file filename
+
+(** Get one statement at a time.
+
+    XXX: Use an internal buffer
+*)
+let bap_get_stmt_from_trace_file ?(atts = true) ?(pin = false) filename off =
+  let off = Int64.of_int off in (* blah, Stream.from does not use int64 *)
+  let g = gamma_create x86_mem x86_regs in
+  let bap_blocks = Libasmir.asmir_bap_from_trace_file filename off 1L atts pin in
+  let numblocks = Libasmir.asmir_bap_blocks_size bap_blocks in
+  let ir = tr_bap_blocks_t_trace_asm g bap_blocks in
   let () = destroy_bap_blocks bap_blocks in
-  ir
+  match numblocks with
+  | -1 -> None
+  | _ -> Some(ir)
+  
+(** Return stream of trace instructions raised to the IL *)
+let bap_stream_from_trace_file ?(atts = true) ?(pin = false) filename =
+  Stream.from (bap_get_stmt_from_trace_file ~atts:atts ~pin:pin filename)
 
 let get_symbols ?(all=false) {asmp=p} =
   let f = if all then asmir_get_all_symbols else asmir_get_symbols in
   let (arr,err) = f p in
   if err <= 0 then failwith "get_symbols";
   arr
-
-let (<<) = (lsl)
 
 let get_function_ranges p =
   let symb = get_symbols p in
@@ -568,9 +732,3 @@ let get_asm_instr_string_range p s e =
   done;
   !str
 
-(* translate byte sequence to bap ir *)
-let byte_insn_to_bap arch addr byteinsn =
-  let prog = Libasmir.byte_insn_to_asmp arch addr byteinsn in
-  let get a = Array.get byteinsn (Int64.to_int (Int64.sub a addr)) in
-  let (pr, n) = asm_addr_to_bap {asmp=prog; arch=arch; secs=[]; get=get} addr in
-  pr, Int64.sub n addr

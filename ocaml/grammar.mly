@@ -8,7 +8,7 @@ open Ast
 
 
 (** Whether or not to strip the trailing _number from variable names *)
-let strip_nums = ref false
+let strip_nums = ref true
 
 let parse_error str =
   let {Lexing.pos_fname=f; pos_lnum=sl; pos_bol=sb; pos_cnum=sc} =
@@ -26,7 +26,7 @@ let err s =
 let stripnum =
   let stripnum1 = Str.replace_first (Str.regexp "_[0-9]+$") "" in
   fun x ->
-    if !strip_nums then
+    if !strip_nums then 
       stripnum1 x
     else
       x
@@ -57,12 +57,14 @@ struct
       
 
   let get_lval n t =
+    let n = stripnum n in
     try
       let v = Hashtbl.find (fst !cur_scope) n in
       if t = None || t = Some(Var.typ v)
       then v
       else err ("Variable '"^n^"' used with inconsistent type")
     with Not_found ->
+      Printf.printf "%s not found\n" n;
       match t with
       | Some t -> add n t
       | None -> err ("Type was never declared for '"^n^"'")
@@ -75,6 +77,7 @@ let mk_attr lab string =
   | "set" when string = "liveout" -> Liveout
   | "set" when string = "initro" -> InitRO
   | "str" | "attr" -> StrAttr string
+  | "tid" -> ThreadId(int_of_string string)
   | _ -> err ("Unknown attribute @"^lab)
 
 let typ_of_string = function
@@ -115,6 +118,7 @@ let casttype_of_string = function
 
 %type <Ast.program> program
 %type <Ast.exp > expr
+%type <Type.context> context
 %nonassoc LET IN
 %left WITH
 /* If the precedence for any of these changes, pp.ml needs to be updated
@@ -162,7 +166,13 @@ stmt:
 | COMMENT attrs { Comment($1, $2) }
 
 
+plusminusint:
+| INT { $1 }
+| MINUS INT { Int64.neg $2 }
 
+context:
+| ID LSQUARE INT RSQUARE EQUAL INT COMMA plusminusint COMMA styp { {name=$1; mem=true; t=$10; index=$3; value=$6; usage=RD; (* XXX fix me *) taint=Taint(Int64.to_int $8)} } /* memory */
+| ID EQUAL INT COMMA plusminusint COMMA typ { {name=$1; mem=false; t=$7; index=0L; value=$3; usage=RD; (* XXX fix me *) taint=Taint(Int64.to_int $5)} } /* non memory */
 
 attrs:
 |    { [] }
@@ -170,7 +180,7 @@ attrs:
 
 attr:
 | AT ID STRING { mk_attr $2 $3 }
-
+| AT ID context { Context($3) }
 
 lval:
 | ID opttyp { 

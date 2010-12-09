@@ -14,7 +14,7 @@ export SOURCE_DIRS_IN = $(BAP_OCAMLDIR) $(BAP_PROJ_OCAMLDIR)
 
 # default subprojects to build
 ifndef SUBPROJS
-	export SUBPROJS = $(PROJUTILS) toil iltrans topredicate get_functions compare split
+	export SUBPROJS = $(PROJUTILS) toil iltrans streamtrans topredicate formula get_functions compare split
 endif
 
 define PROJ_toil
@@ -31,12 +31,26 @@ define PROJ_iltrans
 endef
 export PROJ_iltrans
 
+define PROJ_streamtrans
+	RESULT=streamtrans
+	SOURCES = streamtrans.ml
+	DOC_FILES=$(SOURCES)
+endef
+export PROJ_streamtrans
+
 define PROJ_topredicate
 	RESULT=topredicate
 	SOURCES = topredicate.ml
 	DOC_FILES=$(SOURCES)
 endef
 export PROJ_topredicate
+
+define PROJ_formula
+	RESULT=formula
+	SOURCES = formula.ml
+	DOC_FILES=$(SOURCES)
+endef
+export PROJ_formula
 
 define PROJ_get_functions
 	RESULT=get_functions
