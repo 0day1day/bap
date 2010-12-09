@@ -333,7 +333,7 @@ let clean_delta delta =
       VH.remove delta v
   in
   VH.iter clean_var delta
-
+ 
 (* This is a total HACK due to VEX's handling of the direction flag *)
 let direction_flag eflags = 
   match num_to_bit (Int64.logand eflags 0x400L) with
@@ -817,8 +817,9 @@ let run_block state block =
   (* If we are performing a consistency check, we should not empty out
   delta. However, if delta grows indefinitely, trace operations become
   slow. *)
-  if not !consistency_check then
-    TraceConcrete.cleanup_delta state ;
+  (* if not !consistency_check then *)
+    (* TraceConcrete.cleanup_delta state ; *)
+    clean_delta state.delta;
   let init = TraceConcrete.inst_fetch state.sigma state.pc in
   let executed = ref [] in
   let rec eval_block state stmt = 
@@ -1401,7 +1402,7 @@ let control_flow addr trace =
 (* Making the final jump target a symbolic variable. This
    should be useful for enumerating all possible jump targets *)  
 let limited_control trace = 
-  let target = Var (Var.newvar "symb_jump_target" reg_32) in
+  let target = Var (Var.newvar "s_jump_target" reg_32) in
   let trace, assertion = hijack_control target trace in
     Util.fast_append trace [assertion]
 
@@ -1522,6 +1523,15 @@ let add_pivot gaddr maddr payload trace =
   let passerts = inject_payload_gen (Int(maddr, reg_32)) (string_to_bytes payload) trace in
   Util.fast_append trace passerts
 
+(** Use pivot to create exploit *)
+let add_pivot_file gaddr maddr payloadfile trace =
+  let gaddrexp = Int(gaddr, reg_32) in
+  let trace, assertion = hijack_control gaddrexp trace in
+  (* Concatenate the assertion and the gadget IL *)
+  let trace = Util.fast_append trace [assertion] in
+  let passerts = inject_payload_gen (Int(maddr, reg_32)) (bytes_from_file payloadfile) trace in
+  Util.fast_append trace passerts
+
 (** Transfer control by overwriting sehaddr with gaddr. *)
 let add_seh_pivot gaddr sehaddr paddr payload trace =
   let mem, _ = get_last_load_exp trace in
@@ -1603,8 +1613,11 @@ let solve_formula input output =
 let output_exploit file trace = 
   ignore (output_formula formula_storage trace) ;
   solve_formula formula_storage answer_storage ;
-  let var_vals = solution_from_stp_formula answer_storage in
-    (* The variables that we care about *)
+  let var_vals = match solution_from_stp_formula answer_storage with
+    | Some(x) -> x
+    | None -> failwith "Formula was unsatisfiable"
+  in
+    (* The variables that we care about *)  
   let is_input v = String.sub v 0 4 = "symb" in
     (* A special function to sort interesting variables by name *)
   let underscore = Str.regexp_string "_" in

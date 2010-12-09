@@ -326,10 +326,16 @@ let tr_bap_block_t g asmp b =
   unextend();
   stmts
 
-let tr_bap_block_t_no_asm g b =
+let tr_bap_block_t_trace_asm g b =
   let stmts, addr, unextend = tr_bap_block_aux g b in
   let asm = Libasmir.asm_string_from_block b in
   let stmts = Label(Addr addr, [Asm asm])::stmts in
+  unextend();
+  stmts
+
+let tr_bap_block_t_no_asm g b =
+  let stmts, addr, unextend = tr_bap_block_aux g b in
+  let stmts = Label(Addr addr, [])::stmts in
   unextend();
   stmts
 
@@ -339,13 +345,17 @@ let tr_bap_blocks_t g asmp bs =
   let size = Libasmir.asmir_bap_blocks_size bs -1 in
     foldn (fun i n -> tr_bap_block_t g asmp (asmir_bap_blocks_get bs n)@i) [] size
 
+let tr_bap_blocks_t_trace_asm g bs = 
+  let size = Libasmir.asmir_bap_blocks_size bs -1 in
+    foldn (fun i n -> tr_bap_block_t_trace_asm g (asmir_bap_blocks_get bs n)@i) [] size
+
 let tr_bap_blocks_t_no_asm g bs = 
   let size = Libasmir.asmir_bap_blocks_size bs -1 in
     foldn (fun i n -> tr_bap_block_t_no_asm g (asmir_bap_blocks_get bs n)@i) [] size
 
 let x86_regs = Disasm_i386.regs
 let x86_mem = Disasm_i386.mem
-let x86_mem_external = Ast.Var (x86_mem)
+(* let x86_mem_external = Ast.Var (x86_mem) *)
 
 let arm_regs =
   List.map (fun n -> Var.newvar n reg_32)
@@ -615,7 +625,7 @@ let old_bap_from_trace_file ?(atts = true) ?(pin = false) filename =
     if numblocks = -1 then (
       c := false
     ) else (
-      let moreir = tr_bap_blocks_t_no_asm g bap_blocks in
+      let moreir = tr_bap_blocks_t_trace_asm g bap_blocks in
       let () = destroy_bap_blocks bap_blocks in
 	(* Build ir backwards *)
 	ir := List.rev_append moreir !ir;
@@ -638,7 +648,7 @@ let bap_get_stmt_from_trace_file ?(atts = true) ?(pin = false) filename off =
   let g = gamma_create x86_mem x86_regs in
   let bap_blocks = Libasmir.asmir_bap_from_trace_file filename off 1L atts pin in
   let numblocks = Libasmir.asmir_bap_blocks_size bap_blocks in
-  let ir = tr_bap_blocks_t_no_asm g bap_blocks in
+  let ir = tr_bap_blocks_t_trace_asm g bap_blocks in
   let () = destroy_bap_blocks bap_blocks in
   match numblocks with
   | -1 -> None
@@ -653,8 +663,6 @@ let get_symbols ?(all=false) {asmp=p} =
   let (arr,err) = f p in
   if err <= 0 then failwith "get_symbols";
   arr
-
-(*let (<<) = (lsl)*)
 
 let get_function_ranges p =
   let symb = get_symbols p in

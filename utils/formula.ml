@@ -19,7 +19,10 @@ let main () =
   in
   let is_input v = String.sub v 0 4 = "symb" in
   let lexbuf = Lexing.from_channel cin in
-  let values = Stp_grammar.main Stp_lexer.token lexbuf in
+  let values = match Stp_grammar.main Stp_lexer.token lexbuf with
+    | Some(x) -> x
+    | None -> failwith "Unable to satisfy formula"
+  in
   let values = List.filter (fun (v,_) -> is_input v) values in
   let sorted = sort values in
     List.iter (fun (_, num) -> Printf.printf "\\x%02Lx" num) sorted

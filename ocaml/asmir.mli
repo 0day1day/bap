@@ -57,7 +57,6 @@ val gamma_for_arch : arch -> varctx
 val get_asmprogram_arch : asmprogram -> arch
 
 val x86_mem : Var.t
-val x86_mem_external : Ast.exp
 val x86_regs : Var.t list
 
 val open_program : string -> asmprogram

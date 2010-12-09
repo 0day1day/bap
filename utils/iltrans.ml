@@ -241,6 +241,17 @@ let speclist =
        ]),
      "<gaddress> <maddress> <payload string> Use pivot at gaddress to transfer control to payload at maddress."
     )
+  ::("-trace-pivot-file",
+     Arg.Tuple(
+       let gaddr = ref 0L in
+       let maddr = ref 0L in
+       [
+   	 Arg.String (fun a -> gaddr := Int64.of_string a);
+  	 Arg.String (fun a -> maddr := Int64.of_string a);
+  	 Arg.String (fun a -> add(TransformAst(Traces.add_pivot_file !gaddr !maddr a)));
+       ]),
+     "<gaddress> <maddress> <payload string> Use pivot at gaddress to transfer control to payload at maddress."
+    )
   ::("-trace-seh-pivot",
      Arg.Tuple(
        let gaddr = ref 0L in

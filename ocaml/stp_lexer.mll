@@ -16,6 +16,7 @@ rule token = parse
   | [')']            { RBRACKET }
   | "ASSERT"         { ASSERT }
   | "Invalid"        { INVALID }
+  | "Valid"          { VALID }
   | "0hex"           { read_num lexbuf }
   | "0x"             { read_num lexbuf }
   | "0b"             { read_num lexbuf }

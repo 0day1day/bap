@@ -7,19 +7,21 @@
 %token EQUAL
 %token ASSERT
 %token INVALID
+%token VALID
 %token COMMA
 %token END
 %token EOF
 
 %start main
-%type <(string * int64) list> main
+%type <(string * int64) list option> main
 
 %%
 
 main:
   /* The result comes before or after the assertions depending on version. */
-  assertions result EOF { $1 }
-| result assertions EOF { $2 }
+  assertions goodresult EOF { Some($1) }
+| goodresult assertions EOF { Some($2) }
+| badresult EOF { None }
   ;
 
 assertions:
@@ -31,5 +33,10 @@ assertion:
   ASSERT LBRACKET VAR EQUAL VAL RBRACKET { ($3, $5) }
   ;
 
-result:
+goodresult:
   INVALID END { }
+;
+
+badresult:
+  VALID END { }
+;
