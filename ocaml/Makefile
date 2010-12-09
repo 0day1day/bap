@@ -68,7 +68,6 @@ export SOURCES = \
 	traces.ml \
 	payload.ml \
 	search.ml \
-	snort_grammar.mly snort_lexer.mll\
 	$(PROJSOURCES) \
 
 RESULT = bap

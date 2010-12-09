@@ -14,7 +14,7 @@ export SOURCE_DIRS_IN = $(BAP_OCAMLDIR) $(BAP_PROJ_OCAMLDIR)
 
 # default subprojects to build
 ifndef SUBPROJS
-	export SUBPROJS = $(PROJUTILS) toil iltrans streamtrans topredicate formula snort_parse get_functions compare split
+	export SUBPROJS = $(PROJUTILS) toil iltrans streamtrans topredicate formula get_functions compare split
 endif
 
 define PROJ_toil
@@ -65,13 +65,6 @@ define PROJ_compare
 	DOC_FILES=$(SOURCES)
 endef
 export PROJ_compare
-
-define PROJ_snort_parse
-	RESULT=snort_parse
-	SOURCES = snort_parse.ml
-	DOC_FILES=$(SOURCES)
-endef
-export PROJ_snort_parse
 
 define PROJ_split
 	RESULT=split_disjunction
