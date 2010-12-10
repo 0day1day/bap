@@ -37,7 +37,7 @@ open D
 type segment = CS | SS | DS | ES | FS | GS
 
 type operand =
-  | Oreg of Var.t
+  | Oreg of int
   | Oaddr of Ast.exp
   | Oimm of int64
 
@@ -156,14 +156,14 @@ let regs : var list =
 
 
 
-let o_eax = Oreg eax
-and o_ecx = Oreg ecx
-and o_edx = Oreg edx
-and o_ebx = Oreg ebx
-and o_esp = Oreg esp
-and o_ebp = Oreg ebp
-and o_esi = Oreg esi
-and o_edi = Oreg edi
+let o_eax = Oreg 0
+and o_ecx = Oreg 1
+and o_edx = Oreg 2
+and o_ebx = Oreg 3
+and o_esp = Oreg 4
+and o_ebp = Oreg 5
+and o_esi = Oreg 6
+and o_edi = Oreg 7
 
 let esp_e = Var esp
 and esi_e = Var esi
@@ -211,6 +211,8 @@ let (<*) a b   = binop LT a b
 let (>*) a b   = binop LT b a
 
 let cast_low t e = Cast(CAST_LOW, t, e)
+let cast_high t e = Cast(CAST_HIGH, t, e)
+let cast_unsigned t e = Cast(CAST_UNSIGNED, t, e)
 
 let ite t b e1 e2 = (* FIXME: were we going to add a native if-then-else thing? *)
   if t = r1 then
@@ -220,6 +222,50 @@ let ite t b e1 e2 = (* FIXME: were we going to add a native if-then-else thing? 
 
 let l32 i = Int(Arithmetic.to64 (i,r32), r32)
 let i32 i = Int(Int64.of_int i, r32)
+
+
+(* converts a register number to the corresponding 32bit register variable *)
+let bits2reg32= function
+  | 0 -> eax
+  | 1 -> ecx
+  | 2 -> edx
+  | 3 -> ebx
+  | 4 -> esp
+  | 5 -> ebp
+  | 6 -> esi
+  | 7 -> edi
+  | _ -> failwith "bits2reg32 takes 3 bits"
+
+(*
+let bits2reg8= function
+  | 0 -> al
+  | 1 -> cl
+  | 2 -> dl
+  | 3 -> bl
+  | 4 -> ah
+  | 5 -> ch
+  | 6 -> dh
+  | 7 -> bh
+*)
+
+and reg2bits r = Util.list_firstindex [eax; ecx; edx; ebx; esp; ebp; esi; edi] ((==)r) 
+
+let bits2reg32e b = Var(bits2reg32 b)
+
+let bits2reg16e b = cast_low r16 (bits2reg32e b)
+
+let bits2reg8e b =
+  if b < 4 then
+    cast_low r8 (bits2reg32e b)
+  else
+    cast_high r8 (cast_low r16 (bits2reg32e (b land 3)))
+    
+
+let bits2xmm b = xmms.(b)
+  
+let reg2xmm r =
+  bits2xmm (reg2bits r)
+
 
 module ToIR = struct
 
@@ -233,15 +279,28 @@ let store t a e =
 let storem m t a e =
   move m (Store(Var m, a, e, little_endian, t))
 
+
+
 let op2e t = function
-  | Oreg r when Var.typ r = t -> Var r
+  | Oreg r when t = r32 -> bits2reg32e r
+  | Oreg r when t = r16 -> bits2reg16e r
+  | Oreg r when t = r8 -> bits2reg8e r
   | Oreg r -> unimplemented "sub registers" (*cast_low t (Var r)*)
   | Oaddr e -> load t e
   | Oimm i -> Int(Arithmetic.to64 (i,t), t)
 
 let assn t v e =
   match v with
-  | Oreg(Var.V(_,_,vt) as r) when t = vt -> move r e
+  | Oreg r when t = r32 -> move (bits2reg32 r) e
+  | Oreg r when t = r16 ->
+    let v = bits2reg32 r in
+    move v ((Var v &* l32 0xffff0000L) |* cast_unsigned r32 e)
+  | Oreg r when t = r8 && r < 4 ->
+    let v = bits2reg32 r in
+    move v ((Var v &* l32 0xffffff00L) |* cast_unsigned r32 e)
+  | Oreg r when t = r8 ->
+    let v = bits2reg32 (r land 3) in
+    move v ((Var v &* l32 0xffff00ffL) |* (cast_unsigned r32 e <<* i32 8))
   | Oreg _ -> unimplemented "assignment to sub registers"
   | Oaddr a -> store t a e
   | Oimm _ -> failwith "disasm_i386: Can't assign to an immediate value"
@@ -311,13 +370,15 @@ let to_ir addr next pref = function
   | Movdqa(d,s) -> (
     let zero = Int(0L,r4) and eight = Int(8L,r4) in
     let (s0, s1, a1) = match s with
-      | Oreg r -> (loadm r r64 zero, loadm r r64 eight, [])
+      | Oreg i -> let r = bits2xmm i in
+		  (loadm r r64 zero, loadm r r64 eight, [])
       | Oaddr a -> (load r64 a, load r64 (a +* Int(8L, addr_t)), [a])
       | Oimm _ -> failwith "invalid"
     in
     let (d0, d1, a2) = match d with
       (* FIXME: should this be a single move with two stores? *)
-      | Oreg r -> (storem r r64 zero s0, storem r r64 eight s1, [])
+      | Oreg i -> let r = bits2xmm i in
+		  (storem r r64 zero s0, storem r r64 eight s1, [])
       | Oaddr a -> (store r64 a s0, store r64 (a +* Int(8L, addr_t)) s1, [a])
       | Oimm _ -> failwith "invalid"
     in
@@ -382,7 +443,7 @@ let to_ir addr next pref = function
     else
       unimplemented "unsupported flags in cmps"
   | Stos(Reg bits as t) ->
-    let stmts = [store t edi_e (op2e t (Oreg eax));
+    let stmts = [store t edi_e (op2e t (o_eax));
 		 string_incr t edi]
     in
     if pref = [] then
@@ -447,7 +508,7 @@ module ToStr = struct
     | x::xs -> pref2str x ^ " " ^ prefs2str xs
 
   let opr = function
-    | Oreg v -> Var.name v
+    | Oreg v -> unimplemented "rewrite this" (*Var.name v*)
     | Oimm i -> Printf.sprintf "$0x%Lx" i
     | Oaddr a -> Pp.ast_exp_to_string a
 
@@ -467,27 +528,6 @@ module ToStr = struct
     (* prefs2str pref ^ op2str op *)
 end (* ToStr *)
 
-
-(* converts a register number to the corresponding 32bit register variable *)
-let bits2reg32= function
-  | 0 -> eax
-  | 1 -> ecx
-  | 2 -> edx
-  | 3 -> ebx
-  | 4 -> esp
-  | 5 -> ebp
-  | 6 -> esi
-  | 7 -> edi
-  | _ -> failwith "bits2reg32 takes 3 bits"
-
-and reg2bits r = Util.list_firstindex [eax; ecx; edx; ebx; esp; ebp; esi; edi] ((==)r) 
-
-let bits2reg32e b = Var(bits2reg32 b)
-
-let bits2xmm b = xmms.(b)
-  
-let reg2xmm r =
-  bits2xmm (reg2bits r)
   
 
 let parse_instr g addr =
@@ -564,16 +604,16 @@ let parse_instr g addr =
       let (base, na) = if 4 = rm then parse_sib m na else (bits2reg32e rm, na) in
       let (disp, na) = if m = 1 then parse_disp8 na else (*2*) parse_disp32 na in
       (r, Oaddr(base +* l32 disp), na)
-    | 3 -> (r, Oreg(bits2reg32 rm), s a)
+    | 3 -> (r, Oreg rm, s a)
     | _ -> failwith "Impossible"
   in
   let parse_modrm32 a =
     let (r, rm, na) = parse_modrm32ext a in
-    (Oreg(bits2reg32 r), rm, na)
-  and parse_modrmxmm a =
+    (Oreg r, rm, na)
+(*  and parse_modrmxmm a =
     let (r, rm, na) = parse_modrm32ext a in
     let rm = match rm with Oreg r -> Oreg (reg2xmm r) | _ -> rm in
-    (Oreg(bits2xmm r), rm, na)
+    (Oreg(bits2xmm r), rm, na) *)
   in
   let parse_modrm opsize a = match opsize with
     | Reg 32 -> parse_modrm32 a
@@ -668,7 +708,7 @@ let parse_instr g addr =
 	      let (amt, na) = match b1 & 0xfe with
 		| 0xc0 -> parse_imm8 na
 		| 0xd0 -> (Oimm 1L, na)
-		| 0xd2 -> (Oreg ecx, na)
+		| 0xd2 -> (o_ecx, na)
 		| _ -> failwith "impossible"
 	      in
 	      (match r with (* Grp 2 *)
@@ -688,7 +728,7 @@ let parse_instr g addr =
       let b2 = Char.code (g na) and na = s na in
       match b2 with (* Table A-3 *)
       | 0x6f | 0x7f when pref = [0x66] -> (
-	let r, rm, na = parse_modrmxmm na in
+	let r, rm, na = parse_modrm32 na in
 	let s,d = if b2 = 0x6f then rm, r else r, rm in
 	(Movdqa(d,s), na)
       )
