@@ -36,7 +36,7 @@ let allow_symbolic_indices = ref false
 
 let full_symbolic = ref true
   
-let padding = ref false
+let padding = ref true
 
 let memtype = reg_32  
 

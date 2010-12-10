@@ -298,8 +298,8 @@ let speclist =
      uadd(TransformAst(Traces.trace_length)),
      "Output the length of the trace"
     )
-  ::("-trace-padding", 
-     Arg.Set Traces.padding,
+  ::("-trace-no-padding", 
+     Arg.Unit(fun () -> Traces.padding := false),
      "Apply padding for symbolic unused bytes."
     )   
   ::("-no-let-bindings", 
