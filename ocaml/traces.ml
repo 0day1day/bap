@@ -1711,13 +1711,15 @@ let valid_to_invalid trace =
 	  ignore (output_formula "temp" trace) ;
           ignore (solve_formula "temp" "tempout") ;
 	  ignore(Unix.system("cat tempout"));
-	  let _ = solution_from_stp_formula "tempout" in 
-	  Printf.printf "going higher\n";
-	  test middle u
-	with Parsing.Parse_error
+	  match solution_from_stp_formula "tempout" with
+	  | Some _ -> Printf.printf "going higher\n";
+	      test middle u
+	  | None -> Printf.printf "going lower\n";
+	      test l middle
+	with 
 	| Failure _ ->
-	  (Printf.printf "going lower\n";
-	   test l middle)
+	    (Printf.printf "going lower\n";
+	     test l middle)
 	| Symbeval.UnknownLabel ->
 	    (Printf.printf "going a little higher\n";
 	     test l (u-1))
