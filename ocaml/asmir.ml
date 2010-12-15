@@ -732,3 +732,4 @@ let get_asm_instr_string_range p s e =
   done;
   !str
 
+let set_use_simple_segments = Libasmir.asmir_set_use_simple_segments

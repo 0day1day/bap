@@ -67,7 +67,6 @@ export SOURCES = \
 	interpreter.ml \
 	traces.ml \
 	payload.ml \
-	search.ml \
 	$(PROJSOURCES) \
 
 RESULT = bap

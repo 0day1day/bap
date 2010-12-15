@@ -105,11 +105,6 @@ let ast_chop srcbb srcn trgbb trgn p =
 let ssa_chop srcbb srcn trgbb trgn p = 
   Ssa_slice.CHOP_SSA.chop p !srcbb !srcn !trgbb !trgn
 
-(* Evaluation code added *)
-let eval_ast p = 
-  Search.dfs_ast_program p ;
-  p 
-
 let add c =
   pipeline := c :: !pipeline
 
@@ -123,8 +118,6 @@ let speclist =
      "<file> Pretty print AST graph to <file> (in Graphviz format) (no stmts)")
   ::("-pp-ast-cdg", Arg.String (fun f -> add(TransformAstCfg(output_ast_cdg f))),
      "Output the AST CDG (bbid's)")
-  ::("-ast-eval", uadd(TransformAst eval_ast),
-     "Evaluate an AST and print variable values on exit")
   ::("-pp-ast-pdg", Arg.String (fun f -> add(TransformAstCfg(output_ast_pdg f))),
      "Output the AST DDG (bbid's)")
   ::("-pp-ssa", Arg.String(fun f -> add(TransformSsa(output_ssa f))),

@@ -62,6 +62,11 @@ void set_use_eflags_thunks(bool value){
   use_eflags_thunks = value;
 }
 
+/// Set whether to use code with simple segments or not.
+void asmir_set_use_simple_segments(bool value){
+  use_simple_segments = value;
+}
+
 // Terrible name, but to be consistent, named similar to above. 
 // Return what the current eflags thunks values is 
 bool get_use_eflags_thunks()
