@@ -32,6 +32,9 @@ const int UNIX_FAILURE = -1;
 using namespace std;
 using namespace pintrace;
 
+/** Skip this many taint introductions. */
+int g_skipTaints = 0;
+
 /**************** Helper **********************/
 
 /** Convert a wide string to a narrow one
@@ -50,6 +53,24 @@ auto_ptr<string> GetNarrowOfWide(wchar_t *in) {
   return out;
 }
 
+/** Default Taint policy function */
+bool defaultPolicy(uint32_t addr, uint32_t length, const char *msg) {
+  static int intronum = -1;
+
+  intronum++;
+
+  cerr << "Taint introduction #" << intronum
+       << ". @" << addr << "/" << length << " bytes: "
+       << msg << endl;
+
+  if (intronum >= g_skipTaints) {
+    return true;
+  } else {
+    cerr << "Skipping taint introduction." << endl;
+    return false;
+  }
+}
+
 /**************** Initializers ****************/
 
 //
@@ -57,7 +78,8 @@ TaintTracker::TaintTracker(ValSpecRec * env)
   : source(1),
     values(env),
     taint_net(false),
-    taint_args(false)
+    taint_args(false),
+    pf(defaultPolicy)
 {}
 
 //
@@ -170,6 +192,18 @@ void TaintTracker::printMem()
 
 /***************** Taint Handlers *******************/
 
+// Introduces new tainted bytes to memory
+bool TaintTracker::introMemTaint(uint32_t addr, uint32_t length, const char *msg) {
+  if ((*pf)(addr, length, msg)) {
+    for (int i = 0; i < length; i++) {
+      setTaint(memory, addr+i, source++);
+    }
+    return true;
+  } else {
+    return false;
+  }
+}
+
 //
 void TaintTracker::setTaint(context &ctx, uint32_t key, uint32_t tag)
 {
@@ -259,10 +293,7 @@ bool TaintTracker::recvHelper(uint32_t fd, void *ptr, size_t len) {
 
     cerr << "Tainting " << len << " bytes of recv @" << addr << endl;
 
-    for (size_t i = 0; i < len; i++) {
-      setTaint(memory, addr+i, source++);
-    }
-    return true;
+    return introMemTaint(addr, len, "recv");
   } else {
     return false;
   }
@@ -285,9 +316,7 @@ std::vector<TaintFrame> TaintTracker::taintArgs(char *cmdA, wchar_t *cmdW)
     cerr << "Tainting multibyte command-line arguments: " << bytesA << " bytes @ " << (unsigned int)(cmdA) << endl;
     
     /* Taint multibyte command line */
-    for (size_t i = 0; i < bytesA; i++) {      
-      setTaint(memory, (uint32_t)(cmdA)+i, source++);
-    }
+    introMemTaint((uint32_t)cmdA, bytesA, "Tainted Arguments");
 
     TaintFrame frmA;
     frmA.id = ARG_ID;
@@ -296,9 +325,7 @@ std::vector<TaintFrame> TaintTracker::taintArgs(char *cmdA, wchar_t *cmdW)
     frms.push_back(frmA);
 
     cerr << "Tainting wide command-line arguments: " << bytesW << " bytes @ " << (unsigned int)(cmdW) << endl;
-    for (size_t i = 0; i < bytesW; i++) {      
-      setTaint(memory, (uint32_t)(cmdW)+i, source++);      
-    }
+    introMemTaint((uint32_t)cmdW, bytesW, "Tainted Arguments");
 
     TaintFrame frmW;
     frmW.id = ARG_ID;
@@ -319,10 +346,9 @@ std::vector<TaintFrame> TaintTracker::taintArgs(int argc, char **argv)
     for ( int i = 1 ; i < argc ; i++ ) {
 		cerr << "Tainting " << argv[i] << endl;
       size_t len = strlen(argv[i]);
-      for (uint32_t j = 0 ; j < len ; j++) {
-		  setTaint(memory, (uint32_t)(argv[i]+j), source++);
-	  }
-	TaintFrame frm;
+      introMemTaint((uint32_t)argv[i], len, "Arguments");
+      
+      TaintFrame frm;
       frm.id = ARG_ID;
       frm.addr = (uint32_t)argv[i];
       frm.length = len;
@@ -382,9 +408,8 @@ std::vector<TaintFrame> TaintTracker::taintEnv(char *env, wchar_t *wenv)
 	uint32_t numBytes = numChars * sizeof(wchar_t);
         uint32_t addr = (uint32_t) (wenv+equal+1);
         cerr << "Tainting environment variable: " << var << " @" << (int)addr << " " << numChars << " bytes" << endl;
-        for (uint32_t j = 0 ; j < numBytes ; j++) {
-	  setTaint(memory, (addr+j), source++);
-        }
+	introMemTaint(addr, numBytes, "Environment Variable");
+
         TaintFrame frm;
         frm.id = ENV_ID;
         frm.addr = addr;
@@ -409,8 +434,8 @@ std::vector<TaintFrame> TaintTracker::taintEnv(char **env)
       uint32_t len = strlen(env[i]) - var.size();
       uint32_t addr = (uint32_t)env[i]+equal+1;
       cerr << "Tainting environment variable: " << var << " @" << (int)addr << endl;
-      for (uint32_t j = 0 ; j < len ; j++)
-	setTaint(memory, (addr+j), source++);
+      introMemTaint(addr, len, "environment variable");
+
       TaintFrame frm;
       frm.id = ENV_ID;
       frm.addr = addr;
@@ -539,9 +564,9 @@ bool TaintTracker::taintPostSC(const uint32_t bytes,
               cerr << "Tainting " 
                    << bytes 
                    << " bytes from socket" << endl;
-              for (uint32_t i = 0 ; i < length ; i ++)
-                setTaint(memory, addr + i, source++);
-              return true;
+	      return introMemTaint(addr, length, "recv");
+              //return true;
+
             case _A1_accept:
 	      if (bytes != (uint32_t)UNIX_FAILURE) {
 		cerr << "Accepting an incoming connection" << endl;
@@ -577,9 +602,8 @@ bool TaintTracker::taintPostSC(const uint32_t bytes,
         cerr << "Tainting " 
              << length 
              << "bytes from mmap" << endl;
-        for (uint32_t i = 0 ; i < length ; i ++)
-          setTaint(memory, addr + i, source++);
-        return true;
+	return introMemTaint(addr, length, "mmap");
+        //return true;
         break;
       case __NR_read:
         addr = args[1];
@@ -587,9 +611,8 @@ bool TaintTracker::taintPostSC(const uint32_t bytes,
         cerr << "Tainting " 
              << length 
              << " bytes from read at " << addr << endl;
-        for (uint32_t i = 0 ; i < length ; i ++)
-          setTaint(memory, addr + i, source++);
-        return true;
+	return introMemTaint(addr, length, "read");
+        //return true;
 #else /* windows */
       case __NR_createfilewin:
         
@@ -612,9 +635,8 @@ bool TaintTracker::taintPostSC(const uint32_t bytes,
           cerr << "Tainting " 
                << length 
                << " bytes from read @" << addr << endl;
-          for (uint32_t i = 0 ; i < length ; i ++)
-            setTaint(memory, addr + i, source++);
-          return true;
+	  return introMemTaint(addr, length, "read");
+          //return true;
 	}
 		case __NR_closewin:
 			if (bytes == STATUS_SUCCESS && fds.find(args[0]) != fds.end()) {

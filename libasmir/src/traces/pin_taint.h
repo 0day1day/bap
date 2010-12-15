@@ -63,7 +63,17 @@ struct ValSpecRec {
   uint32_t taint;              // Taint status of the value
 };
 
+/* globals */
+
+extern int g_skipTaints;
+
+/* functions */
+
+bool defaultPolicy(uint32_t addr, uint32_t length, const char *msg);
+
 namespace pintrace { // We will use namespace to avoid collision
+
+  typedef bool(*TAINT_POLICY_FUN)(uint32_t addr, uint32_t length, const char *msg);
   
    // Tracking the taint during program flow
    class TaintTracker {
@@ -169,6 +179,8 @@ namespace pintrace { // We will use namespace to avoid collision
      // How many values are being used
      uint32_t count;
 
+     // The taint policy function
+     TAINT_POLICY_FUN pf;
 
      /********** Syscall-specific vars ***********/
      std::set<string> taint_files;
@@ -188,6 +200,8 @@ namespace pintrace { // We will use namespace to avoid collision
      uint32_t exists(context &ctx, uint32_t elem);
 
      uint32_t getTaint(context &ctx, uint32_t elem);
+
+     bool introMemTaint(uint32_t addr, uint32_t length, const char *msg);
 
      void setTaint(context &ctx, uint32_t key, uint32_t tag);
 

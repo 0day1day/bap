@@ -82,6 +82,7 @@ union PIN_REGISTER
 #define VT_MEM32    (MEM_BASE+0x2)
 #define VT_MEM64    (MEM_BASE+0x3)
 #define VT_MEM128   (MEM_BASE+0x4)
+#define VT_MEM256   (MEM_BASE+0x5)
 
 enum FrameType {
 
