@@ -1,4 +1,5 @@
 #include "asm_program.h"
+#include "vexmem.h"
 #include <stdint.h>
 
 asection* bfd_sections( bfd *abfd) {
@@ -30,4 +31,8 @@ const char* bfd_section_get_name(asection *s) {
 
 int64_t bfd_section_get_flags(asection *s) {
   return s->flags;
+}
+
+void asmir_free_vex_buffers(void) {
+  vx_FreeAll();
 }

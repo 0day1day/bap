@@ -583,6 +583,8 @@ let alt_bap_from_trace_file filename =
   Status.init "Lifting trace" 0 ;
   while !c do
     (*dprintf "Calling the trace again.... ";*)
+    (* flush VEX buffers *)
+    let () = Libasmir.asmir_free_vex_buffers () in
     let trace_frames = Libasmir.asmir_frames_from_trace_file filename !off !trace_blocksize in
     let numframes = Libasmir.asmir_frames_length trace_frames in
     (*dprintf "Got %d frames" numframes;*)

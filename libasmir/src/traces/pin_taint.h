@@ -179,9 +179,6 @@ namespace pintrace { // We will use namespace to avoid collision
      // How many values are being used
      uint32_t count;
 
-     // The taint policy function
-     TAINT_POLICY_FUN pf;
-
      /********** Syscall-specific vars ***********/
      std::set<string> taint_files;
      std::set<uint32_t> fds;
@@ -191,7 +188,8 @@ namespace pintrace { // We will use namespace to avoid collision
 
      /********************************************/
 
-
+     // The taint policy function
+     TAINT_POLICY_FUN pf;
 
      void addTaintToWritten(context &delta, uint32_t tag);
       

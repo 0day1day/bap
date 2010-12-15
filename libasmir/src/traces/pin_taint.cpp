@@ -195,7 +195,7 @@ void TaintTracker::printMem()
 // Introduces new tainted bytes to memory
 bool TaintTracker::introMemTaint(uint32_t addr, uint32_t length, const char *msg) {
   if ((*pf)(addr, length, msg)) {
-    for (int i = 0; i < length; i++) {
+    for (unsigned int i = 0; i < length; i++) {
       setTaint(memory, addr+i, source++);
     }
     return true;
