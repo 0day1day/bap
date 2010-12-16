@@ -86,3 +86,5 @@ val byte_insn_to_bap :
   bfd_architecture -> address_t -> char array -> Ast.program * int64
 
 val set_use_simple_segments : bool -> unit
+
+val get_prog_contents : asmprogram -> int64 -> char
