@@ -117,10 +117,14 @@ and oF = nv "R_OF" r1
 
 and dflag = nv "R_DFLAG" r32 (* 1 if DF=0 or -1 if DF=1 *)
 
+and fs_base = nv "R_FS_BASE" r32
+and gs_base = nv "R_GS_BASE" r32
+
+
 let xmms = Array.init 8 (fun i -> nv (Printf.sprintf "XMM%d" i) xmm_t)
 
 let regs : var list =
-  ebp::esp::esi::edi::eip::eax::ebx::ecx::edx::eflags::cf::pf::af::zf::sf::oF::dflag::
+  ebp::esp::esi::edi::eip::eax::ebx::ecx::edx::eflags::cf::pf::af::zf::sf::oF::dflag::fs_base::gs_base::
   List.map (fun (n,t) -> Var.newvar n t)
     [
 
@@ -143,8 +147,6 @@ let regs : var list =
   ("R_ES", reg_16); 
   ("R_FS", reg_16); 
   ("R_GS", reg_16); 
-  ("R_FS_BASE", reg_32);
-  ("R_GS_BASE", reg_32);
   ("R_SS", reg_16); 
 
   (* floating point *)
@@ -184,12 +186,14 @@ and dflag_e = Var dflag
 let esiaddr = Oaddr esi_e
 and ediaddr = Oaddr edi_e
 
-(* exp helpers *)
-let loadm m t a =
-  Load(Var m, a, little_endian, t)
+let seg_cs = None
+and seg_ss = None
+and seg_ds = None
+and seg_es = None
+and seg_fs = Some fs_base
+and seg_gs = Some gs_base
 
-let load t a =
-  Load(mem_e, a, little_endian, t)
+(* exp helpers *)
 
 let binop op a b = match (a,b) with
   | (Int(a, at), Int(b, bt)) when at = bt ->
@@ -213,6 +217,13 @@ let (>*) a b   = binop LT b a
 let cast_low t e = Cast(CAST_LOW, t, e)
 let cast_high t e = Cast(CAST_HIGH, t, e)
 let cast_unsigned t e = Cast(CAST_UNSIGNED, t, e)
+
+let loadm m t a =
+  Load(Var m, a, little_endian, t)
+
+let load_s s t a = match s with
+  | None -> Load(mem_e, a, little_endian, t)
+  | Some v -> Load(mem_e, Var v +* a, little_endian, t)
 
 let ite t b e1 e2 = (* FIXME: were we going to add a native if-then-else thing? *)
   if t = r1 then
@@ -273,23 +284,23 @@ module ToIR = struct
 let move v e =
   Move(v, e, [])
 
-let store t a e =
-  move mem (Store(mem_e, a, e, little_endian, t))
+let store_s s t a e = match s with
+  | None -> move mem (Store(mem_e, a, e, little_endian, t))
+  | Some v -> move mem (Store(mem_e, Var v +* a, e, little_endian, t))
 
 let storem m t a e =
   move m (Store(Var m, a, e, little_endian, t))
 
 
-
-let op2e t = function
+let op2e_s ss t = function
   | Oreg r when t = r32 -> bits2reg32e r
   | Oreg r when t = r16 -> bits2reg16e r
   | Oreg r when t = r8 -> bits2reg8e r
   | Oreg r -> unimplemented "sub registers" (*cast_low t (Var r)*)
-  | Oaddr e -> load t e
+  | Oaddr e -> load_s ss t e
   | Oimm i -> Int(Arithmetic.to64 (i,t), t)
 
-let assn t v e =
+let assn_s s t v e =
   match v with
   | Oreg r when t = r32 -> move (bits2reg32 r) e
   | Oreg r when t = r16 ->
@@ -302,7 +313,7 @@ let assn t v e =
     let v = bits2reg32 (r land 3) in
     move v ((Var v &* l32 0xffff00ffL) |* (cast_unsigned r32 e <<* i32 8))
   | Oreg _ -> unimplemented "assignment to sub registers"
-  | Oaddr a -> store t a e
+  | Oaddr a -> store_s s t a e
   | Oimm _ -> failwith "disasm_i386: Can't assign to an immediate value"
 
 let bytes_of_width = function
@@ -357,11 +368,16 @@ let set_flags_sub t s1 s2 r =
   ::[]
     
 
-let to_ir addr next pref = function
+let to_ir addr next ss pref =
+  let load = load_s ss (* Need to change this if we want seg_ds <> None *)
+  and op2e = op2e_s ss
+  and store = store_s ss
+  and assn = assn_s ss in
+  function
   | Nop -> []
   | Retn when pref = [] ->
     let t = nv "ra" r32 in
-    [move t (load r32 esp_e);
+    [move t (load_s seg_ss r32 esp_e);
      move esp (esp_e +* (i32 4));
      Jmp(Var t, [StrAttr "ret"])
     ]
@@ -396,9 +412,8 @@ let to_ir addr next pref = function
     [ Jmp(op2e r32 o, [])]
   | Jcc(o, c) ->
     cjmp c (op2e r32 o)
-  | Shift(st, s, o1, o2) when pref = [] || pref = [pref_opsize] ->
+  | Shift(st, s, o1, o2) (*when pref = [] || pref = [pref_opsize]*) ->
     assert (List.mem s [r8; r16; r32]);
-    (* FIXME: how should we deal with undefined state? *)
     let t1 = nv "t1" s and tmpDEST = nv "tmpDEST" s
     and bits = Arithmetic.bits_of_width s
     and s_f = match st with LSHIFT -> (<<*) | RSHIFT -> (>>*) | ARSHIFT -> (>>>*)
@@ -430,7 +445,7 @@ let to_ir addr next pref = function
     let src1 = nv "src1" t and src2 = nv "scr2" t and tmpres = nv "tmp" t in
     let stmts =
       move src1 (op2e t esiaddr)
-      :: move src2 (op2e t ediaddr)
+      :: move src2 (op2e_s seg_es t ediaddr)
       :: move tmpres (Var src1 -* Var src2)
       :: string_incr t esi
       :: string_incr t edi
@@ -443,7 +458,7 @@ let to_ir addr next pref = function
     else
       unimplemented "unsupported flags in cmps"
   | Stos(Reg bits as t) ->
-    let stmts = [store t edi_e (op2e t (o_eax));
+    let stmts = [store_s seg_es t edi_e (op2e t (o_eax));
 		 string_incr t edi]
     in
     if pref = [] then
@@ -452,35 +467,35 @@ let to_ir addr next pref = function
       rep_wrap ~addr ~next stmts
     else
       unimplemented "unsupported prefix for stos"
-  | Push(t, o) when pref = [] ->
+  | Push(t, o) ->
     let tmp = nv "t" t in (* only really needed when o involves esp *)
     move tmp (op2e t o)
     :: move esp (esp_e -* i32 4)
-    :: store t esp_e (Var tmp)
+    :: store_s seg_ss t esp_e (Var tmp) (* FIXME: can ss be overridden? *)
     :: []
-  | Sub(t, o1, o2) when pref = [] ->
+  | Sub(t, o1, o2) ->
     let tmp = nv "t" t in
     move tmp (op2e t o1)
     :: assn t o1 (op2e t o1 -* op2e t o2)
     :: set_flags_sub t (Var tmp) (op2e t o2) (op2e t o1)
-  | Cmp(t, o1, o2) when pref = [] ->
+  | Cmp(t, o1, o2) ->
     let tmp = nv "t" t in
     move tmp (op2e t o1 -* op2e t o2)
     :: set_flags_sub t (op2e t o1) (op2e t o2) (Var tmp)
-  | And(t, o1, o2) when pref = [] ->
+  | And(t, o1, o2) ->
     assn t o1 (op2e t o1 &* op2e t o2)
     :: move oF exp_false
     :: move cf exp_false
     :: move af (Unknown("AF is undefined after and", r1))
     :: set_pszf t (op2e t o1)
-  | Test(t, o1, o2) when pref = [] ->
+  | Test(t, o1, o2) ->
     let tmp = nv "t" t in
     move tmp (op2e t o1 &* op2e t o2)
     :: move oF exp_false
     :: move cf exp_false
     :: move af (Unknown("AF is undefined after and", r1))
     :: set_pszf t (Var tmp)
-  | Cld when pref = [] ->
+  | Cld ->
     [Move(dflag, i32 1, [])]
   | _ -> unimplemented "to_ir"
 
@@ -742,10 +757,26 @@ let parse_instr g addr =
   let op, a = get_opcode pref opsize a in
   (pref, op, a)
 
+let parse_prefixes pref op =
+  (* FIXME: how to deal with conflicting prefixes? *)
+  let rec f t s r = function
+    | [] -> (t, s, List.rev r)
+    | 0x2e::p -> f t seg_cs r p
+    | 0x36::p -> f t seg_ss r p
+    | 0x3e::p -> f t seg_ds r p
+    | 0x26::p -> f t seg_es r p
+    | 0x64::p -> f t seg_fs r p
+    | 0x65::p -> f t seg_gs r p
+    | 0xf0::p -> f t s r p (* discard lock prefix *)
+    | 0x66::p -> f r16 s r p
+    | p::ps -> f t s (p::r) ps
+  in
+  f r32 None [] pref
 
 let disasm_instr g addr =
   let (pref, op, na) = parse_instr g addr in
-  let ir = ToIR.to_ir addr na pref op in
+  let (_, ss, pref) =  parse_prefixes pref op in
+  let ir = ToIR.to_ir addr na ss pref op in
   let asm = try Some(ToStr.to_string pref op) with Failure _ -> None in
   (ToIR.add_labels ?asm addr ir, na)
 
