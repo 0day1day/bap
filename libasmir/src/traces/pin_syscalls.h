@@ -18,9 +18,11 @@
 // Windows system calls @ http://code.google.com/p/miscellaneouz/source/browse/trunk/winsyscalls?spec=svn26&r=26
 // FIXME: We should really handle different versions of Windows better
 // These are for win7
-#define __NR_createfilewin	0x0042
-#define __NR_readfilewin 0x0111
-#define __NR_closewin 0x0032
+#define __NR_closewin            0x0032
+#define __NR_createfilewin	 0x0042
+#define __NR_createsectionwin    0x0054
+#define __NR_mapviewofsectionwin 0x00A8
+#define __NR_readfilewin         0x0111
 
 /********************************************/
 

@@ -182,6 +182,7 @@ namespace pintrace { // We will use namespace to avoid collision
      /********** Syscall-specific vars ***********/
      std::set<string> taint_files;
      std::set<uint32_t> fds;
+     std::map<uint32_t,uint32_t> sections;
      bool taint_net;
      bool taint_args;
      std::set<string> taint_env;
