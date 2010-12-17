@@ -55,6 +55,7 @@ type opcode =
   | Cmps of typ
   | Stos of typ
   | Push of typ * operand
+  | Pop of typ * operand
   | Sub of typ * operand * operand
   | Cmp of typ * operand * operand
   | And of typ * operand * operand
@@ -470,9 +471,12 @@ let to_ir addr next ss pref =
   | Push(t, o) ->
     let tmp = nv "t" t in (* only really needed when o involves esp *)
     move tmp (op2e t o)
-    :: move esp (esp_e -* i32 4)
+    :: move esp (esp_e -* i32 (bytes_of_width t))
     :: store_s seg_ss t esp_e (Var tmp) (* FIXME: can ss be overridden? *)
     :: []
+  | Pop(t, o) ->
+    [assn t o (load_s seg_ss t esp_e);
+     move esp (esp_e +* i32 (bytes_of_width t)) ]
   | Sub(t, o1, o2) ->
     let tmp = nv "t" t in
     move tmp (op2e t o1)
@@ -590,6 +594,12 @@ let parse_instr g addr =
     let d = Int64.logor d (r 3) in
     (d, (Int64.add a 4L))
   in
+  let parse_disp = function
+    | Reg 8 ->  parse_disp8
+    | Reg 16 -> unimplemented "16-bit displacement"
+    | Reg 32 -> parse_disp32
+    | _ -> failwith "unsupported displacement size"
+  in
   let parse_sib m a =
     (* ISR 2.1.5 Table 2-3 *)
     let b = Char.code (g a) in
@@ -653,10 +663,10 @@ let parse_instr g addr =
     let b1 = Char.code (g a)
     and na = s a in
     match b1 with (* Table A-2 *)
-    | 0x53 -> (Push(opsize, o_ebx), na)
-    | 0x55 -> (Push(opsize, o_ebp), na)
-    | 0x56 -> (Push(opsize, o_esi), na)
-    | 0x57 -> (Push(opsize, o_edi), na)
+    | 0x50 | 0x51 | 0x52 | 0x53 | 0x54 | 0x55 | 0x56 | 0x57 ->
+      (Push(opsize, Oreg(b1 & 7)), na)
+    | 0x58 | 0x59 | 0x5a | 0x5b | 0x5c | 0x5d | 0x5e | 0x5f ->
+      (Pop(opsize, Oreg(b1 & 7)), na)
     | 0x74
     | 0x75 -> let (i,na) = parse_disp8 na in
 	      let cc = match b1 with
@@ -702,18 +712,16 @@ let parse_instr g addr =
     | 0xa7 -> (Cmps opsize, na)
     | 0xaa -> (Stos r8, na)
     | 0xab -> (Stos opsize, na)
-    | 0xb8 -> let (i, na) = parse_immv opsize na in
-	      (Mov(opsize, o_eax, i), na)
-    | 0xba -> let (i, na) = parse_immv opsize na in
-	      (Mov(opsize, o_edx, i), na)
+    | 0xb8 | 0xb9 | 0xba | 0xbb | 0xbc | 0xbd | 0xbe
     | 0xbf -> let (i, na) = parse_immv opsize na in
-	      (Mov(opsize, o_edi, i), na)
-
+	      (Mov(opsize, Oreg(b1 & 7), i), na)
     | 0xc7 -> let (_, rm, na) = parse_modrm32 na in
 	      let (i,na) = parse_immz opsize na in
 	      (Mov(opsize, rm, i), na)
     | 0xe8 -> let (i,na) = parse_disp32 na in
 	      (Call(Oimm i, na), na)
+    | 0xe9 -> let (i,na) = parse_disp opsize na in
+	      (Jump(Oimm(Int64.add i na)), na)
     | 0xeb -> let (i,na) = parse_disp8 na in
 	      (Jump(Oimm(Int64.add i na)), na)
     | 0xc0 | 0xc1
