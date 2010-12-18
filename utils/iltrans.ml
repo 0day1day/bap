@@ -196,8 +196,12 @@ let speclist =
      "Trace dead-code elimination."
     )
   ::("-trace-debug", 
-     uadd(TransformAst Traces.valid_to_invalid),
+     uadd(TransformAst Traces.trace_valid_to_invalid),
      "Formula debugging. Prints to files form_val and form_inv"
+    )
+  ::("-trace-conc-debug", 
+     uadd(TransformAst Traces.formula_valid_to_invalid),
+     "Formula debugging. Prints to files form_val and form_inv. Concretizes BEFORE debugging; useful for finding which assertion doesn't work."
     )
   ::("-trace-dsa",
      uadd(TransformAst to_dsa),

@@ -1698,37 +1698,83 @@ let add_assignments trace =
 (******************* Formula Debugging  **********************)
 (*************************************************************)
 
-(* Binary search to check where things go wrong *)
-let valid_to_invalid trace = 
+(* Binary search over the trace IL to see where things go
+   wrong. *)
+let trace_valid_to_invalid trace = 
   let length = List.length trace in
-  let rec test l u =
+  let rec bsearch l u =
     Printf.printf "Searching %d %d\n" l u ;
     if l >= u - 1 then (l,u)
     else 
       let middle = (l + u) / 2 in
       let trace = Util.take middle trace in
-	try 
-	  ignore (output_formula "temp" trace) ;
-          ignore (solve_formula "temp" "tempout") ;
-	  ignore(Unix.system("cat tempout"));
-	  match solution_from_stp_formula "tempout" with
-	  | Some _ -> Printf.printf "going higher\n";
-	      test middle u
-	  | None -> Printf.printf "going lower\n";
-	      test l middle
-	with 
-	| Failure _ ->
-	    (Printf.printf "going lower\n";
-	     test l middle)
-	| Symbeval.UnknownLabel ->
-	    (Printf.printf "going a little higher\n";
-	     test l (u-1))
+      try 
+	ignore (output_formula "temp" trace) ;
+        ignore (solve_formula "temp" "tempout") ;
+	ignore(Unix.system("cat tempout"));
+	match solution_from_stp_formula "tempout" with
+	| Some _ -> Printf.printf "going higher\n";
+	    bsearch middle u
+	| None -> Printf.printf "going lower\n";
+	    bsearch l middle
+      with 
+      | Failure _ ->
+	  (Printf.printf "going lower\n";
+	   bsearch l middle)
+      | Symbeval.UnknownLabel ->
+	  (Printf.printf "going a little higher\n";
+	   bsearch l (u-1))
   in
-  let (l,u) = test 1 length in
-    ignore (output_formula "form_val" (Util.take l trace)) ;
-    ignore (output_formula "form_inv" (Util.take u trace)) ;
-    trace
-      
+  let (l,u) = bsearch 1 length in
+  ignore (output_formula "form_val" (Util.take l trace)) ;
+  ignore (output_formula "form_inv" (Util.take u trace)) ;
+  trace
+
+(* Binary search over the concretized IL to check where things go
+   wrong. *)
+let formula_valid_to_invalid trace = 
+  let sym_and_output trace fname =
+    LetBind.bindings := [] ;  (*  XXX: temporary hack *)
+    ignore(symbolic_run trace);
+    let formula = TraceSymbolic.output_formula () in
+    print_formula fname formula ;
+  in
+  let trace = concrete trace in
+  (* If we leave DCE on, it will screw up the consistency check. *)
+  let trace = match !consistency_check with
+    | false -> trace_dce trace
+    | true -> trace
+  in
+  let length = List.length trace in
+  Printf.printf "Starting search: %d trace length\n" length;
+  let rec bsearch l u =
+    Printf.printf "Searching %d %d\n" l u ;
+    if l >= u - 1 then (l,u)
+    else 
+      let middle = (l + u) / 2 in
+      let trace = Util.take middle trace in
+      try 
+	sym_and_output trace "temp";
+        ignore (solve_formula "temp" "tempout") ;
+	ignore(Unix.system("cat tempout"));
+	match solution_from_stp_formula "tempout" with
+	| Some _ -> Printf.printf "going higher\n";
+	    bsearch middle u
+	| None -> Printf.printf "going lower\n";
+	    bsearch l middle
+      with 
+      | Failure _ ->
+	  (Printf.printf "going lower\n";
+	   bsearch l middle)
+      | Symbeval.UnknownLabel ->
+	  (Printf.printf "going a little higher\n";
+	   bsearch l (u-1))
+  in
+  let (l,u) = bsearch 1 length in
+  ignore (sym_and_output (Util.take l trace) "form_val") ;
+  ignore (sym_and_output (Util.take u trace) "form_inv") ;
+  trace
+
 module NameSet = Set.Make(String)
 
 (* Wanna slice? *)
