@@ -547,7 +547,17 @@ module ToStr = struct
     (* prefs2str pref ^ op2str op *)
 end (* ToStr *)
 
-  
+(* extract the condition to jump on from the opcode bits
+for 70 to 7f and 0f 80 to 8f *)
+let cc_to_exp i =
+  let cc = match i & 0xe with
+    | 0x2 -> cf_e
+    | 0x4 -> zf_e
+    | 0x6 -> cf_e |* zf_e
+    | 0x8 -> sf_e
+    | _ -> failwith "unsupported condition code"
+  in
+  if (i & 1) = 0 then cc else exp_not cc
 
 let parse_instr g addr =
   let s = Int64.succ in
@@ -667,14 +677,12 @@ let parse_instr g addr =
       (Push(opsize, Oreg(b1 & 7)), na)
     | 0x58 | 0x59 | 0x5a | 0x5b | 0x5c | 0x5d | 0x5e | 0x5f ->
       (Pop(opsize, Oreg(b1 & 7)), na)
-    | 0x74
-    | 0x75 -> let (i,na) = parse_disp8 na in
-	      let cc = match b1 with
-		| 0x74 -> zf_e
-		| 0x75 -> exp_not zf_e
-		| _ -> failwith "impossible"
-	      in
-	      (Jcc(Oimm(Int64.add i na), cc), na)
+    | 0x68 (* | 0x6a *) ->
+      let (o, na) = if b1=0x68 then parse_immz opsize na else parse_simm8 na in
+      (Push(opsize, o), na)
+    | 0x72 | 0x73 | 0x74 | 0x75 | 0x76 | 0x77 | 0x78
+    | 0x79 -> let (i,na) = parse_disp8 na in
+	      (Jcc(Oimm(Int64.add i na), cc_to_exp b1), na)
     | 0xc3 -> (Retn, na)
       (* FIXME: operand widths *)
     | 0x80 | 0x81 | 0x82
@@ -755,6 +763,9 @@ let parse_instr g addr =
 	let s,d = if b2 = 0x6f then rm, r else r, rm in
 	(Movdqa(d,s), na)
       )
+      | 0x82 | 0x83 | 0x84 | 0x85 | 0x86 | 0x87 | 0x88
+      | 0x89 ->	let (i,na) = parse_disp32 na in
+		(Jcc(Oimm(Int64.add i na), cc_to_exp b2), na)
       | _ -> unimplemented (Printf.sprintf "unsupported opcode: %02x %02x" b1 b2)
     )
     | n -> unimplemented (Printf.sprintf "unsupported opcode: %02x" n)
