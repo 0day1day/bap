@@ -187,10 +187,6 @@ let speclist =
      uadd(TransformAst Traces.concrete),
      "Execute the trace concretely and obtain a straightline trace"
     )
-  ::("-trace-concolic", 
-     uadd(TransformAst Traces.concolic),
-     "Execute the trace symbolically and generate the formula"
-    )
   ::("-trace-dce",
      uadd(TransformAst Traces.trace_dce),
      "Trace dead-code elimination."
