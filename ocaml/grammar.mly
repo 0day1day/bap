@@ -64,7 +64,7 @@ struct
       then v
       else err ("Variable '"^n^"' used with inconsistent type")
     with Not_found ->
-      Printf.printf "%s not found\n" n;
+      (* Printf.printf "%s not found\n" n; *)
       match t with
       | Some t -> add n t
       | None -> err ("Type was never declared for '"^n^"'")

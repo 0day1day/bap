@@ -2506,7 +2506,7 @@ int del_put_thunk(vector<Stmt*> *ir,
     // cout << "debug " << j << " " << stmt->tostring() << endl;
     
     if (i386_op_is_very_broken(op_string)) {
-      cerr << "Warning: Broken op detected.  Not removing thunks.  Please fix this part of libasmir eventually." << endl;
+      // cerr << "Warning: Broken op detected.  Not removing thunks.  Please fix this part of libasmir eventually." << endl;
     
     
     } else {

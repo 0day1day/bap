@@ -133,6 +133,8 @@ Exp assert_cond(Stmt s);
 
 // generated functions for eflags thunks
 //[null_terminated] Stmt* gen_eflags_helpers_c();
+// using simple segments
+void asmir_set_use_simple_segments(boolean value);
 
 
 asm_program_t asmir_open_file([string] char *filename);

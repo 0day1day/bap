@@ -172,6 +172,8 @@ extern "C" {
   extern Stmt** gen_eflags_helpers_c();
   */
 
+  extern void asmir_set_use_simple_segments(bool value);
+
   extern bap_blocks_t * asmir_asmprogram_to_bap(asm_program_t *prog);
   extern bap_blocks_t * asmir_asmprogram_range_to_bap(asm_program_t *prog, address_t start, address_t end);
   extern asm_program_t* byte_insn_to_asmp(bfd_architecture arch, address_t addr, unsigned char *bb_bytes, unsigned int len);
