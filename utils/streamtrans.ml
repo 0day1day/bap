@@ -36,8 +36,9 @@ let prints block =
 (** Concretely executes a block *)
 let concrete block =
   let no_specials = Traces.remove_specials block in
+  let memv = Traces.find_memv no_specials in
   let trace = try
-    Traces.run_block concrete_state no_specials 
+    Traces.run_block concrete_state memv no_specials 
   with Failure "empty list" -> (*Printf.printf "run blocks failed\n";*) [] in
   trace
 

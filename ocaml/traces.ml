@@ -29,6 +29,9 @@ open D
     trace.  Non-tainted values do not have to match, since their values
     are assumed to be constant. *)
 let consistency_check = ref false;;
+
+(** Alternate assignment uses assign statements rather than
+    overloading lookup_var/mem in the evaluator. *)
 let use_alt_assignment = ref true;;
 
 (* Concretizing as much as possible *)
@@ -41,6 +44,8 @@ let padding = ref true
 let memtype = reg_32  
 
 let endtrace = "This is the final trace block"
+
+let concassignattr = StrAttr("Concrete Assignment")
 
 (*************************************************************)
 (**********************  Datastructures  *********************)
@@ -233,30 +238,32 @@ let assert_vars h =
   let bige = Hashtbl.fold addone global.vars exp_true in
   Assert(bige, [])
 
-(** Build statements assigning operands
+(** Build statements assigning concrete operands 
 
-    @param h Mapping of vars to dsa vars
- *)
-let assign_vars memv =
+    @param symbolic Set to true when symbolically executing and false
+    when concretely executing.  When symbolic mode is enabled, only
+    non-tainted operands will be assigned.
+*)
+let assign_vars memv symbolic =
   let addone k v a = 
     match name_to_var k with
     | Some(realv) -> 
-	(match taint_val (Var.name realv) with 
-	 | Some(false) ->
-	     (try 
-	       Move(realv, v.exp, [])::a
-	     with Not_found -> a)
-	 | _ -> a)
+	(match symbolic, v.tnt with 
+	 | true, false (* Symbolic execution, non-tainted *)
+	 | false, _ (* Concrete execution *) ->
+	     Move(realv, v.exp, [concassignattr])::a
+	 | true, true (* Symbolic, tainted *) -> a)
     | None -> a
   in
   let addmem k v a =
-    (* What should we do when we have symbolic indices? Should we
-       introduce concrete memory information? I am doing so for
-       now. *)
-    match v.tnt with
-    | false ->
-	Move(memv, Store(Var(memv), Int(k, memtype), v.exp, exp_false, reg_8), [])::a
-    | _ -> a
+    (* What should we do when we have symbolic tainted indices? Should we
+       introduce concrete memory information? We are not doing this
+       for now. *)
+    match symbolic, v.tnt with
+    | true, false (* Symbolic *) 
+    | false, _ (* Concrete *) ->
+	Move(memv, Store(Var(memv), Int(k, memtype), v.exp, exp_false, reg_8), [concassignattr])::a
+    | true, true -> a
   in
   let bige = Hashtbl.fold addone global.vars [] in
   let bige = Hashtbl.fold addmem global.memory bige in
@@ -321,6 +328,8 @@ let is_temp var =
   (String.length var > 2) &&
     (String.sub var 0 2 = "T_")
 
+let is_concassign = (==) concassignattr
+
 let is_symbolic (Var.V(_,s,_)) =
   try
     String.sub s 0 5 = "symb_"
@@ -381,6 +390,31 @@ let add_eflags eflags usage taint =
     taint
     
  (* TODO: handle more EFLAGS registers *)
+
+	  
+(** Get the vars used in a program *)
+let allvars p =
+  let h = VH.create 570 in
+  let vis = object(self)
+    inherit Ast_visitor.nop
+
+    method visit_avar v =
+      VH.replace h v ();
+      `DoChildren
+
+    method visit_rvar = self#visit_avar
+  end 
+  in
+  ignore(Ast_visitor.prog_accept vis p);
+  VH.fold (fun k () a -> k::a) h []	
+
+let find_memv trace =
+  let vars = List.filter is_mem (allvars trace) in
+  (* List.iter (fun x -> dprintf "memvar: %s" (Var.name x)) vars; *)
+  match vars with
+  | x::[] -> x
+  | _ -> failwith "More than one var"
+
 
 (********************************************************)
 (*  REG MAPPING: TODO -> move this in a separate file   *)
@@ -635,16 +669,18 @@ struct
     (* print_vars (); *)
 
     match dsa_concrete_val var with
-    | Some(traceval) ->	
+    | Some(traceval) when not !use_alt_assignment ->	
     
-    (* First, look up in the trace. 
+	(* First, look up in the trace as long as we are not using the
+	   alternate assignment scheme. The alternate assignment scheme puts
+	   the value in delta, so we just need to look there.
 
-       Also, we should update delta.
-    *)
+	   If we are not using the alternate scheme, we should update
+	   delta for consistency. *)
 	VH.replace delta var (Symbolic(traceval));
 	Symbolic(traceval)
 
-    | None ->
+    | _ ->
 	
 	(* If we can't find it there, then check in delta. Maybe we
 	   updated it (e.g., R_ESP = R_ESP+4) *)
@@ -682,13 +718,14 @@ struct
     match mu, index with
     | ConcreteMem(m,v), Int(i,t) -> (
 
-	(* First, search the trace memory *)
+	(* First, search the trace memory (not when using alternate
+	   assignment -- see lookup_var) *)
 	match concrete_mem i with
-	| Some(traceval) ->
+	| Some(traceval) when not !use_alt_assignment ->
 	    traceval
-	| None -> 
+	| _ -> 
 
-	  (* If that doesn't work, check delta *)
+	    (* If that doesn't work, check delta *)
 
 	    try AddrMap.find (normalize i t) m
             with Not_found ->
@@ -787,6 +824,7 @@ let trace_transform_stmt stmt evalf =
     | Ast.CJmp _ -> failwith "Evaluation failure!"
     | (Ast.Jmp _) ->
 	[com]
+    | Ast.Move (_, _, atts) when List.exists is_concassign atts -> []
     | s -> [s] in
   if not !allow_symbolic_indices && !exp <> exp_true then
     (* The assertion must come first, since the statement may modify value of the expression! *)
@@ -795,7 +833,7 @@ let trace_transform_stmt stmt evalf =
     s
 	
 (** Running each block separately *)
-let run_block state block = 
+let run_block state memv block = 
   let addr, block = hd_tl block in
   pdebug ("Running block: " ^ (string_of_int !counter) ^ " " ^ (Pp.ast_stmt_to_string addr));
   let info, block = hd_tl block in
@@ -808,18 +846,21 @@ let run_block state block =
     (* TraceConcrete.print_values state.delta; *)
     (* TraceConcrete.print_mem state.delta; *)
   );
+
+  let block = match !use_alt_assignment with
+    | true ->
+	let assigns = assign_vars memv false in
+	List.iter
+	  (fun stmt -> dprintf "assign stmt: %s" (Pp.ast_stmt_to_string stmt)) assigns;	
+	assigns @ block
+    | false -> block
+  in
+
   let block = append_halt block in 
-  (* let block = strip_jmp block in *)
     Status.inc() ;   
     Status.inc() ;
-  (*print_block block ;*)
   TraceConcrete.initialize_prog state block ;
-  (* If we are performing a consistency check, we should not empty out
-  delta. However, if delta grows indefinitely, trace operations become
-  slow. *)
-  (* if not !consistency_check then *)
-    (* TraceConcrete.cleanup_delta state ; *)
-    clean_delta state.delta;
+  clean_delta state.delta;
   let init = TraceConcrete.inst_fetch state.sigma state.pc in
   let executed = ref [] in
   let rec eval_block state stmt = 
@@ -832,8 +873,6 @@ let run_block state block =
     in
     executed := Util.fast_append (trace_transform_stmt stmt evalf) !executed ; 
     (*print_endline (Pp.ast_stmt_to_string stmt) ;*)
-    
-	     
 
     try 
       (match TraceConcrete.eval_stmt state stmt with
@@ -868,13 +907,13 @@ let run_block state block =
       | Halted _ -> 
 	  (addr::info::List.rev (List.tl !executed))
 
-let run_blocks blocks length =
+let run_blocks blocks memv length =
   counter := 1 ;
   Status.init "Concrete Run" length ;
   let state = TraceConcrete.create_state () in
   let rev_trace = List.fold_left 
     (fun acc block -> 
-       List.rev_append (run_block state block) acc
+       List.rev_append (run_block state memv block) acc
     ) [] blocks
   in
   Status.stop () ;
@@ -986,11 +1025,12 @@ let concrete trace =
   let trace = Memory2array.coerce_prog trace in
   let no_specials = remove_specials trace in
   let no_unknowns = remove_unknowns no_specials in
+  let memv = find_memv no_unknowns in
   let blocks = trace_to_blocks no_unknowns in
   (*pdebug ("blocks: " ^ (string_of_int (List.length blocks)));*)
   let length = List.length no_specials in
   
-  let actual_trace = run_blocks blocks length in
+  let actual_trace = run_blocks blocks memv length in
     actual_trace
 
 (*************************************************************)
@@ -1231,22 +1271,6 @@ let add_symbolic_seeds memv = function
 	
 let status = ref 0
 let count = ref 0
-	  
-(** Get the vars used in a program *)
-let allvars p =
-  let h = VH.create 570 in
-  let vis = object(self)
-    inherit Ast_visitor.nop
-
-    method visit_avar v =
-      VH.replace h v ();
-      `DoChildren
-
-    method visit_rvar = self#visit_avar
-  end 
-  in
-  ignore(Ast_visitor.prog_accept vis p);
-  VH.fold (fun k () a -> k::a) h []	
 
 let symbolic_run trace = 
   Status.init "Symbolic Run" (List.length trace) ;
@@ -1258,12 +1282,7 @@ let symbolic_run trace =
   cleanup ();
   let state = TraceSymbolic.build_default_context trace in
   (* Find the memory variable *)
-  let memv =
-    let vars = List.filter is_mem (allvars trace) in
-    List.iter (fun x -> dprintf "memvar: %s" (Var.name x)) vars;
-    assert ((List.length vars) = 1);
-    List.hd vars
-  in
+  let memv = find_memv trace in
   dprintf "Memory variable: %s" (Var.name memv);
   let to_dsa stmt = to_dsa_stmt stmt h rh in
   let formula = 
@@ -1279,7 +1298,7 @@ let symbolic_run trace =
 	     stmts := [(assert_vars h)]
 	   );
 	   if hasconc && !use_alt_assignment then (
-	     let assigns = assign_vars memv in
+	     let assigns = assign_vars memv true in
 	     List.iter
 	       (fun stmt -> dprintf "assign stmt: %s" (Pp.ast_stmt_to_string stmt)) assigns;
 	     stmts := !stmts @ assigns;
