@@ -18,8 +18,8 @@ export SOURCES = \
 	dominator.ml \
 	graphDataflow.mli graphDataflow.ml \
 	type.ml type.mli \
-	arithmetic.ml \
 	var.mli var.ml \
+	arithmetic.ml \
 	ast.ml \
 	ssa.ml \
 	pp.ml \

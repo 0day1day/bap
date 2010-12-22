@@ -191,6 +191,27 @@ let conc_mem_iter f =
 (*********************  Helper Functions  ********************)
 (*************************************************************)
 
+let symb_re = Str.regexp "^symb_\\([0-9]+\\)$";;
+
+let get_symb_num (Var.V(_, s, _)) =
+  if Str.string_match symb_re s 0 then
+    int_of_string(Str.matched_group 1 s)
+  else 
+    failwith ("Expected a symbolic: " ^ s)
+
+(* Return a list of bytes read from a file *)
+let bytes_from_file file =
+  let cin = open_in file in
+  let bytes = ref [] in
+  let rec get_bytes () = 
+    bytes := (input_byte cin)::!bytes ;
+    get_bytes ()
+  in
+    try get_bytes () with End_of_file -> () ;
+    close_in cin;
+    List.rev !bytes
+
+
 (** Keep track of registers not always updated in BAP.  *)
 let badregs = Hashtbl.create 32
 let () =
@@ -664,7 +685,7 @@ let trace_dce trace =
 (********************  Concrete Execution  *******************)
 (*************************************************************)
 
-module TaintConcrete = 
+module TraceConcreteDef = 
 struct 
   let lookup_var delta var = 
 
@@ -747,7 +768,7 @@ struct
     Symbolic.assign v ev ctx
 end
   
-module TraceConcrete = Symbeval.Make(TaintConcrete)(FullSubst)(StdForm)
+module TraceConcrete = Symbeval.Make(TraceConcreteDef)(FullSubst)(StdForm)
 
 (** Check all variables in delta to make sure they agree with operands
     loaded from a trace. We should be able to find bugs in BAP and the
@@ -1026,6 +1047,76 @@ let concrete trace =
   let actual_trace = run_blocks blocks memv length in
     actual_trace
 
+(* Normal concrete execution *)
+module TaintConcreteDef =
+struct
+  include Symbeval.Symbolic
+
+  let bytes = ref (Array.make 0 0)
+
+  let conc2symb _ _ =
+    failwith "No symbolics"
+
+  let lookup_var delta (Var.V(_,s,t) as v) =
+    try VH.find delta v
+    with Not_found ->
+      if is_symbolic v then (
+	let n = (get_symb_num v) - 1 in
+	try
+	  let byte = Int64.of_int ((!bytes).(n)) in
+	  Symbolic(Int(byte, t))
+	with
+	  Invalid_argument _ -> failwith ("Input outside of input file range: " ^ (string_of_int n) ^ "/" ^ (string_of_int (Array.length !bytes)))
+      ) else (
+	dprintf "Variable %s not found" s;
+	match t with
+	| Reg _ ->
+	    Symbolic(Int(0L, t))
+	| TMem _ | Array _ ->
+	    empty_mem v
+      )
+
+  let lookup_mem mu index endian =
+    match mu, index with
+    | ConcreteMem(m,v), Int(i,t) ->
+	(try AddrMap.find (normalize i t) m
+	 with Not_found ->
+	   Int(0L, reg_8)
+	     (* FIXME: handle endian and type? *)
+	)
+    | _ -> failwith "No symbolics"
+
+end
+
+module TaintConcrete = Symbeval.Make(TaintConcreteDef)(FullSubst)(StdForm)
+
+(** Concretely execute a trace without using any operand information *)
+let concrete_rerun file stmts =
+  TaintConcreteDef.bytes := Array.of_list (bytes_from_file file);
+  let length = List.length stmts in
+  Status.init "Concretely Re-executing" length;
+  let initctx = TaintConcrete.build_default_context stmts in
+  (try
+     let step state =
+       let () = Status.inc () in
+       state
+     in
+     let _ = TaintConcrete.eval_straightline ~step:step initctx in
+     failwith "Expected a single state"
+   with 
+     Halted(v, ctx) -> Printf.printf "Halted successfully\n"
+   | AssertFailed ctx -> 
+       let stmt = TaintConcrete.inst_fetch ctx.sigma ctx.pc in
+       Printf.printf "Assertion failure at %Lx: %s\n" ctx.pc (Pp.ast_stmt_to_string stmt) ;
+       clean_delta ctx.delta ;
+       TaintConcrete.print_values ctx.delta;
+       (* TaintConcrete.print_mem ctx.delta *)
+   | Failure s -> Printf.printf "Failure: %s\n" s);
+      
+  Status.stop () ;
+
+  stmts
+
 (*************************************************************)
 (********************  Concolic Execution  *******************)
 (*************************************************************)
@@ -1131,22 +1222,22 @@ struct
   let lookup_var delta var =
 
     let name = Var.name var in
-    dprintf "looking up var %s" name;
+    (* dprintf "looking up var %s" name; *)
 
     (* We need to use DSA because we combine the delta context with
        let-based renaming.  If we did not use DSA, then assignments to
        new registers could shadow previous computations.  *)
-    TraceConcrete.print_values delta;
+    (* TraceConcrete.print_values delta; *)
 
     let unknown = !full_symbolic && not (VH.mem delta var) in
       (match dsa_taint_val var, dsa_concrete_val var with
        | Some(true), _ when unknown ->
   	   (* If the variable is tainted and we don't have a formula for it, it is symbolic *)
-	   dprintf "symbolic";
+	   (* dprintf "symbolic"; *)
   	   Symbolic (Var var)
        | Some(true), _ ->
   	   (* If the variable is tainted, but we do have a formula for it *)
-	   dprintf "getting formula from delta: %s" (Var.name var);
+	   (* dprintf "getting formula from delta: %s" (Var.name var); *)
   	   VH.find delta var
 
        | _, _ when is_symbolic var ->
@@ -1157,7 +1248,7 @@ struct
   	   (* Finally, if untainted try to use the concrete value.
   	      Otherwise, see if we can find the value in delta; it's
   	      probably a temporary. *)
-	   dprintf "Using concrete value";
+	   (* dprintf "Using concrete value"; *)
 	   if !use_alt_assignment then (
 	     (* In the alternate scheme, all concretes are added right to the formula *)
 	     VH.remove delta var;
@@ -1453,18 +1544,6 @@ let add_payload_after ?(offset=4L) payload trace =
   let payload = string_to_bytes payload in
   let trace, assertions = inject_payload offset payload trace in
     Util.fast_append trace assertions
-
-(* Return a list of bytes read from a file *)
-let bytes_from_file file =
-  let cin = open_in file in
-  let bytes = ref [] in
-  let rec get_bytes () = 
-    bytes := (input_byte cin)::!bytes ;
-    get_bytes ()
-  in
-    try get_bytes () with End_of_file -> () ;
-    close_in cin;
-    List.rev !bytes
 
 let add_payload_from_file ?(offset=0L) file trace = 
   let payload = bytes_from_file file in

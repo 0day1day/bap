@@ -397,7 +397,20 @@ struct
       | Not_found ->
 	  (* The only way inst_fetch would fail is if pc falls off the end, right? *)
 	  raise (Halted(None, state))
-	    
+
+  (** Evaluate as long as there is exactly one choice of state.
+
+      @param step This function is called with the evaluator's state
+      for each transition.
+
+  *)
+  let eval_straightline ?(step = Util.id) state =
+    let rec f state =
+      match eval state with
+      | newstate::[] -> f (step newstate)
+      | states -> states
+    in
+    f state
 end
   
 module Std = 

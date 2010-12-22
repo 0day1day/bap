@@ -180,6 +180,10 @@ let speclist =
      uadd(TransformAst Traces.concrete),
      "Execute the trace concretely and obtain a straightline trace"
     )
+  ::("-trace-reconcrete",
+     Arg.String(fun f -> add(TransformAst(Traces.concrete_rerun f))),
+     "Execute a concretized trace with the specified input file."
+    )
   ::("-trace-dce",
      uadd(TransformAst Traces.trace_dce),
      "Trace dead-code elimination."
