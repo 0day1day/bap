@@ -56,9 +56,10 @@ type opcode =
   | Stos of typ
   | Push of typ * operand
   | Pop of typ * operand
-  | Sub of typ * operand * operand
-  | Cmp of typ * operand * operand
-  | And of typ * operand * operand
+  | Add of (typ * operand * operand)
+  | Sub of (typ * operand * operand)
+  | Cmp of (typ * operand * operand)
+  | And of (typ * operand * operand)
   | Test of typ * operand * operand
   | Cld
 
@@ -478,6 +479,18 @@ let to_ir addr next ss pref =
   | Pop(t, o) ->
     [assn t o (load_s seg_ss t esp_e);
      move esp (esp_e +* i32 (bytes_of_width t)) ]
+  | Add(t, o1, o2) ->
+    let tmp = nv "t" t in
+    move tmp (op2e t o1)
+    :: assn t o1 (op2e t o1 +* op2e t o2)
+    :: let s1 = Var tmp and s2 = op2e t o2 and r = op2e t o1 in
+       set_sf r
+       ::set_zf t r
+       ::set_pf r
+       ::move cf (r <* s1)
+       ::move af (Unknown("unimplemented", r1))
+       ::move oF (cast_high r1 (s1 ^* exp_not s2) &* (s1 ^* r))
+       ::[]
   | Sub(t, o1, o2) ->
     let tmp = nv "t" t in
     move tmp (op2e t o1)
@@ -651,10 +664,7 @@ let parse_instr g addr =
     let rm = match rm with Oreg r -> Oreg (reg2xmm r) | _ -> rm in
     (Oreg(bits2xmm r), rm, na) *)
   in
-  let parse_modrm opsize a = match opsize with
-    | Reg 32 -> parse_modrm32 a
-    | _ -> unimplemented "modrm other than 32"
-  in
+  let parse_modrm opsize a = parse_modrm32 a in
   let parse_imm8 a = (* not sign extended *)
     (Oimm(Int64.of_int (Char.code (g a))), s a)
   and parse_simm8 a = (* sign extended *)
@@ -674,6 +684,7 @@ let parse_instr g addr =
     let b1 = Char.code (g a)
     and na = s a in
     match b1 with (* Table A-2 *)
+      (* most of 00 to 3d are near the end *)
     | 0x50 | 0x51 | 0x52 | 0x53 | 0x54 | 0x55 | 0x56 | 0x57 ->
       (Push(opsize, Oreg(b1 & 7)), na)
     | 0x58 | 0x59 | 0x5a | 0x5b | 0x5c | 0x5d | 0x5e | 0x5f ->
@@ -694,6 +705,7 @@ let parse_instr g addr =
 	      in
 	      let opsize = if b1 land 1 = 0 then r8 else opsize in
 	      (match r with (* Grp 1 *)
+	      | 0 -> (Add(opsize, rm, o2), na)
 	      | 4 -> (And(opsize, rm, o2), na)
 	      | 5 -> (Sub(opsize, rm, o2), na)
 	      | 7 -> (Cmp(opsize, rm, o2), na)
@@ -756,6 +768,30 @@ let parse_instr g addr =
 	      | 6 -> (Push(opsize, rm), na)
 	      | _ -> unimplemented (Printf.sprintf "unsupported opcode: ff/%d" r)
 	      )
+    | b1 when b1 < 0x3e && (b1 & 7) < 6 ->
+      (
+	let ins a = match b1 >> 7 with
+	  | 0 -> Add a
+(*	  | 1 -> Or a
+	  | 2 -> Adc a
+	  | 3 -> Sbb a*)
+	  | 4 -> And a
+	  | 5 -> Sub a
+(*	  | 6 -> Xor a*)
+	  | 7 -> Cmp a
+	  | _ -> unimplemented (Printf.sprintf "unsupported opcode: %02x" b1)
+(*	  | _ -> failwith "impossible" *)
+	in
+	let t = if (b1 & 1) = 0  then r8 else opsize in
+	let (o1, o2, na) = match b1 & 6 with
+	  | 0 -> let r, rm, na = parse_modrm t na in
+		 (rm, r, na)
+	  | 2 -> let r, rm, na = parse_modrm t na in
+		 (r, rm, na)
+	  | _ -> unimplemented "early instructions on ?ax"
+	in
+	(ins(t, o1, o2), na)
+      )
     | 0x0f -> (
       let b2 = Char.code (g na) and na = s na in
       match b2 with (* Table A-3 *)
