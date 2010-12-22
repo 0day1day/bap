@@ -448,7 +448,6 @@ let section_contents prog secs =
   in
   get
 
-
 (** Open a binary file for translation *)
 let open_program filename =
   let prog = Libasmir.asmir_open_file filename in
