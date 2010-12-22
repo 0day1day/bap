@@ -432,7 +432,7 @@ let to_ir addr next ss pref =
      if st = LSHIFT then
        move t1 (e1 >>* (i32 bits -* count))
       else
-       move t1 (e1 >>* (count -* i32 1));
+       move t1 (e1 >>* (count +* i32 1));
      move cf (ifzero cf_e (Cast(CAST_LOW, r1, Var t1)));
      assn s o1 (s_f e1 count);
      move oF (ifzero of_e (ite r1 (count =* i32 1) (our_of) (Unknown("OF <- undefined", r1))));
