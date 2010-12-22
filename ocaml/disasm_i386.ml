@@ -431,12 +431,8 @@ let to_ir addr next ss pref =
     [move tmpDEST e1;
      if st = LSHIFT then
        move t1 (e1 >>* (i32 bits -* count))
-     else if st = RSHIFT then
-       move t1 (e1 >>* (count -* i32 1))
-     else if st = ARSHIFT then
-       move t1 (e1 >>>* (count -* i32 1))
      else
-       failwith "Unknown shift type"
+       move t1 (e1 >>* (count -* i32 1))
      ;
      move cf (ifzero cf_e (Cast(CAST_LOW, r1, Var t1)));
      assn s o1 (s_f e1 count);
