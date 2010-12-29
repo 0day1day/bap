@@ -675,6 +675,7 @@ let parse_instr g addr =
     (Oimm l, na)
   in
   let parse_immz t a = match t with
+    | Reg 8 -> parse_imm8 a (* t=r8 when operand is Ib rather than Iz *)
     | Reg 16 -> failwith "parse_imm16 a"
     | Reg 32 | Reg 64 -> parse_imm32 a
     | _ -> failwith "parse_immz unsupported size"
@@ -731,14 +732,25 @@ let parse_instr g addr =
 	      (Mov(opsize, Oaddr(l32 addr), o_eax), na)
     | 0xa6 -> (Cmps r8, na)
     | 0xa7 -> (Cmps opsize, na)
+    | 0xa9 -> let (i,na) = parse_immz opsize na in
+	      (Test(opsize, o_eax, i), na)
     | 0xaa -> (Stos r8, na)
     | 0xab -> (Stos opsize, na)
+    | 0xb0 | 0xb1 | 0xb2 | 0xb3 | 0xb4 | 0xb5 | 0xb6
+    | 0xb7 -> let (i, na) = parse_imm8 na in
+	      (Mov(r8, Oreg(b1 & 7), i), na)
     | 0xb8 | 0xb9 | 0xba | 0xbb | 0xbc | 0xbd | 0xbe
     | 0xbf -> let (i, na) = parse_immv opsize na in
 	      (Mov(opsize, Oreg(b1 & 7), i), na)
-    | 0xc7 -> let (_, rm, na) = parse_modrm32 na in
-	      let (i,na) = parse_immz opsize na in
-	      (Mov(opsize, rm, i), na)
+    | 0xc6
+    | 0xc7 -> let t = if b1 = 0xc6 then r8 else opsize in
+	      let (e, rm, na) = parse_modrm32ext na in
+	      assert (e=0); (* others are invalid opcodes, so we should check *)
+	      let (i,na) = parse_immz t na in
+	      (match e with (* Grp 11 *)
+	      | 0 -> (Mov(t, rm, i), na)
+	      | _ -> failwith "invalid opcode"
+	      )
     | 0xe8 -> let (i,na) = parse_disp32 na in
 	      (Call(Oimm i, na), na)
     | 0xe9 -> let (i,na) = parse_disp opsize na in
