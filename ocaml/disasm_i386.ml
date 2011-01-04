@@ -61,7 +61,9 @@ type opcode =
   | Cmp of (typ * operand * operand)
   | And of (typ * operand * operand)
   | Test of typ * operand * operand
+  | Not of typ * operand
   | Cld
+  | Leave of typ
 
 (* prefix names *)
 let pref_lock = 0xf0
@@ -170,6 +172,7 @@ and o_esi = Oreg 6
 and o_edi = Oreg 7
 
 let esp_e = Var esp
+and ebp_e = Var ebp
 and esi_e = Var esi
 and edi_e = Var edi
 and ecx_e = Var ecx
@@ -370,7 +373,7 @@ let set_flags_sub t s1 s2 r =
   ::[]
     
 
-let to_ir addr next ss pref =
+let rec to_ir addr next ss pref =
   let load = load_s ss (* Need to change this if we want seg_ds <> None *)
   and op2e = op2e_s ss
   and store = store_s ss
@@ -513,8 +516,13 @@ let to_ir addr next ss pref =
     :: move cf exp_false
     :: move af (Unknown("AF is undefined after and", r1))
     :: set_pszf t (Var tmp)
+  | Not(t, o1) ->
+    [assn t o1 (exp_not (op2e t o1))]
   | Cld ->
     [Move(dflag, i32 1, [])]
+  | Leave t when pref = [] -> (* #UD if Lock prefix is used *)
+    Move(esp, ebp_e, [])
+    ::to_ir addr next ss pref (Pop(t, o_ebp))
   | _ -> unimplemented "to_ir"
 
 let add_labels ?(asm) a ir =
@@ -697,7 +705,7 @@ let parse_instr g addr =
     | 0x79 -> let (i,na) = parse_disp8 na in
 	      (Jcc(Oimm(Int64.add i na), cc_to_exp b1), na)
     | 0xc3 -> (Retn, na)
-      (* FIXME: operand widths *)
+    | 0xc9 -> (Leave opsize, na)
     | 0x80 | 0x81 | 0x82
     | 0x83 -> let (r, rm, na) = parse_modrm32ext na in
 	      let (o2, na) =
@@ -716,6 +724,8 @@ let parse_instr g addr =
     | 0x85 -> let (r, rm, na) = parse_modrm32 na in
 	      let o = if b1 = 0x84 then r8 else opsize in
 	      (Test(o, rm, r), na)
+    | 0x88 -> let (r, rm, na) = parse_modrm r8 na in
+	      (Mov(r8, rm, r), na)
     | 0x89 -> let (r, rm, na) = parse_modrm32 na in
 	      (Mov(opsize, rm, r), na)
     | 0x8b -> let (r, rm, na) = parse_modrm32 na in
@@ -774,6 +784,12 @@ let parse_instr g addr =
 	      | _ -> unimplemented "Grp 2: rolls"
 	      )
     | 0xf4 -> (Hlt, na)
+    | 0xf7 -> let t = opsize in
+	      let (r, rm, na) = parse_modrm32ext na in
+	      (match r with (* Grp 3 *)
+	      | 2 -> (Not(t, rm), na)
+	      | _ -> unimplemented (Printf.sprintf "unsupported opcode: %02x/%d" b1 r)
+	      )
     | 0xfc -> (Cld, na)
     | 0xff -> let (r, rm, na) = parse_modrm32ext na in
 	      (match r with (* Grp 5 *)
