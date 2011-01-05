@@ -500,7 +500,7 @@ let rec to_ir addr next ss pref =
        ::set_zf t r
        ::set_pf r
        ::move cf (r <* s1)
-       ::move af (Unknown("unimplemented", r1))
+       ::move af (Unknown("AF for add unimplemented", r1))
        ::move oF (cast_high r1 (s1 ^* exp_not s2) &* (s1 ^* r))
        ::[]
   | Sub(t, o1, o2) ->
@@ -811,7 +811,7 @@ let parse_instr g addr =
 	      )
     | b1 when b1 < 0x3e && (b1 & 7) < 6 ->
       (
-	let ins a = match b1 >> 7 with
+	let ins a = match b1 >> 3 with
 	  | 0 -> Add a
 (*	  | 1 -> Or a
 	  | 2 -> Adc a
@@ -829,7 +829,8 @@ let parse_instr g addr =
 		 (rm, r, na)
 	  | 2 -> let r, rm, na = parse_modrm t na in
 		 (r, rm, na)
-	  | 4 -> unimplemented (Printf.sprintf "unsupported opcode: %02x" b1)
+	  | 4 -> let i, na = parse_immz t na in
+		 (o_eax, i, na)
 	  | _ -> failwith "impossible"
 	in
 	(ins(t, o1, o2), na)
