@@ -47,10 +47,11 @@ type opcode =
   | Mov of typ * operand * operand (* dst, src *)
   | Movdqa of operand * operand (* dst, src *)
   | Lea of operand * Ast.exp
-  | Call of operand * int64 (* Oimm is relative, int64 is RA *)
+  | Call of operand * int64 (* int64 is RA *)
   | Shift of binop_type * typ * operand * operand
   | Jump of operand
   | Jcc of operand * Ast.exp
+  | Setcc of typ * operand * Ast.exp
   | Hlt
   | Cmps of typ
   | Stos of typ
@@ -221,7 +222,11 @@ let (>*) a b   = binop LT b a
 
 let cast_low t e = Cast(CAST_LOW, t, e)
 let cast_high t e = Cast(CAST_HIGH, t, e)
-let cast_unsigned t e = Cast(CAST_UNSIGNED, t, e)
+let cast_unsigned t = function
+  | Cast(CAST_UNSIGNED, Reg t', e) when Arithmetic.bits_of_width t >= t' ->
+    Cast(CAST_UNSIGNED, t, e)
+  | e ->
+    Cast(CAST_UNSIGNED, t, e)
 
 let loadm m t a =
   Load(Var m, a, little_endian, t)
@@ -409,14 +414,18 @@ let rec to_ir addr next ss pref =
   )
   | Lea(r, a) when pref = [] ->
     [assn r32 r a]
-  | Call(Oimm i, ra) when pref = [] ->
+  | Call(o1, ra) when pref = [] ->
+    let target = op2e r32 o1 in
+    if List.mem esp (Stp.freevars target) then unimplemented "call with esp as base";
     [move esp (esp_e -* i32 4);
      store r32 esp_e (l32 ra);
-     Jmp(l32(Int64.add i ra), calla)]
+     Jmp(target, calla)]
   | Jump(o) ->
     [ Jmp(op2e r32 o, [])]
   | Jcc(o, c) ->
     cjmp c (op2e r32 o)
+  | Setcc(t, o1, c) ->
+    [assn t o1 (cast_unsigned t c)]
   | Shift(st, s, o1, o2) (*when pref = [] || pref = [pref_opsize]*) ->
     assert (List.mem s [r8; r16; r32]);
     let t1 = nv "t1" s and tmpDEST = nv "tmpDEST" s
@@ -636,8 +645,10 @@ let parse_instr g addr =
     (* ISR 2.1.5 Table 2-3 *)
     let b = Char.code (g a) in
     let ss = b >> 6 and idx = (b>>3) & 7 in
-    let base, na = if (b & 7) <> 5 then (bits2reg32e (b & 7), s a)
-      else match m with _ -> unimplemented "sib ebp +? disp"
+    let base, na = if (b & 7) <> 5 then (bits2reg32e (b & 7), s a) else
+	match m with
+	| 0 -> let (i,na) = parse_disp32 (s a) in (l32 i, na)
+	| _ -> unimplemented "sib ebp +? disp"
     in
     if idx = 4 then (base, na) else
       let idx = bits2reg32e idx in
@@ -762,7 +773,7 @@ let parse_instr g addr =
 	      | _ -> failwith "invalid opcode"
 	      )
     | 0xe8 -> let (i,na) = parse_disp32 na in
-	      (Call(Oimm i, na), na)
+	      (Call(Oimm(Int64.add i na), na), na)
     | 0xe9 -> let (i,na) = parse_disp opsize na in
 	      (Jump(Oimm(Int64.add i na)), na)
     | 0xeb -> let (i,na) = parse_disp8 na in
@@ -793,6 +804,8 @@ let parse_instr g addr =
     | 0xfc -> (Cld, na)
     | 0xff -> let (r, rm, na) = parse_modrm32ext na in
 	      (match r with (* Grp 5 *)
+	      | 2 -> (Call(rm, na), na)
+	      | 4 -> (Jump rm, na)
 	      | 6 -> (Push(opsize, rm), na)
 	      | _ -> unimplemented (Printf.sprintf "unsupported opcode: ff/%d" r)
 	      )
@@ -816,7 +829,8 @@ let parse_instr g addr =
 		 (rm, r, na)
 	  | 2 -> let r, rm, na = parse_modrm t na in
 		 (r, rm, na)
-	  | _ -> unimplemented "early instructions on ?ax"
+	  | 4 -> unimplemented (Printf.sprintf "unsupported opcode: %02x" b1)
+	  | _ -> failwith "impossible"
 	in
 	(ins(t, o1, o2), na)
       )
@@ -831,6 +845,10 @@ let parse_instr g addr =
       | 0x82 | 0x83 | 0x84 | 0x85 | 0x86 | 0x87 | 0x88
       | 0x89 ->	let (i,na) = parse_disp32 na in
 		(Jcc(Oimm(Int64.add i na), cc_to_exp b2), na)
+    (* add other opcodes for setcc here *)
+      | 0x95 -> let r, rm, na = parse_modrm r8 na in
+		assert (opsize = r32);  (* unclear what happens otherwise *)
+		(Setcc(r8, rm, cc_to_exp b2), na)
       | _ -> unimplemented (Printf.sprintf "unsupported opcode: %02x %02x" b1 b2)
     )
     | n -> unimplemented (Printf.sprintf "unsupported opcode: %02x" n)

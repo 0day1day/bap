@@ -37,6 +37,7 @@ export SOURCES = \
 	sccvn.mli sccvn.ml \
 	deadcode.mli deadcode.ml \
 	ssa_simp.ml \
+	stp.ml \
 	libbfd.idl \
 	libasmir.idl \
 	disasm_i386.ml \
@@ -47,7 +48,6 @@ export SOURCES = \
 	memory2array.ml \
 	gcl.mli gcl.ml \
 	wp.ml \
-	stp.ml \
 	stpexec.mli stpexec.ml \
 	asmirconsts.ml asmir.mli asmir.ml \
 	input.mli input.ml \
