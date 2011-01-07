@@ -37,7 +37,7 @@ open D
 
 *)
 
-type segment = CS | SS | DS | ES | FS | GS
+(* type segment = CS | SS | DS | ES | FS | GS *)
 
 type operand =
   | Oreg of int
@@ -380,7 +380,7 @@ let set_flags_sub t s1 s2 r =
   move cf (r >* s1)
   ::move af ((r &* Int(7L,t)) <* (s1 &* Int(7L,t))) (* Is this right? *)
   ::move oF (Cast(CAST_HIGH, r1, (s1 ^* s2) &* (s1 ^* r) ))
-  ::setpszf t r
+  ::set_pszf t r
     
 
 let rec to_ir addr next ss pref =
@@ -526,7 +526,7 @@ let rec to_ir addr next ss pref =
     ::move cf ((r >* s1) |* (r =* s1 &* cf_e))
     ::move af (Unknown("AF for sbb unimplemented", r1))
     ::move oF (Cast(CAST_HIGH, r1, (s1 ^* s2) &* (s1 ^* r) ))
-    ::setpszf t r
+    ::set_pszf t r
 
   | Cmp(t, o1, o2) ->
     let tmp = nv "t" t in
@@ -617,6 +617,7 @@ let cc_to_exp i =
     | 0x4 -> zf_e
     | 0x6 -> cf_e |* zf_e
     | 0x8 -> sf_e
+    | 0xe -> zf_e |* (sf_e ^* of_e)
     | _ -> failwith "unsupported condition code"
   in
   if (i & 1) = 0 then cc else exp_not cc
@@ -743,8 +744,9 @@ let parse_instr g addr =
     | 0x68 (* | 0x6a *) ->
       let (o, na) = if b1=0x68 then parse_immz opsize na else parse_simm8 na in
       (Push(opsize, o), na)
-    | 0x72 | 0x73 | 0x74 | 0x75 | 0x76 | 0x77 | 0x78
-    | 0x79 -> let (i,na) = parse_disp8 na in
+    | 0x72 | 0x73 | 0x74 | 0x75 | 0x76 | 0x77 | 0x78 | 0x79
+    | 0x7e
+    | 0x7f -> let (i,na) = parse_disp8 na in
 	      (Jcc(Oimm(Int64.add i na), cc_to_exp b1), na)
     | 0xc3 -> (Retn, na)
     | 0xc9 -> (Leave opsize, na)
