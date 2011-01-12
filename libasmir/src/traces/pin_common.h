@@ -6,7 +6,7 @@
 
 #define MAX_INSN_BYTES 15
 
-#define MAX_VALUES_COUNT 30
+#define MAX_VALUES_COUNT 0x30
 
 #define MAX_CACHEMASK_BTYES 2
 

@@ -331,6 +331,7 @@ istream &StdFrame2::unserializePart(istream &in)
    in.read((char *) &taint, values_count * sizeof(uint32_t));
 
    // Read in the values
+   assert (values_count <= MAX_VALUES_COUNT);
    for (int i = 0; i < values_count; i++) {
      in.read((char *) &(values[i]), bytesOfType(types[i]));
    }
