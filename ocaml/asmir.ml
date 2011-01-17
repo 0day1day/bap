@@ -558,10 +558,10 @@ let trans_frame f =
       let stmts, _ = byte_insn_to_bap arch addr bytes in
       stmts
   | Libasmir.FRM_TAINT -> 
-      [Label (Name("ReadSyscall"), []); Comment("All blocks must have two statements", [])]
+      [Comment("ReadSyscall", []); Comment("All blocks must have two statements", [])]
   | Libasmir.FRM_LOADMOD ->
       let name, lowaddr, highaddr = Libasmir.asmir_frame_get_loadmod_info f in
-      [Special(Printf.sprintf "Loaded module '%s' at %#Lx to %#Lx" name lowaddr highaddr, []); Special("All blocks must have two statements", [])]
+      [Special(Printf.sprintf "Loaded module '%s' at %#Lx to %#Lx" name lowaddr highaddr, []); Comment("All blocks must have two statements", [])]
   | _ -> []
 
 let alt_bap_from_trace_file filename =
@@ -569,7 +569,9 @@ let alt_bap_from_trace_file filename =
     let ops = tr_frame_attrs f in
     match stmts with
     | Label (l,a)::others ->
-	 Label (l,a@ops)::others
+	Label (l,a@ops)::others
+    | Comment (s,a)::others ->
+	Comment (s,a@ops)::others
     | others when ops <> [] -> Comment("Attrs without label.", ops)::others
     | others -> others
   in

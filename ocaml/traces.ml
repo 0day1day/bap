@@ -510,7 +510,16 @@ let add_to_conc {name=name; mem=mem; index=index; value=value;
 (* Updating the lookup tables with the concrete values *)
 let update_concrete s =
   match s with
-  | Label (Name s,atts) when is_seed_label s ->
+  (* | Label (Name s,atts) when is_seed_label s -> *)
+  (*     (\* Taint introduction *\) *)
+  (*     List.iter *)
+  (*     	(fun {index=index; taint=Taint taint} -> *)
+  (*     	   (\* Mark the index as symbolic; we don't actually care about *)
+  (*     	      the value *\) *)
+  (*     	   add_symbolic index (Int(0L, reg_8)) *)
+  (*     	) (filter_taint atts); *)
+  (*     false *)
+  | Comment (s,atts) when is_seed_label s ->
       (* Taint introduction *)
       List.iter
       	(fun {index=index; taint=Taint taint} ->
@@ -518,7 +527,7 @@ let update_concrete s =
       	      the value *)
       	   add_symbolic index (Int(0L, reg_8))
       	) (filter_taint atts);
-      false
+      false      
   | Label (_,atts) ->
       (* Concrete operands *)
       let conc_atts = filter_taint atts in
@@ -574,7 +583,7 @@ let remove_jumps =
 (** Removing all specials from the traces *)	
 let remove_specials =
   let no_specials = function 
-    | Ast.Special _ -> false 
+    | Ast.Special _ -> false
     | _ -> true
   in
     List.filter no_specials
@@ -607,7 +616,7 @@ let trace_to_blocks trace =
     | (Ast.Label (Addr _, _) as l)::rest ->
 	let block = List.rev current in
 	to_blocks (block::blocks) [l] rest
-    | (Ast.Comment (c, _) as s)::rest when c = endtrace ->
+    | (Ast.Comment (c, _) as s)::rest when c = endtrace || (is_seed_label c) ->
 	let block = List.rev current in
 	to_blocks (block::blocks) [s] rest
     | x::rest ->
@@ -817,7 +826,25 @@ let check_delta state =
 let counter = ref 1
 
 let get_symbolic_seeds memv = function
-  | Ast.Label (Name s,atts) when is_seed_label s ->
+  (* | Ast.Label (Name s,atts) when is_seed_label s -> *)
+  (*     List.fold_left *)
+  (* 	(fun acc {index=index; taint=Taint taint} -> *)
+  (* 	   let newvarname = "symb_" ^ (string_of_int taint) in *)
+  (* 	   let sym_var = Var (Var.newvar newvarname reg_8) in *)
+  (* 	     pdebug ("Introducing symbolic: "  *)
+  (* 		     ^(Printf.sprintf "%Lx" index) *)
+  (* 		     ^" -> " *)
+  (* 		     ^(Pp.ast_exp_to_string sym_var)); *)
+  (* 	     add_symbolic index sym_var ; *)
+  (* 	     (\* symbolic variable *\) *)
+  (* 	     let mem = Var(memv) in *)
+  (* 	     let store = Store(mem, Int(index, reg_32), sym_var, exp_false, reg_8) in *)
+  (* 	     (\* let constr = BinOp (EQ, mem, store) in *\) *)
+  (* 	     (\*   ignore (LetBind.add_to_formula exp_true constr Rename) *\) *)
+  (* 	     let move = Move(memv, store, []) in *)
+  (* 	     move::acc				        *)
+  (* 	) [] (filter_taint atts) *)
+  | Ast.Comment (s,atts) when is_seed_label s ->
       List.fold_left
 	(fun acc {index=index; taint=Taint taint} ->
 	   let newvarname = "symb_" ^ (string_of_int taint) in
@@ -1790,7 +1817,7 @@ let trace_valid_to_invalid trace =
 
 (* Binary search over the concretized IL to check where things go
    wrong. *)
-let formula_valid_to_invalid trace = 
+let formula_valid_to_invalid ?(min=1) trace = 
   let sym_and_output trace fname =
     LetBind.bindings := [] ;  (*  XXX: temporary hack *)
     ignore(symbolic_run trace);
@@ -1828,7 +1855,7 @@ let formula_valid_to_invalid trace =
 	  (Printf.printf "going a little higher\n";
 	   bsearch l (u-1))
   in
-  let (l,u) = bsearch 1 length in
+  let (l,u) = bsearch min length in
   ignore (sym_and_output (Util.take l trace) "form_val") ;
   ignore (sym_and_output (Util.take u trace) "form_inv") ;
   trace

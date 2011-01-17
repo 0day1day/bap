@@ -22,6 +22,7 @@ type cmd =
  (* add more *)
 
 let pipeline = ref []
+let startdebug = ref 1
 
 let output_ast f p =
   let oc = open_out f in
@@ -188,12 +189,20 @@ let speclist =
      uadd(TransformAst Traces.trace_dce),
      "Trace dead-code elimination."
     )
+  ::("-trace-start-debug",
+     Arg.Set_int(startdebug),
+     "Start debugging at item n."
+    )
   ::("-trace-debug", 
      uadd(TransformAst Traces.trace_valid_to_invalid),
      "Formula debugging. Prints to files form_val and form_inv"
     )
   ::("-trace-conc-debug", 
-     uadd(TransformAst Traces.formula_valid_to_invalid),
+     Arg.Unit 
+       (fun () ->
+	  let f = Traces.formula_valid_to_invalid ~min:!startdebug in
+	  add(TransformAst f)
+       ),
      "Formula debugging. Prints to files form_val and form_inv. Concretizes BEFORE debugging; useful for finding which assertion doesn't work."
     )
   ::("-trace-dsa",
