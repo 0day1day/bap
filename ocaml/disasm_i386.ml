@@ -32,9 +32,12 @@ open D
    In order to get the most common unspported opcodes, you can run something like:
    for f in bin/*; do BAP_DEBUG_MODULES=AsmirV ~/bap/trunk/utils/iltrans -bin $f ; done 2>&1  >/dev/null  | grep opcode | sed 's/.*opcode: //' | sort | uniq -c | sort -n
 
+   To optimize for number of programs disassembled:
+   for f in bin/*; do echo -n "$f "; BAP_DEBUG_MODULES=AsmirV iltrans -bin $f 2>&1  >/dev/null  | grep opcode | sed 's/.*opcode: //' | sort | uniq -c | sort -n  | wc -l; done | sort -n -k 2
+
 *)
 
-type segment = CS | SS | DS | ES | FS | GS
+(* type segment = CS | SS | DS | ES | FS | GS *)
 
 type operand =
   | Oreg of int
@@ -45,22 +48,30 @@ type opcode =
   | Retn
   | Nop
   | Mov of typ * operand * operand (* dst, src *)
+  | Movzx of typ * operand * typ * operand (* dsttyp, dst, srctyp, src *)
+  | Movsx of typ * operand * typ * operand (* dsttyp, dst, srctyp, src *)
   | Movdqa of operand * operand (* dst, src *)
   | Lea of operand * Ast.exp
-  | Call of operand * int64 (* Oimm is relative, int64 is RA *)
+  | Call of operand * int64 (* int64 is RA *)
   | Shift of binop_type * typ * operand * operand
   | Jump of operand
   | Jcc of operand * Ast.exp
+  | Setcc of typ * operand * Ast.exp
   | Hlt
   | Cmps of typ
   | Stos of typ
   | Push of typ * operand
   | Pop of typ * operand
-  | Sub of typ * operand * operand
-  | Cmp of typ * operand * operand
-  | And of typ * operand * operand
+  | Add of (typ * operand * operand)
+  | Sub of (typ * operand * operand)
+  | Sbb of (typ * operand * operand)
+  | Cmp of (typ * operand * operand)
+  | And of (typ * operand * operand)
+  | Xor of (typ * operand * operand)
   | Test of typ * operand * operand
+  | Not of typ * operand
   | Cld
+  | Leave of typ
 
 (* prefix names *)
 let pref_lock = 0xf0
@@ -169,6 +180,7 @@ and o_esi = Oreg 6
 and o_edi = Oreg 7
 
 let esp_e = Var esp
+and ebp_e = Var ebp
 and esi_e = Var esi
 and edi_e = Var edi
 and ecx_e = Var ecx
@@ -217,7 +229,12 @@ let (>*) a b   = binop LT b a
 
 let cast_low t e = Cast(CAST_LOW, t, e)
 let cast_high t e = Cast(CAST_HIGH, t, e)
-let cast_unsigned t e = Cast(CAST_UNSIGNED, t, e)
+let cast_signed t e = Cast(CAST_SIGNED, t, e)
+let cast_unsigned t = function
+  | Cast(CAST_UNSIGNED, Reg t', e) when Arithmetic.bits_of_width t >= t' ->
+    Cast(CAST_UNSIGNED, t, e)
+  | e ->
+    Cast(CAST_UNSIGNED, t, e)
 
 let loadm m t a =
   Load(Var m, a, little_endian, t)
@@ -360,16 +377,13 @@ let set_pszf t r =
    set_zf t r]
 
 let set_flags_sub t s1 s2 r =
-  set_sf r
-  ::set_zf t r
-  ::set_pf r
-  ::move cf (r >* s1)
+  move cf (r >* s1)
   ::move af ((r &* Int(7L,t)) <* (s1 &* Int(7L,t))) (* Is this right? *)
   ::move oF (Cast(CAST_HIGH, r1, (s1 ^* s2) &* (s1 ^* r) ))
-  ::[]
+  ::set_pszf t r
     
 
-let to_ir addr next ss pref =
+let rec to_ir addr next ss pref =
   let load = load_s ss (* Need to change this if we want seg_ds <> None *)
   and op2e = op2e_s ss
   and store = store_s ss
@@ -384,6 +398,10 @@ let to_ir addr next ss pref =
     ]
   | Mov(t, dst,src) when pref = [] ->
     [assn t dst (op2e t src)]
+  | Movzx(t, dst, ts, src) when pref = [] ->
+    [assn t dst (cast_unsigned t (op2e ts src))]
+  | Movsx(t, dst, ts, src) when pref = [] ->
+    [assn t dst (cast_signed t (op2e ts src))]
   | Movdqa(d,s) -> (
     let zero = Int(0L,r4) and eight = Int(8L,r4) in
     let (s0, s1, a1) = match s with
@@ -405,14 +423,18 @@ let to_ir addr next ss pref =
   )
   | Lea(r, a) when pref = [] ->
     [assn r32 r a]
-  | Call(Oimm i, ra) when pref = [] ->
+  | Call(o1, ra) when pref = [] ->
+    let target = op2e r32 o1 in
+    if List.mem esp (Stp.freevars target) then unimplemented "call with esp as base";
     [move esp (esp_e -* i32 4);
      store r32 esp_e (l32 ra);
-     Jmp(l32(Int64.add i ra), calla)]
+     Jmp(target, calla)]
   | Jump(o) ->
     [ Jmp(op2e r32 o, [])]
   | Jcc(o, c) ->
     cjmp c (op2e r32 o)
+  | Setcc(t, o1, c) ->
+    [assn t o1 (cast_unsigned t c)]
   | Shift(st, s, o1, o2) (*when pref = [] || pref = [pref_opsize]*) ->
     assert (List.mem s [r8; r16; r32]);
     let t1 = nv "t1" s and tmpDEST = nv "tmpDEST" s
@@ -478,11 +500,34 @@ let to_ir addr next ss pref =
   | Pop(t, o) ->
     [assn t o (load_s seg_ss t esp_e);
      move esp (esp_e +* i32 (bytes_of_width t)) ]
+  | Add(t, o1, o2) ->
+    let tmp = nv "t" t in
+    move tmp (op2e t o1)
+    :: assn t o1 (op2e t o1 +* op2e t o2)
+    :: let s1 = Var tmp and s2 = op2e t o2 and r = op2e t o1 in
+       set_sf r
+       ::set_zf t r
+       ::set_pf r
+       ::move cf (r <* s1)
+       ::move af (Unknown("AF for add unimplemented", r1))
+       ::move oF (cast_high r1 (s1 ^* exp_not s2) &* (s1 ^* r))
+       ::[]
   | Sub(t, o1, o2) ->
     let tmp = nv "t" t in
     move tmp (op2e t o1)
     :: assn t o1 (op2e t o1 -* op2e t o2)
     :: set_flags_sub t (Var tmp) (op2e t o2) (op2e t o1)
+  | Sbb(t, o1, o2) ->
+    let tmp = nv "t" t in
+    let s1 = Var tmp and s2 = op2e t o2 and r = op2e t o1 in
+    move tmp r
+    :: assn t o1 (r -* s2 -* cast_unsigned t cf_e)
+      (* FIXME: sanity check this *)
+    ::move cf ((r >* s1) |* (r =* s1 &* cf_e))
+    ::move af (Unknown("AF for sbb unimplemented", r1))
+    ::move oF (Cast(CAST_HIGH, r1, (s1 ^* s2) &* (s1 ^* r) ))
+    ::set_pszf t r
+
   | Cmp(t, o1, o2) ->
     let tmp = nv "t" t in
     move tmp (op2e t o1 -* op2e t o2)
@@ -493,6 +538,17 @@ let to_ir addr next ss pref =
     :: move cf exp_false
     :: move af (Unknown("AF is undefined after and", r1))
     :: set_pszf t (op2e t o1)
+  | Xor(t, o1, o2) when o1 = o2->
+    assn t o1 (Int(0L,t))
+    :: move af (Unknown("AF is undefined after xor", r1))
+    :: move zf exp_true
+    :: List.map (fun v -> move v exp_false) [oF; cf; pf; sf]
+  | Xor(t, o1, o2) ->
+    assn t o1 (op2e t o1 ^* op2e t o2)
+    :: move oF exp_false
+    :: move cf exp_false
+    :: move af (Unknown("AF is undefined after xor", r1))
+    :: set_pszf t (op2e t o1)
   | Test(t, o1, o2) ->
     let tmp = nv "t" t in
     move tmp (op2e t o1 &* op2e t o2)
@@ -500,8 +556,13 @@ let to_ir addr next ss pref =
     :: move cf exp_false
     :: move af (Unknown("AF is undefined after and", r1))
     :: set_pszf t (Var tmp)
+  | Not(t, o1) ->
+    [assn t o1 (exp_not (op2e t o1))]
   | Cld ->
     [Move(dflag, i32 1, [])]
+  | Leave t when pref = [] -> (* #UD if Lock prefix is used *)
+    Move(esp, ebp_e, [])
+    ::to_ir addr next ss pref (Pop(t, o_ebp))
   | _ -> unimplemented "to_ir"
 
 let add_labels ?(asm) a ir =
@@ -556,6 +617,7 @@ let cc_to_exp i =
     | 0x4 -> zf_e
     | 0x6 -> cf_e |* zf_e
     | 0x8 -> sf_e
+    | 0xe -> zf_e |* (sf_e ^* of_e)
     | _ -> failwith "unsupported condition code"
   in
   if (i & 1) = 0 then cc else exp_not cc
@@ -615,8 +677,10 @@ let parse_instr g addr =
     (* ISR 2.1.5 Table 2-3 *)
     let b = Char.code (g a) in
     let ss = b >> 6 and idx = (b>>3) & 7 in
-    let base, na = if (b & 7) <> 5 then (bits2reg32e (b & 7), s a)
-      else match m with _ -> unimplemented "sib ebp +? disp"
+    let base, na = if (b & 7) <> 5 then (bits2reg32e (b & 7), s a) else
+	match m with
+	| 0 -> let (i,na) = parse_disp32 (s a) in (l32 i, na)
+	| _ -> unimplemented "sib ebp +? disp"
     in
     if idx = 4 then (base, na) else
       let idx = bits2reg32e idx in
@@ -651,10 +715,7 @@ let parse_instr g addr =
     let rm = match rm with Oreg r -> Oreg (reg2xmm r) | _ -> rm in
     (Oreg(bits2xmm r), rm, na) *)
   in
-  let parse_modrm opsize a = match opsize with
-    | Reg 32 -> parse_modrm32 a
-    | _ -> unimplemented "modrm other than 32"
-  in
+  let parse_modrm opsize a = parse_modrm32 a in
   let parse_imm8 a = (* not sign extended *)
     (Oimm(Int64.of_int (Char.code (g a))), s a)
   and parse_simm8 a = (* sign extended *)
@@ -665,6 +726,7 @@ let parse_instr g addr =
     (Oimm l, na)
   in
   let parse_immz t a = match t with
+    | Reg 8 -> parse_imm8 a (* t=r8 when operand is Ib rather than Iz *)
     | Reg 16 -> failwith "parse_imm16 a"
     | Reg 32 | Reg 64 -> parse_imm32 a
     | _ -> failwith "parse_immz unsupported size"
@@ -674,6 +736,7 @@ let parse_instr g addr =
     let b1 = Char.code (g a)
     and na = s a in
     match b1 with (* Table A-2 *)
+      (* most of 00 to 3d are near the end *)
     | 0x50 | 0x51 | 0x52 | 0x53 | 0x54 | 0x55 | 0x56 | 0x57 ->
       (Push(opsize, Oreg(b1 & 7)), na)
     | 0x58 | 0x59 | 0x5a | 0x5b | 0x5c | 0x5d | 0x5e | 0x5f ->
@@ -681,11 +744,12 @@ let parse_instr g addr =
     | 0x68 (* | 0x6a *) ->
       let (o, na) = if b1=0x68 then parse_immz opsize na else parse_simm8 na in
       (Push(opsize, o), na)
-    | 0x72 | 0x73 | 0x74 | 0x75 | 0x76 | 0x77 | 0x78
-    | 0x79 -> let (i,na) = parse_disp8 na in
+    | 0x72 | 0x73 | 0x74 | 0x75 | 0x76 | 0x77 | 0x78 | 0x79
+    | 0x7e
+    | 0x7f -> let (i,na) = parse_disp8 na in
 	      (Jcc(Oimm(Int64.add i na), cc_to_exp b1), na)
     | 0xc3 -> (Retn, na)
-      (* FIXME: operand widths *)
+    | 0xc9 -> (Leave opsize, na)
     | 0x80 | 0x81 | 0x82
     | 0x83 -> let (r, rm, na) = parse_modrm32ext na in
 	      let (o2, na) =
@@ -694,6 +758,7 @@ let parse_instr g addr =
 	      in
 	      let opsize = if b1 land 1 = 0 then r8 else opsize in
 	      (match r with (* Grp 1 *)
+	      | 0 -> (Add(opsize, rm, o2), na)
 	      | 4 -> (And(opsize, rm, o2), na)
 	      | 5 -> (Sub(opsize, rm, o2), na)
 	      | 7 -> (Cmp(opsize, rm, o2), na)
@@ -703,6 +768,8 @@ let parse_instr g addr =
     | 0x85 -> let (r, rm, na) = parse_modrm32 na in
 	      let o = if b1 = 0x84 then r8 else opsize in
 	      (Test(o, rm, r), na)
+    | 0x88 -> let (r, rm, na) = parse_modrm r8 na in
+	      (Mov(r8, rm, r), na)
     | 0x89 -> let (r, rm, na) = parse_modrm32 na in
 	      (Mov(opsize, rm, r), na)
     | 0x8b -> let (r, rm, na) = parse_modrm32 na in
@@ -719,16 +786,27 @@ let parse_instr g addr =
 	      (Mov(opsize, Oaddr(l32 addr), o_eax), na)
     | 0xa6 -> (Cmps r8, na)
     | 0xa7 -> (Cmps opsize, na)
+    | 0xa9 -> let (i,na) = parse_immz opsize na in
+	      (Test(opsize, o_eax, i), na)
     | 0xaa -> (Stos r8, na)
     | 0xab -> (Stos opsize, na)
+    | 0xb0 | 0xb1 | 0xb2 | 0xb3 | 0xb4 | 0xb5 | 0xb6
+    | 0xb7 -> let (i, na) = parse_imm8 na in
+	      (Mov(r8, Oreg(b1 & 7), i), na)
     | 0xb8 | 0xb9 | 0xba | 0xbb | 0xbc | 0xbd | 0xbe
     | 0xbf -> let (i, na) = parse_immv opsize na in
 	      (Mov(opsize, Oreg(b1 & 7), i), na)
-    | 0xc7 -> let (_, rm, na) = parse_modrm32 na in
-	      let (i,na) = parse_immz opsize na in
-	      (Mov(opsize, rm, i), na)
+    | 0xc6
+    | 0xc7 -> let t = if b1 = 0xc6 then r8 else opsize in
+	      let (e, rm, na) = parse_modrm32ext na in
+	      assert (e=0); (* others are invalid opcodes, so we should check *)
+	      let (i,na) = parse_immz t na in
+	      (match e with (* Grp 11 *)
+	      | 0 -> (Mov(t, rm, i), na)
+	      | _ -> failwith "invalid opcode"
+	      )
     | 0xe8 -> let (i,na) = parse_disp32 na in
-	      (Call(Oimm i, na), na)
+	      (Call(Oimm(Int64.add i na), na), na)
     | 0xe9 -> let (i,na) = parse_disp opsize na in
 	      (Jump(Oimm(Int64.add i na)), na)
     | 0xeb -> let (i,na) = parse_disp8 na in
@@ -750,12 +828,46 @@ let parse_instr g addr =
 	      | _ -> unimplemented "Grp 2: rolls"
 	      )
     | 0xf4 -> (Hlt, na)
+    | 0xf7 -> let t = opsize in
+	      let (r, rm, na) = parse_modrm32ext na in
+	      (match r with (* Grp 3 *)
+	      | 2 -> (Not(t, rm), na)
+	      | _ -> unimplemented (Printf.sprintf "unsupported opcode: %02x/%d" b1 r)
+	      )
     | 0xfc -> (Cld, na)
     | 0xff -> let (r, rm, na) = parse_modrm32ext na in
 	      (match r with (* Grp 5 *)
+	      | 2 -> (Call(rm, na), na)
+	      | 4 -> (Jump rm, na)
 	      | 6 -> (Push(opsize, rm), na)
 	      | _ -> unimplemented (Printf.sprintf "unsupported opcode: ff/%d" r)
 	      )
+    | b1 when b1 < 0x3e && (b1 & 7) < 6 ->
+      (
+	let ins a = match b1 >> 3 with
+	  | 0 -> Add a
+(*	  | 1 -> Or a
+	  | 2 -> Adc a*)
+	  | 3 -> Sbb a
+	  | 4 -> And a
+	  | 5 -> Sub a
+	  | 6 -> Xor a
+	  | 7 -> Cmp a
+	  | _ -> unimplemented (Printf.sprintf "unsupported opcode: %02x" b1)
+(*	  | _ -> failwith "impossible" *)
+	in
+	let t = if (b1 & 1) = 0  then r8 else opsize in
+	let (o1, o2, na) = match b1 & 6 with
+	  | 0 -> let r, rm, na = parse_modrm t na in
+		 (rm, r, na)
+	  | 2 -> let r, rm, na = parse_modrm t na in
+		 (r, rm, na)
+	  | 4 -> let i, na = parse_immz t na in
+		 (o_eax, i, na)
+	  | _ -> failwith "impossible"
+	in
+	(ins(t, o1, o2), na)
+      )
     | 0x0f -> (
       let b2 = Char.code (g na) and na = s na in
       match b2 with (* Table A-3 *)
@@ -767,6 +879,18 @@ let parse_instr g addr =
       | 0x82 | 0x83 | 0x84 | 0x85 | 0x86 | 0x87 | 0x88
       | 0x89 ->	let (i,na) = parse_disp32 na in
 		(Jcc(Oimm(Int64.add i na), cc_to_exp b2), na)
+    (* add other opcodes for setcc here *)
+      | 0x95 -> let r, rm, na = parse_modrm r8 na in
+		assert (opsize = r32);  (* unclear what happens otherwise *)
+		(Setcc(r8, rm, cc_to_exp b2), na)
+      | 0xb6
+      | 0xb7 -> let st = if b2 = 0xb6 then r8 else r16 in
+		let r, rm, na = parse_modrm32 na in
+		(Movzx(opsize, r, st, rm), na)
+      | 0xbe
+      | 0xbf -> let st = if b2 = 0xbe then r8 else r16 in
+		let r, rm, na = parse_modrm32 na in
+		(Movsx(opsize, r, st, rm), na)
       | _ -> unimplemented (Printf.sprintf "unsupported opcode: %02x %02x" b1 b2)
     )
     | n -> unimplemented (Printf.sprintf "unsupported opcode: %02x" n)
