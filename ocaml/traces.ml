@@ -1700,7 +1700,7 @@ let output_exploit file trace =
   solve_formula formula_storage answer_storage ;
   let var_vals = match solution_from_stp_formula answer_storage with
     | Some(x) -> x
-    | None -> failwith "Formula was unsatisfiable"
+    | None -> Printf.printf "Formula was unsatisfiable\n"; failwith "Formula was unsatisfiable"
   in
     (* The variables that we care about *)  
   let is_input v = String.sub v 0 4 = "symb" in
