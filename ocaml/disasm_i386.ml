@@ -67,6 +67,7 @@ type opcode =
   | Sbb of (typ * operand * operand)
   | Cmp of (typ * operand * operand)
   | And of (typ * operand * operand)
+  | Or of (typ * operand * operand)
   | Xor of (typ * operand * operand)
   | Test of typ * operand * operand
   | Not of typ * operand
@@ -538,6 +539,12 @@ let rec to_ir addr next ss pref =
     :: move cf exp_false
     :: move af (Unknown("AF is undefined after and", r1))
     :: set_pszf t (op2e t o1)
+  | Or(t, o1, o2) ->
+    assn t o1 (op2e t o1 |* op2e t o2)
+    :: move oF exp_false
+    :: move cf exp_false
+    :: move af (Unknown("AF is undefined after or", r1))
+    :: set_pszf t (op2e t o1)
   | Xor(t, o1, o2) when o1 = o2->
     assn t o1 (Int(0L,t))
     :: move af (Unknown("AF is undefined after xor", r1))
@@ -617,6 +624,7 @@ let cc_to_exp i =
     | 0x4 -> zf_e
     | 0x6 -> cf_e |* zf_e
     | 0x8 -> sf_e
+    | 0xc -> sf_e ^* of_e
     | 0xe -> zf_e |* (sf_e ^* of_e)
     | _ -> failwith "unsupported condition code"
   in
@@ -745,7 +753,7 @@ let parse_instr g addr =
       let (o, na) = if b1=0x68 then parse_immz opsize na else parse_simm8 na in
       (Push(opsize, o), na)
     | 0x72 | 0x73 | 0x74 | 0x75 | 0x76 | 0x77 | 0x78 | 0x79
-    | 0x7e
+    | 0x7c | 0x7d | 0x7e
     | 0x7f -> let (i,na) = parse_disp8 na in
 	      (Jcc(Oimm(Int64.add i na), cc_to_exp b1), na)
     | 0xc3 -> (Retn, na)
@@ -828,7 +836,8 @@ let parse_instr g addr =
 	      | _ -> unimplemented "Grp 2: rolls"
 	      )
     | 0xf4 -> (Hlt, na)
-    | 0xf7 -> let t = opsize in
+    | 0xf6
+    | 0xf7 -> let t = if b1 = 0xf6 then r8 else opsize in
 	      let (r, rm, na) = parse_modrm32ext na in
 	      (match r with (* Grp 3 *)
 	      | 2 -> (Not(t, rm), na)
@@ -846,8 +855,8 @@ let parse_instr g addr =
       (
 	let ins a = match b1 >> 3 with
 	  | 0 -> Add a
-(*	  | 1 -> Or a
-	  | 2 -> Adc a*)
+	  | 1 -> Or a
+	  (*| 2 -> Adc a*)
 	  | 3 -> Sbb a
 	  | 4 -> And a
 	  | 5 -> Sub a
@@ -876,10 +885,12 @@ let parse_instr g addr =
 	let s,d = if b2 = 0x6f then rm, r else r, rm in
 	(Movdqa(d,s), na)
       )
-      | 0x82 | 0x83 | 0x84 | 0x85 | 0x86 | 0x87 | 0x88
-      | 0x89 ->	let (i,na) = parse_disp32 na in
+      | 0x82 | 0x83 | 0x84 | 0x85 | 0x86 | 0x87 | 0x88 | 0x89
+      | 0x8c | 0x8d | 0x8e
+      | 0x8f ->	let (i,na) = parse_disp32 na in
 		(Jcc(Oimm(Int64.add i na), cc_to_exp b2), na)
     (* add other opcodes for setcc here *)
+      | 0x94
       | 0x95 -> let r, rm, na = parse_modrm r8 na in
 		assert (opsize = r32);  (* unclear what happens otherwise *)
 		(Setcc(r8, rm, cc_to_exp b2), na)
