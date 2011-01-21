@@ -57,7 +57,7 @@ struct
       
 
   let get_lval n t =
-    let n = stripnum n in
+    (* let n = stripnum n in *)
     try
       let v = Hashtbl.find (fst !cur_scope) n in
       if t = None || t = Some(Var.typ v)
