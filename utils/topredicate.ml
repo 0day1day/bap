@@ -30,6 +30,7 @@ let rename_astexp f =
   end in
   Ast_visitor.exp_accept vis
 
+
 let compute_dwp1 cfg post =
   let (gcl, foralls, tossa) = Gcl.passified_of_astcfg cfg in
   let p = rename_astexp tossa post in
@@ -38,6 +39,7 @@ let compute_dwp1 cfg post =
 
 
 let to_ssagcl cfg post =
+  let cfg = Hacks.remove_backedges cfg in
   let {Cfg_ssa.cfg=cfg; to_ssavar=tossa} = Cfg_ssa.trans_cfg cfg in
   let p = rename_astexp tossa post in
   let cfg = if !opt then
