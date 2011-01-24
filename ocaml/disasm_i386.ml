@@ -462,7 +462,8 @@ let rec to_ir addr next ss pref =
      move oF (ifzero of_e (ite r1 (count =* i32 1) (our_of) (Unknown("OF <- undefined", r1))));
      move sf (ifzero sf_e (compute_sf e1));
      move zf (ifzero zf_e (compute_zf s e1));
-     move pf (ifzero pf_e (compute_pf e1))
+     move pf (ifzero pf_e (compute_pf e1));
+     move af (ifzero af_e (Unknown("AF undefined after shift", r1)))
     ]
   | Hlt ->
     [Jmp(Lab "General_protection fault", [])]
