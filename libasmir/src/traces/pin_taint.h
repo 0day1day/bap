@@ -85,6 +85,8 @@ namespace pintrace { // We will use namespace to avoid collision
     string name;
     uint64_t offset;
   };  
+
+  typedef std::pair<string, uint64_t> resource_t;
   
    // Tracking the taint during program flow
    class TaintTracker {
@@ -173,8 +175,8 @@ namespace pintrace { // We will use namespace to avoid collision
      
    private:
 
-     // The taint source (producing taint tags)
-     uint32_t source;
+     // The taint number (producing taint tags)
+     uint32_t taintnum;
 
      // a context defining a map from registers to taint
      // this is maintainted externally now
@@ -192,6 +194,7 @@ namespace pintrace { // We will use namespace to avoid collision
      
      /********** Syscall-specific vars ***********/
      std::set<string> taint_files;
+     std::map<resource_t, uint32_t> taint_mappings;
      std::map<uint32_t, fdInfo_t> fds;
      std::map<uint32_t,uint32_t> sections;
      bool taint_net;
@@ -211,8 +214,10 @@ namespace pintrace { // We will use namespace to avoid collision
 
      uint32_t getTaint(context &ctx, uint32_t elem);
 
-     bool introMemTaint(uint32_t addr, uint32_t length, const char *msg);
+     bool introMemTaint(uint32_t addr, uint32_t length, const char *source, int64_t offset);
 
+     bool introMemTaintFromFd(uint32_t fd, uint32_t addr, uint32_t length);
+     
      void setTaint(context &ctx, uint32_t key, uint32_t tag);
 
    };

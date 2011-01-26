@@ -36,6 +36,9 @@ using namespace pintrace;
 /** Skip this many taint introductions. */
 int g_skipTaints = 0;
 
+/** Reuse taint ids? */
+const bool reuse_taintids = false;
+
 /**************** Helper **********************/
 
 /** Convert a wide string to a narrow one
@@ -76,7 +79,7 @@ bool defaultPolicy(uint32_t addr, uint32_t length, const char *msg) {
 
 //
 TaintTracker::TaintTracker(ValSpecRec * env) 
-  : source(1),
+  : taintnum(1),
     values(env),
     taint_net(false),
     taint_args(false),
@@ -194,16 +197,45 @@ void TaintTracker::printMem()
 
 /***************** Taint Handlers *******************/
 
-// Introduces new tainted bytes to memory
-bool TaintTracker::introMemTaint(uint32_t addr, uint32_t length, const char *msg) {
-  if ((*pf)(addr, length, msg)) {
+// Reads length bytes from source at offset, putting the bytes at
+// addr. If offset is -1, new tainted bytes are assigned. Otherwise,
+// the (source,offset) tuple are compared for each byte to see if that
+// resource has been used before, and if so, the same taint number is given.
+bool TaintTracker::introMemTaint(uint32_t addr, uint32_t length, const char *source, int64_t offset) {
+
+  if ((*pf)(addr, length, source)) {
+
     for (unsigned int i = 0; i < length; i++) {
-      setTaint(memory, addr+i, source++);
+      uint32_t t = 0;
+      if (offset == -1 || reuse_taintids == false) {
+        t = taintnum++;
+      } else {
+        // Check if (source, offset+i) has a byte. If not, assign one.
+        resource_t r(source, offset+i);
+        if (taint_mappings.find(r) != taint_mappings.end()) {
+          t = taint_mappings[r];
+          cerr << "found mapping from " << source << " to " << offset+i << " on taint num " << t << endl;
+        } else {
+          t = taintnum++;
+          taint_mappings[r] = t;
+          cerr << "adding new mapping from " << source << " to " << offset+i << " on taint num " << t << endl;
+        }
+      }
+      setTaint(memory, addr+i, t);
     }
     return true;
   } else {
     return false;
   }
+}
+
+// Reads length bytes from source at offset, putting the bytes at
+// addr. Also adds length to the offset of the resource.
+bool TaintTracker::introMemTaintFromFd(uint32_t fd, uint32_t addr, uint32_t length) {
+  assert(fds.find(fd) != fds.end());
+  bool t = introMemTaint(addr, length, fds[fd].name.c_str(), fds[fd].offset);
+  fds[fd].offset += length;
+  return t;
 }
 
 //
@@ -295,8 +327,7 @@ bool TaintTracker::recvHelper(uint32_t fd, void *ptr, size_t len) {
   if (fds.find(fd) != fds.end()) {
 
     cerr << "Tainting " << len << " bytes of recv @" << addr << endl;
-
-    return introMemTaint(addr, len, "recv");
+    return introMemTaintFromFd(fd, addr, len);
   } else {
     return false;
   }
@@ -349,7 +380,7 @@ std::vector<TaintFrame> TaintTracker::taintArgs(int argc, char **argv)
     for ( int i = 1 ; i < argc ; i++ ) {
 		cerr << "Tainting " << argv[i] << endl;
       size_t len = strlen(argv[i]);
-      introMemTaint((uint32_t)argv[i], len, "Arguments");
+      introMemTaint((uint32_t)argv[i], len, "Arguments", -1);
       
       TaintFrame frm;
       frm.id = ARG_ID;
@@ -387,7 +418,7 @@ std::vector<TaintFrame> TaintTracker::taintEnv(char *env, wchar_t *wenv)
   //     uint32_t addr = (uint32_t)env+equal+1;
   //     cerr << "Tainting environment variable: " << var << " @" << (int)addr << " " << len << " bytes" << endl;
   //     for (uint32_t j = 0 ; j < len ; j++) {
-  // 	setTaint(memory, (addr+j), source++);
+  // 	setTaint(memory, (addr+j), taintnum++);
   //     }
   //     TaintFrame frm;
   //     frm.id = ENV_ID;
@@ -411,7 +442,7 @@ std::vector<TaintFrame> TaintTracker::taintEnv(char *env, wchar_t *wenv)
 	uint32_t numBytes = numChars * sizeof(wchar_t);
         uint32_t addr = (uint32_t) (wenv+equal+1);
         cerr << "Tainting environment variable: " << var << " @" << (int)addr << " " << numChars << " bytes" << endl;
-	introMemTaint(addr, numBytes, "Environment Variable");
+	introMemTaint(addr, numBytes, "Environment Variable", -1);
 
         TaintFrame frm;
         frm.id = ENV_ID;
@@ -437,7 +468,7 @@ std::vector<TaintFrame> TaintTracker::taintEnv(char **env)
       uint32_t len = strlen(env[i]) - var.size();
       uint32_t addr = (uint32_t)env[i]+equal+1;
       cerr << "Tainting environment variable: " << var << " @" << (int)addr << endl;
-      introMemTaint(addr, len, "environment variable");
+      introMemTaint(addr, len, "environment variable", -1);
 
       TaintFrame frm;
       frm.id = ENV_ID;
@@ -599,17 +630,21 @@ bool TaintTracker::taintPostSC(const uint32_t bytes,
   //for ( int i = 0 ; i < MAX_SYSCALL_ARGS ; i ++ )
   //cout << hex << " " << args[i] ;
   //cout << endl ;
+
+  uint32_t fd = -1;
+  
   switch (state) {
 #ifndef _WIN32 /* unix */
       case __NR_socketcall:
         switch (args[0]) {
             case _A1_recv:
               addr = ((uint32_t *)args[1])[1];
+              fd = args[0];
               length = bytes;
               cerr << "Tainting " 
                    << bytes 
                    << " bytes from socket" << endl;
-              return introMemTaint(addr, length, "recv");
+              return introMemTaintFromFd(fd, addr, length);
               //return true;
       
             case _A1_accept:
@@ -635,7 +670,7 @@ bool TaintTracker::taintPostSC(const uint32_t bytes,
         if (bytes != (uint32_t)(UNIX_FAILURE)) { /* -1 == error */
           /* args[0] is filename */
           const char *filename = reinterpret_cast<const char *> (args[0]);
-          fdInfo_t fdinfo(string("open ") + string(filename), 0);
+          fdInfo_t fdinfo(string("file ") + string(filename), 0);
           fds[bytes] = fdinfo;
         }
         break;
@@ -647,30 +682,28 @@ bool TaintTracker::taintPostSC(const uint32_t bytes,
         break;
       case __NR_mmap:
       case __NR_mmap2:
+      {
         addr = bytes;
+        fd = args[5];
         length = args[1];
+        uint32_t offset = args[6];
         cerr << "Tainting " 
              << length 
              << "bytes from mmap" << endl;
-        return introMemTaint(addr, length, "mmap");
-        //return true;
+        return introMemTaint(addr, length, fds[fd].name.c_str(), (int64_t)offset);
         break;
+      }
       case __NR_read:
       {
-        fdInfo_t fdi = fds[args[0]];
+        fd = args[0];
         addr = args[1];
         length = bytes;
         cerr << "Tainting " 
              << length 
              << " bytes from read at " << addr
              << endl;
-        stringstream out;
-        out << "read (" << fdi.name << ") +" << fdi.offset;
 
-        /* Bump offset */
-        fds[args[0]].offset += length;
-    
-        return introMemTaint(addr, length, out.str().c_str());
+        return introMemTaintFromFd(fd, addr, length);
       }
       case __NR_lseek:
         if (bytes != UNIX_FAILURE) {
