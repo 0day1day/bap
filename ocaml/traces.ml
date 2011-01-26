@@ -63,18 +63,20 @@ type value =
 
 type environment =
 {
-  vars:     (string,value)  Hashtbl.t;
-  memory:   (int64,value)   Hashtbl.t;
-  symbolic: (int64,Ast.exp) Hashtbl.t;
+  vars:        (string,value)  Hashtbl.t;
+  memory:      (int64,value)   Hashtbl.t;
+  symbolic:    (int64,Ast.exp) Hashtbl.t;
+  symbolicvar: (int,Ast.exp) Hashtbl.t;
 }
 
 (* A global environment to keep the concrete and taint 
    information of the statement block that is analyzed *)
 let global = 
   {
-  vars     = Hashtbl.create 10;
-  memory   = Hashtbl.create 10;
-  symbolic = Hashtbl.create 10;
+  vars        = Hashtbl.create 100;
+  memory      = Hashtbl.create 100;
+  symbolic    = Hashtbl.create 100;
+  symbolicvar = Hashtbl.create 100;
 }
 
 (* Some wrappers to interface with the above datastructures *)
@@ -93,6 +95,13 @@ let name_to_var name =
 
 let var_lookup v = try Some(Hashtbl.find global.vars v) with Not_found -> None
 let mem_lookup i = try Some(Hashtbl.find global.memory i) with Not_found -> None
+let sym_lookup i = 
+  try Hashtbl.find global.symbolicvar i 
+  with Not_found -> 
+    let newvarname = "symb_" ^ (string_of_int i) in
+    let sym_var = Var (Var.newvar newvarname reg_8) in
+    let () = Hashtbl.add global.symbolicvar i sym_var in
+    sym_var
 
 (** This is a map from DSA variable names to standard variable names. *)
 let dsa_rev_map = ref None
@@ -847,8 +856,7 @@ let get_symbolic_seeds memv = function
   | Ast.Comment (s,atts) when is_seed_label s ->
       List.fold_left
 	(fun acc {index=index; taint=Taint taint} ->
-	   let newvarname = "symb_" ^ (string_of_int taint) in
-	   let sym_var = Var (Var.newvar newvarname reg_8) in
+	   let sym_var = sym_lookup taint in
 	     pdebug ("Introducing symbolic: " 
 		     ^(Printf.sprintf "%Lx" index)
 		     ^" -> "
@@ -1702,17 +1710,17 @@ let output_exploit file trace =
     | Some(x) -> x
     | None -> Printf.printf "Formula was unsatisfiable\n"; failwith "Formula was unsatisfiable"
   in
-    (* The variables that we care about *)  
+    (* The variables that we care about *)
   let is_input v = String.sub v 0 4 = "symb" in
     (* A special function to sort interesting variables by name *)
   let underscore = Str.regexp_string "_" in
   let split_var = Str.split underscore in
   let var_to_string_num var = List.nth (split_var var) 1 in
   let var_to_num var = int_of_string (var_to_string_num var) in
-  let sort = 
+  let sort =
     let sort_aux (var1, _) (var2,_) =
-	compare (var_to_num var1) (var_to_num var2)
-    in  
+  	compare (var_to_num var1) (var_to_num var2)
+    in
       List.sort sort_aux
   in
     (* Padding unused symbolic bytes *)
@@ -1720,12 +1728,13 @@ let output_exploit file trace =
     let rec pad n acc = function
       | [] -> List.rev acc
       | ((var,_) as first)::rest when var_to_num var = n ->
-	  pad (n+1) (first::acc) rest
-      | more ->
-	  pad (n+1) (("",1L)::acc) more
+  	  pad (n+1) (first::acc) rest
+      | ((var,_)::rest) as more ->
+	  assert ((var_to_num var) >= n);
+  	  pad (n+1) (("",1L)::acc) more
     in
       pad 1 []
-  in	  
+  in
   let symb_var_vals = List.filter (fun (v,_) -> is_input v) var_vals in
   let sorted = sort symb_var_vals in
   let padded = if !padding then pad_unused sorted else sorted in
@@ -1737,7 +1746,7 @@ let output_exploit file trace =
     close_out cout;
     print "Exploit string was written out to file \"%s\"\n" file ;
     flush stdout ;
-    trace    
+    trace
 
 
 
