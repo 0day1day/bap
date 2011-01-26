@@ -24,6 +24,7 @@
 #define __NR_createsectionwin    0x0054
 #define __NR_mapviewofsectionwin 0x00A8
 #define __NR_readfilewin         0x0111
+#define __NR_setinfofilewin      0x0149
 
 /********************************************/
 

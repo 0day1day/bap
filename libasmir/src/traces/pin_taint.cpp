@@ -359,7 +359,7 @@ std::vector<TaintFrame> TaintTracker::taintArgs(char *cmdA, wchar_t *cmdW)
     cerr << "Tainting multibyte command-line arguments: " << bytesA << " bytes @ " << (unsigned int)(cmdA) << endl;
     
     /* Taint multibyte command line */
-    introMemTaint((uint32_t)cmdA, bytesA, "Tainted Arguments");
+    introMemTaint((uint32_t)cmdA, bytesA, "Tainted Arguments", -1);
 
     TaintFrame frmA;
     frmA.id = ARG_ID;
@@ -368,7 +368,7 @@ std::vector<TaintFrame> TaintTracker::taintArgs(char *cmdA, wchar_t *cmdW)
     frms.push_back(frmA);
 
     cerr << "Tainting wide command-line arguments: " << bytesW << " bytes @ " << (unsigned int)(cmdW) << endl;
-    introMemTaint((uint32_t)cmdW, bytesW, "Tainted Arguments");
+    introMemTaint((uint32_t)cmdW, bytesW, "Tainted Arguments", -1);
 
     TaintFrame frmW;
     frmW.id = ARG_ID;
@@ -550,7 +550,6 @@ bool TaintTracker::taintPreSC(uint32_t callno, uint32_t *args, /* out */ uint32_
     {
       char tempstr[BUFSIZE];
       WINDOWS::POBJECT_ATTRIBUTES pattr;
-      errno_t e;
       WINDOWS::PWSTR fname;
       size_t origsize;
       size_t convertedChars;
@@ -575,19 +574,24 @@ bool TaintTracker::taintPreSC(uint32_t callno, uint32_t *args, /* out */ uint32_
       
       break;
     }
-  case __NR_readfilewin:
-    {    
+  case __NR_readfilewin:        
       if (fds.find(args[0]) != fds.end()) {
-	state = __NR_read;
 	reading_tainted = true;
 	cerr << "found a t-read " << "len " << args[6] << " off " << args[7] << endl;
 	state = __NR_readfilewin;
       }
-      break;
-    }
-  case __NR_closewin:
-    state = __NR_closewin;
+      break;    
+  case __NR_setinfofilewin:
+    if (fds.find(args[0]) != fds.end()) {
+      state = __NR_setinfofilewin;
+    } 
     break;
+  case __NR_closewin:
+    if (fds.find(args[0]) != fds.end()) {
+	state = __NR_closewin;
+      }
+    break;
+
   case __NR_createsectionwin:
     if (args[6]) {
       state = __NR_createsectionwin;
@@ -729,8 +733,30 @@ std::vector<TaintFrame> TaintTracker::taintPostSC(const uint32_t bytes,
         if (bytes == STATUS_SUCCESS) {
           WINDOWS::PHANDLE p = reinterpret_cast<WINDOWS::PHANDLE> (args[0]);
           uint32_t fd = reinterpret_cast<uint32_t> (*p);
+	  char tempstr[BUFSIZE];
+	  WINDOWS::POBJECT_ATTRIBUTES pattr;
+	  //errno_t e;
+	  WINDOWS::PWSTR fname;
+	  size_t origsize;
+	  size_t convertedChars;
           cerr << "Tainting file descriptor " << fd << endl;
-          fds.insert(fd);
+
+	  pattr = reinterpret_cast<WINDOWS::POBJECT_ATTRIBUTES> (args[2]);
+	  assert(pattr);
+	  assert(pattr->ObjectName);
+	  fname = pattr->ObjectName->Buffer;
+	  origsize = wcslen(fname) + 1;
+	  convertedChars = 0;
+	  wcstombs_s(&convertedChars, tempstr, origsize, fname, BUFSIZE-1);
+	  if (convertedChars < origsize) {
+	    cerr << "Warning: Could not convert all characters" << endl;
+	  }
+
+	  string fnamestr = string("file ") + string(tempstr);
+
+	  cerr << "opened file " << fnamestr << endl;
+	  fdInfo_t fdi(fnamestr, 0);
+	  fds[fd] = fdi;
         }
         break;
       case __NR_readfilewin:
@@ -744,11 +770,23 @@ std::vector<TaintFrame> TaintTracker::taintPostSC(const uint32_t bytes,
           cerr << "Tainting " 
                << length 
                << " bytes from read @" << addr << endl;
-          return introMemTaint(addr, length, "read");
+          return introMemTaintFromFd(args[0], addr, length);
           //return true;
         }
+  case __NR_setinfofilewin:
+    if (bytes == STATUS_SUCCESS) {
+      uint32_t c = args[4];
+      uint32_t fd = args[0];
+      if (c == WINDOWS::FilePositionInformation) {
+	/* Someone is setting the file position. */
+	WINDOWS::PFILE_POSITION_INFORMATION pi = (WINDOWS::PFILE_POSITION_INFORMATION)(args[2]);
+	fds[fd].offset = pi->CurrentByteOffset.QuadPart;
+	cerr << "updated offset to " << fds[fd].offset << endl;
+      }
+    }
+    break;
       case __NR_closewin:
-        if (bytes == STATUS_SUCCESS && fds.find(args[0]) != fds.end()) {
+        if (bytes == STATUS_SUCCESS) {
           cerr << "closed tainted fd " << args[0] << endl;
           fds.erase(args[0]);
         }
@@ -769,13 +807,14 @@ std::vector<TaintFrame> TaintTracker::taintPostSC(const uint32_t bytes,
       }
       case __NR_mapviewofsectionwin:
         if (bytes == STATUS_SUCCESS) {
+	  /* XXX: Determine offset into file. */
           length = 0; // disabled args[6];  /// XXX: possibly wrong
           addr = *(reinterpret_cast<uint32_t *> (args[2])); /// XXX: possibly wrong
           assert(addr);
           cerr << "Tainting " 
                << length 
                << " bytes from read @" << addr << endl;
-          return introMemTaint(addr, length, "read");
+          return introMemTaint(addr, length, "read", -1);
           //return true;
         }
         break;
