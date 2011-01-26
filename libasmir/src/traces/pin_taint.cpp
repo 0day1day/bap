@@ -37,7 +37,7 @@ using namespace pintrace;
 int g_skipTaints = 0;
 
 /** Reuse taint ids? */
-const bool reuse_taintids = false;
+const bool reuse_taintids = true;
 
 /**************** Helper **********************/
 
@@ -201,8 +201,10 @@ void TaintTracker::printMem()
 // addr. If offset is -1, new tainted bytes are assigned. Otherwise,
 // the (source,offset) tuple are compared for each byte to see if that
 // resource has been used before, and if so, the same taint number is given.
-bool TaintTracker::introMemTaint(uint32_t addr, uint32_t length, const char *source, int64_t offset) {
+std::vector<TaintFrame> TaintTracker::introMemTaint(uint32_t addr, uint32_t length, const char *source, int64_t offset) {
 
+  std::vector<TaintFrame> tfs;
+  
   if ((*pf)(addr, length, source)) {
 
     for (unsigned int i = 0; i < length; i++) {
@@ -221,21 +223,27 @@ bool TaintTracker::introMemTaint(uint32_t addr, uint32_t length, const char *sou
           cerr << "adding new mapping from " << source << " to " << offset+i << " on taint num " << t << endl;
         }
       }
+      /* Mark memory as tainted */
       setTaint(memory, addr+i, t);
+      TaintFrame tf;
+      tf.id = t;
+      tf.length = 1;
+      tf.addr = addr+i;
+      tfs.push_back(tf);
     }
-    return true;
+    return tfs;
   } else {
-    return false;
+    return tfs;
   }
 }
 
 // Reads length bytes from source at offset, putting the bytes at
 // addr. Also adds length to the offset of the resource.
-bool TaintTracker::introMemTaintFromFd(uint32_t fd, uint32_t addr, uint32_t length) {
+std::vector<TaintFrame> TaintTracker::introMemTaintFromFd(uint32_t fd, uint32_t addr, uint32_t length) {
   assert(fds.find(fd) != fds.end());
-  bool t = introMemTaint(addr, length, fds[fd].name.c_str(), fds[fd].offset);
+  std::vector<TaintFrame> tfs = introMemTaint(addr, length, fds[fd].name.c_str(), fds[fd].offset);
   fds[fd].offset += length;
-  return t;
+  return tfs;
 }
 
 //
@@ -321,7 +329,7 @@ void TaintTracker::acceptHelper(uint32_t fd) {
   }
 }
 
-bool TaintTracker::recvHelper(uint32_t fd, void *ptr, size_t len) {
+std::vector<TaintFrame> TaintTracker::recvHelper(uint32_t fd, void *ptr, size_t len) {
   uint32_t addr = reinterpret_cast<uint32_t> (ptr);
 
   if (fds.find(fd) != fds.end()) {
@@ -329,7 +337,8 @@ bool TaintTracker::recvHelper(uint32_t fd, void *ptr, size_t len) {
     cerr << "Tainting " << len << " bytes of recv @" << addr << endl;
     return introMemTaintFromFd(fd, addr, len);
   } else {
-    return false;
+    std::vector<TaintFrame> tfs;
+    return tfs;
   }
 }
 
@@ -621,7 +630,7 @@ bool TaintTracker::taintPreSC(uint32_t callno, uint32_t *args, /* out */ uint32_
 }
 
  /** This function is called immediately following a system call. */
-bool TaintTracker::taintPostSC(const uint32_t bytes, 
+std::vector<TaintFrame> TaintTracker::taintPostSC(const uint32_t bytes, 
                                      uint32_t *args,
                                      uint32_t &addr,
                                      uint32_t &length,
@@ -774,7 +783,8 @@ bool TaintTracker::taintPostSC(const uint32_t bytes,
       default:
         break;
   }
-  return false;
+  std::vector<TaintFrame> tfs;
+  return tfs;
 }
 
 /******** Taint Propagation **********/

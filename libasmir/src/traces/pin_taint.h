@@ -100,7 +100,7 @@ namespace pintrace { // We will use namespace to avoid collision
 	 taintIntro */
      bool taintPreSC(uint32_t callno, uint32_t * args, uint32_t &state);
 
-     bool taintPostSC(const uint32_t bytes, 
+     std::vector<TaintFrame> taintPostSC(const uint32_t bytes, 
                             uint32_t * args, 
                             uint32_t &addr,
                             uint32_t &length,
@@ -156,7 +156,7 @@ namespace pintrace { // We will use namespace to avoid collision
 
      void acceptHelper(uint32_t fd);
 
-     bool recvHelper(uint32_t fd, void *ptr, size_t len);
+     std::vector<TaintFrame> recvHelper(uint32_t fd, void *ptr, size_t len);
 
      uint32_t getRegTaint(context &delta, uint32_t reg_int);
 
@@ -214,9 +214,9 @@ namespace pintrace { // We will use namespace to avoid collision
 
      uint32_t getTaint(context &ctx, uint32_t elem);
 
-     bool introMemTaint(uint32_t addr, uint32_t length, const char *source, int64_t offset);
+     std::vector<TaintFrame> introMemTaint(uint32_t addr, uint32_t length, const char *source, int64_t offset);
 
-     bool introMemTaintFromFd(uint32_t fd, uint32_t addr, uint32_t length);
+     std::vector<TaintFrame> introMemTaintFromFd(uint32_t fd, uint32_t addr, uint32_t length);
      
      void setTaint(context &ctx, uint32_t key, uint32_t tag);
 

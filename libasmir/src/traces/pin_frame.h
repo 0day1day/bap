@@ -516,6 +516,8 @@ enum FrameType {
 #endif     
    };
 
+  /* XXX: TaintFrame really should have an id for each byte! */
+  
    struct TaintFrame : public Frame {
 
       uint32_t id;

@@ -612,7 +612,7 @@ conc_map_vec * TaintFrame::getOperands()
 		mem = true;
 		index = addr + i ;
 		value = 0;
-		taint = source ++;
+		taint = id;
 		map = new ConcPair(name,mem,get_type(VT_MEM8),index,
 				   value,usage,taint);
 		concrete_pairs->push_back(map);

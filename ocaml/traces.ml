@@ -1697,7 +1697,7 @@ let solve_formula input output =
 
 let output_exploit file trace = 
   ignore (output_formula formula_storage trace) ;
-  solve_formula formula_storage answer_storage ;
+  solve_formula formula_storage answer_storage ;  
   let var_vals = match solution_from_stp_formula answer_storage with
     | Some(x) -> x
     | None -> Printf.printf "Formula was unsatisfiable\n"; failwith "Formula was unsatisfiable"
