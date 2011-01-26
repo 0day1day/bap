@@ -74,6 +74,17 @@ bool defaultPolicy(uint32_t addr, uint32_t length, const char *msg);
 namespace pintrace { // We will use namespace to avoid collision
 
   typedef bool(*TAINT_POLICY_FUN)(uint32_t addr, uint32_t length, const char *msg);
+
+  struct fdInfo_t {
+    fdInfo_t() {
+      name = string("Uninitialized"); offset=-1;
+    }
+    fdInfo_t(string name_in, uint64_t offset_in) {
+      name = name_in; offset = offset_in;
+    }
+    string name;
+    uint64_t offset;
+  };  
   
    // Tracking the taint during program flow
    class TaintTracker {
@@ -178,10 +189,10 @@ namespace pintrace { // We will use namespace to avoid collision
 
      // How many values are being used
      uint32_t count;
-
+     
      /********** Syscall-specific vars ***********/
      std::set<string> taint_files;
-     std::set<uint32_t> fds;
+     std::map<uint32_t, fdInfo_t> fds;
      std::map<uint32_t,uint32_t> sections;
      bool taint_net;
      bool taint_args;

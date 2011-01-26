@@ -11,6 +11,7 @@
 #define __NR_open		  5
 #define __NR_close		  6
 #define __NR_execve		 11
+#define __NR_lseek               19
 #define __NR_mmap		 90
 #define __NR_socketcall	102
 #define __NR_mmap2		192

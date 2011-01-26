@@ -7,6 +7,7 @@
 #include <unistd.h>
 #endif
 #include <cassert>
+#include <sstream>
 
 #ifdef _WIN32
 /**
@@ -25,8 +26,8 @@ namespace WINDOWS {
 // Needed for STATUS_SUCCESS to work
 typedef WINDOWS::NTSTATUS NTSTATUS;
 #else
-const int UNIX_SUCCESS = 0;
-const int UNIX_FAILURE = -1;
+const unsigned int UNIX_SUCCESS = 0;
+const unsigned int UNIX_FAILURE = -1;
 #endif
 
 using namespace std;
@@ -110,7 +111,8 @@ void TaintTracker::trackFile(string file)
 void TaintTracker::setTaintStdin()
 {
 #ifndef _WIN32
-  fds.insert(STDIN_FILENO);
+  fdInfo_t fd(string("stdin"), 0);
+  fds[STDIN_FILENO] = fd;
 #else
   assert(FALSE);
 #endif
@@ -282,7 +284,8 @@ void TaintTracker::postSysCall(context &delta) {
 void TaintTracker::acceptHelper(uint32_t fd) {
   if (taint_net) {
     cerr << "Tainting fd " << fd << endl;
-    fds.insert(fd);
+    fdInfo_t fdinfo(string("accept"), 0);
+    fds[fd] = fdinfo;
   }
 }
 
@@ -458,44 +461,50 @@ bool TaintTracker::taintPreSC(uint32_t callno, uint32_t *args, /* out */ uint32_
   
   bool reading_tainted = false;
   char filename[128];
-
+  
   switch (callno) {
 #ifndef _WIN32 /* unix */
-  case __NR_open:
-    // FIXME: use PIN_SafeCopy
-    strncpy(filename, (char *)args[0],128); 
-    if (taint_files.find(string(filename)) != taint_files.end()) {
-      cerr << "Opening tainted file: " << string(filename) << endl;
-      state = __NR_open;
-    }
-    break;
-  case __NR_close:
-    state = __NR_close;
-    break;
-    // TODO: do we care about the offset?
-  case __NR_mmap:
-  case __NR_mmap2:
-    if (fds.find(args[4]) != fds.end()) {
-      cerr << "mmapping " << args[0] << endl;
-      state = __NR_mmap2;
-    }
-    break;
-  case __NR_read: 
-    if (fds.find(args[0]) != fds.end()) {
-      state = __NR_read;
-      reading_tainted = true;
-    }
-    break;
-  case __NR_socketcall:
-    // TODO: do we need to distinguish between sockets?
-    if (taint_net) {
-      state = __NR_socketcall;
-      if (args[0] == _A1_recv)
-	reading_tainted = true;
-    }
-    break;
-  case __NR_execve:
-    break;
+      case __NR_open:
+        // FIXME: use PIN_SafeCopy
+        strncpy(filename, (char *)args[0],128); 
+        if (taint_files.find(string(filename)) != taint_files.end()) {
+          cerr << "Opening tainted file: " << string(filename) << endl;
+          state = __NR_open;
+        }
+        break;
+      case __NR_close:
+        state = __NR_close;
+        break;
+        // TODO: do we care about the offset?
+      case __NR_mmap:
+      case __NR_mmap2:
+        if (fds.find(args[4]) != fds.end()) {
+          cerr << "mmapping " << args[0] << endl;
+          state = __NR_mmap2;
+        }
+        break;
+      case __NR_read: 
+        if (fds.find(args[0]) != fds.end()) {
+          state = __NR_read;
+          reading_tainted = true;
+        }
+        break;
+      case __NR_socketcall:
+        // TODO: do we need to distinguish between sockets?
+        if (taint_net) {
+          state = __NR_socketcall;
+          if (args[0] == _A1_recv)
+            reading_tainted = true;
+        }
+        break;
+      case __NR_execve:
+        break;
+      case __NR_lseek:
+        if (fds.find(args[0]) != fds.end()) {
+          state = __NR_lseek;
+        }
+        break;
+        
 #else /* windows */
   case __NR_createfilewin:
     {
@@ -582,134 +591,155 @@ bool TaintTracker::taintPreSC(uint32_t callno, uint32_t *args, /* out */ uint32_
 
  /** This function is called immediately following a system call. */
 bool TaintTracker::taintPostSC(const uint32_t bytes, 
-                                     uint32_t * args,
+                                     uint32_t *args,
                                      uint32_t &addr,
                                      uint32_t &length,
 				     const uint32_t state)
 {
-  //cout << "ret Syscall no: " << bytes << endl << "Args:" ;
   //for ( int i = 0 ; i < MAX_SYSCALL_ARGS ; i ++ )
   //cout << hex << " " << args[i] ;
   //cout << endl ;
   switch (state) {
 #ifndef _WIN32 /* unix */
-  case __NR_socketcall:
-    switch (args[0]) {
-    case _A1_recv:
-      addr = ((uint32_t *)args[1])[1];
-      length = bytes;
-      cerr << "Tainting " 
-	   << bytes 
-	   << " bytes from socket" << endl;
-      return introMemTaint(addr, length, "recv");
-      //return true;
+      case __NR_socketcall:
+        switch (args[0]) {
+            case _A1_recv:
+              addr = ((uint32_t *)args[1])[1];
+              length = bytes;
+              cerr << "Tainting " 
+                   << bytes 
+                   << " bytes from socket" << endl;
+              return introMemTaint(addr, length, "recv");
+              //return true;
       
-    case _A1_accept:
-      if (bytes != (uint32_t)UNIX_FAILURE) {
-	cerr << "Accepting an incoming connection" << endl;
-	fds.insert(bytes);
-      }
-      break;
-    case _A1_socket:
-      if (bytes != (uint32_t)UNIX_FAILURE) {
-	cerr << "Opening a tainted socket " << bytes << endl;
-	fds.insert(bytes);
-      }
-      break;
-    default:
-      break;
-    }
-    break;
-  case __NR_open:
-    // "bytes" contains the file descriptor
-    if (bytes != (uint32_t)(UNIX_FAILURE)) { /* -1 == error */
-      fds.insert(bytes);
-    }
-    break;
-  case __NR_close:
-    if (bytes == (uint32_t)(UNIX_SUCCESS) && fds.find(args[0]) != fds.end()) {
-      cerr << "closed tainted fd " << args[0] << endl;
-      fds.erase(args[0]);
-    }
-    break;
-  case __NR_mmap:
-  case __NR_mmap2:
-    addr = bytes;
-    length = args[1];
-    cerr << "Tainting " 
-	 << length 
-	 << "bytes from mmap" << endl;
-    return introMemTaint(addr, length, "mmap");
-    //return true;
-    break;
-  case __NR_read:
-    addr = args[1];
-    length = bytes;
-    cerr << "Tainting " 
-	 << length 
-	 << " bytes from read at " << addr << endl;
-    return introMemTaint(addr, length, "read");
-    //return true;
-#else /* windows */
-  case __NR_createfilewin:
+            case _A1_accept:
+              if (bytes != (uint32_t)UNIX_FAILURE) {
+                cerr << "Accepting an incoming connection" << endl;
+                fdInfo_t fdinfo(string("accept"), 0);
+                fds[bytes] = fdinfo;
+              }
+              break;
+            case _A1_socket:
+              if (bytes != (uint32_t)UNIX_FAILURE) {
+                cerr << "Opening a tainted socket " << bytes << endl;
+                fdInfo_t fdinfo(string("socket"), 0);
+                fds[bytes] = fdinfo;
+              }
+              break;
+            default:
+              break;
+        }
+        break;
+      case __NR_open:
+        // "bytes" contains the file descriptor
+        if (bytes != (uint32_t)(UNIX_FAILURE)) { /* -1 == error */
+          /* args[0] is filename */
+          const char *filename = reinterpret_cast<const char *> (args[0]);
+          fdInfo_t fdinfo(string("open ") + string(filename), 0);
+          fds[bytes] = fdinfo;
+        }
+        break;
+      case __NR_close:
+        if (bytes == (uint32_t)(UNIX_SUCCESS) && fds.find(args[0]) != fds.end()) {
+          cerr << "closed tainted fd " << args[0] << endl;
+          fds.erase(args[0]);
+        }
+        break;
+      case __NR_mmap:
+      case __NR_mmap2:
+        addr = bytes;
+        length = args[1];
+        cerr << "Tainting " 
+             << length 
+             << "bytes from mmap" << endl;
+        return introMemTaint(addr, length, "mmap");
+        //return true;
+        break;
+      case __NR_read:
+      {
+        fdInfo_t fdi = fds[args[0]];
+        addr = args[1];
+        length = bytes;
+        cerr << "Tainting " 
+             << length 
+             << " bytes from read at " << addr
+             << endl;
+        stringstream out;
+        out << "read (" << fdi.name << ") +" << fdi.offset;
+
+        /* Bump offset */
+        fds[args[0]].offset += length;
     
-    // If opened
-    if (bytes == STATUS_SUCCESS) {
-      WINDOWS::PHANDLE p = reinterpret_cast<WINDOWS::PHANDLE> (args[0]);
-      uint32_t fd = reinterpret_cast<uint32_t> (*p);
-      cerr << "Tainting file descriptor " << fd << endl;
-      fds.insert(fd);
-    }
-    break;
-  case __NR_readfilewin:
-    if (bytes == STATUS_SUCCESS) {
-      WINDOWS::PIO_STATUS_BLOCK psb = reinterpret_cast<WINDOWS::PIO_STATUS_BLOCK> (args[4]);
-      assert(psb);
-      assert(psb->Information);
-      length = psb->Information;
-      addr = args[5];
-      assert(addr);
-      cerr << "Tainting " 
-	   << length 
-	   << " bytes from read @" << addr << endl;
-      return introMemTaint(addr, length, "read");
-      //return true;
-    }
-  case __NR_closewin:
-    if (bytes == STATUS_SUCCESS && fds.find(args[0]) != fds.end()) {
-      cerr << "closed tainted fd " << args[0] << endl;
-      fds.erase(args[0]);
-    }
-    break;
-  case __NR_createsectionwin:
-    {
-      if (bytes == STATUS_SUCCESS) {
-	WINDOWS::PHANDLE file = reinterpret_cast<WINDOWS::PHANDLE> (args[6]);
-	uint32_t fdn = reinterpret_cast<uint32_t> (file);
-	if (fds.find(fdn) != fds.end()) {
-	  WINDOWS::PHANDLE p = reinterpret_cast<WINDOWS::PHANDLE> (args[0]);
-	  uint32_t section = reinterpret_cast<uint32_t> (*p);
-	  cerr << "Created a section with the file handle: " << fdn << endl;
-	  sections[section] = fdn ;
-	}
+        return introMemTaint(addr, length, out.str().c_str());
       }
-      break;
-    }
-  case __NR_mapviewofsectionwin:
-    if (bytes == STATUS_SUCCESS) {
-      length = 0; // disabled args[6];  /// XXX: possibly wrong
-      addr = *(reinterpret_cast<uint32_t *> (args[2])); /// XXX: possibly wrong
-      assert(addr);
-      cerr << "Tainting " 
-	   << length 
-	   << " bytes from read @" << addr << endl;
-      return introMemTaint(addr, length, "read");
-      //return true;
-    }
-    break;
+      case __NR_lseek:
+        if (bytes != UNIX_FAILURE) {
+          cerr << "Changing offset for fd " << args[0] << " to " << bytes << endl;
+          fds[args[0]].offset = bytes;
+        } else {
+          cerr << "lseek() failure!" << endl;
+        }
+        break;
+#else /* windows */
+      case __NR_createfilewin:
+    
+        // If opened
+        if (bytes == STATUS_SUCCESS) {
+          WINDOWS::PHANDLE p = reinterpret_cast<WINDOWS::PHANDLE> (args[0]);
+          uint32_t fd = reinterpret_cast<uint32_t> (*p);
+          cerr << "Tainting file descriptor " << fd << endl;
+          fds.insert(fd);
+        }
+        break;
+      case __NR_readfilewin:
+        if (bytes == STATUS_SUCCESS) {
+          WINDOWS::PIO_STATUS_BLOCK psb = reinterpret_cast<WINDOWS::PIO_STATUS_BLOCK> (args[4]);
+          assert(psb);
+          assert(psb->Information);
+          length = psb->Information;
+          addr = args[5];
+          assert(addr);
+          cerr << "Tainting " 
+               << length 
+               << " bytes from read @" << addr << endl;
+          return introMemTaint(addr, length, "read");
+          //return true;
+        }
+      case __NR_closewin:
+        if (bytes == STATUS_SUCCESS && fds.find(args[0]) != fds.end()) {
+          cerr << "closed tainted fd " << args[0] << endl;
+          fds.erase(args[0]);
+        }
+        break;
+      case __NR_createsectionwin:
+      {
+        if (bytes == STATUS_SUCCESS) {
+          WINDOWS::PHANDLE file = reinterpret_cast<WINDOWS::PHANDLE> (args[6]);
+          uint32_t fdn = reinterpret_cast<uint32_t> (file);
+          if (fds.find(fdn) != fds.end()) {
+            WINDOWS::PHANDLE p = reinterpret_cast<WINDOWS::PHANDLE> (args[0]);
+            uint32_t section = reinterpret_cast<uint32_t> (*p);
+            cerr << "Created a section with the file handle: " << fdn << endl;
+            sections[section] = fdn ;
+          }
+        }
+        break;
+      }
+      case __NR_mapviewofsectionwin:
+        if (bytes == STATUS_SUCCESS) {
+          length = 0; // disabled args[6];  /// XXX: possibly wrong
+          addr = *(reinterpret_cast<uint32_t *> (args[2])); /// XXX: possibly wrong
+          assert(addr);
+          cerr << "Tainting " 
+               << length 
+               << " bytes from read @" << addr << endl;
+          return introMemTaint(addr, length, "read");
+          //return true;
+        }
+        break;
 #endif
-  default:
-    break;
+      default:
+        break;
   }
   return false;
 }
