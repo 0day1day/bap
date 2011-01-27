@@ -947,7 +947,7 @@ let run_block state memv block =
   let init = TraceConcrete.inst_fetch state.sigma state.pc in
   let executed = ref [] in
   let rec eval_block state stmt = 
-    pdebug ("Executing: " ^ (Pp.ast_stmt_to_string stmt));
+    (* pdebug ("Executing: " ^ (Pp.ast_stmt_to_string stmt)); *)
     (*    Hashtbl.iter (fun k v -> pdebug (Printf.sprintf "%Lx -> %s" k (Pp.ast_exp_to_string v))) concrete_mem ;*)
     let evalf e = match TraceConcrete.eval_expr state.delta e with
       | Symbolic(e) -> e
@@ -997,7 +997,19 @@ let run_blocks blocks memv length =
   let rev_trace = List.fold_left 
     (fun acc block -> 
        Status.inc() ;   
-       List.rev_append (run_block state memv block) acc
+       let hd, _ = hd_tl block in
+       let concblock =
+	 match hd with
+	 | Comment(s, _) when s=endtrace ->
+	     (* If the block starts with the endtrace comment, then we
+		shouldn't concretely execute it. It's probably a bunch of
+		assertions. *)
+	     block
+	 | _ ->
+	     run_block state memv block
+       in
+       List.rev_append concblock acc
+
     ) [] blocks
   in
   Status.stop () ;
@@ -1142,7 +1154,7 @@ let concrete_rerun file stmts =
      Halted(v, ctx) -> Printf.printf "Halted successfully\n"
    | AssertFailed ctx -> 
        let stmt = TaintConcrete.inst_fetch ctx.sigma ctx.pc in
-       Printf.printf "Assertion failure at %Lx: %s\n" ctx.pc (Pp.ast_stmt_to_string stmt) ;
+       Printf.printf "Assertion failure at %#Lx: %s\n" ctx.pc (Pp.ast_stmt_to_string stmt) ;
        clean_delta ctx.delta ;
        TaintConcrete.print_values ctx.delta;
        (* TaintConcrete.print_mem ctx.delta *)
@@ -1489,6 +1501,7 @@ let get_last_jmp_exp stmts =
     | _::rest -> get_exp rest
   in
   let (exp, rev) = get_exp rev in
+  let rev = Comment(endtrace, [])::rev in
     (exp, List.rev rev)
 
 (* Substituting the last jump with assertions *)

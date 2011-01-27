@@ -181,7 +181,7 @@ let speclist =
      uadd(TransformAst Traces.concrete),
      "Execute the trace concretely and obtain a straightline trace"
     )
-  ::("-trace-reconcrete",
+  ::("-trace-reconcrete <input>",
      Arg.String(fun f -> add(TransformAst(Traces.concrete_rerun f))),
      "Execute a concretized trace with the specified input file."
     )
