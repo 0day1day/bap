@@ -351,6 +351,7 @@ std::vector<TaintFrame> TaintTracker::recvHelper(uint32_t fd, void *ptr, size_t 
 std::vector<TaintFrame> TaintTracker::taintArgs(char *cmdA, wchar_t *cmdW)
 {
   std::vector<TaintFrame> frms;
+  std::vector<TaintFrame> tfrms;
   if (taint_args) {
     size_t lenA = strlen(cmdA);
     size_t lenW = wcslen(cmdW);
@@ -359,48 +360,28 @@ std::vector<TaintFrame> TaintTracker::taintArgs(char *cmdA, wchar_t *cmdW)
     cerr << "Tainting multibyte command-line arguments: " << bytesA << " bytes @ " << (unsigned int)(cmdA) << endl;
     
     /* Taint multibyte command line */
-    introMemTaint((uint32_t)cmdA, bytesA, "Tainted Arguments", -1);
-
-    TaintFrame frmA;
-    frmA.id = ARG_ID;
-    frmA.addr = (uint32_t)cmdA;
-    frmA.length = bytesA;
-    frms.push_back(frmA);
+    frms = introMemTaint((uint32_t)cmdA, bytesA, "Tainted Arguments", -1);
 
     cerr << "Tainting wide command-line arguments: " << bytesW << " bytes @ " << (unsigned int)(cmdW) << endl;
-    introMemTaint((uint32_t)cmdW, bytesW, "Tainted Arguments", -1);
-
-    TaintFrame frmW;
-    frmW.id = ARG_ID;
-    frmW.addr = (uint32_t)cmdW;
-    frmW.length = bytesW;
-    frms.push_back(frmW);
-
-
+    tfrms = introMemTaint((uint32_t)cmdW, bytesW, "Tainted Arguments", -1);
+    frms.insert(frms.end(), tfrms.begin(), tfrms.end());
   }
   return frms;
 }
 #else
 std::vector<TaintFrame> TaintTracker::taintArgs(int argc, char **argv)
 {
-  std::vector<TaintFrame> frms;
   if (taint_args) {
     cerr << "Tainting command-line arguments" << endl;
     for ( int i = 1 ; i < argc ; i++ ) {
 		cerr << "Tainting " << argv[i] << endl;
       size_t len = strlen(argv[i]);
-      introMemTaint((uint32_t)argv[i], len, "Arguments", -1);
-      
-      TaintFrame frm;
-      frm.id = ARG_ID;
-      frm.addr = (uint32_t)argv[i];
-      frm.length = len;
-      frms.push_back(frm);
+      return introMemTaint((uint32_t)argv[i], len, "Arguments", -1);      
     }
   }
   
   // XXX: Is this even safe?
-  return frms;
+  return std::vector<TaintFrame> ();
 }
 #endif
 
@@ -415,7 +396,7 @@ std::vector<TaintFrame> TaintTracker::taintEnv(char *env, wchar_t *wenv)
    * ...
    * \x00\x00
    */
-  std::vector<TaintFrame> frms;
+  //  std::vector<TaintFrame> frms;
 
   // /* Multibyte strings */
   // for ( ; *env != '\x00'; env += (strlen(env) + 1 /* null */)) {
@@ -451,19 +432,14 @@ std::vector<TaintFrame> TaintTracker::taintEnv(char *env, wchar_t *wenv)
 	uint32_t numBytes = numChars * sizeof(wchar_t);
         uint32_t addr = (uint32_t) (wenv+equal+1);
         cerr << "Tainting environment variable: " << var << " @" << (int)addr << " " << numChars << " bytes" << endl;
-	introMemTaint(addr, numBytes, "Environment Variable", -1);
+	return introMemTaint(addr, numBytes, "Environment Variable", -1);
 
-        TaintFrame frm;
-        frm.id = ENV_ID;
-        frm.addr = addr;
-        frm.length = numBytes;
-        frms.push_back(frm);
       }
     }
   }
 
 
-  return frms;
+  return std::vector<TaintFrame> ();
 }
 #else /* unix */
 std::vector<TaintFrame> TaintTracker::taintEnv(char **env)
@@ -477,16 +453,10 @@ std::vector<TaintFrame> TaintTracker::taintEnv(char **env)
       uint32_t len = strlen(env[i]) - var.size();
       uint32_t addr = (uint32_t)env[i]+equal+1;
       cerr << "Tainting environment variable: " << var << " @" << (int)addr << endl;
-      introMemTaint(addr, len, "environment variable", -1);
-
-      TaintFrame frm;
-      frm.id = ENV_ID;
-      frm.addr = addr;
-      frm.length = len;
-      frms.push_back(frm);
+      return introMemTaint(addr, len, "environment variable", -1);
     }
   }
-  return frms;
+  return std::vector<TaintFrame> ();
 }
 #endif
 
