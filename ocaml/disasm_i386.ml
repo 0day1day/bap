@@ -512,7 +512,7 @@ let rec to_ir addr next ss pref =
        ::set_pf r
        ::move cf (r <* s1)
        ::move af (Unknown("AF for add unimplemented", r1))
-       ::move oF (cast_high r1 (s1 ^* exp_not s2) &* (s1 ^* r))
+       ::move oF (cast_high r1 ((s1 ^* exp_not s2) &* (s1 ^* r)))
        ::[]
   | Sub(t, o1, o2) ->
     let tmp = nv "t" t in
