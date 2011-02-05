@@ -1529,8 +1529,8 @@ let get_last_load_exp stmts =
   let rev = List.rev stmts in
   let rec get_load = function
     | [] -> failwith "no load found"
-    | (Ast.Move(_,Ast.Load(array,index,_,_),_))::rest ->
-	(array,index)
+    | ((Ast.Move(_,Ast.Load(array,index,_,_),_))::rest) as rev ->
+	(array,index, List.rev rev)
     | s::rest -> 
 	get_load rest
   in
@@ -1542,7 +1542,7 @@ let get_last_load_exp stmts =
 *)
 let inject_payload_gen addr payload trace = 
   (* XXX: This is probably inefficient. *)
-  let mem, _ = get_last_load_exp trace in
+  let mem, _, _ = get_last_load_exp trace in
   let payload = List.map Int64.of_int payload in
   let _,assertions = 
     List.fold_left 
@@ -1559,7 +1559,7 @@ let inject_payload_gen addr payload trace =
 (* Injecting a payload at an offset past the return address *)
 let inject_payload start payload trace = 
   (* TODO: A simple dataflow is missing here *)
-  let mem, ind = get_last_load_exp trace in
+  let mem, ind, trace = get_last_load_exp trace in
   dprintf "Injecting shellcode at index: %s" (Pp.ast_exp_to_string ind);
    (* Let's convert to Int64 *)
   let payload = List.map Int64.of_int payload in
@@ -1610,7 +1610,7 @@ exception Found_load of Ast.exp
 let inject_shellcode nops trace = 
   let payload = (nopsled nops) ^ winshellcode in
   (* Find the expression of the last loaded value *)
-  let _,target_addr = get_last_load_exp trace in
+  let _,target_addr,_ = get_last_load_exp trace in
   let target_addr = BinOp(PLUS, target_addr, Int(4L, reg_32)) in
   (* let target_addr = Int64.add target_addr pin_offset in *)
   (* let target_addr = Int(target_addr, reg_32) in *)
@@ -1640,7 +1640,7 @@ let add_pivot_file gaddr maddr payloadfile trace =
 
 (** Transfer control by overwriting sehaddr with gaddr. *)
 let add_seh_pivot gaddr sehaddr paddr payload trace =
-  let mem, _ = get_last_load_exp trace in
+  let mem, _, _ = get_last_load_exp trace in
   let gaddrexp = Int(gaddr, reg_32) in
   let sehexp = Load(mem, Int(sehaddr, reg_32), exp_false, reg_32) in
   let endtrace = Ast.Comment (endtrace, []) in
@@ -1652,7 +1652,7 @@ let add_seh_pivot gaddr sehaddr paddr payload trace =
 
 (** Transfer control by overwriting sehaddr with gaddr. *)
 let add_seh_pivot_file gaddr sehaddr paddr payloadfile trace =
-  let mem, _ = get_last_load_exp trace in
+  let mem, _, _ = get_last_load_exp trace in
   let gaddrexp = Int(gaddr, reg_32) in
   let sehexp = Load(mem, Int(sehaddr, reg_32), exp_false, reg_32) in
   let endtrace = Ast.Comment (endtrace, []) in
