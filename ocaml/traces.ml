@@ -1542,7 +1542,7 @@ let get_last_load_exp stmts =
 *)
 let inject_payload_gen addr payload trace = 
   (* XXX: This is probably inefficient. *)
-  let mem, _, _ = get_last_load_exp trace in
+  let mem = Var(find_memv trace) in
   let payload = List.map Int64.of_int payload in
   let _,assertions = 
     List.fold_left 
@@ -1640,7 +1640,7 @@ let add_pivot_file gaddr maddr payloadfile trace =
 
 (** Transfer control by overwriting sehaddr with gaddr. *)
 let add_seh_pivot gaddr sehaddr paddr payload trace =
-  let mem, _, _ = get_last_load_exp trace in
+  let mem = Var(find_memv trace) in
   let gaddrexp = Int(gaddr, reg_32) in
   let sehexp = Load(mem, Int(sehaddr, reg_32), exp_false, reg_32) in
   let endtrace = Ast.Comment (endtrace, []) in
@@ -1652,7 +1652,7 @@ let add_seh_pivot gaddr sehaddr paddr payload trace =
 
 (** Transfer control by overwriting sehaddr with gaddr. *)
 let add_seh_pivot_file gaddr sehaddr paddr payloadfile trace =
-  let mem, _, _ = get_last_load_exp trace in
+  let mem = Var(find_memv trace) in
   let gaddrexp = Int(gaddr, reg_32) in
   let sehexp = Load(mem, Int(sehaddr, reg_32), exp_false, reg_32) in
   let endtrace = Ast.Comment (endtrace, []) in
