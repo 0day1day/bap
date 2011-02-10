@@ -1595,8 +1595,9 @@ let add_payload_after ?(offset=4L) payload trace =
 
 let add_payload_from_file ?(offset=0L) file trace = 
   let payload = bytes_from_file file in
-  let _, trace = get_last_jmp_exp trace in
-  let trace, assertions = inject_payload offset payload trace in
+  let _, index, trace = get_last_load_exp trace in
+  let start = BinOp(PLUS, index, Int(offset, reg_32)) in
+  let assertions = inject_payload_gen start payload trace in
     Util.fast_append trace assertions
 
 let add_payload_from_file_after ?(offset=4L) file trace = 
