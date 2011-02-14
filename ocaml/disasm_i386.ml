@@ -73,6 +73,7 @@ type opcode =
   | Not of typ * operand
   | Cld
   | Leave of typ
+  | Interrupt of operand
 
 (* prefix names *)
 let pref_lock = 0xf0
@@ -571,6 +572,8 @@ let rec to_ir addr next ss pref =
   | Leave t when pref = [] -> (* #UD if Lock prefix is used *)
     Move(esp, ebp_e, [])
     ::to_ir addr next ss pref (Pop(t, o_ebp))
+  | Interrupt(Oimm i) ->
+    [Special(Printf.sprintf "int %Lx" i, [])]
   | _ -> unimplemented "to_ir"
 
 let add_labels ?(asm) a ir =
@@ -815,6 +818,8 @@ let parse_instr g addr =
 	      | 0 -> (Mov(t, rm, i), na)
 	      | _ -> failwith "invalid opcode"
 	      )
+    | 0xcd -> let (i,na) = parse_imm8 na in
+	      (Interrupt(i), na)
     | 0xe8 -> let (i,na) = parse_disp32 na in
 	      (Call(Oimm(Int64.add i na), na), na)
     | 0xe9 -> let (i,na) = parse_disp opsize na in
