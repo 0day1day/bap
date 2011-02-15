@@ -430,10 +430,13 @@ let bfd_section_name = Libbfd.bfd_section_get_name
 let section_contents prog secs =
   let bfd = Libasmir.asmir_get_bfd prog in
   let sc l s =
-    let size = bfd_section_size s and vma = bfd_section_vma s in
-    dprintf "Reading section at %Lx with size %Ld" vma size;
-    let (ok, a) = Libbfd.bfd_get_section_contents bfd s 0L size in
-    if ok <> 0 then (vma, a)::l else (dprintf "failed."; l)
+    let size = bfd_section_size s and vma = bfd_section_vma s
+    and flags = bfd_section_get_flags s in
+    dprintf "Found section at %Lx with size %Ld. flags=%Lx" vma size flags;
+    if Int64.logand Libbfd.sEC_LOAD flags <> 0L then
+      let (ok, a) = Libbfd.bfd_get_section_contents bfd s 0L size in
+      if ok <> 0 then (vma, a)::l else (dprintf "failed."; l)
+    else l
   in
   let bits = List.fold_left sc [] secs in
   let get a =
