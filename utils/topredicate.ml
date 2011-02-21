@@ -9,6 +9,17 @@ let compute_wp_boring cfg post =
   (Wp.wp gcl post, [])
 
 
+let compute_wp = ref compute_wp_boring
+let fast_fse = ref false
+let irout = ref(Some stdout)
+let post = ref "true"
+let stpout = ref None
+let pstpout = ref None
+let suffix = ref ""
+let assert_vars = ref false
+let opt = ref true
+
+
 (* This may be usefule elsewhere, but I'm not sure where to put it. *)
 let rename_astexp f =
   let vis = object
@@ -19,6 +30,7 @@ let rename_astexp f =
   end in
   Ast_visitor.exp_accept vis
 
+
 let compute_dwp1 cfg post =
   let (gcl, foralls, tossa) = Gcl.passified_of_astcfg cfg in
   let p = rename_astexp tossa post in
@@ -26,20 +38,24 @@ let compute_dwp1 cfg post =
   (wp, moreforalls@foralls)
 
 
-let compute_dwp ?(k=1) cfg post =
+let to_ssagcl cfg post =
+  let cfg = Hacks.remove_backedges cfg in
   let {Cfg_ssa.cfg=cfg; to_ssavar=tossa} = Cfg_ssa.trans_cfg cfg in
   let p = rename_astexp tossa post in
-  let vars = Stp.freevars p in
-  let cfg = Ssa_simp.simp_cfg ~liveout:vars cfg in
+  let cfg = if !opt then
+      let vars = Stp.freevars p in
+      Ssa_simp.simp_cfg ~liveout:vars cfg
+    else cfg
+  in
   let (gcl, _) = Gcl.passified_of_ssa cfg in
+  (gcl, p)
+
+let compute_dwp ?(k=1) cfg post =
+  let (gcl,p) = to_ssagcl cfg post in
   (Wp.dwp ~k gcl p, [])
 
 let compute_flanagansaxe ?(k=1) cfg post =
-  let {Cfg_ssa.cfg=cfg; to_ssavar=tossa} = Cfg_ssa.trans_cfg cfg in
-  let p = rename_astexp tossa post in
-  let vars = Stp.freevars p in
-  let cfg = Ssa_simp.simp_cfg ~liveout:vars cfg in
-  let (gcl, _) = Gcl.passified_of_ssa cfg in
+  let (gcl,p) = to_ssagcl cfg post in
   (Wp.flanagansaxe ~k gcl p, [])
 
 (* FIXME: Why did I think we needed SSA here? *)
@@ -71,15 +87,6 @@ let extract_vars e =
   | (v, Some e) -> (v,e)
   | (v, None) -> (v, exp_true)
 
-
-let compute_wp = ref compute_wp_boring
-let fast_fse = ref false
-let irout = ref(Some stdout)
-let post = ref "true"
-let stpout = ref None
-let pstpout = ref None
-let suffix = ref ""
-let assert_vars = ref false
 
 let compute_fse_bfs cfg post =
   (* FIXME: avoid converting to cfg *)
@@ -142,6 +149,8 @@ let speclist =
      "<n> FSE excluding walks that visit a point more than n times.")
   ::("-fast-fse", Arg.Set fast_fse,
      "Perform FSE without full substitution.")
+  ::("-noopt", Arg.Clear opt,
+     "Do not perform optimizations on the SSA CFG.")
     :: Input.speclist
 
 let anon x = raise(Arg.Bad("Unexpected argument: '"^x^"'"))

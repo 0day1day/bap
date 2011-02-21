@@ -207,9 +207,11 @@ object (self)
 	    ) else put_one n
 	  in
 	  put_all 0;
-      | BinOp(bop, e1, e2) ->
+      | BinOp(bop, e1, e2) as e ->
 	  let t = infer_ast ~check:false e1 in
 	  let t' = infer_ast ~check:false e2 in
+	  if t <> t' then
+	    wprintf "Type mismatch: %s" (Pp.ast_exp_to_string e);
 	  assert (t = t') ;
 	  let bits = if is_integer_type t then  bits_of_width t else -1 in
 	  let sw = string_of_int bits in
