@@ -469,7 +469,7 @@ let rec to_ir addr next ss pref =
   | Hlt ->
     [Jmp(Lab "General_protection fault", [])]
   | Cmps(Reg bits as t) ->
-    let src1 = nv "src1" t and src2 = nv "scr2" t and tmpres = nv "tmp" t in
+    let src1 = nv "src1" t and src2 = nv "src2" t and tmpres = nv "tmp" t in
     let stmts =
       move src1 (op2e t esiaddr)
       :: move src2 (op2e_s seg_es t ediaddr)

@@ -358,9 +358,8 @@ let is_mem (Var.V(_,var,t)) =
   | Array _ -> true
   | Reg _ -> false)
 
-let is_temp var = 
-  (String.length var > 2) &&
-    (String.sub var 0 2 = "T_")
+let is_temp = 
+  Disasm.is_temp
 
 let is_tconcassign = (==) tassignattr
 
@@ -372,7 +371,7 @@ let is_symbolic (Var.V(_,s,_)) =
 (** remove temporaries from delta *)
 let clean_delta delta =
   let clean_var v _ =
-    if is_temp (Var.name v) then
+    if is_temp v then
       VH.remove delta v
   in
   VH.iter clean_var delta
@@ -1363,7 +1362,7 @@ struct
     if !full_symbolic then
       let expr = symb_to_exp ev in
       let is_worth_storing = (*is_concrete expr &&*) 
-	is_temp (Var.name v)
+	is_temp v
       in
       let pred' =
 	if is_worth_storing then (context_update delta v ev ; pred)
