@@ -1584,8 +1584,9 @@ let string_to_bytes payload =
 (* Add an arbitrary payload over the return address *)
 let add_payload ?(offset=0L) payload trace = 
   let payload = string_to_bytes payload in
-  let _, trace = get_last_jmp_exp trace in
-  let trace, assertions = inject_payload offset payload trace in
+  let _, index, trace = get_last_load_exp trace in
+  let start = BinOp(PLUS, index, Int(offset, reg_32)) in
+  let assertions = inject_payload_gen start payload trace in
     Util.fast_append trace assertions
 
 let add_payload_after ?(offset=4L) payload trace = 
