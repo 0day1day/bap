@@ -332,33 +332,58 @@ let fast_append = ExtList.List.append
 
 module StatusPrinter =
 struct
+  let updatetime = 5.0 (* update speed estimate every updatetime seconds *)
   let total = ref 0
   let current = ref 0
+  let percentage = ref 0
   let last = ref 0
+  let lasttime = ref 0.0
   let message = ref "Status"
   let starttime = ref 0.0
-    
+
+  let cpercent () =
+    try
+      (!current * 100 / !total)
+    with Division_by_zero -> 0
+
+  let rate () =
+    let deltat = Unix.gettimeofday () -. !lasttime in
+    let deltay = !current - !last in
+      if deltat == 0.0 || deltay == 0 then
+	-1.0
+	  else
+	(float_of_int deltay) /. deltat
+
   let update () = 
-    if !last = -1 then
+    let p = cpercent () in
+    if p = -1 then
       Printf.printf "%s...\r" !message
     else
-      Printf.printf "%s: %d%%\r" !message !last ;
-    flush stdout
+      Printf.printf "%s: %d%% (%f eps)\r" !message p (rate ()) ;
+
+      percentage := p;
+      last := !current;
+      lasttime := Unix.gettimeofday();
+    
+      flush stdout
       
   let init msg size = 
+    last := 0 ;
     current := 0 ;
-    last := -1 ;
+    percentage := -1 ;
     message := msg ;
     total := size ;
     starttime := Unix.gettimeofday () ;
+    lasttime := !starttime ;
     update ()
       
   let inc () =
     if !total != 0 then (
       current := !current + 1 ;
-    let last' = (!current * 100) / !total in
-      if (last' != !last) then
-	(last := last'; update ()))
+      let percentage' = cpercent() in
+	if ((percentage' != !percentage) 
+	    (*|| ((Unix.gettimeofday() -. !lasttime) >= updatetime)*) ) then
+	  (update ()))
 	  
   let stop () =
     Printf.printf "%s: Done! (%f seconds)\n" !message (Unix.gettimeofday () -. !starttime) ;
