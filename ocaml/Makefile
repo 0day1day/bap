@@ -38,6 +38,7 @@ export SOURCES = \
 	deadcode.mli deadcode.ml \
 	ssa_simp.ml \
 	stp.ml \
+	smtlib1.ml \
 	libbfd.idl \
 	libasmir.idl \
 	disasm_i386.ml \

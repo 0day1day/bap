@@ -184,7 +184,7 @@ match !stpout with
     let m2a = new Memory2array.memory2array_visitor () in
     let wp = Ast_visitor.exp_accept m2a wp in
     let foralls = List.map (Ast_visitor.rvar_accept m2a) foralls in
-    let p = new Stp.pp_oc ~suffix:!suffix oc in
+    let p = new Smtlib1.pp_oc ~suffix:!suffix oc in
     if !assert_vars then (
       let (vars,wp') = extract_vars wp in
       (*List.iter (fun (v,e) -> p#assert_eq v e) vars;*)
