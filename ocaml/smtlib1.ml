@@ -188,7 +188,18 @@ object (self)
 	 (* SMTLIB does not define bvsub. *)
 	 let newe = BinOp(PLUS, e1, UnOp(NEG, e2)) in
 	 self#ast_exp newe
+     | BinOp(LE, e1, e2) -> 
+	 (* Split LE into less than OR equal *)
+	 let newe = BinOp(OR, 
+			  BinOp(LT, e1, e2),
+			  BinOp(EQ, e1, e2)) in
+	 self#ast_exp newe
+     | BinOp(NEQ, e1, e2) ->
+	 let newe = UnOp(NOT, BinOp(EQ, e1, e2)) in
+	 self#ast_exp newe
      | BinOp((EQ|LT) as op, e1, e2) ->
+	 (* EQ and LT are predicates, which return boolean values. We
+	    need to convert these to one-bit bitvectors. *)
 	 let f = match op with
 	   | EQ -> "="
 	   | LT -> "bvult"
@@ -201,36 +212,51 @@ object (self)
 	 space ();
 	 self#ast_exp e2;
 	 pp ") bv1[1] bv0[1])";
-     | BinOp((PLUS|TIMES|DIVIDE|SDIVIDE|MOD|SMOD|AND|OR|XOR|NEQ|LE|SLT|SLE|LSHIFT|RSHIFT|ARSHIFT) as bop, e1, e2) as e ->
-	  let t = infer_ast ~check:false e1 in
-	  let t' = infer_ast ~check:false e2 in
-	  if t <> t' then
-	    wprintf "Type mismatch: %s" (Pp.ast_exp_to_string e);
-	  assert (t = t') ;
-	  let fname = match bop with
-	    | PLUS -> "bvadd"
-	    | MINUS -> failwith "Already defined"
-	    | TIMES -> "bvmul"
-	    | DIVIDE -> "bvudiv"
-	    | SDIVIDE -> failwith "SMTLIB1 has no SDIVIDE, no workaround implemented yet"
-	    | MOD -> "bvurem"
-	    | SMOD -> failwith "SMTLIB1 has no SMOD, no workaround implemented yet"
-	    | AND -> "bvand"
-	    | OR -> "bvor"
-	    | XOR -> "bvxor"
-	    | EQ -> failwith "Already handled"
-	    | NEQ -> "!="
-	    | LT -> "bvult"
-	    | LE | SLT | SLE -> failwith "Not implemented yet"
-	    | LSHIFT -> "bvshl"
-	    | RSHIFT -> "bvlshr"
-	    | ARSHIFT -> failwith "SMTLIB1 has no ARSHIFT, and a workaround is not implemented yet"
-	  in
-	  pc '('; pp fname; space (); self#ast_exp e1; space (); self#ast_exp e2; pc ')';
-      | Cast(ct,t, e1) ->
-	  (* For LOW, we just use extract bitsnew-1:0.
-	     For HIGH, we use bitsnew-1:bitsold-bitsnew.
-	  *)
+     | BinOp(ARSHIFT, e1, e2) ->
+	 (* Rewrite ARSHIFT as RSHIFT and a bitwise OR *)
+	 let rshifte = BinOp(RSHIFT, e1, e2) in
+	 let t = infer_ast e1 in
+	 let carrybit = BinOp(RSHIFT, e1, Int(Int64.of_int ((bits_of_width t)-1), t)) in
+	 (* 0 - carrybit =
+	    [0000...] for 0
+	    [1111...] for 1 *)
+	 let carrymask = BinOp(MINUS, Int(0L, t), carrybit) in
+	 (* We can generate a mask by doing bvnot(-1 >> e2). *)
+	 let maske = exp_not (BinOp(RSHIFT, Int(-1L, t), e2)) in
+	 let maske = exp_and carrymask maske in
+	 let newe = BinOp(OR, maske, rshifte) in
+	 self#ast_exp newe
+	 
+     | BinOp((PLUS|TIMES|DIVIDE|SDIVIDE|MOD|SMOD|AND|OR|XOR|SLT|SLE|LSHIFT|RSHIFT) as bop, e1, e2) as e ->
+	 let t = infer_ast ~check:false e1 in
+	 let t' = infer_ast ~check:false e2 in
+	 if t <> t' then
+	   wprintf "Type mismatch: %s" (Pp.ast_exp_to_string e);
+	 assert (t = t') ;
+	 let fname = match bop with
+	   | PLUS -> "bvadd"
+	   | MINUS -> failwith "Already defined"
+	   | TIMES -> "bvmul"
+	   | DIVIDE -> "bvudiv"
+	   | SDIVIDE -> failwith "SMTLIB1 has no SDIVIDE, no workaround implemented yet"
+	   | MOD -> "bvurem"
+	   | SMOD -> failwith "SMTLIB1 has no SMOD, no workaround implemented yet"
+	   | AND -> "bvand"
+	   | OR -> "bvor"
+	   | XOR -> "bvxor"
+	   | EQ -> failwith "Already handled"
+	   | NEQ -> failwith "Already handled"
+	   | LE | LT -> failwith "Implemented above"
+	   | SLT | SLE -> failwith "Not implemented yet"
+	   | LSHIFT -> "bvshl"
+	   | RSHIFT -> "bvlshr"
+	   | ARSHIFT -> failwith "SMTLIB1 has no ARSHIFT, and a workaround is not implemented yet"
+	 in
+	 pc '('; pp fname; space (); self#ast_exp e1; space (); self#ast_exp e2; pc ')';
+     | Cast(ct,t, e1) ->
+	 (* For LOW, we just use extract bitsnew-1:0.
+	    For HIGH, we use bitsnew-1:bitsold-bitsnew.
+	 *)
 	  let t1 = infer_ast ~check:false e1 in
 	  let (bitsnew, bitsold) = (bits_of_width t, bits_of_width t1) in
 	  let (pre,post) = match ct with
