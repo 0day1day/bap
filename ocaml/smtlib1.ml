@@ -184,66 +184,29 @@ object (self)
      (* 	   pp "SX("; self#ast_exp e1; pp "["; pp (Int64.to_string b); *)
      (* 	   pp ":"; pp (Int64.to_string b); pp "], "; pp bits; pc ')'; *)
      (* 	 ) *)
-     | BinOp(MINUS, e1, e2) ->
-	 (* SMTLIB does not define bvsub. *)
-	 let newe = BinOp(PLUS, e1, UnOp(NEG, e2)) in
-	 self#ast_exp newe
-     | BinOp((LE|SLE) as op, e1, e2) -> 
-	 (* Split (S)LE into less than OR equal *)
-	 let newop = match op with
-	   | LE -> LT
-	   | SLE -> SLT
-	   | _ -> assert false
-	 in
-	 let newe = BinOp(OR, 
-			  BinOp(newop, e1, e2),
-			  BinOp(EQ, e1, e2)) in
-	 self#ast_exp newe
      | BinOp(NEQ, e1, e2) ->
-	 let newe = UnOp(NOT, BinOp(EQ, e1, e2)) in
-	 self#ast_exp newe
-     | BinOp((EQ|LT) as op, e1, e2) ->
-	 (* EQ and LT are predicates, which return boolean values. We
-	    need to convert these to one-bit bitvectors. *)
-	 let f = match op with
-	   | EQ -> "="
-	   | LT -> "bvult"
-	   | _ -> assert false
-	 in
-	 pp "(ite (";
-	 pp f;
-	 space ();
-	 self#ast_exp e1;
-	 space ();
-	 self#ast_exp e2;
-	 pp ") bv1[1] bv0[1])";
-     | BinOp(SLT, e1, e2) ->
-	 let t = infer_ast e1 in
-	 let bits = bits_of_width t in
-	 assert (t = (infer_ast e2));
-	 (* e <$ y iff e + 2^{w-1} < y + 2^{w-1} *)
-	 let addme = Int(Int64.of_int(1 lsl (bits-1)), t) in
-	 let newe = 
-	   BinOp(LT,
-		 BinOp(PLUS, e1, addme),
-		 BinOp(PLUS, e2, addme)) in
-	 self#ast_exp newe
-     | BinOp(ARSHIFT, e1, e2) ->
-	 (* Rewrite ARSHIFT as RSHIFT and a bitwise OR *)
-	 let rshifte = BinOp(RSHIFT, e1, e2) in
-	 let t = infer_ast e1 in
-	 let carrybit = BinOp(RSHIFT, e1, Int(Int64.of_int ((bits_of_width t)-1), t)) in
-	 (* 0 - carrybit =
-	    [0000...] for 0
-	    [1111...] for 1 *)
-	 let carrymask = BinOp(MINUS, Int(0L, t), carrybit) in
-	 (* We can generate a mask by doing bvnot(-1 >> e2). *)
-	 let maske = exp_not (BinOp(RSHIFT, Int(-1L, t), e2)) in
-	 let maske = exp_and carrymask maske in
-	 let newe = BinOp(OR, maske, rshifte) in
-	 self#ast_exp newe
-	 
-     | BinOp((PLUS|TIMES|DIVIDE|SDIVIDE|MOD|SMOD|AND|OR|XOR|LSHIFT|RSHIFT) as bop, e1, e2) as e ->
+	 (* Rewrite NEQ in terms of EQ *)
+       let newe = UnOp(NOT, BinOp(EQ, e1, e2)) in
+       self#ast_exp newe
+     | BinOp((EQ|LT|LE|SLT|SLE) as op, e1, e2) ->
+       (* These are predicates, which return boolean values. We need
+	  to convert these to one-bit bitvectors. *)
+       let f = match op with
+	 | EQ -> "="
+	 | LT -> "bvult"
+	 | LE -> "bvule"
+	 | SLT -> "bvslt"
+	 | SLE -> "bvsle"
+	 | _ -> assert false
+       in
+       pp "(ite (";
+       pp f;
+       space ();
+       self#ast_exp e1;
+       space ();
+       self#ast_exp e2;
+       pp ") bv1[1] bv0[1])";
+     | BinOp((PLUS|MINUS|TIMES|DIVIDE|SDIVIDE|MOD|SMOD|AND|OR|XOR|LSHIFT|RSHIFT|ARSHIFT) as bop, e1, e2) as e ->
 	 let t = infer_ast ~check:false e1 in
 	 let t' = infer_ast ~check:false e2 in
 	 if t <> t' then
@@ -251,67 +214,34 @@ object (self)
 	 assert (t = t') ;
 	 let fname = match bop with
 	   | PLUS -> "bvadd"
-	   | MINUS -> assert false
+	   | MINUS -> "bvsub"
 	   | TIMES -> "bvmul"
 	   | DIVIDE -> "bvudiv"
-	   | SDIVIDE -> failwith "SMTLIB1 has no SDIVIDE, no workaround implemented yet"
+	   | SDIVIDE -> "bvsdiv"
 	   | MOD -> "bvurem"
-	   | SMOD -> failwith "SMTLIB1 has no SMOD, no workaround implemented yet"
+	   | SMOD -> "bvsrem"
 	   | AND -> "bvand"
 	   | OR -> "bvor"
 	   | XOR -> "bvxor"
-	   | EQ -> assert false
-	   | NEQ -> assert false
-	   | LE | LT -> assert false
-	   | SLT | SLE -> assert false
+	   | EQ|NEQ|LE|LT|SLT|SLE -> assert false
 	   | LSHIFT -> "bvshl"
 	   | RSHIFT -> "bvlshr"
-	   | ARSHIFT -> assert false
+	   | ARSHIFT -> "bvashr"
 	 in
 	 pc '('; pp fname; space (); self#ast_exp e1; space (); self#ast_exp e2; pc ')';
-     (* | Cast(CAST_SIGNED, t, e1) -> *)
-     (* 	 (\* This uses arithmetic shift to implement signed casting *\) *)
-     (* 	 let te = infer_ast e1 in *)
-     (* 	 let oldbits = bits_of_width te in *)
-     (* 	 let newbits = bits_of_width t in *)
-     (* 	 let delta = newbits - oldbits in *)
-     (* 	 assert (delta >= 0); *)
-     (* 	 let deltaexp = Int(Int64.of_int delta, t) in *)
-     (* 	 let widen = Cast(CAST_UNSIGNED, t, e1) in *)
-     (* 	 (\* Here we shift left and arith shift right *\) *)
-     (* 	 let signit = BinOp(ARSHIFT,  *)
-     (* 			    BinOp(LSHIFT, *)
-     (* 				  widen, *)
-     (* 				  deltaexp), *)
-     (* 			    deltaexp) in *)
-     (* 	 self#ast_exp signit *)
-     | Cast(CAST_SIGNED, t, e1) ->
-	 let te = infer_ast e1 in
-	 let oldbits = bits_of_width te in
-	 let newbits = bits_of_width t in
-	 let delta = newbits - oldbits in
-	 let deltat = Reg(delta) in
-	 assert (delta >= 0);
-	 let carrybit = BinOp(RSHIFT, e1, Int(Int64.of_int(oldbits-1), te)) in
-	 (* carrymask is all 0s when carrybit is 0, and all 1s otherwise *)
-	 let leftbits = BinOp(MINUS, 
-			       Int(0L, deltat),
-			       Cast(CAST_UNSIGNED, deltat, carrybit))
-	 in
-	 pp "(concat ";
-	 self#ast_exp leftbits;
-	 space ();
-	 self#ast_exp e1;
-	 pc ')'
-     | Cast((CAST_LOW|CAST_HIGH|CAST_UNSIGNED) as ct,t, e1) ->
+     | Cast((CAST_LOW|CAST_HIGH|CAST_UNSIGNED|CAST_SIGNED) as ct,t, e1) ->
 	  let t1 = infer_ast ~check:false e1 in
 	  let (bitsnew, bitsold) = (bits_of_width t, bits_of_width t1) in
+	  let delta = bitsnew - bitsold in
+	  (match ct with
+	    | CAST_LOW | CAST_HIGH -> assert (delta <= 0);
+	    | CAST_UNSIGNED | CAST_SIGNED -> assert (delta >= 0));
 	  let (pre,post) = match ct with
 	    | _ when bitsnew = bitsold -> ("","")
 	    | CAST_LOW      -> ("(extract["^string_of_int(bitsnew-1)^":0] ", ")")
 	    | CAST_HIGH     -> ("(extract["^string_of_int(bitsold-1)^":"^string_of_int(bitsold-bitsnew)^"] ", ")")
-	    | CAST_UNSIGNED -> ("(concat bv0["^string_of_int(bitsnew-bitsold)^"]", ")")
-	    | _ -> assert false
+	    | CAST_UNSIGNED -> ("(zero_extend["^string_of_int(delta)^"]", ")")
+	    | CAST_SIGNED -> ("(sign_extend["^string_of_int(delta)^"]", ")")
 	  in
 	  pp pre;
 	  self#ast_exp e1;
