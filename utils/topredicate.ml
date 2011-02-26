@@ -18,7 +18,7 @@ let pstpout = ref None
 let suffix = ref ""
 let assert_vars = ref false
 let opt = ref true
-
+let pp = ref "stp"
 
 (* This may be usefule elsewhere, but I'm not sure where to put it. *)
 let rename_astexp f =
@@ -137,6 +137,8 @@ let speclist =
      "Use 1st order efficient directionless weakest precondition")
   ::("-flanagansaxe", Arg.Unit(fun()-> compute_wp := compute_flanagansaxe),
      "Use Flanagan & Saxe's algorithm instead of the default WP.")
+  ::("-format", Arg.Set_string pp,
+     "Use the specified output format. Either stp (default) or smtlib1.")
   ::("-extract-vars", Arg.Set assert_vars,
      "Put vars in separate asserts")
   ::("-fse", Arg.Unit(fun()-> compute_wp := compute_fse),
@@ -184,16 +186,32 @@ match !stpout with
     let m2a = new Memory2array.memory2array_visitor () in
     let wp = Ast_visitor.exp_accept m2a wp in
     let foralls = List.map (Ast_visitor.rvar_accept m2a) foralls in
-    let p = new Smtlib1.pp_oc ~suffix:!suffix oc in
-    if !assert_vars then (
-      let (vars,wp') = extract_vars wp in
+    (* XXX: Yuck.  We really need a formula pretty printer interface. *)
+    match !pp with
+      | "stp" ->
+	let p = new Stp.pp_oc ~suffix:!suffix oc in
+	if !assert_vars then (
+	  let (vars,wp') = extract_vars wp in
       (*List.iter (fun (v,e) -> p#assert_eq v e) vars;*)
-      List.iter (fun (v,e) -> p#assert_ast_exp (BinOp(EQ, Var v, e))) vars;
-      p#assert_ast_exp_with_foralls foralls wp'
-    )
-    else
-      p#assert_ast_exp_with_foralls foralls wp;
-    p#close
+	  List.iter (fun (v,e) -> p#assert_ast_exp (BinOp(EQ, Var v, e))) vars;
+	  p#assert_ast_exp_with_foralls foralls wp'
+	)
+	else
+	  p#assert_ast_exp_with_foralls foralls wp;
+	p#close
+      | "smtlib1" ->
+	let p = new Smtlib1.pp_oc ~suffix:!suffix oc in
+	if !assert_vars then (
+	  let (vars,wp') = extract_vars wp in
+      (*List.iter (fun (v,e) -> p#assert_eq v e) vars;*)
+	  List.iter (fun (v,e) -> p#assert_ast_exp (BinOp(EQ, Var v, e))) vars;
+	  p#assert_ast_exp_with_foralls foralls wp'
+	)
+	else
+	  p#assert_ast_exp_with_foralls foralls wp;
+	p#close
+      | _ -> raise (Arg.Bad "Invalid output format")
+
 ;;
 match !pstpout with
 | None -> ()
@@ -201,9 +219,17 @@ match !pstpout with
     let m2a = new Memory2array.memory2array_visitor () in
     let wp = Ast_visitor.exp_accept m2a wp in
     let foralls = List.map (Ast_visitor.rvar_accept m2a) foralls in
-    let p = new Stp.pp_oc ~suffix:!suffix oc in
-    p#forall foralls;
-    p#ast_exp wp;
-    p#close
+    match !pp with
+      | "stp" ->
+	let p = new Stp.pp_oc ~suffix:!suffix oc in
+	p#forall foralls;
+	p#ast_exp wp;
+	p#close
+      | "smtlib1" ->
+	let p = new Smtlib1.pp_oc ~suffix:!suffix oc in
+	p#forall foralls;
+	p#ast_exp wp;
+	p#close
+      | _ -> raise (Arg.Bad "Invalid output format")
 ;;
 

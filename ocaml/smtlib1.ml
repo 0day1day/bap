@@ -11,75 +11,12 @@ open D
 
 module VH = Var.VarHash
 
-
-
-(** Returns a list of free variables in the given expression *)
-let freevars e =
-  let freevis =
-    object(self)
-      inherit Ast_visitor.nop
-      val ctx = VH.create 570
-      val found = VH.create 570
-
-      method get_found =
-	dprintf "found %d freevars" (VH.length found);
-	VH.fold (fun k () a -> k::a) found []
-      method add_dec d = 
-	if not(VH.mem found d || VH.mem ctx d)
-	then VH.add found d ()
-	else dprintf "Not adding %s." (Pp.var_to_string d)
-
-      method visit_exp = function
-	| Let(v, e1, e2) -> 
-	    ignore(Ast_visitor.exp_accept self e1);
-	    VH.add ctx v ();
-	    ignore(Ast_visitor.exp_accept self e2);
-	    VH.remove ctx v;
-	    `SkipChildren
-	| _ ->
-	    `DoChildren
-	      
-      method visit_rvar r =
-	self#add_dec r;
-	`DoChildren
-    end
-  in
-  ignore(Ast_visitor.exp_accept freevis e);
-  freevis#get_found
-
-(** Returns a list of free variables in the given expression *)
-let myfreevars e =
-  let ctx = VH.create 570 
-  and found = VH.create 570 in
-  let get_found () =
-    dprintf "found %d freevars" (VH.length found);
-    VH.fold (fun k () a -> k::a) found []
-  in
-  let add_dec d = 
-    if not(VH.mem found d || VH.mem ctx d)
-    then VH.add found d ()
-    else dprintf "Not adding %s." (Pp.var_to_string d)
-  in
-  let rec freevis = function
-    | Let(v, e1, e2) -> freevis e1; VH.add ctx v (); freevis e2; VH.remove ctx v
-    | Var v -> add_dec v
-	(* Visit all children *)
-    | Load (e1,e2,e3,_) -> freevis e1; freevis e2; freevis e3
-    | Store (e1,e2,e3,e4,_) -> freevis e1; freevis e2; freevis e3; freevis e4
-    | BinOp (_,e1,e2) -> freevis e1; freevis e2
-    | UnOp (_, e) -> freevis e
-    | Cast (_,_,e) -> freevis e
-    | _ -> ()
-  in
-  freevis e;
-  get_found ()
-
 class pp ?suffix:(s="") ft =
   let pp = Format.pp_print_string ft
   and pc = Format.pp_print_char ft
   and pi = Format.pp_print_int ft
   and space = Format.pp_print_space ft
-(*  and cut = Format.pp_print_cut ft*)
+  and cut = Format.pp_print_cut ft
   and force_newline = Format.pp_force_newline ft
   and printf f = Format.fprintf ft f
   and opn  = Format.pp_open_box ft
@@ -122,14 +59,12 @@ object (self)
     VH.find ctx v
 
   method declare_new_freevars e =
-    opn 1;
-    pp "; free variables:"; force_newline();
-    let fvs = myfreevars e in 
-    List.iter (fun v -> if not(VH.mem ctx v) then self#decl v) fvs;
-    cls ();
-    pp "; end free variables."; 
     force_newline();
-    flush()
+    pp "; free variables:"; force_newline();
+    let fvs = Stp.freevars e in 
+    List.iter (fun v -> if not(VH.mem ctx v) then self#decl v) fvs;
+    pp "; end free variables."; 
+    force_newline()
        
   method typ = function
     | Reg n ->	printf "BitVec[%u]" n
@@ -199,13 +134,21 @@ object (self)
 	 | SLE -> "bvsle"
 	 | _ -> assert false
        in
-       pp "(ite (";
+       pp "(ite";
+       space();
+       pp "(";
        pp f;
        space ();
        self#ast_exp e1;
        space ();
        self#ast_exp e2;
-       pp ") bv1[1] bv0[1])";
+       pp ")";
+       space ();
+       pp "bv1[1]";
+       space ();
+       pp "bv0[1]";
+       cut ();
+       pp ")"
      | BinOp((PLUS|MINUS|TIMES|DIVIDE|SDIVIDE|MOD|SMOD|AND|OR|XOR|LSHIFT|RSHIFT|ARSHIFT) as bop, e1, e2) as e ->
 	 let t = infer_ast ~check:false e1 in
 	 let t' = infer_ast ~check:false e2 in
@@ -259,14 +202,14 @@ object (self)
 	  let s = "?" ^ var2s v ^"_"^ string_of_int let_counter in
 	  let_counter <- succ let_counter;
 	  pp s;
-	  opn 2; space();
+	  pc ' ';
 	  self#ast_exp e1;
 	  pc ')';
-	  space(); cls();
-	  space();
+	  space ();
 	  self#extend v s;
 	  self#ast_exp e2;
 	  self#unextend v;
+	  cut ();
 	  pc ')'
       | Load(arr,idx,endian, t) ->
 	  (* FIXME check arr is array and not mem *)
@@ -274,7 +217,7 @@ object (self)
 	  self#ast_exp arr;
 	  space ();
 	  self#ast_exp idx;
-	  space ();
+	  cut ();
 	  pc ')'
       | Store(arr,idx,vl, endian, t) ->
 	  (* FIXME check arr is array and not mem *)
@@ -284,9 +227,11 @@ object (self)
 	  self#ast_exp idx;
 	  space ();
 	  self#ast_exp vl;
+	  cut ();
 	  pc ')'
     );
-    cls();
+    cut();
+    cls()
 
 
 
@@ -352,6 +297,7 @@ object (self)
       self#declare_new_freevars e;
       force_newline();
     );
+    opn 1;
     pp ":assumption (=";
     space();
     self#forall foralls;
@@ -359,7 +305,9 @@ object (self)
     force_newline();
     self#ast_exp e;
     force_newline();
+    cut();
     pp ")";
+    cls();
     force_newline ();
     self#counterexample ();
     self#close_benchmark ()

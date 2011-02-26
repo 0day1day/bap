@@ -4,7 +4,7 @@ open Type
 open Ast
 open Typecheck
 
-module D = Debug.Make(struct let name = "STP" and default=`Debug end)
+module D = Debug.Make(struct let name = "STP" and default=`NoDebug end)
 open D
 
 
@@ -46,33 +46,6 @@ let freevars e =
   in
   ignore(Ast_visitor.exp_accept freevis e);
   freevis#get_found
-
-(** Returns a list of free variables in the given expression *)
-let myfreevars e =
-  let ctx = VH.create 570 
-  and found = VH.create 570 in
-  let get_found () =
-    dprintf "found %d freevars" (VH.length found);
-    VH.fold (fun k () a -> k::a) found []
-  in
-  let add_dec d = 
-    if not(VH.mem found d || VH.mem ctx d)
-    then VH.add found d ()
-    else dprintf "Not adding %s." (Pp.var_to_string d)
-  in
-  let rec freevis = function
-    | Let(v, e1, e2) -> freevis e1; VH.add ctx v (); freevis e2; VH.remove ctx v
-    | Var v -> add_dec v
-	(* Visit all children *)
-    | Load (e1,e2,e3,_) -> freevis e1; freevis e2; freevis e3
-    | Store (e1,e2,e3,e4,_) -> freevis e1; freevis e2; freevis e3; freevis e4
-    | BinOp (_,e1,e2) -> freevis e1; freevis e2
-    | UnOp (_, e) -> freevis e
-    | Cast (_,_,e) -> freevis e
-    | _ -> ()
-  in
-  freevis e;
-  get_found ()
 
 class pp ?suffix:(s="") ft =
   let pp = Format.pp_print_string ft
@@ -122,11 +95,10 @@ object (self)
   method declare_new_freevars e =
     opn 0;
     pp "% free variables:"; force_newline();
-    let fvs = myfreevars e in 
+    let fvs = freevars e in 
     List.iter (fun v -> if not(VH.mem ctx v) then self#decl v) fvs;
     pp "% end free variables."; force_newline();
-    cls();
-    flush();
+    cls()
        
   method typ = function
     | Reg n ->	printf "BITVECTOR(%u)" n
