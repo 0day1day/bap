@@ -309,7 +309,7 @@ object (self)
     pp ")";
     cls();
     force_newline ();
-    self#counterexample ();
+    self#formula ();
     self#close_benchmark ()
 
   method assert_ast_exp e =
@@ -330,9 +330,11 @@ object (self)
     pp "));";
     self#close_benchmark ()
 
-  method counterexample () =
+  method formula () =
     pp ":formula true";
     force_newline();
+
+  method counterexample () = ()
 
   method close =
     Format.pp_print_newline ft ();
