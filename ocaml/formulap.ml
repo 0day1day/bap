@@ -47,6 +47,7 @@ object(self)
   method virtual ast_exp : Ast.exp -> unit
   method virtual assert_ast_exp : Ast.exp -> unit
   method virtual assert_ast_exp_with_foralls : ?fvars:bool -> VH.key list -> Ast.exp -> unit
+  method virtual counterexample : unit -> unit
 end 
 
 class virtual fpp_oc =
