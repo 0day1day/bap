@@ -18,9 +18,12 @@ let pstpout = ref None
 let suffix = ref ""
 let assert_vars = ref false
 let opt = ref true
+(* Set the pretty printer to use.  Explicitly use the abstract formula
+   printer subtype. *)
+let pp = ref ((new Stp.pp_oc) :> (?suffix:string -> out_channel -> Formulap.fpp_oc)) ;;
 
 
-(* This may be usefule elsewhere, but I'm not sure where to put it. *)
+(* This may be useful elsewhere, but I'm not sure where to put it. *)
 let rename_astexp f =
   let vis = object
     inherit Ast_visitor.nop
@@ -43,7 +46,7 @@ let to_ssagcl cfg post =
   let {Cfg_ssa.cfg=cfg; to_ssavar=tossa} = Cfg_ssa.trans_cfg cfg in
   let p = rename_astexp tossa post in
   let cfg = if !opt then
-      let vars = Stp.freevars p in
+      let vars = Formulap.freevars p in
       Ssa_simp.simp_cfg ~liveout:vars cfg
     else cfg
   in
@@ -112,7 +115,13 @@ let compute_fse_maxrepeat i cfg post =
   in 
   (maxrepeat i ast post, [])
 
-
+let set_format s =
+  match s with 
+    | "stp" ->
+      pp := ((new Stp.pp_oc) :> (?suffix:string -> out_channel -> Formulap.fpp_oc))
+    | "smtlib1" ->
+      pp := ((new Smtlib1.pp_oc) :> (?suffix:string -> out_channel -> Formulap.fpp_oc))
+    | _ -> failwith "Unknown formula format"
 
 let speclist =
   ("-o", Arg.String (fun f -> irout := Some(open_out f)),
@@ -137,6 +146,8 @@ let speclist =
      "Use 1st order efficient directionless weakest precondition")
   ::("-flanagansaxe", Arg.Unit(fun()-> compute_wp := compute_flanagansaxe),
      "Use Flanagan & Saxe's algorithm instead of the default WP.")
+  ::("-format", Arg.String set_format,
+     "Use the specified output format. Either stp (default) or smtlib1.")
   ::("-extract-vars", Arg.Set assert_vars,
      "Put vars in separate asserts")
   ::("-fse", Arg.Unit(fun()-> compute_wp := compute_fse),
@@ -184,16 +195,17 @@ match !stpout with
     let m2a = new Memory2array.memory2array_visitor () in
     let wp = Ast_visitor.exp_accept m2a wp in
     let foralls = List.map (Ast_visitor.rvar_accept m2a) foralls in
-    let p = new Stp.pp_oc ~suffix:!suffix oc in
+    let p = !pp ~suffix:!suffix oc in
     if !assert_vars then (
       let (vars,wp') = extract_vars wp in
-      (*List.iter (fun (v,e) -> p#assert_eq v e) vars;*)
       List.iter (fun (v,e) -> p#assert_ast_exp (BinOp(EQ, Var v, e))) vars;
       p#assert_ast_exp_with_foralls foralls wp'
     )
-    else
+    else (
       p#assert_ast_exp_with_foralls foralls wp;
+    );
     p#close
+      
 ;;
 match !pstpout with
 | None -> ()
@@ -201,9 +213,9 @@ match !pstpout with
     let m2a = new Memory2array.memory2array_visitor () in
     let wp = Ast_visitor.exp_accept m2a wp in
     let foralls = List.map (Ast_visitor.rvar_accept m2a) foralls in
-    let p = new Stp.pp_oc ~suffix:!suffix oc in
-    p#forall foralls;
-    p#ast_exp wp;
-    p#close
+    let p = !pp ~suffix:!suffix oc in
+	p#forall foralls;
+	p#ast_exp wp;
+	p#close
 ;;
 

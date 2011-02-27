@@ -41,6 +41,8 @@ let full_symbolic = ref true
   
 let padding = ref true
 
+let printer = ref "stp"
+
 let memtype = reg_32  
 
 let endtrace = "This is the final trace block"
@@ -446,7 +448,8 @@ let find_memv trace =
   (* List.iter (fun x -> dprintf "memvar: %s" (Var.name x)) vars; *)
   match vars with
   | x::[] -> x
-  | _ -> failwith "More than one var"
+  | [] -> failwith "No mem vars"
+  | _::_ -> failwith "More than one mem var"
 
 
 (********************************************************)
@@ -657,7 +660,12 @@ let print_formula file formula =
   let m2a = new Memory2array.memory2array_visitor () in
   let formula = Ast_visitor.exp_accept m2a formula in
   let foralls = List.map (Ast_visitor.rvar_accept m2a) [] in
-  let p = new Stp.pp_oc oc in
+  let p = match !printer with
+    | "stp" -> ((new Stp.pp_oc oc) :> Formulap.fpp_oc)
+    | "smtlib1" -> ((new Smtlib1.pp_oc oc) :> Formulap.fpp_oc)
+    | _ -> failwith "Unknown printer"
+  in
+  (* let p = new Smtlib1.pp_oc oc in *)
   let () = p#assert_ast_exp_with_foralls foralls formula in
   let () = p#counterexample () in
     p#close

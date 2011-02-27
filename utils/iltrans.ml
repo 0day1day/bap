@@ -300,6 +300,10 @@ let speclist =
      Arg.String(fun f -> add(TransformAst(Traces.output_formula f))),
      "<file> Output the STP trace formula to <file>"
     )
+  ::("-trace-formula-format",
+     Arg.Set_string Traces.printer,
+     "Set formula format (STP (default) or smtlib1)."
+  )
   ::("-approx-formula", 
      Arg.Unit(fun () -> add(TransformAst(Payload.sym_analyze))),
      "Approximate formula"

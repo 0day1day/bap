@@ -571,10 +571,10 @@ void ppIROp ( IROp op )
    }
   
    switch (op - base) {
-      case 0: vex_printf(str); vex_printf("8"); break;
-      case 1: vex_printf(str); vex_printf("16"); break;
-      case 2: vex_printf(str); vex_printf("32"); break;
-      case 3: vex_printf(str); vex_printf("64"); break;
+      case 0: vex_printf("%s", str); vex_printf("8"); break;
+      case 1: vex_printf("%s", str); vex_printf("16"); break;
+      case 2: vex_printf("%s", str); vex_printf("32"); break;
+      case 3: vex_printf("%s", str); vex_printf("64"); break;
       default: vpanic("ppIROp(2)");
    }
 }
