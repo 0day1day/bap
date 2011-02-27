@@ -4,7 +4,7 @@ open Type
 open Ast
 open Typecheck
 
-module D = Debug.Make(struct let name = "STP" and default=`Debug end)
+module D = Debug.Make(struct let name = "smtlib1" and default=`Debug end)
 open D
 
 
@@ -28,7 +28,7 @@ class pp ?suffix:(s="") ft =
 
 
 object (self)
-
+  inherit Formulap.fpp
   val used_vars : (string,Var.t) Hashtbl.t = Hashtbl.create 57
   val ctx : string VH.t = VH.create 57
     
@@ -61,7 +61,7 @@ object (self)
   method declare_new_freevars e =
     force_newline();
     pp "; free variables:"; force_newline();
-    let fvs = Stp.freevars e in 
+    let fvs = Formulap.freevars e in 
     List.iter (fun v -> if not(VH.mem ctx v) then self#decl v) fvs;
     pp "; end free variables."; 
     force_newline()
@@ -344,6 +344,7 @@ class pp_oc ?suffix:(s="") fd =
   let ft = Format.formatter_of_out_channel fd in
 object
   inherit pp ~suffix:s ft as super
+  inherit Formulap.fpp_oc
   method close =
     super#close;
     close_out fd

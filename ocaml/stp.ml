@@ -13,39 +13,6 @@ module VH = Var.VarHash
 
 
 
-(** Returns a list of free variables in the given expression *)
-let freevars e =
-  let freevis =
-    object(self)
-      inherit Ast_visitor.nop
-      val ctx = VH.create 570
-      val found = VH.create 570
-
-      method get_found =
-	dprintf "found %d freevars" (VH.length found);
-	VH.fold (fun k () a -> k::a) found []
-      method add_dec d = 
-	if not(VH.mem found d || VH.mem ctx d)
-	then VH.add found d ()
-	else dprintf "Not adding %s." (Pp.var_to_string d)
-
-      method visit_exp = function
-	| Let(v, e1, e2) -> 
-	    ignore(Ast_visitor.exp_accept self e1);
-	    VH.add ctx v ();
-	    ignore(Ast_visitor.exp_accept self e2);
-	    VH.remove ctx v;
-	    `SkipChildren
-	| _ ->
-	    `DoChildren
-	      
-      method visit_rvar r =
-	self#add_dec r;
-	`DoChildren
-    end
-  in
-  ignore(Ast_visitor.exp_accept freevis e);
-  freevis#get_found
 
 class pp ?suffix:(s="") ft =
   let pp = Format.pp_print_string ft
@@ -63,7 +30,7 @@ class pp ?suffix:(s="") ft =
   in
 
 object (self)
-
+  inherit Formulap.fpp
   val used_vars : (string,Var.t) Hashtbl.t = Hashtbl.create 57
   val ctx : string VH.t = VH.create 57
     
@@ -95,7 +62,7 @@ object (self)
   method declare_new_freevars e =
     opn 0;
     pp "% free variables:"; force_newline();
-    let fvs = freevars e in 
+    let fvs = Formulap.freevars e in 
     List.iter (fun v -> if not(VH.mem ctx v) then self#decl v) fvs;
     pp "% end free variables."; force_newline();
     cls()
@@ -364,6 +331,7 @@ class pp_oc ?suffix:(s="") fd =
   let ft = Format.formatter_of_out_channel fd in
 object
   inherit pp ~suffix:s ft as super
+  inherit Formulap.fpp_oc
   method close =
     super#close;
     close_out fd
