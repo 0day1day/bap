@@ -268,6 +268,8 @@ object (self)
     opn 0;
     pp "benchmark file.smt";
     force_newline();
+    pp ":status unknown";
+    force_newline();
     pp ":source { Source Unknown }";
     force_newline();
     pp ":difficulty { Unknown }";
