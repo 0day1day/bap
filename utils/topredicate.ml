@@ -4,12 +4,6 @@ open Type
 let usage = "Usage: "^Sys.argv.(0)^" <input options> [-o output]\n\
              Translate programs to the IL. "
 
-let compute_wp_boring cfg post =
-  let gcl = Gcl.of_astcfg cfg in
-  (Wp.wp gcl post, [])
-
-
-let compute_wp = ref compute_wp_boring
 let fast_fse = ref false
 let irout = ref(Some stdout)
 let post = ref "true"
@@ -33,7 +27,6 @@ let rename_astexp f =
   end in
   Ast_visitor.exp_accept vis
 
-
 let compute_dwp1 cfg post =
   let (gcl, foralls, tossa) = Gcl.passified_of_astcfg cfg in
   let p = rename_astexp tossa post in
@@ -52,6 +45,11 @@ let to_ssagcl cfg post =
   in
   let (gcl, _) = Gcl.passified_of_ssa cfg in
   (gcl, p)
+
+let compute_wp_boring cfg post =
+  (* let gcl = Gcl.of_astcfg cfg in *)
+  let (gcl,post) = to_ssagcl cfg post in
+  (Wp.wp gcl post, [])
 
 let compute_dwp ?(k=1) cfg post =
   let (gcl,p) = to_ssagcl cfg post in
@@ -122,6 +120,8 @@ let set_format s =
     | "smtlib1" ->
       pp := ((new Smtlib1.pp_oc) :> (?suffix:string -> out_channel -> Formulap.fpp_oc))
     | _ -> failwith "Unknown formula format"
+
+let compute_wp = ref compute_wp_boring
 
 let speclist =
   ("-o", Arg.String (fun f -> irout := Some(open_out f)),
