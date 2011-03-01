@@ -11,7 +11,9 @@ let stpout = ref None
 let pstpout = ref None
 let suffix = ref ""
 let assert_vars = ref false
-let opt = ref true
+let usedc = ref true
+let usesccvn = ref true
+
 (* Set the pretty printer to use.  Explicitly use the abstract formula
    printer subtype. *)
 let pp = ref ((new Stp.pp_oc) :> (?suffix:string -> out_channel -> Formulap.fpp_oc)) ;;
@@ -38,10 +40,9 @@ let to_ssagcl cfg post =
   let cfg = Hacks.remove_backedges cfg in
   let {Cfg_ssa.cfg=cfg; to_ssavar=tossa} = Cfg_ssa.trans_cfg cfg in
   let p = rename_astexp tossa post in
-  let cfg = if !opt then
-      let vars = Formulap.freevars p in
-      Ssa_simp.simp_cfg ~liveout:vars cfg
-    else cfg
+  let cfg =
+    let vars = Formulap.freevars p in
+    Ssa_simp.simp_cfg ~liveout:vars ~usedc:!usedc ~usesccvn:!usesccvn cfg      
   in
   let (gcl, _) = Gcl.passified_of_ssa cfg in
   (gcl, p)
@@ -160,8 +161,14 @@ let speclist =
      "<n> FSE excluding walks that visit a point more than n times.")
   ::("-fast-fse", Arg.Set fast_fse,
      "Perform FSE without full substitution.")
-  ::("-noopt", Arg.Clear opt,
-     "Do not perform optimizations on the SSA CFG.")
+  ::("-noopt", Arg.Unit (fun () -> usedc := false; usesccvn := false),
+     "Do not perform any optimizations on the SSA CFG.")
+  ::("-opt", Arg.Unit (fun () -> usedc := true; usesccvn := true),
+     "Perform all optimizations on the SSA CFG.")
+  ::("-optdc", Arg.Unit (fun () -> usedc := true; usesccvn := false),
+     "Perform deadcode elimination on the SSA CFG.")
+  ::("-optsccvn", Arg.Unit (fun () -> usedc := false; usesccvn := true),
+     "Perform sccvn on the SSA CFG.")
     :: Input.speclist
 
 let anon x = raise(Arg.Bad("Unexpected argument: '"^x^"'"))
