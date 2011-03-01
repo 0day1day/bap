@@ -123,11 +123,10 @@ object (self)
 	 (* Rewrite NEQ in terms of EQ *)
        let newe = UnOp(NOT, BinOp(EQ, e1, e2)) in
        self#ast_exp newe
-     | BinOp((EQ|LT|LE|SLT|SLE) as op, e1, e2) ->
+     | BinOp((LT|LE|SLT|SLE) as op, e1, e2) ->
        (* These are predicates, which return boolean values. We need
 	  to convert these to one-bit bitvectors. *)
        let f = match op with
-	 | EQ -> "="
 	 | LT -> "bvult"
 	 | LE -> "bvule"
 	 | SLT -> "bvslt"
@@ -149,24 +148,26 @@ object (self)
        pp "bv0[1]";
        cut ();
        pp ")"
-     | BinOp((PLUS|MINUS|TIMES|DIVIDE|SDIVIDE|MOD|SMOD|AND|OR|XOR|LSHIFT|RSHIFT|ARSHIFT) as bop, e1, e2) as e ->
+     | BinOp((EQ|PLUS|MINUS|TIMES|DIVIDE|SDIVIDE|MOD|SMOD|AND|OR|XOR|LSHIFT|RSHIFT|ARSHIFT) as bop, e1, e2) as e ->
 	 let t = infer_ast ~check:false e1 in
 	 let t' = infer_ast ~check:false e2 in
 	 if t <> t' then
 	   wprintf "Type mismatch: %s" (Pp.ast_exp_to_string e);
 	 assert (t = t') ;
 	 let fname = match bop with
+	   | EQ -> "bvcomp"
 	   | PLUS -> "bvadd"
 	   | MINUS -> "bvsub"
 	   | TIMES -> "bvmul"
 	   | DIVIDE -> "bvudiv"
 	   | SDIVIDE -> "bvsdiv"
 	   | MOD -> "bvurem"
-	   | SMOD -> "bvsrem"
+	   (* | SMOD -> "bvsrem" *)
+	   | SMOD -> failwith "SMOD goes to bvsrem or bvsmod?"
 	   | AND -> "bvand"
 	   | OR -> "bvor"
 	   | XOR -> "bvxor"
-	   | EQ|NEQ|LE|LT|SLT|SLE -> assert false
+	   | NEQ|LE|LT|SLT|SLE -> assert false
 	   | LSHIFT -> "bvshl"
 	   | RSHIFT -> "bvlshr"
 	   | ARSHIFT -> "bvashr"
