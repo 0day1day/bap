@@ -38,5 +38,6 @@ let exp_ite b e1 e2 = (* FIXME: were we going to add a native if-then-else thing
   let t1 = Typecheck.infer_ast e1 in
   let t2 = Typecheck.infer_ast e2 in
   assert (t1 = t2);
-  assert (tb = reg_1);
-  (Cast(CAST_SIGNED, t1, b) &* e1) |*  (Cast(CAST_SIGNED, t1, exp_not b) &* e2) 
+
+  let littleb = if tb <> reg_1 then cast_low reg_1 b else b in
+  ((cast_signed t1 littleb) &* e1) |* ((cast_signed t1 (exp_not littleb)) &* e2) 
