@@ -4,12 +4,6 @@ open Type
 let usage = "Usage: "^Sys.argv.(0)^" <input options> [-o output]\n\
              Translate programs to the IL. "
 
-let compute_wp_boring cfg post =
-  let gcl = Gcl.of_astcfg cfg in
-  (Wp.wp gcl post, [])
-
-
-let compute_wp = ref compute_wp_boring
 let fast_fse = ref false
 let irout = ref(Some stdout)
 let post = ref "true"
@@ -17,7 +11,9 @@ let stpout = ref None
 let pstpout = ref None
 let suffix = ref ""
 let assert_vars = ref false
-let opt = ref true
+let usedc = ref true
+let usesccvn = ref true
+
 (* Set the pretty printer to use.  Explicitly use the abstract formula
    printer subtype. *)
 let pp = ref ((new Stp.pp_oc) :> (?suffix:string -> out_channel -> Formulap.fpp_oc)) ;;
@@ -33,7 +29,6 @@ let rename_astexp f =
   end in
   Ast_visitor.exp_accept vis
 
-
 let compute_dwp1 cfg post =
   let (gcl, foralls, tossa) = Gcl.passified_of_astcfg cfg in
   let p = rename_astexp tossa post in
@@ -45,13 +40,17 @@ let to_ssagcl cfg post =
   let cfg = Hacks.remove_backedges cfg in
   let {Cfg_ssa.cfg=cfg; to_ssavar=tossa} = Cfg_ssa.trans_cfg cfg in
   let p = rename_astexp tossa post in
-  let cfg = if !opt then
-      let vars = Formulap.freevars p in
-      Ssa_simp.simp_cfg ~liveout:vars cfg
-    else cfg
+  let cfg =
+    let vars = Formulap.freevars p in
+    Ssa_simp.simp_cfg ~liveout:vars ~usedc:!usedc ~usesccvn:!usesccvn cfg      
   in
   let (gcl, _) = Gcl.passified_of_ssa cfg in
   (gcl, p)
+
+let compute_wp_boring cfg post =
+  (* let gcl = Gcl.of_astcfg cfg in *)
+  let (gcl,post) = to_ssagcl cfg post in
+  (Wp.wp gcl post, [])
 
 let compute_dwp ?(k=1) cfg post =
   let (gcl,p) = to_ssagcl cfg post in
@@ -123,6 +122,8 @@ let set_format s =
       pp := ((new Smtlib1.pp_oc) :> (?suffix:string -> out_channel -> Formulap.fpp_oc))
     | _ -> failwith "Unknown formula format"
 
+let compute_wp = ref compute_wp_boring
+
 let speclist =
   ("-o", Arg.String (fun f -> irout := Some(open_out f)),
    "<file> Print output to <file> rather than stdout.")
@@ -160,8 +161,14 @@ let speclist =
      "<n> FSE excluding walks that visit a point more than n times.")
   ::("-fast-fse", Arg.Set fast_fse,
      "Perform FSE without full substitution.")
-  ::("-noopt", Arg.Clear opt,
-     "Do not perform optimizations on the SSA CFG.")
+  ::("-noopt", Arg.Unit (fun () -> usedc := false; usesccvn := false),
+     "Do not perform any optimizations on the SSA CFG.")
+  ::("-opt", Arg.Unit (fun () -> usedc := true; usesccvn := true),
+     "Perform all optimizations on the SSA CFG.")
+  ::("-optdc", Arg.Unit (fun () -> usedc := true; usesccvn := false),
+     "Perform deadcode elimination on the SSA CFG.")
+  ::("-optsccvn", Arg.Unit (fun () -> usedc := false; usesccvn := true),
+     "Perform sccvn on the SSA CFG.")
     :: Input.speclist
 
 let anon x = raise(Arg.Bad("Unexpected argument: '"^x^"'"))

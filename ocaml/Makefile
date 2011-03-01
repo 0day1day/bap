@@ -24,6 +24,7 @@ export SOURCES = \
 	ssa.ml \
 	pp.ml \
 	typecheck.ml \
+	ast_convenience.ml \
 	cfg.mli cfg.ml \
 	reachable.mli \
 	reachable.ml \

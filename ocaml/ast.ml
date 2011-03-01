@@ -41,6 +41,8 @@ type stmt =
 
 type program = stmt list
 
+(* XXX: Should we move all of these to ast_convenience? *)
+
 (** Make an expression corresponding to the given label, for use as the
     target of a [Jmp]. *)
 let exp_of_lab = function
@@ -84,7 +86,6 @@ let (exp_shl, exp_shr) =
     | e2 -> BinOp(dir, e1, e2)
   in
   (s LSHIFT, s RSHIFT)
-
 
 let newlab =
   let c = ref 0 in
