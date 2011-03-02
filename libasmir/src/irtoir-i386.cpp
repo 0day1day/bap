@@ -1505,13 +1505,24 @@ void set_flag( vector<Stmt *> *irout, reg_t type, Temp *flag, Exp *cond )
    Set if the least-significant byte of the result contains an even number of
    1 bits; cleared otherwise.
  */
-#define CALC_COND_PF(PF8) (_ex_not(_ex_l_cast(_ex_xor(  ex_shr(PF8, &c_7),\
-						       ex_shr(PF8, &c_6),\
-						       ex_shr(PF8, &c_5),\
-						       ex_shr(PF8, &c_4),\
-						       ex_shr(PF8, &c_3),\
-						       ex_shr(PF8, &c_2),\
-						       ex_shr(PF8, &c_1),\
+
+Constant c8_0(REG_8,0), 
+  c8_1(REG_8,1), 
+  c8_2(REG_8,2), 
+  c8_3(REG_8,3), 
+  c8_4(REG_8,4), 
+  c8_5(REG_8,5), 
+  c8_6(REG_8,6), 
+  c8_7(REG_8,7);
+
+
+#define CALC_COND_PF(PF8) (_ex_not(_ex_l_cast(_ex_xor(  ex_shr(PF8, &c8_7),\
+						       ex_shr(PF8, &c8_6),\
+						       ex_shr(PF8, &c8_5),\
+						       ex_shr(PF8, &c8_4),\
+						       ex_shr(PF8, &c8_3),\
+						       ex_shr(PF8, &c8_2),\
+						       ex_shr(PF8, &c8_1),\
 						       ecl(PF8) ),\
 					     REG_1)))
 

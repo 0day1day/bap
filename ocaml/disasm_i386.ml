@@ -226,7 +226,7 @@ let ite t b e1 e2 = (* FIXME: were we going to add a native if-then-else thing? 
 
 let l32 i = Int(Arithmetic.to64 (i,r32), r32)
 let i32 i = Int(Int64.of_int i, r32)
-
+let it i t = Int(Int64.of_int i, t)
 
 (* converts a register number to the corresponding 32bit register variable *)
 let bits2reg32= function
@@ -338,16 +338,16 @@ and calla = [StrAttr "call"]
 
 let compute_sf result = Cast(CAST_HIGH, r1, result)
 let compute_zf t result = Int(0L, t) =* result
-let compute_pf r =
+let compute_pf t r =
   (* extra parens do not change semantics but do make it pretty print nicer *)
-  exp_not (Cast(CAST_LOW, r1, (((((((r >>* i32 7) ^* (r >>* i32 6)) ^* (r >>* i32 5)) ^* (r >>* i32 4)) ^* (r >>* i32 3)) ^* (r >>* i32 2)) ^* (r >>* i32 1)) ^* r))
+  exp_not (Cast(CAST_LOW, r1, (((((((r >>* it 7 t) ^* (r >>* it 6 t)) ^* (r >>* it 5 t)) ^* (r >>* it 4 t)) ^* (r >>* it 3 t)) ^* (r >>* it 2 t)) ^* (r >>* it 1 t)) ^* r))
 
 let set_sf r = move sf (compute_sf r)
 let set_zf t r = move zf (compute_zf t r)
-let set_pf r = move pf (compute_pf r)
+let set_pf t r = move pf (compute_pf t r)
 
 let set_pszf t r =
-  [set_pf r;
+  [set_pf t r;
    set_sf r;
    set_zf t r]
 
@@ -436,7 +436,7 @@ let rec to_ir addr next ss pref =
      move oF (ifzero of_e (ite r1 (count =* i32 1) (our_of) (Unknown("OF <- undefined", r1))));
      move sf (ifzero sf_e (compute_sf e1));
      move zf (ifzero zf_e (compute_zf s e1));
-     move pf (ifzero pf_e (compute_pf e1));
+     move pf (ifzero pf_e (compute_pf s e1));
      move af (ifzero af_e (Unknown("AF undefined after shift", r1)))
     ]
   | Hlt ->
@@ -483,7 +483,7 @@ let rec to_ir addr next ss pref =
     :: let s1 = Var tmp and s2 = op2e t o2 and r = op2e t o1 in
        set_sf r
        ::set_zf t r
-       ::set_pf r
+       ::set_pf t r
        ::move cf (r <* s1)
        ::move af (Unknown("AF for add unimplemented", r1))
        ::move oF (cast_high r1 ((s1 ^* exp_not s2) &* (s1 ^* r)))
