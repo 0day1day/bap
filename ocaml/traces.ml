@@ -30,6 +30,8 @@ open D
     are assumed to be constant. *)
 let consistency_check = ref false;;
 
+let dce = ref true;;
+
 (** Alternate assignment uses assign statements rather than
     overloading lookup_var/mem in the evaluator. *)
 let use_alt_assignment = ref true;;
@@ -1679,9 +1681,9 @@ let generate_formula trace =
   LetBind.bindings := [] ;  (*  XXX: temporary hack *)
   let trace = concrete trace in
   (* If we leave DCE on, it will screw up the consistency check. *)
-  let trace = match !consistency_check with
-    | false -> trace_dce trace
+  let trace = match !consistency_check || (not !dce) with
     | true -> trace
+    | false -> trace_dce trace
   in
   ignore(symbolic_run trace) ;
   TraceSymbolic.output_formula ()

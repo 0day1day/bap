@@ -49,6 +49,7 @@ type opcode =
   | Retn
   | Nop
   | Mov of typ * operand * operand (* dst, src *)
+  | Movs of typ
   | Movzx of typ * operand * typ * operand (* dsttyp, dst, srctyp, src *)
   | Movsx of typ * operand * typ * operand (* dsttyp, dst, srctyp, src *)
   | Movdqa of operand * operand (* dst, src *)
@@ -373,6 +374,19 @@ let rec to_ir addr next ss pref =
     ]
   | Mov(t, dst,src) when pref = [] ->
     [assn t dst (op2e t src)]
+  | Movs(Reg bits as t) ->
+      let stmts = 
+	store_s seg_es t edi_e (load_s seg_es t esi_e)
+	:: string_incr t esi
+	:: string_incr t edi
+	:: []
+      in
+      if pref = [] then
+	stmts
+      else if pref = [repz] || pref = [repnz] then
+	rep_wrap ~check_zf:(List.hd pref) ~addr ~next stmts
+      else
+	unimplemented "unsupported prefix for movs"
   | Movzx(t, dst, ts, src) when pref = [] ->
     [assn t dst (cast_unsigned t (op2e ts src))]
   | Movsx(t, dst, ts, src) when pref = [] ->
@@ -776,6 +790,7 @@ let parse_instr g addr =
 	      (Test(opsize, o_eax, i), na)
     | 0xaa -> (Stos r8, na)
     | 0xab -> (Stos opsize, na)
+    | 0xa5 -> (Movs opsize, na)
     | 0xb0 | 0xb1 | 0xb2 | 0xb3 | 0xb4 | 0xb5 | 0xb6
     | 0xb7 -> let (i, na) = parse_imm8 na in
 	      (Mov(r8, Oreg(b1 & 7), i), na)

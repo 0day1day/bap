@@ -336,6 +336,10 @@ let speclist =
      Arg.Set Traces.consistency_check,
      "Perform extra consistency checks"
     )
+  ::("-trace-noopt",
+     Arg.Clear Traces.dce,
+     "Disable trace optimizations"
+    )
   ::("-exec",
      uadd(TransformAst Interpreter.execute),
      "Concretely execute the IL")
