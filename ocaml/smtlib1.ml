@@ -183,14 +183,15 @@ object (self)
 	    | CAST_UNSIGNED | CAST_SIGNED -> assert (delta >= 0));
 	  let (pre,post) = match ct with
 	    | _ when bitsnew = bitsold -> ("","")
-	    | CAST_LOW      -> ("(extract["^string_of_int(bitsnew-1)^":0] ", ")")
-	    | CAST_HIGH     -> ("(extract["^string_of_int(bitsold-1)^":"^string_of_int(bitsold-bitsnew)^"] ", ")")
+	    | CAST_LOW      -> ("(extract["^string_of_int(bitsnew-1)^":0]", ")")
+	    | CAST_HIGH     -> ("(extract["^string_of_int(bitsold-1)^":"^string_of_int(bitsold-bitsnew)^"]", ")")
 	    | CAST_UNSIGNED -> ("(zero_extend["^string_of_int(delta)^"]", ")")
 	    | CAST_SIGNED -> ("(sign_extend["^string_of_int(delta)^"]", ")")
 	  in
 	  pp pre;
-	  self#ast_exp e1;
 	  space ();
+	  self#ast_exp e1;
+	  cut ();
 	  pp post
       | Unknown(s,t) ->
 	  pp "unknown_"; pi unknown_counter; pp" ;"; pp s; force_newline();
