@@ -36,7 +36,7 @@ let compute_dwp1 cfg post =
   (wp, moreforalls@foralls)
 
 
-let to_ssagcl cfg post =
+let to_ssapassgcl cfg post =
   let cfg = Hacks.remove_backedges cfg in
   let {Cfg_ssa.cfg=cfg; to_ssavar=tossa} = Cfg_ssa.trans_cfg cfg in
   let p = rename_astexp tossa post in
@@ -47,17 +47,29 @@ let to_ssagcl cfg post =
   let (gcl, _) = Gcl.passified_of_ssa cfg in
   (gcl, p)
 
+let to_ssagcl cfg post =
+  let cfg = Hacks.remove_backedges cfg in
+  let {Cfg_ssa.cfg=cfg; to_ssavar=tossa} = Cfg_ssa.trans_cfg cfg in
+  let p = rename_astexp tossa post in
+  let cfg =
+    let vars = Formulap.freevars p in
+    Ssa_simp.simp_cfg ~liveout:vars ~usedc:!usedc ~usesccvn:!usesccvn cfg      
+  in
+  let cfg = Cfg_ssa.to_astcfg cfg in
+  let gcl = Gcl.of_astcfg cfg in
+  (gcl, p)
+
+
 let compute_wp_boring cfg post =
-  (* let gcl = Gcl.of_astcfg cfg in *)
-  let (gcl,post) = to_ssagcl cfg post in
+  let (gcl, post) = to_ssagcl cfg post in
   (Wp.wp gcl post, [])
 
 let compute_dwp ?(k=1) cfg post =
-  let (gcl,p) = to_ssagcl cfg post in
+  let (gcl,p) = to_ssapassgcl cfg post in
   (Wp.dwp ~k gcl p, [])
 
 let compute_flanagansaxe ?(k=1) cfg post =
-  let (gcl,p) = to_ssagcl cfg post in
+  let (gcl,p) = to_ssapassgcl cfg post in
   (Wp.flanagansaxe ~k gcl p, [])
 
 (* FIXME: Why did I think we needed SSA here? *)
