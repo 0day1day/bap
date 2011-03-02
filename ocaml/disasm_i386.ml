@@ -820,8 +820,9 @@ let parse_instr g addr =
     | 0xf7 -> let t = if b1 = 0xf6 then r8 else opsize in
 	      let (r, rm, na) = parse_modrm32ext na in
 	      (match r with (* Grp 3 *)
-	      | 2 -> (Not(t, rm), na)
-	      | _ -> unimplemented (Printf.sprintf "unsupported opcode: %02x/%d" b1 r)
+	       | 0 -> let (imm, na) = parse_imm8 na in (Test(t, rm, imm), na)
+	       | 2 -> (Not(t, rm), na)
+	       | _ -> unimplemented (Printf.sprintf "unsupported opcode: %02x/%d" b1 r)
 	      )
     | 0xfc -> (Cld, na)
     | 0xff -> let (r, rm, na) = parse_modrm32ext na in
