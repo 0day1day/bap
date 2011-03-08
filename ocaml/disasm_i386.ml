@@ -56,6 +56,7 @@ type opcode =
   | Lea of operand * Ast.exp
   | Call of operand * int64 (* int64 is RA *)
   | Shift of binop_type * typ * operand * operand
+  | Shiftd of binop_type * typ * operand * operand * operand
   | Jump of operand
   | Jcc of operand * Ast.exp
   | Setcc of typ * operand * Ast.exp
@@ -453,6 +454,29 @@ let rec to_ir addr next ss pref =
      move pf (ifzero pf_e (compute_pf s e1));
      move af (ifzero af_e (Unknown("AF undefined after shift", r1)))
     ]
+  | Shiftd(_st, s, dst, fill, shift) ->
+      let t1 = nv "t1" r8 and t2 = nv "t2" s and tempDEST = nv "tempDEST" s in
+      let bits = Arithmetic.bits_of_width s in
+      let our_of = Cast(CAST_HIGH, r1, Var tempDEST) ^* cf_e in
+      let e_dst = op2e s dst in
+      let e_fill = op2e s fill in
+      let e_shift = op2e r8 shift in
+      let ifzero = ite r1 (e_shift =* i32 0) in
+      let ret1 = e_fill >>* (it bits r8 -* e_shift) in
+      let ret2 = e_dst <<* e_shift in
+      let result = ret1 |* ret2 in
+      [
+        move tempDEST e_dst;
+        move t1 e_shift;
+        move t2 (e_dst >>* (i32 bits -* (Var t1)));
+        move cf (ifzero cf_e (Cast(CAST_LOW, r1, Var t2)));
+        assn s dst result;
+        move oF (ifzero of_e (ite r1 (e_shift =* i32 1) (our_of) (Unknown("OF <- undefined", r1))));
+        move sf (ifzero sf_e (compute_sf e_dst));
+        move zf (ifzero zf_e (compute_zf s e_dst));
+        move pf (ifzero pf_e (compute_pf s e_dst));
+        move af (ifzero af_e (Unknown ("AF undefined after shift", r1)))
+      ]
   | Hlt ->
     [Jmp(Lab "General_protection fault", [])]
   | Cmps(Reg bits as t) ->
@@ -598,6 +622,7 @@ module ToStr = struct
     | Lea(r,a) -> Printf.sprintf "lea %s, %s" (opr r) (opr (Oaddr a))
     | Call(a, ra) -> Printf.sprintf "call %s" (opr a)
     | Shift _ -> "shift"
+    | Shiftd _ -> "shiftd"
     | Hlt -> "hlt"
     | Jump a -> Printf.sprintf "jmp %s" (opr a)
     | _ -> unimplemented "op2str"
@@ -832,10 +857,10 @@ let parse_instr g addr =
 	      )
     | 0xf4 -> (Hlt, na)
     | 0xf6
-    | 0xf7 -> let t = if b1 = 0xf6 then r8 else opsize in
+    | 0xf7 -> let t, parse = if b1 = 0xf6 then r8, parse_imm8 else opsize, parse_imm32 in
 	      let (r, rm, na) = parse_modrm32ext na in
 	      (match r with (* Grp 3 *)
-	       | 0 -> let (imm, na) = parse_imm8 na in (Test(t, rm, imm), na)
+	       | 0 -> let (imm, na) = parse na in (Test(t, rm, imm), na)
 	       | 2 -> (Not(t, rm), na)
 	       | _ -> unimplemented (Printf.sprintf "unsupported opcode: %02x/%d" b1 r)
 	      )
@@ -890,6 +915,10 @@ let parse_instr g addr =
       | 0x95 -> let r, rm, na = parse_modrm r8 na in
 		assert (opsize = r32);  (* unclear what happens otherwise *)
 		(Setcc(r8, rm, cc_to_exp b2), na)
+      | 0xa5 ->
+          let (r, rm, na) = parse_modrm32 na in
+	  assert (opsize = r32);
+	  (Shiftd(LSHIFT, opsize, rm, r, o_ecx), na)
       | 0xb6
       | 0xb7 -> let st = if b2 = 0xb6 then r8 else r16 in
 		let r, rm, na = parse_modrm32 na in

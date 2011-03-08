@@ -2904,7 +2904,7 @@ void i386_modify_flags( asm_program_t *prog, bap_block_t *block )
       else if ( op.find("shr",0) == 0
                 || op.find("sar",0) == 0)
         modify_eflags_helper(op, REG_32, ir, 2, (Mod_Func_0 *)mod_eflags_shr);
-      else if ( op.find("shl",0) == 0)
+      else if ( op.find("shl",0) == 0 && op.find("shld") == string::npos )
         modify_eflags_helper(op, REG_32, ir, 2, (Mod_Func_0 *)mod_eflags_shl);
       else {
         cerr << "Warning! Flags not handled for " << op 
