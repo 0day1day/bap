@@ -62,6 +62,7 @@ type opcode =
   | Setcc of typ * operand * Ast.exp
   | Hlt
   | Cmps of typ
+  | Scas of typ
   | Stos of typ
   | Push of typ * operand
   | Pop of typ * operand
@@ -510,6 +511,21 @@ let rec to_ir addr next ss pref =
       rep_wrap ~check_zf:(List.hd pref) ~addr ~next stmts
     else
       unimplemented "unsupported flags in cmps"
+  | Scas(Reg bits as t) ->
+    let src1 = nv "src1" t and src2 = nv "src2" t and tmpres = nv "tmp" t in
+    let stmts =
+      move src1 (cast_low t (Var eax))
+      :: move src2 (op2e_s seg_es t ediaddr)
+      :: move tmpres (Var src1 -* Var src2)
+      :: string_incr t edi
+      :: set_flags_sub t (Var src1) (Var src2) (Var tmpres)
+    in
+    if pref = [] then
+      stmts
+    else if pref = [repz] || pref = [repnz] then
+      rep_wrap ~check_zf:(List.hd pref) ~addr ~next stmts
+    else
+      unimplemented "unsupported flags in cmps"      
   | Stos(Reg bits as t) ->
     let stmts = [store_s seg_es t edi_e (op2e t (o_eax));
 		 string_incr t edi]
@@ -863,6 +879,8 @@ let parse_instr g addr =
 	      (Mov(opsize, Oaddr(l32 addr), o_eax), na)
     | 0xa6 -> (Cmps r8, na)
     | 0xa7 -> (Cmps opsize, na)
+    | 0xae -> (Scas r8, na)
+    | 0xaf -> (Scas opsize, na)
     | 0xa9 -> let (i,na) = parse_immz opsize na in
 	      (Test(opsize, o_eax, i), na)
     | 0xaa -> (Stos r8, na)
