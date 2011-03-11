@@ -75,6 +75,14 @@ let output_ssa_ddg f p =
     close_out oc;
     p
 
+let output_c f p =
+  let oc = open_out f in
+  let ft = Format.formatter_of_out_channel oc in
+  let pp = new To_c.pp ft in 
+  pp#ast_program p;
+  close_out oc;
+  p
+
 let to_dsa p =
   let p,_ = Traces.to_dsa p in
   p 
@@ -138,6 +146,9 @@ let speclist =
      "Convert to the AST.")
   ::("-to-ssa", uadd(ToSsa),
      "Convert to SSA.")
+  :: ("-to-c", Arg.String(fun f -> add(TransformAst(output_c f))), 
+      "<file> Output C to file."
+     )
   ::("-ast-chop", 
       Arg.Tuple 
         (let srcbb = ref 0 and srcn = ref 0 
