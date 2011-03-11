@@ -484,16 +484,21 @@ let rec to_ir addr next ss pref =
         move pf (ifzero pf_e (compute_pf s e_dst));
         move af (ifzero af_e (Unknown ("AF undefined after shift", r1)))
       ]
-  | Bt(t, offset, base) ->
-    let basee = op2e t base in
-    let offsete = op2e t offset in
-    let coffsete = match base with
-      | Oreg _ -> offsete &* (it ((Arithmetic.bits_of_width t)-1) t) (* shift modulo size of the base operand *)
-      | Oaddr _ -> offsete (* don't need to cast for memory *)
-      | Oimm _ -> failwith "Immediate bases not allowed"
-    in
+  | Bt(t, bitoffset, bitbase) ->
+      let offset = op2e t bitoffset in
+      let value, shift = match bitbase with
+        | Oreg i ->
+            let reg = op2e t bitbase in
+            let shift = offset &* it (Arithmetic.bits_of_width t - 1) t in
+            reg, shift
+        | Oaddr a ->
+            let byte = load r8 (a +* (offset >>* (it 3 t))) in
+            let shift = (cast_low r8 offset) &* (it 7 r8) in
+            byte, shift
+        | Oimm _ -> failwith "Immediate bases not allowed"
+      in
       [
-        move cf (cast_low r1 (basee >>* coffsete));
+        move cf (cast_low r1 (value >>* shift));
 	move oF (Unknown ("OF undefined after bt", r1));
 	move sf (Unknown ("SF undefined after bt", r1));
 	move af (Unknown ("AF undefined after bt", r1));
@@ -992,8 +997,9 @@ let parse_instr g addr =
       | 0x95 -> let r, rm, na = parse_modrm r8 na in
 		assert (opsize = r32);  (* unclear what happens otherwise *)
 		(Setcc(r8, rm, cc_to_exp b2), na)
-      | 0xa3 | 0xb4 ->
+      | 0xa3 | 0xba ->
           let (r, rm, na) = parse_modrm opsize na in
+          let r, na = if b2 = 0xba then parse_imm8 na else r, na in
           (Bt(opsize, r, rm), na)
       | 0xa4 ->
 	(* shld *)
