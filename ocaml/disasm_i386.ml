@@ -403,7 +403,8 @@ let rec to_ir addr next ss pref =
       if pref = [] then
 	stmts
       else if pref = [repz] || pref = [repnz] then
-	rep_wrap ~check_zf:(List.hd pref) ~addr ~next stmts
+        (* movs has only rep instruction others just considered to be rep *)
+	rep_wrap ~addr ~next stmts
       else
 	unimplemented "unsupported prefix for movs"
   | Movzx(t, dst, ts, src) when pref = [] ->
@@ -495,16 +496,16 @@ let rec to_ir addr next ss pref =
         move af (ifzero af_e (Unknown ("AF undefined after shift", r1)))
       ]
   | Bt(t, reg, off) ->
-      let value = nv "t3" r8 in
-      let offset = match off with
-        | Oreg i -> op2e t off
-        | Oaddr a -> a
-        | _ -> failwith "impossible"
+      let offset = op2e t off in
+      let bits = function
+        | Reg 8 -> 0x7
+        | Reg 16 -> 0xf
+        | Reg 32 -> 0x1f
+        | _ -> failwith "invalid bitlength"
       in
-      let bitindex = op2e t reg in
+      let bitindex = (op2e t reg) &* it (bits t) t in
       [
-        move value (load r8 (offset +* (bitindex >>* (it 3 t))));
-        move cf (cast_low r1 ((Var value) >>* ((cast_low r8 bitindex) &* (it 7 r8))))
+        move cf (cast_low r1 (offset >>* bitindex));
       ]
   | Hlt ->
     [Jmp(Lab "General_protection fault", [])]
