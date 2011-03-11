@@ -57,6 +57,7 @@ type opcode =
   | Call of operand * int64 (* int64 is RA *)
   | Shift of binop_type * typ * operand * operand
   | Shiftd of binop_type * typ * operand * operand * operand
+  | Bt of typ * operand * operand
   | Jump of operand
   | Jcc of operand * Ast.exp
   | Setcc of typ * operand * Ast.exp
@@ -493,6 +494,18 @@ let rec to_ir addr next ss pref =
         move pf (ifzero pf_e (compute_pf s e_dst));
         move af (ifzero af_e (Unknown ("AF undefined after shift", r1)))
       ]
+  | Bt(t, reg, off) ->
+      let value = nv "t3" r8 in
+      let offset = match off with
+        | Oreg i -> op2e t off
+        | Oaddr a -> a
+        | _ -> failwith "impossible"
+      in
+      let bitindex = op2e t reg in
+      [
+        move value (load r8 (offset +* (bitindex >>* (it 3 t))));
+        move cf (cast_low r1 ((Var value) >>* ((cast_low r8 bitindex) &* (it 7 r8))))
+      ]
   | Hlt ->
     [Jmp(Lab "General_protection fault", [])]
   | Cmps(Reg bits as t) ->
@@ -525,7 +538,7 @@ let rec to_ir addr next ss pref =
     else if pref = [repz] || pref = [repnz] then
       rep_wrap ~check_zf:(List.hd pref) ~addr ~next stmts
     else
-      unimplemented "unsupported flags in cmps"      
+      unimplemented "unsupported flags in cmps"
   | Stos(Reg bits as t) ->
     let stmts = [store_s seg_es t edi_e (op2e t (o_eax));
 		 string_incr t edi]
@@ -971,11 +984,12 @@ let parse_instr g addr =
     | 0x0f -> (
       let b2 = Char.code (g na) and na = s na in
       match b2 with (* Table A-3 *)
-      | 0x6f | 0x7f when pref = [0x66] -> (
-	let r, rm, na = parse_modrm32 na in
-	let s,d = if b2 = 0x6f then rm, r else r, rm in
-	(Movdqa(d,s), na)
-      )
+      | 0x6f | 0x7f when pref = [0x66] ->
+            (
+	      let r, rm, na = parse_modrm32 na in
+	      let s,d = if b2 = 0x6f then rm, r else r, rm in
+	        (Movdqa(d,s), na)
+            )
       | 0x80 | 0x81 | 0x82 | 0x83 | 0x84 | 0x85 | 0x86 | 0x87 | 0x88 | 0x89
       | 0x8c | 0x8d | 0x8e
       | 0x8f ->	let (i,na) = parse_disp32 na in
@@ -985,6 +999,9 @@ let parse_instr g addr =
       | 0x95 -> let r, rm, na = parse_modrm r8 na in
 		assert (opsize = r32);  (* unclear what happens otherwise *)
 		(Setcc(r8, rm, cc_to_exp b2), na)
+      | 0xa3 | 0xb4 ->
+          let (r, rm, na) = parse_modrm opsize na in
+          (Bt(opsize, r, rm), na)
       | 0xa4 ->
 	(* shld *)
         let (r, rm, na) = parse_modrm opsize na in
@@ -1034,5 +1051,3 @@ let disasm_instr g addr =
   let ir = ToIR.to_ir addr na ss pref op in
   let asm = try Some(ToStr.to_string pref op) with Failure _ -> None in
   (ToIR.add_labels ?asm addr ir, na)
-
-
