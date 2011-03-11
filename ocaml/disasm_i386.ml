@@ -230,6 +230,7 @@ let ite t b e1 e2 = (* FIXME: were we going to add a native if-then-else thing? 
 
 let l32 i = Int(Arithmetic.to64 (i,r32), r32)
 let l16 i = Int(Arithmetic.to64 (i,r16), r16)
+let lt i t = Int(Arithmetic.to64 (i,t), t)
 
 let i32 i = Int(Int64.of_int i, r32)
 let it i t = Int(Int64.of_int i, t)
@@ -246,35 +247,12 @@ let bits2reg32= function
   | 7 -> edi
   | _ -> failwith "bits2reg32 takes 3 bits"
 
-(* 16 bit regs table *)
-and bits2reg16 = function
-  | 0 -> cast_low r16 ((Var ebx) +* (Var esi))
-  | 1 -> cast_low r16 ((Var ebx) +* (Var edi))
-  | 2 -> cast_low r16 ((Var ebp) +* (Var esi))
-  | 3 -> cast_low r16 ((Var ebp) +* (Var edi))
-  | 4 -> cast_low r16 (Var esi)
-  | 5 -> cast_low r16 (Var edi)
-  | 6 -> cast_low r16 (Var ebp)
-  | 7 -> cast_low r16 (Var ebx)
-  | _ -> failwith "bits2reg16 takes only 0-7"
-
-(*
-let bits2reg8= function
-  | 0 -> al
-  | 1 -> cl
-  | 2 -> dl
-  | 3 -> bl
-  | 4 -> ah
-  | 5 -> ch
-  | 6 -> dh
-  | 7 -> bh
-*)
-
 and reg2bits r = Util.list_firstindex [eax; ecx; edx; ebx; esp; ebp; esi; edi] ((==)r)
 
 let bits2reg32e b = Var(bits2reg32 b)
 
-let bits2reg16e b = cast_low r16 (bits2reg32e b)
+let bits2reg16e b =
+  cast_low r16 (bits2reg32e b)
 
 let bits2reg8e b =
   if b < 4 then
@@ -282,12 +260,25 @@ let bits2reg8e b =
   else
     cast_high r8 (cast_low r16 (bits2reg32e (b land 3)))
 
-
 let bits2xmm b = xmms.(b)
 
 let reg2xmm r =
   bits2xmm (reg2bits r)
 
+(* effective addresses for 16-bit addressing *)
+let eaddr16 = function
+  (* R/M byte *)
+  | 0 -> (Var ebx) +* (Var esi)
+  | 1 -> (Var ebx) +* (Var edi)
+  | 2 -> (Var ebp) +* (Var esi)
+  | 3 -> (Var ebp) +* (Var edi)
+  | 4 -> Var esi
+  | 5 -> Var edi
+  | 6 -> Var ebp
+  | 7 -> Var ebx
+  | _ -> failwith "eaddr16 takes only 0-7"
+
+let eaddr16e b = cast_low r16 (eaddr16 b)
 
 module ToIR = struct
 
@@ -389,9 +380,7 @@ let rec to_ir addr next ss pref =
      move esp (esp_e +* (i32 4));
      Jmp(Var t, [StrAttr "ret"])
     ]
-  | Mov(t, dst,src) when pref = [] ->
-    [assn t dst (op2e t src)]
-  | Mov(t, dst,src) when pref = [pref_addrsize] ->
+  | Mov(t, dst,src) when pref = [] || pref = [pref_addrsize] ->
     [assn t dst (op2e t src)]
   | Movs(Reg bits as t) ->
       let stmts =
@@ -495,17 +484,20 @@ let rec to_ir addr next ss pref =
         move pf (ifzero pf_e (compute_pf s e_dst));
         move af (ifzero af_e (Unknown ("AF undefined after shift", r1)))
       ]
-  | Bt(t, reg, off) ->
-      let offset = op2e t off in
-      let bits = function
-        | Reg 8 -> 0x7
-        | Reg 16 -> 0xf
-        | Reg 32 -> 0x1f
-        | _ -> failwith "invalid bitlength"
-      in
-      let bitindex = (op2e t reg) &* it (bits t) t in
+  | Bt(t, offset, base) ->
+    let basee = op2e t base in
+    let offsete = op2e t offset in
+    let coffsete = match base with
+      | Oreg _ -> offsete &* (it ((Arithmetic.bits_of_width t)-1) t) (* shift modulo size of the base operand *)
+      | Oaddr _ -> offsete (* don't need to cast for memory *)
+      | Oimm _ -> failwith "Immediate bases not allowed"
+    in
       [
-        move cf (cast_low r1 (offset >>* bitindex));
+        move cf (cast_low r1 (basee >>* coffsete));
+	move oF (Unknown ("OF undefined after bt", r1));
+	move sf (Unknown ("SF undefined after bt", r1));
+	move af (Unknown ("AF undefined after bt", r1));
+	move pf (Unknown ("PF undefined after bt", r1))
       ]
   | Hlt ->
     [Jmp(Lab "General_protection fault", [])]
@@ -539,7 +531,7 @@ let rec to_ir addr next ss pref =
     else if pref = [repz] || pref = [repnz] then
       rep_wrap ~check_zf:(List.hd pref) ~addr ~next stmts
     else
-      unimplemented "unsupported flags in cmps"
+      unimplemented "unsupported flags in scas"
   | Stos(Reg bits as t) ->
     let stmts = [store_s seg_es t edi_e (op2e t (o_eax));
 		 string_incr t edi]
@@ -772,11 +764,11 @@ let parse_instr g addr =
     match m with (* MOD *)
     | 0 -> (match rm with
       | 6 -> let (disp, na) = parse_disp16 (s a) in (r, Oaddr(l16 disp), na)
-      | n when n < 8 -> (r, Oaddr(bits2reg16 n), s a)
+      | n when n < 8 -> (r, Oaddr(eaddr16 rm), s a)
       | _ -> failwith "Impossible"
     )
     | 1 | 2 ->
-      let (base, na) = bits2reg16 rm, na in
+      let (base, na) = eaddr16 rm, na in
       let (disp, na) = if m = 1 then parse_disp8 na else (*2*) parse_disp16 na in
       (r, Oaddr(base +* l16 disp), na)
     | 3 -> (r, Oreg rm, s a)
@@ -832,10 +824,11 @@ let parse_instr g addr =
   in
   let parse_immv = parse_immz in (* until we do amd64 *)
   let get_opcode pref opsize a =
-    let parse_disp32, parse_modrm32, parse_modrm32ext, opsize =
+    (* We should rename these, since the 32 at the end is misleading. *)
+    let parse_disp32, parse_modrm32, parse_modrm32ext =
       if List.mem pref_addrsize pref then
-        parse_disp16, parse_modrm16, parse_modrm16ext, r16
-      else parse_disp32, parse_modrm32, parse_modrm32ext, opsize
+        parse_disp16, parse_modrm16, parse_modrm16ext
+      else parse_disp32, parse_modrm32, parse_modrm32ext
     in
     let b1 = Char.code (g a)
     and na = s a in
@@ -886,9 +879,8 @@ let parse_instr g addr =
 	      )
     | 0x90 -> (Nop, na)
     | 0xa1 ->
-        let li = if List.mem pref_addrsize pref then l16 else l32 in
-        let (addr, na) = parse_disp32 na in
-          (Mov(opsize, o_eax, Oaddr(li addr)), na)
+      let (addr, na) = parse_disp32 na in
+      (Mov(opsize, o_eax, Oaddr(l32 addr)), na)
     | 0xa3 -> let (addr, na) = parse_disp32 na in
 	      (Mov(opsize, Oaddr(l32 addr), o_eax), na)
     | 0xa6 -> (Cmps r8, na)
