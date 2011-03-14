@@ -337,10 +337,11 @@ let rep_wrap ?check_zf ~addr ~next stmts =
       CJmp(zf_e, l32 next, l32 addr, [])
     | _ -> failwith "invalid value for ?check_zf"
   in
-  cjmp (ecx_e =* l32 0L) (l32 next)
-  @ move ecx (ecx_e -* i32 1)
-  :: stmts
-  @ [endstmt]
+    cjmp (ecx_e =* l32 0L) (l32 next)
+    @ stmts
+    @ move ecx (ecx_e -* i32 1)
+    :: cjmp (ecx_e =* l32 0L) (l32 next)
+    @ [endstmt]
 
 let reta = [StrAttr "ret"]
 and calla = [StrAttr "call"]
