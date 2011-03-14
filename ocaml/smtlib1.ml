@@ -1,5 +1,4 @@
-(** Output to SMTLIB1 format
-*)
+(** Output to SMTLIB1 format *)
 open Type
 open Ast
 open Typecheck
@@ -72,19 +71,32 @@ object (self)
     | Array _ -> failwith "SMTLIB1 only supports Arrays with register indices and elements"
     | TMem _ ->	failwith "TMem unsupported by SMTLIB1"
 
-
   method decl (Var.V(_,_,t) as v) =
     self#extend v (var2s v);
     pp ":extrafuns (("; self#var v; space (); self#typ t; pp "))"; force_newline();
 
-
-
+  (** Evaluate an expression to a bitvector *)
   method ast_exp e =
+    let bool_to_bv e =
+      pp "(ite";
+      space ();
+      self#ast_exp_bool e;
+      space ();
+      pp "bit1";
+      space ();
+      pp "bit0)"
+    in
     opn 0;
+    let t = Typecheck.infer_ast e in
     (match e with
+       (* First, send stuff to boolean printer *)
+     | BinOp((AND|OR|XOR), _, _) when t = reg_1 ->
+	 bool_to_bv e
+     (* | Let(_, ep, _) when Typecheck.infer_ast ep = reg_1 -> *)
+     (* 	 bool_to_bv e *)
      | Int((i, Reg t) as p) ->
 	 let maskedval = Arithmetic.to64 p in
-	 pp "bv"; pp (Int64.to_string maskedval); pp "["; pi t; pp "]";
+	 pp "bv"; printf "%Lu" maskedval; pp "["; pi t; pp "]";
      | Int _ -> failwith "Ints may only have register types"
      | Var v ->
 	 self#var v
@@ -95,60 +107,39 @@ object (self)
 	 );
 	 self#ast_exp o;
 	 pc ')'
-     (* 	   (\* Eww, the << operator in stp wants a constant int on the right, *)
-     (* 	      rather than a bitvector *\) *)
-     (* | BinOp((LSHIFT|RSHIFT|ARSHIFT), e1, Int(i,_)) when i = 0L -> *)
-     (* 	 self#ast_exp e1 *)
-     (* | BinOp(LSHIFT, e1, Int(i,_)) -> *)
-     (* 	 let  t = infer_ast ~check:false e1 in *)
-     (* 	 pp "(("; self#ast_exp e1; pp" << "; pp (Int64.to_string i); pp ")["; *)
-     (* 	 pp (string_of_int(bits_of_width t - 1)); pp":0])" *)
-     (* | BinOp(RSHIFT, e1, Int(i,_)) -> (\* Same sort of deal :( *\) *)
-     (* 	 pc '('; self#ast_exp e1; pp " >> "; pp(Int64.to_string i); pc ')' *)
-     (* | BinOp(ARSHIFT, e1, Int(i,_)) -> (\* Same sort of deal :( *\) *)
-     (* 	 let t = infer_ast ~check:false e1 in *)
-     (* 	 let bits = string_of_int (bits_of_width t) in *)
-     (* 	 let gethigh = Int64.sub (Int64.of_int (bits_of_width t)) i in *)
-     (* 	 let gethigh = Int64.sub gethigh 1L in *)
-     (* 	 if gethigh >= 0L then ( *)
-     (* 	   pp "SX(("; self#ast_exp e1;  *)
-     (* 	   pp " >> "; pp (Int64.to_string i); *)
-     (* 	   pp ")["; pp (Int64.to_string gethigh); pp ":0], "; pp bits; pc ')' *)
-     (* 	 ) else ( *)
-     (* 	   let b = Int64.sub (Int64.of_int (bits_of_width t)) 1L in *)
-     (* 	   pp "SX("; self#ast_exp e1; pp "["; pp (Int64.to_string b); *)
-     (* 	   pp ":"; pp (Int64.to_string b); pp "], "; pp bits; pc ')'; *)
-     (* 	 ) *)
-     | BinOp(NEQ, e1, e2) ->
-	 (* Rewrite NEQ in terms of EQ *)
-       let newe = UnOp(NOT, BinOp(EQ, e1, e2)) in
-       self#ast_exp newe
-     | BinOp((EQ|LT|LE|SLT|SLE) as op, e1, e2) ->
-       (* These are predicates, which return boolean values. We need
-	  to convert these to one-bit bitvectors. *)
-       let f = match op with
-	 | EQ -> "="
-	 | LT -> "bvult"
-	 | LE -> "bvule"
-	 | SLT -> "bvslt"
-	 | SLE -> "bvsle"
-	 | _ -> assert false
-       in
-       pp "(ite";
-       space();
-       pp "(";
-       pp f;
-       space ();
-       self#ast_exp e1;
-       space ();
-       self#ast_exp e2;
-       pp ")";
-       space ();
-       pp "bv1[1]";
-       space ();
-       pp "bv0[1]";
-       cut ();
-       pp ")"
+     | BinOp((NEQ|EQ|LT|LE|SLT|SLE), _, _) ->
+	 bool_to_bv e
+	 
+     (* | BinOp(NEQ, e1, e2) -> *)
+     (* 	 (\* Rewrite NEQ in terms of EQ *\) *)
+     (*   let newe = UnOp(NOT, BinOp(EQ, e1, e2)) in *)
+     (*   self#ast_exp newe *)
+     (* | BinOp((EQ|LT|LE|SLT|SLE) as op, e1, e2) -> *)
+     (*   (\* These are predicates, which return boolean values. We need *)
+     (* 	  to convert these to one-bit bitvectors. *\) *)
+     (*   let f = match op with *)
+     (* 	 | EQ -> "=" *)
+     (* 	 | LT -> "bvult" *)
+     (* 	 | LE -> "bvule" *)
+     (* 	 | SLT -> "bvslt" *)
+     (* 	 | SLE -> "bvsle" *)
+     (* 	 | _ -> assert false *)
+     (*   in *)
+     (*   pp "(ite"; *)
+     (*   space(); *)
+     (*   pp "("; *)
+     (*   pp f; *)
+     (*   space (); *)
+     (*   self#ast_exp e1; *)
+     (*   space (); *)
+     (*   self#ast_exp e2; *)
+     (*   pp ")"; *)
+     (*   space (); *)
+     (*   pp "bv1[1]"; *)
+     (*   space (); *)
+     (*   pp "bv0[1]"; *)
+     (*   cut (); *)
+     (*   pp ")" *)
      | BinOp((PLUS|MINUS|TIMES|DIVIDE|SDIVIDE|MOD|SMOD|AND|OR|XOR|LSHIFT|RSHIFT|ARSHIFT) as bop, e1, e2) as e ->
 	 let t = infer_ast ~check:false e1 in
 	 let t' = infer_ast ~check:false e2 in
@@ -236,6 +227,201 @@ object (self)
     cut();
     cls()
 
+  (** Evaluate an expression to a boolean *)
+  method ast_exp_bool e =
+    let t = Typecheck.infer_ast e in
+    assert (t = reg_1);
+    opn 0;
+    (match e with
+     | Int((i, Reg t) as p) when t = 1 ->
+	 let maskedval = Arithmetic.to64 p in
+	 (match maskedval with
+	 | 0L -> pp "false"
+	 | 1L -> pp "true"
+	 | _ -> failwith "ast_exp_bool")
+     | Int((i, Reg t)) -> failwith "ast_exp_bool only takes reg_1 expressions"
+     | Int _ -> failwith "Ints may only have register types"
+     | UnOp((NEG|NOT), o) ->
+	 (* neg and not are the same for one bit! *)
+	 pp "(not";
+	 space ();
+	 self#ast_exp_bool o;
+	 cut ();
+	 pc ')'
+     | BinOp(NEQ, e1, e2) ->
+	 (* Rewrite NEQ in terms of EQ *)
+       let newe = UnOp(NOT, BinOp(EQ, e1, e2)) in
+       self#ast_exp_bool newe
+     | BinOp((EQ|LT|LE|SLT|SLE) as op, e1, e2) ->
+       (* These are predicates, which return boolean values. We need
+	  to convert these to one-bit bitvectors. *)
+       let f = match op with
+	 | EQ -> "="
+	 | LT -> "bvult"
+	 | LE -> "bvule"
+	 | SLT -> "bvslt"
+	 | SLE -> "bvsle"
+	 | _ -> assert false
+       in
+       pp "(";
+       pp f;
+       space ();
+       self#ast_exp e1;
+       space ();
+       self#ast_exp e2;
+       pp ")";
+       cut ();
+     | BinOp((AND|OR|XOR) as bop, e1, e2) ->
+    	 let t = infer_ast ~check:false e1 in
+    	 let t' = infer_ast ~check:false e2 in
+    	 if t <> t' then
+    	   wprintf "Type mismatch: %s" (Pp.ast_exp_to_string e);
+    	 assert (t = t') ;
+    	 let fname = match bop with
+    	   | AND -> "and"
+    	   | OR -> "or"
+    	   | XOR -> "xor"
+	   | _ -> assert false
+    	 in
+    	 pc '('; pp fname; space (); self#ast_exp_bool e1; space (); self#ast_exp_bool e2; pc ')';
+	 
+    (*  | Var v -> *)
+    (* 	 self#var v *)
+    (*  | UnOp(uop, o) -> *)
+    (* 	 (match uop with *)
+    (* 	  | NEG -> pp "(bvneg"; space (); *)
+    (* 	  | NOT -> pp "(bvnot"; space (); *)
+    (* 	 ); *)
+    (* 	 self#ast_exp o; *)
+    (* 	 pc ')' *)
+    (*  | BinOp(NEQ, e1, e2) -> *)
+    (* 	 (\* Rewrite NEQ in terms of EQ *\) *)
+    (*    let newe = UnOp(NOT, BinOp(EQ, e1, e2)) in *)
+    (*    self#ast_exp newe *)
+    (*  | BinOp((EQ|LT|LE|SLT|SLE) as op, e1, e2) -> *)
+    (*    (\* These are predicates, which return boolean values. We need *)
+    (* 	  to convert these to one-bit bitvectors. *\) *)
+    (*    let f = match op with *)
+    (* 	 | EQ -> "=" *)
+    (* 	 | LT -> "bvult" *)
+    (* 	 | LE -> "bvule" *)
+    (* 	 | SLT -> "bvslt" *)
+    (* 	 | SLE -> "bvsle" *)
+    (* 	 | _ -> assert false *)
+    (*    in *)
+    (*    pp "(ite"; *)
+    (*    space(); *)
+    (*    pp "("; *)
+    (*    pp f; *)
+    (*    space (); *)
+    (*    self#ast_exp e1; *)
+    (*    space (); *)
+    (*    self#ast_exp e2; *)
+    (*    pp ")"; *)
+    (*    space (); *)
+    (*    pp "bv1[1]"; *)
+    (*    space (); *)
+    (*    pp "bv0[1]"; *)
+    (*    cut (); *)
+    (*    pp ")" *)
+    (*  | BinOp((PLUS|MINUS|TIMES|DIVIDE|SDIVIDE|MOD|SMOD|AND|OR|XOR|LSHIFT|RSHIFT|ARSHIFT) as bop, e1, e2) as e -> *)
+    (* 	 let t = infer_ast ~check:false e1 in *)
+    (* 	 let t' = infer_ast ~check:false e2 in *)
+    (* 	 if t <> t' then *)
+    (* 	   wprintf "Type mismatch: %s" (Pp.ast_exp_to_string e); *)
+    (* 	 assert (t = t') ; *)
+    (* 	 let fname = match bop with *)
+    (* 	   (\* | EQ -> "bvcomp" *\) (\* bvcomp doesn't work on memories! *\) *)
+    (* 	   | PLUS -> "bvadd" *)
+    (* 	   | MINUS -> "bvsub" *)
+    (* 	   | TIMES -> "bvmul" *)
+    (* 	   | DIVIDE -> "bvudiv" *)
+    (* 	   | SDIVIDE -> "bvsdiv" *)
+    (* 	   | MOD -> "bvurem" *)
+    (* 	   (\* | SMOD -> "bvsrem" *\) *)
+    (* 	   | SMOD -> failwith "SMOD goes to bvsrem or bvsmod?" *)
+    (* 	   | AND -> "bvand" *)
+    (* 	   | OR -> "bvor" *)
+    (* 	   | XOR -> "bvxor" *)
+    (* 	   | NEQ|EQ|LE|LT|SLT|SLE -> assert false *)
+    (* 	   | LSHIFT -> "bvshl" *)
+    (* 	   | RSHIFT -> "bvlshr" *)
+    (* 	   | ARSHIFT -> "bvashr" *)
+    (* 	 in *)
+    (* 	 pc '('; pp fname; space (); self#ast_exp e1; space (); self#ast_exp e2; pc ')'; *)
+    (*  | Cast((CAST_LOW|CAST_HIGH|CAST_UNSIGNED|CAST_SIGNED) as ct,t, e1) -> *)
+    (* 	  let t1 = infer_ast ~check:false e1 in *)
+    (* 	  let (bitsnew, bitsold) = (bits_of_width t, bits_of_width t1) in *)
+    (* 	  let delta = bitsnew - bitsold in *)
+    (* 	  (match ct with *)
+    (* 	    | CAST_LOW | CAST_HIGH -> assert (delta <= 0); *)
+    (* 	    | CAST_UNSIGNED | CAST_SIGNED -> assert (delta >= 0)); *)
+    (* 	  let (pre,post) = match ct with *)
+    (* 	    | _ when bitsnew = bitsold -> ("","") *)
+    (* 	    | CAST_LOW      -> ("(extract["^string_of_int(bitsnew-1)^":0]", ")") *)
+    (* 	    | CAST_HIGH     -> ("(extract["^string_of_int(bitsold-1)^":"^string_of_int(bitsold-bitsnew)^"]", ")") *)
+    (* 	    | CAST_UNSIGNED -> ("(zero_extend["^string_of_int(delta)^"]", ")") *)
+    (* 	    | CAST_SIGNED -> ("(sign_extend["^string_of_int(delta)^"]", ")") *)
+    (* 	  in *)
+    (* 	  pp pre; *)
+    (* 	  space (); *)
+    (* 	  self#ast_exp e1; *)
+    (* 	  cut (); *)
+    (* 	  pp post *)
+    (*   | Unknown(s,t) -> *)
+    (* 	  pp "unknown_"; pi unknown_counter; pp" ;"; pp s; force_newline(); *)
+    (* 	  unknown_counter <- unknown_counter + 1; *)
+    (*   | Lab lab -> *)
+    (* 	  failwith ("SMTLIB: don't know how to handle label names: " *)
+    (* 		      ^ (Pp.ast_exp_to_string e)) *)
+
+      (* | Let(v, e1, e2) when Typecheck.infer_ast e1 = reg_1 -> *)
+      (* 	  pp "(flet ("; *)
+      (* 	  (\* v isn't allowed to shadow anything. also, smtlib requires it be prefixed with ? *\) *)
+      (* 	  let s = "$" ^ var2s v ^"_"^ string_of_int let_counter in *)
+      (* 	  let_counter <- succ let_counter; *)
+      (* 	  pp s; *)
+      (* 	  pc ' '; *)
+      (* 	  self#ast_exp_bool e1; *)
+      (* 	  pc ')'; *)
+      (* 	  space (); *)
+      (* 	  self#extend v s; *)
+      (* 	  self#ast_exp_bool e2; *)
+      (* 	  self#unextend v; *)
+      (* 	  cut (); *)
+      (* 	  pc ')' *)
+
+
+    (*   | Load(arr,idx,endian, t) -> *)
+    (* 	  (\* FIXME check arr is array and not mem *\) *)
+    (* 	  pp "(select "; *)
+    (* 	  self#ast_exp arr; *)
+    (* 	  space (); *)
+    (* 	  self#ast_exp idx; *)
+    (* 	  cut (); *)
+    (* 	  pc ')' *)
+    (*   | Store(arr,idx,vl, endian, t) -> *)
+    (* 	  (\* FIXME check arr is array and not mem *\) *)
+    (* 	  pp "(store "; *)
+    (* 	  self#ast_exp arr; *)
+    (* 	  space (); *)
+    (* 	  self#ast_exp idx; *)
+    (* 	  space (); *)
+    (* 	  self#ast_exp vl; *)
+    (* 	  cut (); *)
+    (* 	  pc ')' *)
+     | o ->
+	 (* For other expressions, we'll print as a BV, and then convert back to bool. *)
+	 pp "(=";
+	 space ();
+	 pp "bv1[1]";
+	 space ();
+	 self#ast_exp o;
+	 pp ")"
+    );
+    cut();
+    cls()
+
 
 
   method forall = function
@@ -303,15 +489,11 @@ object (self)
       force_newline();
     );
     opn 1;
-    pp ":assumption (=";
+    pp ":assumption";
     space();
     self#forall foralls;
-    pp "bv1[1] ";
-    force_newline();
-    self#ast_exp e;
-    force_newline();
+    self#ast_exp_bool e;
     cut();
-    pp ")";
     cls();
     force_newline ();
     self#formula ();
@@ -328,12 +510,25 @@ object (self)
     pp ":formula (";
     self#exists exists;
     self#forall foralls;
-    pp "(= bv1[1] ";
-    force_newline();
-    self#ast_exp e;
-    force_newline();
-    pp "));";
+    self#ast_exp_bool e;
+    pp ");";
     self#close_benchmark ()
+
+  (* (\** Is e a valid expression (always true)? *\) *)
+  (* method valid_ast_exp ?(exists=[]) ?(foralls=[]) e = *)
+  (*   self#open_benchmark (); *)
+  (*   self#declare_new_freevars e; *)
+  (*   force_newline(); *)
+  (*   pp ":formula ("; *)
+  (*   self#exists exists; *)
+  (*   self#forall foralls; *)
+  (*   pp "(= bv1[1] "; *)
+  (*   force_newline(); *)
+  (*   self#ast_exp e; *)
+  (*   force_newline(); *)
+  (*   pp "));"; *)
+  (*   self#close_benchmark () *)
+
 
   method formula () =
     pp ":formula true";
