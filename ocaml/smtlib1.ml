@@ -27,7 +27,26 @@ class pp ?suffix:(s="") ft =
     name^"_"^(string_of_int num)^s
   in
 
-
+  let opflatten e =
+    let rec oh bop e1 e2 =
+      let l1 = match e1 with
+	| BinOp(bop', e'1, e'2) when bop' = bop ->
+	    oh bop e'1 e'2
+	| _ -> [e1]
+      in
+      let l2 = match e2 with
+	| BinOp(bop', e'1, e'2) when bop' = bop ->
+	    oh bop e'1 e'2
+	| _ -> [e2]
+      in
+      Util.fast_append l1 l2
+    in
+    match e with
+    | BinOp(bop, e1, e2) ->
+	oh bop e1 e2
+    | _ -> failwith "opflatten expects a binop"
+  in
+  
 object (self)
   inherit Formulap.fpp
   val used_vars : (string,Var.t) Hashtbl.t = Hashtbl.create 57
@@ -266,7 +285,6 @@ object (self)
 	 (* neg and not are the same for one bit! *)
 	 pp "(not";
 	 space ();
-	 Printf.printf "wtf! %s\n" (Pp.ast_exp_to_string o);
 	 self#ast_exp_bool o;
 	 cut ();
 	 pc ')'
@@ -311,12 +329,17 @@ object (self)
     	   | XOR -> "xor"
 	   | _ -> assert false
     	 in
-    	 pc '('; pp fname; space (); self#ast_exp_bool e1; space (); self#ast_exp_bool e2; pc ')';
-     (* | Cast((CAST_LOW|CAST_HIGH|CAST_UNSIGNED|CAST_SIGNED),t, e1) -> *)
-     (* 	  let t1 = infer_ast ~check:false e1 in *)
-     (* 	  let (bitsnew, bitsold) = (bits_of_width t, bits_of_width t1) in *)
-     (* 	  let delta = bitsnew - bitsold in *)
-     (* 	  if delta = 0 then self#ast_exp_bool e1 else bv_to_bool e *)
+	 let oplist = opflatten e in
+    	 (* pc '('; pp fname; space (); self#ast_exp_bool e1; space (); self#ast_exp_bool e2; pc ')'; *)
+    	 pc '('; pp fname; 
+	 List.iter
+	   (fun e -> space (); self#ast_exp_bool e) oplist;
+	 pc ')';
+     | Cast((CAST_LOW|CAST_HIGH|CAST_UNSIGNED|CAST_SIGNED),t, e1) ->
+     	  let t1 = infer_ast ~check:false e1 in
+     	  let (bitsnew, bitsold) = (bits_of_width t, bits_of_width t1) in
+     	  let delta = bitsnew - bitsold in
+     	  if delta = 0 then self#ast_exp_bool e1 else bv_to_bool e
      | Var v when snd (VH.find ctx v) = Bool ->
 	 let name,st = VH.find ctx v in
 	 pp name
