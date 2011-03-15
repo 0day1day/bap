@@ -10,6 +10,8 @@ open D
 
 module VH = Var.VarHash
 
+type sort = BitVec | Bool
+
 class pp ?suffix:(s="") ft =
   let pp = Format.pp_print_string ft
   and pc = Format.pp_print_char ft
@@ -29,7 +31,7 @@ class pp ?suffix:(s="") ft =
 object (self)
   inherit Formulap.fpp
   val used_vars : (string,Var.t) Hashtbl.t = Hashtbl.create 57
-  val ctx : string VH.t = VH.create 57
+  val ctx : (string*sort) VH.t = VH.create 57
     
   val mutable unknown_counter = 0;
 
@@ -38,24 +40,25 @@ object (self)
   method flush () =
     flush();
 
-  method extend v s =
+  method extend v s st =
     assert(not(Hashtbl.mem used_vars s));
     Hashtbl.add used_vars s v;
-    VH.add ctx v s
+    VH.add ctx v (s,st)
 
   method unextend v =
     VH.remove ctx v
 
   method var v =
-    try 
-      pp (VH.find ctx v)
-    with Not_found ->
-      let s = var2s v in
-      self#extend v s; (* FIXME: is this really what we want? *)
-      pp s
+    match (VH.find ctx v) with
+    | n,_ -> pp n
 
   method varname v =
-    VH.find ctx v
+    match VH.find ctx v with
+    | n,_ -> n
+
+  method varsort v =
+    match VH.find ctx v with
+    | _,st -> st
 
   method declare_new_freevars e =
     force_newline();
@@ -72,7 +75,11 @@ object (self)
     | TMem _ ->	failwith "TMem unsupported by SMTLIB1"
 
   method decl (Var.V(_,_,t) as v) =
-    self#extend v (var2s v);
+    let sort = match t with
+      | Reg 1 -> Bool (* Let's try making all 1-bit bvs bools for now *)
+      | _ -> BitVec
+    in
+    self#extend v (var2s v) sort;
     pp ":extrafuns (("; self#var v; space (); self#typ t; pp "))"; force_newline();
 
   (** Evaluate an expression to a bitvector *)
@@ -82,15 +89,18 @@ object (self)
       space ();
       self#ast_exp_bool e;
       space ();
-      pp "bit1";
+      self#ast_exp exp_true;
       space ();
-      pp "bit0)"
+      self#ast_exp exp_false;
+      pc ')'
     in
     opn 0;
     let t = Typecheck.infer_ast e in
     (match e with
        (* First, send stuff to boolean printer *)
-     | BinOp((AND|OR|XOR), _, _) when t = reg_1 ->
+     | BinOp((AND|OR|XOR), _, _) when t = Reg 1 ->
+	 bool_to_bv e
+     | UnOp _ when t = Reg 1 ->
 	 bool_to_bv e
      (* | Let(_, ep, _) when Typecheck.infer_ast ep = reg_1 -> *)
      (* 	 bool_to_bv e *)
@@ -99,7 +109,10 @@ object (self)
 	 pp "bv"; printf "%Lu" maskedval; pp "["; pi t; pp "]";
      | Int _ -> failwith "Ints may only have register types"
      | Var v ->
-	 self#var v
+	 let name,st = VH.find ctx v in
+	 (match st with 
+	 | BitVec -> pp name;
+	 | Bool -> bool_to_bv e)
      | UnOp(uop, o) ->
 	 (match uop with
 	  | NEG -> pp "(bvneg"; space ();
@@ -200,7 +213,7 @@ object (self)
 	  self#ast_exp e1;
 	  pc ')';
 	  space ();
-	  self#extend v s;
+	  self#extend v s BitVec;
 	  self#ast_exp e2;
 	  self#unextend v;
 	  cut ();
@@ -229,6 +242,14 @@ object (self)
 
   (** Evaluate an expression to a boolean *)
   method ast_exp_bool e =
+    let bv_to_bool e =
+      pp "(=";
+      space ();
+      pp "bv1[1]";
+      space ();
+      self#ast_exp e;
+      pp ")"
+    in
     let t = Typecheck.infer_ast e in
     assert (t = reg_1);
     opn 0;
@@ -245,6 +266,7 @@ object (self)
 	 (* neg and not are the same for one bit! *)
 	 pp "(not";
 	 space ();
+	 Printf.printf "wtf! %s\n" (Pp.ast_exp_to_string o);
 	 self#ast_exp_bool o;
 	 cut ();
 	 pc ')'
@@ -255,7 +277,11 @@ object (self)
      | BinOp((EQ|LT|LE|SLT|SLE) as op, e1, e2) ->
        (* These are predicates, which return boolean values. We need
 	  to convert these to one-bit bitvectors. *)
+       let t1 = Typecheck.infer_ast e1 in
+       let t2 = Typecheck.infer_ast e2 in
+       assert (t1 = t2);
        let f = match op with
+	 | EQ when t1 = reg_1 -> "iff" (* = only applies to terms... but booleans are formulas, not terms *)
 	 | EQ -> "="
 	 | LT -> "bvult"
 	 | LE -> "bvule"
@@ -263,12 +289,14 @@ object (self)
 	 | SLE -> "bvsle"
 	 | _ -> assert false
        in
+       let pf = if t1 = reg_1 then self#ast_exp_bool else self#ast_exp
+       in
        pp "(";
        pp f;
        space ();
-       self#ast_exp e1;
+       pf e1;
        space ();
-       self#ast_exp e2;
+       pf e2;
        pp ")";
        cut ();
      | BinOp((AND|OR|XOR) as bop, e1, e2) ->
@@ -284,6 +312,14 @@ object (self)
 	   | _ -> assert false
     	 in
     	 pc '('; pp fname; space (); self#ast_exp_bool e1; space (); self#ast_exp_bool e2; pc ')';
+     (* | Cast((CAST_LOW|CAST_HIGH|CAST_UNSIGNED|CAST_SIGNED),t, e1) -> *)
+     (* 	  let t1 = infer_ast ~check:false e1 in *)
+     (* 	  let (bitsnew, bitsold) = (bits_of_width t, bits_of_width t1) in *)
+     (* 	  let delta = bitsnew - bitsold in *)
+     (* 	  if delta = 0 then self#ast_exp_bool e1 else bv_to_bool e *)
+     | Var v when snd (VH.find ctx v) = Bool ->
+	 let name,st = VH.find ctx v in
+	 pp name
 	 
     (*  | Var v -> *)
     (* 	 self#var v *)
@@ -412,12 +448,7 @@ object (self)
     (* 	  pc ')' *)
      | o ->
 	 (* For other expressions, we'll print as a BV, and then convert back to bool. *)
-	 pp "(=";
-	 space ();
-	 pp "bv1[1]";
-	 space ();
-	 self#ast_exp o;
-	 pp ")"
+	 bv_to_bool o
     );
     cut();
     cls()
