@@ -222,11 +222,8 @@ let load_s s t a = match s with
   | None -> Load(mem_e, a, little_endian, t)
   | Some v -> Load(mem_e, Var v +* a, little_endian, t)
 
-let ite t b e1 e2 = (* FIXME: were we going to add a native if-then-else thing? *)
-  if t = r1 then
-    (b &* e1) |*  (exp_not b &* e2)
-  else
-    (Cast(CAST_SIGNED, t, b) &* e1) |*  (Cast(CAST_SIGNED, t, exp_not b) &* e2)
+let ite t b e1 e2 =
+  exp_ite ~t b e1 e2
 
 let l32 i = Int(Arithmetic.to64 (i,r32), r32)
 let l16 i = Int(Arithmetic.to64 (i,r16), r16)

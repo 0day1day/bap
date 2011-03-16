@@ -33,11 +33,33 @@ let cast_unsigned t = function
   | e ->
     Cast(CAST_UNSIGNED, t, e)
 
-let exp_ite b e1 e2 = (* FIXME: were we going to add a native if-then-else thing? *)
+let exp_ite ?t b e1 e2 =
+  (* FIXME: were we going to add a native if-then-else thing? *)
+  (* type inference shouldn't be needed when t is specified, but we're paranoid *)
   let tb = Typecheck.infer_ast b in
   let t1 = Typecheck.infer_ast e1 in
   let t2 = Typecheck.infer_ast e2 in
   assert (t1 = t2);
+  assert (tb = reg_1);
 
-  let littleb = if tb <> reg_1 then cast_low reg_1 b else b in
-  ((cast_signed t1 littleb) &* e1) |* ((cast_signed t1 (exp_not littleb)) &* e2) 
+  let t = match t with
+    | None -> t1
+    | Some t -> assert (t=t1); t
+  in
+  if t = reg_1 then
+    (b &* e1) |*  (exp_not b &* e2)
+  else
+    ((cast_signed t b) &* e1) |* ((cast_signed t (exp_not b)) &* e2) 
+
+
+let parse_ite = function
+  | BinOp(OR,
+	  BinOp(AND, Cast(CAST_SIGNED, _, b1), e1),
+	  BinOp(AND, Cast(CAST_SIGNED, _, UnOp(NOT, b2)), e2)
+  ) 
+  | BinOp(OR,
+	  BinOp(AND, b1, e1),
+	  BinOp(AND, UnOp(NOT, b2), e2)
+  ) when b1 = b2 && Typecheck.infer_ast ~check:false b1 = reg_1-> 
+    Some(b1, e1, e2)
+  | _ -> None
