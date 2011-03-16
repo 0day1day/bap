@@ -6,7 +6,7 @@ open Typecheck
 module D = Debug.Make(struct let name = "smtlib1" and default=`Debug end)
 open D
 
-
+exception No_rule
 
 module VH = Var.VarHash
 
@@ -46,7 +46,7 @@ class pp ?suffix:(s="") ft =
 	oh bop e1 e2
     | _ -> failwith "opflatten expects a binop"
   in
-  
+
 object (self)
   inherit Formulap.fpp
   val used_vars : (string,Var.t) Hashtbl.t = Hashtbl.create 57
@@ -55,6 +55,24 @@ object (self)
   val mutable unknown_counter = 0;
 
   val mutable let_counter = 0;
+
+  method bool_to_bv e =
+    pp "(ite";
+    space ();
+    self#ast_exp_bool_base e;
+    space ();
+    self#ast_exp_base exp_true;
+    space ();
+    self#ast_exp_base exp_false;
+    pc ')'
+
+  method bv_to_bool e =
+    pp "(=";
+    space ();
+    pp "bv1[1]";
+    space ();
+    self#ast_exp_base e;
+    pp ")"
 
   method flush () =
     flush();
@@ -70,6 +88,25 @@ object (self)
   method var v =
     match (VH.find ctx v) with
     | n,_ -> pp n
+
+  method letme v e1 e2 st =
+    let t1 = Typecheck.infer_ast e1 in
+    let cmd,c,pf,vst = match t1 with Reg 1 -> "flet","$",self#ast_exp_bool,Bool | _ -> "let","?",self#ast_exp,BitVec in
+    let pf2 = match st with Bool -> self#ast_exp_bool | BitVec -> self#ast_exp in
+    pp "("; pp cmd; pp " (";
+    (* v isn't allowed to shadow anything. also, smtlib requires it be prefixed with ? or $ *)
+    let s = c ^ var2s v ^"_"^ string_of_int let_counter in
+    let_counter <- succ let_counter;
+    pp s;
+    pc ' ';
+    pf e1;
+    pc ')';
+    space ();
+    self#extend v s vst;
+    pf2 e2;
+    self#unextend v;
+    cut ();
+    pc ')'
 
   method varname v =
     match VH.find ctx v with
@@ -101,28 +138,10 @@ object (self)
     self#extend v (var2s v) sort;
     pp ":extrafuns (("; self#var v; space (); self#typ t; pp "))"; force_newline();
 
-  (** Evaluate an expression to a bitvector *)
-  method ast_exp e =
-    let bool_to_bv e =
-      pp "(ite";
-      space ();
-      self#ast_exp_bool e;
-      space ();
-      self#ast_exp exp_true;
-      space ();
-      self#ast_exp exp_false;
-      pc ')'
-    in
+  method ast_exp_base e =
     opn 0;
-    let t = Typecheck.infer_ast e in
+    (* let t = Typecheck.infer_ast e in *)
     (match e with
-       (* First, send stuff to boolean printer *)
-     | BinOp((AND|OR|XOR), _, _) when t = Reg 1 ->
-	 bool_to_bv e
-     | UnOp _ when t = Reg 1 ->
-	 bool_to_bv e
-     (* | Let(_, ep, _) when Typecheck.infer_ast ep = reg_1 -> *)
-     (* 	 bool_to_bv e *)
      | Int((i, Reg t) as p) ->
 	 let maskedval = Arithmetic.to64 p in
 	 pp "bv"; printf "%Lu" maskedval; pp "["; pi t; pp "]";
@@ -131,7 +150,7 @@ object (self)
 	 let name,st = VH.find ctx v in
 	 (match st with 
 	 | BitVec -> pp name;
-	 | Bool -> bool_to_bv e)
+	 | Bool -> raise No_rule)
      | UnOp(uop, o) ->
 	 (match uop with
 	  | NEG -> pp "(bvneg"; space ();
@@ -139,39 +158,6 @@ object (self)
 	 );
 	 self#ast_exp o;
 	 pc ')'
-     | BinOp((NEQ|EQ|LT|LE|SLT|SLE), _, _) ->
-	 bool_to_bv e
-	 
-     (* | BinOp(NEQ, e1, e2) -> *)
-     (* 	 (\* Rewrite NEQ in terms of EQ *\) *)
-     (*   let newe = UnOp(NOT, BinOp(EQ, e1, e2)) in *)
-     (*   self#ast_exp newe *)
-     (* | BinOp((EQ|LT|LE|SLT|SLE) as op, e1, e2) -> *)
-     (*   (\* These are predicates, which return boolean values. We need *)
-     (* 	  to convert these to one-bit bitvectors. *\) *)
-     (*   let f = match op with *)
-     (* 	 | EQ -> "=" *)
-     (* 	 | LT -> "bvult" *)
-     (* 	 | LE -> "bvule" *)
-     (* 	 | SLT -> "bvslt" *)
-     (* 	 | SLE -> "bvsle" *)
-     (* 	 | _ -> assert false *)
-     (*   in *)
-     (*   pp "(ite"; *)
-     (*   space(); *)
-     (*   pp "("; *)
-     (*   pp f; *)
-     (*   space (); *)
-     (*   self#ast_exp e1; *)
-     (*   space (); *)
-     (*   self#ast_exp e2; *)
-     (*   pp ")"; *)
-     (*   space (); *)
-     (*   pp "bv1[1]"; *)
-     (*   space (); *)
-     (*   pp "bv0[1]"; *)
-     (*   cut (); *)
-     (*   pp ")" *)
      | BinOp((PLUS|MINUS|TIMES|DIVIDE|SDIVIDE|MOD|SMOD|AND|OR|XOR|LSHIFT|RSHIFT|ARSHIFT) as bop, e1, e2) as e ->
 	 let t = infer_ast ~check:false e1 in
 	 let t' = infer_ast ~check:false e2 in
@@ -222,21 +208,7 @@ object (self)
       | Lab lab ->
 	  failwith ("SMTLIB: don't know how to handle label names: "
 		      ^ (Pp.ast_exp_to_string e))
-      | Let(v, e1, e2) ->
-	  pp "(let (";
-	  (* v isn't allowed to shadow anything. also, smtlib requires it be prefixed with ? *)
-	  let s = "?" ^ var2s v ^"_"^ string_of_int let_counter in
-	  let_counter <- succ let_counter;
-	  pp s;
-	  pc ' ';
-	  self#ast_exp e1;
-	  pc ')';
-	  space ();
-	  self#extend v s BitVec;
-	  self#ast_exp e2;
-	  self#unextend v;
-	  cut ();
-	  pc ')'
+      | Let(v, e1, e2) -> self#letme v e1 e2 BitVec
       | Load(arr,idx,endian, t) ->
 	  (* FIXME check arr is array and not mem *)
 	  pp "(select ";
@@ -255,20 +227,25 @@ object (self)
 	  self#ast_exp vl;
 	  cut ();
 	  pc ')'
+      | _ -> raise No_rule
     );
     cut();
     cls()
 
-  (** Evaluate an expression to a boolean *)
-  method ast_exp_bool e =
-    let bv_to_bool e =
-      pp "(=";
-      space ();
-      pp "bv1[1]";
-      space ();
-      self#ast_exp e;
-      pp ")"
-    in
+  (** Evaluate an expression to a bitvector *)
+  method ast_exp e =
+    let t = Typecheck.infer_ast e in
+    if t = reg_1 then
+      try
+	self#bool_to_bv e
+      with No_rule ->
+	self#ast_exp_base e
+    else
+      self#ast_exp_base e
+
+  (** Try to evaluate an expression to a boolean. If no good rule
+      exists, then raises the No_rule exception. *)
+  method ast_exp_bool_base e =
     let t = Typecheck.infer_ast e in
     assert (t = reg_1);
     opn 0;
@@ -276,9 +253,9 @@ object (self)
      | Int((i, Reg t) as p) when t = 1 ->
 	 let maskedval = Arithmetic.to64 p in
 	 (match maskedval with
-	 | 0L -> pp "false"
-	 | 1L -> pp "true"
-	 | _ -> failwith "ast_exp_bool")
+	  | 0L -> pp "false"
+	  | 1L -> pp "true"
+	  | _ -> failwith "ast_exp_bool")
      | Int((i, Reg t)) -> failwith "ast_exp_bool only takes reg_1 expressions"
      | Int _ -> failwith "Ints may only have register types"
      | UnOp((NEG|NOT), o) ->
@@ -339,143 +316,26 @@ object (self)
      	  let t1 = infer_ast ~check:false e1 in
      	  let (bitsnew, bitsold) = (bits_of_width t, bits_of_width t1) in
      	  let delta = bitsnew - bitsold in
-     	  if delta = 0 then self#ast_exp_bool e1 else bv_to_bool e
-     | Var v when snd (VH.find ctx v) = Bool ->
+     	  if delta = 0 then self#ast_exp_bool e1 else self#bv_to_bool e
+     | Var v ->
 	 let name,st = VH.find ctx v in
-	 pp name
-	 
-    (*  | Var v -> *)
-    (* 	 self#var v *)
-    (*  | UnOp(uop, o) -> *)
-    (* 	 (match uop with *)
-    (* 	  | NEG -> pp "(bvneg"; space (); *)
-    (* 	  | NOT -> pp "(bvnot"; space (); *)
-    (* 	 ); *)
-    (* 	 self#ast_exp o; *)
-    (* 	 pc ')' *)
-    (*  | BinOp(NEQ, e1, e2) -> *)
-    (* 	 (\* Rewrite NEQ in terms of EQ *\) *)
-    (*    let newe = UnOp(NOT, BinOp(EQ, e1, e2)) in *)
-    (*    self#ast_exp newe *)
-    (*  | BinOp((EQ|LT|LE|SLT|SLE) as op, e1, e2) -> *)
-    (*    (\* These are predicates, which return boolean values. We need *)
-    (* 	  to convert these to one-bit bitvectors. *\) *)
-    (*    let f = match op with *)
-    (* 	 | EQ -> "=" *)
-    (* 	 | LT -> "bvult" *)
-    (* 	 | LE -> "bvule" *)
-    (* 	 | SLT -> "bvslt" *)
-    (* 	 | SLE -> "bvsle" *)
-    (* 	 | _ -> assert false *)
-    (*    in *)
-    (*    pp "(ite"; *)
-    (*    space(); *)
-    (*    pp "("; *)
-    (*    pp f; *)
-    (*    space (); *)
-    (*    self#ast_exp e1; *)
-    (*    space (); *)
-    (*    self#ast_exp e2; *)
-    (*    pp ")"; *)
-    (*    space (); *)
-    (*    pp "bv1[1]"; *)
-    (*    space (); *)
-    (*    pp "bv0[1]"; *)
-    (*    cut (); *)
-    (*    pp ")" *)
-    (*  | BinOp((PLUS|MINUS|TIMES|DIVIDE|SDIVIDE|MOD|SMOD|AND|OR|XOR|LSHIFT|RSHIFT|ARSHIFT) as bop, e1, e2) as e -> *)
-    (* 	 let t = infer_ast ~check:false e1 in *)
-    (* 	 let t' = infer_ast ~check:false e2 in *)
-    (* 	 if t <> t' then *)
-    (* 	   wprintf "Type mismatch: %s" (Pp.ast_exp_to_string e); *)
-    (* 	 assert (t = t') ; *)
-    (* 	 let fname = match bop with *)
-    (* 	   (\* | EQ -> "bvcomp" *\) (\* bvcomp doesn't work on memories! *\) *)
-    (* 	   | PLUS -> "bvadd" *)
-    (* 	   | MINUS -> "bvsub" *)
-    (* 	   | TIMES -> "bvmul" *)
-    (* 	   | DIVIDE -> "bvudiv" *)
-    (* 	   | SDIVIDE -> "bvsdiv" *)
-    (* 	   | MOD -> "bvurem" *)
-    (* 	   (\* | SMOD -> "bvsrem" *\) *)
-    (* 	   | SMOD -> failwith "SMOD goes to bvsrem or bvsmod?" *)
-    (* 	   | AND -> "bvand" *)
-    (* 	   | OR -> "bvor" *)
-    (* 	   | XOR -> "bvxor" *)
-    (* 	   | NEQ|EQ|LE|LT|SLT|SLE -> assert false *)
-    (* 	   | LSHIFT -> "bvshl" *)
-    (* 	   | RSHIFT -> "bvlshr" *)
-    (* 	   | ARSHIFT -> "bvashr" *)
-    (* 	 in *)
-    (* 	 pc '('; pp fname; space (); self#ast_exp e1; space (); self#ast_exp e2; pc ')'; *)
-    (*  | Cast((CAST_LOW|CAST_HIGH|CAST_UNSIGNED|CAST_SIGNED) as ct,t, e1) -> *)
-    (* 	  let t1 = infer_ast ~check:false e1 in *)
-    (* 	  let (bitsnew, bitsold) = (bits_of_width t, bits_of_width t1) in *)
-    (* 	  let delta = bitsnew - bitsold in *)
-    (* 	  (match ct with *)
-    (* 	    | CAST_LOW | CAST_HIGH -> assert (delta <= 0); *)
-    (* 	    | CAST_UNSIGNED | CAST_SIGNED -> assert (delta >= 0)); *)
-    (* 	  let (pre,post) = match ct with *)
-    (* 	    | _ when bitsnew = bitsold -> ("","") *)
-    (* 	    | CAST_LOW      -> ("(extract["^string_of_int(bitsnew-1)^":0]", ")") *)
-    (* 	    | CAST_HIGH     -> ("(extract["^string_of_int(bitsold-1)^":"^string_of_int(bitsold-bitsnew)^"]", ")") *)
-    (* 	    | CAST_UNSIGNED -> ("(zero_extend["^string_of_int(delta)^"]", ")") *)
-    (* 	    | CAST_SIGNED -> ("(sign_extend["^string_of_int(delta)^"]", ")") *)
-    (* 	  in *)
-    (* 	  pp pre; *)
-    (* 	  space (); *)
-    (* 	  self#ast_exp e1; *)
-    (* 	  cut (); *)
-    (* 	  pp post *)
-    (*   | Unknown(s,t) -> *)
-    (* 	  pp "unknown_"; pi unknown_counter; pp" ;"; pp s; force_newline(); *)
-    (* 	  unknown_counter <- unknown_counter + 1; *)
-    (*   | Lab lab -> *)
-    (* 	  failwith ("SMTLIB: don't know how to handle label names: " *)
-    (* 		      ^ (Pp.ast_exp_to_string e)) *)
-
-      (* | Let(v, e1, e2) when Typecheck.infer_ast e1 = reg_1 -> *)
-      (* 	  pp "(flet ("; *)
-      (* 	  (\* v isn't allowed to shadow anything. also, smtlib requires it be prefixed with ? *\) *)
-      (* 	  let s = "$" ^ var2s v ^"_"^ string_of_int let_counter in *)
-      (* 	  let_counter <- succ let_counter; *)
-      (* 	  pp s; *)
-      (* 	  pc ' '; *)
-      (* 	  self#ast_exp_bool e1; *)
-      (* 	  pc ')'; *)
-      (* 	  space (); *)
-      (* 	  self#extend v s; *)
-      (* 	  self#ast_exp_bool e2; *)
-      (* 	  self#unextend v; *)
-      (* 	  cut (); *)
-      (* 	  pc ')' *)
-
-
-    (*   | Load(arr,idx,endian, t) -> *)
-    (* 	  (\* FIXME check arr is array and not mem *\) *)
-    (* 	  pp "(select "; *)
-    (* 	  self#ast_exp arr; *)
-    (* 	  space (); *)
-    (* 	  self#ast_exp idx; *)
-    (* 	  cut (); *)
-    (* 	  pc ')' *)
-    (*   | Store(arr,idx,vl, endian, t) -> *)
-    (* 	  (\* FIXME check arr is array and not mem *\) *)
-    (* 	  pp "(store "; *)
-    (* 	  self#ast_exp arr; *)
-    (* 	  space (); *)
-    (* 	  self#ast_exp idx; *)
-    (* 	  space (); *)
-    (* 	  self#ast_exp vl; *)
-    (* 	  cut (); *)
-    (* 	  pc ')' *)
-     | o ->
-	 (* For other expressions, we'll print as a BV, and then convert back to bool. *)
-	 bv_to_bool o
+	 (match st with
+	 | BitVec -> self#bv_to_bool e
+	 | Bool -> pp name) 
+     | Let(v, e1, e2) -> self#letme v e1 e2 Bool
+     | _ -> cls(); raise No_rule
     );
     cut();
     cls()
 
+  (** Try to evaluate an expression to a boolean. If no good rule
+      exists, uses bitvector conversion instead. *)
+  method ast_exp_bool e =
+    let t = Typecheck.infer_ast e in
+    assert (t = reg_1);
+    try self#ast_exp_bool_base e
+    with No_rule ->
+      self#bv_to_bool e
 
 
   method forall = function
@@ -486,7 +346,7 @@ object (self)
 	in
 	opn 2;
 	pp "FORALL (";space();
-	  (* TODO: group by type *)
+	(* TODO: group by type *)
 	List.iter (fun v -> var_type v; pc ','; space()) vars;
 	var_type v;
 	pp "):";
