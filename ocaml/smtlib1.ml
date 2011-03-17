@@ -1,6 +1,7 @@
 (** Output to SMTLIB1 format *)
 open Type
 open Ast
+open Ast_convenience
 open Typecheck
 
 module D = Debug.Make(struct let name = "smtlib1" and default=`Debug end)
@@ -158,6 +159,20 @@ object (self)
 	 );
 	 self#ast_exp o;
 	 pc ')'
+     | BinOp((AND|OR), _, _) when parse_ite e <> None ->
+	 let b, e1, e2 = match parse_ite e with
+	   | Some(b, e1, e2) -> b, e1, e2
+	   | None -> assert false
+	 in
+	 pp "(ite";
+	 space ();
+	 self#ast_exp_bool b;
+	 space ();
+	 self#ast_exp e1;
+	 space ();
+	 self#ast_exp e2;
+	 cut ();
+	 pc ')';
      | BinOp((PLUS|MINUS|TIMES|DIVIDE|SDIVIDE|MOD|SMOD|AND|OR|XOR|LSHIFT|RSHIFT|ARSHIFT) as bop, e1, e2) as e ->
 	 let t = infer_ast ~check:false e1 in
 	 let t' = infer_ast ~check:false e2 in
@@ -269,6 +284,20 @@ object (self)
 	 (* Rewrite NEQ in terms of EQ *)
        let newe = UnOp(NOT, BinOp(EQ, e1, e2)) in
        self#ast_exp_bool newe
+     | BinOp((OR|AND), _, _) when parse_ite e <> None ->
+	 let b, e1, e2 = match parse_ite e with
+	   | Some(b, e1, e2) -> b, e1, e2
+	   | None -> assert false
+	 in
+	 pp "(if_then_else";
+	 space ();
+	 self#ast_exp_bool b;
+	 space ();
+	 self#ast_exp_bool e1;
+	 space ();
+	 self#ast_exp_bool e2;
+	 cut ();
+	 pc ')';
      | BinOp((EQ|LT|LE|SLT|SLE) as op, e1, e2) ->
        (* These are predicates, which return boolean values. We need
 	  to convert these to one-bit bitvectors. *)

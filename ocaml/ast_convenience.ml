@@ -51,7 +51,6 @@ let exp_ite ?t b e1 e2 =
   else
     ((cast_signed t b) &* e1) |* ((cast_signed t (exp_not b)) &* e2) 
 
-
 let parse_ite = function
   | BinOp(OR,
 	  BinOp(AND, Cast(CAST_SIGNED, _, b1), e1),
@@ -62,4 +61,9 @@ let parse_ite = function
 	  BinOp(AND, UnOp(NOT, b2), e2)
   ) when b1 = b2 && Typecheck.infer_ast ~check:false b1 = reg_1-> 
     Some(b1, e1, e2)
+      (* In case one branch is optimized away *)
+  | BinOp(AND,
+	  Cast(CAST_SIGNED, nt, b1),
+	  e1) when Typecheck.infer_ast ~check:false b1 = reg_1 ->
+    Some(b1, e1, Int(0L, nt))
   | _ -> None
