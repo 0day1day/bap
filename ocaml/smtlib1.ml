@@ -133,7 +133,7 @@ object (self)
 
   method decl (Var.V(_,_,t) as v) =
     let sort = match t with
-      | Reg 1 -> Bool (* Let's try making all 1-bit bvs bools for now *)
+      (* | Reg 1 -> Bool (\* Let's try making all 1-bit bvs bools for now *\) *)
       | _ -> BitVec
     in
     self#extend v (var2s v) sort;
