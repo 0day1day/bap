@@ -318,9 +318,6 @@ let speclist =
      Arg.Set Traces.consistency_check,
      "Perform extra consistency checks"
     )
-  ::("-exec",
-     uadd(TransformAst Interpreter.execute),
-     "Concretely execute the IL")
   :: ("-normalize-mem", uadd(TransformAst Memory2array.coerce_prog),
       "Normalize memory accesses as array accesses")
   :: ("-prune-cfg",

@@ -100,8 +100,6 @@ let symb_to_string = function
 module type MemLookup =
 sig
   val lookup_var : (varval VH.t) -> VH.key -> varval
-  val conc2symb : Ast.exp AddrMap.t -> Ast.var -> varval
-  val normalize : int64 -> Type.typ -> int64
   val update_mem : varval -> Ast.exp -> Ast.exp -> Ast.exp -> varval
   val lookup_mem : varval -> Ast.exp -> Ast.exp -> Ast.exp
   val assign : Var.t -> varval -> ctx -> ctx list
@@ -144,12 +142,12 @@ struct
     with Not_found -> 
       match lab with
 	| Name _ (*-> failwith ("jump to inexistent label "^s)*)
-	| Addr _ -> raise UnknownLabel (*failwith ("jump to inexistent label "^
+	| Addr _ -> 
+	    wprintf "Unknown label: %s" (Pp.label_to_string lab);
+	    raise UnknownLabel (*failwith ("jump to inexistent label "^
 					 (Printf.sprintf "%Lx" x)) *)
 	    
   let lookup_var        = MemL.lookup_var
-  let conc2symb         = MemL.conc2symb
-  let normalize         = MemL.normalize
   let update_mem        = MemL.update_mem
   let lookup_mem        = MemL.lookup_mem
   let assign            = MemL.assign
@@ -396,11 +394,12 @@ struct
        [])
       | Not_found ->
 	  (* The only way inst_fetch would fail is if pc falls off the end, right? *)
+	  wprintf "PC not found: %#Lx" state.pc;
 	  raise (Halted(None, state))
 	    
 end
   
-module Std = 
+module SymbolicMemL = 
 struct 
   let lookup_var delta var =
     try VH.find delta var
@@ -452,6 +451,42 @@ struct
     context_update delta v ev ;
     [{ctx with pc=Int64.succ pc}]
 end
+
+module ConcreteMemL = 
+struct 
+  let lookup_var delta var =
+    try VH.find delta var
+    with Not_found ->
+      match Var.typ var with
+	| TMem _ 
+	| Array _ ->
+	    empty_mem var
+	| Reg n as t ->
+	    Symbolic(Int(0L, t))
+	    
+  let normalize = SymbolicMemL.normalize
+    
+  let rec update_mem mu pos value endian = 
+    (*pdebug "Update mem" ;*)
+    match mu, pos with
+      | ConcreteMem (m,v), Int(p,t) ->
+	  ConcreteMem(AddrMap.add (normalize p t) value m, v)
+      | _ -> failwith "Symbolic memory in concrete evaluation"
+		
+  let rec lookup_mem mu index endian =
+    (*pdebug "Lookup mem" ;*)
+    match mu, index with
+      | ConcreteMem(m,v), Int(i,t) ->
+	  (try AddrMap.find (normalize i t) m
+	   with Not_found ->
+	     Int(0L, reg_8)
+	  )
+      | _ -> failwith "Symbolic memory or address in concrete evaluation"
+	  
+  let assign v ev ({delta=delta; pred=pred; pc=pc} as ctx) =
+    context_update delta v ev ;
+    [{ctx with pc=Int64.succ pc}]
+end
   
 module FullSubst =
 struct
@@ -475,7 +510,36 @@ struct
   let output_formula () = failwith "Formula output unsupported"
 end
   
-module Symbolic = Make(Std)(FullSubst)(StdForm)
-module SymbolicFast = Make(Std)(PartialSubst)(StdForm)
+module Symbolic = Make(SymbolicMemL)(FullSubst)(StdForm)
+module SymbolicFast = Make(SymbolicMemL)(PartialSubst)(StdForm)
+
+module Concrete = Make(ConcreteMemL)(FullSubst)(StdForm)
+
+(** Execute a program concretely *)
+let concretely_execute p ?(i=[]) s  =
+  let rec step ctx =
+    try
+      let s = Concrete.inst_fetch ctx.sigma ctx.pc in
+      dprintf "Executing: %s" (Pp.ast_stmt_to_string s);
+      match Concrete.eval ctx with
+      | [next] -> step next
+      | _ -> failwith "step"
+    with Halted _ -> ctx
+  in
+  let ctx = Concrete.build_default_context p in
+  (* Evaluate initialization statements *)
+  let ctx = List.fold_left (fun ctx s -> 
+			      dprintf "Init %s" (Pp.ast_stmt_to_string s);
+			      match Concrete.eval_stmt ctx s with
+			      | nctx::[] -> nctx
+			      | _ -> failwith "Expected one context"
+			   ) ctx i
+  in
+  let ctx = {ctx with pc = Concrete.label_decode ctx.lambda (Addr s)} in
+  let ctx = step ctx in
+  Concrete.print_values ctx.delta;
+  Concrete.print_mem ctx.delta;
+  ctx
 
 let eval_expr = Symbolic.eval_expr
+

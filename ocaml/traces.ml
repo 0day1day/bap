@@ -664,9 +664,7 @@ struct
 		wprintf "Unknown variable during eval: %s" (Var.name var);
               Symbolic(Int(0L, (Var.typ var)))
 	      
-	  
-  let conc2symb = Symbolic.conc2symb
-  let normalize = Symbolic.normalize
+  let normalize = SymbolicMemL.normalize
   let update_mem mu pos value endian = 
     (match mu,pos with
     | ConcreteMem(_), Int(i,t) ->
@@ -1149,8 +1147,6 @@ struct
       )
 	
 	
-  let conc2symb = Symbolic.conc2symb
-  let normalize = Symbolic.normalize
   let update_mem mu pos value endian =
     match is_concrete pos with
     | true ->
