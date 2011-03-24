@@ -82,6 +82,13 @@ let ssa_temp_name = "temp"
    the Ast expression *)
 let rec exp2ssaexp (ctx:Ctx.t) ~(revstmts:stmt list) ?(attrs=[]) e : stmt list * exp =
   match e with 
+  | Ast.Ite(b, e1, e2) ->
+      (* let (revstmts, vb) = exp2ssa ctx revstmts b in *)
+      (* let (revstmts, v1) = exp2ssa ctx revstmts e1 in *)
+      (* let (revstmts, v2) = exp2ssa ctx revstmts e2 in *)
+      (* failwith "Whoops, need SSA ite" *)
+      (* XXX: Fix me *)
+      exp2ssaexp ctx revstmts (Ast_convenience.exp_ite b e1 e2)
   | Ast.BinOp(op, e1, e2) -> 
       let (revstmts, v1) = exp2ssa ctx revstmts e1 in
       let (revstmts, v2) = exp2ssa ctx revstmts e2 in

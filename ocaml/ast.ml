@@ -16,6 +16,7 @@ type var = Var.t
 type exp = 
   | Load of (exp * exp * exp * typ)  (** Load(arr,idx,endian, t) *)
   | Store of (exp * exp * exp * exp * typ)  (** Store(arr,idx,val, endian, t) *)
+  | Ite of (exp * exp * exp)
   | BinOp of (binop_type * exp * exp)
   | UnOp of (unop_type * exp)
   | Var of var

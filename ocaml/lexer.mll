@@ -119,6 +119,10 @@ rule token = parse
   | "in"         { IN }
   | "label"      { LABEL } 
   | "addr"       { ADDR } 
+(* if then else expressions *)
+  | "if"         { IF }
+  | "then"       { THEN }
+  | "else"       { ELSE }
 (* sugar *)
   | "true"       { TRUE }
   | "false"      { FALSE }

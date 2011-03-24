@@ -346,6 +346,11 @@ struct
   let lab l env _st = 
     let lab = if is_addr l then lab_to_addr l else Name l in
       Scalar(get_lab env.MyTypes.lambda lab, reg_64)
+  let ite (cond,e1,e2) env st =
+    let ce = eval_expr cond env st
+    and e1 = eval_expr e1 env st
+    and e2 = eval_expr e2 env st in
+    Scalar(if Int ce = exp_true then e1 else e2)
   let binop (op,e1,e2) env st = 
     let e1 = eval_expr e1 env st
     and e2 = eval_expr e2 env st in

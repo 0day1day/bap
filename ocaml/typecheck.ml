@@ -38,13 +38,17 @@ let rec infer_ast ?(check=true) = function
       (* FIXME: Check context *)
       Var.typ v
   | UnOp(_, e) ->
+      if check then check_reg e;
       infer_ast ~check e
   | BinOp(o, e1,e2) ->
-      (* FIXME: checking *)
+      if check then (check_same e1 e2; check_reg e1);
       (match o with
        | EQ | NEQ | LT | LE | SLT | SLE -> reg_1
-       | _ -> infer_ast e1
+       | _ -> infer_ast ~check e1
       )
+  | Ite(b, e1, e2) ->
+      if check then check_same e1 e2;
+      infer_ast ~check e1 
   | Lab s ->
       (* FIXME: no type for labels yet *)
       reg_64
@@ -68,6 +72,13 @@ let rec infer_ast ?(check=true) = function
       );
       infer_ast ~check:false arr
 
+and check_same e1 e2 =
+  if (infer_ast e1) <> (infer_ast e2) then
+    terror "Similar types expected"
+
+and check_reg e1 =
+  if not (is_integer_type (infer_ast e1)) then
+    terror "Expected integer type"
 
 and check_idx arr idx endian t =
   let ta = infer_ast arr

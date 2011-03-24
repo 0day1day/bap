@@ -139,6 +139,7 @@ object (self)
      to be parenthesized. Larger numbers means it has higher precedence.
      Maximum prec before paretheses are added are as follows:
 	  5 Let
+          7 Ite
          10 Store
 	 20 OR
 	 30 XOR
@@ -186,6 +187,20 @@ object (self)
 	 pp " ="; space();
 	 self#ast_exp ~prec:10 vl;
 	 rparen 10;
+     | Ast.Ite(c,x,y) ->
+	 lparen 7;
+	 pp "if";
+	 space ();
+	 self#ast_exp c;
+	 space ();
+	 pp "then";
+	 space ();
+	 self#ast_exp x;
+	 space ();
+	 pp "else";
+	 space ();
+	 self#ast_exp y;	 
+	 rparen 7
      | Ast.BinOp(b,x,y) ->
 	 let p = binop_prec b in
 	 lparen p;

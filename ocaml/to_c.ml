@@ -131,6 +131,7 @@ object(self)
     (* prec tells us how much parenthization we need. 0 means it doesn't need
        to be parenthesized. Larger numbers means it has higher precedence.
        Maximum prec before paretheses are added are as follows:
+       50  ITE
        100 OR
        200 XOR
        300 AND
@@ -149,6 +150,19 @@ object(self)
     (match e with
        Let _ ->
 	 raise (Invalid_argument "Let's not supported. Try calling unlet first.")
+     | Ite(b, e1, e2) ->
+	 (* XXX: Needs testing *)
+	 lparen 50;
+	 self#ast_exp b;
+	 space ();
+	 pp "?";
+	 space ();
+	 self#ast_exp e1;
+	 space ();
+	 pp ":";
+	 space ();
+	 self#ast_exp e2;	 
+	 rparen 50
      | BinOp(b,e1,e2) ->
 	 let op_prec = match b with
 	   | OR                          -> 100

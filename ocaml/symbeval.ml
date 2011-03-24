@@ -242,14 +242,27 @@ struct
 	  Symbolic value
       | Lab _ as labl ->
 	  Symbolic labl
+      | Ite(cond,e1,e2) ->
+	  let v1 = eval_expr delta e1
+	  and v2 = eval_expr delta e2 in
+	  (match eval_expr delta cond with
+	   | v when is_symbolic v ->
+	       Symbolic(Ite(symb_to_exp v, symb_to_exp v1, symb_to_exp v2))
+	   | v when is_true_val v ->
+	       Symbolic(symb_to_exp v1)
+	   | v when is_false_val v ->
+	       Symbolic(symb_to_exp v2)
+	   | _ ->
+	       failwith "not possible"
+	  )
       | BinOp (op,e1,e2) ->
 	  (*let  t1 = Typecheck.infer_ast ~check:false e1 in
-	  let  t2 = Typecheck.infer_ast ~check:false e2 in
+	    let  t2 = Typecheck.infer_ast ~check:false e2 in
 	    if op = PLUS then 
-	      (if t1 != t2 then 
-		 (print_endline ((Pp.ast_exp_to_string e1) ^ " " ^  (Pp.ast_exp_to_string e2)) ;
-				 assert false)
-	      ) ;*)
+	    (if t1 != t2 then 
+	    (print_endline ((Pp.ast_exp_to_string e1) ^ " " ^  (Pp.ast_exp_to_string e2)) ;
+	    assert false)
+	    ) ;*)
 	  let v1 = eval_expr delta e1
 	  and v2 = eval_expr delta e2 in
 	    if is_symbolic v1 || is_symbolic v2 then 

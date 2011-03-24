@@ -109,6 +109,7 @@ let casttype_of_string = function
 %token LPAREN RPAREN LSQUARE RSQUARE
 %token COMMA SEMI EOF COLON
 %token CJMP JMP LABEL ADDR ASSERT HALT SPECIAL
+%token IF THEN ELSE
 %token LET IN UNKNOWN WITH TRUE FALSE EBIG ELITTLE
 %token PLUS MINUS  DIVIDE MOD SMOD TIMES 
 %token SDIVIDE LSHIFT RSHIFT ARSHIFT XOR NEQ
@@ -124,6 +125,7 @@ let casttype_of_string = function
 %type <Ast.exp > expr
 %type <Type.context> context
 %nonassoc LET IN
+%nonassoc IF THEN ELSE
 %left WITH
 /* If the precedence for any of these changes, pp.ml needs to be updated
    accordingly, so that it can parethesize things properly */
@@ -248,6 +250,8 @@ expr:
 | TRUE               { exp_true } 
 | FALSE              { exp_false }
 | INT COLON typ      { Int($1, $3) } 
+| IF expr THEN expr ELSE expr      
+      { Ite($2, $4, $6) }
 | expr WITH LSQUARE expr COMMA endian RSQUARE COLON typ assign expr %prec WITH
       { Store($1, $4, $11, $6, $9) }
 | expr LSQUARE expr COMMA endian RSQUARE COLON typ { Load($1, $3, $5, $8) }
