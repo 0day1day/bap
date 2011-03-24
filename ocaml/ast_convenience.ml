@@ -42,14 +42,12 @@ let exp_ite ?t b e1 e2 =
   assert (t1 = t2);
   assert (tb = reg_1);
 
-  let t = match t with
-    | None -> t1
-    | Some t -> assert (t=t1); t
-  in
-  if t = reg_1 then
-    (b &* e1) |*  (exp_not b &* e2)
-  else
-    ((cast_signed t b) &* e1) |* ((cast_signed t (exp_not b)) &* e2) 
+  (match t with
+    | None -> ()
+    | Some t -> assert (t=t1));
+
+  Ite(b, e1, e2)
+  
 
 let parse_ite = function
   | BinOp(OR,

@@ -322,6 +322,18 @@ object (self)
 	 pp "]:"; self#typ t;
 	 pp " ="; space();
 	 self#ssa_value vl
+     | Ssa.Ite(c, x, y) ->
+	 pp "if";
+	 space ();
+	 self#ssa_value c;
+	 space ();
+	 pp "then";
+	 space ();
+	 self#ssa_value x;
+	 space ();
+	 pp "else";
+	 space ();
+	 self#ssa_value y	 
      | Ssa.BinOp(b, x, y) ->
 	 self#ssa_value x;
 	 pp " "; pp (binop_to_string b); space();

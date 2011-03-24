@@ -109,8 +109,8 @@ let casttype_of_string = function
 %token LPAREN RPAREN LSQUARE RSQUARE
 %token COMMA SEMI EOF COLON
 %token CJMP JMP LABEL ADDR ASSERT HALT SPECIAL
-%token IF THEN ELSE
 %token LET IN UNKNOWN WITH TRUE FALSE EBIG ELITTLE
+%token IF THEN ELSE
 %token PLUS MINUS  DIVIDE MOD SMOD TIMES 
 %token SDIVIDE LSHIFT RSHIFT ARSHIFT XOR NEQ
 %token SLT SLE AND OR 
@@ -242,6 +242,8 @@ expr:
 | UNKNOWN STRING COLON typ { Unknown($2, $4) } 
 | STRING             { Lab($1) } 
 | lval               { Var($1) } 
+| IF expr THEN expr ELSE expr      
+      { Ite($2, $4, $6) }
 | letstart IN expr   { Scope.pop();
 		       let (x,y) = $1 in
 		       Let(x,y, $3) } 
@@ -250,8 +252,6 @@ expr:
 | TRUE               { exp_true } 
 | FALSE              { exp_false }
 | INT COLON typ      { Int($1, $3) } 
-| IF expr THEN expr ELSE expr      
-      { Ite($2, $4, $6) }
 | expr WITH LSQUARE expr COMMA endian RSQUARE COLON typ assign expr %prec WITH
       { Store($1, $4, $11, $6, $9) }
 | expr LSQUARE expr COMMA endian RSQUARE COLON typ { Load($1, $3, $5, $8) }

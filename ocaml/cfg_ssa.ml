@@ -62,6 +62,7 @@ let type_of_exp = function
     -> t
   | BinOp((EQ|NEQ|LT|LE|SLT|SLE),_,_)
     -> Ast.reg_1
+  | Ite(_,v,_)
   | BinOp(_,v,_)
   | Store(v,_,_,_,_)
   | UnOp(_,v)
@@ -83,12 +84,10 @@ let ssa_temp_name = "temp"
 let rec exp2ssaexp (ctx:Ctx.t) ~(revstmts:stmt list) ?(attrs=[]) e : stmt list * exp =
   match e with 
   | Ast.Ite(b, e1, e2) ->
-      (* let (revstmts, vb) = exp2ssa ctx revstmts b in *)
-      (* let (revstmts, v1) = exp2ssa ctx revstmts e1 in *)
-      (* let (revstmts, v2) = exp2ssa ctx revstmts e2 in *)
-      (* failwith "Whoops, need SSA ite" *)
-      (* XXX: Fix me *)
-      exp2ssaexp ctx revstmts (Ast_convenience.exp_ite b e1 e2)
+      let (revstmts, vb) = exp2ssa ctx revstmts b in
+      let (revstmts, v1) = exp2ssa ctx revstmts e1 in
+      let (revstmts, v2) = exp2ssa ctx revstmts e2 in
+      (revstmts, Ite(vb, v1, v2))
   | Ast.BinOp(op, e1, e2) -> 
       let (revstmts, v1) = exp2ssa ctx revstmts e1 in
       let (revstmts, v2) = exp2ssa ctx revstmts e2 in
@@ -385,6 +384,7 @@ let uninitialized cfg =
     and f_e = function
       | Load(v1,v2,v3,_) -> f_v v1; f_v v2; f_v v3
       | Store(v1,v2,v3,v4,_) -> f_v v1; f_v v2; f_v v3; f_v v4
+      | Ite(cond,v1,v2) -> f_v cond; f_v v1; f_v v2
       | BinOp(_,v1,v2) -> f_v v1; f_v v2
       | UnOp(_,v)
       | Cast(_,_,v)
@@ -604,6 +604,7 @@ let rec value2ast tm = function
 and exp2ast tm =
   let v2a = value2ast tm in
   function
+    | Ite(c,v1,v2) -> Ast.Ite(v2a c, v2a v1, v2a v2)
     | BinOp(bo,v1,v2) -> Ast.BinOp(bo, v2a v1, v2a v2)
     | UnOp(uo, v) -> Ast.UnOp(uo, v2a v)
     | Val v -> v2a v

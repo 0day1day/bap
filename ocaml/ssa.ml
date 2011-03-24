@@ -19,6 +19,7 @@ type value =
 type exp = 
   | Load of value * value * value * typ  (** Load(arr,idx,endian, t) *)
   | Store of value * value * value * value * typ  (** Store(arr,idx,val, endian, t) *)
+  | Ite of value * value * value
   | BinOp of binop_type * value * value
   | UnOp of unop_type * value
   | Val of value

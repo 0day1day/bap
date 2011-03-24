@@ -50,6 +50,7 @@ type vn = Top | Hash of Ssa.var | HInt of (int64 * typ)
 let top = Top
 type expid = 
   | Const of Ssa.value (* Except Var *)
+  | It of vn * vn * vn
   | Bin of binop_type * vn * vn
   | Un of unop_type * vn
   | Cst of cast_type * typ * vn
@@ -153,6 +154,7 @@ let get_expid info =
     | Val(Var _ as v) ->
 	vn2eid info (vn v) 
     | Val v -> Const v
+    | Ite(c,v1,v2) -> It(vn c, vn v1, vn v2)
     | BinOp((PLUS|TIMES|AND|OR|XOR|EQ|NEQ) as op,v1,v2) ->
 	let (h1,h2) = (vn v1, vn v2) in
 	if h1 <= h2 then Bin(op, h1, h2) else Bin(op, h2, h1)
@@ -181,6 +183,12 @@ let opt_expid info var exp =
       toconst (Arithmetic.unop op v)
   | Cst(ct, t, HInt v) ->
       toconst (Arithmetic.cast ct v t)
+  | It(HInt(1L,t), x, _) ->
+      sameas x
+  | It(HInt(0L,t), _, y) ->
+      sameas y
+  | It(b, x, y) when x = y ->
+      sameas x
   (* phis can be constant*)
   | Ph(x::xs) as eid -> (
       match

@@ -91,7 +91,7 @@ object (self)
     | n,_ -> pp n
 
   method letme v e1 e2 st =
-    let t1 = Typecheck.infer_ast e1 in
+    let t1 = Typecheck.infer_ast ~check:false e1 in
     let cmd,c,pf,vst = match t1 with Reg 1 -> "flet","$",self#ast_exp_bool,Bool | _ -> "let","?",self#ast_exp,BitVec in
     let pf2 = match st with Bool -> self#ast_exp_bool | BitVec -> self#ast_exp in
     pp "("; pp cmd; pp " (";
@@ -152,6 +152,16 @@ object (self)
 	 (match st with 
 	 | BitVec -> pp name;
 	 | Bool -> raise No_rule)
+     | Ite(cond, e1, e2) ->
+	 pp "(ite";
+	 space ();
+	 self#ast_exp_bool cond;
+	 space ();
+	 self#ast_exp e1;
+	 space ();
+	 self#ast_exp e2;
+	 cut ();
+	 pc ')'
      | UnOp(uop, o) ->
 	 (match uop with
 	  | NEG -> pp "(bvneg"; space ();
@@ -160,19 +170,19 @@ object (self)
 	 self#ast_exp o;
 	 pc ')'
      | BinOp((AND|OR), _, _) when parse_ite e <> None ->
-	 let b, e1, e2 = match parse_ite e with
-	   | Some(b, e1, e2) -> b, e1, e2
-	   | None -> assert false
-	 in
-	 pp "(ite";
-	 space ();
-	 self#ast_exp_bool b;
-	 space ();
-	 self#ast_exp e1;
-	 space ();
-	 self#ast_exp e2;
-	 cut ();
-	 pc ')';
+     	 let b, e1, e2 = match parse_ite e with
+     	   | Some(b, e1, e2) -> b, e1, e2
+     	   | None -> assert false
+     	 in
+     	 pp "(ite";
+     	 space ();
+     	 self#ast_exp_bool b;
+     	 space ();
+     	 self#ast_exp e1;
+     	 space ();
+     	 self#ast_exp e2;
+     	 cut ();
+     	 pc ')';
      | BinOp((PLUS|MINUS|TIMES|DIVIDE|SDIVIDE|MOD|SMOD|AND|OR|XOR|LSHIFT|RSHIFT|ARSHIFT) as bop, e1, e2) as e ->
 	 let t = infer_ast ~check:false e1 in
 	 let t' = infer_ast ~check:false e2 in
@@ -198,7 +208,7 @@ object (self)
 	   | ARSHIFT -> "bvashr"
 	 in
 	 pc '('; pp fname; space (); self#ast_exp e1; space (); self#ast_exp e2; pc ')';
-     | Cast((CAST_UNSIGNED|CAST_SIGNED) as ct, t, e1) when (infer_ast e1) = reg_1 ->
+     | Cast((CAST_UNSIGNED|CAST_SIGNED) as ct, t, e1) when (infer_ast ~check:false e1) = reg_1 ->
 	 (* Optimization: 
 	    CAST(UNSIGNED, Reg n, bool_e) =
 	    ite bool_e 1[n] 0[n]
@@ -277,7 +287,7 @@ object (self)
 
   (** Evaluate an expression to a bitvector *)
   method ast_exp e =
-    let t = Typecheck.infer_ast e in
+    let t = Typecheck.infer_ast ~check:false e in
     if t = reg_1 then
       try
 	self#bool_to_bv e
@@ -289,7 +299,7 @@ object (self)
   (** Try to evaluate an expression to a boolean. If no good rule
       exists, then raises the No_rule exception. *)
   method ast_exp_bool_base e =
-    let t = Typecheck.infer_ast e in
+    let t = Typecheck.infer_ast ~check:false e in
     assert (t = reg_1);
     opn 0;
     (match e with
@@ -301,6 +311,16 @@ object (self)
 	  | _ -> failwith "ast_exp_bool")
      | Int((i, Reg t)) -> failwith "ast_exp_bool only takes reg_1 expressions"
      | Int _ -> failwith "Ints may only have register types"
+     | Ite(cond, e1, e2) ->
+	 pp "(if_then_else";
+	 space ();
+	 self#ast_exp_bool cond;
+	 space ();
+	 self#ast_exp_bool e1;
+	 space ();
+	 self#ast_exp_bool e2;
+	 cut ();
+	 pc ')'
      | UnOp((NEG|NOT), o) ->
 	 (* neg and not are the same for one bit! *)
 	 pp "(not";
@@ -313,24 +333,24 @@ object (self)
        let newe = UnOp(NOT, BinOp(EQ, e1, e2)) in
        self#ast_exp_bool newe
      | BinOp((OR|AND), _, _) when parse_ite e <> None ->
-	 let b, e1, e2 = match parse_ite e with
-	   | Some(b, e1, e2) -> b, e1, e2
-	   | None -> assert false
-	 in
-	 pp "(if_then_else";
-	 space ();
-	 self#ast_exp_bool b;
-	 space ();
-	 self#ast_exp_bool e1;
-	 space ();
-	 self#ast_exp_bool e2;
-	 cut ();
-	 pc ')';
+     	 let b, e1, e2 = match parse_ite e with
+     	   | Some(b, e1, e2) -> b, e1, e2
+     	   | None -> assert false
+     	 in
+     	 pp "(if_then_else";
+     	 space ();
+     	 self#ast_exp_bool b;
+     	 space ();
+     	 self#ast_exp_bool e1;
+     	 space ();
+     	 self#ast_exp_bool e2;
+     	 cut ();
+     	 pc ')';
      | BinOp((EQ|LT|LE|SLT|SLE) as op, e1, e2) ->
        (* These are predicates, which return boolean values. We need
 	  to convert these to one-bit bitvectors. *)
-       let t1 = Typecheck.infer_ast e1 in
-       let t2 = Typecheck.infer_ast e2 in
+       let t1 = Typecheck.infer_ast ~check:false e1 in
+       let t2 = Typecheck.infer_ast ~check:false e2 in
        assert (t1 = t2);
        let f = match op with
 	 | EQ when t1 = reg_1 -> "iff" (* = only applies to terms... but booleans are formulas, not terms *)
@@ -388,7 +408,7 @@ object (self)
   (** Try to evaluate an expression to a boolean. If no good rule
       exists, uses bitvector conversion instead. *)
   method ast_exp_bool e =
-    let t = Typecheck.infer_ast e in
+    let t = Typecheck.infer_ast ~check:false e in
     assert (t = reg_1);
     try self#ast_exp_bool_base e
     with No_rule ->
