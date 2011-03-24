@@ -228,6 +228,8 @@ struct
       
   (* Evaluate an expression in a context Delta,Mu *)
   let rec eval_expr delta expr =
+    (* Decide whether or not we should evaluate the memory, which can
+       lead to exponential blow-up due to substitution. *)
     let symb_mem mem = 
       if is_symbolic_store mem then 
 	(pdebug "symb mem!" ; Symbolic mem)

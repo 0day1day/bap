@@ -198,7 +198,35 @@ object (self)
 	   | ARSHIFT -> "bvashr"
 	 in
 	 pc '('; pp fname; space (); self#ast_exp e1; space (); self#ast_exp e2; pc ')';
-     | Cast((CAST_LOW|CAST_HIGH|CAST_UNSIGNED|CAST_SIGNED) as ct,t, e1) ->
+     | Cast((CAST_UNSIGNED|CAST_SIGNED) as ct, t, e1) when (infer_ast e1) = reg_1 ->
+	 (* Optimization: 
+	    CAST(UNSIGNED, Reg n, bool_e) =
+	    ite bool_e 1[n] 0[n]
+	    CAST(SIGNED, Reg n, bool_e) =
+	    ite bool_e -1[n] 0[n]
+	 *)
+	 let t1 = infer_ast ~check:false e1 in
+	 let (bitsnew, bitsold) = (bits_of_width t, bits_of_width t1) in
+	 let delta = bitsnew - bitsold in
+	 let textend, fextend = match ct with
+	   | CAST_UNSIGNED -> Int(1L, t), Int(0L, t)
+	   | CAST_SIGNED -> Int(-1L, t), Int(0L, t)
+	   | _ -> assert false
+	 in
+	 assert (delta >= 0);
+	 (match delta with
+	 | 0 -> self#ast_exp e1
+	 | _ -> 
+	     pp "(ite";
+	     space ();
+	     self#ast_exp_bool e1;
+	     space ();
+	     self#ast_exp textend;
+	     space ();
+	     self#ast_exp fextend;
+	     cut ();
+	     pc ')')	 
+     | Cast((CAST_LOW|CAST_HIGH|CAST_UNSIGNED|CAST_SIGNED) as ct, t, e1) ->
 	  let t1 = infer_ast ~check:false e1 in
 	  let (bitsnew, bitsold) = (bits_of_width t, bits_of_width t1) in
 	  let delta = bitsnew - bitsold in
