@@ -28,8 +28,12 @@ let pipeline = ref []
 (* Initialization statements *)
 let inits = ref []
 
-let cexecute s p =
-  let () = ignore(Symbeval.concretely_execute p ~i:(List.rev !inits) s) in
+let cexecute_at s p =
+  let () = ignore(Symbeval.concretely_execute p ~i:(List.rev !inits) ~s) in
+  p
+
+let cexecute p =
+  let () = ignore(Symbeval.concretely_execute p ~i:(List.rev !inits)) in
   p
 
 let add c =
@@ -64,7 +68,10 @@ let mapmem a e =
 
 let speclist =
   ("-eval", 
-     Arg.String (fun s -> add(TransformAst (cexecute (Int64.of_string s)))),
+     Arg.Unit (fun () -> add(TransformAst cexecute)),
+     "<pc> Concretely execute the IL from the beginning")
+  ::("-eval-at", 
+     Arg.String (fun s -> add(TransformAst (cexecute_at (Int64.of_string s)))),
      "<pc> Concretely execute the IL from pc")
   ::("-init-var",
      Arg.Tuple 
