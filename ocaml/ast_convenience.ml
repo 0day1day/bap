@@ -36,9 +36,9 @@ let cast_unsigned t = function
 let exp_ite ?t b e1 e2 =
   (* FIXME: were we going to add a native if-then-else thing? *)
   (* type inference shouldn't be needed when t is specified, but we're paranoid *)
-  let tb = Typecheck.infer_ast b in
-  let t1 = Typecheck.infer_ast e1 in
-  let t2 = Typecheck.infer_ast e2 in
+  let tb = Typecheck.infer_ast ~check:false b in
+  let t1 = Typecheck.infer_ast ~check:false e1 in
+  let t2 = Typecheck.infer_ast ~check:false e2 in
   assert (t1 = t2);
   assert (tb = reg_1);
 
