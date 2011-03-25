@@ -55,6 +55,7 @@ export SOURCES = \
 	asmirconsts.ml asmir.mli asmir.ml \
 	input.mli input.ml \
 	depgraphs.ml \
+	to_c.ml \
 	vsa.ml \
 	memory2scalar.ml \
 	eval.ml \
@@ -129,4 +130,3 @@ include $(OCAMLMAKEFILE)
 
 bap.dot: $(DOC_FILES)
 	 ocamlfind ocamldoc -I /usr/lib/ocaml/3.10.2/ -package str,ocamlgraph,extlib,unix,sqlite3 -dot -o bap.dot -m avlsoper $(DOC_FILES)
-

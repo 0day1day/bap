@@ -34,7 +34,7 @@ let toshift shiftedt v =
     if i <= Int64.of_int max && i >= 0L
     then Int64.to_int i
     else
-      (pwarn("Warning: shifting "^string_of_int max^"-bit value by "
+      (pdebug("Warning: shifting "^string_of_int max^"-bit value by "
 		    ^Int64.to_string i);
        max)
 

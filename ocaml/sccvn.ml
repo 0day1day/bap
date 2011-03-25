@@ -222,6 +222,8 @@ let opt_expid info var exp =
   | Bin(LE, _, HInt(i,t)) when Arithmetic.tos64 (i,t) = -1L ->
       Const(Ssa.val_true)
 	(* TODO: add SLT and SLE. Requires canonicalized ints *)
+  | Bin(EQ, x, (HInt(1L,t))) when t = (Reg 1) ->
+      sameas x
   | x -> x
 
 (* simplifications in bap_opt which we don't (yet) do here:

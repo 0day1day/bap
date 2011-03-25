@@ -147,12 +147,12 @@ rule token = parse
   | "<>"         { NEQ } 
   | '<'          { LT }
   | "<="         { LE } 
-  | "<$"         { SLT } 
-  | "<=$"        { SLE } 
+  | "$<"         { SLT } 
+  | "$<="        { SLE } 
   | '>'          { GT }
   | ">="         { GE } 
-  | ">$"         { SGT } 
-  | ">=$"        { SGE } 
+  | "$>"         { SGT } 
+  | "$>="        { SGE } 
   | '~'          { NOT }
   | ":="         { ASSIGN }
   | ':'          { COLON } 

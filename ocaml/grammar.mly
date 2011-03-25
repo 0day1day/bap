@@ -80,12 +80,16 @@ let mk_attr lab string =
   | "tid" -> ThreadId(int_of_string string)
   | _ -> err ("Unknown attribute @"^lab)
 
-let typ_of_string = function
+let typ_of_string = 
+  let tre = Str.regexp "^u\\([0-9]+\\)$" in
+  function
   | "bool" -> reg_1
   | "u8" -> reg_8
   | "u16" -> reg_16
   | "u32" -> reg_32
   | "u64" -> reg_64
+  | s when Str.string_match tre s 0 ->
+      Reg(int_of_string (Str.matched_group 1 s))
   | s -> err ("Unexpected type '"^s^"'")
 
 let casttype_of_string = function

@@ -753,15 +753,13 @@ struct
 		wprintf "Unknown variable during eval: %s" (Var.name var);
               Symbolic(Int(0L, (Var.typ var)))
 	      
-	  
-  let conc2symb = Symbolic.conc2symb
-  let normalize = Symbolic.normalize
+  let normalize = SymbolicMemL.normalize
   let update_mem mu pos value endian = 
     (match mu,pos with
     | ConcreteMem(_), Int(i,t) ->
 	del_mem i
     | _ -> failwith "Bad memory for concrete evaluation");
-    Symbolic.update_mem mu pos value endian
+    Concrete.update_mem mu pos value endian
 
   let lookup_mem mu index endian = 
     (*pdebug ("index at " ^ (Pp.ast_exp_to_string index)) ;*)
@@ -792,10 +790,10 @@ struct
 
   let assign v ev ctx =
     dsa_del_var v;
-    Symbolic.assign v ev ctx
+    Concrete.assign v ev ctx
 end
   
-module TraceConcrete = Symbeval.Make(TraceConcreteDef)(FullSubst)(StdForm)
+module TraceConcrete = Symbeval.Make(TraceConcreteDef)(FastEval)(StdForm)
 
 (** Check all variables in delta to make sure they agree with operands
     loaded from a trace. We should be able to find bugs in BAP and the
@@ -1133,6 +1131,7 @@ struct
       )
 
   let lookup_mem mu index endian =
+    let normalize = SymbolicMemL.normalize in
     match mu, index with
     | ConcreteMem(m,v), Int(i,t) ->
 	(try AddrMap.find (normalize i t) m
@@ -1144,7 +1143,7 @@ struct
 
 end
 
-module TaintConcrete = Symbeval.Make(TaintConcreteDef)(FullSubst)(StdForm)
+module TaintConcrete = Symbeval.Make(TaintConcreteDef)(FastEval)(StdForm)
 
 (** Concretely execute a trace without using any operand information *)
 let concrete_rerun file stmts =
@@ -1330,8 +1329,6 @@ struct
       )
 	
 	
-  let conc2symb = Symbolic.conc2symb
-  let normalize = Symbolic.normalize
   let update_mem mu pos value endian =
     match is_concrete pos with
     | true ->
@@ -1387,7 +1384,7 @@ struct
       Symbolic.assign v ev ctx
 end
 
-module TraceSymbolic = Symbeval.Make(TaintSymbolic)(FullSubst)(LetBind)
+module TraceSymbolic = Symbeval.Make(TaintSymbolic)(FastEval)(LetBind)
 
 let status = ref 0
 let count = ref 0
