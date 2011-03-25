@@ -23,14 +23,14 @@ end
 
 module NaiveSymb =
 struct
-  let init = Symbolic.build_default_context
-  let eval = Symbolic.eval
+  let init = SymbolicSlow.build_default_context
+  let eval = SymbolicSlow.eval
 end
 
 module FastSymb =
 struct
-  let init = SymbolicFast.build_default_context
-  let eval = SymbolicFast.eval
+  let init = Symbolic.build_default_context
+  let eval = Symbolic.eval
 end
 
 module MakeSearch(S:STRATEGY)(Symbolic:Symb) =

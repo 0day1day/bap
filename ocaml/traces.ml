@@ -703,7 +703,7 @@ struct
     Symbolic.assign v ev ctx
 end
   
-module TraceConcrete = Symbeval.Make(TaintConcrete)(FullSubst)(StdForm)
+module TraceConcrete = Symbeval.Make(TaintConcrete)(FastEval)(StdForm)
 
 (** Check all variables in delta to make sure they agree with operands
     loaded from a trace. We should be able to find bugs in BAP and the
@@ -1202,7 +1202,7 @@ struct
       Symbolic.assign v ev ctx
 end
 
-module TraceSymbolic = Symbeval.Make(TaintSymbolic)(FullSubst)(LetBind)
+module TraceSymbolic = Symbeval.Make(TaintSymbolic)(FastEval)(LetBind)
 
 let add_symbolic_seeds memv = function
   | Ast.Label (Name s,atts) when is_seed_label s ->
