@@ -670,7 +670,7 @@ struct
     | ConcreteMem(_), Int(i,t) ->
 	del_mem i
     | _ -> failwith "Bad memory for concrete evaluation");
-    Symbolic.update_mem mu pos value endian
+    Concrete.update_mem mu pos value endian
 
   let lookup_mem mu index endian = 
     (*pdebug ("index at " ^ (Pp.ast_exp_to_string index)) ;*)
@@ -700,7 +700,7 @@ struct
 
   let assign v ev ctx =
     dsa_del_var v;
-    Symbolic.assign v ev ctx
+    Concrete.assign v ev ctx
 end
   
 module TraceConcrete = Symbeval.Make(TaintConcrete)(FastEval)(StdForm)

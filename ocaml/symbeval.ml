@@ -73,6 +73,7 @@ let is_true_val = (=) val_true
 let is_false_val = (=) val_false
 let is_symbolic = function
   | Symbolic (Int _) -> false
+  | ConcreteMem _ -> false
   | _ -> true
 let is_concrete = function
   | Int _ -> true
