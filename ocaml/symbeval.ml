@@ -296,7 +296,7 @@ struct
 	  (match t with
 	     | Reg 8 ->
 		 (* This doesn't introduce any blowup on its own. *)
-		 let mem = symb_mem mem 
+		 let mem = eval_expr delta mem 
 		 and ind = eval_expr delta ind
 		 and endian = eval_expr delta endian in
 		 let mem_arr = symb_to_exp ind 
@@ -316,14 +316,11 @@ struct
 	    (match t with
 	       | Reg 8 -> 
 		   (* No blowup here. *)
-		   let mem = symb_mem mem in
+		   let mem = eval_expr delta mem in
 		     update_mem mem index value endian
 	       | Reg _ -> 
 		   (* Splitting blowup, but I don't know how to avoid this. *)
-		   if not (is_symbolic_store mem) && is_concrete index
-		   then eval_expr delta (* we only care about 32bit *)
-		     (Memory2array.split_writes mem index t endian value)
-		   else symb_mem 
+		   eval_expr delta 
 		     (Memory2array.split_writes mem index t endian value)
 	       | Array _ -> 
 		   failwith "storing array currently unsupported"
