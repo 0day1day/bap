@@ -17,12 +17,14 @@ let bits_of_width = function
 (* drop high bits *)
 let to64 (i,t) =
   let bits = 64 - bits_of_width t in
+  if bits < 0 then failwith "Arithmetic only works on reg64 and smaller";
   Int64.shift_right_logical (Int64.shift_left i bits) bits
 
 
 (* sign extend to 64 bits*)
 let tos64 (i,t) =
   let bits = 64 - bits_of_width t in
+  if bits < 0 then failwith "Arithmetic only works on reg64 and smaller";
   Int64.shift_right (Int64.shift_left i bits) bits
 
   
