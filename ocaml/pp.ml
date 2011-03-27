@@ -131,7 +131,7 @@ object (self)
     | (i,t) ->
       if i < 10L && i > -10L
       then pp (Int64.to_string i)
-      else printf "0x%Lx" (Int64.logand i (Int64.pred (Int64.shift_left 1L (Arithmetic.bits_of_width t))));
+      else printf "0x%Lx" i;
       pp ":"; self#typ t
 
 
