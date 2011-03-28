@@ -169,6 +169,18 @@ object (self)
 	 );
 	 self#ast_exp o;
 	 pc ')'
+     | BinOp(OR, _, _) when parse_concat e <> None ->
+     	 let el, er = match parse_concat e with
+     	   | Some(el, er) -> el, er
+     	   | None -> assert false
+     	 in
+     	 pp "(concat";
+     	 space ();
+     	 self#ast_exp el;
+     	 space ();
+     	 self#ast_exp er;
+     	 cut ();
+     	 pc ')'
      | BinOp((AND|OR), _, _) when parse_ite e <> None ->
      	 let b, e1, e2 = match parse_ite e with
      	   | Some(b, e1, e2) -> b, e1, e2
@@ -208,6 +220,20 @@ object (self)
 	   | ARSHIFT -> "bvashr"
 	 in
 	 pc '('; pp fname; space (); self#ast_exp e1; space (); self#ast_exp e2; pc ')';
+     | Cast(CAST_LOW, t, BinOp(RSHIFT, e', Int(i, t2))) when parse_extract e <> None ->
+     	 (* Optimization:
+     	    Original: extract 0:bits(t)-1, and then shift left by i bits.
+     	    New: extract i:bits(t)-1+i
+     	 *)
+     	 let hbit, lbit = match parse_extract e with
+     	   | Some(hbit, lbit) -> hbit, lbit
+     	   | None -> assert false
+     	 in
+     	 pp ("(extract["^Int64.to_string hbit^":"^Int64.to_string lbit^"]");
+     	 space ();
+     	 self#ast_exp e';
+     	 cut ();
+     	 pc ')';
      | Cast((CAST_UNSIGNED|CAST_SIGNED) as ct, t, e1) when (infer_ast ~check:false e1) = reg_1 ->
 	 (* Optimization: 
 	    CAST(UNSIGNED, Reg n, bool_e) =
@@ -289,10 +315,12 @@ object (self)
   method ast_exp e =
     let t = Typecheck.infer_ast ~check:false e in
     if t = reg_1 then
-      try
+     (* try *)
+	(* XXX: Major bug. Ack... bool_to_bv can print stuff to the
+	   file and then raise an exception. *)
 	self#bool_to_bv e
-      with No_rule ->
-	self#ast_exp_base e
+      (* with No_rule -> *)
+      (* 	self#ast_exp_base e *)
     else
       self#ast_exp_base e
 
@@ -347,8 +375,7 @@ object (self)
      	 cut ();
      	 pc ')';
      | BinOp((EQ|LT|LE|SLT|SLE) as op, e1, e2) ->
-       (* These are predicates, which return boolean values. We need
-	  to convert these to one-bit bitvectors. *)
+       (* These are predicates, which return boolean values. *)
        let t1 = Typecheck.infer_ast ~check:false e1 in
        let t2 = Typecheck.infer_ast ~check:false e2 in
        assert (t1 = t2);
@@ -371,7 +398,27 @@ object (self)
        pf e2;
        pp ")";
        cut ();
-     | BinOp((AND|OR|XOR) as bop, e1, e2) ->
+       (* Z3 does not treat xor as associative; they said they would
+	  fix this on 3/28/2011. *)
+     | BinOp(XOR as bop, e1, e2) ->
+	 let t = infer_ast ~check:false e1 in
+	 let t' = infer_ast ~check:false e2 in
+    	 if t <> t' then
+    	   wprintf "Type mismatch: %s" (Pp.ast_exp_to_string e);
+    	 assert (t = t') ;
+    	 let fname = match bop with
+    	   | XOR -> "xor"
+	   | _ -> assert false
+    	 in
+	 pc '(';
+	 pp fname;
+	 space ();
+	 self#ast_exp_bool e1;
+	 space ();
+	 self#ast_exp_bool e2;
+	 cut ();
+	 pc ')'
+     | BinOp((AND|OR(*|XOR*)) as bop, e1, e2) ->
     	 let t = infer_ast ~check:false e1 in
     	 let t' = infer_ast ~check:false e2 in
     	 if t <> t' then

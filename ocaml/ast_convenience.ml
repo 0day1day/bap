@@ -3,6 +3,7 @@
 
 open Ast
 open Type
+open Typecheck
 
 (* exp helpers *)
 let binop op a b = match (a,b) with
@@ -65,3 +66,50 @@ let parse_ite = function
 	  e1) when Typecheck.infer_ast ~check:false b1 = reg_1 ->
     Some(b1, e1, Int(0L, nt))
   | _ -> None
+
+let parse_extract = function
+     | Cast(CAST_LOW, t, BinOp(RSHIFT, e', Int(i, t2))) ->
+     	 (* Optimization:
+     	    Original: extract 0:bits(t)-1, and then shift left by i bits.
+     	    New: extract i:bits(t)-1+i
+     	 *)
+     	 let et = infer_ast ~check:false e' in
+     	 let bits_t = Int64.of_int (bits_of_width t) in
+     	 let lbit = i in
+     	 let hbit = Int64.pred (Int64.add lbit bits_t) in
+     	 (* XXX: This should be unsigned >, but I don't think it matters. *)
+     	 if hbit > Int64.of_int(bits_of_width et) then
+     	   None
+	 else
+	   Some(hbit, lbit)
+     | _ -> None
+
+let parse_concat = function
+  | BinOp(OR,
+	  BinOp(LSHIFT,
+		Cast(CAST_UNSIGNED, nt1, el),
+		Int(bits, _)),
+	  Cast(CAST_UNSIGNED, nt2, er))
+  | BinOp(OR,
+	  Cast(CAST_UNSIGNED, nt2, er),
+	  BinOp(LSHIFT,
+		Cast(CAST_UNSIGNED, nt1, el),
+		Int(bits, _)))
+      when nt1 = nt2 && bits = Int64.of_int(bits_of_width (infer_ast ~check:false er)) ->
+      Some(el, er)
+  | BinOp(OR,
+	  BinOp(LSHIFT,
+		Cast(CAST_UNSIGNED, nt1, el),
+		Int(bits, _)),
+	  (Int(i, nt2) as er))
+  | BinOp(OR,
+	  (Int(i, nt2) as er),
+	  BinOp(LSHIFT,
+		Cast(CAST_UNSIGNED, nt1, el),
+		Int(bits, _)))
+      (* If we cast to nt1 and nt2 and we get the same thing, the
+      optimizer probably just dropped the case. *)
+      when Arithmetic.to64 (i, nt2) = Arithmetic.to64 (i, nt1) ->
+      Some(el, er)
+  | _ -> None
+	 
