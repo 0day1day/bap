@@ -167,7 +167,7 @@ object (self)
 	  | NEG -> pp "(bvneg"; space ();
 	  | NOT -> pp "(bvnot"; space ();
 	 );
-	 self#ast_exp o;
+	 self#ast_exp_bv o;
 	 pc ')'
      | BinOp(OR, _, _) when parse_concat e <> None ->
      	 let el, er = match parse_concat e with
@@ -176,9 +176,9 @@ object (self)
      	 in
      	 pp "(concat";
      	 space ();
-     	 self#ast_exp el;
+     	 self#ast_exp_bv el;
      	 space ();
-     	 self#ast_exp er;
+     	 self#ast_exp_bv er;
      	 cut ();
      	 pc ')'
      | BinOp((AND|OR), _, _) when parse_ite e <> None ->
@@ -231,7 +231,7 @@ object (self)
      	 in
      	 pp ("(extract["^Int64.to_string hbit^":"^Int64.to_string lbit^"]");
      	 space ();
-     	 self#ast_exp e';
+     	 self#ast_exp_bv e';
      	 cut ();
      	 pc ')';
      | Cast((CAST_UNSIGNED|CAST_SIGNED) as ct, t, e1) when (infer_ast ~check:false e1) = reg_1 ->
@@ -278,7 +278,7 @@ object (self)
 	  in
 	  pp pre;
 	  space ();
-	  self#ast_exp e1;
+	  self#ast_exp_bv e1;
 	  cut ();
 	  pp post
       | Unknown(s,t) ->
@@ -311,11 +311,12 @@ object (self)
     cut();
     cls()
 
-  (** Evaluate an expression to a bitvector *)
+  (** Evaluate an expression to a bitvector, preferring bools instead
+      of 1-bit bvs. *)
   method ast_exp e =
     let t = Typecheck.infer_ast ~check:false e in
     if t = reg_1 then
-     (* try *)
+      (* try *)
 	(* XXX: Major bug. Ack... bool_to_bv can print stuff to the
 	   file and then raise an exception. *)
 	self#bool_to_bv e
@@ -323,6 +324,17 @@ object (self)
       (* 	self#ast_exp_base e *)
     else
       self#ast_exp_base e
+
+  (** Evaluates an expression to a bitvector, preferring
+      bitvectors over booleans. *)
+  method ast_exp_bv e =
+    (* try *)
+    (* XXX: Major bug. Ack... bool_to_bv can print stuff to the
+       file and then raise an exception. *)
+    self#ast_exp_base e
+      (* with No_rule -> *)
+      (* 	self#bool_to_bv e *)
+      
 
   (** Try to evaluate an expression to a boolean. If no good rule
       exists, then raises the No_rule exception. *)
@@ -388,7 +400,7 @@ object (self)
 	 | SLE -> "bvsle"
 	 | _ -> assert false
        in
-       let pf = if t1 = reg_1 then self#ast_exp_bool else self#ast_exp
+       let pf = self#ast_exp
        in
        pp "(";
        pp f;
