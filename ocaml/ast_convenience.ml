@@ -41,7 +41,7 @@ let exp_ite ?t b e1 e2 =
   let t1 = Typecheck.infer_ast ~check:false e1 in
   let t2 = Typecheck.infer_ast ~check:false e2 in
   assert (t1 = t2);
-  assert (tb = reg_1);
+  assert (tb = Reg(1));
 
   (match t with
     | None -> ()
@@ -58,12 +58,12 @@ let parse_ite = function
   | BinOp(OR,
 	  BinOp(AND, b1, e1),
 	  BinOp(AND, UnOp(NOT, b2), e2)
-  ) when b1 = b2 && Typecheck.infer_ast ~check:false b1 = reg_1-> 
+  ) when b1 = b2 && Typecheck.infer_ast ~check:false b1 = Reg(1) -> 
     Some(b1, e1, e2)
       (* In case one branch is optimized away *)
   | BinOp(AND,
 	  Cast(CAST_SIGNED, nt, b1),
-	  e1) when Typecheck.infer_ast ~check:false b1 = reg_1 ->
+	  e1) when Typecheck.infer_ast ~check:false b1 = Reg(1) ->
     Some(b1, e1, Int(0L, nt))
   | _ -> None
 

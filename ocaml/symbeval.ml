@@ -73,6 +73,7 @@ let is_true_val = (=) val_true
 let is_false_val = (=) val_false
 let is_symbolic = function
   | Symbolic (Int _) -> false
+  | ConcreteMem _ -> false
   | _ -> true
 let is_concrete = function
   | Int _ -> true
@@ -105,9 +106,9 @@ sig
   val assign : Var.t -> varval -> ctx -> ctx list
 end
   
-module type SymbMem =
+module type EvalTune =
 sig
-  val is_symbolic_store : Ast.exp -> bool 
+  val eval_symb_let : bool 
 end
 
 (* A new interface for the result handling *)
@@ -125,14 +126,12 @@ sig
   val output_formula : unit -> Ast.exp
 end
   
-module Make(MemL: MemLookup)(SMem: SymbMem)(Form: Formula) = 
+module Make(MemL: MemLookup)(Tune: EvalTune)(Form: Formula) = 
 struct
   
   let byte_type = reg_8
   let index_type = reg_32
-    
-  let is_symbolic_store = SMem.is_symbolic_store
-    
+
   (* Lookup functions for basic contexts *)
   let inst_fetch sigma pc =
     Hashtbl.find sigma pc 
@@ -151,7 +150,7 @@ struct
   let update_mem        = MemL.update_mem
   let lookup_mem        = MemL.lookup_mem
   let assign            = MemL.assign
-  let is_symbolic_store = SMem.is_symbolic_store
+  let eval_symb_let     = Tune.eval_symb_let    
   let add_constraint    = Form.add_to_formula
   let output_formula    = Form.output_formula
     
@@ -230,13 +229,14 @@ struct
   let rec eval_expr delta expr =
     (* Decide whether or not we should evaluate the memory, which can
        lead to exponential blow-up due to substitution. *)
-    let symb_mem mem = 
-      if is_symbolic_store mem then 
-	(pdebug "symb mem!" ; Symbolic mem)
-      else eval_expr delta mem 
-    in
+    (* Evaluate an expression e, but only if the evaluation will be
+       the same size as the unevaluated form (or smaller). Each
+       expression type can assume that subexpression evaluation has
+       the same property. *)
     let eval = function 
       | Var v -> 
+	  (* This can clearly result in a large symbolic
+	     result. Should we leave Vars? *)
 	  lookup_var delta v 
       | Int _ as value -> 
 	  Symbolic value
@@ -256,25 +256,21 @@ struct
 	       failwith "not possible"
 	  )
       | BinOp (op,e1,e2) ->
-	  (*let  t1 = Typecheck.infer_ast ~check:false e1 in
-	    let  t2 = Typecheck.infer_ast ~check:false e2 in
-	    if op = PLUS then 
-	    (if t1 != t2 then 
-	    (print_endline ((Pp.ast_exp_to_string e1) ^ " " ^  (Pp.ast_exp_to_string e2)) ;
-	    assert false)
-	    ) ;*)
+	  (* In the worst case, we will just combine two symbolic
+	     expressions. *)
 	  let v1 = eval_expr delta e1
 	  and v2 = eval_expr delta e2 in
-	    if is_symbolic v1 || is_symbolic v2 then 
-	      let e1' = symb_to_exp v1
-	      and e2' = symb_to_exp v2 in
-		Symbolic (BinOp (op, e1', e2'))
-	    else (* if both concrete exprs -> concrete evaluation *)
+	  if is_symbolic v1 || is_symbolic v2 then 
+	    let e1' = symb_to_exp v1
+	    and e2' = symb_to_exp v2 in
+	    Symbolic (BinOp (op, e1', e2'))
+	  else (* if both concrete exprs -> concrete evaluation *)
 	      let e1' = concrete_val_tuple v1
 	      and e2' = concrete_val_tuple v2 in
 	      let (v,t) = (Arithmetic.binop op e1' e2') in
 		Symbolic (Int(v,t))
       | UnOp (op,e) ->
+	  (* In the worst case, we will have a symbolic expression. *)
 	  let v = eval_expr delta e in
 	    if is_symbolic v then 
 	      Symbolic(UnOp(op, symb_to_exp v))
@@ -283,6 +279,7 @@ struct
 	      let (v,t) = Arithmetic.unop op e' in
 		Symbolic (Int (v,t))
       | Cast (ct,t,e) -> 
+	  (* In the worst case, we will have a symbolic expression. *)
 	  let v = eval_expr delta e in
 	    if is_symbolic v then
 	      let e' = symb_to_exp v in
@@ -291,22 +288,32 @@ struct
 	      let e' = concrete_val_tuple v in
 	      let (n',t') = Arithmetic.cast ct e' t in
 		Symbolic (Int (n',t'))
-      | Let (var,e1,e2) ->
+      | Let (var,e1,e2) as l ->
+	  (* Consider let v=e in e+e+e+e+e+e+e+e+e+e+e+e+e+e+e. If e
+	     is not concrete, this could lead to a huge blowup.
+
+	     So, if e is symbolic, we won't attempt to evaluate the expression
+	     further at all. *)
 	  let v1 = eval_expr delta e1 in
-	  let delta' = context_copy delta in (* FIXME: avoid copying *)
+	  if is_symbolic v1 && not eval_symb_let then
+	    Symbolic(l)
+	  else
+	    let delta' = context_copy delta in (* FIXME: avoid copying *)
 	    context_update delta' var v1 ;
 	    let v2 = eval_expr delta' e2 in
-	      v2
+	    v2
       | Load (mem,ind,endian,t) ->
 	  (match t with
 	     | Reg 8 ->
-		 let mem = symb_mem mem 
+		 (* This doesn't introduce any blowup on its own. *)
+		 let mem = eval_expr delta mem 
 		 and ind = eval_expr delta ind
 		 and endian = eval_expr delta endian in
 		 let mem_arr = symb_to_exp ind 
 		 and endian_exp = symb_to_exp endian in
 		   Symbolic (lookup_mem mem mem_arr endian_exp)
 	     | Reg _ ->  (* we only care about 32bit *)
+		 (* Splitting introduces blowup.  Can we avoid it? *)
 		 eval_expr delta (Memory2array.split_loads mem ind t endian)
 	     | Array _ ->
 		 failwith ("loading array currently unsupported" ^ (Pp.typ_to_string t))
@@ -318,13 +325,12 @@ struct
 	  and endian = symb_to_exp (eval_expr delta endian) in
 	    (match t with
 	       | Reg 8 -> 
-		   let mem = symb_mem mem in
+		   (* No blowup here. *)
+		   let mem = eval_expr delta mem in
 		     update_mem mem index value endian
 	       | Reg _ -> 
-		   if not (is_symbolic_store mem) && is_concrete index
-		   then eval_expr delta (* we only care about 32bit *)
-		     (Memory2array.split_writes mem index t endian value)
-		   else symb_mem 
+		   (* Splitting blowup, but I don't know how to avoid this. *)
+		   eval_expr delta 
 		     (Memory2array.split_writes mem index t endian value)
 	       | Array _ -> 
 		   failwith "storing array currently unsupported"
@@ -502,19 +508,15 @@ struct
     context_update delta v ev ;
     [{ctx with pc=Int64.succ pc}]
 end
-  
-module FullSubst =
+
+module FastEval =
 struct
-  let is_symbolic_store = function
-    | Store _ (*| Let _*) -> true
-    | _ -> false
+  let eval_symb_let = false
 end
 
-module PartialSubst =
+module SlowEval =
 struct
-  let is_symbolic_store = function
-    | Store _ | Let _ -> true
-    | _ -> false
+  let eval_symb_let = true
 end
 
 module StdForm =
@@ -525,13 +527,13 @@ struct
   let output_formula () = failwith "Formula output unsupported"
 end
   
-module Symbolic = Make(SymbolicMemL)(FullSubst)(StdForm)
-module SymbolicFast = Make(SymbolicMemL)(PartialSubst)(StdForm)
+module Symbolic = Make(SymbolicMemL)(FastEval)(StdForm)
+module SymbolicSlow = Make(SymbolicMemL)(SlowEval)(StdForm)
 
-module Concrete = Make(ConcreteMemL)(FullSubst)(StdForm)
+module Concrete = Make(ConcreteMemL)(FastEval)(StdForm)
 
 (** Execute a program concretely *)
-let concretely_execute p ?(i=[]) s  =
+let concretely_execute ?s ?(i=[]) p =
   let rec step ctx =
     try
       let s = Concrete.inst_fetch ctx.sigma ctx.pc in
@@ -550,7 +552,10 @@ let concretely_execute p ?(i=[]) s  =
 			      | _ -> failwith "Expected one context"
 			   ) ctx i
   in
-  let ctx = {ctx with pc = Concrete.label_decode ctx.lambda (Addr s)} in
+  let ctx = match s with
+    | Some(s) -> {ctx with pc = Concrete.label_decode ctx.lambda (Addr s)} 
+    | None -> ctx
+  in
   let ctx = step ctx in
   Concrete.print_values ctx.delta;
   Concrete.print_mem ctx.delta;

@@ -44,7 +44,7 @@ class pp ?suffix:(s="") ft =
     in
     match e with
     | BinOp(bop, e1, e2) ->
-	oh bop e1 e2
+	List.rev (oh bop e1 e2)
     | _ -> failwith "opflatten expects a binop"
   in
 
@@ -70,9 +70,9 @@ object (self)
   method bv_to_bool e =
     pp "(=";
     space ();
-    pp "bv1[1]";
-    space ();
     self#ast_exp_base e;
+    space ();
+    pp "bv1[1]";
     pp ")"
 
   method flush () =
@@ -234,7 +234,7 @@ object (self)
      	 self#ast_exp_bv e';
      	 cut ();
      	 pc ')';
-     | Cast((CAST_UNSIGNED|CAST_SIGNED) as ct, t, e1) when (infer_ast ~check:false e1) = reg_1 ->
+     | Cast((CAST_UNSIGNED|CAST_SIGNED) as ct, t, e1) when (infer_ast ~check:false e1) = Reg(1) ->
 	 (* Optimization: 
 	    CAST(UNSIGNED, Reg n, bool_e) =
 	    ite bool_e 1[n] 0[n]
@@ -274,6 +274,7 @@ object (self)
 	    | CAST_LOW      -> ("(extract["^string_of_int(bitsnew-1)^":0]", ")")
 	    | CAST_HIGH     -> ("(extract["^string_of_int(bitsold-1)^":"^string_of_int(bitsold-bitsnew)^"]", ")")
 	    | CAST_UNSIGNED -> ("(zero_extend["^string_of_int(delta)^"]", ")")
+	    (* | CAST_UNSIGNED -> ("(concat bv0["^string_of_int(delta)^"] ", ")") *)
 	    | CAST_SIGNED -> ("(sign_extend["^string_of_int(delta)^"]", ")")
 	  in
 	  pp pre;
@@ -315,7 +316,7 @@ object (self)
       of 1-bit bvs. *)
   method ast_exp e =
     let t = Typecheck.infer_ast ~check:false e in
-    if t = reg_1 then
+    if t = Reg(1) then
       (* try *)
 	(* XXX: Major bug. Ack... bool_to_bv can print stuff to the
 	   file and then raise an exception. *)
@@ -340,7 +341,7 @@ object (self)
       exists, then raises the No_rule exception. *)
   method ast_exp_bool_base e =
     let t = Typecheck.infer_ast ~check:false e in
-    assert (t = reg_1);
+    assert (t = Reg(1));
     opn 0;
     (match e with
      | Int((i, Reg t) as p) when t = 1 ->
@@ -386,21 +387,28 @@ object (self)
      	 self#ast_exp_bool e2;
      	 cut ();
      	 pc ')';
+     (* Short cuts for e = exp_true and e = exp_false *)
+     | BinOp(EQ, e1, e2) when e1 = Int(1L, Reg(1)) ->
+	 self#ast_exp_bool e2	 
+     | BinOp(EQ, e2, e1) when e1 = Int(1L, Reg(1)) ->
+	 self#ast_exp_bool e2
+     | BinOp(EQ, e1, e2) when e1 = Int(0L, Reg(1)) ->
+	 self#ast_exp_bool (UnOp(NOT, e2))
+     | BinOp(EQ, e2, e1) when e1 = Int(0L, Reg(1)) ->
+	 self#ast_exp_bool (UnOp(NOT, e2))
      | BinOp((EQ|LT|LE|SLT|SLE) as op, e1, e2) ->
        (* These are predicates, which return boolean values. *)
        let t1 = Typecheck.infer_ast ~check:false e1 in
        let t2 = Typecheck.infer_ast ~check:false e2 in
        assert (t1 = t2);
-       let f = match op with
-	 | EQ when t1 = reg_1 -> "iff" (* = only applies to terms... but booleans are formulas, not terms *)
-	 | EQ -> "="
-	 | LT -> "bvult"
-	 | LE -> "bvule"
-	 | SLT -> "bvslt"
-	 | SLE -> "bvsle"
+       let f,pf = match op with
+	 | EQ when t1 = Reg(1) -> "iff", self#ast_exp_bool (* = only applies to terms... but booleans are formulas, not terms *)
+	 | EQ -> "=", self#ast_exp
+	 | LT -> "bvult", self#ast_exp
+	 | LE -> "bvule", self#ast_exp
+	 | SLT -> "bvslt", self#ast_exp
+	 | SLE -> "bvsle", self#ast_exp
 	 | _ -> assert false
-       in
-       let pf = self#ast_exp
        in
        pp "(";
        pp f;
@@ -468,7 +476,7 @@ object (self)
       exists, uses bitvector conversion instead. *)
   method ast_exp_bool e =
     let t = Typecheck.infer_ast ~check:false e in
-    assert (t = reg_1);
+    assert (t = Reg(1));
     try self#ast_exp_bool_base e
     with No_rule ->
       self#bv_to_bool e
