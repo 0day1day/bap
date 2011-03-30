@@ -13,6 +13,8 @@ module VH = Var.VarHash
 
 type sort = BitVec | Bool
 
+let use_booleans = ref false ;;
+
 (** This printer has to deal with a number of differences between the
     BAP IL and SMTLIB.  One of the most striking is that SMTLIB has
     separate types for booleans and bitvectors of one bit; BAP only has
@@ -127,7 +129,7 @@ object (self)
   (** Returns a lazy expression that prints let v = e1 in e2. Never raises No_rule. *)
   method letme v e1 e2 st =
     let t1 = Typecheck.infer_ast ~check:false e1 in
-    let cmd,c,pf,vst = match t1 with Reg 1 -> "flet","$",self#ast_exp_bool,Bool | _ -> "let","?",self#ast_exp,BitVec in
+    let cmd,c,pf,vst = match t1,!use_booleans with Reg 1,true -> "flet","$",self#ast_exp_bool,Bool | _ -> "let","?",self#ast_exp,BitVec in
     let pf2 = match st with Bool -> self#ast_exp_bool | BitVec -> self#ast_exp in
     (* The print functions called, ast_exp and ast_exp_bool never
        raise No_rule. So, we don't need to evaluate them before the lazy
@@ -397,21 +399,23 @@ object (self)
   (** Evaluate an expression to a bitvector, preferring bools instead
       of 1-bit bvs. *)
   method ast_exp e =
-    let t = Typecheck.infer_ast ~check:false e in
-    if t = Reg(1) then
-      try
-	(* ML is call by value, so the argument will be fully
-	   evaluated to a lazy evaluation.  If this suceeds without a
-	   No_rule exception, THEN the lazy evaluation will occur,
-	   causing the formatter to print.
-
-	   E.g., Lazy.force e is the same as let lazye = e in Lazy.force lazye.
-	*)
-	Lazy.force (self#bool_to_bv e)
-      with No_rule ->
-	Lazy.force (self#ast_exp_base e)
-    else
-      Lazy.force (self#ast_exp_base e)
+    if not !use_booleans then self#ast_exp_bv e
+    else (
+      let t = Typecheck.infer_ast ~check:false e in
+      if t = Reg(1) then
+	try
+	  (* ML is call by value, so the argument will be fully
+	     evaluated to a lazy evaluation.  If this suceeds without a
+	     No_rule exception, THEN the lazy evaluation will occur,
+	     causing the formatter to print.
+	     
+	     E.g., Lazy.force e is the same as let lazye = e in Lazy.force lazye.
+	  *)
+	  Lazy.force (self#bool_to_bv e)
+	with No_rule ->
+	  Lazy.force (self#ast_exp_base e)
+      else
+	Lazy.force (self#ast_exp_base e))
 
   (** Evaluates an expression to a bitvector, preferring
       bitvectors over booleans. *)
@@ -580,10 +584,15 @@ object (self)
   method ast_exp_bool e =
     let t = Typecheck.infer_ast ~check:false e in
     assert (t = Reg(1));
-    try Lazy.force (self#ast_exp_bool_base e)
-    with No_rule ->
-      Lazy.force (self#bv_to_bool e)
-
+    if !use_booleans then (
+      try Lazy.force (self#ast_exp_bool_base e)
+      with No_rule ->
+	Lazy.force (self#bv_to_bool e)
+    ) else (
+      try Lazy.force (self#bv_to_bool e)
+      with No_rule ->
+	Lazy.force (self#ast_exp_bool_base e)
+    )
 
   method forall = function
     | [] -> ()
