@@ -7,6 +7,9 @@ open Type
 module VH = Var.VarHash
 module F = Format
 
+module D = Debug.Make(struct let name = "pp" and default=`Debug end)
+open D
+
 let output_varnums = ref true
 
 let rec typ_to_string = function
@@ -125,32 +128,38 @@ object (self)
     | Addr x -> printf "addr 0x%Lx" x
 
   method int i t =
-    match (Arithmetic.tos64 (i,t), t) with
+    let (i,t) = try Arithmetic.tos64 (i,t), t 
+    with Arithmetic.ArithmeticEx _ ->
+      (* tos won't work for registers >= 64.  But, constants of such
+	 type don't need to have their bits set to zero, anyway. *)
+      (match t with Reg n when n >= 64 -> (i, t) | _ -> failwith "Unable to remove high-order bits while printing int")
+    in
+    match (i, t) with
     | (0L, Reg 1) -> pp "false"
     | (-1L, Reg 1) -> pp "true"
     | (i,t) ->
-      if i < 10L && i > -10L
-      then pp (Int64.to_string i)
-      else printf "0x%Lx" i;
-      pp ":"; self#typ t
+	if i < 10L && i > -10L
+	then pp (Int64.to_string i)
+	else printf "0x%Lx" i;
+	pp ":"; self#typ t
 
 
   (* prec tells us how much parenthization we need. 0 means it doesn't need
      to be parenthesized. Larger numbers means it has higher precedence.
      Maximum prec before paretheses are added are as follows:
-	  5 Let
-          7 Ite
-         10 Store
-	 20 OR
-	 30 XOR
-	 40 AND
-	 50 EQ NEQ
-	 60 LT SLT SLE LE
-	 70 LSHIFT RSHIFT ARSHIFT
-	 80 PLUS MINUS
-	 90 TIMES DIVIDE SDIVIDE MOD SMOD
-	 100 UMINUS NOT
-         110 Get
+     5 Let
+     7 Ite
+     10 Store
+     20 OR
+     30 XOR
+     40 AND
+     50 EQ NEQ
+     60 LT SLT SLE LE
+     70 LSHIFT RSHIFT ARSHIFT
+     80 PLUS MINUS
+     90 TIMES DIVIDE SDIVIDE MOD SMOD
+     100 UMINUS NOT
+     110 Get
      Because we don't distinguish precedence to the right or left, we will
      always overparethesise expressions such as:
      let x = y in x + let x = 2:reg32_t in x

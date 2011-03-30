@@ -35,6 +35,7 @@
 open Type
 open Ssa
 open ExtList
+open Arithmetic
 
 module VH = Var.VarHash
 module C = Cfg.SSA
@@ -178,18 +179,26 @@ let opt_expid info var exp =
   match eid with
   (* constant folding *)
   | Bin(op, HInt v1, HInt v2) ->
-      toconst (Arithmetic.binop op v1 v2)
+      (* Arithmetic can fail when regs are too big. We catch it here
+	 and don't simplify.  This is kind of a hack. *)      
+      (try
+	toconst (Arithmetic.binop op v1 v2)
+      with ArithmeticEx _ -> eid)
   | Un(op, HInt v) ->
-      toconst (Arithmetic.unop op v)
+      (try
+	 toconst (Arithmetic.unop op v)
+       with ArithmeticEx _ -> eid)
   | Cst(ct, t, HInt v) ->
-      toconst (Arithmetic.cast ct v t)
+      (try
+	 toconst (Arithmetic.cast ct v t)
+       with ArithmeticEx _ -> eid)
   | It(HInt(1L,t), x, _) ->
       sameas x
   | It(HInt(0L,t), _, y) ->
       sameas y
   | It(b, x, y) when x = y ->
       sameas x
-  (* phis can be constant*)
+	(* phis can be constant*)
   | Ph(x::xs) as eid -> (
       match
 	List.fold_left

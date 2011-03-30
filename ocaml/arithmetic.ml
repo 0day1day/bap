@@ -10,6 +10,8 @@ module D = Debug.Make(struct let name = "Arithmetic" and default = `Debug end)
 open D
 open Type
 
+exception ArithmeticEx of string
+
 let bits_of_width = function
   | Reg n -> n
   | _ -> failwith "Expected register type"
@@ -17,14 +19,14 @@ let bits_of_width = function
 (* drop high bits *)
 let to64 (i,t) =
   let bits = 64 - bits_of_width t in
-  if bits < 0 then failwith "Arithmetic only works on reg64 and smaller";
+  if bits < 0 then raise (ArithmeticEx("Arithmetic only works on reg64 and smaller"));
   Int64.shift_right_logical (Int64.shift_left i bits) bits
 
 
 (* sign extend to 64 bits*)
 let tos64 (i,t) =
   let bits = 64 - bits_of_width t in
-  if bits < 0 then failwith "Arithmetic only works on reg64 and smaller";
+  if bits < 0 then raise (ArithmeticEx("Arithmetic only works on reg64 and smaller"));
   Int64.shift_right (Int64.shift_left i bits) bits
 
   
