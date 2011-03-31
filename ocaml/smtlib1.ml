@@ -13,7 +13,7 @@ module VH = Var.VarHash
 
 type sort = BitVec | Bool
 
-let use_booleans = ref false ;;
+let use_booleans = ref true ;;
 
 (** This printer has to deal with a number of differences between the
     BAP IL and SMTLIB.  One of the most striking is that SMTLIB has
