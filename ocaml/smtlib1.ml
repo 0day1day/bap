@@ -628,7 +628,27 @@ object (self)
 	pp "):";
 	cls();space();
 
-  method open_benchmark () =
+  method open_benchmark e =
+    let has_mem e =
+      let found_mem = ref false in
+      let v = object(self)
+	inherit Ast_visitor.nop
+	method visit_exp = function
+	  | Load _
+	  | Store _ -> found_mem := true; `SkipChildren
+	  | Var v when not (is_integer_type (Var.typ v)) -> found_mem := true; `SkipChildren
+	  | _ when !found_mem -> `SkipChildren
+	  | _ -> `DoChildren	  
+      end
+      in
+      ignore(Ast_visitor.exp_accept v e);
+      !found_mem
+    in
+    let get_logic e =
+      match has_mem e with
+      | true -> "QF_ABV"
+      | false -> "QF_BV"
+    in
     pc '(';
     opn 0;
     pp "benchmark file.smt";
@@ -641,7 +661,7 @@ object (self)
     force_newline();
     pp ":category { Unknown }";
     force_newline();
-    pp ":logic QF_AUFBV";
+    pp (":logic "^(get_logic e));
     force_newline()
 
   method close_benchmark () =
@@ -659,7 +679,7 @@ object (self)
   (*   cls() *)
 
   method assert_ast_exp_with_foralls ?(fvars=true) foralls e =
-    self#open_benchmark ();
+    self#open_benchmark e;
     if fvars then (
       self#declare_new_freevars e;
       force_newline();
@@ -680,7 +700,7 @@ object (self)
 
   (** Is e a valid expression (always true)? *)
   method valid_ast_exp ?(exists=[]) ?(foralls=[]) e =
-    self#open_benchmark ();
+    self#open_benchmark e;
     self#declare_new_freevars e;
     force_newline();
     pp ":formula (";

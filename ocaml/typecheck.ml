@@ -24,6 +24,8 @@ let is_integer_type = function
   | Reg _ -> true
   | TMem _ | Array _ -> false
 
+let is_mem_type t = not (is_integer_type t)
+
 let bits_of_width = function
   | Reg n -> n
   | _ -> invalid_arg "bits_of_width"
