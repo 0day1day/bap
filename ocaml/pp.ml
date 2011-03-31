@@ -128,17 +128,17 @@ object (self)
     | Addr x -> printf "addr 0x%Lx" x
 
   method int i t =
-    let (i,t) = try Arithmetic.tos64 (i,t), t 
+    let (is, i) = try Arithmetic.tos64 (i,t), Arithmetic.to64 (i,t) 
     with Arithmetic.ArithmeticEx _ ->
       (* tos won't work for registers >= 64.  But, constants of such
 	 type don't need to have their bits set to zero, anyway. *)
-      (match t with Reg n when n >= 64 -> (i, t) | _ -> failwith "Unable to remove high-order bits while printing int")
+      (match t with Reg n when n >= 64 -> (i, i) | _ -> failwith "Unable to remove high-order bits while printing int")
     in
-    match (i, t) with
+    match (is, t) with
     | (0L, Reg 1) -> pp "false"
     | (-1L, Reg 1) -> pp "true"
-    | (i,t) ->
-	if i < 10L && i > -10L
+    | _ ->
+	if is < 10L && is > -10L
 	then pp (Int64.to_string i)
 	else printf "0x%Lx" i;
 	pp ":"; self#typ t
