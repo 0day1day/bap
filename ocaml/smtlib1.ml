@@ -516,7 +516,6 @@ object (self)
 	       with No_rule ->
 	     (* We have one bool, and one bv.  We'll have to use a
 		conversion. *)
-		 dprintf "One bool and one bv %s %s" (Pp.ast_exp_to_string e1) (Pp.ast_exp_to_string e2);
 		 "iff", lazy (self#ast_exp_bool e1), lazy (self#ast_exp_bool e2))	     
 	 )
 	 else
