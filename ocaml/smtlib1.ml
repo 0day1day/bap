@@ -507,13 +507,20 @@ object (self)
        let f,pe1,pe2 = 
 	 (* If we can print as bool, we can use iff.  Otherwise, we
 	    can use =. *)
-	 if t1 = Reg(1) then
+	 if t1 = Reg(1) then (
 	   try
 	     "iff", self#ast_exp_bool_base e1, self#ast_exp_bool_base e2
 	   with No_rule ->
-	     "=", self#ast_exp_base e1, self#ast_exp_base e2
+	     (try
+		 "=", self#ast_exp_base e1, self#ast_exp_base e2
+	       with No_rule ->
+	     (* We have one bool, and one bv.  We'll have to use a
+		conversion. *)
+		 dprintf "One bool and one bv %s %s" (Pp.ast_exp_to_string e1) (Pp.ast_exp_to_string e2);
+		 "iff", lazy (self#ast_exp_bool e1), lazy (self#ast_exp_bool e2))	     
+	 )
 	 else
-	     "=", self#ast_exp_base e1, self#ast_exp_base e2
+	   "=", lazy (self#ast_exp_bv e1), lazy (self#ast_exp_bv e2)
        in
        lazy(
 	 pp "(";
