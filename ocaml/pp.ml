@@ -12,6 +12,8 @@ open D
 
 let output_varnums = ref true
 
+let many_parens = ref false
+
 let rec typ_to_string = function
   | Reg 1 -> "bool"
   | Reg 8 -> "u8"
@@ -165,8 +167,8 @@ object (self)
      let x = y in x + let x = 2:reg32_t in x
   *)
   method ast_exp ?(prec=0) e =
-    let lparen bind = if bind < prec then pp "("
-    and rparen bind = if bind < prec then pp ")"
+    let lparen bind = if !many_parens || bind < prec then pp "("
+    and rparen bind = if !many_parens || bind < prec then pp ")"
     and binop_prec = function
       | OR -> 20
       | XOR -> 30

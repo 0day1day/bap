@@ -69,7 +69,7 @@ class pp ?suffix:(s="") ft =
     in
     match e with
     | BinOp(bop, e1, e2) ->
-	List.rev (oh bop e1 e2)
+	oh bop e1 e2
     | _ -> failwith "opflatten expects a binop"
   in
 
@@ -492,21 +492,45 @@ object (self)
 	 )
      (* Short cuts for e = exp_true and e = exp_false *)
      | BinOp(EQ, e1, e2) when e1 = Int(1L, Reg(1)) ->
-	 lazy(self#ast_exp_bool e2)
+     	 lazy(self#ast_exp_bool e2)
      | BinOp(EQ, e2, e1) when e1 = Int(1L, Reg(1)) ->
-	 lazy(self#ast_exp_bool e2)
+     	 lazy(self#ast_exp_bool e2)
      | BinOp(EQ, e1, e2) when e1 = Int(0L, Reg(1)) ->
-	 lazy(self#ast_exp_bool (UnOp(NOT, e2)))
+     	 lazy(self#ast_exp_bool (UnOp(NOT, e2)))
      | BinOp(EQ, e2, e1) when e1 = Int(0L, Reg(1)) ->
-	 lazy(self#ast_exp_bool (UnOp(NOT, e2)))
-     | BinOp((EQ|LT|LE|SLT|SLE) as op, e1, e2) ->
+     	 lazy(self#ast_exp_bool (UnOp(NOT, e2)))
+     | BinOp(EQ, e1, e2) ->
+       (* These are predicates, which return boolean values. *)
+       let t1 = Typecheck.infer_ast ~check:false e1 in
+       let t2 = Typecheck.infer_ast ~check:false e2 in
+       assert (t1 = t2);
+       let f,pe1,pe2 = 
+	 (* If we can print as bool, we can use iff.  Otherwise, we
+	    can use =. *)
+	 if t1 = Reg(1) then
+	   try
+	     "iff", self#ast_exp_bool_base e1, self#ast_exp_bool_base e2
+	   with No_rule ->
+	     "=", self#ast_exp_base e1, self#ast_exp_base e2
+	 else
+	     "=", self#ast_exp_base e1, self#ast_exp_base e2
+       in
+       lazy(
+	 pp "(";
+	 pp f;
+	 space ();
+	 Lazy.force pe1;
+	 space ();
+	 Lazy.force pe2;
+	 pp ")";
+	 cut ();
+       )
+     | BinOp((LT|LE|SLT|SLE) as op, e1, e2) ->
        (* These are predicates, which return boolean values. *)
        let t1 = Typecheck.infer_ast ~check:false e1 in
        let t2 = Typecheck.infer_ast ~check:false e2 in
        assert (t1 = t2);
        let f,pf = match op with
-	 | EQ when t1 = Reg(1) -> "iff", self#ast_exp_bool (* = only applies to terms... but booleans are formulas, not terms *)
-	 | EQ -> "=", self#ast_exp
 	 | LT -> "bvult", self#ast_exp
 	 | LE -> "bvule", self#ast_exp
 	 | SLT -> "bvslt", self#ast_exp
@@ -572,16 +596,17 @@ object (self)
 	  then 
 	    lazy(self#ast_exp_bool e1) 
 	  else 
-	    (* XXX: WTF? *)
-	    let pe = self#bv_to_bool e in 
-	    lazy(Lazy.force pe)
+	    (* (\* XXX: WTF? *\) *)
+	    (* let pe = self#bv_to_bool e in  *)
+	    (* lazy(Lazy.force pe) *)
+	    raise No_rule
      | Var v ->
 	 let name,st = VH.find ctx v in
 	 (match st with
 	 | BitVec -> raise No_rule
 	 | Bool -> lazy(pp name)) 
      | Let(v, e1, e2) -> self#letme v e1 e2 Bool
-     | _ -> cls(); raise No_rule
+     | _ -> raise No_rule
       ) in
     lazy (opn 0; Lazy.force lazye; cut (); cls ())
 
