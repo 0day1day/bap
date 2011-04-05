@@ -1006,6 +1006,8 @@ let formula_size formula =
   let (+) = Int64.add in
   let rec size = function
     | Ast.Ite(_,e1,e2) -> Int64.one + (size e1) + (size e2)
+    | Ast.Extract(_,_,e) -> Int64.one + (size e)
+    | Ast.Concat(el,er) -> Int64.one + (size el) + (size er)
     | Ast.BinOp(_,e1,e2) -> Int64.one + (size e1) + (size e2)
     | Ast.UnOp(_,e) -> Int64.one + size e
     | Ast.Var _ -> Int64.one

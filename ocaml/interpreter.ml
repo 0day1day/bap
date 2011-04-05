@@ -351,6 +351,13 @@ struct
     and e1 = eval_expr e1 env st
     and e2 = eval_expr e2 env st in
     Scalar(if Int ce = exp_true then e1 else e2)
+  let extract (h,l,e) env st =
+    let e = eval_expr e env st in
+    Scalar(Arithmetic.extract h l e)
+  let concat (le,re) env st =
+    let le = eval_expr le env st in
+    let re = eval_expr re env st in
+    Scalar(Arithmetic.concat le re)
   let binop (op,e1,e2) env st = 
     let e1 = eval_expr e1 env st
     and e2 = eval_expr e2 env st in

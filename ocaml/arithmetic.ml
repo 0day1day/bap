@@ -103,6 +103,27 @@ let cast ct ((_,t) as v) t2 =
 	    ((Int64.lognot(Int64.shift_left (-1L) bits))) )
   )
 
+
+let extract h l ((_,t) as v) =
+  let n = Int64.succ (Int64.sub h l) in
+  let nt = Reg(Int64.to_int n) in
+  let s = binop RSHIFT v (l,t) in
+  cast CAST_LOW s nt
+  
+
+let concat ((_,lt) as lv) ((_,rt) as rv) =
+  let bitsl,bitsr =
+    match lt, rt with
+    | Reg(bitsl), Reg(bitsr) -> bitsl, bitsr
+    | _ -> failwith "concat"
+  in
+  let nt = Reg(bitsl + bitsr) in
+  let lv = cast CAST_LOW lv nt in
+  let rv = cast CAST_LOW rv nt in
+  let lv = binop LSHIFT lv (Int64.of_int bitsr, lt) in
+  binop OR lv rv
+
+
 let is_zero ((i,t) as v) =
   let zero = 0L in
   let i64 = to64 v in

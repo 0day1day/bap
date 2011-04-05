@@ -69,7 +69,7 @@ let parse_ite = function
 
 let parse_extract = function
      | Cast(CAST_LOW, t, BinOp(RSHIFT, e', Int(i, t2))) ->
-     	 (* Optimization:
+     	 (* 
      	    Original: extract 0:bits(t)-1, and then shift left by i bits.
      	    New: extract i:bits(t)-1+i
      	 *)
@@ -113,3 +113,37 @@ let parse_concat = function
       Some(el, er)
   | _ -> None
 	 
+(* Functions for removing expression types 
+
+   Should these recurse on subexpressions?
+*)
+let rm_ite = function
+  | Ite(b, e1, e2) ->
+      let t = Typecheck.infer_ast b in
+      if t = reg_1 then
+	(b &* e1) |*  (exp_not b &* e2)
+      else
+	((cast_signed t b) &* e1) |* ((cast_signed t (exp_not b)) &* e2) 
+  | _ -> assert false (* Should we just act as a noop? *)
+
+let rm_extract = function
+  | Extract(h, l, e) ->
+      let nb = Int64.to_int (Int64.succ (Int64.sub h l)) in
+      let nt = Reg(nb) in
+      assert(h >= 0L);
+      assert (nb >= 0);
+      let t = infer_ast ~check:false e in
+      let e = if l <> 0L then e >>* Int(l, t) else e in
+      let e = if t <> nt then cast_low nt e else e in
+      e
+  | _ -> assert false
+
+let rm_concat = function
+  | Concat(le, re) ->
+      let bitsl,bitsr = 
+	Typecheck.bits_of_width (Typecheck.infer_ast ~check:false le),
+	Typecheck.bits_of_width (Typecheck.infer_ast ~check:false re) 		 
+      in
+      let nt = Reg(bitsl + bitsr) in
+      exp_or ((cast_unsigned nt le) <<* Int(Int64.of_int bitsr, nt)) (cast_unsigned nt re)
+  | _ -> assert false

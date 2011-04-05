@@ -109,6 +109,20 @@ object (self)
 	 space ();
 	 self#ast_exp v2;
 	 pc ')'
+     | Extract(h,l,e) ->
+	 pp "(";
+	 self#ast_exp e;
+	 pp ")[";
+	 pi (Int64.to_int h);
+	 pc ':';
+	 pi (Int64.to_int l);
+	 pc ']'
+     | Concat(le,re) ->
+	 pc '(';
+	 self#ast_exp le;
+	 pc '@';
+	 self#ast_exp re;
+	 pc ')'
      | Var v ->
 	 self#var v
      | UnOp(uop, o) ->

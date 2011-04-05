@@ -27,6 +27,8 @@ struct
     val int     : (int64 * typ) -> process_exp
     val lab     : string -> process_exp
     val ite     : (Ast.exp * Ast.exp * Ast.exp) -> process_exp
+    val extract : (int64 * int64 * Ast.exp) -> process_exp
+    val concat  : (Ast.exp * Ast.exp) -> process_exp
     val binop   : (binop_type * Ast.exp * Ast.exp) -> process_exp
     val unop    : (unop_type * Ast.exp) -> process_exp
     val cast    : (cast_type * typ * Ast.exp) -> process_exp
@@ -56,6 +58,8 @@ struct
       | Int i     -> Expr.int i
       | Lab l     -> Expr.lab l
       | Ite i     -> Expr.ite i
+      | Extract e -> Expr.extract e
+      | Concat c  -> Expr.concat c
       | BinOp b   -> Expr.binop b
       | UnOp u    -> Expr.unop u
       | Cast c    -> Expr.cast c

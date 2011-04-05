@@ -293,10 +293,6 @@ object (self)
 	   pc '('; pp fname; space (); Lazy.force pe1; space (); Lazy.force pe2; pc ')';
 	 )
      | Cast(CAST_LOW, t, BinOp(RSHIFT, e', Int(i, t2))) when parse_extract e <> None ->
-     	 (* Optimization:
-     	    Original: extract 0:bits(t)-1, and then shift left by i bits.
-     	    New: extract i:bits(t)-1+i
-     	 *)
      	 let hbit, lbit = match parse_extract e with
      	   | Some(hbit, lbit) -> hbit, lbit
      	   | None -> assert false
@@ -364,7 +360,27 @@ object (self)
 	    cut ();
 	    pp post
 	  )
-      | Unknown(s,t) ->
+     | Concat(le,re) ->
+	 let pe1 = lazy (self#ast_exp le) in
+	 let pe2 = lazy (self#ast_exp re) in
+	 lazy (
+	   pp "(concat ";
+	   Lazy.force pe1;
+	   space ();
+	   Lazy.force pe2;
+	   cut ();
+	   pc ')'
+	 )
+     | Extract(h,l,e) ->
+	 let pe = lazy (self#ast_exp e) in
+	 lazy(
+	   pp ("(extract["^Int64.to_string(h)^":"^Int64.to_string(l)^"]");
+	   space ();
+	   Lazy.force pe;
+	   cut ();
+	   pc ')'
+	 )
+     | Unknown(s,t) ->
 	  lazy (
 	    pp "unknown_"; pi unknown_counter; pp" ;"; pp s; force_newline();
 	    unknown_counter <- unknown_counter + 1;

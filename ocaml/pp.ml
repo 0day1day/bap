@@ -152,6 +152,8 @@ object (self)
      5 Let
      7 Ite
      10 Store
+     12 Concat
+     15 Extract
      20 OR
      30 XOR
      40 AND
@@ -202,16 +204,32 @@ object (self)
 	 lparen 7;
 	 pp "if";
 	 space ();
-	 self#ast_exp c;
+	 self#ast_exp ~prec:7 c;
 	 space ();
 	 pp "then";
 	 space ();
-	 self#ast_exp x;
+	 self#ast_exp ~prec:7 x;
 	 space ();
 	 pp "else";
 	 space ();
-	 self#ast_exp y;	 
+	 self#ast_exp ~prec:7 y;	 
 	 rparen 7
+     | Ast.Extract(h, l, e) ->
+	 pp "extract:";
+	 pp (Int64.to_string h);
+	 pc ':';
+	 pp (Int64.to_string l);
+	 pc ':';
+	 pc '[';
+	 self#ast_exp e;
+	 pc ']';
+     | Ast.Concat(le, re) ->
+	 pp "concat:";
+	 pc '[';
+	 self#ast_exp le;
+	 pp "][";
+	 self#ast_exp re;
+	 pc ']'
      | Ast.BinOp(b,x,y) ->
 	 let p = binop_prec b in
 	 lparen p;
@@ -238,10 +256,10 @@ object (self)
 	 lparen 5;
 	 pp "let "; self#var v; pp " :=";
 	 opn 2; space();
-	 self#ast_exp e1; space(); 
+	 self#ast_exp ~prec:5 e1; space(); 
 	 cls();
 	 pp "in"; space();
-	 self#ast_exp e2;
+	 self#ast_exp ~prec:5 e2;
 	 rparen 5
      | Ast.Unknown(s,t) ->
 	 pp "unknown \""; pp s; pp "\":"; self#typ t
@@ -345,6 +363,20 @@ object (self)
 	 pp "else";
 	 space ();
 	 self#ssa_value y	 
+     | Ssa.Extract(h, l, e) ->
+	 pp "extract:";
+	 pp (Int64.to_string h);
+	 pc ':';
+	 pp (Int64.to_string l);
+	 pp ":[";
+	 self#ssa_value e;
+	 pc ']';
+     | Ssa.Concat(lv, rv) ->
+	 pp "concat:[";
+	 self#ssa_value lv;
+	 pp "][";
+	 self#ssa_value rv;
+	 pc ']'
      | Ssa.BinOp(b, x, y) ->
 	 self#ssa_value x;
 	 pp " "; pp (binop_to_string b); space();

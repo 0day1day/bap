@@ -52,6 +52,8 @@ let top = Top
 type expid = 
   | Const of Ssa.value (* Except Var *)
   | It of vn * vn * vn
+  | Ex of int64 * int64 * vn
+  | Con of vn * vn
   | Bin of binop_type * vn * vn
   | Un of unop_type * vn
   | Cst of cast_type * typ * vn
@@ -156,6 +158,8 @@ let get_expid info =
 	vn2eid info (vn v) 
     | Val v -> Const v
     | Ite(c,v1,v2) -> It(vn c, vn v1, vn v2)
+    | Extract(h,l,e) -> Ex(h,l, vn e)
+    | Concat(le,re) -> Con(vn le, vn re)
     | BinOp((PLUS|TIMES|AND|OR|XOR|EQ|NEQ) as op,v1,v2) ->
 	let (h1,h2) = (vn v1, vn v2) in
 	if h1 <= h2 then Bin(op, h1, h2) else Bin(op, h2, h1)
@@ -198,7 +202,16 @@ let opt_expid info var exp =
       sameas y
   | It(b, x, y) when x = y ->
       sameas x
-	(* phis can be constant*)
+  (* XXX: Extract(Shift) optimizations *)
+  | Ex(h, l, HInt v) ->
+      (try
+	 toconst (Arithmetic.extract h l v)
+       with ArithmeticEx _ -> eid)
+  | Con(HInt lv, HInt rv) ->
+      (try
+	 toconst (Arithmetic.concat lv rv)
+       with ArithmeticEx _ -> eid)
+  (* phis can be constant*)
   | Ph(x::xs) as eid -> (
       match
 	List.fold_left

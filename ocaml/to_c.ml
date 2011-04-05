@@ -5,6 +5,7 @@
 *)
 open Type
 open Ast
+open Ast_convenience
 open Printf
 open ExtList
 open Format
@@ -163,6 +164,10 @@ object(self)
 	 space ();
 	 self#ast_exp e2;	 
 	 rparen 50
+     | Extract _ ->
+	 self#ast_exp (rm_extract e)
+     | Concat _ ->
+	 self#ast_exp (rm_concat e)
      | BinOp(b,e1,e2) ->
 	 let op_prec = match b with
 	   | OR                          -> 100

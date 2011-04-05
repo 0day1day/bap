@@ -60,6 +60,29 @@ let rec infer_ast ?(check=true) = function
 	and t2 = infer_ast ~check e2 in
 	check_same t1 t2);
       infer_ast ~check:false e1 
+  | Extract(h,l,e) ->
+      let (-) = Int64.sub in
+      let (+) = Int64.add in
+      let ns = Int64.to_int(h-l+1L) in
+      let nt = Reg ns in
+      if check then (
+	match infer_ast ~check:true e with
+	| Reg(oldn) ->
+	    if (ns <= 0) then terror("Extract must extract at least one bit");
+	    if l < 0L then terror("Lower bit index must be at least 0");
+	    if h > (Int64.of_int oldn)-1L then terror("Upper bit index must be at most one less than the size of the original register")
+	      
+	| _ -> terror ("Extract expects Reg type")	
+      );
+      nt
+  | Concat(le, re) ->
+      let lt, rt = infer_ast ~check le, infer_ast ~check re in
+      let nt = match lt, rt with
+	| Reg(lb), Reg(rb) ->
+	    Reg(lb+rb)
+	| _ -> terror "Concat expects Reg type"
+      in
+      nt
   | Lab s ->
       (* FIXME: no type for labels yet *)
       reg_64

@@ -114,6 +114,7 @@ let casttype_of_string = function
 %token PLUS MINUS  DIVIDE MOD SMOD TIMES 
 %token SDIVIDE LSHIFT RSHIFT ARSHIFT XOR NEQ
 %token SLT SLE AND OR 
+%token CONCAT EXTRACT
 %token EQUAL EQUALEQUAL LT  LE NOT ASSIGN 
 %token GT GE SGT SGE
 %token AT QUESTION
@@ -129,11 +130,13 @@ let casttype_of_string = function
 %left WITH
 /* If the precedence for any of these changes, pp.ml needs to be updated
    accordingly, so that it can parethesize things properly */
+%nonassoc CONCAT
+%nonassoc EXTRACT
 %left OR
 %left XOR
 %left AND
-%left EQUAL NEQ
-%left LT SLT SLE LE   GT GE SGT SGE
+%left EQUAL EQUALEQUAL NEQ
+%left LT SLT SLE LE GT GE SGT SGE
 %left LSHIFT RSHIFT ARSHIFT
 %left PLUS MINUS
 %left TIMES DIVIDE SDIVIDE MOD SMOD
@@ -247,6 +250,8 @@ expr:
 | letstart IN expr   { Scope.pop();
 		       let (x,y) = $1 in
 		       Let(x,y, $3) } 
+| EXTRACT COLON INT COLON INT COLON LSQUARE expr RSQUARE { Extract($3, $5, $8) }
+| CONCAT COLON LSQUARE expr RSQUARE LSQUARE expr RSQUARE { Concat($4, $7) }
 | ID COLON typ LPAREN expr RPAREN  
     { Cast(casttype_of_string $1, $3, $5) }	  
 | TRUE               { exp_true } 

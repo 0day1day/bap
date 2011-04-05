@@ -118,11 +118,14 @@ rule token = parse
   | "let"        { LET }
   | "in"         { IN }
   | "label"      { LABEL } 
-  | "addr"       { ADDR } 
+  | "addr"       { ADDR }
+  | "extract"    { EXTRACT }
+  | "concat"     { CONCAT } 
+ 
 (* if then else expressions *)
   | "if"         { IF }
   | "then"       { THEN }
-  | "else"       { ELSE }
+  | "else"       { ELSE }  
 (* sugar *)
   | "true"       { TRUE }
   | "false"      { FALSE }
