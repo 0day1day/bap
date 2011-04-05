@@ -115,7 +115,7 @@ let casttype_of_string = function
 %token SDIVIDE LSHIFT RSHIFT ARSHIFT XOR NEQ
 %token SLT SLE AND OR 
 %token CONCAT EXTRACT
-%token EQUAL EQUALEQUAL LT  LE NOT ASSIGN 
+%token EQUAL EQUALEQUAL LT LE NOT ASSIGN 
 %token GT GE SGT SGE
 %token AT QUESTION
 %token LCURLY RCURLY
@@ -125,6 +125,7 @@ let casttype_of_string = function
 %type <Ast.program> program
 %type <Ast.exp > expr
 %type <Type.context> context
+%nonassoc EQUAL
 %nonassoc LET IN
 %nonassoc IF THEN ELSE
 %left WITH
@@ -135,7 +136,7 @@ let casttype_of_string = function
 %left OR
 %left XOR
 %left AND
-%left EQUAL EQUALEQUAL NEQ
+%left EQUALEQUAL NEQ
 %left LT SLT SLE LE GT GE SGT SGE
 %left LSHIFT RSHIFT ARSHIFT
 %left PLUS MINUS
@@ -228,7 +229,7 @@ expr:
 | expr AND expr      { BinOp(AND, $1, $3) }
 | expr OR expr       { BinOp(OR, $1, $3) }
 | expr XOR expr      { BinOp(XOR,  $1, $3) }
-| expr EQUAL expr    { BinOp(EQ, $1, $3) }
+| expr EQUAL expr %prec EQUALEQUAL    { BinOp(EQ, $1, $3) }
 | expr EQUALEQUAL expr    { BinOp(EQ, $1, $3) }
 | expr NEQ expr      { BinOp(NEQ, $1, $3) }
 | expr LT expr       { BinOp(LT, $1, $3) }
