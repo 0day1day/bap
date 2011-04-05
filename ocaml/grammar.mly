@@ -136,7 +136,7 @@ let casttype_of_string = function
 %left OR
 %left XOR
 %left AND
-%left EQUALEQUAL NEQ
+%left /*EQUAL*/ EQUALEQUAL NEQ
 %left LT SLT SLE LE GT GE SGT SGE
 %left LSHIFT RSHIFT ARSHIFT
 %left PLUS MINUS
@@ -229,8 +229,8 @@ expr:
 | expr AND expr      { BinOp(AND, $1, $3) }
 | expr OR expr       { BinOp(OR, $1, $3) }
 | expr XOR expr      { BinOp(XOR,  $1, $3) }
-| expr EQUAL expr %prec EQUALEQUAL    { BinOp(EQ, $1, $3) }
 | expr EQUALEQUAL expr    { BinOp(EQ, $1, $3) }
+/* | expr EQUAL expr %prec EQUALEQUAL    { BinOp(EQ, $1, $3) } */
 | expr NEQ expr      { BinOp(NEQ, $1, $3) }
 | expr LT expr       { BinOp(LT, $1, $3) }
 | expr LE expr       { BinOp(LE,  $1, $3) }

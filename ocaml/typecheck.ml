@@ -44,11 +44,11 @@ let rec infer_ast ?(check=true) = function
 	(let t = infer_ast ~check e in
 	check_reg t);
       infer_ast ~check:false e;
-  | BinOp(o,e1,e2) ->
+  | BinOp(o,e1,e2) as e ->
       if check then (
 	let t1 = infer_ast ~check e1
 	and t2 = infer_ast ~check e2 in
-	check_same t1 t2; 
+	check_same t1 t2 ~e; 
 	check_reg t1);
       (match o with
        | EQ | NEQ | LT | LE | SLT | SLE -> reg_1
@@ -57,8 +57,9 @@ let rec infer_ast ?(check=true) = function
   | Ite(b,e1,e2) ->
       if check then 
 	(let t1 = infer_ast ~check e1
-	and t2 = infer_ast ~check e2 in
-	check_same t1 t2);
+	 and t2 = infer_ast ~check e2 in
+	 Printf.printf "ite\n";
+	 check_same t1 t2);
       infer_ast ~check:false e1 
   | Extract(h,l,e) ->
       let (-) = Int64.sub in
@@ -106,9 +107,10 @@ let rec infer_ast ?(check=true) = function
       );
       infer_ast ~check:false arr
 
-and check_same t1 t2 =
+and check_same ?e t1 t2 =
   if t1 <> t2 then
-    terror "Similar types expected"
+    let es = match e with | Some(e) -> ("\nProblem expression: "^(Pp.ast_exp_to_string e)) | None -> "" in
+    terror ("Similar types expected: "^(Pp.typ_to_string t1)^" <> "^(Pp.typ_to_string t2)^es)
 
 and check_reg t =
   if not (is_integer_type t) then

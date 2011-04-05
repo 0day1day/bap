@@ -45,7 +45,7 @@ let binop_to_string = function
   | AND -> "&"
   | OR -> "|"
   | XOR -> "^"
-  | EQ -> "="
+  | EQ -> "=="
   | NEQ -> "<>"
   | LT -> "<"
   | LE -> "<="
