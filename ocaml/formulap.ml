@@ -17,7 +17,7 @@ let freevars e =
 
       method get_found =
 	dprintf "found %d freevars" (VH.length found);
-	VH.fold (fun k () a -> k::a) found []
+	List.rev (VH.fold (fun k () a -> k::a) found [])
       method add_dec d = 
 	if not(VH.mem found d || VH.mem ctx d)
 	then VH.add found d ()
