@@ -85,6 +85,13 @@ let parse_extract = function
      | _ -> None
 
 let parse_concat = function
+    (* Note: We should only parse when we would preserve the type.
+       So, (nt1=nt2) = bits(er) + bits(el) 
+
+       XXX: When we convert to normalized memory access, we get
+       expressions like Cast(r32)(mem[0]) @ Cast(r32)(mem[1]) << 8 @
+       ....  It sure would be nice if we could recognize this as a
+       series of concats. *)
   | BinOp(OR,
 	  BinOp(LSHIFT,
 		Cast(CAST_UNSIGNED, nt1, el),
@@ -95,7 +102,10 @@ let parse_concat = function
 	  BinOp(LSHIFT,
 		Cast(CAST_UNSIGNED, nt1, el),
 		Int(bits, _)))
-      when nt1 = nt2 && bits = Int64.of_int(bits_of_width (infer_ast ~check:false er)) ->
+      when nt1 = nt2 
+	&& bits = Int64.of_int(bits_of_width (infer_ast ~check:false er))
+	&& bits_of_width nt1 = bits_of_width (infer_ast ~check:false el) + bits_of_width (infer_ast ~check:false er) (* Preserve the type *)
+	->
       Some(el, er)
   | BinOp(OR,
 	  BinOp(LSHIFT,
@@ -108,8 +118,11 @@ let parse_concat = function
 		Cast(CAST_UNSIGNED, nt1, el),
 		Int(bits, _)))
       (* If we cast to nt1 and nt2 and we get the same thing, the
-      optimizer probably just dropped the case. *)
-      when Arithmetic.to64 (i, nt2) = Arithmetic.to64 (i, nt1) ->
+	 optimizer probably just dropped the cast. *)
+      when Arithmetic.to64 (i, nt2) = Arithmetic.to64 (i, nt1) 
+	&& bits = Int64.of_int(bits_of_width (infer_ast ~check:false er))
+	&& bits_of_width nt1 = bits_of_width (infer_ast ~check:false el) + bits_of_width (infer_ast ~check:false er) (* Preserve the type *)
+	->
       Some(el, er)
   | _ -> None
 	 
