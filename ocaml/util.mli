@@ -87,3 +87,4 @@ module StatusPrinter :
     val stop : unit -> unit
   end
 
+val binary_of_int64 : ?pad:int -> int64 -> string

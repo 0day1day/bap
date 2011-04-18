@@ -490,3 +490,21 @@ let list_delete l e =
 
 (** Some -> true, None -> false *)
 let has_some x = x <> None
+
+(** Convert integer to binary represented as a string *)
+let binary_of_int64 ?pad n = 
+  let getb n = Int64.logand n 1L in (* Get lsb *)
+  let getrest n = Int64.shift_right_logical n 1 in (* Get all but lsb *)
+  let zeroextend s = match pad with
+    | None -> s
+    | Some(l) -> 
+	let p = l - String.length s in
+	assert (p >= 0);
+	(String.make p '0') ^ s 
+  in
+  let rec f = function
+    | 0L -> "0"
+    | 1L -> "1"
+    | n -> (f (getrest n)) ^ (f (getb n))
+  in
+  zeroextend (f n)

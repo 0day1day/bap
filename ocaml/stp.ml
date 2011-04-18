@@ -83,17 +83,14 @@ object (self)
     opn 0;
     (match e with
      | Int(i,t) ->
-	 let format = match t with
-	   | Reg 1  -> format_of_string "0bin%Ld"
-	   | Reg 8  -> format_of_string "0hex%02Lx"
-	   | Reg 16 -> format_of_string "0hex%04Lx"
-	   | Reg 32 -> format_of_string "0hex%08Lx"
-	   | Reg 64 -> format_of_string "0hex%016Lx"
-	   | Reg _ -> failwith "unimplemented bitvector length"
-	   | _ -> invalid_arg "Only constant integers supported"
-	 in
 	 let maskedval = Arithmetic.to64 (i,t) in
-	 printf format maskedval
+	 (match t with
+	   | Reg 1  -> printf "0bin%Ld" maskedval
+	   | Reg (8 as n) | Reg (16 as n) | Reg (24 as n) | Reg (32 as n) | Reg (64 as n) ->
+	       printf "0hex%0*Lx" (n/4) maskedval
+	   | Reg n ->
+	       printf "0bin%s" (Util.binary_of_int64 ~pad:n maskedval)
+	   | _ -> invalid_arg "Only constant integers supported")
      | Var v ->
 	 self#var v
      | UnOp(uop, o) ->
