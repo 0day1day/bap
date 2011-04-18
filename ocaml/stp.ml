@@ -86,7 +86,7 @@ object (self)
 	 let maskedval = Arithmetic.to64 (i,t) in
 	 (match t with
 	   | Reg 1  -> printf "0bin%Ld" maskedval
-	   | Reg (8 as n) | Reg (16 as n) | Reg (24 as n) | Reg (32 as n) | Reg (64 as n) ->
+	   | Reg n when (n mod 4) = 0 ->
 	       printf "0hex%0*Lx" (n/4) maskedval
 	   | Reg n ->
 	       printf "0bin%s" (Util.binary_of_int64 ~pad:n maskedval)
