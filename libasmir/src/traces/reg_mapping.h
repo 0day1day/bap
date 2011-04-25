@@ -203,7 +203,9 @@ typedef enum
     REG_INST_PTR = REG_EIP,
 #endif
     
+#if !defined(TARGET_DOXYGEN)
     REG_PHYSICAL_CONTEXT_END = REG_INST_PTR,
+#endif
 
     // partial registers common to both the IA-32 and Intel(R) 64 architectures.
     REG_AL,
@@ -346,8 +348,19 @@ typedef enum
 #else    
     REG_YMM_LAST = REG_YMM7,
 #endif
-    
+
     REG_MXCSR,
+    REG_MXCSRMASK,
+
+    // This corresponds to the "orig_eax" register that is visible
+    // to some debuggers.
+#if defined(TARGET_IA32E)
+    REG_ORIG_RAX,
+    REG_ORIG_GAX = REG_ORIG_RAX,
+#else
+    REG_ORIG_EAX,
+    REG_ORIG_GAX = REG_ORIG_EAX,
+#endif
 
     REG_DR_BASE,
     REG_DR0 = REG_DR_BASE,
@@ -413,19 +426,21 @@ typedef enum
     REG_TR6,
     REG_TR7,
     REG_TR_LAST = REG_TR7,
-    
+
     REG_FPST_BASE,
-    REG_FP_BASE = REG_FPST_BASE,
-    REG_FPCW = REG_FP_BASE,
+    REG_FPSTATUS_BASE = REG_FPST_BASE,
+    REG_FPCW = REG_FPSTATUS_BASE,
     REG_FPSW,
-    REG_FPTAG,
+    REG_FPTAG,          ///< Abridged 8-bit version of x87 tag register.
     REG_FPIP_OFF,
     REG_FPIP_SEL,
     REG_FPOPCODE,
     REG_FPDP_OFF,
     REG_FPDP_SEL,
-    REG_FP_LAST = REG_FPDP_SEL,
-    
+    REG_FPSTATUS_LAST = REG_FPDP_SEL,
+
+    REG_FPTAG_FULL,     ///< Full 16-bit version of x87 tag register.
+
     REG_ST_BASE,
     REG_ST0 = REG_ST_BASE,
     REG_ST1,
@@ -435,9 +450,9 @@ typedef enum
     REG_ST5,
     REG_ST6,
     REG_ST7,
-#if !defined(TARGET_DOXYGEN)
     REG_ST_LAST = REG_ST7,
     REG_FPST_LAST = REG_ST_LAST,
+#if !defined(TARGET_DOXYGEN)
     REG_MACHINE_LAST = REG_FPST_LAST, /* last machine register */
     
     /* these are the two registers implementing the eflags in pin
@@ -460,14 +475,9 @@ typedef enum
      */
     REG_STATUS_FLAGS,
     REG_DF_FLAG,
-    
-    /* Aggregates of registers (still application regs) */
-    REG_AGGREGATE_BASE,
-    REG_FPST_ALL = REG_AGGREGATE_BASE,
-    REG_AGGREGATE_LAST = REG_FPST_ALL,
 
-    REG_APPLICATION_LAST = REG_AGGREGATE_LAST, /* last register name used by the application */
-    
+    REG_APPLICATION_LAST = REG_DF_FLAG, /* last register name used by the application */
+
     /* Pin's virtual register names */
     REG_PIN_BASE,
     REG_PIN_GR_BASE = REG_PIN_BASE,
@@ -630,9 +640,18 @@ typedef enum
     REG_INST_G7,                            ///< Scratch register used in pintools
     REG_INST_G8,                            ///< Scratch register used in pintools
     REG_INST_G9,                            ///< Scratch register used in pintools
-
+    REG_INST_G10,                            ///< Scratch register used in pintools
+    REG_INST_G11,                            ///< Scratch register used in pintools
+    REG_INST_G12,                            ///< Scratch register used in pintools
+    REG_INST_G13,                            ///< Scratch register used in pintools
+    REG_INST_G14,                            ///< Scratch register used in pintools
+    REG_INST_G15,                            ///< Scratch register used in pintools
+    REG_INST_G16,                            ///< Scratch register used in pintools
+    REG_INST_G17,                            ///< Scratch register used in pintools
+    REG_INST_G18,                            ///< Scratch register used in pintools
+    REG_INST_G19,                            ///< Scratch register used in pintools
     REG_INST_TOOL_FIRST = REG_INST_G0,     
-    REG_INST_TOOL_LAST = REG_INST_G9,
+    REG_INST_TOOL_LAST = REG_INST_G19,
 
     REG_BUF_BASE0,
     REG_BUF_BASE1,
@@ -750,9 +769,4 @@ typedef enum
 
 
 } REG;
-
-
-
-
-
 #endif
