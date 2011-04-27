@@ -2,6 +2,7 @@
 
 export OCAMLMAKEFILE=OCamlMakefile
 export LIBASMIR=../libasmir
+export BIGINT=../bigint-3.12/otherlibs/num
 include $(LIBASMIR)/makefile.inc
 -include ../../ocaml-proj/Makefile
 
@@ -85,7 +86,9 @@ export YFLAGS = -v
 
 export CLIBS = asmir vex opcodes bfd iberty stdc++ 
 export CFLAGS = -g
-export LDFLAGS = $(LIBASMIR_LDFLAGS) 
+export LDFLAGS = $(LIBASMIR_LDFLAGS)
+export INCDIRS = $(BIGINT)/
+export LIBS = $(BIGINT)/nums
 export CLIBFLAGS= $(LDFLAGS)
 export RESULTDEPS = $(LIBASMIR)/src/libasmir.a $(VEX_DIR)/libvex.a
 export LIBDIRS = $(LIBASMIR)/src # ../appreplay ../stp ../stp/ocaml

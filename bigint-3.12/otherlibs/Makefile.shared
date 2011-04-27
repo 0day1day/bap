@@ -22,7 +22,7 @@ include $(ROOTDIR)/config/Makefile
 CC=$(BYTECC)
 CAMLRUN=ocamlrun
 COMPFLAGS=-warn-error A -g $(EXTRACAMLFLAGS)
-MKLIB=ocamlrun ocamlmklib
+MKLIB=ocamlmklib
 
 # Variables to be defined by individual libraries:
 #LIBNAME=

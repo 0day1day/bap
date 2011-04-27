@@ -1,0 +1,7 @@
+This is a branch in which I will test using bigints to represent
+constant Ints.  Hopefully this will allow us to support XMMs in
+traces.
+
+This branch includes a stripped down version of ocaml 3.12.  This is because the big int implementation in ML prior to version 3.12 did not include shifts.  Rather than make everyone upgrade, we'll just build the newer big int implementation and use that until most people can easily upgrade to 3.12.
+
+We do need to keep a good chunk of the ocaml build system around.  This is because the big int implementation will build optimized versions (e.g., in assembly) for different architectures.  The logic for this is in the configure/Make scripts, so we can't just get rid of them entirely.
