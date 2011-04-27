@@ -1,4 +1,4 @@
-(** Basic integer arithmetic on N-bit integers (N < 64)
+(** Basic integer arithmetic on N-bit integers
 
     These are common operations which are needed for constant folding or
     evaluation.
@@ -7,6 +7,7 @@
  *)
 
 module D = Debug.Make(struct let name = "Arithmetic" and default = `Debug end)
+open Big_int
 open D
 open Type
 
@@ -16,14 +17,15 @@ let bits_of_width = function
 
 (* drop high bits *)
 let to64 (i,t) =
-  let bits = 64 - bits_of_width t in
-  Int64.shift_right_logical (Int64.shift_left i bits) bits
+  let bits = bits_of_width t in
+  let modv = shift_left_big_int unit_big_int bits in (* 2^bits *)
+  mod_big_int i modv (* i mod 2^bits *)
 
 
 (* sign extend to 64 bits*)
 let tos64 (i,t) =
-  let bits = 64 - bits_of_width t in
-  Int64.shift_right (Int64.shift_left i bits) bits
+  wprintf "tos64 not finished yet";
+  to64 (i,t)
 
   
 (* shifting by more than the number of bits or by negative values
@@ -31,52 +33,53 @@ let tos64 (i,t) =
 let toshift shiftedt v =
   let max = bits_of_width shiftedt
   and i = to64 v in
-    if i <= Int64.of_int max && i >= 0L
-    then Int64.to_int i
+    if le_big_int i (big_int_of_int max) && sign_big_int i <> -1
+    then int_of_big_int i
     else
       (pdebug("Warning: shifting "^string_of_int max^"-bit value by "
-		    ^Int64.to_string i);
+		    ^string_of_big_int i);
        max)
 
 (* "cast" an int64 to a value *)
 let to_val t i =
-  let mask = Int64.shift_right_logical (-1L) (64-bits_of_width t) in
-    (Int64.logand mask i, t)
+  (** What about negative values? *)
+  (to64 (i,t), t)
 
 let exp_bool =
-  let t = (1L, Reg(1))
-  and f = (0L, Reg(1)) in
+  let t = (unit_big_int, Reg(1))
+  and f = (zero_big_int, Reg(1)) in
   (fun b -> if b then t else f)
 
 (** [binop operand lhs lhst rhs rhst] *)
 let binop op ((_,t) as v1) v2 =
   match op with
-  | PLUS -> to_val t (Int64.add (to64 v1) (to64 v2))
-  | MINUS -> to_val t (Int64.sub (to64 v1) (to64 v2))
-  | TIMES -> to_val t (Int64.mul (to64 v1) (to64 v2))
-  | AND -> to_val t (Int64.logand (to64 v1) (to64 v2))
-  | OR -> to_val t (Int64.logor (to64 v1) (to64 v2))
-  | XOR -> to_val t (Int64.logxor (to64 v1) (to64 v2))
-  | EQ -> exp_bool((to64 v1) = (to64 v2))
-  | NEQ -> exp_bool((to64 v1) <> (to64 v2))
-  | LSHIFT -> to_val t (Int64.shift_left (to64 v1) (toshift t v2))
-  | RSHIFT -> to_val t (Int64.shift_right_logical (to64 v1) (toshift t v2))
-  | ARSHIFT -> to_val t (Int64.shift_right (tos64 v1) (toshift t v2))
-  | DIVIDE -> to_val t (Util.int64_udiv (tos64 v1) (tos64 v2))
+  | PLUS -> to_val t (add_big_int (to64 v1) (to64 v2))
+  | MINUS -> to_val t (sub_big_int (to64 v1) (to64 v2))
+  | TIMES -> to_val t (mult_big_int (to64 v1) (to64 v2))
+  | AND -> to_val t (and_big_int (to64 v1) (to64 v2))
+  | OR -> to_val t (or_big_int (to64 v1) (to64 v2))
+  | XOR -> to_val t (xor_big_int (to64 v1) (to64 v2))
+  | EQ -> exp_bool(eq_big_int (to64 v1) (to64 v2))
+  | NEQ -> exp_bool(not (eq_big_int (to64 v1) (to64 v2)))
+  | LSHIFT -> to_val t (shift_left_big_int (to64 v1) (toshift t v2))
+  | RSHIFT -> to_val t (shift_right_big_int (to64 v1) (toshift t v2))
+  | ARSHIFT -> to_val t (shift_right_towards_zero_big_int (tos64 v1) (toshift t v2))
+      (* div_big_int rounds towards infinity. *)
+  | DIVIDE -> (*to_val t (Util.int64_udiv (tos64 v1) (tos64 v2))*) failwith "Not done"
       (* Int64.div rounds towards zero. What do we want? *)
-  | SDIVIDE -> to_val t (Int64.div (tos64 v1) (tos64  v2))
-  | MOD -> to_val t (Int64.rem (tos64 v1) (tos64 v2))
-  | SMOD -> to_val t (Int64.rem (tos64 v1) (tos64 v2))
-  | SLT -> exp_bool(tos64 v1 < tos64 v2)
-  | SLE -> exp_bool(tos64 v1 <= tos64 v2)
-  | LT -> exp_bool(Util.int64_ucompare (to64 v1) (to64 v2) < 0)
-  | LE -> exp_bool(Util.int64_ucompare (to64 v1) (to64 v2) <= 0)
+  | SDIVIDE -> to_val t (div_big_int (tos64 v1) (tos64  v2))
+  | MOD -> to_val t (mod_big_int (tos64 v1) (tos64 v2))
+  | SMOD -> (* to_val t (Int64.rem (tos64 v1) (tos64 v2)) *) failwith "Not done"
+  | SLT -> exp_bool(lt_big_int (tos64 v1) (tos64 v2))
+  | SLE -> exp_bool(le_big_int (tos64 v1) (tos64 v2))
+  | LT -> exp_bool(lt_big_int (to64 v1) (to64 v2))
+  | LE -> exp_bool(le_big_int (to64 v1) (to64 v2))
 
 
 let unop op ((_,t) as v) =
   match op with
-  | NEG -> to_val t (Int64.neg (to64 v))
-  | NOT -> to_val t (Int64.lognot (to64 v))
+  | NEG -> to_val t (minus_big_int (to64 v))
+  | NOT -> (* to_val t (Int64.lognot (to64 v)) *) failwith "Not done"
 
 
 let cast ct ((_,t) as v) t2 =
@@ -84,22 +87,16 @@ let cast ct ((_,t) as v) t2 =
   and bits = bits_of_width t2 in
   (match ct with
    | CAST_UNSIGNED ->
-       to_val t2 (to64  v)
+       to_val t2 (to64 v)
    | CAST_SIGNED ->
-       to_val t2 (tos64  v)
+       to_val t2 (tos64 v)
    | CAST_HIGH ->
        to_val t2
-	 (Int64.shift_right 
-	    (Int64.logand (to64  v)
-	       (Int64.shift_left (-1L) (bits1-bits)) )
-	    (bits1-bits) )
+	 (shift_right_big_int (to64 v) (bits1-bits))
    | CAST_LOW ->
-       to_val t2
-	 (Int64.logand (to64  v)
-	    ((Int64.lognot(Int64.shift_left (-1L) bits))) )
+       to_val t2 (to64 v)
   )
 
 let is_zero ((i,t) as v) =
-  let zero = 0L in
-  let i64 = to64 v in
-  zero = i64
+  let v = to64 v in
+  sign_big_int v = 0

@@ -2,9 +2,12 @@
 
 export OCAMLMAKEFILE=OCamlMakefile
 export LIBASMIR=../libasmir
-export BIGINT=../bigint-3.12/otherlibs/num
+export BIGINT=$(CURDIR)/../bigint-3.12/otherlibs/num
 include $(LIBASMIR)/makefile.inc
 -include ../../ocaml-proj/Makefile
+
+# Stop annoying warnings about big_int duplication!
+export OCAMLFIND_IGNORE_DUPS_IN=$(CURDIR)/../bigint-3.12/otherlibs/num
 
 #export INCDIRS += ../stp ../stp/ocaml
 #export EXTLIBDIRS += ../stp ../stp/ocaml
@@ -87,7 +90,7 @@ export YFLAGS = -v
 export CLIBS = asmir vex opcodes bfd iberty stdc++ 
 export CFLAGS = -g
 export LDFLAGS = $(LIBASMIR_LDFLAGS)
-export INCDIRS = $(BIGINT)/
+export INCDIRS = $(BIGINT)
 export LIBS = $(BIGINT)/nums
 export CLIBFLAGS= $(LDFLAGS)
 export RESULTDEPS = $(LIBASMIR)/src/libasmir.a $(VEX_DIR)/libvex.a

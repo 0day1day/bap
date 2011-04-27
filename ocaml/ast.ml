@@ -10,6 +10,7 @@
 
 open ExtList
 open Type
+open Big_int
 
 type var = Var.t
 
@@ -20,7 +21,7 @@ type exp =
   | UnOp of (unop_type * exp)
   | Var of var
   | Lab of string
-  | Int of (int64 * typ)
+  | Int of (big_int * typ)
   | Cast of (cast_type * typ * exp) (** Cast to a new type. *)
   | Let of (var * exp * exp)
   | Unknown of (string * typ)
@@ -47,7 +48,7 @@ type program = stmt list
     target of a [Jmp]. *)
 let exp_of_lab = function
   | Name s -> Lab s
-  | Addr a -> Int(a, Reg 64)
+  | Addr a -> Int(big_int_of_int64 a, Reg 64)
 
 (** If possible, make a label that would be refered to by the given
     expression. *)
