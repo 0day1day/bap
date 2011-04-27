@@ -48,17 +48,17 @@ let exp_ite ?t b e1 e2 =
     | Some t -> assert (t=t1));
 
   Ite(b, e1, e2)
-  
+
 
 let parse_ite = function
   | BinOp(OR,
 	  BinOp(AND, Cast(CAST_SIGNED, _, b1), e1),
 	  BinOp(AND, Cast(CAST_SIGNED, _, UnOp(NOT, b2)), e2)
-  ) 
+  )
   | BinOp(OR,
 	  BinOp(AND, b1, e1),
 	  BinOp(AND, UnOp(NOT, b2), e2)
-  ) when b1 = b2 && Typecheck.infer_ast ~check:false b1 = Reg(1) -> 
+  ) when b1 = b2 && Typecheck.infer_ast ~check:false b1 = Reg(1) ->
     Some(b1, e1, e2)
       (* In case one branch is optimized away *)
   | BinOp(AND,
@@ -69,7 +69,7 @@ let parse_ite = function
 
 let parse_extract = function
      | Cast(CAST_LOW, t, BinOp(RSHIFT, e', Int(i, t2))) ->
-     	 (* 
+     	 (*
      	    Original: extract 0:bits(t)-1, and then shift left by i bits.
      	    New: extract i:bits(t)-1+i
      	 *)
@@ -86,7 +86,7 @@ let parse_extract = function
 
 let parse_concat = function
     (* Note: We should only parse when we would preserve the type.
-       So, (nt1=nt2) = bits(er) + bits(el) 
+       So, (nt1=nt2) = bits(er) + bits(el)
 
        XXX: When we convert to normalized memory access, we get
        expressions like Cast(r32)(mem[0]) @ Cast(r32)(mem[1]) << 8 @
@@ -102,7 +102,7 @@ let parse_concat = function
 	  BinOp(LSHIFT,
 		Cast(CAST_UNSIGNED, nt1, el),
 		Int(bits, _)))
-      when nt1 = nt2 
+      when nt1 = nt2
 	&& bits = Int64.of_int(bits_of_width (infer_ast ~check:false er))
 	&& bits_of_width nt1 = bits_of_width (infer_ast ~check:false el) + bits_of_width (infer_ast ~check:false er) (* Preserve the type *)
 	->
@@ -119,24 +119,26 @@ let parse_concat = function
 		Int(bits, _)))
       (* If we cast to nt1 and nt2 and we get the same thing, the
 	 optimizer probably just dropped the cast. *)
-      when Arithmetic.to64 (i, nt2) = Arithmetic.to64 (i, nt1) 
+      when Arithmetic.to64 (i, nt2) = Arithmetic.to64 (i, nt1)
 	&& bits = Int64.of_int(bits_of_width (infer_ast ~check:false er))
 	&& bits_of_width nt1 = bits_of_width (infer_ast ~check:false el) + bits_of_width (infer_ast ~check:false er) (* Preserve the type *)
 	->
       Some(el, er)
   | _ -> None
-	 
-(* Functions for removing expression types 
+
+(* Functions for removing expression types
 
    Should these recurse on subexpressions?
 *)
 let rm_ite = function
   | Ite(b, e1, e2) ->
       let t = Typecheck.infer_ast b in
-      if t = reg_1 then
+      (match t with
+      | Reg(1) ->
 	(b &* e1) |*  (exp_not b &* e2)
-      else
-	((cast_signed t b) &* e1) |* ((cast_signed t (exp_not b)) &* e2) 
+      | Reg n ->
+	((cast_signed t b) &* e1) |* ((cast_signed t (exp_not b)) &* e2)
+      | _ -> failwith "rm_ite does not work with memories")
   | _ -> assert false (* Should we just act as a noop? *)
 
 let rm_extract = function
@@ -153,9 +155,9 @@ let rm_extract = function
 
 let rm_concat = function
   | Concat(le, re) ->
-      let bitsl,bitsr = 
+      let bitsl,bitsr =
 	Typecheck.bits_of_width (Typecheck.infer_ast ~check:false le),
-	Typecheck.bits_of_width (Typecheck.infer_ast ~check:false re) 		 
+	Typecheck.bits_of_width (Typecheck.infer_ast ~check:false re)
       in
       let nt = Reg(bitsl + bitsr) in
       exp_or ((cast_unsigned nt le) <<* Int(Int64.of_int bitsr, nt)) (cast_unsigned nt re)
