@@ -359,7 +359,7 @@ let set_pszf t r =
    set_zf t r]
 
 let set_flags_sub t s1 s2 r =
-  move cf (r >* s1)
+  move cf (s2 >* s1)
   ::move af ((r &* Int(7L,t)) <* (s1 &* Int(7L,t))) (* Is this right? *)
   ::move oF (Cast(CAST_HIGH, r1, (s1 ^* s2) &* (s1 ^* r) ))
   ::set_pszf t r
@@ -566,11 +566,11 @@ let rec to_ir addr next ss pref =
        ::move af (Unknown("AF for add unimplemented", r1))
        ::move oF (cast_high r1 ((s1 ^* exp_not s2) &* (s1 ^* r)))
        ::[]
-  | Sub(t, o1, o2) ->
-    let tmp = nv "t" t in
-    move tmp (op2e t o1)
+  | Sub(t, o1, o2) (* o1 = o1 - o2 *) ->
+    let oldo1 = nv "t" t in
+    move oldo1 (op2e t o1)
     :: assn t o1 (op2e t o1 -* op2e t o2)
-    :: set_flags_sub t (Var tmp) (op2e t o2) (op2e t o1)
+    :: set_flags_sub t (Var oldo1) (op2e t o2) (op2e t o1) 
   | Sbb(t, o1, o2) ->
     let tmp = nv "t" t in
     let s1 = Var tmp and s2 = op2e t o2 and r = op2e t o1 in
@@ -581,7 +581,6 @@ let rec to_ir addr next ss pref =
     ::move af (Unknown("AF for sbb unimplemented", r1))
     ::move oF (Cast(CAST_HIGH, r1, (s1 ^* s2) &* (s1 ^* r) ))
     ::set_pszf t r
-
   | Cmp(t, o1, o2) ->
     let tmp = nv "t" t in
     move tmp (op2e t o1 -* op2e t o2)
