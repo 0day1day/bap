@@ -508,3 +508,21 @@ let binary_of_int64 ?pad n =
     | n -> (f (getrest n)) ^ (f (getb n))
   in
   zeroextend (f n)
+
+(** Convert big integer to binary represented as a string *)
+let binary_of_bigint ?pad n = 
+  let getb n = Big_int.and_big_int n Big_int_convenience.bi1 in (* Get lsb *)
+  let getrest n = Big_int.shift_right_big_int n 1 in (* Get all but lsb *)
+  let zeroextend s = match pad with
+    | None -> s
+    | Some(l) -> 
+	let p = l - String.length s in
+	assert (p >= 0);
+	(String.make p '0') ^ s 
+  in
+  let rec f = function
+    | bi when Big_int_convenience.bi_is_zero bi -> "0"
+    | bi when Big_int_convenience.bi_is_one bi -> "1"
+    | n -> (f (getrest n)) ^ (f (getb n))
+  in
+  zeroextend (f n)

@@ -1,13 +1,16 @@
 -include ../../utils-proj/Makefile
 
 export BAP_OCAMLDIR=../ocaml
+export BIGINT=$(CURDIR)/../bigint-3.12/otherlibs/num
 export OCAMLMAKEFILE=$(BAP_OCAMLDIR)/OCamlMakefile
 
+# Stop annoying warnings about big_int duplication!
+export OCAMLFIND_IGNORE_DUPS_IN=$(CURDIR)/../bigint-3.12/otherlibs/num
 
 # ocamlfind packages required
 export PACKS = bigarray str ocamlgraph extlib unix
-export LIBS = ../ocaml/bap 
-export INCDIRS = $(BAP_OCAMLDIR)
+export LIBS = nums ../ocaml/bap
+export INCDIRS = $(BAP_OCAMLDIR) $(BIGINT)
 
 # Include sources from ../ocaml in the automatically generated dependencies.
 export SOURCE_DIRS_IN = $(BAP_OCAMLDIR) $(BAP_PROJ_OCAMLDIR)
@@ -58,13 +61,6 @@ define PROJ_get_functions
 	DOC_FILES=$(SOURCES)
 endef
 export PROJ_get_functions
-
-define PROJ_compare
-	RESULT=compareprogs
-	SOURCES = compareprogs.ml
-	DOC_FILES=$(SOURCES)
-endef
-export PROJ_compare
 
 define PROJ_split
 	RESULT=split_disjunction

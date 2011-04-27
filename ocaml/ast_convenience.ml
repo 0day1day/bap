@@ -2,6 +2,7 @@
     separate file so it can use functions from Typecheck and elsewhere. *)
 
 open Ast
+open Big_int
 open Type
 
 (* exp helpers *)
@@ -65,5 +66,5 @@ let parse_ite = function
   | BinOp(AND,
 	  Cast(CAST_SIGNED, nt, b1),
 	  e1) when Typecheck.infer_ast ~check:false b1 = reg_1 ->
-    Some(b1, e1, Int(0L, nt))
+    Some(b1, e1, Int(zero_big_int, nt))
   | _ -> None

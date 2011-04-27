@@ -88,3 +88,4 @@ module StatusPrinter :
   end
 
 val binary_of_int64 : ?pad:int -> int64 -> string
+val binary_of_bigint : ?pad:int -> Big_int.big_int -> string

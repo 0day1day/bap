@@ -56,7 +56,7 @@ let lab_of_exp = function
   | Lab s -> Some(Name s)
   | Int(i, t) ->
       (* Some(Addr(Int64.logand i (Int64.pred(Int64.shift_left 1L bits)))) *)
-      Some(Addr(Arithmetic.to64 (i,t)))
+      Some(Addr(int64_of_big_int (Arithmetic.to64 (i,t))))
   | _ -> None
     
 
@@ -67,9 +67,9 @@ and reg_32 = Reg 32
 and reg_64 = Reg 64
 
 (** False constant. (If convenient, refer to this rather than building your own.) *)
-let exp_false = Int(0L, reg_1)
+let exp_false = Int(bi0, reg_1)
 (** True constant. *)
-let exp_true = Int(1L, reg_1)
+let exp_true = Int(bi1, reg_1)
 
 let little_endian = exp_false
 let big_endian = exp_true
@@ -83,7 +83,7 @@ let exp_implies e1 e2 = exp_or (exp_not e1) e2
 
 let (exp_shl, exp_shr) =
   let s dir e1 = function
-    | Int(0L,_) -> e1
+    | Int(i,_) when bi_is_zero i -> e1
     | e2 -> BinOp(dir, e1, e2)
   in
   (s LSHIFT, s RSHIFT)

@@ -8,6 +8,7 @@
 
 module D = Debug.Make(struct let name = "Arithmetic" and default = `Debug end)
 open Big_int
+open Big_int_convenience
 open D
 open Type
 
@@ -19,15 +20,19 @@ let bits_of_width = function
 let to64 (i,t) =
   let bits = bits_of_width t in
   let modv = shift_left_big_int unit_big_int bits in (* 2^bits *)
-  mod_big_int i modv (* i mod 2^bits *)
-
+  let final = mod_big_int i modv in (* i mod 2^bits *)
+  (* mod always returns a positive number *)
+  final
 
 (* sign extend to 64 bits*)
 let tos64 (i,t) =
-  wprintf "tos64 not finished yet";
-  to64 (i,t)
+  let bits = bits_of_width t in
+  let modv = shift_left_big_int unit_big_int bits in (* 2^(bits-1) *)
+  let final = mod_big_int i modv in (* i mod 2^(bits-1) *)
+  (* mod always returns a positive number *)
+  let sign = shift_right_big_int i (bits-1) in
+  if bi_is_zero sign then (* positive *) final else (* negative *) minus_big_int final
 
-  
 (* shifting by more than the number of bits or by negative values
  * will be the same as shifting by the number of bits. *)
 let toshift shiftedt v =
@@ -42,7 +47,6 @@ let toshift shiftedt v =
 
 (* "cast" an int64 to a value *)
 let to_val t i =
-  (** What about negative values? *)
   (to64 (i,t), t)
 
 let exp_bool =

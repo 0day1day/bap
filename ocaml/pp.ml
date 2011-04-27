@@ -1,8 +1,10 @@
 (** Pretty printing
-    
+
     @todo Write .mli
 *)
 
+open Big_int
+open Big_int_convenience
 open Type
 module VH = Var.VarHash
 module F = Format
@@ -16,7 +18,7 @@ let rec typ_to_string = function
   | Reg 32 -> "u32"
   | Reg 64 -> "u64"
   | Reg n -> Printf.sprintf "u%u" n
-  | TMem t -> "?" ^ typ_to_string t 
+  | TMem t -> "?" ^ typ_to_string t
   | Array(idx,e) -> typ_to_string e ^ "?" ^ typ_to_string idx
 
 
@@ -97,23 +99,20 @@ object (self)
 
   method attrs a = List.iter (fun a -> space();self#attr a) a
 
-  method attr =
-    let bits_of_width = function
-      | Reg n -> n
-      | _ -> failwith "bits_of_width"
-    in
-      function
+  method attr = function
     | Asm s -> pp "@asm \""; pp s; pp "\""
     | Address a -> printf "@address \"0x%Lx\"" a;
     | Liveout -> pp "@set \"liveout\""
     | StrAttr s -> pp "@str \""; pp s; pc '\"'
     | Context {name=s; mem=mem; value=v; index=i; t=tp; taint=Taint t} -> 
-	let ts = string_of_int t in
-	(*if t = Taint then "tainted" else "untainted" in*)
-	let ind = if mem then "[0x"^(Int64.format "%Lx" i)^"]" else "" in
-	pp "@context "; pp (s^ ind ^" = 0x"^(Int64.format "%Lx" v)^ ", " ^ ts
-			      ^", u"
-			      ^ (string_of_int (bits_of_width tp)))
+	(* let ts = string_of_int t in *)
+	(* (\*if t = Taint then "tainted" else "untainted" in*\) *)
+	(* let ind = if mem then "[0x"^(Int64.format "%Lx" i)^"]" else "" in *)
+	(* pp "@context "; pp (s^ ind ^" = 0x"^(Int64.format "%Lx" v)^ ", " ^ ts *)
+	(* 		      ^", u" *)
+	(* 		      ^ (string_of_int (bits_of_width tp))) *)
+	(* XXX: FIX ME *)
+	failwith "Context printing disabled"
     | ThreadId i -> pp "@tid \""; pp (string_of_int i); pp "\""
     | ExnAttr _ (* we could try to print something using Printexc.to_string *)
     | Pos _ -> () (* ignore position attrs *)
@@ -126,13 +125,15 @@ object (self)
 
   method int i t =
     match (Arithmetic.tos64 (i,t), t) with
-    | (0L, Reg 1) -> pp "false"
-    | (-1L, Reg 1) -> pp "true"
-    | (i,t) ->
-      if i < 10L && i > -10L
-      then pp (Int64.to_string i)
-      else printf "0x%Lx" (Int64.logand i (Int64.pred (Int64.shift_left 1L (Arithmetic.bits_of_width t))));
-      pp ":"; self#typ t
+    | (bi, Reg 1) when bi_is_zero bi -> pp "false"
+    | (bi, Reg 1) when bi_is_minusone bi -> pp "true"
+    | (bi,t) ->
+	(* XXX: Can't print big int in hex :-x *)
+	pp (string_of_big_int bi);
+	(* if lt_big_int (abs_big_int bi) (big_int_of_int 10) *)
+	(* then pp (string_of_big_int bi) *)
+	(* else printf "0x%Lx" (Int64.logand bi (Int64.pred (Int64.shift_left 1L (Arithmetic.bits_of_width t)))); *)
+	pp ":"; self#typ t
 
 
   (* prec tells us how much parenthization we need. 0 means it doesn't need
@@ -223,9 +224,9 @@ object (self)
     cls();
 
   method ast_endian = function
-    | Ast.Int(0L, Reg 1) ->
+    | Ast.Int(bi, Reg 1) when bi_is_zero bi ->
 	pp "e_little";
-    | Ast.Int(1L, Reg 1) ->
+    | Ast.Int(bi, Reg 1) when bi_is_one bi ->
 	pp "e_big"
     | x -> self#ast_exp x
 
@@ -286,10 +287,9 @@ object (self)
 	pc '"'; pp lab; pc '"'
 
   method ssa_endian = function
-    | Ssa.Int(0L, Reg 1) -> pp "e_little";
-    | Ssa.Int(1L, Reg 1) -> pp "e_big"
+    | Ssa.Int(bi, Reg 1) when bi_is_zero bi -> pp "e_little";
+    | Ssa.Int(bi, Reg 1) when bi_is_one bi -> pp "e_big"
     | x -> self#ssa_value x
-
 
   method ssa_exp e =
     opn 0;

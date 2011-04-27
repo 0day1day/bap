@@ -16,6 +16,8 @@
  *)
 
 open Ast
+open Big_int
+open Big_int_convenience
 open Type
   
 module VH = Var.VarHash
@@ -439,11 +441,11 @@ struct
     let init = Var v in
       pdebug "The point of no return" ;
       Symbolic (AddrMap.fold
-		  (fun k v m -> Store (m,Int(k,reg_32),v,exp_false,reg_8))
+		  (fun k v m -> Store (m,Int(big_int_of_int64 k,reg_32),v,exp_false,reg_8))
 		  memory init)
 	
   (* Normalize a memory address, setting high bits to 0. *)
-  let normalize i t = Arithmetic.to64 (i,t)
+  let normalize i t = int64_of_big_int (Arithmetic.to64 (i,t))
     
   let rec update_mem mu pos value endian = 
     (*pdebug "Update mem" ;*)
@@ -483,7 +485,7 @@ struct
 	| Array _ ->
 	    empty_mem var
 	| Reg n as t ->
-	    Symbolic(Int(0L, t))
+	    Symbolic(Int(bi0, t))
 	    
   let normalize = SymbolicMemL.normalize
     
@@ -500,7 +502,7 @@ struct
       | ConcreteMem(m,v), Int(i,t) ->
 	  (try AddrMap.find (normalize i t) m
 	   with Not_found ->
-	     Int(0L, reg_8)
+	     Int(bi0, reg_8)
 	  )
       | _ -> failwith "Symbolic memory or address in concrete evaluation"
 	  

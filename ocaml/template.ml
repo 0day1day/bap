@@ -1,6 +1,7 @@
 (* T E S T I N G *)
 
 open Ast
+open Big_int
 open Int64
 open Type
   
@@ -24,7 +25,7 @@ struct
   module type Exprs =
   sig
     val var     : Var.t -> process_exp
-    val int     : (int64 * typ) -> process_exp
+    val int     : (big_int * typ) -> process_exp
     val lab     : string -> process_exp
     val binop   : (binop_type * Ast.exp * Ast.exp) -> process_exp
     val unop    : (unop_type * Ast.exp) -> process_exp

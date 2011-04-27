@@ -17,6 +17,7 @@ export OCAMLFIND_IGNORE_DUPS_IN=$(CURDIR)/../bigint-3.12/otherlibs/num
 
 # common sources
 export SOURCES = \
+	big_int_convenience.ml \
 	debug.mli debug.ml \
 	util.mli util.ml \
 	dominator.ml \
@@ -66,16 +67,18 @@ export SOURCES = \
 	symbeval.ml symbeval_search.ml \
 	ast_slice.ml \
 	ssa_slice.ml \
-	comparelib.ml \
 	structural_analysis.ml \
 	unroll.ml \
 	hacks.ml \
 	coalesce.ml \
 	template.ml \
-	interpreter.ml \
 	traces.ml \
 	payload.ml \
-	$(PROJSOURCES) \
+	$(PROJSOURCES)
+
+# Fix the interpreter to work with big ints
+#	interpreter.ml \
+
 
 RESULT = bap
 DOC_FILES := $(filter %.mli, $(SOURCES)) $(filter %.ml, $(SOURCES))
@@ -91,7 +94,7 @@ export CLIBS = asmir vex opcodes bfd iberty stdc++
 export CFLAGS = -g
 export LDFLAGS = $(LIBASMIR_LDFLAGS)
 export INCDIRS = $(BIGINT)
-export LIBS = $(BIGINT)/nums
+export LIBS = nums
 export CLIBFLAGS= $(LDFLAGS)
 export RESULTDEPS = $(LIBASMIR)/src/libasmir.a $(VEX_DIR)/libvex.a
 export LIBDIRS = $(LIBASMIR)/src # ../appreplay ../stp ../stp/ocaml

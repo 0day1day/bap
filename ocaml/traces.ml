@@ -1,8 +1,10 @@
 (* A module to perform trace analysis *)
 
+open Ast
+open Big_int
+open Big_int_convenience
 open Symbeval
 open Type
-open Ast
 
 module D = Debug.Make(struct let name = "TraceEval" and default=`NoDebug end)
 open D
@@ -300,6 +302,7 @@ let assign_vars memv symbolic =
     match symbolic, v.tnt with
     | true, false (* Symbolic *) 
     | false, _ (* Concrete *) ->
+	let k = big_int_of_int64 k in
 	Move(memv, Store(Var(memv), Int(k, memtype), v.exp, exp_false, reg_8), getattrs v.tnt)::a
     | true, true -> a
   in
@@ -323,10 +326,11 @@ let typ_to_bytes = function
 
 (* Get the ith byte of a value v *)
 let get_byte i v = 
-  Int64.logand (Int64.shift_right v ((i-1)*8)) 0xffL 
+  (* Int64.logand (Int64.shift_right v ((i-1)*8)) 0xffL  *)
+  and_big_int (shift_right_big_int v ((i-1)*8)) (biconst 0xff)
 
 let num_to_bit num =
-  if num > Int64.zero then Int64.one else Int64.zero
+  if bi_is_zero num then bi0 else bi1
 
 (* Wrappers & Useful shorthands to manipulate taint 
    attributes and process taint info *)
@@ -382,9 +386,9 @@ let clean_delta delta =
  
 (* This is a total HACK due to VEX's handling of the direction flag *)
 let direction_flag eflags = 
-  match num_to_bit (Int64.logand eflags 0x400L) with
-    | 0L -> 1L
-    | _ -> 0xFFFFFFFFL
+  match num_to_bit (and_big_int eflags (biconst 0x400)) with
+    | bi when bi_is_zero bi -> bi1
+    | _ -> (big_int_of_int64 0xFFFFFFFFL)
 
 (* Unfortunately we need to special-case the EFLAGS registers
    since PIN does not provide us with separate registers for 
@@ -392,22 +396,22 @@ let direction_flag eflags =
 let add_eflags eflags usage taint =
   add_var 
     "R_AF" 
-    (Int(num_to_bit (Int64.logand eflags 0x10L), reg_1))
+    (Int(num_to_bit (and_big_int eflags (biconst 0x10)), reg_1))
     usage
     taint;
   add_var 
     "R_CF" 
-    (Int(num_to_bit (Int64.logand eflags 0x01L), reg_1))
+    (Int(num_to_bit (and_big_int eflags (biconst 0x01)), reg_1))
     usage
     taint;
   add_var 
     "R_ZF" 
-    (Int(num_to_bit (Int64.logand eflags 0x40L), reg_1))
+    (Int(num_to_bit (and_big_int eflags (biconst 0x40)), reg_1))
     usage
     taint;
   add_var 
     "R_SF" 
-    (Int(num_to_bit (Int64.logand eflags 0x80L), reg_1))
+    (Int(num_to_bit (and_big_int eflags (biconst 0x80)), reg_1))
     usage
     taint;
   add_var
@@ -417,12 +421,12 @@ let add_eflags eflags usage taint =
     false;
   add_var
     "R_OF"
-    (Int(num_to_bit (Int64.logand eflags 0x800L), reg_1))
+    (Int(num_to_bit (and_big_int eflags (biconst 0x800)), reg_1))
     usage
     taint;
   add_var
     "R_PF"
-    (Int(num_to_bit (Int64.logand eflags 0x4L), reg_1))
+    (Int(num_to_bit (and_big_int eflags (biconst 0x4)), reg_1))
     usage
     taint
     
@@ -513,7 +517,7 @@ let add_to_conc {name=name; mem=mem; index=index; value=value;
 	try Hashtbl.find regs name
 	with Not_found -> (name, 0,typ)
       in
-      let bits = Arithmetic.to64 (Int64.shift_left value shift,typ) in
+      let bits = Arithmetic.to64 (shift_left_big_int value shift,typ) in
       let fullvalue = Int(bits,typ) in
 	(add_new_var fullname fullvalue usage taint ;
 	 
@@ -538,7 +542,7 @@ let update_concrete s =
       	(fun {index=index; taint=Taint taint} ->
       	   (* Mark the index as symbolic; we don't actually care about
       	      the value *)
-      	   add_symbolic index (Int(0L, reg_8))
+      	   add_symbolic index (Int(bi0, reg_8))
       	) (filter_taint atts);
       false      
   | Label (_,atts) ->
@@ -608,7 +612,7 @@ let remove_unknowns =
     method visit_exp = function
       | Unknown(s,t) ->
 	  dprintf "Removed unknown: %s" s;
-	  `ChangeTo (Int(0L,t))
+	  `ChangeTo (Int(bi0,t))
       | _ -> `DoChildren
   end
   in Ast_visitor.prog_accept v
@@ -751,13 +755,13 @@ struct
 	  | Reg _ ->
 	      if not (isbad var) then 
 		wprintf "Unknown variable during eval: %s" (Var.name var);
-              Symbolic(Int(0L, (Var.typ var)))
+              Symbolic(Int(bi0, (Var.typ var)))
 	      
   let normalize = SymbolicMemL.normalize
   let update_mem mu pos value endian = 
     (match mu,pos with
     | ConcreteMem(_), Int(i,t) ->
-	del_mem i
+	del_mem (int64_of_big_int i)
     | _ -> failwith "Bad memory for concrete evaluation");
     Concrete.update_mem mu pos value endian
 
@@ -770,7 +774,7 @@ struct
 
 	(* First, search the trace memory (not when using alternate
 	   assignment -- see lookup_var) *)
-	match concrete_mem i with
+	match concrete_mem (int64_of_big_int i) with
 	| Some(traceval) when not !use_alt_assignment ->
 	    traceval
 	| _ -> 
@@ -782,8 +786,8 @@ struct
 	      
 	      (* Well, this isn't good... Just make something up
 		 :( *)
-	      wprintf "Unknown memory value during eval: addr %Ld" i;
-	      Int(0L, reg_8)
+	      wprintf "Unknown memory value during eval: addr %Ld" (int64_of_big_int i);
+	      Int(bi0, reg_8)
       )              
 	
     | _ -> failwith "Concrete evaluation should never have symbolic memories"
@@ -807,10 +811,10 @@ let check_delta state =
       try
 	let evalbyte = get_int (AddrMap.find addr cm) in
 	let issymb = Hashtbl.mem global.symbolic addr in
-	if tracebyte <> evalbyte && (not issymb) && (not !use_alt_assignment) then wprintf "Consistency error: Tainted memory value (address %Lx, value %Lx) present in trace does not match value %Lx in in concrete evaluator" addr tracebyte evalbyte
+	if tracebyte <> evalbyte && (not issymb) && (not !use_alt_assignment) then wprintf "Consistency error: Tainted memory value (address %Lx, value %s) present in trace does not match value %s in in concrete evaluator" addr (string_of_big_int tracebyte) (string_of_big_int evalbyte)
       with Not_found -> 
 	if not !use_alt_assignment then
-	  wprintf "Consistency error: Tainted memory value (address %Lx, value %Lx) present in trace but missing in concrete evaluator" addr tracebyte
+	  wprintf "Consistency error: Tainted memory value (address %Lx, value %s) present in trace but missing in concrete evaluator" addr (string_of_big_int tracebyte)
     )
   in
   let check_var var evalval =
@@ -871,7 +875,7 @@ let get_symbolic_seeds memv = function
 	     add_symbolic index sym_var ;
 	     (* symbolic variable *)
 	     let mem = Var(memv) in
-	     let store = Store(mem, Int(index, reg_32), sym_var, exp_false, reg_8) in
+	     let store = Store(mem, Int(big_int_of_int64 index, reg_32), sym_var, exp_false, reg_8) in
 	     (* let constr = BinOp (EQ, mem, store) in *)
 	     (*   ignore (LetBind.add_to_formula exp_true constr Rename) *)
 	     let move = Move(memv, store, []) in
@@ -1117,7 +1121,7 @@ struct
       if is_symbolic v then (
 	let n = (get_symb_num v) - 1 in
 	try
-	  let byte = Int64.of_int ((!bytes).(n)) in
+	  let byte = big_int_of_int ((!bytes).(n)) in
 	  Symbolic(Int(byte, t))
 	with
 	  Invalid_argument _ -> failwith ("Input outside of input file range: " ^ (string_of_int n) ^ "/" ^ (string_of_int (Array.length !bytes)))
@@ -1125,7 +1129,7 @@ struct
 	dprintf "Variable %s not found" s;
 	match t with
 	| Reg _ ->
-	    Symbolic(Int(0L, t))
+	    Symbolic(Int(bi0, t))
 	| TMem _ | Array _ ->
 	    empty_mem v
       )
@@ -1136,7 +1140,7 @@ struct
     | ConcreteMem(m,v), Int(i,t) ->
 	(try AddrMap.find (normalize i t) m
 	 with Not_found ->
-	   Int(0L, reg_8)
+	   Int(bi0, reg_8)
 	     (* FIXME: handle endian and type? *)
 	)
     | _ -> failwith "No symbolics"
@@ -1221,12 +1225,12 @@ let get_indices () =
 let get_concrete_read_index () =
   let el = IntSet.max_elt !memory_read in
     memory_read := IntSet.remove el !memory_read ;
-    Int(el, reg_32)
+    Int(big_int_of_int64 el, reg_32)
 
 let get_concrete_write_index () =
   let el = IntSet.max_elt !memory_write in
     memory_write := IntSet.remove el !memory_write ;
-    Int(el, reg_32)
+    Int(big_int_of_int64 el, reg_32)
 
 
 module LetBind =
@@ -1333,7 +1337,7 @@ struct
     match is_concrete pos with
     | true ->
 	(match pos with
-	 | Int (n, _) -> del_symbolic n
+	 | Int (n, _) -> del_symbolic (int64_of_big_int n)
 	 | _ -> ());
 	Symbolic.update_mem mu pos value endian
     | _  ->
@@ -1346,7 +1350,7 @@ struct
     | Int(n,_) ->
 	(try 
 	   (* Check if this is a symbolic seed *)
-	   let var = symbolic_mem n in
+	   let var = symbolic_mem (int64_of_big_int n) in
 	   (* pdebug ("introducing symbolic: "^(Pp.ast_exp_to_string var)) ; *)
 	   (*update_mem mu index var endian;
 	     Hashtbl.remove n;*)
@@ -1518,7 +1522,7 @@ let hijack_control target trace =
       
 (* Setting the return address to an arbitrary value *)
 let control_flow addr trace = 
-  let target = Int64.of_string (addr) in
+  let target = big_int_of_string addr in
   let target = Int(target,reg_32) in
   let trace, assertion = hijack_control target trace in
     Util.fast_append trace [assertion]
@@ -1549,15 +1553,15 @@ let get_last_load_exp stmts =
 let inject_payload_gen addr payload trace = 
   (* XXX: This is probably inefficient. *)
   let mem = Var(find_memv trace) in
-  let payload = List.map Int64.of_int payload in
+  let payload = List.map big_int_of_int payload in
   let _,assertions = 
     List.fold_left 
       (fun (i,acc) value ->
 	 let index = Ast.BinOp(PLUS, addr, Int(i,reg_32)) in
 	 let load = Ast.Load(mem, index, exp_false, reg_8) in
 	 let constr = Ast.BinOp(EQ, load, Int(value, reg_8)) in
-	   (Int64.succ i, (Ast.Assert(constr, [])::acc))
-      ) (0L, []) payload
+	 (succ_big_int i, (Ast.Assert(constr, [])::acc))
+      ) (bi0, []) payload
   in
   List.rev assertions
 
@@ -1568,15 +1572,15 @@ let inject_payload start payload trace =
   let mem, ind, trace = get_last_load_exp trace in
   dprintf "Injecting shellcode at index: %s" (Pp.ast_exp_to_string ind);
    (* Let's convert to Int64 *)
-  let payload = List.map Int64.of_int payload in
+  let payload = List.map big_int_of_int payload in
   let _,assertions = 
     List.fold_left 
       (fun (i,acc) value ->
 	 let index = Ast.BinOp(PLUS, ind, Int(i,reg_32)) in
 	 let load = Ast.Load(mem, index, exp_false, reg_8) in
 	 let constr = Ast.BinOp(EQ, load, Int(value, reg_8)) in
-	   (Int64.succ i, (Ast.Assert(constr, [])::acc))
-      ) (start, []) payload
+	   (succ_big_int i, (Ast.Assert(constr, [])::acc))
+      ) (big_int_of_int64 start, []) payload
   in
     trace, List.rev assertions
 
@@ -1591,7 +1595,7 @@ let string_to_bytes payload =
 let add_payload ?(offset=0L) payload trace = 
   let payload = string_to_bytes payload in
   let _, index, trace = get_last_load_exp trace in
-  let start = BinOp(PLUS, index, Int(offset, reg_32)) in
+  let start = BinOp(PLUS, index, Int(big_int_of_int64 offset, reg_32)) in
   let assertions = inject_payload_gen start payload trace in
     Util.fast_append trace assertions
 
@@ -1603,7 +1607,7 @@ let add_payload_after ?(offset=4L) payload trace =
 let add_payload_from_file ?(offset=0L) file trace = 
   let payload = bytes_from_file file in
   let _, index, trace = get_last_load_exp trace in
-  let start = BinOp(PLUS, index, Int(offset, reg_32)) in
+  let start = BinOp(PLUS, index, Int(big_int_of_int64 offset, reg_32)) in
   let assertions = inject_payload_gen start payload trace in
     Util.fast_append trace assertions
 
@@ -1619,7 +1623,7 @@ let inject_shellcode nops trace =
   let payload = (nopsled nops) ^ winshellcode in
   (* Find the expression of the last loaded value *)
   let _,target_addr,_ = get_last_load_exp trace in
-  let target_addr = BinOp(PLUS, target_addr, Int(4L, reg_32)) in
+  let target_addr = BinOp(PLUS, target_addr, Int(bi4, reg_32)) in
   (* let target_addr = Int64.add target_addr pin_offset in *)
   (* let target_addr = Int(target_addr, reg_32) in *)
   let _, assertion = hijack_control target_addr trace in
@@ -1630,44 +1634,44 @@ let inject_shellcode nops trace =
 
 (** Use pivot to create exploit *)
 let add_pivot gaddr maddr payload trace =
-  let gaddrexp = Int(gaddr, reg_32) in
+  let gaddrexp = Int(big_int_of_int64 gaddr, reg_32) in
   let trace, assertion = hijack_control gaddrexp trace in
   (* Concatenate the assertion and the gadget IL *)
   let trace = Util.fast_append trace [assertion] in
-  let passerts = inject_payload_gen (Int(maddr, reg_32)) (string_to_bytes payload) trace in
+  let passerts = inject_payload_gen (Int(big_int_of_int64 maddr, reg_32)) (string_to_bytes payload) trace in
   Util.fast_append trace passerts
 
 (** Use pivot to create exploit *)
 let add_pivot_file gaddr maddr payloadfile trace =
-  let gaddrexp = Int(gaddr, reg_32) in
+  let gaddrexp = Int(big_int_of_int64 gaddr, reg_32) in
   let trace, assertion = hijack_control gaddrexp trace in
   (* Concatenate the assertion and the gadget IL *)
   let trace = Util.fast_append trace [assertion] in
-  let passerts = inject_payload_gen (Int(maddr, reg_32)) (bytes_from_file payloadfile) trace in
+  let passerts = inject_payload_gen (Int(big_int_of_int64 maddr, reg_32)) (bytes_from_file payloadfile) trace in
   Util.fast_append trace passerts
 
 (** Transfer control by overwriting sehaddr with gaddr. *)
 let add_seh_pivot gaddr sehaddr paddr payload trace =
   let mem = Var(find_memv trace) in
-  let gaddrexp = Int(gaddr, reg_32) in
-  let sehexp = Load(mem, Int(sehaddr, reg_32), exp_false, reg_32) in
+  let gaddrexp = Int(big_int_of_int64 gaddr, reg_32) in
+  let sehexp = Load(mem, Int(big_int_of_int64 sehaddr, reg_32), exp_false, reg_32) in
   let endtrace = Ast.Comment (endtrace, []) in
   let assertion = Ast.Assert(BinOp(EQ, gaddrexp, sehexp), []) in
   (* Concatenate the assertion and the gadget IL *)
   let trace = Util.fast_append trace [endtrace; assertion] in
-  let passerts = inject_payload_gen (Int(paddr, reg_32)) (string_to_bytes payload) trace in
+  let passerts = inject_payload_gen (Int(big_int_of_int64 paddr, reg_32)) (string_to_bytes payload) trace in
   Util.fast_append trace passerts
 
 (** Transfer control by overwriting sehaddr with gaddr. *)
 let add_seh_pivot_file gaddr sehaddr paddr payloadfile trace =
   let mem = Var(find_memv trace) in
-  let gaddrexp = Int(gaddr, reg_32) in
-  let sehexp = Load(mem, Int(sehaddr, reg_32), exp_false, reg_32) in
+  let gaddrexp = Int(big_int_of_int64 gaddr, reg_32) in
+  let sehexp = Load(mem, Int(big_int_of_int64 sehaddr, reg_32), exp_false, reg_32) in
   let endtrace = Ast.Comment (endtrace, []) in
   let assertion = Ast.Assert(BinOp(EQ, gaddrexp, sehexp), []) in
   (* Concatenate the assertion and the gadget IL *)
   let trace = Util.fast_append trace [endtrace; assertion] in
-  let passerts = inject_payload_gen (Int(paddr, reg_32)) (bytes_from_file payloadfile) trace in
+  let passerts = inject_payload_gen (Int(big_int_of_int64 paddr, reg_32)) (bytes_from_file payloadfile) trace in
   Util.fast_append trace passerts
 
 (*************************************************************)
@@ -1957,7 +1961,7 @@ let trace_transform_stmt2 stmt evalf =
       | n -> 
           let var = Var (newvar (Int64.add num (Int64.of_int (bytes - n))) reg_8) in
           let var = Cast(CAST_UNSIGNED, t, var) in
-          let acc = BinOp (OR, BinOp(LSHIFT, var, Int(shift, reg_32)), acc) in
+          let acc = BinOp (OR, BinOp(LSHIFT, var, Int(big_int_of_int64 shift, reg_32)), acc) in
             load_aux acc (Int64.add shift 8L) (n-1)
     in
     let var = Var (newvar num reg_8) in
@@ -1975,7 +1979,7 @@ let trace_transform_stmt2 stmt evalf =
       | Load (mem, idx, _endian, t) ->
           let num = concretize idx in
           let bytes = get_bytes t in
-          let exp = load num t bytes in
+          let exp = load (int64_of_big_int num) t bytes in
             `ChangeTo exp
       | _ -> `DoChildren
     method visit_stmt = function
@@ -1987,7 +1991,7 @@ let trace_transform_stmt2 stmt evalf =
       | 0 -> acc
       | n ->
           let var = newvar (Int64.add num (Int64.of_int (bytes-n))) reg_8 in
-          let exp = BinOp (RSHIFT, value, Int(shift, reg_32)) in
+          let exp = BinOp (RSHIFT, value, Int(big_int_of_int64 shift, reg_32)) in
           let exp = Cast(CAST_UNSIGNED, reg_8, exp) in
           let acc = (Move(var, exp, [])) :: acc in
             break_aux acc (Int64.add shift 8L) (n - 1)
@@ -2018,7 +2022,7 @@ let trace_transform_stmt2 stmt evalf =
     | Ast.Move (v, Store(mem, idx, value, _endian, t), _) ->
         let idx = concretize idx in
         let bytes = get_bytes t in
-          break_move idx value t bytes 
+          break_move (int64_of_big_int idx) value t bytes 
     | Ast.Move (_, _, atts) when List.exists is_tconcassign atts -> []
     | s -> [s] in
     (*if not !allow_symbolic_indices && !exp <> exp_true then

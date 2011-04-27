@@ -10,10 +10,11 @@
 (* XXX: What should we do when there is a 1 bit access? *)
 
 module D = Debug.Make(struct let name="memory2array" and default=`Debug end)
-
 open D
-open Type
+
 open Ast
+open Big_int
+open Type
 open Var
 
 
@@ -28,10 +29,10 @@ let getwidth regtyp =
 let split_load array index eletype endian bytenum =
   let newtype = Reg(bitwidth) in
   let indextype = Typecheck.infer_ast index in
-  let indexplus = BinOp(PLUS, index, Int(Int64.of_int(bytenum), indextype)) in
+  let indexplus = BinOp(PLUS, index, Int(big_int_of_int bytenum, indextype)) in
   let exp = Load(array, indexplus, endian, newtype) in
   let exp = Cast(CAST_UNSIGNED, eletype, exp) in
-  let exp = exp_shl exp (Int(Int64.of_int((bytenum) * bitwidth), eletype)) in
+  let exp = exp_shl exp (Int(big_int_of_int (bytenum * bitwidth), eletype)) in
   exp
  
 let split_load_list array index eletype endian =
@@ -48,8 +49,8 @@ let split_loads array index eletype endian =
 let split_write array index eletype endian data bytenum =
   let newtype = Reg(bitwidth) in
   let indextype = Typecheck.infer_ast index in
-  let indexplus = BinOp(PLUS, index, Int(Int64.of_int(bytenum), indextype)) in
-  let exp = exp_shr data (Int(Int64.of_int((bytenum) * bitwidth), eletype)) in
+  let indexplus = BinOp(PLUS, index, Int(big_int_of_int bytenum, indextype)) in
+  let exp = exp_shr data (Int(big_int_of_int (bytenum * bitwidth), eletype)) in
   let exp = Cast(CAST_LOW, newtype, exp) in
   let exp = Store(array, indexplus, exp, endian, newtype) in
   exp

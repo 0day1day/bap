@@ -32,6 +32,8 @@
 *)
 
 
+open Big_int
+open Big_int_convenience
 open Type
 open Ssa
 open ExtList
@@ -46,7 +48,7 @@ open D
 module Dom = Dominator.Make(G)
     
 
-type vn = Top | Hash of Ssa.var | HInt of (int64 * typ)
+type vn = Top | Hash of Ssa.var | HInt of (big_int * typ)
 let top = Top
 type expid = 
   | Const of Ssa.value (* Except Var *)
@@ -74,7 +76,7 @@ let vn2eid info = function
 let hash_to_string = function
   | Top -> "T"
   | Hash v -> "<"^Pp.var_to_string v^">"
-  | HInt(i,t) -> Int64.to_string i ^":"^ Pp.typ_to_string t
+  | HInt(i,t) -> string_of_big_int i ^":"^ Pp.typ_to_string t
 
 let meet a b = match (a,b) with
   | (Top, x)
@@ -194,35 +196,36 @@ let opt_expid info var exp =
       | Some Top -> eid (* FIXME: what to do here? *)
     )
   (* identities on binops *)
-  | Bin(AND, _, (HInt(0L,t) as v)) ->
+  | Bin(AND, _, (HInt(bi,t) as v)) when bi_is_zero bi ->
       sameas v
-  | Bin(AND, x, HInt(i,t)) when Arithmetic.tos64 (i,t) = -1L ->
+  | Bin(AND, x, HInt(i,t)) when bi_is_minusone (Arithmetic.tos64 (i,t)) ->
       sameas x
-  | Bin(OR, x, HInt(0L,_)) ->
+  | Bin(OR, x, HInt(bi,_)) when bi_is_zero bi ->
       sameas x
-  | Bin(OR, _, (HInt(i,t) as v)) when Arithmetic.tos64 (i,t) = -1L ->
+  | Bin(OR, _, (HInt(i,t) as v)) when bi_is_minusone (Arithmetic.tos64 (i,t)) ->
       sameas v
-  | Bin(XOR, x, HInt(0L,_))
-  | Bin(PLUS, x, HInt(0L,_))
-  | Bin(LSHIFT, x, HInt(0L,_))
-  | Bin(RSHIFT, x, HInt(0L,_))
-  | Bin(ARSHIFT, x, HInt(0L,_))
-  | Bin(TIMES, x, HInt(1L,_))
-  | Bin(DIVIDE, x, HInt(1L,_))
-  | Bin(SDIVIDE, x, HInt(1L,_)) ->
+  | Bin(XOR, x, HInt(bi,_))
+  | Bin(PLUS, x, HInt(bi,_))
+  | Bin(LSHIFT, x, HInt(bi,_))
+  | Bin(RSHIFT, x, HInt(bi,_))
+  | Bin(ARSHIFT, x, HInt(bi,_)) when bi_is_zero bi ->
+      sameas x
+  | Bin(TIMES, x, HInt(bi,_))
+  | Bin(DIVIDE, x, HInt(bi,_))
+  | Bin(SDIVIDE, x, HInt(bi,_)) when bi_is_one bi ->
       sameas x
   | Bin(AND, x, y)
   | Bin(OR, x, y)
       when x = y ->
       sameas x
   | Bin(XOR, x, y) when x = y ->
-      Const(Int(0L, Var.typ var))
-  | Bin(LT, _, HInt(0L,_)) ->
+      Const(Int(bi0, Var.typ var))
+  | Bin(LT, _, HInt(bi,_)) when bi_is_zero bi ->
       Const(Ssa.val_false)
-  | Bin(LE, _, HInt(i,t)) when Arithmetic.tos64 (i,t) = -1L ->
+  | Bin(LE, _, HInt(i,t)) when bi_is_minusone (Arithmetic.tos64 (i,t)) ->
       Const(Ssa.val_true)
 	(* TODO: add SLT and SLE. Requires canonicalized ints *)
-  | Bin(EQ, x, (HInt(1L,t))) when t = (Reg 1) ->
+  | Bin(EQ, x, (HInt(bi,t))) when t = (Reg 1) && bi_is_zero bi ->
       sameas x
   | x -> x
 

@@ -8,6 +8,8 @@ TODO:
 *)
 
 open Ast
+open Big_int
+open Big_int_convenience
 open Type
 open Util
 
@@ -67,7 +69,7 @@ let print_values delta =
   Hashtbl.iter 
     (fun k v ->
        match k,v with 
-       | var,Int (n,_) -> Printf.printf "%s = %s\n" (Var.name var) (Int64.to_string n)
+       | var,Int (n,_) -> Printf.printf "%s = %s\n" (Var.name var) (string_of_big_int n)
        | _ -> ()
     ) delta
 
@@ -76,7 +78,7 @@ let print_mem memory =
   Hashtbl.iter 
     (fun k v ->
        match k,v with 
-       | Int (v,_),Int (n,_) -> Printf.printf "%s -> %s\n" (Int64.to_string v) (Int64.to_string n)
+       | Int (v,_),Int (n,_) -> Printf.printf "%s -> %s\n" (string_of_big_int v) (string_of_big_int n)
        | _ -> ()
     ) memory
 
@@ -162,7 +164,7 @@ let rec eval_expr (delta,mu,expr) =
              let rec get_bytes offset acc =
                if offset = n then acc
                else 
-                 let mem_index = BinOp (PLUS,arr,Int(Int64.of_int offset, Reg 64)) in
+                 let mem_index = BinOp (PLUS,arr,Int(biconst offset, Reg 64)) in
                  let index = eval_expr (delta,mu,mem_index) in
                  let byte = lookup_mem mu index in
                  get_bytes (offset+1) (byte::acc)
@@ -171,14 +173,14 @@ let rec eval_expr (delta,mu,expr) =
              let loaded = 
                let bytes = get_bytes 0 [] in
                if v3 = exp_false then bytes else List.rev bytes
-             and byte_size = Int(8L,Reg 64) in
+             and byte_size = Int(bi8,Reg 64) in
              (* calculating the loaded value *)
              let value = 
                List.fold_left
                  (fun v n ->
                     let shl = (BinOp(LSHIFT,v,byte_size)) in
                     BinOp(OR,shl,n)
-                 ) (Int(0L,Reg 64)) loaded 
+                 ) (Int(bi0,Reg 64)) loaded 
              in
              value
          | _ -> failwith "not a loadable type"
@@ -199,11 +201,11 @@ let rec eval_expr (delta,mu,expr) =
              let rec get_bytes offset (v,pos,vals) =
                if offset = n then (v,pos,vals)
                else 
-                 let index = BinOp (PLUS,arr,Int(Int64.of_int offset, Reg 64)) in
+                 let index = BinOp (PLUS,arr,Int(biconst offset, Reg 64)) in
                  let ind = eval_expr (delta,mu,index) in
-                 let byte = BinOp (AND,v,Int(lsb,Reg 64)) in
+                 let byte = BinOp (AND,v,Int(big_int_of_int64 lsb, Reg 64)) in
                  let ebyte = eval_expr (delta,mu,byte) in
-                 let v' = (BinOp (RSHIFT,v,Int(8L,Reg 64))) in
+                 let v' = (BinOp (RSHIFT,v,Int(bi8,Reg 64))) in
                  get_bytes (offset+1) (v',ind::pos,ebyte::vals)
              in
              let _,poss,vals = get_bytes 0 (v3,[],[]) in

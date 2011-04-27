@@ -6,6 +6,8 @@
 *)
 
 module VM = Var.VarMap
+
+open Big_int
 open Util
 open Type
 open Ssa
@@ -383,7 +385,7 @@ struct
 	      let find v = VM.find v l in
 	      let do_find v =  try find v with Not_found -> top v  in
 	      let val2si = function
-		| Int(i,t) -> SI.of_bap_int i t
+		| Int(i,t) -> SI.of_bap_int (int64_of_big_int i) t
 		| Lab _ -> raise(Unimplemented "No SI for labels (should be a constant)")
 		| Var v -> do_find v
 	      in
@@ -645,7 +647,7 @@ struct
 	      let find v = VM.find v l in
 	      let do_find v =  try find v with Not_found -> VS.top in
 	      let val2vs = function
-		| Int(i,t) -> VS.of_bap_int i t
+		| Int(i,t) -> VS.of_bap_int (int64_of_big_int i) t
 		| Lab _ -> raise(Unimplemented "No VS for labels (should be a constant)")
 		| Var v -> do_find v
 	      in
@@ -781,7 +783,7 @@ module AbsEnv = struct
     with Not_found -> VS.top
 
   let ssaval2vs ae = function
-    | Int(i,t) -> VS.of_bap_int i t
+    | Int(i,t) -> VS.of_bap_int (int64_of_big_int i) t
     | Lab _ -> raise(Unimplemented "No VS for labels (should be a constant)")
     | Var v -> do_find_vs ae v
 
@@ -855,7 +857,7 @@ struct
 	      in
 	      let val2vs = function
 		| Int(i,t)->
-		      VS.of_bap_int i t
+		      VS.of_bap_int (int64_of_big_int i) t
 		| Lab _ -> raise(Unimplemented "No VS for labels (should be a constant)")
 		| Var v -> do_find v
 	      in

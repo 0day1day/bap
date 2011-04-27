@@ -5,13 +5,14 @@
     @author Ivan Jager
 *)
 
+open Big_int
 open ExtList
 open Type
 
 type var = Var.t
 
 type value =
-  | Int of int64 * typ
+  | Int of big_int * typ
   | Var of var
   | Lab of string
 
@@ -41,13 +42,13 @@ type stmt =
   | Comment of string * attrs (** A comment to be ignored *)
   (* | Special of string * attrs (** A "special" statement. (does magic) *) *)
 
-let val_false = Int(0L, Ast.reg_1)
-let val_true = Int(1L, Ast.reg_1)
+let val_false = Int(zero_big_int, Ast.reg_1)
+let val_true = Int(unit_big_int, Ast.reg_1)
 
 (** If possible, make a label that would be refered to by the given
     expression. *)
 let val_of_exp = function
   | Lab s -> Some(Name s)
-  | Int(i, Reg bits) ->
-      Some(Addr(Int64.logand i (Int64.pred(Int64.shift_left 1L bits))))
+  | Int(i, t) ->
+      Some(Addr(int64_of_big_int (Arithmetic.to64 (i,t))))
   | _ -> None

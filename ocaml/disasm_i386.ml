@@ -1,6 +1,8 @@
 open Int64
 open Ast
 open Ast_convenience
+open Big_int
+open Big_int_convenience
 open Type
 
 module D = Debug.Make(struct let name = "Disasm_i386" and default=`NoDebug end)
@@ -43,7 +45,7 @@ open D
 type operand =
   | Oreg of int
   | Oaddr of Ast.exp
-  | Oimm of int64
+  | Oimm of int64 (* XXX: Should this be big_int? *)
 
 type opcode =
   | Retn
@@ -225,12 +227,12 @@ let load_s s t a = match s with
 let ite t b e1 e2 =
   exp_ite ~t b e1 e2
 
-let l32 i = Int(Arithmetic.to64 (i,r32), r32)
-let l16 i = Int(Arithmetic.to64 (i,r16), r16)
-let lt i t = Int(Arithmetic.to64 (i,t), t)
+let l32 i = Int(Arithmetic.to64 (big_int_of_int64 i,r32), r32)
+let l16 i = Int(Arithmetic.to64 (big_int_of_int64 i,r16), r16)
+let lt i t = Int(Arithmetic.to64 (big_int_of_int64 i,t), t)
 
-let i32 i = Int(Int64.of_int i, r32)
-let it i t = Int(Int64.of_int i, t)
+let i32 i = Int(biconst i, r32)
+let it i t = Int(biconst i, t)
 
 (* converts a register number to the corresponding 32bit register variable *)
 let bits2reg32= function
@@ -297,7 +299,7 @@ let op2e_s ss t = function
   | Oreg r when t = r8 -> bits2reg8e r
   | Oreg r -> unimplemented "sub registers" (*cast_low t (Var r)*)
   | Oaddr e -> load_s ss t e
-  | Oimm i -> Int(Arithmetic.to64 (i,t), t)
+  | Oimm i -> Int(Arithmetic.to64 (big_int_of_int64 i,t), t)
 
 let assn_s s t v e =
   match v with
@@ -344,7 +346,7 @@ let reta = [StrAttr "ret"]
 and calla = [StrAttr "call"]
 
 let compute_sf result = Cast(CAST_HIGH, r1, result)
-let compute_zf t result = Int(0L, t) =* result
+let compute_zf t result = Int(bi0, t) =* result
 let compute_pf t r =
   (* extra parens do not change semantics but do make it pretty print nicer *)
   exp_not (Cast(CAST_LOW, r1, (((((((r >>* it 7 t) ^* (r >>* it 6 t)) ^* (r >>* it 5 t)) ^* (r >>* it 4 t)) ^* (r >>* it 3 t)) ^* (r >>* it 2 t)) ^* (r >>* it 1 t)) ^* r))
@@ -360,7 +362,7 @@ let set_pszf t r =
 
 let set_flags_sub t s1 s2 r =
   move cf (s2 >* s1)
-  ::move af ((r &* Int(7L,t)) <* (s1 &* Int(7L,t))) (* Is this right? *)
+  ::move af ((r &* Int(bi7,t)) <* (s1 &* Int(bi7,t))) (* Is this right? *)
   ::move oF (Cast(CAST_HIGH, r1, (s1 ^* s2) &* (s1 ^* r) ))
   ::set_pszf t r
 
@@ -399,18 +401,18 @@ let rec to_ir addr next ss pref =
   | Movsx(t, dst, ts, src) when pref = [] ->
     [assn t dst (cast_signed t (op2e ts src))]
   | Movdqa(d,s) -> (
-    let zero = Int(0L,r4) and eight = Int(8L,r4) in
+    let zero = Int(bi0,r4) and eight = Int(bi8,r4) in
     let (s0, s1, a1) = match s with
       | Oreg i -> let r = bits2xmm i in
 		  (loadm r r64 zero, loadm r r64 eight, [])
-      | Oaddr a -> (load r64 a, load r64 (a +* Int(8L, addr_t)), [a])
+      | Oaddr a -> (load r64 a, load r64 (a +* Int(bi8, addr_t)), [a])
       | Oimm _ -> failwith "invalid"
     in
     let (d0, d1, a2) = match d with
       (* FIXME: should this be a single move with two stores? *)
       | Oreg i -> let r = bits2xmm i in
 		  (storem r r64 zero s0, storem r r64 eight s1, [])
-      | Oaddr a -> (store r64 a s0, store r64 (a +* Int(8L, addr_t)) s1, [a])
+      | Oaddr a -> (store r64 a s0, store r64 (a +* Int(bi8, addr_t)) s1, [a])
       | Oimm _ -> failwith "invalid"
     in
     (List.map (fun a -> Assert( (a &* i32 15) =* i32 0, [])) (a1@a2))
@@ -598,7 +600,7 @@ let rec to_ir addr next ss pref =
     :: move af (Unknown("AF is undefined after or", r1))
     :: set_pszf t (op2e t o1)
   | Xor(t, o1, o2) when o1 = o2->
-    assn t o1 (Int(0L,t))
+    assn t o1 (Int(bi0,t))
     :: move af (Unknown("AF is undefined after xor", r1))
     :: move zf exp_true
     :: List.map (fun v -> move v exp_false) [oF; cf; pf; sf]
@@ -722,7 +724,10 @@ let parse_instr g addr =
     | _ -> None
   in*)
   let parse_disp8 a =
-    (Arithmetic.tos64 (Int64.of_int (Char.code (g a)), r8), s a)
+    (* (Arithmetic.tos64 (big_int_of_int (Char.code (g a)), r8), s a) *)
+    let r n = Int64.shift_left (Int64.of_int (Char.code (g (Int64.add a (Int64.of_int n))))) (8*n) in
+    let d = r 0 in
+    (d, (Int64.succ a))
   and parse_disp16 a =
     let r n = Int64.shift_left (Int64.of_int (Char.code (g (Int64.add a (Int64.of_int n))))) (8*n) in
     let d = r 0 in
@@ -736,7 +741,7 @@ let parse_instr g addr =
     let d = Int64.logor d (r 3) in
     (d, (Int64.add a 4L))
   in
-  let parse_disp = function
+  let parse_disp:(Type.typ -> int64 -> int64 * int64) = function
     | Reg 8 ->  parse_disp8
     | Reg 16 -> parse_disp16
     | Reg 32 -> parse_disp32
