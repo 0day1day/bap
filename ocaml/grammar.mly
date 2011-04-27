@@ -80,12 +80,16 @@ let mk_attr lab string =
   | "tid" -> ThreadId(int_of_string string)
   | _ -> err ("Unknown attribute @"^lab)
 
-let typ_of_string = function
+let typ_of_string = 
+  let tre = Str.regexp "^u\\([0-9]+\\)$" in
+  function
   | "bool" -> reg_1
   | "u8" -> reg_8
   | "u16" -> reg_16
   | "u32" -> reg_32
   | "u64" -> reg_64
+  | s when Str.string_match tre s 0 ->
+      Reg(int_of_string (Str.matched_group 1 s))
   | s -> err ("Unexpected type '"^s^"'")
 
 let casttype_of_string = function
@@ -104,7 +108,7 @@ let casttype_of_string = function
 
 %token LPAREN RPAREN LSQUARE RSQUARE
 %token COMMA SEMI EOF COLON
-%token CJMP JMP LABEL ADDR ASSERT HALT SPECIAL CALL RET
+%token CJMP JMP LABEL ADDR ASSERT HALT SPECIAL
 %token LET IN UNKNOWN WITH TRUE FALSE EBIG ELITTLE
 %token PLUS MINUS  DIVIDE MOD SMOD TIMES 
 %token SDIVIDE LSHIFT RSHIFT ARSHIFT XOR NEQ
@@ -114,12 +118,11 @@ let casttype_of_string = function
 %token AT QUESTION
 %token LCURLY RCURLY
 
-%start program expr db
+%start program expr
 
 %type <Ast.program> program
 %type <Ast.exp > expr
 %type <Type.context> context
-%type <Ast.exp list> db
 %nonassoc LET IN
 %left WITH
 /* If the precedence for any of these changes, pp.ml needs to be updated
@@ -135,16 +138,6 @@ let casttype_of_string = function
 %left UMINUS NOT
 %nonassoc LSQUARE
 %%
-
-db:
-| exprlist EOF { $1 }
-
-exprlist:
-| revexprlist { List.rev $1 }
-
-revexprlist:
-| revexprlist expr { $2 :: $1 }
-| { [] }
 
 program: 
 | stmtlist EOF { $1 }
@@ -175,8 +168,7 @@ stmt:
 | LABEL ID attrs { Label(Name $2, $3) }
 | ADDR INT attrs { Label(Addr $2, $3) }
 | COMMENT attrs { Comment($1, $2) }
-| RET { Ret }
-| CALL expr attrs semi { Call($2, $3) }
+
 
 plusminusint:
 | INT { $1 }
