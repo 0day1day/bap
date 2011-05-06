@@ -71,8 +71,12 @@ let empty_mem v = ConcreteMem(AddrMap.empty, v)
 let empty_smem v = Symbolic(Var(v))
 let val_true = Symbolic exp_true
 let val_false = Symbolic exp_false
-let is_true_val = (=) val_true
-let is_false_val = (=) val_false
+let is_true_val = function
+  | Symbolic e -> full_exp_eq e exp_true
+  | ConcreteMem _ -> false
+let is_false_val = function
+  | Symbolic e -> full_exp_eq e exp_false
+  | ConcreteMem _ -> false
 let is_symbolic = function
   | Symbolic (Int _) -> false
   | ConcreteMem _ -> false

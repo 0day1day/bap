@@ -110,45 +110,45 @@ let ncjmp c t =
   :: Label(l, [])
   :: []
 
-  let num = function
-    | Load _ -> 0
-    | Store _ -> 1
-    | BinOp _ -> 2
-    | UnOp _ -> 3
-    | Var _ -> 4
-    | Lab _ -> 5
-    | Int _ -> 6
-    | Cast _ -> 7
-    | Let _ -> 8
-    | Unknown _ -> 9
+let num_exp = function
+  | Load _ -> 0
+  | Store _ -> 1
+  | BinOp _ -> 2
+  | UnOp _ -> 3
+  | Var _ -> 4
+  | Lab _ -> 5
+  | Int _ -> 6
+  | Cast _ -> 7
+  | Let _ -> 8
+  | Unknown _ -> 9
 
   (* Returns elist, tlist, btlist, utlist, vlist, slist, ilist, clist *)
-  let getargs = function
-    | Load(e1,e2,e3,t1) -> [e1;e2;e3], [t1], [], [], [], [], [], []
-    | Store(e1,e2,e3,e4,t1) -> [e1;e2;e3;e4], [t1], [], [], [], [], [], []
-    | BinOp(bt,e1,e2) -> [e1;e2], [], [bt], [], [], [], [], []
-    | UnOp(ut,e1) -> [e1], [], [], [ut], [], [], [], []
-    | Var(v1) -> [], [], [], [], [v1], [], [], []
-    | Lab(s1) -> [], [], [], [], [], [s1], [], []
-    | Int(i1,t1) -> [], [t1], [], [], [], [], [i1], []
-    | Cast(c1,t1,e1) -> [e1], [t1], [], [], [], [], [], [c1]
-    | Let(v1,e1,e2) -> [e1;e2], [], [], [], [v1], [], [], []
-    | Unknown(s1,t1) -> [], [t1], [], [], [], [s1], [], []
+let getargs_exp = function
+  | Load(e1,e2,e3,t1) -> [e1;e2;e3], [t1], [], [], [], [], [], []
+  | Store(e1,e2,e3,e4,t1) -> [e1;e2;e3;e4], [t1], [], [], [], [], [], []
+  | BinOp(bt,e1,e2) -> [e1;e2], [], [bt], [], [], [], [], []
+  | UnOp(ut,e1) -> [e1], [], [], [ut], [], [], [], []
+  | Var(v1) -> [], [], [], [], [v1], [], [], []
+  | Lab(s1) -> [], [], [], [], [], [s1], [], []
+  | Int(i1,t1) -> [], [t1], [], [], [], [], [i1], []
+  | Cast(c1,t1,e1) -> [e1], [t1], [], [], [], [], [], [c1]
+  | Let(v1,e1,e2) -> [e1;e2], [], [], [], [v1], [], [], []
+  | Unknown(s1,t1) -> [], [t1], [], [], [], [s1], [], []
 
 
 (** quick_exp_eq e1 e2 returns true if and only if the subexpressions
     in e1 and e2 are *physically* equal. *)
 let quick_exp_eq e1 e2 =
-  if (num e1) <> (num e2) then false else
-    let l1,l2,l3,l4,l5,l6,l7,l8 = getargs e1 in
-    let r1,r2,r3,r4,r5,r6,r7,r8 = getargs e2 in
+  if (num_exp e1) <> (num_exp e2) then false else
+    let l1,l2,l3,l4,l5,l6,l7,l8 = getargs_exp e1 in
+    let r1,r2,r3,r4,r5,r6,r7,r8 = getargs_exp e2 in
     let b1 = List.for_all2 (==) l1 r1 in
     let b2 = List.for_all2 (==) l2 r2 in
     let b3 = List.for_all2 (==) l3 r3 in
     let b4 = List.for_all2 (==) l4 r4 in
     let b5 = List.for_all2 (==) l5 r5 in
     let b6 = List.for_all2 (==) l6 r6 in
-    let b7 = List.for_all2 (eq_big_int) l7 r7 in
+    let b7 = List.for_all2 (==) l7 r7 in
     let b8 = List.for_all2 (==) l8 r8 in
     if b1 & b2 & b3 & b4 & b5 & b6 & b7 & b8 then
       true else false
@@ -158,19 +158,21 @@ let quick_exp_eq e1 e2 =
 
     This function should be equivalent to =, except that it understands
     Big_int's, which are abstract values.
+
+    XXX: Can we make this tail recursive?
 *)
 let rec full_exp_eq e1 e2 =
-  if (num e1) <> (num e2) then false else
-    let l1,l2,l3,l4,l5,l6,l7,l8 = getargs e1 in
-    let r1,r2,r3,r4,r5,r6,r7,r8 = getargs e2 in
-    let b1 = List.for_all2 (==) l1 r1 in
-    let b2 = List.for_all2 (==) l2 r2 in
-    let b3 = List.for_all2 (==) l3 r3 in
-    let b4 = List.for_all2 (==) l4 r4 in
-    let b5 = List.for_all2 (==) l5 r5 in
-    let b6 = List.for_all2 (==) l6 r6 in
+  if (num_exp e1) <> (num_exp e2) then false else
+    let l1,l2,l3,l4,l5,l6,l7,l8 = getargs_exp e1 in
+    let r1,r2,r3,r4,r5,r6,r7,r8 = getargs_exp e2 in
+    let b1 = List.for_all2 (==) l1 r1 in (* e must be == *)
+    let b2 = List.for_all2 (=) l2 r2 in
+    let b3 = List.for_all2 (=) l3 r3 in
+    let b4 = List.for_all2 (=) l4 r4 in
+    let b5 = List.for_all2 (=) l5 r5 in
+    let b6 = List.for_all2 (=) l6 r6 in
     let b7 = List.for_all2 (eq_big_int) l7 r7 in
-    let b8 = List.for_all2 (==) l8 r8 in
+    let b8 = List.for_all2 (=) l8 r8 in
     if b1 & b2 & b3 & b4 & b5 & b6 & b7 & b8 then
       true
     else if b2 & b3 & b4 & b5 & b6 & b7 & b8 then
@@ -180,6 +182,46 @@ let rec full_exp_eq e1 e2 =
     else (* If something else differs, we are definitely not equal. *)
       false
 
+let num_stmt = function
+  | Move _ -> 0
+  | Jmp _ -> 1
+  | CJmp _ -> 2
+  | Label _ -> 3
+  | Halt _ -> 4
+  | Assert _ -> 5
+  | Comment _ -> 6
+  | Special _ -> 7
+
+let getargs_stmt = function
+  | Move(v,e,a) -> [e], [v], [], [a], []
+  | CJmp(e1,e2,e3,a) -> [e1;e2;e3], [], [], [a], []
+  | Label(l,a) -> [], [], [l], [a], []
+  | Jmp(e,a)
+  | Halt(e,a)
+  | Assert(e,a) -> [e], [], [], [a], []
+  | Comment(s,a)
+  | Special(s,a) -> [], [], [], [a], [s]
+
+(** quick_stmt_eq returns true if and only if the subexpressions in e1
+    and e2 are *physically* equal. *)
+let quick_stmt_eq s1 s2 =
+  if (num_stmt s1) <> (num_stmt s2) then false else
+    let l1,l2,l3,l4,l5 = getargs_stmt s1 in
+    let r1,r2,r3,r4,r5 = getargs_stmt s2 in
+    let b1 = List.for_all2 (==) l1 r1 in
+    let b2 = List.for_all2 (==) l2 r2 in
+    let b3 = List.for_all2 (==) l3 r3 in
+    let b4 = List.for_all2 (==) l4 r4 in
+    let b5 = List.for_all2 (==) l5 r5 in
+    if b1 & b2 & b3 & b4 & b5 then
+      true
+    else if b2 & b3 & b4 & b5 then
+      (* e1 and e2 are not physically equal.  But maybe their subexpressions
+	 are physically equal. *)
+      List.for_all2 quick_exp_eq l1 r1
+    else
+      false
+
 (** full_stmt_eq returns true if and only if e1 and e2 are
     structurally equivalent.
 
@@ -187,34 +229,14 @@ let rec full_exp_eq e1 e2 =
     Big_int's, which are abstract values.
 *)
 let full_stmt_eq s1 s2 =
-  let num = function
-    | Move _ -> 0
-    | Jmp _ -> 1
-    | CJmp _ -> 2
-    | Label _ -> 3
-    | Halt _ -> 4
-    | Assert _ -> 5
-    | Comment _ -> 6
-    | Special _ -> 7
-  in
-  let getargs = function
-    | Move(v,e,a) -> [e], [v], [], [a], []
-    | CJmp(e1,e2,e3,a) -> [e1;e2;e3], [], [], [a], []
-    | Label(l,a) -> [], [], [l], [a], []
-    | Jmp(e,a)
-    | Halt(e,a)
-    | Assert(e,a) -> [e], [], [], [a], []
-    | Comment(s,a)
-    | Special(s,a) -> [], [], [], [a], [s]
-  in
-  if (num s1) <> (num s2) then false else
-    let l1,l2,l3,l4,l5 = getargs s1 in
-    let r1,r2,r3,r4,r5 = getargs s2 in
-    let b1 = List.for_all2 (==) l1 r1 in
-    let b2 = List.for_all2 (==) l2 r2 in
-    let b3 = List.for_all2 (==) l3 r3 in
-    let b4 = List.for_all2 (==) l4 r4 in
-    let b5 = List.for_all2 (==) l5 r5 in
+  if (num_stmt s1) <> (num_stmt s2) then false else
+    let l1,l2,l3,l4,l5 = getargs_stmt s1 in
+    let r1,r2,r3,r4,r5 = getargs_stmt s2 in
+    let b1 = List.for_all2 (==) l1 r1 in (* e must use == *)
+    let b2 = List.for_all2 (=) l2 r2 in
+    let b3 = List.for_all2 (=) l3 r3 in
+    let b4 = List.for_all2 (=) l4 r4 in
+    let b5 = List.for_all2 (=) l5 r5 in
     if b1 & b2 & b3 & b4 & b5 then
       true
     else if b2 & b3 & b4 & b5 then

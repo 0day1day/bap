@@ -69,7 +69,7 @@ let binop op ((_,t) as v1) v2 =
   | RSHIFT -> to_val t (shift_right_big_int (to64 v1) (toshift t v2))
   | ARSHIFT -> to_val t (shift_right_towards_zero_big_int (tos64 v1) (toshift t v2))
       (* div_big_int rounds towards infinity. *)
-  | DIVIDE -> (*to_val t (Util.int64_udiv (tos64 v1) (tos64 v2))*) failwith "Not done"
+  | DIVIDE -> to_val t (div_big_int (to64 v1) (to64 v2))
       (* Int64.div rounds towards zero. What do we want? *)
   | SDIVIDE -> to_val t (div_big_int (tos64 v1) (tos64  v2))
   | MOD -> to_val t (mod_big_int (tos64 v1) (tos64 v2))
@@ -83,8 +83,8 @@ let binop op ((_,t) as v1) v2 =
 let unop op ((_,t) as v) =
   match op with
   | NEG -> to_val t (minus_big_int (to64 v))
-  | NOT -> (* to_val t (Int64.lognot (to64 v)) *) failwith "Not done"
-
+  | NOT -> (* implemented as xor with -1 *)
+    to_val t (xor_big_int (to64 (bim1,t)) (to64 v))
 
 let cast ct ((_,t) as v) t2 =
   let bits1 = bits_of_width t

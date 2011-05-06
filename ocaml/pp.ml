@@ -112,7 +112,8 @@ object (self)
 	(* 		      ^", u" *)
 	(* 		      ^ (string_of_int (bits_of_width tp))) *)
 	(* XXX: FIX ME *)
-	failwith "Context printing disabled"
+      pp "Context printing disabled"
+	(* failwith "Context printing disabled" *)
     | ThreadId i -> pp "@tid \""; pp (string_of_int i); pp "\""
     | ExnAttr _ (* we could try to print something using Printexc.to_string *)
     | Pos _ -> () (* ignore position attrs *)

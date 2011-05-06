@@ -28,10 +28,10 @@ let biconst i = big_int_of_int i
 let (%==) bi1 bi2 = eq_big_int bi1 bi2
 
 (** bi_is_zero bi returns true iff bi = 0 *)
-let bi_is_zero bi = eq_big_int bi0 bi
+let bi_is_zero bi = bi0 %== bi
 
 (** bi_is_one bi returns true iff bi = 1 *)
-let bi_is_one bi = eq_big_int bi1 bi
+let bi_is_one bi = bi1 %== bi
 
 (** bi_is_minusone bi returns true iff bi = -1 *)
-let bi_is_minusone bi = eq_big_int bim1 bi
+let bi_is_minusone bi = bim1 %== bi

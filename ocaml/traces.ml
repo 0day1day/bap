@@ -811,7 +811,7 @@ let check_delta state =
       try
 	let evalbyte = get_int (AddrMap.find addr cm) in
 	let issymb = Hashtbl.mem global.symbolic addr in
-	if tracebyte <> evalbyte && (not issymb) && (not !use_alt_assignment) then wprintf "Consistency error: Tainted memory value (address %Lx, value %s) present in trace does not match value %s in in concrete evaluator" addr (string_of_big_int tracebyte) (string_of_big_int evalbyte)
+	if not (eq_big_int tracebyte evalbyte) && (not issymb) && (not !use_alt_assignment) then wprintf "Consistency error: Tainted memory value (address %Lx, value %s) present in trace does not match value %s in in concrete evaluator" addr (string_of_big_int tracebyte) (string_of_big_int evalbyte)
       with Not_found -> 
 	if not !use_alt_assignment then
 	  wprintf "Consistency error: Tainted memory value (address %Lx, value %s) present in trace but missing in concrete evaluator" addr (string_of_big_int tracebyte)
@@ -827,7 +827,7 @@ let check_delta state =
 	match dsavarname, traceval, tainted with
 	| Some(dsavarname), Some(traceval), Some(tainted) -> 
 	    ((*dprintf "Doing check on %s" dsavarname;*)
-	     if (traceval <> evalval && tainted && not (Hashtbl.mem badregs (Var.name var))) then 
+	     if (not (full_exp_eq traceval evalval) && tainted && not (Hashtbl.mem badregs (Var.name var))) then 
 	       wprintf "Difference between tainted BAP and trace values in previous instruction: %s Trace=%s Eval=%s" (dsavarname) (Pp.ast_exp_to_string traceval) (Pp.ast_exp_to_string evalval)
 		 (* If we can't find concrete value, it's probably just a BAP temporary *)
 	    )
@@ -909,9 +909,9 @@ let trace_transform_stmt stmt evalf =
   let s = Printf.sprintf "Removed: %s" (Pp.ast_stmt_to_string stmt) in
   let com = Ast.Comment(s, []) in
   let s = match stmt with
-    | (Ast.CJmp (e,tl,_,atts1)) when (evalf e) = exp_true ->
+    | (Ast.CJmp (e,tl,_,atts1)) when full_exp_eq (evalf e) exp_true ->
     	[com; Ast.Assert(e,atts1)]
-    | (Ast.CJmp (e,_,fl,atts1)) when (evalf e) = exp_false ->
+    | (Ast.CJmp (e,_,fl,atts1)) when full_exp_eq (evalf e) exp_false ->
     	[com; Ast.Assert(UnOp(NOT,e),atts1)]
     | Ast.CJmp _ -> failwith "Evaluation failure!"
     | (Ast.Jmp _) ->
@@ -920,7 +920,7 @@ let trace_transform_stmt stmt evalf =
 	     execution does not need these *)
     | Ast.Move (_, _, atts) when List.exists is_tconcassign atts -> []
     | s -> [s] in
-  if not !allow_symbolic_indices && !exp <> exp_true then
+  if not !allow_symbolic_indices && full_exp_eq !exp exp_true then
     (* The assertion must come first, since the statement may modify value of the expression! *)
     s @ [Assert(!exp, [])]
   else
@@ -2010,9 +2010,9 @@ let trace_transform_stmt2 stmt evalf =
   let s = Printf.sprintf "Removed: %s" (Pp.ast_stmt_to_string stmt) in
   let com = Ast.Comment(s, []) in
   let s = match stmt with
-    | (Ast.CJmp (e,tl,_,atts1)) when (evalf e) = exp_true ->
+    | (Ast.CJmp (e,tl,_,atts1)) when full_exp_eq (evalf e) exp_true ->
     	[com; Ast.Assert(e,atts1)]
-    | (Ast.CJmp (e,_,fl,atts1)) when (evalf e) = exp_false ->
+    | (Ast.CJmp (e,_,fl,atts1)) when full_exp_eq (evalf e) exp_false ->
     	[com; Ast.Assert(UnOp(NOT,e),atts1)]
     | Ast.CJmp _ -> failwith "Evaluation failure!"
     | (Ast.Jmp _) ->
