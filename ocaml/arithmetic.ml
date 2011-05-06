@@ -27,11 +27,11 @@ let to64 (i,t) =
 (* sign extend to 64 bits*)
 let tos64 (i,t) =
   let bits = bits_of_width t in
-  let modv = shift_left_big_int unit_big_int bits in (* 2^(bits-1) *)
+  let modv = shift_left_big_int unit_big_int (bits-1) in (* 2^(bits-1) *)
   let final = mod_big_int i modv in (* i mod 2^(bits-1) *)
   (* mod always returns a positive number *)
   let sign = shift_right_big_int i (bits-1) in
-  if bi_is_zero sign then (* positive *) final else (* negative *) minus_big_int final
+  if bi_is_zero sign then (* positive *) final else (* negative *) minus_big_int (sub_big_int modv (to64 (final, Reg(bits-1))))
 
 (* shifting by more than the number of bits or by negative values
  * will be the same as shifting by the number of bits. *)

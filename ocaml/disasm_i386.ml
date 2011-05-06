@@ -227,9 +227,9 @@ let load_s s t a = match s with
 let ite t b e1 e2 =
   exp_ite ~t b e1 e2
 
-let l32 i = Int(Arithmetic.to64 (big_int_of_int64 i,r32), r32)
-let l16 i = Int(Arithmetic.to64 (big_int_of_int64 i,r16), r16)
-let lt i t = Int(Arithmetic.to64 (big_int_of_int64 i,t), t)
+let l32 i = Int(Arithmetic.tos64 (big_int_of_int64 i,r32), r32)
+let l16 i = Int(Arithmetic.tos64 (big_int_of_int64 i,r16), r16)
+let lt i t = Int(Arithmetic.tos64 (big_int_of_int64 i,t), t)
 
 let i32 i = Int(biconst i, r32)
 let it i t = Int(biconst i, t)
@@ -724,11 +724,14 @@ let parse_instr g addr =
     | _ -> None
   in*)
   let parse_disp8 a =
-    (* (Arithmetic.tos64 (big_int_of_int (Char.code (g a)), r8), s a) *)
-    let r n = Int64.shift_left (Int64.of_int (Char.code (g (Int64.add a (Int64.of_int n))))) (8*n) in
-    let d = r 0 in
-    (d, (Int64.succ a))
+    (* This has too many conversions, but the below code doesn't handle
+       signedness correctly. *)
+    (int64_of_big_int (Arithmetic.tos64 (big_int_of_int (Char.code (g a)), r8)), s a)
+  (* let r n = Int64.shift_left (Int64.of_int (Char.code (g (Int64.add a (Int64.of_int n))))) (8*n) in *)
+  (*   let d = r 0 in *)
+  (*   (d, (Int64.succ a)) *)
   and parse_disp16 a =
+    (* XXX: Does this handle negative displacements correctly? *)
     let r n = Int64.shift_left (Int64.of_int (Char.code (g (Int64.add a (Int64.of_int n))))) (8*n) in
     let d = r 0 in
     let d = Int64.logor d (r 1) in
