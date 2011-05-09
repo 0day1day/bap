@@ -872,6 +872,8 @@ let parse_instr g addr =
     | 0x89 ->
         let (r, rm, na) = parse_modrm32 na in
 	  (Mov(opsize, rm, r), na)
+	| 0x8a -> let (r, rm, na) = parse_modrm r8 na in
+	    (Mov(r8, r, rm), na)
     | 0x8b -> let (r, rm, na) = parse_modrm32 na in
 	      (Mov(opsize, r, rm), na)
     | 0x8d -> let (r, rm, na) = parse_modrm opsize na in
