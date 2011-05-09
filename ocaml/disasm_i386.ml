@@ -891,6 +891,8 @@ let parse_instr g addr =
     | 0xa7 -> (Cmps opsize, na)
     | 0xae -> (Scas r8, na)
     | 0xaf -> (Scas opsize, na)
+	| 0xa8 -> let (i, na) = parse_imm8 na in
+	  (Test(r8, o_eax, i), na)
     | 0xa9 -> let (i,na) = parse_immz opsize na in
 	      (Test(opsize, o_eax, i), na)
     | 0xaa -> (Stos r8, na)
