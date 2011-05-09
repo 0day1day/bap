@@ -39,8 +39,14 @@ conc_map* get_cval(TraceAttrs_t *ta, int i) {
 const char* cval_name(conc_map *m) {
   return m->name.c_str();
 }
-const_val_t cval_value(conc_map *m) {
-  return m->value;
+big_val_t* cval_value(conc_map *m) {
+  return &(m->value);
+}
+long cval_value_size(big_val_t *v) {
+  return v->size();
+}
+const_val_t cval_value_part(big_val_t *v, int i) {
+  return v->at(i);
 }
 const_val_t cval_ind(conc_map *m) {
   return m->index;

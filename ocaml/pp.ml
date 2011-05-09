@@ -104,16 +104,15 @@ object (self)
     | Address a -> printf "@address \"0x%Lx\"" a;
     | Liveout -> pp "@set \"liveout\""
     | StrAttr s -> pp "@str \""; pp s; pc '\"'
-    | Context {name=s; mem=mem; value=v; index=i; t=tp; taint=Taint t} -> 
-	(* let ts = string_of_int t in *)
-	(* (\*if t = Taint then "tainted" else "untainted" in*\) *)
-	(* let ind = if mem then "[0x"^(Int64.format "%Lx" i)^"]" else "" in *)
-	(* pp "@context "; pp (s^ ind ^" = 0x"^(Int64.format "%Lx" v)^ ", " ^ ts *)
-	(* 		      ^", u" *)
-	(* 		      ^ (string_of_int (bits_of_width tp))) *)
-	(* XXX: FIX ME *)
-      pp "Context printing disabled"
-	(* failwith "Context printing disabled" *)
+    | Context {name=s; mem=mem; value=v; index=i; t=Reg bits; taint=Taint t} -> 
+	let ts = string_of_int t in
+	(*if t = Taint then "tainted" else "untainted" in*)
+	let ind = if mem then "[0x"^(Int64.format "%Lx" i)^"]" else "" in
+	pp "@context "; pp (s^ ind ^" = "^(string_of_big_int v)^ ", " ^ ts
+			      ^", u"
+			      ^ (string_of_int bits))
+    | Context _ ->
+      failwith "Contexts only specify register types"
     | ThreadId i -> pp "@tid \""; pp (string_of_int i); pp "\""
     | ExnAttr _ (* we could try to print something using Printexc.to_string *)
     | Pos _ -> () (* ignore position attrs *)

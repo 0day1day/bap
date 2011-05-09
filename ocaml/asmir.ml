@@ -205,12 +205,28 @@ let get_cval_usage = function
 (* TODO: needs to be refined for bytes *)
 let int_to_taint n = Taint n
 
+let big_int_of_big_val v =
+  let n = (cval_value_size v) - 1 in
+  Util.foldn
+    (fun acc index ->
+      (* On x86, the data will be stored in litle endian form, so the
+	 last index has the most significant data.  We want to access
+	 this first, since we shift left as we go. *)
+      let revindex = n - index in
+      (* We need to convert the int64 we need to two's complement form *)
+      let tempv = Arithmetic.to64 (big_int_of_int64 (cval_value_part v revindex), reg_64) in
+      let shiftacc = shift_left_big_int acc 64 (* sizeof(int64) *) in
+      (* dprintf "Hmmm.... %s %s" (string_of_big_int tempv) (string_of_big_int shiftacc); *)
+      add_big_int tempv shiftacc)
+    zero_big_int
+    n
+
 let tr_context_tup cval =
   Context {name=Libasmir.cval_name cval;
            mem=Libasmir.cval_mem cval;
            t=cval_type_to_typ (Libasmir.cval_type cval);
            index=Libasmir.cval_ind cval;
-           value=big_int_of_int64 (Libasmir.cval_value cval);
+           value=big_int_of_big_val (Libasmir.cval_value cval);
 	   usage=get_cval_usage(Libasmir.cval_usage cval);
            taint=int_to_taint (Libasmir.cval_taint cval)}
 

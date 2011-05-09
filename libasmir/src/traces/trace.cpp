@@ -119,15 +119,17 @@ conc_map_vec * Trace::operand_status(EntryHeader * eh)
   for ( i = 0 ; i < eh->num_operands ; i ++ )
     {
       type = opsize_to_type(eh->operand[i].length<<3);
+      big_val_t tval;
       switch (eh->operand[i].type)
 	{ 
 	case TRegister: 
 	  name = register_name(eh->operand[i].addr);
 	  mem = false;
 	  value = eh->operand[i].value ;
+          tval.push_back(value);
 	  taint = eh->operand[i].tainted ;
 	  map = new ConcPair(name,mem,static_cast<cval_type_t>(type),
-			     index,value,usage,taint);
+			     index,tval,usage,taint);
 	  concrete_pairs->push_back(map);
 	  break;
 	case TMemLoc: 
@@ -137,9 +139,10 @@ conc_map_vec * Trace::operand_status(EntryHeader * eh)
 	  mem = true;
 	  index = eh->operand[i].addr ;
 	  value = eh->operand[i].value ;
+          tval.push_back(value);
 	  taint = eh->operand[i].tainted ;
 	  map = new ConcPair(name,mem,static_cast<cval_type_t>(type),
-			     index,value,usage,taint);
+			     index,tval,usage,taint);
 	  concrete_pairs->push_back(map);
 	  break ;
 	case TImmediate : 

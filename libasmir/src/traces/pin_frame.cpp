@@ -214,50 +214,7 @@ istream &StdFrame::unserializePart(istream &in)
 #ifdef GET_OPERANDS
 conc_map_vec * StdFrame::getOperands()
 {
-  conc_map_vec * concrete_pairs = new vector<conc_map *>();
-  int i, type, t, usage; bool mem;
-  string name;
-  const_val_t index, value;
-  conc_map * map;
-  for ( i = 0 ; i < values_count ; i ++ )
-    {
-      switch (types[i])
-	{
-            case VT_REG128:
-            case VT_REG64:
-            case VT_REG32: 
-            case VT_REG16: 
-            case VT_REG8: 
-              name = pin_register_name(locs[i]);
-              mem = false;
-              value = values[i] ;
-              usage = usages[i] ;
-              t = taint[i] ;
-              map = new ConcPair(name,mem,get_type(types[i]),index,
-                                 value,usage,t);
-              concrete_pairs->push_back(map);
-              break;
-            case VT_MEM128:
-            case VT_MEM64:
-            case VT_MEM32: 
-            case VT_MEM16: 
-            case VT_MEM8: 
-              name = "mem";
-              mem = true;
-              index = locs[i] ;
-              value = values[i] ;
-              usage = usages[i] ;
-              t = taint[i] ;
-              map = new ConcPair(name,mem,get_type(types[i]),index,
-                                 value,usage,t);
-              concrete_pairs->push_back(map);
-              break ;
-            default : 
-              cerr << "type: " << types[i] << endl ; 
-              assert(0) ;
-	}
-    }
-  return concrete_pairs;
+  assert(false);
 }
 #endif
 
@@ -351,6 +308,7 @@ conc_map_vec * StdFrame2::getOperands()
   conc_map * map;
   for ( i = 0 ; i < values_count ; i ++ )
     {
+      big_val_t tval;
       switch (types[i])
 	{
 	case VT_REG128:
@@ -362,16 +320,17 @@ conc_map_vec * StdFrame2::getOperands()
 	  name = pin_register_name(locs[i]);
 	  mem = false;
 	  value = 0;
-	  if (bytes > sizeof(const_val_t)) {
-	    value = -1;
-	  } else {
-	    memcpy(&value, &(values[i].qword[0]), bytes);
-	  }
+          for (int j = 0; j < ((bytes + (sizeof(const_val_t)-1))/sizeof(const_val_t)); j++) {
+            /* Insert each chunk, while preserving the byte order */
+            memcpy(&value, &(values[i].byte[j*sizeof(const_val_t)]), sizeof(const_val_t));
+            // cerr << "Pushing back " << value << endl;
+            tval.push_back(value);
+          }
 
 	  usage = usages[i] ;
 	  t = taint[i] ;
 	  map = new ConcPair(name,mem,get_type(types[i]),index,
-			     value,usage,t);
+			     tval,usage,t);
 	  concrete_pairs->push_back(map);
 	  break;
 	case VT_MEM128:
@@ -383,16 +342,17 @@ conc_map_vec * StdFrame2::getOperands()
 	  name = "mem";
 	  mem = true;
 	  index = locs[i] ;
-	  value = 0;
-	  if (bytes > sizeof(const_val_t)) {
-	    value = -1;
-	  } else {
-	    memcpy(&value, &(values[i].qword[0]), bytes);
-	  }
-	  usage = usages[i] ;
+
+          for (int j = 0; j < ((bytes + (sizeof(const_val_t)-1))/sizeof(const_val_t)); j++) {
+            /* Insert each chunk, while preserving the byte order */
+            memcpy(&value, &(values[i].byte[j*sizeof(const_val_t)]), sizeof(const_val_t));
+            tval.push_back(value);
+          }
+
+          usage = usages[i] ;
 	  t = taint[i] ;
 	  map = new ConcPair(name,mem,get_type(types[i]),index,
-			     value,usage,t);
+			     tval,usage,t);
 	  concrete_pairs->push_back(map);
 	  break ;
 	default : 
@@ -556,16 +516,18 @@ conc_map_vec * SyscallFrame::getOperands()
   conc_map * map;
   uint32_t bytes = callno;
   uint32_t i;
+  big_val_t tval;
+  //  tval.push_back(0);
   for ( i = 0 ; i < callno ; i ++ )
     {
       name = "mem";
       mem = true;
       index = args[1] + i ;
-      value = 0;
+      //      value = 0;
       usage = 0;
       taint = source++ ;
       map = new ConcPair(name,mem,get_type(VT_MEM8),index,
-			 value,usage,taint);
+			 tval,usage,taint);
       concrete_pairs->push_back(map);
     }
   return concrete_pairs;
@@ -606,15 +568,17 @@ conc_map_vec * TaintFrame::getOperands()
 	conc_map * map;
 	uint32_t i;
 	usage = 0;
-	for ( i = 0 ; i < length ; i ++ )
+        big_val_t tval;
+        // tval.push_back(0);
+        for ( i = 0 ; i < length ; i ++ )
 	{
 		name = "mem";
 		mem = true;
 		index = addr + i ;
-		value = 0;
+                //		value = 0;
 		taint = id;
 		map = new ConcPair(name,mem,get_type(VT_MEM8),index,
-				   value,usage,taint);
+				   tval,usage,taint);
 		concrete_pairs->push_back(map);
 	}
 	return concrete_pairs;
