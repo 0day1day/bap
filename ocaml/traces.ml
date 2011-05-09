@@ -1043,7 +1043,7 @@ let to_dsa_stmt s h rh =
     else (
       dsa_ctr := !dsa_ctr + 1;
       assert (!dsa_ctr <> 0);
-      let s = Printf.sprintf "%sdsa%d" s !dsa_ctr in
+      let s = Printf.sprintf "dsa_%s_%d" s !dsa_ctr in
       Var.newvar s t
       )
   in

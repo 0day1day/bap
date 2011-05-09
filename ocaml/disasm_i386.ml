@@ -113,7 +113,8 @@ let r16 = Ast.reg_16
 let r32 = Ast.reg_32
 let r64 = Ast.reg_64
 let addr_t = r32
-let xmm_t = TMem r4 (* 128 bits that can be accessesed as different things *)
+let r128 = Reg 128
+let xmm_t = Reg 128
 
 let nv = Var.newvar
 (* registers *)
@@ -246,7 +247,11 @@ let bits2reg32= function
   | 7 -> edi
   | _ -> failwith "bits2reg32 takes 3 bits"
 
+let bits2xmm b = xmms.(b)
+
 and reg2bits r = Util.list_firstindex [eax; ecx; edx; ebx; esp; ebp; esi; edi] ((==)r)
+
+let bits2xmme b = Var(bits2xmm b)
 
 let bits2reg32e b = Var(bits2reg32 b)
 
@@ -258,8 +263,6 @@ let bits2reg8e b =
     cast_low r8 (bits2reg32e b)
   else
     cast_high r8 (cast_low r16 (bits2reg32e (b land 3)))
-
-let bits2xmm b = xmms.(b)
 
 let reg2xmm r =
   bits2xmm (reg2bits r)
@@ -303,6 +306,7 @@ let op2e_s ss t = function
 
 let assn_s s t v e =
   match v with
+  | Oreg r when t = r128 -> move (bits2xmm r) e
   | Oreg r when t = r32 -> move (bits2reg32 r) e
   | Oreg r when t = r16 ->
     let v = bits2reg32 r in
@@ -401,22 +405,21 @@ let rec to_ir addr next ss pref =
   | Movsx(t, dst, ts, src) when pref = [] ->
     [assn t dst (cast_signed t (op2e ts src))]
   | Movdqa(d,s) -> (
-    let zero = Int(bi0,r4) and eight = Int(bi8,r4) in
-    let (s0, s1, a1) = match s with
-      | Oreg i -> let r = bits2xmm i in
-		  (loadm r r64 zero, loadm r r64 eight, [])
-      | Oaddr a -> (load r64 a, load r64 (a +* Int(bi8, addr_t)), [a])
+    let (s, al) = match s with
+      | Oreg i -> bits2xmme i, []
+      | Oaddr a -> load xmm_t a, [a]
       | Oimm _ -> failwith "invalid"
     in
-    let (d0, d1, a2) = match d with
+    let (d, al) = match d with
       (* FIXME: should this be a single move with two stores? *)
-      | Oreg i -> let r = bits2xmm i in
-		  (storem r r64 zero s0, storem r r64 eight s1, [])
-      | Oaddr a -> (store r64 a s0, store r64 (a +* Int(bi8, addr_t)) s1, [a])
+      | Oreg i ->
+	let r = bits2xmm i in
+	move r s, []
+      | Oaddr a -> store xmm_t a s, a::al
       | Oimm _ -> failwith "invalid"
     in
-    (List.map (fun a -> Assert( (a &* i32 15) =* i32 0, [])) (a1@a2))
-    @ [d0;d1;]
+    (List.map (fun a -> Assert( (a &* i32 15) =* i32 0, [])) (al))
+    @ [d]
 
   )
   | Lea(r, a) when pref = [] ->

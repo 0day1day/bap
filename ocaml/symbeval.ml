@@ -148,7 +148,10 @@ struct
       match lab with
 	| Name _ (*-> failwith ("jump to inexistent label "^s)*)
 	| Addr _ -> 
-	    wprintf "Unknown label: %s" (Pp.label_to_string lab);
+	    (* I'd like to print a warning here, but traces rely on this
+	       behavior, so it prints a lot of warnings if we leave it
+	       on. *)
+	    (* wprintf "Unknown label: %s" (Pp.label_to_string lab); *)
 	    raise UnknownLabel (*failwith ("jump to inexistent label "^
 					 (Printf.sprintf "%Lx" x)) *)
 	    
@@ -294,10 +297,37 @@ struct
 	    let delta' = context_copy delta in (* FIXME: avoid copying *)
 	    context_update delta' var v1 ;
 	    let v2 = eval_expr delta' e2 in
-	    v2
+	    (* So, this is a little subtle.  Consider what happens if
+	       we have let x = 1 in let foo = freevar in x. We would
+	       evaluate let foo = freevar in x in the context where x
+	       is mapped to 1.  However, since freevar is a symbolic
+	       expression, we would not evaluate it further, and would
+	       return the evaluation expression let foo = freevar in
+	       x.  However, this is incorrect, because we are removing
+	       the Let binding for x!  We should really wrap any free
+	       variable with a Let binding to its current value in the
+	       context.
+
+	       Unfortunately, the way that lookup_var is implemented
+	       does not make it easy to know whether a variable is
+	       really defined or not.  (In traces, we return 0
+	       whenever we see an unknown variable, for instance.) So,
+	       as a stopgap measure, if var is free in v2, we return
+	       the original expression. *)
+	    (match v2 with
+	    | Symbolic v2' ->
+	      let fvars = Formulap.freevars v2' in
+	      let isvar = (fun v -> not (Var.equal v var)) in
+	      if List.for_all isvar fvars then
+		(* var is not free! We are good to go *)
+	      v2
+	      else
+		(* var is still free; we can't use the evaluated version *)
+		Symbolic(l)
+	    | _ -> v2)
       | Load (mem,ind,endian,t) ->
-	  (match t with
-	     | Reg 8 ->
+	(match t with
+	| Reg 8 ->
 		 (* This doesn't introduce any blowup on its own. *)
 		 let mem = eval_expr delta mem 
 		 and ind = eval_expr delta ind
