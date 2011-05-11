@@ -68,6 +68,7 @@ type opcode =
   | Push of typ * operand
   | Pop of typ * operand
   | Add of (typ * operand * operand)
+  | Dec of typ * operand
   | Sub of (typ * operand * operand)
   | Sbb of (typ * operand * operand)
   | Cmp of (typ * operand * operand)
@@ -364,6 +365,11 @@ let set_flags_sub t s1 s2 r =
   ::move oF (Cast(CAST_HIGH, r1, (s1 ^* s2) &* (s1 ^* r) ))
   ::set_pszf t r
 
+(* Same as set_flags_sub, but do not touch the cf *)
+let set_flags_dec t s1 s2 r =
+  move af ((r &* Int(7L,t)) <* (s1 &* Int(7L,t))) (* Is this right? *)
+  ::move oF (Cast(CAST_HIGH, r1, (s1 ^* s2) &* (s1 ^* r) ))
+  ::set_pszf t r
 
 let rec to_ir addr next ss pref =
   let load = load_s ss (* Need to change this if we want seg_ds <> None *)
@@ -566,6 +572,11 @@ let rec to_ir addr next ss pref =
        ::move af (Unknown("AF for add unimplemented", r1))
        ::move oF (cast_high r1 ((s1 ^* exp_not s2) &* (s1 ^* r)))
        ::[]
+  | Dec(t, o) (* o = o - 1 *) ->
+    let tmp = nv "t" t in
+    move tmp (op2e t o)
+    :: assn t o (op2e t o -* i32 1)
+    :: set_flags_dec t (Var tmp) (i32 1) (op2e t o)
   | Sub(t, o1, o2) (* o1 = o1 - o2 *) ->
     let oldo1 = nv "t" t in
     move oldo1 (op2e t o1)
@@ -663,6 +674,7 @@ module ToStr = struct
     | Shift _ -> "shift"
     | Shiftd _ -> "shiftd"
     | Hlt -> "hlt"
+    | Dec (t, r) -> Printf.sprintf "dec %s" (opr r)
     | Jump a -> Printf.sprintf "jmp %s" (opr a)
     | _ -> unimplemented "op2str"
 
@@ -835,7 +847,12 @@ let parse_instr g addr =
     let b1 = Char.code (g a)
     and na = s a in
     match b1 with (* Table A-2 *)
-      (* most of 00 to 3d are near the end *)
+      (*** most of 00 to 3d are near the end ***)
+	  (* In 64-bit mode, DEC r16 and DEC r32 are not encodable 
+	   * (because opcodes 48H through 4FH are REX prefixes) *)
+	| 0x48 | 0x49 | 0x4a | 0x4b | 0x4c | 0x4d | 0x4e | 0x4f -> 
+		let (o, na) = parse_immz opsize na in
+		(Dec(opsize, o), na)
     | 0x50 | 0x51 | 0x52 | 0x53 | 0x54 | 0x55 | 0x56 | 0x57 ->
       (Push(opsize, Oreg(b1 & 7)), na)
     | 0x58 | 0x59 | 0x5a | 0x5b | 0x5c | 0x5d | 0x5e | 0x5f ->
