@@ -1,8 +1,8 @@
 .globl	_test
 _test:
-		push %rbp
-		mov  %rsp,%rbp
-		movb -0x1(%rbp), %al
+		push %ebp
+		mov  %esp,%ebp
+		movb -0x1(%ebp), %al
 		leave
 		ret
 
