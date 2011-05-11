@@ -359,17 +359,20 @@ let set_pszf t r =
    set_sf r;
    set_zf t r]
 
+let set_aof_sub t s1 s2 r =
+  move af ((r &* Int(7L,t)) <* (s1 &* Int(7L,t))) (* Is this right? *)
+  ::move oF (Cast(CAST_HIGH, r1, (s1 ^* s2) &* (s1 ^* r) ))
+  ::[]
+
 let set_flags_sub t s1 s2 r =
   move cf (s2 >* s1)
-  ::move af ((r &* Int(7L,t)) <* (s1 &* Int(7L,t))) (* Is this right? *)
-  ::move oF (Cast(CAST_HIGH, r1, (s1 ^* s2) &* (s1 ^* r) ))
-  ::set_pszf t r
+  ::set_aof_sub t s1 s2 r
+  @set_pszf t r
 
 (* Same as set_flags_sub, but do not touch the cf *)
 let set_flags_dec t s1 s2 r =
-  move af ((r &* Int(7L,t)) <* (s1 &* Int(7L,t))) (* Is this right? *)
-  ::move oF (Cast(CAST_HIGH, r1, (s1 ^* s2) &* (s1 ^* r) ))
-  ::set_pszf t r
+  set_aof_sub t s1 s2 r
+  @set_pszf t r
 
 let rec to_ir addr next ss pref =
   let load = load_s ss (* Need to change this if we want seg_ds <> None *)
@@ -575,13 +578,13 @@ let rec to_ir addr next ss pref =
   | Dec(t, o) (* o = o - 1 *) ->
     let tmp = nv "t" t in
     move tmp (op2e t o)
-    :: assn t o (op2e t o -* i32 1)
-    :: set_flags_dec t (Var tmp) (i32 1) (op2e t o)
+    :: assn t o (op2e t o -* it 1 t)
+    :: set_flags_dec t (Var tmp) (it 1 t) (op2e t o)
   | Sub(t, o1, o2) (* o1 = o1 - o2 *) ->
     let oldo1 = nv "t" t in
     move oldo1 (op2e t o1)
     :: assn t o1 (op2e t o1 -* op2e t o2)
-    :: set_flags_sub t (Var oldo1) (op2e t o2) (op2e t o1) 
+    :: set_flags_sub t (Var oldo1) (op2e t o2) (op2e t o1)
   | Sbb(t, o1, o2) ->
     let tmp = nv "t" t in
     let s1 = Var tmp and s2 = op2e t o2 and r = op2e t o1 in
@@ -847,12 +850,9 @@ let parse_instr g addr =
     let b1 = Char.code (g a)
     and na = s a in
     match b1 with (* Table A-2 *)
-      (*** most of 00 to 3d are near the end ***)
-	  (* In 64-bit mode, DEC r16 and DEC r32 are not encodable 
-	   * (because opcodes 48H through 4FH are REX prefixes) *)
-	| 0x48 | 0x49 | 0x4a | 0x4b | 0x4c | 0x4d | 0x4e | 0x4f -> 
-		let (o, na) = parse_immz opsize na in
-		(Dec(opsize, o), na)
+	(*** most of 00 to 3d are near the end ***)
+    | 0x48 | 0x49 | 0x4a | 0x4b | 0x4c | 0x4d | 0x4e | 0x4f ->
+      (Dec(opsize, Oreg(b1 & 7)), na)
     | 0x50 | 0x51 | 0x52 | 0x53 | 0x54 | 0x55 | 0x56 | 0x57 ->
       (Push(opsize, Oreg(b1 & 7)), na)
     | 0x58 | 0x59 | 0x5a | 0x5b | 0x5c | 0x5d | 0x5e | 0x5f ->
@@ -887,10 +887,10 @@ let parse_instr g addr =
     | 0x88 -> let (r, rm, na) = parse_modrm r8 na in
 	      (Mov(r8, rm, r), na)
     | 0x89 ->
-        let (r, rm, na) = parse_modrm32 na in
-	  (Mov(opsize, rm, r), na)
-	| 0x8a -> let (r, rm, na) = parse_modrm r8 na in
-	    (Mov(r8, r, rm), na)
+      let (r, rm, na) = parse_modrm32 na in
+      (Mov(opsize, rm, r), na)
+    | 0x8a -> let (r, rm, na) = parse_modrm r8 na in
+	      (Mov(r8, r, rm), na)
     | 0x8b -> let (r, rm, na) = parse_modrm32 na in
 	      (Mov(opsize, r, rm), na)
     | 0x8d -> let (r, rm, na) = parse_modrm opsize na in
@@ -908,8 +908,8 @@ let parse_instr g addr =
     | 0xa7 -> (Cmps opsize, na)
     | 0xae -> (Scas r8, na)
     | 0xaf -> (Scas opsize, na)
-	| 0xa8 -> let (i, na) = parse_imm8 na in
-	  (Test(r8, o_eax, i), na)
+    | 0xa8 -> let (i, na) = parse_imm8 na in
+	      (Test(r8, o_eax, i), na)
     | 0xa9 -> let (i,na) = parse_immz opsize na in
 	      (Test(opsize, o_eax, i), na)
     | 0xaa -> (Stos r8, na)
