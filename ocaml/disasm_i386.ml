@@ -350,14 +350,10 @@ let compute_zf t result = Int(0L, t) =* result
 let compute_pf t r =
   (* extra parens do not change semantics but do make it pretty print nicer *)
   exp_not (Cast(CAST_LOW, r1, (((((((r >>* it 7 t) ^* (r >>* it 6 t)) ^* (r >>* it 5 t)) ^* (r >>* it 4 t)) ^* (r >>* it 3 t)) ^* (r >>* it 2 t)) ^* (r >>* it 1 t)) ^* r))
-let compute_af t s1 s2 result = 
-  (* 1:u32 = (0x10:u32 & (r ^ (s1 ^ s2))) *)
-  Int(1L, t) =* (Int(16L, t) &* (result ^* (s1 ^* s2)))
 
 let set_sf r = move sf (compute_sf r)
 let set_zf t r = move zf (compute_zf t r)
 let set_pf t r = move pf (compute_pf t r)
-let set_af t s1 s2 r = move af (compute_af t s1 s2 r)
 
 let set_pszf t r =
   [set_pf t r;
@@ -366,8 +362,8 @@ let set_pszf t r =
 
 (* Helper functions to set flags for adding *)
 let set_aopszf_add t s1 s2 r =
-  set_af t s1 s2 r
-  ::move oF (cast_high r1 ((s1 ^* exp_not s2) &* (s1 ^* r)))
+  move af (((it 1 t) <<* (it 3 t)) =* ( ((s1 &* ((it 1 t) <<* (it 3 t)) =* (s2 &* ((it 1 t) <<* (it 3 t))))) &* (s1 ^* r)))
+  ::move oF (cast_high r1 ((s1 ^* (exp_not s2)) &* (s1 ^* r)))
   ::set_pszf t r
 
 let set_flags_add t s1 s2 r =
@@ -376,10 +372,10 @@ let set_flags_add t s1 s2 r =
 
 (* Helper functions to set flags for subtracting *)
 let set_aopszf_sub t s1 s2 r =
-  set_af t s1 s2 r
+  move af (((it 1 t) <<* (it 3 t)) =* ( ((s1 &* ((it 1 t) <<* (it 3 t)) ^* (s2 &* ((it 1 t) <<* (it 3 t))))) &* (s1 ^* r)))
   ::move oF (Cast(CAST_HIGH, r1, (s1 ^* s2) &* (s1 ^* r) ))
   ::set_pszf t r
-
+	
 let set_flags_sub t s1 s2 r =
   move cf (s2 >* s1)
   ::set_aopszf_sub t s1 s2 r
@@ -1013,6 +1009,7 @@ let parse_instr g addr =
     | 0x0f -> (
       let b2 = Char.code (g na) and na = s na in
       match b2 with (* Table A-3 *)
+	  | 0x1f -> (Nop, na)
       | 0x6f | 0x7f when pref = [0x66] ->
             (
 	      let r, rm, na = parse_modrm32 na in
