@@ -362,7 +362,7 @@ let set_pszf t r =
 
 (* Helper functions to set flags for adding *)
 let set_aopszf_add t s1 s2 r =
-  move af (((it 1 t) <<* (it 3 t)) =* ( ((s1 &* ((it 1 t) <<* (it 3 t)) =* (s2 &* ((it 1 t) <<* (it 3 t))))) &* (s1 ^* r)))
+  move af ((it (1 lsl 3) t) =* (((s1 &* (it (1 lsl 3) t) =* (s2 &* (it (1 lsl 3) t)))) &* (s1 ^* r)))
   ::move oF (cast_high r1 ((s1 ^* (exp_not s2)) &* (s1 ^* r)))
   ::set_pszf t r
 
@@ -372,7 +372,7 @@ let set_flags_add t s1 s2 r =
 
 (* Helper functions to set flags for subtracting *)
 let set_aopszf_sub t s1 s2 r =
-  move af (((it 1 t) <<* (it 3 t)) =* ( ((s1 &* ((it 1 t) <<* (it 3 t)) ^* (s2 &* ((it 1 t) <<* (it 3 t))))) &* (s1 ^* r)))
+  move af ((it (1 lsl 3) t) =* (((s1 &* (it (1 lsl 3) t) ^* (s2 &* (it (1 lsl 3) t)))) &* (s1 ^* r)))
   ::move oF (Cast(CAST_HIGH, r1, (s1 ^* s2) &* (s1 ^* r) ))
   ::set_pszf t r
 	
