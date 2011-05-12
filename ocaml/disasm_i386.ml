@@ -68,6 +68,7 @@ type opcode =
   | Push of typ * operand
   | Pop of typ * operand
   | Add of (typ * operand * operand)
+  | Inc of typ * operand
   | Dec of typ * operand
   | Sub of (typ * operand * operand)
   | Sbb of (typ * operand * operand)
@@ -349,30 +350,40 @@ let compute_zf t result = Int(0L, t) =* result
 let compute_pf t r =
   (* extra parens do not change semantics but do make it pretty print nicer *)
   exp_not (Cast(CAST_LOW, r1, (((((((r >>* it 7 t) ^* (r >>* it 6 t)) ^* (r >>* it 5 t)) ^* (r >>* it 4 t)) ^* (r >>* it 3 t)) ^* (r >>* it 2 t)) ^* (r >>* it 1 t)) ^* r))
+let compute_af t s1 s2 result = 
+  (* 1:u32 = (0x10:u32 & (r ^ (s1 ^ s2))) *)
+  Int(1L, t) =* (Int(16L, t) &* (result ^* (s1 ^* s2)))
 
 let set_sf r = move sf (compute_sf r)
 let set_zf t r = move zf (compute_zf t r)
 let set_pf t r = move pf (compute_pf t r)
+let set_af t s1 s2 r = move af (compute_af t s1 s2 r)
 
 let set_pszf t r =
   [set_pf t r;
    set_sf r;
    set_zf t r]
 
-let set_aof_sub t s1 s2 r =
-  move af ((r &* Int(7L,t)) <* (s1 &* Int(7L,t))) (* Is this right? *)
+(* Helper functions to set flags for adding *)
+let set_aopszf_add t s1 s2 r =
+  set_af t s1 s2 r
+  ::move oF (cast_high r1 ((s1 ^* exp_not s2) &* (s1 ^* r)))
+  ::set_pszf t r
+
+let set_flags_add t s1 s2 r =
+  move cf (r <* s1)
+  ::set_aopszf_add t s1 s2 r
+
+(* Helper functions to set flags for subtracting *)
+let set_aopszf_sub t s1 s2 r =
+  set_af t s1 s2 r
   ::move oF (Cast(CAST_HIGH, r1, (s1 ^* s2) &* (s1 ^* r) ))
-  ::[]
+  ::set_pszf t r
 
 let set_flags_sub t s1 s2 r =
   move cf (s2 >* s1)
-  ::set_aof_sub t s1 s2 r
-  @set_pszf t r
-
-(* Same as set_flags_sub, but do not touch the cf *)
-let set_flags_dec t s1 s2 r =
-  set_aof_sub t s1 s2 r
-  @set_pszf t r
+  ::set_aopszf_sub t s1 s2 r
+  
 
 let rec to_ir addr next ss pref =
   let load = load_s ss (* Need to change this if we want seg_ds <> None *)
@@ -568,18 +579,17 @@ let rec to_ir addr next ss pref =
     move tmp (op2e t o1)
     :: assn t o1 (op2e t o1 +* op2e t o2)
     :: let s1 = Var tmp and s2 = op2e t o2 and r = op2e t o1 in
-       set_sf r
-       ::set_zf t r
-       ::set_pf t r
-       ::move cf (r <* s1)
-       ::move af (Unknown("AF for add unimplemented", r1))
-       ::move oF (cast_high r1 ((s1 ^* exp_not s2) &* (s1 ^* r)))
-       ::[]
+       set_flags_add t s1 s2 r
+  | Inc(t, o) (* o = o + 1 *) ->
+    let tmp = nv "t" t in
+    move tmp (op2e t o)
+    :: assn t o (op2e t o +* it 1 t)
+    :: set_aopszf_add t (Var tmp) (it 1 t) (op2e t o)
   | Dec(t, o) (* o = o - 1 *) ->
     let tmp = nv "t" t in
     move tmp (op2e t o)
     :: assn t o (op2e t o -* it 1 t)
-    :: set_flags_dec t (Var tmp) (it 1 t) (op2e t o)
+    :: set_aopszf_sub t (Var tmp) (it 1 t) (op2e t o) (* CF is maintained *)
   | Sub(t, o1, o2) (* o1 = o1 - o2 *) ->
     let oldo1 = nv "t" t in
     move oldo1 (op2e t o1)
@@ -677,6 +687,7 @@ module ToStr = struct
     | Shift _ -> "shift"
     | Shiftd _ -> "shiftd"
     | Hlt -> "hlt"
+    | Inc (t, r) -> Printf.sprintf "inc %s" (opr r)
     | Dec (t, r) -> Printf.sprintf "dec %s" (opr r)
     | Jump a -> Printf.sprintf "jmp %s" (opr a)
     | _ -> unimplemented "op2str"
@@ -851,6 +862,8 @@ let parse_instr g addr =
     and na = s a in
     match b1 with (* Table A-2 *)
 	(*** most of 00 to 3d are near the end ***)
+    | 0x40 | 0x41 | 0x42 | 0x43 | 0x44 | 0x45 | 0x46 | 0x47 ->
+		(Inc(opsize, Oreg(b1 & 7)), na)
     | 0x48 | 0x49 | 0x4a | 0x4b | 0x4c | 0x4d | 0x4e | 0x4f ->
       (Dec(opsize, Oreg(b1 & 7)), na)
     | 0x50 | 0x51 | 0x52 | 0x53 | 0x54 | 0x55 | 0x56 | 0x57 ->

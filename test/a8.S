@@ -2,7 +2,8 @@
 .globl	_test
 _test:
 		movl $0x10, %eax	
-		subb $0x10, %al
+		add  $0xF10, %eax
+		sub  $0x01, %eax	
 		movl $0x0, %eax	
 		jz out
 		dec %eax
