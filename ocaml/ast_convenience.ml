@@ -11,18 +11,19 @@ let binop op a b = match (a,b) with
     Int(i,t)
   | _ -> BinOp(op, a, b)
 
-let (+*) a b   = binop PLUS a b
-let (-*) a b   = binop MINUS a b
+let ( +* ) a b   = binop PLUS a b
+let ( -* ) a b   = binop MINUS a b
 let ( ** ) a b   = binop TIMES a b
-let (<<*) a b  = binop LSHIFT a b
-let (>>*) a b  = binop RSHIFT a b
-let (>>>*) a b = binop ARSHIFT a b
-let (&*) a b   = binop AND a b
-let (|*) a b   = binop OR a b
-let (^*) a b   = binop XOR a b
-let (=*) a b   = binop EQ a b
-let (<*) a b   = binop LT a b
-let (>*) a b   = binop LT b a
+let ( <<* ) a b  = binop LSHIFT a b
+let ( >>* ) a b  = binop RSHIFT a b
+let ( >>>* ) a b = binop ARSHIFT a b
+let ( &* ) a b   = binop AND a b
+let ( |* ) a b   = binop OR a b
+let ( ^* ) a b   = binop XOR a b
+let ( ==* ) a b  = binop EQ a b
+let ( <* ) a b   = binop LT a b
+let ( >* ) a b   = binop LT b a
+let ( =* ) a b   = binop XOR a (UnOp(NOT, b))
 
 let cast_low t e = Cast(CAST_LOW, t, e)
 let cast_high t e = Cast(CAST_HIGH, t, e)

@@ -336,17 +336,17 @@ let rep_wrap ?check_zf ~addr ~next stmts =
       CJmp(zf_e, l32 next, l32 addr, [])
     | _ -> failwith "invalid value for ?check_zf"
   in
-    cjmp (ecx_e =* l32 0L) (l32 next)
+    cjmp (ecx_e ==* l32 0L) (l32 next)
     @ stmts
     @ move ecx (ecx_e -* i32 1)
-    :: cjmp (ecx_e =* l32 0L) (l32 next)
+    :: cjmp (ecx_e ==* l32 0L) (l32 next)
     @ [endstmt]
 
 let reta = [StrAttr "ret"]
 and calla = [StrAttr "call"]
 
 let compute_sf result = Cast(CAST_HIGH, r1, result)
-let compute_zf t result = Int(0L, t) =* result
+let compute_zf t result = Int(0L, t) ==* result
 let compute_pf t r =
   (* extra parens do not change semantics but do make it pretty print nicer *)
   exp_not (Cast(CAST_LOW, r1, (((((((r >>* it 7 t) ^* (r >>* it 6 t)) ^* (r >>* it 5 t)) ^* (r >>* it 4 t)) ^* (r >>* it 3 t)) ^* (r >>* it 2 t)) ^* (r >>* it 1 t)) ^* r))
@@ -362,7 +362,7 @@ let set_pszf t r =
 
 (* Helper functions to set flags for adding *)
 let set_aopszf_add t s1 s2 r =
-  move af ((it (1 lsl 3) t) =* (((s1 &* (it (1 lsl 3) t) =* (s2 &* (it (1 lsl 3) t)))) &* (s1 ^* r)))
+  move af ((it (1 lsl 3) t) ==* ((it (1 lsl 3) t) &* (s1 =* s2)) &* (s1 ^* r))
   ::move oF (cast_high r1 ((s1 ^* (exp_not s2)) &* (s1 ^* r)))
   ::set_pszf t r
 
@@ -372,7 +372,7 @@ let set_flags_add t s1 s2 r =
 
 (* Helper functions to set flags for subtracting *)
 let set_aopszf_sub t s1 s2 r =
-  move af ((it (1 lsl 3) t) =* (((s1 &* (it (1 lsl 3) t) ^* (s2 &* (it (1 lsl 3) t)))) &* (s1 ^* r)))
+  move af ((it (1 lsl 3) t) ==* (((s1 &* (it (1 lsl 3) t) ^* (s2 &* (it (1 lsl 3) t)))) &* (s1 ^* r)))
   ::move oF (Cast(CAST_HIGH, r1, (s1 ^* s2) &* (s1 ^* r) ))
   ::set_pszf t r
 	
@@ -429,7 +429,7 @@ let rec to_ir addr next ss pref =
       | Oaddr a -> (store r64 a s0, store r64 (a +* Int(8L, addr_t)) s1, [a])
       | Oimm _ -> failwith "invalid"
     in
-    (List.map (fun a -> Assert( (a &* i32 15) =* i32 0, [])) (a1@a2))
+    (List.map (fun a -> Assert( (a &* i32 15) ==* i32 0, [])) (a1@a2))
     @ [d0;d1;]
 
   )
@@ -455,7 +455,7 @@ let rec to_ir addr next ss pref =
       | _ -> failwith "invalid shift type"
     and count = (op2e r32 o2) &* i32 31
     and e1 = op2e s o1 in
-    let ifzero = ite r1 (count =* i32 0)
+    let ifzero = ite r1 (count ==* i32 0)
     and our_of = match st with
       | LSHIFT -> Cast(CAST_HIGH, r1, e1) ^* cf_e
       | RSHIFT -> Cast(CAST_HIGH, r1, Var tmpDEST)
@@ -470,7 +470,7 @@ let rec to_ir addr next ss pref =
      ;
      move cf (ifzero cf_e (Cast(CAST_LOW, r1, Var t1)));
      assn s o1 (s_f e1 count);
-     move oF (ifzero of_e (ite r1 (count =* i32 1) (our_of) (Unknown("OF <- undefined", r1))));
+     move oF (ifzero of_e (ite r1 (count ==* i32 1) (our_of) (Unknown("OF <- undefined", r1))));
      move sf (ifzero sf_e (compute_sf e1));
      move zf (ifzero zf_e (compute_zf s e1));
      move pf (ifzero pf_e (compute_pf s e1));
@@ -483,7 +483,7 @@ let rec to_ir addr next ss pref =
       let e_shift = op2e s shift in
       let bits = Arithmetic.bits_of_width s in
       let our_of = cast_high r1 (Var tempDEST) ^* cast_high r1 e_dst in
-      let ifzero = ite r1 (e_shift =* it 0 s) in
+      let ifzero = ite r1 (e_shift ==* it 0 s) in
       let ret1 = e_fill >>* (it bits s -* e_shift) in
       let ret2 = e_dst <<* e_shift in
       let result = ret1 |* ret2 in
@@ -492,7 +492,7 @@ let rec to_ir addr next ss pref =
         move tempDEST e_dst;
         move cf (ifzero cf_e (Cast(CAST_LOW, r1, t2)));
         assn s dst result;
-        move oF (ifzero of_e (ite r1 (e_shift =* i32 1) (our_of) (it 0 r1)));
+        move oF (ifzero of_e (ite r1 (e_shift ==* i32 1) (our_of) (it 0 r1)));
         move sf (ifzero sf_e (compute_sf e_dst));
         move zf (ifzero zf_e (compute_zf s e_dst));
         move pf (ifzero pf_e (compute_pf s e_dst));
@@ -597,7 +597,7 @@ let rec to_ir addr next ss pref =
     move tmp r
     :: assn t o1 (r -* s2 -* cast_unsigned t cf_e)
       (* FIXME: sanity check this *)
-    ::move cf ((r >* s1) |* (r =* s1 &* cf_e))
+    ::move cf ((r >* s1) |* (r ==* s1 &* cf_e))
     ::move af (Unknown("AF for sbb unimplemented", r1))
     ::move oF (Cast(CAST_HIGH, r1, (s1 ^* s2) &* (s1 ^* r) ))
     ::set_pszf t r
