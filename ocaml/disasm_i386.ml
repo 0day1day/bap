@@ -362,20 +362,19 @@ let set_pszf t r =
 
 (* Arithmetic flag
 
-   AF is set when there is a carry to or borrow from bit 4, when
+   AF is set when there is a carry to or borrow from bit 5, when
    considering unsigned operands. Let X_i denote bit i of value X.
-   Note that in addition, r_4 = c + [(op1_4 + op2_4) mod 2], where c
+   Note that in addition, r_5 = c + [(op1_5 + op2_5) mod 2], where c
    is the carry bit from the lower four bits. Since AF = c, and we
-   want to know the value of AF, we can rewrite as AF = c = r_4 -
-   [(op1_4 + op2_4) mod 2]. Noting that addition and subtraction mod 2
-   is just xor, we can simplify to AF = r_4 xor op1_4 xor op2_4.
+   want to know the value of AF, we can rewrite as AF = c = r_5 -
+   [(op1_5 + op2_5) mod 2]. Noting that addition and subtraction mod 2
+   is just xor, we can simplify to AF = r_5 xor op1_5 xor op2_5.
 *)
 
 (* Helper functions to set flags for adding *)
 let set_aopszf_add t s1 s2 r =
-  (* XXX: fix me *)
-  (* let bit3 = it (1 lsl 3) t in *)
-  (* move af (bit3 ==* ((bit3 &* (s1 =* s2)) &* (s1 ^* r))) *)
+  let bit5 = it (1 lsl 5) t in 
+  move af (bit5 ==* (bit5 &* ((r ^* s1) ^* s2)))
   ::move oF (cast_high r1 ((s1 =* s2) &* (s1 ^* r)))
   ::set_pszf t r
 
@@ -385,9 +384,8 @@ let set_flags_add t s1 s2 r =
 
 (* Helper functions to set flags for subtracting *)
 let set_aopszf_sub t s1 s2 r =
-  (* XXX: fix me *)
-  (* let bit3 = it (1 lsl 3) t in *)
-  (* move af (bit3 ==* ((bit3 &* (s1 ^* s2)) &* (s1 ^* r))) *)
+  let bit5 = it (1 lsl 5) t in
+  move af (bit5 ==* ((bit5 &* ((r ^* s1) ^* s2))))
   ::move oF (Cast(CAST_HIGH, r1, (s1 ^* s2) &* (s1 ^* r) ))
   ::set_pszf t r
 
