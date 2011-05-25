@@ -24,6 +24,10 @@ type exp =
   | Cast of (cast_type * typ * exp) (** Cast to a new type. *)
   | Let of (var * exp * exp)
   | Unknown of (string * typ)
+  (* Expression types below here are just syntactic sugar for the above *)
+  | Ite of (exp * exp * exp)
+  | Extract of (int64 * int64 * exp) (** Extract hbits to lbits of e (Reg type) *)
+  | Concat of (exp * exp) (** Concat two reg expressions together *)
 
 type attrs = Type.attributes
 

@@ -61,19 +61,25 @@ let quick_exp_eq e1 e2 =
   let num = function
     | Load _ -> 0
     | Store _ -> 1
-    | BinOp _ -> 2
-    | UnOp _ -> 3
-    | Var _ -> 4
-    | Lab _ -> 5
-    | Int _ -> 6
-    | Cast _ -> 7
-    | Let _ -> 8
-    | Unknown _ -> 9
+    | Ite _ -> 2
+    | Extract _ -> 3
+    | Concat _ -> 4
+    | BinOp _ -> 5
+    | UnOp _ -> 6
+    | Var _ -> 7
+    | Lab _ -> 8
+    | Int _ -> 9
+    | Cast _ -> 10
+    | Let _ -> 11
+    | Unknown _ -> 12
   in
   (* Returns elist, tlist, btlist, utlist, vlist, slist, ilist, clist *)
   let getargs = function
     | Load(e1,e2,e3,t1) -> [e1;e2;e3], [t1], [], [], [], [], [], []
     | Store(e1,e2,e3,e4,t1) -> [e1;e2;e3;e4], [t1], [], [], [], [], [], []
+    | Ite(e1,e2,e3) -> [e1;e2;e3], [], [], [], [], [], [], []
+    | Extract(h,l,e) -> [e], [], [], [], [], [], [h;l], []
+    | Concat(le, re) -> [le;re], [], [], [], [], [], [], []
     | BinOp(bt,e1,e2) -> [e1;e2], [], [bt], [], [], [], [], []
     | UnOp(ut,e1) -> [e1], [], [], [ut], [], [], [], []
     | Var(v1) -> [], [], [], [], [v1], [], [], []
@@ -111,6 +117,18 @@ let rec exp_accept visitor =
     | Lab _ as l -> l
     | Var v ->
 	Var(rvar_accept visitor v)
+    | Ite(b, v1, v2) ->
+	let b' = exp_accept visitor b in
+	let v1' = exp_accept visitor v1 in
+	let v2' = exp_accept visitor v2 in
+	Ite(b', v1', v2')
+    | Extract(h, l, v) ->
+	let v' = exp_accept visitor v in
+	Extract(h, l, v')
+    | Concat(vl, vr) ->
+	let vl' = exp_accept visitor vl in
+	let vr' = exp_accept visitor vr in
+	Concat(vl', vr')
     | BinOp(bop, v1, v2) -> 
 	let v1' = exp_accept visitor v1 in 
 	let v2' = exp_accept visitor v2 in 

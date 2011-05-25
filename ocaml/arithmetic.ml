@@ -10,6 +10,8 @@ module D = Debug.Make(struct let name = "Arithmetic" and default = `Debug end)
 open D
 open Type
 
+exception ArithmeticEx of string
+
 let bits_of_width = function
   | Reg n -> n
   | _ -> failwith "Expected register type"
@@ -17,12 +19,14 @@ let bits_of_width = function
 (* drop high bits *)
 let to64 (i,t) =
   let bits = 64 - bits_of_width t in
+  if bits < 0 then raise (ArithmeticEx("Arithmetic only works on reg64 and smaller"));
   Int64.shift_right_logical (Int64.shift_left i bits) bits
 
 
 (* sign extend to 64 bits*)
 let tos64 (i,t) =
   let bits = 64 - bits_of_width t in
+  if bits < 0 then raise (ArithmeticEx("Arithmetic only works on reg64 and smaller"));
   Int64.shift_right (Int64.shift_left i bits) bits
 
   
@@ -98,6 +102,27 @@ let cast ct ((_,t) as v) t2 =
 	 (Int64.logand (to64  v)
 	    ((Int64.lognot(Int64.shift_left (-1L) bits))) )
   )
+
+
+let extract h l ((_,t) as v) =
+  let n = Int64.succ (Int64.sub h l) in
+  let nt = Reg(Int64.to_int n) in
+  let s = binop RSHIFT v (l,t) in
+  cast CAST_LOW s nt
+  
+
+let concat ((_,lt) as lv) ((_,rt) as rv) =
+  let bitsl,bitsr =
+    match lt, rt with
+    | Reg(bitsl), Reg(bitsr) -> bitsl, bitsr
+    | _ -> failwith "concat"
+  in
+  let nt = Reg(bitsl + bitsr) in
+  let lv = cast CAST_LOW lv nt in
+  let rv = cast CAST_LOW rv nt in
+  let lv = binop LSHIFT lv (Int64.of_int bitsr, lt) in
+  binop OR lv rv
+
 
 let is_zero ((i,t) as v) =
   let zero = 0L in

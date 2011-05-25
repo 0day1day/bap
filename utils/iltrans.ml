@@ -23,6 +23,15 @@ type cmd =
 
 let pipeline = ref []
 
+let typecheck p =
+  let v = object(self)
+    inherit Ast_visitor.nop
+    method visit_exp e = ignore(Typecheck.infer_ast ~check:true e); `DoChildren
+  end 
+  in
+  ignore(Ast_visitor.prog_accept v p);
+  p
+
 let output_ast f p =
   let oc = open_out f in
   let pp = new Pp.pp_oc oc in
@@ -330,6 +339,8 @@ let speclist =
       "<n> Unroll loops n times")
   :: ("-rm-backedges", uadd(TransformAstCfg Hacks.remove_backedges),
       "Remove backedges")
+    :: ("-typecheck", uadd(TransformAst typecheck),
+	"Typecheck program")
   :: Input.speclist
 
 let anon x = raise(Arg.Bad("Unexpected argument: '"^x^"'"))

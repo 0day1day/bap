@@ -94,6 +94,35 @@ object (self)
 	 in
 	 let maskedval = Arithmetic.to64 (i,t) in
 	 printf format maskedval
+     | Ite(b, v1, v2) ->
+	 (* XXX: Needs testing *)
+	 pp "(IF";
+	 space ();
+	 self#ast_exp b;
+	 (* Do we need to add = 0bin1? *)	 
+	 space ();
+	 pp "THEN";
+	 space ();
+	 self#ast_exp v1;
+	 space ();
+	 pp "ELSE";
+	 space ();
+	 self#ast_exp v2;
+	 pc ')'
+     | Extract(h,l,e) ->
+	 pp "(";
+	 self#ast_exp e;
+	 pp ")[";
+	 pi (Int64.to_int h);
+	 pc ':';
+	 pi (Int64.to_int l);
+	 pc ']'
+     | Concat(le,re) ->
+	 pc '(';
+	 self#ast_exp le;
+	 pc '@';
+	 self#ast_exp re;
+	 pc ')'
      | Var v ->
 	 self#var v
      | UnOp(uop, o) ->
