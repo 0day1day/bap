@@ -40,6 +40,11 @@ if test $? != 0; then
     echo "bap needs libextlib-ocaml-dev"
     exit -1
 fi
+ocamlfind query batteries
+if test $? != 0; then
+    echo "bap needs ocaml-batteries-included"
+    exit -1
+fi
 # ocamlfind query sqlite3
 # if test $? != 0; then
 #     echo "bap needs ocaml-sqlite3 from http://ocaml.info/home/ocaml_sources.html#ocaml-sqlite3"
