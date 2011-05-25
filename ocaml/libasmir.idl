@@ -181,6 +181,10 @@ threadid_t asmir_frame_tid(trace_frame_t tf);
 
 [string] const char* asmir_frame_get_loadmod_info(trace_frame_t tf, [out] address_t *lowout, [out] address_t *highout);
 
+void asmir_frame_get_syscall_info(trace_frame_t tf, [out] int *callno, [out] address_t *addr, [out] threadid_t *tid);
+
+void asmir_frame_get_except_info(trace_frame_t tf, [out] int *exceptno, [out] threadid_t *tid, [out] address_t *from_addr, [out] address_t *to_addr);
+
 
 // frame operands
 cval_vec_t asmir_frame_get_operands(trace_frame_t tf);

@@ -249,6 +249,33 @@ const char* asmir_frame_get_loadmod_info(trace_frame_t *tf, uint64_t *lowout, ui
   return lf->name;
 }
 
+void asmir_frame_get_syscall_info(trace_frame_t *tf, int *callno,
+                                  uint64_t *addr, int *tid) {
+  assert(tf);
+  assert(tf->type = pintrace::FRM_SYSCALL);
+
+  pintrace::SyscallFrame *sf = dynamic_cast<pintrace::SyscallFrame*> (tf);
+  
+  *addr = sf->addr;
+  *tid = sf->tid;
+  *callno = sf->callno;    
+}
+
+void asmir_frame_get_except_info(trace_frame_t *tf, int *exceptno,
+                                 int *tid, uint64_t *from_addr,
+                                 uint64_t *to_addr) {
+  assert(tf);
+  assert(tf->type = pintrace::FRM_EXCEPT);
+
+  pintrace::ExceptionFrame *ef = dynamic_cast<pintrace::ExceptionFrame*> (tf);
+  
+  *from_addr = ef->from_addr;
+  *to_addr = ef->to_addr;
+  *tid = ef->tid;
+  *exceptno = ef->exception;
+}
+
+
 conc_map_vec * asmir_frame_get_operands(trace_frame_t *tf) {
   assert(tf);  
   

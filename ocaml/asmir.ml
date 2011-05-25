@@ -566,6 +566,15 @@ let trans_frame f =
   | Libasmir.FRM_LOADMOD ->
       let name, lowaddr, highaddr = Libasmir.asmir_frame_get_loadmod_info f in
       [Special(Printf.sprintf "Loaded module '%s' at %#Lx to %#Lx" name lowaddr highaddr, []); Comment("All blocks must have two statements", [])]
+  | Libasmir.FRM_SYSCALL ->
+	let callno, addr, tid = Libasmir.asmir_frame_get_syscall_info f in
+	[Special(Printf.sprintf "Syscall number %d at %#Lx by thread %d" callno addr tid,[]);
+	 Comment("All blocks must have two statements", [])]
+  | Libasmir.FRM_EXCEPT ->
+	let exceptno, tid, from_addr, to_addr =
+	  Libasmir.asmir_frame_get_except_info f in
+	[Special(Printf.sprintf "Exception number %d by thread %d at %#Lx to %#Lx" exceptno tid from_addr to_addr,[]);
+	 Comment("All blocks must have two statements", [])]
   | _ -> []
 
 let alt_bap_from_trace_file filename =
