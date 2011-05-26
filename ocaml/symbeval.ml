@@ -142,7 +142,7 @@ struct
       match lab with
 	| Name _ (*-> failwith ("jump to inexistent label "^s)*)
 	| Addr _ -> 
-	    wprintf "Unknown label: %s" (Pp.label_to_string lab);
+	    (* wprintf "Unknown label: %s" (Pp.label_to_string lab); *)
 	    raise UnknownLabel (*failwith ("jump to inexistent label "^
 					 (Printf.sprintf "%Lx" x)) *)
 	    

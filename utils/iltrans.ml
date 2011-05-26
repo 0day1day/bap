@@ -347,6 +347,11 @@ let speclist =
      Arg.Set Traces.consistency_check,
      "Perform extra consistency checks"
     )
+  ::("-trace-check-all",
+     Arg.Unit(fun () -> Traces.consistency_check := true;
+	   Traces.checkall := true),
+     "Perform extra consistency checks"
+    )
   ::("-trace-noopt",
      Arg.Clear Traces.dce,
      "Disable trace optimizations"

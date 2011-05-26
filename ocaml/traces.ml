@@ -30,6 +30,8 @@ open D
     are assumed to be constant. *)
 let consistency_check = ref false;;
 
+let checkall = ref false;;
+
 let dce = ref true;;
 
 (** Alternate assignment uses assign statements rather than
@@ -822,8 +824,8 @@ let check_delta state =
 	let tainted = dsa_taint_val var in
 	match dsavarname, traceval, tainted with
 	| Some(dsavarname), Some(traceval), Some(tainted) -> 
-	    ((*dprintf "Doing check on %s" dsavarname;*)
-	     if (traceval <> evalval && tainted && not (Hashtbl.mem badregs (Var.name var))) then 
+	    (dprintf "Doing check on %s" dsavarname;
+	     if (traceval <> evalval && (tainted || !checkall) && not (Hashtbl.mem badregs (Var.name var))) then 
 	       wprintf "Difference between tainted BAP and trace values in previous instruction: %s Trace=%s Eval=%s" (dsavarname) (Pp.ast_exp_to_string traceval) (Pp.ast_exp_to_string evalval)
 		 (* If we can't find concrete value, it's probably just a BAP temporary *)
 	    )
