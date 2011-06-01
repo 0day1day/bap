@@ -627,7 +627,7 @@ conc_map_vec * TaintFrame::getOperands()
 ostream &ExceptionFrame::serialize(ostream &out, uint16_t sz)
 {
    
-   ostream &out2 = Frame::serialize(out, sz + 12);
+   ostream &out2 = Frame::serialize(out, sz + 16);
 
    WRITE(out2, exception);
    WRITE(out2, tid);
