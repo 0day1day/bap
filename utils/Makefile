@@ -5,7 +5,7 @@ export OCAMLMAKEFILE=$(BAP_OCAMLDIR)/OCamlMakefile
 
 
 # ocamlfind packages required
-export PACKS = bigarray str ocamlgraph extlib unix batteries
+export PACKS = bigarray str ocamlgraph extlib unix
 export LIBS = ../ocaml/bap 
 export INCDIRS = $(BAP_OCAMLDIR)
 
