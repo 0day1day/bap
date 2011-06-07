@@ -59,7 +59,7 @@ exception ExcState of string * addr
 exception Halted of varval option * ctx
 
 (* An unknown label was found *)  
-exception UnknownLabel
+exception UnknownLabel of label_kind
 
 (* An assertion failed *)
 exception AssertFailed of ctx
@@ -143,7 +143,7 @@ struct
 	| Name _ (*-> failwith ("jump to inexistent label "^s)*)
 	| Addr _ -> 
 	    (* wprintf "Unknown label: %s" (Pp.label_to_string lab); *)
-	    raise UnknownLabel (*failwith ("jump to inexistent label "^
+	    raise (UnknownLabel lab)(*failwith ("jump to inexistent label "^
 					 (Printf.sprintf "%Lx" x)) *)
 	    
   let lookup_var        = MemL.lookup_var

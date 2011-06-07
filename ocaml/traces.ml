@@ -30,6 +30,7 @@ open D
     are assumed to be constant. *)
 let consistency_check = ref false;;
 
+(** Option used to force checking of an entire trace. *)
 let checkall = ref false;;
 
 let dce = ref true;;
@@ -782,8 +783,7 @@ struct
 	    try AddrMap.find (normalize i t) m
             with Not_found ->
 	      
-	      (* Well, this isn't good... Just make something up
-		 :( *)
+	      (* Well, this isn't good... Just make something up *)
 	      wprintf "Unknown memory value during eval: addr %Ld" i;
 	      Int(0L, reg_8)
       )              
@@ -825,8 +825,10 @@ let check_delta state =
 	match dsavarname, traceval, tainted with
 	| Some(dsavarname), Some(traceval), Some(tainted) -> 
 	    (dprintf "Doing check on %s" dsavarname;
-	     if (traceval <> evalval && (tainted || !checkall) && not (Hashtbl.mem badregs (Var.name var))) then 
-	       wprintf "Difference between tainted BAP and trace values in previous instruction: %s Trace=%s Eval=%s" (dsavarname) (Pp.ast_exp_to_string traceval) (Pp.ast_exp_to_string evalval)
+		 let s = if (!checkall) then "" else "tainted " in
+	     if (traceval <> evalval && (tainted || !checkall) 
+			 && not (Hashtbl.mem badregs (Var.name var))) then 
+	       wprintf "Difference between %sBAP and trace values in previous instruction: %s Trace=%s Eval=%s" (s) (dsavarname) (Pp.ast_exp_to_string traceval) (Pp.ast_exp_to_string evalval)
 		 (* If we can't find concrete value, it's probably just a BAP temporary *)
 	    )
 	| _ -> ( (* probably a temporary *) ))
@@ -956,6 +958,8 @@ let run_block state memv block =
   let init = TraceConcrete.inst_fetch state.sigma state.pc in
   let executed = ref [] in
   let rec eval_block state stmt = 
+    pwarn("XXXSW Executing: " ^ (Pp.ast_stmt_to_string stmt));
+	pwarn("XXXSW block addr: " ^ (Pp.ast_stmt_to_string addr));
     (* pdebug ("Executing: " ^ (Pp.ast_stmt_to_string stmt)); *)
     (*    Hashtbl.iter (fun k v -> pdebug (Printf.sprintf "%Lx -> %s" k (Pp.ast_exp_to_string v))) concrete_mem ;*)
     let evalf e = match TraceConcrete.eval_expr state.delta e with
@@ -994,8 +998,18 @@ let run_block state memv block =
 	    raise e
 	  (* ) else 
 	  ((addr,false)::(info,false)::(List.tl !executed)) *)
-      | UnknownLabel ->
-	  (addr::info::List.rev (!executed))
+      | UnknownLabel lab ->
+		(match lab with
+			Name s -> ()
+		  (* XXXSW print address of where evaluator jumped to *) 
+		  | Addr x -> pwarn(Printf.sprintf "XXXSW x = 0x%Lx" x));
+		
+		pwarn ("XXXSW lab = " ^ (Pp.label_to_string lab));
+		pwarn ("XXXSW addr = " ^ (Pp.ast_stmt_to_string addr));
+
+	  (* XXXSW Look at next block, print next instruction and compare the two *)
+	  (* XXXSW If not jump, find next instruction address and compare to trace *)
+	  (addr::info::List.rev (!executed)) 
       | Halted _ -> 
 	  (addr::info::List.rev (List.tl !executed))
 
@@ -1838,7 +1852,7 @@ let trace_valid_to_invalid trace =
       | Failure _ ->
 	  (Printf.printf "going lower\n";
 	   bsearch l middle)
-      | Symbeval.UnknownLabel ->
+      | Symbeval.UnknownLabel _ ->
 	  (Printf.printf "going a little higher\n";
 	   bsearch l (u-1))
   in
@@ -1883,7 +1897,7 @@ let formula_valid_to_invalid ?(min=1) trace =
       | Failure _ ->
 	  (Printf.printf "going lower\n";
 	   bsearch l middle)
-      | Symbeval.UnknownLabel ->
+      | Symbeval.UnknownLabel _ ->
 	  (Printf.printf "going a little higher\n";
 	   bsearch l (u-1))
   in
@@ -2122,7 +2136,7 @@ let run_and_subst_block state memv block =
 	    raise e
 	  (* ) else 
 	  ((addr,false)::(info,false)::(List.tl !executed)) *)
-      | UnknownLabel ->
+      | UnknownLabel _ ->
 	  (addr::info::List.rev (!executed))
       | Halted _ -> 
 	  (addr::info::List.rev (List.tl !executed))
