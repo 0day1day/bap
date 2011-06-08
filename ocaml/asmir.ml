@@ -441,10 +441,10 @@ let section_contents prog secs =
   let bits = List.fold_left sc [] secs in
   let get a =
     (* let open Int64 in *)
-    let (-) = Int64.sub and (+) = Int64.add in
+    let (-) = Int64.sub in
     let rec f a = function [] -> raise Not_found
-      | (s,arr)::_ when a - s >= 0L && a - s < s + Int64.of_int(BArray.dim arr)  ->
-	arr.{Int64.to_int(a-s)}
+      | (s,arr)::_ when a - s >= 0L && a - s < Int64.of_int(BArray.dim arr)  ->
+	  arr.{Int64.to_int(a-s)}
       | _::b -> f a b
     in
     f a bits
