@@ -925,9 +925,21 @@ let trace_transform_stmt stmt evalf =
     s @ [Assert(!exp, [])]
   else
     s
-	
+
+let rec get_next_label blocks = 
+  match blocks with
+	| block::remaining ->
+	  let addr, block = hd_tl block in
+	  (try
+		(match addr with
+		  | Label (Addr a,_) -> Some(a)
+		  | _ -> get_next_label remaining)
+	  with
+		|	Failure _ -> None)
+	| [] -> None
+
 (** Running each block separately *)
-let run_block state memv block = 
+let run_block ?(next_label = None) state memv block =  
   let addr, block = hd_tl block in
   let input_seeds = get_symbolic_seeds memv addr in
   pdebug ("Running block: " ^ (string_of_int !counter) ^ " " ^ (Pp.ast_stmt_to_string addr));
@@ -959,7 +971,6 @@ let run_block state memv block =
   let executed = ref [] in
   let rec eval_block state stmt = 
     pwarn("XXXSW Executing: " ^ (Pp.ast_stmt_to_string stmt));
-	pwarn("XXXSW block addr: " ^ (Pp.ast_stmt_to_string addr));
     (* pdebug ("Executing: " ^ (Pp.ast_stmt_to_string stmt)); *)
     (*    Hashtbl.iter (fun k v -> pdebug (Printf.sprintf "%Lx -> %s" k (Pp.ast_exp_to_string v))) concrete_mem ;*)
     let evalf e = match TraceConcrete.eval_expr state.delta e with
@@ -999,41 +1010,46 @@ let run_block state memv block =
 	  (* ) else 
 	  ((addr,false)::(info,false)::(List.tl !executed)) *)
       | UnknownLabel lab ->
-		(match lab with
-			Name s -> ()
-		  (* XXXSW print address of where evaluator jumped to *) 
-		  | Addr x -> pwarn(Printf.sprintf "XXXSW x = 0x%Lx" x));
-		
-		pwarn ("XXXSW lab = " ^ (Pp.label_to_string lab));
-		pwarn ("XXXSW addr = " ^ (Pp.ast_stmt_to_string addr));
-
-	  (* XXXSW Look at next block, print next instruction and compare the two *)
-	  (* XXXSW If not jump, find next instruction address and compare to trace *)
+		(match next_label with
+		  | Some(l) ->
+			(match lab with
+				Name s -> ()
+			  | Addr x -> 
+				if (x <> l) then 
+				  let s = 
+					Printf.sprintf "Unknown label address (0x%Lx) does not equal the next label (0x%Lx)" x l in
+				  pwarn (s ^ "\nCurrent block is: " ^ (Pp.ast_stmt_to_string addr))
+			);
+		  | None -> ());
 	  (addr::info::List.rev (!executed)) 
       | Halted _ -> 
+		(* XXXSW use addr to reverse lookup label in lambda *)
+		(* XXXSW compare this to next_label and warn if not equal *)
 	  (addr::info::List.rev (List.tl !executed))
 
 let run_blocks blocks memv length =
   counter := 1 ;
   Status.init "Concrete Run" length ;
   let state = TraceConcrete.create_state () in
-  let rev_trace = List.fold_left 
-    (fun acc block -> 
+  let (rev_trace,_) = List.fold_left 
+    (fun (acc,remaining) block -> 
        Status.inc() ;   
-       let hd, _ = hd_tl block in
+       let hd, block_tail = hd_tl block in
        let concblock =
-	 match hd with
-	 | Comment(s, _) when s=endtrace ->
+		 (match hd with
+		   | Comment(s, _) when s=endtrace ->
 	     (* If the block starts with the endtrace comment, then we
-		shouldn't concretely execute it. It's probably a bunch of
-		assertions. *)
-	     block
-	 | _ ->
-	     run_block state memv block
+			shouldn't concretely execute it. It's probably a bunch of
+			assertions. *)
+			 block
+		   | _ ->
+			 let l = get_next_label remaining
+			 in
+			 run_block ~next_label:(l) state memv block)
        in
-       List.rev_append concblock acc
+       (List.rev_append concblock acc, List.tl remaining)
 
-    ) [] blocks
+    ) ([],List.tl blocks) blocks
   in
   Status.stop () ;
   List.rev rev_trace
