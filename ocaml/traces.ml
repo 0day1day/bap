@@ -1047,7 +1047,10 @@ let run_blocks blocks memv length =
 			 in
 			 run_block ~next_label:(l) state memv block)
        in
-       (List.rev_append concblock acc, List.tl remaining)
+       (List.rev_append concblock acc,
+	match remaining with
+	| [] -> []
+	| _::tl -> tl)
 
     ) ([],List.tl blocks) blocks
   in
