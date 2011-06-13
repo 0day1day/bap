@@ -132,6 +132,8 @@ let set_format s =
       pp := ((new Stp.pp_oc) :> (?suffix:string -> out_channel -> Formulap.fpp_oc))
     | "smtlib1" ->
       pp := ((new Smtlib1.pp_oc) :> (?suffix:string -> out_channel -> Formulap.fpp_oc))
+    | "smtlib2" ->
+      pp := ((new Smtlib2.pp_oc) :> (?suffix:string -> out_channel -> Formulap.fpp_oc))
     | _ -> failwith "Unknown formula format"
 
 let compute_wp = ref compute_wp_boring
@@ -160,7 +162,7 @@ let speclist =
   ::("-flanagansaxe", Arg.Unit(fun()-> compute_wp := compute_flanagansaxe),
      "Use Flanagan & Saxe's algorithm instead of the default WP.")
   ::("-format", Arg.String set_format,
-     "Use the specified output format. Either stp (default) or smtlib1.")
+     "Use the specified output format. Either stp (default), smtlib1 or smtlib2.")
   ::("-extract-vars", Arg.Set assert_vars,
      "Put vars in separate asserts")
   ::("-fse", Arg.Unit(fun()-> compute_wp := compute_fse),

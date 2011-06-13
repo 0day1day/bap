@@ -41,6 +41,7 @@ export SOURCES = \
 	formulap.ml \
 	stp.ml \
 	smtlib1.ml \
+	smtlib2.ml \
 	libbfd.idl \
 	libasmir.idl \
 	disasm_i386.ml \
