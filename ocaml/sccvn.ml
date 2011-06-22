@@ -46,11 +46,10 @@ module D = Debug.Make(struct let name = "SCCVN" and default=`NoDebug end)
 open D
 
 module Dom = Dominator.Make(G)
-    
 
 type vn = Top | Hash of Ssa.var | HInt of (big_int * typ)
 let top = Top
-type expid = 
+type expid =
   | Const of Ssa.value (* Except Var *)
   | Bin of binop_type * vn * vn
   | Un of unop_type * vn
@@ -59,10 +58,76 @@ type expid =
   | Ld of vn * vn * vn * typ
   | St of vn * vn * vn * vn * typ
   | Ph of vn list
-      
+
+let vn_compare vn1 vn2 = match vn1,vn2 with
+  | Top,Top -> 0
+  | Hash(v1), Hash(v2) -> compare v1 v2
+  | HInt(i1,t1), HInt(i2,t2) ->
+      let c1 = compare t1 t2 in
+      if c1 <> 0 then c1
+      else compare_big_int i1 i2
+  | _, _ -> compare vn1 vn2
+
+let vn_eq vn1 vn2 = (vn_compare vn1 vn2) = 0
+
+let (==!) = vn_eq
+let (<=!) vn1 vn2 = vn_compare vn1 vn2 <= 0
+let (<>!) v1 v2 = not (vn_eq v1 v2)
+
+let expid_eq e1 e2 =
+  (* values, vns, bops, uops, types, cts, vars *)
+  let getnum = function
+    | Const _ -> 1
+    | Bin _ -> 2
+    | Un _ -> 3
+    | Cst _ -> 4
+    | Unique _ -> 5
+    | Ld _ -> 6
+    | St _ -> 7
+    | Ph _ -> 8
+  in
+  let getargs = function
+    | Const(v) -> [v], [], [], [], [], [], []
+    | Bin(bop, vn1, vn2) -> [], [vn1; vn2], [bop], [], [], [], []
+    | Un(uop, vn) -> [], [vn], [], [uop], [], [], []
+    | Cst(ct, t, vn) -> [], [vn], [], [], [t], [ct], []
+    | Unique(var) -> [], [], [], [], [], [], [var]
+    | Ld(vn1, vn2, vn3, t) -> [], [vn1; vn2; vn3], [], [], [t], [], []
+    | St(vn1, vn2, vn3, vn4, t) -> [], [vn1; vn2; vn3; vn4], [], [], [t], [], []
+    | Ph(vnlist) -> [], vnlist, [], [], [], [], []
+  in
+  if (getnum e1) <> (getnum e2) then false
+  else (
+    let l1,l2,l3,l4,l5,l6,l7 = getargs e1 in
+    let r1,r2,r3,r4,r5,r6,r7 = getargs e2 in
+    let b1 = List.for_all2 (==) l1 r1 in
+    let b2 = List.for_all2 (==) l2 r2 in
+    let b3 = List.for_all2 (=) l3 r3 in
+    let b4 = List.for_all2 (=) l4 r4 in
+    let b5 = List.for_all2 (=) l5 r5 in
+    let b6 = List.for_all2 (=) l6 r6 in
+    let b7 = List.for_all2 (=) l7 r7 in
+    if b1 & b2 & b3 & b4 & b5 & b6 & b7 then
+      true
+    else if b3 & b4 & b5 & b6 & b7 then
+      (* e1 and e2 are not physically equal.  But maybe the
+         subexpressions are structurally, but not physically,
+         equal. *)
+      List.for_all2 Ssa.full_value_eq l1 r1
+      && List.for_all2 vn_eq l2 r2
+    else
+      false)
+
+module EH =
+  Hashtbl.Make(struct
+                 type t = expid
+                 let equal = expid_eq
+                 and hash = Hashtbl.hash
+               end)
+
 type rpoinfo = { (* private to the SCCVN module *)
   vn_h : vn VH.t; (* maps vars to value numbers *)
-  eid2vn : (expid, vn) Hashtbl.t; (* maps expids to value numbers *)
+  eid2vn : vn EH.t; (* maps expids to value numbers *)
   vn2eid : expid VH.t; (* inverse of eid2vn *)
   (* vn2eid is expid VH.t rather than (vn, expid) Hashtbl.t, since top is
      never used as a key, and the map from HInt is trivial. *)
@@ -82,10 +147,12 @@ let meet a b = match (a,b) with
   | (Top, x)
   | (x, Top) ->
       Some x
-  | (HInt _, HInt _) when a = b ->
+  | _, _ when a ==! b ->
       Some a
-  | (Hash x, Hash y) when x == y ->
-      Some a
+  (* | (HInt _, HInt _) when a ==% b -> *)
+  (*     Some a *)
+  (* | (Hash x, Hash y) when x == y -> *)
+  (*     Some a *)
   | (Hash _, Hash _)
   | (HInt _, HInt _) ->
       None
@@ -135,13 +202,13 @@ let add_const =
 	   VH.add info.vn2eid v eid;
 	   Hash v
      in
-     Hashtbl.add info.eid2vn eid h;
+     EH.add info.eid2vn eid h;
      h )
 
 let get_expid info =
   let vn = function
     | (Int _ | Lab _) as v -> (
-	try Hashtbl.find info.eid2vn (Const v)
+	try EH.find info.eid2vn (Const v)
 	with Not_found ->
 	  add_const info v
       )
@@ -157,7 +224,7 @@ let get_expid info =
     | Val v -> Const v
     | BinOp((PLUS|TIMES|AND|OR|XOR|EQ|NEQ) as op,v1,v2) ->
 	let (h1,h2) = (vn v1, vn v2) in
-	if h1 <= h2 then Bin(op, h1, h2) else Bin(op, h2, h1)
+	if h1 <=! h2 then Bin(op, h1, h2) else Bin(op, h2, h1)
     | BinOp(op,v1,v2) -> Bin(op, vn v1, vn v2)
     | UnOp(op, v) -> Un(op, vn v)
     | Cast(ct, t, v) -> Cst(ct,t, vn v)
@@ -216,9 +283,9 @@ let opt_expid info var exp =
       sameas x
   | Bin(AND, x, y)
   | Bin(OR, x, y)
-      when x = y ->
+      when x ==! y ->
       sameas x
-  | Bin(XOR, x, y) when x = y ->
+  | Bin(XOR, x, y) when x ==! y ->
       Const(Int(bi0, Var.typ var))
   | Bin(LT, _, HInt(bi,_)) when bi_is_zero bi ->
       Const(Ssa.val_false)
@@ -241,14 +308,14 @@ let lookup ~opt info var exp =
   let get_eid = if opt then opt_expid else get_expid in
   try
     let eid = get_eid info var exp in
-    try Hashtbl.find info.eid2vn eid
+    try EH.find info.eid2vn eid
     with Not_found ->
       match eid with
       | Const(Var _) -> top
       | Const(Int(i,t)) -> HInt(i,t)
       | _ ->
 	  let h = Hash var in
-	  Hashtbl.add info.eid2vn eid h;
+	  EH.add info.eid2vn eid h;
 	  VH.add info.vn2eid var eid;
 	  h
   with Not_found -> (* no VNs for subexpressions yet *)
@@ -267,7 +334,7 @@ let fold_postfix_component f g v i=
 let rpo ~opt cfg =
   let info = {
     vn_h = VH.create 57;
-    eid2vn = Hashtbl.create 57;
+    eid2vn = EH.create 57;
     vn2eid = VH.create 57;
   }
   in
@@ -297,7 +364,7 @@ let rpo ~opt cfg =
 	  and eid = Unique x in
 	  VH.add info.vn_h x h;
 	  VH.add info.vn2eid x eid;
-	  Hashtbl.add info.eid2vn eid h;
+	  EH.add info.eid2vn eid h;
 	);
 	`DoChildren
     end
@@ -321,8 +388,8 @@ let rpo ~opt cfg =
       (fun (v,e) ->
 	 let oldvn = vn v in
 	 let temp = lookup v e in
-	 if oldvn <> temp (*&& temp <> top*) then (
-	   assert(temp <> top); (* FIXME: prove this is always true *)
+	 if oldvn <>! temp (*&& temp <> top*) then (
+	   assert(temp <>! top); (* FIXME: prove this is always true *)
 	   changed := true;
 	   dprintf "Updating %s -> %s" (Pp.var_to_string v) (hash_to_string temp);
 	   VH.replace info.vn_h v temp
@@ -473,7 +540,7 @@ let aliased cfg =
       Some(i = i')
   | (Lab x, Lab y) when x = y ->
       Some true
-  | (Var x, Var y) when vn x = vn y ->
+  | (Var x, Var y) when vn x ==! vn y ->
       Some true
   | _ -> 
       (* We could also check whether an lval was assigned a constant,

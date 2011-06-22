@@ -55,9 +55,7 @@ let rec action vischil startvisit node=
   | `ChangeToAndDoChildren x -> vischil x
 
 let wrapstmt f v = let v' = f v in if quick_stmt_eq v v' then v else v'
-
-let wrapexp f v =
-  let v' = f v in if quick_exp_eq v v' then v else v'
+let wrapexp f v = let v' = f v in if quick_exp_eq v v' then v else v'
 
 
 let rec exp_accept visitor =

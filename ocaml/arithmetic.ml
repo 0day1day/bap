@@ -19,13 +19,18 @@ let bits_of_width = function
 (* drop high bits *)
 let to64 (i,t) =
   (* What should we do if i is negative?  Set the sign bit
-     appropriately? *)
-  assert (i >=% bi0);
+     appropriately? I guess that's what we'll do for now. *)
   let bits = bits_of_width t in
-  let modv = unit_big_int <<% bits in (* 2^bits *)
+  let modv = bi1 <<% bits in (* 2^bits *)
   let final = mod_big_int i modv in (* i mod 2^bits *)
   (* mod always returns a positive number *)
-  final
+  (* now add in the sign bit *)
+  let addsign = if i <% bi0 then
+    (final |% bi1 <<% (bits-1))
+  else
+    final
+  in
+  addsign
 
 (* sign extend to 64 bits*)
 let tos64 (i,t) =

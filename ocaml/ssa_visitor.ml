@@ -50,7 +50,9 @@ let rec action vischil startvisit node=
       action vischil f (vischil node)
 *)
 
-let wrap f v = let v' = f v in if v = v' then v else v'
+let wrapstmt f v = let v' = f v in if quick_stmt_eq v v' then v else v'
+let wrapexp f v = let v' = f v in if quick_exp_eq v v' then v else v'
+let wrapval f v = let v' = f v in if quick_value_eq v v' then v else v'
 
 let id x = x
 
@@ -85,7 +87,7 @@ let rec exp_accept visitor =
 	let vl' = List.map (rvar_accept visitor) vl in  
 	Phi(vl')
   in
-  action (wrap vischil) (visitor#visit_exp)
+  action (wrapexp vischil) (visitor#visit_exp)
 
 
 and avar_accept visitor =
@@ -98,7 +100,7 @@ and value_accept visitor =
     | Var var -> Var(rvar_accept visitor var)
     | v -> v
   in
-  action (wrap vischil) (visitor#visit_value)
+  action (wrapval vischil) (visitor#visit_value)
 
 and stmt_accept visitor = 
   let vischil = function 
@@ -118,7 +120,7 @@ and stmt_accept visitor =
     | Assert(e,a) -> Assert(value_accept visitor e, a)
     | Halt(e,a) -> Halt(value_accept visitor e, a)
   in
-  action (wrap vischil) (visitor#visit_stmt)
+  action (wrapstmt vischil) (visitor#visit_stmt)
 
 let stmts_accept vis stmts =
   List.map (stmt_accept vis) stmts
