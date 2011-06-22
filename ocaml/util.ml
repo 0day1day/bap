@@ -7,6 +7,9 @@
     @author Ivan Jager
 *)
 
+open Big_int_convenience
+open ExtString
+
 (** The identity function *)
 let id = fun x -> x
 
@@ -526,3 +529,69 @@ let binary_of_bigint ?pad n =
     | n -> (f (getrest n)) ^ (f (getb n))
   in
   zeroextend (f n)
+
+(** Convert big integer to binary represented as a string
+
+    XXX: We could make this more efficient by operating one int64 at a
+    time, instead of just a nibble.
+*)
+let hex_of_bigint ?pad n = 
+  let getn n = Big_int.and_big_int n Big_int_convenience.bif in (* Get lsnibble *)
+  let getrest n = Big_int.shift_right_big_int n 4 in (* Get all but lsnibble *)
+  let zeroextend s = match pad with
+    | None -> s
+    | Some(l) -> 
+	let p = l - String.length s in
+	assert (p >= 0);
+	(String.make p '0') ^ s 
+  in
+  let rec f = function
+    | bi when bi <=% Big_int_convenience.bif -> Printf.sprintf "%x" (Big_int.int_of_big_int bi)
+    | n -> (f (getrest n)) ^ (f (getn n))
+  in
+  zeroextend (f n)
+
+(** Convert string representation in hex or decimal to big int form. *)
+let bigint_of_string s =
+  let hex_prefix = "0x" in
+  let is_hex s =
+    let re = Str.regexp ("^"^hex_prefix) in
+    Str.string_match re s 0
+  in
+  let hex_to_bitlen s =
+    (String.length s) * 4
+  in
+  let bitlen_to_hex n =
+    (* Round up *)
+    (n+3) / 4
+  in
+  (* If the highest bit is 1, Int64.of_string will return a negative
+     value. So, we use 60 bits instead of 64 to avoid messing with
+     int64's sign bit. *)
+  let numbits = 60 in
+  let getmost s = String.sub s 0 (bitlen_to_hex numbits) in
+  let getrest s =
+    let start = bitlen_to_hex numbits in
+    let last = String.length s in
+    String.sub s start (last - start)
+  in
+  (* Get rid of 0x prefix, if any *)
+  let rec f s =
+    let len = hex_to_bitlen s in
+    if len <= numbits then
+      let bi = Big_int.big_int_of_int64 (Int64.of_string ("0x"^s)) in
+      assert (bi >=% bi0);
+      bi
+    else (
+      (* Printf.printf "getmost: %s v: %s\n" (getmost s) (Big_int.string_of_big_int (f (getmost s))); *)
+      (* Printf.printf "getrest: %s v: %s\n" (getrest s) (Big_int.string_of_big_int (f (getrest s))); *)
+      let bi = (f (getmost s) <<% (hex_to_bitlen (getrest s))) |% (f (getrest s)) in
+      assert (bi >=% bi0);
+      bi
+    )
+  in
+  if is_hex s then
+    f (String.slice ~first:(String.length hex_prefix) s)
+  else
+    (* big_int_of_string handles decimals *)
+    Big_int.big_int_of_string s

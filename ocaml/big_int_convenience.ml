@@ -2,36 +2,60 @@
 
 open Big_int
 
-let bi0 = big_int_of_int 0
-let bi1 = big_int_of_int 1
-let bi2 = big_int_of_int 2
-let bi3 = big_int_of_int 3
-let bi4 = big_int_of_int 4
-let bi5 = big_int_of_int 5
-let bi6 = big_int_of_int 6
-let bi7 = big_int_of_int 7
-let bi8 = big_int_of_int 8
-let bi9 = big_int_of_int 9
-let bim1 = big_int_of_int (-1)
-let bim2 = big_int_of_int (-2)
-let bim3 = big_int_of_int (-3)
-let bim4 = big_int_of_int (-4)
-let bim5 = big_int_of_int (-5)
-let bim6 = big_int_of_int (-6)
-let bim7 = big_int_of_int (-7)
-let bim8 = big_int_of_int (-8)
-let bim9 = big_int_of_int (-9)
+let bi0 = big_int_of_int 0x0
+let bi1 = big_int_of_int 0x1
+let bi2 = big_int_of_int 0x2
+let bi3 = big_int_of_int 0x3
+let bi4 = big_int_of_int 0x4
+let bi5 = big_int_of_int 0x5
+let bi6 = big_int_of_int 0x6
+let bi7 = big_int_of_int 0x7
+let bi8 = big_int_of_int 0x8
+let bi9 = big_int_of_int 0x9
+let bia = big_int_of_int 0xa
+let bib = big_int_of_int 0xb
+let bic = big_int_of_int 0xc
+let bid = big_int_of_int 0xd
+let bie = big_int_of_int 0xe
+let bif = big_int_of_int 0xf
+let bim1 = big_int_of_int (-0x1)
+let bim2 = big_int_of_int (-0x2)
+let bim3 = big_int_of_int (-0x3)
+let bim4 = big_int_of_int (-0x4)
+let bim5 = big_int_of_int (-0x5)
+let bim6 = big_int_of_int (-0x6)
+let bim7 = big_int_of_int (-0x7)
+let bim8 = big_int_of_int (-0x8)
+let bim9 = big_int_of_int (-0x9)
+let bima = big_int_of_int (-0xa)
+let bimb = big_int_of_int (-0xb)
+let bimc = big_int_of_int (-0xc)
+let bimd = big_int_of_int (-0xd)
+let bime = big_int_of_int (-0xe)
+let bimf = big_int_of_int (-0xf)
 
 let biconst i = big_int_of_int i
 
 (** Infix operator to test if two big ints are equal. *)
-let (%==) bi1 bi2 = eq_big_int bi1 bi2
+let (==%) bi1 bi2 = eq_big_int bi1 bi2
+
+(** Infix operator for <= *)
+let (<=%) bi1 bi2 = le_big_int bi1 bi2
+
+(** Infix operator for >= *)
+let (>=%) bi1 bi2 = ge_big_int bi1 bi2
+
+(** Infix operator for << *)
+let (<<%) bi1 i2 = shift_left_big_int bi1 i2
+
+(** Infix operator for | *)
+let (|%) bi1 bi2 = or_big_int bi1 bi2
 
 (** bi_is_zero bi returns true iff bi = 0 *)
-let bi_is_zero bi = bi0 %== bi
+let bi_is_zero bi = bi0 ==% bi
 
 (** bi_is_one bi returns true iff bi = 1 *)
-let bi_is_one bi = bi1 %== bi
+let bi_is_one bi = bi1 ==% bi
 
 (** bi_is_minusone bi returns true iff bi = -1 *)
-let bi_is_minusone bi = bim1 %== bi
+let bi_is_minusone bi = bim1 ==% bi

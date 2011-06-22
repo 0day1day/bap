@@ -18,8 +18,11 @@ let bits_of_width = function
 
 (* drop high bits *)
 let to64 (i,t) =
+  (* What should we do if i is negative?  Set the sign bit
+     appropriately? *)
+  assert (i >=% bi0);
   let bits = bits_of_width t in
-  let modv = shift_left_big_int unit_big_int bits in (* 2^bits *)
+  let modv = unit_big_int <<% bits in (* 2^bits *)
   let final = mod_big_int i modv in (* i mod 2^bits *)
   (* mod always returns a positive number *)
   final

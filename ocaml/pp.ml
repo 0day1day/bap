@@ -108,7 +108,7 @@ object (self)
 	let ts = string_of_int t in
 	(*if t = Taint then "tainted" else "untainted" in*)
 	let ind = if mem then "[0x"^(Int64.format "%Lx" i)^"]" else "" in
-	pp "@context "; pp (s^ ind ^" = "^(string_of_big_int v)^ ", " ^ ts
+	pp "@context "; pp (s^ ind ^" = 0x"^(Util.hex_of_bigint v)^ ", " ^ ts
 			      ^", u"
 			      ^ (string_of_int bits))
     | Context _ ->
@@ -128,11 +128,9 @@ object (self)
     | (bi, Reg 1) when bi_is_zero bi -> pp "false"
     | (bi, Reg 1) when bi_is_minusone bi -> pp "true"
     | (bi,t) ->
-	(* XXX: Can't print big int in hex :-x *)
-	pp (string_of_big_int bi);
-	(* if lt_big_int (abs_big_int bi) (big_int_of_int 10) *)
-	(* then pp (string_of_big_int bi) *)
-	(* else printf "0x%Lx" (Int64.logand bi (Int64.pred (Int64.shift_left 1L (Arithmetic.bits_of_width t)))); *)
+        if lt_big_int (abs_big_int bi) (big_int_of_int 10)
+	then pp (string_of_big_int bi)
+        else pp ("0x"^(Util.hex_of_bigint (Arithmetic.to64 (i,t))));
 	pp ":"; self#typ t
 
 
