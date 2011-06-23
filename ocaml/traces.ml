@@ -228,21 +228,38 @@ let bytes_from_file file =
     List.rev !bytes
 
 
-(** Keep track of registers not always updated in BAP.  *)
+(** A list of registers that we will never check for correctness.  *)
 let badregs = Hashtbl.create 32
 let () =
   List.iter (fun r -> Hashtbl.add badregs r ())
-    ("EFLAGS"
-     (* ::"R_FS" *)
-     ::"R_LDT"
-     ::"R_GDT"
-     ::"R_CC_OP"
-     ::"R_CC_DEP1"
-     ::"R_CC_DEP2"
-     ::"R_CC_NDEP"
+    (
+      "EFLAGS"
+      ::"R_FS"
+      ::"R_LDT"
+      ::"R_GDT"
+      ::"R_CC_OP"
+      ::"R_CC_DEP1"
+      ::"R_CC_DEP2"
+      ::"R_CC_NDEP"
+      ::[])
+
+(** A list of registers that we should only check when checking
+    all instructions.  This includes EFLAGS registers because we will
+    not consider an instruction tainted if the only operand that is
+    tainted is EFLAGS. *)
+let checkallregs = Hashtbl.create 32
+let () =
+  List.iter (fun r -> Hashtbl.add checkallregs r ())
+    ("R_AF"
+     ::"R_CF"
+     ::"R_ZF"
+     ::"R_OF"
+     ::"R_SF"
+     ::"R_PF"
      ::[])
 
-let isbad v = Hashtbl.mem badregs (Var.name v)
+let isnotallbad v = if not !checkall then Hashtbl.mem checkallregs (Var.name v) else false
+let isbad v = Hashtbl.mem badregs (Var.name v) || isnotallbad v
 
 let print_vars () =
   let printone k v = dprintf "Info for register %s %s" k (Pp.ast_exp_to_string v.exp) in
@@ -251,7 +268,7 @@ let print_vars () =
 (** Build a statement asserting that each operand is equal to its value in the trace
 
     @param h Mapping of vars to dsa vars
- *)
+*)
 let assert_vars h =
   let addone k v a = 
     match name_to_var k with
@@ -599,16 +616,16 @@ let remove_specials =
     List.filter no_specials
 
 (** Removing all unknowns from the trace *)
-let remove_unknowns =
-  let v = object(self)
-    inherit Ast_visitor.nop
-    method visit_exp = function
-      | Unknown(s,t) ->
-	  dprintf "Removed unknown: %s" s;
-	  `ChangeTo (Int(0L,t))
-      | _ -> `DoChildren
-  end
-  in Ast_visitor.prog_accept v
+(* let remove_unknowns = *)
+  (* let v = object(self) *)
+  (*   inherit Ast_visitor.nop *)
+  (*   method visit_exp = function *)
+  (*     | Unknown(s,t) -> *)
+  (*         dprintf "Removed unknown: %s" s; *)
+  (*         `ChangeTo (Int(0L,t)) *)
+  (*     | _ -> `DoChildren *)
+  (* end *)
+  (* in Ast_visitor.prog_accept v *)
    
 (* Appends a Halt instruction to the end of the trace *)
 let append_halt trace = 
@@ -797,6 +814,20 @@ module TraceConcrete = Symbeval.Make(TraceConcreteDef)(FastEval)(StdForm)
 let check_delta state =
   (* let dsa_concrete_val v = concrete_val (Var.name v) in *)
   (* let dsa_taint_val v = taint_val (Var.name v) in *)
+  let contains_unknown e =
+    let foundone = ref false in
+    let v = object(self)
+      inherit Ast_visitor.nop
+      method visit_exp = function
+        | Unknown _ -> foundone := true; raise Exit
+        | _ -> `DoChildren
+    end
+    in
+    (try
+       ignore(Ast_visitor.exp_accept v e)
+     with Exit -> ());
+    !foundone
+  in
   let check_mem cm addr v =
     if v.tnt then (
       let tracebyte = get_int v.exp in
@@ -819,11 +850,18 @@ let check_delta state =
 	match dsavarname, traceval, tainted with
 	| Some(dsavarname), Some(traceval), Some(tainted) -> 
 	    (dprintf "Doing check on %s" dsavarname;
-		 let s = if (!checkall) then "" else "tainted " in
+	     let s = if (!checkall) then "" else "tainted " in
 	     if (traceval <> evalval && (tainted || !checkall) 
-			 && not (Hashtbl.mem badregs (Var.name var))) then 
-	       wprintf "Difference between %sBAP and trace values in previous instruction: %s Trace=%s Eval=%s" (s) (dsavarname) (Pp.ast_exp_to_string traceval) (Pp.ast_exp_to_string evalval)
-		 (* If we can't find concrete value, it's probably just a BAP temporary *)
+		 && not (isbad var)) then (
+	       (* The trace value and evaluator's value differ.  The
+	          only time this is okay is if the evaluated expression
+	          contains an unknown. *)
+               if contains_unknown evalval then
+                 dprintf "Unknown encountered in %s: %s" dsavarname (Pp.ast_exp_to_string evalval)
+               else
+                 wprintf "Difference between %sBAP and trace values in previous instruction: %s Trace=%s Eval=%s" (s) (dsavarname) (Pp.ast_exp_to_string traceval) (Pp.ast_exp_to_string evalval)
+             )
+	       (* If we can't find concrete value, it's probably just a BAP temporary *)
 	    )
 	| _ -> ( (* probably a temporary *) ))
     | TMem _
@@ -964,7 +1002,7 @@ let run_block ?(next_label = None) state memv block =
   let init = TraceConcrete.inst_fetch state.sigma state.pc in
   let executed = ref [] in
   let rec eval_block state stmt = 
-    pwarn("XXXSW Executing: " ^ (Pp.ast_stmt_to_string stmt));
+    (* pwarn("XXXSW Executing: " ^ (Pp.ast_stmt_to_string stmt)); *)
     (* pdebug ("Executing: " ^ (Pp.ast_stmt_to_string stmt)); *)
     (*    Hashtbl.iter (fun k v -> pdebug (Printf.sprintf "%Lx -> %s" k (Pp.ast_exp_to_string v))) concrete_mem ;*)
     let evalf e = match TraceConcrete.eval_expr state.delta e with
@@ -1122,9 +1160,9 @@ let concrete trace =
   dsa_rev_map := None;
   let trace = Memory2array.coerce_prog trace in
   let no_specials = remove_specials trace in
-  let no_unknowns = remove_unknowns no_specials in
-  let memv = find_memv no_unknowns in
-  let blocks = trace_to_blocks no_unknowns in
+  (* let no_unknowns = remove_unknowns no_specials in *)
+  let memv = find_memv no_specials in
+  let blocks = trace_to_blocks no_specials in
   (*pdebug ("blocks: " ^ (string_of_int (List.length blocks)));*)
   let length = List.length blocks in
   let actual_trace = run_blocks blocks memv length in
@@ -2222,9 +2260,9 @@ let concrete_substitution trace =
   dsa_rev_map := None;
   (*let trace = Memory2array.coerce_prog trace in*)
   let no_specials = remove_specials trace in
-  let no_unknowns = remove_unknowns no_specials in
-  let memv = find_memv no_unknowns in
-  let blocks = trace_to_blocks no_unknowns in
+  (* let no_unknowns = remove_unknowns no_specials in *)
+  let memv = find_memv no_specials in
+  let blocks = trace_to_blocks no_specials in
   (*pdebug ("blocks: " ^ (string_of_int (List.length blocks)));*)
   let length = List.length blocks in
   let actual_trace = run_and_subst_blocks blocks memv length in
