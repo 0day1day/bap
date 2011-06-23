@@ -69,7 +69,7 @@ let mapmem a e =
 let speclist =
   ("-eval", 
      Arg.Unit (fun () -> add(TransformAst cexecute)),
-     "<pc> Concretely execute the IL from the beginning")
+     "Concretely execute the IL from the beginning of the program")
   ::("-eval-at", 
      Arg.String (fun s -> add(TransformAst (cexecute_at (Int64.of_string s)))),
      "<pc> Concretely execute the IL from pc")
