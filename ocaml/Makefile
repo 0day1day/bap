@@ -52,7 +52,7 @@ export SOURCES = \
 	memory2array.ml \
 	gcl.mli gcl.ml \
 	wp.ml \
-	stpexec.mli stpexec.ml \
+	smtexec.mli smtexec.ml \
 	asmirconsts.ml asmir.mli asmir.ml \
 	input.mli input.ml \
 	depgraphs.ml \

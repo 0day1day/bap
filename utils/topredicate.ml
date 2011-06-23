@@ -17,7 +17,7 @@ let usesccvn = ref true
 let solve = ref false
 
 (* Select which solver to use *)
-let solver = ref (Stpexec.STP.si);;
+let solver = ref (Smtexec.STP.si);;
 
 (* This may be useful elsewhere, but I'm not sure where to put it. *)
 let rename_astexp f =
@@ -127,11 +127,11 @@ let compute_fse_maxrepeat i cfg post =
   (maxrepeat i ast post, [])
 
 let set_solver s =
-  solver := try Hashtbl.find Stpexec.solvers s
+  solver := try Hashtbl.find Smtexec.solvers s
   with Not_found ->
     failwith "Unknown solver"
 
-let solvers = Hashtbl.fold (fun k _ s -> k ^ " " ^ s) Stpexec.solvers ""
+let solvers = Hashtbl.fold (fun k _ s -> k ^ " " ^ s) Smtexec.solvers ""
 
 let compute_wp = ref compute_wp_boring
 
@@ -229,7 +229,7 @@ match !stpout with
     p#close;
     if !solve then
       let r = (!solver)#solve_formula_file !stpoutname in
-      Printf.fprintf stderr "Solve result: %s\n" (Stpexec.result_to_string r)
+      Printf.fprintf stderr "Solve result: %s\n" (Smtexec.result_to_string r)
 
 ;;
 match !pstpout with
