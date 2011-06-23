@@ -476,10 +476,10 @@ let check_equivalence a (ir1, next1) (ir2, next2) =
     let wp1 = to_wp ir1
     and wp2 = to_wp ir2 in
     let e = BinOp(EQ, wp1, wp2) in
-    match Stpexec.CVC3.solve_formula_exp e with
+    match Stpexec.CVC3.check_exp_validity e with
     | Stpexec.Valid -> ()
     | Stpexec.Invalid -> wprintf "formulas for %Lx (%s aka %s) not equivalent" a (get_asm ir1) (get_asm ir2)
-    | Stpexec.StpError -> failwith "StpError"
+    | Stpexec.SmtError -> failwith "SmtError"
     | Stpexec.Timeout -> failwith "Timeout"
   with Failure s
   | Invalid_argument s ->

@@ -114,7 +114,7 @@ object (self)
       pp ")"
     )
 
-  method flush () =
+  method flush =
     flush();
 
   method extend v s st =
@@ -775,7 +775,7 @@ object (self)
     force_newline();
     pp "(get-assignment)"
 
-  method counterexample () = ()
+  method counterexample = ()
 
   method close =
     Format.pp_print_newline ft ();

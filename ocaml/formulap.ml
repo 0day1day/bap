@@ -47,11 +47,19 @@ object(self)
   method virtual ast_exp : Ast.exp -> unit
   method virtual assert_ast_exp : Ast.exp -> unit
   method virtual assert_ast_exp_with_foralls : ?fvars:bool -> VH.key list -> Ast.exp -> unit
-  method virtual counterexample : unit -> unit
+  method virtual valid_ast_exp : ?exists:(var list) -> ?foralls:(var list) -> Ast.exp -> unit
+  method virtual counterexample : unit
 end 
 
 class virtual fpp_oc =
 object(self)
   inherit fpp
   method virtual close : unit
+  method virtual flush : unit
 end
+
+(* Naming this type is useful.
+
+   I guess we should/could change the type of fpp_oc too to avoid
+this. *)
+type fppf = ?suffix:string -> out_channel -> fpp_oc

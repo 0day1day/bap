@@ -1,7 +1,10 @@
 (**
-   Module for executing STP inside of BAP
+   Module for executing SMTs inside of BAP
 
-   This is a pretty big hack, and is not portable in any shape or way.
+   XXX: This is not portable in any shape or way. It will only work on
+   Unix-like systems.
+
+   @author ejs
 *)
 
 exception Alarm_signal_internal;;
@@ -12,8 +15,17 @@ open D
 
 open Unix
 
-type result = Valid | Invalid | StpError | Timeout
+type result = Valid | Invalid | SmtError | Timeout
 
+(** Class type to embed SMT execution functions.  If OCaml < 3.12 had
+    first-class modules, we wouldn't need this. *)
+class type smtexec =
+object
+  method printer : Formulap.fppf
+  method solvername : string
+  method solve_formula_file : ?timeout:int -> string -> result
+  (* XXX: Add other methods *)
+end
 
 module type SOLVER_INFO =
 sig
@@ -21,12 +33,18 @@ sig
   val solvername : string (** Solver name *)
   val cmdstr : string -> string (** Given a filename, produce a command string to invoke solver *)
   val parse_result : string -> string -> Unix.process_status -> result (** Given output, decide the result *)
+  val printer : Formulap.fppf
 end
 
+(* Output type *)
 module type SOLVER =
 sig
   val solve_formula_file : ?timeout:int -> string -> result (** Solve a formula in a file *)
-  val solve_formula_exp : ?timeout:int -> ?exists:(Ast.var list) -> ?foralls:(Ast.var list) -> Ast.exp -> result (** Solve a formula in an exp *)
+  val check_exp_validity : ?timeout:int -> ?exists:(Ast.var list) -> ?foralls:(Ast.var list) -> Ast.exp -> result (** Check validity of an exp *)
+  val create_cfg_formula :
+    ?exists:Ast.var list ->  ?foralls:Ast.var list -> ?remove:bool
+    -> Cfg.AST.G.t -> string
+  val si : smtexec
 end
 
 let select_timeout = 0.1 (* seconds *)
@@ -37,34 +55,6 @@ let alarm_handler i =
 let compute_wp_boring cfg post =
   let gcl = Gcl.of_astcfg cfg in
     (Wp.wp gcl post, [])
-
-(** Write given formula out to random filename and return the filename *)
-let write_formula ?(exists=[]) ?(foralls=[]) ?(remove=true) f  =
-    let name, oc = Filename.open_temp_file ("formula" ^ (string_of_int (getpid ())))  ".stp" in
-    at_exit (fun () -> 
-	       if remove then
-		 try 
-		   Unix.unlink name
-		 with _ -> ());
-    dprintf "Using temporary file %s" name;  
-    let pp = new Stp.pp_oc oc in
-    pp#valid_ast_exp ~exists:exists ~foralls:foralls f;
-    pp#flush ();
-(*     output_string oc "QUERY(FALSE); COUNTEREXAMPLE;\n"; *)
-    pp#close;
-    name
-
-(** Write formula for AST CFG out to random filename and return the filename *)
-let create_formula ?(exists=[]) ?(foralls=[]) ?remove p  =
-    let p = Prune_unreachable.prune_unreachable_ast p in
-    let post = Ast.exp_true in
-    let (wp, _foralls) = compute_wp_boring p post in
-    let m2a = new Memory2array.memory2array_visitor () in
-    let wp = Ast_visitor.exp_accept m2a wp in
-    let foralls = List.map (Ast_visitor.rvar_accept m2a) foralls in
-    (* FIXME: same for exists? *)
-    write_formula ~exists ~foralls ?remove wp
-
 
 (* let query_formula ?timeout ?exists ?foralls f = *)
 (*   let filename = write_formula ?exists ?foralls f in *)
@@ -144,32 +134,100 @@ let result_to_string result =
   match result with
   | Valid -> "Valid"
   | Invalid -> "Invalid"
-  | StpError -> "StpError"
+  | SmtError -> "SmtError"
   | Timeout -> "Timeout"
 
 module Make = functor (S: SOLVER_INFO) ->
-  struct
+struct
+  (** Write given formula out to random filename and return the filename *)
+    let write_formula ?(exists=[]) ?(foralls=[]) ?(remove=true) f  =
+      let name, oc = Filename.open_temp_file ("formula" ^ (string_of_int (getpid ())))  ".stp" in
+      at_exit (fun () -> 
+	         if remove then
+		   try 
+		     Unix.unlink name
+		   with _ -> ());
+      dprintf "Using temporary file %s" name;  
+      let pp = S.printer oc in
+      pp#valid_ast_exp ~exists:exists ~foralls:foralls f;
+      pp#flush;
+      (*     output_string oc "QUERY(FALSE); COUNTEREXAMPLE;\n"; *)
+      pp#close;
+      name
+        
+    (** Write formula for AST CFG out to random filename and return the filename *)
+    let create_cfg_formula ?(exists=[]) ?(foralls=[]) ?remove p  =
+      let p = Prune_unreachable.prune_unreachable_ast p in
+      let post = Ast.exp_true in
+      let (wp, _foralls) = compute_wp_boring p post in
+      let m2a = new Memory2array.memory2array_visitor () in
+      let wp = Ast_visitor.exp_accept m2a wp in
+      let foralls = List.map (Ast_visitor.rvar_accept m2a) foralls in
+      (* FIXME: same for exists? *)
+      write_formula ~exists ~foralls ?remove wp
+        
     let solve_formula_file ?(timeout=S.timeout) file =
       ignore(alarm timeout);
       let cmdline = S.cmdstr file in
 
       try
+        dprintf "Executing: %s" cmdline;
 	let sout,serr,pstatus = syscall cmdline in
 	
 	(* Turn the alarm off *)
 	ignore(alarm 0);
-
+        
+        dprintf "Parsing result...";
 	S.parse_result sout serr pstatus
 
       with Alarm_signal(pid) ->
 	kill pid 9;
 	Timeout
 
-    let solve_formula_exp ?timeout ?exists ?foralls f =
+    let check_exp_validity ?timeout ?exists ?foralls f =
       let filename = write_formula ?exists ?foralls f in
       solve_formula_file ?timeout filename
 
+    class c = object(self)
+      method solvername = S.solvername
+      method solve_formula_file = solve_formula_file
+      method printer = S.printer
+    end
+
+    let si = new c
+
   end;;
+
+module STPSMTLIB_INFO =
+struct
+  let timeout = 60
+  let solvername = "stp"
+  let cmdstr f = "stp --SMTLIB1 -t " ^ f
+  let parse_result stdout stderr pstatus =
+    let failstat = match pstatus with
+      | WEXITED(c) -> c > 0
+      | _ -> true
+    in
+    let fail = failstat || ExtString.String.exists stderr "Fatal" in
+    let issat = ExtString.String.exists stdout "sat" in
+    let isunsat = ExtString.String.exists stdout "unsat" in
+    
+    (*       dprintf "fail: %b %b %b" fail isinvalid isvalid; *)
+    
+    if isunsat then
+      Valid
+    else if issat then
+      Invalid
+    else if fail then (
+      dprintf "output: %s\nerror: %s" stdout stderr;  
+      SmtError
+    )
+    else
+      failwith "Something weird happened."
+  let printer = ((new Smtlib1.pp_oc) :> Formulap.fppf)
+end
+
+module STPSMTLIB = Make(STPSMTLIB_INFO)
 
 module STP_INFO =
 struct
@@ -192,11 +250,12 @@ struct
     else if isinvalid then
       Invalid
     else if fail then (
-      dprintf "STP output: %s\nSTP error: %s" stdout stderr;  
-      StpError
+      dprintf "output: %s\nerror: %s" stdout stderr;  
+      SmtError
     )
     else
       failwith "Something weird happened."
+  let printer = ((new Stp.pp_oc) :> Formulap.fppf)
 end
 
 module STP = Make(STP_INFO)
@@ -206,30 +265,87 @@ struct
   let timeout = 60
   let solvername = "cvc3"
   let cmdstr f = "cvc3 " ^ f
-  let parse_result stdout stderr pstatus =
-    let failstat = match pstatus with
-      | WEXITED(c) -> c > 0
-      | _ -> true
-    in
-    let fail = failstat || ExtString.String.exists stderr "Fatal" in
-    let isinvalid = ExtString.String.exists stdout "Invalid." in
-    let isvalid = ExtString.String.exists stdout "Valid." in
+  (* let parse_result stdout stderr pstatus = *)
+  (*   let failstat = match pstatus with *)
+  (*     | WEXITED(c) -> c > 0 *)
+  (*     | _ -> true *)
+  (*   in *)
+  (*   let fail = failstat || ExtString.String.exists stderr "Fatal" in *)
+  (*   let isinvalid = ExtString.String.exists stdout "Invalid." in *)
+  (*   let isvalid = ExtString.String.exists stdout "Valid." in *)
     
-    (*       dprintf "fail: %b %b %b" fail isinvalid isvalid; *)
+  (*   (\*       dprintf "fail: %b %b %b" fail isinvalid isvalid; *\) *)
     
-    if isvalid then
-      Valid
-    else if isinvalid then
-      Invalid
-    else if fail then (
-      dprintf "CVC output: %s\nCVC error: %s" stdout stderr;  
-      StpError
-    )
-    else
-      failwith "Something weird happened."
+  (*   if isvalid then *)
+  (*     Valid *)
+  (*   else if isinvalid then *)
+  (*     Invalid *)
+  (*   else if fail then ( *)
+  (*     dprintf "CVC output: %s\nCVC error: %s" stdout stderr;   *)
+  (*     SmtError *)
+  (*   ) *)
+  (*   else *)
+  (*     failwith "Something weird happened." *)
+  let parse_result = STP_INFO.parse_result
+  let printer = ((new Stp.pp_oc) :> Formulap.fppf)
 end
 
 module CVC3 = Make(CVC3_INFO)
 
+module CVC3SMTLIB_INFO =
+struct
+  let timeout = 60
+  let solvername = "cvc3"
+  let cmdstr f = "cvc3 -lang smtlib " ^ f
+  (* let parse_result stdout stderr pstatus = *)
+  (*   let failstat = match pstatus with *)
+  (*     | WEXITED(c) -> c > 0 *)
+  (*     | _ -> true *)
+  (*   in *)
+  (*   let fail = failstat || ExtString.String.exists stderr "Fatal" in *)
+  (*   let isinvalid = ExtString.String.exists stdout "Invalid." in *)
+  (*   let isvalid = ExtString.String.exists stdout "Valid." in *)
+    
+  (*   (\*       dprintf "fail: %b %b %b" fail isinvalid isvalid; *\) *)
+    
+  (*   if isvalid then *)
+  (*     Valid *)
+  (*   else if isinvalid then *)
+  (*     Invalid *)
+  (*   else if fail then ( *)
+  (*     dprintf "CVC output: %s\nCVC error: %s" stdout stderr;   *)
+  (*     SmtError *)
+  (*   ) *)
+  (*   else *)
+  (*     failwith "Something weird happened." *)
+  let parse_result = STPSMTLIB_INFO.parse_result
+  let printer = ((new Smtlib1.pp_oc) :> Formulap.fppf)
+end
+
+module CVC3SMTLIB = Make(CVC3SMTLIB_INFO)
+
+module YICES_INFO =
+struct
+  let timeout = 60
+  let solvername = "yices"
+  let cmdstr f = "yices " ^ f
+  let parse_result =
+    STPSMTLIB_INFO.parse_result
+  let printer = ((new Smtlib1.pp_oc) :> Formulap.fppf)
+end
+
+module YICES = Make(YICES_INFO)
+
+let solvers = Hashtbl.create 10;;
+List.iter (fun (n,s) -> Hashtbl.add solvers n s)
+  (
+    ("stp", STP.si)
+    ::("stp_smtlib", STPSMTLIB.si)
+    ::("cvc3", CVC3.si)
+    ::("cvc3_smtlib", CVC3SMTLIB.si)
+    ::("yices", YICES.si)
+    ::[]
+  )
+
 let runstp = STP.solve_formula_file
-let query_formula = STP.solve_formula_exp
+let query_formula = STP.check_exp_validity

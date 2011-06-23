@@ -1,4 +1,4 @@
-type result = Valid | Invalid | StpError | Timeout
+type result = Valid | Invalid | SmtError | Timeout
 val result_to_string : result -> string
 
 module type SOLVER_INFO =
@@ -7,23 +7,38 @@ sig
   val solvername : string (** Solver name *)
   val cmdstr : string -> string (** Given a filename, produce a command string to invoke solver *)
   val parse_result : string -> string -> Unix.process_status -> result (** Given output, decide the result *)
+  val printer : Formulap.fppf
+end
+
+(** This is a hack so we can use subtyping of the solver instances *)
+class type smtexec =
+object
+  method printer : Formulap.fppf
+  method solvername : string
+  method solve_formula_file : ?timeout:int -> string -> result
 end
 
 module type SOLVER =
 sig
   val solve_formula_file : ?timeout:int -> string -> result (** Solve a formula in a file *)
-  val solve_formula_exp : ?timeout:int -> ?exists:(Ast.var list) -> ?foralls:(Ast.var list) -> Ast.exp -> result (** Solve a formula in an exp *)
+  val check_exp_validity : ?timeout:int -> ?exists:(Ast.var list) -> ?foralls:(Ast.var list) -> Ast.exp -> result (** Check validity of an exp *)
+  val create_cfg_formula :
+    ?exists:Ast.var list ->  ?foralls:Ast.var list -> ?remove:bool
+    -> Cfg.AST.G.t -> string
+  val si : smtexec
 end
 
 module Make : functor (Module : SOLVER_INFO) -> SOLVER
 
-module STP : SOLVER 
+module STP : SOLVER
+module STPSMTLIB : SOLVER
 module CVC3 : SOLVER
+module CVC3SMTLIB : SOLVER
+module YICES : SOLVER
 
-(** Dump a formula to a file *)
-val create_formula :
-  ?exists:Ast.var list ->  ?foralls:Ast.var list -> ?remove:bool
-  -> Cfg.AST.G.t -> string
+(** A Hashtbl of solver names to solver interfaces *)
+val solvers : (string,smtexec) Hashtbl.t
+
 
 (* The following are deprecated, use modules *)
 

@@ -38,7 +38,7 @@ object (self)
 
   val mutable let_counter = 0;
 
-  method flush () =
+  method flush =
     flush();
 
   method extend v s =
@@ -322,6 +322,8 @@ object (self)
     self#ast_exp e;
     force_newline();
     pp ");";
+    force_newline();
+    pp "QUERY(FALSE);";
     cls();
 
   (** Is e a valid expression (always true)? *)
@@ -343,12 +345,12 @@ object (self)
   method assert_ast_exp e =
     self#assert_ast_exp_with_foralls [] e
 
-  method counterexample () =
-    force_newline();
-    pp "QUERY(FALSE);";
+  method counterexample =
+    (* force_newline(); *)
+    (* pp "QUERY(FALSE);"; *)
     force_newline();
     pp "COUNTEREXAMPLE;";
-    cls();
+    cls()
 
   method close =
     Format.pp_print_newline ft ();

@@ -111,7 +111,7 @@ object (self)
       pp ")"
     )
 
-  method flush () =
+  method flush =
     flush();
 
   method extend v s st =
@@ -777,7 +777,7 @@ object (self)
     pp ":formula true";
     force_newline();
 
-  method counterexample () = ()
+  method counterexample = ()
 
   method close =
     Format.pp_print_newline ft ();
