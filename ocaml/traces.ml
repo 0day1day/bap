@@ -233,21 +233,15 @@ let badregs = Hashtbl.create 32
 let () =
   List.iter (fun r -> Hashtbl.add badregs r ())
     ("EFLAGS"
-     ::"R_FS"
+     (* ::"R_FS" *)
      ::"R_LDT"
      ::"R_GDT"
-     ::"R_AF"
-     ::"R_CF"
-     ::"R_ZF"
-     ::"R_OF"
-     ::"R_SF"
-     ::"R_PF"
      ::"R_CC_OP"
      ::"R_CC_DEP1"
      ::"R_CC_DEP2"
      ::"R_CC_NDEP"
      ::[])
-    
+
 let isbad v = Hashtbl.mem badregs (Var.name v)
 
 let print_vars () =
