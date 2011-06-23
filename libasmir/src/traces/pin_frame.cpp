@@ -99,6 +99,9 @@ Frame *Frame::unserialize(istream &in, bool noskip)
        case FRM_TAINT:
          f = new TaintFrame;
          break;
+       case FRM_EXCEPT:
+         f = new ExceptionFrame;
+         break;
        case FRM_NONE:
        default:
       // TODO: Error handling here.
@@ -113,7 +116,7 @@ Frame *Frame::unserialize(istream &in, bool noskip)
 }
 
 
-// Writes a serialized version of the frame into buffer 'buf'. The
+// Writes a serialized version of the frame into buffer 'out'. The
 // buffer must be of at least this.size bytes long.
 // Returns a pointer to the character just after the last character
 // written to the buffer.
@@ -186,7 +189,7 @@ istream &StdFrame::unserializePart(istream &in)
 
    READ(in, addr);
    READ(in, tid);
-
+ 
    uint8_t lengths;
    READ(in, lengths);
 
@@ -585,6 +588,29 @@ conc_map_vec * TaintFrame::getOperands()
 }
 #endif
 
+ostream &ExceptionFrame::serialize(ostream &out, uint16_t sz)
+{
+   
+   ostream &out2 = Frame::serialize(out, sz + 16);
+
+   WRITE(out2, exception);
+   WRITE(out2, tid);
+   WRITE(out2, from_addr);
+   WRITE(out2, to_addr);
+
+   return out2;
+}
+
+istream &ExceptionFrame::unserializePart(istream &in)
+{
+
+   READ(in, exception);
+   READ(in, tid);
+   READ(in, from_addr);
+   READ(in, to_addr);
+   
+   return in;
+}
 
 #if 0
 int main(int argc, char **argv)

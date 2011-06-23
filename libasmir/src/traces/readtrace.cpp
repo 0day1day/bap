@@ -130,94 +130,108 @@ bap_blocks_t * read_trace_from_file(const string &filename,
       //      cerr << "pos " << tr.pos() << " of " << tr.count() << endl;
       
       switch(f->type) {
-          case pintrace::FRM_STD: // TODO: We should consider key frame
+          
+      case pintrace::FRM_STD: // TODO: We should consider key frame
           {
-            assert(false);
-            break;
+              assert(false);
+              break;
           }
-          case pintrace::FRM_STD2: // TODO: We should consider key frame
-	{
-          //static int num = 0;
-          //cerr << "Raising frame " << num++ << endl;
-          pintrace::StdFrame2 *cur_frm = (pintrace::StdFrame2 *) f;
-
-          /* Set up the trace_read_memory function so the
-           * disassembler is happy. */
-          set_trace_bytes(cur_frm->rawbytes, cur_frm->insn_length, cur_frm->addr);
           
-          bap_block_t *bblock = new bap_block_t;
-	  bblock->bap_ir = new vector<Stmt *>();
-	  bblock->inst = cur_frm->addr;
-	  bblock->vex_ir = translate_insn(arch,
-					  (unsigned char *)cur_frm->rawbytes,
-					  cur_frm->addr);
-	  // prog = byte_insn_to_asmp(bfd_arch, 
-	  //       		   cur_frm->addr,
-	  //       		   (unsigned char *)cur_frm->rawbytes,
-	  //       		   MAX_INSN_BYTES);
-	  generate_bap_ir_block(prog, bblock);
-
-          // free internal VEX memory...
-          vx_FreeAll();
-
-          string assembly(asmir_string_of_insn(prog, (bfd_vma)(cur_frm->addr)));
-          ////string assembly("ed has disabled this; fix it");
-	  bblock->bap_ir->front()->assembly = assembly;
-	  if (atts)
-	    bblock->bap_ir->front()->attributes.cv = cur_frm->getOperands() ;
-          bblock->bap_ir->front()->attributes.tid = cur_frm->tid;
-          
-	  result->push_back(bblock);
-	  //for (int i = 0 ; i < bblock->bap_ir->size() ; i ++)
-	  //    cout << bblock->bap_ir->at(i)->tostring() << endl ;
-	  break;
-	}
-          case pintrace::FRM_SYSCALL: 
-	{
-	  break;
-	}
-
-          case pintrace::FRM_LOADMOD:
+      case pintrace::FRM_STD2: // TODO: We should consider key frame
           {
-            std::stringstream ss;
-            pintrace::LoadModuleFrame *lf = (pintrace::LoadModuleFrame*) f;
-            bap_block_t *bblock = new bap_block_t;
-            bblock->bap_ir = new vector<Stmt *>();
-            bblock->inst = NULL;
-            
-            /* Build string */
-            ss.flags ( ios::hex );
-            ss << "Loaded module " << lf->name << " at " << lf->low_addr
-               << " to " << lf->high_addr;
-            
-            Special *special = new Special(ss.str());
-            bblock->bap_ir->push_back(special);
-            bblock->vex_ir = NULL;
-            result->push_back(bblock);
-            break;
-          }
-          case pintrace::FRM_TAINT:
-	{
-	  pintrace::TaintFrame * tf = (pintrace::TaintFrame *) f;
-	  bap_block_t *bblock = new bap_block_t;
-	  bblock->bap_ir = new vector<Stmt *>();
-          bblock->inst = tf->id;
-	  //generate_bap_ir_block(prog, bblock);
-	  Label * label = new Label("ReadSyscall");
-	  if (atts)
-	    label->attributes.cv = tf->getOperands() ;
-          bblock->bap_ir->push_back(label);
-	  bblock->vex_ir = NULL;
-	  result->push_back(bblock);
+              //static int num = 0;
+              //cerr << "Raising frame " << num++ << endl;
+              pintrace::StdFrame2 *cur_frm = (pintrace::StdFrame2 *) f;
+
+              /* Set up the trace_read_memory function so the
+               * disassembler is happy. */
+              set_trace_bytes(cur_frm->rawbytes, cur_frm->insn_length,
+                              cur_frm->addr);
           
-	  //cerr << sf->callno << " " << sf->args[0] << " " << sf->args[4] << endl;
-	  //for (int i = 0 ; i < bblock->bap_ir->size() ; i ++)
-	  //    cout << bblock->bap_ir->at(i)->tostring() << endl ;
-	  break;
+              bap_block_t *bblock = new bap_block_t;
+              bblock->bap_ir = new vector<Stmt *>();
+              bblock->inst = cur_frm->addr;
+              bblock->vex_ir =
+                  translate_insn(arch,
+                                 (unsigned char *)cur_frm->rawbytes,
+                                 cur_frm->addr);
+              // prog = byte_insn_to_asmp(bfd_arch, 
+              //       		   cur_frm->addr,
+              //       		   (unsigned char *)cur_frm->rawbytes,
+              //       		   MAX_INSN_BYTES);
+              generate_bap_ir_block(prog, bblock);
+
+              // free internal VEX memory...
+              vx_FreeAll();
+
+              string assembly(asmir_string_of_insn(prog,
+                                                   (bfd_vma)(cur_frm->addr)));
+              ////string assembly("ed has disabled this; fix it");
+              bblock->bap_ir->front()->assembly = assembly;
+              if (atts)
+                  bblock->bap_ir->front()->attributes.cv =
+                      cur_frm->getOperands() ;
+              bblock->bap_ir->front()->attributes.tid = cur_frm->tid;
+          
+              result->push_back(bblock);
+              //for (int i = 0 ; i < bblock->bap_ir->size() ; i ++)
+              //    cout << bblock->bap_ir->at(i)->tostring() << endl ;
+              break;
+          }
+          
+      case pintrace::FRM_SYSCALL: 
+          {
+              break;
+          }
+          
+      case pintrace::FRM_LOADMOD:
+          {
+              std::stringstream ss;
+              pintrace::LoadModuleFrame *lf = (pintrace::LoadModuleFrame*) f;
+              bap_block_t *bblock = new bap_block_t;
+              bblock->bap_ir = new vector<Stmt *>();
+              bblock->inst = NULL;
+            
+              /* Build string */
+              ss.flags ( ios::hex );
+              ss << "Loaded module " << lf->name << " at " << lf->low_addr
+                 << " to " << lf->high_addr;
+            
+              Special *special = new Special(ss.str());
+              bblock->bap_ir->push_back(special);
+              bblock->vex_ir = NULL;
+              result->push_back(bblock);
+              break;
+          }
+          
+      case pintrace::FRM_TAINT:
+          {
+              pintrace::TaintFrame * tf = (pintrace::TaintFrame *) f;
+              bap_block_t *bblock = new bap_block_t;
+              bblock->bap_ir = new vector<Stmt *>();
+              bblock->inst = tf->id;
+              //generate_bap_ir_block(prog, bblock);
+              Label * label = new Label("ReadSyscall");
+              if (atts)
+                  label->attributes.cv = tf->getOperands() ;
+              bblock->bap_ir->push_back(label);
+              bblock->vex_ir = NULL;
+              result->push_back(bblock);
+          
+              //cerr << sf->callno << " " << sf->args[0] << " " << sf->args[4] << endl;
+              //for (int i = 0 ; i < bblock->bap_ir->size() ; i ++)
+              //    cout << bblock->bap_ir->at(i)->tostring() << endl ;
+              break;
 	  
-                    }
+          }
+          
+      case pintrace::FRM_EXCEPT:   // TODO: Fill this in
+          {
+              break;
+          }
+
       default:
-	break;
+          break;
 
       }
 

@@ -32,6 +32,9 @@ open D
     are assumed to be constant. *)
 let consistency_check = ref false;;
 
+(** Option used to force checking of an entire trace. *)
+let checkall = ref false;;
+
 let dce = ref true;;
 
 (** Alternate assignment uses assign statements rather than
@@ -784,8 +787,7 @@ struct
 	    try AddrMap.find (normalize i t) m
             with Not_found ->
 	      
-	      (* Well, this isn't good... Just make something up
-		 :( *)
+	      (* Well, this isn't good... Just make something up *)
 	      wprintf "Unknown memory value during eval: addr %Ld" (int64_of_big_int i);
 	      Int(bi0, reg_8)
       )              
@@ -826,12 +828,13 @@ let check_delta state =
 	let tainted = dsa_taint_val var in
 	match dsavarname, traceval, tainted with
 	| Some(dsavarname), Some(traceval), Some(tainted) -> 
-	    ((*dprintf "Doing check on %s" dsavarname;*)
-	     if (not (full_exp_eq traceval evalval) && tainted && not (Hashtbl.mem badregs (Var.name var))) then 
-	       wprintf "Difference between tainted BAP and trace values in previous instruction: %s Trace=%s Eval=%s" (dsavarname) (Pp.ast_exp_to_string traceval) (Pp.ast_exp_to_string evalval)
+	    dprintf "Doing check on %s" dsavarname;
+	     let s = if (!checkall) then "" else "tainted " in
+	     if (traceval <> evalval && (tainted || !checkall) 
+		 && not (Hashtbl.mem badregs (Var.name var))) then 
+	       wprintf "Difference between %sBAP and trace values in previous instruction: %s Trace=%s Eval=%s" (s) (dsavarname) (Pp.ast_exp_to_string traceval) (Pp.ast_exp_to_string evalval)
 		 (* If we can't find concrete value, it's probably just a BAP temporary *)
-	    )
-	| _ -> ( (* probably a temporary *) ))
+	| _ -> ()) (* probably a temporary *)
     | TMem _
     | Array _ -> 
 	let cmem = match evalval with
@@ -925,9 +928,21 @@ let trace_transform_stmt stmt evalf =
     s @ [Assert(!exp, [])]
   else
     s
-	
+
+let rec get_next_label blocks = 
+  match blocks with
+	| block::remaining ->
+	  let addr, block = hd_tl block in
+	  (try
+		(match addr with
+		  | Label (Addr a,_) -> Some(a)
+		  | _ -> get_next_label remaining)
+	  with
+		|	Failure _ -> None)
+	| [] -> None
+
 (** Running each block separately *)
-let run_block state memv block = 
+let run_block ?(next_label = None) state memv block =  
   let addr, block = hd_tl block in
   let input_seeds = get_symbolic_seeds memv addr in
   pdebug ("Running block: " ^ (string_of_int !counter) ^ " " ^ (Pp.ast_stmt_to_string addr));
@@ -958,6 +973,7 @@ let run_block state memv block =
   let init = TraceConcrete.inst_fetch state.sigma state.pc in
   let executed = ref [] in
   let rec eval_block state stmt = 
+    (* pwarn("XXXSW Executing: " ^ (Pp.ast_stmt_to_string stmt)); *)
     (* pdebug ("Executing: " ^ (Pp.ast_stmt_to_string stmt)); *)
     (*    Hashtbl.iter (fun k v -> pdebug (Printf.sprintf "%Lx -> %s" k (Pp.ast_exp_to_string v))) concrete_mem ;*)
     let evalf e = match TraceConcrete.eval_expr state.delta e with
@@ -996,32 +1012,46 @@ let run_block state memv block =
 	    raise e
 	  (* ) else 
 	  ((addr,false)::(info,false)::(List.tl !executed)) *)
-      | UnknownLabel ->
+      | UnknownLabel lab ->
+	  (match next_label, lab with
+	   | Some(l), Addr x when x <> l && !checkall ->
+	       let s =
+		 Printf.sprintf "Unknown label address (0x%Lx) does not equal the next label (0x%Lx)" x l in
+	       pwarn (s ^ "\nCurrent block is: " ^ (Pp.ast_stmt_to_string addr))
+           | _ -> ()
+	  );
 	  (addr::info::List.rev (!executed))
       | Halted _ -> 
+		(* XXXSW use addr to reverse lookup label in lambda *)
+		(* XXXSW compare this to next_label and warn if not equal *)
 	  (addr::info::List.rev (List.tl !executed))
 
 let run_blocks blocks memv length =
   counter := 1 ;
   Status.init "Concrete Run" length ;
   let state = TraceConcrete.create_state () in
-  let rev_trace = List.fold_left 
-    (fun acc block -> 
+  let (rev_trace,_) = List.fold_left 
+    (fun (acc,remaining) block -> 
        Status.inc() ;   
-       let hd, _ = hd_tl block in
+       let hd, block_tail = hd_tl block in
        let concblock =
-	 match hd with
-	 | Comment(s, _) when s=endtrace ->
+		 (match hd with
+		   | Comment(s, _) when s=endtrace ->
 	     (* If the block starts with the endtrace comment, then we
-		shouldn't concretely execute it. It's probably a bunch of
-		assertions. *)
-	     block
-	 | _ ->
-	     run_block state memv block
+			shouldn't concretely execute it. It's probably a bunch of
+			assertions. *)
+			 block
+		   | _ ->
+			 let l = get_next_label remaining
+			 in
+			 run_block ~next_label:(l) state memv block)
        in
-       List.rev_append concblock acc
+       (List.rev_append concblock acc,
+	match remaining with
+	| [] -> []
+	| _::tl -> tl)
 
-    ) [] blocks
+    ) ([],List.tl blocks) blocks
   in
   Status.stop () ;
   List.rev rev_trace
@@ -1840,7 +1870,7 @@ let trace_valid_to_invalid trace =
       | Failure _ ->
 	  (Printf.printf "going lower\n";
 	   bsearch l middle)
-      | Symbeval.UnknownLabel ->
+      | Symbeval.UnknownLabel _ ->
 	  (Printf.printf "going a little higher\n";
 	   bsearch l (u-1))
   in
@@ -1885,7 +1915,7 @@ let formula_valid_to_invalid ?(min=1) trace =
       | Failure _ ->
 	  (Printf.printf "going lower\n";
 	   bsearch l middle)
-      | Symbeval.UnknownLabel ->
+      | Symbeval.UnknownLabel _ ->
 	  (Printf.printf "going a little higher\n";
 	   bsearch l (u-1))
   in
@@ -2124,7 +2154,7 @@ let run_and_subst_block state memv block =
 	    raise e
 	  (* ) else 
 	  ((addr,false)::(info,false)::(List.tl !executed)) *)
-      | UnknownLabel ->
+      | UnknownLabel _ ->
 	  (addr::info::List.rev (!executed))
       | Halted _ -> 
 	  (addr::info::List.rev (List.tl !executed))

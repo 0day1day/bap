@@ -38,7 +38,7 @@ asmir_get_all_sections(asm_program_t prog,
                        [out] long *num);
 
 enum frame_type_t {
-  FRM_NONE = 0, FRM_KEY, FRM_STD, FRM_LOADMOD, FRM_SYSCALL, FRM_TAINT, FRM_STD2 };
+  FRM_NONE = 0, FRM_KEY, FRM_STD, FRM_LOADMOD, FRM_SYSCALL, FRM_TAINT, FRM_STD2, FRM_EXCEPT };
 
 enum exp_type_t {
   BINOP, UNOP, CONSTANT, MEM, TEMP, PHI, CAST,
@@ -185,6 +185,10 @@ threadid_t asmir_frame_tid(trace_frame_t tf);
 [length_is(*len)] char* asmir_frame_get_insn_bytes(trace_frame_t tf, [out] address_t *addrout, [out] int *len);
 
 [string] const char* asmir_frame_get_loadmod_info(trace_frame_t tf, [out] address_t *lowout, [out] address_t *highout);
+
+void asmir_frame_get_syscall_info(trace_frame_t tf, [out] int *callno, [out] address_t *addr, [out] threadid_t *tid);
+
+void asmir_frame_get_except_info(trace_frame_t tf, [out] int *exceptno, [out] threadid_t *tid, [out] address_t *from_addr, [out] address_t *to_addr);
 
 
 // frame operands

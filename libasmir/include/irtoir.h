@@ -199,6 +199,8 @@ extern "C" {
   extern uint8_t * asmir_frame_get_insn_bytes(trace_frame_t *tf, uint64_t *addrout, int *len);
 
   extern const char* asmir_frame_get_loadmod_info(trace_frame_t *tf, uint64_t *lowout, uint64_t *highout);
+  extern void asmir_frame_get_syscall_info(trace_frame_t *tf, int *callno, uint64_t *addr, int *tid);
+  extern void asmir_frame_get_except_info(trace_frame_t *tf, int *exceptno, int *tid, uint64_t *from_addr, uint64_t *to_addr);
   extern conc_map_vec * asmir_frame_get_operands(trace_frame_t *tf);
   extern void asmir_frame_destroy_operands(conc_map_vec *cv);
   extern int asmir_frame_operands_length(conc_map_vec *cv);
