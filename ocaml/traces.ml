@@ -788,7 +788,7 @@ struct
             with Not_found ->
 	      
 	      (* Well, this isn't good... Just make something up *)
-	      wprintf "Unknown memory value during eval: addr %Ld" (int64_of_big_int i);
+	      wprintf "Unknown memory value during eval: addr %Lx" (int64_of_big_int i);
 	      Int(bi0, reg_8)
       )              
 	
@@ -830,7 +830,7 @@ let check_delta state =
 	| Some(dsavarname), Some(traceval), Some(tainted) -> 
 	    dprintf "Doing check on %s" dsavarname;
 	     let s = if (!checkall) then "" else "tainted " in
-	     if (traceval <> evalval && (tainted || !checkall) 
+	     if (not (full_exp_eq traceval evalval) && (tainted || !checkall) 
 		 && not (Hashtbl.mem badregs (Var.name var))) then 
 	       wprintf "Difference between %sBAP and trace values in previous instruction: %s Trace=%s Eval=%s" (s) (dsavarname) (Pp.ast_exp_to_string traceval) (Pp.ast_exp_to_string evalval)
 		 (* If we can't find concrete value, it's probably just a BAP temporary *)
