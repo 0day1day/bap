@@ -42,6 +42,7 @@ export SOURCES = \
 	debug_snippets.ml \
 	sccvn.mli sccvn.ml \
 	deadcode.mli deadcode.ml \
+	ssa_simp_misc.ml \
 	ssa_simp.ml \
 	formulap.ml \
 	stp.ml \

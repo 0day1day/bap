@@ -285,6 +285,8 @@ let opt_expid info var exp =
   | Bin(OR, x, y)
       when x ==! y ->
       sameas x
+  | Bin(EQ, x, y) when x ==! y ->
+      Const(Ssa.val_true)
   | Bin(XOR, x, y) when x ==! y ->
       Const(Int(bi0, Var.typ var))
   | Bin(LT, _, HInt(bi,_)) when bi_is_zero bi ->
