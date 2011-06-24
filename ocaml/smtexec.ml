@@ -200,10 +200,15 @@ struct
 
   end;;
 
-let parse_model s =
+let parse_model solver s =
+  dprintf "stdout: %s" s;
   try
     let lexbuf = Lexing.from_string s in
-    let solution = Stp_grammar.main Stp_lexer.token lexbuf in
+    let solution = match solver with
+      | "stp" -> Stp_grammar.main Stp_lexer.token lexbuf 
+      | "cvc3" -> Cvc3_grammar.main Cvc3_lexer.token lexbuf
+      | _ -> failwith "Unknown solver"
+    in
     Lexing.flush_input lexbuf;
     solution
   with _ ->
@@ -248,7 +253,7 @@ module STP_INFO =
 struct
   let timeout = 60
   let solvername = "stp"
-  let cmdstr f = "stp -t " ^ f
+  let cmdstr f = "stp -p " ^ f
   let parse_result stdout stderr pstatus =
     let failstat = match pstatus with
       | WEXITED(c) -> c > 0
@@ -263,7 +268,7 @@ struct
     if isvalid then
       Valid
     else if isinvalid then (
-      let m = parse_model stdout in
+      let m = parse_model solvername stdout in
       print_model m;
       Invalid
     ) else if fail then (
@@ -281,7 +286,7 @@ module CVC3_INFO =
 struct
   let timeout = 60
   let solvername = "cvc3"
-  let cmdstr f = "cvc3 " ^ f
+  let cmdstr f = "cvc3 +model " ^ f
   (* let parse_result stdout stderr pstatus = *)
   (*   let failstat = match pstatus with *)
   (*     | WEXITED(c) -> c > 0 *)
@@ -303,7 +308,29 @@ struct
   (*   ) *)
   (*   else *)
   (*     failwith "Something weird happened." *)
-  let parse_result = STP_INFO.parse_result
+  let parse_result stdout stderr pstatus =
+    let failstat = match pstatus with
+      | WEXITED(c) -> c > 0
+      | _ -> true
+    in
+    let fail = failstat || ExtString.String.exists stderr "Fatal" in
+    let isinvalid = ExtString.String.exists stdout "Invalid." in
+    let isvalid = ExtString.String.exists stdout "Valid." in
+    
+    (*       dprintf "fail: %b %b %b" fail isinvalid isvalid; *)
+    
+    if isvalid then
+      Valid
+    else if isinvalid then (
+      let m = parse_model solvername stdout in
+      print_model m;
+      Invalid
+    ) else if fail then (
+      dprintf "output: %s\nerror: %s" stdout stderr;  
+      SmtError
+    )
+    else
+      failwith "Something weird happened."
   let printer = ((new Stp.pp_oc) :> Formulap.fppf)
 end
 

@@ -22,9 +22,16 @@ module type SOLVER =
 sig
   val solve_formula_file : ?timeout:int -> string -> result (** Solve a formula in a file *)
   val check_exp_validity : ?timeout:int -> ?exists:(Ast.var list) -> ?foralls:(Ast.var list) -> Ast.exp -> result (** Check validity of an exp *)
+    (* XXX: check_exp_sat *)
+    (** Write a formula for weakest precondition.
+
+        XXX: Select weakest precondition method
+        XXX: Give this a better name
+    *)
   val create_cfg_formula :
-    ?exists:Ast.var list ->  ?foralls:Ast.var list -> ?remove:bool
-    -> Cfg.AST.G.t -> string
+    ?exists:Ast.var list ->  ?foralls:Ast.var list -> ?remove:bool -> Cfg.AST.G.t -> string
+    (* XXX: solve_wp *)
+    
   val si : smtexec
 end
 

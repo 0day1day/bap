@@ -347,10 +347,9 @@ object (self)
 
   method counterexample =
     (* force_newline(); *)
-    (* pp "QUERY(FALSE);"; *)
-    force_newline();
-    pp "COUNTEREXAMPLE;";
-    cls()
+    (* pp "COUNTEREXAMPLE;"; *)
+    (* cls() *)
+    ()
 
   method close =
     Format.pp_print_newline ft ();
