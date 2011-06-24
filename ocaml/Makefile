@@ -49,6 +49,7 @@ export SOURCES = \
 	grammar.mly lexer.mll \
 	stp_grammar.mly stp_lexer.mll \
 	cvc3_grammar.mly cvc3_lexer.mll \
+	yices_grammar.mly yices_lexer.mll \
 	parser.ml \
 	memory2array.ml \
 	gcl.mli gcl.ml \

@@ -5,7 +5,9 @@
 %token SEMICOLON
 %token LBRACKET RBRACKET
 %token EQUAL
+%token MODEL
 %token ASSERT
+%token DASHES
 %token INVALID
 %token VALID
 %token COMMA
@@ -18,25 +20,24 @@
 %%
 
 main:
-  /* The result comes before or after the assertions depending on version. */
-  assertions goodresult EOF { Some($1) }
-| goodresult assertions EOF { Some($2) }
+/* The result comes before or after the assertions depending on version. */
+  goodresult MODEL assertions DASHES EOF { Some($3) }
 | badresult EOF { None }
   ;
 
 assertions:
-    /* empty */ { [] }
-  | assertion SEMICOLON assertions { $1 :: $3 }
+  /* empty */ { [] }
+  | assertion assertions { $1 :: $2 }
   ;
 
 assertion:
-  ASSERT LBRACKET VAR EQUAL VAL RBRACKET { ($3, $5) }
+  LBRACKET EQUAL VAR VAL RBRACKET { ($3, $4) }
   ;
 
 goodresult:
-  INVALID PERIOD { }
+  INVALID { }
 ;
 
 badresult:
-  VALID PERIOD { }
+  VALID { }
 ;
