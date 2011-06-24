@@ -693,7 +693,7 @@ object (self)
     in
     let get_logic e =
       match has_mem e with
-      | true -> "QF_ABV"
+      | true -> "QF_AUFBV"
       | false -> "QF_BV"
     in
     pc '(';

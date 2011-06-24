@@ -15,7 +15,9 @@ open D
 
 open Unix
 
-type result = Valid | Invalid | SmtError | Timeout
+type model = (string*int64) list option
+
+type result = Valid | Invalid (*of model*) | SmtError | Timeout
 
 (** Class type to embed SMT execution functions.  If OCaml < 3.12 had
     first-class modules, we wouldn't need this. *)
@@ -198,6 +200,19 @@ struct
 
   end;;
 
+let parse_model s =
+  try
+    let lexbuf = Lexing.from_string s in
+    let solution = Stp_grammar.main Stp_lexer.token lexbuf in
+    Lexing.flush_input lexbuf;
+    solution
+  with _ ->
+    None
+
+let print_model = function
+  | Some(l) -> List.iter (fun (v,i) -> Printf.printf "%s -> %#Lx\n" v i) l
+  | None -> Printf.printf "No model found\n"
+
 module STPSMTLIB_INFO =
 struct
   let timeout = 60
@@ -247,9 +262,11 @@ struct
     
     if isvalid then
       Valid
-    else if isinvalid then
+    else if isinvalid then (
+      let m = parse_model stdout in
+      print_model m;
       Invalid
-    else if fail then (
+    ) else if fail then (
       dprintf "output: %s\nerror: %s" stdout stderr;  
       SmtError
     )
