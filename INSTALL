@@ -72,3 +72,11 @@ which can help you visualize how modules are related, e.g., run:
   $ dot -Tpdf bap.dot > bap.pdf
   $ xpdf bap.pdf
 
+
+
+*** Optional: Making unit tests ***
+Install oUnit libs:
+$ sudo apt-get install libounit-ocaml-dev
+
+Make and run tests
+$ make tests
