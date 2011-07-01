@@ -682,24 +682,61 @@ module ToStr = struct
   let rec prefs2str = function [] -> ""
     | x::xs -> pref2str x ^ " " ^ prefs2str xs
 
+	  (* XXX Clean up printing here *)
+  let oreg2str = function
+	| 0 -> "eax"
+	| 1 -> "ecx"
+	| 2 -> "edx"
+	| 3 -> "ebx"
+	| 4 -> "exp"
+	| 5 -> "ebp"
+	| 6 -> "esi"
+	| 7 -> "edi"
+	| v -> unimplemented (Printf.sprintf "Don't know what oreg %i is." v)
+
+
   let opr = function
-    | Oreg v -> unimplemented "rewrite this" (*Var.name v*)
+    | Oreg v -> oreg2str v	  
     | Oimm i -> Printf.sprintf "$0x%Lx" i
     | Oaddr a -> Pp.ast_exp_to_string a
 
   let op2str = function
     | Retn -> "ret"
     | Nop -> "nop"
-    | Mov(t, d,s) -> Printf.sprintf "mov %s, %s" (opr d) (opr s)
-    | Lea(r,a) -> Printf.sprintf "lea %s, %s" (opr r) (opr (Oaddr a))
+    | Mov(t,d,s) -> Printf.sprintf "mov %s, %s" (opr d) (opr s)
+	| Movs(t) -> "movs"
+	| Movzx(dt,dst,st,src) -> Printf.sprintf "movzx %s, %s" (opr dst) (opr src)
+	| Movsx(dt,dst,st,src) -> Printf.sprintf "movsx %s, %s" (opr dst) (opr src)
+	| Movdqa(d,s) -> Printf.sprintf "movdqa %s, %s" (opr d) (opr s)
+	| Lea(r,a) -> Printf.sprintf "lea %s, %s" (opr r) (opr (Oaddr a))
     | Call(a, ra) -> Printf.sprintf "call %s" (opr a)
     | Shift _ -> "shift"
     | Shiftd _ -> "shiftd"
     | Hlt -> "hlt"
-    | Inc (t, r) -> Printf.sprintf "inc %s" (opr r)
-    | Dec (t, r) -> Printf.sprintf "dec %s" (opr r)
-    | Jump a -> Printf.sprintf "jmp %s" (opr a)
-    | _ -> unimplemented "op2str"
+    | Inc (t, o) -> Printf.sprintf "inc %s" (opr o)
+    | Dec (t, o) -> Printf.sprintf "dec %s" (opr o)
+    | Jump a -> Printf.sprintf "jmp %s" (opr a)	
+	| Bt(t,d,s) -> Printf.sprintf "bt %s, %s" (opr d) (opr s)
+	| Jcc _ -> "jcc"
+	| Setcc _ -> "setcc"
+	| Cmps _ -> "cmps"
+	| Scas _ -> "scas"
+	| Stos _ -> "stos"
+	| Push(t,o) -> Printf.sprintf "push %s" (opr o)
+	| Pop(t,o) -> Printf.sprintf "pop %s" (opr o)
+	| Add(t,d,s) -> Printf.sprintf "add %s, %s" (opr d) (opr s)
+	| Sub(t,d,s) -> Printf.sprintf "sub %s, %s" (opr d) (opr s)
+	| Sbb(t,d,s) -> Printf.sprintf "sbb %s, %s" (opr d) (opr s)
+	| Cmp(t,d,s) -> Printf.sprintf "cmp %s, %s" (opr d) (opr s)
+	| And(t,d,s) -> Printf.sprintf "and %s, %s" (opr d) (opr s)
+	| Or(t,d,s) -> Printf.sprintf "or %s, %s" (opr d) (opr s)
+	| Xor(t,d,s) -> Printf.sprintf "xor %s, %s" (opr d) (opr s)
+	| Test(t,d,s) -> Printf.sprintf "test %s, %s" (opr d) (opr s)
+	| Not(t,o) -> Printf.sprintf "not %s" (opr o)
+	| Cld -> "cld"
+	| Leave _ -> "leave"
+	| Interrupt(o) -> Printf.sprintf "int %s" (opr o)
+    (*_ -> unimplemented "op2str"*)
 
   let to_string pref op =
     failwith "fallback to libdisasm"

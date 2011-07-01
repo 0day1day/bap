@@ -9,6 +9,7 @@ let test_input () = todo "test_input not implemented yet";;
 
 
 let suite = "IL OUnit test suite" >::: 
-  ["test_input_fails" >:: test_input_fails;
-   "test_input" >:: test_input;
+  [
+	"test_input_fails" >:: test_input_fails;
+	"test_input" >:: test_input;
   ]
