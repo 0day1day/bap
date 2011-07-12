@@ -1,10 +1,9 @@
 open OUnit
 
 let open_program_test _ = 
-  let p = Asmir.open_program "x86/nop" in
-  todo "Implement open_program test";;
+  ignore (Asmir.open_program ~loud:false "x86/nop");;
 
-let suite = "Asmir OUnit test suite" >:::
+let suite = "Asmir" >:::
   [
 	"open_program_test" >:: open_program_test;
   ]

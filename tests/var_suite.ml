@@ -8,13 +8,14 @@ let test_identity _ =
   assert_equal ~cmp:Var.equal ~msg:"var2 does not equal var2!" var2 var2;;
 
 let test_inequality2 _ = 
-  assert_bool ("var1 is equal to var2!") (not(Var.equal var1 var2));;
+  assert_bool "var1 is equal to var2!" (not(Var.equal var1 var2));;
 
-let suite = "Var oUnit test suite" >:::
+let suite = "Var" >:::
   [
 	"test_identity" >:: test_identity;
 	"test_inequality" >:: 
-	  (fun () -> if(Var.equal var1 var2) 
+	  (fun () -> 
+		if(Var.equal var1 var2) 
 		then
 		  assert_failure "var1 is equal to var2!"
 		else 

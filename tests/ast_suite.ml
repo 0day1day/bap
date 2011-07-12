@@ -11,7 +11,7 @@ let test_false_id _ =
   assert_bool s (not(Eval.is_false Ast.exp_true));;
 
 
-let suite = "Ast OUnit test suite" >::: 
+let suite = "Ast" >::: 
   [
 	"test_truth_id" >:: test_truth_id;
 	"test_false_id" >:: test_false_id;

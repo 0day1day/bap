@@ -22,6 +22,9 @@ SOURCES = \
 
 all: $(TARGETS)
 
+test: all
+	./$(RESULT)
+
 # XXX Use ocamlmake to clean up x86 executables?
 TRASH = x86/nop
 
