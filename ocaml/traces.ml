@@ -1003,7 +1003,7 @@ let run_block ?(next_label = None) state memv block =
   let executed = ref [] in
   let rec eval_block state stmt = 
     (* pwarn("XXXSW Executing: " ^ (Pp.ast_stmt_to_string stmt)); *)
-	pwarn ("XXXSW Current block is: " ^ (Pp.ast_stmt_to_string addr));
+    (* pwarn ("XXXSW Current block is: " ^ (Pp.ast_stmt_to_string addr)); *)
     (* pdebug ("Executing: " ^ (Pp.ast_stmt_to_string stmt)); *)
     (*    Hashtbl.iter (fun k v -> pdebug (Printf.sprintf "%Lx -> %s" k (Pp.ast_exp_to_string v))) concrete_mem ;*)
     let evalf e = match TraceConcrete.eval_expr state.delta e with

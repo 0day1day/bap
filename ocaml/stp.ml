@@ -343,10 +343,9 @@ object (self)
     self#assert_ast_exp_with_foralls [] e
 
   method counterexample =
-    (* force_newline(); *)
-    (* pp "COUNTEREXAMPLE;"; *)
-    (* cls() *)
-    ()
+    force_newline();
+    pp "COUNTEREXAMPLE;";
+    cls()
 
   method close =
     Format.pp_print_newline ft ();
