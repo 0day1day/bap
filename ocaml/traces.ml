@@ -683,7 +683,7 @@ let print_formula file formula =
   in
   (* let p = new Smtlib1.pp_oc oc in *)
   let () = p#assert_ast_exp_with_foralls foralls formula in
-  let () = p#counterexample () in
+  let () = p#counterexample in
     p#close
 
 module Status = Util.StatusPrinter
@@ -1003,6 +1003,7 @@ let run_block ?(next_label = None) state memv block =
   let executed = ref [] in
   let rec eval_block state stmt = 
     (* pwarn("XXXSW Executing: " ^ (Pp.ast_stmt_to_string stmt)); *)
+	pwarn ("XXXSW Current block is: " ^ (Pp.ast_stmt_to_string addr));
     (* pdebug ("Executing: " ^ (Pp.ast_stmt_to_string stmt)); *)
     (*    Hashtbl.iter (fun k v -> pdebug (Printf.sprintf "%Lx -> %s" k (Pp.ast_exp_to_string v))) concrete_mem ;*)
     let evalf e = match TraceConcrete.eval_expr state.delta e with
@@ -1042,21 +1043,47 @@ let run_block ?(next_label = None) state memv block =
 	  (* ) else 
 	  ((addr,false)::(info,false)::(List.tl !executed)) *)
       | UnknownLabel lab ->
-		(match next_label with
-		  | Some(l) ->
-			(match lab with
-				Name s -> ()
-			  | Addr x -> 
-				if (x <> l) then 
-				  let s = 
-					Printf.sprintf "Unknown label address (0x%Lx) does not equal the next label (0x%Lx)" x l in
-				  pwarn (s ^ "\nCurrent block is: " ^ (Pp.ast_stmt_to_string addr))
-			);
-		  | None -> ());
+		if (!checkall) then
+		  (match next_label with
+			| Some(l) ->
+			  (match lab with
+				  Name s -> ()
+				| Addr x -> 
+				  if (x <> l) then 
+					let s = 
+					  Printf.sprintf "Unknown label address (0x%Lx) does not equal the next label (0x%Lx)" x l in
+					pwarn (s ^ "\nCurrent block is: " ^ (Pp.ast_stmt_to_string addr))
+			  );
+			| None -> ());
+
 	  (addr::info::List.rev (!executed)) 
-      | Halted _ -> 
-		(* XXXSW use addr to reverse lookup label in lambda *)
-		(* XXXSW compare this to next_label and warn if not equal *)
+      | Halted (_,ctx)-> 
+		if (!checkall) then
+		  (match next_label with
+			(* XXXSW use pc(?) to reverse lookup label in lambda *)
+			(* XXXSW compare this to next_label and warn if not equal *)
+			| Some(l) -> 
+			  let f hash_label hash_addr = 
+				pwarn ("XXXSW Halt label = " ^ (Pp.label_to_string hash_label));
+				pwarn (Printf.sprintf "XXXSW Halt addr = 0x%Lx" hash_addr);
+				
+			  in
+			  let s sigma_addr sigma_stmt =
+				pwarn ("XXXSW Sigma stmt = " ^ (Pp.ast_stmt_to_string sigma_stmt));
+				pwarn (Printf.sprintf "XXXSW Sigma addr = 0x%Lx" sigma_addr);
+			  in
+			  pwarn ("Current block is: " ^ (Pp.ast_stmt_to_string addr));
+			  pwarn (Printf.sprintf "XXXSW Halt pc = 0x%Lx" state.pc);
+			  pwarn (Printf.sprintf "XXXSW Halt next_label = 0x%Lx" l);
+
+			  (* label_decode state.lambda next_label *)
+			  Hashtbl.iter f state.lambda;
+			  Hashtbl.iter s state.sigma;
+			  pwarn ("XXXSW Context from Halted");
+			  Hashtbl.iter f ctx.lambda;
+			  Hashtbl.iter s ctx.sigma;
+			  
+			| None -> ());
 	  (addr::info::List.rev (List.tl !executed))
 
 let run_blocks blocks memv length =
@@ -1254,6 +1281,9 @@ let formula_size formula =
   let _max n1 n2 = if n1 > n2 then n1 else n2 in
   let (+) = Int64.add in
   let rec size = function
+    | Ast.Ite(_,e1,e2) -> Int64.one + (size e1) + (size e2)
+    | Ast.Extract(_,_,e) -> Int64.one + (size e)
+    | Ast.Concat(el,er) -> Int64.one + (size el) + (size er)
     | Ast.BinOp(_,e1,e2) -> Int64.one + (size e1) + (size e2)
     | Ast.UnOp(_,e) -> Int64.one + size e
     | Ast.Var _ -> Int64.one

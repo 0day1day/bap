@@ -24,6 +24,8 @@ let is_integer_type = function
   | Reg _ -> true
   | TMem _ | Array _ -> false
 
+let is_mem_type t = not (is_integer_type t)
+
 let bits_of_width = function
   | Reg n -> n
   | _ -> invalid_arg "bits_of_width"
@@ -38,13 +40,50 @@ let rec infer_ast ?(check=true) = function
       (* FIXME: Check context *)
       Var.typ v
   | UnOp(_, e) ->
-      infer_ast ~check e
-  | BinOp(o, e1,e2) ->
-      (* FIXME: checking *)
+      if check then 
+	(let t = infer_ast ~check e in
+	check_reg t);
+      infer_ast ~check:false e;
+  | BinOp(o,e1,e2) as e ->
+      if check then (
+	let t1 = infer_ast ~check e1
+	and t2 = infer_ast ~check e2 in
+	check_same t1 t2 ~e; 
+	check_reg t1);
       (match o with
        | EQ | NEQ | LT | LE | SLT | SLE -> reg_1
-       | _ -> infer_ast e1
+       | _ -> infer_ast ~check:false e1
       )
+  | Ite(b,e1,e2) ->
+      if check then 
+	(let t1 = infer_ast ~check e1
+	 and t2 = infer_ast ~check e2 in
+	 Printf.printf "ite\n";
+	 check_same t1 t2);
+      infer_ast ~check:false e1 
+  | Extract(h,l,e) ->
+      let (-) = Int64.sub in
+      let (+) = Int64.add in
+      let ns = Int64.to_int(h-l+1L) in
+      let nt = Reg ns in
+      if check then (
+	match infer_ast ~check:true e with
+	| Reg(oldn) ->
+	    if (ns <= 0) then terror("Extract must extract at least one bit");
+	    if l < 0L then terror("Lower bit index must be at least 0");
+	    if h > (Int64.of_int oldn)-1L then terror("Upper bit index must be at most one less than the size of the original register")
+	      
+	| _ -> terror ("Extract expects Reg type")	
+      );
+      nt
+  | Concat(le, re) ->
+      let lt, rt = infer_ast ~check le, infer_ast ~check re in
+      let nt = match lt, rt with
+	| Reg(lb), Reg(rb) ->
+	    Reg(lb+rb)
+	| _ -> terror "Concat expects Reg type"
+      in
+      nt
   | Lab s ->
       (* FIXME: no type for labels yet *)
       reg_64
@@ -68,6 +107,14 @@ let rec infer_ast ?(check=true) = function
       );
       infer_ast ~check:false arr
 
+and check_same ?e t1 t2 =
+  if t1 <> t2 then
+    let es = match e with | Some(e) -> ("\nProblem expression: "^(Pp.ast_exp_to_string e)) | None -> "" in
+    terror ("Similar types expected: "^(Pp.typ_to_string t1)^" <> "^(Pp.typ_to_string t2)^es)
+
+and check_reg t =
+  if not (is_integer_type t) then
+    terror "Expected integer type"
 
 and check_idx arr idx endian t =
   let ta = infer_ast arr

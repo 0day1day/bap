@@ -441,10 +441,10 @@ let section_contents prog secs =
   let bits = List.fold_left sc [] secs in
   let get a =
     (* let open Int64 in *)
-    let (-) = Int64.sub and (+) = Int64.add in
+    let (-) = Int64.sub in
     let rec f a = function [] -> raise Not_found
-      | (s,arr)::_ when a - s >= 0L && a - s < s + Int64.of_int(BArray.dim arr)  ->
-	arr.{Int64.to_int(a-s)}
+      | (s,arr)::_ when a - s >= 0L && a - s < Int64.of_int(BArray.dim arr)  ->
+	  arr.{Int64.to_int(a-s)}
       | _::b -> f a b
     in
     f a bits
@@ -477,11 +477,11 @@ let check_equivalence a (ir1, next1) (ir2, next2) =
     let wp1 = to_wp ir1
     and wp2 = to_wp ir2 in
     let e = BinOp(EQ, wp1, wp2) in
-    match Stpexec.CVC3.solve_formula_exp e with
-    | Stpexec.Valid -> ()
-    | Stpexec.Invalid -> wprintf "formulas for %Lx (%s aka %s) not equivalent" a (get_asm ir1) (get_asm ir2)
-    | Stpexec.StpError -> failwith "StpError"
-    | Stpexec.Timeout -> failwith "Timeout"
+    match Smtexec.CVC3.check_exp_validity e with
+    | Smtexec.Valid -> ()
+    | Smtexec.Invalid -> wprintf "formulas for %Lx (%s aka %s) not equivalent" a (get_asm ir1) (get_asm ir2)
+    | Smtexec.SmtError -> failwith "SmtError"
+    | Smtexec.Timeout -> failwith "Timeout"
   with Failure s
   | Invalid_argument s ->
     (match get_asm ir1 with (* Don't warn for known instructions *)

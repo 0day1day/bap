@@ -7,7 +7,12 @@ open Type
 module VH = Var.VarHash
 module F = Format
 
+module D = Debug.Make(struct let name = "pp" and default=`Debug end)
+open D
+
 let output_varnums = ref true
+
+let many_parens = ref false
 
 let rec typ_to_string = function
   | Reg 1 -> "bool"
@@ -40,7 +45,7 @@ let binop_to_string = function
   | AND -> "&"
   | OR -> "|"
   | XOR -> "^"
-  | EQ -> "="
+  | EQ -> "=="
   | NEQ -> "<>"
   | LT -> "<"
   | LE -> "<="
@@ -125,38 +130,47 @@ object (self)
     | Addr x -> printf "addr 0x%Lx" x
 
   method int i t =
-    match (Arithmetic.tos64 (i,t), t) with
+    let (is, i) = try Arithmetic.tos64 (i,t), Arithmetic.to64 (i,t) 
+    with Arithmetic.ArithmeticEx _ ->
+      (* tos won't work for registers >= 64.  But, constants of such
+	 type don't need to have their bits set to zero, anyway. *)
+      (match t with Reg n when n >= 64 -> (i, i) | _ -> failwith "Unable to remove high-order bits while printing int")
+    in
+    match (is, t) with
     | (0L, Reg 1) -> pp "false"
     | (-1L, Reg 1) -> pp "true"
-    | (i,t) ->
-      if i < 10L && i > -10L
-      then pp (Int64.to_string i)
-      else printf "0x%Lx" (Int64.logand i (Int64.pred (Int64.shift_left 1L (Arithmetic.bits_of_width t))));
-      pp ":"; self#typ t
+    | _ ->
+	if is < 10L && is > -10L
+	then pp (Int64.to_string i)
+	else printf "0x%Lx" i;
+	pp ":"; self#typ t
 
 
   (* prec tells us how much parenthization we need. 0 means it doesn't need
      to be parenthesized. Larger numbers means it has higher precedence.
      Maximum prec before paretheses are added are as follows:
-	  5 Let
-         10 Store
-	 20 OR
-	 30 XOR
-	 40 AND
-	 50 EQ NEQ
-	 60 LT SLT SLE LE
-	 70 LSHIFT RSHIFT ARSHIFT
-	 80 PLUS MINUS
-	 90 TIMES DIVIDE SDIVIDE MOD SMOD
-	 100 UMINUS NOT
-         110 Get
+     5 Let
+     7 Ite
+     10 Store
+     12 Concat
+     15 Extract
+     20 OR
+     30 XOR
+     40 AND
+     50 EQ NEQ
+     60 LT SLT SLE LE
+     70 LSHIFT RSHIFT ARSHIFT
+     80 PLUS MINUS
+     90 TIMES DIVIDE SDIVIDE MOD SMOD
+     100 UMINUS NOT
+     110 Get
      Because we don't distinguish precedence to the right or left, we will
      always overparethesise expressions such as:
      let x = y in x + let x = 2:reg32_t in x
   *)
   method ast_exp ?(prec=0) e =
-    let lparen bind = if bind < prec then pp "("
-    and rparen bind = if bind < prec then pp ")"
+    let lparen bind = if !many_parens || bind < prec then pp "("
+    and rparen bind = if !many_parens || bind < prec then pp ")"
     and binop_prec = function
       | OR -> 20
       | XOR -> 30
@@ -186,6 +200,36 @@ object (self)
 	 pp " ="; space();
 	 self#ast_exp ~prec:10 vl;
 	 rparen 10;
+     | Ast.Ite(c,x,y) ->
+	 lparen 7;
+	 pp "if";
+	 space ();
+	 self#ast_exp ~prec:7 c;
+	 space ();
+	 pp "then";
+	 space ();
+	 self#ast_exp ~prec:7 x;
+	 space ();
+	 pp "else";
+	 space ();
+	 self#ast_exp ~prec:7 y;	 
+	 rparen 7
+     | Ast.Extract(h, l, e) ->
+	 pp "extract:";
+	 pp (Int64.to_string h);
+	 pc ':';
+	 pp (Int64.to_string l);
+	 pc ':';
+	 pc '[';
+	 self#ast_exp e;
+	 pc ']';
+     | Ast.Concat(le, re) ->
+	 pp "concat:";
+	 pc '[';
+	 self#ast_exp le;
+	 pp "][";
+	 self#ast_exp re;
+	 pc ']'
      | Ast.BinOp(b,x,y) ->
 	 let p = binop_prec b in
 	 lparen p;
@@ -212,10 +256,10 @@ object (self)
 	 lparen 5;
 	 pp "let "; self#var v; pp " :=";
 	 opn 2; space();
-	 self#ast_exp e1; space(); 
+	 self#ast_exp ~prec:5 e1; space(); 
 	 cls();
 	 pp "in"; space();
-	 self#ast_exp e2;
+	 self#ast_exp ~prec:5 e2;
 	 rparen 5
      | Ast.Unknown(s,t) ->
 	 pp "unknown \""; pp s; pp "\":"; self#typ t
@@ -307,6 +351,32 @@ object (self)
 	 pp "]:"; self#typ t;
 	 pp " ="; space();
 	 self#ssa_value vl
+     | Ssa.Ite(c, x, y) ->
+	 pp "if";
+	 space ();
+	 self#ssa_value c;
+	 space ();
+	 pp "then";
+	 space ();
+	 self#ssa_value x;
+	 space ();
+	 pp "else";
+	 space ();
+	 self#ssa_value y	 
+     | Ssa.Extract(h, l, e) ->
+	 pp "extract:";
+	 pp (Int64.to_string h);
+	 pc ':';
+	 pp (Int64.to_string l);
+	 pp ":[";
+	 self#ssa_value e;
+	 pc ']';
+     | Ssa.Concat(lv, rv) ->
+	 pp "concat:[";
+	 self#ssa_value lv;
+	 pp "][";
+	 self#ssa_value rv;
+	 pc ']'
      | Ssa.BinOp(b, x, y) ->
 	 self#ssa_value x;
 	 pp " "; pp (binop_to_string b); space();

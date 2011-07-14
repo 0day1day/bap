@@ -35,6 +35,7 @@
 open Type
 open Ssa
 open ExtList
+open Arithmetic
 
 module VH = Var.VarHash
 module C = Cfg.SSA
@@ -50,6 +51,9 @@ type vn = Top | Hash of Ssa.var | HInt of (int64 * typ)
 let top = Top
 type expid = 
   | Const of Ssa.value (* Except Var *)
+  | It of vn * vn * vn
+  | Ex of int64 * int64 * vn
+  | Con of vn * vn
   | Bin of binop_type * vn * vn
   | Un of unop_type * vn
   | Cst of cast_type * typ * vn
@@ -153,6 +157,9 @@ let get_expid info =
     | Val(Var _ as v) ->
 	vn2eid info (vn v) 
     | Val v -> Const v
+    | Ite(c,v1,v2) -> It(vn c, vn v1, vn v2)
+    | Extract(h,l,e) -> Ex(h,l, vn e)
+    | Concat(le,re) -> Con(vn le, vn re)
     | BinOp((PLUS|TIMES|AND|OR|XOR|EQ|NEQ) as op,v1,v2) ->
 	let (h1,h2) = (vn v1, vn v2) in
 	if h1 <= h2 then Bin(op, h1, h2) else Bin(op, h2, h1)
@@ -176,11 +183,34 @@ let opt_expid info var exp =
   match eid with
   (* constant folding *)
   | Bin(op, HInt v1, HInt v2) ->
-      toconst (Arithmetic.binop op v1 v2)
+      (* Arithmetic can fail when regs are too big. We catch it here
+	 and don't simplify.  This is kind of a hack. *)      
+      (try
+	toconst (Arithmetic.binop op v1 v2)
+      with ArithmeticEx _ -> eid)
   | Un(op, HInt v) ->
-      toconst (Arithmetic.unop op v)
+      (try
+	 toconst (Arithmetic.unop op v)
+       with ArithmeticEx _ -> eid)
   | Cst(ct, t, HInt v) ->
-      toconst (Arithmetic.cast ct v t)
+      (try
+	 toconst (Arithmetic.cast ct v t)
+       with ArithmeticEx _ -> eid)
+  | It(HInt(1L,t), x, _) ->
+      sameas x
+  | It(HInt(0L,t), _, y) ->
+      sameas y
+  | It(b, x, y) when x = y ->
+      sameas x
+  (* XXX: Extract(Shift) optimizations *)
+  | Ex(h, l, HInt v) ->
+      (try
+	 toconst (Arithmetic.extract h l v)
+       with ArithmeticEx _ -> eid)
+  | Con(HInt lv, HInt rv) ->
+      (try
+	 toconst (Arithmetic.concat lv rv)
+       with ArithmeticEx _ -> eid)
   (* phis can be constant*)
   | Ph(x::xs) as eid -> (
       match
@@ -224,6 +254,8 @@ let opt_expid info var exp =
 	(* TODO: add SLT and SLE. Requires canonicalized ints *)
   | Bin(EQ, x, (HInt(1L,t))) when t = (Reg 1) ->
       sameas x
+  (* | Bin(EQ, x, (HInt(0L,t))) when t = (Reg 1) -> *)
+  (*     (Un(NOT, x)) *)
   | x -> x
 
 (* simplifications in bap_opt which we don't (yet) do here:

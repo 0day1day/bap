@@ -62,11 +62,20 @@ let type_of_exp = function
     -> t
   | BinOp((EQ|NEQ|LT|LE|SLT|SLE),_,_)
     -> Ast.reg_1
+  | Ite(_,v,_)
   | BinOp(_,v,_)
   | Store(v,_,_,_,_)
   | UnOp(_,v)
   | Val v
     -> type_of_value v
+  | Extract(h, l, v) ->
+      let n = Int64.succ (Int64.sub h l) in
+      assert(n >= 1L);
+      Reg(Int64.to_int n)
+  | Concat(lv, rv) ->
+      (match type_of_value lv, type_of_value rv with
+      | Reg(lt), Reg(rt) -> Reg(lt + rt)
+      | _ -> failwith "type_of_exp")
   | Phi(x::_)
     -> Var.typ x
   | Phi []
@@ -82,6 +91,18 @@ let ssa_temp_name = "temp"
    the Ast expression *)
 let rec exp2ssaexp (ctx:Ctx.t) ~(revstmts:stmt list) ?(attrs=[]) e : stmt list * exp =
   match e with 
+  | Ast.Ite(b, e1, e2) ->
+      let (revstmts, vb) = exp2ssa ctx revstmts b in
+      let (revstmts, v1) = exp2ssa ctx revstmts e1 in
+      let (revstmts, v2) = exp2ssa ctx revstmts e2 in
+      (revstmts, Ite(vb, v1, v2))
+  | Ast.Extract(h, l, e) ->
+      let (revstmts, ve) = exp2ssa ctx revstmts e in
+      (revstmts, Extract(h, l, ve))
+  | Ast.Concat(le, re) ->
+      let (revstmts, lv) = exp2ssa ctx revstmts le in
+      let (revstmts, rv) = exp2ssa ctx revstmts re in
+      (revstmts, Concat(lv, rv))
   | Ast.BinOp(op, e1, e2) -> 
       let (revstmts, v1) = exp2ssa ctx revstmts e1 in
       let (revstmts, v2) = exp2ssa ctx revstmts e2 in
@@ -378,6 +399,9 @@ let uninitialized cfg =
     and f_e = function
       | Load(v1,v2,v3,_) -> f_v v1; f_v v2; f_v v3
       | Store(v1,v2,v3,v4,_) -> f_v v1; f_v v2; f_v v3; f_v v4
+      | Ite(cond,v1,v2) -> f_v cond; f_v v1; f_v v2
+      | Extract(_,_,v) -> f_v v
+      | Concat(lv,rv) -> f_v lv; f_v rv
       | BinOp(_,v1,v2) -> f_v v1; f_v v2
       | UnOp(_,v)
       | Cast(_,_,v)
@@ -597,6 +621,9 @@ let rec value2ast tm = function
 and exp2ast tm =
   let v2a = value2ast tm in
   function
+    | Ite(c,v1,v2) -> Ast.Ite(v2a c, v2a v1, v2a v2)
+    | Extract(h,l,v) -> Ast.Extract(h, l, v2a v)
+    | Concat(lv,rv) -> Ast.Concat(v2a lv, v2a rv)
     | BinOp(bo,v1,v2) -> Ast.BinOp(bo, v2a v1, v2a v2)
     | UnOp(uo, v) -> Ast.UnOp(uo, v2a v)
     | Val v -> v2a v

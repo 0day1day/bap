@@ -1,5 +1,5 @@
 {
-  open Stp_grammar
+  open Yices_grammar
   (* TODO: add support for memories *)
 }
 
@@ -14,9 +14,11 @@ rule token = parse
   | ';'              { SEMICOLON }
   | '('              { LBRACKET }
   | ')'              { RBRACKET }
+  | "----"           { DASHES }
+  | "MODEL"          { MODEL }
   | "ASSERT"         { ASSERT }
-  | "Invalid"        { INVALID }
-  | "Valid"          { VALID }
+  | "sat"            { INVALID }
+  | "unsat"          { VALID }
   | "0hex"           { read_num lexbuf }
   | "0x"             { read_num lexbuf }
   | "0b"             { read_num lexbuf }
@@ -25,6 +27,6 @@ rule token = parse
   | _                { token lexbuf }
 
 and read_num = parse
-  | digit+ as n      { VAL(Int64.of_string ("0x"^n)) }
+  | digit+ as n      { VAL(Int64.of_string ("0b"^n)) }
   | _                { token lexbuf }
 

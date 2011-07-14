@@ -1,10 +1,13 @@
-(** Output to SMTLIB1 format *)
+(** Output to SMTLIB2 format 
+
+    @author ejs
+*)
 open Type
 open Ast
 open Ast_convenience
 open Typecheck
 
-module D = Debug.Make(struct let name = "smtlib1" and default=`Debug end)
+module D = Debug.Make(struct let name = "smtlib2" and default=`Debug end)
 open D
 
 exception No_rule
@@ -135,14 +138,14 @@ object (self)
        raise No_rule. So, we don't need to evaluate them before the lazy
        block. *)
     lazy(
-      pp "("; pp cmd; pp " (";
+      pp "("; pp cmd; pp " ((";
       (* v isn't allowed to shadow anything. also, smtlib requires it be prefixed with ? or $ *)
       let s = c ^ var2s v ^"_"^ string_of_int let_counter in
       let_counter <- succ let_counter;
       pp s;
       pc ' ';
       pf e1;
-      pc ')';
+      pp "))";
       space ();
       self#extend v s vst;
       pf2 e2;
@@ -168,10 +171,10 @@ object (self)
     force_newline()
        
   method typ = function
-    | Reg n ->	printf "BitVec[%u]" n
-    | Array(Reg idx, Reg elmt) -> printf "Array[%u:%u] " idx elmt;
-    | Array _ -> failwith "SMTLIB1 only supports Arrays with register indices and elements"
-    | TMem _ ->	failwith "TMem unsupported by SMTLIB1"
+    | Reg n ->	printf "(_ BitVec %d)" n
+    | Array(Reg idx, Reg elmt) -> printf "(Array %u %u)" idx elmt;
+    | Array _ -> failwith "SMTLIB2 only supports Arrays with register indices and elements"
+    | TMem _ ->	failwith "TMem unsupported by SMTLIB2"
 
   method decl (Var.V(_,_,t) as v) =
     let sort = match t with
@@ -179,7 +182,7 @@ object (self)
       | _ -> BitVec
     in
     self#extend v (var2s v) sort;
-    pp ":extrafuns (("; self#var v; space (); self#typ t; pp "))"; force_newline();
+    pp "(declare-fun "; self#var v; space (); pp "()"; space (); self#typ t; pp ")"; force_newline();
 
   (** Prints the BAP expression e in SMTLIB format.  If e is a
       1-bit bitvector in BAP, then e is printed as a SMTLIB 1-bit
@@ -200,7 +203,7 @@ object (self)
 		if t >= 64 then i else failwith "Unable to set high bits to zero")	   
 	    in
 	 lazy (
-	   pp "bv"; printf "%Lu" maskedval; pp "["; pi t; pp "]";
+	   pp "(_ bv"; printf "%Lu " maskedval; pi t; pc ')'
 	 )
      | Int _ -> failwith "Ints may only have register types"
      | Var v ->
@@ -693,26 +696,18 @@ object (self)
     in
     let get_logic e =
       match has_mem e with
-      | true -> "QF_AUFBV"
+      | true -> "QF_ABV"
       | false -> "QF_BV"
     in
-    pc '(';
-    opn 0;
-    pp "benchmark file.smt";
+    pp ("(set-logic "^(get_logic e)); pc ')';
     force_newline();
-    pp ":status unknown";
+    pp "(set-info :smt-lib-version 2.0)";
     force_newline();
-    pp ":source { Source Unknown }";
-    force_newline();
-    pp ":difficulty { Unknown }";
-    force_newline();
-    pp ":category { Unknown }";
-    force_newline();
-    pp (":logic "^(get_logic e));
+    pp "(set-option :produce-assignments true)";
     force_newline()
 
   method close_benchmark () =
-    pc ')'; cls()
+    ()
 
   (* method assert_eq v e = *)
   (*   opn 0; *)
@@ -732,11 +727,12 @@ object (self)
       force_newline();
     );
     opn 1;
-    pp ":assumption";
+    pp "(assert ";
     space();
     self#forall foralls;
     self#ast_exp_bool e;
     cut();
+    pc ')';
     cls();
     force_newline ();
     self#formula ();
@@ -750,11 +746,12 @@ object (self)
     self#open_benchmark e;
     self#declare_new_freevars e;
     force_newline();
-    pp ":formula (";
+    pp "assert (";
     self#exists exists;
     self#forall foralls;
-    self#ast_exp_bool e;
+    self#ast_exp_bool (UnOp(NOT, e));
     pp ");";
+    self#formula ();
     self#close_benchmark ()
 
   (* (\** Is e a valid expression (always true)? *\) *)
@@ -774,8 +771,9 @@ object (self)
 
 
   method formula () =
-    pp ":formula true";
+    pp "(check-sat)";
     force_newline();
+    pp "(get-assignment)"
 
   method counterexample = ()
 
