@@ -6,13 +6,13 @@ trace analysis tasks.
 
 \subsection{Setup}
 
-The PIN trace tool is located in the \cmdline{experimental/}
+The PIN trace tool is located in the \cmdline{pintraces/}
 directory.  Because of licensing reasons, we cannot distribute PIN
 with the trace tool.  PIN must be extracted inside of the traces
 directory; for instance, if the traces branch is located in
 \cmdline{\$PATH/traces}, then PIN should be in
 \cmdline{\$PATH/traces/pin}.  Running ./getpin.sh from the
-\cmdline{\$PATH/traces/experimental} directory will automatically
+\cmdline{\$PATH/traces/pintraces} directory will automatically
 download and install PIN for Linux; the user is responsible for
 accepting the PIN license agreements.  On Windows, PIN must be
 downloaded and extracted by hand.  The PIN tool can be built by
@@ -22,7 +22,7 @@ directory.  On Windows, we reccomend using GNU Make for Windows
 C++ 2010 express
 (\url{http://www.microsoft.com/visualstudio/en-us/products/2010-editions/visual-cpp-express)}.
 After compilation, the PIN tool should exist in
-\cmdline{\$PATH/traces/experimental/obj-ia32/gentrace.so} (or
+\cmdline{\$PATH/traces/pintraces/obj-ia32/gentrace.so} (or
 gentrace.dll on Windows).  In the rest of the chapter, we will assume
 Linux is being used; most interaction with the trace tool is the same.
 
@@ -30,7 +30,7 @@ Linux is being used; most interaction with the trace tool is the same.
 
 To see the command line options to the trace tool, execute
 \cmdline{\$PATH/traces/pin/pin -t
-  \$PATH/traces/experimental/obj-ia32/gentrace.so -h -- /bin/ls}.  By
+  \$PATH/traces/pintraces/obj-ia32/gentrace.so -h -- /bin/ls}.  By
 default, the trace tool will only log instructions that are
 \emph{tainted}, i.e., those that depend on user input.  The options
 that begin with taint are used to mark various data
@@ -40,8 +40,8 @@ readme as being user input.
 We will record a trace of a simple buffer overflow.  Run \cmdline{echo
   ``helloooooooooooooooooo'' > readme} to create the input file.  Then
 run \cmdline{\$PATH/traces/pin/pin -t
-  \$PATH/traces/experimental/obj-ia32/gentrace.so -taint-files readme
-  \$PATH/traces/experimental/examples/bof1}.  The PIN tool will output
+  \$PATH/traces/pintraces/obj-ia32/gentrace.so -taint-files readme
+  \$PATH/traces/pintraces/examples/bof1}.  The PIN tool will output
 many debugging messages; this is normal.  If the trace tool detected
 the buffer overflow, it will print ``stack smashing detected'' near
 the end of the logs.  At this point, there should be a trace file
