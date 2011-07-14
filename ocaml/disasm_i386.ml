@@ -751,6 +751,7 @@ module ToStr = struct
 	| And(t,d,s) -> Printf.sprintf "and %s, %s" (opr d) (opr s)
 	| Or(t,d,s) -> Printf.sprintf "or %s, %s" (opr d) (opr s)
 	| Xor(t,d,s) -> Printf.sprintf "xor %s, %s" (opr d) (opr s)
+	| Pxor(d,s)  -> Printf.sprintf "pxor %s, %s" (opr d) (opr s)
 	| Test(t,d,s) -> Printf.sprintf "test %s, %s" (opr d) (opr s)
 	| Not(t,o) -> Printf.sprintf "not %s" (opr o)
 	| Cld -> "cld"
