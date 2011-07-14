@@ -76,6 +76,7 @@ type opcode =
   | And of (typ * operand * operand)
   | Or of (typ * operand * operand)
   | Xor of (typ * operand * operand)
+  | Pxor of operand * operand    (* jed *)
   | Test of typ * operand * operand
   | Not of typ * operand
   | Cld
@@ -446,6 +447,25 @@ let rec to_ir addr next ss pref =
     @ [d0;d1;]
 
   )
+  | Pxor (d,s) ->(   (* jed *)
+    let zero = Int(0L,r4) and eight = Int(8L, r4) in
+    let (s0, s1, a1) = match s with
+      | Oreg i -> let r = bits2xmm i in
+        (loadm r r64 zero, loadm r r64 eight, [])
+      | Oaddr a -> (load r64 a, load r64 (a +* Int(8L, addr_t)), [a])
+      | Oimm _ -> failwith "pxor does not take immediate operands"
+    in
+    let (d0, d1, a2) = match d with
+      | Oreg i -> (
+          let r = bits2xmm i in
+          let (db0, db1) = (loadm r r64 zero, loadm r r64 eight) in
+          (storem r r64 zero (s0 ^* db0), storem r r64 eight (s1 ^* db1), []))
+      | Oaddr a -> (
+          let (db0, db1) = (load r64 a, load r64 (a +* Int(8L, addr_t))) in
+          (store r64 a (s0 ^* db0), store r64 (a +* Int(8L, addr_t)) (s1 ^* db1), [a]))
+      | Oimm _ -> failwith "pxor does not take immediate operands"
+    in
+      [d0;d1] )
   | Lea(r, a) when pref = [] ->
     [assn r32 r a]
   | Call(o1, ra) when pref = [] ->
@@ -1096,6 +1116,9 @@ let parse_instr g addr =
       | 0xbf -> let st = if b2 = 0xbe then r8 else r16 in
 		let r, rm, na = parse_modrm32 na in
 		(Movsx(opsize, r, st, rm), na)
+      | 0xef when pref = [0x66] -> 
+		let d, s, na = parse_modrm32 na in 
+        (Pxor(d,s), na) (* jed *)
       | _ -> unimplemented (Printf.sprintf "unsupported opcode: %02x %02x" b1 b2)
     )
     | n -> unimplemented (Printf.sprintf "unsupported opcode: %02x" n)

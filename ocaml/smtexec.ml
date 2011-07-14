@@ -88,8 +88,8 @@ let syscall cmd =
      let wait = ref true in
      let estatus = ref None in
      let buf = String.create 1 in
-     while !wait do    
-       
+     while !wait do
+
        (* Read any new data from stdout/stderr *)
        let rd timeout  =
 	 let rl,_,_ = select fdlist [] fdlist timeout in
@@ -112,17 +112,17 @@ let syscall cmd =
 
        (* Do a read *)
        rd select_timeout;
-       
+
        (* Check if the process is dead yet *)
        let pid',estatus' = waitpid [WNOHANG] pid in
        if pid' = pid then begin
 	 wait := false;
 	 estatus := Some(estatus')
        end;
-       
+
        (* Do another read, in case the process died *)
        rd 0.0;
-       
+
      done;
      close stdoutread;
      close stderrread;
@@ -131,7 +131,7 @@ let syscall cmd =
      close stdoutread;
      close stderrread;
      raise (Alarm_signal pid) )
- 
+
 let result_to_string result =
   match result with
   | Valid -> "Valid"
@@ -144,19 +144,19 @@ struct
   (** Write given formula out to random filename and return the filename *)
     let write_formula ?(exists=[]) ?(foralls=[]) ?(remove=true) f  =
       let name, oc = Filename.open_temp_file ("formula" ^ (string_of_int (getpid ())))  ".stp" in
-      at_exit (fun () -> 
+      at_exit (fun () ->
 	         if remove then
-		   try 
+		   try
 		     Unix.unlink name
 		   with _ -> ());
-      dprintf "Using temporary file %s" name;  
+      dprintf "Using temporary file %s" name;
       let pp = S.printer oc in
       pp#valid_ast_exp ~exists:exists ~foralls:foralls f;
       pp#flush;
       (*     output_string oc "QUERY(FALSE); COUNTEREXAMPLE;\n"; *)
       pp#close;
       name
-        
+
     (** Write formula for AST CFG out to random filename and return the filename *)
     let create_cfg_formula ?(exists=[]) ?(foralls=[]) ?remove p  =
       let p = Prune_unreachable.prune_unreachable_ast p in
@@ -167,7 +167,7 @@ struct
       let foralls = List.map (Ast_visitor.rvar_accept m2a) foralls in
       (* FIXME: same for exists? *)
       write_formula ~exists ~foralls ?remove wp
-        
+
     let solve_formula_file ?(timeout=S.timeout) file =
       ignore(alarm timeout);
       let cmdline = S.cmdstr file in
@@ -175,10 +175,10 @@ struct
       try
         dprintf "Executing: %s" cmdline;
 	let sout,serr,pstatus = syscall cmdline in
-	
+
 	(* Turn the alarm off *)
 	ignore(alarm 0);
-        
+
         dprintf "Parsing result...";
 	S.parse_result sout serr pstatus
 
@@ -201,60 +201,30 @@ struct
   end;;
 
 let parse_model solver s =
-  dprintf "stdout: %s" s;
+  dprintf "solver: %s stdout: %s" solver s;
   try
     let lexbuf = Lexing.from_string s in
     let solution = match solver with
-      | "stp" -> Stp_grammar.main Stp_lexer.token lexbuf 
+      | "stp" -> Stp_grammar.main Stp_lexer.token lexbuf
       | "cvc3" -> Cvc3_grammar.main Cvc3_lexer.token lexbuf
+      | "yices" -> Yices_grammar.main Yices_lexer.token lexbuf
       | _ -> failwith "Unknown solver"
     in
     Lexing.flush_input lexbuf;
     solution
-  with _ ->
+  with Parsing.Parse_error ->
     None
 
 let print_model = function
-  | Some(l) -> List.iter (fun (v,i) -> Printf.printf "%s -> %#Lx\n" v i) l
+  | Some(l) -> Printf.printf "Model:\n"; List.iter (fun (v,i) -> Printf.printf "%s -> %#Lx\n" v i) l
   | None -> Printf.printf "No model found\n"
-
-module STPSMTLIB_INFO =
-struct
-  let timeout = 60
-  let solvername = "stp"
-  let cmdstr f = "stp --SMTLIB1 -t " ^ f
-  let parse_result stdout stderr pstatus =
-    let failstat = match pstatus with
-      | WEXITED(c) -> c > 0
-      | _ -> true
-    in
-    let fail = failstat || ExtString.String.exists stderr "Fatal" in
-    let issat = ExtString.String.exists stdout "sat" in
-    let isunsat = ExtString.String.exists stdout "unsat" in
-    
-    (*       dprintf "fail: %b %b %b" fail isinvalid isvalid; *)
-    
-    if isunsat then
-      Valid
-    else if issat then
-      Invalid
-    else if fail then (
-      dprintf "output: %s\nerror: %s" stdout stderr;  
-      SmtError
-    )
-    else
-      failwith "Something weird happened."
-  let printer = ((new Smtlib1.pp_oc) :> Formulap.fppf)
-end
-
-module STPSMTLIB = Make(STPSMTLIB_INFO)
 
 module STP_INFO =
 struct
   let timeout = 60
   let solvername = "stp"
   let cmdstr f = "stp -p " ^ f
-  let parse_result stdout stderr pstatus =
+  let parse_result_builder solvername stdout stderr pstatus =
     let failstat = match pstatus with
       | WEXITED(c) -> c > 0
       | _ -> true
@@ -262,9 +232,9 @@ struct
     let fail = failstat || ExtString.String.exists stderr "Fatal" in
     let isinvalid = ExtString.String.exists stdout "Invalid." in
     let isvalid = ExtString.String.exists stdout "Valid." in
-    
+
     (*       dprintf "fail: %b %b %b" fail isinvalid isvalid; *)
-    
+
     if isvalid then
       Valid
     else if isinvalid then (
@@ -272,15 +242,50 @@ struct
       print_model m;
       Invalid
     ) else if fail then (
-      dprintf "output: %s\nerror: %s" stdout stderr;  
+      dprintf "output: %s\nerror: %s" stdout stderr;
       SmtError
     )
     else
       failwith "Something weird happened."
+  let parse_result = parse_result_builder solvername
   let printer = ((new Stp.pp_oc) :> Formulap.fppf)
 end
 
 module STP = Make(STP_INFO)
+
+module STPSMTLIB_INFO =
+struct
+  let timeout = 60
+  let solvername = "stp"
+  let cmdstr f = "stp --SMTLIB1 -t " ^ f
+  let parse_result_builder solvername stdout stderr pstatus =
+    let failstat = match pstatus with
+      | WEXITED(c) -> c > 0
+      | _ -> true
+    in
+    let fail = failstat || ExtString.String.exists stderr "Fatal" in
+    let issat = ExtString.String.exists stdout "sat" in
+    let isunsat = ExtString.String.exists stdout "unsat" in
+
+    (*       dprintf "fail: %b %b %b" fail isinvalid isvalid; *)
+
+    if isunsat then
+      Valid
+    else if issat then (
+      let m = parse_model solvername stdout in
+      print_model m;
+      Invalid
+    ) else if fail then (
+      dprintf "output: %s\nerror: %s" stdout stderr;
+      SmtError
+    )
+    else
+      failwith "Something weird happened."
+  let parse_result = parse_result_builder solvername
+  let printer = ((new Smtlib1.pp_oc) :> Formulap.fppf)
+end
+
+module STPSMTLIB = Make(STPSMTLIB_INFO)
 
 module CVC3_INFO =
 struct
@@ -295,9 +300,9 @@ struct
   (*   let fail = failstat || ExtString.String.exists stderr "Fatal" in *)
   (*   let isinvalid = ExtString.String.exists stdout "Invalid." in *)
   (*   let isvalid = ExtString.String.exists stdout "Valid." in *)
-    
+
   (*   (\*       dprintf "fail: %b %b %b" fail isinvalid isvalid; *\) *)
-    
+
   (*   if isvalid then *)
   (*     Valid *)
   (*   else if isinvalid then *)
@@ -308,29 +313,30 @@ struct
   (*   ) *)
   (*   else *)
   (*     failwith "Something weird happened." *)
-  let parse_result stdout stderr pstatus =
-    let failstat = match pstatus with
-      | WEXITED(c) -> c > 0
-      | _ -> true
-    in
-    let fail = failstat || ExtString.String.exists stderr "Fatal" in
-    let isinvalid = ExtString.String.exists stdout "Invalid." in
-    let isvalid = ExtString.String.exists stdout "Valid." in
-    
-    (*       dprintf "fail: %b %b %b" fail isinvalid isvalid; *)
-    
-    if isvalid then
-      Valid
-    else if isinvalid then (
-      let m = parse_model solvername stdout in
-      print_model m;
-      Invalid
-    ) else if fail then (
-      dprintf "output: %s\nerror: %s" stdout stderr;  
-      SmtError
-    )
-    else
-      failwith "Something weird happened."
+  (* let parse_result stdout stderr pstatus = *)
+  (*   let failstat = match pstatus with *)
+  (*     | WEXITED(c) -> c > 0 *)
+  (*     | _ -> true *)
+  (*   in *)
+  (*   let fail = failstat || ExtString.String.exists stderr "Fatal" in *)
+  (*   let isinvalid = ExtString.String.exists stdout "Invalid." in *)
+  (*   let isvalid = ExtString.String.exists stdout "Valid." in *)
+
+  (*   (\*       dprintf "fail: %b %b %b" fail isinvalid isvalid; *\) *)
+
+  (*   if isvalid then *)
+  (*     Valid *)
+  (*   else if isinvalid then ( *)
+  (*     let m = parse_model solvername stdout in *)
+  (*     print_model m; *)
+  (*     Invalid *)
+  (*   ) else if fail then ( *)
+  (*     dprintf "output: %s\nerror: %s" stdout stderr; *)
+  (*     SmtError *)
+  (*   ) *)
+  (*   else *)
+  (*     failwith "Something weird happened." *)
+  let parse_result = STP_INFO.parse_result_builder solvername
   let printer = ((new Stp.pp_oc) :> Formulap.fppf)
 end
 
@@ -341,28 +347,7 @@ struct
   let timeout = 60
   let solvername = "cvc3"
   let cmdstr f = "cvc3 -lang smtlib " ^ f
-  (* let parse_result stdout stderr pstatus = *)
-  (*   let failstat = match pstatus with *)
-  (*     | WEXITED(c) -> c > 0 *)
-  (*     | _ -> true *)
-  (*   in *)
-  (*   let fail = failstat || ExtString.String.exists stderr "Fatal" in *)
-  (*   let isinvalid = ExtString.String.exists stdout "Invalid." in *)
-  (*   let isvalid = ExtString.String.exists stdout "Valid." in *)
-    
-  (*   (\*       dprintf "fail: %b %b %b" fail isinvalid isvalid; *\) *)
-    
-  (*   if isvalid then *)
-  (*     Valid *)
-  (*   else if isinvalid then *)
-  (*     Invalid *)
-  (*   else if fail then ( *)
-  (*     dprintf "CVC output: %s\nCVC error: %s" stdout stderr;   *)
-  (*     SmtError *)
-  (*   ) *)
-  (*   else *)
-  (*     failwith "Something weird happened." *)
-  let parse_result = STPSMTLIB_INFO.parse_result
+  let parse_result = STPSMTLIB_INFO.parse_result_builder solvername
   let printer = ((new Smtlib1.pp_oc) :> Formulap.fppf)
 end
 
@@ -372,9 +357,8 @@ module YICES_INFO =
 struct
   let timeout = 60
   let solvername = "yices"
-  let cmdstr f = "yices " ^ f
-  let parse_result =
-    STPSMTLIB_INFO.parse_result
+  let cmdstr f = "yices -m " ^ f
+  let parse_result = STPSMTLIB_INFO.parse_result_builder solvername
   let printer = ((new Smtlib1.pp_oc) :> Formulap.fppf)
 end
 
