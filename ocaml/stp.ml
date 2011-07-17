@@ -95,8 +95,11 @@ object (self)
 	 (* XXX: Needs testing *)
 	 pp "(IF";
 	 space ();
+	 pc '(';
 	 self#ast_exp b;
-	 (* Do we need to add = 0bin1? *)	 
+	 pp "=0bin1";
+	 (* Do we need to add = 0bin1? Yes. *)
+	 pc ')';
 	 space ();
 	 pp "THEN";
 	 space ();
@@ -105,7 +108,8 @@ object (self)
 	 pp "ELSE";
 	 space ();
 	 self#ast_exp v2;
-	 pc ')'
+	 space ();
+	 pp "ENDIF)"
      | Extract(h,l,e) ->
 	 pp "(";
 	 self#ast_exp e;
