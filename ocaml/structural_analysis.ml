@@ -125,7 +125,7 @@ let structural_analysis c =
       (* If we are going to remove the entry node, set the entry node
 	 to the new coalesced node. *)
       if rmn = !entry then
-	entry := n;
+	entry := node;
       G.remove_vertex g rmn
     in
     List.iter (rm) nodeset;
