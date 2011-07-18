@@ -120,8 +120,16 @@ let structural_analysis c =
 	 List.iter (fun p -> update_edge p v) preds;
       ) nodeset;
     compact g node nodeset;
-    List.iter (G.remove_vertex g) nodeset;
-    (*let ctnode = create_node() in*)
+    let rm rmn =
+      (* dprintf "Removing %s" (node2s rmn); *)
+      (* If we are going to remove the entry node, set the entry node
+	 to the new coalesced node. *)
+      if rmn = !entry then
+	entry := n;
+      G.remove_vertex g rmn
+    in
+    List.iter (rm) nodeset;
+  (*let ctnode = create_node() in*)
     (* FIXME: ctedges *)
   in
   let reduce g rtype nodeset =
@@ -149,6 +157,7 @@ let structural_analysis c =
 		| _ -> nset)
       | _ -> nset
     in
+    dprintf "Succ %s" (node2s node);
     match G.succ g node with
     | [_] | [] ->
 	let nset = predchain node (succchain node [node]) in

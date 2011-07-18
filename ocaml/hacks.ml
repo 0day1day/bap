@@ -20,12 +20,16 @@ let ret_to_jmp ?(ra=ra_final) p =
   let a = Array.of_list p in
   Array.iteri
     (fun i s -> match s with
+      (* Old lifting of ret *)
      | Special("ret", _) ->
 	 a.(i) <- Jmp(Lab function_end, attrs);
 	 (match a.(i-1) with 
 	  | Jmp(t,at) -> a.(i-1) <- Move(ra, t, attrs@at)
 	  | _ -> failwith "expected Jmp before ret special"
 	 )
+     (* disasm_i386 lifting of ret *)
+     | Jmp(t, attrs) when attrs = [StrAttr "ret"] ->
+       a.(i) <- Jmp(Lab function_end, attrs)
      | _ -> ()
     ) a;
   let l = Array.to_list a in
@@ -43,7 +47,6 @@ let assert_noof p =
   in
   List.flatten il
 	   
-
 
 let remove_backedges cfg =
   let module C = Cfg.AST in
