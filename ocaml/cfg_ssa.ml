@@ -319,8 +319,8 @@ let rec trans_cfg cfg =
       C.set_stmts ssa b stmts'
     in
     dprintf "going on to children";
-      (* rename children *)
-    List.iter (fun n -> dprintf "Dominates %s" (v2s n)) (dom_tree b);
+    (* rename children *)
+    (* List.iter (fun n -> dprintf "Dominates %s" (v2s n)) (dom_tree b); *)
     let ssa = List.fold_left rename_block ssa (dom_tree b) in
     let () =
       (* Update any phis in our successors *)
@@ -343,8 +343,8 @@ let rec trans_cfg cfg =
     in
    (* save context for exit node *)
     (if bbid = BB_Exit then (
-      dprintf "Exit ctx:";
-      VH.iter (fun k v -> dprintf "%s -> %s" (Pp.var_to_string k) (Pp.var_to_string v)) vh_ctx;
+      (* dprintf "Exit ctx:"; *)
+      (* VH.iter (fun k v -> dprintf "%s -> %s" (Pp.var_to_string k) (Pp.var_to_string v)) vh_ctx; *)
       VH.iter (fun k v -> VH.replace exitctx k (VH.find vh_ctx k)) vh_ctx ));
    (* restore context *)
     Ctx.pop ctx;
@@ -380,7 +380,7 @@ let rec trans_cfg cfg =
       ssa ssa
   in
   dprintf "Done translating to SSA";
-  VH.iter (fun k v -> dprintf "%s -> %s" (Pp.var_to_string k) (Pp.var_to_string v)) exitctx;
+  (* VH.iter (fun k v -> dprintf "%s -> %s" (Pp.var_to_string k) (Pp.var_to_string v)) exitctx; *)
   {cfg=ssa; to_astvar=VH.find to_oldvar; to_ssavar=VH.find exitctx}
 
 (** Translates a CFG into SSA form. *)
