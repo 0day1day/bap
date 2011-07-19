@@ -11,6 +11,7 @@ let unroll_loop ?(count=8) cfg head body =
   dprintf "Unrolling loop for %s with %d nodes" (Cfg.bbid_to_string (C.G.V.label head)) (List.length body);
   let nodes = head::body in
   let nnodes = List.length nodes in
+  let ohead = head in
   let edges = List.fold_left
     (fun acc node ->
        List.fold_left
@@ -77,7 +78,7 @@ let unroll_loop ?(count=8) cfg head body =
                  let origdst = try Hashtbl.find backedges dst with Not_found -> dst in
                  ith_copy i origdst
                else
-                 C.find_vertex cfg (Cfg.BB_Exit)
+		 ohead (* C.find_vertex cfg (Cfg.BB_Exit) *)
              in
              let edgelabel = C.G.E.label edge in
              let newedge = C.G.E.create src edgelabel newdst in

@@ -2,6 +2,9 @@ open Type
 open Ast
 open Util
 
+module D = Debug.Make(struct let name = "Hacks" and default=`Debug end)
+open D
+
 let ra_final = Var.newvar "ra_final" reg_32
 and ra0 = Var.newvar "ra0" Ast.reg_32
 and (mem,sp,r_of) =
@@ -10,7 +13,6 @@ and (mem,sp,r_of) =
    List.find (fun v -> Var.name v = "R_ESP") d,
    List.find (fun v -> Var.name v = "R_OF") d
   )
-
 
 let function_end = "function_end"
 and attrs = [StrAttr "ret hack"]
@@ -52,7 +54,7 @@ let remove_backedges cfg =
   let module C = Cfg.AST in
   let a = [StrAttr "added by remove_backedeges"] in
   let assert_false = Assert(exp_false, a) in
-  let exit = C.find_vertex cfg Cfg.BB_Exit in
+  let cfg, error = Cfg_ast.find_error cfg in
   let handle_backedge cfg e =
     let s = C.G.E.src e in
     let revstmts = List.rev (C.get_stmts cfg s) in
@@ -60,9 +62,10 @@ let remove_backedges cfg =
       | Jmp(t,_)::rest ->
 	  assert_false::rest
       | CJmp(c,t1,t2,attrs)::rest ->
+	(* e is the label we are REMOVING *)
 	  let (t,c) = match C.G.E.label e with
-	    | Some true -> (t1, c)
-	    | Some false -> (t2, exp_not c)
+	    | Some true -> (t2, exp_not c)
+	    | Some false -> (t1, c)
 	    | None -> failwith "missing edge label from cjmp"
 	  in
 	Jmp(t, attrs)::Assert(c,a)::rest
@@ -70,7 +73,7 @@ let remove_backedges cfg =
     in
     let cfg = C.set_stmts cfg s (List.rev revstmts) in
     let cfg = C.remove_edge_e cfg e in
-    if C.G.succ cfg s = [] then C.add_edge cfg s exit else cfg
+    if C.G.succ cfg s = [] then C.add_edge cfg s error else cfg
   in
   let find_backedges cfg =
     let module H = Hashtbl.Make(Cfg.BBid) in
@@ -92,4 +95,7 @@ let remove_backedges cfg =
     walk entry []
   in
   let backedges = find_backedges cfg in
+  (* SUPER HACK ALERT XXXXXXXX. Fix the above algorithm; don't use two
+     colors *)
+  let backedges = Util.list_unique backedges in
   List.fold_left handle_backedge cfg backedges

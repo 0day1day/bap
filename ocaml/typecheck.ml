@@ -48,8 +48,10 @@ let rec infer_ast ?(check=true) = function
       if check then (
 	let t1 = infer_ast ~check e1
 	and t2 = infer_ast ~check e2 in
-	check_same t1 t2 ~e; 
-	check_reg t1);
+	check_same t1 t2 ~e;
+	match o with
+	| EQ | NEQ -> ()
+	| _ -> check_reg t1);
       (match o with
        | EQ | NEQ | LT | LE | SLT | SLE -> reg_1
        | _ -> infer_ast ~check:false e1

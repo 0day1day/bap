@@ -18,17 +18,45 @@ open D
 
 let v2s v = bbid_to_string(C.G.V.label v)
 
+let create c l stmts =
+  let v = C.G.V.create l in
+  let c = C.add_vertex c v in
+  (C.set_stmts c v stmts, v)
+
+(** Find BB_Entry in a graph, or raise an exception if not already present. *)
+let find_entry g =
+  try
+    g, C.find_vertex g BB_Entry
+  with Not_found ->
+    failwith "BB_Entry is missing! This should not happen."
+
+(** Find BB_Error in a graph, or add it if not already present. *)
+let find_error g =
+  try
+    g, C.find_vertex g BB_Error
+  with Not_found ->
+    create g BB_Error [Label(Name "BB_ERROR", []); Assert(exp_false, [])]
+
+(** Find BB_Exit in a graph, or add it if not already present. *)
+let find_exit g =
+  try
+    g, C.find_vertex g BB_Exit
+  with Not_found ->
+    create g BB_Exit [(*Label(Name "BB_Exit", []); *)Comment("exit node",[])]
+
+(** Find BB_Indirect in a graph, or add it if not already present. *)
+let find_indirect g =
+  try
+    g, C.find_vertex g BB_Indirect
+  with Not_found ->
+    create g BB_Indirect []
+
 (** Build a CFG from a program *)
 let of_prog ?(special_error = true) p =
-  let create c l stmts =
-    let v = C.G.V.create l in
-    let c = C.add_vertex c v in
-    (C.set_stmts c v stmts, v)
-  in
   let (tmp, entry) = create (C.empty()) BB_Entry [Comment("entry node",[])] in
-  let (tmp, exit) = create tmp BB_Exit [Comment("exit node",[])] in
-  let (tmp, error) = create tmp BB_Error [Label(Name "BB_ERROR", []); Assert(exp_false, [])] in
-  let (c, indirect) = create tmp BB_Indirect [] in
+  let (tmp, exit) = find_exit tmp in
+  let (tmp, error) = find_error tmp in
+  let (c, indirect) = find_indirect tmp in
   let c = C.add_edge c indirect error in (* indirect jumps could fail *)
 
   let postponed_edges = Hashtbl.create 5700 in
