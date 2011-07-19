@@ -8,7 +8,7 @@ export INCDIRS = $(BAP_OCAMLDIR)
 # Include sources from ../ocaml in the automatically generated dependencies.
 export SOURCE_DIRS_IN = $(BAP_OCAMLDIR) $(BAP_PROJ_OCAMLDIR)
 
-TARGETS = ASM nc dc
+TARGETS = ASM CTESTS nc dc 
 
 RESULT = bap_test_suite
 
@@ -18,6 +18,7 @@ SOURCES = \
 	ast_suite.ml \
 	disasm_i386_suite.ml \
 	asmir_suite.ml \
+	traces_suite.ml \
 	bap_suite.ml
 
 all: $(TARGETS)
@@ -26,7 +27,7 @@ test: all
 	./$(RESULT)
 
 # XXX Use ocamlmake to clean up x86 executables?
-TRASH = x86/nop
+TRASH = x86/nop C/test
 
 include $(OCAMLMAKEFILE)
 
@@ -34,3 +35,5 @@ include $(OCAMLMAKEFILE)
 ASM:
 	cd ./x86 ; make
 
+CTESTS:
+	cd ./C ; make

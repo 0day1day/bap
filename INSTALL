@@ -8,6 +8,8 @@ To build BAP on x86, do the following:
   $ ./autogen.sh
   $ ./configure
   $ make
+-- or to make all and run unit tests after --
+  $ make test 
 
 On x86_64, instead of ./configure you may need ./configure CFLAGS=-DAMD64.
 
@@ -57,6 +59,24 @@ VEX, then use the --with-vex=<vex dir> configure option.
 
 
 
+*** Installing pin ***
+
+The PIN trace tool is located in the pintraces/ directory. Because of licensing
+reasons, we cannot distribute PIN with the trace tool. PIN must be extracted 
+inside of the traces directory; for instance, if the traces branch is located 
+in $PATH/traces, then PIN should be in $PATH/traces/pin. Running ./getpin.sh 
+from the $PATH/traces/pintraces directory will automatically download and 
+install PIN for Linux; the user is responsible for accepting the PIN license 
+agreements. On Windows, PIN must be downloaded and extracted by hand. The PIN 
+tool can be built by executing make in the $PATH/traces/experiemental directory.
+On Windows, we reccomend using GNU Make for Windows
+(http://gnuwin32.sourceforge.net/packages/make.htm) and Visual C++ 2010 express
+(http://www.microsoft.com/visualstudio/en-us/products/2010-editions/visual-cpp-express).
+After compilation, the PIN tool should exist in 
+$PATH/traces/pintraces/obj-ia32/gentrace.so (or gentrace.dll on Windows). 
+
+
+
 *** Optional: Making the documentation ***
 
 Optionally you can also make the documentation by running: 'make doc'
@@ -75,13 +95,16 @@ which can help you visualize how modules are related, e.g., run:
 
 
 *** Optional: Making unit tests ***
+
 Install oUnit libs:
 $ sudo apt-get install libounit-ocaml-dev
 
 Make tests:
+$ make tests
+-- or --
 $ cd tests && make
 
 Run tests:
 $ cd tests && ./bap_test_suite
-or for verbose test output:
+-- or for verbose test output --
 $ cd tests && ./bap_test_suite -verbose
