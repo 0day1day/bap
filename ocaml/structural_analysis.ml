@@ -157,7 +157,7 @@ let structural_analysis c =
 		| _ -> nset)
       | _ -> nset
     in
-    dprintf "Succ %s" (node2s node);
+    (* dprintf "Succ %s" (node2s node); *)
     match G.succ g node with
     | [_] | [] ->
 	let nset = predchain node (succchain node [node]) in

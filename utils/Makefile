@@ -14,7 +14,7 @@ export SOURCE_DIRS_IN = $(BAP_OCAMLDIR) $(BAP_PROJ_OCAMLDIR)
 
 # default subprojects to build
 ifndef SUBPROJS
-	export SUBPROJS = $(PROJUTILS) toil iltrans ileval topredicate formula get_functions compare split recon
+	export SUBPROJS = $(PROJUTILS) toil iltrans ileval topredicate formula get_functions compare split recon insert_halt
 endif
 
 define PROJ_toil
@@ -79,6 +79,13 @@ define PROJ_recon
 	DOC_FILES=$(SOURCES)
 endef
 export PROJ_recon
+
+define PROJ_insert_halt
+	RESULT=insert_halt
+	SOURCES = insert_halt.ml
+	DOC_FILES=$(SOURCES)
+endef
+export PROJ_insert_halt
 
 # suffix for bytecode (which when we make all is debug code)
 export BCSUFFIX = .dbg
