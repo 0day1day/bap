@@ -1,8 +1,10 @@
 export BAP_OCAMLDIR=../ocaml
 export OCAMLMAKEFILE=$(BAP_OCAMLDIR)/OCamlMakefile
+export OUNIT=$(CURDIR)/../ounit-1.1.0/_build/src/
 
-export PACKS = oUnit bigarray str ocamlgraph extlib unix
-export LIBS = ../ocaml/bap 
+#export PACKS = oUnit bigarray str ocamlgraph extlib unix
+export PACKS = bigarray str ocamlgraph extlib unix
+export LIBS = ../ocaml/bap oUnit
 export INCDIRS = $(BAP_OCAMLDIR)
 
 # Include sources from ../ocaml in the automatically generated dependencies.
@@ -20,6 +22,8 @@ SOURCES = \
 	asmir_suite.ml \
 	traces_suite.ml \
 	bap_suite.ml
+
+export INCDIRS = $(OUNIT)
 
 all: $(TARGETS)
 

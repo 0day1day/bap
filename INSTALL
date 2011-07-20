@@ -96,9 +96,6 @@ which can help you visualize how modules are related, e.g., run:
 
 *** Optional: Making unit tests ***
 
-Install oUnit libs:
-$ sudo apt-get install libounit-ocaml-dev
-
 Make tests:
 $ make tests
 -- or --
