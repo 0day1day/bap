@@ -48,10 +48,10 @@ let doit = match !rangeonly with
 	 let cfg = Cfg_ast.of_prog ir in
 	 let cfg = Prune_unreachable.prune_unreachable_ast cfg in
 	 let cfg = if !unroll then
-	     Unroll.unroll_loops cfg
+	     let cfg = Unroll.unroll_loops cfg in
+	     Hacks.remove_backedges cfg
 	   else cfg
 	 in
-	 let cfg = Hacks.remove_backedges cfg in
 	 let cfg = Prune_unreachable.prune_unreachable_ast cfg in
 	 (* let oc = open_out "unroll.out" in *)
 	 (* let ssa_func_cfg = Cfg_ssa.of_astcfg cfg in *)
