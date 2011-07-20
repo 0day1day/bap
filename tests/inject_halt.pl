@@ -41,6 +41,7 @@ foreach $line (<IL>) {
 close(IL);
 close(ILOUT);
 
+exit 0;
 # 080482d7 <main>:
 #  80482d7:       55                      push   %ebp
 #  80482d8:       89 e5                   mov    %esp,%ebp
