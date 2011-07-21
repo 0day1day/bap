@@ -236,6 +236,12 @@ void TraceWriter::add(Frame &frm)
    frm_count++;
 }
 
+  void TraceWriter::add(std::vector<TaintFrame> &fs) {
+    for (std::vector<TaintFrame>::iterator i = fs.begin(); i != fs.end(); i++) {
+      add(*i);
+    }
+  }
+  
 // Finalizes the trace file. Will update header values if necessary, and
 // then add a TOC to the file as specified by the array 'toc'. If 'toc' is
 // NULL, then no TOC will be added, unless buildTOC is true, in which case

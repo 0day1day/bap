@@ -59,7 +59,7 @@ exception ExcState of string * addr
 exception Halted of varval option * ctx
 
 (* An unknown label was found *)  
-exception UnknownLabel
+exception UnknownLabel of label_kind
 
 (* An assertion failed *)
 exception AssertFailed of ctx
@@ -142,8 +142,8 @@ struct
       match lab with
 	| Name _ (*-> failwith ("jump to inexistent label "^s)*)
 	| Addr _ -> 
-	    wprintf "Unknown label: %s" (Pp.label_to_string lab);
-	    raise UnknownLabel (*failwith ("jump to inexistent label "^
+	    (* wprintf "Unknown label: %s" (Pp.label_to_string lab); *)
+	    raise (UnknownLabel lab)(*failwith ("jump to inexistent label "^
 					 (Printf.sprintf "%Lx" x)) *)
 	    
   let lookup_var        = MemL.lookup_var
@@ -436,7 +436,20 @@ struct
 	  (* The only way inst_fetch would fail is if pc falls off the end, right? *)
 	  wprintf "PC not found: %#Lx" state.pc;
 	  raise (Halted(None, state))
-	    
+
+  (** Evaluate as long as there is exactly one choice of state.
+
+      @param step This function is called with the evaluator's state
+      for each transition.
+
+  *)
+  let eval_straightline ?(step = Util.id) state =
+    let rec f state =
+      match eval state with
+      | newstate::[] -> f (step newstate)
+      | states -> states
+    in
+    f state
 end
   
 module SymbolicMemL = 

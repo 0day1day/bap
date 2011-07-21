@@ -63,7 +63,30 @@ struct ValSpecRec {
   uint32_t taint;              // Taint status of the value
 };
 
+/* globals */
+
+extern int g_skipTaints;
+
+/* functions */
+
+bool defaultPolicy(uint32_t addr, uint32_t length, const char *msg);
+
 namespace pintrace { // We will use namespace to avoid collision
+
+  typedef bool(*TAINT_POLICY_FUN)(uint32_t addr, uint32_t length, const char *msg);
+
+  struct fdInfo_t {
+    fdInfo_t() {
+      name = string("Uninitialized"); offset=-1;
+    }
+    fdInfo_t(string name_in, uint64_t offset_in) {
+      name = name_in; offset = offset_in;
+    }
+    string name;
+    uint64_t offset;
+  };  
+
+  typedef std::pair<string, uint64_t> resource_t;
   
    // Tracking the taint during program flow
    class TaintTracker {
@@ -77,7 +100,7 @@ namespace pintrace { // We will use namespace to avoid collision
 	 taintIntro */
      bool taintPreSC(uint32_t callno, uint32_t * args, uint32_t &state);
 
-     bool taintPostSC(const uint32_t bytes, 
+     std::vector<TaintFrame> taintPostSC(const uint32_t bytes, 
                             uint32_t * args, 
                             uint32_t &addr,
                             uint32_t &length,
@@ -133,7 +156,7 @@ namespace pintrace { // We will use namespace to avoid collision
 
      void acceptHelper(uint32_t fd);
 
-     bool recvHelper(uint32_t fd, void *ptr, size_t len);
+     std::vector<TaintFrame> recvHelper(uint32_t fd, void *ptr, size_t len);
 
      uint32_t getRegTaint(context &delta, uint32_t reg_int);
 
@@ -152,8 +175,8 @@ namespace pintrace { // We will use namespace to avoid collision
      
    private:
 
-     // The taint source (producing taint tags)
-     uint32_t source;
+     // The taint number (producing taint tags)
+     uint32_t taintnum;
 
      // a context defining a map from registers to taint
      // this is maintainted externally now
@@ -168,18 +191,20 @@ namespace pintrace { // We will use namespace to avoid collision
 
      // How many values are being used
      uint32_t count;
-
-
+     
      /********** Syscall-specific vars ***********/
      std::set<string> taint_files;
-     std::set<uint32_t> fds;
+     std::map<resource_t, uint32_t> taint_mappings;
+     std::map<uint32_t, fdInfo_t> fds;
+     std::map<uint32_t,uint32_t> sections;
      bool taint_net;
      bool taint_args;
      std::set<string> taint_env;
 
      /********************************************/
 
-
+     // The taint policy function
+     TAINT_POLICY_FUN pf;
 
      void addTaintToWritten(context &delta, uint32_t tag);
       
@@ -189,6 +214,10 @@ namespace pintrace { // We will use namespace to avoid collision
 
      uint32_t getTaint(context &ctx, uint32_t elem);
 
+     std::vector<TaintFrame> introMemTaint(uint32_t addr, uint32_t length, const char *source, int64_t offset);
+
+     std::vector<TaintFrame> introMemTaintFromFd(uint32_t fd, uint32_t addr, uint32_t length);
+     
      void setTaint(context &ctx, uint32_t key, uint32_t tag);
 
    };

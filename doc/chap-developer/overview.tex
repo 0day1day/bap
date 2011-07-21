@@ -6,8 +6,9 @@ implemented in OCaml. We interface the C++ front-end with the OCaml
 back-end using OCaml via IDL generated stubs.
 
 The front-end interfaces with Valgrind's
-VEX~\cite{nethercote:2004:phd} to help lift instructions (see
-Chapter~\ref{vine:frontend}), GNU BFD for parsing executable objects,
+VEX~\cite{nethercote:2004:phd} to help lift instructions%% (see
+%% Chapter~\ref{vine:frontend})
+, GNU BFD for parsing executable objects,
 and GNU libopcodes for pretty-printing the disassembly. Each
 disassembled instruction is lifted to the IL, then passed to the
 back-end .  

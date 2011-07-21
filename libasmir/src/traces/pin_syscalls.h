@@ -11,6 +11,7 @@
 #define __NR_open		  5
 #define __NR_close		  6
 #define __NR_execve		 11
+#define __NR_lseek               19
 #define __NR_mmap		 90
 #define __NR_socketcall	102
 #define __NR_mmap2		192
@@ -18,9 +19,12 @@
 // Windows system calls @ http://code.google.com/p/miscellaneouz/source/browse/trunk/winsyscalls?spec=svn26&r=26
 // FIXME: We should really handle different versions of Windows better
 // These are for win7
-#define __NR_createfilewin	0x0042
-#define __NR_readfilewin 0x0111
-#define __NR_closewin 0x0032
+#define __NR_closewin            0x0032
+#define __NR_createfilewin	 0x0042
+#define __NR_createsectionwin    0x0054
+#define __NR_mapviewofsectionwin 0x00A8
+#define __NR_readfilewin         0x0111
+#define __NR_setinfofilewin      0x0149
 
 /********************************************/
 

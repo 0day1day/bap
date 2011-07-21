@@ -203,7 +203,9 @@ typedef enum
     REG_INST_PTR = REG_EIP,
 #endif
     
+#if !defined(TARGET_DOXYGEN)
     REG_PHYSICAL_CONTEXT_END = REG_INST_PTR,
+#endif
 
     // partial registers common to both the IA-32 and Intel(R) 64 architectures.
     REG_AL,
@@ -298,6 +300,7 @@ typedef enum
     REG_MXT,
     
     REG_XMM_BASE,
+    REG_FIRST_FP_REG = REG_XMM_BASE,
     REG_XMM0 = REG_XMM_BASE,
     REG_XMM1,
     REG_XMM2,
@@ -346,8 +349,18 @@ typedef enum
 #else    
     REG_YMM_LAST = REG_YMM7,
 #endif
-    
     REG_MXCSR,
+    REG_MXCSRMASK,
+
+    // This corresponds to the "orig_eax" register that is visible
+    // to some debuggers.
+#if defined(TARGET_IA32E)
+    REG_ORIG_RAX,
+    REG_ORIG_GAX = REG_ORIG_RAX,
+#else
+    REG_ORIG_EAX,
+    REG_ORIG_GAX = REG_ORIG_EAX,
+#endif
 
     REG_DR_BASE,
     REG_DR0 = REG_DR_BASE,
@@ -413,19 +426,21 @@ typedef enum
     REG_TR6,
     REG_TR7,
     REG_TR_LAST = REG_TR7,
-    
+
     REG_FPST_BASE,
-    REG_FP_BASE = REG_FPST_BASE,
-    REG_FPCW = REG_FP_BASE,
+    REG_FPSTATUS_BASE = REG_FPST_BASE,
+    REG_FPCW = REG_FPSTATUS_BASE,
     REG_FPSW,
-    REG_FPTAG,
+    REG_FPTAG,          ///< Abridged 8-bit version of x87 tag register.
     REG_FPIP_OFF,
     REG_FPIP_SEL,
     REG_FPOPCODE,
     REG_FPDP_OFF,
     REG_FPDP_SEL,
-    REG_FP_LAST = REG_FPDP_SEL,
-    
+    REG_FPSTATUS_LAST = REG_FPDP_SEL,
+
+    REG_FPTAG_FULL,     ///< Full 16-bit version of x87 tag register.
+
     REG_ST_BASE,
     REG_ST0 = REG_ST_BASE,
     REG_ST1,
@@ -435,11 +450,15 @@ typedef enum
     REG_ST5,
     REG_ST6,
     REG_ST7,
-#if !defined(TARGET_DOXYGEN)
     REG_ST_LAST = REG_ST7,
     REG_FPST_LAST = REG_ST_LAST,
+#if !defined(TARGET_DOXYGEN)
     REG_MACHINE_LAST = REG_FPST_LAST, /* last machine register */
-    
+
+    // REG_X87 is a representative of the X87 fp state - is is NOT available for explicit use in ANY
+    // of the Pin APIs.
+    REG_X87,
+
     /* these are the two registers implementing the eflags in pin
        REG_STATUS_FLAGS represents the OF, SF, ZF, AF, PF and CF flags.
        REG_DF_FLAG      represents the DF flag.
@@ -460,14 +479,10 @@ typedef enum
      */
     REG_STATUS_FLAGS,
     REG_DF_FLAG,
-    
-    /* Aggregates of registers (still application regs) */
-    REG_AGGREGATE_BASE,
-    REG_FPST_ALL = REG_AGGREGATE_BASE,
-    REG_AGGREGATE_LAST = REG_FPST_ALL,
 
-    REG_APPLICATION_LAST = REG_AGGREGATE_LAST, /* last register name used by the application */
-    
+
+    REG_APPLICATION_LAST = REG_DF_FLAG, /* last register name used by the application */
+
     /* Pin's virtual register names */
     REG_PIN_BASE,
     REG_PIN_GR_BASE = REG_PIN_BASE,
@@ -630,9 +645,18 @@ typedef enum
     REG_INST_G7,                            ///< Scratch register used in pintools
     REG_INST_G8,                            ///< Scratch register used in pintools
     REG_INST_G9,                            ///< Scratch register used in pintools
-
+    REG_INST_G10,                            ///< Scratch register used in pintools
+    REG_INST_G11,                            ///< Scratch register used in pintools
+    REG_INST_G12,                            ///< Scratch register used in pintools
+    REG_INST_G13,                            ///< Scratch register used in pintools
+    REG_INST_G14,                            ///< Scratch register used in pintools
+    REG_INST_G15,                            ///< Scratch register used in pintools
+    REG_INST_G16,                            ///< Scratch register used in pintools
+    REG_INST_G17,                            ///< Scratch register used in pintools
+    REG_INST_G18,                            ///< Scratch register used in pintools
+    REG_INST_G19,                            ///< Scratch register used in pintools
     REG_INST_TOOL_FIRST = REG_INST_G0,     
-    REG_INST_TOOL_LAST = REG_INST_G9,
+    REG_INST_TOOL_LAST = REG_INST_G19,
 
     REG_BUF_BASE0,
     REG_BUF_BASE1,
@@ -687,9 +711,14 @@ typedef enum
     REG_PIN_BRIDGE_ORIG_SP,    // hold the stack ptr value before the bridge
     REG_PIN_BRIDGE_APP_IP, // hold the application (not code cache) IP to resume
     REG_PIN_BRIDGE_SP_BEFORE_ALIGN, // hold the stack ptr value before the stack alignment
+    REG_PIN_BRIDGE_SP_BEFORE_CALL, // hold the stack ptr value before call to replaced function in probe mode
     REG_PIN_BRIDGE_MARSHALLING_FRAME, // hold the address of the marshalled reference registers
-    REG_PIN_BRIDGE_CONTEXT_FRAME, // hold the address of the context frame
-    REG_PIN_BRIDGE_CONTEXT_ORIG_SP, // hold the sp at which the context was pushed
+    REG_PIN_BRIDGE_ON_STACK_CONTEXT_FRAME, // hold the address of the on stack context frame
+    REG_PIN_BRIDGE_CONTEXT_ON_STACK_SP, // hold the sp at which the on stack context was pushed
+    REG_PIN_BRIDGE_CONTEXT_ORIG_SP,
+    REG_PIN_BRIDGE_CONTEXT_FRAME,
+    REG_PIN_BRIDGE_SPILL_AREA_CONTEXT_FRAME, // hold the address of the spill area context frame
+    REG_PIN_BRIDGE_CONTEXT_SPILL_AREA_SP, // hold the sp at which the spill area context was pushed
 
     REG_PIN_SPILLPTR,  // ptr to the pin spill area
     REG_PIN_GR_LAST = REG_PIN_SPILLPTR,
@@ -750,9 +779,4 @@ typedef enum
 
 
 } REG;
-
-
-
-
-
 #endif

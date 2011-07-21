@@ -134,6 +134,9 @@ namespace pintrace { // We will use namespace to avoid collision
       // Adds a new frame to the trace.
       void add(Frame &frm);
 
+      // Adds a vector of new frames to the trace.
+      void add(std::vector<TaintFrame> &frms);
+     
       // Finalizes the trace file. Will update header values if necessary,
       // and then add a TOC to the file as specified by the array
       // 'toc'. If 'toc' is NULL, then no TOC will be added, unless

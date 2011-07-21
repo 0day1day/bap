@@ -451,6 +451,7 @@ let section_contents prog secs =
   in
   get
 
+
 (** Open a binary file for translation *)
 let open_program filename =
   let prog = Libasmir.asmir_open_file filename in
@@ -561,10 +562,19 @@ let trans_frame f =
       let stmts, _ = byte_insn_to_bap arch addr bytes in
       stmts
   | Libasmir.FRM_TAINT -> 
-      [Label (Name("ReadSyscall"), []); Comment("All blocks must have two statements", [])]
+      [Comment("ReadSyscall", []); Comment("All blocks must have two statements", [])]
   | Libasmir.FRM_LOADMOD ->
       let name, lowaddr, highaddr = Libasmir.asmir_frame_get_loadmod_info f in
-      [Special(Printf.sprintf "Loaded module '%s' at %#Lx to %#Lx" name lowaddr highaddr, []); Special("All blocks must have two statements", [])]
+      [Special(Printf.sprintf "Loaded module '%s' at %#Lx to %#Lx" name lowaddr highaddr, []); Comment("All blocks must have two statements", [])]
+  | Libasmir.FRM_SYSCALL ->
+	let callno, addr, tid = Libasmir.asmir_frame_get_syscall_info f in
+	[Special(Printf.sprintf "Syscall number %d at %#Lx by thread %d" callno addr tid,[]);
+	 Comment("All blocks must have two statements", [])]
+  | Libasmir.FRM_EXCEPT ->
+	let exceptno, tid, from_addr, to_addr =
+	  Libasmir.asmir_frame_get_except_info f in
+	[Special(Printf.sprintf "Exception number %d by thread %d at %#Lx to %#Lx" exceptno tid from_addr to_addr,[]);
+	 Comment("All blocks must have two statements", [])]
   | _ -> []
 
 let alt_bap_from_trace_file filename =
@@ -572,7 +582,9 @@ let alt_bap_from_trace_file filename =
     let ops = tr_frame_attrs f in
     match stmts with
     | Label (l,a)::others ->
-	 Label (l,a@ops)::others
+	Label (l,a@ops)::others
+    | Comment (s,a)::others ->
+	Comment (s,a@ops)::others
     | others when ops <> [] -> Comment("Attrs without label.", ops)::others
     | others -> others
   in
@@ -587,6 +599,8 @@ let alt_bap_from_trace_file filename =
   Status.init "Lifting trace" 0 ;
   while !c do
     (*dprintf "Calling the trace again.... ";*)
+    (* flush VEX buffers *)
+    let () = Libasmir.asmir_free_vex_buffers () in
     let trace_frames = Libasmir.asmir_frames_from_trace_file filename !off !trace_blocksize in
     let numframes = Libasmir.asmir_frames_length trace_frames in
     (*dprintf "Got %d frames" numframes;*)

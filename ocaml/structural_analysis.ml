@@ -6,7 +6,7 @@
     TODO: Add support for proper and improper intervals.
 *)
 
-module D = Debug.Make(struct let name = "Structural" and default=`Debug end)
+module D = Debug.Make(struct let name = "Structural" and default=`NoDebug end)
 open D
 
 
@@ -14,7 +14,7 @@ type region_type =
   | Block | IfThen | IfThenElse | Case | Proper
   | SelfLoop | WhileLoop | NaturalLoop | Improper
 
-type node = B of Cfg.bbid | R of region_type * node list
+type node = BBlock of Cfg.bbid | Region of region_type * node list
 
 module C = Cfg.AST
 
@@ -39,9 +39,9 @@ let rtype2s = function
   | Improper    -> "Improper"
 
 let rec node2s = function
-  | B b -> Cfg.bbid_to_string b
-  | R(rt, b::_) -> node2s b ^ "'"
-  | R _ -> failwith "eep, empty region?"
+  | BBlock b -> Cfg.bbid_to_string b
+  | Region(rt, b::_) -> node2s b ^ "'"
+  | Region _ -> failwith "eep, empty region?"
 
 let nodes2s nodes = String.concat ", " (List.map node2s nodes)
 
@@ -58,7 +58,7 @@ let printg g =
 
 let graph_of_cfg c =
   let g = G.create ~size:(C.G.nb_vertex c) () in
-  let w v = B(C.G.V.label v) in
+  let w v = BBlock (C.G.V.label v) in
   C.G.iter_vertex (fun v -> G.add_vertex g (w v)) c;
   C.G.iter_edges (fun s d -> G.add_edge g (w s) (w d)) c;
   g
@@ -82,8 +82,8 @@ let find_backedges g entry =
 
 let structural_analysis c =
   let g = graph_of_cfg c
-  and entry = ref (B Cfg.BB_Entry)
-  and exit = ref (B Cfg.BB_Exit) in
+  and entry = ref (BBlock Cfg.BB_Entry)
+  and exit = ref (BBlock Cfg.BB_Exit) in
   let size = G.nb_vertex g in
   let structures = ref (G.fold_vertex (fun v l -> v::l) g [])
   and structof = Hashtbl.create size
@@ -120,12 +120,20 @@ let structural_analysis c =
 	 List.iter (fun p -> update_edge p v) preds;
       ) nodeset;
     compact g node nodeset;
-    List.iter (G.remove_vertex g) nodeset;
-    (*let ctnode = create_node() in*)
+    let rm rmn =
+      (* dprintf "Removing %s" (node2s rmn); *)
+      (* If we are going to remove the entry node, set the entry node
+	 to the new coalesced node. *)
+      if rmn = !entry then
+      	entry := node;
+      G.remove_vertex g rmn
+    in
+    List.iter rm nodeset;
+  (*let ctnode = create_node() in*)
     (* FIXME: ctedges *)
   in
   let reduce g rtype nodeset =
-    let node = R(rtype, nodeset) in
+    let node = Region(rtype, nodeset) in
     if debug then dprintf "Making %s region %s out of %s" (rtype2s rtype) (node2s node) (nodes2s nodeset);
     replace g node nodeset;
     structures := node :: !structures;
@@ -149,6 +157,7 @@ let structural_analysis c =
 		| _ -> nset)
       | _ -> nset
     in
+    (* dprintf "Succ %s" (node2s node); *)
     match G.succ g node with
     | [_] | [] ->
 	let nset = predchain node (succchain node [node]) in
@@ -160,7 +169,7 @@ let structural_analysis c =
 	 | [s], [s'] when s = s' ->
 	     (match G.pred g m, G.pred g n with
 	      | [_], [_] -> Some(IfThenElse, [node;m;n])
-	      | _ -> failwith "structural_analysys: unimplemeted: Proper?" )
+	      | _ -> failwith "structural_analysis: unimplemeted: Proper?" ) (* if the successors of an if-then-else have other parents *)
 	 | [s],_ when s = n && G.pred g m = [node] ->
 	     Some(IfThen, [node; m])
 	 | _,[s] when s = m && G.pred g n = [node] ->
@@ -182,6 +191,7 @@ let structural_analysis c =
     dprintf "cyclic_region: checking %s. nset: %s" (node2s node) (nodes2s nset);
     match nset with
     | [_] ->
+        dprintf "Successors: %s" (nodes2s (G.succ g node));
 	if List.mem node (G.succ g node) then
 	  Some(SelfLoop, nset)
 	else (dprintf "cyclic_region: Node %s not in a cycle" (node2s node); None)
@@ -198,22 +208,34 @@ let structural_analysis c =
     | [] -> failwith "structural_analysis: cyclic_region_type: nset cannot be empty"
   in
   let get_reachunder g n =
+(* HERP DERP
     (* This is terribly unoptimized *)
     let module PC = Graph.Path.Check(G) in
     let module Op = Graph.Oper.I(G) in
     (*let gm = Op.mirror (G.copy g) in*)
-    let backedges = find_backedges g !entry in
-    let is_backedge a b =
+    (* let backedges = find_backedges g !entry in *)
+    let path = PC.check_path (PC.create g) in
+    (*let is_backedge a b =
       (* FIXME: There's a better way to check for backedgeness, isn't there?. *)
-      Hashtbl.mem backedges (a,b)
-	(* path b a *)
-    in
-    let backpreds = List.filter (fun p -> is_backedge p n) (G.pred g n) in
+      (* Hashtbl.mem backedges (a,b) *)
+      path b a
+    in*)
+    let _ = dprintf "get_reachunder: %s original backpreds: %s" (node2s n) (nodes2s (G.succ g n)) in
+    let backpreds = List.filter (fun p -> path p n) (G.succ g n) in
+    dprintf "preds: %s" (nodes2s (G.pred g n));
+    Hashtbl.iter (fun (a,b) _ -> dprintf "node: %s -> %s" (node2s a) (node2s b)) backedges;
     dprintf "get_reachunder: %s backpreds: %s" (node2s n) (nodes2s backpreds);
     let g' = G.copy g in
-    G.remove_vertex g' n;
     let path = PC.check_path (PC.create g') in
+    G.remove_vertex g' n;
     n :: G.fold_vertex (fun m l -> if List.exists (fun k -> path m k) backpreds then m::l else l) g' []
+*)
+    let path = PC.check_path (PC.create g) in
+    let seesMe = n :: G.fold_vertex (fun m l -> if (path m n) then m::l else l) g [] in
+    let iSee   = G.fold_vertex (fun m l -> if (path n m) then m::l else l) g [] in
+    let sect   = List.filter (fun x -> List.mem x seesMe) iSee in
+    dprintf "get_reachunder HERP DERP: %s\n" (nodes2s sect);
+    sect
   in
 
   let rec doit () =
@@ -232,6 +254,7 @@ let structural_analysis c =
 	    exit := p;
 	  progress := true;
       | None ->
+          dprintf "acyclic_region_type returned None";
 	  let reachunder = get_reachunder g n in
 	  match cyclic_region_type g n reachunder with
 	  | Some(rtype, reachunder) ->

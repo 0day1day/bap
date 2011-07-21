@@ -22,6 +22,7 @@ type cmd =
  (* add more *)
 
 let pipeline = ref []
+let startdebug = ref 1
 
 let typecheck p =
   let v = object(self)
@@ -200,17 +201,41 @@ let speclist =
      uadd(TransformAst Traces.concrete),
      "Execute the trace concretely and obtain a straightline trace"
     )
-  ::("-trace-concolic", 
-     uadd(TransformAst Traces.concolic),
-     "Execute the trace symbolically and generate the formula"
+  ::("-trace-concrete-subst", 
+     uadd(TransformAst Traces.concrete_substitution),
+     "Execute the trace concretely and obtain a straightline trace"
+    )
+  ::("-trace-slice", 
+     uadd(TransformAst Traces.check_slice),
+     "Slice a trace based on the overwritten return address"
+    )
+  ::("-trace-clean", 
+     uadd(TransformAst Traces.clean),
+     "Remove labels and comments from a concretized trace"
+    )
+  ::("-trace-reconcrete",
+     Arg.String(fun f -> add(TransformAst(Traces.concrete_rerun f))),
+     "Execute a concretized trace with the specified input file."
     )
   ::("-trace-dce",
      uadd(TransformAst Traces.trace_dce),
      "Trace dead-code elimination."
     )
+  ::("-trace-start-debug",
+     Arg.Set_int(startdebug),
+     "Start debugging at item n."
+    )
   ::("-trace-debug", 
-     uadd(TransformAst Traces.valid_to_invalid),
+     uadd(TransformAst Traces.trace_valid_to_invalid),
      "Formula debugging. Prints to files form_val and form_inv"
+    )
+  ::("-trace-conc-debug", 
+     Arg.Unit 
+       (fun () ->
+	  let f = Traces.formula_valid_to_invalid ~min:!startdebug in
+	  add(TransformAst f)
+       ),
+     "Formula debugging. Prints to files form_val and form_inv. Concretizes BEFORE debugging; useful for finding which assertion doesn't work."
     )
   ::("-trace-dsa",
      uadd(TransformAst to_dsa),
@@ -295,6 +320,10 @@ let speclist =
      Arg.String(fun f -> add(TransformAst(Traces.output_formula f))),
      "<file> Output the STP trace formula to <file>"
     )
+  ::("-trace-formula-format",
+     Arg.Set_string Traces.printer,
+     "Set formula format (STP (default) or smtlib1)."
+  )
   ::("-approx-formula", 
      Arg.Unit(fun () -> add(TransformAst(Payload.sym_analyze))),
      "Approximate formula"
@@ -311,8 +340,8 @@ let speclist =
      uadd(TransformAst(Traces.trace_length)),
      "Output the length of the trace"
     )
-  ::("-trace-padding", 
-     Arg.Set Traces.padding,
+  ::("-trace-no-padding", 
+     Arg.Unit(fun () -> Traces.padding := false),
      "Apply padding for symbolic unused bytes."
     )   
   ::("-no-let-bindings", 
@@ -326,6 +355,15 @@ let speclist =
   ::("-trace-check",
      Arg.Set Traces.consistency_check,
      "Perform extra consistency checks"
+    )
+  ::("-trace-check-all",
+     Arg.Unit(fun () -> Traces.consistency_check := true;
+	   Traces.checkall := true),
+     "Perform extra consistency checks"
+    )
+  ::("-trace-noopt",
+     Arg.Clear Traces.dce,
+     "Disable trace optimizations"
     )
   :: ("-normalize-mem", uadd(TransformAst Memory2array.coerce_prog),
       "Normalize memory accesses as array accesses")

@@ -82,6 +82,7 @@ union PIN_REGISTER
 #define VT_MEM32    (MEM_BASE+0x2)
 #define VT_MEM64    (MEM_BASE+0x3)
 #define VT_MEM128   (MEM_BASE+0x4)
+#define VT_MEM256   (MEM_BASE+0x5)
 
 enum FrameType {
 
@@ -104,7 +105,9 @@ enum FrameType {
    FRM_TAINT = 5,
 
    FRM_STD2 = 6,
-   
+
+   // Exception frame
+   FRM_EXCEPT = 7,
 };
 
 
@@ -193,7 +196,7 @@ enum FrameType {
     *        Store the value of the memory location being read.
     *     EndIf
     *     If this instruction has any subsequent memory reads:
-    *        Store the values of the memory locations being red.
+    *        Store the values of the memory locations being read.
     *     EndIf
     *
     *   i.e. the values array will start with the values of all registers
@@ -472,7 +475,7 @@ enum FrameType {
     * LoadModuleFrame : Records information about a loaded module.
     *
     * Packed format:
-    *   48 bytes -> Values of all registers.
+    *  XXX
     *
     * Additional notes:
     *
@@ -495,7 +498,7 @@ enum FrameType {
     * SyscallFrame : A system call.
     *
     * Packed format:
-    *   48 bytes -> Values of all registers.
+    *   XXX
     *
     * Additional notes:
     *
@@ -515,6 +518,8 @@ enum FrameType {
 #endif     
    };
 
+  /* XXX: TaintFrame really should have an id for each byte! */
+  
    struct TaintFrame : public Frame {
 
       uint32_t id;
@@ -528,6 +533,30 @@ enum FrameType {
      conc_map_vec * getOperands();
 #endif     
    };
+
+   /* ExceptionFrame: Exceptionframe, used to capture state if there is a 
+    *                 processor exception.
+    *
+    * Packed format:
+    *  XXX
+    *
+    * Additional notes:
+    * XXX
+    *
+    */
+   struct ExceptionFrame : public Frame {
+
+       uint32_t exception;
+       uint32_t tid;
+       // XXX Can these be 64 bit?
+       uint32_t from_addr;
+       uint32_t to_addr;
+
+      ExceptionFrame() : Frame(FRM_EXCEPT) {}
+      virtual std::ostream &serialize(std::ostream &out, uint16_t sz = 0);
+      virtual std::istream &unserializePart(std::istream &in);
+   };
+
 
 }; // END of namespace
 

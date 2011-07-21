@@ -457,7 +457,8 @@ object
   inherit pp ft as super
   method close =
     super#close;
-    close_out fd
+    if fd <> stdout then
+      close_out fd
 end
 
 

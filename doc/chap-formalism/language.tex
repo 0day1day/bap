@@ -7,9 +7,10 @@
 Table~\ref{vine:syntax} shows the syntax of \bil. We use the term
 ``instruction'' to refer to an assembly-level instruction, and the
 term ``statement'' to refer to instructions within \bil.  Thus, \bap
-raises instructions to statements in \bil.  In \ref{vinesec:typecheck}
-we give basic type-checking rules which disallow certain syntactically
-valid but nonsensical expressions, and in ~\ref{vine:operational} we
+raises instructions to statements in \bil.  In %% \ref{vine:typecheck}
+%% we give basic type-checking rules which disallow certain syntactically
+%% valid but nonsensical expressions, and in
+~\ref{vine:operational} we
 provide the operational semantics. In the remainder of this section we
 give an informal description and motivation for constructs in the IL.
 
@@ -69,9 +70,8 @@ efficiency.
 In \bil, the {\tt store} operation is pure (i.e., side-effect
 free). The advantage of pure memory operations in \bil notation is it
 makes it possible to syntactically distinguish what memory is modified
-or read.  One place we take advantage of this is in SSA
-(see~\ref{vine:backend}) where both scalars and memory have a unique
-single static assignment location.
+or read.  One place we take advantage of this is in SSA where both
+scalars and memory have a unique single static assignment location.
 
 Each {\tt store} expression must specify what memory to load or store
 from.  The resulting memory is returned as a value.  The semantics of

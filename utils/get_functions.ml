@@ -3,10 +3,12 @@ let usage = "Usage: "^Sys.argv.(0)^" <elf file> (<output prefix> | -r) [<functio
              Disassemble functions from a binary."
 
 let rangeonly = ref false
+let unroll = ref false
 let speclist =
   ("-r", Arg.Set rangeonly,
    "Print ranges rather than disassembling functions.")
-    :: Input.speclist
+  ::("-unroll", Arg.Set unroll, "Unroll loops.")
+  ::[]
 
 let file = ref ""
 let prefix = ref ""
@@ -45,9 +47,16 @@ let doit = match !rangeonly with
 	 (*let ir = Hacks.assert_noof ir in *)
 	 let cfg = Cfg_ast.of_prog ir in
 	 let cfg = Prune_unreachable.prune_unreachable_ast cfg in
-	 (* let structs = Structural_analysis.structural_analysis cfg in *)
-	 let cfg = Unroll.unroll_loops cfg in
-	 let cfg = Hacks.remove_backedges cfg in
+	 let cfg = if !unroll then
+	     let cfg = Unroll.unroll_loops cfg in
+	     Hacks.remove_backedges cfg
+	   else cfg
+	 in
+	 let cfg = Prune_unreachable.prune_unreachable_ast cfg in
+	 (* let oc = open_out "unroll.out" in *)
+	 (* let ssa_func_cfg = Cfg_ssa.of_astcfg cfg in *)
+	 (* Cfg_pp.SsaStmtsDot.output_graph oc ssa_func_cfg; *)
+	 (* close_out oc; *)
 	 let ir = Cfg_ast.to_prog cfg in
 	 let oc = open_out (!prefix ^ n ^ ".il") in
 	 let pp = new Pp.pp_oc oc in
@@ -60,5 +69,8 @@ let doit = match !rangeonly with
 	     Printf.eprintf "Warning: problem with %s (0x%Lx-0x%Lx)\n" n s e
       )
 ;;
-(* Fixme: only for given functions *)
+let filter_range (s,_,_) =
+  List.mem s !names
+let ranges = if List.length !names > 0 then List.filter filter_range ranges else ranges;;
+
 List.iter doit ranges
