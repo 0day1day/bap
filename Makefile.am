@@ -4,7 +4,7 @@
 
 #include @top_srcdir@/config/recursive.mk
 
-SUBDIRS=ounit-1.1.0 VEX libasmir ocaml utils tests
+SUBDIRS=ounit-1.1.0 pcre-ocaml-release-6.2.2 VEX libasmir ocaml utils tests
 # stp/ocaml ocaml utils doc
 
 test: all

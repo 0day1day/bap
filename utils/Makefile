@@ -3,11 +3,10 @@
 export BAP_OCAMLDIR=../ocaml
 export OCAMLMAKEFILE=$(BAP_OCAMLDIR)/OCamlMakefile
 
-
 # ocamlfind packages required
 export PACKS = bigarray str ocamlgraph extlib unix batteries
-export LIBS = ../ocaml/bap 
-export INCDIRS = $(BAP_OCAMLDIR)
+export LIBS = ../ocaml/bap
+export INCDIRS = $(BAP_OCAMLDIR) $(PCRE)
 
 # Include sources from ../ocaml in the automatically generated dependencies.
 export SOURCE_DIRS_IN = $(BAP_OCAMLDIR) $(BAP_PROJ_OCAMLDIR)
