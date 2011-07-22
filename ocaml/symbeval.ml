@@ -565,11 +565,12 @@ module SymbolicSlow = Make(SymbolicMemL)(SlowEval)(StdForm)
 module Concrete = Make(ConcreteMemL)(FastEval)(StdForm)
 
 (** Execute a program concretely *)
-let concretely_execute ?s ?(i=[]) p =
+let concretely_execute ?(loud=true) ?s ?(i=[]) p =
   let rec step ctx =
     try
       let s = Concrete.inst_fetch ctx.sigma ctx.pc in
-      dprintf "Executing: %s" (Pp.ast_stmt_to_string s);
+      if loud then 
+		dprintf "Executing: %s" (Pp.ast_stmt_to_string s);
       match Concrete.eval ctx with
       | [next] -> step next
       | _ -> failwith "step"
@@ -589,8 +590,10 @@ let concretely_execute ?s ?(i=[]) p =
     | None -> ctx
   in
   let ctx = step ctx in
-  Concrete.print_values ctx.delta;
-  Concrete.print_mem ctx.delta;
+  if loud then (
+	Concrete.print_values ctx.delta;
+	Concrete.print_mem ctx.delta;
+  );
   ctx
 
 let eval_expr = Symbolic.eval_expr

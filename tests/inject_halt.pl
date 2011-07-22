@@ -12,14 +12,14 @@ open(OBJDUMP, "objdump -D $file |") || die "Could not objdump: $!\n";
 foreach $line (<OBJDUMP>) {
     if (defined $mainAddr && 
         $line =~ /([0-9|a-e]+):\s+\S+\s+ret/) {
-        print "Ret line is:\n$line";
-        print "Ret Addr = $1\n";
+#        print "Ret line is:\n$line";
+ #       print "Ret Addr = $1\n";
         $retAddr = $1;
         last;
     }
 
     if ($line =~ /^([0-9|a-e]+) <main>/) {
-        print "Main Addr = $1\n";
+#        print "Main Addr = $1\n";
         $mainAddr = $1;
     }
 }
@@ -35,7 +35,7 @@ foreach $line (<IL>) {
     print ILOUT $line;
     if($line =~ /$labelStr/) {
         print ILOUT "halt true\n";
-        print "Il line is $line";
+ #       print "Il line is $line";
     }
 }
 close(IL);
