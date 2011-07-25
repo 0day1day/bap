@@ -22,6 +22,7 @@ SOURCES = \
 	disasm_i386_suite.ml \
 	asmir_suite.ml \
 	traces_suite.ml \
+	pin_suite.ml \
 	bap_suite.ml
 
 

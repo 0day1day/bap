@@ -4,7 +4,7 @@ open Pcre
 
 let in_il = ref None
 and out_il = ref None
-and ret_addr = ref None
+(*and ret_addr = ref None*)
 
 let speclist =
   [

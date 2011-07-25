@@ -12,6 +12,7 @@ let tests =
 		Disasm_i386_suite.suite;
 		Asmir_suite.suite;
 		Traces_suite.suite;
+		Pin_suite.suite;
 	  ]);;
 
 let verbose = ref false;;
