@@ -31,8 +31,8 @@ Linux is being used; most interaction with the trace tool is the same.
 To see the command line options to the trace tool, execute 
 
 \begin{verbatim} 
-$PATH/traces/pin/pin -t
-$PATH/traces/pintraces/obj-ia32/gentrace.so -h -- /bin/ls
+$PATH/traces/pin/pin -t \
+ $PATH/traces/pintraces/obj-ia32/gentrace.so -h -- /bin/ls
 \end{verbatim}
 
 By default, the trace tool will only log instructions that are
@@ -50,9 +50,9 @@ echo ``helloooooooooooooooooo'' > readme
  to create the input file.  Then run 
 
 \begin{verbatim}
-$PATH/traces/pin/pin -t 
-$PATH/traces/pintraces/obj-ia32/gentrace.so -taint-files readme
-$PATH/traces/pintraces/examples/bof
+$PATH/traces/pin/pin -t  \
+ $PATH/traces/pintraces/obj-ia32/gentrace.so -taint-files readme \
+ $PATH/traces/pintraces/examples/bof
 \end{verbatim}
 
 The PIN tool will output
