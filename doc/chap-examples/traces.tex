@@ -50,9 +50,15 @@ echo ``helloooooooooooooooooo'' > readme
  to create the input file.  Then run 
 
 \begin{verbatim}
+make $PATH/traces/pintraces/examples/bof1/
+\end{verbatim}
+
+and
+
+\begin{verbatim}
 $PATH/traces/pin/pin -t  \
  $PATH/traces/pintraces/obj-ia32/gentrace.so -taint-files readme \
- $PATH/traces/pintraces/examples/bof
+ -- $PATH/traces/pintraces/examples/bof1/bof1
 \end{verbatim}
 
 The PIN tool will output
