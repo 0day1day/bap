@@ -5,7 +5,7 @@ PACKAGES=bof1
 all: $(PACKAGES)
 
 bof1: bof1.c
-	gcc -o $@ -fno-stack-protector -mpreferred-stack-boundary=2 $^
+	gcc -o $@ -fno-stack-protector -m32 -mpreferred-stack-boundary=2 $^
 
 .PHONY: clean all
 

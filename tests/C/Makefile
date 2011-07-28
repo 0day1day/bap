@@ -1,12 +1,11 @@
+include Makefile.defs
 
-SRC=$(wildcard *.c)
-EXECS = $(SRC:%.c=%)
 CFLAGS = -m32 -static
 
-all: $(EXECS)
+all: $(CEXECS)
 
-$(EXECS): $(SRC)
+$(CEXECS): $(CSRC)
 	gcc $@.c -o $@ $(CFLAGS)
 
 clean:
-	rm -f $(EXECS)
+	rm -f $(CEXECS)
