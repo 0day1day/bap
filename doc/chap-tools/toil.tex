@@ -8,10 +8,10 @@ The {\tt toil} tool lifts binary code to \bil.  The syntax for {\tt
 Lifting up binary code to the IL consists of three steps:
 \begin{itemize}\squish
 \item {\bf Step 1.} First, the binary file is disassembled. {\tt toil}
-  currently interfaces with two disassemblers: IDA Pro~\cite{idapro},
-  a commercial disassembler, and a linear sweep disassembler built on
-  top of GNU libopcodes.  Interfacing with other disassemblers is
-  straight-forward.
+  currently interfaces with %% two disassemblers: IDA Pro~\cite{idapro},
+  %% a commercial disassembler, and 
+  a linear sweep disassembler built on top of GNU libopcodes.
+  Interfacing with other disassemblers like IDA Pro is straight-forward.
 
 \item {\bf Step 2.} The disassembly is passed to VEX, a third-party
   library which turns assembly instructions into the VEX intermediate
