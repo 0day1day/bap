@@ -23,7 +23,7 @@ TARGETS = CTESTS ASM nc dc
 RESULT = bap_test_suite
 
 # XXX Use ocamlmake to clean up x86 executables?
-TRASH = x86/nop C/test C/taint_test
+TRASH = x86/nop C/test C/taint_test C/bof1
 
 SOURCES = \
 	il_suite.ml \

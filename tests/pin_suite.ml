@@ -1,24 +1,75 @@
 open OUnit
 open Pcre
 
-let startup dir _ =
-	let pwd = Sys.getcwd () in
-	Sys.chdir dir;
-	pwd;;
+let bof = "C/bof1";;
+let pin_path = "../pin/";;
+let pin = "pin";;
+let gentrace_path = "../pintraces/obj-ia32/";;
+let gentrace = "gentrace.so";;
+let stp_path = "../stpwrap/stp/bin/";;
+let stp = "stp";;
+let taint_file = "tainted_file";;
+let out_suffix = "bap-pin-test.out";;
+let exploit_file = "exploit";;
+
+
+let chdir_startup dir _ =
+  let pwd = Sys.getcwd () in 
+  Sys.chdir dir;
+  pwd;;
 
 
 let chdir_cleanup pwd = Sys.chdir pwd;;
 
 
+let check_file file _ =
+  (@?) ("File "^file^" does not exist!") (Sys.file_exists file)
+
+
+let create_input_file _ =
+  let out = open_out taint_file in
+  output_string out "helloooooooooooooooooo\n";
+  close_out out;;
+  
+
+let rec find_pin_out files =
+  match files with
+  | [] -> assert_failure ("Could not find a file with suffix "^out_suffix)
+  | f::fs -> if (pmatch ~pat:out_suffix f) then f else find_pin_out fs;;
+
+
+let pin_trace_setup _ =
+  let args = 
+	["-t"; (gentrace_path^gentrace); "-taint-files"; taint_file; 
+	 "-o"; out_suffix; "--"; bof; taint_file ] in
+  let exit_code = Unix.WEXITED(1) in
+  create_input_file();
+  assert_command ~exit_code (pin_path^pin) args;
+  find_pin_out (Array.to_list (Sys.readdir "./"));;
+
+
+let pin_trace_test pin_out = 
+  let prog = Asmir.bap_from_trace_file ~pin:true pin_out in
+  Traces.consistency_check := true;
+  ignore(Traces.concrete prog);
+  Traces.consistency_check := false;
+  Unix.putenv "PATH" ("$PATH:"^stp_path);
+  ignore(Traces.output_exploit exploit_file prog);;
+
+
+(* Note: This will leave the files pin.log and pintool.log by intention *)
+let pin_trace_cleanup pin_out = 
+  Sys.remove pin_out; Sys.remove exploit_file; Sys.remove taint_file;;
+
 
 let suite = "Pin" >:::
   [
-	"pin_dir_test" >:: 
-	  (fun () ->
-		(@?) "Directory ../pin does not exist!" (Sys.is_directory "../pin"));
-	"pin_obj_test" >:: bracket 
-	  (startup "../pintraces/obj-ia32/") 
-	  (fun _ -> 
-		(@?) "File gentrace.so does not exist!" (Sys.file_exists "gentrace.so"))
-	  chdir_cleanup;
+	"pin_binary_test" >:: 
+	  bracket (chdir_startup pin_path) (check_file pin) chdir_cleanup;
+	"pin_obj_test" >:: 
+	  bracket (chdir_startup gentrace_path) (check_file gentrace) chdir_cleanup;
+	"stp_binary_test" >::
+	  bracket (chdir_startup stp_path) (check_file stp) chdir_cleanup;
+	"pin_taint_test" >::
+	  bracket pin_trace_setup pin_trace_test pin_trace_cleanup;
   ]

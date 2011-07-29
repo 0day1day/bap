@@ -1,4 +1,4 @@
-let usage = "Usage: "^Sys.argv.(0)^" <options>\nRun BAP unit tests. "
+(*let usage = "Usage: "^Sys.argv.(0)^" <options>\nRun BAP unit tests. "*)
 
 open OUnit
 
@@ -39,7 +39,7 @@ let rec print_paths paths =
   | [] -> ()
   | p::ps -> Format.printf "%s\n" (string_of_path p); print_paths ps;;
 
-let speclist =
+(*let speclist =
   [
 	("-list-tests",
 	 Arg.Unit(fun () -> print_paths (test_case_paths tests);exit 0),
@@ -48,11 +48,11 @@ let speclist =
   ];;
 
 let anon x = raise(Arg.Bad("Unexpected argument: '"^x^"'"));;
-let () = Arg.parse speclist anon usage;;
+let () = Arg.parse speclist anon usage;;*)
 
 let _ = 
   let results =
-	run_test_tt ~verbose:!verbose tests
+	run_test_tt_main (*~arg_specs:speclist ~verbose:!verbose*) tests
   in
   Format.printf "%s\n" "";
   summarize_results results
