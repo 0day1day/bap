@@ -222,7 +222,10 @@ initialize_bfd(const char *filename)
     return NULL;
   }
 
-  if(!bfd_check_format_matches(abfd, bfd_object, &matching)) {
+  /* if(!bfd_check_format_matches(abfd, bfd_object, &matching)) { */
+  if( (!bfd_check_format_matches(abfd, bfd_object, &matching)) &&
+      (!bfd_check_format_matches(abfd, bfd_core, &matching)) ) {
+
     fprintf(stderr, "initialize_bfd: bfd_check_format_matches failed\n");
     bfd_close_all_done(abfd);
     return NULL;
