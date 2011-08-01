@@ -5,6 +5,9 @@ open Ast
 open Type
 open Typecheck
 
+
+exception RangeNotFound of int64 * int64
+
 (* exp helpers *)
 let binop op a b = match (a,b) with
   | (Int(a, at), Int(b, bt)) when at = bt ->
@@ -175,7 +178,7 @@ let rm_concat = function
 let find_prog_chunk prog start_addr end_addr = 
   let rec find_prog_chunk_k prog starta enda k =
 	match prog with
-	| [] -> k
+	| [] -> raise (RangeNotFound (start_addr, end_addr))
 	| p::ps -> 
 	  match starta with
 	  | Some(a) -> (match p with

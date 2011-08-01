@@ -13,6 +13,7 @@ let tests =
 		Asmir_suite.suite;
 		Traces_suite.suite;
 		Pin_suite.suite;
+		Predicate_suite.suite;
 	  ]);;
 
 let verbose = ref false;;

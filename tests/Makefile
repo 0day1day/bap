@@ -7,7 +7,7 @@ export OUNIT=$(CURDIR)/../ounit-1.1.0/_build/src/
 export PCRE=$(CURDIR)/../pcre-ocaml-release-6.2.2/lib
 
 #export PACKS = oUnit bigarray str ocamlgraph extlib unix
-export PACKS = bigarray str ocamlgraph extlib unix
+export PACKS = bigarray str ocamlgraph extlib unix batteries
 export LIBS = ../ocaml/bap oUnit pcre
 export INCDIRS = $(BAP_OCAMLDIR) $(OUNIT) $(PCRE)
 
@@ -26,6 +26,7 @@ RESULT = bap_test_suite
 TRASH = x86/nop C/test C/taint_test C/bof1
 
 SOURCES = \
+	testCommon.ml \
 	il_suite.ml \
 	var_suite.ml \
 	ast_suite.ml \
@@ -33,6 +34,7 @@ SOURCES = \
 	asmir_suite.ml \
 	traces_suite.ml \
 	pin_suite.ml \
+	predicate_suite.ml \
 	bap_suite.ml
 
 
