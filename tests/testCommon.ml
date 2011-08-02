@@ -8,8 +8,8 @@ let stp = "stp";;
 
 let set_stp_path _ =
   let path = Sys.getenv("PATH") in
-  if (pmatch ~pat:stp_path path) then () 
-  else (Unix.putenv "PATH" ("$PATH:"^stp_path));;
+  if (pmatch ~pat:stp_path path) then ()
+  else (Unix.putenv "PATH" (path^":"^stp_path));;
 
 let rec find_fun ?(msg="") ranges name = match ranges with
   | [] -> assert_failure ("Could not find function "^name^msg)
