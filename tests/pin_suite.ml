@@ -1,29 +1,15 @@
 open OUnit
 open Pcre
+open TestCommon
 
 let bof = "C/bof1";;
 let pin_path = "../pin/";;
 let pin = "pin";;
 let gentrace_path = "../pintraces/obj-ia32/";;
 let gentrace = "gentrace.so";;
-let stp_path = "../stpwrap/stp/bin/";;
-let stp = "stp";;
 let taint_file = "tainted_file";;
 let out_suffix = "bap-pin-test.out";;
 let exploit_file = "exploit";;
-
-
-let chdir_startup dir _ =
-  let pwd = Sys.getcwd () in 
-  Sys.chdir dir;
-  pwd;;
-
-
-let chdir_cleanup pwd = Sys.chdir pwd;;
-
-
-let check_file file _ =
-  (@?) ("File "^file^" does not exist!") (Sys.file_exists file)
 
 
 let create_input_file _ =
@@ -53,7 +39,7 @@ let pin_trace_test pin_out =
   Traces.consistency_check := true;
   ignore(Traces.concrete prog);
   Traces.consistency_check := false;
-  Unix.putenv "PATH" ("$PATH:"^stp_path);
+  set_stp_path();
   ignore(Traces.output_exploit exploit_file prog);;
 
 

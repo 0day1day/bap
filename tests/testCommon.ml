@@ -2,10 +2,31 @@ open OUnit
 open Pcre
 open Ast
 
+let stp_path = "../stpwrap/stp/bin/";;
+let stp = "stp";;
+
+
+let set_stp_path _ =
+  let path = Sys.getenv("PATH") in
+  if (pmatch ~pat:stp_path path) then () 
+  else (Unix.putenv "PATH" ("$PATH:"^stp_path));;
 
 let rec find_fun ?(msg="") ranges name = match ranges with
   | [] -> assert_failure ("Could not find function "^name^msg)
   | (n,s,e)::rs -> if (n = name) then (s,e) else find_fun ~msg rs name;;
+
+
+let chdir_startup dir _ =
+  let pwd = Sys.getcwd () in 
+  Sys.chdir dir;
+  pwd;;
+
+
+let chdir_cleanup pwd = Sys.chdir pwd;;
+
+
+let check_file file _ =
+  (@?) ("File "^file^" does not exist!") (Sys.file_exists file)
 
 
 let rec find_call prog = 
@@ -83,4 +104,3 @@ let check_eax ctx eax =
 
 let check_functions msg ranges names =
   ignore(List.map (find_fun ~msg ranges) names);;
-
