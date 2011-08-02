@@ -59,6 +59,8 @@ val get_asmprogram_arch : asmprogram -> arch
 val x86_mem : Var.t
 val x86_regs : Var.t list
 
+val all_regs : Var.t list
+
 val open_program : ?loud:bool -> string -> asmprogram
 val asmprogram_to_bap : ?init_ro:bool -> asmprogram -> Ast.program
 val asm_addr_to_bap :

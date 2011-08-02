@@ -46,16 +46,16 @@ export SOURCES = \
 	libasmir.idl \
 	disasm_i386.ml \
 	disasm.ml \
-	grammar.mly lexer.mll \
-	stp_grammar.mly stp_lexer.mll \
-	cvc3_grammar.mly cvc3_lexer.mll \
-	yices_grammar.mly yices_lexer.mll \
-	parser.ml \
 	memory2array.ml \
 	gcl.mli gcl.ml \
 	wp.ml \
+	stp_grammar.mly stp_lexer.mll \
+	cvc3_grammar.mly cvc3_lexer.mll \
+	yices_grammar.mly yices_lexer.mll \
 	smtexec.mli smtexec.ml \
 	asmirconsts.ml asmir.mli asmir.ml \
+	grammar.mly lexer.mll \
+	parser.ml \
 	input.mli input.ml \
 	depgraphs.ml \
 	to_c.ml \

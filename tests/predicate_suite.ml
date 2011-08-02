@@ -21,12 +21,7 @@ let predicate_stp_setup _ =
   let g_cfg = Hacks.remove_backedges g_cfg in
   let g_cfg = Prune_unreachable.prune_unreachable_ast g_cfg in
   let g_ir = Cfg_ast.to_prog g_cfg in
-  let oc = open_out g_il in
-  let pp = new Pp.pp_oc oc in
-  pp#ast_program g_ir;
-  pp#close;;
-(*  g_ir;;
-  g_cfg;;*)
+  g_cfg;;
 
 
 (* Copied from topredicate...what's the better thing to do here? *)
@@ -53,11 +48,8 @@ let to_ssagcl cfg post =
   (gcl, p);;
 
 
-let predicate_stp_solve_test str stp_result _ (*g_prog*) = 
+let predicate_stp_solve_test str stp_result g_cfg (*g_prog*) = 
   let _ = set_stp_path() in
-  let g_prog = Parser.program_from_file g_il in
-  let g_cfg = Cfg_ast.of_prog g_prog in
-  let g_cfg = Prune_unreachable.prune_unreachable_ast g_cfg in
 (*  let str = "R_EAX_5:u32 == 43:u32" in*)
   let post = Parser.exp_from_string str in
   let (gcl, post) = to_ssagcl g_cfg post in
@@ -78,7 +70,9 @@ let predicate_stp_solve_test str stp_result _ (*g_prog*) =
 ;;
 
 
-let predicate_stp_tear_down _ = Sys.remove g_il; Sys.remove stp_out;;
+let predicate_stp_tear_down _ = 
+  try Sys.remove g_il with _ -> ();
+  try Sys.remove stp_out with _ -> ();;
 
 
 let suite = "Predicate" >:::
@@ -88,12 +82,12 @@ let suite = "Predicate" >:::
 	"predicate_stp_solve_test" >::
 	  (bracket 
 		 predicate_stp_setup 
-		 (predicate_stp_solve_test "R_EAX_5:u32 == 42:u32" (Smtexec.Invalid))
+		 (predicate_stp_solve_test "R_EAX:u32 == 42:u32" (Smtexec.Invalid))
 		 predicate_stp_tear_down);
 	"predicate_stp_unsolve_test" >::
 	  (bracket 
 		 predicate_stp_setup 
-		 (predicate_stp_solve_test "R_EAX_5:u32 == 43:u32" (Smtexec.Valid))
+		 (predicate_stp_solve_test "R_EAX:u32 == 43:u32" (Smtexec.Valid))
 		 predicate_stp_tear_down);
 
   ]
