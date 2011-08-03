@@ -24,7 +24,7 @@ let predicate_stp_setup _ =
   g_cfg;;
 
 
-(* Copied from topredicate...what's the better thing to do here? *)
+(* TODO: Copied from topredicate...what's the better thing to do here? *)
 let rename_astexp f =
   let vis = object
     inherit Ast_visitor.nop
@@ -48,9 +48,8 @@ let to_ssagcl cfg post =
   (gcl, p);;
 
 
-let predicate_stp_solve_test str stp_result g_cfg (*g_prog*) = 
+let predicate_stp_solve_test str stp_result g_cfg = 
   let _ = set_stp_path() in
-(*  let str = "R_EAX_5:u32 == 43:u32" in*)
   let post = Parser.exp_from_string str in
   let (gcl, post) = to_ssagcl g_cfg post in
   let wp = Wp.wp gcl post in
