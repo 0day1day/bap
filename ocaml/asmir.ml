@@ -753,6 +753,10 @@ let get_asm_instr_string_range p s e =
   done;
   !str
 
+let set_print_warning = Libasmir.asmir_set_print_warning
+
+let get_print_warning = Libasmir.asmir_get_print_warning
+
 let set_use_simple_segments = Libasmir.asmir_set_use_simple_segments
 
 let get_prog_contents {get=get} addr =

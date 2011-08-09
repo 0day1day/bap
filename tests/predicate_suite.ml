@@ -9,7 +9,8 @@ let stp_out = "stp_out.stp";;
 let solver = ref (Smtexec.STP.si);;
 
 let predicate_stp_setup _ =
-  (* TODO: Silence Asmir output for tests *)
+  (* Silence floating point warnings for tests *)
+  let _ = if (Asmir.get_print_warning()) then Asmir.set_print_warning(false) in
   let prog = Asmir.open_program test_file in
   let ranges = Asmir.get_function_ranges prog in
   let (start_g, end_g) = find_fun ~msg:" in predicate_stp_setup" ranges "g" in

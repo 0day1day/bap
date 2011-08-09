@@ -28,7 +28,8 @@ let concrete_eval_setup _ =
   let prog = Asmir.open_program ~loud:false test_file in
   let ranges = Asmir.get_function_ranges prog in
   let (start_addr,_) = find_fun ranges "main" in
-  (* TODO: silence this output for tests *)
+  (* Silence floating point warnings for tests *)
+  let _ = if (Asmir.get_print_warning()) then Asmir.set_print_warning(false) in
   let ir = Asmir.asmprogram_to_bap prog in
   let outir = inject_stmt ir start_addr "ret" halt_stmt in 
   pp#ast_program outir;

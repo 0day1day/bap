@@ -37,7 +37,8 @@ asmir_get_all_sections(asm_program_t prog,
                        [out] long *num);
 
 enum frame_type_t {
-  FRM_NONE = 0, FRM_KEY, FRM_STD, FRM_LOADMOD, FRM_SYSCALL, FRM_TAINT, FRM_STD2, FRM_EXCEPT };
+  FRM_NONE = 0, FRM_KEY, FRM_STD, FRM_LOADMOD, FRM_SYSCALL, FRM_TAINT, 
+  FRM_STD2, FRM_EXCEPT };
 
 enum exp_type_t {
   BINOP, UNOP, CONSTANT, MEM, TEMP, PHI, CAST,
@@ -61,7 +62,8 @@ enum cast_t {
   CAST_UNSIGNED, CAST_SIGNED, CAST_HIGH, CAST_LOW,
   CAST_FLOAT, CAST_INTEGER, CAST_RFLOAT, CAST_RINTEGER };
 
-enum stmt_type_t {  JMP,   CJMP, SPECIAL, MOVE,  COMMENT,  LABEL, EXPSTMT, VARDECL, CALL, RETURN, FUNCTION, ASSERT};
+enum stmt_type_t {  JMP,   CJMP, SPECIAL, MOVE,  COMMENT,  LABEL, EXPSTMT, 
+		    VARDECL, CALL, RETURN, FUNCTION, ASSERT};
 
 enum cval_type_t {NONE, BOOL, CHR, INT_16, INT_32, INT_64, INT_128};
 
@@ -131,6 +133,9 @@ boolean func_is_external(Stmt s);
 [null_terminated] Stmt* func_body(Stmt s);
 Exp assert_cond(Stmt s);
 
+void asmir_set_print_warning(boolean value);
+boolean asmir_get_print_warning();
+
 // generated functions for eflags thunks
 //[null_terminated] Stmt* gen_eflags_helpers_c();
 // using simple segments
@@ -142,7 +147,7 @@ void asmir_close(asm_program_t p);
 [string] char* asmir_string_of_insn(asm_program_t prog, address_t inst);
 enum bfd_architecture asmir_get_asmp_arch(asm_program_t prog);
 
-/* How did this get revived? */
+/* FIXME: How did this get revived? */
 address_t memory_cell_data_address(memory_cell_data_t md);
 int memory_cell_data_value(memory_cell_data_t md);
 memory_data_t get_rodata(asm_program_t prog);

@@ -11,6 +11,8 @@
 #define Ist_MFence Ist_MBE
 #endif
 
+// flag to disable warnings (for unit test's sake)
+bool print_warnings = 1;
 
 // enable/disable lazy eflags computation.
 // this is for transitional purposes, and should be removed soon.
@@ -51,6 +53,20 @@ void modify_flags( asm_program_t *prog, bap_block_t *block );
 static void insert_specials(bap_block_t * block);
 void do_cleanups_before_processing();
 
+
+//======================================================================
+// 
+// Helper functions for output (generally should only be used by automated
+// testing)
+//
+//======================================================================
+void asmir_set_print_warning(bool value) {
+  print_warnings = value;
+}
+
+bool asmir_get_print_warning() {
+  return print_warnings;
+}
 //======================================================================
 // 
 // Helper functions for the translation
@@ -193,10 +209,16 @@ reg_t IRType_to_reg_type( IRType type )
     case Ity_I16:   t = REG_16; break;
     case Ity_I32:   t = REG_32; break;
     case Ity_I64:   t = REG_64; break;
-    case Ity_F32:   fprintf(stderr, "warning: Float32 register encountered\n"); 
-                    t = REG_32; break;
-    case Ity_F64:   fprintf(stderr, "warning: Float64 register encountered\n");
-                    t = REG_64; break;
+    case Ity_F32:   
+      if(print_warnings) { 
+	fprintf(stderr, "warning: Float32 register encountered\n");
+      } 
+      t = REG_32; break;
+    case Ity_F64:   
+      if(print_warnings) { 
+	fprintf(stderr, "warning: Float64 register encountered\n");
+      }
+      t = REG_64; break;
     default:
       throw "Unknown IRType";
     }
