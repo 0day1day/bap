@@ -655,7 +655,10 @@ let old_bap_from_trace_file ?(atts = true) ?(pin = false) filename =
   r
 
 let bap_from_trace_file ?(atts = true) ?(pin = false) filename =
-  alt_bap_from_trace_file filename
+  if pin then
+    old_bap_from_trace_file ~atts ~pin filename
+  else
+    alt_bap_from_trace_file filename
 
 (** Get one statement at a time.
 
