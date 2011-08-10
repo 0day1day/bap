@@ -496,7 +496,7 @@ let check_equivalence a (ir1, next1) (ir2, next2) =
 
 
 (** Translate only one address of a  Libasmir.asm_program_t to Vine *)
-let asm_addr_to_bap {asmp=prog; arch=arch; get=get} addr =
+let asm_addr_to_bap ?(log=fun _ -> ()) {asmp=prog; arch=arch; get=get} addr =
   let fallback() = 
     let g = gamma_for_arch arch in
     let (block, next) = Libasmir.asmir_addr_to_bap prog addr in
@@ -504,40 +504,46 @@ let asm_addr_to_bap {asmp=prog; arch=arch; get=get} addr =
     destroy_bap_block block;
     (ir, next)
   in
-  try let (ir,na) as v = try  Disasm.disasm_instr arch get addr
-    with Failure s -> DV.dprintf "disasm_instr %Lx: %s" addr s; raise Disasm.Unimplemented
-      in
-      DV.dprintf "Disassembled %Lx directly" addr;
-      if DCheck.debug then
-	check_equivalence addr v (fallback());
-      (match ir with
-      | Label(l, [])::rest ->
+  try 
+	let (ir,na) as v = 
+	  (try (Disasm.disasm_instr arch get addr)
+       with Failure s -> 
+		 log(Printf.sprintf "XXX disasm_instr %Lx: %s\n" addr s);
+		 DV.dprintf "disasm_instr %Lx: %s" addr s; raise Disasm.Unimplemented
+	  )
+    in
+    DV.dprintf "Disassembled %Lx directly" addr;
+    if DCheck.debug then check_equivalence addr v (fallback());
+    (match ir with
+    | Label(l, [])::rest ->
 	  (Label(l, [Asm(Libasmir.asmir_string_of_insn prog addr)])::rest,
 	   na)
-      | _ -> v
-      )
+    | _ -> v
+    )
   with Disasm.Unimplemented ->
     DV.dprintf "Disassembling %Lx through VEX" addr;
     fallback()
 
-let asmprogram_to_bap_range ?(init_ro = false) p st en =
+let asmprogram_to_bap_range ?(log=fun _ -> ()) ?(init_ro = false) p st en =
   let rec f l s =
-    let (ir, n) = asm_addr_to_bap p s in
+    let (ir, n) = asm_addr_to_bap ~log p s in
     if n >= en then List.flatten (List.rev (ir::l))
     else f (ir::l) n
   in
   f [] st
 
-let asmprogram_section_to_bap p s =
+let asmprogram_section_to_bap ?(log=fun _ -> ()) p s =
   let size = bfd_section_size s and vma = bfd_section_vma s in
-  asmprogram_to_bap_range p vma (Int64.add vma size)
+  asmprogram_to_bap_range ~log p vma (Int64.add vma size)
 
 let is_code sec =
   Int64.logand (Libbfd.bfd_section_get_flags sec) Libbfd.sEC_CODE <> 0L
 
 (** Translate an entire Libasmir.asm_program_t into a Vine program *)
-let asmprogram_to_bap ?(init_ro=false) p =
-  let irs = List.map (fun s -> if is_code s then asmprogram_section_to_bap p s else []) p.secs in
+let asmprogram_to_bap ?(log=fun _ -> ()) ?(init_ro=false) p =
+  let irs = List.map 
+	(fun s -> 
+	  if is_code s then asmprogram_section_to_bap ~log p s else []) p.secs in
   let ir = List.flatten irs in
 
   if init_ro then

@@ -10,5 +10,8 @@ SUBDIRS=ounit-1.1.0 pcre-ocaml-release-6.2.2 VEX libasmir ocaml utils tests pint
 test: all
 	cd tests/ ; ./bap_test_suite
 
+cscope:
+	cscope -b `find . -name "*.[ch]" -or -name "*.hh" -or -name "*.cc" -or -name "*.cpp"`
+
 #regression:
 #	cd $(top_srcdir)/../regression/ocaml;./test.sh
