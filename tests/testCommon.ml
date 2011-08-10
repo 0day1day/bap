@@ -104,3 +104,16 @@ let check_eax ctx eax =
 
 let check_functions msg ranges names =
   ignore(List.map (find_fun ~msg ranges) names);;
+
+
+let check_pin_setup _ =
+  let cat_arg = "/proc/sys/kernel/yama/ptrace_scope" in
+  let foutput char_stream = 
+	(match (Stream.next char_stream) with
+	| '0' -> ()
+	| _ -> assert_failure
+	  (cat_arg^
+		 " must contain 0 for pin to work.  As root, please execute $ echo 0 > "
+	   ^cat_arg))
+  in
+  assert_command ~foutput ~verbose:true "cat" [cat_arg];;

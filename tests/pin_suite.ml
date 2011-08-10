@@ -29,6 +29,7 @@ let pin_trace_setup _ =
 	["-t"; (gentrace_path^gentrace); "-taint-files"; taint_file; 
 	 "-o"; out_suffix; "--"; bof; taint_file ] in
   let exit_code = Unix.WEXITED(1) in
+  check_pin_setup();
   create_input_file();
   assert_command ~exit_code (pin_path^pin) args;
   find_pin_out (Array.to_list (Sys.readdir "./"));;
