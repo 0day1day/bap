@@ -18,6 +18,7 @@ open ExtList
 module BArray = Bigarray.Array1
 
 exception Disassembly_error;;
+exception Memory_error;;
 
 type arch = Libbfd.bfd_architecture
 type asmprogram = {asmp : Libasmir.asm_program_t;
@@ -442,7 +443,7 @@ let section_contents prog secs =
   let get a =
     (* let open Int64 in *)
     let (-) = Int64.sub in
-    let rec f a = function [] -> raise Not_found
+    let rec f a = function [] -> raise Memory_error
       | (s,arr)::_ when a - s >= 0L && a - s < Int64.of_int(BArray.dim arr)  ->
 	  arr.{Int64.to_int(a-s)}
       | _::b -> f a b
@@ -519,9 +520,17 @@ let asm_addr_to_bap {asmp=prog; arch=arch; get=get} addr =
 
 let asmprogram_to_bap_range ?(init_ro = false) p st en =
   let rec f l s =
-    let (ir, n) = asm_addr_to_bap p s in
-    if n >= en then List.flatten (List.rev (ir::l))
-    else f (ir::l) n
+    try
+      let (ir, n) = asm_addr_to_bap p s in
+      if n >= en then List.flatten (List.rev (ir::l))
+      else
+	f (ir::l) n
+    with Memory_error ->
+      (* If we fail, hopefully it is because there were some random
+	 bytes at the end of the section that we tried to
+	 disassemble *)
+      wprintf "Failed to read instruction byte while disassembling at address %#Lx; end of section at %#Lx" s en;
+      List.flatten (List.rev l)
   in
   f [] st
 
