@@ -429,13 +429,12 @@ let bfd_section_size = Libbfd.bfd_section_get_size
 let bfd_section_vma = Libbfd.bfd_section_get_vma
 let bfd_section_name = Libbfd.bfd_section_get_name
 
-let section_contents ?(be_loud=true) prog secs =
+let section_contents prog secs =
   let bfd = Libasmir.asmir_get_bfd prog in
   let sc l s =
     let size = bfd_section_size s and vma = bfd_section_vma s
     and flags = bfd_section_get_flags s in
-	if be_loud then 
-	  dprintf "Found section at %Lx with size %Ld. flags=%Lx" vma size flags;
+	dprintf "Found section at %Lx with size %Ld. flags=%Lx" vma size flags;
     if Int64.logand Libbfd.sEC_LOAD flags <> 0L then
       let (ok, a) = Libbfd.bfd_get_section_contents bfd s 0L size in
       if ok <> 0 then (vma, a)::l else (dprintf "failed."; l)
@@ -456,12 +455,12 @@ let section_contents ?(be_loud=true) prog secs =
 
 
 (** Open a binary file for translation *)
-let open_program ?(loud=true) filename =
+let open_program filename =
   let prog = Libasmir.asmir_open_file filename in
     (* tell the GC how to free resources associated with prog *)
   Gc.finalise Libasmir.asmir_close prog;
   let secs = Array.to_list (get_all_sections prog)  in
-  let get = section_contents ~be_loud:loud prog secs in
+  let get = section_contents prog secs in
   {asmp=prog; arch=Libasmir.asmir_get_asmp_arch prog; secs=secs; get=get}
 
 
@@ -513,7 +512,7 @@ let asm_addr_to_bap ?(log=fun _ -> ()) {asmp=prog; arch=arch; get=get} addr =
 	  )
     in
     DV.dprintf "Disassembled %Lx directly" addr;
-    if DCheck.debug then check_equivalence addr v (fallback());
+    if DCheck.debug() then check_equivalence addr v (fallback());
     (match ir with
     | Label(l, [])::rest ->
 	  (Label(l, [Asm(Libasmir.asmir_string_of_insn prog addr)])::rest,

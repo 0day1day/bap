@@ -5,7 +5,7 @@ let test_input_fails _ =
   assert_raises (Arg.Bad "No input specified") (fun _ -> Input.get_program());;
 
 let test_input_nop () = 
-  let p = Asmir.open_program ~loud:false "./x86/nop" in
+  let p = Asmir.open_program "./x86/nop" in
   (* Silence floating point warnings for tests *)
   let _ = if (Asmir.get_print_warning()) then Asmir.set_print_warning(false) in
   let stmts = Asmir.asmprogram_to_bap p in

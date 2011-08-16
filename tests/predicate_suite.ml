@@ -21,7 +21,6 @@ let predicate_stp_setup _ =
   let g_cfg = Unroll.unroll_loops g_cfg in
   let g_cfg = Hacks.remove_backedges g_cfg in
   let g_cfg = Prune_unreachable.prune_unreachable_ast g_cfg in
-  let g_ir = Cfg_ast.to_prog g_cfg in
   g_cfg;;
 
 
