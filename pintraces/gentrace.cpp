@@ -437,6 +437,16 @@ static uint32_t GetTypeOfReg(REG r) {
   if (REG_is_gr32(r)) return VT_REG32;
   if (REG_is_gr64(r)) return VT_REG64;
 
+  string s = REG_StringShort(r);
+
+  if (s == "eip" || s == "eflags") {
+    // No problem for these
+    return VT_NONE;
+  }
+
+  // Otherwise, print a warning...
+  
+  cerr << "Warning: Unknown register size of register " << REG_StringShort(r) << endl;
   return VT_NONE;
 }
 
@@ -1357,7 +1367,7 @@ VOID InstrBlock(BBL bbl)
       uint32_t rawbytes_i[4];
       // Is it an xor?
       bool is_xor = false;
-      //memcpy((char *) rawbytes_i, (char *) INS_Address(ins), INS_Size(ins));
+
       UINT sz = INS_Size(ins);
       assert(PIN_SafeCopy((void*)rawbytes_i, (const void*) INS_Address(ins), sz) == sz);
       
@@ -1432,45 +1442,21 @@ VOID InstrBlock(BBL bbl)
 
             valcount++;
 
-            /**
-            IARGLIST_AddArguments(arglist,
-                                  IARG_UINT32, ty,
-                                  IARG_UINT32, r,
-                                  IARG_REG_VALUE, r,
-                                  IARG_END);
-            **/
-
          } else if (INS_OperandIsMemory(ins, i) ||
 		    INS_OperandIsAddressGenerator(ins, i)) {
 
-            /* // FIXME: create a new type for index registers
-            REG segreg = INS_OperandMemorySegmentReg(ins, i);
-            if (segreg != REG_INVALID()) {
-               opndvals[valcount].reg = segreg;
-               opndvals[valcount].type = VT_REG16;
-               valcount++;
-            }
-            */
+
+           /* Note: Compiled code sometimes uses LEA instructions for
+            * arithmetic.  As such, we always want to treat reads of
+            * these base/index registers as tainted. */
 
             REG basereg = INS_OperandMemoryBaseReg(ins, i);
             if (basereg != REG_INVALID()) {
 
                opndvals[valcount].reg = basereg;
+               opndvals[valcount].type = GetTypeOfReg(basereg);
 
-               if (REG_is_gr32(basereg)) 
-                  opndvals[valcount].type = VT_REG32;
-               else if (REG_is_gr16(basereg)) 
-                  opndvals[valcount].type = VT_REG16;
-               else if (REG_is_gr8(basereg)) 
-                  opndvals[valcount].type = VT_REG8;
-               else {
-                  // TODO: Handle more cases, and decide if this catchall is
-                  // a really bad idea.
-                 assert(false);
-                 //opndvals[valcount].type = VT_REG32;
-               }
-
-               if (TaintedIndices)
+               if (TaintedIndices || INS_OperandIsAddressGenerator(ins, i))
                   opndvals[valcount].taint = RD;
                else
                   opndvals[valcount].taint = 0;
@@ -1483,21 +1469,9 @@ VOID InstrBlock(BBL bbl)
             if (idxreg != REG_INVALID()) {
 
                opndvals[valcount].reg = idxreg;
+               opndvals[valcount].type = GetTypeOfReg(idxreg);
 
-               if (REG_is_gr32(idxreg))
-                  opndvals[valcount].type = VT_REG32;
-               else if (REG_is_gr16(idxreg))
-                  opndvals[valcount].type = VT_REG16;
-               else if (REG_is_gr8(idxreg))
-                  opndvals[valcount].type = VT_REG8;
-               else {
-                  // TODO: Handle more cases, and decide if this catchall is
-                  // a really bad idea.
-                 assert(false);
-                 //opndvals[valcount].type = VT_REG32;
-               }
-
-               if (TaintedIndices)
+               if (TaintedIndices || INS_OperandIsAddressGenerator(ins, i))
                   opndvals[valcount].taint = RD;
                else
                   opndvals[valcount].taint = 0;
