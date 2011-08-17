@@ -22,7 +22,8 @@ let pin_out_suffix = "bap-pin-test.out";;
 
 let rec find_pin_out files =
   match files with
-  | [] -> assert_failure ("Could not find a file with suffix "^pin_out_suffix)
+  | [] -> assert_failure 
+	("Could not find a file with suffix "^pin_out_suffix^" Did pin fail?")
   | f::fs -> if (pmatch ~pat:pin_out_suffix f) then f else find_pin_out fs;;
 
 let check_pin_setup _ =

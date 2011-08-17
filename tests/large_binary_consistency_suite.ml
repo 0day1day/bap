@@ -2,17 +2,20 @@ open OUnit
 open Pcre
 open TestCommon
 
-let out_suffix = "large-consistency-test.out";;
-let binary = "/bin/ls";;
+let binary = "../x32_bins/date";;
 let binary_args = "";;
 
 let pin_trace_setup _ =
   let args = 
+	(" -t "^(gentrace_path^gentrace)^" -logall-before -o "^pin_out_suffix^" -- "
+	 ^binary^" "^binary_args) in
+  (*let args = 
 	["-t"; (gentrace_path^gentrace); 
 	 "-o"; pin_out_suffix; "--"; binary; binary_args ] in
-  let exit_code = Unix.WEXITED(1) in
+  let exit_code = Unix.WEXITED(1) in*)
   check_pin_setup();
-  assert_command ~exit_code (pin_path^pin) args;
+  (*assert_command ~exit_code (pin_path^pin) args;*)
+  Sys.command (pin_path^pin^args);
   find_pin_out (Array.to_list (Sys.readdir "./"));;
 
 

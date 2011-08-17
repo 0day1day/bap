@@ -834,7 +834,7 @@ let check_delta state =
       try
 	let evalbyte = get_int (AddrMap.find addr cm) in
 	let issymb = Hashtbl.mem global.symbolic addr in
-	if tracebyte <> evalbyte && (not issymb) && (not !use_alt_assignment) then wprintf "Consistency error: Tainted memory value (address %Lx, value %Lx) present in trace does not match value %Lx in in concrete evaluator" addr tracebyte evalbyte
+	if tracebyte <> evalbyte && (not issymb) && (not !use_alt_assignment) then wprintf "Consistency error: Tainted memory value (address %Lx, value %Lx) present in trace does not match value %Lx in concrete evaluator" addr tracebyte evalbyte
       with Not_found -> 
 	if not !use_alt_assignment then
 	  wprintf "Consistency error: Tainted memory value (address %Lx, value %Lx) present in trace but missing in concrete evaluator" addr tracebyte
@@ -859,7 +859,9 @@ let check_delta state =
                if contains_unknown evalval then
                  dprintf "Unknown encountered in %s: %s" dsavarname (Pp.ast_exp_to_string evalval)
                else
-                 wprintf "Difference between %sBAP and trace values in previous instruction: %s Trace=%s Eval=%s" (s) (dsavarname) (Pp.ast_exp_to_string traceval) (Pp.ast_exp_to_string evalval)
+				 (* XXXSW *)
+				 if ("R_EIP" <> dsavarname ) then
+                   wprintf "Difference between %sBAP and trace values in previous instruction: %s Trace=%s Eval=%s" (s) (dsavarname) (Pp.ast_exp_to_string traceval) (Pp.ast_exp_to_string evalval)
              )
 	       (* If we can't find concrete value, it's probably just a BAP temporary *)
 	    )
@@ -1058,7 +1060,7 @@ let run_block ?(next_label = None) state memv block =
 
 	  (addr::info::List.rev (!executed)) 
       | Halted (_,ctx)-> 
-		if (!checkall) then
+		(*if (!checkall) then
 		  (match next_label with
 			(* XXXSW use pc(?) to reverse lookup label in lambda *)
 			(* XXXSW compare this to next_label and warn if not equal *)
@@ -1083,7 +1085,7 @@ let run_block ?(next_label = None) state memv block =
 			  Hashtbl.iter f ctx.lambda;
 			  Hashtbl.iter s ctx.sigma;
 			  
-			| None -> ());
+			| None -> ());*)
 	  (addr::info::List.rev (List.tl !executed))
 
 let run_blocks blocks memv length =
