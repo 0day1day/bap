@@ -8,11 +8,8 @@
 %token ASSERT
 %token INVALID
 %token VALID
-%token SAT
-%token DASH
-%token MODEL
 %token COMMA
-%token END
+%token PERIOD
 %token EOF
 
 %start main
@@ -20,30 +17,26 @@
 
 %%
 
-  main:
-/* The result comes before or after the assertions depending on version. */
+main:
+  /* The result comes before or after the assertions depending on version. */
   assertions goodresult EOF { Some($1) }
 | goodresult assertions EOF { Some($2) }
-| goodresult assertions DASH DASH DASH DASH EOF { Some($2) }
 | badresult EOF { None }
   ;
-  
-  assertions:
-  /* empty */ { [] }
-| assertion SEMICOLON assertions { $1 :: $3 }
-| assertion assertions { $1 :: $2 }
+
+assertions:
+    /* empty */ { [] }
+  | assertion SEMICOLON assertions { $1 :: $3 }
   ;
-  
-  assertion:
-  ASSERT LBRACKET VAR EQUAL VAL RBRACKET { ($3, $5) } /* STP style */
-| LBRACKET EQUAL VAR VAL RBRACKET { ($3, $4) }         /* YICES style */
+
+assertion:
+  ASSERT LBRACKET VAR EQUAL VAL RBRACKET { ($3, $5) }
   ;
-  
-  goodresult:
-  INVALID END { }
-| SAT MODEL { }
-  ;
-  
+
+goodresult:
+  INVALID PERIOD { }
+;
+
 badresult:
-  VALID END { }
+  VALID PERIOD { }
 ;

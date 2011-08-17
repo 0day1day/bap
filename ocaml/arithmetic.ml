@@ -12,11 +12,16 @@ open Big_int_convenience
 open D
 open Type
 
+exception ArithmeticEx of string
+
 let bits_of_width = function
   | Reg n -> n
   | _ -> failwith "Expected register type"
 
-(* drop high bits *)
+(* drop high bits
+
+   XXX: Rename me
+*)
 let to64 (i,t) =
   let bits = bits_of_width t in
   let modv = bi1 <<% bits in (* 2^bits *)
@@ -27,18 +32,18 @@ let to64 (i,t) =
 (* sign extend to 64 bits*)
 let tos64 (i,t) =
   let bits = bits_of_width t in
-  let modv = shift_left_big_int unit_big_int (bits-1) in (* 2^(bits-1) *)
+  let modv = bi1 <<% (bits-1) in (* 2^(bits-1) *)
   let final = mod_big_int i modv in (* i mod 2^(bits-1) *)
   (* mod always returns a positive number *)
-  let sign = shift_right_big_int i (bits-1) in
-  if bi_is_zero sign then (* positive *) final else (* negative *) minus_big_int (sub_big_int modv (to64 (final, Reg(bits-1))))
+  let sign = i >>% (bits-1) in
+  if bi_is_zero sign then (* positive *) final else (* negative *) minus_big_int (modv -% (to64 (final, Reg(bits-1))))
 
 (* shifting by more than the number of bits or by negative values
  * will be the same as shifting by the number of bits. *)
 let toshift shiftedt v =
   let max = bits_of_width shiftedt
   and i = to64 v in
-    if le_big_int i (big_int_of_int max) && sign_big_int i <> -1
+    if i <=% (big_int_of_int max) && sign_big_int i <> -1
     then int_of_big_int i
     else
       (pdebug("Warning: shifting "^string_of_int max^"-bit value by "
@@ -100,6 +105,27 @@ let cast ct ((_,t) as v) t2 =
    | CAST_LOW ->
        to_val t2 (to64 v)
   )
+
+
+let extract h l ((_,t) as v) =
+  let n = (h -% l) +% bi1 in
+  let nt = Reg(int_of_big_int n) in
+  let s = binop RSHIFT v (l,t) in
+  cast CAST_LOW s nt
+  
+
+let concat ((_,lt) as lv) ((_,rt) as rv) =
+  let bitsl,bitsr =
+    match lt, rt with
+    | Reg(bitsl), Reg(bitsr) -> bitsl, bitsr
+    | _ -> failwith "concat"
+  in
+  let nt = Reg(bitsl + bitsr) in
+  let lv = cast CAST_LOW lv nt in
+  let rv = cast CAST_LOW rv nt in
+  let lv = binop LSHIFT lv (biconst bitsr, lt) in
+  binop OR lv rv
+
 
 let is_zero ((i,t) as v) =
   let v = to64 v in

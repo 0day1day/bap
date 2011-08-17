@@ -26,7 +26,8 @@ AC_PROG_RANLIB
 AC_PROG_OCAML
 AC_PROG_OCAMLFIND
 AC_PROG_CAMLIDL
-AC_PROG_LATEX
+# This isn't essential
+#AC_PROG_LATEX
 #AC_PROG_LIBTOOL
 
 # Checks for ocaml libraries
@@ -39,6 +40,11 @@ ocamlfind query extlib
 if test $? != 0; then
     echo "bap needs libextlib-ocaml-dev"
     exit -1
+fi
+ocamlfind query batteries
+if test $? != 0; then
+     echo "bap needs ocaml-batteries-included"
+     exit -1
 fi
 # ocamlfind query sqlite3
 # if test $? != 0; then
@@ -129,8 +135,8 @@ AC_HEADER_STDC
 AC_CHECK_HEADERS([fcntl.h stdint.h stdlib.h string.h unistd.h])
 AC_CHECK_HEADER([/usr/include/bfd.h], ,
    AC_MSG_ERROR([You need BFD headers (e.g., libbfd-dev)]))
-AC_CHECK_HEADER([/usr/include/sqlite3.h], ,
-   AC_MSG_ERROR([You need sqlite3 headers (e.g., libsqlite3-dev, and sqlite3 is also recommended but not required)]))
+dnl AC_CHECK_HEADER([/usr/include/sqlite3.h], ,
+dnl    AC_MSG_ERROR([You need sqlite3 headers (e.g., libsqlite3-dev, and sqlite3 is also recommended but not required)]))
 
 
 # Checks for typedefs, structures, and compiler characteristics.

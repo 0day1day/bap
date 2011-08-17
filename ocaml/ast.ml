@@ -26,6 +26,10 @@ type exp =
   | Cast of (cast_type * typ * exp) (** Cast to a new type. *)
   | Let of (var * exp * exp)
   | Unknown of (string * typ)
+  (* Expression types below here are just syntactic sugar for the above *)
+  | Ite of (exp * exp * exp)
+  | Extract of (big_int * big_int * exp) (** Extract hbits to lbits of e (Reg type) *)
+  | Concat of (exp * exp) (** Concat two reg expressions together *)
 
 type attrs = Type.attributes
 
@@ -113,35 +117,40 @@ let ncjmp c t =
 let num_exp = function
   | Load _ -> 0
   | Store _ -> 1
-  | BinOp _ -> 2
-  | UnOp _ -> 3
-  | Var _ -> 4
-  | Lab _ -> 5
-  | Int _ -> 6
-  | Cast _ -> 7
-  | Let _ -> 8
-  | Unknown _ -> 9
+  | Ite _ -> 2
+  | Extract _ -> 3
+  | Concat _ -> 4
+  | BinOp _ -> 5
+  | UnOp _ -> 6
+  | Var _ -> 7
+  | Lab _ -> 8
+  | Int _ -> 9
+  | Cast _ -> 10
+  | Let _ -> 11
+  | Unknown _ -> 12
 
   (* Returns elist, tlist, btlist, utlist, vlist, slist, ilist, clist *)
-let getargs_exp = function
-  | Load(e1,e2,e3,t1) -> [e1;e2;e3], [t1], [], [], [], [], [], []
-  | Store(e1,e2,e3,e4,t1) -> [e1;e2;e3;e4], [t1], [], [], [], [], [], []
-  | BinOp(bt,e1,e2) -> [e1;e2], [], [bt], [], [], [], [], []
-  | UnOp(ut,e1) -> [e1], [], [], [ut], [], [], [], []
-  | Var(v1) -> [], [], [], [], [v1], [], [], []
-  | Lab(s1) -> [], [], [], [], [], [s1], [], []
-  | Int(i1,t1) -> [], [t1], [], [], [], [], [i1], []
-  | Cast(c1,t1,e1) -> [e1], [t1], [], [], [], [], [], [c1]
-  | Let(v1,e1,e2) -> [e1;e2], [], [], [], [v1], [], [], []
-  | Unknown(s1,t1) -> [], [t1], [], [], [], [s1], [], []
-
+  let getargs = function
+    | Load(e1,e2,e3,t1) -> [e1;e2;e3], [t1], [], [], [], [], [], []
+    | Store(e1,e2,e3,e4,t1) -> [e1;e2;e3;e4], [t1], [], [], [], [], [], []
+    | Ite(e1,e2,e3) -> [e1;e2;e3], [], [], [], [], [], [], []
+    | Extract(h,l,e) -> [e], [], [], [], [], [], [h;l], []
+    | Concat(le, re) -> [le;re], [], [], [], [], [], [], []
+    | BinOp(bt,e1,e2) -> [e1;e2], [], [bt], [], [], [], [], []
+    | UnOp(ut,e1) -> [e1], [], [], [ut], [], [], [], []
+    | Var(v1) -> [], [], [], [], [v1], [], [], []
+    | Lab(s1) -> [], [], [], [], [], [s1], [], []
+    | Int(i1,t1) -> [], [t1], [], [], [], [], [i1], []
+    | Cast(c1,t1,e1) -> [e1], [t1], [], [], [], [], [], [c1]
+    | Let(v1,e1,e2) -> [e1;e2], [], [], [], [v1], [], [], []
+    | Unknown(s1,t1) -> [], [t1], [], [], [], [s1], [], []
 
 (** quick_exp_eq e1 e2 returns true if and only if the subexpressions
     in e1 and e2 are *physically* equal. *)
 let quick_exp_eq e1 e2 =
   if (num_exp e1) <> (num_exp e2) then false else
-    let l1,l2,l3,l4,l5,l6,l7,l8 = getargs_exp e1 in
-    let r1,r2,r3,r4,r5,r6,r7,r8 = getargs_exp e2 in
+    let l1,l2,l3,l4,l5,l6,l7,l8 = getargs e1 in
+    let r1,r2,r3,r4,r5,r6,r7,r8 = getargs e2 in
     let b1 = List.for_all2 (==) l1 r1 in
     let b2 = List.for_all2 (==) l2 r2 in
     let b3 = List.for_all2 (==) l3 r3 in
@@ -163,8 +172,8 @@ let quick_exp_eq e1 e2 =
 *)
 let rec full_exp_eq e1 e2 =
   if (num_exp e1) <> (num_exp e2) then false else
-    let l1,l2,l3,l4,l5,l6,l7,l8 = getargs_exp e1 in
-    let r1,r2,r3,r4,r5,r6,r7,r8 = getargs_exp e2 in
+    let l1,l2,l3,l4,l5,l6,l7,l8 = getargs e1 in
+    let r1,r2,r3,r4,r5,r6,r7,r8 = getargs e2 in
     let b1 = List.for_all2 (==) l1 r1 in (* e must be == *)
     let b2 = List.for_all2 (=) l2 r2 in
     let b3 = List.for_all2 (=) l3 r3 in

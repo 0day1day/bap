@@ -57,20 +57,31 @@ let rec action vischil startvisit node=
 let wrapstmt f v = let v' = f v in if quick_stmt_eq v v' then v else v'
 let wrapexp f v = let v' = f v in if quick_exp_eq v v' then v else v'
 
-
 let rec exp_accept visitor =
   let vischil = function
     | Int _ as i -> i
     | Lab _ as l -> l
     | Var v ->
-      Var(rvar_accept visitor v)
-    | BinOp(bop, v1, v2) ->
-      let v1' = exp_accept visitor v1 in
-      let v2' = exp_accept visitor v2 in
-      BinOp(bop, v1', v2')
-    | UnOp(up, v) ->
-      let v' = exp_accept visitor v in
-      UnOp(up, v')
+	Var(rvar_accept visitor v)
+    | Ite(b, v1, v2) ->
+	let b' = exp_accept visitor b in
+	let v1' = exp_accept visitor v1 in
+	let v2' = exp_accept visitor v2 in
+	Ite(b', v1', v2')
+    | Extract(h, l, v) ->
+	let v' = exp_accept visitor v in
+	Extract(h, l, v')
+    | Concat(vl, vr) ->
+	let vl' = exp_accept visitor vl in
+	let vr' = exp_accept visitor vr in
+	Concat(vl', vr')
+    | BinOp(bop, v1, v2) -> 
+	let v1' = exp_accept visitor v1 in 
+	let v2' = exp_accept visitor v2 in 
+	BinOp(bop, v1', v2')
+    | UnOp(up, v) -> 
+	let v' = exp_accept visitor v in 
+	UnOp(up, v')
     | Cast(ct, t, v) ->
       let v' = exp_accept visitor v in
       Cast(ct,t,v')

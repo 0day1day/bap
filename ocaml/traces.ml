@@ -230,27 +230,38 @@ let bytes_from_file file =
     List.rev !bytes
 
 
-(** Keep track of registers not always updated in BAP.  *)
+(** A list of registers that we will never check for correctness.  *)
 let badregs = Hashtbl.create 32
 let () =
   List.iter (fun r -> Hashtbl.add badregs r ())
-    ("EFLAGS"
-     ::"R_FS"
-     ::"R_LDT"
-     ::"R_GDT"
-     ::"R_AF"
+    (
+      "EFLAGS"
+      ::"R_FS"
+      ::"R_LDT"
+      ::"R_GDT"
+      ::"R_CC_OP"
+      ::"R_CC_DEP1"
+      ::"R_CC_DEP2"
+      ::"R_CC_NDEP"
+      ::[])
+
+(** A list of registers that we should only check when checking
+    all instructions.  This includes EFLAGS registers because we will
+    not consider an instruction tainted if the only operand that is
+    tainted is EFLAGS. *)
+let checkallregs = Hashtbl.create 32
+let () =
+  List.iter (fun r -> Hashtbl.add checkallregs r ())
+    ("R_AF"
      ::"R_CF"
      ::"R_ZF"
      ::"R_OF"
      ::"R_SF"
      ::"R_PF"
-     ::"R_CC_OP"
-     ::"R_CC_DEP1"
-     ::"R_CC_DEP2"
-     ::"R_CC_NDEP"
      ::[])
-    
-let isbad v = Hashtbl.mem badregs (Var.name v)
+
+let isnotallbad v = if not !checkall then Hashtbl.mem checkallregs (Var.name v) else false
+let isbad v = Hashtbl.mem badregs (Var.name v) || isnotallbad v
 
 let print_vars () =
   let printone k v = dprintf "Info for register %s %s" k (Pp.ast_exp_to_string v.exp) in
@@ -259,7 +270,7 @@ let print_vars () =
 (** Build a statement asserting that each operand is equal to its value in the trace
 
     @param h Mapping of vars to dsa vars
- *)
+*)
 let assert_vars h =
   let addone k v a = 
     match name_to_var k with
@@ -608,17 +619,17 @@ let remove_specials =
   in
     List.filter no_specials
 
-(** Removing all unknowns from the trace *)
-let remove_unknowns =
-  let v = object(self)
-    inherit Ast_visitor.nop
-    method visit_exp = function
-      | Unknown(s,t) ->
-	  dprintf "Removed unknown: %s" s;
-	  `ChangeTo (Int(bi0,t))
-      | _ -> `DoChildren
-  end
-  in Ast_visitor.prog_accept v
+(* (\** Removing all unknowns from the trace *\) *)
+(* let remove_unknowns = *)
+(*   let v = object(self) *)
+(*     inherit Ast_visitor.nop *)
+(*     method visit_exp = function *)
+(*       | Unknown(s,t) -> *)
+(* 	  dprintf "Removed unknown: %s" s; *)
+(* 	  `ChangeTo (Int(bi0,t)) *)
+(*       | _ -> `DoChildren *)
+(*   end *)
+(*   in Ast_visitor.prog_accept v *)
    
 (* Appends a Halt instruction to the end of the trace *)
 let append_halt trace = 
@@ -676,7 +687,7 @@ let print_formula file formula =
   in
   (* let p = new Smtlib1.pp_oc oc in *)
   let () = p#assert_ast_exp_with_foralls foralls formula in
-  let () = p#counterexample () in
+  let () = p#counterexample in
     p#close
 
 module Status = Util.StatusPrinter
@@ -807,6 +818,20 @@ module TraceConcrete = Symbeval.Make(TraceConcreteDef)(FastEval)(StdForm)
 let check_delta state =
   (* let dsa_concrete_val v = concrete_val (Var.name v) in *)
   (* let dsa_taint_val v = taint_val (Var.name v) in *)
+  let contains_unknown e =
+    let foundone = ref false in
+    let v = object(self)
+      inherit Ast_visitor.nop
+      method visit_exp = function
+        | Unknown _ -> foundone := true; raise Exit
+        | _ -> `DoChildren
+    end
+    in
+    (try
+       ignore(Ast_visitor.exp_accept v e)
+     with Exit -> ());
+    !foundone
+  in
   let check_mem cm addr v =
     if v.tnt then (
       let tracebyte = get_int v.exp in
@@ -832,7 +857,13 @@ let check_delta state =
 	     let s = if (!checkall) then "" else "tainted " in
 	     if (not (full_exp_eq traceval evalval) && (tainted || !checkall) 
 		 && not (Hashtbl.mem badregs (Var.name var))) then 
-	       wprintf "Difference between %sBAP and trace values in previous instruction: %s Trace=%s Eval=%s" (s) (dsavarname) (Pp.ast_exp_to_string traceval) (Pp.ast_exp_to_string evalval)
+	       (* The trace value and evaluator's value differ.  The
+	          only time this is okay is if the evaluated expression
+	          contains an unknown. *)
+               if contains_unknown evalval then
+                 dprintf "Unknown encountered in %s: %s" dsavarname (Pp.ast_exp_to_string evalval)
+               else
+	         wprintf "Difference between %sBAP and trace values in previous instruction: %s Trace=%s Eval=%s" (s) (dsavarname) (Pp.ast_exp_to_string traceval) (Pp.ast_exp_to_string evalval)
 		 (* If we can't find concrete value, it's probably just a BAP temporary *)
 	| _ -> ()) (* probably a temporary *)
     | TMem _
@@ -974,6 +1005,7 @@ let run_block ?(next_label = None) state memv block =
   let executed = ref [] in
   let rec eval_block state stmt = 
     (* pwarn("XXXSW Executing: " ^ (Pp.ast_stmt_to_string stmt)); *)
+    (* pwarn ("XXXSW Current block is: " ^ (Pp.ast_stmt_to_string addr)); *)
     (* pdebug ("Executing: " ^ (Pp.ast_stmt_to_string stmt)); *)
     (*    Hashtbl.iter (fun k v -> pdebug (Printf.sprintf "%Lx -> %s" k (Pp.ast_exp_to_string v))) concrete_mem ;*)
     let evalf e = match TraceConcrete.eval_expr state.delta e with
@@ -1021,9 +1053,33 @@ let run_block ?(next_label = None) state memv block =
            | _ -> ()
 	  );
 	  (addr::info::List.rev (!executed))
-      | Halted _ -> 
-		(* XXXSW use addr to reverse lookup label in lambda *)
-		(* XXXSW compare this to next_label and warn if not equal *)
+      | Halted (_,ctx)-> 
+		if (!checkall) then
+		  (match next_label with
+			(* XXXSW use pc(?) to reverse lookup label in lambda *)
+			(* XXXSW compare this to next_label and warn if not equal *)
+			| Some(l) -> 
+			  let f hash_label hash_addr = 
+				pwarn ("XXXSW Halt label = " ^ (Pp.label_to_string hash_label));
+				pwarn (Printf.sprintf "XXXSW Halt addr = 0x%Lx" hash_addr);
+				
+			  in
+			  let s sigma_addr sigma_stmt =
+				pwarn ("XXXSW Sigma stmt = " ^ (Pp.ast_stmt_to_string sigma_stmt));
+				pwarn (Printf.sprintf "XXXSW Sigma addr = 0x%Lx" sigma_addr);
+			  in
+			  pwarn ("Current block is: " ^ (Pp.ast_stmt_to_string addr));
+			  pwarn (Printf.sprintf "XXXSW Halt pc = 0x%Lx" state.pc);
+			  pwarn (Printf.sprintf "XXXSW Halt next_label = 0x%Lx" l);
+
+			  (* label_decode state.lambda next_label *)
+			  Hashtbl.iter f state.lambda;
+			  Hashtbl.iter s state.sigma;
+			  pwarn ("XXXSW Context from Halted");
+			  Hashtbl.iter f ctx.lambda;
+			  Hashtbl.iter s ctx.sigma;
+			  
+			| None -> ());
 	  (addr::info::List.rev (List.tl !executed))
 
 let run_blocks blocks memv length =
@@ -1127,9 +1183,9 @@ let concrete trace =
   dsa_rev_map := None;
   let trace = Memory2array.coerce_prog trace in
   let no_specials = remove_specials trace in
-  let no_unknowns = remove_unknowns no_specials in
-  let memv = find_memv no_unknowns in
-  let blocks = trace_to_blocks no_unknowns in
+  (* let no_unknowns = remove_unknowns no_specials in *)
+  let memv = find_memv no_specials in
+  let blocks = trace_to_blocks no_specials in
   (*pdebug ("blocks: " ^ (string_of_int (List.length blocks)));*)
   let length = List.length blocks in
   let actual_trace = run_blocks blocks memv length in
@@ -1221,6 +1277,9 @@ let formula_size formula =
   let _max n1 n2 = if n1 > n2 then n1 else n2 in
   let (+) = Int64.add in
   let rec size = function
+    | Ast.Ite(_,e1,e2) -> Int64.one + (size e1) + (size e2)
+    | Ast.Extract(_,_,e) -> Int64.one + (size e)
+    | Ast.Concat(el,er) -> Int64.one + (size el) + (size er)
     | Ast.BinOp(_,e1,e2) -> Int64.one + (size e1) + (size e2)
     | Ast.UnOp(_,e) -> Int64.one + size e
     | Ast.Var _ -> Int64.one
@@ -2227,9 +2286,9 @@ let concrete_substitution trace =
   dsa_rev_map := None;
   (*let trace = Memory2array.coerce_prog trace in*)
   let no_specials = remove_specials trace in
-  let no_unknowns = remove_unknowns no_specials in
-  let memv = find_memv no_unknowns in
-  let blocks = trace_to_blocks no_unknowns in
+  (* let no_unknowns = remove_unknowns no_specials in *)
+  let memv = find_memv no_specials in
+  let blocks = trace_to_blocks no_specials in
   (*pdebug ("blocks: " ^ (string_of_int (List.length blocks)));*)
   let length = List.length blocks in
   let actual_trace = run_and_subst_blocks blocks memv length in

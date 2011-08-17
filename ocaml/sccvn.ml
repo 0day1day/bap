@@ -37,6 +37,7 @@ open Big_int_convenience
 open Type
 open Ssa
 open ExtList
+open Arithmetic
 
 module VH = Var.VarHash
 module C = Cfg.SSA
@@ -51,6 +52,9 @@ type vn = Top | Hash of Ssa.var | HInt of (big_int * typ)
 let top = Top
 type expid =
   | Const of Ssa.value (* Except Var *)
+  | It of vn * vn * vn
+  | Ex of big_int * big_int * vn
+  | Con of vn * vn
   | Bin of binop_type * vn * vn
   | Un of unop_type * vn
   | Cst of cast_type * typ * vn
@@ -75,31 +79,37 @@ let (<=!) vn1 vn2 = vn_compare vn1 vn2 <= 0
 let (<>!) v1 v2 = not (vn_eq v1 v2)
 
 let expid_eq e1 e2 =
-  (* values, vns, bops, uops, types, cts, vars *)
+  (* values, vns, bops, uops, types, cts, vars, big ints *)
   let getnum = function
     | Const _ -> 1
-    | Bin _ -> 2
-    | Un _ -> 3
-    | Cst _ -> 4
-    | Unique _ -> 5
-    | Ld _ -> 6
-    | St _ -> 7
-    | Ph _ -> 8
+    | It _ -> 2
+    | Ex _ -> 3
+    | Con _ -> 4
+    | Bin _ -> 5
+    | Un _ -> 6
+    | Cst _ -> 7
+    | Unique _ -> 8
+    | Ld _ -> 9
+    | St _ -> 10
+    | Ph _ -> 11
   in
   let getargs = function
-    | Const(v) -> [v], [], [], [], [], [], []
-    | Bin(bop, vn1, vn2) -> [], [vn1; vn2], [bop], [], [], [], []
-    | Un(uop, vn) -> [], [vn], [], [uop], [], [], []
-    | Cst(ct, t, vn) -> [], [vn], [], [], [t], [ct], []
-    | Unique(var) -> [], [], [], [], [], [], [var]
-    | Ld(vn1, vn2, vn3, t) -> [], [vn1; vn2; vn3], [], [], [t], [], []
-    | St(vn1, vn2, vn3, vn4, t) -> [], [vn1; vn2; vn3; vn4], [], [], [t], [], []
-    | Ph(vnlist) -> [], vnlist, [], [], [], [], []
+    | Const(v) -> [v], [], [], [], [], [], [], []
+    | It(vn1,vn2,vn3) -> [], [vn1;vn2;vn3], [], [], [], [], [], []
+    | Ex(bi1,bi2,vn1) -> [], [vn1], [], [], [], [], [], [bi1;bi2]
+    | Con(vn1,vn2) -> [], [vn1;vn2], [], [], [], [], [], []
+    | Bin(bop, vn1, vn2) -> [], [vn1; vn2], [bop], [], [], [], [], []
+    | Un(uop, vn) -> [], [vn], [], [uop], [], [], [], []
+    | Cst(ct, t, vn) -> [], [vn], [], [], [t], [ct], [], []
+    | Unique(var) -> [], [], [], [], [], [], [var], []
+    | Ld(vn1, vn2, vn3, t) -> [], [vn1; vn2; vn3], [], [], [t], [], [], []
+    | St(vn1, vn2, vn3, vn4, t) -> [], [vn1; vn2; vn3; vn4], [], [], [t], [], [], []
+    | Ph(vnlist) -> [], vnlist, [], [], [], [], [], []
   in
   if (getnum e1) <> (getnum e2) then false
   else (
-    let l1,l2,l3,l4,l5,l6,l7 = getargs e1 in
-    let r1,r2,r3,r4,r5,r6,r7 = getargs e2 in
+    let l1,l2,l3,l4,l5,l6,l7,l8 = getargs e1 in
+    let r1,r2,r3,r4,r5,r6,r7,r8 = getargs e2 in
     let b1 = List.for_all2 (==) l1 r1 in
     let b2 = List.for_all2 (==) l2 r2 in
     let b3 = List.for_all2 (=) l3 r3 in
@@ -107,9 +117,10 @@ let expid_eq e1 e2 =
     let b5 = List.for_all2 (=) l5 r5 in
     let b6 = List.for_all2 (=) l6 r6 in
     let b7 = List.for_all2 (=) l7 r7 in
-    if b1 & b2 & b3 & b4 & b5 & b6 & b7 then
+    let b8 = List.for_all2 (==%) l8 r8 in
+    if b1 & b2 & b3 & b4 & b5 & b6 & b7 & b8 then
       true
-    else if b3 & b4 & b5 & b6 & b7 then
+    else if b3 & b4 & b5 & b6 & b7 & b8 then
       (* e1 and e2 are not physically equal.  But maybe the
          subexpressions are structurally, but not physically,
          equal. *)
@@ -222,6 +233,9 @@ let get_expid info =
     | Val(Var _ as v) ->
 	vn2eid info (vn v) 
     | Val v -> Const v
+    | Ite(c,v1,v2) -> It(vn c, vn v1, vn v2)
+    | Extract(h,l,e) -> Ex(h,l, vn e)
+    | Concat(le,re) -> Con(vn le, vn re)
     | BinOp((PLUS|TIMES|AND|OR|XOR|EQ|NEQ) as op,v1,v2) ->
 	let (h1,h2) = (vn v1, vn v2) in
 	if h1 <=! h2 then Bin(op, h1, h2) else Bin(op, h2, h1)
@@ -245,11 +259,34 @@ let opt_expid info var exp =
   match eid with
   (* constant folding *)
   | Bin(op, HInt v1, HInt v2) ->
-      toconst (Arithmetic.binop op v1 v2)
+      (* Arithmetic can fail when regs are too big. We catch it here
+	 and don't simplify.  This is kind of a hack. *)      
+      (try
+	toconst (Arithmetic.binop op v1 v2)
+      with ArithmeticEx _ -> eid)
   | Un(op, HInt v) ->
-      toconst (Arithmetic.unop op v)
+      (try
+	 toconst (Arithmetic.unop op v)
+       with ArithmeticEx _ -> eid)
   | Cst(ct, t, HInt v) ->
-      toconst (Arithmetic.cast ct v t)
+      (try
+	 toconst (Arithmetic.cast ct v t)
+       with ArithmeticEx _ -> eid)
+  | It(HInt(bi,t), x, _) when bi_is_one bi ->
+      sameas x
+  | It(HInt(bi,t), _, y) when bi_is_zero bi ->
+      sameas y
+  | It(b, x, y) when x = y ->
+      sameas x
+  (* XXX: Extract(Shift) optimizations *)
+  | Ex(h, l, HInt v) ->
+      (try
+	 toconst (Arithmetic.extract h l v)
+       with ArithmeticEx _ -> eid)
+  | Con(HInt lv, HInt rv) ->
+      (try
+	 toconst (Arithmetic.concat lv rv)
+       with ArithmeticEx _ -> eid)
   (* phis can be constant*)
   | Ph(x::xs) as eid -> (
       match
@@ -296,6 +333,8 @@ let opt_expid info var exp =
 	(* TODO: add SLT and SLE. Requires canonicalized ints *)
   | Bin(EQ, x, (HInt(bi,t))) when t = (Reg 1) && bi_is_zero bi ->
       sameas x
+  (* | Bin(EQ, x, (HInt(0L,t))) when t = (Reg 1) -> *)
+  (*     (Un(NOT, x)) *)
   | x -> x
 
 (* simplifications in bap_opt which we don't (yet) do here:

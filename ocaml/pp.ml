@@ -9,7 +9,12 @@ open Type
 module VH = Var.VarHash
 module F = Format
 
+module D = Debug.Make(struct let name = "pp" and default=`Debug end)
+open D
+
 let output_varnums = ref true
+
+let many_parens = ref false
 
 let rec typ_to_string = function
   | Reg 1 -> "bool"
@@ -42,7 +47,7 @@ let binop_to_string = function
   | AND -> "&"
   | OR -> "|"
   | XOR -> "^"
-  | EQ -> "="
+  | EQ -> "=="
   | NEQ -> "<>"
   | LT -> "<"
   | LE -> "<="
@@ -124,11 +129,12 @@ object (self)
     | Addr x -> printf "addr 0x%Lx" x
 
   method int i t =
-    match (Arithmetic.tos64 (i,t), t) with
+    let (is, i) = Arithmetic.tos64 (i,t), Arithmetic.to64 (i,t) in
+    match (is, t) with
     | (bi, Reg 1) when bi_is_zero bi -> pp "false"
     | (bi, Reg 1) when bi_is_minusone bi -> pp "true"
     | (bi,t) ->
-        if lt_big_int (abs_big_int bi) (big_int_of_int 10)
+        if (abs_big_int bi) <% bia
 	then pp (string_of_big_int bi)
         else pp ("0x"^(Util.hex_of_bigint (Arithmetic.to64 (i,t))));
 	pp ":"; self#typ t
@@ -137,25 +143,28 @@ object (self)
   (* prec tells us how much parenthization we need. 0 means it doesn't need
      to be parenthesized. Larger numbers means it has higher precedence.
      Maximum prec before paretheses are added are as follows:
-	  5 Let
-         10 Store
-	 20 OR
-	 30 XOR
-	 40 AND
-	 50 EQ NEQ
-	 60 LT SLT SLE LE
-	 70 LSHIFT RSHIFT ARSHIFT
-	 80 PLUS MINUS
-	 90 TIMES DIVIDE SDIVIDE MOD SMOD
-	 100 UMINUS NOT
-         110 Get
+     5 Let
+     7 Ite
+     10 Store
+     12 Concat
+     15 Extract
+     20 OR
+     30 XOR
+     40 AND
+     50 EQ NEQ
+     60 LT SLT SLE LE
+     70 LSHIFT RSHIFT ARSHIFT
+     80 PLUS MINUS
+     90 TIMES DIVIDE SDIVIDE MOD SMOD
+     100 UMINUS NOT
+     110 Get
      Because we don't distinguish precedence to the right or left, we will
      always overparethesise expressions such as:
      let x = y in x + let x = 2:reg32_t in x
   *)
   method ast_exp ?(prec=0) e =
-    let lparen bind = if bind < prec then pp "("
-    and rparen bind = if bind < prec then pp ")"
+    let lparen bind = if !many_parens || bind < prec then pp "("
+    and rparen bind = if !many_parens || bind < prec then pp ")"
     and binop_prec = function
       | OR -> 20
       | XOR -> 30
@@ -185,6 +194,36 @@ object (self)
 	 pp " ="; space();
 	 self#ast_exp ~prec:10 vl;
 	 rparen 10;
+     | Ast.Ite(c,x,y) ->
+	 lparen 7;
+	 pp "if";
+	 space ();
+	 self#ast_exp ~prec:7 c;
+	 space ();
+	 pp "then";
+	 space ();
+	 self#ast_exp ~prec:7 x;
+	 space ();
+	 pp "else";
+	 space ();
+	 self#ast_exp ~prec:7 y;	 
+	 rparen 7
+     | Ast.Extract(h, l, e) ->
+	 pp "extract:";
+	 pp (string_of_big_int h);
+	 pc ':';
+	 pp (string_of_big_int l);
+	 pc ':';
+	 pc '[';
+	 self#ast_exp e;
+	 pc ']';
+     | Ast.Concat(le, re) ->
+	 pp "concat:";
+	 pc '[';
+	 self#ast_exp le;
+	 pp "][";
+	 self#ast_exp re;
+	 pc ']'
      | Ast.BinOp(b,x,y) ->
 	 let p = binop_prec b in
 	 lparen p;
@@ -211,10 +250,10 @@ object (self)
 	 lparen 5;
 	 pp "let "; self#var v; pp " :=";
 	 opn 2; space();
-	 self#ast_exp e1; space(); 
+	 self#ast_exp ~prec:5 e1; space(); 
 	 cls();
 	 pp "in"; space();
-	 self#ast_exp e2;
+	 self#ast_exp ~prec:5 e2;
 	 rparen 5
      | Ast.Unknown(s,t) ->
 	 pp "unknown \""; pp s; pp "\":"; self#typ t
@@ -305,6 +344,32 @@ object (self)
 	 pp "]:"; self#typ t;
 	 pp " ="; space();
 	 self#ssa_value vl
+     | Ssa.Ite(c, x, y) ->
+	 pp "if";
+	 space ();
+	 self#ssa_value c;
+	 space ();
+	 pp "then";
+	 space ();
+	 self#ssa_value x;
+	 space ();
+	 pp "else";
+	 space ();
+	 self#ssa_value y	 
+     | Ssa.Extract(h, l, e) ->
+	 pp "extract:";
+	 pp (string_of_big_int h);
+	 pc ':';
+	 pp (string_of_big_int l);
+	 pp ":[";
+	 self#ssa_value e;
+	 pc ']';
+     | Ssa.Concat(lv, rv) ->
+	 pp "concat:[";
+	 self#ssa_value lv;
+	 pp "][";
+	 self#ssa_value rv;
+	 pc ']'
      | Ssa.BinOp(b, x, y) ->
 	 self#ssa_value x;
 	 pp " "; pp (binop_to_string b); space();
@@ -385,7 +450,8 @@ object
   inherit pp ft as super
   method close =
     super#close;
-    close_out fd
+    if fd <> stdout then
+      close_out fd
 end
 
 

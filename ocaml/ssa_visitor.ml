@@ -58,6 +58,18 @@ let id x = x
 
 let rec exp_accept visitor = 
   let vischil = function
+    | Ite(cond, v1, v2) ->
+	let vc' = value_accept visitor cond in 
+	let v1' = value_accept visitor v1 in 
+	let v2' = value_accept visitor v2 in 
+	Ite(vc', v1', v2')
+    | Extract(h, l, v) ->
+	let v' = value_accept visitor v in
+	Extract(h, l, v')
+    | Concat(lv, rv) ->
+	let lv' = value_accept visitor lv in
+	let rv' = value_accept visitor rv in
+	Concat(lv', rv')
     | BinOp(bop, v1, v2) -> 
 	let v1' = value_accept visitor v1 in 
 	let v2' = value_accept visitor v2 in 

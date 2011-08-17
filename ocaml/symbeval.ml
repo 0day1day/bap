@@ -251,6 +251,38 @@ struct
 	  Symbolic value
       | Lab _ as labl ->
 	  Symbolic labl
+      | Ite(cond,e1,e2) ->
+	  let v1 = eval_expr delta e1
+	  and v2 = eval_expr delta e2 in
+	  (match eval_expr delta cond with
+	   | v when is_symbolic v ->
+	       Symbolic(Ite(symb_to_exp v, symb_to_exp v1, symb_to_exp v2))
+	   | v when is_true_val v ->
+	       Symbolic(symb_to_exp v1)
+	   | v when is_false_val v ->
+	       Symbolic(symb_to_exp v2)
+	   | _ ->
+	       failwith "not possible"
+	  )
+      | Extract(h,l,e) ->
+	  let v = eval_expr delta e in
+	  if is_symbolic v then (
+	    Symbolic(Extract(h,l,symb_to_exp v))
+	  ) else (
+	    let (v,t) = Arithmetic.extract h l (concrete_val_tuple v) in
+	    Symbolic(Int(v,t))
+	  )
+      | Concat(le,re) ->
+	  let lv = eval_expr delta le
+	  and rv = eval_expr delta re in
+	  if is_symbolic lv || is_symbolic rv then (
+	    Symbolic(Concat(symb_to_exp lv, symb_to_exp rv))
+	  ) else (
+	    let lv = concrete_val_tuple lv in
+	    let rv = concrete_val_tuple rv in
+	    let (v,t) = Arithmetic.concat lv rv in
+	    Symbolic(Int(v,t))
+	  )
       | BinOp (op,e1,e2) ->
 	  (* In the worst case, we will just combine two symbolic
 	     expressions. *)

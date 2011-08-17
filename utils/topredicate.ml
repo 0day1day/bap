@@ -8,16 +8,16 @@ let fast_fse = ref false
 let irout = ref(Some stdout)
 let post = ref "true"
 let stpout = ref None
+let stpoutname = ref ""
 let pstpout = ref None
 let suffix = ref ""
 let assert_vars = ref false
 let usedc = ref true
 let usesccvn = ref true
+let solve = ref false
 
-(* Set the pretty printer to use.  Explicitly use the abstract formula
-   printer subtype. *)
-let pp = ref ((new Stp.pp_oc) :> (?suffix:string -> out_channel -> Formulap.fpp_oc)) ;;
-
+(* Select which solver to use *)
+let solver = ref (Smtexec.STP.si);;
 
 (* This may be useful elsewhere, but I'm not sure where to put it. *)
 let rename_astexp f =
@@ -126,20 +126,19 @@ let compute_fse_maxrepeat i cfg post =
   in 
   (maxrepeat i ast post, [])
 
-let set_format s =
-  match s with 
-    | "stp" ->
-      pp := ((new Stp.pp_oc) :> (?suffix:string -> out_channel -> Formulap.fpp_oc))
-    | "smtlib1" ->
-      pp := ((new Smtlib1.pp_oc) :> (?suffix:string -> out_channel -> Formulap.fpp_oc))
-    | _ -> failwith "Unknown formula format"
+let set_solver s =
+  solver := try Hashtbl.find Smtexec.solvers s
+  with Not_found ->
+    failwith "Unknown solver"
+
+let solvers = Hashtbl.fold (fun k _ s -> k ^ " " ^ s) Smtexec.solvers ""
 
 let compute_wp = ref compute_wp_boring
 
 let speclist =
   ("-o", Arg.String (fun f -> irout := Some(open_out f)),
    "<file> Print output to <file> rather than stdout.")
-  ::("-stp-out", Arg.String (fun f -> stpout := Some(open_out f)),
+  ::("-stp-out", Arg.String (fun f -> stpoutname := f; stpout := Some(open_out f)),
    "<file> Print output to <file> rather than stdout.")
   ::("-pstp-out", Arg.String (fun f -> pstpout := Some(open_out f)),
    "<file> Print WP expression without assertion to <file>.")
@@ -159,8 +158,8 @@ let speclist =
      "Use 1st order efficient directionless weakest precondition")
   ::("-flanagansaxe", Arg.Unit(fun()-> compute_wp := compute_flanagansaxe),
      "Use Flanagan & Saxe's algorithm instead of the default WP.")
-  ::("-format", Arg.String set_format,
-     "Use the specified output format. Either stp (default) or smtlib1.")
+  ::("-solver", Arg.String set_solver,
+     ("Use the specified solver. Choices: " ^ solvers))
   ::("-extract-vars", Arg.Set assert_vars,
      "Put vars in separate asserts")
   ::("-fse", Arg.Unit(fun()-> compute_wp := compute_fse),
@@ -181,7 +180,9 @@ let speclist =
      "Perform deadcode elimination on the SSA CFG.")
   ::("-optsccvn", Arg.Unit (fun () -> usedc := false; usesccvn := true),
      "Perform sccvn on the SSA CFG.")
-    :: Input.speclist
+  ::("-solve", Arg.Unit (fun () -> solve := true),
+     "Solve the generated formula.")
+  :: Input.speclist
 
 let anon x = raise(Arg.Bad("Unexpected argument: '"^x^"'"))
 let () = Arg.parse speclist anon usage
@@ -214,7 +215,8 @@ match !stpout with
     let m2a = new Memory2array.memory2array_visitor () in
     let wp = Ast_visitor.exp_accept m2a wp in
     let foralls = List.map (Ast_visitor.rvar_accept m2a) foralls in
-    let p = !pp ~suffix:!suffix oc in
+    let pp = (((!solver)#printer) :> Formulap.fppf) in
+    let p = pp ~suffix:!suffix oc in
     if !assert_vars then (
       let (vars,wp') = extract_vars wp in
       List.iter (fun (v,e) -> p#assert_ast_exp (BinOp(EQ, Var v, e))) vars;
@@ -223,8 +225,12 @@ match !stpout with
     else (
       p#assert_ast_exp_with_foralls foralls wp;
     );
-    p#close
-      
+    p#counterexample;
+    p#close;
+    if !solve then
+      let r = (!solver)#solve_formula_file !stpoutname in
+      Printf.fprintf stderr "Solve result: %s\n" (Smtexec.result_to_string r)
+
 ;;
 match !pstpout with
 | None -> ()
@@ -232,7 +238,8 @@ match !pstpout with
     let m2a = new Memory2array.memory2array_visitor () in
     let wp = Ast_visitor.exp_accept m2a wp in
     let foralls = List.map (Ast_visitor.rvar_accept m2a) foralls in
-    let p = !pp ~suffix:!suffix oc in
+    let pp = (((!solver)#printer) :> Formulap.fppf) in
+    let p = pp ~suffix:!suffix oc in
 	p#forall foralls;
 	p#ast_exp wp;
 	p#close

@@ -135,6 +135,20 @@ let rec eval_expr (delta,mu,expr) =
         value
     | Lab _ as labl ->
         labl
+    | Ite(b,e1,e2) ->
+	let b = eval_expr (delta,mu,b)
+	and v1 = eval_expr (delta,mu,e1)
+	and v2 = eval_expr (delta,mu,e2) in
+	if is_true b then v1 else v2
+    | Extract(h,l,e) ->
+	let v = get_expr e in
+	let (v,t) = Arithmetic.extract h l v in
+	Int (v,t)
+    | Concat(le,re) ->
+	let vl = get_expr le
+	and vr = get_expr re in
+	let (v,t) = Arithmetic.concat vl vr in
+	Int (v,t)
     | BinOp (op,e1,e2) ->
         let v1 = get_expr e1 
         and v2 = get_expr e2 in

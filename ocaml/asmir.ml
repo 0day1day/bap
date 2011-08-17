@@ -19,6 +19,7 @@ open Util
 module BArray = Bigarray.Array1
 
 exception Disassembly_error;;
+exception Memory_error;;
 
 type arch = Libbfd.bfd_architecture
 type asmprogram = {asmp : Libasmir.asm_program_t;
@@ -458,10 +459,10 @@ let section_contents prog secs =
   let bits = List.fold_left sc [] secs in
   let get a =
     (* let open Int64 in *)
-    let (-) = Int64.sub and (+) = Int64.add in
-    let rec f a = function [] -> raise Not_found
-      | (s,arr)::_ when a - s >= 0L && a - s < s + Int64.of_int(BArray.dim arr)  ->
-	arr.{Int64.to_int(a-s)}
+    let (-) = Int64.sub in
+    let rec f a = function [] -> raise Memory_error
+      | (s,arr)::_ when a - s >= 0L && a - s < Int64.of_int(BArray.dim arr)  ->
+	  arr.{Int64.to_int(a-s)}
       | _::b -> f a b
     in
     f a bits
@@ -494,11 +495,11 @@ let check_equivalence a (ir1, next1) (ir2, next2) =
     let wp1 = to_wp ir1
     and wp2 = to_wp ir2 in
     let e = BinOp(EQ, wp1, wp2) in
-    match Stpexec.CVC3.solve_formula_exp e with
-    | Stpexec.Valid -> ()
-    | Stpexec.Invalid -> wprintf "formulas for %Lx (%s aka %s) not equivalent" a (get_asm ir1) (get_asm ir2)
-    | Stpexec.StpError -> failwith "StpError"
-    | Stpexec.Timeout -> failwith "Timeout"
+    match Smtexec.CVC3.check_exp_validity e with
+    | Smtexec.Valid -> ()
+    | Smtexec.Invalid -> wprintf "formulas for %Lx (%s aka %s) not equivalent" a (get_asm ir1) (get_asm ir2)
+    | Smtexec.SmtError -> failwith "SmtError"
+    | Smtexec.Timeout -> failwith "Timeout"
   with Failure s
   | Invalid_argument s ->
     (match get_asm ir1 with (* Don't warn for known instructions *)
@@ -536,9 +537,17 @@ let asm_addr_to_bap {asmp=prog; arch=arch; get=get} addr =
 
 let asmprogram_to_bap_range ?(init_ro = false) p st en =
   let rec f l s =
-    let (ir, n) = asm_addr_to_bap p s in
-    if n >= en then List.flatten (List.rev (ir::l))
-    else f (ir::l) n
+    try
+      let (ir, n) = asm_addr_to_bap p s in
+      if n >= en then List.flatten (List.rev (ir::l))
+      else
+	f (ir::l) n
+    with Memory_error ->
+      (* If we fail, hopefully it is because there were some random
+	 bytes at the end of the section that we tried to
+	 disassemble *)
+      wprintf "Failed to read instruction byte while disassembling at address %#Lx; end of section at %#Lx" s en;
+      List.flatten (List.rev l)
   in
   f [] st
 
@@ -672,7 +681,10 @@ let old_bap_from_trace_file ?(atts = true) ?(pin = false) filename =
   r
 
 let bap_from_trace_file ?(atts = true) ?(pin = false) filename =
-  alt_bap_from_trace_file filename
+  if pin then
+    alt_bap_from_trace_file filename
+  else
+    old_bap_from_trace_file ~atts ~pin filename
 
 (** Get one statement at a time.
 

@@ -4,6 +4,8 @@
     @author Ivan Jager
 *)
 
+open Big_int
+open Big_int_convenience
 open Util
 open Ssa
 open Cfg
@@ -17,6 +19,8 @@ module VH = Var.VarHash
 module C = Cfg.SSA
 module CA = Cfg.AST
 module Dom = Dominator.Make(C.G)
+
+let v2s n = bbid_to_string (C.G.V.label n)
 
 (* A translation context (for translating to SSA) *)
 module Ctx =
@@ -62,11 +66,20 @@ let type_of_exp = function
     -> t
   | BinOp((EQ|NEQ|LT|LE|SLT|SLE),_,_)
     -> Ast.reg_1
+  | Ite(_,v,_)
   | BinOp(_,v,_)
   | Store(v,_,_,_,_)
   | UnOp(_,v)
   | Val v
     -> type_of_value v
+  | Extract(h, l, v) ->
+      let n = ((h -% l) +% bi1) in
+      assert(n >=% bi1);
+      Reg(int_of_big_int n)
+  | Concat(lv, rv) ->
+      (match type_of_value lv, type_of_value rv with
+      | Reg(lt), Reg(rt) -> Reg(lt + rt)
+      | _ -> failwith "type_of_exp")
   | Phi(x::_)
     -> Var.typ x
   | Phi []
@@ -82,6 +95,18 @@ let ssa_temp_name = "temp"
    the Ast expression *)
 let rec exp2ssaexp (ctx:Ctx.t) ~(revstmts:stmt list) ?(attrs=[]) e : stmt list * exp =
   match e with 
+  | Ast.Ite(b, e1, e2) ->
+      let (revstmts, vb) = exp2ssa ctx revstmts b in
+      let (revstmts, v1) = exp2ssa ctx revstmts e1 in
+      let (revstmts, v2) = exp2ssa ctx revstmts e2 in
+      (revstmts, Ite(vb, v1, v2))
+  | Ast.Extract(h, l, e) ->
+      let (revstmts, ve) = exp2ssa ctx revstmts e in
+      (revstmts, Extract(h, l, ve))
+  | Ast.Concat(le, re) ->
+      let (revstmts, lv) = exp2ssa ctx revstmts le in
+      let (revstmts, rv) = exp2ssa ctx revstmts re in
+      (revstmts, Concat(lv, rv))
   | Ast.BinOp(op, e1, e2) -> 
       let (revstmts, v1) = exp2ssa ctx revstmts e1 in
       let (revstmts, v2) = exp2ssa ctx revstmts e2 in
@@ -296,7 +321,8 @@ let rec trans_cfg cfg =
       C.set_stmts ssa b stmts'
     in
     dprintf "going on to children";
-      (* rename children *)
+    (* rename children *)
+    (* List.iter (fun n -> dprintf "Dominates %s" (v2s n)) (dom_tree b); *)
     let ssa = List.fold_left rename_block ssa (dom_tree b) in
     let () =
       (* Update any phis in our successors *)
@@ -317,10 +343,12 @@ let rec trans_cfg cfg =
 	)
 	(C.G.succ ssa b)
     in
-    (* save context for exit node *)
-    (if bbid = BB_Exit then
-       VH.iter (fun k v -> VH.replace exitctx k v) vh_ctx);
-    (* restore context *)
+   (* save context for exit node *)
+    (if bbid = BB_Exit then (
+      (* dprintf "Exit ctx:"; *)
+      (* VH.iter (fun k v -> dprintf "%s -> %s" (Pp.var_to_string k) (Pp.var_to_string v)) vh_ctx; *)
+      VH.iter (fun k v -> VH.replace exitctx k (VH.find vh_ctx k)) vh_ctx ));
+   (* restore context *)
     Ctx.pop ctx;
     ssa
   in
@@ -354,6 +382,7 @@ let rec trans_cfg cfg =
       ssa ssa
   in
   dprintf "Done translating to SSA";
+  (* VH.iter (fun k v -> dprintf "%s -> %s" (Pp.var_to_string k) (Pp.var_to_string v)) exitctx; *)
   {cfg=ssa; to_astvar=VH.find to_oldvar; to_ssavar=VH.find exitctx}
 
 (** Translates a CFG into SSA form. *)
@@ -378,6 +407,9 @@ let uninitialized cfg =
     and f_e = function
       | Load(v1,v2,v3,_) -> f_v v1; f_v v2; f_v v3
       | Store(v1,v2,v3,v4,_) -> f_v v1; f_v v2; f_v v3; f_v v4
+      | Ite(cond,v1,v2) -> f_v cond; f_v v1; f_v v2
+      | Extract(_,_,v) -> f_v v
+      | Concat(lv,rv) -> f_v lv; f_v rv
       | BinOp(_,v1,v2) -> f_v v1; f_v v2
       | UnOp(_,v)
       | Cast(_,_,v)
@@ -597,6 +629,9 @@ let rec value2ast tm = function
 and exp2ast tm =
   let v2a = value2ast tm in
   function
+    | Ite(c,v1,v2) -> Ast.Ite(v2a c, v2a v1, v2a v2)
+    | Extract(h,l,v) -> Ast.Extract(h, l, v2a v)
+    | Concat(lv,rv) -> Ast.Concat(v2a lv, v2a rv)
     | BinOp(bo,v1,v2) -> Ast.BinOp(bo, v2a v1, v2a v2)
     | UnOp(uo, v) -> Ast.UnOp(uo, v2a v)
     | Val v -> v2a v

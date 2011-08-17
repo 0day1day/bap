@@ -21,6 +21,9 @@ type value =
 type exp = 
   | Load of value * value * value * typ  (** Load(arr,idx,endian, t) *)
   | Store of value * value * value * value * typ  (** Store(arr,idx,val, endian, t) *)
+  | Ite of value * value * value
+  | Extract of big_int * big_int * value
+  | Concat of value * value
   | BinOp of binop_type * value * value
   | UnOp of unop_type * value
   | Val of value
@@ -68,31 +71,37 @@ let quick_value_eq = full_value_eq
 let num_exp = function
   | Load _ -> 0
   | Store _ -> 1
-  | BinOp _ -> 2
-  | UnOp _ -> 3
-  | Val _ -> 4
-  | Cast _ -> 5
-  | Unknown _ -> 6
-  | Phi _ -> 7
+  | Ite _ -> 2
+  | Extract _ -> 3
+  | Concat _ -> 4
+  | BinOp _ -> 5
+  | UnOp _ -> 6
+  | Val _ -> 7
+  | Cast _ -> 8
+  | Unknown _ -> 9
+  | Phi _ -> 10
 
-  (* Returns vallist, tlist, btlist, utlist, slist, clist, varlist *)
+  (* Returns vallist, tlist, btlist, utlist, slist, clist, varlist, ilist *)
 let getargs_exp = function
-  | Load(e1,e2,e3,t1) -> [e1;e2;e3], [t1], [], [], [], [], []
-  | Store(e1,e2,e3,e4,t1) -> [e1;e2;e3;e4], [t1], [], [], [], [], []
-  | BinOp(bt,e1,e2) -> [e1;e2], [], [bt], [], [], [], []
-  | UnOp(ut,e1) -> [e1], [], [], [ut], [], [], []
-  | Val(v1) -> [v1], [], [], [], [], [], []
-  | Cast(c1,t1,e1) -> [e1], [t1], [], [], [], [c1], []
-  | Unknown(s1,t1) -> [], [t1], [], [], [s1], [], []
-  | Phi(vl1) -> [], [], [], [], [], [], [vl1]
+  | Load(e1,e2,e3,t1) -> [e1;e2;e3], [t1], [], [], [], [], [], []
+  | Store(e1,e2,e3,e4,t1) -> [e1;e2;e3;e4], [t1], [], [], [], [], [], []
+  | Ite(e1,e2,e3) -> [e1;e2;e3], [], [], [], [], [], [], []
+  | Extract(i1,i2,e1) -> [e1], [], [], [], [], [], [], [i1;i2]
+  | Concat(e1,e2) -> [e1;e2], [], [], [], [], [], [], []
+  | BinOp(bt,e1,e2) -> [e1;e2], [], [bt], [], [], [], [], []
+  | UnOp(ut,e1) -> [e1], [], [], [ut], [], [], [], []
+  | Val(v1) -> [v1], [], [], [], [], [], [], []
+  | Cast(c1,t1,e1) -> [e1], [t1], [], [], [], [c1], [], []
+  | Unknown(s1,t1) -> [], [t1], [], [], [s1], [], [], []
+  | Phi(vl1) -> [], [], [], [], [], [], [vl1], []
 
 
 (** quick_exp_eq e1 e2 returns true if and only if the subexpressions
     in e1 and e2 are *physically* equal. *)
 let quick_exp_eq e1 e2 =
   if (num_exp e1) <> (num_exp e2) then false else
-    let l1,l2,l3,l4,l5,l6,l7 = getargs_exp e1 in
-    let r1,r2,r3,r4,r5,r6,r7 = getargs_exp e2 in
+    let l1,l2,l3,l4,l5,l6,l7,l8 = getargs_exp e1 in
+    let r1,r2,r3,r4,r5,r6,r7,r8 = getargs_exp e2 in
     let b1 = List.for_all2 (==) l1 r1 in
     let b2 = List.for_all2 (==) l2 r2 in
     let b3 = List.for_all2 (==) l3 r3 in
@@ -100,7 +109,8 @@ let quick_exp_eq e1 e2 =
     let b5 = List.for_all2 (==) l5 r5 in
     let b6 = List.for_all2 (==) l6 r6 in
     let b7 = List.for_all2 (==) l7 r7 in
-    if b1 & b2 & b3 & b4 & b5 & b6 & b7 then
+    let b8 = List.for_all2 (==) l8 r8 in
+    if b1 & b2 & b3 & b4 & b5 & b6 & b7 & b8 then
       true else false
 
 (** full_exp_eq e1 e2 returns true if and only if e1 and e2 are
@@ -113,8 +123,8 @@ let quick_exp_eq e1 e2 =
 *)
 let rec full_exp_eq e1 e2 =
   if (num_exp e1) <> (num_exp e2) then false else
-    let l1,l2,l3,l4,l5,l6,l7 = getargs_exp e1 in
-    let r1,r2,r3,r4,r5,r6,r7 = getargs_exp e2 in
+    let l1,l2,l3,l4,l5,l6,l7,l8 = getargs_exp e1 in
+    let r1,r2,r3,r4,r5,r6,r7,r8 = getargs_exp e2 in
     let b1 = List.for_all2 (==) l1 r1 in (* vals must be == *)
     let b2 = List.for_all2 (=) l2 r2 in
     let b3 = List.for_all2 (=) l3 r3 in
@@ -122,9 +132,10 @@ let rec full_exp_eq e1 e2 =
     let b5 = List.for_all2 (=) l5 r5 in
     let b6 = List.for_all2 (=) l6 r6 in
     let b7 = List.for_all2 (=) l7 r7 in
-    if b1 & b2 & b3 & b4 & b5 & b6 & b7 then
+    let b8 = List.for_all2 (eq_big_int) l8 r8 in
+    if b1 & b2 & b3 & b4 & b5 & b6 & b7 & b8 then
       true
-    else if b2 & b3 & b4 & b5 & b6 & b7 then
+    else if b2 & b3 & b4 & b5 & b6 & b7 & b8 then
       (* e1 and e2 are not physically equal.  But maybe the
          subexpressions are structurally, but not physically,
          equal. *)

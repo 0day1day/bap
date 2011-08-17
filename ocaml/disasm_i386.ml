@@ -70,6 +70,8 @@ type opcode =
   | Push of typ * operand
   | Pop of typ * operand
   | Add of (typ * operand * operand)
+  | Inc of typ * operand
+  | Dec of typ * operand
   | Sub of (typ * operand * operand)
   | Sbb of (typ * operand * operand)
   | Cmp of (typ * operand * operand)
@@ -340,10 +342,10 @@ let rep_wrap ?check_zf ~addr ~next stmts =
       CJmp(zf_e, l32 next, l32 addr, [])
     | _ -> failwith "invalid value for ?check_zf"
   in
-    cjmp (ecx_e =* l32 0L) (l32 next)
+    cjmp (ecx_e ==* l32 0L) (l32 next)
     @ stmts
     @ move ecx (ecx_e -* i32 1)
-    :: cjmp (ecx_e =* l32 0L) (l32 next)
+    :: cjmp (ecx_e ==* l32 0L) (l32 next)
     @ [endstmt]
 
 let reta = [StrAttr "ret"]
@@ -364,11 +366,38 @@ let set_pszf t r =
    set_sf r;
    set_zf t r]
 
-let set_flags_sub t s1 s2 r =
-  move cf (s2 >* s1)
-  ::move af ((r &* Int(bi7,t)) <* (s1 &* Int(bi7,t))) (* Is this right? *)
+(* Arithmetic flag
+
+   AF is set when there is a carry to or borrow from bit 5, when
+   considering unsigned operands. Let X_i denote bit i of value X.
+   Note that in addition, r_5 = c + [(op1_5 + op2_5) mod 2], where c
+   is the carry bit from the lower four bits. Since AF = c, and we
+   want to know the value of AF, we can rewrite as AF = c = r_5 -
+   [(op1_5 + op2_5) mod 2]. Noting that addition and subtraction mod 2
+   is just xor, we can simplify to AF = r_5 xor op1_5 xor op2_5.
+*)
+
+(* Helper functions to set flags for adding *)
+let set_aopszf_add t s1 s2 r =
+  let bit5 = it (1 lsl 5) t in 
+  move af (bit5 ==* (bit5 &* ((r ^* s1) ^* s2)))
+  ::move oF (cast_high r1 ((s1 =* s2) &* (s1 ^* r)))
+  ::set_pszf t r
+
+let set_flags_add t s1 s2 r =
+  move cf (r <* s1)
+  ::set_aopszf_add t s1 s2 r
+
+(* Helper functions to set flags for subtracting *)
+let set_aopszf_sub t s1 s2 r =
+  let bit5 = it (1 lsl 5) t in
+  move af (bit5 ==* ((bit5 &* ((r ^* s1) ^* s2))))
   ::move oF (Cast(CAST_HIGH, r1, (s1 ^* s2) &* (s1 ^* r) ))
   ::set_pszf t r
+
+let set_flags_sub t s1 s2 r =
+  move cf (s2 >* s1)
+  ::set_aopszf_sub t s1 s2 r
 
 
 let rec to_ir addr next ss pref =
@@ -444,7 +473,7 @@ let rec to_ir addr next ss pref =
       | _ -> failwith "invalid shift type"
     and count = (op2e r32 o2) &* i32 31
     and e1 = op2e s o1 in
-    let ifzero = ite r1 (count =* i32 0)
+    let ifzero = ite r1 (count ==* i32 0)
     and our_of = match st with
       | LSHIFT -> Cast(CAST_HIGH, r1, e1) ^* cf_e
       | RSHIFT -> Cast(CAST_HIGH, r1, Var tmpDEST)
@@ -459,7 +488,7 @@ let rec to_ir addr next ss pref =
      ;
      move cf (ifzero cf_e (Cast(CAST_LOW, r1, Var t1)));
      assn s o1 (s_f e1 count);
-     move oF (ifzero of_e (ite r1 (count =* i32 1) (our_of) (Unknown("OF <- undefined", r1))));
+     move oF (ifzero of_e (ite r1 (count ==* i32 1) (our_of) (Unknown("OF <- undefined", r1))));
      move sf (ifzero sf_e (compute_sf e1));
      move zf (ifzero zf_e (compute_zf s e1));
      move pf (ifzero pf_e (compute_pf s e1));
@@ -472,7 +501,7 @@ let rec to_ir addr next ss pref =
       let e_shift = op2e s shift in
       let bits = Arithmetic.bits_of_width s in
       let our_of = cast_high r1 (Var tempDEST) ^* cast_high r1 e_dst in
-      let ifzero = ite r1 (e_shift =* it 0 s) in
+      let ifzero = ite r1 (e_shift ==* it 0 s) in
       let ret1 = e_fill >>* (it bits s -* e_shift) in
       let ret2 = e_dst <<* e_shift in
       let result = ret1 |* ret2 in
@@ -481,7 +510,7 @@ let rec to_ir addr next ss pref =
         move tempDEST e_dst;
         move cf (ifzero cf_e (Cast(CAST_LOW, r1, t2)));
         assn s dst result;
-        move oF (ifzero of_e (ite r1 (e_shift =* i32 1) (our_of) (it 0 r1)));
+        move oF (ifzero of_e (ite r1 (e_shift ==* i32 1) (our_of) (it 0 r1)));
         move sf (ifzero sf_e (compute_sf e_dst));
         move zf (ifzero zf_e (compute_zf s e_dst));
         move pf (ifzero pf_e (compute_pf s e_dst));
@@ -564,25 +593,29 @@ let rec to_ir addr next ss pref =
     move tmp (op2e t o1)
     :: assn t o1 (op2e t o1 +* op2e t o2)
     :: let s1 = Var tmp and s2 = op2e t o2 and r = op2e t o1 in
-       set_sf r
-       ::set_zf t r
-       ::set_pf t r
-       ::move cf (r <* s1)
-       ::move af (Unknown("AF for add unimplemented", r1))
-       ::move oF (cast_high r1 ((s1 ^* exp_not s2) &* (s1 ^* r)))
-       ::[]
+       set_flags_add t s1 s2 r
+  | Inc(t, o) (* o = o + 1 *) ->
+    let tmp = nv "t" t in
+    move tmp (op2e t o)
+    :: assn t o (op2e t o +* it 1 t)
+    :: set_aopszf_add t (Var tmp) (it 1 t) (op2e t o)
+  | Dec(t, o) (* o = o - 1 *) ->
+    let tmp = nv "t" t in
+    move tmp (op2e t o)
+    :: assn t o (op2e t o -* it 1 t)
+    :: set_aopszf_sub t (Var tmp) (it 1 t) (op2e t o) (* CF is maintained *)
   | Sub(t, o1, o2) (* o1 = o1 - o2 *) ->
     let oldo1 = nv "t" t in
     move oldo1 (op2e t o1)
     :: assn t o1 (op2e t o1 -* op2e t o2)
-    :: set_flags_sub t (Var oldo1) (op2e t o2) (op2e t o1) 
+    :: set_flags_sub t (Var oldo1) (op2e t o2) (op2e t o1)
   | Sbb(t, o1, o2) ->
     let tmp = nv "t" t in
     let s1 = Var tmp and s2 = op2e t o2 and r = op2e t o1 in
     move tmp r
     :: assn t o1 (r -* s2 -* cast_unsigned t cf_e)
       (* FIXME: sanity check this *)
-    ::move cf ((r >* s1) |* (r =* s1 &* cf_e))
+    ::move cf ((r >* s1) |* (r ==* s1 &* cf_e))
     ::move af (Unknown("AF for sbb unimplemented", r1))
     ::move oF (Cast(CAST_HIGH, r1, (s1 ^* s2) &* (s1 ^* r) ))
     ::set_pszf t r
@@ -668,6 +701,8 @@ module ToStr = struct
     | Shift _ -> "shift"
     | Shiftd _ -> "shiftd"
     | Hlt -> "hlt"
+    | Inc (t, r) -> Printf.sprintf "inc %s" (opr r)
+    | Dec (t, r) -> Printf.sprintf "dec %s" (opr r)
     | Jump a -> Printf.sprintf "jmp %s" (opr a)
     | _ -> unimplemented "op2str"
 
@@ -846,7 +881,11 @@ let parse_instr g addr =
     let b1 = Char.code (g a)
     and na = s a in
     match b1 with (* Table A-2 *)
-      (* most of 00 to 3d are near the end *)
+	(*** most of 00 to 3d are near the end ***)
+    | 0x40 | 0x41 | 0x42 | 0x43 | 0x44 | 0x45 | 0x46 | 0x47 ->
+		(Inc(opsize, Oreg(b1 & 7)), na)
+    | 0x48 | 0x49 | 0x4a | 0x4b | 0x4c | 0x4d | 0x4e | 0x4f ->
+      (Dec(opsize, Oreg(b1 & 7)), na)
     | 0x50 | 0x51 | 0x52 | 0x53 | 0x54 | 0x55 | 0x56 | 0x57 ->
       (Push(opsize, Oreg(b1 & 7)), na)
     | 0x58 | 0x59 | 0x5a | 0x5b | 0x5c | 0x5d | 0x5e | 0x5f ->
@@ -881,8 +920,10 @@ let parse_instr g addr =
     | 0x88 -> let (r, rm, na) = parse_modrm r8 na in
 	      (Mov(r8, rm, r), na)
     | 0x89 ->
-        let (r, rm, na) = parse_modrm32 na in
-	  (Mov(opsize, rm, r), na)
+      let (r, rm, na) = parse_modrm32 na in
+      (Mov(opsize, rm, r), na)
+    | 0x8a -> let (r, rm, na) = parse_modrm r8 na in
+	      (Mov(r8, r, rm), na)
     | 0x8b -> let (r, rm, na) = parse_modrm32 na in
 	      (Mov(opsize, r, rm), na)
     | 0x8d -> let (r, rm, na) = parse_modrm opsize na in
@@ -900,6 +941,8 @@ let parse_instr g addr =
     | 0xa7 -> (Cmps opsize, na)
     | 0xae -> (Scas r8, na)
     | 0xaf -> (Scas opsize, na)
+    | 0xa8 -> let (i, na) = parse_imm8 na in
+	      (Test(r8, o_eax, i), na)
     | 0xa9 -> let (i,na) = parse_immz opsize na in
 	      (Test(opsize, o_eax, i), na)
     | 0xaa -> (Stos r8, na)
@@ -990,6 +1033,7 @@ let parse_instr g addr =
     | 0x0f -> (
       let b2 = Char.code (g na) and na = s na in
       match b2 with (* Table A-3 *)
+	  | 0x1f -> (Nop, na)
       | 0x6f | 0x7f when pref = [0x66] ->
             (
 	      let r, rm, na = parse_modrm32 na in

@@ -12,25 +12,15 @@ To build BAP on x86, do the following:
 On x86_64, instead of ./configure you may need ./configure CFLAGS=-DAMD64.
 
 Configure should report any dependencies you do not have.  You can
-satisfy most dependencies on debian lenny by running:
+satisfy most dependencies on Ubuntu 11.04 by running:
 
-  $ sudo aptitude install ocaml ocaml-findlib libgdome2-ocaml-dev\
-    camlidl libocamlgraph-ocaml-dev libextlib-ocaml-dev sqlite3\
-    libsqlite3-ocaml-dev libsqlite3-dev libsqlite3-0\
-    libsqlite3-ocaml libsqlite3-ocaml-dev binutils-dev automake autoconf \
-    texlive-latex-extra texlive-fonts-recommended texlive-latex-base g++
+  $ sudo apt-get install ocaml ocaml-native-compilers ocaml-findlib camlidl \
+    libocamlgraph-ocaml-dev libextlib-ocaml-dev ocaml-batteries-included    \
+    binutils-dev
 
-You may also need to (e.g., on Ubuntu 8.04):
-  $ sudo aptitude install  ocaml-native-compilers texlive-base \
-   texlive-latex-base texlive-fonts-recommended liblablgtk2-gnome-ocaml-dev
-
-Unfortunately, we require a more recent version of ocamlgraph than
-provided with Ubuntu 8.04.  You can download ocamlgraph from
-http://ocamlgraph.lri.fr/. Note you must install the findlib
-packages, e.g.,
-   $ make install-findlib
-(Note this requires the  liblablgtk2-gnome-ocaml-dev on my system).
-
+To compile the documentation, you also need
+  $ sudo aptitude install texlive-base texlive-latex-base \
+    texlive-latex-extra texlive-fonts-recommended 
 
 If you get an error that says there is an undefined reference to
 '__stack_chk_fail', either you need to reconfigure with gcc set to

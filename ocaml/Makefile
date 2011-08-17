@@ -47,17 +47,20 @@ export SOURCES = \
 	formulap.ml \
 	stp.ml \
 	smtlib1.ml \
+	smtlib2.ml \
 	libbfd.idl \
 	libasmir.idl \
 	disasm_i386.ml \
 	disasm.ml \
 	grammar.mly lexer.mll \
 	stp_grammar.mly stp_lexer.mll \
+	cvc3_grammar.mly cvc3_lexer.mll \
+	yices_grammar.mly yices_lexer.mll \
 	parser.ml \
 	memory2array.ml \
 	gcl.mli gcl.ml \
 	wp.ml \
-	stpexec.mli stpexec.ml \
+	smtexec.mli smtexec.ml \
 	asmirconsts.ml asmir.mli asmir.ml \
 	input.mli input.ml \
 	depgraphs.ml \
@@ -75,7 +78,15 @@ export SOURCES = \
 	template.ml \
 	traces.ml \
 	payload.ml \
-	$(PROJSOURCES)
+	graphDataflowW.ml \
+	tie_ast_preprocess.ml \
+	tie_val.ml \
+	tie_type.ml \
+	tie_ft_grammar.mli tie_ft_grammar.ml \
+	tie_ft_lex.ml \
+	tie_utils.ml \
+	tie_typeinf.ml \
+	$(PROJSOURCES) \
 
 # Fix the interpreter to work with big ints
 #	interpreter.ml \
@@ -87,7 +98,7 @@ DOC_FILES := $(filter %.mli, $(SOURCES)) $(filter %.ml, $(SOURCES))
 
 
 # ocamlfind packages required
-export PACKS = bigarray str ocamlgraph extlib unix
+export PACKS = bigarray str ocamlgraph extlib unix batteries
 export YFLAGS = -v
 
 

@@ -39,6 +39,9 @@ let biconst i = big_int_of_int i
 (** Infix operator to test if two big ints are equal. *)
 let (==%) bi1 bi2 = eq_big_int bi1 bi2
 
+(** Infix operator to test for non-equality *)
+let (<>%) bi1 bi2 = not (bi1 ==% bi2)
+
 (** Infix operator for < *)
 let (<%) bi1 bi2 = lt_big_int bi1 bi2
 
@@ -53,6 +56,12 @@ let (>=%) bi1 bi2 = ge_big_int bi1 bi2
 
 (** Infix operator for << *)
 let (<<%) bi1 i2 = shift_left_big_int bi1 i2
+
+(** Infix operator for >> *)
+let (>>%) bi1 i2 = shift_right_big_int bi1 i2
+
+(** Infix operator for $>> *)
+let ($>>%) bi1 i2 = shift_right_towards_zero_big_int bi1 i2
 
 (** Infix operator for + *)
 let (+%) bi1 bi2 = add_big_int bi1 bi2
