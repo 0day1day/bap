@@ -77,7 +77,6 @@ export SOURCES = \
 	coalesce.ml \
 	template.ml \
 	traces.ml \
-	payload.ml \
 	graphDataflowW.ml \
 	tie_ast_preprocess.ml \
 	tie_val.ml \
