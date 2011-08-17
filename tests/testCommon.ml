@@ -25,6 +25,21 @@ let rec find_pin_out files =
   | [] -> assert_failure ("Could not find a file with suffix "^pin_out_suffix)
   | f::fs -> if (pmatch ~pat:pin_out_suffix f) then f else find_pin_out fs;;
 
+let check_pin_setup _ =
+  (* Only do this if we are running in an x64 environment *)
+  let cat_arg = "/proc/sys/kernel/yama/ptrace_scope" in
+  let foutput char_stream = 
+	(match (Stream.next char_stream) with
+	| '0' -> ()
+	| _ -> assert_failure
+	  (cat_arg^
+		 " must contain 0 for pin to work.  As root, please execute $ echo 0 > "
+	   ^cat_arg))
+  in
+  if (Sys.file_exists cat_arg) 
+  then assert_command ~foutput ~verbose:true "cat" [cat_arg]
+  else ();;
+
 
 (** General system functions **)
 let chdir_startup dir _ =
@@ -121,16 +136,3 @@ let check_eax ctx eax =
 
 let check_functions msg ranges names =
   ignore(List.map (find_fun ~msg ranges) names);;
-
-
-let check_pin_setup _ =
-  let cat_arg = "/proc/sys/kernel/yama/ptrace_scope" in
-  let foutput char_stream = 
-	(match (Stream.next char_stream) with
-	| '0' -> ()
-	| _ -> assert_failure
-	  (cat_arg^
-		 " must contain 0 for pin to work.  As root, please execute $ echo 0 > "
-	   ^cat_arg))
-  in
-  assert_command ~foutput ~verbose:true "cat" [cat_arg];;
