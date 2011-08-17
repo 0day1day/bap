@@ -507,12 +507,12 @@ let asm_addr_to_bap ?(log=fun _ -> ()) {asmp=prog; arch=arch; get=get} addr =
 	let (ir,na) as v = 
 	  (try (Disasm.disasm_instr arch get addr)
        with Failure s -> 
-		 log(Printf.sprintf "XXX disasm_instr %Lx: %s\n" addr s);
+		 log(Printf.sprintf "disasm_instr %Lx: %s\n" addr s);
 		 DV.dprintf "disasm_instr %Lx: %s" addr s; raise Disasm.Unimplemented
 	  )
     in
     DV.dprintf "Disassembled %Lx directly" addr;
-    if DCheck.debug() then check_equivalence addr v (fallback());
+    if DCheck.debug then check_equivalence addr v (fallback());
     (match ir with
     | Label(l, [])::rest ->
 	  (Label(l, [Asm(Libasmir.asmir_string_of_insn prog addr)])::rest,

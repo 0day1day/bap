@@ -3,11 +3,10 @@
 *
 *  Made by (David Brumley)
 *)
-val set_global_debug : bool -> unit
 
 module type DEBUG =
   sig
-    val debug : unit -> bool
+    val debug : bool
     val warn : bool
     val pdebug : string -> unit
     val dprintf : ('a, unit, string, unit) format4 -> 'a

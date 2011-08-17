@@ -52,10 +52,9 @@ let anon x = raise(Arg.Bad("Unexpected argument: '"^x^"'"));;
 let () = Arg.parse speclist anon usage;;*)
 
 let _ = 
-  let _ = Debug.set_global_debug false in
-  let results =
-	run_test_tt_main (*~arg_specs:speclist ~verbose:!verbose*) tests
-  in
+  (* let results = 
+	run_test_tt_main ~arg_specs:speclist ~verbose:!verbose tests in*)
+  let results = run_test_tt_main tests in
   Format.printf "%s\n" "";
   summarize_results results
 ;;

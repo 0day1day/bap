@@ -32,10 +32,6 @@ let debug_string = prerr_string
 (** like [debug_string] but prints a newline and flushes the buffer *)
 let debug_endline = prerr_endline
 
-let global_debug = ref true
-
-let set_global_debug v = global_debug := v
-
 let output_endline oc s =
   output_string oc s;
   output_char oc '\n';
@@ -56,35 +52,32 @@ let get_env_options varname defvalue =
       let modules = Sys.getenv varname in
       let len = String.length modules in
       let lookup name =
-		let rec f spos =
-		  let npos =
-			try String.index_from modules spos ':'
-			with Not_found -> len
-		  in
-		  if npos = spos then true else
-			let (sub, res) =
-			  if String.get modules spos = '!'
-			  then (String.sub modules (spos+1) (npos-spos-1), false)
-			  else (String.sub modules spos (npos-spos), true)
-			in
-			if sub = "" || sub = name then res
-			else if npos < len then f (npos+1) else defvalue
-		in
-		f 0
+	let rec f spos =
+	  let npos =
+	    try String.index_from modules spos ':'
+	    with Not_found -> len
+	  in
+	  if npos = spos then true else
+	    let (sub, res) =
+	      if String.get modules spos = '!'
+	      then (String.sub modules (spos+1) (npos-spos-1), false)
+	      else (String.sub modules spos (npos-spos), true)
+	    in
+	    if sub = "" || sub = name then res
+	    else if npos < len then f (npos+1) else defvalue
+	in
+	f 0
       in
       lookup
     with Not_found ->
       default
 
 
-(** [has_debug d s] returns true when debugging is enabled for s. d is the
-	default behavior
+(** [has_debug s] returns true when debugging is enabled for s.
     See documentation on [BAP_DEBUG_MODULES] at the top.
 *)
-let has_debug d s =
-  (*get_env_options "BAP_DEBUG_MODULES"*)
-  if !global_debug then get_env_options "BAP_DEBUG_MODULES" d s
-  else get_env_options "BAP_DEBUG_MODULES" false s
+let has_debug =
+  get_env_options "BAP_DEBUG_MODULES"
 
 (** [has_warn s] returns true when warnings are enabled for s.
     See documention on [BAP_WARN_MODULES] at the top *)
@@ -137,7 +130,7 @@ let ptime =
 (** The type of module that contains the debugging functions *)
 module type DEBUG =
 sig
-  val debug : unit -> bool
+  val debug : bool
     (** Whether debugging is on *)
 
   val warn : bool
@@ -177,7 +170,7 @@ end
 (** No-op debugging module. Throws everything away. *)
 module NoDebug : DEBUG  =
 struct
-  let debug _ = false
+  let debug = false
   let pdebug = (fun _ -> ())
   let dprintf fmt = Printf.ksprintf ignore fmt
   let dtrace = (fun ~before ~f ~after -> f)
@@ -190,16 +183,16 @@ end
 module Make(Module:DEBUG_MOD_INFO)  : DEBUG =
 struct
 
-  let debug _ = has_debug (Module.default = `Debug) Module.name
+  let debug = has_debug (Module.default = `Debug) Module.name 
 
   let pdebug s =
     pindent(); ptime();
     debug_string Module.name; debug_string ": ";
     debug_endline s
-  let pdebug a = if debug() then pdebug a else NoDebug.pdebug a
+  let pdebug = if debug then pdebug else NoDebug.pdebug
 
-  let dprintf fmt = Printf.ksprintf pdebug fmt 
-  let dprintf a = if debug() then dprintf a else NoDebug.dprintf a
+  let dprintf fmt = Printf.ksprintf pdebug fmt
+  let dprintf = if debug then dprintf else NoDebug.dprintf
 
   let dtrace ~before ~f ~after x =
     before x;
@@ -209,7 +202,7 @@ struct
     after r;
     r
  
-  let dtrace = if debug() then dtrace else NoDebug.dtrace
+  let dtrace = if debug then dtrace else NoDebug.dtrace
 
   let warn = has_warn Module.name
 

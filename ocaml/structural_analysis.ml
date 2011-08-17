@@ -50,7 +50,7 @@ module PC = Graph.Path.Check(G)
 module DFS = Graph.Traverse.Dfs(G)
 
 let printg g =
-  if debug() then (
+  if debug then (
     G.iter_vertex (fun v -> pdebug (node2s v)) g;
     G.iter_edges (fun a b -> dprintf "%s -> %s" (node2s a) (node2s b)) g;
   )
@@ -91,7 +91,7 @@ let structural_analysis c =
   and post_ctr = ref 0 in
 
   let compact g n nset =
-    if debug() then dprintf "compacting %s from %s"  (node2s n) (nodes2s nset);
+    if debug then dprintf "compacting %s from %s"  (node2s n) (nodes2s nset);
     let nleft = ref (List.length nset)
     and last = ref 0 in
     Array.iter 
@@ -134,7 +134,7 @@ let structural_analysis c =
   in
   let reduce g rtype nodeset =
     let node = Region(rtype, nodeset) in
-    if debug() then dprintf "Making %s region %s out of %s" (rtype2s rtype) (node2s node) (nodes2s nodeset);
+    if debug then dprintf "Making %s region %s out of %s" (rtype2s rtype) (node2s node) (nodes2s nodeset);
     replace g node nodeset;
     structures := node :: !structures;
     List.iter (fun n->Hashtbl.add structof n node) nodeset;
