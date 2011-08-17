@@ -65,7 +65,6 @@ export SOURCES = \
 	symbeval.ml symbeval_search.ml \
 	ast_slice.ml \
 	ssa_slice.ml \
-	comparelib.ml \
 	structural_analysis.ml \
 	unroll.ml \
 	hacks.ml \
@@ -73,7 +72,6 @@ export SOURCES = \
 	template.ml \
 	interpreter.ml \
 	traces.ml \
-	payload.ml \
 	graphDataflowW.ml \
 	tie_ast_preprocess.ml \
 	tie_val.ml \

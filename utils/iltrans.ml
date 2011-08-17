@@ -324,10 +324,6 @@ let speclist =
      Arg.Set_string Traces.printer,
      "Set formula format (STP (default) or smtlib1)."
   )
-  ::("-approx-formula", 
-     Arg.Unit(fun () -> add(TransformAst(Payload.sym_analyze))),
-     "Approximate formula"
-    )
   ::("-trace-exploit", 
      Arg.String(fun f -> add(TransformAst(Traces.output_exploit f))),
      "<file> Output the exploit string to <file>"

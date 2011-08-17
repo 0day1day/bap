@@ -14,7 +14,7 @@ export SOURCE_DIRS_IN = $(BAP_OCAMLDIR) $(BAP_PROJ_OCAMLDIR)
 
 # default subprojects to build
 ifndef SUBPROJS
-	export SUBPROJS = $(PROJUTILS) toil iltrans ileval topredicate formula get_functions compare split recon
+	export SUBPROJS = $(PROJUTILS) toil iltrans ileval topredicate formula get_functions split recon
 endif
 
 define PROJ_toil
@@ -58,13 +58,6 @@ define PROJ_get_functions
 	DOC_FILES=$(SOURCES)
 endef
 export PROJ_get_functions
-
-define PROJ_compare
-	RESULT=compareprogs
-	SOURCES = compareprogs.ml
-	DOC_FILES=$(SOURCES)
-endef
-export PROJ_compare
 
 define PROJ_split
 	RESULT=split_disjunction
