@@ -2,30 +2,16 @@ open OUnit
 open Pcre
 open TestCommon
 
-let bof = "C/bof1";;
-let taint_file = "tainted_file";;
-let exploit_file = "exploit";;
-
-
-let create_input_file _ =
-  let out = open_out taint_file in
-  output_string out "helloooooooooooooooooo\n";
-  close_out out;;
-  
-
-let rec find_pin_out files =
-  match files with
-  | [] -> assert_failure ("Could not find a file with suffix "^pin_out_suffix)
-  | f::fs -> if (pmatch ~pat:pin_out_suffix f) then f else find_pin_out fs;;
-
+let out_suffix = "large-consistency-test.out";;
+let binary = "/bin/ls";;
+let binary_args = "";;
 
 let pin_trace_setup _ =
   let args = 
-	["-t"; (gentrace_path^gentrace); "-taint-files"; taint_file; 
-	 "-o"; pin_out_suffix; "--"; bof; taint_file ] in
+	["-t"; (gentrace_path^gentrace); 
+	 "-o"; pin_out_suffix; "--"; binary; binary_args ] in
   let exit_code = Unix.WEXITED(1) in
   check_pin_setup();
-  create_input_file();
   assert_command ~exit_code (pin_path^pin) args;
   find_pin_out (Array.to_list (Sys.readdir "./"));;
 
@@ -33,15 +19,17 @@ let pin_trace_setup _ =
 let pin_trace_test pin_out = 
   let prog = Asmir.bap_from_trace_file ~pin:true pin_out in
   Traces.consistency_check := true;
+  Traces.checkall := true;
   ignore(Traces.concrete prog);
-  Traces.consistency_check := false;
+(*  Traces.consistency_check := false;
   set_stp_path();
-  ignore(Traces.output_exploit exploit_file prog);;
+  ignore(Traces.output_exploit exploit_file prog)*)
+;;
 
 
 (* Note: This will leave the files pin.log and pintool.log by intention *)
 let pin_trace_cleanup pin_out = 
-  Sys.remove pin_out; Sys.remove exploit_file; Sys.remove taint_file;;
+  Sys.remove pin_out;;
 
 
 let suite = "Pin" >:::
@@ -52,6 +40,6 @@ let suite = "Pin" >:::
 	  bracket (chdir_startup gentrace_path) (check_file gentrace) chdir_cleanup;
 	"stp_binary_test" >::
 	  bracket (chdir_startup stp_path) (check_file stp) chdir_cleanup;
-	"pin_taint_test" >::
+	"large_binary_consistency_test" >::
 	  bracket pin_trace_setup pin_trace_test pin_trace_cleanup;
   ]

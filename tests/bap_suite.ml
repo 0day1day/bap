@@ -14,6 +14,7 @@ let tests =
 		Traces_suite.suite;
 		Pin_suite.suite;
 		Predicate_suite.suite;
+		Large_binary_consistency_suite.suite;
 	  ]);;
 
 let verbose = ref false;;

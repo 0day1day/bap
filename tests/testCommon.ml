@@ -2,6 +2,7 @@ open OUnit
 open Pcre
 open Ast
 
+(** STP helpers **)
 let stp_path = "../stpwrap/stp/bin/";;
 let stp = "stp";;
 
@@ -11,11 +12,21 @@ let set_stp_path _ =
   if (pmatch ~pat:stp_path path) then ()
   else (Unix.putenv "PATH" (path^":"^stp_path));;
 
-let rec find_fun ?(msg="") ranges name = match ranges with
-  | [] -> assert_failure ("Could not find function "^name^msg)
-  | (n,s,e)::rs -> if (n = name) then (s,e) else find_fun ~msg rs name;;
+
+(** pin helpers **)
+let pin_path = "../pin/";;
+let pin = "pin";;
+let gentrace_path = "../pintraces/obj-ia32/";;
+let gentrace = "gentrace.so";;
+let pin_out_suffix = "bap-pin-test.out";;
+
+let rec find_pin_out files =
+  match files with
+  | [] -> assert_failure ("Could not find a file with suffix "^pin_out_suffix)
+  | f::fs -> if (pmatch ~pat:pin_out_suffix f) then f else find_pin_out fs;;
 
 
+(** General system functions **)
 let chdir_startup dir _ =
   let pwd = Sys.getcwd () in 
   Sys.chdir dir;
@@ -27,6 +38,12 @@ let chdir_cleanup pwd = Sys.chdir pwd;;
 
 let check_file file _ =
   (@?) ("File "^file^" does not exist!") (Sys.file_exists file)
+
+
+(** Common functions across multipule tests **)
+let rec find_fun ?(msg="") ranges name = match ranges with
+  | [] -> assert_failure ("Could not find function "^name^msg)
+  | (n,s,e)::rs -> if (n = name) then (s,e) else find_fun ~msg rs name;;
 
 
 let rec find_call prog = 
