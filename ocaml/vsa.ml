@@ -538,9 +538,9 @@ struct
     | (vs, ([_] as vsg))  when vsg = id ->
 	vs
     | ([_] as vsg, _)  when Some vsg = annihilator ->
-	Option.get annihilator
+	BatOption.get annihilator
     | (_,([_] as vsg))  when Some vsg = annihilator ->
-	Option.get annihilator
+	BatOption.get annihilator
     | _ -> top
 
   let logand = makeother SI.logand minus_one (Some zero)

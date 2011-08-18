@@ -64,7 +64,7 @@ let compute_wp_boring cfg post =
 
 (** Convert space delimited command string (command arg1 arg2 ... ) to a command and argument array *)
 let split_cmdstr cmdstr =
-  let slist = ExtString.String.nsplit cmdstr " " in
+  let slist = BatString.nsplit cmdstr " " in
   let cmd = List.hd slist in
   let args = Array.of_list slist in
   cmd, args
@@ -229,9 +229,9 @@ struct
       | WEXITED(c) -> c > 0
       | _ -> true
     in
-    let fail = failstat || ExtString.String.exists stderr "Fatal" in
-    let isinvalid = ExtString.String.exists stdout "Invalid." in
-    let isvalid = ExtString.String.exists stdout "Valid." in
+    let fail = failstat || BatString.exists stderr "Fatal" in
+    let isinvalid = BatString.exists stdout "Invalid." in
+    let isvalid = BatString.exists stdout "Valid." in
 
     (*       dprintf "fail: %b %b %b" fail isinvalid isvalid; *)
 
@@ -263,9 +263,9 @@ struct
       | WEXITED(c) -> c > 0
       | _ -> true
     in
-    let fail = failstat || ExtString.String.exists stderr "Fatal" in
-    let issat = ExtString.String.exists stdout "sat" in
-    let isunsat = ExtString.String.exists stdout "unsat" in
+    let fail = failstat || BatString.exists stderr "Fatal" in
+    let issat = BatString.exists stdout "sat" in
+    let isunsat = BatString.exists stdout "unsat" in
 
     (*       dprintf "fail: %b %b %b" fail isinvalid isvalid; *)
 
@@ -297,9 +297,9 @@ struct
   (*     | WEXITED(c) -> c > 0 *)
   (*     | _ -> true *)
   (*   in *)
-  (*   let fail = failstat || ExtString.String.exists stderr "Fatal" in *)
-  (*   let isinvalid = ExtString.String.exists stdout "Invalid." in *)
-  (*   let isvalid = ExtString.String.exists stdout "Valid." in *)
+  (*   let fail = failstat || BatString.exists stderr "Fatal" in *)
+  (*   let isinvalid = BatString.exists stdout "Invalid." in *)
+  (*   let isvalid = BatString.exists stdout "Valid." in *)
 
   (*   (\*       dprintf "fail: %b %b %b" fail isinvalid isvalid; *\) *)
 
@@ -318,9 +318,9 @@ struct
   (*     | WEXITED(c) -> c > 0 *)
   (*     | _ -> true *)
   (*   in *)
-  (*   let fail = failstat || ExtString.String.exists stderr "Fatal" in *)
-  (*   let isinvalid = ExtString.String.exists stdout "Invalid." in *)
-  (*   let isvalid = ExtString.String.exists stdout "Valid." in *)
+  (*   let fail = failstat || BatString.exists stderr "Fatal" in *)
+  (*   let isinvalid = BatString.exists stdout "Invalid." in *)
+  (*   let isvalid = BatString.exists stdout "Valid." in *)
 
   (*   (\*       dprintf "fail: %b %b %b" fail isinvalid isvalid; *\) *)
 

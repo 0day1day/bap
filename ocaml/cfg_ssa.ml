@@ -10,7 +10,7 @@ open Util
 open Ssa
 open Cfg
 open Type
-open ExtList
+open BatList
 
 module D = Debug.Make(struct let name = "SSA" and default=`Debug end)
 open D
@@ -659,7 +659,7 @@ let stmts2ast tm stmts =
     | Move(l,_,_) when VH.mem tm l -> true
     | _ -> false
   in
-  ExtList.List.fold_right
+  List.fold_right
     (fun s ast -> if is_trash s then ast else stmt2ast tm s :: ast)
     stmts []
 

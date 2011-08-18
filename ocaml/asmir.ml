@@ -10,7 +10,7 @@
 open Asmirconsts
 open Ast
 open Big_int
-open ExtList
+open BatList
 open Libasmir
 open Libbfd
 open Type

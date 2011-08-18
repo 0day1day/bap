@@ -8,7 +8,8 @@
 *)
 
 open Big_int_convenience
-open ExtString
+open BatString
+open BatList
 
 (** The identity function *)
 let id = fun x -> x
@@ -329,9 +330,8 @@ let run_with_remapped_fd fd_from fd_to f =
 
   rv
 
-let take = ExtList.List.take
-
-let fast_append = ExtList.List.append
+let take = BatList.take
+let fast_append = append
 
 module StatusPrinter =
 struct
@@ -591,7 +591,7 @@ let bigint_of_string s =
     )
   in
   if is_hex s then
-    f (String.slice ~first:(String.length hex_prefix) s)
+    f (slice ~first:(String.length hex_prefix) s)
   else
     (* big_int_of_string handles decimals *)
     Big_int.big_int_of_string s
