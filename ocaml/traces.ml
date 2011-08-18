@@ -853,10 +853,10 @@ let check_delta state =
 	let tainted = dsa_taint_val var in
 	match dsavarname, traceval, tainted with
 	| Some(dsavarname), Some(traceval), Some(tainted) -> 
-	    dprintf "Doing check on %s" dsavarname;
+	    dprintf "Doing check on %s %b %b" dsavarname (tainted || !checkall) (not (isbad var));
 	     let s = if (!checkall) then "" else "tainted " in
 	     if (not (full_exp_eq traceval evalval) && (tainted || !checkall) 
-		 && not (Hashtbl.mem badregs (Var.name var))) then 
+		 && not (isbad var)) then 
 	       (* The trace value and evaluator's value differ.  The
 	          only time this is okay is if the evaluated expression
 	          contains an unknown. *)

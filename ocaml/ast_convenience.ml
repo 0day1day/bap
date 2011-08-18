@@ -33,6 +33,7 @@ let ( &* ) a b   = binop AND a b
 let ( |* ) a b   = binop OR a b
 let ( ^* ) a b   = binop XOR a b
 let ( ==* ) a b  = binop EQ a b
+let ( <>* ) a b  = binop NEQ a b
 let ( <* ) a b   = binop LT a b
 let ( >* ) a b   = binop LT b a
 (** bitwise equality *)
