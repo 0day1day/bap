@@ -3,15 +3,18 @@
 
     TODO: Make the interface consistent with that of Pp.
 *)
-open Type
+
 open Ast
 open Ast_convenience
-open Printf
-open ExtList
+open Big_int
+open Big_int_convenience
+open BatList
 open Format
 open Pp
-open Var
+open Printf
+open Type
 open Typecheck
+open Var
 module VH = VarHash;;
 
 class pp ?(debug_labels=false) ft =
@@ -281,14 +284,17 @@ object(self)
 
 
   method format_value = function
-    | Int(1L, Reg 1) -> pp "1"
-    | Int(0L, Reg 1) -> pp "0"
+    | Int(bi, Reg 1) when bi_is_one bi -> pp "1"
+    | Int(bi, Reg 1) when bi_is_zero bi -> pp "0"
     | Int(x,t) -> 
 	(* No moding here, since the value should have been modded earlier,
 	   and if it wasn't, it's better not to hide it. *)
-	pp (if 0L <= x && x < 10L
-	    then Int64.to_string x
-	    else Printf.sprintf "0x%LxLL" x)
+
+	(* XXX: Ugh, can't print in hex for big ints yet anyway :-X *)
+	pp (string_of_big_int x);
+	(* pp (if 0L <= x && x < 10L *)
+	(*     then Int64.to_string x *)
+	(*     else Printf.sprintf "0x%LxLL" x) *)
     | _ -> ()
 
 

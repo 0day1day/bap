@@ -7,13 +7,14 @@
     @author Ivan Jager
 *)
 
-open Libbfd
-open Libasmir
 open Asmirconsts
-open Type
 open Ast
+open Big_int
+open BatList
+open Libasmir
+open Libbfd
+open Type
 open Util
-open ExtList
 
 module BArray = Bigarray.Array1
 
@@ -91,7 +92,7 @@ let rec tr_exp g e =
         UnOp(tr_unop(Libasmir.unop_type e),
 	     tr_exp g (Libasmir.unop_subexp e) )
     | CONSTANT ->
-        Int(Libasmir.constant_val e, tr_regtype (constant_regtype e))
+        Int(big_int_of_int64 (Libasmir.constant_val e), tr_regtype (constant_regtype e))
     | MEM ->
 	let mem = gamma_lookup g "$mem" in
 	let wtyp = tr_regtype (mem_regtype e) in 
@@ -120,7 +121,7 @@ let rec tr_exp g e =
     | NAME ->
 	(match tr_label (name_string e) with
 	 | Name n -> Lab n
-	 | Addr i -> Int(i, reg_64)
+	 | Addr i -> Int(big_int_of_int64 i, reg_64)
 	)
     | UNKNOWN ->
         Unknown(unknown_str e, tr_regtype(unknown_regtype e))
@@ -205,12 +206,28 @@ let get_cval_usage = function
 (* TODO: needs to be refined for bytes *)
 let int_to_taint n = Taint n
 
+let big_int_of_big_val v =
+  let n = (cval_value_size v) - 1 in
+  Util.foldn
+    (fun acc index ->
+      (* On x86, the data will be stored in litle endian form, so the
+	 last index has the most significant data.  We want to access
+	 this first, since we shift left as we go. *)
+      let revindex = n - index in
+      (* We need to convert the int64 we need to two's complement form *)
+      let tempv = Arithmetic.to64 (big_int_of_int64 (cval_value_part v revindex), reg_64) in
+      let shiftacc = shift_left_big_int acc 64 (* sizeof(int64) *) in
+      (* dprintf "Hmmm.... %s %s" (string_of_big_int tempv) (string_of_big_int shiftacc); *)
+      add_big_int tempv shiftacc)
+    zero_big_int
+    n
+
 let tr_context_tup cval =
   Context {name=Libasmir.cval_name cval;
            mem=Libasmir.cval_mem cval;
            t=cval_type_to_typ (Libasmir.cval_type cval);
            index=Libasmir.cval_ind cval;
-           value=Libasmir.cval_value cval;
+           value=big_int_of_big_val (Libasmir.cval_value cval);
 	   usage=get_cval_usage(Libasmir.cval_usage cval);
            taint=int_to_taint (Libasmir.cval_taint cval)}
 
@@ -411,8 +428,8 @@ let get_rodata_assignments ?(prepend_to=[]) mem {asmp=prog} =
   let rodata = Libasmir.get_rodata prog in
   fold_memory_data
     (fun a v acc -> 
-        let m_addr = Int(a, Reg 32) in
-        let m_val = Int(Int64.of_int v, Reg 8) in
+        let m_addr = Int(big_int_of_int64 a, Reg 32) in
+        let m_val = Int(big_int_of_int v, Reg 8) in
         Move(mem, Store(Var mem, m_addr, m_val, little_endian, Reg 8), [InitRO]) :: acc)
     rodata prepend_to
 

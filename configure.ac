@@ -162,3 +162,6 @@ AC_CONFIG_FILES([Makefile
                  libasmir/apps/Makefile
                  libasmir/src/Makefile])
 AC_OUTPUT
+
+# Configure ocaml 3.12
+(cd bigint-3.12 && ./configure)

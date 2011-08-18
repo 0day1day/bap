@@ -7,6 +7,8 @@
 
 open Type
 open Ast
+open Big_int
+open Big_int_convenience
 
 exception TypeError of string
 
@@ -60,20 +62,17 @@ let rec infer_ast ?(check=true) = function
       if check then 
 	(let t1 = infer_ast ~check e1
 	 and t2 = infer_ast ~check e2 in
-	 Printf.printf "ite\n";
 	 check_same t1 t2);
       infer_ast ~check:false e1 
   | Extract(h,l,e) ->
-      let (-) = Int64.sub in
-      let (+) = Int64.add in
-      let ns = Int64.to_int(h-l+1L) in
+      let ns = int_of_big_int(h -% l +% bi1) in
       let nt = Reg ns in
       if check then (
 	match infer_ast ~check:true e with
 	| Reg(oldn) ->
 	    if (ns <= 0) then terror("Extract must extract at least one bit");
-	    if l < 0L then terror("Lower bit index must be at least 0");
-	    if h > (Int64.of_int oldn)-1L then terror("Upper bit index must be at most one less than the size of the original register")
+	    if l <% bi0 then terror("Lower bit index must be at least 0");
+	    if h >% (big_int_of_int oldn) -% bi1 then terror("Upper bit index must be at most one less than the size of the original register")
 	      
 	| _ -> terror ("Extract expects Reg type")	
       );

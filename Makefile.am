@@ -4,7 +4,7 @@
 
 #include @top_srcdir@/config/recursive.mk
 
-SUBDIRS=VEX libasmir ocaml utils
+SUBDIRS=bigint-3.12 batteries-1.4.0 VEX libasmir ocaml utils
 # stp/ocaml ocaml utils doc
 
 #regression:

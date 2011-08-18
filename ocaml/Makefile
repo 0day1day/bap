@@ -2,8 +2,13 @@
 
 export OCAMLMAKEFILE=OCamlMakefile
 export LIBASMIR=../libasmir
+export BIGINT=$(CURDIR)/../bigint-3.12/otherlibs/num
+export BATT=$(CURDIR)/../batteries-1.4.0/_build/src
 include $(LIBASMIR)/makefile.inc
 -include ../../ocaml-proj/Makefile
+
+# Stop annoying warnings about big_int duplication!
+export OCAMLFIND_IGNORE_DUPS_IN=$(CURDIR)/../bigint-3.12/otherlibs/num
 
 #export INCDIRS += ../stp ../stp/ocaml
 #export EXTLIBDIRS += ../stp ../stp/ocaml
@@ -13,6 +18,7 @@ include $(LIBASMIR)/makefile.inc
 
 # common sources
 export SOURCES = \
+	big_int_convenience.ml \
 	debug.mli debug.ml \
 	util.mli util.ml \
 	dominator.ml \
@@ -37,6 +43,7 @@ export SOURCES = \
 	debug_snippets.ml \
 	sccvn.mli sccvn.ml \
 	deadcode.mli deadcode.ml \
+	ssa_simp_misc.ml \
 	ssa_simp.ml \
 	formulap.ml \
 	stp.ml \
@@ -65,15 +72,12 @@ export SOURCES = \
 	symbeval.ml symbeval_search.ml \
 	ast_slice.ml \
 	ssa_slice.ml \
-	comparelib.ml \
 	structural_analysis.ml \
 	unroll.ml \
 	hacks.ml \
 	coalesce.ml \
 	template.ml \
-	interpreter.ml \
 	traces.ml \
-	payload.ml \
 	graphDataflowW.ml \
 	tie_ast_preprocess.ml \
 	tie_val.ml \
@@ -84,19 +88,25 @@ export SOURCES = \
 	tie_typeinf.ml \
 	$(PROJSOURCES) \
 
+# Fix the interpreter to work with big ints
+#	interpreter.ml \
+
+
 RESULT = bap
 DOC_FILES := $(filter %.mli, $(SOURCES)) $(filter %.ml, $(SOURCES))
 
 
 
 # ocamlfind packages required
-export PACKS = bigarray str ocamlgraph extlib unix batteries
+export PACKS = bigarray str ocamlgraph unix
 export YFLAGS = -v
 
 
 export CLIBS = asmir vex opcodes bfd iberty stdc++ 
 export CFLAGS = -g
-export LDFLAGS = $(LIBASMIR_LDFLAGS) 
+export LDFLAGS = $(LIBASMIR_LDFLAGS)
+export INCDIRS = $(BIGINT) $(BATT)
+export LIBS = nums
 export CLIBFLAGS= $(LDFLAGS)
 export RESULTDEPS = $(LIBASMIR)/src/libasmir.a $(VEX_DIR)/libvex.a
 export LIBDIRS = $(LIBASMIR)/src # ../appreplay ../stp ../stp/ocaml

@@ -192,7 +192,7 @@ rule token = parse
   | "#"           { cpptoken lexbuf }
   | id           { ID(get lexbuf) }
   | digit+ | hexinteger { 
-      try INT(Int64.of_string(get lexbuf))
+      try INT(Util.bigint_of_string (get lexbuf))
       with Failure "int_of_string" -> 
 	raise(LexError "Error converting integer");
     }
