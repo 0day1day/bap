@@ -3,7 +3,7 @@
 *)
 
 open Util
-module List = ExtList.List;;
+open BatList
 
 module D = Debug.Make(struct let name = "GraphDataflowW" and default=`Debug end)
 (* module D = Debug.Make(struct let name = "GraphDataflowW" and default=`NoDebug end) *)

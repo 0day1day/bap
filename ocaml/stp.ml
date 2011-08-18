@@ -1,7 +1,10 @@
 (** Output to STP format (same as CVCL or CVC3)
 *)
-open Type
+
 open Ast
+open Big_int
+open Big_int_convenience
+open Type
 open Typecheck
 
 module D = Debug.Make(struct let name = "STP" and default=`Debug end)
@@ -85,11 +88,10 @@ object (self)
      | Int(i,t) ->
 	 let maskedval = Arithmetic.to64 (i,t) in
 	 (match t with
-	   | Reg 1  -> printf "0bin%Ld" maskedval
 	   | Reg n when (n mod 4) = 0 ->
-	       printf "0hex%0*Lx" (n/4) maskedval
+	       printf "0hex%s" (Util.hex_of_bigint ~pad:(n/4) maskedval)
 	   | Reg n ->
-	       printf "0bin%s" (Util.binary_of_int64 ~pad:n maskedval)
+	       printf "0bin%s" (Util.binary_of_bigint ~pad:n maskedval)
 	   | _ -> invalid_arg "Only constant integers supported")
      | Ite(b, v1, v2) ->
 	 (* XXX: Needs testing *)
@@ -114,9 +116,9 @@ object (self)
 	 pp "(";
 	 self#ast_exp e;
 	 pp ")[";
-	 pi (Int64.to_int h);
+	 pi (int_of_big_int h);
 	 pc ':';
-	 pi (Int64.to_int l);
+	 pi (int_of_big_int l);
 	 pc ']'
      | Concat(le,re) ->
 	 pc '(';
@@ -135,24 +137,24 @@ object (self)
 	 pc ')'
 	   (* Eww, the << operator in stp wants a constant int on the right,
 	      rather than a bitvector *)
-     | BinOp((LSHIFT|RSHIFT|ARSHIFT), e1, Int(i,_)) when i = 0L ->
+     | BinOp((LSHIFT|RSHIFT|ARSHIFT), e1, Int(i,_)) when bi_is_zero i ->
 	 (* STP barfs on 0, so we don't put the shift *)
 	 self#ast_exp e1
      | BinOp(LSHIFT, e1, Int(i,_)) ->
 	 let  t = infer_ast ~check:false e1 in
-	 pp "(("; self#ast_exp e1; pp" << "; pp (Int64.to_string i); pp ")[";
+	 pp "(("; self#ast_exp e1; pp" << "; pp (string_of_big_int i); pp ")[";
 	 pp (string_of_int(bits_of_width t - 1)); pp":0])"
      | BinOp(RSHIFT, e1, Int(i,_)) -> (* Same sort of deal :( *)
-	 pc '('; self#ast_exp e1; pp " >> "; pp(Int64.to_string i); pc ')'
+	 pc '('; self#ast_exp e1; pp " >> "; pp(string_of_big_int i); pc ')'
      | BinOp(ARSHIFT, e1, Int(i,_)) -> (* Same sort of deal :( *)
 	 let t = infer_ast ~check:false e1 in
 	 let bits = string_of_int (bits_of_width t) in
-	 let gethigh = Int64.sub (Int64.of_int (bits_of_width t)) i in
-	 let gethigh = Int64.sub gethigh 1L in
-	 if gethigh >= 0L then (
-	   pp "SX(("; self#ast_exp e1; 
-	   pp " >> "; pp (Int64.to_string i);
-	   pp ")["; pp (Int64.to_string gethigh); pp ":0], "; pp bits; pc ')'
+	 let gethigh = sub_big_int (big_int_of_int (bits_of_width t)) i in
+	 let gethigh = sub_big_int gethigh bi1 in
+	 if ge_big_int gethigh bi0 then (
+	   pp "SX(("; self#ast_exp e1;
+	   pp " >> "; pp (string_of_big_int i);
+	   pp ")["; pp (string_of_big_int gethigh); pp ":0], "; pp bits; pc ')'
 	 ) else (
 	   let b = Int64.sub (Int64.of_int (bits_of_width t)) 1L in
 	   pp "SX("; self#ast_exp e1; pp "["; pp (Int64.to_string b);
@@ -160,7 +162,7 @@ object (self)
 	 )
       | BinOp((LSHIFT|RSHIFT|ARSHIFT) as bop, e1, e2) ->
 	  let t2 = infer_ast ~check:false e2 in
-	  let const n = Int(Int64.of_int n,t2) in
+	  let const n = Int(biconst n,t2) in
 	  let put_one n = self#ast_exp (BinOp(bop, e1, const n)) in
 	  let rec put_all n =
 	    if n < 64 then (

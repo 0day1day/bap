@@ -1,6 +1,8 @@
 open Int64
 open Ast
 open Ast_convenience
+open Big_int
+open Big_int_convenience
 open Type
 
 module D = Debug.Make(struct let name = "Disasm_i386" and default=`NoDebug end)
@@ -43,7 +45,7 @@ open D
 type operand =
   | Oreg of int
   | Oaddr of Ast.exp
-  | Oimm of int64
+  | Oimm of int64 (* XXX: Should this be big_int? *)
 
 type opcode =
   | Retn
@@ -76,7 +78,7 @@ type opcode =
   | And of (typ * operand * operand)
   | Or of (typ * operand * operand)
   | Xor of (typ * operand * operand)
-  | Pxor of operand * operand    (* jed *)
+  | Pxor of (typ * operand * operand)
   | Test of typ * operand * operand
   | Not of typ * operand
   | Cld
@@ -112,9 +114,10 @@ let r4 = Reg 4
 let r8 = Ast.reg_8
 let r16 = Ast.reg_16
 let r32 = Ast.reg_32
-let r64 = Ast.reg_64
 let addr_t = r32
-let xmm_t = TMem r4 (* 128 bits that can be accessesed as different things *)
+let r64 = Ast.reg_64
+let r128 = Reg 128
+let xmm_t = Reg 128
 
 let nv = Var.newvar
 (* registers *)
@@ -228,12 +231,12 @@ let load_s s t a = match s with
 let ite t b e1 e2 =
   exp_ite ~t b e1 e2
 
-let l32 i = Int(Arithmetic.to64 (i,r32), r32)
-let l16 i = Int(Arithmetic.to64 (i,r16), r16)
-let lt i t = Int(Arithmetic.to64 (i,t), t)
+let l32 i = Int(Arithmetic.tos64 (big_int_of_int64 i,r32), r32)
+let l16 i = Int(Arithmetic.tos64 (big_int_of_int64 i,r16), r16)
+let lt i t = Int(Arithmetic.tos64 (big_int_of_int64 i,t), t)
 
-let i32 i = Int(Int64.of_int i, r32)
-let it i t = Int(Int64.of_int i, t)
+let i32 i = Int(biconst i, r32)
+let it i t = Int(biconst i, t)
 
 (* converts a register number to the corresponding 32bit register variable *)
 let bits2reg32= function
@@ -247,7 +250,11 @@ let bits2reg32= function
   | 7 -> edi
   | _ -> failwith "bits2reg32 takes 3 bits"
 
+let bits2xmm b = xmms.(b)
+
 and reg2bits r = Util.list_firstindex [eax; ecx; edx; ebx; esp; ebp; esi; edi] ((==)r)
+
+let bits2xmme b = Var(bits2xmm b)
 
 let bits2reg32e b = Var(bits2reg32 b)
 
@@ -259,8 +266,6 @@ let bits2reg8e b =
     cast_low r8 (bits2reg32e b)
   else
     cast_high r8 (cast_low r16 (bits2reg32e (b land 3)))
-
-let bits2xmm b = xmms.(b)
 
 let reg2xmm r =
   bits2xmm (reg2bits r)
@@ -295,15 +300,17 @@ let storem m t a e =
 
 
 let op2e_s ss t = function
+  | Oreg r when t = r128 -> bits2xmme r
   | Oreg r when t = r32 -> bits2reg32e r
   | Oreg r when t = r16 -> bits2reg16e r
   | Oreg r when t = r8 -> bits2reg8e r
-  | Oreg r -> unimplemented "sub registers" (*cast_low t (Var r)*)
+  | Oreg r -> unimplemented "unknown register"
   | Oaddr e -> load_s ss t e
-  | Oimm i -> Int(Arithmetic.to64 (i,t), t)
+  | Oimm i -> Int(Arithmetic.to64 (big_int_of_int64 i,t), t)
 
 let assn_s s t v e =
   match v with
+  | Oreg r when t = r128 -> move (bits2xmm r) e
   | Oreg r when t = r32 -> move (bits2reg32 r) e
   | Oreg r when t = r16 ->
     let v = bits2reg32 r in
@@ -347,7 +354,7 @@ let reta = [StrAttr "ret"]
 and calla = [StrAttr "call"]
 
 let compute_sf result = Cast(CAST_HIGH, r1, result)
-let compute_zf t result = Int(0L, t) ==* result
+let compute_zf t result = Int(bi0, t) ==* result
 let compute_pf t r =
   (* extra parens do not change semantics but do make it pretty print nicer *)
   exp_not (Cast(CAST_LOW, r1, (((((((r >>* it 7 t) ^* (r >>* it 6 t)) ^* (r >>* it 5 t)) ^* (r >>* it 4 t)) ^* (r >>* it 3 t)) ^* (r >>* it 2 t)) ^* (r >>* it 1 t)) ^* r))
@@ -429,43 +436,26 @@ let rec to_ir addr next ss pref =
   | Movsx(t, dst, ts, src) when pref = [] ->
     [assn t dst (cast_signed t (op2e ts src))]
   | Movdqa(d,s) -> (
-    let zero = Int(0L,r4) and eight = Int(8L,r4) in
-    let (s0, s1, a1) = match s with
-      | Oreg i -> let r = bits2xmm i in
-		  (loadm r r64 zero, loadm r r64 eight, [])
-      | Oaddr a -> (load r64 a, load r64 (a +* Int(8L, addr_t)), [a])
+    let (s, al) = match s with
+      | Oreg i -> bits2xmme i, []
+      | Oaddr a -> load xmm_t a, [a]
       | Oimm _ -> failwith "invalid"
     in
-    let (d0, d1, a2) = match d with
+    let (d, al) = match d with
       (* FIXME: should this be a single move with two stores? *)
-      | Oreg i -> let r = bits2xmm i in
-		  (storem r r64 zero s0, storem r r64 eight s1, [])
-      | Oaddr a -> (store r64 a s0, store r64 (a +* Int(8L, addr_t)) s1, [a])
+      | Oreg i ->
+	let r = bits2xmm i in
+	move r s, []
+      | Oaddr a -> store xmm_t a s, a::al
       | Oimm _ -> failwith "invalid"
     in
-    (List.map (fun a -> Assert( (a &* i32 15) ==* i32 0, [])) (a1@a2))
-    @ [d0;d1;]
+    (List.map (fun a -> Assert( (a &* i32 15) =* i32 0, [])) (al))
+    @ [d]
 
   )
-  | Pxor (d,s) ->(   (* jed *)
-    let zero = Int(0L,r4) and eight = Int(8L, r4) in
-    let (s0, s1, a1) = match s with
-      | Oreg i -> let r = bits2xmm i in
-        (loadm r r64 zero, loadm r r64 eight, [])
-      | Oaddr a -> (load r64 a, load r64 (a +* Int(8L, addr_t)), [a])
-      | Oimm _ -> failwith "pxor does not take immediate operands"
-    in
-    let (d0, d1, a2) = match d with
-      | Oreg i -> (
-          let r = bits2xmm i in
-          let (db0, db1) = (loadm r r64 zero, loadm r r64 eight) in
-          (storem r r64 zero (s0 ^* db0), storem r r64 eight (s1 ^* db1), []))
-      | Oaddr a -> (
-          let (db0, db1) = (load r64 a, load r64 (a +* Int(8L, addr_t))) in
-          (store r64 a (s0 ^* db0), store r64 (a +* Int(8L, addr_t)) (s1 ^* db1), [a]))
-      | Oimm _ -> failwith "pxor does not take immediate operands"
-    in
-      [d0;d1] )
+  | Pxor args ->
+    (* Pxor is just a larger xor *)
+    to_ir addr next ss pref (Xor(args))
   | Lea(r, a) when pref = [] ->
     [assn r32 r a]
   | Call(o1, ra) when pref = [] ->
@@ -651,7 +641,7 @@ let rec to_ir addr next ss pref =
     :: move af (Unknown("AF is undefined after or", r1))
     :: set_pszf t (op2e t o1)
   | Xor(t, o1, o2) when o1 = o2->
-    assn t o1 (Int(0L,t))
+    assn t o1 (Int(bi0,t))
     :: move af (Unknown("AF is undefined after xor", r1))
     :: move zf exp_true
     :: List.map (fun v -> move v exp_false) [oF; cf; pf; sf]
@@ -724,11 +714,11 @@ module ToStr = struct
     | Retn -> "ret"
     | Nop -> "nop"
     | Mov(t,d,s) -> Printf.sprintf "mov %s, %s" (opr d) (opr s)
-	| Movs(t) -> "movs"
-	| Movzx(dt,dst,st,src) -> Printf.sprintf "movzx %s, %s" (opr dst) (opr src)
-	| Movsx(dt,dst,st,src) -> Printf.sprintf "movsx %s, %s" (opr dst) (opr src)
-	| Movdqa(d,s) -> Printf.sprintf "movdqa %s, %s" (opr d) (opr s)
-	| Lea(r,a) -> Printf.sprintf "lea %s, %s" (opr r) (opr (Oaddr a))
+    | Movs(t) -> "movs"
+    | Movzx(dt,dst,st,src) -> Printf.sprintf "movzx %s, %s" (opr dst) (opr src)
+    | Movsx(dt,dst,st,src) -> Printf.sprintf "movsx %s, %s" (opr dst) (opr src)
+    | Movdqa(d,s) -> Printf.sprintf "movdqa %s, %s" (opr d) (opr s)
+    | Lea(r,a) -> Printf.sprintf "lea %s, %s" (opr r) (opr (Oaddr a))
     | Call(a, ra) -> Printf.sprintf "call %s" (opr a)
     | Shift _ -> "shift"
     | Shiftd _ -> "shiftd"
@@ -736,27 +726,27 @@ module ToStr = struct
     | Inc (t, o) -> Printf.sprintf "inc %s" (opr o)
     | Dec (t, o) -> Printf.sprintf "dec %s" (opr o)
     | Jump a -> Printf.sprintf "jmp %s" (opr a)	
-	| Bt(t,d,s) -> Printf.sprintf "bt %s, %s" (opr d) (opr s)
-	| Jcc _ -> "jcc"
-	| Setcc _ -> "setcc"
-	| Cmps _ -> "cmps"
-	| Scas _ -> "scas"
-	| Stos _ -> "stos"
-	| Push(t,o) -> Printf.sprintf "push %s" (opr o)
-	| Pop(t,o) -> Printf.sprintf "pop %s" (opr o)
-	| Add(t,d,s) -> Printf.sprintf "add %s, %s" (opr d) (opr s)
-	| Sub(t,d,s) -> Printf.sprintf "sub %s, %s" (opr d) (opr s)
-	| Sbb(t,d,s) -> Printf.sprintf "sbb %s, %s" (opr d) (opr s)
-	| Cmp(t,d,s) -> Printf.sprintf "cmp %s, %s" (opr d) (opr s)
-	| And(t,d,s) -> Printf.sprintf "and %s, %s" (opr d) (opr s)
-	| Or(t,d,s) -> Printf.sprintf "or %s, %s" (opr d) (opr s)
-	| Xor(t,d,s) -> Printf.sprintf "xor %s, %s" (opr d) (opr s)
-	| Pxor(d,s)  -> Printf.sprintf "pxor %s, %s" (opr d) (opr s)
-	| Test(t,d,s) -> Printf.sprintf "test %s, %s" (opr d) (opr s)
-	| Not(t,o) -> Printf.sprintf "not %s" (opr o)
-	| Cld -> "cld"
-	| Leave _ -> "leave"
-	| Interrupt(o) -> Printf.sprintf "int %s" (opr o)
+    | Bt(t,d,s) -> Printf.sprintf "bt %s, %s" (opr d) (opr s)
+    | Jcc _ -> "jcc"
+    | Setcc _ -> "setcc"
+    | Cmps _ -> "cmps"
+    | Scas _ -> "scas"
+    | Stos _ -> "stos"
+    | Push(t,o) -> Printf.sprintf "push %s" (opr o)
+    | Pop(t,o) -> Printf.sprintf "pop %s" (opr o)
+    | Add(t,d,s) -> Printf.sprintf "add %s, %s" (opr d) (opr s)
+    | Sub(t,d,s) -> Printf.sprintf "sub %s, %s" (opr d) (opr s)
+    | Sbb(t,d,s) -> Printf.sprintf "sbb %s, %s" (opr d) (opr s)
+    | Cmp(t,d,s) -> Printf.sprintf "cmp %s, %s" (opr d) (opr s)
+    | And(t,d,s) -> Printf.sprintf "and %s, %s" (opr d) (opr s)
+    | Or(t,d,s) -> Printf.sprintf "or %s, %s" (opr d) (opr s)
+    | Xor(t,d,s) -> Printf.sprintf "xor %s, %s" (opr d) (opr s)
+    | Pxor(t,d,s)  -> Printf.sprintf "pxor %s, %s" (opr d) (opr s)
+    | Test(t,d,s) -> Printf.sprintf "test %s, %s" (opr d) (opr s)
+    | Not(t,o) -> Printf.sprintf "not %s" (opr o)
+    | Cld -> "cld"
+    | Leave _ -> "leave"
+    | Interrupt(o) -> Printf.sprintf "int %s" (opr o)
     (*_ -> unimplemented "op2str"*)
 
   let to_string pref op =
@@ -815,8 +805,14 @@ let parse_instr g addr =
     | _ -> None
   in*)
   let parse_disp8 a =
-    (Arithmetic.tos64 (Int64.of_int (Char.code (g a)), r8), s a)
+    (* This has too many conversions, but the below code doesn't handle
+       signedness correctly. *)
+    (int64_of_big_int (Arithmetic.tos64 (big_int_of_int (Char.code (g a)), r8)), s a)
+  (* let r n = Int64.shift_left (Int64.of_int (Char.code (g (Int64.add a (Int64.of_int n))))) (8*n) in *)
+  (*   let d = r 0 in *)
+  (*   (d, (Int64.succ a)) *)
   and parse_disp16 a =
+    (* XXX: Does this handle negative displacements correctly? *)
     let r n = Int64.shift_left (Int64.of_int (Char.code (g (Int64.add a (Int64.of_int n))))) (8*n) in
     let d = r 0 in
     let d = Int64.logor d (r 1) in
@@ -829,7 +825,7 @@ let parse_instr g addr =
     let d = Int64.logor d (r 3) in
     (d, (Int64.add a 4L))
   in
-  let parse_disp = function
+  let parse_disp:(Type.typ -> int64 -> int64 * int64) = function
     | Reg 8 ->  parse_disp8
     | Reg 16 -> parse_disp16
     | Reg 32 -> parse_disp32
@@ -918,7 +914,7 @@ let parse_instr g addr =
     | _ -> failwith "parse_immz unsupported size"
   in
   let parse_immv = parse_immz in (* until we do amd64 *)
-  let get_opcode pref opsize a =
+  let get_opcode pref (opsize,mopsize) a =
     (* We should rename these, since the 32 at the end is misleading. *)
     let parse_disp32, parse_modrm32, parse_modrm32ext =
       if List.mem pref_addrsize pref then
@@ -1117,18 +1113,22 @@ let parse_instr g addr =
       | 0xbf -> let st = if b2 = 0xbe then r8 else r16 in
 		let r, rm, na = parse_modrm32 na in
 		(Movsx(opsize, r, st, rm), na)
-      | 0xef when pref = [0x66] -> 
-		let d, s, na = parse_modrm32 na in 
-        (Pxor(d,s), na) (* jed *)
+      | 0xef ->
+		let d, s, na = parse_modrm32 na in
+		(Pxor(mopsize,d,s), na)
       | _ -> unimplemented (Printf.sprintf "unsupported opcode: %02x %02x" b1 b2)
     )
     | n -> unimplemented (Printf.sprintf "unsupported opcode: %02x" n)
 
   in
   let pref, a = get_prefixes addr in
-  let opsize = if List.mem pref_opsize pref then r16 else r32 in
-  let op, a = get_opcode pref opsize a in
-  (pref, op, a)
+  (* Opsize for regular instructions, MMX/SSE2 instructions
+
+     The opsize override makes regular operands smaller, but MMX
+     operands larger.  *)
+  let opsize,mopsize = if List.mem pref_opsize pref then r16,r128 else r32,r64 in
+  let op, a = get_opcode pref (opsize,mopsize) a in
+(pref, op, a)
 
 let parse_prefixes pref op =
   (* FIXME: how to deal with conflicting prefixes? *)

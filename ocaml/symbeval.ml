@@ -16,6 +16,8 @@
  *)
 
 open Ast
+open Big_int
+open Big_int_convenience
 open Type
   
 module VH = Var.VarHash
@@ -69,8 +71,12 @@ let empty_mem v = ConcreteMem(AddrMap.empty, v)
 let empty_smem v = Symbolic(Var(v))
 let val_true = Symbolic exp_true
 let val_false = Symbolic exp_false
-let is_true_val = (=) val_true
-let is_false_val = (=) val_false
+let is_true_val = function
+  | Symbolic e -> full_exp_eq e exp_true
+  | ConcreteMem _ -> false
+let is_false_val = function
+  | Symbolic e -> full_exp_eq e exp_false
+  | ConcreteMem _ -> false
 let is_symbolic = function
   | Symbolic (Int _) -> false
   | ConcreteMem _ -> false
@@ -142,10 +148,13 @@ struct
       match lab with
 	| Name _ (*-> failwith ("jump to inexistent label "^s)*)
 	| Addr _ -> 
+	    (* I'd like to print a warning here, but traces rely on this
+	       behavior, so it prints a lot of warnings if we leave it
+	       on. *)
 	    (* wprintf "Unknown label: %s" (Pp.label_to_string lab); *)
 	    raise (UnknownLabel lab)(*failwith ("jump to inexistent label "^
 					 (Printf.sprintf "%Lx" x)) *)
-	    
+
   let lookup_var        = MemL.lookup_var
   let update_mem        = MemL.update_mem
   let lookup_mem        = MemL.lookup_mem
@@ -320,10 +329,37 @@ struct
 	    let delta' = context_copy delta in (* FIXME: avoid copying *)
 	    context_update delta' var v1 ;
 	    let v2 = eval_expr delta' e2 in
-	    v2
+	    (* So, this is a little subtle.  Consider what happens if
+	       we have let x = 1 in let foo = freevar in x. We would
+	       evaluate let foo = freevar in x in the context where x
+	       is mapped to 1.  However, since freevar is a symbolic
+	       expression, we would not evaluate it further, and would
+	       return the evaluation expression let foo = freevar in
+	       x.  However, this is incorrect, because we are removing
+	       the Let binding for x!  We should really wrap any free
+	       variable with a Let binding to its current value in the
+	       context.
+
+	       Unfortunately, the way that lookup_var is implemented
+	       does not make it easy to know whether a variable is
+	       really defined or not.  (In traces, we return 0
+	       whenever we see an unknown variable, for instance.) So,
+	       as a stopgap measure, if var is free in v2, we return
+	       the original expression. *)
+	    (match v2 with
+	    | Symbolic v2' ->
+	      let fvars = Formulap.freevars v2' in
+	      let isvar = (fun v -> not (Var.equal v var)) in
+	      if List.for_all isvar fvars then
+		(* var is not free! We are good to go *)
+	      v2
+	      else
+		(* var is still free; we can't use the evaluated version *)
+		Symbolic(l)
+	    | _ -> v2)
       | Load (mem,ind,endian,t) ->
-	  (match t with
-	     | Reg 8 ->
+	(match t with
+	| Reg 8 ->
 		 (* This doesn't introduce any blowup on its own. *)
 		 let mem = eval_expr delta mem 
 		 and ind = eval_expr delta ind
@@ -471,11 +507,11 @@ struct
     let init = Var v in
       pdebug "The point of no return" ;
       Symbolic (AddrMap.fold
-		  (fun k v m -> Store (m,Int(k,reg_32),v,exp_false,reg_8))
+		  (fun k v m -> Store (m,Int(big_int_of_int64 k,reg_32),v,exp_false,reg_8))
 		  memory init)
 	
   (* Normalize a memory address, setting high bits to 0. *)
-  let normalize i t = Arithmetic.to64 (i,t)
+  let normalize i t = int64_of_big_int (Arithmetic.to64 (i,t))
     
   let rec update_mem mu pos value endian = 
     (*pdebug "Update mem" ;*)
@@ -515,7 +551,7 @@ struct
 	| Array _ ->
 	    empty_mem var
 	| Reg n as t ->
-	    Symbolic(Int(0L, t))
+	    Symbolic(Int(bi0, t))
 	    
   let normalize = SymbolicMemL.normalize
     
@@ -532,7 +568,7 @@ struct
       | ConcreteMem(m,v), Int(i,t) ->
 	  (try AddrMap.find (normalize i t) m
 	   with Not_found ->
-	     Int(0L, reg_8)
+	     Int(bi0, reg_8)
 	  )
       | _ -> failwith "Symbolic memory or address in concrete evaluation"
 	  

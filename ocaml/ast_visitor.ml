@@ -5,7 +5,7 @@
 
 open Type
 open Ast
-open ExtList
+open BatList
 
 
 class type t = object
@@ -18,11 +18,11 @@ class type t = object
   (** Called when visiting a referenced variable *)
   method visit_rvar : var -> var visit_action
 
-  (** Called when visiting assigned variable.  
+  (** Called when visiting assigned variable.
 
       Note that in a Move() or Let(), referenced variables will be
       visited first, so that this can be used to add the assigned
-      variable to your context.  
+      variable to your context.
   *)
   method visit_avar : var -> var visit_action
 
@@ -32,7 +32,7 @@ class type t = object
 
   (** Called on the binding when recursing into a Let. This allows
       doing stuff between the first and second expressions in a Let. *)
-  method visit_binding: var * exp -> (var * exp) visit_action 
+  method visit_binding: var * exp -> (var * exp) visit_action
 
 
 end
@@ -54,64 +54,10 @@ let rec action vischil startvisit node=
   | `DoChildren -> vischil node
   | `ChangeToAndDoChildren x -> vischil x
 
-(* XXX: Where does this belong? *)
-(** A quick test to see if expressions are probably equal. Useful if
-    you need to know whether to copy or not. *)
-let quick_exp_eq e1 e2 =
-  let num = function
-    | Load _ -> 0
-    | Store _ -> 1
-    | Ite _ -> 2
-    | Extract _ -> 3
-    | Concat _ -> 4
-    | BinOp _ -> 5
-    | UnOp _ -> 6
-    | Var _ -> 7
-    | Lab _ -> 8
-    | Int _ -> 9
-    | Cast _ -> 10
-    | Let _ -> 11
-    | Unknown _ -> 12
-  in
-  (* Returns elist, tlist, btlist, utlist, vlist, slist, ilist, clist *)
-  let getargs = function
-    | Load(e1,e2,e3,t1) -> [e1;e2;e3], [t1], [], [], [], [], [], []
-    | Store(e1,e2,e3,e4,t1) -> [e1;e2;e3;e4], [t1], [], [], [], [], [], []
-    | Ite(e1,e2,e3) -> [e1;e2;e3], [], [], [], [], [], [], []
-    | Extract(h,l,e) -> [e], [], [], [], [], [], [h;l], []
-    | Concat(le, re) -> [le;re], [], [], [], [], [], [], []
-    | BinOp(bt,e1,e2) -> [e1;e2], [], [bt], [], [], [], [], []
-    | UnOp(ut,e1) -> [e1], [], [], [ut], [], [], [], []
-    | Var(v1) -> [], [], [], [], [v1], [], [], []
-    | Lab(s1) -> [], [], [], [], [], [s1], [], []
-    | Int(i1,t1) -> [], [t1], [], [], [], [], [i1], []
-    | Cast(c1,t1,e1) -> [e1], [t1], [], [], [], [], [], [c1]
-    | Let(v1,e1,e2) -> [e1;e2], [], [], [], [v1], [], [], []
-    | Unknown(s1,t1) -> [], [t1], [], [], [], [s1], [], []
-  in
-  if (num e1) <> (num e2) then false else
-    let l1,l2,l3,l4,l5,l6,l7,l8 = getargs e1 in
-    let r1,r2,r3,r4,r5,r6,r7,r8 = getargs e2 in
-    let b1 = List.for_all2 (==) l1 r1 in
-    let b2 = List.for_all2 (==) l2 r2 in
-    let b3 = List.for_all2 (==) l3 r3 in
-    let b4 = List.for_all2 (==) l4 r4 in
-    let b5 = List.for_all2 (==) l5 r5 in
-    let b6 = List.for_all2 (==) l6 r6 in
-    let b7 = List.for_all2 (==) l7 r7 in
-    let b8 = List.for_all2 (==) l8 r8 in
-    if b1 & b2 & b3 & b4 & b5 & b6 & b7 & b8 then
-      true else false
+let wrapstmt f v = let v' = f v in if quick_stmt_eq v v' then v else v'
+let wrapexp f v = let v' = f v in if quick_exp_eq v v' then v else v'
 
-(* this really should be a more shallow comparison, otherwise it will
-   be slow when there is a deeply nested change *)
-let wrap f v = let v' = f v in if v = v' then v else v'
-
-let wrapexp f v = 
-  let v' = f v in if quick_exp_eq v v' then v else v'
-
-
-let rec exp_accept visitor = 
+let rec exp_accept visitor =
   let vischil = function
     | Int _ as i -> i
     | Lab _ as l -> l
@@ -137,32 +83,32 @@ let rec exp_accept visitor =
 	let v' = exp_accept visitor v in 
 	UnOp(up, v')
     | Cast(ct, t, v) ->
-	let v' = exp_accept visitor v in 
-	Cast(ct,t,v')
+      let v' = exp_accept visitor v in
+      Cast(ct,t,v')
     | Unknown _ as exp -> exp
-    | Load(v1,v2,v3, t) -> 
-	let v1' = exp_accept visitor v1 in 
-	let v2' = exp_accept visitor v2 in 
-	let v3' = exp_accept visitor v3 in 
-	Load(v1',v2',v3', t)
+    | Load(v1,v2,v3, t) ->
+      let v1' = exp_accept visitor v1 in
+      let v2' = exp_accept visitor v2 in
+      let v3' = exp_accept visitor v3 in
+      Load(v1',v2',v3', t)
     | Store(v1,v2,v3,v4, t) ->
-	let v1' = exp_accept visitor v1 in 
-	let v2' = exp_accept visitor v2 in 
-	let v3' = exp_accept visitor v3 in 
-	let v4' = exp_accept visitor v4 in 
-	Store(v1',v2',v3',v4',t)
+      let v1' = exp_accept visitor v1 in
+      let v2' = exp_accept visitor v2 in
+      let v3' = exp_accept visitor v3 in
+      let v4' = exp_accept visitor v4 in
+      Store(v1',v2',v3',v4',t)
     | Let(v,e1,e2) ->
-	let (v',e1') = binding_accept visitor (v,e1) in
-	let e2' = exp_accept visitor e2 in
-	let v' = uvar_accept visitor v' in
-	Let(v', e1', e2')
+      let (v',e1') = binding_accept visitor (v,e1) in
+      let e2' = exp_accept visitor e2 in
+      let v' = uvar_accept visitor v' in
+      Let(v', e1', e2')
   in
   action (wrapexp vischil) visitor#visit_exp
 
 
 and avar_accept visitor =
   action Util.id visitor#visit_avar
-and rvar_accept visitor = 
+and rvar_accept visitor =
   action Util.id visitor#visit_rvar
 
 and binding_accept visitor =
@@ -174,18 +120,18 @@ and binding_accept visitor =
   action vischil visitor#visit_binding
 
 and uvar_accept visitor =
-  let vischil v = 
+  let vischil v =
     (* We already visited children in the binding, so we pretend we
        have no children here. *)
     v
   in
   action vischil visitor#visit_uvar
 
-and stmt_accept visitor = 
-  let vischil = function 
+and stmt_accept visitor =
+  let vischil = function
       (* TODO: attributes? *)
-    | Jmp(l, a) -> Jmp(exp_accept visitor l, a) 
-    | CJmp(c, l1, l2, a) -> 
+    | Jmp(l, a) -> Jmp(exp_accept visitor l, a)
+    | CJmp(c, l1, l2, a) ->
 	let c' = exp_accept visitor c in
 	let l1' = exp_accept visitor l1 in
 	let l2' = exp_accept visitor l2 in
@@ -200,7 +146,7 @@ and stmt_accept visitor =
     | Halt(e,a) -> Halt(exp_accept visitor e, a)
     | Special _ as s -> s
   in
-  action (wrap vischil) (visitor#visit_stmt)
+  action (wrapstmt vischil) (visitor#visit_stmt)
 
 and prog_accept visitor prog =
   List.map (fun instmt -> stmt_accept visitor instmt) prog

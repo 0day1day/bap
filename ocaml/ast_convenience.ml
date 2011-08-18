@@ -2,6 +2,8 @@
     separate file so it can use functions from Typecheck and elsewhere. *)
 
 open Ast
+open Big_int
+open Big_int_convenience
 open Type
 open Typecheck
 
@@ -33,6 +35,7 @@ let ( ^* ) a b   = binop XOR a b
 let ( ==* ) a b  = binop EQ a b
 let ( <* ) a b   = binop LT a b
 let ( >* ) a b   = binop LT b a
+(** bitwise equality *)
 let ( =* ) a b   = binop XOR a (unop NOT b)
 
 let cast_low t e = Cast(CAST_LOW, t, e)
@@ -68,13 +71,13 @@ let parse_ite = function
   | BinOp(OR,
 	  BinOp(AND, b1, e1),
 	  BinOp(AND, UnOp(NOT, b2), e2)
-  ) when b1 = b2 && Typecheck.infer_ast ~check:false b1 = Reg(1) ->
+  ) when full_exp_eq b1 b2 && Typecheck.infer_ast ~check:false b1 = Reg(1) ->
     Some(b1, e1, e2)
       (* In case one branch is optimized away *)
   | BinOp(AND,
 	  Cast(CAST_SIGNED, nt, b1),
 	  e1) when Typecheck.infer_ast ~check:false b1 = Reg(1) ->
-    Some(b1, e1, Int(0L, nt))
+    Some(b1, e1, Int(zero_big_int, nt))
   | _ -> None
 
 let parse_extract = function
@@ -84,11 +87,11 @@ let parse_extract = function
      	    New: extract i:bits(t)-1+i
      	 *)
      	 let et = infer_ast ~check:false e' in
-     	 let bits_t = Int64.of_int (bits_of_width t) in
+     	 let bits_t = big_int_of_int (bits_of_width t) in
      	 let lbit = i in
-     	 let hbit = Int64.pred (Int64.add lbit bits_t) in
+     	 let hbit = (lbit +% bits_t) -% bi1 in
      	 (* XXX: This should be unsigned >, but I don't think it matters. *)
-     	 if hbit > Int64.of_int(bits_of_width et) then
+     	 if hbit >% big_int_of_int(bits_of_width et) then
      	   None
 	 else
 	   Some(hbit, lbit)
@@ -113,7 +116,7 @@ let parse_concat = function
 		Cast(CAST_UNSIGNED, nt1, el),
 		Int(bits, _)))
       when nt1 = nt2
-	&& bits = Int64.of_int(bits_of_width (infer_ast ~check:false er))
+	&& bits ==% big_int_of_int(bits_of_width (infer_ast ~check:false er))
 	&& bits_of_width nt1 = bits_of_width (infer_ast ~check:false el) + bits_of_width (infer_ast ~check:false er) (* Preserve the type *)
 	->
       Some(el, er)
@@ -129,8 +132,8 @@ let parse_concat = function
 		Int(bits, _)))
       (* If we cast to nt1 and nt2 and we get the same thing, the
 	 optimizer probably just dropped the cast. *)
-      when Arithmetic.to64 (i, nt2) = Arithmetic.to64 (i, nt1)
-	&& bits = Int64.of_int(bits_of_width (infer_ast ~check:false er))
+      when Arithmetic.to64 (i, nt2) ==% Arithmetic.to64 (i, nt1)
+	&& bits ==% big_int_of_int(bits_of_width (infer_ast ~check:false er))
 	&& bits_of_width nt1 = bits_of_width (infer_ast ~check:false el) + bits_of_width (infer_ast ~check:false er) (* Preserve the type *)
 	->
       Some(el, er)
@@ -153,12 +156,12 @@ let rm_ite = function
 
 let rm_extract = function
   | Extract(h, l, e) ->
-      let nb = Int64.to_int (Int64.succ (Int64.sub h l)) in
+      let nb = int_of_big_int ((h -% l) +% bi1) in
       let nt = Reg(nb) in
-      assert(h >= 0L);
+      assert(h >=% bi0);
       assert (nb >= 0);
       let t = infer_ast ~check:false e in
-      let e = if l <> 0L then e >>* Int(l, t) else e in
+      let e = if l <>% bi0 then e >>* Int(l, t) else e in
       let e = if t <> nt then cast_low nt e else e in
       e
   | _ -> assert false
@@ -170,7 +173,7 @@ let rm_concat = function
 	Typecheck.bits_of_width (Typecheck.infer_ast ~check:false re)
       in
       let nt = Reg(bitsl + bitsr) in
-      exp_or ((cast_unsigned nt le) <<* Int(Int64.of_int bitsr, nt)) (cast_unsigned nt re)
+      exp_or ((cast_unsigned nt le) <<* Int(big_int_of_int bitsr, nt)) (cast_unsigned nt re)
   | _ -> assert false
 
 

@@ -21,6 +21,7 @@ typedef [abstract] void* memory_cell_data_t;
 typedef [abstract] void* memory_data_t;
 typedef [abstract] void* trace_frames_t;
 typedef [abstract] void* trace_frame_t;
+typedef [abstract] void* big_val_t;
 
 typedef int threadid_t;
 
@@ -111,8 +112,12 @@ trace_attrs stmt_attributes([in] Stmt s);
 threadid_t trace_tid(trace_attrs ta);
 int conc_map_size(trace_attrs ta);
 cval_t get_cval(trace_attrs ta, int i);
+
+// Concrete value helpers
 [string] char* cval_name(cval_t m);
-const_val_t cval_value(cval_t m);
+big_val_t cval_value(cval_t m);
+int cval_value_size(big_val_t v);
+const_val_t cval_value_part(big_val_t v, int i);
 const_val_t cval_ind(cval_t m);
 boolean cval_mem(cval_t m);
 enum cval_type_t cval_type(cval_t m);

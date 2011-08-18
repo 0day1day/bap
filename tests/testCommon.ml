@@ -1,3 +1,5 @@
+open Big_int
+open Big_int_convenience
 open OUnit
 open Pcre
 open Ast
@@ -110,14 +112,14 @@ let inject_stmt prog start_addr asm stmt =
 let halt_stmt = Halt(exp_true,[]);;
 
 
-let check_int64_answer e correct = 
+let check_bigint_answer e correct = 
   match e with
-  | Int(int,_) -> if (int <> correct)
+  | Int(int,_) -> if (int <>% correct)
 	then 
 	  assert_failure 
-		("Final value in EAX " ^ (Int64.to_string int) 
+		("Final value in EAX " ^ (string_of_big_int int) 
 		 ^ " does not equal correct value "
-		^ (Int64.to_string correct))
+		^ (string_of_big_int correct))
 	else ()
   | _ -> assert_failure ("Final value in EAX is not an Ast.Int!");;
 
@@ -129,7 +131,7 @@ let check_eax ctx eax =
 	  match k,v with
 	  | var,Symbeval.Symbolic e ->
 		if (pmatch ~pat (Pp.var_to_string var)) 
-		then check_int64_answer e eax
+		then check_bigint_answer e eax
 		else ()
 	  | _ -> ()
     ) ctx.Symbeval.delta;;

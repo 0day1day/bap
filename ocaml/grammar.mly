@@ -5,7 +5,7 @@
 
 open Type
 open Ast
-
+open Big_int
 
 (** Whether or not to strip the trailing _number from variable names *)
 let strip_nums = ref true
@@ -102,7 +102,7 @@ let casttype_of_string = function
 %}
 
 %token <string> ID
-%token <Int64.t> INT
+%token <Big_int.big_int> INT
 %token <string> STRING
 %token <string> COMMENT
 
@@ -172,17 +172,17 @@ stmt:
 | HALT expr attrs semi { Halt($2, $3) }
 | ASSERT expr attrs semi { Assert($2, $3) } 
 | LABEL ID attrs { Label(Name $2, $3) }
-| ADDR INT attrs { Label(Addr $2, $3) }
+| ADDR INT attrs { Label(Addr (int64_of_big_int $2), $3) }
 | COMMENT attrs { Comment($1, $2) }
 
 
 plusminusint:
 | INT { $1 }
-| MINUS INT { Int64.neg $2 }
+| MINUS INT { minus_big_int $2 }
 
 context:
-| ID LSQUARE INT RSQUARE EQUAL INT COMMA plusminusint COMMA styp { {name=$1; mem=true; t=$10; index=$3; value=$6; usage=RD; (* XXX fix me *) taint=Taint(Int64.to_int $8)} } /* memory */
-| ID EQUAL INT COMMA plusminusint COMMA typ { {name=$1; mem=false; t=$7; index=0L; value=$3; usage=RD; (* XXX fix me *) taint=Taint(Int64.to_int $5)} } /* non memory */
+| ID LSQUARE INT RSQUARE EQUAL INT COMMA plusminusint COMMA styp { {name=$1; mem=true; t=$10; index=int64_of_big_int $3; value=$6; usage=RD; (* XXX fix me *) taint=Taint(int_of_big_int $8)} } /* memory */
+| ID EQUAL INT COMMA plusminusint COMMA typ { {name=$1; mem=false; t=$7; index=0L; value=$3; usage=RD; (* XXX fix me *) taint=Taint(int_of_big_int $5)} } /* non memory */
 
 attrs:
 |    { [] }

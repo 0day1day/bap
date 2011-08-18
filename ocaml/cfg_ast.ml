@@ -11,7 +11,7 @@ open Cfg
 
 module C = Cfg.AST
 
-open ExtList
+open BatList
 
 module D = Debug.Make(struct let name = "CFG_AST" and default=`NoDebug end)
 open D

@@ -23,16 +23,18 @@ typedef struct Stmt Stmt;
 #include <vector>
 using namespace std;
 
+typedef vector<const_val_t> big_val_t;
+
 typedef struct ConcPair {
   string name;
   bool mem;
   cval_type_t type;
   const_val_t index;
-  const_val_t value;
+  big_val_t value;
   int usage;
   int taint;
   ConcPair(string str, bool m, cval_type_t typ, 
-           const_val_t ind, const_val_t val, 
+           const_val_t ind, big_val_t val, 
 	   int usg,int tnt){
     name = str; mem = m; 
     type = typ; index = ind; 
@@ -260,7 +262,9 @@ extern "C" {
   extern int conc_map_size(TraceAttrs_t*);
   extern conc_map* get_cval(TraceAttrs_t*,int);
   extern const char* cval_name(conc_map*);
-  extern const_val_t cval_value(conc_map*);
+  extern big_val_t* cval_value(conc_map*);
+  extern long cval_value_size(big_val_t*);
+  extern const_val_t cval_value_part(big_val_t*, int);
   extern long cval_mem(conc_map*);
   extern const_val_t cval_ind(conc_map*);
   extern cval_type_t cval_type(conc_map*);
