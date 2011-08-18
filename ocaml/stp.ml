@@ -88,9 +88,8 @@ object (self)
      | Int(i,t) ->
 	 let maskedval = Arithmetic.to64 (i,t) in
 	 (match t with
-	   (* XXX: FIX ME for big ints!!! *)
-	   (* | Reg n when (n mod 4) = 0 -> *)
-	   (*     printf "0hex%0*Lx" (n/4) maskedval *)
+	   | Reg n when (n mod 4) = 0 ->
+	       printf "0hex%s" (Util.hex_of_bigint ~pad:(n/4) maskedval)
 	   | Reg n ->
 	       printf "0bin%s" (Util.binary_of_bigint ~pad:n maskedval)
 	   | _ -> invalid_arg "Only constant integers supported")

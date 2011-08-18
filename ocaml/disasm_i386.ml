@@ -352,7 +352,7 @@ let reta = [StrAttr "ret"]
 and calla = [StrAttr "call"]
 
 let compute_sf result = Cast(CAST_HIGH, r1, result)
-let compute_zf t result = Int(bi0, t) =* result
+let compute_zf t result = Int(bi0, t) ==* result
 let compute_pf t r =
   (* extra parens do not change semantics but do make it pretty print nicer *)
   exp_not (Cast(CAST_LOW, r1, (((((((r >>* it 7 t) ^* (r >>* it 6 t)) ^* (r >>* it 5 t)) ^* (r >>* it 4 t)) ^* (r >>* it 3 t)) ^* (r >>* it 2 t)) ^* (r >>* it 1 t)) ^* r))
