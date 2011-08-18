@@ -78,6 +78,7 @@ type opcode =
   | And of (typ * operand * operand)
   | Or of (typ * operand * operand)
   | Xor of (typ * operand * operand)
+  | Pxor of (typ * operand * operand)
   | Test of typ * operand * operand
   | Not of typ * operand
   | Cld
@@ -113,8 +114,8 @@ let r4 = Reg 4
 let r8 = Ast.reg_8
 let r16 = Ast.reg_16
 let r32 = Ast.reg_32
-let r64 = Ast.reg_64
 let addr_t = r32
+let r64 = Ast.reg_64
 let r128 = Reg 128
 let xmm_t = Reg 128
 
@@ -299,10 +300,11 @@ let storem m t a e =
 
 
 let op2e_s ss t = function
+  | Oreg r when t = r128 -> bits2xmme r
   | Oreg r when t = r32 -> bits2reg32e r
   | Oreg r when t = r16 -> bits2reg16e r
   | Oreg r when t = r8 -> bits2reg8e r
-  | Oreg r -> unimplemented "sub registers" (*cast_low t (Var r)*)
+  | Oreg r -> unimplemented "unknown register"
   | Oaddr e -> load_s ss t e
   | Oimm i -> Int(Arithmetic.to64 (big_int_of_int64 i,t), t)
 
@@ -451,6 +453,9 @@ let rec to_ir addr next ss pref =
     @ [d]
 
   )
+  | Pxor args ->
+    (* Pxor is just a larger xor *)
+    to_ir addr next ss pref (Xor(args))
   | Lea(r, a) when pref = [] ->
     [assn r32 r a]
   | Call(o1, ra) when pref = [] ->
@@ -871,7 +876,7 @@ let parse_instr g addr =
     | _ -> failwith "parse_immz unsupported size"
   in
   let parse_immv = parse_immz in (* until we do amd64 *)
-  let get_opcode pref opsize a =
+  let get_opcode pref (opsize,mopsize) a =
     (* We should rename these, since the 32 at the end is misleading. *)
     let parse_disp32, parse_modrm32, parse_modrm32ext =
       if List.mem pref_addrsize pref then
@@ -1070,15 +1075,22 @@ let parse_instr g addr =
       | 0xbf -> let st = if b2 = 0xbe then r8 else r16 in
 		let r, rm, na = parse_modrm32 na in
 		(Movsx(opsize, r, st, rm), na)
+      | 0xef ->
+		let d, s, na = parse_modrm32 na in
+		(Pxor(mopsize,d,s), na)
       | _ -> unimplemented (Printf.sprintf "unsupported opcode: %02x %02x" b1 b2)
     )
     | n -> unimplemented (Printf.sprintf "unsupported opcode: %02x" n)
 
   in
   let pref, a = get_prefixes addr in
-  let opsize = if List.mem pref_opsize pref then r16 else r32 in
-  let op, a = get_opcode pref opsize a in
-  (pref, op, a)
+  (* Opsize for regular instructions, MMX/SSE2 instructions
+
+     The opsize override makes regular operands smaller, but MMX
+     operands larger.  *)
+  let opsize,mopsize = if List.mem pref_opsize pref then r16,r128 else r32,r64 in
+  let op, a = get_opcode pref (opsize,mopsize) a in
+(pref, op, a)
 
 let parse_prefixes pref op =
   (* FIXME: how to deal with conflicting prefixes? *)
