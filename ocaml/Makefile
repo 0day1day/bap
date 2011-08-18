@@ -79,13 +79,6 @@ export SOURCES = \
 	template.ml \
 	traces.ml \
 	graphDataflowW.ml \
-	tie_ast_preprocess.ml \
-	tie_val.ml \
-	tie_type.ml \
-	tie_ft_grammar.mli tie_ft_grammar.ml \
-	tie_ft_lex.ml \
-	tie_utils.ml \
-	tie_typeinf.ml \
 	$(PROJSOURCES) \
 
 # Fix the interpreter to work with big ints

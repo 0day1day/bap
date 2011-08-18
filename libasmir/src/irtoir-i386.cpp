@@ -447,8 +447,8 @@ static Exp *translate_get_reg_8( int offset )
 
 static Exp *translate_get_segreg_base( int offset )
 {
-    string name;
-    bool sub;
+    string name = "";
+    bool usebase = false;
     Exp *value = NULL;
 
     switch ( offset )
@@ -456,21 +456,53 @@ static Exp *translate_get_segreg_base( int offset )
         // 
         // These are regular 16 bit registers
         //
-        case OFFB_CS:   name = "CS_BASE";  break;
-        case OFFB_DS:   name = "DS_BASE";  break;
-        case OFFB_ES:   name = "ES_BASE";  break;
-        case OFFB_FS:   name = "FS_BASE";  break;
-        case OFFB_GS:   name = "GS_BASE";  break;
-        case OFFB_SS:   name = "SS_BASE";  break;
+        // case OFFB_CS:
+        //   name = "CS_BASE";
+        //   usebase = true;
+        //   break;
+        // case OFFB_DS:
+        //   name = "DS_BASE";
+        //   usebase = true;
+        //   break;
+        // case OFFB_ES:
+        //   name = "ES_BASE";
+        //   usebase = true;
+        //   break;
+
+      /* Use base registers for FS and GS. */
+        case OFFB_FS:
+          name = "FS_BASE";
+          usebase = true;
+          break;
+        case OFFB_GS:
+          name = "GS_BASE";
+          usebase = true;
+          break;
+        // case OFFB_SS:
+        //   name = "SS_BASE";
+        //   usebase = true;
+        //   break;
+
+          /* These are all assumed to be zero */
+        case OFFB_CS:
+        case OFFB_DS:
+        case OFFB_ES:
+        case OFFB_SS:
+          usebase = false;
+          value = ex_const(REG_32, 0);
+          break;
 
         default:
             throw "Unrecognized register offset";
     }
 
-    Temp *reg = mk_reg(name, REG_32);
-    value = reg;
-
-    return value;
+    if (usebase) {
+      Temp *reg = mk_reg(name, REG_32);
+      value = reg;
+      return value;
+    } else {
+      return value;
+    }
 
 }
 
