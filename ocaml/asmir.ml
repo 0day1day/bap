@@ -553,15 +553,20 @@ let asm_addr_to_bap {asmp=prog; arch=arch; get=get} addr =
 
 let asmprogram_to_bap_range ?(init_ro = false) p st en =
   let rec f l s =
-    try
-      let (ir, n) = asm_addr_to_bap p s in
+    (* This odd structure is to ensure tail-recursion *)
+    let t =
+      try Some(asm_addr_to_bap p s)
+      with Memory_error -> None
+    in
+    match t with
+    | Some(ir, n) ->
       if n >= en then List.flatten (List.rev (ir::l))
       else
 	f (ir::l) n
-    with Memory_error ->
+    | None ->
       (* If we fail, hopefully it is because there were some random
-	 bytes at the end of the section that we tried to
-	 disassemble *)
+    	 bytes at the end of the section that we tried to
+    	 disassemble *)
       wprintf "Failed to read instruction byte while disassembling at address %#Lx; end of section at %#Lx" s en;
       List.flatten (List.rev l)
   in
