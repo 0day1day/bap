@@ -561,7 +561,7 @@ let asmprogram_to_bap_range ?(log=fun _ -> ()) ?(init_ro = false) p st en =
   let rec f l s =
     (* This odd structure is to ensure tail-recursion *)
     let t = 
-      try Some(asm_addr_to_bap ~log p s) 
+      try Some(asm_addr_to_bap ~log p s)
       with Memory_error -> None in
     match t with
     | Some(ir, n) ->
