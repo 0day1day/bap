@@ -149,7 +149,7 @@ and stmt_accept visitor =
   action (wrapstmt vischil) (visitor#visit_stmt)
 
 and prog_accept visitor prog =
-  List.map (fun instmt -> stmt_accept visitor instmt) prog
+  map (fun instmt -> stmt_accept visitor instmt) prog
 
 and cfg_accept vis p =
   Cfg.AST.G.fold_vertex
