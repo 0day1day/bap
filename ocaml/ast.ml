@@ -8,7 +8,7 @@
     @author Ivan Jager
 *)
 
-open BatList
+open BatListFull
 open Type
 open Big_int
 open Big_int_convenience

@@ -236,6 +236,7 @@ let () =
   List.iter (fun r -> Hashtbl.add badregs r ())
     (
       "EFLAGS"
+      ::"R_EIP"
       ::"R_FS"
       ::"R_LDT"
       ::"R_GDT"

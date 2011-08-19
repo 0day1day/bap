@@ -7,7 +7,7 @@
 
 open Big_int
 open Big_int_convenience
-open BatList
+open BatListFull
 open Type
 
 type var = Var.t
