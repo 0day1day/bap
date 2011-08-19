@@ -626,13 +626,13 @@ let rec to_ir addr next ss pref =
     :: set_flags_sub t (Var oldo1) (op2e t o2) (op2e t o1)
   | Sbb(t, o1, o2) ->
     let tmp = nv "t" t in
-    let s1 = Var tmp and s2 = op2e t o2 and r = op2e t o1 in
+    let s1 = Var tmp and s2 = (op2e t o2) +* cast_unsigned t cf_e and r = op2e t o1 in
     move tmp r
-    :: assn t o1 (r -* s2 -* cast_unsigned t cf_e)
-      (* FIXME: sanity check this *)
+    :: assn t o1 (r -* s2)
+    (* FIXME: sanity check this *)
+    ::move oF (Cast(CAST_HIGH, r1, (s1 ^* s2)) &* (s1 ^* r))
     ::move cf ((r >* s1) |* (r ==* s1 &* cf_e))
     ::move af (Unknown("AF for sbb unimplemented", r1))
-    ::move oF (Cast(CAST_HIGH, r1, (s1 ^* s2) &* (s1 ^* r) ))
     ::set_pszf t r
   | Cmp(t, o1, o2) ->
     let tmp = nv "t" t in
@@ -653,8 +653,8 @@ let rec to_ir addr next ss pref =
   | Xor(t, o1, o2) when o1 = o2->
     assn t o1 (Int(0L,t))
     :: move af (Unknown("AF is undefined after xor", r1))
-    :: move zf exp_true
-    :: List.map (fun v -> move v exp_false) [oF; cf; pf; sf]
+    :: List.map (fun v -> move v exp_true) [zf; pf]
+    @  List.map (fun v -> move v exp_false) [oF; cf; sf]
   | Xor(t, o1, o2) ->
     assn t o1 (op2e t o1 ^* op2e t o2)
     :: move oF exp_false
