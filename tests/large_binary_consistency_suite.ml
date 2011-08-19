@@ -4,6 +4,8 @@ open TestCommon
 
 let binary = "../x32_bins/date";;
 let binary_args = "";;
+let log_file = "large_binary_test.log";;
+
 
 let pin_trace_setup _ =
   let args = 
@@ -21,9 +23,12 @@ let pin_trace_setup _ =
 
 let pin_trace_test pin_out = 
   let prog = Asmir.bap_from_trace_file ~pin:true pin_out in
+  let oc = open_out log_file in  
+  let log = fun x -> output_string oc x in
   Traces.consistency_check := true;
   Traces.checkall := true;
-  ignore(Traces.concrete prog);
+  ignore(Traces.concrete ~log prog);
+  close_out oc;
 (*  Traces.consistency_check := false;
   set_stp_path();
   ignore(Traces.output_exploit exploit_file prog)*)
