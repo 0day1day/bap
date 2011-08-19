@@ -206,6 +206,28 @@ struct
 	   | _ -> ()
       ) delta
 
+  (** Number of variable locations stored in state *)
+  let num_values delta =
+    VH.length delta
+
+  (** Number of concrete memory locations stored in state *)
+  let num_mem_locs delta =
+    (** Number of bindings in map
+
+	XXX: This is inefficient; switch to BatMaps which support cardinality
+    *)
+    let map_length m =
+      AddrMap.fold (fun _ _ c -> c+1) m 0
+    in
+    VH.fold
+      (fun k v count  ->
+	 match k,v with
+	   | var, ConcreteMem(mem,_) ->
+             count + (map_length mem)
+	   | _ -> count
+      ) delta 0
+      
+
   let print_mem delta =
     pdebug "contents of memories" ;
     VH.iter 
