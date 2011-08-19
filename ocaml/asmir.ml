@@ -554,6 +554,9 @@ let asm_addr_to_bap ?(log=fun _ -> ()) {asmp=prog; arch=arch; get=get} addr =
     DV.dprintf "Disassembling %Lx through VEX" addr;
     fallback()
 
+let flatten ll =
+	List.rev (List.fold_left (fun accu l -> List.rev_append l accu) [] ll)
+
 let asmprogram_to_bap_range ?(log=fun _ -> ()) ?(init_ro = false) p st en =
   let rec f l s =
     (* This odd structure is to ensure tail-recursion *)
@@ -562,7 +565,7 @@ let asmprogram_to_bap_range ?(log=fun _ -> ()) ?(init_ro = false) p st en =
       with Memory_error -> None in
     match t with
     | Some(ir, n) ->
-      if n >= en then List.flatten (List.rev (ir::l))
+      if n >= en then flatten (List.rev (ir::l))
       else
 	f (ir::l) n
     | None ->
@@ -570,7 +573,7 @@ let asmprogram_to_bap_range ?(log=fun _ -> ()) ?(init_ro = false) p st en =
     	 bytes at the end of the section that we tried to
     	 disassemble *)
       wprintf "Failed to read instruction byte while disassembling at address %#Lx; end of section at %#Lx" s en;
-      List.flatten (List.rev l)
+      flatten (List.rev l)
   in
   f [] st
 
@@ -586,8 +589,7 @@ let asmprogram_to_bap ?(log=fun _ -> ()) ?(init_ro=false) p =
   let irs = List.map 
 	(fun s -> 
 	  if is_code s then asmprogram_section_to_bap ~log p s else []) p.secs in
-  let ir = List.flatten irs in
-
+  let ir = flatten irs in
   if init_ro then
   let g = gamma_for_arch p.arch in
     let m = gamma_lookup g "$mem" in
