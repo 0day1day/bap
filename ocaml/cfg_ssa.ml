@@ -10,7 +10,7 @@ open Util
 open Ssa
 open Cfg
 open Type
-open BatList
+open BatListFull
 
 module D = Debug.Make(struct let name = "SSA" and default=`Debug end)
 open D

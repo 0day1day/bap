@@ -8,7 +8,7 @@ open Ast
 open Ast_convenience
 open Big_int
 open Big_int_convenience
-open BatList
+open BatListFull
 open Format
 open Pp
 open Printf

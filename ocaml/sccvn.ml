@@ -36,7 +36,7 @@ open Big_int
 open Big_int_convenience
 open Type
 open Ssa
-open BatList
+open BatListFull
 open Arithmetic
 
 module VH = Var.VarHash
@@ -190,7 +190,7 @@ let defsite cfg =
 	 | Move(l,_,_) -> VH.add defsites l (b,i)
 	 | _ -> ()
 	 in
-       iteri addone (C.get_stmts cfg b)
+       List.iteri addone (C.get_stmts cfg b)
     )
     cfg;
   let beforeentry = (C.G.V.create Cfg.BB_Entry, -1) in
@@ -552,7 +552,7 @@ let replacer ?(opt=true) cfg =
   let somechange = ref false in
   let replace b cfg =
     let stmts = 
-      mapi
+      List.mapi
 	(fun i s ->
 	   vis#set_pos (b,i);
 	   Ssa_visitor.stmt_accept vis s

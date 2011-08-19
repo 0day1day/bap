@@ -5,7 +5,7 @@
 
 open Type
 open Ast
-open BatList
+open BatListFull
 
 
 class type t = object
@@ -149,7 +149,7 @@ and stmt_accept visitor =
   action (wrapstmt vischil) (visitor#visit_stmt)
 
 and prog_accept visitor prog =
-  map (fun instmt -> stmt_accept visitor instmt) prog
+  List.map (fun instmt -> stmt_accept visitor instmt) prog
 
 and cfg_accept vis p =
   Cfg.AST.G.fold_vertex
