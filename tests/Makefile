@@ -43,6 +43,7 @@ SOURCES = \
 	large_binary_consistency_suite.ml \
 	bap_suite.ml
 
+export BCSUFFIX = .dbg
 
 all: $(TARGETS)
 
@@ -51,9 +52,8 @@ test: all
 
 include $(OCAMLMAKEFILE)
 
-# XXX Better way to do this?
 ASM:
-	cd ./x86 ; make
+	make -C x86
 
 CTESTS:
-	cd ./C ; make
+	make -C C
