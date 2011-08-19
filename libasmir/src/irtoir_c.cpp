@@ -11,44 +11,49 @@
 
 #include "jumpbuf.h"
 
-bap_blocks_t * asmir_asmprogram_to_bap(asm_program_t *prog) {
-  vector<bap_block_t *> *res = new vector<bap_block_t *>();
-  // eww, references
+/* These are no longer used with BAP's native lifting code */
 
-  jmp_buf_set = 1;
-  if (setjmp(vex_error) != 0) {
-    /* There was an exception */
-    jmp_buf_set = 0;
-    cerr << "There was an exception" << endl;
-    return NULL;
-  }
+// bap_blocks_t * asmir_asmprogram_to_bap(asm_program_t *prog) {
+//   vector<bap_block_t *> *res = new vector<bap_block_t *>();
+//   // eww, references
 
-  *res = generate_vex_ir(prog);
-  generate_bap_ir(prog, *res);
-  jmp_buf_set = 0;
-  return res;
-}
+//   // Set longjmp to handle possible VEX errors
+//   jmp_buf_set = 1;
+//   if (setjmp(vex_error) != 0) {
+//     /* There was an exception */
+//     jmp_buf_set = 0;
+//     cerr << "There was an exception" << endl;
+//     return NULL;
+//   }
+
+//   *res = generate_vex_ir(prog);
+//   generate_bap_ir(prog, *res);
+//   jmp_buf_set = 0;
+//   return res;
+// }
 
 
-bap_blocks_t *asmir_asmprogram_range_to_bap(asm_program_t *prog, 
-					address_t start,
-					address_t end)
-{
-  vector<bap_block_t *> *res = new vector<bap_block_t *>();
-  // eww, references
+// bap_blocks_t *asmir_asmprogram_range_to_bap(asm_program_t *prog, 
+// 					address_t start,
+// 					address_t end)
+// {
+//   vector<bap_block_t *> *res = new vector<bap_block_t *>();
+//   // eww, references
 
-  jmp_buf_set = 1;
-  if (setjmp(vex_error) != 0) {
-    /* There was an exception */
-    jmp_buf_set = 0;
-    return NULL;
-  }
-  
-  *res = generate_vex_ir(prog, start, end);
-  generate_bap_ir(prog, *res);
-  jmp_buf_set = 0;
-  return res;
-}
+//   // Set longjmp to handle possible VEX errors
+//   jmp_buf_set = 1;
+//   if (setjmp(vex_error) != 0) {
+//     /* There was an exception */
+//     jmp_buf_set = 0;
+//     cerr << "There was an exception" << endl;
+//     return NULL;
+//   }
+
+//   *res = generate_vex_ir(prog, start, end);
+//   generate_bap_ir(prog, *res);
+//   jmp_buf_set = 0;
+//   return res;
+// }
 
 int asmir_bap_blocks_size(bap_blocks_t *bs) {
   if (bs) {
@@ -68,12 +73,18 @@ void destroy_bap_block(bap_block_t *b) {
   // FIXME: stuff in vex_ir seems to be allocated in VEX's own heap?
   // If so, should provide a way to free that memory too?
   //free(b->vex_ir);
-  for (vector<Stmt*>::iterator j = b->bap_ir->begin();
-       j != b->bap_ir->end(); j++) {
-    Stmt::destroy(*j);
+
+  if (b == NULL) {
+    cerr << "WARNING: attempt to destroy NULL bap block" << endl;
+  } else {
+
+    for (vector<Stmt*>::iterator j = b->bap_ir->begin();
+         j != b->bap_ir->end(); j++) {
+      Stmt::destroy(*j);
+    }
+    delete b->bap_ir;
+    delete b;
   }
-  delete b->bap_ir;
-  delete b;
 }
 
 void destroy_bap_blocks(bap_blocks_t *bs) {
@@ -83,7 +94,8 @@ void destroy_bap_blocks(bap_blocks_t *bs) {
   delete bs;
 }
 
-/* Check for an error (i.e., a NULL ptr */
+/* Check for an error block sequence.  So ML code can figure out if
+ * an error occured, since it can't inspect pointers directly. */
 long asmir_bap_blocks_error(bap_blocks_t *bs) {
 
   if (bs == NULL) {
@@ -94,6 +106,10 @@ long asmir_bap_blocks_error(bap_blocks_t *bs) {
   }
 }
 
+/* Check for an error block. */
+long asmir_bap_block_error(bap_block_t *b) {
+  return asmir_bap_blocks_error((bap_blocks_t*) b);
+}
 
 address_t asmir_bap_block_address(bap_block_t *b)
 {
@@ -101,7 +117,11 @@ address_t asmir_bap_block_address(bap_block_t *b)
 }
 
 int asmir_bap_block_size(bap_block_t *b) {
+  if (b == NULL) {
+    return -1;
+  } else {
   return b->bap_ir->size();
+  }
 }
 
 Stmt * asmir_bap_block_get(bap_block_t *b, int i) {
@@ -149,6 +169,16 @@ byte_insn_to_asmp(bfd_architecture arch, address_t addr, unsigned char *bb_bytes
 // moved from ir_program.cpp
 bap_block_t* asmir_addr_to_bap(asm_program_t *p, address_t addr, address_t *next)
 {
+
+  // Set longjmp to handle possible VEX errors
+  jmp_buf_set = 1;
+  if (setjmp(vex_error) != 0) {
+    /* There was an exception */
+    jmp_buf_set = 0;
+    cerr << "There was an exception in asmir_addr_to_bap" << endl;
+    return NULL;
+  }
+  
   translate_init();
   bap_block_t * bap_block = generate_vex_ir(p, addr);
   generate_bap_ir_block(p, bap_block);

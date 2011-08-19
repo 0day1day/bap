@@ -1000,7 +1000,8 @@ let parse_instr g addr =
     | 0xc6
     | 0xc7 -> let t = if b1 = 0xc6 then r8 else opsize in
 	      let (e, rm, na) = parse_modrm32ext na in
-	      assert (e=0); (* others are invalid opcodes, so we should check *)
+              if e<>0 then failwith "Invalid opcode";
+	      (* assert (e=0); (\* others are invalid opcodes, so we should check *\) *)
 	      let (i,na) = parse_immz t na in
 	      (match e with (* Grp 11 *)
 	      | 0 -> (Mov(t, rm, i), na)

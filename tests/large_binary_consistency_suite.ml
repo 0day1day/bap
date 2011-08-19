@@ -15,7 +15,7 @@ let pin_trace_setup _ =
   let exit_code = Unix.WEXITED(1) in*)
   check_pin_setup();
   (*assert_command ~exit_code (pin_path^pin) args;*)
-  Sys.command (pin_path^pin^args);
+  ignore(Sys.command (pin_path^pin^args));
   find_pin_out (Array.to_list (Sys.readdir "./"));;
 
 

@@ -177,14 +177,15 @@ extern "C" {
 
   extern void asmir_set_use_simple_segments(bool value);
 
-  extern bap_blocks_t * asmir_asmprogram_to_bap(asm_program_t *prog);
-  extern bap_blocks_t * asmir_asmprogram_range_to_bap(asm_program_t *prog, address_t start, address_t end);
+  /* extern bap_blocks_t * asmir_asmprogram_to_bap(asm_program_t *prog); */
+  /* extern bap_blocks_t * asmir_asmprogram_range_to_bap(asm_program_t *prog, address_t start, address_t end); */
   extern asm_program_t* byte_insn_to_asmp(bfd_architecture arch, address_t addr, unsigned char *bb_bytes, unsigned int len);
   extern bap_block_t* asmir_addr_to_bap(asm_program_t *p, address_t addr, address_t *next);
 
   extern int asmir_bap_blocks_size(bap_blocks_t *bs);
   extern bap_block_t * asmir_bap_blocks_get(bap_blocks_t *bs, int i);
   extern long asmir_bap_blocks_error(bap_blocks_t *bs);
+  extern long asmir_bap_block_error(bap_block_t *bs);
   extern void destroy_bap_blocks(bap_blocks_t *bs);
   extern void destroy_bap_block(bap_block_t *bs);
   extern int asmir_bap_block_size(bap_block_t *b);

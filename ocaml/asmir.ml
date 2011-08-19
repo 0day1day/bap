@@ -325,6 +325,9 @@ let rec handle_specials =
     Libasmir.asmir_bap_blocks_get) into a list of statements *)
 let tr_bap_block_aux g b =
   let size = Libasmir.asmir_bap_block_size b - 1 in
+  if Libasmir.asmir_bap_block_error b then
+    failwith "Block was not lifted correctly by vine";
+  assert (size+1 > 0);
   let addr = Libasmir.asmir_bap_block_address b in
   let (decs,stmts) =
     foldn (fun (ds,ss) n -> let s = asmir_bap_block_get b n in
@@ -514,44 +517,58 @@ let check_equivalence a (ir1, next1) (ir2, next2) =
 
 (** Translate only one address of a  Libasmir.asm_program_t to Vine *)
 let asm_addr_to_bap ?(log=fun _ -> ()) {asmp=prog; arch=arch; get=get} addr =
-  let fallback() = 
+  let fallback() =
     let g = gamma_for_arch arch in
     let (block, next) = Libasmir.asmir_addr_to_bap prog addr in
-    let ir = tr_bap_block_t g prog block in
-    destroy_bap_block block;
-    (ir, next)
+    if Libasmir.asmir_bap_block_error block then
+      (* We are unable to lift this address. Decode errors are
+         converted to a Special("VEX Decode Error"), so this is a
+         non-Decode error.
+
+         Unfortunately, we get no idea of the instruction length when
+         this happens, so we'll optimistically increase by one.  *)
+      let asm = Libasmir.asmir_string_of_insn prog addr in
+      (Disasm_i386.ToIR.add_labels ~asm addr (Special("VEX General Error", [])::[]), Int64.succ addr)
+    else
+      (* Success: vine gave us a block to translate *)
+      let ir = tr_bap_block_t g prog block in
+      destroy_bap_block block;
+      (ir, next)
   in
   try 
-	let (ir,na) as v = 
-	  (try (Disasm.disasm_instr arch get addr)
+    let (ir,na) as v = 
+      (try (Disasm.disasm_instr arch get addr)
        with Failure s -> 
-		 log(Printf.sprintf "disasm_instr %Lx: %s\n" addr s);
-		 DV.dprintf "disasm_instr %Lx: %s" addr s; raise Disasm.Unimplemented
-	  )
+	 log(Printf.sprintf "disasm_instr %Lx: %s\n" addr s);
+	 DV.dprintf "disasm_instr %Lx: %s" addr s; raise Disasm.Unimplemented
+      )
     in
     DV.dprintf "Disassembled %Lx directly" addr;
     if DCheck.debug then check_equivalence addr v (fallback());
     (match ir with
     | Label(l, [])::rest ->
-	  (Label(l, [Asm(Libasmir.asmir_string_of_insn prog addr)])::rest,
-	   na)
-    | _ -> v
-    )
+      (Label(l, [Asm(Libasmir.asmir_string_of_insn prog addr)])::rest,
+       na)
+    | _ -> v)
   with Disasm.Unimplemented ->
     DV.dprintf "Disassembling %Lx through VEX" addr;
     fallback()
 
 let asmprogram_to_bap_range ?(log=fun _ -> ()) ?(init_ro = false) p st en =
   let rec f l s =
-    try
-      let (ir, n) = asm_addr_to_bap ~log p s in
+    (* This odd structure is to ensure tail-recursion *)
+    let t = 
+      try Some(asm_addr_to_bap ~log p s) 
+      with Memory_error -> None in
+    match t with
+    | Some(ir, n) ->
       if n >= en then List.flatten (List.rev (ir::l))
       else
 	f (ir::l) n
-    with Memory_error ->
+    | None ->
       (* If we fail, hopefully it is because there were some random
-	 bytes at the end of the section that we tried to
-	 disassemble *)
+    	 bytes at the end of the section that we tried to
+    	 disassemble *)
       wprintf "Failed to read instruction byte while disassembling at address %#Lx; end of section at %#Lx" s en;
       List.flatten (List.rev l)
   in
