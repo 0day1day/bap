@@ -18,10 +18,10 @@ export OCAMLFIND_IGNORE_DUPS_IN=$(CURDIR)/../bigint-3.12/otherlibs/num
 
 # common sources
 export SOURCES = \
-	big_int_convenience.ml \
 	debug.mli debug.ml \
 	BatListFull.ml \
 	util.mli util.ml \
+	big_int_convenience.ml \
 	dominator.ml \
 	graphDataflow.mli graphDataflow.ml \
 	type.ml type.mli \

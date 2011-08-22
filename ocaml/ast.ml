@@ -254,3 +254,6 @@ let full_stmt_eq s1 s2 =
       List.for_all2 full_exp_eq l1 r1
     else
       false
+
+let is_true = full_exp_eq exp_true
+let is_false = full_exp_eq exp_false

@@ -7,9 +7,9 @@
     @author Ivan Jager
 *)
 
-open Big_int_convenience
 open BatString
 open BatList
+open Big_int
 
 (** The identity function *)
 let id = fun x -> x
@@ -512,9 +512,11 @@ let binary_of_int64 ?pad n =
   in
   zeroextend (f n)
 
+(* More substantial functions *)
+
 (** Convert big integer to binary represented as a string *)
-let binary_of_bigint ?pad n = 
-  let getb n = Big_int.and_big_int n Big_int_convenience.bi1 in (* Get lsb *)
+let binary_of_big_int ?pad n = 
+  let getb n = Big_int.and_big_int n (big_int_of_int 1) in (* Get lsb *)
   let getrest n = Big_int.shift_right_big_int n 1 in (* Get all but lsb *)
   let zeroextend s = match pad with
     | None -> s
@@ -524,8 +526,8 @@ let binary_of_bigint ?pad n =
 	(String.make p '0') ^ s 
   in
   let rec f = function
-    | bi when Big_int_convenience.bi_is_zero bi -> "0"
-    | bi when Big_int_convenience.bi_is_one bi -> "1"
+    | bi when (eq_big_int bi zero_big_int) -> "0"
+    | bi when (eq_big_int bi unit_big_int) -> "1"
     | n -> (f (getrest n)) ^ (f (getb n))
   in
   zeroextend (f n)
@@ -535,8 +537,8 @@ let binary_of_bigint ?pad n =
     XXX: We could make this more efficient by operating one int64 at a
     time, instead of just a nibble.
 *)
-let hex_of_bigint ?pad n = 
-  let getn n = Big_int.and_big_int n Big_int_convenience.bif in (* Get lsnibble *)
+let hex_of_big_int ?pad n = 
+  let getn n = Big_int.and_big_int n (big_int_of_int 0xf) in (* Get lsnibble *)
   let getrest n = Big_int.shift_right_big_int n 4 in (* Get all but lsnibble *)
   let zeroextend s = match pad with
     | None -> s
@@ -545,14 +547,15 @@ let hex_of_bigint ?pad n =
 	assert (p >= 0);
 	(String.make p '0') ^ s 
   in
+  let (<=%) = le_big_int in
   let rec f = function
-    | bi when bi <=% Big_int_convenience.bif -> Printf.sprintf "%x" (Big_int.int_of_big_int bi)
+    | bi when bi <=% (big_int_of_int 0xf) -> Printf.sprintf "%x" (Big_int.int_of_big_int bi)
     | n -> (f (getrest n)) ^ (f (getn n))
   in
   zeroextend (f n)
 
 (** Convert string representation in hex or decimal to big int form. *)
-let bigint_of_string s =
+let big_int_of_string s =
   let hex_prefix = "0x" in
   let is_hex s =
     let re = Str.regexp ("^"^hex_prefix) in
@@ -580,13 +583,17 @@ let bigint_of_string s =
     let len = hex_to_bitlen s in
     if len <= numbits then
       let bi = Big_int.big_int_of_int64 (Int64.of_string ("0x"^s)) in
-      assert (bi >=% bi0);
+      let (>=%) = ge_big_int in
+      assert (bi >=% zero_big_int);
       bi
     else (
       (* Printf.printf "getmost: %s v: %s\n" (getmost s) (Big_int.string_of_big_int (f (getmost s))); *)
       (* Printf.printf "getrest: %s v: %s\n" (getrest s) (Big_int.string_of_big_int (f (getrest s))); *)
+      let (|%) = or_big_int in
+      let (<<%) = shift_left_big_int in
       let bi = (f (getmost s) <<% (hex_to_bitlen (getrest s))) |% (f (getrest s)) in
-      assert (bi >=% bi0);
+      let (>=%) = ge_big_int in
+      assert (bi >=% zero_big_int);
       bi
     )
   in
