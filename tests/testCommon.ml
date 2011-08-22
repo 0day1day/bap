@@ -4,6 +4,17 @@ open OUnit
 open Pcre
 open Ast
 
+(** Test run args **)
+let long = ref false;;
+
+let speclist =
+  [
+	("-long", Arg.Set long, "\tRun long binary tests too");
+  ];;
+
+let long_check _ = skip_if (not !long) "Long running tests turned off";;
+
+
 (** STP helpers **)
 let stp_path = "../stpwrap/stp/bin/";;
 let stp = "stp";;
@@ -34,7 +45,7 @@ let check_pin_setup _ =
   let foutput char_stream = 
 	(match (Stream.next char_stream) with
 	| '0' -> ()
-	| _ -> assert_failure
+	| _ -> skip_if true
 	  (cat_arg^
 		 " must contain 0 for pin to work.  As root, please execute $ echo 0 > "
 	   ^cat_arg))
@@ -45,17 +56,9 @@ let check_pin_setup _ =
 
 
 (** General system functions **)
-let chdir_startup dir _ =
-  let pwd = Sys.getcwd () in 
-  Sys.chdir dir;
-  pwd;;
-
-
-let chdir_cleanup pwd = Sys.chdir pwd;;
-
-
-let check_file file _ =
-  (@?) ("File "^file^" does not exist!") (Sys.file_exists file)
+let check_file file =
+  if not(Sys.file_exists file) then skip_if true
+   ("File "^file^" does not exist; Skipping this test!");;
 
 
 (** Common functions across multipule tests **)

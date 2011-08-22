@@ -9,6 +9,7 @@ let stp_out = "stp_out.stp";;
 let solver = ref (Smtexec.STP.si);;
 
 let predicate_stp_setup _ =
+  let _ = check_file (stp_path^stp) in
   (* Silence floating point warnings for tests *)
   let _ = if (Asmir.get_print_warning()) then Asmir.set_print_warning(false) in
   let prog = Asmir.open_program test_file in
@@ -76,8 +77,6 @@ let predicate_stp_tear_down _ =
 
 let suite = "Predicate" >:::
   [
-	"stp_binary_test" >::
-	  bracket (chdir_startup stp_path) (check_file stp) chdir_cleanup;
 	"predicate_stp_solve_test" >::
 	  (bracket 
 		 predicate_stp_setup 

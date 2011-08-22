@@ -15,7 +15,11 @@ let pin_trace_setup _ =
 	["-t"; (gentrace_path^gentrace); 
 	 "-o"; pin_out_suffix; "--"; binary; binary_args ] in
   let exit_code = Unix.WEXITED(1) in*)
+  long_check();
   check_pin_setup();
+  check_file (pin_path^pin);
+  check_file (gentrace_path^gentrace);
+  check_file (stp_path^stp);
   (*assert_command ~exit_code (pin_path^pin) args;*)
   ignore(Sys.command (pin_path^pin^args));
   find_pin_out (Array.to_list (Sys.readdir "./"));;
@@ -42,12 +46,6 @@ let pin_trace_cleanup pin_out =
 
 let suite = "Pin" >:::
   [
-	"pin_binary_test" >:: 
-	  bracket (chdir_startup pin_path) (check_file pin) chdir_cleanup;
-	"pin_obj_test" >:: 
-	  bracket (chdir_startup gentrace_path) (check_file gentrace) chdir_cleanup;
-	"stp_binary_test" >::
-	  bracket (chdir_startup stp_path) (check_file stp) chdir_cleanup;
 	"large_binary_consistency_test" >::
 	  bracket pin_trace_setup pin_trace_test pin_trace_cleanup;
   ]
