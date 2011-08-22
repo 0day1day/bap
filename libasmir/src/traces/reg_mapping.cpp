@@ -678,30 +678,48 @@ switch (id) {
     case REG_MXT:
     
     case REG_XMM_BASE:
-    case REG_XMM0 = case REG_XMM_BASE:
+*/
+    // case REG_XMM0 = case REG_XMM_BASE:
+    case REG_XMM0:
+      return string("XMM0");
     case REG_XMM1:
+      return string("XMM1");
     case REG_XMM2:
+      return string("XMM2");
     case REG_XMM3:
+      return string("XMM3");
     case REG_XMM4:
+      return string("XMM4");
     case REG_XMM5:
+      return string("XMM5");
     case REG_XMM6:
+      return string("XMM6");
     case REG_XMM7:
+      return string("XMM7");
     
-#if defined(TARGET_IA32E)
+      //#if defined(TARGET_IA32E)
     // additional xmm registers in the Intel(R) 64 architecture
-    case REG_XMM8:
-    case REG_XMM9:
-    case REG_XMM10:
-    case REG_XMM11:
-    case REG_XMM12:
-    case REG_XMM13:
-    case REG_XMM14:
-    case REG_XMM15:
-    case REG_XMM_LAST = case REG_XMM15:
-#else    
-    case REG_XMM_LAST = case REG_XMM7:
-#endif
-
+    // case REG_XMM8:
+    //   return string("XMM8");
+    // case REG_XMM9:
+    //   return string("XMM9");
+    // case REG_XMM10:
+    //   return string("XMM10");
+    // case REG_XMM11:
+    //   return string("XMM11");
+    // case REG_XMM12:
+    //   return string("XMM12");
+    // case REG_XMM13:
+    //   return string("XMM13");
+    // case REG_XMM14:
+    //   return string("XMM14");
+    // case REG_XMM15:
+    //   return string("XMM15");
+//     case REG_XMM_LAST = case REG_XMM15:
+// #else    
+//     case REG_XMM_LAST = case REG_XMM7:
+// #endif
+      /*
     case REG_YMM_BASE:
     case REG_YMM0 = case REG_YMM_BASE:
     case REG_YMM1:

@@ -1,8 +1,10 @@
 (** Pretty printing
-    
+
     @todo Write .mli
 *)
 
+open Big_int
+open Big_int_convenience
 open Type
 module VH = Var.VarHash
 module F = Format
@@ -21,7 +23,7 @@ let rec typ_to_string = function
   | Reg 32 -> "u32"
   | Reg 64 -> "u64"
   | Reg n -> Printf.sprintf "u%u" n
-  | TMem t -> "?" ^ typ_to_string t 
+  | TMem t -> "?" ^ typ_to_string t
   | Array(idx,e) -> typ_to_string e ^ "?" ^ typ_to_string idx
 
 
@@ -102,23 +104,20 @@ object (self)
 
   method attrs a = List.iter (fun a -> space();self#attr a) a
 
-  method attr =
-    let bits_of_width = function
-      | Reg n -> n
-      | _ -> failwith "bits_of_width"
-    in
-      function
+  method attr = function
     | Asm s -> pp "@asm \""; pp s; pp "\""
     | Address a -> printf "@address \"0x%Lx\"" a;
     | Liveout -> pp "@set \"liveout\""
     | StrAttr s -> pp "@str \""; pp s; pc '\"'
-    | Context {name=s; mem=mem; value=v; index=i; t=tp; taint=Taint t} -> 
+    | Context {name=s; mem=mem; value=v; index=i; t=Reg bits; taint=Taint t} -> 
 	let ts = string_of_int t in
 	(*if t = Taint then "tainted" else "untainted" in*)
 	let ind = if mem then "[0x"^(Int64.format "%Lx" i)^"]" else "" in
-	pp "@context "; pp (s^ ind ^" = 0x"^(Int64.format "%Lx" v)^ ", " ^ ts
+	pp "@context "; pp (s^ ind ^" = 0x"^(Util.hex_of_bigint v)^ ", " ^ ts
 			      ^", u"
-			      ^ (string_of_int (bits_of_width tp)))
+			      ^ (string_of_int bits))
+    | Context _ ->
+      failwith "Contexts only specify register types"
     | ThreadId i -> pp "@tid \""; pp (string_of_int i); pp "\""
     | ExnAttr _ (* we could try to print something using Printexc.to_string *)
     | Pos _ -> () (* ignore position attrs *)
@@ -130,19 +129,14 @@ object (self)
     | Addr x -> printf "addr 0x%Lx" x
 
   method int i t =
-    let (is, i) = try Arithmetic.tos64 (i,t), Arithmetic.to64 (i,t) 
-    with Arithmetic.ArithmeticEx _ ->
-      (* tos won't work for registers >= 64.  But, constants of such
-	 type don't need to have their bits set to zero, anyway. *)
-      (match t with Reg n when n >= 64 -> (i, i) | _ -> failwith "Unable to remove high-order bits while printing int")
-    in
+    let (is, i) = Arithmetic.tos64 (i,t), Arithmetic.to64 (i,t) in
     match (is, t) with
-    | (0L, Reg 1) -> pp "false"
-    | (-1L, Reg 1) -> pp "true"
-    | _ ->
-	if is < 10L && is > -10L
-	then pp (Int64.to_string i)
-	else printf "0x%Lx" i;
+    | (bi, Reg 1) when bi_is_zero bi -> pp "false"
+    | (bi, Reg 1) when bi_is_minusone bi -> pp "true"
+    | (bi,t) ->
+        if (abs_big_int bi) <% bia
+	then pp (string_of_big_int bi)
+        else pp ("0x"^(Util.hex_of_bigint (Arithmetic.to64 (i,t))));
 	pp ":"; self#typ t
 
 
@@ -216,9 +210,9 @@ object (self)
 	 rparen 7
      | Ast.Extract(h, l, e) ->
 	 pp "extract:";
-	 pp (Int64.to_string h);
+	 pp (string_of_big_int h);
 	 pc ':';
-	 pp (Int64.to_string l);
+	 pp (string_of_big_int l);
 	 pc ':';
 	 pc '[';
 	 self#ast_exp e;
@@ -267,9 +261,9 @@ object (self)
     cls();
 
   method ast_endian = function
-    | Ast.Int(0L, Reg 1) ->
+    | Ast.Int(bi, Reg 1) when bi_is_zero bi ->
 	pp "e_little";
-    | Ast.Int(1L, Reg 1) ->
+    | Ast.Int(bi, Reg 1) when bi_is_one bi ->
 	pp "e_big"
     | x -> self#ast_exp x
 
@@ -330,10 +324,9 @@ object (self)
 	pc '"'; pp lab; pc '"'
 
   method ssa_endian = function
-    | Ssa.Int(0L, Reg 1) -> pp "e_little";
-    | Ssa.Int(1L, Reg 1) -> pp "e_big"
+    | Ssa.Int(bi, Reg 1) when bi_is_zero bi -> pp "e_little";
+    | Ssa.Int(bi, Reg 1) when bi_is_one bi -> pp "e_big"
     | x -> self#ssa_value x
-
 
   method ssa_exp e =
     opn 0;
@@ -365,9 +358,9 @@ object (self)
 	 self#ssa_value y	 
      | Ssa.Extract(h, l, e) ->
 	 pp "extract:";
-	 pp (Int64.to_string h);
+	 pp (string_of_big_int h);
 	 pc ':';
-	 pp (Int64.to_string l);
+	 pp (string_of_big_int l);
 	 pp ":[";
 	 self#ssa_value e;
 	 pc ']';

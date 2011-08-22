@@ -8,10 +8,10 @@
 open Type
 open Ast
 open Cfg
+open BatListFull
 
 module C = Cfg.AST
 
-open ExtList
 
 module D = Debug.Make(struct let name = "CFG_AST" and default=`NoDebug end)
 open D

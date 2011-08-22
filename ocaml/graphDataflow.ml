@@ -4,9 +4,7 @@
 *)
 
 open Util
-module List = ExtList.List;;
-
-
+module List = BatListFull.List
 
 module type G =
 sig

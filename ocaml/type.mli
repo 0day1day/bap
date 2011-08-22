@@ -3,7 +3,6 @@
     @author Ivan Jager
 *)
 
-
 type label = 
   | Name of string (** For named labels*)
   | Addr of int64 (** For addresses. Cast REG_type as unsigned when comparing. *)
@@ -70,7 +69,7 @@ type context =
    mem   : bool;
    t     : typ;
    index : int64;
-   value : int64;
+   value : Big_int.big_int;
    usage : usage;
    taint : taint_type
  }

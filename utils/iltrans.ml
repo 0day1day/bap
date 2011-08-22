@@ -109,7 +109,7 @@ let sccvn p =
 let deadcode p =
   fst(Deadcode.do_dce p)
 let jumpelim p =
-  Deadcode.cfg_jumpelim p
+  fst(Ssa_simp_misc.cfg_jumpelim p)
 let ast_coalesce = Coalesce.AST_Coalesce.coalesce
 let ssa_coalesce = Coalesce.SSA_Coalesce.coalesce
 let memory2scalardef p =

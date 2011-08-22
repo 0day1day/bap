@@ -3,6 +3,8 @@
     @author ejs
 *)
 open Type
+open Big_int
+open Big_int_convenience
 open Ast
 open Ast_convenience
 open Typecheck
@@ -203,7 +205,7 @@ object (self)
 		if t >= 64 then i else failwith "Unable to set high bits to zero")	   
 	    in
 	 lazy (
-	   pp "(_ bv"; printf "%Lu " maskedval; pi t; pc ')'
+	   pp "(_ bv"; pp (string_of_big_int maskedval); space (); pi t; pc ')'
 	 )
      | Int _ -> failwith "Ints may only have register types"
      | Var v ->
@@ -302,7 +304,7 @@ object (self)
      	 in
 	 let pe' = lazy (self#ast_exp_bv e') in
 	 lazy(
-  	   pp ("(extract["^Int64.to_string hbit^":"^Int64.to_string lbit^"]");
+  	   pp ("(extract["^string_of_big_int hbit^":"^string_of_big_int lbit^"]");
      	   space ();
 	   Lazy.force pe';
      	   cut ();
@@ -319,8 +321,8 @@ object (self)
 	 let (bitsnew, bitsold) = (bits_of_width t, bits_of_width t1) in
 	 let delta = bitsnew - bitsold in
 	 let textend, fextend = match ct with
-	   | CAST_UNSIGNED -> Int(1L, t), Int(0L, t)
-	   | CAST_SIGNED -> Int(-1L, t), Int(0L, t)
+	   | CAST_UNSIGNED -> Int(bi1, t), Int(bi0, t)
+	   | CAST_SIGNED -> Int(bim1, t), Int(bi0, t)
 	   | _ -> assert false
 	 in
 	 assert (delta >= 0);
@@ -377,7 +379,7 @@ object (self)
      | Extract(h,l,e) ->
 	 let pe = lazy (self#ast_exp e) in
 	 lazy(
-	   pp ("(extract["^Int64.to_string(h)^":"^Int64.to_string(l)^"]");
+	   pp ("(extract["^string_of_big_int(h)^":"^string_of_big_int(l)^"]");
 	   space ();
 	   Lazy.force pe;
 	   cut ();
@@ -461,8 +463,8 @@ object (self)
      | Int((i, Reg t) as p) when t = 1 ->
 	 let maskedval = Arithmetic.to64 p in
 	 (match maskedval with
-	  | 0L -> lazy(pp "false")
-	  | 1L -> lazy(pp "true")
+	  | bi when bi_is_zero bi -> lazy(pp "false")
+	  | bi when bi_is_one bi -> lazy(pp "true")
 	  | _ -> failwith "ast_exp_bool")
      | Int((i, Reg t)) -> failwith "ast_exp_bool only takes reg_1 expressions"
      | Int _ -> failwith "Ints may only have register types"
@@ -510,13 +512,13 @@ object (self)
      	   pc ')';
 	 )
      (* Short cuts for e = exp_true and e = exp_false *)
-     | BinOp(EQ, e1, e2) when e1 = Int(1L, Reg(1)) ->
+     | BinOp(EQ, e1, e2) when full_exp_eq e1 (Int(bi1, Reg(1))) ->
      	 lazy(self#ast_exp_bool e2)
-     | BinOp(EQ, e2, e1) when e1 = Int(1L, Reg(1)) ->
+     | BinOp(EQ, e2, e1) when full_exp_eq e1 (Int(bi1, Reg(1))) ->
      	 lazy(self#ast_exp_bool e2)
-     | BinOp(EQ, e1, e2) when e1 = Int(0L, Reg(1)) ->
+     | BinOp(EQ, e1, e2) when full_exp_eq e1 (Int(bi0, Reg(1))) ->
      	 lazy(self#ast_exp_bool (UnOp(NOT, e2)))
-     | BinOp(EQ, e2, e1) when e1 = Int(0L, Reg(1)) ->
+     | BinOp(EQ, e2, e1) when full_exp_eq e1 (Int(bi0, Reg(1))) ->
      	 lazy(self#ast_exp_bool (UnOp(NOT, e2)))
      | BinOp(EQ, e1, e2) ->
        (* These are predicates, which return boolean values. *)

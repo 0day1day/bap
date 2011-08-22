@@ -4,11 +4,13 @@
     @author Ivan Jager
 *)
 
+open Big_int
+open Big_int_convenience
 open Util
 open Ssa
 open Cfg
 open Type
-open ExtList
+open BatListFull
 
 module D = Debug.Make(struct let name = "SSA" and default=`Debug end)
 open D
@@ -71,9 +73,9 @@ let type_of_exp = function
   | Val v
     -> type_of_value v
   | Extract(h, l, v) ->
-      let n = Int64.succ (Int64.sub h l) in
-      assert(n >= 1L);
-      Reg(Int64.to_int n)
+      let n = ((h -% l) +% bi1) in
+      assert(n >=% bi1);
+      Reg(int_of_big_int n)
   | Concat(lv, rv) ->
       (match type_of_value lv, type_of_value rv with
       | Reg(lt), Reg(rt) -> Reg(lt + rt)
@@ -657,7 +659,7 @@ let stmts2ast tm stmts =
     | Move(l,_,_) when VH.mem tm l -> true
     | _ -> false
   in
-  ExtList.List.fold_right
+  List.fold_right
     (fun s ast -> if is_trash s then ast else stmt2ast tm s :: ast)
     stmts []
 

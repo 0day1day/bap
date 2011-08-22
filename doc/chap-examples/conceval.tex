@@ -7,7 +7,8 @@ Let's start with the following simple C program:
 \verbatiminput{chap-examples/test.c}
 
 We can compile this source file (named test.c) to a binary using
-\cmdline{gcc -static test.c -o test}.  We use the -static option of
+\cmdline{gcc -static test.c -o test} (note if you are on an x64 machine you may
+need to add the \cmdline{-m32} option).  We use the \cmdline{-static} option of
 gcc here because the BAP evaluator needs to know what code is located
 at each memory location. This means that BAP does not currently
 support self-modifying code, or dynamic linking (unless the user

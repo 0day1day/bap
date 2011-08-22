@@ -8,8 +8,10 @@
     @author Ivan Jager
 *)
 
-open ExtList
+open BatListFull
 open Type
+open Big_int
+open Big_int_convenience
 
 type var = Var.t
 
@@ -20,13 +22,13 @@ type exp =
   | UnOp of (unop_type * exp)
   | Var of var
   | Lab of string
-  | Int of (int64 * typ)
+  | Int of (big_int * typ)
   | Cast of (cast_type * typ * exp) (** Cast to a new type. *)
   | Let of (var * exp * exp)
   | Unknown of (string * typ)
   (* Expression types below here are just syntactic sugar for the above *)
   | Ite of (exp * exp * exp)
-  | Extract of (int64 * int64 * exp) (** Extract hbits to lbits of e (Reg type) *)
+  | Extract of (big_int * big_int * exp) (** Extract hbits to lbits of e (Reg type) *)
   | Concat of (exp * exp) (** Concat two reg expressions together *)
 
 type attrs = Type.attributes
@@ -51,7 +53,7 @@ type program = stmt list
     target of a [Jmp]. *)
 let exp_of_lab = function
   | Name s -> Lab s
-  | Addr a -> Int(a, Reg 64)
+  | Addr a -> Int(big_int_of_int64 a, Reg 64)
 
 (** If possible, make a label that would be refered to by the given
     expression. *)
@@ -59,7 +61,7 @@ let lab_of_exp = function
   | Lab s -> Some(Name s)
   | Int(i, t) ->
       (* Some(Addr(Int64.logand i (Int64.pred(Int64.shift_left 1L bits)))) *)
-      Some(Addr(Arithmetic.to64 (i,t)))
+      Some(Addr(int64_of_big_int (Arithmetic.to64 (i,t))))
   | _ -> None
     
 
@@ -70,9 +72,9 @@ and reg_32 = Reg 32
 and reg_64 = Reg 64
 
 (** False constant. (If convenient, refer to this rather than building your own.) *)
-let exp_false = Int(0L, reg_1)
+let exp_false = Int(bi0, reg_1)
 (** True constant. *)
-let exp_true = Int(1L, reg_1)
+let exp_true = Int(bi1, reg_1)
 
 let little_endian = exp_false
 let big_endian = exp_true
@@ -86,7 +88,7 @@ let exp_implies e1 e2 = exp_or (exp_not e1) e2
 
 let (exp_shl, exp_shr) =
   let s dir e1 = function
-    | Int(0L,_) -> e1
+    | Int(i,_) when bi_is_zero i -> e1
     | e2 -> BinOp(dir, e1, e2)
   in
   (s LSHIFT, s RSHIFT)
@@ -111,3 +113,144 @@ let ncjmp c t =
   CJmp(c, exp_of_lab l, t, [])
   :: Label(l, [])
   :: []
+
+let num_exp = function
+  | Load _ -> 0
+  | Store _ -> 1
+  | Ite _ -> 2
+  | Extract _ -> 3
+  | Concat _ -> 4
+  | BinOp _ -> 5
+  | UnOp _ -> 6
+  | Var _ -> 7
+  | Lab _ -> 8
+  | Int _ -> 9
+  | Cast _ -> 10
+  | Let _ -> 11
+  | Unknown _ -> 12
+
+  (* Returns elist, tlist, btlist, utlist, vlist, slist, ilist, clist *)
+  let getargs = function
+    | Load(e1,e2,e3,t1) -> [e1;e2;e3], [t1], [], [], [], [], [], []
+    | Store(e1,e2,e3,e4,t1) -> [e1;e2;e3;e4], [t1], [], [], [], [], [], []
+    | Ite(e1,e2,e3) -> [e1;e2;e3], [], [], [], [], [], [], []
+    | Extract(h,l,e) -> [e], [], [], [], [], [], [h;l], []
+    | Concat(le, re) -> [le;re], [], [], [], [], [], [], []
+    | BinOp(bt,e1,e2) -> [e1;e2], [], [bt], [], [], [], [], []
+    | UnOp(ut,e1) -> [e1], [], [], [ut], [], [], [], []
+    | Var(v1) -> [], [], [], [], [v1], [], [], []
+    | Lab(s1) -> [], [], [], [], [], [s1], [], []
+    | Int(i1,t1) -> [], [t1], [], [], [], [], [i1], []
+    | Cast(c1,t1,e1) -> [e1], [t1], [], [], [], [], [], [c1]
+    | Let(v1,e1,e2) -> [e1;e2], [], [], [], [v1], [], [], []
+    | Unknown(s1,t1) -> [], [t1], [], [], [], [s1], [], []
+
+(** quick_exp_eq e1 e2 returns true if and only if the subexpressions
+    in e1 and e2 are *physically* equal. *)
+let quick_exp_eq e1 e2 =
+  if (num_exp e1) <> (num_exp e2) then false else
+    let l1,l2,l3,l4,l5,l6,l7,l8 = getargs e1 in
+    let r1,r2,r3,r4,r5,r6,r7,r8 = getargs e2 in
+    let b1 = List.for_all2 (==) l1 r1 in
+    let b2 = List.for_all2 (==) l2 r2 in
+    let b3 = List.for_all2 (==) l3 r3 in
+    let b4 = List.for_all2 (==) l4 r4 in
+    let b5 = List.for_all2 (==) l5 r5 in
+    let b6 = List.for_all2 (==) l6 r6 in
+    let b7 = List.for_all2 (==) l7 r7 in
+    let b8 = List.for_all2 (==) l8 r8 in
+    if b1 & b2 & b3 & b4 & b5 & b6 & b7 & b8 then
+      true else false
+
+(** full_exp_eq e1 e2 returns true if and only if e1 and e2 are
+    structurally equivalent.
+
+    This function should be equivalent to =, except that it understands
+    Big_int's, which are abstract values.
+
+    XXX: Can we make this tail recursive?
+*)
+let rec full_exp_eq e1 e2 =
+  if (num_exp e1) <> (num_exp e2) then false else
+    let l1,l2,l3,l4,l5,l6,l7,l8 = getargs e1 in
+    let r1,r2,r3,r4,r5,r6,r7,r8 = getargs e2 in
+    let b1 = List.for_all2 (==) l1 r1 in (* e must be == *)
+    let b2 = List.for_all2 (=) l2 r2 in
+    let b3 = List.for_all2 (=) l3 r3 in
+    let b4 = List.for_all2 (=) l4 r4 in
+    let b5 = List.for_all2 (=) l5 r5 in
+    let b6 = List.for_all2 (=) l6 r6 in
+    let b7 = List.for_all2 (eq_big_int) l7 r7 in
+    let b8 = List.for_all2 (=) l8 r8 in
+    if b1 & b2 & b3 & b4 & b5 & b6 & b7 & b8 then
+      true
+    else if b2 & b3 & b4 & b5 & b6 & b7 & b8 then
+(* e1 and e2 are not physically equal.  But maybe the subexpressions
+   are structurally, but not physically, equal. *)
+      List.for_all2 full_exp_eq l1 r1
+    else (* If something else differs, we are definitely not equal. *)
+      false
+
+let num_stmt = function
+  | Move _ -> 0
+  | Jmp _ -> 1
+  | CJmp _ -> 2
+  | Label _ -> 3
+  | Halt _ -> 4
+  | Assert _ -> 5
+  | Comment _ -> 6
+  | Special _ -> 7
+
+let getargs_stmt = function
+  | Move(v,e,a) -> [e], [v], [], [a], []
+  | CJmp(e1,e2,e3,a) -> [e1;e2;e3], [], [], [a], []
+  | Label(l,a) -> [], [], [l], [a], []
+  | Jmp(e,a)
+  | Halt(e,a)
+  | Assert(e,a) -> [e], [], [], [a], []
+  | Comment(s,a)
+  | Special(s,a) -> [], [], [], [a], [s]
+
+(** quick_stmt_eq returns true if and only if the subexpressions in e1
+    and e2 are *physically* equal. *)
+let quick_stmt_eq s1 s2 =
+  if (num_stmt s1) <> (num_stmt s2) then false else
+    let l1,l2,l3,l4,l5 = getargs_stmt s1 in
+    let r1,r2,r3,r4,r5 = getargs_stmt s2 in
+    let b1 = List.for_all2 (==) l1 r1 in
+    let b2 = List.for_all2 (==) l2 r2 in
+    let b3 = List.for_all2 (==) l3 r3 in
+    let b4 = List.for_all2 (==) l4 r4 in
+    let b5 = List.for_all2 (==) l5 r5 in
+    if b1 & b2 & b3 & b4 & b5 then
+      true
+    else if b2 & b3 & b4 & b5 then
+      (* e1 and e2 are not physically equal.  But maybe their subexpressions
+	 are physically equal. *)
+      List.for_all2 quick_exp_eq l1 r1
+    else
+      false
+
+(** full_stmt_eq returns true if and only if e1 and e2 are
+    structurally equivalent.
+
+    This function should be equivalent to =, except that it understands
+    Big_int's, which are abstract values.
+*)
+let full_stmt_eq s1 s2 =
+  if (num_stmt s1) <> (num_stmt s2) then false else
+    let l1,l2,l3,l4,l5 = getargs_stmt s1 in
+    let r1,r2,r3,r4,r5 = getargs_stmt s2 in
+    let b1 = List.for_all2 (==) l1 r1 in (* e must use == *)
+    let b2 = List.for_all2 (=) l2 r2 in
+    let b3 = List.for_all2 (=) l3 r3 in
+    let b4 = List.for_all2 (=) l4 r4 in
+    let b5 = List.for_all2 (=) l5 r5 in
+    if b1 & b2 & b3 & b4 & b5 then
+      true
+    else if b2 & b3 & b4 & b5 then
+(* e1 and e2 are not physically equal.  But maybe the subexpressions
+   are structurally, but not physically, equal. *)
+      List.for_all2 full_exp_eq l1 r1
+    else
+      false
