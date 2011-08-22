@@ -27,18 +27,18 @@ let pin_trace_setup _ =
   check_pin_setup();
   check_file (pin_path^pin);
   check_file (gentrace_path^gentrace);
-  check_file (stp_path^stp);
+  check_stp_path(stp_path^stp);
   create_input_file();
   assert_command ~exit_code (pin_path^pin) args;
   find_pin_out (Array.to_list (Sys.readdir "./"));;
 
 
 let pin_trace_test pin_out = 
+(*  let _ =  in *)
   let prog = Asmir.bap_from_trace_file ~pin:true pin_out in
   Traces.consistency_check := true;
   ignore(Traces.concrete prog);
   Traces.consistency_check := false;
-  set_stp_path();
   ignore(Traces.output_exploit exploit_file prog);;
 
 

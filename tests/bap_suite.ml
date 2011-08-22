@@ -1,5 +1,3 @@
-(*let usage = "Usage: "^Sys.argv.(0)^" <options>\nRun BAP unit tests. "*)
-
 open OUnit
 open TestCommon
 

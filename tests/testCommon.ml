@@ -20,10 +20,14 @@ let stp_path = "../stpwrap/stp/bin/";;
 let stp = "stp";;
 
 
-let set_stp_path _ =
+let check_stp_path file =
   let path = Sys.getenv("PATH") in
   if (pmatch ~pat:stp_path path) then ()
-  else (Unix.putenv "PATH" (path^":"^stp_path));;
+  else (
+	if (Sys.file_exists file) 
+	then Unix.putenv "PATH" (path^":"^stp_path)
+	else skip_if true 
+	  ("Skipping test.  Stp is not in PATH and can not find file "^file));;
 
 
 (** pin helpers **)

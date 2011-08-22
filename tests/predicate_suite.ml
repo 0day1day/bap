@@ -9,7 +9,7 @@ let stp_out = "stp_out.stp";;
 let solver = ref (Smtexec.STP.si);;
 
 let predicate_stp_setup _ =
-  let _ = check_file (stp_path^stp) in
+  let _ = check_stp_path (stp_path^stp) in 
   (* Silence floating point warnings for tests *)
   let _ = if (Asmir.get_print_warning()) then Asmir.set_print_warning(false) in
   let prog = Asmir.open_program test_file in
@@ -49,8 +49,7 @@ let to_ssagcl cfg post =
   (gcl, p);;
 
 
-let predicate_stp_solve_test str stp_result g_cfg = 
-  let _ = set_stp_path() in
+let predicate_stp_solve_test str stp_result g_cfg =
   let post = Parser.exp_from_string str in
   let (gcl, post) = to_ssagcl g_cfg post in
   let wp = Wp.wp gcl post in
