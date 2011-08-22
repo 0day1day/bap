@@ -146,7 +146,7 @@ and fs_base = nv "R_FS_BASE" r32
 and gs_base = nv "R_GS_BASE" r32
 
 
-let xmms = Array.init 8 (fun i -> nv (Printf.sprintf "XMM%d" i) xmm_t)
+let xmms = Array.init 8 (fun i -> nv (Printf.sprintf "R_XMM%d" i) xmm_t)
 
 let regs : var list =
   ebp::esp::esi::edi::eip::eax::ebx::ecx::edx::eflags::cf::pf::af::zf::sf::oF::dflag::fs_base::gs_base::
