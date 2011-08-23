@@ -441,7 +441,7 @@ static uint32_t GetTypeOfReg(REG r) {
 
   if (s == "eip" || s == "eflags") {
     // No problem for these
-    return VT_NONE;
+    return VT_REG32;
   }
 
   // Otherwise, print a warning...
