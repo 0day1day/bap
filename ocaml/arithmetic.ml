@@ -43,12 +43,13 @@ let tos64 (i,t) =
 let toshift shiftedt v =
   let max = bits_of_width shiftedt
   and i = to64 v in
-    if i <=% (big_int_of_int max) && sign_big_int i <> -1
-    then int_of_big_int i
-    else
-      (pdebug("Warning: shifting "^string_of_int max^"-bit value by "
-		    ^string_of_big_int i);
-       max)
+  assert (i >=% bi0);
+  if i <=% (big_int_of_int max)
+  then int_of_big_int i
+  else
+    (pdebug("Warning: shifting "^string_of_int max^"-bit value by "
+	    ^string_of_big_int i);
+     max)
 
 (* "cast" an int64 to a value *)
 let to_val t i =

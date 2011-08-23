@@ -554,6 +554,7 @@ let asm_addr_to_bap {asmp=prog; arch=arch; get=get} addr =
 let flatten ll =
 	List.rev (List.fold_left (fun accu l -> List.rev_append l accu) [] ll)
 
+(* asmprogram_to_bap_range p st en will read bytes at [st,en) from p and translate them to bap *)
 let asmprogram_to_bap_range ?(init_ro = false) p st en =
   let rec f l s =
     (* This odd structure is to ensure tail-recursion *)
