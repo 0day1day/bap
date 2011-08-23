@@ -326,7 +326,7 @@ conc_map_vec * StdFrame2::getOperands()
           for (int j = 0; j < ((bytes + (sizeof(const_val_t)-1))/sizeof(const_val_t)); j++) {
             /* Insert each chunk, while preserving the byte order */
             memcpy(&value, &(values[i].byte[j*sizeof(const_val_t)]), sizeof(const_val_t));
-            // cerr << "Pushing back " << value << endl;
+            //cerr << hex << "Pushing back name " << name << " value: " << value << " bytes: " << bytes << endl;
             tval.push_back(value);
           }
 
@@ -349,6 +349,7 @@ conc_map_vec * StdFrame2::getOperands()
           for (int j = 0; j < ((bytes + (sizeof(const_val_t)-1))/sizeof(const_val_t)); j++) {
             /* Insert each chunk, while preserving the byte order */
             memcpy(&value, &(values[i].byte[j*sizeof(const_val_t)]), sizeof(const_val_t));
+            //cerr << hex << "Pushing back mem " << value << endl;
             tval.push_back(value);
           }
 
