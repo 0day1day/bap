@@ -36,8 +36,9 @@ let pin_trace_setup _ =
 let pin_trace_test pin_out = 
 (*  let _ =  in *)
   let prog = Asmir.bap_from_trace_file ~pin:true pin_out in
+  let prog_ref = ref (Some prog) in
   Traces.consistency_check := true;
-  ignore(Traces.concrete prog);
+  ignore(Traces.concrete prog_ref);
   Traces.consistency_check := false;
   ignore(Traces.output_exploit exploit_file prog);;
 

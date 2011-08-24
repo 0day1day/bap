@@ -123,6 +123,9 @@ let ast_chop srcbb srcn trgbb trgn p =
 let ssa_chop srcbb srcn trgbb trgn p = 
   Ssa_slice.CHOP_SSA.chop p !srcbb !srcn !trgbb !trgn
 
+let trace_concrete_wrap t = 
+  let trace = ref (Some t) in Traces.concrete trace
+
 let add c =
   pipeline := c :: !pipeline
 
@@ -198,7 +201,7 @@ let speclist =
   ::("-trace-cut", Arg.Int(fun i -> add(TransformAst(Util.take i))),
      "<n>  Get the first <n> instructions of the trace")
   ::("-trace-concrete", 
-     uadd(TransformAst Traces.concrete),
+     uadd(TransformAst trace_concrete_wrap),
      "Execute the trace concretely and obtain a straightline trace"
     )
   ::("-trace-concrete-subst", 

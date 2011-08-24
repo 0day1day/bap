@@ -26,9 +26,10 @@ let pin_trace_setup _ =
 
 
 let pin_trace_test pin_out = 
-  let prog = Asmir.bap_from_trace_file ~pin:true pin_out in
+  let prog = ref (Some(Asmir.bap_from_trace_file ~pin:true pin_out)) in
   let oc = open_out log_file in  
   let log = fun x -> output_string oc x in
+(*  let _ = Gc.finalise (fun _ -> Printf.printf "%s\n" "Garbage Collected!") !prog in *)
   Traces.consistency_check := true;
   Traces.checkall := true;
   ignore(Traces.concrete ~log prog);
