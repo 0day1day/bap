@@ -93,10 +93,6 @@ DOC_FILES := $(filter %.mli, $(SOURCES)) $(filter %.ml, $(SOURCES))
 
 # ocamlfind packages required
 export PACKS = bigarray str ocamlgraph unix
-# ocamlfind packages for ocamldoc
-# don't include packages in /usr/lib/ocaml, this will cause ocamldoc
-# to complain about conflicts with our local big_int
-export DOCPACKS = ocamlgraph
 export YFLAGS = -v
 
 

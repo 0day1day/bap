@@ -329,15 +329,12 @@ ifndef REAL_OCAMLFIND
     ifdef PREDS
       PRE_OCAML_FIND_PREDICATES := $(subst $(space),$(comma),$(PREDS))
       PRE_OCAML_FIND_PACKAGES := $(subst $(space),$(comma),$(PACKS))
-      PRE_OCAML_FIND_DOCPACKAGES := $(subst $(space),$(comma),$(DOCPACKS))
       OCAML_FIND_PREDICATES := -predicates $(PRE_OCAML_FIND_PREDICATES)
   #    OCAML_DEP_PREDICATES := -syntax $(PRE_OCAML_FIND_PREDICATES)
       OCAML_FIND_PACKAGES := $(OCAML_FIND_PREDICATES) -package $(PRE_OCAML_FIND_PACKAGES)
-      OCAML_FIND_DOCPACKAGES := $(OCAML_FIND_PREDICATES) -package $(PRE_OCAML_FIND_DOCPACKAGES)
       OCAML_DEP_PACKAGES := $(OCAML_DEP_PREDICATES) -package $(PRE_OCAML_FIND_PACKAGES)
     else
       OCAML_FIND_PACKAGES := -package $(subst $(space),$(comma),$(PACKS))
-      OCAML_FIND_DOCPACKAGES := -package $(subst $(space),$(comma),$(DOCPACKS))
       OCAML_DEP_PACKAGES :=
     endif
     OCAML_FIND_LINKPKG := -linkpkg
@@ -1157,12 +1154,12 @@ $(DOC_DIR)/$(RESULT)/html/index.html: $(DOC_DIR)/$(RESULT)/html $(DOC_FILES)
 	rm -rf $</*
 	$(QUIET)pp=`sed -n -e '/^#/d' -e 's/(\*pp \([^*]*\) \*)/\1/p;q' $(FIRST_DOC_FILE)`; \
 	if [ -z "$$pp" ]; then \
-	  $(ECHO) $(REAL_OCAMLFIND) $(OCAMLDOC) $(OCAML_FIND_DOCPACKAGES) -html -d $< $(OCAMLDOCFLAGS) $(INCFLAGS) $(DOC_FILES); \
-	  $(REAL_OCAMLFIND) $(OCAMLDOC) $(OCAML_FIND_DOCPACKAGES) -html -d $< $(OCAMLDOCFLAGS) $(INCFLAGS) $(DOC_FILES); \
+	  $(ECHO) $(REAL_OCAMLFIND) $(OCAMLDOC) $(OCAML_FIND_PACKAGES) -html -d $< $(OCAMLDOCFLAGS) $(INCFLAGS) $(DOC_FILES); \
+	  $(REAL_OCAMLFIND) $(OCAMLDOC) $(OCAML_FIND_PACKAGES) -html -d $< $(OCAMLDOCFLAGS) $(INCFLAGS) $(DOC_FILES); \
 	else \
-	  $(ECHO) $(REAL_OCAMLFIND) $(OCAMLDOC) $(OCAML_FIND_DOCPACKAGES) -pp \"$$pp $(PPFLAGS)\" -html -d $< $(OCAMLDOCFLAGS) \
+	  $(ECHO) $(REAL_OCAMLFIND) $(OCAMLDOC) $(OCAML_FIND_PACKAGES) -pp \"$$pp $(PPFLAGS)\" -html -d $< $(OCAMLDOCFLAGS) \
 	  	$(INCFLAGS) $(DOC_FILES); \
-	  $(REAL_OCAMLFIND) $(OCAMLDOC) $(OCAML_FIND_DOCPACKAGES) -pp "$$pp $(PPFLAGS)" -html -d $< $(OCAMLDOCFLAGS) \
+	  $(REAL_OCAMLFIND) $(OCAMLDOC) $(OCAML_FIND_PACKAGES) -pp "$$pp $(PPFLAGS)" -html -d $< $(OCAMLDOCFLAGS) \
 	  	$(INCFLAGS) $(DOC_FILES); \
 	fi
 
@@ -1173,14 +1170,14 @@ $(DOC_DIR)/$(RESULT)/latex/doc.tex: $(DOC_DIR)/$(RESULT)/latex $(DOC_FILES)
 	rm -rf $</*
 	$(QUIET)pp=`sed -n -e '/^#/d' -e 's/(\*pp \([^*]*\) \*)/\1/p;q' $(FIRST_DOC_FILE)`; \
 	if [ -z "$$pp" ]; then \
-	  $(ECHO) $(REAL_OCAMLFIND) $(OCAMLDOC) $(OCAML_FIND_DOCPACKAGES) -latex $(OCAMLDOCFLAGS) $(INCFLAGS) \
+	  $(ECHO) $(REAL_OCAMLFIND) $(OCAMLDOC) $(OCAML_FIND_PACKAGES) -latex $(OCAMLDOCFLAGS) $(INCFLAGS) \
 	  	$(DOC_FILES) -o $@; \
-	  $(REAL_OCAMLFIND) $(OCAMLDOC) $(OCAML_FIND_DOCPACKAGES) -latex $(OCAMLDOCFLAGS) $(INCFLAGS) $(DOC_FILES) \
+	  $(REAL_OCAMLFIND) $(OCAMLDOC) $(OCAML_FIND_PACKAGES) -latex $(OCAMLDOCFLAGS) $(INCFLAGS) $(DOC_FILES) \
 	  	-o $@; \
 	else \
-	  $(ECHO) $(REAL_OCAMLFIND) $(OCAMLDOC) $(OCAML_FIND_DOCPACKAGES) -pp \"$$pp $(PPFLAGS)\" -latex $(OCAMLDOCFLAGS) \
+	  $(ECHO) $(REAL_OCAMLFIND) $(OCAMLDOC) $(OCAML_FIND_PACKAGES) -pp \"$$pp $(PPFLAGS)\" -latex $(OCAMLDOCFLAGS) \
 	  	$(INCFLAGS) $(DOC_FILES) -o $@; \
-	  $(REAL_OCAMLFIND) $(OCAMLDOC) $(OCAML_FIND_DOCPACKAGES) -pp "$$pp $(PPFLAGS)" -latex $(OCAMLDOCFLAGS) \
+	  $(REAL_OCAMLFIND) $(OCAMLDOC) $(OCAML_FIND_PACKAGES) -pp "$$pp $(PPFLAGS)" -latex $(OCAMLDOCFLAGS) \
 	  	$(INCFLAGS) $(DOC_FILES) -o $@; \
 	fi
 
