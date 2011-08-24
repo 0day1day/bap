@@ -18,10 +18,10 @@ export OCAMLFIND_IGNORE_DUPS_IN=$(CURDIR)/../bigint-3.12/otherlibs/num
 
 # common sources
 export SOURCES = \
-	big_int_convenience.ml \
 	debug.mli debug.ml \
 	BatListFull.ml \
 	util.mli util.ml \
+	big_int_convenience.ml \
 	dominator.ml \
 	graphDataflow.mli graphDataflow.ml \
 	type.ml type.mli \
@@ -93,6 +93,10 @@ DOC_FILES := $(filter %.mli, $(SOURCES)) $(filter %.ml, $(SOURCES))
 
 # ocamlfind packages required
 export PACKS = bigarray str ocamlgraph unix
+# ocamlfind packages for ocamldoc
+# don't include packages in /usr/lib/ocaml, this will cause ocamldoc
+# to complain about conflicts with our local big_int
+export DOCPACKS = ocamlgraph
 export YFLAGS = -v
 
 
