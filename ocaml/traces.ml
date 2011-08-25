@@ -1043,7 +1043,7 @@ let run_block ?(next_label = None) ?(log=fun _ -> ()) state memv block prev_bloc
       !l
     in
     let defs = finddefs block in
-    List.iter (fun v -> VH.replace reg_to_stmt v addr) defs;
+    List.iter (fun v -> if not (is_temp v) then VH.replace reg_to_stmt v addr) defs
   );
 
   log("SWXXX Running block: " ^ (string_of_int !counter) ^ " " ^ (Pp.ast_stmt_to_string addr)^"\n");
