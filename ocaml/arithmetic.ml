@@ -76,10 +76,20 @@ let binop op ((_,t) as v1) v2 =
   | ARSHIFT -> to_val t (shift_right_towards_zero_big_int (tos64 v1) (toshift t v2))
       (* div_big_int rounds towards infinity. *)
   | DIVIDE -> to_val t (div_big_int (to64 v1) (to64 v2))
-      (* Int64.div rounds towards zero. What do we want? *)
-  | SDIVIDE -> to_val t (div_big_int (tos64 v1) (tos64  v2))
+      (* X86 returns towards zero.  Big int implementation uses
+         positive modulus (see Hacker's Delight 9-1). These are the same
+         when the dividend is positive, so for now we'll use the Big int
+         implementation but raise an exception when the dividend is not
+         positive. *)
+  | SDIVIDE -> if (tos64 v1) >=% bi0 then
+      to_val t (div_big_int (tos64 v1) (tos64 v2))
+    else
+      raise (ArithmeticEx "SDIVIDE implementation incomplete")
   | MOD -> to_val t (mod_big_int (tos64 v1) (tos64 v2))
-  | SMOD -> (* to_val t (Int64.rem (tos64 v1) (tos64 v2)) *) failwith "Not done"
+  | SMOD -> if (tos64 v1) >=% bi0 then
+      to_val t (mod_big_int (tos64 v1) (tos64 v2))
+    else
+      raise (ArithmeticEx "SMOD implementation incomplete")
   | SLT -> exp_bool(lt_big_int (tos64 v1) (tos64 v2))
   | SLE -> exp_bool(le_big_int (tos64 v1) (tos64 v2))
   | LT -> exp_bool(lt_big_int (to64 v1) (to64 v2))
