@@ -2,7 +2,8 @@ open OUnit
 open Pcre
 open TestCommon
 
-let binary = "../x32_bins/ls";;
+
+let binary = "../coreutils32_static/ls";;
 let binary_args = "";;
 let log_file = "large_binary_test.log";;
 
