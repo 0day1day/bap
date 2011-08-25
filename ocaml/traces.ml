@@ -1244,27 +1244,15 @@ let to_dsa p =
     output a set of constraints *)
 let concrete ?(log=fun _ -> ()) trace = 
   dsa_rev_map := None;
-  (match !trace with 
-  | Some(t) -> (
-	let _  = (Printf.printf "%s\n" "SWXXXDINGDINGDING"; 
-			  Gc.print_stat stdout;) in
-	let m2a_trace = Memory2array.coerce_prog t in
-	let _  = (Printf.printf "%s\n" "DINGDINGDING"; 
-			  Gc.print_stat stdout; 
-			  Printf.printf "%s\n" "***Seperator***"; 
-			  Gc.compact(); Gc.print_stat stdout) in
-(*	let _ = (trace := None; 
-			 Printf.printf "%s\n" "***Seperator-NONE***"; 
-			 Gc.compact(); Gc.print_stat stdout) in *)
-	let no_specials = remove_specials m2a_trace in
-	(* let no_unknowns = remove_unknowns no_specials in *)
-	let memv = find_memv no_specials in
-	let blocks = trace_to_blocks no_specials in
-	(*pdebug ("blocks: " ^ (string_of_int (List.length blocks)));*)
-	let length = List.length blocks in
-	let actual_trace = run_blocks ~log blocks memv length in
-    actual_trace)
-  | None -> failwith ("Cannot perform concrete execution on trace None"))
+  let trace = Memory2array.coerce_prog trace in
+  let no_specials = remove_specials trace in
+  (* let no_unknowns = remove_unknowns no_specials in *)
+  let memv = find_memv no_specials in
+  let blocks = trace_to_blocks no_specials in
+  (*pdebug ("blocks: " ^ (string_of_int (List.length blocks)));*)
+  let length = List.length blocks in
+  let actual_trace = run_blocks ~log blocks memv length in
+    actual_trace
 
 (* Normal concrete execution *)
 module TaintConcreteDef =
@@ -1844,8 +1832,7 @@ let add_seh_pivot_file gaddr sehaddr paddr payloadfile trace =
 
 let generate_formula trace = 
   LetBind.bindings := [] ;  (*  XXX: temporary hack *)
-  let trace_ref = ref (Some trace) in
-  let trace = concrete trace_ref in
+  let trace = concrete trace in
   (* If we leave DCE on, it will screw up the consistency check. *)
   let trace = match !consistency_check || (not !dce) with
     | true -> trace
@@ -2017,14 +2004,13 @@ let trace_valid_to_invalid trace =
 (* Binary search over the concretized IL to check where things go
    wrong. *)
 let formula_valid_to_invalid ?(min=1) trace = 
-  let trace_ref = ref (Some trace) in
   let sym_and_output trace fname =
     LetBind.bindings := [] ;  (*  XXX: temporary hack *)
     ignore(symbolic_run trace);
     let formula = TraceSymbolic.output_formula () in
     print_formula fname formula ;
   in
-  let trace = concrete trace_ref in
+  let trace = concrete trace in
   (* If we leave DCE on, it will screw up the consistency check. *)
   let trace = match !consistency_check with
     | false -> trace_dce trace
