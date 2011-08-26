@@ -92,7 +92,7 @@ DOC_FILES := $(filter %.mli, $(SOURCES)) $(filter %.ml, $(SOURCES))
 
 
 # ocamlfind packages required
-export PACKS = bigarray str ocamlgraph unix
+export PACKS = bigarray str ocamlgraph unix camomile threads
 # ocamlfind packages for ocamldoc
 # don't include packages in /usr/lib/ocaml, this will cause ocamldoc
 # to complain about conflicts with our local big_int
@@ -104,12 +104,13 @@ export CLIBS = asmir vex opcodes bfd iberty stdc++
 export CFLAGS = -g
 export LDFLAGS = $(LIBASMIR_LDFLAGS)
 export INCDIRS = $(BIGINT) $(BATT)
-export LIBS = nums
+export LIBS = nums batteries
 export CLIBFLAGS= $(LDFLAGS)
 export RESULTDEPS = $(LIBASMIR)/src/libasmir.a $(VEX_DIR)/libvex.a
 export LIBDIRS = $(LIBASMIR)/src # ../appreplay ../stp ../stp/ocaml
 
-OCAMLFLAGS = -warn-error Aelz # -for-pack Bap #-w A
+OCAMLLDFLAGS = -thread # just for make top
+OCAMLFLAGS = -thread -warn-error Aelz # -for-pack Bap #-w A
 # merge everything but descriptions.
 OCAMLDOCFLAGS = -m avlsoper
 
