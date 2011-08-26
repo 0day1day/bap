@@ -38,6 +38,42 @@ let tos64 (i,t) =
   let sign = i >>% (bits-1) in
   if bi_is_zero sign then (* positive *) final else (* negative *) minus_big_int (modv -% (to64 (final, Reg(bits-1))))
 
+(* signed truncating division implemented using euclidean division.
+
+   See https://kestrel.ece.cmu.edu/svn/personal/edmcman/intdiv/ for an
+   admittedly bad proof. *)
+let t_div dividend divisor =
+  if dividend >=% bi0 then
+    (* When dividend >= 0, division is the same *)
+    dividend /% divisor
+  else
+    (* If dividend < 0, we have to look at the remainder to figure out the answer. *)
+    let (q,r) = quomod_big_int dividend divisor in
+    if r ==% bi0 then
+      (* If dividend < 0 and r = 0, then division is the same *)
+      q
+    else if r >=% bi0 then
+      (* If dividend < 0 and r > 0, then truncateddivq = q - sign(q) *)
+      q -% big_int_of_int (sign_big_int q)
+    else raise (ArithmeticEx "t_div: If dividend < 0 then r can't be greater than 0!")
+
+(* signed truncated modulus implemented using euclidean division. 
+
+   See https://kestrel.ece.cmu.edu/svn/personal/edmcman/intdiv/ for an
+   admittedly bad proof. *)
+let t_mod dividend divisor =
+   if dividend >=% bi0 then
+   (* When dividend >= 0, division is the same *)
+     dividend %% divisor
+   else
+     let r = dividend %% divisor in
+     (* If r=0, the answer is r *)
+     if r ==% bi0 then r
+     else if r >=% bi0 then
+       (* Otherwise it is r - |d| *)
+       r -% (abs_big_int divisor)
+    else raise (ArithmeticEx "t_mod: If dividend < 0 then r can't be greater than 0!")
+
 (* shifting by more than the number of bits or by negative values
  * will be the same as shifting by the number of bits. *)
 let toshift shiftedt v =
