@@ -83,7 +83,7 @@ let toshift shiftedt v =
   if i <=% (big_int_of_int max)
   then int_of_big_int i
   else
-    (pdebug("Warning: shifting "^string_of_int max^"-bit value by "
+    (pdebug("shifting "^string_of_int max^"-bit value by "
 	    ^string_of_big_int i);
      max)
 
