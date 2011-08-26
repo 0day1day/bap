@@ -41,7 +41,8 @@ let tos64 (i,t) =
 (* signed truncating division implemented using euclidean division.
 
    See https://kestrel.ece.cmu.edu/svn/personal/edmcman/intdiv/ for an
-   admittedly bad proof. *)
+   admittedly bad proof. Also see truncating_division_test in big_int
+   test suite. *)
 let t_div dividend divisor =
   if dividend >=% bi0 then
     (* When dividend >= 0, division is the same *)
@@ -60,10 +61,11 @@ let t_div dividend divisor =
 (* signed truncated modulus implemented using euclidean division. 
 
    See https://kestrel.ece.cmu.edu/svn/personal/edmcman/intdiv/ for an
-   admittedly bad proof. *)
+   admittedly bad proof. Also see truncating_division_test in big_int
+   test suite. *)
 let t_mod dividend divisor =
-   if dividend >=% bi0 then
-   (* When dividend >= 0, division is the same *)
+  if dividend >=% bi0 then
+    (* When dividend >= 0, division is the same *)
      dividend %% divisor
    else
      let r = dividend %% divisor in
@@ -117,15 +119,9 @@ let binop op ((_,t) as v1) v2 =
          when the dividend is positive, so for now we'll use the Big int
          implementation but raise an exception when the dividend is not
          positive. *)
-  | SDIVIDE -> if (tos64 v1) >=% bi0 then
-      to_val t (div_big_int (tos64 v1) (tos64 v2))
-    else
-      raise (ArithmeticEx "SDIVIDE implementation incomplete")
-  | MOD -> to_val t (mod_big_int (tos64 v1) (tos64 v2))
-  | SMOD -> if (tos64 v1) >=% bi0 then
-      to_val t (mod_big_int (tos64 v1) (tos64 v2))
-    else
-      raise (ArithmeticEx "SMOD implementation incomplete")
+  | SDIVIDE -> to_val t (t_div (tos64 v1) (tos64 v2))
+  | MOD -> to_val t (mod_big_int (to64 v1) (to64 v2))
+  | SMOD -> to_val t (t_mod (tos64 v1) (tos64 v2))
   | SLT -> exp_bool(lt_big_int (tos64 v1) (tos64 v2))
   | SLE -> exp_bool(le_big_int (tos64 v1) (tos64 v2))
   | LT -> exp_bool(lt_big_int (to64 v1) (to64 v2))

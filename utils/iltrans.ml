@@ -373,8 +373,8 @@ let speclist =
       "<n> Unroll loops n times")
   :: ("-rm-backedges", uadd(TransformAstCfg Hacks.remove_backedges),
       "Remove backedges")
-    :: ("-typecheck", uadd(TransformAst typecheck),
-	"Typecheck program")
+  :: ("-typecheck", uadd(TransformAst typecheck),
+      "Typecheck program")
   :: Input.speclist
 
 let anon x = raise(Arg.Bad("Unexpected argument: '"^x^"'"))
