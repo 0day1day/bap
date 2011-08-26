@@ -191,6 +191,8 @@ let rec full_exp_eq e1 e2 =
     else (* If something else differs, we are definitely not equal. *)
       false
 
+let (===) = full_exp_eq
+
 let num_stmt = function
   | Move _ -> 0
   | Jmp _ -> 1
@@ -254,3 +256,6 @@ let full_stmt_eq s1 s2 =
       List.for_all2 full_exp_eq l1 r1
     else
       false
+
+let is_true = (===) exp_true
+let is_false = (===) exp_false

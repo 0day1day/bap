@@ -1,6 +1,7 @@
 (** Convenience functions for Big_ints *)
 
 open Big_int
+open BatString
 
 let bi0 = big_int_of_int 0x0
 let bi1 = big_int_of_int 0x1
@@ -35,6 +36,7 @@ let bime = big_int_of_int (-0xe)
 let bimf = big_int_of_int (-0xf)
 
 let biconst i = big_int_of_int i
+let biconst64 i = big_int_of_int64 i
 
 (** Infix operator to test if two big ints are equal. *)
 let (==%) bi1 bi2 = eq_big_int bi1 bi2
@@ -66,6 +68,9 @@ let ($>>%) bi1 i2 = shift_right_towards_zero_big_int bi1 i2
 (** Infix operator for + *)
 let (+%) bi1 bi2 = add_big_int bi1 bi2
 
+(** Operator for incremeneting *)
+let (++%) bi = succ_big_int bi
+
 (** Infix operator for - *)
 let (-%) bi1 bi2 = sub_big_int bi1 bi2
 
@@ -74,6 +79,15 @@ let (|%) bi1 bi2 = or_big_int bi1 bi2
 
 (** Infix operator for & *)
 let (&%) bi1 bi2 = and_big_int bi1 bi2
+
+(* Infix operator for div (/) *)
+let (/%) bi1 bi2 = div_big_int bi1 bi2
+
+(** Infix operator for mod (%) *)
+let (%%) bi1 bi2 = mod_big_int bi1 bi2
+
+(** Operator for printing as hex *)
+let (~%) = Util.hex_of_big_int
 
 (** bi_is_zero bi returns true iff bi = 0 *)
 let bi_is_zero bi = bi0 ==% bi

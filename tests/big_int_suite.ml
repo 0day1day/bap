@@ -11,7 +11,7 @@ let op_to_string = function
 
 exception TestFail of op * int64 * int64
 
-let truncating_division_test n =
+let truncating_division_test ?(n=10000) () =
   let () = Random.self_init () in
   let getrandsign () =
     match Random.int64 2L with
@@ -36,15 +36,15 @@ let truncating_division_test n =
     let bmod = Arithmetic.t_mod (big_int_of_int64 x) (big_int_of_int64 y) in
     let idiv = big_int_of_int64 idiv in
     let imod = big_int_of_int64 imod in
-    if bdiv <>% idiv then raise TestFail(Div, x, y);
-    if bmod <>% imod then raise TestFail(Mod, x, y)
+    if bdiv <>% idiv then raise (TestFail(Div, x, y));
+    if bmod <>% imod then raise (TestFail(Mod, x, y))
   in
   try
     List.iter test_a_case testcases
-  with TestFail(o, x, y) -> assert_failure (Printf.sprintf "Invalid truncating %s result: (%d,%d)" (op_to_string o) x y)
+  with TestFail(o, x, y) -> assert_failure (Printf.sprintf "Invalid truncating %s result: (%Ld,%Ld)" (op_to_string o) x y)
 ;;
 
 let suite = "Bigint" >:::
   [
-    "truncating_division_test" >:: truncating_division_test 100000
+    "truncating_division_test" >:: truncating_division_test
   ]
