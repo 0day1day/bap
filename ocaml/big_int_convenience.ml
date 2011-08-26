@@ -80,6 +80,9 @@ let (|%) bi1 bi2 = or_big_int bi1 bi2
 (** Infix operator for & *)
 let (&%) bi1 bi2 = and_big_int bi1 bi2
 
+(* Infix operator for div (/) *)
+let (/%) bi1 bi2 = div_big_int bi1 bi2
+
 (** Infix operator for mod (%) *)
 let (%%) bi1 bi2 = mod_big_int bi1 bi2
 

@@ -38,6 +38,42 @@ let tos64 (i,t) =
   let sign = i >>% (bits-1) in
   if bi_is_zero sign then (* positive *) final else (* negative *) minus_big_int (modv -% (to64 (final, Reg(bits-1))))
 
+(* signed truncating division implemented using euclidean division.
+
+   See https://kestrel.ece.cmu.edu/svn/personal/edmcman/intdiv/ for an
+   admittedly bad proof. *)
+let t_div dividend divisor =
+  if dividend >=% bi0 then
+    (* When dividend >= 0, division is the same *)
+    dividend /% divisor
+  else
+    (* If dividend < 0, we have to look at the remainder to figure out the answer. *)
+    let (q,r) = quomod_big_int dividend divisor in
+    if r ==% bi0 then
+      (* If dividend < 0 and r = 0, then division is the same *)
+      q
+    else if r >=% bi0 then
+      (* If dividend < 0 and r > 0, then truncateddivq = q - sign(q) *)
+      q -% big_int_of_int (sign_big_int q)
+    else raise (ArithmeticEx "t_div: If dividend < 0 then r can't be greater than 0!")
+
+(* signed truncated modulus implemented using euclidean division. 
+
+   See https://kestrel.ece.cmu.edu/svn/personal/edmcman/intdiv/ for an
+   admittedly bad proof. *)
+let t_mod dividend divisor =
+   if dividend >=% bi0 then
+   (* When dividend >= 0, division is the same *)
+     dividend %% divisor
+   else
+     let r = dividend %% divisor in
+     (* If r=0, the answer is r *)
+     if r ==% bi0 then r
+     else if r >=% bi0 then
+       (* Otherwise it is r - |d| *)
+       r -% (abs_big_int divisor)
+    else raise (ArithmeticEx "t_mod: If dividend < 0 then r can't be greater than 0!")
+
 (* shifting by more than the number of bits or by negative values
  * will be the same as shifting by the number of bits. *)
 let toshift shiftedt v =
@@ -47,7 +83,7 @@ let toshift shiftedt v =
   if i <=% (big_int_of_int max)
   then int_of_big_int i
   else
-    (pdebug("Warning: shifting "^string_of_int max^"-bit value by "
+    (pdebug("shifting "^string_of_int max^"-bit value by "
 	    ^string_of_big_int i);
      max)
 
@@ -76,10 +112,20 @@ let binop op ((_,t) as v1) v2 =
   | ARSHIFT -> to_val t (shift_right_towards_zero_big_int (tos64 v1) (toshift t v2))
       (* div_big_int rounds towards infinity. *)
   | DIVIDE -> to_val t (div_big_int (to64 v1) (to64 v2))
-      (* Int64.div rounds towards zero. What do we want? *)
-  | SDIVIDE -> to_val t (div_big_int (tos64 v1) (tos64  v2))
+      (* X86 returns towards zero.  Big int implementation uses
+         positive modulus (see Hacker's Delight 9-1). These are the same
+         when the dividend is positive, so for now we'll use the Big int
+         implementation but raise an exception when the dividend is not
+         positive. *)
+  | SDIVIDE -> if (tos64 v1) >=% bi0 then
+      to_val t (div_big_int (tos64 v1) (tos64 v2))
+    else
+      raise (ArithmeticEx "SDIVIDE implementation incomplete")
   | MOD -> to_val t (mod_big_int (tos64 v1) (tos64 v2))
-  | SMOD -> (* to_val t (Int64.rem (tos64 v1) (tos64 v2)) *) failwith "Not done"
+  | SMOD -> if (tos64 v1) >=% bi0 then
+      to_val t (mod_big_int (tos64 v1) (tos64 v2))
+    else
+      raise (ArithmeticEx "SMOD implementation incomplete")
   | SLT -> exp_bool(lt_big_int (tos64 v1) (tos64 v2))
   | SLE -> exp_bool(le_big_int (tos64 v1) (tos64 v2))
   | LT -> exp_bool(lt_big_int (to64 v1) (to64 v2))

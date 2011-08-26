@@ -231,9 +231,9 @@ let load_s s t a = match s with
 let ite t b e1 e2 =
   exp_ite ~t b e1 e2
 
-let l32 i = Int(Arithmetic.tos64 (big_int_of_int64 i,r32), r32)
-let l16 i = Int(Arithmetic.tos64 (big_int_of_int64 i,r16), r16)
-let lt i t = Int(Arithmetic.tos64 (big_int_of_int64 i,t), t)
+let l32 i = Int(Arithmetic.to64 (big_int_of_int64 i,r32), r32)
+let l16 i = Int(Arithmetic.to64 (big_int_of_int64 i,r16), r16)
+let lt i t = Int(Arithmetic.to64 (big_int_of_int64 i,t), t)
 
 let i32 i = Int(biconst i, r32)
 let it i t = Int(biconst i, t)
