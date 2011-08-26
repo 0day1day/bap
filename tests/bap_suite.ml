@@ -11,6 +11,7 @@ let short_tests = [
   Traces_suite.suite;
   Pin_suite.suite;
   Predicate_suite.suite;
+  Big_int_suite.suite;
 ];;
 
 let long_tests = [

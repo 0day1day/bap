@@ -41,6 +41,7 @@ SOURCES = \
 	pin_suite.ml \
 	predicate_suite.ml \
 	large_binary_consistency_suite.ml \
+	big_int_suite.ml \
 	bap_suite.ml
 
 export BCSUFFIX = .dbg
