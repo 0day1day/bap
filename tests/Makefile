@@ -27,8 +27,8 @@ TARGETS = CTESTS ASM nc dc
 
 RESULT = bap_test_suite
 
-# XXX Use ocamlmake to clean up x86 executables?
-TRASH = x86/nop C/test C/taint_test C/bof1
+# XXX Use ocamlmake to clean up asm executables?
+TRASH = asm/nop C/test C/taint_test C/bof1
 
 SOURCES = \
 	testCommon.ml \
@@ -41,7 +41,7 @@ SOURCES = \
 	pin_suite.ml \
 	predicate_suite.ml \
 	large_binary_consistency_suite.ml \
-	big_int_suite.ml \
+	arithmetic_suite.ml \
 	bap_suite.ml
 
 export BCSUFFIX = .dbg
@@ -54,7 +54,7 @@ test: all
 include $(OCAMLMAKEFILE)
 
 ASM:
-	make -C x86
+	make -C asm
 
 CTESTS:
 	make -C C

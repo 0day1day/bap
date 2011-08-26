@@ -1,7 +1,9 @@
+open Ast
 open Arithmetic
 open Big_int
 open Big_int_convenience
 open OUnit
+open Type
 
 type op = Mod | Div
 
@@ -32,8 +34,8 @@ let truncating_division_test ?(n=10000) () =
     (* Printf.printf "Testing %Ld / %Ld\n" x y; *)
     let idiv = Int64.div x y in
     let imod = Int64.rem x y in
-    let bdiv = Arithmetic.t_div (big_int_of_int64 x) (big_int_of_int64 y) in
-    let bmod = Arithmetic.t_mod (big_int_of_int64 x) (big_int_of_int64 y) in
+    let bdiv = tos64 (Arithmetic.binop SDIVIDE (to_val (Reg 128) (big_int_of_int64 x)) (to_val (Reg 128) (big_int_of_int64 y))) in
+    let bmod = tos64 (Arithmetic.binop SMOD (to_val (Reg 128) (big_int_of_int64 x)) (to_val (Reg 128) (big_int_of_int64 y))) in
     let idiv = big_int_of_int64 idiv in
     let imod = big_int_of_int64 imod in
     if bdiv <>% idiv then raise (TestFail(Div, x, y));
@@ -44,7 +46,7 @@ let truncating_division_test ?(n=10000) () =
   with TestFail(o, x, y) -> assert_failure (Printf.sprintf "Invalid truncating %s result: (%Ld,%Ld)" (op_to_string o) x y)
 ;;
 
-let suite = "Bigint" >:::
+let suite = "Arithmetic" >:::
   [
     "truncating_division_test" >:: truncating_division_test
   ]
