@@ -1,7 +1,7 @@
 open OUnit
 
 let open_program_test _ = 
-  ignore (Asmir.open_program "x86/nop");;
+  ignore (Asmir.open_program "asm/nop");;
 
 let suite = "Asmir" >:::
   [

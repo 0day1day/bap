@@ -37,11 +37,11 @@ let gentrace_path = "../pintraces/obj-ia32/";;
 let gentrace = "gentrace.so";;
 let pin_out_suffix = "bap-pin-test.out";;
 
-let rec find_pin_out files =
+let rec find_pin_out files tag =
   match files with
   | [] -> assert_failure 
-	("Could not find a file with suffix "^pin_out_suffix^" Did pin fail?")
-  | f::fs -> if (pmatch ~pat:pin_out_suffix f) then f else find_pin_out fs;;
+	("Could not find a file with suffix "^tag^pin_out_suffix^" Did pin fail?")
+  | f::fs -> if (pmatch ~pat:(tag^pin_out_suffix) f) then f else find_pin_out fs tag;;
 
 let check_pin_setup _ =
   (* Only do this if we are running in an x64 environment *)
