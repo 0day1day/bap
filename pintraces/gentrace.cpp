@@ -679,6 +679,8 @@ VOID FlushBuffer(BOOL addKeyframe, const CONTEXT *ctx, THREADID threadid, BOOL n
       //LOG("Inserting keyframe:\n");
       //LOG("  addr: " + hexstr(PIN_GetContextReg(ctx, REG_EIP)) + "\n");
 
+     assert(ctx);
+
       KeyFrame kf;
       kf.pos = g_tw->count();
       kf.setAll((uint32_t) PIN_GetContextReg(ctx, REG_EAX),
@@ -2455,6 +2457,15 @@ if (follow)
   cerr << "Following" << endl;
  else
    cerr << "Not following" << endl;
+
+#ifndef _WIN32
+/* If we're on Linux, this means we're about to call execv(), and
+ * we're going to disappear! We had better write out our trace! */
+
+cerr << "Flushing buffer before execv()" << endl;
+FlushBuffer(false, NULL, PIN_ThreadId(), true);
+Cleanup();
+#endif
 
 return follow;
 }
