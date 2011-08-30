@@ -36,6 +36,7 @@ let bime = big_int_of_int (-0xe)
 let bimf = big_int_of_int (-0xf)
 
 let biconst i = big_int_of_int i
+let biconst32 i = big_int_of_int32 i
 let biconst64 i = big_int_of_int64 i
 
 (** Infix operator to test if two big ints are equal. *)
