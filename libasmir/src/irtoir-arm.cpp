@@ -1,6 +1,7 @@
 #include "irtoir-internal.h"
 #include "libvex_guest_arm.h"
 #include <assert.h>
+#include <stddef.h>
 
 
 //

@@ -2,6 +2,7 @@
 #include <vector>
 #include <iostream>
 #include <assert.h>
+#include <stddef.h>
 
 //#include "typecheck_ir.h"
 #include "irtoir-internal.h"
