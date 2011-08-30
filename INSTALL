@@ -26,8 +26,8 @@ The following command will install build dependencies on Fedora Core 15:
 
   $ sudo yum install ocaml ocaml-ocamlgraph ocaml-findlib  \
    ocaml-camlidl-devel ocaml-ocamlgraph-devel ocaml-extlib \
-   ocaml-camomile-devel ocaml-camlp4-devel automake        \
-   binutils-devel gcc-c++
+   ocaml-camomile-devel ocaml-camomile-data                \
+   ocaml-camlp4-devel automake binutils-devel gcc-c++
 
 If you get an error that says there is an undefined reference to
 '__stack_chk_fail', either you need to reconfigure with gcc set to
