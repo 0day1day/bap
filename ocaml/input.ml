@@ -79,7 +79,9 @@ let get_program () =
     | [] -> p
     | arg::args -> cat (List.rev_append (List.rev (get_one arg)) p) args
   in
-  cat [] !inputs
+  try
+    cat [] !inputs
+  with _ -> failwith "An exception occured while lifting"
 
 let get_stream_program () = match !streaminputs with
   | None -> raise(Arg.Bad "No input specified")
