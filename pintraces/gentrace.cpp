@@ -2292,7 +2292,11 @@ VOID ExceptionHandler(THREADID threadid, CONTEXT_CHANGE_REASON reason, const CON
   cerr << "context change" << endl;
   LLOG("Exception!\n");
   // Get the address from instruction pointer (should be EIP).
-  ef.from_addr = (uint32_t) PIN_GetContextReg(from, REG_INST_PTR);
+  if (from)
+    ef.from_addr = (uint32_t) PIN_GetContextReg(from, REG_INST_PTR);
+  else
+    ef.from_addr = -1;
+
   // Fatal signals have no 'to' context
   if (to)
     ef.to_addr = (uint32_t) PIN_GetContextReg(to, REG_INST_PTR);

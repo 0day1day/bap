@@ -533,7 +533,7 @@ struct
 		  memory init)
 	
   (* Normalize a memory address, setting high bits to 0. *)
-  let normalize i t = int64_of_big_int (Arithmetic.to64 (i,t))
+  let normalize i t = int64_of_big_int (Arithmetic.to_big_int (i,t))
     
   let rec update_mem mu pos value endian = 
     (*pdebug "Update mem" ;*)

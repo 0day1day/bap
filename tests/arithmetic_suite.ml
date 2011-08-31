@@ -34,8 +34,8 @@ let truncating_division_test ?(n=10000) () =
     (* Printf.printf "Testing %Ld / %Ld\n" x y; *)
     let idiv = Int64.div x y in
     let imod = Int64.rem x y in
-    let bdiv = tos64 (Arithmetic.binop SDIVIDE (to_val (Reg 128) (big_int_of_int64 x)) (to_val (Reg 128) (big_int_of_int64 y))) in
-    let bmod = tos64 (Arithmetic.binop SMOD (to_val (Reg 128) (big_int_of_int64 x)) (to_val (Reg 128) (big_int_of_int64 y))) in
+    let bdiv = to_sbig_int (Arithmetic.binop SDIVIDE (to_val (Reg 128) (big_int_of_int64 x)) (to_val (Reg 128) (big_int_of_int64 y))) in
+    let bmod = to_sbig_int (Arithmetic.binop SMOD (to_val (Reg 128) (big_int_of_int64 x)) (to_val (Reg 128) (big_int_of_int64 y))) in
     let idiv = big_int_of_int64 idiv in
     let imod = big_int_of_int64 imod in
     if bdiv <>% idiv then raise (TestFail(Div, x, y));

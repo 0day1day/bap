@@ -537,7 +537,7 @@ let add_to_conc {name=name; mem=mem; index=index; value=value;
 	try Hashtbl.find regs name
 	with Not_found -> (name, 0,typ)
       in
-      let bits = Arithmetic.to64 (shift_left_big_int value shift,typ) in
+      let bits = Arithmetic.to_big_int (shift_left_big_int value shift,typ) in
       let fullvalue = Int(bits,typ) in
 	(add_new_var fullname fullvalue usage taint ;
 	 

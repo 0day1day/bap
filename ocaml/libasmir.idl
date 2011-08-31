@@ -1,9 +1,6 @@
 /*
   Low level interface to libasmir. Avoid using this directly. Instead, use
   the Asmir module.
-
-  TODO:  Find some way to check the return value of asmir_open_file for NULL.
-
 */
 
 // #include "libbfd.idl"
@@ -11,7 +8,7 @@ import "libbfd.idl";
 
 typedef [abstract] void* Exp;
 typedef [abstract] void* Stmt;
-typedef [abstract] void* asm_program_t;
+typedef [abstract,errorcheck(null_check)] void* asm_program_t;
 typedef [abstract] void* bap_block_t;
 typedef [abstract] void* bap_blocks_t;
 typedef [abstract] void* cval_t;
@@ -24,6 +21,14 @@ typedef [abstract] void* trace_frame_t;
 typedef [abstract] void* big_val_t;
 
 typedef int threadid_t;
+
+quote(C, "
+    void null_check(void *ptr) {
+        if (ptr == NULL) {
+            caml_failwith(\"Unexpected NULL encountered.\");
+        }
+    }
+");
 
 [length_is(*num)] asymbol*
 asmir_get_symbols(asm_program_t prog,

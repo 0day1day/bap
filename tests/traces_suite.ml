@@ -52,7 +52,7 @@ let concrete_eval_test (ranges, s) =
   let main_prog = Ast_convenience.find_prog_chunk prog start_addr end_addr in
   let s = find_call main_prog in 
   let ctx2 = Symbeval.concretely_execute ~s ~i prog in
-  let eax2 = Arithmetic.to64(bim1,Type.Reg(32)) in
+  let eax2 = Arithmetic.to_big_int(bim1,Type.Reg(32)) in
   let msg = " from check_functions" in
   check_functions msg ranges ["main"; "g"];
   check_eax ctx1 eax1;

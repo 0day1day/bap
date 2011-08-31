@@ -216,7 +216,7 @@ let big_int_of_big_val v t =
 	    this first, since we shift left as we go. *)
          let revindex = n - index in
          (* We need to convert the int64 we need to two's complement form *)
-         let tempv = Arithmetic.to64 (big_int_of_int64 (cval_value_part v revindex), reg_64) in
+         let tempv = Arithmetic.to_big_int (big_int_of_int64 (cval_value_part v revindex), reg_64) in
          let shiftacc = shift_left_big_int acc 64 (* sizeof(int64) *) in
          (* dprintf "Hmmm.... %s %s" (string_of_big_int tempv) (string_of_big_int shiftacc); *)
          add_big_int tempv shiftacc)
@@ -224,7 +224,7 @@ let big_int_of_big_val v t =
       n
   in
   (* Cast off useless bits *)
-  Arithmetic.to64 (big_int_of_big_val_help v, t)
+  Arithmetic.to_big_int (big_int_of_big_val_help v, t)
 
 
 let tr_context_tup cval =
@@ -456,13 +456,25 @@ let bfd_section_size = Libbfd.bfd_section_get_size
 let bfd_section_vma = Libbfd.bfd_section_get_vma
 let bfd_section_name = Libbfd.bfd_section_get_name
 
+(** Is section s loaded? *)
+let is_load s =
+  let flags = bfd_section_get_flags s in
+  Int64.logand Libbfd.sEC_LOAD flags <> 0L
+
+(** Is section s code? *)
+let is_code s =
+  let flags = bfd_section_get_flags s in
+  Int64.logand flags Libbfd.sEC_CODE <> 0L
+
 let section_contents prog secs =
   let bfd = Libasmir.asmir_get_bfd prog in
   let sc l s =
     let size = bfd_section_size s and vma = bfd_section_vma s
-    and flags = bfd_section_get_flags s in
-	dprintf "Found section at %Lx with size %Ld. flags=%Lx" vma size flags;
-    if Int64.logand Libbfd.sEC_LOAD flags <> 0L then
+    and flags = bfd_section_get_flags s
+    and name = bfd_section_name s in
+    dprintf "Found section %s at %Lx with size %Ld. flags=%Lx" name vma size flags;
+    if is_load s then
+    (* if Int64.logand Libbfd.sEC_LOAD flags <> 0L then *)
       let (ok, a) = Libbfd.bfd_get_section_contents bfd s 0L size in
       if ok <> 0 then (vma, a)::l else (dprintf "failed."; l)
     else l
@@ -587,9 +599,6 @@ let asmprogram_to_bap_range ?(log=fun _ -> ()) ?(init_ro = false) p st en =
 let asmprogram_section_to_bap ?(log=fun _ -> ()) p s =
   let size = bfd_section_size s and vma = bfd_section_vma s in
   asmprogram_to_bap_range ~log p vma (Int64.add vma size)
-
-let is_code sec =
-  Int64.logand (Libbfd.bfd_section_get_flags sec) Libbfd.sEC_CODE <> 0L
 
 (** Translate an entire Libasmir.asm_program_t into a Vine program *)
 let asmprogram_to_bap ?(log=fun _ -> ()) ?(init_ro=false) p =

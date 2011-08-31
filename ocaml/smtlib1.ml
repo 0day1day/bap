@@ -194,7 +194,7 @@ object (self)
     let lazye = 
       (match e with
      | Int((i, Reg t) as p) ->
-	 let maskedval = Arithmetic.to64 p in
+	 let maskedval = Arithmetic.to_big_int p in
 	 (* pp "bv"; printf "%Lu" maskedval; pp "["; pi t; pp "]"; *)
 	 lazy(
            pp "bv"; printf "%s" (string_of_big_int maskedval); pp "["; pi t; pp "]"
@@ -453,7 +453,7 @@ object (self)
     let lazye = 
       (match e with
      | Int((i, Reg t) as p) when t = 1 ->
-	 let maskedval = Arithmetic.to64 p in
+	 let maskedval = Arithmetic.to_big_int p in
 	 (match maskedval with
 	  | bi when bi_is_zero bi -> lazy(pp "false")
 	  | bi when bi_is_one bi -> lazy(pp "true")

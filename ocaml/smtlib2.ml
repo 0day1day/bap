@@ -199,7 +199,7 @@ object (self)
      | Int((i, Reg t) as p) ->
 	 let maskedval = 
 	   (try
-	      Arithmetic.to64 p
+	      Arithmetic.to_big_int p
 	    with
 	      Arithmetic.ArithmeticEx _ -> 
 		if t >= 64 then i else failwith "Unable to set high bits to zero")	   
@@ -461,7 +461,7 @@ object (self)
     let lazye = 
       (match e with
      | Int((i, Reg t) as p) when t = 1 ->
-	 let maskedval = Arithmetic.to64 p in
+	 let maskedval = Arithmetic.to_big_int p in
 	 (match maskedval with
 	  | bi when bi_is_zero bi -> lazy(pp "false")
 	  | bi when bi_is_one bi -> lazy(pp "true")
