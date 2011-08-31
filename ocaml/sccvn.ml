@@ -302,11 +302,11 @@ let opt_expid info var exp =
   (* identities on binops *)
   | Bin(AND, _, (HInt(bi,t) as v)) when bi_is_zero bi ->
       sameas v
-  | Bin(AND, x, HInt(i,t)) when bi_is_minusone (Arithmetic.tos64 (i,t)) ->
+  | Bin(AND, x, HInt(i,t)) when bi_is_minusone (Arithmetic.to_sbig_int (i,t)) ->
       sameas x
   | Bin(OR, x, HInt(bi,_)) when bi_is_zero bi ->
       sameas x
-  | Bin(OR, _, (HInt(i,t) as v)) when bi_is_minusone (Arithmetic.tos64 (i,t)) ->
+  | Bin(OR, _, (HInt(i,t) as v)) when bi_is_minusone (Arithmetic.to_sbig_int (i,t)) ->
       sameas v
   | Bin(XOR, x, HInt(bi,_))
   | Bin(PLUS, x, HInt(bi,_))
@@ -328,7 +328,7 @@ let opt_expid info var exp =
       Const(Int(bi0, Var.typ var))
   | Bin(LT, _, HInt(bi,_)) when bi_is_zero bi ->
       Const(Ssa.val_false)
-  | Bin(LE, _, HInt(i,t)) when bi_is_minusone (Arithmetic.tos64 (i,t)) ->
+  | Bin(LE, _, HInt(i,t)) when bi_is_minusone (Arithmetic.to_sbig_int (i,t)) ->
       Const(Ssa.val_true)
 	(* TODO: add SLT and SLE. Requires canonicalized ints *)
   | Bin(EQ, x, (HInt(bi,t))) when t = (Reg 1) && bi_is_zero bi ->

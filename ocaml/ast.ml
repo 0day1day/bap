@@ -61,7 +61,7 @@ let lab_of_exp = function
   | Lab s -> Some(Name s)
   | Int(i, t) ->
       (* Some(Addr(Int64.logand i (Int64.pred(Int64.shift_left 1L bits)))) *)
-      Some(Addr(int64_of_big_int (Arithmetic.to64 (i,t))))
+      Some(Addr(int64_of_big_int (Arithmetic.to_big_int (i,t))))
   | _ -> None
     
 

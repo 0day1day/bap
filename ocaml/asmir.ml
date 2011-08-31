@@ -215,7 +215,7 @@ let big_int_of_big_val v =
 	 this first, since we shift left as we go. *)
       let revindex = n - index in
       (* We need to convert the int64 we need to two's complement form *)
-      let tempv = Arithmetic.to64 (big_int_of_int64 (cval_value_part v revindex), reg_64) in
+      let tempv = Arithmetic.to_big_int (big_int_of_int64 (cval_value_part v revindex), reg_64) in
       let shiftacc = shift_left_big_int acc 64 (* sizeof(int64) *) in
       (* dprintf "Hmmm.... %s %s" (string_of_big_int tempv) (string_of_big_int shiftacc); *)
       add_big_int tempv shiftacc)
@@ -489,7 +489,7 @@ let section_contents prog secs =
 let open_program filename =
   let prog = Libasmir.asmir_open_file filename in
     (* tell the GC how to free resources associated with prog *)
-  Gc.finalise Libasmir.asmir_close prog;
+  Libasmir.asmir_close prog;
   let secs = Array.to_list (get_all_sections prog)  in
   let get = section_contents prog secs in
   {asmp=prog; arch=Libasmir.asmir_get_asmp_arch prog; secs=secs; get=get}

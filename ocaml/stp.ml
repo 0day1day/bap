@@ -86,7 +86,7 @@ object (self)
     opn 0;
     (match e with
      | Int(i,t) ->
-	 let maskedval = Arithmetic.to64 (i,t) in
+	 let maskedval = Arithmetic.to_big_int (i,t) in
 	 (match t with
 	   | Reg n when (n mod 4) = 0 ->
 	       printf "0hex%s" (Util.hex_of_big_int ~pad:(n/4) maskedval)
