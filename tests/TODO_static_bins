@@ -2,3 +2,4 @@ runcon
 kill
 stdbuf
 tee
+shred

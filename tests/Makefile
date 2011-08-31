@@ -19,6 +19,10 @@ export INCDIRS = $(BAP_OCAMLDIR) $(BIGINT) $(BATT) $(OUNIT) $(PCRE)
 # Include sources from ../ocaml in the automatically generated dependencies.
 export SOURCE_DIRS_IN = $(BAP_OCAMLDIR) $(BAP_PROJ_OCAMLDIR)
 
+ifndef SUBPROJS
+	export SUBPROJS = analyze_test_log
+endif
+
 CSRC=$(wildcard C/*.c)
 CEXECS = $(CSRC:C/%.c=%)
 
@@ -44,6 +48,13 @@ SOURCES = \
 	arithmetic_suite.ml \
 	bap_suite.ml
 
+define PROJ_analyze_test_log
+	RESULT=analyze_test_log
+	SOURCES = analyze_test_log.ml
+	DOC_FILES=$(SOURCES)
+endef
+export PROJ_analyze_test_log
+
 export BCSUFFIX = .dbg
 
 all: $(TARGETS)
@@ -58,3 +69,6 @@ ASM:
 
 CTESTS:
 	make -C C
+
+%:
+	make -f $(OCAMLMAKEFILE) subprojs SUBTARGET=$@
