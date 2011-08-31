@@ -489,7 +489,7 @@ let section_contents prog secs =
 let open_program filename =
   let prog = Libasmir.asmir_open_file filename in
     (* tell the GC how to free resources associated with prog *)
-  Libasmir.asmir_close prog;
+  Gc.finalise Libasmir.asmir_close prog;
   let secs = Array.to_list (get_all_sections prog)  in
   let get = section_contents prog secs in
   {asmp=prog; arch=Libasmir.asmir_get_asmp_arch prog; secs=secs; get=get}

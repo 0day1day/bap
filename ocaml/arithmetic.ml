@@ -18,7 +18,7 @@ let bits_of_width = function
   | Reg n -> n
   | _ -> failwith "Expected register type"
 
-(* drop high bits *)
+(* drop high bits to type t *)
 let to_big_int (i,t) =
   let bits = bits_of_width t in
   let modv = bi1 <<% bits in (* 2^bits *)
@@ -26,7 +26,7 @@ let to_big_int (i,t) =
   (* mod always returns a positive number *)
   final
 
-(* sign extend to 64 bits*)
+(* sign extend to type t *)
 let to_sbig_int (i,t) =
   let bits = bits_of_width t in
   let modv = bi1 <<% (bits-1) in (* 2^(bits-1) *)
