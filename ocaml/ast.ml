@@ -61,7 +61,7 @@ let lab_of_exp = function
   | Lab s -> Some(Name s)
   | Int(i, t) ->
       (* Some(Addr(Int64.logand i (Int64.pred(Int64.shift_left 1L bits)))) *)
-      Some(Addr(int64_of_big_int (Arithmetic.to64 (i,t))))
+      Some(Addr(int64_of_big_int (Arithmetic.to_big_int (i,t))))
   | _ -> None
     
 
@@ -70,6 +70,7 @@ and reg_8 = Reg 8
 and reg_16 = Reg 16
 and reg_32 = Reg 32
 and reg_64 = Reg 64
+and reg_128 = Reg 128
 
 (** False constant. (If convenient, refer to this rather than building your own.) *)
 let exp_false = Int(bi0, reg_1)

@@ -15,12 +15,19 @@ Configure should report any dependencies you do not have.  You can
 satisfy most dependencies on Ubuntu 11.04 by running:
 
   $ sudo apt-get install ocaml ocaml-native-compilers ocaml-findlib camlidl \
-    libocamlgraph-ocaml-dev libextlib-ocaml-dev ocaml-batteries-included    \
-    binutils-dev automake
+    libocamlgraph-ocaml-dev libextlib-ocaml-dev binutils-dev automake \
+    libcamomile-ocaml-dev
 
 To compile the documentation, you also need
   $ sudo aptitude install texlive-base texlive-latex-base \
     texlive-latex-extra texlive-fonts-recommended 
+
+The following command will install build dependencies on Fedora Core 15:
+
+  $ sudo yum install ocaml ocaml-ocamlgraph ocaml-findlib  \
+   ocaml-camlidl-devel ocaml-ocamlgraph-devel ocaml-extlib \
+   ocaml-camomile-devel ocaml-camomile-data                \
+   ocaml-camlp4-devel automake binutils-devel gcc-c++
 
 If you get an error that says there is an undefined reference to
 '__stack_chk_fail', either you need to reconfigure with gcc set to

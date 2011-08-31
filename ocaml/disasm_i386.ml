@@ -231,9 +231,9 @@ let load_s s t a = match s with
 let ite t b e1 e2 =
   exp_ite ~t b e1 e2
 
-let l32 i = Int(Arithmetic.to64 (big_int_of_int64 i,r32), r32)
-let l16 i = Int(Arithmetic.to64 (big_int_of_int64 i,r16), r16)
-let lt i t = Int(Arithmetic.to64 (big_int_of_int64 i,t), t)
+let l32 i = Int(Arithmetic.to_big_int (big_int_of_int64 i,r32), r32)
+let l16 i = Int(Arithmetic.to_big_int (big_int_of_int64 i,r16), r16)
+let lt i t = Int(Arithmetic.to_big_int (big_int_of_int64 i,t), t)
 
 let i32 i = Int(biconst i, r32)
 let it i t = Int(biconst i, t)
@@ -306,7 +306,7 @@ let op2e_s ss t = function
   | Oreg r when t = r8 -> bits2reg8e r
   | Oreg r -> unimplemented "unknown register"
   | Oaddr e -> load_s ss t e
-  | Oimm i -> Int(Arithmetic.to64 (big_int_of_int64 i,t), t)
+  | Oimm i -> Int(Arithmetic.to_big_int (big_int_of_int64 i,t), t)
 
 let assn_s s t v e =
   match v with
@@ -769,7 +769,7 @@ let parse_instr g addr =
   let parse_disp8 a =
     (* This has too many conversions, but the below code doesn't handle
        signedness correctly. *)
-    (int64_of_big_int (Arithmetic.tos64 (big_int_of_int (Char.code (g a)), r8)), s a)
+    (int64_of_big_int (Arithmetic.to_sbig_int (big_int_of_int (Char.code (g a)), r8)), s a)
   (* let r n = Int64.shift_left (Int64.of_int (Char.code (g (Int64.add a (Int64.of_int n))))) (8*n) in *)
   (*   let d = r 0 in *)
   (*   (d, (Int64.succ a)) *)

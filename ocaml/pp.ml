@@ -129,14 +129,14 @@ object (self)
     | Addr x -> printf "addr 0x%Lx" x
 
   method int i t =
-    let (is, i) = Arithmetic.tos64 (i,t), Arithmetic.to64 (i,t) in
+    let (is, i) = Arithmetic.to_sbig_int (i,t), Arithmetic.to_big_int (i,t) in
     match (is, t) with
     | (bi, Reg 1) when bi_is_zero bi -> pp "false"
     | (bi, Reg 1) when bi_is_minusone bi -> pp "true"
     | (bi,t) ->
         if (abs_big_int bi) <% bia
 	then pp (string_of_big_int bi)
-        else pp ("0x"^(Util.hex_of_big_int (Arithmetic.to64 (i,t))));
+        else pp ("0x"^(Util.hex_of_big_int (Arithmetic.to_big_int (i,t))));
 	pp ":"; self#typ t
 
 

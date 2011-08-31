@@ -130,7 +130,7 @@ let parse_concat = function
 		Int(bits, _)))
       (* If we cast to nt1 and nt2 and we get the same thing, the
 	 optimizer probably just dropped the cast. *)
-      when Arithmetic.to64 (i, nt2) ==% Arithmetic.to64 (i, nt1)
+      when Arithmetic.to_big_int (i, nt2) ==% Arithmetic.to_big_int (i, nt1)
 	&& bits ==% big_int_of_int(bits_of_width (infer_ast ~check:false er))
 	&& bits_of_width nt1 = bits_of_width (infer_ast ~check:false el) + bits_of_width (infer_ast ~check:false er) (* Preserve the type *)
 	->
