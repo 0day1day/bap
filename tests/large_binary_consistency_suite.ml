@@ -5,7 +5,7 @@ open TestCommon
 
 let binary_dir = "static_bins/";;
 let args_dir = "static_args/";;
-let log_file_suffix = "large_binary_test.log";;
+let log_file_suffix = "_large_binary_test.log";;
 
 
 let file_list dir = 
@@ -31,8 +31,10 @@ let get_args binary =
 
 let gen_trace binary =
   let binary_args = get_args binary in
+  (* XXX This does not scale; whats a better way to do this? *)
+  let args = if (binary <> "nohup") then " -follow_execv " else " " in
   let args = 
-	(" -t "^(gentrace_path^gentrace)^" -logall-before -o "^binary^
+	(args^"-t "^(gentrace_path^gentrace)^" -logall-before -o "^binary^
 		pin_out_suffix^" -- "^binary_dir^binary^" "^binary_args) in
   print_endline ("Executing cmd "^pin_path^pin^args);
   ignore(Sys.command (pin_path^pin^args));
@@ -42,7 +44,7 @@ let gen_trace binary =
 let run_concrete pin_out binary = 
   print_endline ("Processing binary "^binary^" with trace-file "^pin_out);
   let prog = Asmir.bap_from_trace_file ~pin:true pin_out in
-  let oc = open_out (binary^log_file_suffix) in  
+  let oc = open_out (binary^log_file_suffix) in
   let log = fun x -> output_string oc x in
   Traces.consistency_check := true;
   Traces.checkall := true;
@@ -70,6 +72,12 @@ let pin_trace_test bins =
 (* Note: This will leave the files pin.log and pintool.log by intention *)
 let pin_trace_cleanup pin_outs = 
   ();;(*List.map Sys.remove pin_outs;;*)
+
+(* TODO: cleanup and startup
+ $ rm x*
+swhitman@joethecat:~/Security/svn/bap/branches/traces+unittest/tests$ rm -rf /tmp/x*
+swhitman@joethecat:~/Security/svn/bap/branches/traces+unittest/tests$ mkdir /tmp/tmp
+*)
 
 
 let suite = "Pin" >:::
