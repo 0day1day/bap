@@ -620,7 +620,7 @@ let rec to_ir addr next ss pref =
     move tmp r
     :: assn t o1 (r -* s2)
     (* FIXME: sanity check this *)
-    ::move oF (Cast(CAST_HIGH, r1, (s1 ^* s2)) &* (s1 ^* r))
+    ::move oF (cast_high r1 ((s1 ^* s2) &* (s1 ^* r)))
     ::move cf ((r >* s1) |* (r ==* s1 &* cf_e))
     ::move af (Unknown("AF for sbb unimplemented", r1))
     ::set_pszf t r
