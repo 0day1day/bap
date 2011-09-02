@@ -364,9 +364,9 @@ struct
   let update () = 
     let p = cpercent () in
     if p = -1 then
-      dprintf "%s...\r" !message
+      if (debug) then Printf.printf "%s...\r" !message
     else
-      dprintf "%s: %d%% (%f eps)\r" !message p (rate ()) ;
+      if (debug) then Printf.printf "%s: %d%% (%f eps)\r" !message p (rate ()) ;
 
       percentage := p;
       last := !current;
@@ -393,7 +393,9 @@ struct
 	  (update ()))
 	  
   let stop () =
-    dprintf "%s: Done! (%f seconds)\n" !message (Unix.gettimeofday () -. !starttime) ;
+    if (debug) then 
+	  Printf.printf "%s: Done! (%f seconds)\n" !message 
+		(Unix.gettimeofday () -. !starttime) ;
     flush stdout
 end
 
