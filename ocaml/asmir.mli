@@ -62,14 +62,10 @@ val x86_regs : Var.t list
 val all_regs : Var.t list
 
 val open_program :  string -> asmprogram
-val asmprogram_to_bap : ?log:(string -> unit) -> ?init_ro:bool -> asmprogram -> 
-  Ast.program
-val asm_addr_to_bap :
-  (*varctx ->*) ?log:(string -> unit) -> asmprogram -> address_t -> 
-  Ast.program * address_t
+val asmprogram_to_bap : ?init_ro:bool -> asmprogram -> Ast.program
+val asm_addr_to_bap : (*varctx ->*) asmprogram -> address_t -> Ast.program * address_t
 
-val asmprogram_to_bap_range : ?log:(string -> unit) ->  ?init_ro:bool ->
-  asmprogram -> address_t -> address_t  -> Ast.program
+val asmprogram_to_bap_range : ?init_ro:bool -> asmprogram -> address_t -> address_t  -> Ast.program
 
 val bap_from_trace_file : ?atts:bool -> ?pin:bool -> string -> Ast.program
 

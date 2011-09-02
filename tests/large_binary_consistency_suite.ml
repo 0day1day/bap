@@ -15,8 +15,8 @@ let file_list dir =
   while !c do
 	try
 	  let file = Unix.readdir dir_hand in
-	  if file <> ".." && file <> "." && file <> "CVS" 
-		&& String.sub file 0 1 <> "." 
+	  if (file <> ".." && file <> "." && file <> "CVS" 
+		  && String.sub file 0 1 <> ".")
 	  then dirs := file::(!dirs)
 	with End_of_file -> (Unix.closedir dir_hand; c := false)
   done;
@@ -51,16 +51,26 @@ let run_concrete pin_out binary =
   ignore(Traces.concrete ~log prog);
   close_out oc;;
 
+
 let pin_trace_setup _ =
   long_check();
   check_pin_setup();
   check_file (pin_path^pin);
   check_file (gentrace_path^gentrace);
   check_file (stp_path^stp);
+  Unix.mkdir "/tmp/tmp" 0o640;
   file_list binary_dir;;
 
+
 let pin_trace_test bins = 
-  let pin_outs = List.map gen_trace bins in
+  let pin_outs = 
+	if (!long_bins <> "") then
+	  let file_list = Array.to_list (Sys.readdir !long_bins) in
+	  let find_existing_pin_out binary =
+		!long_bins^"/"^(find_pin_out file_list binary) in
+	  List.map find_existing_pin_out bins
+	else List.map gen_trace bins 
+  in
   List.iter2 run_concrete pin_outs bins;
   pin_outs
 (*  Traces.consistency_check := false;
@@ -71,13 +81,8 @@ let pin_trace_test bins =
 
 (* Note: This will leave the files pin.log and pintool.log by intention *)
 let pin_trace_cleanup pin_outs = 
-  ();;(*List.map Sys.remove pin_outs;;*)
-
-(* TODO: cleanup and startup
- $ rm x*
-swhitman@joethecat:~/Security/svn/bap/branches/traces+unittest/tests$ rm -rf /tmp/x*
-swhitman@joethecat:~/Security/svn/bap/branches/traces+unittest/tests$ mkdir /tmp/tmp
-*)
+  if (Sys.is_directory "/tmp/tmp") then Sys.remove "/tmp/tmp";
+  Sys.remove "x*"; Sys.remove "/tmp/x*"; ;;(*List.map Sys.remove pin_outs;;*)
 
 
 let suite = "Pin" >:::
