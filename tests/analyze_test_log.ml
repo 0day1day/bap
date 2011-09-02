@@ -7,6 +7,7 @@ let log = ref stdin;;
 let out = ref stdout;;
 let verbose = ref false;;
 
+let bap_unknown_tbl = Hashtbl.create 100;;
 let expanded_hashtbl = Hashtbl.create 100;;
 let small_hashtbl = Hashtbl.create 100;;
 
@@ -26,7 +27,7 @@ let print_hashtbl table =
   let create_list key value k = (key,value)::k in
   let hash_list = Hashtbl.fold create_list table [] in
   let print_item (key,value) = 
-	print_endline ("Item: "^key^" count: "^ (string_of_int value))
+	print_endline (key^" : "^(string_of_int value))
   in
   let cmp (_,value1) (_,value2) = compare value1 value2 in
   List.map print_item (List.sort cmp hash_list);;
@@ -36,6 +37,7 @@ let insert_item hashtbl item =
 	then Hashtbl.find hashtbl item else 0 in
   Hashtbl.replace hashtbl item (count+1);;
 
+let bap_regexp = regexp "^AsmirTest: BAP unknown disasm_instr \S+: disasm_i386: unimplemented feature: unsupported opcode: (.*)$";;
 let vex_regexp = regexp "^vex x86->IR: unhandled instruction bytes: (.*)$";;
 let trace_eval_regexp = regexp "^WARNING \(TraceEval\): Difference between BAP and trace values in .*asm (\".*?\") .*context (.*)\]: (R_\S*) Trace=(\S*) Eval=(\S*)$";;
 
@@ -50,25 +52,32 @@ let get_match rex text =
 
 let process_line l = (
   try
-	let matches = extract ~rex:vex_regexp ~full_match:false l in
-	let vex_instr = Array.get matches 0 in
-	insert_item small_hashtbl vex_instr;
-	if (!verbose) then print_endline ("Unknown VEX instructions: "^vex_instr);
+	let matches = extract ~rex:bap_regexp ~full_match:false l in
+	let bap_instr = Array.get matches 0 in
+	insert_item bap_unknown_tbl bap_instr;
+	if (!verbose) then print_endline ("Unknown BAP instructions: "^bap_instr);
   with Not_found -> (
 	try
-	  let matches = extract ~rex:trace_eval_regexp ~full_match:false l in
-	  let asm = get_match asm_regexp (Array.get matches 0) in 
-	  insert_item small_hashtbl (get_match first_word_regexp asm);
-	  if (!verbose) then (
-		insert_item expanded_hashtbl asm;	  
-		print_endline "Second exp result:";
-		print_endline ("Asm = "^asm);
-		print_endline ("Context = "^Array.get matches 1);
-		print_endline ("Reg = "^Array.get matches 2);
-		print_endline ("Trace = "^Array.get matches 3);
-		print_endline ("Eval = "^Array.get matches 4);
-	  )
-	with Not_found ->  () (*print_endline ("Unknown line: "^l)*)
+	  let matches = extract ~rex:vex_regexp ~full_match:false l in
+	  let vex_instr = Array.get matches 0 in
+	  insert_item small_hashtbl vex_instr;
+	  if (!verbose) then print_endline ("Unknown VEX instructions: "^vex_instr);
+	with Not_found -> (
+	  try
+		let matches = extract ~rex:trace_eval_regexp ~full_match:false l in
+		let asm = get_match asm_regexp (Array.get matches 0) in 
+		insert_item small_hashtbl (get_match first_word_regexp asm);
+		if (!verbose) then (
+		  insert_item expanded_hashtbl asm;	  
+		  print_endline "Second exp result:";
+		  print_endline ("Asm = "^asm);
+		  print_endline ("Context = "^Array.get matches 1);
+		  print_endline ("Reg = "^Array.get matches 2);
+		  print_endline ("Trace = "^Array.get matches 3);
+		  print_endline ("Eval = "^Array.get matches 4);
+		)
+	  with Not_found ->  () (*print_endline ("Unknown line: "^l)*)
+	)
   )
 );;
   
@@ -80,6 +89,8 @@ let _ =
   if (!verbose) then (
 	print_endline("Expanded Summary:");
 	ignore(print_hashtbl expanded_hashtbl));
+  print_endline("BAP unknown Summary:");
+  print_hashtbl bap_unknown_tbl;
   print_endline("Small Summary:");
   print_hashtbl small_hashtbl;;
 	
