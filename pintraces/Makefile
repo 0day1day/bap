@@ -90,7 +90,7 @@ tools: $(OBJDIR) $(TOOLS)
 test: $(OBJDIR) $(TOOL_ROOTS:%=%.test)
 
 gentrace.test: $(OBJDIR)cp-pin.exe
-      $(MAKE) -k -C MyPinTool PIN_HOME=$(PIN_HOME)
+	$(MAKE) -k -C MyPinTool PIN_HOME=$(PIN_HOME)
 
 $(OBJDIR)cp-pin.exe:
 	$(CXX) $(PIN_HOME)/source/tools/Tests/cp-pin.cpp $(APP_CXXFLAGS) -o $(OBJDIR)cp-pin.exe
