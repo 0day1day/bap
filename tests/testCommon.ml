@@ -149,3 +149,5 @@ let check_eax ctx eax =
 
 let check_functions msg ranges names =
   ignore(List.map (find_fun ~msg ranges) names);;
+
+let typecheck p = ignore(UtilsCommon.typecheck p);;

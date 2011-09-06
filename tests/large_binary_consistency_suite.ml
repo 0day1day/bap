@@ -46,6 +46,7 @@ let run_concrete pin_out binary =
   let prog = Asmir.bap_from_trace_file ~pin:true pin_out in
   let oc = open_out (binary^log_file_suffix) in
   let log = fun x -> output_string oc x in
+  typecheck prog;
   Traces.consistency_check := true;
   Traces.checkall := true;
   ignore(Traces.concrete ~log prog);

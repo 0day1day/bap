@@ -48,6 +48,7 @@ SOURCES = \
 	arithmetic_suite.ml \
 	bap_suite.ml
 
+# XXX How to get analyze_test_log to be cleaned?
 define PROJ_analyze_test_log
 	RESULT=analyze_test_log
 	SOURCES = analyze_test_log.ml

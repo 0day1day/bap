@@ -80,6 +80,7 @@ export SOURCES = \
 	template.ml \
 	traces.ml \
 	graphDataflowW.ml \
+	utilsCommon.ml \
 	$(PROJSOURCES) \
 
 # Fix the interpreter to work with big ints

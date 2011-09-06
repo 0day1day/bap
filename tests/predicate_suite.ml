@@ -2,6 +2,7 @@ open OUnit
 open Pcre
 open Ast
 open TestCommon
+open UtilsCommon
 
 let test_file = "C/test";;
 let g_il = "g.il";;
@@ -22,31 +23,8 @@ let predicate_stp_setup _ =
   let g_cfg = Unroll.unroll_loops g_cfg in
   let g_cfg = Hacks.remove_backedges g_cfg in
   let g_cfg = Prune_unreachable.prune_unreachable_ast g_cfg in
+  typecheck g_ir;
   g_cfg;;
-
-
-(* TODO: Copied from topredicate...what's the better thing to do here? *)
-let rename_astexp f =
-  let vis = object
-    inherit Ast_visitor.nop
-    method visit_rvar v =
-      try `ChangeTo(f v)
-      with Not_found -> `DoChildren
-  end in
-  Ast_visitor.exp_accept vis;;
-
-
-let to_ssagcl cfg post =
-  let cfg = Hacks.remove_backedges cfg in
-  let {Cfg_ssa.cfg=cfg; to_ssavar=tossa} = Cfg_ssa.trans_cfg cfg in
-  let p = rename_astexp tossa post in
-  let cfg =
-    let vars = Formulap.freevars p in
-    Ssa_simp.simp_cfg ~liveout:vars ~usedc:true ~usesccvn:true cfg      
-  in
-  let cfg = Cfg_ssa.to_astcfg cfg in
-  let gcl = Gcl.of_astcfg cfg in
-  (gcl, p);;
 
 
 let predicate_stp_solve_test str stp_result g_cfg =
