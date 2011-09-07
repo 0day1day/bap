@@ -122,7 +122,7 @@ bap_lib_doc: all htdoc
 tags: TAGS
 
 TAGS: $(SOURCES)
-	otags $^
+	-otags $^
 
 # You may also tell "make" at the command-line what kind of target to
 # produce (e.g. "make nc").  Here all the possibilities with shortcuts
