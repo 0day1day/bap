@@ -9,3 +9,5 @@ SUBDIRS=bigint-3.12 batteries-1.4.0 VEX libasmir ocaml utils
 
 #regression:
 #	cd $(top_srcdir)/../regression/ocaml;./test.sh
+
+all-local: tags
