@@ -476,9 +476,9 @@ let rec to_ir addr next ss pref =
     and bits = Arithmetic.bits_of_width s
     and s_f = match st with LSHIFT -> (<<*) | RSHIFT -> (>>*) | ARSHIFT -> (>>>*)
       | _ -> failwith "invalid shift type"
-    and count = (op2e r32 o2) &* i32 31
+    and count = (op2e s o2) &* (it 31 s)
     and e1 = op2e s o1 in
-    let ifzero = ite r1 (count ==* i32 0)
+    let ifzero = ite r1 (count ==* (it 0 s))
     and our_of = match st with
       | LSHIFT -> Cast(CAST_HIGH, r1, e1) ^* cf_e
       | RSHIFT -> Cast(CAST_HIGH, r1, Var tmpDEST)
@@ -487,13 +487,13 @@ let rec to_ir addr next ss pref =
     in
     [move tmpDEST e1;
      if st = LSHIFT then
-       move t1 (e1 >>* (i32 bits -* count))
+       move t1 (e1 >>* ((it bits s) -* count))
      else
-       move t1 (e1 >>* (count -* i32 1))
+       move t1 (e1 >>* (count -* (it 1 s)))
      ;
      move cf (ifzero cf_e (Cast(CAST_LOW, r1, Var t1)));
      assn s o1 (s_f e1 count);
-     move oF (ifzero of_e (ite r1 (count ==* i32 1) (our_of) (Unknown("OF <- undefined", r1))));
+     move oF (ifzero of_e (ite r1 (count ==* (it 1 s)) (our_of) (Unknown("OF <- undefined", r1))));
      move sf (ifzero sf_e (compute_sf e1));
      move zf (ifzero zf_e (compute_zf s e1));
      move pf (ifzero pf_e (compute_pf s e1));
