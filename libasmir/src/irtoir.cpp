@@ -293,7 +293,7 @@ Exp *translate_32HLto64( Exp *arg1, Exp *arg2 )
     Exp *high = new Cast( arg1, REG_64, CAST_UNSIGNED );
     Exp *low = new Cast( arg2, REG_64, CAST_UNSIGNED );
 
-    high = new BinOp( LSHIFT, high, ex_const(32) );
+    high = new BinOp( LSHIFT, high, ex_const(REG_64,32) );
 
     return new BinOp( BITOR, high, low );
 }
@@ -302,7 +302,7 @@ Exp *translate_64HLto64( Exp *high, Exp *low )
     assert(high);
     assert(low);
 
-    high = new BinOp( LSHIFT, high, ex_const(32) );
+    high = new BinOp( LSHIFT, high, ex_const(REG_64, 32) );
     high = new BinOp( BITAND, high, ex_const(REG_64, 0xffffffff00000000LL) );
     low = new BinOp( BITAND, low, ex_const(REG_64, 0xffffffffL) );
 
@@ -634,21 +634,54 @@ Exp *translate_simple_binop( IRExpr *expr, IRSB *irbb, vector<Stmt *> *irout )
 	case Iop_Xor16:
 	case Iop_Xor32:
 	case Iop_Xor64:        return new BinOp(XOR, arg1, arg2);
-        case Iop_Shl8:
+    case Iop_Shl8:
+        if (!count_opnd && !use_eflags_thunks)  count_opnd = arg2;
+        return new BinOp(LSHIFT, arg1, new Cast(arg2, REG_8, CAST_UNSIGNED));
+        break;
 	case Iop_Shl16:
+        if (!count_opnd && !use_eflags_thunks)  count_opnd = arg2;
+        return new BinOp(LSHIFT, arg1, new Cast(arg2, REG_16, CAST_UNSIGNED));
+        break;
 	case Iop_Shl32:
-        case Iop_Shl64:   {  if (!count_opnd && !use_eflags_thunks)  count_opnd = arg2;
-                        	return new BinOp(LSHIFT, arg1, arg2);}
-        case Iop_Shr8:
+        if (!count_opnd && !use_eflags_thunks)  count_opnd = arg2;
+        return new BinOp(LSHIFT, arg1, new Cast(arg2, REG_32, CAST_UNSIGNED));
+        break;
+    case Iop_Shl64:
+        if (!count_opnd && !use_eflags_thunks)  count_opnd = arg2;
+        return new BinOp(LSHIFT, arg1, new Cast(arg2, REG_64, CAST_UNSIGNED));
+        break;
+    case Iop_Shr8:
+        if (!count_opnd && !use_eflags_thunks)  count_opnd = arg2;
+        return new BinOp(RSHIFT, arg1, new Cast(arg2, REG_8, CAST_UNSIGNED));
+        break;
 	case Iop_Shr16:
+        if (!count_opnd && !use_eflags_thunks)  count_opnd = arg2;
+        return new BinOp(RSHIFT, arg1, new Cast(arg2, REG_16, CAST_UNSIGNED));
+        break;
 	case Iop_Shr32:
-	case Iop_Shr64:   {  if (!count_opnd && !use_eflags_thunks)  count_opnd = arg2;
-                           	return new BinOp(RSHIFT, arg1, arg2); }
-        case Iop_Sar8:
+        if (!count_opnd && !use_eflags_thunks)  count_opnd = arg2;
+        return new BinOp(RSHIFT, arg1, new Cast(arg2, REG_32, CAST_UNSIGNED));
+        break;
+	case Iop_Shr64:
+        if (!count_opnd && !use_eflags_thunks)  count_opnd = arg2;
+        return new BinOp(RSHIFT, arg1, new Cast(arg2, REG_64, CAST_UNSIGNED));
+        break;
+    case Iop_Sar8:
+        if (!count_opnd && !use_eflags_thunks)  count_opnd = arg2;
+        return new BinOp(ARSHIFT, arg1, new Cast(arg2, REG_8, CAST_UNSIGNED));
+        break;
 	case Iop_Sar16:
+        if (!count_opnd && !use_eflags_thunks)  count_opnd = arg2;
+        return new BinOp(ARSHIFT, arg1, new Cast(arg2, REG_16, CAST_UNSIGNED));
+        break;
 	case Iop_Sar32:
-        case Iop_Sar64:   {  if (!count_opnd && !use_eflags_thunks)  count_opnd = arg2;
-                           	return new BinOp(ARSHIFT, arg1, arg2); }
+        if (!count_opnd && !use_eflags_thunks)  count_opnd = arg2;
+        return new BinOp(ARSHIFT, arg1, new Cast(arg2, REG_32, CAST_UNSIGNED));
+        break;
+    case Iop_Sar64:
+        if (!count_opnd && !use_eflags_thunks)  count_opnd = arg2;
+        return new BinOp(ARSHIFT, arg1, new Cast(arg2, REG_64, CAST_UNSIGNED));
+        break;
         case Iop_CmpEQ8:
 	case Iop_CmpEQ16:
 	case Iop_CmpEQ32:
