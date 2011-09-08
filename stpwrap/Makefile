@@ -6,3 +6,7 @@ stp/bin/stp:
 clean:
 	echo Not cleaning STP
 #	-cd ./stp && make clean
+
+tags: 
+
+.PHONY: tags

@@ -381,7 +381,7 @@ let set_pszf t r =
 
 (* Helper functions to set flags for adding *)
 let set_aopszf_add t s1 s2 r =
-  let bit4 = it (1 lsl 4) t in 
+  let bit4 = it (1 lsl 4) t in
   move af (bit4 ==* (bit4 &* ((r ^* s1) ^* s2)))
   ::move oF (cast_high r1 ((s1 =* s2) &* (s1 ^* r)))
   ::set_pszf t r
@@ -620,7 +620,7 @@ let rec to_ir addr next ss pref =
     move tmp r
     :: assn t o1 (r -* s2)
     (* FIXME: sanity check this *)
-    ::move oF (Cast(CAST_HIGH, r1, (s1 ^* s2)) &* (s1 ^* r))
+    ::move oF (cast_high r1 ((s1 ^* s2) &* (s1 ^* r)))
     ::move cf ((r >* s1) |* (r ==* s1 &* cf_e))
     ::move af (Unknown("AF for sbb unimplemented", r1))
     ::set_pszf t r
@@ -980,6 +980,8 @@ let parse_instr g addr =
       (Mov(opsize, o_eax, Oaddr(l32 addr)), na)
     | 0xa3 -> let (addr, na) = parse_disp32 na in
 	      (Mov(opsize, Oaddr(l32 addr), o_eax), na)
+    | 0xa4 -> (Movs r8, na)
+    | 0xa5 -> (Movs opsize, na)
     | 0xa6 -> (Cmps r8, na)
     | 0xa7 -> (Cmps opsize, na)
     | 0xae -> (Scas r8, na)
@@ -990,7 +992,6 @@ let parse_instr g addr =
 	      (Test(opsize, o_eax, i), na)
     | 0xaa -> (Stos r8, na)
     | 0xab -> (Stos opsize, na)
-    | 0xa5 -> (Movs opsize, na)
     | 0xb0 | 0xb1 | 0xb2 | 0xb3 | 0xb4 | 0xb5 | 0xb6
     | 0xb7 -> let (i, na) = parse_imm8 na in
 	      (Mov(r8, Oreg(b1 & 7), i), na)

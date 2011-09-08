@@ -15,3 +15,5 @@ cscope:
 
 #regression:
 #	cd $(top_srcdir)/../regression/ocaml;./test.sh
+
+all-local: tags

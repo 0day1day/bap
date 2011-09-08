@@ -43,7 +43,7 @@ module Status = Util.StatusPrinter
 
 (* more verbose debugging *)
 module DV = Debug.Make(struct let name = "AsmirV" and default=`NoDebug end)
-module DCheck = Debug.Make(struct let name = "AsmirCheck" and default=`NoDebug end)
+(* module DCheck = Debug.Make(struct let name = "AsmirCheck" and default=`NoDebug end) *)
 
 (* Debug output for testing*)
 module DTest = Debug.Make(struct let name = "AsmirTest" and default=`NoDebug end)
@@ -512,30 +512,30 @@ let get_asm = function
   | Label(_,[Asm s])::_ -> s
   | _ -> ""
 
-let check_equivalence a (ir1, next1) (ir2, next2) =
-  assert(next1 = next2);
-  try
-    let q = Var(Var.newvar "q" reg_1) in
-    let to_wp p = 
-      let p = Memory2array.coerce_prog p in
-      Wp.wp (Gcl.of_ast p) q
-    in
-    let wp1 = to_wp ir1
-    and wp2 = to_wp ir2 in
-    let e = BinOp(EQ, wp1, wp2) in
-    match Smtexec.CVC3.check_exp_validity e with
-    | Smtexec.Valid -> ()
-    | Smtexec.Invalid -> wprintf "formulas for %Lx (%s aka %s) not equivalent" a (get_asm ir1) (get_asm ir2)
-    | Smtexec.SmtError -> failwith "SmtError"
-    | Smtexec.Timeout -> failwith "Timeout"
-  with Failure s
-  | Invalid_argument s ->
-    (match get_asm ir1 with (* Don't warn for known instructions *)
-    | "ret" | "hlt"-> ()
-    | _ -> wprintf "Could not check equivalence for %Lx: %s" a s
-    )
-  | Not_found ->
-    wprintf "Could not check equivalence for %Lx: Not_found" a
+(* let check_equivalence a (ir1, next1) (ir2, next2) = *)
+(*   assert(next1 = next2); *)
+(*   try *)
+(*     let q = Var(Var.newvar "q" reg_1) in *)
+(*     let to_wp p =  *)
+(*       let p = Memory2array.coerce_prog p in *)
+(*       Wp.wp (Gcl.of_ast p) q *)
+(*     in *)
+(*     let wp1 = to_wp ir1 *)
+(*     and wp2 = to_wp ir2 in *)
+(*     let e = BinOp(EQ, wp1, wp2) in *)
+(*     match Smtexec.CVC3.check_exp_validity e with *)
+(*     | Smtexec.Valid -> () *)
+(*     | Smtexec.Invalid -> wprintf "formulas for %Lx (%s aka %s) not equivalent" a (get_asm ir1) (get_asm ir2) *)
+(*     | Smtexec.SmtError -> failwith "SmtError" *)
+(*     | Smtexec.Timeout -> failwith "Timeout" *)
+(*   with Failure s *)
+(*   | Invalid_argument s -> *)
+(*     (match get_asm ir1 with (\* Don't warn for known instructions *\) *)
+(*     | "ret" | "hlt"-> () *)
+(*     | _ -> wprintf "Could not check equivalence for %Lx: %s" a s *)
+(*     ) *)
+(*   | Not_found -> *)
+(*     wprintf "Could not check equivalence for %Lx: Not_found" a *)
 
 
 (** Translate only one address of a  Libasmir.asm_program_t to Vine *)
@@ -569,7 +569,8 @@ let asm_addr_to_bap {asmp=prog; arch=arch; get=get} addr =
 		)
       in
       DV.dprintf "Disassembled %Lx directly" addr;
-      if DCheck.debug then check_equivalence addr v (fallback());
+      (* if DCheck.debug then check_equivalence addr v (fallback()); *)
+	  (* If we don't have a string disassembly, use binutils disassembler *)
       (match ir with
       | Label(l, [])::rest ->
 		(Label(l, [Asm(Libasmir.asmir_string_of_insn prog addr)])::rest,

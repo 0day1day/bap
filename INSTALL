@@ -18,7 +18,7 @@ satisfy most dependencies on Ubuntu 11.04 by running:
 
   $ sudo apt-get install ocaml ocaml-native-compilers ocaml-findlib camlidl \
     libocamlgraph-ocaml-dev libextlib-ocaml-dev binutils-dev automake \
-    libcamomile-ocaml-dev
+    libcamomile-ocaml-dev otags
 
 To compile the documentation, you also need
   $ sudo aptitude install texlive-base texlive-latex-base \

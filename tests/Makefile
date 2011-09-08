@@ -71,5 +71,10 @@ ASM:
 CTESTS:
 	make -C C
 
+tags: TAGS
+
+TAGS: $(SOURCES)
+	-otags $^
+
 %:
 	make -f $(OCAMLMAKEFILE) subprojs SUBTARGET=$@
