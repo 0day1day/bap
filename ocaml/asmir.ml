@@ -21,6 +21,8 @@ module BArray = Bigarray.Array1
 exception Disassembly_error;;
 exception Memory_error;;
 
+let always_vex = ref false;;
+
 type arch = Libbfd.bfd_architecture
 type asmprogram = {asmp : Libasmir.asm_program_t;
 		   arch : arch;
@@ -556,24 +558,27 @@ let asm_addr_to_bap {asmp=prog; arch=arch; get=get} addr =
       destroy_bap_block block;
       (ir, next)
   in
-  try 
-    let (ir,na) as v = 
-      (try (Disasm.disasm_instr arch get addr)
-       with Failure s -> 
-		 DTest.dprintf "BAP unknown disasm_instr %Lx: %s" addr s;
-		 DV.dprintf "disasm_instr %Lx: %s" addr s; raise Disasm.Unimplemented
-      )
-    in
-    DV.dprintf "Disassembled %Lx directly" addr;
-    if DCheck.debug then check_equivalence addr v (fallback());
-    (match ir with
-    | Label(l, [])::rest ->
-      (Label(l, [Asm(Libasmir.asmir_string_of_insn prog addr)])::rest,
-       na)
-    | _ -> v)
-  with Disasm.Unimplemented ->
-    DV.dprintf "Disassembling %Lx through VEX" addr;
-    fallback()
+  if (!always_vex) then fallback() 
+  else (
+	try 
+      let (ir,na) as v = 
+		(try (Disasm.disasm_instr arch get addr)
+		 with Failure s -> 
+		   DTest.dprintf "BAP unknown disasm_instr %Lx: %s" addr s;
+		   DV.dprintf "disasm_instr %Lx: %s" addr s; raise Disasm.Unimplemented
+		)
+      in
+      DV.dprintf "Disassembled %Lx directly" addr;
+      if DCheck.debug then check_equivalence addr v (fallback());
+      (match ir with
+      | Label(l, [])::rest ->
+		(Label(l, [Asm(Libasmir.asmir_string_of_insn prog addr)])::rest,
+		 na)
+      | _ -> v)
+	with Disasm.Unimplemented ->
+      DV.dprintf "Disassembling %Lx through VEX" addr;
+      fallback()
+  )
 
 let flatten ll =
 	List.rev (List.fold_left (fun accu l -> List.rev_append l accu) [] ll)

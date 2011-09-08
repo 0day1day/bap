@@ -563,11 +563,11 @@ Exp *translate_simple_unop( IRExpr *expr, IRSB *irbb, vector<Stmt *> *irout )
 
 //         case Iop_ReinterpI64asF64:  return new Cast( arg, REG_64, CAST_RFLOAT );
 //         case Iop_ReinterpF64asI64:  return new Cast( arg, REG_64, CAST_RINTEGER );
-        case Iop_F32toF64: 
+            /*   case Iop_F32toF64: 
         case Iop_I32toF64:
         case Iop_ReinterpI64asF64:
         case Iop_ReinterpF64asI64:
-          return new Unknown("floatcast", REG_64);
+        return new Unknown("floatcast", REG_64); */
 
         default:
             break;
@@ -693,16 +693,85 @@ Exp *translate_binop( IRExpr *expr, IRSB *irbb, vector<Stmt *> *irout )
         return result;
 
     switch ( expr->Iex.Binop.op ) 
-    {
-        case Iop_CmpF64:
+        {
+
+ 
+        case Iop_CmpF32:
+        case Iop_CmpF64:     
+        case Iop_CmpF128:
+
         // arg1 in this case, specifies rounding mode, and so is ignored
-        case Iop_I64toF64:
+            /*        case Iop_I64toF64:
         case Iop_F64toI64:
         case Iop_F64toF32:          
         case Iop_F64toI32:
         case Iop_F64toI16:
         case Iop_RoundF64toInt:
-        case Iop_2xm1F64:
+        case Iop_2xm1F64:*/
+
+
+        case Iop_F64toI16S: /* IRRoundingMode(I32) x F64 -> signed I16 */
+        case Iop_F64toI32S: /* IRRoundingMode(I32) x F64 -> signed I32 */
+        case Iop_F64toI64S: /* IRRoundingMode(I32) x F64 -> signed I64 */
+        case Iop_F64toI64U: /* IRRoundingMode(I32) x F64 -> unsigned I64 */
+
+        case Iop_F64toI32U: /* IRRoundingMode(I32) x F64 -> unsigned I32 */
+
+        case Iop_I16StoF64: /*                       signed I16 -> F64 */
+        case Iop_I32StoF64: /*                       signed I32 -> F64 */
+        case Iop_I64StoF64: /* IRRoundingMode(I32) x signed I64 -> F64 */
+        case Iop_I64UtoF64: /* IRRoundingMode(I32) x unsigned I64 -> F64 */
+        case Iop_I64UtoF32: /* IRRoundingMode(I32) x unsigned I64 -> F32 */
+
+        case Iop_I32UtoF64: /*                       unsigned I32 -> F64 */
+
+        case Iop_F32toI16S: /* IRRoundingMode(I32) x F32 -> signed I16 */
+        case Iop_F32toI32S: /* IRRoundingMode(I32) x F32 -> signed I32 */
+        case Iop_F32toI64S: /* IRRoundingMode(I32) x F32 -> signed I64 */
+
+        case Iop_I16StoF32: /*                       signed I16 -> F32 */
+        case Iop_I32StoF32: /* IRRoundingMode(I32) x signed I32 -> F32 */
+        case Iop_I64StoF32: /* IRRoundingMode(I32) x signed I64 -> F32 */
+
+      /* Conversion between floating point formats */
+        case Iop_F32toF64:  /*                       F32 -> F64 */
+        case Iop_F64toF32:  /* IRRoundingMode(I32) x F64 -> F32 */
+
+      /* Reinterpretation.  Take an F64 and produce an I64 with 
+         the same bit pattern, or vice versa. */
+        case Iop_ReinterpF64asI64:
+        case Iop_ReinterpI64asF64:
+        case Iop_ReinterpF32asI32:
+        case Iop_ReinterpI32asF32:
+
+      /* Support for 128-bit floating point */
+        case Iop_F64HLtoF128:/* (high half of F128,low half of F128) -> F128 */
+        case Iop_F128HItoF64:/* F128 -> high half of F128 into a F64 register */
+        case Iop_F128LOtoF64:/* F128 -> low  half of F128 into a F64 register */
+
+      /* :: IRRoundingMode(I32) x F128 x F128 -> F128 */
+        case Iop_AddF128:
+        case Iop_SubF128:
+        case Iop_MulF128:
+        case Iop_DivF128:
+
+      /* :: F128 -> F128 */
+        case Iop_NegF128:
+        case Iop_AbsF128:
+
+      /* :: IRRoundingMode(I32) x F128 -> F128 */
+        case Iop_SqrtF128:
+
+        case Iop_I32StoF128: /*                signed I32  -> F128 */
+        case Iop_I64StoF128: /*                signed I64  -> F128 */
+        case Iop_F32toF128:  /*                       F32  -> F128 */
+        case Iop_F64toF128:  /*                       F64  -> F128 */
+
+        case Iop_F128toI32S: /* IRRoundingMode(I32) x F128 -> signed I32  */
+        case Iop_F128toI64S: /* IRRoundingMode(I32) x F128 -> signed I64  */
+        case Iop_F128toF64:  /* IRRoundingMode(I32) x F128 -> F64         */
+        case Iop_F128toF32:  /* IRRoundingMode(I32) x F128 -> F32         */
+            
 	  return new Unknown("Floating point binop", regt_of_irexpr(irbb, expr));
 
 //         case Iop_CmpF64:            return translate_CmpF64(expr, irbb, irout);
@@ -1298,12 +1367,11 @@ bap_block_t* generate_vex_ir(asm_program_t *prog, address_t inst)
   VexArch guest = vexarch_of_prog(prog);
 
   vblock->inst = inst;
-  
   // Skip the VEX translation of special instructions because these
   // are also the ones that VEX does not handle
-  if ( !is_special( inst ))
-    vblock->vex_ir = translate_insn(guest, asmir_get_ptr_to_instr(prog, inst), inst);
-  else
+  if ( !is_special( inst )) {
+      vblock->vex_ir = translate_insn(guest, asmir_get_ptr_to_instr(prog, inst), inst);
+  } else
     vblock->vex_ir = NULL;
 
   return vblock;
@@ -1342,11 +1410,12 @@ vector<bap_block_t *> generate_vex_ir( asm_program_t *prog )
   
   vector<bap_block_t *> results;
 
-  for (section_t *sec = prog->segs; sec; sec = sec->next)
-    if (sec->is_code) {
-      vector<bap_block_t *> tmp = generate_vex_ir(prog, sec->start_addr, sec->end_addr);
-      results.insert(results.end(), tmp.begin(), tmp.end());
-    }
+  for (section_t *sec = prog->segs; sec; sec = sec->next) {
+      if (sec->is_code) {
+          vector<bap_block_t *> tmp = generate_vex_ir(prog, sec->start_addr, sec->end_addr);
+          results.insert(results.end(), tmp.begin(), tmp.end());
+      }
+  }
 
     return results;
 }
@@ -1391,6 +1460,8 @@ void generate_bap_ir_block( asm_program_t *prog, bap_block_t *block )
 {
   static unsigned int ir_addr = 100; // Argh, this is dumb
 
+  assert(block);
+  
   // Set the global everyone else will look at.
   guest_arch = vexarch_of_prog(prog);
 

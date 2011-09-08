@@ -22,7 +22,7 @@ type arch
 val arch_i386 : arch
 val arch_arm : arch
 
-
+val always_vex : bool ref
 
 type varctx
 
