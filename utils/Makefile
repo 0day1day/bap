@@ -75,6 +75,10 @@ export BCSUFFIX = .dbg
 
 all: nc dc
 
+# Recursive make
+tags:
+	echo 'Making tags (not really)'
+
 %:
 	make -f $(OCAMLMAKEFILE) subprojs SUBTARGET=$@
 

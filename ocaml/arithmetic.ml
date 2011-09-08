@@ -6,7 +6,7 @@
     @author Ivan Jager
  *)
 
-module D = Debug.Make(struct let name = "Arithmetic" and default = `Debug end)
+module D = Debug.Make(struct let name = "Arithmetic" and default = `NoDebug end)
 open Big_int
 open Big_int_convenience
 open D
