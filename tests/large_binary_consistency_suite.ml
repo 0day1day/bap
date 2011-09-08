@@ -59,7 +59,7 @@ let pin_trace_setup _ =
   check_file (pin_path^pin);
   check_file (gentrace_path^gentrace);
   check_file (stp_path^stp);
-  Unix.mkdir "/tmp/tmp" 0o640;
+  if (not(Sys.is_directory "/tmp/tmp")) then Unix.mkdir "/tmp/tmp" 0o640;
   file_list binary_dir;;
 
 
