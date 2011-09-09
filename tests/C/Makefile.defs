@@ -1,4 +1,0 @@
-
-CSRC=$(wildcard *.c)
-CEXECS = $(CSRC:%.c=%)
-

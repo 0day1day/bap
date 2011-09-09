@@ -131,7 +131,3 @@ $(TOOLS): %$(PINTOOL_SUFFIX) : %.o
 ## cleaning
 clean:
 	-$(RM) "$(OBJDIR)" *.out *.tested *.failed makefile.copy reader
-
-tags: 
-
-.PHONY: tags

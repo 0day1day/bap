@@ -239,7 +239,7 @@ struct
       Valid
     else if isinvalid then (
       let m = parse_model solvername stdout in
-      if debug then print_model m;
+      print_model m;
       Invalid
     ) else if fail then (
       dprintf "output: %s\nerror: %s" stdout stderr;

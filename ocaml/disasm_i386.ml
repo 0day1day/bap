@@ -477,9 +477,9 @@ let rec to_ir addr next ss pref =
     and bits = Arithmetic.bits_of_width s
     and s_f = match st with LSHIFT -> (<<*) | RSHIFT -> (>>*) | ARSHIFT -> (>>>*)
       | _ -> failwith "invalid shift type"
-    and count = (op2e s o2) &* (it 31 s)
+    and count = (op2e r32 o2) &* i32 31
     and e1 = op2e s o1 in
-    let ifzero = ite r1 (count ==* (it 0 s))
+    let ifzero = ite r1 (count ==* i32 0)
     and our_of = match st with
       | LSHIFT -> Cast(CAST_HIGH, r1, e1) ^* cf_e
       | RSHIFT -> Cast(CAST_HIGH, r1, Var tmpDEST)
@@ -488,13 +488,13 @@ let rec to_ir addr next ss pref =
     in
     [move tmpDEST e1;
      if st = LSHIFT then
-       move t1 (e1 >>* ((it bits s) -* count))
+       move t1 (e1 >>* (i32 bits -* count))
      else
-       move t1 (e1 >>* (count -* (it 1 s)))
+       move t1 (e1 >>* (count -* i32 1))
      ;
      move cf (ifzero cf_e (Cast(CAST_LOW, r1, Var t1)));
      assn s o1 (s_f e1 count);
-     move oF (ifzero of_e (ite r1 (count ==* (it 1 s)) (our_of) (Unknown("OF <- undefined", r1))));
+     move oF (ifzero of_e (ite r1 (count ==* i32 1) (our_of) (Unknown("OF <- undefined", r1))));
      move sf (ifzero sf_e (compute_sf e1));
      move zf (ifzero zf_e (compute_zf s e1));
      move pf (ifzero pf_e (compute_pf s e1));
@@ -695,63 +695,25 @@ module ToStr = struct
   let rec prefs2str = function [] -> ""
     | x::xs -> pref2str x ^ " " ^ prefs2str xs
 
-	  (* XXX Clean up printing here *)
-  let oreg2str = function
-	| 0 -> "eax"
-	| 1 -> "ecx"
-	| 2 -> "edx"
-	| 3 -> "ebx"
-	| 4 -> "exp"
-	| 5 -> "ebp"
-	| 6 -> "esi"
-	| 7 -> "edi"
-	| v -> unimplemented (Printf.sprintf "Don't know what oreg %i is." v)
-
-
   let opr = function
-    | Oreg v -> oreg2str v	  
+    | Oreg v -> unimplemented "rewrite this" (*Var.name v*)
     | Oimm i -> Printf.sprintf "$0x%Lx" i
     | Oaddr a -> Pp.ast_exp_to_string a
 
   let op2str = function
     | Retn -> "ret"
     | Nop -> "nop"
-    | Mov(t,d,s) -> Printf.sprintf "mov %s, %s" (opr d) (opr s)
-    | Movs(t) -> "movs"
-    | Movzx(dt,dst,st,src) -> Printf.sprintf "movzx %s, %s" (opr dst) (opr src)
-    | Movsx(dt,dst,st,src) -> Printf.sprintf "movsx %s, %s" (opr dst) (opr src)
-    | Movdqa(d,s) -> Printf.sprintf "movdqa %s, %s" (opr d) (opr s)
+    | Mov(t, d,s) -> Printf.sprintf "mov %s, %s" (opr d) (opr s)
     | Lea(r,a) -> Printf.sprintf "lea %s, %s" (opr r) (opr (Oaddr a))
     | Call(a, ra) -> Printf.sprintf "call %s" (opr a)
     | Shift _ -> "shift"
     | Shiftd _ -> "shiftd"
     | Hlt -> "hlt"
     | Rdtsc -> "rdtsc"
-    | Inc (t, o) -> Printf.sprintf "inc %s" (opr o)
-    | Dec (t, o) -> Printf.sprintf "dec %s" (opr o)
-    | Jump a -> Printf.sprintf "jmp %s" (opr a)	
-    | Bt(t,d,s) -> Printf.sprintf "bt %s, %s" (opr d) (opr s)
-    | Jcc _ -> "jcc"
-    | Setcc _ -> "setcc"
-    | Cmps _ -> "cmps"
-    | Scas _ -> "scas"
-    | Stos _ -> "stos"
-    | Push(t,o) -> Printf.sprintf "push %s" (opr o)
-    | Pop(t,o) -> Printf.sprintf "pop %s" (opr o)
-    | Add(t,d,s) -> Printf.sprintf "add %s, %s" (opr d) (opr s)
-    | Sub(t,d,s) -> Printf.sprintf "sub %s, %s" (opr d) (opr s)
-    | Sbb(t,d,s) -> Printf.sprintf "sbb %s, %s" (opr d) (opr s)
-    | Cmp(t,d,s) -> Printf.sprintf "cmp %s, %s" (opr d) (opr s)
-    | And(t,d,s) -> Printf.sprintf "and %s, %s" (opr d) (opr s)
-    | Or(t,d,s) -> Printf.sprintf "or %s, %s" (opr d) (opr s)
-    | Xor(t,d,s) -> Printf.sprintf "xor %s, %s" (opr d) (opr s)
-    | Pxor(t,d,s)  -> Printf.sprintf "pxor %s, %s" (opr d) (opr s)
-    | Test(t,d,s) -> Printf.sprintf "test %s, %s" (opr d) (opr s)
-    | Not(t,o) -> Printf.sprintf "not %s" (opr o)
-    | Cld -> "cld"
-    | Leave _ -> "leave"
-    | Interrupt(o) -> Printf.sprintf "int %s" (opr o)
-    (*_ -> unimplemented "op2str"*)
+    | Inc (t, r) -> Printf.sprintf "inc %s" (opr r)
+    | Dec (t, r) -> Printf.sprintf "dec %s" (opr r)
+    | Jump a -> Printf.sprintf "jmp %s" (opr a)
+    | _ -> unimplemented "op2str"
 
   let to_string pref op =
     failwith "fallback to libdisasm"

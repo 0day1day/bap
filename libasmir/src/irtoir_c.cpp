@@ -183,7 +183,7 @@ bap_block_t* asmir_addr_to_bap(asm_program_t *p, address_t addr, address_t *next
   bap_block_t * bap_block = generate_vex_ir(p, addr);
   generate_bap_ir_block(p, bap_block);
   if (next)
-      *next = addr + asmir_get_instr_length(p, addr);
+    *next = addr + asmir_get_instr_length(p, addr);
   return bap_block;
 }
 

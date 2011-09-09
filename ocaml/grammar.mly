@@ -38,7 +38,7 @@ struct
     List.iter (fun v -> Hashtbl.add h (Var.name v) v) decls;
     (h, Stack.create() )
 
-  let defscope = create Asmir.all_regs
+  let defscope = create []
   let cur_scope = ref defscope
 
   let add n t =

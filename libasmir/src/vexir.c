@@ -70,9 +70,6 @@ static void *dispatch( void )
     return NULL;
 }
 
-static UInt needs_self_check ( void* opaque, VexGuestExtents* vge ) {
-   return 0;
-}
 //----------------------------------------------------------------------
 // This is where we copy out the IRSB
 //----------------------------------------------------------------------
@@ -116,8 +113,7 @@ void translate_init()
     vc.iropt_unroll_thresh          = 0;
     vc.guest_max_insns              = 1;    // By default, we translate 1 instruction at a time
     vc.guest_chase_thresh           = 0;    
-    vc.guest_chase_cond             = 0;
-    
+
     LibVEX_Init(&failure_exit, 
                 &log_bytes, 
                 0,              // Debug level
@@ -155,11 +151,10 @@ void translate_init()
 #endif
     vta.instrument1         = instrument1;      // Callback we defined to help us save the IR
     vta.instrument2         = NULL;
-    //    vta.do_self_check       = False;
+    vta.do_self_check       = False;
     vta.traceflags          = 0;                // Debug verbosity
-    vta.dispatch_unassisted = dispatch; // Not used
-    vta.dispatch_assisted   = dispatch;  // Not used
-    vta.needs_self_check    = needs_self_check;  // Not used
+    vta.dispatch            = dispatch; // Not used
+
 }
 
 //----------------------------------------------------------------------

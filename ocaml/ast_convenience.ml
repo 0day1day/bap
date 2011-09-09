@@ -7,9 +7,6 @@ open Big_int_convenience
 open Type
 open Typecheck
 
-
-exception RangeNotFound of int64 * int64
-
 (* exp helpers *)
 let binop op a b = match (a,b) with
   | (Int(a, at), Int(b, bt)) when at = bt ->
@@ -176,30 +173,3 @@ let rm_concat = function
       let nt = Reg(bitsl + bitsr) in
       exp_or ((cast_unsigned nt le) <<* Int(big_int_of_int bitsr, nt)) (cast_unsigned nt re)
   | _ -> assert false
-
-
-(* Return list of statments between start_addr and end_addr *)
-let find_prog_chunk prog start_addr end_addr = 
-  let rec find_prog_chunk_k prog starta enda k =
-	match prog with
-	| [] -> raise (RangeNotFound (start_addr, end_addr))
-	| p::ps -> 
-	  match starta with
-	  | Some(a) -> (match p with
-		| Label(Addr(addr),attrs) -> 
-		  (* If this is the start address we are looking for begin recording 
-			 with accumulator k.  Set starta to None so that we know we are in
-			 the desired range *)
-		  if (addr = a) then find_prog_chunk_k ps None enda (p::k)
-		  else find_prog_chunk_k ps starta enda k
-		| _ -> find_prog_chunk_k ps starta enda k
-	  )
-	  (* Indicates we are inside desired block; return through end_addr *)
-	  | None -> (match p with
-		| Label(Addr(addr),attrs) -> 
-		  if (addr = enda) then k
-		  else find_prog_chunk_k ps starta enda (p::k)
-		| _ -> find_prog_chunk_k ps starta enda (p::k)
-	  )
-  in
-  List.rev (find_prog_chunk_k prog (Some start_addr) end_addr [])

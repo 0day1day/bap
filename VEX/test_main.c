@@ -1,37 +1,10 @@
 
 /*---------------------------------------------------------------*/
-/*--- begin                                       test_main.c ---*/
+/*---                                                         ---*/
+/*--- This file (test_main.c) is                              ---*/
+/*--- Copyright (C) 2005 OpenWorks LLP.  All rights reserved. ---*/
+/*---                                                         ---*/
 /*---------------------------------------------------------------*/
-
-/*
-   This file is part of Valgrind, a dynamic binary instrumentation
-   framework.
-
-   Copyright (C) 2004-2010 OpenWorks LLP
-      info@open-works.net
-
-   This program is free software; you can redistribute it and/or
-   modify it under the terms of the GNU General Public License as
-   published by the Free Software Foundation; either version 2 of the
-   License, or (at your option) any later version.
-
-   This program is distributed in the hope that it will be useful, but
-   WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-   General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
-   02110-1301, USA.
-
-   The GNU General Public License is contained in the file COPYING.
-
-   Neither the names of the U.S. Department of Energy nor the
-   University of California nor the names of its contributors may be
-   used to endorse or promote products derived from this software
-   without prior written permission.
-*/
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -76,7 +49,7 @@ static Bool verbose = True;
 
 /* Forwards */
 #if 1 /* UNUSED */
-//static IRSB* ac_instrument ( IRSB*, VexGuestLayout*, IRType );
+static IRSB* ac_instrument ( IRSB*, VexGuestLayout*, IRType );
 static
 IRSB* mc_instrument ( void* closureV,
                       IRSB* bb_in, VexGuestLayout* layout, 
@@ -84,12 +57,7 @@ IRSB* mc_instrument ( void* closureV,
                       IRType gWordTy, IRType hWordTy );
 #endif
 
-static Bool chase_into_not_ok ( void* opaque, Addr64 dst ) {
-   return False;
-}
-static UInt needs_self_check ( void* opaque, VexGuestExtents* vge ) {
-   return 0;
-}
+static Bool chase_into_not_ok ( void* opaque, Addr64 dst ) { return False; }
 
 int main ( int argc, char** argv )
 {
@@ -133,8 +101,7 @@ int main ( int argc, char** argv )
 
    while (!feof(f)) {
 
-      __attribute__((unused))
-      char* unused1 = fgets(linebuf, N_LINEBUF,f);
+      fgets(linebuf, N_LINEBUF,f);
       if (linebuf[0] == 0) continue;
       if (linebuf[0] != '.') continue;
 
@@ -147,8 +114,7 @@ int main ( int argc, char** argv )
                                  & orig_addr, & orig_nbytes ));
       assert(orig_nbytes >= 1);
       assert(!feof(f));
-      __attribute__((unused))
-      char* unused2 = fgets(linebuf, N_LINEBUF,f);
+      fgets(linebuf, N_LINEBUF,f);
       assert(linebuf[0] == '.');
 
       /* second line is:   . byte byte byte etc */
@@ -217,12 +183,11 @@ int main ( int argc, char** argv )
       vta.instrument1     = mc_instrument;
       vta.instrument2     = NULL;
 #endif
-      vta.needs_self_check  = needs_self_check;
+      vta.do_self_check   = False;
       vta.preamble_function = NULL;
       vta.traceflags      = TEST_FLAGS;
 #if 1 /* x86, amd64 hosts */
-      vta.dispatch_unassisted = (void*)0x12345678;
-      vta.dispatch_assisted   = (void*)0x12345678;
+      vta.dispatch        = (void*)0x12345678;
 #else /* ppc32, ppc64 hosts */
       vta.dispatch        = NULL;
 #endif
@@ -232,10 +197,9 @@ int main ( int argc, char** argv )
       for (i = 0; i < TEST_N_ITERS; i++)
          tres = LibVEX_Translate ( &vta );
 
-      if (tres.status != VexTransOK)
-         printf("\ntres = %d\n", (Int)tres.status);
-      assert(tres.status == VexTransOK);
-      assert(tres.n_sc_extents == 0);
+      if (tres != VexTransOK)
+         printf("\ntres = %d\n", (Int)tres);
+      assert(tres == VexTransOK);
       assert(vge.n_used == 1);
       assert((UInt)(vge.len[0]) == orig_nbytes);
 
@@ -472,7 +436,7 @@ static void MC_helperc_value_check4_fail( void ) { }
    This file is part of MemCheck, a heavyweight Valgrind tool for
    detecting memory errors.
 
-   Copyright (C) 2000-2010 Julian Seward 
+   Copyright (C) 2000-2008 Julian Seward 
       jseward@acm.org
 
    This program is free software; you can redistribute it and/or
@@ -1293,7 +1257,6 @@ IRAtom* mkLazyN ( MCEnv* mce,
 /*------------------------------------------------------------*/
 
 static
-__attribute__((unused))
 IRAtom* expensiveAdd32 ( MCEnv* mce, IRAtom* qaa, IRAtom* qbb, 
                                      IRAtom* aa,  IRAtom* bb )
 {
@@ -1534,9 +1497,9 @@ IRAtom* vectorNarrowV128 ( MCEnv* mce, IROp narrow_op,
    IRAtom *at1, *at2, *at3;
    IRAtom* (*pcast)( MCEnv*, IRAtom* );
    switch (narrow_op) {
-      case Iop_QNarrowBin32Sto16Sx8: pcast = mkPCast32x4; break;
-      case Iop_QNarrowBin16Sto8Sx16: pcast = mkPCast16x8; break;
-      case Iop_QNarrowBin16Sto8Ux16: pcast = mkPCast16x8; break;
+      case Iop_QNarrow32Sx4: pcast = mkPCast32x4; break;
+      case Iop_QNarrow16Sx8: pcast = mkPCast16x8; break;
+      case Iop_QNarrow16Ux8: pcast = mkPCast16x8; break;
       default: VG_(tool_panic)("vectorNarrowV128");
    }
    tl_assert(isShadowAtom(mce,vatom1));
@@ -1657,26 +1620,18 @@ IRAtom* expr2vbits_Binop ( MCEnv* mce,
          return binary16Ix8(mce, vatom1, vatom2);
 
       case Iop_Sub32x4:
-      case Iop_QSub32Sx4:
-      case Iop_QSub32Ux4:
       case Iop_CmpGT32Sx4:
       case Iop_CmpEQ32x4:
       case Iop_Add32x4:
-      case Iop_QAdd32Ux4:
-      case Iop_QAdd32Sx4:
          return binary32Ix4(mce, vatom1, vatom2);
 
       case Iop_Sub64x2:
-      case Iop_QSub64Ux2:
-      case Iop_QSub64Sx2:
       case Iop_Add64x2:
-      case Iop_QAdd64Ux2:
-      case Iop_QAdd64Sx2:
          return binary64Ix2(mce, vatom1, vatom2);
 
-      case Iop_QNarrowBin32Sto16Sx8:
-      case Iop_QNarrowBin16Sto8Sx16:
-      case Iop_QNarrowBin16Sto8Ux16:
+      case Iop_QNarrow32Sx4:
+      case Iop_QNarrow16Sx8:
+      case Iop_QNarrow16Ux8:
          return vectorNarrowV128(mce, op, vatom1, vatom2);
 
       case Iop_Sub64Fx2:
@@ -1742,20 +1697,20 @@ IRAtom* expr2vbits_Binop ( MCEnv* mce,
       /* Scalar floating point */
 
          //      case Iop_RoundF64:
-      case Iop_F64toI64S:
-      case Iop_I64StoF64:
+      case Iop_F64toI64:
+      case Iop_I64toF64:
          /* First arg is I32 (rounding mode), second is F64 or I64
             (data). */
          return mkLazy2(mce, Ity_I64, vatom1, vatom2);
 
       case Iop_PRemC3210F64: case Iop_PRem1C3210F64:
          /* Takes two F64 args. */
-      case Iop_F64toI32S:
+      case Iop_F64toI32:
       case Iop_F64toF32:
          /* First arg is I32 (rounding mode), second is F64 (data). */
          return mkLazy2(mce, Ity_I32, vatom1, vatom2);
 
-      case Iop_F64toI16S:
+      case Iop_F64toI16:
          /* First arg is I32 (rounding mode), second is F64 (data). */
          return mkLazy2(mce, Ity_I16, vatom1, vatom2);
 
@@ -1941,7 +1896,7 @@ IRExpr* expr2vbits_Unop ( MCEnv* mce, IROp op, IRAtom* atom )
          return assignNew(mce, Ity_V128, unop(op, vatom));
 
       case Iop_F32toF64: 
-      case Iop_I32StoF64:
+      case Iop_I32toF64:
       case Iop_NegF64:
       case Iop_SinF64:
       case Iop_CosF64:
@@ -2522,7 +2477,6 @@ static Bool isBogusAtom ( IRAtom* at )
            || n == 1010100);
 }
 
-__attribute__((unused))
 static Bool checkForBogusLiterals ( /*FLAT*/ IRStmt* st )
 {
    Int     i;
@@ -2708,5 +2662,5 @@ IRSB* mc_instrument ( void* closureV,
 #endif /* UNUSED */
 
 /*--------------------------------------------------------------------*/
-/*--- end                                              test_main.c ---*/
+/*--- end                                           mc_translate.c ---*/
 /*--------------------------------------------------------------------*/

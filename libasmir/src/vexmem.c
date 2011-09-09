@@ -348,22 +348,8 @@ IRStmt* vx_IRStmt_Exit ( IRExpr* guard, IRJumpKind jk, IRConst* dst ) {
    s->Ist.Exit.dst   = dst;
    return s;
 }
-IRStmt* vx_IRStmt_CAS (IRCAS* d) {
-   IRStmt* s       = (IRStmt *)vx_Alloc(sizeof(IRStmt));
-   s->tag          = Ist_CAS;
-   s->Ist.CAS.details  = d;
-   return s;
-}
-IRStmt* vx_IRStmt_LLSC ( IREndness end,
-                      IRTemp result, IRExpr* addr, IRExpr* storedata ) {
-    IRStmt* s = (IRStmt *)vx_Alloc(sizeof(IRStmt));
-   s->tag                = Ist_LLSC;
-   s->Ist.LLSC.end       = end;
-   s->Ist.LLSC.result    = result;
-   s->Ist.LLSC.addr      = addr;
-   s->Ist.LLSC.storedata = storedata;
-   return s;
-}
+
+
 
 /* Constructors -- IRSB */
 
@@ -479,9 +465,7 @@ IRExpr* vx_dopyIRExpr ( IRExpr* e )
       case Iex_Mux0X: 
          return vx_IRExpr_Mux0X(vx_dopyIRExpr(e->Iex.Mux0X.cond),
                              vx_dopyIRExpr(e->Iex.Mux0X.expr0),
-                                vx_dopyIRExpr(e->Iex.Mux0X.exprX));
-   case Iex_Binder:
-         vx_panic("vx_dopyIRExpr: case Iex_Binder (this should not be seen outside VEX)");
+                             vx_dopyIRExpr(e->Iex.Mux0X.exprX));
       default:
          vx_panic("vx_dopyIRExpr");
    }
@@ -505,33 +489,6 @@ IRDirty* vx_dopyIRDirty ( IRDirty* d )
    for (i = 0; i < d2->nFxState; i++)
       d2->fxState[i] = d->fxState[i];
    return d2;
-}
-
-IRCAS* vx_mkIRCAS ( IRTemp oldHi, IRTemp oldLo,
-                 IREndness end, IRExpr* addr, 
-                 IRExpr* expdHi, IRExpr* expdLo,
-                 IRExpr* dataHi, IRExpr* dataLo ) {
-    IRCAS* cas = (IRCAS *)vx_Alloc(sizeof(IRCAS));
-   cas->oldHi  = oldHi;
-   cas->oldLo  = oldLo;
-   cas->end    = end;
-   cas->addr   = addr;
-   cas->expdHi = expdHi;
-   cas->expdLo = expdLo;
-   cas->dataHi = dataHi;
-   cas->dataLo = dataLo;
-   return cas;
-}
-
-
-IRCAS* vx_dopyIRCAS ( IRCAS* cas )
-{
-   return vx_mkIRCAS( cas->oldHi, cas->oldLo, cas->end,
-                   vx_dopyIRExpr(cas->addr),
-                   cas->expdHi==NULL ? NULL : vx_dopyIRExpr(cas->expdHi),
-                   vx_dopyIRExpr(cas->expdLo),
-                   cas->dataHi==NULL ? NULL : vx_dopyIRExpr(cas->dataHi),
-                   vx_dopyIRExpr(cas->dataLo) );
 }
 
 IRStmt* vx_dopyIRStmt ( IRStmt* s )
@@ -566,17 +523,7 @@ IRStmt* vx_dopyIRStmt ( IRStmt* s )
       case Ist_Exit: 
          return vx_IRStmt_Exit(vx_dopyIRExpr(s->Ist.Exit.guard),
                             s->Ist.Exit.jk,
-                               vx_dopyIRConst(s->Ist.Exit.dst));
-   case Ist_CAS:
-       return vx_IRStmt_CAS(vx_dopyIRCAS(s->Ist.CAS.details));
-   case Ist_LLSC:
-                return vx_IRStmt_LLSC(s->Ist.LLSC.end,
-                            s->Ist.LLSC.result,
-                            vx_dopyIRExpr(s->Ist.LLSC.addr),
-                            s->Ist.LLSC.storedata
-                                      ? vx_dopyIRExpr(s->Ist.LLSC.storedata)
-                               : NULL);
-       
+                            vx_dopyIRConst(s->Ist.Exit.dst));
       default: 
          vx_panic("vx_dopyIRStmt");
    }

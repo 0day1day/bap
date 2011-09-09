@@ -27,16 +27,24 @@
 #define OFFB_R12      offsetof(VexGuestARMState,guest_R12)
 #define OFFB_R13      offsetof(VexGuestARMState,guest_R13)
 #define OFFB_R14      offsetof(VexGuestARMState,guest_R14)
-#define OFFB_R15T      offsetof(VexGuestARMState,guest_R15T)
+#define OFFB_R15      offsetof(VexGuestARMState,guest_R15)
 
 // We assume you are compiling with the included patched version of 
 // VEX. If not, you may need to define ARM_THUNKS to revert to 
 // (at least at the time of this writing) default VEX ARM behavior.
 
+#ifdef ARM_THUNKS
 #define OFFB_CC_OP    offsetof(VexGuestARMState,guest_CC_OP)
 #define OFFB_CC_DEP1  offsetof(VexGuestARMState,guest_CC_DEP1)
 #define OFFB_CC_DEP2  offsetof(VexGuestARMState,guest_CC_DEP2)
-#define OFFB_CC_NDEP  offsetof(VexGuestARMState,guest_CC_NDEP)
+
+#else
+
+// Note to self: Don't commit this until people are ready to switch
+// to a patched version of VEX. --aij
+#define OFFB_CC    offsetof(VexGuestARMState,guest_CC)
+
+#endif
 
 vector<VarDecl *> arm_get_reg_decls()
 {
@@ -94,12 +102,15 @@ static string reg_offset_to_name( int offset )
     case OFFB_R12:    	return "R12";    
     case OFFB_R13:    	return "R13";    
     case OFFB_R14:    	return "R14";    
-    case OFFB_R15T:    	return "R15T";    
+    case OFFB_R15:    	return "R15";    
 
+#ifdef ARM_THUNKS
     case OFFB_CC_OP:  	return "CC_OP";	 
     case OFFB_CC_DEP1:	return "CC_DEP1";
     case OFFB_CC_DEP2:	return "CC_DEP2";
-    case OFFB_CC_NDEP:  return "CC_NDEP";
+#else
+    case OFFB_CC:  	return "CC";	 
+#endif
     default:
       panic("reg_offset_to_name(arm): Unrecognized register offset");
     }

@@ -36,14 +36,10 @@ let prints block =
 (** Concretely executes a block *)
 let concrete block =
   let no_specials = Traces.remove_specials block in
-  (* SWXXX use disasm.mem(?) instead *)
   let memv = Traces.find_memv no_specials in
-  let trace = 
-	try
-	  (* SWXXX modify to use range (should look a lot like loop in traces.ml) *)
-	  (* SWXXX do memory2array at block level *)
-	  Traces.run_block concrete_state memv no_specials None
-	with Failure "empty list" -> (*Printf.printf "run blocks failed\n";*) [] in
+  let trace = try
+    Traces.run_block concrete_state memv no_specials 
+  with Failure "empty list" -> (*Printf.printf "run blocks failed\n";*) [] in
   trace
 
 let speclist =

@@ -162,9 +162,6 @@ extern "C" {
   typedef struct vector_bap_block_t bap_blocks_t;
 #endif  // __cplusplus
 
-  extern void asmir_set_print_warning(bool value);
-  extern bool asmir_get_print_warning();
-
   /*
   /// Enable/disable eflags thunks code. 
   extern void set_use_eflags_thunks(bool value);
