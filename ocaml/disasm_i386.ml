@@ -82,6 +82,7 @@ type opcode =
   | Test of typ * operand * operand
   | Not of typ * operand
   | Cld
+  | Rdtsc
   | Leave of typ
   | Interrupt of operand
 
@@ -543,6 +544,8 @@ let rec to_ir addr next ss pref =
       ]
   | Hlt ->
     [Jmp(Lab "General_protection fault", [])]
+  | Rdtsc ->
+    [Special ("rdtsc", [])]
   | Cmps(Reg bits as t) ->
     let src1 = nv "src1" t and src2 = nv "src2" t and tmpres = nv "tmp" t in
     let stmts =
@@ -706,6 +709,7 @@ module ToStr = struct
     | Shift _ -> "shift"
     | Shiftd _ -> "shiftd"
     | Hlt -> "hlt"
+    | Rdtsc -> "rdtsc"
     | Inc (t, r) -> Printf.sprintf "inc %s" (opr r)
     | Dec (t, r) -> Printf.sprintf "dec %s" (opr r)
     | Jump a -> Printf.sprintf "jmp %s" (opr a)
@@ -1040,7 +1044,8 @@ let parse_instr g addr =
     | 0x0f -> (
       let b2 = Char.code (g na) and na = s na in
       match b2 with (* Table A-3 *)
-	  | 0x1f -> (Nop, na)
+      | 0x1f -> (Nop, na)
+      | 0x31 -> (Rdtsc, na)
       | 0x6f | 0x7f when pref = [0x66] ->
             (
 	      let r, rm, na = parse_modrm32 na in
