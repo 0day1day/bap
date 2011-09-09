@@ -57,6 +57,7 @@ let speclist =
     ("-pin", (* enable pin trace *)
      Arg.Set pintrace,
      "Enable pin trace");
+	("-always-vex", Arg.Set Asmir.always_vex, "Only use vex to lift to IL" );
   ]
 
 
@@ -79,8 +80,8 @@ let get_program () =
     | [] -> p
     | arg::args -> cat (List.rev_append (List.rev (get_one arg)) p) args
   in
-  try
-    cat [] !inputs
+  try  
+	cat [] !inputs
   with _ -> failwith "An exception occured while lifting"
 
 let get_stream_program () = match !streaminputs with
