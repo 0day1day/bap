@@ -299,6 +299,7 @@ let store_s s t a e = match s with
 let storem m t a e =
   move m (Store(Var m, a, e, little_endian, t))
 
+
 let op2e_s ss t = function
   | Oreg r when t = r128 -> bits2xmme r
   | Oreg r when t = r32 -> bits2reg32e r
@@ -396,6 +397,7 @@ let set_aopszf_sub t s1 s2 r =
   move af (bit4 ==* ((bit4 &* ((r ^* s1) ^* s2))))
   ::move oF (Cast(CAST_HIGH, r1, (s1 ^* s2) &* (s1 ^* r) ))
   ::set_pszf t r
+
 let set_flags_sub t s1 s2 r =
   move cf (s2 >* s1)
   ::set_aopszf_sub t s1 s2 r
