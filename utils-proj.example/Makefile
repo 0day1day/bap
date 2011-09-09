@@ -2,8 +2,8 @@
 # $Id$
 
 # We need to tell the main utils Makefile to include our proj's ocaml
-export BAP_PROJ_OCAMLDIR=../../ocaml-proj
-export BAP_PROJ_UTILDIR=../../utils-proj
+export BAP_PROJ_OCAMLDIR=$(CURDIR)/../../ocaml-proj
+export BAP_PROJ_UTILDIR=$(CUDIR)/../../utils-proj
 
 define PROJ_testutil
 	RESULT=testutil
