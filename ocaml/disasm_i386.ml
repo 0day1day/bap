@@ -270,7 +270,6 @@ let bits2reg8e b =
 
 let reg2xmm r =
   bits2xmm (reg2bits r)
-let it i t = Int(Int64.of_int i, t)
 
 (* effective addresses for 16-bit addressing *)
 let eaddr16 = function
@@ -1122,23 +1121,6 @@ let parse_instr g addr =
       | 0xef ->
 		let d, s, na = parse_modrm32 na in
 		(Pxor(mopsize,d,s), na)
-      | 0x80 | 0x81 | 0x82 | 0x83 | 0x84 | 0x85 | 0x86 | 0x87 | 0x88 | 0x89
-      | 0x8c | 0x8d | 0x8e
-      | 0x8f ->	let (i,na) = parse_disp32 na in
-		(Jcc(Oimm(Int64.add i na), cc_to_exp b2), na)
-    (* add other opcodes for setcc here *)
-      | 0x94
-      | 0x95 -> let r, rm, na = parse_modrm r8 na in
-		assert (opsize = r32);  (* unclear what happens otherwise *)
-		(Setcc(r8, rm, cc_to_exp b2), na)
-      | 0xb6
-      | 0xb7 -> let st = if b2 = 0xb6 then r8 else r16 in
-		let r, rm, na = parse_modrm32 na in
-		(Movzx(opsize, r, st, rm), na)
-      | 0xbe
-      | 0xbf -> let st = if b2 = 0xbe then r8 else r16 in
-		let r, rm, na = parse_modrm32 na in
-		(Movsx(opsize, r, st, rm), na)
       | _ -> unimplemented (Printf.sprintf "unsupported opcode: %02x %02x" b1 b2)
     )
     | n -> unimplemented (Printf.sprintf "unsupported opcode: %02x" n)
