@@ -1,42 +1,31 @@
 
 /*---------------------------------------------------------------*/
-/*---                                                         ---*/
-/*--- This file (libvex_guest_amd64.h) is                     ---*/
-/*--- Copyright (C) OpenWorks LLP.  All rights reserved.      ---*/
-/*---                                                         ---*/
+/*--- begin                              libvex_guest_amd64.h ---*/
 /*---------------------------------------------------------------*/
 
 /*
-   This file is part of LibVEX, a library for dynamic binary
-   instrumentation and translation.
+   This file is part of Valgrind, a dynamic binary instrumentation
+   framework.
 
-   Copyright (C) 2004-2008 OpenWorks LLP.  All rights reserved.
+   Copyright (C) 2004-2010 OpenWorks LLP
+      info@open-works.net
 
-   This library is made available under a dual licensing scheme.
+   This program is free software; you can redistribute it and/or
+   modify it under the terms of the GNU General Public License as
+   published by the Free Software Foundation; either version 2 of the
+   License, or (at your option) any later version.
 
-   If you link LibVEX against other code all of which is itself
-   licensed under the GNU General Public License, version 2 dated June
-   1991 ("GPL v2"), then you may use LibVEX under the terms of the GPL
-   v2, as appearing in the file LICENSE.GPL.  If the file LICENSE.GPL
-   is missing, you can obtain a copy of the GPL v2 from the Free
-   Software Foundation Inc., 51 Franklin St, Fifth Floor, Boston, MA
+   This program is distributed in the hope that it will be useful, but
+   WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+   General Public License for more details.
+
+   You should have received a copy of the GNU General Public License
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
    02110-1301, USA.
 
-   For any other uses of LibVEX, you must first obtain a commercial
-   license from OpenWorks LLP.  Please contact info@open-works.co.uk
-   for information about commercial licensing.
-
-   This software is provided by OpenWorks LLP "as is" and any express
-   or implied warranties, including, but not limited to, the implied
-   warranties of merchantability and fitness for a particular purpose
-   are disclaimed.  In no event shall OpenWorks LLP be liable for any
-   direct, indirect, incidental, special, exemplary, or consequential
-   damages (including, but not limited to, procurement of substitute
-   goods or services; loss of use, data, or profits; or business
-   interruption) however caused and on any theory of liability,
-   whether in contract, strict liability, or tort (including
-   negligence or otherwise) arising in any way out of the use of this
-   software, even if advised of the possibility of such damage.
+   The GNU General Public License is contained in the file COPYING.
 
    Neither the names of the U.S. Department of Energy nor the
    University of California nor the names of its contributors may be
@@ -87,22 +76,25 @@ typedef
       /* The D flag is stored here, encoded as either -1 or +1 */
       /* 160 */ ULong  guest_DFLAG;
       /* 168 */ ULong  guest_RIP;
+      /* Bit 18 (AC) of eflags stored here, as either 0 or 1. */
+      /* ... */ ULong  guest_ACFLAG;
+      /* Bit 21 (ID) of eflags stored here, as either 0 or 1. */
+      /* 176 */ ULong guest_IDFLAG;
       /* Probably a lot more stuff too. 
          D,ID flags
          16  128-bit SSE registers
          all the old x87 FPU gunk
-         segment registers
-      */
-
-      /* Bit 21 (ID) of eflags stored here, as either 0 or 1. */
-      /* 176 */ ULong guest_IDFLAG;
+         segment registers */
 
       /* HACK to make tls on amd64-linux work.  %fs only ever seems to
          hold zero, and so guest_FS_ZERO holds the 64-bit offset
          associated with a %fs value of zero. */
       /* 184 */ ULong guest_FS_ZERO;
 
-      /* XMM registers */
+      /* XMM registers.  Note that these must be allocated
+         consecutively in order that the SSE4.2 PCMP{E,I}STR{I,M}
+         helpers can treat them as an array.  XMM16 is a fake reg used
+         as an intermediary in handling aforementioned insns. */
       /* 192 */ULong guest_SSEROUND;
       /* 200 */U128  guest_XMM0;
       U128  guest_XMM1;
@@ -120,6 +112,7 @@ typedef
       U128  guest_XMM13;
       U128  guest_XMM14;
       U128  guest_XMM15;
+      U128  guest_XMM16;
 
       /* FPU */
       /* Note.  Setting guest_FTOP to be ULong messes up the
@@ -152,6 +145,21 @@ typedef
          replace-style ones. */
       ULong guest_NRADDR;
 
+      /* Used for Darwin syscall dispatching. */
+      ULong guest_SC_CLASS;
+
+      /* HACK to make tls on darwin work.  %gs only ever seems to
+         hold 0x60, and so guest_GS_0x60 holds the 64-bit offset
+         associated with a %gs value of 0x60.  (A direct analogue
+         of the %fs-zero hack for amd64-linux). */
+      ULong guest_GS_0x60;
+
+      /* Needed for Darwin (but mandated for all guest architectures):
+         RIP at the last syscall insn (int 0x80/81/82, sysenter,
+         syscall).  Used when backing up to restart a syscall that has
+         been interrupted by a signal. */
+      ULong guest_IP_AT_SYSCALL;
+
       /* Padding to make it have an 16-aligned size */
       ULong padding;
    }
@@ -175,6 +183,13 @@ void LibVEX_GuestAMD64_initialise ( /*OUT*/VexGuestAMD64State* vex_state );
    corresponding native %rflags value. */
 extern 
 ULong LibVEX_GuestAMD64_get_rflags ( /*IN*/VexGuestAMD64State* vex_state );
+
+/* Set the carry flag in the given state to 'new_carry_flag', which
+   should be zero or one. */
+extern
+void
+LibVEX_GuestAMD64_put_rflag_c ( ULong new_carry_flag,
+                                /*MOD*/VexGuestAMD64State* vex_state );
 
 
 #if 0

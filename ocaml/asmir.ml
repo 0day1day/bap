@@ -21,6 +21,8 @@ module BArray = Bigarray.Array1
 exception Disassembly_error;;
 exception Memory_error;;
 
+let always_vex = ref false;;
+
 type arch = Libbfd.bfd_architecture
 type asmprogram = {asmp : Libasmir.asm_program_t;
 		   arch : arch;
@@ -42,6 +44,9 @@ module Status = Util.StatusPrinter
 (* more verbose debugging *)
 module DV = Debug.Make(struct let name = "AsmirV" and default=`NoDebug end)
 (* module DCheck = Debug.Make(struct let name = "AsmirCheck" and default=`NoDebug end) *)
+
+(* Debug output for testing*)
+module DTest = Debug.Make(struct let name = "AsmirTest" and default=`NoDebug end)
 
 (** Translate a unop *)
 let tr_unop = function
@@ -206,28 +211,34 @@ let get_cval_usage = function
 (* TODO: needs to be refined for bytes *)
 let int_to_taint n = Taint n
 
-let big_int_of_big_val v =
-  let n = (cval_value_size v) - 1 in
-  Util.foldn
-    (fun acc index ->
-      (* On x86, the data will be stored in litle endian form, so the
-	 last index has the most significant data.  We want to access
-	 this first, since we shift left as we go. *)
-      let revindex = n - index in
-      (* We need to convert the int64 we need to two's complement form *)
-      let tempv = Arithmetic.to_big_int (big_int_of_int64 (cval_value_part v revindex), reg_64) in
-      let shiftacc = shift_left_big_int acc 64 (* sizeof(int64) *) in
-      (* dprintf "Hmmm.... %s %s" (string_of_big_int tempv) (string_of_big_int shiftacc); *)
-      add_big_int tempv shiftacc)
-    zero_big_int
-    n
+let big_int_of_big_val v t =
+  let big_int_of_big_val_help v =
+    let n = (cval_value_size v) - 1 in
+    Util.foldn
+      (fun acc index ->
+         (* On x86, the data will be stored in litle endian form, so the
+	    last index has the most significant data.  We want to access
+	    this first, since we shift left as we go. *)
+         let revindex = n - index in
+         (* We need to convert the int64 we need to two's complement form *)
+         let tempv = Arithmetic.to_big_int (big_int_of_int64 (cval_value_part v revindex), reg_64) in
+         let shiftacc = shift_left_big_int acc 64 (* sizeof(int64) *) in
+         (* dprintf "Hmmm.... %s %s" (string_of_big_int tempv) (string_of_big_int shiftacc); *)
+         add_big_int tempv shiftacc)
+      zero_big_int
+      n
+  in
+  (* Cast off useless bits *)
+  Arithmetic.to_big_int (big_int_of_big_val_help v, t)
+
 
 let tr_context_tup cval =
+  let t = cval_type_to_typ (Libasmir.cval_type cval) in
   Context {name=Libasmir.cval_name cval;
            mem=Libasmir.cval_mem cval;
-           t=cval_type_to_typ (Libasmir.cval_type cval);
+           t=t;
            index=Libasmir.cval_ind cval;
-           value=big_int_of_big_val (Libasmir.cval_value cval);
+           value=big_int_of_big_val (Libasmir.cval_value cval) t;
 	   usage=get_cval_usage(Libasmir.cval_usage cval);
            taint=int_to_taint (Libasmir.cval_taint cval)}
 
@@ -403,6 +414,8 @@ let arm_regs =
       "CC_DEP2";
     ]
 
+let all_regs = x86_regs @ arm_regs
+
 let decls_for_arch = function
   | Bfd_arch_i386 -> x86_mem::x86_regs
   | Bfd_arch_arm  -> x86_mem::arm_regs
@@ -545,23 +558,28 @@ let asm_addr_to_bap {asmp=prog; arch=arch; get=get} addr =
       destroy_bap_block block;
       (ir, next)
   in
-  try let (ir,na) as v = try 
-    Disasm.disasm_instr arch get addr
-  with Failure s -> DV.dprintf "disasm_instr %Lx: %s" addr s; raise Disasm.Unimplemented
-  in
-  DV.dprintf "Disassembled %Lx directly" addr;
-  (* if DCheck.debug then *)
-  (*   check_equivalence addr v (fallback()); *)
-  (* If we don't have a string disassembly, use binutils disassembler *)
-  (match ir with
-   | Label(l, [])::rest ->
-       (Label(l, [Asm(Libasmir.asmir_string_of_insn prog addr)])::rest,
-	na)
-   | _ -> v
+  if (!always_vex) then fallback() 
+  else (
+	try 
+      let (ir,na) as v = 
+		(try (Disasm.disasm_instr arch get addr)
+		 with Failure s -> 
+		   DTest.dprintf "BAP unknown disasm_instr %Lx: %s" addr s;
+		   DV.dprintf "disasm_instr %Lx: %s" addr s; raise Disasm.Unimplemented
+		)
+      in
+      DV.dprintf "Disassembled %Lx directly" addr;
+      (* if DCheck.debug then check_equivalence addr v (fallback()); *)
+	  (* If we don't have a string disassembly, use binutils disassembler *)
+      (match ir with
+      | Label(l, [])::rest ->
+		(Label(l, [Asm(Libasmir.asmir_string_of_insn prog addr)])::rest,
+		 na)
+      | _ -> v)
+	with Disasm.Unimplemented ->
+      DV.dprintf "Disassembling %Lx through VEX" addr;
+      fallback()
   )
-  with Disasm.Unimplemented ->
-    DV.dprintf "Disassembling %Lx through VEX" addr;
-    fallback()
 
 let flatten ll =
 	List.rev (List.fold_left (fun accu l -> List.rev_append l accu) [] ll)
@@ -570,10 +588,9 @@ let flatten ll =
 let asmprogram_to_bap_range ?(init_ro = false) p st en =
   let rec f l s =
     (* This odd structure is to ensure tail-recursion *)
-    let t =
+    let t = 
       try Some(asm_addr_to_bap p s)
-      with Memory_error -> None
-    in
+      with Memory_error -> None in
     match t with
     | Some(ir, n) ->
       if n >= en then flatten (List.rev (ir::l))
@@ -594,9 +611,10 @@ let asmprogram_section_to_bap p s =
 
 (** Translate an entire Libasmir.asm_program_t into a Vine program *)
 let asmprogram_to_bap ?(init_ro=false) p =
-  let irs = List.map (fun s -> if is_code s then asmprogram_section_to_bap p s else []) p.secs in
+  let irs = List.map 
+	(fun s -> 
+	  if is_code s then asmprogram_section_to_bap p s else []) p.secs in
   let ir = flatten irs in
-
   if init_ro then
   let g = gamma_for_arch p.arch in
     let m = gamma_lookup g "$mem" in
@@ -637,6 +655,7 @@ let trans_frame f =
 	 Comment("All blocks must have two statements", [])]
   | _ -> []
 
+(* SWXXX Add buffering around this/let it find a range where alt_bap finds entire range *)
 let alt_bap_from_trace_file filename =
   let add_operands stmts f =
     let ops = tr_frame_attrs f in
@@ -727,6 +746,8 @@ let bap_from_trace_file ?(atts = true) ?(pin = false) filename =
 let bap_get_stmt_from_trace_file ?(atts = true) ?(pin = false) filename off =
   let off = Int64.of_int off in (* blah, Stream.from does not use int64 *)
   let g = gamma_create x86_mem x86_regs in
+  (* SWXXX this is the old way, use alt_bap_from_trace_file instead *)
+  (* SWXXX this has no buffer at all; will parse entire trace for every instruction *)
   let bap_blocks = Libasmir.asmir_bap_from_trace_file filename off 1L atts pin in
   let numblocks = Libasmir.asmir_bap_blocks_size bap_blocks in
   let ir = tr_bap_blocks_t_trace_asm g bap_blocks in
@@ -812,6 +833,10 @@ let get_asm_instr_string_range p s e =
     s := Int64.add !s len
   done;
   !str
+
+let set_print_warning = Libasmir.asmir_set_print_warning
+
+let get_print_warning = Libasmir.asmir_get_print_warning
 
 let set_use_simple_segments = Libasmir.asmir_set_use_simple_segments
 
