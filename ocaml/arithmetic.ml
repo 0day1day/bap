@@ -109,13 +109,7 @@ let binop op ((_,t) as v1) v2 =
   | LSHIFT -> to_val t (shift_left_big_int (to_big_int v1) (toshift t v2))
   | RSHIFT -> to_val t (shift_right_big_int (to_big_int v1) (toshift t v2))
   | ARSHIFT -> to_val t (shift_right_towards_zero_big_int (to_sbig_int v1) (toshift t v2))
-      (* div_big_int rounds towards infinity. *)
   | DIVIDE -> to_val t (div_big_int (to_big_int v1) (to_big_int v2))
-      (* X86 returns towards zero.  Big int implementation uses
-         positive modulus (see Hacker's Delight 9-1). These are the same
-         when the dividend is positive, so for now we'll use the Big int
-         implementation but raise an exception when the dividend is not
-         positive. *)
   | SDIVIDE -> to_val t (t_div (to_sbig_int v1) (to_sbig_int v2))
   | MOD -> to_val t (mod_big_int (to_big_int v1) (to_big_int v2))
   | SMOD -> to_val t (t_mod (to_sbig_int v1) (to_sbig_int v2))
@@ -152,7 +146,7 @@ let extract h l ((_,t) as v) =
   let nt = Reg(int_of_big_int n) in
   let s = binop RSHIFT v (l,t) in
   cast CAST_LOW s nt
-  
+
 
 let concat ((_,lt) as lv) ((_,rt) as rv) =
   let bitsl,bitsr =
