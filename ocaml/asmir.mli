@@ -22,7 +22,7 @@ type arch
 val arch_i386 : arch
 val arch_arm : arch
 
-
+val always_vex : bool ref
 
 type varctx
 
@@ -59,13 +59,13 @@ val get_asmprogram_arch : asmprogram -> arch
 val x86_mem : Var.t
 val x86_regs : Var.t list
 
-val open_program : string -> asmprogram
-val asmprogram_to_bap : ?init_ro:bool -> asmprogram -> Ast.program
-val asm_addr_to_bap :
-  (*varctx ->*) asmprogram -> address_t -> Ast.program * address_t
+val all_regs : Var.t list
 
-val asmprogram_to_bap_range : ?init_ro:bool ->
-  asmprogram -> address_t -> address_t  -> Ast.program
+val open_program :  string -> asmprogram
+val asmprogram_to_bap : ?init_ro:bool -> asmprogram -> Ast.program
+val asm_addr_to_bap : (*varctx ->*) asmprogram -> address_t -> Ast.program * address_t
+
+val asmprogram_to_bap_range : ?init_ro:bool -> asmprogram -> address_t -> address_t  -> Ast.program
 
 val bap_from_trace_file : ?atts:bool -> ?pin:bool -> string -> Ast.program
 
@@ -87,6 +87,10 @@ val is_code : section_ptr -> bool
 
 val byte_insn_to_bap : 
   bfd_architecture -> address_t -> char array -> Ast.program * int64
+
+val set_print_warning : bool -> unit
+
+val get_print_warning : unit -> bool
 
 val set_use_simple_segments : bool -> unit
 

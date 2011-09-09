@@ -1,7 +1,8 @@
 let usage = "Usage: "^Sys.argv.(0)^" <input options> [transformations and outputs]\n\
              Transform BAP IL programs. "
 
-(* open Bap*)
+
+open UtilsCommon
 
 type ast = Ast.program
 type astcfg = Cfg.AST.G.t
@@ -24,14 +25,6 @@ type cmd =
 let pipeline = ref []
 let startdebug = ref 1
 
-let typecheck p =
-  let v = object(self)
-    inherit Ast_visitor.nop
-    method visit_exp e = ignore(Typecheck.infer_ast ~check:true e); `DoChildren
-  end 
-  in
-  ignore(Ast_visitor.prog_accept v p);
-  p
 
 let output_ast f p =
   let oc = open_out f in
