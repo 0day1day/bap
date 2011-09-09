@@ -66,6 +66,33 @@ exception UnknownLabel of label_kind
 (* An assertion failed *)
 exception AssertFailed of ctx
 
+(* Memory equality
+
+   XXX: This should be in arithmetic.ml, but the evaluator uses an
+   internal type AddrMap to represent concrete memories.
+
+   XXX: The semantics of memory equality are undefined.  For now,
+   we'll say that an initial memory is undefined. So, unless a
+   concrete memory is completely specified (e.g., has values for all
+   2^32 mappings), it will not equal another concrete memory unless
+   they originated from the same variable. *)
+let eq_concrete_mem (m1,v1) (m2,v2) =
+  let bool_to_astint = function
+    | true -> (bi1, reg_1)
+    | false -> (bi0, reg_1)
+  in
+  (* let print_map m = dprintf "Printing map"; AddrMap.iter (fun k m -> dprintf "%Lx -> %s" k (Pp.ast_exp_to_string m)) m in *)
+  (* dprintf "cmpmem: %s %s" (Var.name v1) (Var.name v2); *)
+  (* print_map m1; print_map m2; *)
+  if v1 <> v2 then bool_to_astint false (* XXX: Technically, we should check to make sure that both
+                                           mappings are not completely full and equivalent. *)
+  else bool_to_astint (AddrMap.equal (===) m1 m2)
+
+let mem_binop op m1 m2 = match op with
+  | EQ -> eq_concrete_mem m1 m2
+  | NEQ -> Arithmetic.unop NOT (eq_concrete_mem m1 m2)
+  | _ -> failwith ((Pp.binop_to_string op) ^ " undefined for memories")
+
 (* Useful shorthands *)
 let empty_mem v = ConcreteMem(AddrMap.empty, v)
 let empty_smem v = Symbolic(Var(v))
@@ -84,6 +111,9 @@ let is_symbolic = function
 let is_concrete = function
   | Int _ -> true
   | _ -> false
+let is_concrete_mem = function
+  | ConcreteMem _ -> true
+  | Symbolic _ -> false
 let concrete_val_tuple = function
   | Symbolic (Int (v,t)) -> (v,t)
   | Symbolic e -> 
@@ -99,7 +129,9 @@ let context_copy = VH.copy
 let symb_to_exp = function
   | Symbolic e -> e
   | ConcreteMem _ -> failwith "this is not a symbolic expression"
-      
+let concmem_to_mem = function
+  | ConcreteMem m -> m
+  | _ -> failwith "not a concrete memory"
 let symb_to_string = function
   | Symbolic e -> "Symbolic "^(Pp.ast_exp_to_string e)
   | ConcreteMem m -> "Memory"
@@ -310,15 +342,20 @@ struct
 	     expressions. *)
 	  let v1 = eval_expr delta e1
 	  and v2 = eval_expr delta e2 in
-	  if is_symbolic v1 || is_symbolic v2 then 
-	    let e1' = symb_to_exp v1
-	    and e2' = symb_to_exp v2 in
-	    Symbolic (BinOp (op, e1', e2'))
-	  else (* if both concrete exprs -> concrete evaluation *)
-	      let e1' = concrete_val_tuple v1
-	      and e2' = concrete_val_tuple v2 in
+          (match v1, v2 with
+          | Symbolic (Int e1'), Symbolic (Int e2') ->
+              (* We have two concrete scalars *)
 	      let (v,t) = (Arithmetic.binop op e1' e2') in
-		Symbolic (Int(v,t))
+	      Symbolic (Int(v,t))
+          | ConcreteMem m1, ConcreteMem m2 ->
+              (* We have two concrete memories. Note that this can
+                 only return bool. *)
+              Symbolic (Int (mem_binop op m1 m2))
+          | _ ->
+              (* Something is symbolic *)
+	      let e1' = symb_to_exp v1
+	      and e2' = symb_to_exp v2 in
+	      Symbolic (BinOp (op, e1', e2')))
       | UnOp (op,e) ->
 	  (* In the worst case, we will have a symbolic expression. *)
 	  let v = eval_expr delta e in
