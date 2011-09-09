@@ -68,6 +68,20 @@ let check_file file =
    ("File "^file^" does not exist; Skipping this test!");;
 
 
+let mkdir_and_ignore path = try Unix.mkdir path 0o640 with _ -> ();;
+
+
+let rm_and_ignore path =
+  (try if (Sys.is_directory(path)) then Unix.rmdir path with _ -> ());
+  try Sys.remove path with _ -> ();;
+
+
+let rec rm_and_ignore_list paths =
+  match paths with
+  | [] -> ()
+  | p::ps -> rm_and_ignore p; rm_and_ignore_list ps;;
+
+
 (** Common functions across multipule tests **)
 let rec find_fun ?(msg="") ranges name = match ranges with
   | [] -> assert_failure ("Could not find function "^name^msg)

@@ -59,11 +59,8 @@ let pin_trace_setup _ =
   check_file (pin_path^pin);
   check_file (gentrace_path^gentrace);
   check_file (stp_path^stp);
-  (* make a dir for rmdir *)
-  (try ignore(Sys.is_directory "/tmp/rmdir")
-   with Sys_error _ -> Unix.mkdir "/tmp/rmdir" 0o640);
-  (try ignore(Sys.is_directory "/tmp/tmp");
-   with Sys_error _ -> Unix.mkdir "/tmp/tmp" 0o640);
+  mkdir_and_ignore("/tmp/rmdir");
+  mkdir_and_ignore("/tmp/tmp");
   file_list binary_dir;;
 
 
@@ -86,11 +83,11 @@ let pin_trace_test bins =
 
 (* Note: This will leave the files pin.log and pintool.log by intention *)
 let pin_trace_cleanup pin_outs = 
-  (try if (Sys.is_directory "/tmp/tmp") 
-	then Sys.remove "/tmp/tmp" with _ -> ());
-  (try if (Sys.is_directory "/tmp/rmdir") 
-	then Sys.remove "/tmp/rmdir" with _ ->());
-  Sys.remove "x*"; Sys.remove "/tmp/x*"; ;;(*List.map Sys.remove pin_outs;;*)
+  let to_delete = ["/tmp/tmp" ; "/tmp/rmdir" ; "/tmp/xcp" ; "/tmp/xginstall" 
+				  ; "/tmp/xx" ; "/tmp/xxlink" ; "/tmp/xxln" ; "/tmp/xxmkfifo" 
+				  ; "/tmp/xxmknod" ; "xaa" ; "xx00" ; "xx01"] in
+  ignore(rm_and_ignore_list to_delete);
+;;(*List.map Sys.remove pin_outs;;*)
 
 
 let suite = "Pin" >:::
