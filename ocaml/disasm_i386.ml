@@ -85,6 +85,10 @@ type opcode =
   | Cld
   | Rdtsc
   | Cpuid
+  | Stmxcsr of operand
+  | Ldmxcsr of operand
+  | Fnstcw of operand
+  | Fldcw of operand
   | Leave of typ
   | Interrupt of operand
 
@@ -148,11 +152,13 @@ and dflag = nv "R_DFLAG" r32 (* 1 if DF=0 or -1 if DF=1 *)
 and fs_base = nv "R_FS_BASE" r32
 and gs_base = nv "R_GS_BASE" r32
 
+and fpu_ctrl = nv "R_FPU_CONTROL" r16
+and mxcsr = nv "R_MXCSR" r32
 
 let xmms = Array.init 8 (fun i -> nv (Printf.sprintf "R_XMM%d" i) xmm_t)
 
 let regs : var list =
-  ebp::esp::esi::edi::eip::eax::ebx::ecx::edx::eflags::cf::pf::af::zf::sf::oF::dflag::fs_base::gs_base::
+  ebp::esp::esi::edi::eip::eax::ebx::ecx::edx::eflags::cf::pf::af::zf::sf::oF::dflag::fs_base::gs_base::fpu_ctrl::mxcsr::
   List.map (fun (n,t) -> Var.newvar n t)
     [
 
@@ -573,6 +579,38 @@ let rec to_ir addr next ss pref =
   | Cpuid ->
       let undef reg = move reg (Unknown ("cpuid", r32)) in
       List.map undef [eax; ebx; ecx; edx]
+  | Stmxcsr (dst) ->
+      let dst = match dst with
+        | Oaddr addr -> addr
+        | _ -> failwith "stmxcsr argument cannot be non-memory"
+      in
+      [
+        store r32 dst (Var mxcsr);(*(Unknown ("stmxcsr", r32));*)
+      ]
+  | Ldmxcsr (src) ->
+      let src = match src with
+        | Oaddr addr -> addr
+        | _ -> failwith "ldmxcsr argument cannot be non-memory"
+      in
+      [
+        move mxcsr (load r32 src);
+      ]
+  | Fnstcw (dst) ->
+      let dst = match dst with
+        | Oaddr addr -> addr
+        | _ -> failwith "fnstcw argument cannot be non-memory"
+      in
+      [
+        store r16 dst (Var fpu_ctrl);
+      ]
+  | Fldcw (src) ->
+      let src = match src with
+        | Oaddr addr -> addr
+        | _ -> failwith "fldcw argument cannot be non-memory"
+      in
+      [
+        move fpu_ctrl (load r16 src);
+      ]
   | Cmps(Reg bits as t) ->
     let src1 = nv "src1" t and src2 = nv "src2" t and tmpres = nv "tmp" t in
     let stmts =
@@ -755,6 +793,10 @@ module ToStr = struct
     | Hlt -> "hlt"
     | Rdtsc -> "rdtsc"
     | Cpuid -> "cpuid"
+    | Stmxcsr (o) -> Printf.sprintf "stmxcr %s" (opr o)
+    | Ldmxcsr (o) -> Printf.sprintf "ldmxcr %s" (opr o)
+    | Fnstcw (o) -> Printf.sprintf "fnstcw %s" (opr o)
+    | Fldcw (o) -> Printf.sprintf "fldcw %s" (opr o)
     | Inc (t, o) -> Printf.sprintf "inc %s" (opr o)
     | Dec (t, o) -> Printf.sprintf "dec %s" (opr o)
     | Jump a -> Printf.sprintf "jmp %s" (opr a)
@@ -1042,6 +1084,13 @@ let parse_instr g addr =
 	      )
     | 0xcd -> let (i,na) = parse_imm8 na in
 	      (Interrupt(i), na)
+    | 0xd9 ->
+        let (r, rm, na) = parse_modrm32ext na in
+        (match r with
+           | 5 -> (Fldcw rm, na)
+           | 7 -> (Fnstcw rm, na)
+           | _ -> unimplemented (Printf.sprintf "unsupported opcode: d9/%d" r)
+        )
     | 0xe8 -> let (i,na) = parse_disp32 na in
 	      (Call(Oimm(Int64.add i na), na), na)
     | 0xe9 -> let (i,na) = parse_disp opsize na in
@@ -1141,6 +1190,13 @@ let parse_instr g addr =
 	(* shld *)
         let (r, rm, na) = parse_modrm opsize na in
 	(Shiftd(LSHIFT, opsize, rm, r, o_ecx), na)
+      | 0xae ->
+          let (r, rm, na) = parse_modrm32ext na in
+          (match r with
+             | 2 -> (Ldmxcsr rm, na) (* ldmxcsr *)
+             | 3 -> (Stmxcsr rm, na) (* stmxcsr *)
+             | _ -> unimplemented (Printf.sprintf "unsupported opcode: ff/%d" r)
+          )
       | 0xb6
       | 0xb7 -> let st = if b2 = 0xb6 then r8 else r16 in
 		let r, rm, na = parse_modrm32 na in
