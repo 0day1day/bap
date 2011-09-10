@@ -39,6 +39,10 @@ let biconst i = big_int_of_int i
 let biconst32 i = big_int_of_int32 i
 let biconst64 i = big_int_of_int64 i
 
+let big_int_of_bool = function
+  | true -> bi1
+  | false -> bi0
+
 (** Infix operator to test if two big ints are equal. *)
 let (==%) bi1 bi2 = eq_big_int bi1 bi2
 
