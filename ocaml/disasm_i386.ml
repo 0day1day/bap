@@ -83,6 +83,7 @@ type opcode =
   | Not of typ * operand
   | Cld
   | Rdtsc
+  | Cpuid
   | Leave of typ
   | Interrupt of operand
 
@@ -543,7 +544,13 @@ let rec to_ir addr next ss pref =
   | Hlt ->
     [Jmp(Lab "General_protection fault", [])]
   | Rdtsc ->
-    [Special ("rdtsc", [])]
+      [
+        move eax (Unknown ("rdtsc", r32));
+        move edx (Unknown ("rdtsc", r32));
+      ]
+  | Cpuid ->
+      let undef reg = move reg (Unknown ("cpuid", r32)) in
+      List.map undef [eax; ebx; ecx; edx]
   | Cmps(Reg bits as t) ->
     let src1 = nv "src1" t and src2 = nv "src2" t and tmpres = nv "tmp" t in
     let stmts =
@@ -707,7 +714,7 @@ module ToStr = struct
 
 
   let opr = function
-    | Oreg v -> oreg2str v	  
+    | Oreg v -> oreg2str v
     | Oimm i -> Printf.sprintf "$0x%Lx" i
     | Oaddr a -> Pp.ast_exp_to_string a
 
@@ -725,9 +732,10 @@ module ToStr = struct
     | Shiftd _ -> "shiftd"
     | Hlt -> "hlt"
     | Rdtsc -> "rdtsc"
+    | Cpuid -> "cpuid"
     | Inc (t, o) -> Printf.sprintf "inc %s" (opr o)
     | Dec (t, o) -> Printf.sprintf "dec %s" (opr o)
-    | Jump a -> Printf.sprintf "jmp %s" (opr a)	
+    | Jump a -> Printf.sprintf "jmp %s" (opr a)
     | Bt(t,d,s) -> Printf.sprintf "bt %s, %s" (opr d) (opr s)
     | Jcc _ -> "jcc"
     | Setcc _ -> "setcc"
@@ -1097,6 +1105,7 @@ let parse_instr g addr =
       | 0x95 -> let r, rm, na = parse_modrm r8 na in
 		assert (opsize = r32);  (* unclear what happens otherwise *)
 		(Setcc(r8, rm, cc_to_exp b2), na)
+      | 0xa2 -> (Cpuid, na)
       | 0xa3 | 0xba ->
           let (r, rm, na) = parse_modrm opsize na in
           let r, na = if b2 = 0xba then parse_imm8 na else r, na in
