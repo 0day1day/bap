@@ -4,6 +4,7 @@ open Ast_convenience
 open Big_int
 open Big_int_convenience
 open Type
+module VH=Var.VarHash
 
 module D = Debug.Make(struct let name = "Disasm_i386" and default=`NoDebug end)
 open D
@@ -183,8 +184,6 @@ let regs : var list =
     ]
     @ Array.to_list xmms
 
-
-
 let o_eax = Oreg 0
 and o_ecx = Oreg 1
 and o_edx = Oreg 2
@@ -271,6 +270,29 @@ let bits2reg8e b =
 
 let reg2xmm r =
   bits2xmm (reg2bits r)
+
+(* These aren't used by Disasm_i386, but might be useful to external
+   users. *)
+let subregs =
+  let hi r = (reg2bits r) + 4 in
+  (eax, "R_AL", bits2reg8e (reg2bits eax))
+  :: (ecx, "R_CL", bits2reg8e (reg2bits ecx))
+  :: (edx, "R_DL", bits2reg8e (reg2bits edx))
+  :: (ebx, "R_BL", bits2reg8e (reg2bits ebx))
+  :: (eax, "R_AH", bits2reg8e (hi eax))
+  :: (ecx, "R_CH", bits2reg8e (hi ecx))
+  :: (edx, "R_DH", bits2reg8e (hi edx))
+  :: (ebx, "R_BH", bits2reg8e (hi ebx))
+  :: (eax, "R_AX", bits2reg16e (reg2bits eax))
+  :: (ecx, "R_CX", bits2reg16e (reg2bits ecx))
+  :: (edx, "R_DX", bits2reg16e (reg2bits edx))
+  :: (ebx, "R_BX", bits2reg16e (reg2bits ebx))
+  :: []
+
+let subregs_find =
+  let h = VH.create 10 in
+  let () = List.iter (fun ((fr,_,_) as t) -> VH.add h fr t) subregs in
+  VH.find_all h
 
 (* effective addresses for 16-bit addressing *)
 let eaddr16 = function
