@@ -57,14 +57,14 @@ struct
       
 
   let get_lval n t =
-    let n = stripnum n in
+    (* let n = stripnum n in *)
     try
       let v = Hashtbl.find (fst !cur_scope) n in
       if t = None || t = Some(Var.typ v)
       then v
       else err ("Variable '"^n^"' used with inconsistent type")
     with Not_found ->
-      Printf.printf "%s not found\n" n;
+      (* Printf.printf "%s not found\n" n; *)
       match t with
       | Some t -> add n t
       | None -> err ("Type was never declared for '"^n^"'")
