@@ -16,7 +16,7 @@ let freevars e =
       val found = VH.create 570
 
       method get_found =
-	dprintf "found %d freevars" (VH.length found);
+	(* dprintf "found %d freevars" (VH.length found); *)
 	List.rev (VH.fold (fun k () a -> k::a) found [])
       method add_dec d = 
 	if not(VH.mem found d || VH.mem ctx d)

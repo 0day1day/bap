@@ -126,6 +126,12 @@ void translate_init()
 
     LibVEX_default_VexArchInfo(&vai);
 
+    // Enable SSE
+    /* vai.hwcaps |= VEX_HWCAPS_X86_SSE1; */
+    /* vai.hwcaps |= VEX_HWCAPS_X86_SSE2; */
+    /* vai.hwcaps |= VEX_HWCAPS_X86_SSE3; */
+    /* vai.hwcaps |= VEX_HWCAPS_X86_LZCNT; */
+
     // Setup the translation args
     vta.arch_guest          = VexArch_INVALID; // to be assigned later
     //vta.arch_guest          = VexArchARM;
