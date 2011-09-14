@@ -12,7 +12,7 @@ module F = Format
 module D = Debug.Make(struct let name = "pp" and default=`Debug end)
 open D
 
-let output_varnums = ref true
+let output_varnums = ref false
 
 let many_parens = ref false
 

@@ -194,6 +194,36 @@ let rec full_exp_eq e1 e2 =
 
 let (===) = full_exp_eq
 
+let rec compare_exp e1 e2 =
+  let c = compare (num_exp e1) (num_exp e2) in
+  if c <> 0 then c else
+    let l1,l2,l3,l4,l5,l6,l7,l8 = getargs e1 in
+    let r1,r2,r3,r4,r5,r6,r7,r8 = getargs e2 in
+    (* Put each comparison in a list as a lazy computation *)
+    let l =
+      lazy (compare l2 r2)
+      :: lazy (compare l3 r3)
+      :: lazy (compare l4 r4)
+      :: lazy (compare l5 r5)
+      :: lazy (compare l6 r6)
+      :: lazy (compare l8 r8)
+      :: lazy (Util.list_compare compare_big_int l7 r7)
+      :: lazy (Util.list_compare compare_exp l1 r1)
+      :: []
+    in
+    (* Compute each comparison, and stop when we get a non-zero *)
+    match List.fold_left
+      (fun acc lz -> match acc with
+      | Some _ as x -> x
+      | None ->
+        (match Lazy.force lz with
+        | 0 -> None
+        | x -> Some(x))
+      ) None l
+    with
+    | Some(x) -> x
+    | None -> 0
+
 let num_stmt = function
   | Move _ -> 0
   | Jmp _ -> 1

@@ -2,13 +2,16 @@
    Snippets of debugging code
 *)
 
+module D = Debug.Make(struct let name = "Debug_snippets" and default=`Debug end)
+open D
+
 (** AST debugging visitor *)
 
 let v = object(self)
   inherit Ast_visitor.nop
     (* Add each variable to definedvars *)
   method visit_stmt stmt =
-    Printf.fprintf stderr "Stmt: %s\n" (Pp.ast_stmt_to_string stmt);
+    dprintf "Stmt: %s" (Pp.ast_stmt_to_string stmt);
     `SkipChildren
 end 
   

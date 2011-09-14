@@ -4,6 +4,7 @@ open Ast_convenience
 open Big_int
 open Big_int_convenience
 open Type
+module VH=Var.VarHash
 
 module D = Debug.Make(struct let name = "Disasm_i386" and default=`NoDebug end)
 open D
@@ -83,6 +84,11 @@ type opcode =
   | Not of typ * operand
   | Cld
   | Rdtsc
+  | Cpuid
+  | Stmxcsr of operand
+  | Ldmxcsr of operand
+  | Fnstcw of operand
+  | Fldcw of operand
   | Leave of typ
   | Interrupt of operand
 
@@ -146,11 +152,13 @@ and dflag = nv "R_DFLAG" r32 (* 1 if DF=0 or -1 if DF=1 *)
 and fs_base = nv "R_FS_BASE" r32
 and gs_base = nv "R_GS_BASE" r32
 
+and fpu_ctrl = nv "R_FPU_CONTROL" r16
+and mxcsr = nv "R_MXCSR" r32
 
 let xmms = Array.init 8 (fun i -> nv (Printf.sprintf "R_XMM%d" i) xmm_t)
 
 let regs : var list =
-  ebp::esp::esi::edi::eip::eax::ebx::ecx::edx::eflags::cf::pf::af::zf::sf::oF::dflag::fs_base::gs_base::
+  ebp::esp::esi::edi::eip::eax::ebx::ecx::edx::eflags::cf::pf::af::zf::sf::oF::dflag::fs_base::gs_base::fpu_ctrl::mxcsr::
   List.map (fun (n,t) -> Var.newvar n t)
     [
 
@@ -181,8 +189,6 @@ let regs : var list =
   ("R_FC3210", reg_32);
     ]
     @ Array.to_list xmms
-
-
 
 let o_eax = Oreg 0
 and o_ecx = Oreg 1
@@ -270,6 +276,29 @@ let bits2reg8e b =
 
 let reg2xmm r =
   bits2xmm (reg2bits r)
+
+(* These aren't used by Disasm_i386, but might be useful to external
+   users. *)
+let subregs =
+  let hi r = (reg2bits r) + 4 in
+  (eax, "R_AL", bits2reg8e (reg2bits eax))
+  :: (ecx, "R_CL", bits2reg8e (reg2bits ecx))
+  :: (edx, "R_DL", bits2reg8e (reg2bits edx))
+  :: (ebx, "R_BL", bits2reg8e (reg2bits ebx))
+  :: (eax, "R_AH", bits2reg8e (hi eax))
+  :: (ecx, "R_CH", bits2reg8e (hi ecx))
+  :: (edx, "R_DH", bits2reg8e (hi edx))
+  :: (ebx, "R_BH", bits2reg8e (hi ebx))
+  :: (eax, "R_AX", bits2reg16e (reg2bits eax))
+  :: (ecx, "R_CX", bits2reg16e (reg2bits ecx))
+  :: (edx, "R_DX", bits2reg16e (reg2bits edx))
+  :: (ebx, "R_BX", bits2reg16e (reg2bits ebx))
+  :: []
+
+let subregs_find =
+  let h = VH.create 10 in
+  let () = List.iter (fun ((fr,_,_) as t) -> VH.add h fr t) subregs in
+  VH.find_all h
 
 (* effective addresses for 16-bit addressing *)
 let eaddr16 = function
@@ -461,7 +490,7 @@ let rec to_ir addr next ss pref =
     let target = op2e r32 o1 in
     if List.mem esp (Formulap.freevars target) then unimplemented "call with esp as base";
     [move esp (esp_e -* i32 4);
-     store r32 esp_e (l32 ra);
+     store_s None r32 esp_e (l32 ra);
      Jmp(target, calla)]
   | Jump(o) ->
     [ Jmp(op2e r32 o, [])]
@@ -543,7 +572,45 @@ let rec to_ir addr next ss pref =
   | Hlt ->
     [Jmp(Lab "General_protection fault", [])]
   | Rdtsc ->
-    [Special ("rdtsc", [])]
+      [
+        move eax (Unknown ("rdtsc", r32));
+        move edx (Unknown ("rdtsc", r32));
+      ]
+  | Cpuid ->
+      let undef reg = move reg (Unknown ("cpuid", r32)) in
+      List.map undef [eax; ebx; ecx; edx]
+  | Stmxcsr (dst) ->
+      let dst = match dst with
+        | Oaddr addr -> addr
+        | _ -> failwith "stmxcsr argument cannot be non-memory"
+      in
+      [
+        store r32 dst (Var mxcsr);(*(Unknown ("stmxcsr", r32));*)
+      ]
+  | Ldmxcsr (src) ->
+      let src = match src with
+        | Oaddr addr -> addr
+        | _ -> failwith "ldmxcsr argument cannot be non-memory"
+      in
+      [
+        move mxcsr (load r32 src);
+      ]
+  | Fnstcw (dst) ->
+      let dst = match dst with
+        | Oaddr addr -> addr
+        | _ -> failwith "fnstcw argument cannot be non-memory"
+      in
+      [
+        store r16 dst (Var fpu_ctrl);
+      ]
+  | Fldcw (src) ->
+      let src = match src with
+        | Oaddr addr -> addr
+        | _ -> failwith "fldcw argument cannot be non-memory"
+      in
+      [
+        move fpu_ctrl (load r16 src);
+      ]
   | Cmps(Reg bits as t) ->
     let src1 = nv "src1" t and src2 = nv "src2" t and tmpres = nv "tmp" t in
     let stmts =
@@ -707,7 +774,7 @@ module ToStr = struct
 
 
   let opr = function
-    | Oreg v -> oreg2str v	  
+    | Oreg v -> oreg2str v
     | Oimm i -> Printf.sprintf "$0x%Lx" i
     | Oaddr a -> Pp.ast_exp_to_string a
 
@@ -725,9 +792,14 @@ module ToStr = struct
     | Shiftd _ -> "shiftd"
     | Hlt -> "hlt"
     | Rdtsc -> "rdtsc"
+    | Cpuid -> "cpuid"
+    | Stmxcsr (o) -> Printf.sprintf "stmxcr %s" (opr o)
+    | Ldmxcsr (o) -> Printf.sprintf "ldmxcr %s" (opr o)
+    | Fnstcw (o) -> Printf.sprintf "fnstcw %s" (opr o)
+    | Fldcw (o) -> Printf.sprintf "fldcw %s" (opr o)
     | Inc (t, o) -> Printf.sprintf "inc %s" (opr o)
     | Dec (t, o) -> Printf.sprintf "dec %s" (opr o)
-    | Jump a -> Printf.sprintf "jmp %s" (opr a)	
+    | Jump a -> Printf.sprintf "jmp %s" (opr a)
     | Bt(t,d,s) -> Printf.sprintf "bt %s, %s" (opr d) (opr s)
     | Jcc _ -> "jcc"
     | Setcc _ -> "setcc"
@@ -1012,6 +1084,13 @@ let parse_instr g addr =
 	      )
     | 0xcd -> let (i,na) = parse_imm8 na in
 	      (Interrupt(i), na)
+    | 0xd9 ->
+        let (r, rm, na) = parse_modrm32ext na in
+        (match r with
+           | 5 -> (Fldcw rm, na)
+           | 7 -> (Fnstcw rm, na)
+           | _ -> unimplemented (Printf.sprintf "unsupported opcode: d9/%d" r)
+        )
     | 0xe8 -> let (i,na) = parse_disp32 na in
 	      (Call(Oimm(Int64.add i na), na), na)
     | 0xe9 -> let (i,na) = parse_disp opsize na in
@@ -1097,6 +1176,7 @@ let parse_instr g addr =
       | 0x95 -> let r, rm, na = parse_modrm r8 na in
 		assert (opsize = r32);  (* unclear what happens otherwise *)
 		(Setcc(r8, rm, cc_to_exp b2), na)
+      | 0xa2 -> (Cpuid, na)
       | 0xa3 | 0xba ->
           let (r, rm, na) = parse_modrm opsize na in
           let r, na = if b2 = 0xba then parse_imm8 na else r, na in
@@ -1110,6 +1190,13 @@ let parse_instr g addr =
 	(* shld *)
         let (r, rm, na) = parse_modrm opsize na in
 	(Shiftd(LSHIFT, opsize, rm, r, o_ecx), na)
+      | 0xae ->
+          let (r, rm, na) = parse_modrm32ext na in
+          (match r with
+             | 2 -> (Ldmxcsr rm, na) (* ldmxcsr *)
+             | 3 -> (Stmxcsr rm, na) (* stmxcsr *)
+             | _ -> unimplemented (Printf.sprintf "unsupported opcode: ff/%d" r)
+          )
       | 0xb6
       | 0xb7 -> let st = if b2 = 0xb6 then r8 else r16 in
 		let r, rm, na = parse_modrm32 na in

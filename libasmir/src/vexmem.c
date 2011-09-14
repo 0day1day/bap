@@ -70,7 +70,7 @@ static IRTypeEnv* vx_dopyIRTypeEnv ( IRTypeEnv* src );
 //
 void vx_panic ( HChar* str )
 {
-    printf("\nvex: the `impossible' happened:\n   %s\n", str);
+    printf("\nlibasmir-vex: the `impossible' happened:\n   %s\n", str);
     exit(-1);
 }
 

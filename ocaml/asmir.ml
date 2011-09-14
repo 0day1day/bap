@@ -414,7 +414,7 @@ let arm_regs =
       "CC_DEP2";
     ]
 
-let all_regs = x86_regs @ arm_regs
+let all_regs = x86_mem :: x86_regs @ arm_regs
 
 let decls_for_arch = function
   | Bfd_arch_i386 -> x86_mem::x86_regs
