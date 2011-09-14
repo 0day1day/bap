@@ -1,3 +1,5 @@
+(** Functions that are used by utilities and tests *)
+
 open Ast
 open Type
 
@@ -15,11 +17,12 @@ let rename_astexp f =
 
 let to_ssagcl cfg post =
   let cfg = Hacks.remove_backedges cfg in
+  let cfg = Coalesce.AST_Coalesce.coalesce cfg in
   let {Cfg_ssa.cfg=cfg; to_ssavar=tossa} = Cfg_ssa.trans_cfg cfg in
   let p = rename_astexp tossa post in
   let cfg =
     let vars = Formulap.freevars p in
-    Ssa_simp.simp_cfg ~liveout:vars ~usedc:true ~usesccvn:true cfg      
+    Ssa_simp.simp_cfg ~liveout:vars ~usedc:true ~usesccvn:true cfg
   in
   let cfg = Cfg_ssa.to_astcfg cfg in
   let gcl = Gcl.of_astcfg cfg in

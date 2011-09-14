@@ -2,7 +2,7 @@ open OUnit
 open Pcre
 open Ast
 open TestCommon
-open UtilsCommon
+open Utils_common
 
 let test_file = "C/test";;
 let g_il = "g.il";;
@@ -23,7 +23,7 @@ let predicate_stp_setup _ =
   let g_cfg = Unroll.unroll_loops g_cfg in
   let g_cfg = Hacks.remove_backedges g_cfg in
   let g_cfg = Prune_unreachable.prune_unreachable_ast g_cfg in
-  typecheck g_ir;
+  ignore(typecheck g_ir);
   g_cfg;;
 
 

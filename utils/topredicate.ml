@@ -1,6 +1,6 @@
 open Ast
 open Type
-open UtilsCommon
+open Utils_common
 
 let usage = "Usage: "^Sys.argv.(0)^" <input options> [-o output]\n\
              Translate programs to the IL. "
@@ -34,7 +34,7 @@ let to_ssapassgcl cfg post =
   let p = rename_astexp tossa post in
   let cfg =
     let vars = Formulap.freevars p in
-    Ssa_simp.simp_cfg ~liveout:vars ~usedc:!usedc ~usesccvn:!usesccvn cfg      
+    Ssa_simp.simp_cfg ~liveout:vars ~usedc:!usedc ~usesccvn:!usesccvn cfg
   in
   let (gcl, _) = Gcl.passified_of_ssa cfg in
   (gcl, p)
@@ -86,24 +86,24 @@ let compute_fse_bfs cfg post =
   (* FIXME: avoid converting to cfg *)
   let ast = Cfg_ast.to_prog cfg in
   let bfs = if !fast_fse then Symbeval_search.bfs_ast_program_fast
-            else Symbeval_search.bfs_ast_program 
-  in 
+            else Symbeval_search.bfs_ast_program
+  in
   (bfs ast post, [])
 
 let compute_fse_bfs_maxdepth i cfg post =
   (* FIXME: avoid converting to cfg *)
   let ast = Cfg_ast.to_prog cfg in
   let bfs = if !fast_fse then Symbeval_search.bfs_maxdepth_ast_program_fast
-            else Symbeval_search.bfs_maxdepth_ast_program 
-  in 
+            else Symbeval_search.bfs_maxdepth_ast_program
+  in
   (bfs i ast post, [])
 
 let compute_fse_maxrepeat i cfg post =
   (* FIXME: avoid converting to cfg *)
   let ast = Cfg_ast.to_prog cfg in
   let maxrepeat = if !fast_fse then Symbeval_search.maxrepeat_ast_program_fast
-            else Symbeval_search.maxrepeat_ast_program 
-  in 
+            else Symbeval_search.maxrepeat_ast_program
+  in
   (maxrepeat i ast post, [])
 
 let set_solver s =
