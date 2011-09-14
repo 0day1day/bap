@@ -2,6 +2,9 @@
 
 open Cfg
 
+module D = Debug.Make(struct let name="Coalesce" and default=`Debug end)
+open D
+
 module MakeCoalesce (C: CFG) = 
 struct
   module G = C.G
@@ -48,7 +51,10 @@ struct
      in
      List.fold_left fold_dfs g worklist
    in
-     fold_dfs cfg entry_node
+   dprintf "Starting";
+   let o = fold_dfs cfg entry_node in
+   dprintf "Finished";
+   o
 end
 
 module AST_Coalesce = MakeCoalesce(AST)
