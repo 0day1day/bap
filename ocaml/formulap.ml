@@ -18,13 +18,13 @@ let freevars e =
       method get_found =
 	(* dprintf "found %d freevars" (VH.length found); *)
 	List.rev (VH.fold (fun k () a -> k::a) found [])
-      method add_dec d = 
+      method add_dec d =
 	if not(VH.mem found d || VH.mem ctx d)
 	then VH.add found d ()
 	else dprintf "Not adding %s." (Pp.var_to_string d)
 
       method visit_exp = function
-	| Let(v, e1, e2) -> 
+	| Let(v, e1, e2) ->
 	    ignore(Ast_visitor.exp_accept self e1);
 	    VH.add ctx v ();
 	    ignore(Ast_visitor.exp_accept self e2);
@@ -32,7 +32,7 @@ let freevars e =
 	    `SkipChildren
 	| _ ->
 	    `DoChildren
-	      
+
       method visit_rvar r =
 	self#add_dec r;
 	`DoChildren
@@ -49,7 +49,7 @@ object(self)
   method virtual assert_ast_exp_with_foralls : ?fvars:bool -> VH.key list -> Ast.exp -> unit
   method virtual valid_ast_exp : ?exists:(var list) -> ?foralls:(var list) -> Ast.exp -> unit
   method virtual counterexample : unit
-end 
+end
 
 class virtual fpp_oc =
 object(self)

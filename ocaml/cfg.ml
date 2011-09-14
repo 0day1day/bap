@@ -47,12 +47,13 @@ end
 module type CFG =
 sig
   include Graph.Builder.S with type G.V.label = bbid and type G.E.label = bool option
-  
+
   type lang
 
   val find_vertex : G.t -> G.V.label -> G.V.t
   val find_label : G.t -> Type.label -> G.V.t
   val get_stmts : G.t -> G.V.t -> lang
+  val default : lang
   val set_stmts : G.t -> G.V.t -> lang -> G.t
   val join_stmts : lang -> lang -> lang
   (*val newid : G.t -> bbid*)
@@ -72,13 +73,13 @@ type ('a,'b,'c) pcfg =
       l: 'c;
       nextid : int
     }
-    
+
 module type Language =
-sig 
-  type t 
-  val default : t 
+sig
+  type t
+  val default : t
   val join : t -> t -> t
-  val iter_labels : (label->unit) -> t -> unit 
+  val iter_labels : (label->unit) -> t -> unit
 end
 
 (* Begin persistent implementation *)
@@ -113,7 +114,7 @@ struct
 
 
     (* boring wrappers *)
-      
+
     let is_empty     x = G'.is_empty x.g
     let nb_vertex    x = G'.nb_vertex x.g
     let nb_edges     x = G'.nb_edges     x.g
@@ -122,10 +123,10 @@ struct
     let mem_vertex   x = G'.mem_vertex	 x.g
     let mem_edge     x = G'.mem_edge     x.g
     let mem_edge_e   x = G'.mem_edge_e   x.g
-    let find_edge    x = G'.find_edge	 x.g  
-    let succ	     x = G'.succ	 x.g  
-    let pred	     x = G'.pred	 x.g  
-    let succ_e	     x = G'.succ_e	 x.g  
+    let find_edge    x = G'.find_edge	 x.g
+    let succ	     x = G'.succ	 x.g
+    let pred	     x = G'.pred	 x.g
+    let succ_e	     x = G'.succ_e	 x.g
     let pred_e	     x = G'.pred_e       x.g
 
     let iter_vertex  x y = G'.iter_vertex x y.g
@@ -133,10 +134,10 @@ struct
     let fold_vertex  x y = G'.fold_vertex x y.g
     let fold_edges   x y = G'.fold_edges  x y.g
     let iter_edges_e x y = G'.iter_edges_e x y.g
-    let fold_edges_e x y = G'.fold_edges_e x y.g 
-    let iter_succ    x y = G'.iter_succ   x y.g	  
-    let iter_pred    x y = G'.iter_pred   x y.g	  
-    let fold_succ    x y = G'.fold_succ   x y.g 
+    let fold_edges_e x y = G'.fold_edges_e x y.g
+    let iter_succ    x y = G'.iter_succ   x y.g
+    let iter_pred    x y = G'.iter_pred   x y.g
+    let fold_succ    x y = G'.fold_succ   x y.g
     let fold_pred    x y = G'.fold_pred   x y.g
     let iter_succ_e  x y = G'.iter_succ_e x y.g
     let fold_succ_e  x y = G'.fold_succ_e x y.g
@@ -149,7 +150,7 @@ struct
     let remove_edge c v1 v2 = { c with g = G'.remove_edge c.g v1 v2 }
     let remove_edge_e c e   = { c with g = G'.remove_edge_e c.g e }
     let add_vertex c v      = { c with g = G'.add_vertex c.g v }
-    
+
     let join_stmts = Lang.join
 
 
@@ -158,15 +159,17 @@ struct
 
     (* Extra stuff to make this a CFG *)
 
-    let find_vertex c id = 
-      let v = V.create id in 
+    let find_vertex c id =
+      let v = V.create id in
 	if mem_vertex c v then v else raise Not_found
-      
+
     let find_label c l = LM.find l c.l
 
     let get_stmts c v =
       try BM.find v c.s
       with Not_found -> Lang.default
+
+    let default = Lang.default
 
     (* helper *)
     let fold_labels f l a =
@@ -227,9 +230,10 @@ struct
   let remove_edge = G.remove_edge
   let remove_edge_e = G.remove_edge_e
 
-  let find_vertex = G.find_vertex 
+  let find_vertex = G.find_vertex
   let find_label = G.find_label
   let get_stmts = G.get_stmts
+  let default = G.default
   let set_stmts = G.set_stmts
   let join_stmts = G.join_stmts
   let newid = G.newid
@@ -277,6 +281,7 @@ sig
     and type G.t = (G'.t, lang BM.t, G'.V.t LM.t) pcfg
 
   val get_stmts  : G.t -> G.V.t -> lang
+  val default    : lang
   val set_stmts  : G.t -> G.V.t -> lang -> G.t
 end
 

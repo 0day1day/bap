@@ -30,7 +30,7 @@ let exp_and a b =
     @param simp is an optional expression simplifier.
 
     @param p is the program
-    
+
     @param q is the post-condition.
 *)
 let wp ?(simp=Util.id) (p:Gcl.t) (q:exp) : exp =
@@ -46,7 +46,7 @@ let wp ?(simp=Util.id) (p:Gcl.t) (q:exp) : exp =
 	wp q s2 (fun x -> wp x s1 k)
     | Assign(t, e) ->
 	k(simp(Let(t, e, q)))
-    | Assert e -> 
+    | Assert e ->
 	k (simp(exp_and e q))
   in
   wp q p  (fun x->x)
@@ -57,43 +57,43 @@ let wp ?(simp=Util.id) (p:Gcl.t) (q:exp) : exp =
 (** the efficient weakest precondition wp(p,q):Q where Q is guaranteed
     to be linear in the size of p.  This version expects p to be
     assignment-free, e.g., to be an SSA acyclic program. See
-    CMU-CS-08-159.pdf (Brumley's thesis), chapter 3.3.  
+    CMU-CS-08-159.pdf (Brumley's thesis), chapter 3.3.
 
     @param simp is an expression simplifier. You can pass in fun x->x
-    if you want no simplification.  
+    if you want no simplification.
 
     @param p is the program
-    
+
     @param q is the post-condition.
 *)
 let efficient_wp ?(simp=Util.id) (p:Gcl.t) =
-  let wlp_f_ctx = Hashtbl.create 113 in 
+  let wlp_f_ctx = Hashtbl.create 113 in
   let rec wlp_f s k =
     try k (Hashtbl.find wlp_f_ctx s)
     with Not_found ->
       let remember q = Hashtbl.add wlp_f_ctx s q; k q in
       match s with
-      | Skip -> 
+      | Skip ->
 	  remember exp_false
       | Assume e
-      | Assert e -> 
+      | Assert e ->
 	  remember (exp_not e)
       | Choice(s1, s2) ->
-	  wlp_f s1 (fun q1 -> wlp_f s2 
-		      (fun q2 -> 
+	  wlp_f s1 (fun q1 -> wlp_f s2
+		      (fun q2 ->
 			 let q = simp(exp_and q1 q2 ) in
 			 remember q
 		      ))
       | Seq(s1, s2) ->
-	  wlp_f s1 (fun q1 -> wlp_f s2 
-		      (fun q2 -> 
+	  wlp_f s1 (fun q1 -> wlp_f s2
+		      (fun q2 ->
 			 let q = simp(exp_or q1 q2 ) in
 			 remember q
 		      ))
-      | Assign _ -> 
+      | Assign _ ->
 	  raise (Invalid_argument("efficient_wp requires an assignment-free program"))
   in
-  let rec wp_t s k : exp = 
+  let rec wp_t s k : exp =
     match s with
     | Skip
     | Assume _ ->
@@ -104,7 +104,7 @@ let efficient_wp ?(simp=Util.id) (p:Gcl.t) =
 	wp_t s1 (fun q1 -> wp_t s2 (fun q2 -> k(simp(exp_and q1 q2))))
 (*	  (* by the book^Wthesis *)
     | Seq(s1, s2) ->
-	wp_t s2 (fun q1 -> wp_t s1 
+	wp_t s2 (fun q1 -> wp_t s1
 		   (fun q2 -> wlp_f s1
 		      (fun q3 -> k(simp(exp_and q1 (exp_or q2 q3)))) ))
 *)
@@ -113,11 +113,11 @@ let efficient_wp ?(simp=Util.id) (p:Gcl.t) =
 	wp_t s1 (fun q1 -> wp_t s2
 		   (fun q2 -> wlp_f s1
 		      (fun q3 -> k(simp(exp_and q1 (exp_or q2 q3)))) ))
-    | Assign _ -> 
+    | Assign _ ->
 	invalid_arg "efficient_wp requires an assignment-free program"
   in
-  let q0 = wlp_f p (fun x -> x) in 
-  let qpr = wp_t p (fun x -> x) in 
+  let q0 = wlp_f p (fun x -> x) in
+  let qpr = wp_t p (fun x -> x) in
   (fun q -> simp(exp_and qpr (exp_or q0 q)))
 
 let dwp_name = "dwptemp"
@@ -148,7 +148,7 @@ let rm_useless_vars vs n w =
   (* FIXME: remove vars that are only referenced once *)
   let l = List.length vs in
   let h = VH.create l
-  and c = VH.create l in  
+  and c = VH.create l in
   List.iter (fun (v,e) -> VH.add h v e; VH.add c v (ref 0)) vs;
   let inc v = try incr (VH.find c v) with Not_found -> () in
   let counter =
@@ -289,7 +289,7 @@ let dwp ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (p:Gcl.t) =
 
 let dwp_let ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (p:Gcl.t) =
   let (_, vars, n, w) = dwp_pred_help ~simp ~less_duplication ~k p in
-  (fun q -> 
+  (fun q ->
      let exp = exp_and (exp_not w) (exp_and n q) in
      List.fold_left (fun exp (v,e) -> Let(v,e,exp)) exp vars
   )
