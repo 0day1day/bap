@@ -12,12 +12,12 @@ $| = 1;
 my $rep_url = 'file:///var/lib/svn/bap/trunk';
 my $local_path = "/tmp/test-svn-hook";
 my $true = 1;
-my $curr_dir = `/bin/pwd`;
-my $sendmail = '/usr/bin/sendmail';
+my $mail = '/usr/bin/mail';
 my $svnlook = '/usr/bin/svnlook';
 my ($revision, $repos);
 my $getpin = 0;
 my $merged;
+my ($subj, $to);
 
 GetOptions(
     'revision|r=s'    => \$revision,
@@ -33,6 +33,7 @@ sub check_system {
     my @cmd = @_;
     my @lines;
     my $result, $merged;
+    my $msg;
 
     $merged = tee_merged {
         $result = system(@cmd);
@@ -46,36 +47,29 @@ sub check_system {
     }
 
     if($result != 0) {
-        print "Error! Last lines of ouput:\n";
-        print (join("\n",@lines));
-	print "\n";
+        print "Error executing cmd:\n@cmd\nLast lines of ouput (if any):\n";
+	$msg = (join("\n",@lines)) . "\n";
+	print $msg;
 
-	# go back to where we started
-	chdir $curr_dir;
-	# Send notification email
-	open (MAIL, "|$sendmail -oi -t");
-	print MAIL "From: svn\@kestrel.ece.cmu.edu\n";
-#	print MAIL "To: bap-dev@lists.andrew.cmu.edu\n";
-	print MAIL "To: swhitman\@andrew.cmu.edu\n";
-	print MAIL "Subject: r$revision Build and Test failure!\n\n";
-	print MAIL "Revision $revision failed to build or pass unit tests.  ";
-	print MAIL "The last lines of output are provided below:\n";
-	print MAIL @lines;
-	print MAIL "\n";
-	close MAIL;
-
-	print "sendmail -oi -t:\n";
-	print "From: svn\@kestrel.ece.cmu.edu\n";
-	print "To: swhitman\@andrew.cmu.edu\n";
-	print "Subject: r$revision Build and Test failure!\n\n";
-	print "Revision $revision failed to build or pass unit tests.  ";
-	print "The last lines of output are provided below:\n";
-	print @lines;
-	print "\n";
+	# leave $local_path before removing it
+	chdir '/';
 
 	# Clean up before exit
 	print "Removing temporary repository at $local_path\n";
-	check_system('rm', '-rf', $local_path);
+	check_system('/bin/rm', '-rf', $local_path);
+
+	# Send notification email
+	$subj = "FAILURE: r$revision - Build and Test failure!";
+	$to = 'swhitman@andrew.cmu.edu';
+#	$to = 'bap-dev@lists.andrew.cmu.edu';
+	open (MAIL, "|-",$mail, "-s",$subj,$to) or 
+	    die "Can't open pipe to mail: $!\n";
+
+	print MAIL "Revision $revision failed to build or pass unit tests.  ";
+	print MAIL "The last lines of output are provided below:\n";
+	print MAIL "\n<...snip...>\n";
+	print MAIL $msg;
+	close MAIL;
 
         print "Exiting...\n";
         exit($result);
@@ -92,14 +86,21 @@ exit(0) if(`$svnlook log -r $revision $repos` =~ /unittest-opt-out/);
 # Make sure this revision touches trunk
 exit(0) if(`$svnlook changed -r $revision $repos` !~ /[U|A|D]\s+trunk\/.*$/);
 
+print "Verifying commit revision $revision to repo $repos\n";
+
 # check out repository to /tmp
 mkdir $local_path;
 chdir $local_path;
+
+print "Checking out repository $rep_url\n";
 
 my $ctx = new SVN::Client(auth => [SVN::Client::get_username_provider()]);
 $ctx->checkout($rep_url, $local_path, $revision, $true);
 
 print "Finished checking out repository $rep_url\n";
+
+# Set path variable so autogen will work
+$ENV{'PATH'} = '/bin:/usr/bin';
 
 # configure
 print "Configuring\n";
@@ -118,8 +119,8 @@ if($getpin) {
 print "Making test\n";
 check_system("make test");
 
-# go back to where we started
-chdir $curr_dir;
+# leave $local_path before removing it
+chdir '/';
 # remove /tmp/trunk
 print "Removing temporary repository at $local_path\n";
-check_system('rm', '-rf', $local_path)
+check_system('/bin/rm', '-rf', $local_path)
