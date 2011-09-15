@@ -468,7 +468,7 @@ let list_cart_prod3 f l1 l2 l3 =
 let list_cart_prod4 f l1 l2 l3 l4 =
   List.iter (fun x -> list_cart_prod3 (f x) l2 l3 l4) l1
 
-(** {list_permutation setlist f] calls f with every value in the
+(** {list_permutation setlist f} calls f with every value in the
     cartesian product of the sets in setlist. For instance, if setlist is
     [[1;2]; [2;3]], then this function will call f [1;2], f [1;3], f
     [2;2], and f [2;3] in some order.
