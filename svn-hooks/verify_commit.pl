@@ -9,12 +9,13 @@ use Term::ReadKey;
 use Capture::Tiny qw/tee_merged/;  # requires package libcapture-tiny-perl 
 $| = 1;
 
-my $rep_url = 'https://kestrel.ece.cmu.edu/svn/bap/trunk';
+my $rep_url = 'file:///var/lib/svn/bap/trunk';
 my $local_path = "/tmp/test-svn-hook";
 my $true = 1;
-my $curr_dir = `pwd`;
-my $svn_look = '/usr/bin/svnlook';
-my ($revision, $repos, $svnlook);
+my $curr_dir = `/bin/pwd`;
+my $sendmail = '/usr/bin/sendmail';
+my $svnlook = '/usr/bin/svnlook';
+my ($revision, $repos);
 my $getpin = 0;
 my $merged;
 
@@ -24,6 +25,7 @@ GetOptions(
     'svnlook=s'       => \$svnlook,
     'getpin'          => \$getpin,
     );
+
 #
 # Keep track of the last 10 lines to print out in case of error; Exit on error
 #
@@ -31,63 +33,70 @@ sub check_system {
     my @cmd = @_;
     my @lines;
     my $result, $merged;
+
     $merged = tee_merged {
         $result = system(@cmd);
     };
+
     @lines = split(/\n/,$merged);
-    while (scalar(@lines) > 10) {
+
+    # Only grab the last 30 or so lines of output
+    while (scalar(@lines) > 30) {
         shift(@lines);
     }
+
     if($result != 0) {
         print "Error! Last lines of ouput:\n";
         print (join("\n",@lines));
-        print "\nExiting...\n";
-        exit(-1);
+	print "\n";
+
+	# go back to where we started
+	chdir $curr_dir;
+	# Send notification email
+	open (MAIL, "|$sendmail -oi -t");
+	print MAIL "From: svn\@kestrel.ece.cmu.edu\n";
+#	print MAIL "To: bap-dev@lists.andrew.cmu.edu\n";
+	print MAIL "To: swhitman\@andrew.cmu.edu\n";
+	print MAIL "Subject: r$revision Build and Test failure!\n\n";
+	print MAIL "Revision $revision failed to build or pass unit tests.  ";
+	print MAIL "The last lines of output are provided below:\n";
+	print MAIL @lines;
+	print MAIL "\n";
+	close MAIL;
+
+	print "sendmail -oi -t:\n";
+	print "From: svn\@kestrel.ece.cmu.edu\n";
+	print "To: swhitman\@andrew.cmu.edu\n";
+	print "Subject: r$revision Build and Test failure!\n\n";
+	print "Revision $revision failed to build or pass unit tests.  ";
+	print "The last lines of output are provided below:\n";
+	print @lines;
+	print "\n";
+
+	# Clean up before exit
+	print "Removing temporary repository at $local_path\n";
+	check_system('rm', '-rf', $local_path);
+
+        print "Exiting...\n";
+        exit($result);
     }
 }
 
-#
-# Simple prompt to get svn authentication for checkout; for testing.
-#
-sub simple_prompt {
-    my $cred = shift;
-    my $realm = shift;
-    my $default_username = shift;
-    my $may_save = shift;
-    my $pool = shift;
 
-    print "Enter authentication info for realm: $realm\n";
-    print "Username: ";
-    my $username = <>;
-    chomp($username);
-    $cred->username($username);
-
-    print "Type your password:";
-    ReadMode('noecho'); # don't echo
-    chomp(my $password = <STDIN>);
-    ReadMode(0);        # back to normal
-    $cred->password($password);
-    print "\n";
-}
+die "Incorrect options!\n" 
+    unless (defined $revision && defined $repos && defined $svnlook);
 
 # Did user provide opt-out message?
-exit (0) if(`$svnlook log -r $revision $repos` =~ /unittest-opt-out/);
+exit(0) if(`$svnlook log -r $revision $repos` =~ /unittest-opt-out/);
 
 # Make sure this revision touches trunk
-exit (0) if(`$svnlook changed -r $revision $repos` !~ /[U|A|D]\s+trunk.*$/);
+exit(0) if(`$svnlook changed -r $revision $repos` !~ /[U|A|D]\s+trunk\/.*$/);
 
 # check out repository to /tmp
 mkdir $local_path;
 chdir $local_path;
 
-my $ctx = new SVN::Client(
-    auth => [SVN::Client::get_simple_provider(),
-             SVN::Client::get_simple_prompt_provider(\&simple_prompt,2),
-             SVN::Client::get_username_provider()]
-    );
-
-print "Checking out repository $rep_url\n";
-
+my $ctx = new SVN::Client(auth => [SVN::Client::get_username_provider()]);
 $ctx->checkout($rep_url, $local_path, $revision, $true);
 
 print "Finished checking out repository $rep_url\n";
@@ -107,7 +116,7 @@ if($getpin) {
 
 # make test
 print "Making test\n";
-check_system("make");
+check_system("make test");
 
 # go back to where we started
 chdir $curr_dir;
