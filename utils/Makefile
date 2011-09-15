@@ -1,16 +1,18 @@
+export BAP_DIR=$(CURDIR)/..
+
 -include ../../utils-proj/Makefile
 
-export BAP_OCAMLDIR=../ocaml
-export BIGINT=$(CURDIR)/../bigint-3.12/otherlibs/num
-export BATT=$(CURDIR)/../batteries-1.4.0/_build/src
+export BAP_OCAMLDIR=$(BAP_DIR)/ocaml
+export BIGINT=$(BAP_DIR)/bigint-3.12/otherlibs/num
+export BATT=$(BAP_DIR)/batteries-1.4.0/_build/src
 export OCAMLMAKEFILE=$(BAP_OCAMLDIR)/OCamlMakefile
 
 # Stop annoying warnings about big_int duplication!
-export OCAMLFIND_IGNORE_DUPS_IN=$(CURDIR)/../bigint-3.12/otherlibs/num
+export OCAMLFIND_IGNORE_DUPS_IN=$(BAP_DIR)/bigint-3.12/otherlibs/num
 
 # ocamlfind packages required
 export PACKS = bigarray str ocamlgraph unix camomile
-export LIBS = nums batteries ../ocaml/bap
+export LIBS = nums batteries bap
 export INCDIRS = $(BAP_OCAMLDIR) $(BIGINT) $(BATT)
 
 # Include sources from ../ocaml in the automatically generated dependencies.

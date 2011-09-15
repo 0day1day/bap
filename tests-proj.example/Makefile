@@ -1,3 +1,5 @@
+include $(CURDIR)/../ocaml-proj/Makefile
+
 export BAP_DIR=$(CURDIR)/../bap
 export BAP_OCAMLDIR=$(BAP_DIR)/ocaml
 export OCAMLMAKEFILE=$(BAP_OCAMLDIR)/OCamlMakefile

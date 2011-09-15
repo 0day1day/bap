@@ -1,14 +1,16 @@
 # $Id$
 
+export BAP_DIR=$(CURDIR)/..
+
 export OCAMLMAKEFILE=OCamlMakefile
 export LIBASMIR=../libasmir
-export BIGINT=$(CURDIR)/../bigint-3.12/otherlibs/num
-export BATT=$(CURDIR)/../batteries-1.4.0/_build/src
+export BIGINT=$(BAP_DIR)/bigint-3.12/otherlibs/num
+export BATT=$(BAP_DIR)/batteries-1.4.0/_build/src
 include $(LIBASMIR)/makefile.inc
 -include ../../ocaml-proj/Makefile
 
 # Stop annoying warnings about big_int duplication!
-export OCAMLFIND_IGNORE_DUPS_IN=$(CURDIR)/../bigint-3.12/otherlibs/num
+export OCAMLFIND_IGNORE_DUPS_IN=$(BAP_DIR)/bigint-3.12/otherlibs/num
 
 #export INCDIRS += ../stp ../stp/ocaml
 #export EXTLIBDIRS += ../stp ../stp/ocaml
