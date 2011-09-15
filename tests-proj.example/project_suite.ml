@@ -1,6 +1,7 @@
 open OUnit
 
-let sample_test () = ()
+(* Function in ocaml-proj *)
+let sample_test = Test.testf
 
 let tests = [
   "sample_test" >:: sample_test
