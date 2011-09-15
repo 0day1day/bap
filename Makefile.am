@@ -6,17 +6,12 @@
 
 SUBDIRS=ounit-1.1.0 pcre-ocaml-release-6.2.2 bigint-3.12 batteries-1.4.0 VEX libasmir ocaml utils tests stpwrap
 
-# automake sucks
-#if TESTSPROJ
-#SUBDIRS += ../tests-proj
-#endif
 
 # pintraces removed temporarily
 # stp/ocaml ocaml utils doc
 
 test: all
 	$(MAKE) -C tests test
-	-$(MAKE) -C ../tests-proj test
 
 cscope:
 	cscope -b `find . -name "*.[ch]" -or -name "*.hh" -or -name "*.cc" -or -name "*.cpp"`
