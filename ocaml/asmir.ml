@@ -72,6 +72,7 @@ let gamma_create mem decls : varctx =
   let h = Hashtbl.create 57 in
   List.iter (fun (Var.V(_,nm,_) as var) -> Hashtbl.add h nm var) decls;
   Hashtbl.add h "$mem" mem;
+  Hashtbl.add h "mem" mem;
   h
 
 let gamma_lookup (g:varctx) s =
