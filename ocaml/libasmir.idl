@@ -22,12 +22,12 @@ typedef [abstract] void* big_val_t;
 
 typedef int threadid_t;
 
-quote(C, "
-    void null_check(void *ptr) {
-        if (ptr == NULL) {
-            caml_failwith(\"Unexpected NULL encountered.\");
-        }
-    }
+quote(C, " \
+    void null_check(void *ptr) { \
+        if (ptr == NULL) { \
+            caml_failwith(\"Unexpected NULL encountered.\"); \
+        } \
+    } \
 ");
 
 [length_is(*num)] asymbol*
