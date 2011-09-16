@@ -2,7 +2,6 @@
 
 use strict;
 use Getopt::Long;
-# apt-get install libsvn-hooks-perl or libsvn-svnlook-perl
 use SVN::Core;
 use SVN::Client;
 use Term::ReadKey;
