@@ -7,6 +7,8 @@ use SVN::Core;
 use SVN::Client;
 use Term::ReadKey;
 use Capture::Tiny qw/tee_merged/;  # requires package libcapture-tiny-perl 
+use Fcntl qw(:flock);
+
 $| = 1;
 
 my $rep_url = 'file:///var/lib/svn/bap/trunk';
@@ -86,6 +88,10 @@ exit(0) if(`$svnlook log -r $revision $repos` =~ /unittest-opt-out/);
 # Make sure this revision touches trunk
 exit(0) if(`$svnlook changed -r $revision $repos` !~ /[U|A|D]\s+trunk\/.*$/);
 
+# Make sure at most one process runs at a time
+print "Acquiring exclusive lock\n";
+flock(DATA, LOCK_EX) or die "Couldn't acquire lock...Exiting!\n";
+
 print "Verifying commit revision $revision to repo $repos\n";
 
 # check out repository to /tmp
@@ -124,3 +130,7 @@ chdir '/';
 # remove /tmp/trunk
 print "Removing temporary repository at $local_path\n";
 check_system('/bin/rm', '-rf', $local_path)
+
+# This section is used for locking and must be the last line of this file.
+# DO NOT (RE)MOVE!
+__DATA__
