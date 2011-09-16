@@ -453,6 +453,14 @@ let list_compare f l1 l2 =
   | None -> 0 (* Equal *)
   | Some(x) -> x (* Not equal *)
 
+(** Same as {List.mem}, but uses a user-specified equality function. *)
+let list_memf eqf ele l =
+  try
+    List.iter
+      (fun e -> if eqf e ele then raise Exit else ()) l;
+    false
+  with Exit -> true
+
 (** Given two lists, calls f with every possible combination *)
 let list_cart_prod2 f l1 l2 =
   List.iter

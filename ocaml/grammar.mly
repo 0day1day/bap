@@ -38,8 +38,8 @@ struct
     List.iter (fun v -> Hashtbl.add h (Var.name v) v) decls;
     (h, Stack.create() )
 
-  let defscope = create Asmir.all_regs
-  let cur_scope = ref defscope
+  let defscope () = create Asmir.all_regs
+  let cur_scope = ref (defscope ())
 
   let add n t =
     let v = Var.newvar (stripnum n) t in
@@ -99,6 +99,11 @@ let casttype_of_string = function
   | "low"     -> CAST_LOW     
   | s -> err("Unexpected cast type '"^s^"'")
 
+
+let scope_create = Scope.create
+let scope_set s = Scope.cur_scope := s
+let scope_default = Scope.defscope
+
 %}
 
 %token <string> ID
@@ -146,7 +151,7 @@ let casttype_of_string = function
 %%
 
 program: 
-| stmtlist EOF { $1 }
+| stmtlist EOF { scope_set (scope_default()); $1 }
 
 stmtlist:
 | revstmtlist  { List.rev $1 }
@@ -276,7 +281,3 @@ assign:
 | EQUAL {()}
 
 %%
-
-let scope_create = Scope.create
-let scope_set s = Scope.cur_scope := s
-let scope_default = Scope.defscope
