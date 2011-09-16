@@ -1,5 +1,6 @@
 (** A module to perform coalescing on CFGs *)
 
+open BatListFull
 open Cfg
 
 module D = Debug.Make(struct let name="Coalesce" and default=`Debug end)

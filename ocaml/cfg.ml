@@ -1,3 +1,4 @@
+open BatListFull
 open Type
 
 (* a label map *)
@@ -243,7 +244,9 @@ module LangAST =
 struct
   type t = Ast.stmt list
   let default = []
-  let join = List.append
+  let join sl1 sl2 = match List.rev sl1 with
+    | Ast.Jmp _ :: sl1' -> List.append (List.rev sl1') sl2
+    | _ -> BatList.append sl1 sl2
   let iter_labels f =
     List.iter (function Ast.Label(l, _) -> f l  | _ -> () )
 end
@@ -252,7 +255,9 @@ module LangSSA =
 struct
   type t = Ssa.stmt list
   let default = []
-  let join = List.append
+  let join sl1 sl2 = match List.rev sl1 with
+    | Ssa.Jmp _ :: sl1' -> List.append (List.rev sl1') sl2
+    | _ -> BatList.append sl1 sl2
   let iter_labels f =
     (* optimization: assume labels are at the beginning *)
     let rec g = function
