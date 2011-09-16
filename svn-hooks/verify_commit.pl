@@ -25,8 +25,8 @@ my ($revision, $repos);
 my $getpin = 0;
 my $merged;
 my $subj;
-my $to = 'swhitman@andrew.cmu.edu';
-#my $to = 'bap-dev@lists.andrew.cmu.edu';
+#my $to = 'swhitman@andrew.cmu.edu';
+my $to = 'bap-dev@lists.andrew.cmu.edu';
 
 
 GetOptions(
