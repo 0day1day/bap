@@ -1,5 +1,11 @@
 #!/usr/bin/perl
 
+#
+# NOTE: This file is in svn for tracking purposes.  The actual file which is 
+# run is on kestrel at /var/lib/svn/bap/hooks/verify_commit.pl  Changes to this
+# file must also be made to /var/lib/svn/bap/hooks/verify_commit.pl.
+#
+
 use strict;
 use Getopt::Long;
 use SVN::Core;
@@ -18,7 +24,10 @@ my $svnlook = '/usr/bin/svnlook';
 my ($revision, $repos);
 my $getpin = 0;
 my $merged;
-my ($subj, $to);
+my $subj;
+my $to = 'swhitman@andrew.cmu.edu';
+#my $to = 'bap-dev@lists.andrew.cmu.edu';
+
 
 GetOptions(
     'revision|r=s'    => \$revision,
@@ -28,7 +37,8 @@ GetOptions(
     );
 
 #
-# Keep track of the last 10 lines to print out in case of error; Exit on error
+# Keep track of the last 10 lines to print out in case of error; Clean up and 
+# Exit on error.
 #
 sub check_system {
     my @cmd = @_;
@@ -61,8 +71,6 @@ sub check_system {
 
 	# Send notification email
 	$subj = "FAILURE: r$revision - Build and Test failure!";
-	$to = 'swhitman@andrew.cmu.edu';
-#	$to = 'bap-dev@lists.andrew.cmu.edu';
 	open (MAIL, "|-",$mail, "-s",$subj,$to) or 
 	    die "Can't open pipe to mail: $!\n";
 
