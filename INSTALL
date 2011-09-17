@@ -18,10 +18,7 @@ satisfy most dependencies on Ubuntu 11.04 by running:
 
   $ sudo apt-get install ocaml ocaml-native-compilers ocaml-findlib camlidl \
     libocamlgraph-ocaml-dev libextlib-ocaml-dev binutils-dev automake \
-    libcamomile-ocaml-dev otags 
-
-On Debian 6+ add the following packages:
-   libpcre3-dev camlp4-extra
+    libcamomile-ocaml-dev otags libpcre3-dev camlp4-extra bison flex
 
 On x86_64 add the following packages:
     gcc-multilib g++-multilib
