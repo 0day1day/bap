@@ -19,6 +19,9 @@ export INCDIRS = $(BAP_OCAMLDIR) $(BIGINT) $(BATT) $(PCRE)
 # Include sources from ../ocaml in the automatically generated dependencies.
 export SOURCE_DIRS_IN = $(BAP_OCAMLDIR) $(BAP_PROJ_OCAMLDIR)
 
+# When BAP lib changes, we need to recompile utilities
+export RESULTDEPS = $(BAP_OCAMLDIR)/bap.a
+
 # default subprojects to build
 ifndef SUBPROJS
 	export SUBPROJS = $(PROJUTILS) toil iltrans ileval topredicate formula get_functions split streamtrans

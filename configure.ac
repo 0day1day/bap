@@ -135,6 +135,9 @@ echo "LIBASMIR_CXXFLAGS=-I${VEX_DIR}/pub -I`pwd`/src/include $CXXFLAGS" >> libas
 echo "LIBASMIR_LDFLAGS=-L${VEX_DIR} -L`pwd`/src $LDFLAGS" >> libasmir/makefile.inc
 echo "LIBASMIR_LIBS=-lasmir -lvex -lbfd -ldl -liberty" >> libasmir/makefile.inc
 
+AC_SUBST(ASMIR_DIR)
+ASMIR_DIR="`pwd`/libasmir"
+
 
 # Checks for header files.
 AC_HEADER_STDC
