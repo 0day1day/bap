@@ -23,20 +23,19 @@ export INCDIRS = $(BAP_OCAMLDIR) $(BIGINT) $(BATT) $(OUNIT) $(PCRE)
 # Include sources from ../ocaml in the automatically generated dependencies.
 export SOURCE_DIRS_IN = $(BAP_OCAMLDIR) $(BAP_PROJ_OCAMLDIR)
 
-export SUBPROJS += $(PROJTESTS) analyze_test_log
+export SUBPROJS += $(PROJTESTS) analyze_test_log bap_test_suite
 
 CSRC=$(wildcard C/*.c)
 CEXECS = $(CSRC:C/%.c=%)
 
-
-TARGETS = CTESTS ASM nc dc 
-
-RESULT = bap_test_suite
-
 # XXX Use ocamlmake to clean up asm executables?
 TRASH = asm/nop C/test C/taint_test C/bof1
 
-SOURCES = \
+TARGETS = CTESTS ASM nc dc
+
+define PROJ_baptest
+	RESULT = bap_test_suite
+	SOURCES = \
 	il_suite.ml \
 	var_suite.ml \
 	ast_suite.ml \
@@ -47,6 +46,9 @@ SOURCES = \
 	predicate_suite.ml \
 	arithmetic_suite.ml \
 	bap_suite.ml
+	DOC_FILES=$(SOURCES)
+endef
+export PROJ_baptest
 
 # XXX How to get analyze_test_log to be cleaned?
 define PROJ_analyze_test_log
@@ -62,8 +64,6 @@ all: $(TARGETS)
 
 test: all
 	./$(RESULT)
-
-include $(OCAMLMAKEFILE)
 
 ASM:
 	make -C asm
