@@ -23,7 +23,7 @@ export INCDIRS = $(BAP_OCAMLDIR) $(BIGINT) $(BATT) $(OUNIT) $(PCRE)
 # Include sources from ../ocaml in the automatically generated dependencies.
 export SOURCE_DIRS_IN = $(BAP_OCAMLDIR) $(BAP_PROJ_OCAMLDIR)
 
-export SUBPROJS += $(PROJTESTS) analyze_test_log bap_test_suite
+export SUBPROJS += $(PROJTESTS) analyze_test_log baptest
 
 CSRC=$(wildcard C/*.c)
 CEXECS = $(CSRC:C/%.c=%)
@@ -63,7 +63,7 @@ export BCSUFFIX = .dbg
 all: $(TARGETS)
 
 test: all
-	./$(RESULT)
+	./bap_test_suite
 
 ASM:
 	make -C asm
