@@ -1,7 +1,7 @@
 open OUnit
 open Pcre
 open Ast
-open TestCommon
+open Test_common
 open Big_int
 open Big_int_convenience
 

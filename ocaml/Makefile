@@ -6,6 +6,9 @@ export OCAMLMAKEFILE=OCamlMakefile
 export LIBASMIR=../libasmir
 export BIGINT=$(BAP_DIR)/bigint-3.12/otherlibs/num
 export BATT=$(BAP_DIR)/batteries-1.4.0/_build/src
+export OUNIT=$(BAP_DIR)/ounit-1.1.0/_build/src/
+export PCRE=$(BAP_DIR)/pcre-ocaml-release-6.2.2/lib
+
 include $(LIBASMIR)/makefile.inc
 -include ../../ocaml-proj/Makefile
 
@@ -83,6 +86,7 @@ export SOURCES = \
 	traces.ml \
 	graphDataflowW.ml \
 	utils_common.ml \
+	test_common.ml \
 	$(PROJSOURCES) \
 
 # Fix the interpreter to work with big ints
@@ -106,8 +110,8 @@ export YFLAGS = -v
 export CLIBS = asmir vex opcodes bfd iberty stdc++ 
 export CFLAGS = -g
 export LDFLAGS = $(LIBASMIR_LDFLAGS)
-export INCDIRS = $(BIGINT) $(BATT)
-export LIBS = nums batteries
+export INCDIRS = $(BIGINT) $(BATT) $(OUNIT) $(PCRE)
+export LIBS = nums batteries oUnit pcre
 export CLIBFLAGS= $(LDFLAGS)
 export RESULTDEPS = $(LIBASMIR)/src/libasmir.a $(VEX_DIR)/libvex.a
 export LIBDIRS = $(LIBASMIR)/src # ../appreplay ../stp ../stp/ocaml

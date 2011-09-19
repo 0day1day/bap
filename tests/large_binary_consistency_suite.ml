@@ -1,6 +1,6 @@
 open OUnit
 open Pcre
-open TestCommon
+open Test_common
 
 
 let binary_dir = "static_bins/";;

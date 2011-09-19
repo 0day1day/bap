@@ -1,5 +1,5 @@
 open OUnit
-open TestCommon
+open Test_common
 
 
 let short_tests = [

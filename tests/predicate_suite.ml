@@ -1,7 +1,7 @@
 open OUnit
 open Pcre
 open Ast
-open TestCommon
+open Test_common
 open Utils_common
 
 let test_file = "C/test";;

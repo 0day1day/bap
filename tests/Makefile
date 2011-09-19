@@ -17,7 +17,7 @@ export OCAMLFIND_IGNORE_DUPS_IN=$(BAP_DIR)/bigint-3.12/otherlibs/num
 
 #export PACKS = oUnit bigarray str ocamlgraph extlib unix
 export PACKS = bigarray str ocamlgraph unix camomile
-export LIBS = nums batteries ../ocaml/bap oUnit pcre
+export LIBS = nums batteries oUnit pcre ../ocaml/bap
 export INCDIRS = $(BAP_OCAMLDIR) $(BIGINT) $(BATT) $(OUNIT) $(PCRE)
 
 # Include sources from ../ocaml in the automatically generated dependencies.
@@ -37,7 +37,6 @@ RESULT = bap_test_suite
 TRASH = asm/nop C/test C/taint_test C/bof1
 
 SOURCES = \
-	testCommon.ml \
 	il_suite.ml \
 	var_suite.ml \
 	ast_suite.ml \
