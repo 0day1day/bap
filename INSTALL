@@ -11,8 +11,6 @@ To build BAP on x86, do the following:
 -- or to make all and run unit tests after --
   $ make test 
 
-On x86_64, instead of ./configure you may need ./configure CFLAGS=-DAMD64.
-
 Configure should report any dependencies you do not have.  You can
 satisfy most dependencies on Ubuntu 11.04 by running:
 
