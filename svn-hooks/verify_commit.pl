@@ -118,7 +118,7 @@ $ENV{'PATH'} = '/bin:/usr/bin';
 # configure
 print "Configuring\n";
 check_system("./autogen.sh");
-check_system("./configure", "CFLAGS=-DAMD64");
+check_system("./configure");
 
 # getpin?
 if($getpin) {
