@@ -14,12 +14,7 @@ let short_tests = [
   Arithmetic_suite.suite;
 ];;
 
-let long_tests = [
-  Large_binary_consistency_suite.suite;
-];;
-
-
-let bap_tests = ("BAP" >::: short_tests@long_tests);;
+let bap_tests = ("BAP" >::: short_tests);;
  
 
 let summarize r =

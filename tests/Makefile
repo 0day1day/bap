@@ -45,7 +45,6 @@ SOURCES = \
 	traces_suite.ml \
 	pin_suite.ml \
 	predicate_suite.ml \
-	large_binary_consistency_suite.ml \
 	arithmetic_suite.ml \
 	bap_suite.ml
 
