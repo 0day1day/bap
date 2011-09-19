@@ -131,6 +131,9 @@ tags: TAGS
 TAGS: $(SOURCES)
 	-otags $^
 
+runtop:	top
+	./bap.top -I $(BIGINT)
+
 # You may also tell "make" at the command-line what kind of target to
 # produce (e.g. "make nc").  Here all the possibilities with shortcuts
 # between parenthesis:
