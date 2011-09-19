@@ -4,6 +4,7 @@ val uncurry : ('a -> 'b -> 'c) -> ('a * 'b -> 'c)
 val ( <@ ) : ('a -> 'b) -> ('c -> 'a) -> 'c -> 'b
 
 val foldn : ?t:int -> ('a -> int -> 'a) -> 'a -> int -> 'a
+val foldn64 : ?t:int64 -> ('a -> int64 -> 'a) -> 'a -> int64 -> 'a
 val mapn : (int -> 'a) -> int -> 'a list
 
 (* Use decr and incr instead
