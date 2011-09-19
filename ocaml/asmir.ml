@@ -822,6 +822,9 @@ let get_section_startaddr p sectionname =
 let get_section_endaddr p sectionname =
   Libasmir.asmir_get_sec_endaddr p.asmp sectionname
 
+let get_start_addr p =
+  Libasmir.asmir_get_start_addr p.asmp
+
 
 let get_asm_instr_string_range p s e =
   let s = ref s in

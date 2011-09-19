@@ -79,6 +79,7 @@ val get_all_asections : asmprogram -> section_ptr array
 
 val get_section_startaddr : asmprogram -> string -> address_t
 val get_section_endaddr : asmprogram -> string -> address_t
+val get_start_addr : asmprogram -> address_t
 
 val get_asm_instr_string_range : asmprogram -> address_t -> address_t -> string
 

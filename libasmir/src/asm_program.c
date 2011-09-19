@@ -411,6 +411,13 @@ bfd_vma asmir_get_sec_endaddr(asm_program_t *prog, const char *sectionname) {
 }
 
 /*
+ * Get the start address (entry point) of the program.
+ */
+bfd_vma asmir_get_start_addr(asm_program_t *prog) {
+    return prog->abfd->start_address;
+}
+
+/*
  * Return a list of all sections
  *
  * XXX: Does not free memory
