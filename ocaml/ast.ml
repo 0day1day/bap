@@ -290,3 +290,17 @@ let full_stmt_eq s1 s2 =
 
 let is_true = (===) exp_true
 let is_false = (===) exp_false
+
+let is_indirectjump s =
+  let is_indirect_exp e = match lab_of_exp e with
+    | Some _ -> false
+    | None -> true
+  in
+match s with
+| Jmp(e, _) -> is_indirect_exp e (* Only jumps to labels are direct *)
+| CJmp(_, e1, e2, _) -> is_indirect_exp e1 || is_indirect_exp e2
+| _ -> false
+
+let is_syscall = function
+  | Special(("syscall"|"int 80"), _) -> true
+  | _ -> false

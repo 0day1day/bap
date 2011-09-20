@@ -354,6 +354,9 @@ let speclist =
      Arg.Clear Traces.dce,
      "Disable trace optimizations"
     )
+  ::("-trace-merge",
+     uadd(TransformAst(Traces_merge.do_merge)),
+     "This will do something specific later.")
   :: ("-normalize-mem", uadd(TransformAst Memory2array.coerce_prog),
       "Normalize memory accesses as array accesses")
   :: ("-prune-cfg",

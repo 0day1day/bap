@@ -1,13 +1,14 @@
 (* A module to perform trace analysis *)
 
 open Ast
+open BatListFull
 open Big_int
 open Big_int_convenience
 open Symbeval
 open Type
 
-module D = Debug.Make(struct let name = "TraceEval" and default=`NoDebug end)
-module DV = Debug.Make(struct let name = "TraceEvalVerbose" and default=`NoDebug end)
+module D = Debug.Make(struct let name = "Traces" and default=`NoDebug end)
+module DV = Debug.Make(struct let name = "TracesVerbose" and default=`NoDebug end)
 open D
 
 (** So here's how we will do partial symbolic execution on
@@ -617,6 +618,15 @@ let remove_jumps =
   in
     List.filter no_jmps
 
+(** Remove 'Loaded module' specials *)
+let remove_loaded = 
+  let loaded = Str.regexp "^Loaded module " in
+  let rs = function
+    | Ast.Special(s, attrs) when Str.string_match loaded s 0 -> Ast.Comment(s, attrs)
+    | s -> s
+  in
+  List.map rs
+
 (** Removing all specials from the traces *)	
 let remove_specials =
   let no_specials = function 
@@ -970,6 +980,7 @@ let trace_transform_stmt stmt evalf =
 	  (* Removing assignment of tainted operands: symbolic
 	     execution does not need these *)
     | Ast.Move (_, _, atts) when List.exists is_tconcassign atts -> []
+    | Ast.Special _ -> [com]
     | s -> [s] in
   if not !allow_symbolic_indices && full_exp_eq !exp exp_true then
     (* The assertion must come first, since the statement may modify value of the expression! *)
@@ -990,7 +1001,7 @@ let rec get_next_label blocks =
 	| [] -> None
 
 (** Running each block separately *)
-let run_block ?(next_label = None) ?(log=fun _ -> ()) state memv block prev_block =  
+let run_block ?(next_label = None) ?(log=fun _ -> ()) ?(transformf = (fun s _ -> [s])) state memv block prev_block =  
   let addr, block = hd_tl block in
   let input_seeds = get_symbolic_seeds memv addr in
   pdebug ("Running block: " ^ (string_of_int !counter) ^ " " ^ (Pp.ast_stmt_to_string addr));
@@ -1073,7 +1084,7 @@ let run_block ?(next_label = None) ?(log=fun _ -> ()) state memv block prev_bloc
       | _ -> failwith "Expected symbolic" 
     in
     executed := Util.fast_append input_seeds !executed ;
-    executed := Util.fast_append (trace_transform_stmt stmt evalf) !executed ; 
+    executed := Util.fast_append (transformf stmt evalf) !executed ; 
     (*print_endline (Pp.ast_stmt_to_string stmt) ;*)
 
     try 
@@ -1086,7 +1097,7 @@ let run_block ?(next_label = None) ?(log=fun _ -> ()) state memv block prev_bloc
 	    failwith "multiple targets..."
       )
     with
-	(* Ignore failed assertions -- assuming that we introduced them *)
+    (* Ignore failed assertions -- assuming that we introduced them *)
     | AssertFailed _ as _e -> 
 	  wprintf "failed assertion: %s" (Pp.ast_stmt_to_string stmt);
 	  (* raise e; *)
@@ -1159,7 +1170,7 @@ let run_blocks ?(log=fun _ -> ()) blocks memv length =
 	  block
 	| _ ->
 	  let l = get_next_label remaining in 
-	  run_block ~next_label:(l) ~log state memv block prev_block)
+	  run_block ~next_label:(l) ~log ~transformf:trace_transform_stmt state memv block prev_block)
       in
       (
 	(* prev block *) (Some block),
@@ -1898,7 +1909,7 @@ let output_exploit file trace =
     let sort_aux (var1, _) (var2,_) =
   	compare (var_to_num var1) (var_to_num var2)
     in
-      List.sort sort_aux
+      List.sort ~cmp:sort_aux
   in
     (* Padding unused symbolic bytes *)
   let pad_unused =

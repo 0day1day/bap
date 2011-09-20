@@ -85,6 +85,7 @@ export SOURCES = \
 	template.ml \
 	traces.ml \
 	traces_surgical.ml \
+	traces_merge.ml \
 	graphDataflowW.ml \
 	utils_common.ml \
 	test_common.ml \
