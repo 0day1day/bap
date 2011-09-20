@@ -33,7 +33,7 @@ let rec foldn64 ?(t=0L) f i n =
   match n-t with
   | 0L -> f i n
   | _ when n>t -> foldn64 ~t f (f i n) (n-1L)
-  | -1L -> i (* otags has trouble with '-1L' *)
+  | n when n == -1L -> i (* otags has trouble with '-1L' *)
   | _ -> raise (Invalid_argument "negative index number in foldn64")
 
 (** [mapn f n] is the same as [f 0; f 1; ...; f n] *)
