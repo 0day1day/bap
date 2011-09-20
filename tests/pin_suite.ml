@@ -1,6 +1,6 @@
 open OUnit
 open Pcre
-open TestCommon
+open Test_common
 
 let bof = "C/bof1";;
 let taint_file = "tainted_file";;

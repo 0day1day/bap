@@ -30,6 +30,11 @@ AC_PROG_CAMLIDL
 #AC_PROG_LATEX
 #AC_PROG_LIBTOOL
 
+# Add -DAMD64 when needed
+if test "$(uname -m)" == "x86_64";
+   then export CFLAGS="$CFLAGS -DAMD64";
+fi
+
 # Checks for ocaml libraries
 ocamlfind query ocamlgraph
 if test $? != 0; then
@@ -124,10 +129,14 @@ AC_SUBST(VEX_DIR)
 
 
 #cp libasmir/makefile.inc.in libasmir/makefile.inc
+rm -f libasmir/makefile.inc
 echo "VEX_DIR=${VEX_DIR}" >> libasmir/makefile.inc
 echo "LIBASMIR_CXXFLAGS=-I${VEX_DIR}/pub -I`pwd`/src/include $CXXFLAGS" >> libasmir/makefile.inc
 echo "LIBASMIR_LDFLAGS=-L${VEX_DIR} -L`pwd`/src $LDFLAGS" >> libasmir/makefile.inc
 echo "LIBASMIR_LIBS=-lasmir -lvex -lbfd -ldl -liberty" >> libasmir/makefile.inc
+
+AC_SUBST(ASMIR_DIR)
+ASMIR_DIR="`pwd`/libasmir"
 
 
 # Checks for header files.

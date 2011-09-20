@@ -4,19 +4,7 @@ open OUnit
 open Pcre
 open Ast
 
-(** Test run args **)
-let long = ref false;;
-let long_bins = ref "";;
-
-let speclist =
-  [
-	("-long", Arg.Set long, "\tRun long binary tests");
-	("-long-bins", Arg.Set_string long_bins, 
-	 "<dir> Run long binary tests on traces in directory <dir>");
-  ];;
-
-let long_check _ = skip_if (not !long) "Long running tests turned off";;
-
+let speclist = [];;
 
 (** STP helpers **)
 let stp_path = "../stpwrap/stp/bin/";;

@@ -2374,7 +2374,7 @@ vector<Stmt *> mod_eflags_umul( reg_t type, Exp *arg1, Exp *arg2 )
                 c_3(REG_32,3), 
                 c_4(REG_32,4), 
                 c_5(REG_32,5), 
-                c_6(REG_32,6), c_TYPE_SIZE_LESS_1(REG_32,type_size - 1),
+                c_6(REG_32,6), c_TYPE_SIZE_LESS_1(type,type_size - 1),
                 c_7(REG_32,7);
 
     // Calculate flags
@@ -2452,7 +2452,7 @@ vector<Stmt *> mod_eflags_smul( reg_t type, Exp *arg1, Exp *arg2 )
                 c_3(REG_32,3), 
                 c_4(REG_32,4), 
                 c_5(REG_32,5), 
-                c_6(REG_32,6), c_TYPE_SIZE_LESS_1(REG_32,type_size - 1),
+                c_6(REG_32,6), c_TYPE_SIZE_LESS_1(type,type_size - 1),
                 c_7(REG_32,7);
 
     // Calculate flags

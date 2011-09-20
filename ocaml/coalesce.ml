@@ -1,5 +1,6 @@
 (** A module to perform coalescing on CFGs *)
 
+open BatListFull
 open Cfg
 
 module MakeCoalesce (C: CFG) =

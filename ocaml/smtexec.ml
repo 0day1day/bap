@@ -10,7 +10,7 @@
 exception Alarm_signal_internal;;
 exception Alarm_signal of int;;
 
-module D = Debug.Make(struct let name = "Stpexec" and default=`Debug end)
+module D = Debug.Make(struct let name = "Smtexec" and default=`NoDebug end)
 open D
 
 open Unix

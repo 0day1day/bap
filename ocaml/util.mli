@@ -4,6 +4,7 @@ val uncurry : ('a -> 'b -> 'c) -> ('a * 'b -> 'c)
 val ( <@ ) : ('a -> 'b) -> ('c -> 'a) -> 'c -> 'b
 
 val foldn : ?t:int -> ('a -> int -> 'a) -> 'a -> int -> 'a
+val foldn64 : ?t:int64 -> ('a -> int64 -> 'a) -> 'a -> int64 -> 'a
 val mapn : (int -> 'a) -> int -> 'a list
 
 (* Use decr and incr instead
@@ -37,6 +38,7 @@ val list_insert : 'a list -> 'a list -> int -> 'a list
 val list_remove: 'a list -> int -> int -> 'a list
 val list_delete: 'a list -> 'a -> 'a list
 val list_compare: ('a -> 'a -> int) -> ('a list) -> ('a list) -> int
+val list_memf: ('a -> 'a -> bool) -> 'a -> ('a list) -> bool
 val list_cart_prod2: ('a -> 'b -> unit) -> ('a list) -> ('b list) -> unit
 val list_cart_prod3: ('a -> 'b -> 'c -> unit) -> ('a list) -> ('b list) -> ('c list) -> unit
 val list_cart_prod4: ('a -> 'b -> 'c -> 'd -> unit) -> ('a list) -> ('b list) -> ('c list) -> ('d list) -> unit

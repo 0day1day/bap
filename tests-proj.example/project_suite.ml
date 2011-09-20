@@ -1,21 +1,13 @@
 open OUnit
-open Test_common
 
+(* Function in ocaml-proj *)
+let sample_test = Test.testf
 
-let short_tests = [
-  Il_suite.suite;
-  Var_suite.suite;
-  Ast_suite.suite;
-  Disasm_i386_suite.suite;
-  Asmir_suite.suite;
-  Traces_suite.suite;
-  Pin_suite.suite;
-  Predicate_suite.suite;
-  Arithmetic_suite.suite;
+let tests = [
+  "sample_test" >:: sample_test
 ];;
 
-let bap_tests = ("BAP" >::: short_tests);;
- 
+let bap_tests = ("Project" >::: tests);;
 
 let summarize r =
   match r with 
@@ -39,9 +31,8 @@ let rec print_paths paths =
   | [] -> ()
   | p::ps -> Format.printf "%s\n" (string_of_path p); print_paths ps;;
 
-
-let _ = 
-  let results = run_test_tt_main ~arg_specs:speclist bap_tests in
+let _ =
+  let results = run_test_tt_main bap_tests in
   Format.printf "%s\n" "";
   summarize_results results
 ;;

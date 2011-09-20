@@ -96,7 +96,7 @@ let global =
 (* Some wrappers to interface with the above datastructures *)
 
 (** Create a lookup for our variables *)
-let gamma = Asmir.gamma_create Asmir.x86_mem Asmir.x86_regs
+let gamma = Asmir.gamma_for_arch Asmir.arch_i386
 
 (** Convert name of a register to a var for that register *)
 let name_to_var name =

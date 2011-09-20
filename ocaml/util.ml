@@ -22,11 +22,19 @@ let uncurry f = fun (x,y) -> f x y
 
 (** [foldn f i n] is f (... (f (f i n) (n-1)) ...) 0 *)
 let rec foldn ?(t=0) f i n =  match n-t with
-  | 0 -> f i 0
-  | _ when n>t -> foldn f (f i n) (n-1)
+  | 0 -> f i n
+  | _ when n>t -> foldn ~t f (f i n) (n-1)
   | -1 -> i
   | _ -> raise (Invalid_argument "negative index number in foldn")
 
+(** [foldn f i n] is f (... (f (f i n) (n-1)) ...) 0 *)
+let rec foldn64 ?(t=0L) f i n =
+  let (-) = Int64.sub in
+  match n-t with
+  | 0L -> f i n
+  | _ when n>t -> foldn64 ~t f (f i n) (n-1L)
+  | n when n == -1L -> i (* otags has trouble with '-1L' *)
+  | _ -> raise (Invalid_argument "negative index number in foldn64")
 
 (** [mapn f n] is the same as [f 0; f 1; ...; f n] *)
 let mapn f n =
@@ -453,6 +461,14 @@ let list_compare f l1 l2 =
   | None -> 0 (* Equal *)
   | Some(x) -> x (* Not equal *)
 
+(** Same as {List.mem}, but uses a user-specified equality function. *)
+let list_memf eqf ele l =
+  try
+    List.iter
+      (fun e -> if eqf e ele then raise Exit else ()) l;
+    false
+  with Exit -> true
+
 (** Given two lists, calls f with every possible combination *)
 let list_cart_prod2 f l1 l2 =
   List.iter
@@ -468,7 +484,7 @@ let list_cart_prod3 f l1 l2 l3 =
 let list_cart_prod4 f l1 l2 l3 l4 =
   List.iter (fun x -> list_cart_prod3 (f x) l2 l3 l4) l1
 
-(** {list_permutation setlist f] calls f with every value in the
+(** {list_permutation setlist f} calls f with every value in the
     cartesian product of the sets in setlist. For instance, if setlist is
     [[1;2]; [2;3]], then this function will call f [1;2], f [1;3], f
     [2;2], and f [2;3] in some order.
