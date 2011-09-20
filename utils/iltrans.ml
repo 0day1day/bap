@@ -195,11 +195,11 @@ let speclist =
      "Execute the trace concretely and obtain a straightline trace"
     )
   ::("-trace-concrete-subst",
-     uadd(TransformAst Traces.concrete_substitution),
+     uadd(TransformAst Traces_surgical.concrete_substitution),
      "Execute the trace concretely and obtain a straightline trace"
     )
   ::("-trace-slice",
-     uadd(TransformAst Traces.check_slice),
+     uadd(TransformAst Traces_surgical.check_slice),
      "Slice a trace based on the overwritten return address"
     )
   ::("-trace-clean",

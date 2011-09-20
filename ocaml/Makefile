@@ -84,6 +84,7 @@ export SOURCES = \
 	coalesce.ml \
 	template.ml \
 	traces.ml \
+	traces_surgical.ml \
 	graphDataflowW.ml \
 	utils_common.ml \
 	test_common.ml \
