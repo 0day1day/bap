@@ -128,6 +128,8 @@ all: dcl ncl #top
 
 bap_lib_doc: all htdoc
 
+docall: all htdoc ladoc psdoc pdfdoc
+
 tags: TAGS
 
 TAGS: $(SOURCES)
