@@ -1,4 +1,5 @@
 open Ast
+open Grammar_scope
 open Type
 open Utils_common
 
@@ -19,7 +20,6 @@ let solve = ref false
 
 (* Select which solver to use *)
 let solver = ref (Smtexec.STP.si);;
-
 
 let compute_dwp1 cfg post =
   let (gcl, foralls, tossa) = Gcl.passified_of_astcfg cfg in
@@ -168,13 +168,13 @@ let anon x = raise(Arg.Bad("Unexpected argument: '"^x^"'"))
 let () = Arg.parse speclist anon usage
 
 
-let prog =
+let prog,scope =
   try Input.get_program()
   with Arg.Bad s ->
     Arg.usage speclist (s^"\n"^usage);
     exit 1
 
-let post = Parser.exp_from_string !post
+let post,_ = Parser.exp_from_string ~scope !post
 
 let cfg = Cfg_ast.of_prog prog
 let cfg = Prune_unreachable.prune_unreachable_ast cfg

@@ -68,6 +68,7 @@ export SOURCES = \
 	yices_grammar.mly yices_lexer.mll \
 	smtexec.mli smtexec.ml \
 	asmirconsts.ml asmir.mli asmir.ml \
+	grammar_scope.ml \
 	grammar.mly lexer.mll \
 	parser.ml \
 	input.mli input.ml \
