@@ -5,7 +5,7 @@
 #include @top_srcdir@/config/recursive.mk
 
 if TESTS_OPT
-TESTDIRS=ounit-1.1.0 pcre-ocaml-release-6.2.2 tests stpwrap
+TESTDIRS=ounit-1.1.0 pcre-ocaml-release-6.2.2
 TESTPOSTDIRS=tests stpwrap
 endif
 
