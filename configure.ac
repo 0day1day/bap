@@ -171,6 +171,8 @@ AC_CHECK_FUNCS([bzero memset strstr strtoul])
 
 # Check for library function versions
 
+AM_CONDITIONAL([TESTS_OPT], [test -d tests])
+
 AC_CONFIG_FILES([Makefile
                  libasmir/Makefile
                  libasmir/apps/Makefile
