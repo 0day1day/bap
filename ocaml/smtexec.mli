@@ -1,3 +1,12 @@
+(**
+   Module for executing SMTs inside of BAP
+
+   XXX: This is not portable in any shape or way. It will only work on
+   Unix-like systems.
+
+   @author ejs
+*)
+
 type result = Valid | Invalid | SmtError | Timeout
 val result_to_string : result -> string
 

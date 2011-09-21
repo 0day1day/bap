@@ -1,3 +1,5 @@
+(** Native lifter of x86 instructions to the BAP IL *)
+
 open Int64
 open Ast
 open Ast_convenience

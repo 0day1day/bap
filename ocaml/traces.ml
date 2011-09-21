@@ -1,4 +1,4 @@
-(* A module to perform trace analysis *)
+(** A module to perform trace analysis *)
 
 open Ast
 open Big_int

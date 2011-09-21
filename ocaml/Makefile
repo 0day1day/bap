@@ -75,7 +75,6 @@ export SOURCES = \
 	depgraphs.ml \
 	to_c.ml \
 	vsa.ml \
-	memory2scalar.ml \
 	eval.ml \
 	symbeval.ml symbeval_search.ml \
 	ast_slice.ml \

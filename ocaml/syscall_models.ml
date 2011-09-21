@@ -1,7 +1,6 @@
 (**
 
-   @file syscall_models.ml
-   @description A module with IL models of system calls.
+   A module with IL models of system calls.
 
 *)
 

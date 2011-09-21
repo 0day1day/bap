@@ -1,4 +1,4 @@
-(* A module to try out search strategies on symbolic execution *)
+(** A module to try out search strategies on symbolic execution *)
 
 module D = Debug.Make(struct let name = "SearchFSE" and default=`Debug end)
 open D

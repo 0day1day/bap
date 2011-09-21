@@ -1,3 +1,5 @@
+(** Functions used by BAP library and tests *)
+
 open Big_int
 open Big_int_convenience
 open OUnit
