@@ -151,7 +151,7 @@ let scope_default = Scope.defscope
 %%
 
 program: 
-| stmtlist EOF { scope_set (scope_default()); $1 }
+| stmtlist EOF { (*scope_set (scope_default());*) $1 }
 
 stmtlist:
 | revstmtlist  { List.rev $1 }

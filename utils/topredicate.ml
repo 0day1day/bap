@@ -208,7 +208,7 @@ match !stpout with
     p#counterexample;
     p#close;
     if !solve then
-      let r = (!solver)#solve_formula_file !stpoutname in
+      let r = (!solver)#solve_formula_file ~printmodel:true !stpoutname in
       Printf.fprintf stderr "Solve result: %s\n" (Smtexec.result_to_string r)
 
 ;;
