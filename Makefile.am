@@ -6,9 +6,10 @@
 
 if TESTS_OPT
 TESTDIRS=ounit-1.1.0 pcre-ocaml-release-6.2.2 tests stpwrap
+TESTPOSTDIRS=tests stpwrap
 endif
 
-SUBDIRS=bigint-3.12 batteries-1.4.0 VEX libasmir ocaml utils $(TESTDIRS)
+SUBDIRS=bigint-3.12 batteries-1.4.0 $(TESTDIRS) VEX libasmir ocaml utils $(TESTPOSTDIRS)
 
 
 # pintraces removed temporarily
