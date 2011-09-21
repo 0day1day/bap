@@ -64,44 +64,41 @@ dnl fi
 #
 #    AS_HELP_STRING([--with-vex], [Vex directory]),
 #
+AC_ARG_WITH(vex, 
+    [  --with-vex=/path/to/vex/dir    Vex directory],
+[
+    AC_CHECK_FILE($withval/pub/libvex.h,
+        [VEX_DIR=$withval],
+        [AC_MSG_ERROR([Directory '$withval' does not exist, or does not contain Vex])])
+],
+[
+    VEX_DIR=`pwd`/'VEX'
+])
 
-VEX_DIR=`pwd`/'VEX'
+if test "${VEX_DIR}" = ""; then
+	echo " ** ERROR: "
+	echo " ** You must supply --with-vex, which should"
+	echo " ** point to the directory containing VEX"
+	exit -1
+fi
 
+AC_ARG_WITH(vex-revision, 
+    [  --with-vex-revision=<num>    Vex version],
+[
+        VEX_VERSION=$withval
+],
+[
+        VEX_VERSION=`svn info ${VEX_DIR} | grep Revision | awk '{print $2}'`
+])
+#+
+if test -e "${VEX_DIR}/priv/main/vex_svnversion.h"; then
+    VEX_VERSION=`tr -d \" <"${VEX_DIR}/priv/main/vex_svnversion.h"`
+fi
 
-dnl AC_ARG_WITH(vex, 
-dnl     [  --with-vex=/path/to/vex/dir    Vex directory],
-dnl [
-dnl     AC_CHECK_FILE($withval/pub/libvex.h,
-dnl         [VEX_DIR=$withval],
-dnl         [AC_MSG_ERROR([Directory '$withval' does not exist, or does not contain Vex])])
-dnl ],
-dnl [
-dnl ])
-
-dnl if test "${VEX_DIR}" = ""; then
-dnl 	echo " ** ERROR: "
-dnl 	echo " ** You must supply --with-vex, which should"
-dnl 	echo " ** point to the directory containing VEX"
-dnl 	exit -1
-dnl fi
-
-dnl AC_ARG_WITH(vex-revision, 
-dnl     [  --with-vex-revision=<num>    Vex version],
-dnl [
-dnl         VEX_VERSION=$withval
-dnl ],
-dnl [
-dnl         VEX_VERSION=`svn info ${VEX_DIR} | grep Revision | awk '{print $2}'`
-dnl ])
-dnl #+
-dnl if test -e "${VEX_DIR}/priv/main/vex_svnversion.h"; then
-dnl     VEX_VERSION=`tr -d \" <"${VEX_DIR}/priv/main/vex_svnversion.h"`
-dnl fi
-
-dnl if test "${VEX_VERSION}" = ""; then
-dnl     echo "Could not determine VEX version (override with --with-vex-revision=<num>)"
-dnl     exit -1
-dnl fi
+if test "${VEX_VERSION}" = ""; then
+    echo "Could not determine VEX version (override with --with-vex-revision=<num>)"
+    exit -1
+fi
 
 
 
