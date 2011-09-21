@@ -575,17 +575,17 @@ let update_concrete s =
 	) else false
   | _ -> false
 
-(** Get the address of the next instruction in the trace *)
-let rec get_next_address = function
-  | [] -> raise Not_found
-  | (Ast.Label ((Addr n),_))::_ -> 
-      Name ("pc_"^(Int64.format "0x%Lx" n))
-  | _::xs -> get_next_address xs     
+(* (\** Get the address of the next instruction in the trace *\) *)
+(* let rec get_next_address = function *)
+(*   | [] -> raise Not_found *)
+(*   | (Ast.Label ((Addr n),_))::_ ->  *)
+(*       Name ("pc_"^(Int64.format "0x%Lx" n)) *)
+(*   | _::xs -> get_next_address xs      *)
 
-(* Converts an address to a string label *)
-let to_label = function
-  | Addr n -> Name ("pc_"^(Int64.format "0x%Lx" n))
-  | other -> other
+(* (\* Converts an address to a string label *\) *)
+(* let to_label = function *)
+(*   | Addr n -> Name ("pc_"^(Int64.format "0x%Lx" n)) *)
+(*   | other -> other *)
 
 (** Fetching the first stmt with attributes containing taint info *)
 let rec get_first_atts = function
