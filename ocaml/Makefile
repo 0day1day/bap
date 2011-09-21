@@ -59,6 +59,7 @@ export SOURCES = \
 	libasmir.idl \
 	disasm_i386.ml \
 	disasm.ml \
+	syscall_models.ml \
 	memory2array.ml \
 	gcl.mli gcl.ml \
 	wp.ml \
