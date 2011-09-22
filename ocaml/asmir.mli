@@ -14,6 +14,7 @@
 open Libbfd
 open Libasmir
 
+exception Memory_error
 exception Disassembly_error
 
 type asmprogram
