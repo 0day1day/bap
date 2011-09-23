@@ -11,11 +11,11 @@ let il_file = "C/test.il";;
 
 (* i represents the change on the stack to the "wrong" value for function g *)
 let i = 
-  let a = Parser.exp_from_string "R_ESP_1:u32" in
-  let e = Parser.exp_from_string "43:u32" in
+  let a,_ = Parser.exp_from_string "R_ESP_1:u32" in
+  let e,_ = Parser.exp_from_string "43:u32" in
   let t = Typecheck.infer_ast e in
   let m = match Parser.exp_from_string "mem_45:?u32" with
-    | Var(v) -> v
+    | Var(v), _ -> v
     | _ -> assert false
   in
   let s = Move(m, Store(Var(m), a, e, exp_false, t), []) in
@@ -45,7 +45,7 @@ let concrete_eval_setup _ =
     the execution at the "call <g>" assembly instruction in main, and verifies
 	that the result is -1. *)
 let concrete_eval_test (ranges, s) = 
-  let prog = Parser.program_from_file il_file in
+  let prog,_ = Parser.program_from_file il_file in
   let ctx1 = Symbeval.concretely_execute ~s prog in
   let eax1 = biconst 0x2a in
   let (start_addr,end_addr) = find_fun ranges "main" in
