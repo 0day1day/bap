@@ -21,7 +21,7 @@ export SOURCE_DIRS_IN = $(BAP_OCAMLDIR) $(BAP_PROJ_OCAMLDIR)
 
 # default subprojects to build
 ifndef SUBPROJS
-	export SUBPROJS = $(PROJUTILS) toil iltrans ileval topredicate formula get_functions split streamtrans
+	export SUBPROJS = $(PROJUTILS) toil iltrans ileval topredicate formula get_functions split streamtrans rdisasm
 endif
 
 define PROJ_toil
@@ -79,6 +79,13 @@ define PROJ_streamtrans
 	DOC_FILES=$(SOURCES)
 endef
 export PROJ_streamtrans
+
+define PROJ_rdisasm
+	RESULT=rdisasm
+	SOURCES = rdisasm.ml
+	DOC_FILES=$(SOURCES)
+endef
+export PROJ_rdisasm
 
 
 # suffix for bytecode (which when we make all is debug code)
