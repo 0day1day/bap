@@ -25,12 +25,12 @@ let uadd c =
 
 (** Prints the block *)
 let prints block =
-  Printf.printf "new block\n";
+  print_endline "new block";
   List.iter
     (fun stmt ->
-       Printf.printf "Stmt: %s\n" (Pp.ast_stmt_to_string stmt)
+       print_endline ("Stmt: "^ (Pp.ast_stmt_to_string stmt))
     ) block;
-  Printf.printf "end block\n";
+  print_endline "end block";
   block
 
 (** Concretely executes a block *)

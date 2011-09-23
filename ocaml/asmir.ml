@@ -657,14 +657,14 @@ let trans_frame f =
   | _ -> []
 
 (* SWXXX Add buffering around this/let it find a range where alt_bap finds entire range *)
-let alt_bap_from_trace_file filename =
+let alt_bap_from_trace_file_range filename off reqframes =
   let add_operands stmts f =
     let ops = tr_frame_attrs f in
     match stmts with
     | Label (l,a)::others ->
-	Label (l,a@ops)::others
+	  Label (l,a@ops)::others
     | Comment (s,a)::others ->
-	Comment (s,a@ops)::others
+	  Comment (s,a@ops)::others
     | others when ops <> [] -> Comment("Attrs without label.", ops)::others
     | others -> others
   in
@@ -672,41 +672,50 @@ let alt_bap_from_trace_file filename =
     let stmts = trans_frame f in
     add_operands stmts f
   in
-  let ir = ref [] in
-  let off = ref 0L in
   let c = ref true in
-  (* might be better to just grab the length of the trace in advance :*( *)
+  let revstmts = ref [] in
+  (* flush VEX buffers *)
+  let () = Libasmir.asmir_free_vex_buffers () in
+  let trace_frames = 
+	Libasmir.asmir_frames_from_trace_file filename !off reqframes in
+  let numframes = Libasmir.asmir_frames_length trace_frames in
+  (*dprintf "Got %d frames" numframes;*)
+  if numframes = 0 || numframes = -1 then (
+    c := false
+  ) else (
+	if ((Int64.of_int numframes) < reqframes) then 
+	  dprintf "Got %d frames which is < requested frames %s" numframes (Int64.to_string reqframes);
+    revstmts := Util.foldn
+	  (fun acc n ->
+		let frameno = numframes-1-n in
+		(* dprintf "frame %d" frameno; *)
+		let stmts = 
+		  raise_frame (Libasmir.asmir_frames_get trace_frames frameno) in
+		List.rev_append stmts acc) [] (numframes-1);
+	off := Int64.add !off !trace_blocksize
+  (* let moreir = tr_bap_blocks_t_no_asm g bap_blocks in *)
+  (* Build ir backwards *)
+  (* ir := List.rev_append moreir !ir; *)
+  );
+  asmir_frames_destroy trace_frames;
+  (!c,!revstmts)
+
+
+let alt_bap_from_trace_file filename =
+  let off = ref 0L in
+  let ir = ref [] in
+  let c = ref true in
   Status.init "Lifting trace" 0 ;
   while !c do
-    (*dprintf "Calling the trace again.... ";*)
-    (* flush VEX buffers *)
-    let () = Libasmir.asmir_free_vex_buffers () in
-    let trace_frames = Libasmir.asmir_frames_from_trace_file filename !off !trace_blocksize in
-    let numframes = Libasmir.asmir_frames_length trace_frames in
-    (*dprintf "Got %d frames" numframes;*)
-    if numframes = 0 || numframes = -1 then (
-      c := false
-    ) else (
-      let revstmts = Util.foldn
-	(fun acc n ->
-	   let frameno = numframes-1-n in
-	   (* dprintf "frame %d" frameno; *)
-	   let stmts = raise_frame (Libasmir.asmir_frames_get trace_frames frameno) in
-	   List.rev_append stmts acc) [] (numframes-1) in
-      ir := Util.fast_append revstmts !ir;
-
-      (* let moreir = tr_bap_blocks_t_no_asm g bap_blocks in *)
-	(* Build ir backwards *)
-	(* ir := List.rev_append moreir !ir; *)
-	off := Int64.add !off !trace_blocksize
-    );
-
-    asmir_frames_destroy trace_frames;
-
+	let (tmp_c,revstmts) = 
+	  alt_bap_from_trace_file_range filename off !trace_blocksize in
+    ir := Util.fast_append revstmts !ir;
+	c := tmp_c;
   done;
   let r = List.rev !ir in
   Status.stop () ;
   r
+
 
 (* deprecated *)  
 let old_bap_from_trace_file ?(atts = true) ?(pin = false) filename =
@@ -740,22 +749,23 @@ let bap_from_trace_file ?(atts = true) ?(pin = false) filename =
   else
     old_bap_from_trace_file ~atts ~pin filename
 
-(** Get one statement at a time.
-
-    XXX: Use an internal buffer
-*)
+(** Get one statement at a time. *)
 let bap_get_stmt_from_trace_file ?(atts = true) ?(pin = false) filename off =
-  let off = Int64.of_int off in (* blah, Stream.from does not use int64 *)
-  let g = gamma_create x86_mem x86_regs in
+  let off = ref (Int64.of_int off) in (* blah, Stream.from does not use int64 *)
+  (* SWXXX what to do instead of the below? *)
+  (* let g = gamma_create x86_mem x86_regs in *)
+  let (c,ir) = alt_bap_from_trace_file_range filename off 1L in
+  if c then Some(ir) else None
+
   (* SWXXX this is the old way, use alt_bap_from_trace_file instead *)
   (* SWXXX this has no buffer at all; will parse entire trace for every instruction *)
-  let bap_blocks = Libasmir.asmir_bap_from_trace_file filename off 1L atts pin in
+ (* let bap_blocks = Libasmir.asmir_bap_from_trace_file filename off 1L atts pin in 
   let numblocks = Libasmir.asmir_bap_blocks_size bap_blocks in
   match numblocks with
   | -1 -> None
   | _ -> Some(let ir = tr_bap_blocks_t_trace_asm g bap_blocks in
               let () = destroy_bap_blocks bap_blocks in
-              ir)
+              ir) *)
   
 (** Return stream of trace instructions raised to the IL *)
 let bap_stream_from_trace_file ?(atts = true) ?(pin = false) filename =
