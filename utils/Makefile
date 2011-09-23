@@ -95,7 +95,7 @@ tags:
 
 # Print out command line to start ocamldebug
 debug: dc
-	echo ocamldebug -I $(BIGINT) -I $(BAP_OCAMLDIR) -I $(BATT) program
+	@echo ocamldebug -I $(BIGINT) -I $(BAP_OCAMLDIR) -I $(BATT) program
 
 %:
 	make -f $(OCAMLMAKEFILE) subprojs SUBTARGET=$@

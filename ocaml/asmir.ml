@@ -656,7 +656,7 @@ let trans_frame f =
 	 Comment("All blocks must have two statements", [])]
   | _ -> []
 
-(* SWXXX Add buffering around this/let it find a range where alt_bap finds entire range *)
+
 let alt_bap_from_trace_file_range filename off reqframes =
   let add_operands stmts f =
     let ops = tr_frame_attrs f in
@@ -684,7 +684,8 @@ let alt_bap_from_trace_file_range filename off reqframes =
     c := false
   ) else (
 	if ((Int64.of_int numframes) < reqframes) then 
-	  dprintf "Got %d frames which is < requested frames %s" numframes (Int64.to_string reqframes);
+	  dprintf "Got %d frames which is < requested frames %s" 
+		numframes (Int64.to_string reqframes);
     revstmts := Util.foldn
 	  (fun acc n ->
 		let frameno = numframes-1-n in
@@ -757,15 +758,6 @@ let bap_get_stmt_from_trace_file ?(atts = true) ?(pin = false) filename off =
   let (c,ir) = alt_bap_from_trace_file_range filename off 1L in
   if c then Some(ir) else None
 
-  (* SWXXX this is the old way, use alt_bap_from_trace_file instead *)
-  (* SWXXX this has no buffer at all; will parse entire trace for every instruction *)
- (* let bap_blocks = Libasmir.asmir_bap_from_trace_file filename off 1L atts pin in 
-  let numblocks = Libasmir.asmir_bap_blocks_size bap_blocks in
-  match numblocks with
-  | -1 -> None
-  | _ -> Some(let ir = tr_bap_blocks_t_trace_asm g bap_blocks in
-              let () = destroy_bap_blocks bap_blocks in
-              ir) *)
   
 (** Return stream of trace instructions raised to the IL *)
 let bap_stream_from_trace_file ?(atts = true) ?(pin = false) filename =
