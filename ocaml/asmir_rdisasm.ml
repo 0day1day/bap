@@ -1,3 +1,7 @@
+open BatListFull
+module D = Debug.Make(struct let name = "Asmir_rdisasm" and default=`NoDebug end)
+open D
+
 let get_addr expr =
   match expr with
   | Ast.Int (i, _) -> Some (Big_int.int64_of_big_int i)
@@ -16,9 +20,27 @@ let get_code_addrs stmts next =
   let rec
     get_code_addrs' stmts l =
       match stmts with
+      (* We must explore the following instructions next.
+
+         To see why, consider what happens with a conditional jump:
+
+         addr 0xd2928 @asm "je     0x00000000000d29b4"
+         label pc_0xd2928
+         cjmp R_ZF:bool, 0xd29b4:u32, "nocjmp0"
+         label nocjmp0
+
+         If the condition is false, control transfers to the next
+         instruction.  This is expected to be the next instruction in
+         memory. If we recursed to the target first, then we would
+         build the IL with the new target there, and thus implicitly
+         transfer control to that address even when the condition is
+         false!
+
+         As a result of this, next should be at the front of the list,
+         and we can use a Queue. *)
       | [] -> next :: l
       | (Ast.Jmp (e, attrs)) :: _ ->
-          let addrs = collect_some get_addr l e in
+        let addrs = collect_some get_addr l e in
           (* Assume that control returns to the next instruction a call. *)
           if List.mem (Type.StrAttr "call") attrs
           then next :: addrs
@@ -36,7 +58,7 @@ let get_code_addrs stmts next =
             else get_code_addrs' rest (addrs @ l)
       | _ :: rest -> get_code_addrs' rest l
   in
-    get_code_addrs' stmts []
+  get_code_addrs' stmts []
 
 module Int64Set = Set.Make( 
   struct
@@ -47,18 +69,18 @@ module Int64Set = Set.Make(
 let rdisasm_at p startaddr =
   let seen = ref Int64Set.empty in
   let out = ref [] in
-  let stack = Stack.create () in
-    Stack.push startaddr stack;
-    while not (Stack.is_empty stack) do
-      let addr = Stack.pop stack in
-      try
-        let (statement, next) = Asmir.asm_addr_to_bap p addr in
-          out := statement :: !out;
-          List.iter
-            (fun x -> if not (Int64Set.mem x !seen)
-              then (Stack.push x stack; seen := Int64Set.add x !seen)
-              else ())
-            (get_code_addrs statement next)
+  let stack = Queue.create () in
+  Queue.push startaddr stack;
+  while not (Queue.is_empty stack) do
+    let addr = Queue.pop stack in
+    try
+      let (statement, next) = Asmir.asm_addr_to_bap p addr in
+      out := statement :: !out;
+      List.iter
+        (fun x -> if not (Int64Set.mem x !seen)
+          then (Queue.push x stack; seen := Int64Set.add x !seen)
+          else ())
+        (get_code_addrs statement next)
       (*
        * Ignore invalid addresses.
        * (some programs have a call 0 for some reason)

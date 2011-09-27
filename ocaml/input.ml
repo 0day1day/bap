@@ -48,6 +48,11 @@ let speclist =
     ("-binrecurse",
      Arg.String(fun s -> addinput (`Binrecurse s)),
      "<file> Lift binary to the IL using a recursive descent algorithm.");
+    ("-binrecurseat",
+     Arg.Tuple(let f = ref "" in
+               [Arg.Set_string f;
+                Arg.String (fun s -> addinput (`Binrecurseat (!f, toint64 s)))]),
+     "<file> <start> Lift binary to the IL using a recursive descent algorithm starting at <start>.");
     ("-trace",
      Arg.String(fun s ->
 		  set_gc () ;
@@ -82,6 +87,9 @@ let get_program () =
     | `Binrecurse f ->
       let p = Asmir.open_program f in
       List.append (Asmir_rdisasm.rdisasm p) oldp, oldscope
+    | `Binrecurseat (f, s) ->
+      let p = Asmir.open_program f in
+      List.append (Asmir_rdisasm.rdisasm_at p s) oldp, oldscope
     | `Trace f ->
       List.append (Asmir.bap_from_trace_file ~pin:!pintrace f) oldp, oldscope
   in
