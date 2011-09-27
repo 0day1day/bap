@@ -59,6 +59,7 @@ export SOURCES = \
 	libasmir.idl \
 	disasm_i386.ml \
 	disasm.ml \
+	syscall_models.ml \
 	memory2array.ml \
 	gcl.mli gcl.ml \
 	wp.ml \
@@ -69,13 +70,13 @@ export SOURCES = \
 	asmirconsts.ml \
 	asmir.mli asmir.ml \
 	asmir_rdisasm.mli asmir_rdisasm.ml \
+	grammar_scope.ml \
 	grammar.mly lexer.mll \
 	parser.ml \
 	input.mli input.ml \
 	depgraphs.ml \
 	to_c.ml \
 	vsa.ml \
-	memory2scalar.ml \
 	eval.ml \
 	symbeval.ml symbeval_search.ml \
 	ast_slice.ml \
@@ -127,6 +128,8 @@ all: dcl ncl #top
 	@echo $(PROJSOURCES)
 
 bap_lib_doc: all htdoc
+
+docall: all htdoc ladoc psdoc pdfdoc
 
 tags: TAGS
 

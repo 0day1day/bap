@@ -751,11 +751,11 @@ let bap_get_stmt_from_trace_file ?(atts = true) ?(pin = false) filename off =
   (* SWXXX this has no buffer at all; will parse entire trace for every instruction *)
   let bap_blocks = Libasmir.asmir_bap_from_trace_file filename off 1L atts pin in
   let numblocks = Libasmir.asmir_bap_blocks_size bap_blocks in
-  let ir = tr_bap_blocks_t_trace_asm g bap_blocks in
-  let () = destroy_bap_blocks bap_blocks in
   match numblocks with
   | -1 -> None
-  | _ -> Some(ir)
+  | _ -> Some(let ir = tr_bap_blocks_t_trace_asm g bap_blocks in
+              let () = destroy_bap_blocks bap_blocks in
+              ir)
   
 (** Return stream of trace instructions raised to the IL *)
 let bap_stream_from_trace_file ?(atts = true) ?(pin = false) filename =

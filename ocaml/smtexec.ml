@@ -10,7 +10,7 @@
 exception Alarm_signal_internal;;
 exception Alarm_signal of int;;
 
-module D = Debug.Make(struct let name = "Stpexec" and default=`Debug end)
+module D = Debug.Make(struct let name = "Smtexec" and default=`NoDebug end)
 open D
 
 open Unix
@@ -25,7 +25,7 @@ class type smtexec =
 object
   method printer : Formulap.fppf
   method solvername : string
-  method solve_formula_file : ?timeout:int -> string -> result
+  method solve_formula_file : ?printmodel:bool -> ?timeout:int -> string -> result
   (* XXX: Add other methods *)
 end
 
@@ -34,14 +34,14 @@ sig
   val timeout : int (** Default timeout in seconds *)
   val solvername : string (** Solver name *)
   val cmdstr : string -> string (** Given a filename, produce a command string to invoke solver *)
-  val parse_result : string -> string -> Unix.process_status -> result (** Given output, decide the result *)
+  val parse_result : ?printmodel:bool -> string -> string -> Unix.process_status -> result (** Given output, decide the result *)
   val printer : Formulap.fppf
 end
 
 (* Output type *)
 module type SOLVER =
 sig
-  val solve_formula_file : ?timeout:int -> string -> result (** Solve a formula in a file *)
+  val solve_formula_file : ?printmodel:bool -> ?timeout:int -> string -> result (** Solve a formula in a file *)
   val check_exp_validity : ?timeout:int -> ?exists:(Ast.var list) -> ?foralls:(Ast.var list) -> Ast.exp -> result (** Check validity of an exp *)
   val create_cfg_formula :
     ?exists:Ast.var list ->  ?foralls:Ast.var list -> ?remove:bool
@@ -168,7 +168,7 @@ struct
       (* FIXME: same for exists? *)
       write_formula ~exists ~foralls ?remove wp
 
-    let solve_formula_file ?(timeout=S.timeout) file =
+    let solve_formula_file ?(printmodel=false) ?(timeout=S.timeout) file =
       ignore(alarm timeout);
       let cmdline = S.cmdstr file in
 
@@ -180,7 +180,7 @@ struct
 	ignore(alarm 0);
 
         dprintf "Parsing result...";
-	S.parse_result sout serr pstatus
+	S.parse_result ~printmodel sout serr pstatus
 
       with Alarm_signal(pid) ->
 	kill pid 9;
@@ -224,7 +224,7 @@ struct
   let timeout = 60
   let solvername = "stp"
   let cmdstr f = "stp -p " ^ f
-  let parse_result_builder solvername stdout stderr pstatus =
+  let parse_result_builder solvername ?(printmodel=false) stdout stderr pstatus =
     let failstat = match pstatus with
       | WEXITED(c) -> c > 0
       | _ -> true
@@ -238,8 +238,9 @@ struct
     if isvalid then
       Valid
     else if isinvalid then (
-      let m = parse_model solvername stdout in
-      if debug then print_model m;
+      if printmodel then
+        (let m = parse_model solvername stdout in
+        print_model m);
       Invalid
     ) else if fail then (
       dprintf "output: %s\nerror: %s" stdout stderr;
@@ -258,7 +259,7 @@ struct
   let timeout = 60
   let solvername = "stp"
   let cmdstr f = "stp --SMTLIB1 -t " ^ f
-  let parse_result_builder solvername stdout stderr pstatus =
+  let parse_result_builder solvername ?(printmodel=false) stdout stderr pstatus =
     let failstat = match pstatus with
       | WEXITED(c) -> c > 0
       | _ -> true
@@ -272,8 +273,9 @@ struct
     if isunsat then
       Valid
     else if issat then (
-      let m = parse_model solvername stdout in
-      print_model m;
+      if printmodel then
+        (let m = parse_model solvername stdout in
+         print_model m);
       Invalid
     ) else if fail then (
       dprintf "output: %s\nerror: %s" stdout stderr;

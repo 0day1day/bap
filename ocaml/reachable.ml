@@ -1,6 +1,6 @@
 (** Code for dealing with reachable/unreachable nodes in a CFG. *)
 
-module D = Debug.Make(struct let name = "Reachable" and default=`Debug end)
+module D = Debug.Make(struct let name = "Reachable" and default=`NoDebug end)
 
 (** Along the lines of Builder.S, but with remove instead of add *)
 module type B =

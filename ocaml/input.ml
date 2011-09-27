@@ -1,3 +1,5 @@
+open BatListFull
+
 let init_ro = ref false
 let inputs = ref []
 and streaminputs = ref None
@@ -67,27 +69,28 @@ let speclist =
 
 let get_program () =
   if !inputs = [] then raise(Arg.Bad "No input specified");
-  let get_one = function
+  let get_one (oldp,oldscope) = function
     | `Il f ->
-	Parser.program_from_file f
+      let newp, newscope = Parser.program_from_file ~scope:oldscope f in
+      List.append newp oldp, newscope
     | `Bin f ->
-	let p = Asmir.open_program f in
-	Asmir.asmprogram_to_bap ~init_ro:!init_ro p
+      let p = Asmir.open_program f in
+      List.append (Asmir.asmprogram_to_bap ~init_ro:!init_ro p) oldp, oldscope
     | `Binrange (f, s, e) ->
-	let p = Asmir.open_program f in
-	Asmir.asmprogram_to_bap_range ~init_ro:!init_ro p s e
+      let p = Asmir.open_program f in
+      List.append (Asmir.asmprogram_to_bap_range ~init_ro:!init_ro p s e) oldp, oldscope
     | `Binrecurse f ->
       let p = Asmir.open_program f in
-      Asmir_rdisasm.rdisasm p
+      List.append (Asmir_rdisasm.rdisasm p) oldp, oldscope
     | `Trace f ->
-    Asmir.bap_from_trace_file ~pin:!pintrace f
+      List.append (Asmir.bap_from_trace_file ~pin:!pintrace f) oldp, oldscope
   in
-  let rec cat p = function
-    | [] -> p
-    | arg::args -> cat (List.rev_append (List.rev (get_one arg)) p) args
-  in
+ (* let rec cat p = function *)
+  (*   | [] -> p *)
+  (*   | arg::args -> cat (List.rev_append (List.rev (get_one arg)) p) args *)
+  (* in *)
   try
-	cat [] !inputs
+    List.fold_left get_one ([], Grammar_scope.default_scope ()) (List.rev !inputs)
   with _ -> failwith "An exception occured while lifting"
 
 let get_stream_program () = match !streaminputs with
