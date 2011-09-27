@@ -7,11 +7,11 @@ and pintrace = ref false
 let set_gc () =
   Gc.set
     {
-      (Gc.get ()) with 
+      (Gc.get ()) with
 	Gc.minor_heap_size = 32000000; (* 128 mb *)
 	Gc.major_heap_increment = 16000000; (* 64 mb *)
 	Gc.max_overhead = 100; (* compact after 100% overhead *)
-    }      
+    }
 
 let stream_speclist =
   (* let addinput i = streaminputs := i :: !streaminputs in *)
@@ -19,7 +19,7 @@ let stream_speclist =
     ("-tracestream",
      Arg.String(fun s -> streaminputs := Some(`Tracestream s)),
      "<file> Read a trace to be processed as a stream.");
-    
+
     ("-pin",
      Arg.Set pintrace,
      "Enable pin trace.");
@@ -35,7 +35,7 @@ let speclist =
   [
     ("-init-ro", Arg.Set (init_ro), "Access rodata.");
     ("-bin",
-     Arg.String(fun s-> addinput (`Bin s)),
+     Arg.String(fun s -> addinput (`Bin s)),
      "<file> Convert a binary to the IL");
     ("-binrange",
      Arg.Tuple(let f = ref ""
@@ -43,8 +43,11 @@ let speclist =
                [Arg.Set_string f; Arg.String(setint64 s);
                 Arg.String(fun e->addinput(`Binrange(!f, !s, toint64 e)))]),
      "<file> <start> <end> Convert the given range of a binary to the IL");
+    ("-binrecurse",
+     Arg.String(fun s -> addinput (`Binrecurse s)),
+     "<file> Lift binary to the IL using a recursive descent algorithm.");
     ("-trace",
-     Arg.String(fun s -> 
+     Arg.String(fun s ->
 		  set_gc () ;
 		  addinput (`Trace s)),
      "<file> Read in a trace and lift it to the IL");
@@ -73,6 +76,9 @@ let get_program () =
     | `Binrange (f, s, e) ->
 	let p = Asmir.open_program f in
 	Asmir.asmprogram_to_bap_range ~init_ro:!init_ro p s e
+    | `Binrecurse f ->
+      let p = Asmir.open_program f in
+      Asmir_rdisasm.rdisasm p
     | `Trace f ->
     Asmir.bap_from_trace_file ~pin:!pintrace f
   in
@@ -80,13 +86,13 @@ let get_program () =
     | [] -> p
     | arg::args -> cat (List.rev_append (List.rev (get_one arg)) p) args
   in
-  try  
+  try
 	cat [] !inputs
   with _ -> failwith "An exception occured while lifting"
 
 let get_stream_program () = match !streaminputs with
   | None -> raise(Arg.Bad "No input specified")
   | Some(`Tracestream f) -> Asmir.bap_stream_from_trace_file ~pin:!pintrace f
-    
+
 
 (*  with fixme -> raise(Arg.Bad "Could not open input file")*)

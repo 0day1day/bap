@@ -1,20 +1,3 @@
-let usage = "Usage: " ^ Sys.argv.(0) ^ " program"
-
-let speclist = []
-let file = ref ""
-let anon = (:=) file
-
-;;
-
-Arg.parse speclist anon usage
-
-;;
-
-let pp = new Pp.pp_oc stdout
-
-let p = Asmir.open_program !file
-let startaddr = Asmir.get_start_addr p
-
 let get_addr expr =
   match expr with
   | Ast.Int (i, _) -> Some (Big_int.int64_of_big_int i)
@@ -61,7 +44,7 @@ module Int64Set = Set.Make(
     let compare = Int64.compare
   end)
 
-let rdisasm p startaddr =
+let rdisasm_at p startaddr =
   let seen = ref Int64Set.empty in
   let out = ref [] in
   let stack = Stack.create () in
@@ -84,9 +67,5 @@ let rdisasm p startaddr =
     done;
     List.concat (List.rev !out)
 
-let ss = rdisasm p startaddr
-
-;;
-
-pp#ast_program ss;
-pp#close
+let rdisasm p =
+  rdisasm_at p (Asmir.get_start_addr p)

@@ -66,7 +66,9 @@ export SOURCES = \
 	cvc3_grammar.mly cvc3_lexer.mll \
 	yices_grammar.mly yices_lexer.mll \
 	smtexec.mli smtexec.ml \
-	asmirconsts.ml asmir.mli asmir.ml \
+	asmirconsts.ml \
+	asmir.mli asmir.ml \
+	asmir_rdisasm.mli asmir_rdisasm.ml \
 	grammar.mly lexer.mll \
 	parser.ml \
 	input.mli input.ml \
