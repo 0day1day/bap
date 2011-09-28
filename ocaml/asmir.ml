@@ -829,13 +829,16 @@ let get_start_addr p =
 let get_asm_instr_string_range p s e =
   let s = ref s in
   let str = ref "" in
-  while !s < e do
+  (try
+    while !s < e do
 
-    str := !str ^ "; " ^ (Libasmir.asmir_string_of_insn p.asmp !s);
+      str := !str ^ "; " ^ (Libasmir.asmir_string_of_insn p.asmp !s);
 
-    let len = Int64.of_int (Libasmir.asmir_get_instr_length p.asmp !s) in
-    s := Int64.add !s len
-  done;
+      let len = Int64.of_int (Libasmir.asmir_get_instr_length p.asmp !s) in
+      if len = -1L then raise Exit;
+      s := Int64.add !s len
+    done;
+  with Exit -> ());
   !str
 
 let set_print_warning = Libasmir.asmir_set_print_warning
