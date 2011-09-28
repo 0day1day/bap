@@ -649,15 +649,15 @@ let append_halt trace =
 let trace_to_blocks trace = 
   let rec to_blocks blocks current = function
     | [] -> 
-	List.rev ((List.rev current)::blocks)
+	  List.rev ((List.rev current)::blocks)
     | (Ast.Label (Addr _, _) as l)::rest ->
-	let block = List.rev current in
-	to_blocks (block::blocks) [l] rest
+	  let block = List.rev current in
+	  to_blocks (block::blocks) [l] rest
     | (Ast.Comment (c, _) as s)::rest when c = endtrace || (is_seed_label c) ->
-	let block = List.rev current in
-	to_blocks (block::blocks) [s] rest
+	  let block = List.rev current in
+	  to_blocks (block::blocks) [s] rest
     | x::rest ->
-	to_blocks blocks (x::current) rest
+	  to_blocks blocks (x::current) rest
   in
   let blocks = to_blocks [] [] trace in
     List.filter (fun b -> List.length b > 1) blocks
@@ -683,9 +683,9 @@ let trace_length trace =
 
 let print_formula file formula =
   let oc = open_out file in
-  let m2a = new Memory2array.memory2array_visitor () in
-  let formula = Ast_visitor.exp_accept m2a formula in
-  let foralls = List.map (Ast_visitor.rvar_accept m2a) [] in
+  let mem_hash = Var.VarHash.create 1000 in
+  let formula = Memory2array.coerce_exp_state mem_hash formula in
+  let foralls = List.map (Memory2array.coerce_rvar_state mem_hash) [] in
   let p = match !printer with
     | "stp" -> ((new Stp.pp_oc oc) :> Formulap.fpp_oc)
     | "smtlib1" -> ((new Smtlib1.pp_oc oc) :> Formulap.fpp_oc)
@@ -1052,8 +1052,8 @@ let run_block ?(next_label = None) ?(log=fun _ -> ()) state memv block prev_bloc
   let block = match !use_alt_assignment with
     | true ->
 	let assigns = assign_vars memv false in
-	(* List.iter *)
-	(*   (fun stmt -> dprintf "assign stmt: %s" (Pp.ast_stmt_to_string stmt)) assigns;	 *)
+	 List.iter 
+	   (fun stmt -> dprintf "assign stmt: %s" (Pp.ast_stmt_to_string stmt)) assigns;	 
 	assigns @ block
     | false -> block
   in
@@ -1066,8 +1066,8 @@ let run_block ?(next_label = None) ?(log=fun _ -> ()) state memv block prev_bloc
   let rec eval_block state stmt = 
     (* pwarn("XXXSW Executing: " ^ (Pp.ast_stmt_to_string stmt)); *)
     (* pwarn ("XXXSW Current block is: " ^ (Pp.ast_stmt_to_string addr)); *)
-    (* pdebug ("Executing: " ^ (Pp.ast_stmt_to_string stmt)); *)
-    (*    Hashtbl.iter (fun k v -> pdebug (Printf.sprintf "%Lx -> %s" k (Pp.ast_exp_to_string v))) concrete_mem ;*)
+    pdebug ("Executing: " ^ (Pp.ast_stmt_to_string stmt));
+       (* Hashtbl.iter (fun k v -> pdebug (Printf.sprintf "%Lx -> %s" k (Pp.ast_exp_to_string v))) concrete_mem ; *)
     let evalf e = match TraceConcrete.eval_expr state.delta e with
       | Symbolic(e) -> e
       | _ -> failwith "Expected symbolic" 

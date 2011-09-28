@@ -683,8 +683,8 @@ let alt_bap_from_trace_file_range filename off reqframes =
   if numframes = 0 || numframes = -1 then (
     c := false
   ) else (
-	if ((Int64.of_int numframes) < reqframes) then 
-	  dprintf "Got %d frames which is < requested frames %s" 
+	if ((Int64.of_int numframes) <> reqframes) then 
+	  dprintf "Got %d frames which <> requested frames %s" 
 		numframes (Int64.to_string reqframes);
     revstmts := Util.foldn
 	  (fun acc n ->
@@ -699,7 +699,7 @@ let alt_bap_from_trace_file_range filename off reqframes =
   (* ir := List.rev_append moreir !ir; *)
   );
   asmir_frames_destroy trace_frames;
-  (!c,!revstmts)
+  (!c, !revstmts)
 
 
 let alt_bap_from_trace_file filename =
@@ -756,7 +756,7 @@ let bap_get_stmt_from_trace_file ?(atts = true) ?(pin = false) filename off =
   (* SWXXX what to do instead of the below? *)
   (* let g = gamma_create x86_mem x86_regs in *)
   let (c,ir) = alt_bap_from_trace_file_range filename off 1L in
-  if c then Some(ir) else None
+  if c then Some(List.rev ir) else None
 
   
 (** Return stream of trace instructions raised to the IL *)

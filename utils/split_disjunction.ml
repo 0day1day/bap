@@ -38,8 +38,7 @@ let write_file n e =
   let pp = new Pp.pp_oc (open_out (s^".il")) in
   pp#ast_exp e;
   pp#close;
-  let m2a = new Memory2array.memory2array_visitor () in
-  let e = Ast_visitor.exp_accept m2a e in
+  let e = Memory2array.coerce_exp e in
   let p = new Stp.pp_oc (open_out (s^".stp")) in
   p#assert_ast_exp e;
   p#close

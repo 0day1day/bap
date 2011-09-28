@@ -1,7 +1,7 @@
 let usage = "Usage: "^Sys.argv.(0)^" <input options> [transformations and outputs]\n\
              Transform BAP IL programs. "
 
-(* open Bap*)
+open BatListFull
 
 type ast = Ast.program
 (*type astcfg = Cfg.AST.G.t
@@ -14,6 +14,9 @@ type cmd =
   | TransformAst of (ast -> ast)
 
 let concrete_state = Traces.TraceConcrete.create_state ()
+let mem_hash = Var.VarHash.create 1000;;
+(* HACK to make sure default memory has a map to normalized memory *)
+ignore(Memory2array.coerce_rvar_state mem_hash Asmir.x86_mem);;
 
 let pipeline = ref []
 
@@ -35,16 +38,19 @@ let prints block =
 
 (** Concretely executes a block *)
 let concrete block =
+  let block = Memory2array.coerce_prog_state mem_hash block in
   let no_specials = Traces.remove_specials block in
-  (* SWXXX use disasm.mem(?) instead *)
-  let memv = Traces.find_memv no_specials in
-  let trace = 
-	try
-	  (* SWXXX modify to use range (should look a lot like loop in traces.ml) *)
-	  (* SWXXX do memory2array at block level *)
-	  Traces.run_block concrete_state memv no_specials None
-	with Failure "empty list" -> (*Printf.printf "run blocks failed\n";*) [] in
-  trace
+  let memv = Var.VarHash.find mem_hash Asmir.x86_mem in
+	(* SWXXX modify to use range (should look a lot like loop in traces.ml) *)
+	(* what about prev_block? *)
+  try
+	prints block;
+	print_endline "Streamtrans concrete state:";
+	Traces.TraceConcrete.print_values concrete_state.Symbeval.delta;
+	ignore(Traces.run_block concrete_state memv no_specials None);
+	[]
+  with 
+  | Failure "empty list" -> (*Printf.printf "run blocks failed\n";*) [] 
 
 let speclist =
   ("-print", uadd(TransformAst(prints)),
@@ -70,6 +76,9 @@ let rec apply_cmd prog = function
       | Ast p -> Ast(f p)
     )
 ;;
+
+Traces.checkall := true;
+Traces.consistency_check := true;
 
 Stream.iter
   (fun block ->

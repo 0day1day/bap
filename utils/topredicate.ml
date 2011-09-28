@@ -192,9 +192,9 @@ match !irout with
 match !stpout with
 | None -> ()
 | Some oc ->
-    let m2a = new Memory2array.memory2array_visitor () in
-    let wp = Ast_visitor.exp_accept m2a wp in
-    let foralls = List.map (Ast_visitor.rvar_accept m2a) foralls in
+    let mem_hash = Var.VarHash.create 1000 in
+    let wp = Memory2array.coerce_exp_state mem_hash wp in
+    let foralls = List.map (Memory2array.coerce_rvar_state mem_hash) foralls in 
     let pp = (((!solver)#printer) :> Formulap.fppf) in
     let p = pp ~suffix:!suffix oc in
     if !assert_vars then (
@@ -215,9 +215,9 @@ match !stpout with
 match !pstpout with
 | None -> ()
 | Some oc ->
-    let m2a = new Memory2array.memory2array_visitor () in
-    let wp = Ast_visitor.exp_accept m2a wp in
-    let foralls = List.map (Ast_visitor.rvar_accept m2a) foralls in
+    let mem_hash = Var.VarHash.create 1000 in
+    let wp = Memory2array.coerce_exp_state mem_hash wp in
+    let foralls = List.map (Memory2array.coerce_rvar_state mem_hash) foralls in 
     let pp = (((!solver)#printer) :> Formulap.fppf) in
     let p = pp ~suffix:!suffix oc in
 	p#forall foralls;
