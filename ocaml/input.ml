@@ -86,10 +86,10 @@ let get_program () =
       List.append (Asmir.asmprogram_to_bap_range ~init_ro:!init_ro p s e) oldp, oldscope
     | `Binrecurse f ->
       let p = Asmir.open_program f in
-      List.append (Asmir_rdisasm.rdisasm p) oldp, oldscope
+      List.append (fst (Asmir_rdisasm.rdisasm p)) oldp, oldscope
     | `Binrecurseat (f, s) ->
       let p = Asmir.open_program f in
-      List.append (Asmir_rdisasm.rdisasm_at p s) oldp, oldscope
+      List.append (fst (Asmir_rdisasm.rdisasm_at p s)) oldp, oldscope
     | `Trace f ->
       List.append (Asmir.bap_from_trace_file ~pin:!pintrace f) oldp, oldscope
   in

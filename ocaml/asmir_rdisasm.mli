@@ -1,2 +1,2 @@
-val rdisasm_at : Asmir.asmprogram -> int64 -> Ast.program
-val rdisasm : Asmir.asmprogram -> Ast.program
+val rdisasm_at : ?max:int -> Asmir.asmprogram -> int64 -> Ast.program * string
+val rdisasm : ?max:int -> Asmir.asmprogram -> Ast.program * string

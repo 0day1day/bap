@@ -1,3 +1,8 @@
+(** Recursive disassembly module
+
+    @author Ricky
+*)
+
 open BatListFull
 module D = Debug.Make(struct let name = "Asmir_rdisasm" and default=`NoDebug end)
 open D
@@ -66,28 +71,41 @@ module Int64Set = Set.Make(
     let compare = Int64.compare
   end)
 
-let rdisasm_at p startaddr =
+(** Recursively disassemble [p] beginning at [startaddr]. If [max] is
+    defined, raises {!Asmir.Disassembly_error} if more than [max] IL
+    statements are discovered during lifting. *)
+let rdisasm_at ?max p startaddr =
   let seen = ref Int64Set.empty in
   let out = ref [] in
+  let outasm = ref "" in
   let stack = Queue.create () in
+  let numstmts = ref 0 in
   Queue.push startaddr stack;
   while not (Queue.is_empty stack) do
     let addr = Queue.pop stack in
     try
-      let (statement, next) = Asmir.asm_addr_to_bap p addr in
-      out := statement :: !out;
+      let (statements, next) = Asmir.asm_addr_to_bap p addr in
+      let asm = Asmir.get_asm_instr_string p addr in
+      out := statements :: !out;
+      outasm := !outasm ^ "; " ^ asm;
+      numstmts := !numstmts + (List.length statements);
+      (match max with
+      | Some(n) when !numstmts > n -> raise Asmir.Disassembly_error
+      | _ -> ());
       List.iter
         (fun x -> if not (Int64Set.mem x !seen)
           then (Queue.push x stack; seen := Int64Set.add x !seen)
           else ())
-        (get_code_addrs statement next)
-      (*
-       * Ignore invalid addresses.
-       * (some programs have a call 0 for some reason)
-       *)
-      with Asmir.Memory_error -> ()
-    done;
-    List.concat (List.rev !out)
+        (get_code_addrs statements next)
+    (*
+     * Ignore invalid addresses.
+     * (some programs have a call 0 for some reason)
+     *)
+    with Asmir.Memory_error -> ()
+  done;
+  List.concat (List.rev !out), !outasm
 
-let rdisasm p =
-  rdisasm_at p (Asmir.get_start_addr p)
+(** Recursively disassemble [p] beginning at the program's defined start
+    address.  [max] behaves the same as in {!rdisasm_at}. *)
+let rdisasm ?max p =
+  rdisasm_at ?max p (Asmir.get_start_addr p)
