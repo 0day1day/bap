@@ -41,13 +41,11 @@ let concrete block =
   let block = Memory2array.coerce_prog_state mem_hash block in
   let no_specials = Traces.remove_specials block in
   let memv = Var.VarHash.find mem_hash Asmir.x86_mem in
-	(* SWXXX modify to use range (should look a lot like loop in traces.ml) *)
-	(* what about prev_block? *)
   try
-	prints block;
-	print_endline "Streamtrans concrete state:";
-	Traces.TraceConcrete.print_values concrete_state.Symbeval.delta;
-	ignore(Traces.run_block concrete_state memv no_specials None);
+	(* prints block; *)
+	(* print_endline "Streamtrans concrete state:"; *)
+	(* Traces.TraceConcrete.print_values concrete_state.Symbeval.delta; *)
+	ignore(Traces.run_block concrete_state memv no_specials);
 	[]
   with 
   | Failure "empty list" -> (*Printf.printf "run blocks failed\n";*) [] 
