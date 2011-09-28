@@ -170,12 +170,13 @@ let regs : var list =
   ("R_CC_DEP2", reg_32);
   ("R_CC_NDEP", reg_32);
 
-  (* more status flags *)
+  (* status flags/misc *)
   ("R_IDFLAG", reg_32);
   ("R_ACFLAG", reg_32);
   ("R_EMWARN", reg_32);
   ("R_LDT", reg_32);
   ("R_GDT", reg_32);
+  ("R_IP_AT_SYSCALL", reg_32);
 
   (* segment regs *)
   ("R_CS", reg_16);
@@ -189,7 +190,7 @@ let regs : var list =
   ("R_FTOP", reg_32);
   ("R_FPROUND", reg_32);
   ("R_FC3210", reg_32);
-  ("R_IP_AT_SYSCALL", reg_32);
+
     ]
     @ Array.to_list xmms
 
