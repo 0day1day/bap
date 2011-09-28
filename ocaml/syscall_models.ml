@@ -14,9 +14,12 @@ open Ast
 
 *)
 
+let x86_is_system_call = function
+  | Special(("int 80"|"syscall"), _) -> true
+  | _ -> false
 
 (* System call names - fill in as needed *)
-let get_name = function
+let linux_get_name = function
   | 1 -> "exit"
   | 3 -> "read"
   | 4 -> "write"
@@ -47,22 +50,23 @@ let get_name = function
   | n -> "unknown syscall #" ^ string_of_int n
 
 (* Fill in system call models as needed *)
-let get_model = function
+let linux_get_model = function
   | 1 as eax ->
       (* exit *)
       Some [
-        Comment (get_name eax ^ " model", []);
+        Comment (linux_get_name eax ^ " model", []);
         (* Exit code is in ebx *)
         Halt(Var Disasm_i386.ebx, []);
       ]
   | _ ->
       None
 
-let syscall_to_il eax =
-  match get_model eax with
+let linux_syscall_to_il eax =
+  match linux_get_model eax with
     | Some model ->
         model
     | None ->
-        let sys_name = get_name eax in
-        [ Special (sys_name, []) ]
-
+        let sys_name = linux_get_name eax in
+        Special (sys_name, [])
+        :: Move(Disasm_i386.eax, Unknown("System call output", reg_32), [])
+        :: []

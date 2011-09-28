@@ -644,7 +644,7 @@ let trans_frame f =
       [Comment("ReadSyscall", []); Comment("All blocks must have two statements", [])]
   | Libasmir.FRM_LOADMOD ->
       let name, lowaddr, highaddr = Libasmir.asmir_frame_get_loadmod_info f in
-      [Special(Printf.sprintf "Loaded module '%s' at %#Lx to %#Lx" name lowaddr highaddr, []); Comment("All blocks must have two statements", [])]
+      [Comment(Printf.sprintf "Loaded module '%s' at %#Lx to %#Lx" name lowaddr highaddr, []); Comment("All blocks must have two statements", [])]
   | Libasmir.FRM_SYSCALL ->
 	let callno, addr, tid = Libasmir.asmir_frame_get_syscall_info f in
 	[Special(Printf.sprintf "Syscall number %d at %#Lx by thread %d" callno addr tid,[]);
