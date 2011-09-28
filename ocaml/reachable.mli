@@ -1,4 +1,4 @@
-(** Along the lines of Builder.S, but with remove instead of add 
+(** Reachability analysis
 
 $Id$
 *)

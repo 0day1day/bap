@@ -1,3 +1,5 @@
+(** Native lifter of x86 instructions to the BAP IL *)
+
 open Int64
 open Ast
 open Ast_convenience
@@ -187,6 +189,7 @@ let regs : var list =
   ("R_FTOP", reg_32);
   ("R_FPROUND", reg_32);
   ("R_FC3210", reg_32);
+  ("R_IP_AT_SYSCALL", reg_32);
     ]
     @ Array.to_list xmms
 

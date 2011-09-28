@@ -1,7 +1,11 @@
 all:	stp/bin/stp
 
 stp/bin/stp:
-	cd ./stp && ./scripts/configure && make
+ifeq (,$(shell which stp))
+	cd ./stp && ./scripts/configure && make 
+else 
+	@echo "stp is already in path; Not making STP." 
+endif
 
 clean:
 	echo Not cleaning STP
