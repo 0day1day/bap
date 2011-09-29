@@ -507,8 +507,8 @@ struct
           )
       | Comment _ | Label _ -> 
           [{ctx with pc=next_pc}]
-      | Special _ -> 
-          failwith "Specials not handled yet!"
+      | Special _ as s -> 
+          failwith ("Specials not handled yet: "^(Pp.ast_stmt_to_string s))
     in
       eval stmt 
 
