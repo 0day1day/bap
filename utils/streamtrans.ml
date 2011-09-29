@@ -43,8 +43,7 @@ let concrete block =
   let memv = Var.VarHash.find mem_hash Asmir.x86_mem in
   try
 	(* prints block; *)
-	(* print_endline "Streamtrans concrete state:"; *)
-	(* Traces.TraceConcrete.print_values concrete_state.Symbeval.delta; *)
+	(* Ignore output of run_block and return [] to limit memory consumption *)
 	ignore(Traces.run_block concrete_state memv no_specials);
 	[]
   with 

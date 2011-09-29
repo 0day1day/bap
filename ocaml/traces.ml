@@ -103,7 +103,7 @@ let name_to_var name =
   try
     Some(Asmir.gamma_lookup gamma name)
   with Failure _ ->
-    wprintf "Did not find %s in gamma" name;
+    if (name <> "Unknown") then wprintf "Did not find %s in gamma" name;
     None
       
 
@@ -2180,9 +2180,8 @@ let run_and_subst_block state memv block =
   let _ = ignore(update_concrete addr) in
   if !consistency_check then (
     (* remove temps *)
-	(* SWXXX *)
     clean_delta state.delta;
-    ignore(check_delta state);
+    check_delta state;
     (* TraceConcrete.print_values state.delta; *)
     (* TraceConcrete.print_mem state.delta; *)
   );
