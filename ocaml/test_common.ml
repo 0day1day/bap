@@ -78,7 +78,6 @@ let check_pin_setup _ =
   (* Check environment variable for path to pin *)
   let env_pin_path = try Sys.getenv "PIN_PATH" with _ -> "" in
   if (env_pin_path <> "") then pin_path := env_pin_path;
-  print_endline ("SWXXXUsing pin_path "^(!pin_path));
   check_file(!pin_path^pin);
   check_file(gentrace_path^gentrace);
 ;;
