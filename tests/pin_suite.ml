@@ -20,11 +20,11 @@ let pin_trace_setup _ =
 	 "-o"; tag^pin_out_suffix; "--"; bof; taint_file ] in
   let exit_code = Unix.WEXITED(1) in
   check_pin_setup();
-  check_file (pin_path^pin);
-  check_file (gentrace_path^gentrace);
+  (* check_file (pin_path^pin); *)
+  (* check_file (gentrace_path^gentrace); *)
   check_stp_path(stp_path^stp);
   create_input_file();
-  assert_command ~exit_code (pin_path^pin) args;
+  assert_command ~exit_code (!pin_path^pin) args;
   find_pin_out (Array.to_list (Sys.readdir "./")) tag;;
 
 

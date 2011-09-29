@@ -620,7 +620,7 @@ let remove_jumps =
 (** Removing all specials from the traces *)	
 let remove_specials =
   let no_specials = function 
-    | Ast.Special _ -> false
+    | Ast.Special(_, attrs) when List.mem (StrAttr "TraceRemove") attrs -> false
     | _ -> true
   in
     List.filter no_specials
@@ -1240,7 +1240,7 @@ let to_dsa p =
 let concrete trace = 
   dsa_rev_map := None;
   let trace = Memory2array.coerce_prog trace in
-  (* let no_specials = remove_specials trace in *)
+  let trace = remove_specials trace in
   (* let no_unknowns = remove_unknowns no_specials in *)
   let memv = find_memv trace in
   let blocks = trace_to_blocks trace in
