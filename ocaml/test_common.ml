@@ -11,6 +11,27 @@ exception RangeNotFound of int64 * int64
 
 let speclist = [];;
 
+
+(** General system functions **)
+let check_file file =
+  if not(Sys.file_exists file) then skip_if true
+    ("File "^file^" does not exist; Skipping this test!");;
+
+
+let mkdir_and_ignore path = try Unix.mkdir path 0o640 with _ -> ();;
+
+
+let rm_and_ignore path =
+  (try if (Sys.is_directory(path)) then Unix.rmdir path with _ -> ());
+  try Sys.remove path with _ -> ();;
+
+
+let rec rm_and_ignore_list paths =
+  match paths with
+  | [] -> ()
+  | p::ps -> rm_and_ignore p; rm_and_ignore_list ps;;
+
+
 (** STP helpers **)
 let stp_path = "../stpwrap/stp/bin/";;
 let stp = "stp";;
@@ -28,7 +49,7 @@ let check_stp_path file =
 
 
 (** pin helpers **)
-let pin_path = "../pin/";;
+let pin_path = ref "../pin/";;
 let pin = "pin";;
 let gentrace_path = "../pintraces/obj-ia32/";;
 let gentrace = "gentrace.so";;
@@ -51,29 +72,16 @@ let check_pin_setup _ =
 	 " must contain 0 for pin to work.  As root, please execute $ echo 0 > "
        ^cat_arg))
   in
+  (* Check if ptrace_scope has been turned off *)
   if (Sys.file_exists cat_arg) 
-  then assert_command ~foutput ~verbose:true "cat" [cat_arg]
-  else ();;
-
-
-(** General system functions **)
-let check_file file =
-  if not(Sys.file_exists file) then skip_if true
-    ("File "^file^" does not exist; Skipping this test!");;
-
-
-let mkdir_and_ignore path = try Unix.mkdir path 0o640 with _ -> ();;
-
-
-let rm_and_ignore path =
-  (try if (Sys.is_directory(path)) then Unix.rmdir path with _ -> ());
-  try Sys.remove path with _ -> ();;
-
-
-let rec rm_and_ignore_list paths =
-  match paths with
-  | [] -> ()
-  | p::ps -> rm_and_ignore p; rm_and_ignore_list ps;;
+  then assert_command ~foutput ~verbose:true "cat" [cat_arg] else ();
+  (* Check environment variable for path to pin *)
+  let env_pin_path = try Sys.getenv "PIN_PATH" with _ -> "" in
+  if (env_pin_path <> "") then pin_path := env_pin_path;
+  print_endline ("SWXXXUsing pin_path "^(!pin_path));
+  check_file(!pin_path^pin);
+  check_file(gentrace_path^gentrace);
+;;
 
 
 (** Common functions across multipule tests **)
