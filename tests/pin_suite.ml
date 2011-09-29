@@ -39,7 +39,8 @@ let pin_trace_test pin_out =
 
 (* Note: This will leave the files pin.log and pintool.log by intention *)
 let pin_trace_cleanup pin_out = 
-  Sys.remove pin_out; Sys.remove exploit_file; Sys.remove taint_file;;
+  rm_and_ignore_list [pin_out ; exploit_file ; taint_file];;
+(*  Sys.remove pin_out; Sys.remove exploit_file; Sys.remove taint_file;; *)
 
 
 let suite = "Pin" >:::

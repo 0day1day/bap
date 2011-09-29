@@ -43,6 +43,9 @@ let concrete block =
   let memv = Var.VarHash.find mem_hash Asmir.x86_mem in
   try
 	(* prints block; *)
+	Util.print_obj_info "concrete_state" concrete_state;
+	Util.print_obj_info "mem_hash" mem_hash;
+	Util.print_obj_info "memv" memv;
 	(* Ignore output of run_block and return [] to limit memory consumption *)
 	ignore(Traces.run_block concrete_state memv no_specials);
 	[]

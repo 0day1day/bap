@@ -968,6 +968,12 @@ let trace_transform_stmt stmt evalf =
 	  (* Removing assignment of tainted operands: symbolic
 	     execution does not need these *)
     | Ast.Move (_, _, atts) when List.exists is_tconcassign atts -> []
+    (* | s when Syscall_models.x86_is_system_call s -> *)
+    (*   let eax = evalf (Var Disasm_i386.eax) in *)
+    (*   (match eax with *)
+    (*   | Int(i, _) -> *)
+    (*     Syscall_models.linux_syscall_to_il (Big_int.int_of_big_int i) *)
+    (*   | _ -> failwith "Unexpected evaluation problem") *)
     | s -> [s] in
   if not !allow_symbolic_indices && full_exp_eq !exp exp_true then
     (* The assertion must come first, since the statement may modify value of the expression! *)
@@ -1033,9 +1039,9 @@ let run_block ?(next_label = None) state memv block =
   let block = append_halt block in 
   TraceConcrete.initialize_prog state block ;
   clean_delta state.delta;
-  let init = TraceConcrete.inst_fetch state.sigma state.pc in
   let executed = ref [] in
-  let rec eval_block state stmt = 
+  let rec eval_block state = 
+    let stmt = TraceConcrete.inst_fetch state.sigma state.pc in
     (* pdebug ("Executing: " ^ (Pp.ast_stmt_to_string stmt)); *)
        (* Hashtbl.iter (fun k v -> pdebug (Printf.sprintf "%Lx -> %s" k (Pp.ast_exp_to_string v))) concrete_mem ; *)
     let evalf e = match TraceConcrete.eval_expr state.delta e with
@@ -1046,26 +1052,46 @@ let run_block ?(next_label = None) state memv block =
     executed := Util.fast_append (trace_transform_stmt stmt evalf) !executed ; 
     (*print_endline (Pp.ast_stmt_to_string stmt) ;*)
 
-    try 
+    (* If we have a system call, run the model instead.
+
+       HACK: This is a pretty ugly hack.
+    *)
+    if Syscall_models.x86_is_system_call stmt then
+      let eax = evalf (Var Disasm_i386.eax) in
+      let stmts = (match eax with
+        | Int(i, _) ->
+          Syscall_models.linux_syscall_to_il (Big_int.int_of_big_int i)
+        | _ -> failwith "Unexpected evaluation problem") in
+      (* Hack: Remember the next pc; we will clobber this *)
+      let newpc = Int64.succ state.pc in
+      let newstate = List.fold_left
+        (fun state stmt ->
+          let isspecial = match stmt with Special _ -> true | _ -> false in
+          if isspecial then state else
+            match TraceConcrete.eval_stmt state stmt with
+            | x::[] -> x
+            | _ -> failwith "expected one state") state stmts in
+      eval_block {newstate with pc=newpc}
+    else
+      try 
       (match TraceConcrete.eval_stmt state stmt with
 	 | [newstate] ->
-	     let next = TraceConcrete.inst_fetch newstate.sigma newstate.pc in
+	     (* let next = TraceConcrete.inst_fetch newstate.sigma newstate.pc in *)
 	       (*pdebug ("pc: " ^ (Int64.to_string newstate.pc)) ;*)
-	       eval_block newstate next
+	       eval_block newstate
 	 | _ -> 
 	    failwith "multiple targets..."
       )
     with
-	(* Ignore failed assertions -- assuming that we introduced them *)
+    (* Ignore failed assertions -- assuming that we introduced them *)
     | AssertFailed _ as _e -> 
 	  wprintf "failed assertion: %s" (Pp.ast_stmt_to_string stmt);
 	  (* raise e; *)
 	  let new_pc = Int64.succ state.pc in
-	  let next = TraceConcrete.inst_fetch state.sigma new_pc in
-	  eval_block {state with pc=new_pc} next
+	  eval_block {state with pc=new_pc}
   in
     try
-      eval_block state init
+      eval_block state
     with 
       |	Failure s as e -> 
 	  pwarn ("block evaluation failed :(\nReason: "^s) ;
@@ -1214,10 +1240,10 @@ let to_dsa p =
 let concrete trace = 
   dsa_rev_map := None;
   let trace = Memory2array.coerce_prog trace in
-  let no_specials = remove_specials trace in
+  (* let no_specials = remove_specials trace in *)
   (* let no_unknowns = remove_unknowns no_specials in *)
-  let memv = find_memv no_specials in
-  let blocks = trace_to_blocks no_specials in
+  let memv = find_memv trace in
+  let blocks = trace_to_blocks trace in
   (*pdebug ("blocks: " ^ (string_of_int (List.length blocks)));*)
   let length = List.length blocks in
   let actual_trace = run_blocks blocks memv length in

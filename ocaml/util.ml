@@ -638,3 +638,15 @@ let big_int_of_string s =
   else
     (* big_int_of_string handles decimals *)
     Big_int.big_int_of_string s
+
+
+(* Print the size of an object *)
+let print_obj_info title value = 
+  let module D = Debug.Make(struct let name = "UtilSize" and default=`Debug end) in
+  let i = Objsize.objsize value in
+  D.dprintf "%S : data_words=%i headers=%i depth=%i\n    \
+bytes_without_headers=%i bytes_with_headers=%i\n%!"
+    title i.Objsize.data i.Objsize.headers i.Objsize.depth
+    (Objsize.size_without_headers i)
+    (Objsize.size_with_headers i);
+  D.dprintf "%S : total size in MB = %i" title ((Objsize.size_with_headers i) / 1048576)

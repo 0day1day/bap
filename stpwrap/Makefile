@@ -1,10 +1,10 @@
 all:	stp/bin/stp
 
 stp/bin/stp:
-ifeq (,$(findstring stp/bin,${PATH}))
+ifeq (,$(shell which stp))
 	cd ./stp && ./scripts/configure && make 
 else 
-	@echo "stp/bin is already in path; Not making STP." 
+	@echo "stp is already in path; Not making STP." 
 endif
 
 clean:

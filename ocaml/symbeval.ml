@@ -511,7 +511,7 @@ struct
           failwith "Specials not handled yet!"
     in
       eval stmt 
-	
+
 (* Performs one evaluation step on the program and returns *
  * a list of all possible follow-up states.                *)
   let eval state =
@@ -536,7 +536,6 @@ struct
 
       @param step This function is called with the evaluator's state
       for each transition.
-
   *)
   let eval_straightline ?(step = Util.id) state =
     let rec f state =
@@ -545,6 +544,7 @@ struct
       | states -> states
     in
     f state
+
 end
   
 module SymbolicMemL = 
