@@ -48,8 +48,7 @@ let predicate_stp_solve_test str stp_result g_cfg =
 
 
 let predicate_stp_tear_down _ = 
-  try Sys.remove g_il with _ -> ();
-  try Sys.remove stp_out with _ -> ();;
+  rm_and_ignore_list [g_il ; stp_out];;
 
 
 let suite = "Predicate" >:::

@@ -383,7 +383,7 @@ struct
 	     further at all. *)
 	  let v1 = eval_expr delta e1 in
 	  if is_symbolic v1 && not eval_symb_let then
-	    Symbolic(l)
+            Symbolic(l)
 	  else
 	    let delta' = context_copy delta in (* FIXME: avoid copying *)
 	    context_update delta' var v1 ;
@@ -411,7 +411,7 @@ struct
 	      let isvar = (fun v -> not (Var.equal v var)) in
 	      if List.for_all isvar fvars then
 		(* var is not free! We are good to go *)
-	      v2
+                v2
 	      else
 		(* var is still free; we can't use the evaluated version *)
 		Symbolic(l)
