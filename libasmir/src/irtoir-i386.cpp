@@ -1011,7 +1011,7 @@ Exp *i386_translate_ccall( IRExpr *expr, IRSB *irbb, vector<Stmt *> *irout )
       irout->push_back
         (new Move(result->clone(),
                   _ex_or(_ex_shl(new Cast(new_eflags, REG_64, CAST_UNSIGNED), 
-                                 ex_const(32)),
+                                 ex_const(REG_64, 32)),
                          new Cast(answer, REG_64, CAST_UNSIGNED))));
 
       // clean up
