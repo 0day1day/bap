@@ -9,7 +9,9 @@ open Type
 
 exception RangeNotFound of int64 * int64
 
-let speclist = [];;
+let leave_files = ref false;;
+let speclist = ["-leave-files", Arg.Set leave_files, 
+				"Don't remove files after test";];;
 
 
 (** General system functions **)
@@ -22,8 +24,9 @@ let mkdir_and_ignore path = try Unix.mkdir path 0o640 with _ -> ();;
 
 
 let rm_and_ignore path =
-  (try if (Sys.is_directory(path)) then Unix.rmdir path with _ -> ());
-  try Sys.remove path with _ -> ();;
+  if(!leave_files) then () 
+  else ((try if (Sys.is_directory(path)) then Unix.rmdir path with _ -> ());
+		try Sys.remove path with _ -> ());;
 
 
 let rec rm_and_ignore_list paths =

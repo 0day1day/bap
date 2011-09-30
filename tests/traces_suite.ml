@@ -60,7 +60,7 @@ let concrete_eval_test (ranges, s) =
   check_eax ctx2 eax2;;
 
 
-let concrete_eval_tear_down _ = Sys.remove il_file;;
+let concrete_eval_tear_down _ = rm_and_ignore il_file;;
 
 
 let suite = "Traces" >:::
