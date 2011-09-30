@@ -27,13 +27,6 @@ trace_frames_t * read_frames_from_file(const string &filename,
       cerr << "Trace exception: " << e.msg << endl;
       throw e;
     }
-
-    // FIXME: Currently only x86
-    /* VexArch arch = VexArchX86;
-    bfd_architecture bfd_arch = bfd_arch_i386;
-    asm_program_t * prog = asmir_trace_asmp_for_arch(bfd_arch);
-    assert(prog);
-    assert(prog->abfd); */
     
     // Initializations
     translate_init();
@@ -162,6 +155,7 @@ bap_blocks_t * read_trace_from_file(const string &filename,
               generate_bap_ir_block(prog, bblock);
 
               // free internal VEX memory...
+              // XXX Not necessary(?) as asmir_close will do this too
               vx_FreeAll();
 
               string assembly(asmir_string_of_insn(prog,
@@ -237,6 +231,7 @@ bap_blocks_t * read_trace_from_file(const string &filename,
 
       /* After all this, delete the frame */
       delete f;
+      /* Clean up prog, prog->abfd, and vex memory */
       asmir_close(prog);
     }
     

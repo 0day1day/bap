@@ -44,9 +44,6 @@ let concrete block =
   try
 	(* prints block; *)
 	Util.print_obj_info "concrete_state" concrete_state;
-	Util.print_obj_info "concrete_state.delta" concrete_state.Symbeval.delta;
-	Util.print_obj_info "mem_hash" mem_hash;
-	Util.print_obj_info "memv" memv;
 	(* Ignore output of run_block and return [] to limit memory consumption *)
 	ignore(Traces.run_block concrete_state memv no_specials);
 	[]

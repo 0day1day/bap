@@ -1171,7 +1171,7 @@ Stmt *translate_stmt( IRStmt *stmt, IRSB *irbb, vector<Stmt *> *irout )
     Stmt *result = NULL;
 
     switch ( stmt->tag )
-    {
+        {
         case Ist_NoOp:
             result = new Comment("NoOp");
             break;
@@ -1185,26 +1185,32 @@ Stmt *translate_stmt( IRStmt *stmt, IRSB *irbb, vector<Stmt *> *irout )
             result = translate_put(stmt, irbb, irout);
             break;
         case Ist_PutI:
-	    result = new Special(uTag + "PutI");
-	    break;
+            result = new Special(uTag + "PutI");
+            break;
         case Ist_WrTmp:
             result = translate_tmp_st(stmt, irbb, irout);
             break;
         case Ist_Store:
             result = translate_store(stmt, irbb, irout);
             break;
+        case Ist_CAS:
+            result = new Special(uTag + "CAS");
+            break;
+        case Ist_LLSC:
+            result = new Special(uTag + "LLSC");
+            break;
         case Ist_Dirty:
-	    result = new Special(uTag + "Dirty");
+            result = new Special(uTag + "Dirty");
             break;
         case Ist_MFence:
-	    result = new Comment(sTag + "MFence"); 
+            result = new Comment(sTag + "MFence"); 
             break;
         case Ist_Exit:
             result = translate_exit(stmt, irbb, irout);
             break;
         default:
             throw "Unrecognized statement type";
-    }
+        }
 
     assert(result);
 

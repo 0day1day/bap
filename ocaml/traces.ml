@@ -1030,8 +1030,8 @@ let run_block ?(next_label = None) state memv block =
   let block = match !use_alt_assignment with
     | true ->
 	let assigns = assign_vars memv false in
-	 List.iter 
-	   (fun stmt -> dprintf "assign stmt: %s" (Pp.ast_stmt_to_string stmt)) assigns;	 
+	List.iter 
+	   (fun stmt -> DV.dprintf "assign stmt: %s" (Pp.ast_stmt_to_string stmt)) assigns;	 
 	assigns @ block
     | false -> block
   in
