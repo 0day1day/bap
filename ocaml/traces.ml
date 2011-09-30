@@ -1459,7 +1459,7 @@ struct
   let lookup_var delta var =
 
     let name = Var.name var in
-    (* DV.dprintf "looking up var %s" name; *)
+    DV.dprintf "looking up var %s" name;
 
     (* We need to use DSA because we combine the delta context with
        let-based renaming.  If we did not use DSA, then assignments to
@@ -1503,7 +1503,7 @@ struct
 	     | Array _ -> (* DV.dprintf "new memory %s" (Var.name var); *) empty_smem var
   	     | _ ->
 		 (match dsa_var var with
-		 | Some(x) -> if isbad x then
+		 | Some(x) -> if not (isbad x) then
   		   wprintf "Variable not found during evaluation: %s" name
 		 | _ -> ());
   		 Symbolic(Var(var))
@@ -1551,10 +1551,10 @@ struct
     if !full_symbolic then
       let expr = symb_to_exp ev in
       let is_worth_storing = (*is_concrete expr &&*) 
-	is_temp v
+	is_temp (Util.option_unwrap (dsa_var v))
       in
       let pred' =
-	if is_worth_storing then (context_update delta v ev ; pred)
+	if is_worth_storing then (dprintf "Storing %s in delta" (Pp.var_to_string v); (context_update delta v ev ; pred))
 	else
 	  let constr = BinOp (EQ, Var v, expr) in
 	  pdebug ((Var.name v) ^ " = " ^ (Pp.ast_exp_to_string expr)) ;
@@ -1566,7 +1566,10 @@ struct
       Symbolic.assign v ev ctx
 end
 
-module TraceSymbolic = Symbeval.Make(TaintSymbolic)(FastEval)(LetBind)
+(* If we evaluate temporaries in delta, we need sloweval, otherwise we
+   might have let x = T_123 in foo that goes in the formula, but T_123
+   will not be defined in the formula. *)
+module TraceSymbolic = Symbeval.Make(TaintSymbolic)(SlowEval)(LetBind)
 
 let status = ref 0
 let count = ref 0
