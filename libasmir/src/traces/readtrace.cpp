@@ -35,6 +35,7 @@ trace_frames_t * read_frames_from_file(const string &filename,
 
     if (!tr.seek(offset)) {
       /* Couldn't seek there! */
+      delete result;
       return NULL;
     }
     

@@ -1233,7 +1233,10 @@ Stmt *translate_jumpkind( IRSB *irbb, vector<Stmt *> *irout )
     if ( irbb->jumpkind == Ijk_Boring && irbb->stmts[irbb->stmts_used-1]->tag != Ist_Exit )     
       if ( irbb->stmts[0]->Ist.IMark.addr + irbb->stmts[0]->Ist.IMark.len 
             == irbb->next->Iex.Const.con->Ico.U32 )
+      {
+        Exp::destroy(dest);
         return NULL;
+      }
   }
   else
     dest = translate_expr( irbb->next, irbb, irout );
@@ -1254,9 +1257,11 @@ Stmt *translate_jumpkind( IRSB *irbb, vector<Stmt *> *irout )
           if(!translate_calls_and_returns)
             result = new Jmp(dest);
           else
+            Exp::destroy(dest);
             result = new Return(NULL);
           break;
         case Ijk_NoDecode:
+          Exp::destroy(dest);
           result = new Special("VEX decode error");
           break;
         case Ijk_Sys_syscall:
@@ -1265,15 +1270,11 @@ Stmt *translate_jumpkind( IRSB *irbb, vector<Stmt *> *irout )
         case Ijk_Sys_sysenter:
           // Since these will create a special (insert_specials), we
           // won't translate these as a jump here.
+          Exp::destroy(dest);
           return NULL;
           break;
         default:
-          //
-          // TODO:
-          // It's occurred to me that whenever we throw due to an
-          // unrecognized something, the unused objects created above
-          // are leaked, e.g. dest in this case.
-          //
+          Exp::destroy(dest);
           throw "Unrecognized jump kind";    
     }
 

@@ -684,17 +684,17 @@ let alt_bap_from_trace_file_range filename off reqframes =
   if numframes = 0 || numframes = -1 then (
     c := false
   ) else (
-	if ((Int64.of_int numframes) <> reqframes) then 
-	  dprintf "Got %d frames which <> requested frames %s" 
-		numframes (Int64.to_string reqframes);
+    if ((Int64.of_int numframes) <> reqframes) then 
+      dprintf "Got %d frames which <> requested frames %s" 
+	numframes (Int64.to_string reqframes);
     revstmts := Util.foldn
-	  (fun acc n ->
-		let frameno = numframes-1-n in
+      (fun acc n ->
+	let frameno = numframes-1-n in
 		(* dprintf "frame %d" frameno; *)
-		let stmts = 
-		  raise_frame (Libasmir.asmir_frames_get trace_frames frameno) in
-		List.rev_append stmts acc) [] (numframes-1);
-	off := Int64.add !off !trace_blocksize
+	let stmts = 
+	  raise_frame (Libasmir.asmir_frames_get trace_frames frameno) in
+	List.rev_append stmts acc) [] (numframes-1);
+    off := Int64.add !off !trace_blocksize
   (* let moreir = tr_bap_blocks_t_no_asm g bap_blocks in *)
   (* Build ir backwards *)
   (* ir := List.rev_append moreir !ir; *)
