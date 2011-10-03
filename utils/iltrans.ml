@@ -105,10 +105,10 @@ let jumpelim p =
   fst(Ssa_simp_misc.cfg_jumpelim p)
 let ast_coalesce = Coalesce.AST_Coalesce.coalesce
 let ssa_coalesce = Coalesce.SSA_Coalesce.coalesce
-(* let memory2scalardef p = *)
-(*   Memory2scalar.convert_g p Memory2scalar.Default *)
-(* let memory2scalariroptir p = *)
-(*   Memory2scalar.convert_g p Memory2scalar.IndirectROPTIR *)
+let memory2scalardef p =
+  Memory2scalar.convert_g p Memory2scalar.Default
+let memory2scalariroptir p =
+  Memory2scalar.convert_g p Memory2scalar.IndirectROPTIR
 
 (* Chop code added *)
 let ast_chop srcbb srcn trgbb trgn p =
@@ -178,10 +178,10 @@ let speclist =
      "Perform coalescing on the SSA.")
   ::("-jumpelim", uadd(TransformSsa jumpelim),
      "Control flow optimization.")
-  (* ::("-memtoscalar", uadd(TransformSsa memory2scalardef), *)
-  (*    "Convert memory accesses to scalars (default mode).") *)
-  (* ::("-memtoscalar-initro", uadd(TransformSsa memory2scalariroptir), *)
-  (*    "Convert memory accesses to scalars (IndirectROPTIR mode).") *)
+  ::("-memtoscalar", uadd(TransformSsa memory2scalardef),
+     "Convert memory accesses to scalars (default mode).")
+  ::("-memtoscalar-initro", uadd(TransformSsa memory2scalariroptir),
+     "Convert memory accesses to scalars (IndirectROPTIR mode).")
   ::("-ssa-simp", uadd(TransformSsa Ssa_simp.simp_cfg),
      "Perform all supported optimizations on SSA")
   ::("-ssa-to-single-stmt",
@@ -379,7 +379,7 @@ let () = Arg.parse speclist anon usage
 let pipeline = List.rev !pipeline
 
 let prog =
-  try fst (Input.get_program())
+  try Input.get_program()
   with Arg.Bad s ->
     Arg.usage speclist (s^"\n"^usage);
     exit 1

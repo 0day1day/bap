@@ -1,5 +1,3 @@
-(** Functions used by BAP library and tests *)
-
 open Big_int
 open Big_int_convenience
 open OUnit
@@ -15,13 +13,12 @@ let stp = "stp";;
 
 let check_stp_path file =
   let path = Sys.getenv("PATH") in
-  print_endline("Checking for stp...");
-  match Unix.system("stp -h 2> /dev/null") with
-  | Unix.WEXITED(0) -> ()
-  | _ -> (if (Sys.file_exists file) 
-    then Unix.putenv "PATH" (path^":"^stp_path)
-    else skip_if true 
-      ("Skipping test.  Stp is not in PATH and can not find file "^file));;
+  if (pmatch ~pat:stp_path path) then ()
+  else (
+	if (Sys.file_exists file) 
+	then Unix.putenv "PATH" (path^":"^stp_path)
+	else skip_if true 
+	  ("Skipping test.  Stp is not in PATH and can not find file "^file));;
 
 
 (** pin helpers **)

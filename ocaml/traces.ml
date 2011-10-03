@@ -1,4 +1,4 @@
-(** A module to perform trace analysis *)
+(* A module to perform trace analysis *)
 
 open Ast
 open BatListFull
@@ -576,17 +576,17 @@ let update_concrete s =
 	) else false
   | _ -> false
 
-(* (\** Get the address of the next instruction in the trace *\) *)
-(* let rec get_next_address = function *)
-(*   | [] -> raise Not_found *)
-(*   | (Ast.Label ((Addr n),_))::_ ->  *)
-(*       Name ("pc_"^(Int64.format "0x%Lx" n)) *)
-(*   | _::xs -> get_next_address xs      *)
+(** Get the address of the next instruction in the trace *)
+let rec get_next_address = function
+  | [] -> raise Not_found
+  | (Ast.Label ((Addr n),_))::_ -> 
+      Name ("pc_"^(Int64.format "0x%Lx" n))
+  | _::xs -> get_next_address xs     
 
-(* (\* Converts an address to a string label *\) *)
-(* let to_label = function *)
-(*   | Addr n -> Name ("pc_"^(Int64.format "0x%Lx" n)) *)
-(*   | other -> other *)
+(* Converts an address to a string label *)
+let to_label = function
+  | Addr n -> Name ("pc_"^(Int64.format "0x%Lx" n))
+  | other -> other
 
 (** Fetching the first stmt with attributes containing taint info *)
 let rec get_first_atts = function
@@ -1072,9 +1072,9 @@ let run_block ?(next_label = None) ?(log=fun _ -> ()) ?(transformf = (fun s _ ->
   let block = append_halt block in 
   TraceConcrete.initialize_prog state block ;
   clean_delta state.delta;
+  let init = TraceConcrete.inst_fetch state.sigma state.pc in
   let executed = ref [] in
-  let rec eval_block state = 
-    let stmt = TraceConcrete.inst_fetch state.sigma state.pc in
+  let rec eval_block state stmt = 
     (* pwarn("XXXSW Executing: " ^ (Pp.ast_stmt_to_string stmt)); *)
     (* pwarn ("XXXSW Current block is: " ^ (Pp.ast_stmt_to_string addr)); *)
     (* pdebug ("Executing: " ^ (Pp.ast_stmt_to_string stmt)); *)
@@ -1087,33 +1087,12 @@ let run_block ?(next_label = None) ?(log=fun _ -> ()) ?(transformf = (fun s _ ->
     executed := Util.fast_append (transformf stmt evalf) !executed ; 
     (*print_endline (Pp.ast_stmt_to_string stmt) ;*)
 
-    (* If we have a system call, run the model instead.
-
-       HACK: This is a pretty ugly hack.
-    *)
-    if Syscall_models.x86_is_system_call stmt then
-      let eax = evalf (Var Disasm_i386.eax) in
-      let stmts = (match eax with
-        | Int(i, _) ->
-          Syscall_models.linux_syscall_to_il (Big_int.int_of_big_int i)
-        | _ -> failwith "Unexpected evaluation problem") in
-      (* Hack: Remember the next pc; we will clobber this *)
-      let newpc = Int64.succ state.pc in
-      let newstate = List.fold_left
-        (fun state stmt ->
-          let isspecial = match stmt with Special _ -> true | _ -> false in
-          if isspecial then state else
-            match TraceConcrete.eval_stmt state stmt with
-            | x::[] -> x
-            | _ -> failwith "expected one state") state stmts in
-      eval_block {newstate with pc=newpc}
-    else
-      try 
+    try 
       (match TraceConcrete.eval_stmt state stmt with
 	 | [newstate] ->
-	     (* let next = TraceConcrete.inst_fetch newstate.sigma newstate.pc in *)
+	     let next = TraceConcrete.inst_fetch newstate.sigma newstate.pc in
 	       (*pdebug ("pc: " ^ (Int64.to_string newstate.pc)) ;*)
-	       eval_block newstate
+	       eval_block newstate next
 	 | _ -> 
 	    failwith "multiple targets..."
       )
@@ -1123,10 +1102,11 @@ let run_block ?(next_label = None) ?(log=fun _ -> ()) ?(transformf = (fun s _ ->
 	  wprintf "failed assertion: %s" (Pp.ast_stmt_to_string stmt);
 	  (* raise e; *)
 	  let new_pc = Int64.succ state.pc in
-	  eval_block {state with pc=new_pc}
+	  let next = TraceConcrete.inst_fetch state.sigma new_pc in
+	  eval_block {state with pc=new_pc} next
   in
     try
-      eval_block state
+      eval_block state init
     with 
       |	Failure s as e -> 
 	  pwarn ("block evaluation failed :(\nReason: "^s) ;
@@ -1276,10 +1256,10 @@ let to_dsa p =
 let concrete ?(log=fun _ -> ()) trace = 
   dsa_rev_map := None;
   let trace = Memory2array.coerce_prog trace in
-  (* let no_specials = remove_specials trace in *)
+  let no_specials = remove_specials trace in
   (* let no_unknowns = remove_unknowns no_specials in *)
-  let memv = find_memv trace in
-  let blocks = trace_to_blocks trace in
+  let memv = find_memv no_specials in
+  let blocks = trace_to_blocks no_specials in
   (*pdebug ("blocks: " ^ (string_of_int (List.length blocks)));*)
   let length = List.length blocks in
   let actual_trace = run_blocks ~log blocks memv length in

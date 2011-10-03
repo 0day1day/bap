@@ -28,8 +28,6 @@ let pipeline = ref []
 (* Initialization statements *)
 let inits = ref []
 
-let scope = ref (Grammar_scope.default_scope ())
-
 let cexecute_at s p =
   let () = ignore(Symbeval.concretely_execute p ~i:(List.rev !inits) ~s) in
   p
@@ -45,27 +43,25 @@ let uadd c =
   Arg.Unit(fun()-> add c)
 
 let mapv v e =
-  let e,ns = Parser.exp_from_string ~scope:!scope e in
+  let e = Parser.exp_from_string e in
   let t = Typecheck.infer_ast e in
   let ts = Pp.typ_to_string t in
-  let v,ns = match Parser.exp_from_string ~scope:ns (v ^ ":" ^ ts) with
-    | Var(v), ns -> v, ns
+  let v = match Parser.exp_from_string (v ^ ":" ^ ts) with
+    | Var(v) -> v
     | _ -> assert false
   in
-  scope := ns;
   let s = Move(v, e, []) in
   inits := s :: !inits
 
 let mapmem a e =
-  let a,ns = Parser.exp_from_string ~scope:!scope a in
-  let e,ns = Parser.exp_from_string ~scope:ns e in
+  let a = Parser.exp_from_string a in
+  let e = Parser.exp_from_string e in
   let t = Typecheck.infer_ast e in
   (* XXX: Fix parser/asmir so that we don't have to do this! *)
-  let m,ns = match Parser.exp_from_string ~scope:ns "mem_45:?u32" with
-    | Var(v), ns -> v, ns
+  let m = match Parser.exp_from_string "mem_45:?u32" with
+    | Var(v) -> v
     | _ -> assert false
   in
-  scope := ns;
   let s = Move(m, Store(Var(m), a, e, exp_false, t), []) in
   inits := s :: !inits
   
@@ -101,10 +97,7 @@ let () = Arg.parse speclist anon usage
 let pipeline = List.rev !pipeline
 
 let prog =
-  try let p,s = Input.get_program() in
-      (* Save scope for expression parsing *)
-      scope := s;
-      p
+  try Input.get_program()
   with Arg.Bad s ->
     Arg.usage speclist (s^"\n"^usage);
     exit 1

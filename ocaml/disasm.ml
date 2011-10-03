@@ -1,5 +1,3 @@
-(** General disassembly stuff *)
-
 exception Unimplemented
 
 let disasm_instr arch =

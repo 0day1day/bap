@@ -1,8 +1,6 @@
 (** Functions that are used by utilities and tests *)
 
 open Ast
-module D=Debug.Make(struct let name = "Utils_common" and default=`NoDebug end)
-open D
 open Type
 
 
@@ -38,13 +36,5 @@ let typecheck p =
     method visit_exp e = ignore(Typecheck.infer_ast ~check:true e); `DoChildren
   end 
   in
-  List.iter
-    (fun s ->
-      try ignore(Ast_visitor.stmt_accept v s)
-      with Typecheck.TypeError _ as e ->
-        (* Having the statement usually helps *)
-        wprintf "Problem statement: %s" (Pp.ast_stmt_to_string s);
-        raise e
-    )
-    p;
+  ignore(Ast_visitor.prog_accept v p);
   p

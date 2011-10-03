@@ -28,7 +28,7 @@ let predicate_stp_setup _ =
 
 
 let predicate_stp_solve_test str stp_result g_cfg =
-  let post,_ = Parser.exp_from_string str in
+  let post = Parser.exp_from_string str in
   let (gcl, post) = to_ssagcl g_cfg post in
   let wp = Wp.wp gcl post in
   let m2a = new Memory2array.memory2array_visitor () in

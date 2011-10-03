@@ -300,3 +300,7 @@ match s with
 | Jmp(e, _) -> is_indirect_exp e (* Only jumps to labels are direct *)
 | CJmp(_, e1, e2, _) -> is_indirect_exp e1 || is_indirect_exp e2
 | _ -> false
+
+let is_syscall = function
+  | Special(("syscall"|"int 80"), _) -> true
+  | _ -> false

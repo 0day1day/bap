@@ -1,5 +1,3 @@
-(** Hacks *)
-
 open Type
 open Ast
 open Util

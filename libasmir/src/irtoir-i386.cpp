@@ -62,8 +62,6 @@
 #define OFFB_TILEN     offsetof(VexGuestX86State,guest_TILEN)
 #define OFFB_NRADDR    offsetof(VexGuestX86State,guest_NRADDR)
 
-#define OFFB_IP_AT_SYSCALL offsetof(VexGuestX86State,guest_IP_AT_SYSCALL)
-
 //
 // Sub register offsets, calculated manually
 //
@@ -391,9 +389,7 @@ static string reg_offset_to_name( int offset )
         case OFFB_TILEN:    name = "TILEN";     break;
         case OFFB_NRADDR:   name = "NRADDR";    break;
 
-        case OFFB_IP_AT_SYSCALL: name = "IP_AT_SYSCALL"; break;
-
-        default:
+        default:            
             panic("Unrecognized register name");
     }
 

@@ -136,7 +136,7 @@ let unroll_loop ?(count=8) cfg head body =
           (*if (t1' = t2') then
             (let ss = C.get_stmts cfg s1 in dprintf "stmt: %s" (Pp.ast_stmt_to_string (List.hd ss));
              let ss = C.get_stmts cfg s2 in dprintf "stmt: %s" (Pp.ast_stmt_to_string (List.hd ss)));*)
-	  if t1' === t1 && t2' === t2 then revstmts
+	  if t1' = t1 && t2' = t2 then revstmts
 	  else CJmp(c,t1',t2',attrs)::rest
       | Jmp _::rest
       | rest -> rest

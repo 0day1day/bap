@@ -1,12 +1,3 @@
-(**
-   Module for executing SMTs inside of BAP
-
-   XXX: This is not portable in any shape or way. It will only work on
-   Unix-like systems.
-
-   @author ejs
-*)
-
 type result = Valid | Invalid | SmtError | Timeout
 val result_to_string : result -> string
 
@@ -15,7 +6,7 @@ sig
   val timeout : int (** Default timeout in seconds *)
   val solvername : string (** Solver name *)
   val cmdstr : string -> string (** Given a filename, produce a command string to invoke solver *)
-  val parse_result : ?printmodel:bool -> string -> string -> Unix.process_status -> result (** Given output, decide the result *)
+  val parse_result : string -> string -> Unix.process_status -> result (** Given output, decide the result *)
   val printer : Formulap.fppf
 end
 
@@ -24,12 +15,12 @@ class type smtexec =
 object
   method printer : Formulap.fppf
   method solvername : string
-  method solve_formula_file : ?printmodel:bool -> ?timeout:int -> string -> result
+  method solve_formula_file : ?timeout:int -> string -> result
 end
 
 module type SOLVER =
 sig
-  val solve_formula_file : ?printmodel:bool -> ?timeout:int -> string -> result (** Solve a formula in a file *)
+  val solve_formula_file : ?timeout:int -> string -> result (** Solve a formula in a file *)
   val check_exp_validity : ?timeout:int -> ?exists:(Ast.var list) -> ?foralls:(Ast.var list) -> Ast.exp -> result (** Check validity of an exp *)
     (* XXX: check_exp_sat *)
     (** Write a formula for weakest precondition.

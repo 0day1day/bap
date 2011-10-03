@@ -644,7 +644,7 @@ let trans_frame f =
       [Comment("ReadSyscall", []); Comment("All blocks must have two statements", [])]
   | Libasmir.FRM_LOADMOD ->
       let name, lowaddr, highaddr = Libasmir.asmir_frame_get_loadmod_info f in
-      [Comment(Printf.sprintf "Loaded module '%s' at %#Lx to %#Lx" name lowaddr highaddr, []); Comment("All blocks must have two statements", [])]
+      [Special(Printf.sprintf "Loaded module '%s' at %#Lx to %#Lx" name lowaddr highaddr, []); Comment("All blocks must have two statements", [])]
   | Libasmir.FRM_SYSCALL ->
 	let callno, addr, tid = Libasmir.asmir_frame_get_syscall_info f in
 	[Special(Printf.sprintf "Syscall number %d at %#Lx by thread %d" callno addr tid,[]);
@@ -751,11 +751,11 @@ let bap_get_stmt_from_trace_file ?(atts = true) ?(pin = false) filename off =
   (* SWXXX this has no buffer at all; will parse entire trace for every instruction *)
   let bap_blocks = Libasmir.asmir_bap_from_trace_file filename off 1L atts pin in
   let numblocks = Libasmir.asmir_bap_blocks_size bap_blocks in
+  let ir = tr_bap_blocks_t_trace_asm g bap_blocks in
+  let () = destroy_bap_blocks bap_blocks in
   match numblocks with
   | -1 -> None
-  | _ -> Some(let ir = tr_bap_blocks_t_trace_asm g bap_blocks in
-              let () = destroy_bap_blocks bap_blocks in
-              ir)
+  | _ -> Some(ir)
   
 (** Return stream of trace instructions raised to the IL *)
 let bap_stream_from_trace_file ?(atts = true) ?(pin = false) filename =

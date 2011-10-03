@@ -3,16 +3,72 @@
 (* Author: David Brumley, Ivan Jager *)
 (* $Id$ *)
 
+open Type
 open Ast
 open Big_int
-open Grammar_scope
-open Type
+
+(** Whether or not to strip the trailing _number from variable names *)
+let strip_nums = ref true
 
 let parse_error str =
   let {Lexing.pos_fname=f; pos_lnum=sl; pos_bol=sb; pos_cnum=sc} =
     Parsing.symbol_start_pos()
   and {Lexing.pos_lnum=el; pos_bol=eb; pos_cnum=ec } = Parsing.symbol_end_pos() in
   Printf.eprintf "%s:%i:%i-%i:%i: %s\n" f sl (sc-sb) el (ec-eb) str
+
+  
+
+let err s =
+  prerr_endline s;
+  failwith ("Parser: "^s)
+    (*raise Parsing.Parse_error*)
+
+let stripnum =
+  let stripnum1 = Str.replace_first (Str.regexp "_[0-9]+$") "" in
+  fun x ->
+    if !strip_nums then 
+      stripnum1 x
+    else
+      x
+
+module Scope =
+struct
+  let create decls =
+    let h = Hashtbl.create 5700 in
+    List.iter (fun v -> Hashtbl.add h (Var.name v) v) decls;
+    (h, Stack.create() )
+
+  let defscope () = create Asmir.all_regs
+  let cur_scope = ref (defscope ())
+
+  let add n t =
+    let v = Var.newvar (stripnum n) t in
+    Hashtbl.add (fst !cur_scope) n v;
+    v
+      
+  let add_push n t =
+    Stack.push n (snd !cur_scope);
+    add n t
+
+  let pop () =
+    let (h,s) = !cur_scope in
+    let n = Stack.pop s in
+    Hashtbl.remove h n
+      
+
+  let get_lval n t =
+    (* let n = stripnum n in *)
+    try
+      let v = Hashtbl.find (fst !cur_scope) n in
+      if t = None || t = Some(Var.typ v)
+      then v
+      else err ("Variable '"^n^"' used with inconsistent type")
+    with Not_found ->
+      (* Printf.printf "%s not found\n" n; *)
+      match t with
+      | Some t -> add n t
+      | None -> err ("Type was never declared for '"^n^"'")
+end
 
 let mk_attr lab string =
   match lab with
@@ -43,6 +99,10 @@ let casttype_of_string = function
   | "low"     -> CAST_LOW     
   | s -> err("Unexpected cast type '"^s^"'")
 
+
+let scope_create = Scope.create
+let scope_set s = Scope.cur_scope := s
+let scope_default = Scope.defscope
 
 %}
 
@@ -91,7 +151,7 @@ let casttype_of_string = function
 %%
 
 program: 
-| stmtlist EOF { $1 }
+| stmtlist EOF { scope_set (scope_default()); $1 }
 
 stmtlist:
 | revstmtlist  { List.rev $1 }

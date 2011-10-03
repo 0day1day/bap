@@ -30,7 +30,7 @@ let anon x =
 let () = Arg.parse speclist anon usage
 
 
-let e,_ = Parser.exp_from_file !filename
+let e = Parser.exp_from_file !filename
 let es = split_disjunction e
 
 let write_file n e =

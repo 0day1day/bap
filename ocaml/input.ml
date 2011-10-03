@@ -1,5 +1,3 @@
-open BatListFull
-
 let init_ro = ref false
 let inputs = ref []
 and streaminputs = ref None
@@ -9,11 +7,11 @@ and pintrace = ref false
 let set_gc () =
   Gc.set
     {
-      (Gc.get ()) with
+      (Gc.get ()) with 
 	Gc.minor_heap_size = 32000000; (* 128 mb *)
 	Gc.major_heap_increment = 16000000; (* 64 mb *)
 	Gc.max_overhead = 100; (* compact after 100% overhead *)
-    }
+    }      
 
 let stream_speclist =
   (* let addinput i = streaminputs := i :: !streaminputs in *)
@@ -21,7 +19,7 @@ let stream_speclist =
     ("-tracestream",
      Arg.String(fun s -> streaminputs := Some(`Tracestream s)),
      "<file> Read a trace to be processed as a stream.");
-
+    
     ("-pin",
      Arg.Set pintrace,
      "Enable pin trace.");
@@ -46,7 +44,7 @@ let speclist =
                 Arg.String(fun e->addinput(`Binrange(!f, !s, toint64 e)))]),
      "<file> <start> <end> Convert the given range of a binary to the IL");
     ("-trace",
-     Arg.String(fun s ->
+     Arg.String(fun s -> 
 		  set_gc () ;
 		  addinput (`Trace s)),
      "<file> Read in a trace and lift it to the IL");
@@ -66,30 +64,29 @@ let speclist =
 
 let get_program () =
   if !inputs = [] then raise(Arg.Bad "No input specified");
-  let get_one (oldp,oldscope) = function
+  let get_one = function
     | `Il f ->
-      let newp, newscope = Parser.program_from_file ~scope:oldscope f in
-	List.append newp oldp, newscope
+	Parser.program_from_file f
     | `Bin f ->
 	let p = Asmir.open_program f in
-	List.append (Asmir.asmprogram_to_bap ~init_ro:!init_ro p) oldp, oldscope
+	Asmir.asmprogram_to_bap ~init_ro:!init_ro p
     | `Binrange (f, s, e) ->
 	let p = Asmir.open_program f in
-	List.append (Asmir.asmprogram_to_bap_range ~init_ro:!init_ro p s e) oldp, oldscope
+	Asmir.asmprogram_to_bap_range ~init_ro:!init_ro p s e
     | `Trace f ->
-      List.append (Asmir.bap_from_trace_file ~pin:!pintrace f) oldp, oldscope
+    Asmir.bap_from_trace_file ~pin:!pintrace f
   in
- (* let rec cat p = function *)
-  (*   | [] -> p *)
-  (*   | arg::args -> cat (List.rev_append (List.rev (get_one arg)) p) args *)
-  (* in *)
-  try
-    List.fold_left get_one ([], Grammar_scope.default_scope ()) (List.rev !inputs)
+  let rec cat p = function
+    | [] -> p
+    | arg::args -> cat (List.rev_append (List.rev (get_one arg)) p) args
+  in
+  try  
+	cat [] !inputs
   with _ -> failwith "An exception occured while lifting"
 
 let get_stream_program () = match !streaminputs with
   | None -> raise(Arg.Bad "No input specified")
   | Some(`Tracestream f) -> Asmir.bap_stream_from_trace_file ~pin:!pintrace f
-
+    
 
 (*  with fixme -> raise(Arg.Bad "Could not open input file")*)

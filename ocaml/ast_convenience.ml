@@ -49,6 +49,7 @@ let cast_unsigned t = function
     Cast(CAST_UNSIGNED, t, e)
 
 let exp_ite ?t b e1 e2 =
+  (* FIXME: were we going to add a native if-then-else thing? *)
   (* type inference shouldn't be needed when t is specified, but we're paranoid *)
   let tb = Typecheck.infer_ast ~check:false b in
   let t1 = Typecheck.infer_ast ~check:false e1 in
