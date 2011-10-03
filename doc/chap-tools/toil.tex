@@ -67,9 +67,11 @@ as a sequence of instructions that form a loop.
 In addition to binary files, {\tt toil} can also lift an instruction trace
 to the IL. Conditional branches in a trace are lifted as {\tt assert}
 statements so that the executed branch is followed. This is done to
-prevent branching outside the trace to an unknown instruction. The
-TEMU~\cite{temu} dynamic analysis tool currently supports generating
-traces in the \bap trace format.
+prevent branching outside the trace to an unknown instruction.
+%% We probably shouldn't mention TEMU since it's unsupported.
+%% The
+%% TEMU~\cite{temu} dynamic analysis tool currently supports generating
+%% traces in the \bap trace format.
 
 
 
