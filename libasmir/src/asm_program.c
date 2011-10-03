@@ -2,13 +2,14 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
+#include <limits.h>
 
 #include "asm_program.h"
 #include "libiberty.h"
 
 
 
-static void initialize_sections(asm_program_t *p);
+static void initialize_sections(asm_program_t *p, bfd_vma base);
 static bfd* initialize_bfd(const char *filename);
 
 /* find the segment for memory address addr */
@@ -38,7 +39,7 @@ bfd_byte *asmir_get_ptr_to_instr(asm_program_t *prog, bfd_vma addr)
 
 
 asm_program_t *
-asmir_open_file(const char *filename)
+asmir_open_file(const char *filename, bfd_vma base)
 {
   asm_program_t *prog = malloc(sizeof(asm_program_t));
   if (!prog)
@@ -49,7 +50,7 @@ asmir_open_file(const char *filename)
     return NULL;
   }
   prog->abfd = abfd;
-  initialize_sections(prog);
+  initialize_sections(prog, base);
 
   return prog;
 }
@@ -160,8 +161,14 @@ trace_read_memory (bfd_vma memaddr,
 }
 
 static void
-initialize_sections(asm_program_t *prog)
+initialize_sections(asm_program_t *prog, bfd_vma base)
 {
+#if SIZEOF_BFD_VMA == 4
+  bfd_vma lowest = LONG_MAX;
+#else
+  bfd_vma lowest = LLONG_MAX;
+#endif
+  bfd_vma offset = 0;
   struct disassemble_info *disasm_info = &prog->disasm_info;
   bfd *abfd = prog->abfd;
   unsigned int opb = bfd_octets_per_byte(abfd);
@@ -170,6 +177,24 @@ initialize_sections(asm_program_t *prog)
   section_t **nextseg = &prog->segs;
   asection *section;
 
+  /* Look for the section loaded into the lowest memory address */
+  if (base != -1) {
+    for(section = abfd->sections; section; section = section->next) {
+      /* fprintf(stderr, "Section %s, vma %Lx\n", section->name, section->vma); */
+      if ((section->vma < lowest) && (section->flags & SEC_LOAD)) { lowest = section->vma; }
+    }
+
+    //    fprintf(stderr, "Lowest section is %Lx\n", lowest);
+    /* If base is negative one, then don't move anything.  Otherwise,
+       we'll assume that the program is loaded to lowest, and then adjust
+       that so it goes to base. */
+    if (base != -1) {
+      offset = base - lowest;
+      //      fprintf(stderr, "Adjusting by %Lx\n", offset);
+    }
+
+  }
+
   for(section = abfd->sections; section; section = section->next) {
     section_t *seg;
     bfd_byte *data;
@@ -177,6 +202,7 @@ initialize_sections(asm_program_t *prog)
 
     if(datasize == 0) continue;
 
+    section->vma += offset;
     data = bfd_alloc2(abfd, datasize, sizeof(bfd_byte));
     bfd_get_section_contents(abfd, section, data, 0, datasize);
     seg = bfd_alloc(abfd, sizeof(section_t));

@@ -152,7 +152,7 @@ boolean asmir_get_print_warning();
 void asmir_set_use_simple_segments(boolean value);
 
 
-asm_program_t asmir_open_file([string] char *filename);
+asm_program_t asmir_open_file([string] char *filename, address_t base);
 void asmir_close(asm_program_t p);
 [string] char* asmir_string_of_insn(asm_program_t prog, address_t inst);
 enum bfd_architecture asmir_get_asmp_arch(asm_program_t prog);

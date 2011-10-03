@@ -620,7 +620,7 @@ let remove_jumps =
 (** Removing all specials from the traces *)	
 let remove_specials =
   let no_specials = function 
-    | Ast.Special(_, attrs) when List.mem (StrAttr "TraceRemove") attrs -> false
+    | Ast.Special(_, attrs) when not (List.mem (StrAttr "TraceKeep") attrs) -> false
     | _ -> true
   in
     List.filter no_specials

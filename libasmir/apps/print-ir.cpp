@@ -133,7 +133,7 @@ int main(int argc, char *argv[])
     // Disassemble the program 
     //
     cerr << "Disassembling binary." << endl;
-    asm_program_t *prog = asmir_open_file(argv[1]);
+    asm_program_t *prog = asmir_open_file(argv[1], -1);
     assert(prog);
 
 
