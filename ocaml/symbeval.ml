@@ -383,7 +383,7 @@ struct
 	     further at all. *)
 	  let v1 = eval_expr delta e1 in
 	  if is_symbolic v1 && not eval_symb_let then
-	    Symbolic(l)
+            Symbolic(l)
 	  else
 	    let delta' = context_copy delta in (* FIXME: avoid copying *)
 	    context_update delta' var v1 ;
@@ -411,7 +411,7 @@ struct
 	      let isvar = (fun v -> not (Var.equal v var)) in
 	      if List.for_all isvar fvars then
 		(* var is not free! We are good to go *)
-	      v2
+                v2
 	      else
 		(* var is still free; we can't use the evaluated version *)
 		Symbolic(l)
@@ -507,11 +507,11 @@ struct
           )
       | Comment _ | Label _ -> 
           [{ctx with pc=next_pc}]
-      | Special _ -> 
-          failwith "Specials not handled yet!"
+      | Special _ as s -> 
+          failwith ("Specials not handled yet: "^(Pp.ast_stmt_to_string s))
     in
       eval stmt 
-	
+
 (* Performs one evaluation step on the program and returns *
  * a list of all possible follow-up states.                *)
   let eval state =
@@ -536,7 +536,6 @@ struct
 
       @param step This function is called with the evaluator's state
       for each transition.
-
   *)
   let eval_straightline ?(step = Util.id) state =
     let rec f state =
@@ -545,6 +544,7 @@ struct
       | states -> states
     in
     f state
+
 end
   
 module SymbolicMemL = 

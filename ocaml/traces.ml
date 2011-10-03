@@ -1,4 +1,4 @@
-(* A module to perform trace analysis *)
+(** A module to perform trace analysis *)
 
 open Ast
 open BatListFull
@@ -576,17 +576,17 @@ let update_concrete s =
 	) else false
   | _ -> false
 
-(** Get the address of the next instruction in the trace *)
-let rec get_next_address = function
-  | [] -> raise Not_found
-  | (Ast.Label ((Addr n),_))::_ -> 
-      Name ("pc_"^(Int64.format "0x%Lx" n))
-  | _::xs -> get_next_address xs     
+(* (\** Get the address of the next instruction in the trace *\) *)
+(* let rec get_next_address = function *)
+(*   | [] -> raise Not_found *)
+(*   | (Ast.Label ((Addr n),_))::_ ->  *)
+(*       Name ("pc_"^(Int64.format "0x%Lx" n)) *)
+(*   | _::xs -> get_next_address xs      *)
 
-(* Converts an address to a string label *)
-let to_label = function
-  | Addr n -> Name ("pc_"^(Int64.format "0x%Lx" n))
-  | other -> other
+(* (\* Converts an address to a string label *\) *)
+(* let to_label = function *)
+(*   | Addr n -> Name ("pc_"^(Int64.format "0x%Lx" n)) *)
+(*   | other -> other *)
 
 (** Fetching the first stmt with attributes containing taint info *)
 let rec get_first_atts = function
@@ -630,7 +630,7 @@ let remove_loaded =
 (** Removing all specials from the traces *)	
 let remove_specials =
   let no_specials = function 
-    | Ast.Special _ -> false
+    | Ast.Special(_, attrs) when not (List.mem (StrAttr "TraceKeep") attrs) -> false
     | _ -> true
   in
     List.filter no_specials
@@ -980,7 +980,12 @@ let trace_transform_stmt stmt evalf =
 	  (* Removing assignment of tainted operands: symbolic
 	     execution does not need these *)
     | Ast.Move (_, _, atts) when List.exists is_tconcassign atts -> []
-    | Ast.Special _ -> [com]
+    (* | s when Syscall_models.x86_is_system_call s -> *)
+    (*   let eax = evalf (Var Disasm_i386.eax) in *)
+    (*   (match eax with *)
+    (*   | Int(i, _) -> *)
+    (*     Syscall_models.linux_syscall_to_il (Big_int.int_of_big_int i) *)
+    (*   | _ -> failwith "Unexpected evaluation problem") *)
     | s -> [s] in
   if not !allow_symbolic_indices && full_exp_eq !exp exp_true then
     (* The assertion must come first, since the statement may modify value of the expression! *)
@@ -1072,9 +1077,9 @@ let run_block ?(next_label = None) ?(log=fun _ -> ()) ?(transformf = (fun s _ ->
   let block = append_halt block in 
   TraceConcrete.initialize_prog state block ;
   clean_delta state.delta;
-  let init = TraceConcrete.inst_fetch state.sigma state.pc in
   let executed = ref [] in
-  let rec eval_block state stmt = 
+  let rec eval_block state = 
+    let stmt = TraceConcrete.inst_fetch state.sigma state.pc in
     (* pwarn("XXXSW Executing: " ^ (Pp.ast_stmt_to_string stmt)); *)
     (* pwarn ("XXXSW Current block is: " ^ (Pp.ast_stmt_to_string addr)); *)
     (* pdebug ("Executing: " ^ (Pp.ast_stmt_to_string stmt)); *)
@@ -1087,12 +1092,33 @@ let run_block ?(next_label = None) ?(log=fun _ -> ()) ?(transformf = (fun s _ ->
     executed := Util.fast_append (transformf stmt evalf) !executed ; 
     (*print_endline (Pp.ast_stmt_to_string stmt) ;*)
 
-    try 
+    (* If we have a system call, run the model instead.
+
+       HACK: This is a pretty ugly hack.
+    *)
+    if Syscall_models.x86_is_system_call stmt then
+      let eax = evalf (Var Disasm_i386.eax) in
+      let stmts = (match eax with
+        | Int(i, _) ->
+          Syscall_models.linux_syscall_to_il (Big_int.int_of_big_int i)
+        | _ -> failwith "Unexpected evaluation problem") in
+      (* Hack: Remember the next pc; we will clobber this *)
+      let newpc = Int64.succ state.pc in
+      let newstate = List.fold_left
+        (fun state stmt ->
+          let isspecial = match stmt with Special _ -> true | _ -> false in
+          if isspecial then state else
+            match TraceConcrete.eval_stmt state stmt with
+            | x::[] -> x
+            | _ -> failwith "expected one state") state stmts in
+      eval_block {newstate with pc=newpc}
+    else
+      try 
       (match TraceConcrete.eval_stmt state stmt with
 	 | [newstate] ->
-	     let next = TraceConcrete.inst_fetch newstate.sigma newstate.pc in
+	     (* let next = TraceConcrete.inst_fetch newstate.sigma newstate.pc in *)
 	       (*pdebug ("pc: " ^ (Int64.to_string newstate.pc)) ;*)
-	       eval_block newstate next
+	       eval_block newstate
 	 | _ -> 
 	    failwith "multiple targets..."
       )
@@ -1102,11 +1128,10 @@ let run_block ?(next_label = None) ?(log=fun _ -> ()) ?(transformf = (fun s _ ->
 	  wprintf "failed assertion: %s" (Pp.ast_stmt_to_string stmt);
 	  (* raise e; *)
 	  let new_pc = Int64.succ state.pc in
-	  let next = TraceConcrete.inst_fetch state.sigma new_pc in
-	  eval_block {state with pc=new_pc} next
+	  eval_block {state with pc=new_pc}
   in
     try
-      eval_block state init
+      eval_block state
     with 
       |	Failure s as e -> 
 	  pwarn ("block evaluation failed :(\nReason: "^s) ;
@@ -1256,10 +1281,10 @@ let to_dsa p =
 let concrete ?(log=fun _ -> ()) trace = 
   dsa_rev_map := None;
   let trace = Memory2array.coerce_prog trace in
-  let no_specials = remove_specials trace in
+  let trace = remove_specials trace in
   (* let no_unknowns = remove_unknowns no_specials in *)
-  let memv = find_memv no_specials in
-  let blocks = trace_to_blocks no_specials in
+  let memv = find_memv trace in
+  let blocks = trace_to_blocks trace in
   (*pdebug ("blocks: " ^ (string_of_int (List.length blocks)));*)
   let length = List.length blocks in
   let actual_trace = run_blocks ~log blocks memv length in
@@ -1444,7 +1469,7 @@ struct
   let lookup_var delta var =
 
     let name = Var.name var in
-    (* DV.dprintf "looking up var %s" name; *)
+    DV.dprintf "looking up var %s" name;
 
     (* We need to use DSA because we combine the delta context with
        let-based renaming.  If we did not use DSA, then assignments to
@@ -1488,7 +1513,7 @@ struct
 	     | Array _ -> (* DV.dprintf "new memory %s" (Var.name var); *) empty_smem var
   	     | _ ->
 		 (match dsa_var var with
-		 | Some(x) -> if isbad x then
+		 | Some(x) -> if not (isbad x) then
   		   wprintf "Variable not found during evaluation: %s" name
 		 | _ -> ());
   		 Symbolic(Var(var))
@@ -1536,10 +1561,10 @@ struct
     if !full_symbolic then
       let expr = symb_to_exp ev in
       let is_worth_storing = (*is_concrete expr &&*) 
-	is_temp v
+	is_temp (Util.option_unwrap (dsa_var v))
       in
       let pred' =
-	if is_worth_storing then (context_update delta v ev ; pred)
+	if is_worth_storing then (dprintf "Storing %s in delta" (Pp.var_to_string v); (context_update delta v ev ; pred))
 	else
 	  let constr = BinOp (EQ, Var v, expr) in
 	  pdebug ((Var.name v) ^ " = " ^ (Pp.ast_exp_to_string expr)) ;
@@ -1551,7 +1576,10 @@ struct
       Symbolic.assign v ev ctx
 end
 
-module TraceSymbolic = Symbeval.Make(TaintSymbolic)(FastEval)(LetBind)
+(* If we evaluate temporaries in delta, we need sloweval, otherwise we
+   might have let x = T_123 in foo that goes in the formula, but T_123
+   will not be defined in the formula. *)
+module TraceSymbolic = Symbeval.Make(TaintSymbolic)(SlowEval)(LetBind)
 
 let status = ref 0
 let count = ref 0

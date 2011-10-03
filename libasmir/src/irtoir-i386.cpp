@@ -62,6 +62,8 @@
 #define OFFB_TILEN     offsetof(VexGuestX86State,guest_TILEN)
 #define OFFB_NRADDR    offsetof(VexGuestX86State,guest_NRADDR)
 
+#define OFFB_IP_AT_SYSCALL offsetof(VexGuestX86State,guest_IP_AT_SYSCALL)
+
 //
 // Sub register offsets, calculated manually
 //
@@ -389,7 +391,9 @@ static string reg_offset_to_name( int offset )
         case OFFB_TILEN:    name = "TILEN";     break;
         case OFFB_NRADDR:   name = "NRADDR";    break;
 
-        default:            
+        case OFFB_IP_AT_SYSCALL: name = "IP_AT_SYSCALL"; break;
+
+        default:
             panic("Unrecognized register name");
     }
 
@@ -1007,7 +1011,7 @@ Exp *i386_translate_ccall( IRExpr *expr, IRSB *irbb, vector<Stmt *> *irout )
       irout->push_back
         (new Move(result->clone(),
                   _ex_or(_ex_shl(new Cast(new_eflags, REG_64, CAST_UNSIGNED), 
-                                 ex_const(32)),
+                                 ex_const(REG_64, 32)),
                          new Cast(answer, REG_64, CAST_UNSIGNED))));
 
       // clean up
