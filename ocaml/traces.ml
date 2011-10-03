@@ -618,11 +618,17 @@ let remove_jumps =
   in
     List.filter no_jmps
 
+(** Detect 'loaded module' specials *)
+let is_loaded =
+  let loaded = Str.regexp "^Loaded module " in
+  function
+    | Ast.Special(s, attrs) when Str.string_match loaded s 0 -> true
+    | _ -> false
+
 (** Remove 'Loaded module' specials *)
 let remove_loaded = 
-  let loaded = Str.regexp "^Loaded module " in
   let rs = function
-    | Ast.Special(s, attrs) when Str.string_match loaded s 0 -> Ast.Comment(s, attrs)
+    | Ast.Special(s, attrs) as sfull when is_loaded sfull -> Ast.Comment(s, attrs)
     | s -> s
   in
   List.map rs
