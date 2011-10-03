@@ -1256,9 +1256,10 @@ Stmt *translate_jumpkind( IRSB *irbb, vector<Stmt *> *irout )
         case Ijk_Ret:
           if(!translate_calls_and_returns)
             result = new Jmp(dest);
-          else
+          else {
             Exp::destroy(dest);
             result = new Return(NULL);
+          }
           break;
         case Ijk_NoDecode:
           Exp::destroy(dest);
