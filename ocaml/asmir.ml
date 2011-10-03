@@ -500,8 +500,12 @@ let section_contents prog secs =
 
 
 (** Open a binary file for translation *)
-let open_program filename =
-  let prog = Libasmir.asmir_open_file filename in
+let open_program ?base filename =
+  let base = match base with
+    | None -> -1L
+    | Some(x) -> x
+  in
+  let prog = Libasmir.asmir_open_file filename base in
     (* tell the GC how to free resources associated with prog *)
   Gc.finalise Libasmir.asmir_close prog;
   let secs = Array.to_list (get_all_sections prog)  in
