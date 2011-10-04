@@ -7,7 +7,25 @@
 #include "asm_program.h"
 #include "libiberty.h"
 
+/* This elf stuff is interal to BFD (TOO BAD) */
 
+#define SHT_PROGBITS	1		/* Program specific (private) data */
+
+struct elf_internal_phdr {
+  unsigned long	p_type;			/* Identifies program segment type */
+  unsigned long	p_flags;		/* Segment flags */
+  bfd_vma	p_offset;		/* Segment file offset */
+  bfd_vma	p_vaddr;		/* Segment virtual address */
+  bfd_vma	p_paddr;		/* Segment physical address */
+  bfd_vma	p_filesz;		/* Segment size in file */
+  bfd_vma	p_memsz;		/* Segment size in memory */
+  bfd_vma	p_align;		/* Segment alignment, file & memory */
+};
+
+typedef struct elf_internal_phdr Elf_Internal_Phdr;
+extern Elf_Internal_Phdr * _bfd_elf_find_segment_containing_section(bfd * abfd, asection * section);
+
+/* End internal BFD elf stuff */
 
 static void initialize_sections(asm_program_t *p, bfd_vma base);
 static bfd* initialize_bfd(const char *filename);
@@ -151,9 +169,9 @@ trace_read_memory (bfd_vma memaddr,
   uintptr_t memhelper = memaddr;
   size_t offstart = memaddr - trace_instruction_addr;
   size_t offend = offstart + length;
-  
+
   if (offstart > trace_instruction_size || offend > trace_instruction_size) {
-    fprintf(stderr, "WARNING: Disassembler looking for unknown address. Known base: %#Lx Wanted: %#Lx Length: %#x\n", trace_instruction_addr, memaddr, length);
+    fprintf(stderr, "WARNING: Disassembler looking for unknown address. Known base: %#" BFD_VMA_FMT "x Wanted: %#" BFD_VMA_FMT "x Length: %#x\n", trace_instruction_addr, memaddr, length);
   }
 
   memcpy(myaddr, trace_instruction_bytes+offstart, length);
@@ -168,6 +186,7 @@ initialize_sections(asm_program_t *prog, bfd_vma base)
 #else
   bfd_vma lowest = LLONG_MAX;
 #endif
+  asection *lowsec = NULL;
   bfd_vma offset = 0;
   struct disassemble_info *disasm_info = &prog->disasm_info;
   bfd *abfd = prog->abfd;
@@ -179,19 +198,39 @@ initialize_sections(asm_program_t *prog, bfd_vma base)
 
   /* Look for the section loaded into the lowest memory address */
   if (base != -1) {
-    for(section = abfd->sections; section; section = section->next) {
-      /* fprintf(stderr, "Section %s, vma %Lx\n", section->name, section->vma); */
-      if ((section->vma < lowest) && (section->flags & SEC_LOAD)) { lowest = section->vma; }
+
+    if (bfd_get_flavour(abfd) ==  bfd_target_elf_flavour) {
+
+    /* BFD has some issues with ELF files.  ELF files have both
+       sections and segments ("program headers").  We really care
+       about the lowest address of program segments, but BFD only
+       shows sections when an ELF file contains both. So, we need to
+       use ELF-specific functions to learn the segment address, which
+       is typically different than the section address. */
+      int i;
+      size_t ubound = bfd_get_elf_phdr_upper_bound(abfd);
+      Elf_Internal_Phdr *phdrs = bfd_alloc(abfd, ubound);
+      if (phdrs == NULL) { bfd_perror(NULL); assert(0); }
+      int n = bfd_get_elf_phdrs(abfd, phdrs);
+      if (n == -1) { bfd_perror(NULL); assert(0); }
+
+      for (i = 0; i < n; i++) {
+        //fprintf(stderr, "VA: %#" BFD_VMA_FMT "x Align: %#" BFD_VMA_FMT "x Aligned: %#" BFD_VMA_FMT "x\n", phdrs[i].p_vaddr, phdrs[i].p_align, phdrs[i].p_vaddr & (~(phdrs[i].p_align)));
+        bfd_vma aligned = phdrs[i].p_vaddr & (~(phdrs[i].p_align));
+        if ((phdrs[i].p_flags & SHT_PROGBITS) && aligned < lowest) { lowest = aligned; }
+      }
+    } else {
+
+      /* Non-ELF files */
+      for (section = abfd->sections; section; section = section->next) {
+        /* fprintf(stderr, "Section %s, vma %Lx\n", section->name, section->vma); */
+        if ((section->vma < lowest) && (section->flags & SEC_LOAD)) { lowest = section->vma; lowsec = section; }
+      }
     }
 
-    //    fprintf(stderr, "Lowest section is %Lx\n", lowest);
-    /* If base is negative one, then don't move anything.  Otherwise,
-       we'll assume that the program is loaded to lowest, and then adjust
-       that so it goes to base. */
-    if (base != -1) {
-      offset = base - lowest;
-      //      fprintf(stderr, "Adjusting by %Lx\n", offset);
-    }
+    //fprintf(stderr, "Lowest section is %#" BFD_VMA_FMT "x\n", lowest);
+    offset = base - lowest;
+    //fprintf(stderr, "Adjusting by %Lx\n", offset);
 
   }
 
