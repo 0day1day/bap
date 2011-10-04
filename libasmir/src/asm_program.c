@@ -178,28 +178,17 @@ trace_read_memory (bfd_vma memaddr,
   return 0;
 }
 
-static void
-initialize_sections(asm_program_t *prog, bfd_vma base)
-{
+bfd_vma asmir_get_base_address(asm_program_t *prog) {
 #if SIZEOF_BFD_VMA == 4
   bfd_vma lowest = LONG_MAX;
 #else
   bfd_vma lowest = LLONG_MAX;
 #endif
-  asection *lowsec = NULL;
-  bfd_vma offset = 0;
-  struct disassemble_info *disasm_info = &prog->disasm_info;
+  assert(prog);
   bfd *abfd = prog->abfd;
-  unsigned int opb = bfd_octets_per_byte(abfd);
-  disasm_info->octets_per_byte = opb;
-  init_disasm_info(prog);
-  section_t **nextseg = &prog->segs;
   asection *section;
 
-  /* Look for the section loaded into the lowest memory address */
-  if (base != -1) {
-
-    if (bfd_get_flavour(abfd) ==  bfd_target_elf_flavour) {
+  if (bfd_get_flavour(abfd) ==  bfd_target_elf_flavour) {
 
     /* BFD has some issues with ELF files.  ELF files have both
        sections and segments ("program headers").  We really care
@@ -224,14 +213,34 @@ initialize_sections(asm_program_t *prog, bfd_vma base)
       /* Non-ELF files */
       for (section = abfd->sections; section; section = section->next) {
         /* fprintf(stderr, "Section %s, vma %Lx\n", section->name, section->vma); */
-        if ((section->vma < lowest) && (section->flags & SEC_LOAD)) { lowest = section->vma; lowsec = section; }
+        if ((section->vma < lowest) && (section->flags & SEC_LOAD)) { lowest = section->vma; }
       }
     }
 
-    //fprintf(stderr, "Lowest section is %#" BFD_VMA_FMT "x\n", lowest);
-    offset = base - lowest;
-    //fprintf(stderr, "Adjusting by %Lx\n", offset);
+  //fprintf(stderr, "Lowest section is %#" BFD_VMA_FMT "x\n", lowest);
+  //fprintf(stderr, "Adjusting by %Lx\n", offset);
 
+  return lowest;
+}
+
+static void
+initialize_sections(asm_program_t *prog, bfd_vma base)
+{
+  bfd_vma offset = 0;
+  struct disassemble_info *disasm_info = &prog->disasm_info;
+  assert(prog);
+  bfd *abfd = prog->abfd;
+  unsigned int opb = bfd_octets_per_byte(abfd);
+  disasm_info->octets_per_byte = opb;
+  init_disasm_info(prog);
+  section_t **nextseg = &prog->segs;
+  asection *section;
+
+  /* Look for the section loaded into the lowest memory address */
+  if (base != -1) {
+
+    bfd_vma offset = base - asmir_get_base_address(prog);
+    //fprintf(stderr, "Adjusting by %Lx\n", offset);
   }
 
   for(section = abfd->sections; section; section = section->next) {

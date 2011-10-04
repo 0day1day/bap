@@ -68,6 +68,8 @@ extern void asmir_close(asm_program_t *p);
 extern bfd_byte *asmir_get_ptr_to_instr(asm_program_t *prog, bfd_vma addr);
 extern int asmir_get_instr_length(asm_program_t *prog, bfd_vma addr);
 
+extern bfd_vma asmir_get_base_address(asm_program_t *prog);
+  
 // helper for disassembling bytes in traces
 extern void set_trace_bytes(void *bytes, size_t len, bfd_vma addr);
   

@@ -190,7 +190,7 @@ bap_blocks_t * read_trace_from_file(const string &filename,
               pintrace::LoadModuleFrame *lf = (pintrace::LoadModuleFrame*) f;
               bap_block_t *bblock = new bap_block_t;
               bblock->bap_ir = new vector<Stmt *>();
-              bblock->inst = NULL;
+              bblock->inst = 0;
             
               /* Build string */
               ss.flags ( ios::hex );

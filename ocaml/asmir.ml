@@ -772,6 +772,12 @@ let get_symbols ?(all=false) {asmp=p} =
   if err <= 0 then failwith "get_symbols";
   arr
 
+(* XXX: Very inefficient *)
+let find_symbol {asmp=p} name =
+  let (arr,err) = asmir_get_all_symbols p in
+  if err <= 0 then failwith "find_symbol";
+  BatArray.find (fun sym -> if sym.bfd_symbol_name = name then true else false) arr
+
 let get_function_ranges p =
   let symb = get_symbols p in
   ignore p; (* does this ensure p is live til here? *)
@@ -827,6 +833,8 @@ let get_section_startaddr p sectionname =
 let get_section_endaddr p sectionname =
   Libasmir.asmir_get_sec_endaddr p.asmp sectionname
 
+let get_base_address p =
+  Libasmir.asmir_get_base_address p.asmp
 
 let get_asm_instr_string_range p s e =
   let s = ref s in
