@@ -13,7 +13,8 @@ type prog =
 type cmd = 
   | TransformAst of (ast -> ast)
 
-let concrete_state = Traces.TraceConcrete.create_state ()
+let offset = ref 0;;
+let concrete_state = Traces.TraceConcrete.create_state ();;
 let mem_hash = Var.VarHash.create 1000;;
 (* HACK to make sure default memory has a map to normalized memory *)
 ignore(Memory2array.coerce_rvar_state mem_hash Asmir.x86_mem);;
@@ -37,15 +38,38 @@ let prints block =
   block
 
 (** Concretely executes a block *)
-let concrete block =
-  let block = Memory2array.coerce_prog_state mem_hash block in
-  let no_specials = Traces.remove_specials block in
+let concrete trace =
+  let trace = Memory2array.coerce_prog_state mem_hash trace in
+  let no_specials = Traces.remove_specials trace in
+  let blocks = Traces.trace_to_blocks no_specials in
   let memv = Var.VarHash.find mem_hash Asmir.x86_mem in
   try
 	(* prints block; *)
 	Util.print_obj_info "concrete_state" concrete_state;
 	(* Ignore output of run_block and return [] to limit memory consumption *)
-	ignore(Traces.run_block concrete_state memv no_specials);
+	(* ignore(Traces.run_blocks ~concrete_state blocks memv); *)
+	(* ignore(Traces.run_block ~next_label concrete_state memv no_specials); *)
+	(* The following is based on run_blocks.  It's probably to reimplement 
+	   run_blocks then reproduce the code here. *)
+	ignore(
+	  List.fold_left 
+		(fun remaining block -> 
+		  let hd, block_tail = Util.hd_tl block in
+		  (match hd with
+		  | Ast.Comment(s, _) when s=Traces.endtrace ->
+			  (* If the block starts with the endtrace comment, then we
+				 shouldn't concretely execute it. It's probably a bunch of
+				 assertions. *)
+			()
+		  | _ ->
+			ignore(Traces.run_block concrete_state memv block));
+		  ((* remaining *) 
+			(match remaining with
+			| [] -> []
+			| _::tl -> tl)
+		  ))
+		(List.tl blocks) blocks
+	);
 	[]
   with 
   | Failure "empty list" -> (*Printf.printf "run blocks failed\n";*) [] 

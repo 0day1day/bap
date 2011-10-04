@@ -686,15 +686,17 @@ let alt_bap_from_trace_file_range filename off reqframes =
   ) else (
     if ((Int64.of_int numframes) <> reqframes) then 
       dprintf "Got %d frames which <> requested frames %s" 
-	numframes (Int64.to_string reqframes);
-    revstmts := Util.foldn
+		numframes (Int64.to_string reqframes);
+    revstmts := 
+	  Util.foldn
       (fun acc n ->
-	let frameno = numframes-1-n in
+		let frameno = numframes-1-n in
 		(* dprintf "frame %d" frameno; *)
-	let stmts = 
-	  raise_frame (Libasmir.asmir_frames_get trace_frames frameno) in
-	List.rev_append stmts acc) [] (numframes-1);
-    off := Int64.add !off !trace_blocksize
+		let stmts = 
+		  raise_frame (Libasmir.asmir_frames_get trace_frames frameno) in
+		List.rev_append stmts acc) 
+	  [] (numframes-1);
+    off := Int64.add !off (Int64.of_int numframes);
   (* let moreir = tr_bap_blocks_t_no_asm g bap_blocks in *)
   (* Build ir backwards *)
   (* ir := List.rev_append moreir !ir; *)
@@ -752,17 +754,16 @@ let bap_from_trace_file ?(atts = true) ?(pin = false) filename =
     old_bap_from_trace_file ~atts ~pin filename
 
 (** Get one statement at a time. *)
-let bap_get_stmt_from_trace_file ?(atts = true) ?(pin = false) filename off =
-  let off = ref (Int64.of_int off) in (* blah, Stream.from does not use int64 *)
-  (* SWXXX what to do instead of the below? *)
-  (* let g = gamma_create x86_mem x86_regs in *)
-  let (c,ir) = alt_bap_from_trace_file_range filename off 1L in
+let bap_get_stmt_from_trace_file ?(atts = true) ?(rate=1L) ?(pin = false) filename off =
+  (* blah, Stream.from does not use int64 *)
+  let off = ref (Int64.mul (Int64.of_int off) rate) in
+  let (c,ir) = alt_bap_from_trace_file_range filename off rate in
   if c then Some(List.rev ir) else None
 
   
 (** Return stream of trace instructions raised to the IL *)
-let bap_stream_from_trace_file ?(atts = true) ?(pin = false) filename =
-  Stream.from (bap_get_stmt_from_trace_file ~atts:atts ~pin:pin filename)
+let bap_stream_from_trace_file ?(atts = true) ?(rate=1L) ?(pin = false) filename =
+  Stream.from (bap_get_stmt_from_trace_file ~atts ~rate ~pin filename)
 
 let get_symbols ?(all=false) {asmp=p} =
   let f = if all then asmir_get_all_symbols else asmir_get_symbols in

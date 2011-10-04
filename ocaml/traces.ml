@@ -374,9 +374,7 @@ let get_int = function
 
 let taint_to_bool n = n != 0
 
-let hd_tl = function
-  | [] -> failwith "empty list"
-  | x::xs -> x, xs
+let hd_tl = Util.hd_tl
 
 let is_mem (Var.V(_,var,t)) =
   (String.length var >= 3) &&

@@ -20,6 +20,11 @@ let curry f = fun x y -> f(x,y)
 (** The opposite of [curry] *)
 let uncurry f = fun (x,y) -> f x y
 
+(** Return the head and tail of a list *)
+let hd_tl = function
+  | [] -> failwith "empty list"
+  | x::xs -> x, xs
+
 (** [foldn f i n] is f (... (f (f i n) (n-1)) ...) 0 *)
 let rec foldn ?(t=0) f i n =  match n-t with
   | 0 -> f i n
@@ -641,7 +646,7 @@ let big_int_of_string s =
 
 (* Print the size of an object *)
 let print_obj_info title value = 
-  let module D = Debug.Make(struct let name = "UtilSize" and default=`Debug end) in
+  let module D = Debug.Make(struct let name = "UtilSize" and default=`NoDebug end) in
   let i = Objsize.objsize value in
   D.dprintf "%S : data_words=%i headers=%i depth=%i\n    \
 bytes_without_headers=%i bytes_with_headers=%i"

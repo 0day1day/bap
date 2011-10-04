@@ -3,6 +3,7 @@ val curry : ('a * 'b -> 'c) -> 'a -> 'b -> 'c
 val uncurry : ('a -> 'b -> 'c) -> ('a * 'b -> 'c)
 val ( <@ ) : ('a -> 'b) -> ('c -> 'a) -> 'c -> 'b
 
+val hd_tl : 'a list -> ('a * 'a list)
 val foldn : ?t:int -> ('a -> int -> 'a) -> 'a -> int -> 'a
 val foldn64 : ?t:int64 -> ('a -> int64 -> 'a) -> 'a -> int64 -> 'a
 val mapn : (int -> 'a) -> int -> 'a list
