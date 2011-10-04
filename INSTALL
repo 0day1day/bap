@@ -9,21 +9,22 @@ To build BAP on x86, do the following:
   $ ./configure
   $ make
 -- or to make all and run unit tests after --
-  $ make test 
+  $ make test
 
 Configure should report any dependencies you do not have.  You can
 satisfy most dependencies on Ubuntu 11.04 by running:
 
   $ sudo apt-get install ocaml ocaml-native-compilers ocaml-findlib camlidl \
     libocamlgraph-ocaml-dev libextlib-ocaml-dev binutils-dev automake \
-    libcamomile-ocaml-dev otags libpcre3-dev camlp4-extra bison flex
+    libcamomile-ocaml-dev otags libpcre3-dev camlp4-extra bison flex \
+    zlib1g-dev
 
 On x86_64 add the following packages:
     gcc-multilib g++-multilib
 
 To compile the documentation, you also need
   $ sudo aptitude install texlive-base texlive-latex-base \
-    texlive-latex-extra texlive-fonts-recommended 
+    texlive-latex-extra texlive-fonts-recommended
 
 The following command will install build dependencies on Fedora Core 15:
 
@@ -34,13 +35,13 @@ The following command will install build dependencies on Fedora Core 15:
 
 If you get an error that says there is an undefined reference to
 '__stack_chk_fail', either you need to reconfigure with gcc set to
-disable stack protection, or you have compiled part of the code 
-with the stack protector and part without it, in which case you 
+disable stack protection, or you have compiled part of the code
+with the stack protector and part without it, in which case you
 might have to enable it to finish compilation.
 You can enable/disable the stack protector in gcc in the following way:
-Disable: ./configure CC="gcc -fno-stack-protector" 
+Disable: ./configure CC="gcc -fno-stack-protector"
 Enable: ./configure CC="gcc -fstack-protector"
-Doing make clean first, will ensure that the whole platform gets 
+Doing make clean first, will ensure that the whole platform gets
 compiled with the same flag
 
 
@@ -59,18 +60,18 @@ VEX, then use the --with-vex=<vex dir> configure option.
 *** Installing pin ***
 
 The PIN trace tool is located in the pintraces/ directory. Because of licensing
-reasons, we cannot distribute PIN with the trace tool. PIN must be extracted 
-inside of the traces directory; for instance, if the traces branch is located 
-in $PATH/traces, then PIN should be in $PATH/traces/pin. Running ./getpin.sh 
-from the $PATH/traces/pintraces directory will automatically download and 
-install PIN for Linux; the user is responsible for accepting the PIN license 
-agreements. On Windows, PIN must be downloaded and extracted by hand. The PIN 
+reasons, we cannot distribute PIN with the trace tool. PIN must be extracted
+inside of the traces directory; for instance, if the traces branch is located
+in $PATH/traces, then PIN should be in $PATH/traces/pin. Running ./getpin.sh
+from the $PATH/traces/pintraces directory will automatically download and
+install PIN for Linux; the user is responsible for accepting the PIN license
+agreements. On Windows, PIN must be downloaded and extracted by hand. The PIN
 tool can be built by executing make in the $PATH/traces/experiemental directory.
 On Windows, we reccomend using GNU Make for Windows
 (http://gnuwin32.sourceforge.net/packages/make.htm) and Visual C++ 2010 express
 (http://www.microsoft.com/visualstudio/en-us/products/2010-editions/visual-cpp-express).
-After compilation, the PIN tool should exist in 
-$PATH/traces/pintraces/obj-ia32/gentrace.so (or gentrace.dll on Windows). 
+After compilation, the PIN tool should exist in
+$PATH/traces/pintraces/obj-ia32/gentrace.so (or gentrace.dll on Windows).
 
 
 
