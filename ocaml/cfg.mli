@@ -24,6 +24,9 @@ module BBid :
     val equal : 'a -> 'a -> bool
   end
 
+module BS : Set.S with type elt = BBid.t
+module BH : Hashtbl.S with type key = BBid.t
+module BM : Map.S with type key = BBid.t
 
 module type CFG =
 sig

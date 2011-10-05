@@ -36,11 +36,11 @@ if test "$(uname -m)" == "x86_64";
 fi
 
 # Checks for ocaml libraries
-ocamlfind query ocamlgraph
-if test $? != 0; then
-    echo "bap needs libocamlgraph-ocaml-dev"
-    exit -1
-fi
+dnl ocamlfind query ocamlgraph
+dnl if test $? != 0; then
+dnl     echo "bap needs libocamlgraph-ocaml-dev"
+dnl     exit -1
+dnl fi
 dnl ocamlfind query extlib
 dnl if test $? != 0; then
 dnl     echo "bap needs libextlib-ocaml-dev"
@@ -181,3 +181,6 @@ AC_OUTPUT
 
 # Configure ocaml 3.12
 (cd bigint-3.12 && ./configure)
+
+# Configure ocamlgraph
+(cd ocamlgraph-1.8 && ./configure)

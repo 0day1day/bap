@@ -62,7 +62,8 @@ struct
  let remove_unreachable g v =
    let u = unreachable g v in
    let count = ref 0 in
-   let g = List.fold_left (fun a v -> incr count; BI.remove_vertex a v) g u in
+   D.dprintf "removing %d" (List.length u);
+   let g = List.fold_left (fun a v -> incr count; D.dprintf "Boom removed"; BI.remove_vertex a v) g u in
    D.dprintf "removed %d" !count;
    g
 

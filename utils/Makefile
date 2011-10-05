@@ -6,15 +6,16 @@ export BAP_OCAMLDIR=$(BAP_DIR)/ocaml
 export BIGINT=$(BAP_DIR)/bigint-3.12/otherlibs/num
 export BATT=$(BAP_DIR)/batteries-1.4.0/_build/src
 export PCRE=$(BAP_DIR)/pcre-ocaml-release-6.2.2/lib
+export OCAMLGRAPH=$(BAP_DIR)/ocamlgraph-1.8
 export OCAMLMAKEFILE=$(BAP_OCAMLDIR)/OCamlMakefile
 
 # Stop annoying warnings about big_int duplication!
 export OCAMLFIND_IGNORE_DUPS_IN=$(BAP_DIR)/bigint-3.12/otherlibs/num
 
 # ocamlfind packages required
-export PACKS = bigarray str ocamlgraph unix camomile
-export LIBS = nums batteries bap pcre
-export INCDIRS = $(BAP_OCAMLDIR) $(BIGINT) $(BATT) $(PCRE)
+export PACKS = bigarray str unix camomile
+export LIBS = nums batteries graph bap pcre
+export INCDIRS = $(BAP_OCAMLDIR) $(BIGINT) $(BATT) $(PCRE) $(OCAMLGRAPH)
 
 # Include sources from ../ocaml in the automatically generated dependencies.
 export SOURCE_DIRS_IN = $(BAP_OCAMLDIR) $(BAP_PROJ_OCAMLDIR)

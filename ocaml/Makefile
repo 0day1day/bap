@@ -8,6 +8,7 @@ export BIGINT=$(BAP_DIR)/bigint-3.12/otherlibs/num
 export BATT=$(BAP_DIR)/batteries-1.4.0/_build/src
 export OUNIT=$(BAP_DIR)/ounit-1.1.0/_build/src/
 export PCRE=$(BAP_DIR)/pcre-ocaml-release-6.2.2/lib
+export OCAMLGRAPH=$(BAP_DIR)/ocamlgraph-1.8
 
 include $(LIBASMIR)/makefile.inc
 -include ../../ocaml-proj/Makefile
@@ -102,19 +103,19 @@ DOC_FILES := $(filter %.mli, $(SOURCES)) $(filter %.ml, $(SOURCES))
 
 
 # ocamlfind packages required
-export PACKS = bigarray str ocamlgraph unix camomile threads
+export PACKS = bigarray str unix camomile threads
 # ocamlfind packages for ocamldoc
 # don't include packages in /usr/lib/ocaml, this will cause ocamldoc
 # to complain about conflicts with our local big_int
-export DOCPACKS = ocamlgraph
+export DOCPACKS = ocamlgraph 
 export YFLAGS = -v
 
 
 export CLIBS = asmir vex opcodes bfd iberty stdc++ 
 export CFLAGS = -g
 export LDFLAGS = $(LIBASMIR_LDFLAGS)
-export INCDIRS = $(BIGINT) $(BATT) $(OUNIT) $(PCRE)
-export LIBS = nums batteries oUnit pcre
+export INCDIRS = $(BIGINT) $(BATT) $(OUNIT) $(PCRE) $(OCAMLGRAPH)
+export LIBS = nums batteries oUnit pcre graph
 export CLIBFLAGS= $(LDFLAGS)
 export RESULTDEPS = $(LIBASMIR)/src/libasmir.a $(VEX_DIR)/libvex.a
 export LIBDIRS = $(LIBASMIR)/src # ../appreplay ../stp ../stp/ocaml
