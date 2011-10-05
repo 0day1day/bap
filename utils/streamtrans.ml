@@ -5,7 +5,7 @@ open BatListFull
 
 type ast = Ast.program
 (*type astcfg = Cfg.AST.G.t
-type ssa = Cfg.SSA.G.t*)
+  type ssa = Cfg.SSA.G.t*)
 
 type prog =
   | Ast of ast
@@ -32,7 +32,7 @@ let prints block =
   print_endline "new block";
   List.iter
     (fun stmt ->
-       print_endline ("Stmt: "^ (Pp.ast_stmt_to_string stmt))
+      print_endline ("Stmt: "^ (Pp.ast_stmt_to_string stmt))
     ) block;
   print_endline "end block";
   block
@@ -44,39 +44,39 @@ let concrete trace =
   let blocks = Traces.trace_to_blocks no_specials in
   let memv = Var.VarHash.find mem_hash Asmir.x86_mem in
   try
-	(* prints block; *)
-	Util.print_obj_info "concrete_state" concrete_state;
-	(* Ignore output of run_block and return [] to limit memory consumption *)
-	(* ignore(Traces.run_blocks ~concrete_state blocks memv); *)
-	(* ignore(Traces.run_block ~next_label concrete_state memv no_specials); *)
-	(* The following is based on run_blocks.  It's probably to reimplement 
-	   run_blocks then reproduce the code here. *)
-	ignore(
-	  List.fold_left 
-		(fun remaining block -> 
-		  let hd, block_tail = Util.hd_tl block in
-		  (match hd with
-		  | Ast.Comment(s, _) when s=Traces.endtrace ->
-			  (* If the block starts with the endtrace comment, then we
-				 shouldn't concretely execute it. It's probably a bunch of
-				 assertions. *)
-			()
-		  | _ ->
-			ignore(Traces.run_block concrete_state memv block));
-		  ((* remaining *) 
-			(match remaining with
-			| [] -> []
-			| _::tl -> tl)
-		  ))
-		(List.tl blocks) blocks
-	);
-	[]
+    (* prints block; *)
+    Util.print_obj_info "concrete_state" concrete_state;
+    (* Ignore output of run_block and return [] to limit memory consumption *)
+    (* ignore(Traces.run_blocks ~concrete_state blocks memv); *)
+    (* ignore(Traces.run_block ~next_label concrete_state memv no_specials); *)
+    (* The following is based on run_blocks.  It's probably to reimplement 
+       run_blocks then reproduce the code here. *)
+    ignore(
+      List.fold_left 
+	(fun remaining block -> 
+	  let hd, block_tail = Util.hd_tl block in
+	  (match hd with
+	  | Ast.Comment(s, _) when s=Traces.endtrace ->
+	    (* If the block starts with the endtrace comment, then we
+	       shouldn't concretely execute it. It's probably a bunch of
+	       assertions. *)
+	    ()
+	  | _ ->
+	    ignore(Traces.run_block concrete_state memv block));
+	  ((* remaining *) 
+	    (match remaining with
+	    | [] -> []
+	    | _::tl -> tl)
+	  ))
+	(try List.tl blocks with _ -> []) blocks
+    );
+    []
   with 
   | Failure "empty list" -> (*Printf.printf "run blocks failed\n";*) [] 
 
 let speclist =
   ("-print", uadd(TransformAst(prints)),
-     "Print each statement in the trace.")
+   "Print each statement in the trace.")
   ::("-concrete", uadd(TransformAst(concrete)),
      "Concretely execute each block.")
   :: Input.stream_speclist
@@ -94,9 +94,9 @@ let prog =
 
 let rec apply_cmd prog = function
   | TransformAst f -> (
-      match prog with
-      | Ast p -> Ast(f p)
-    )
+    match prog with
+    | Ast p -> Ast(f p)
+  )
 ;;
 
 Traces.checkall := true;
@@ -104,7 +104,7 @@ Traces.consistency_check := true;
 
 Stream.iter
   (fun block ->
-     ignore(List.fold_left apply_cmd (Ast block) pipeline)
+    ignore(List.fold_left apply_cmd (Ast block) pipeline)
   ) prog
 
 
