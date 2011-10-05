@@ -239,7 +239,7 @@ initialize_sections(asm_program_t *prog, bfd_vma base)
   /* Look for the section loaded into the lowest memory address */
   if (base != -1) {
 
-    bfd_vma offset = base - asmir_get_base_address(prog);
+    offset = base - asmir_get_base_address(prog);
     //fprintf(stderr, "Adjusting by %Lx\n", offset);
   }
 

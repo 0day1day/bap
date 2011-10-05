@@ -29,6 +29,7 @@ sig
   val unreachable : gt -> vt -> vt list
     
   val remove_unreachable : gt -> vt -> gt      
+  val remove_unreachable_copy : gt -> vt -> gt      
 end
 
 (** Make functions for folding/iterating over reachable or unreachable vertices,
@@ -95,7 +96,7 @@ struct
    let newg = fold_reachable add_edges g v newg in
    newg
 
- let remove_unreachable = remove_unreachable_copy
+ let remove_unreachable = remove_unreachable_remove
 
 end
 

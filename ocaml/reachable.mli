@@ -28,6 +28,7 @@ module type Reach =
     val unreachable : gt -> vt -> vt list
       
     val remove_unreachable : gt -> vt -> gt      
+    val remove_unreachable_copy : gt -> vt -> gt      
   end
 
 module Make :
