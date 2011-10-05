@@ -78,6 +78,8 @@ type opcode =
   | Sub of (typ * operand * operand)
   | Sbb of (typ * operand * operand)
   | Cmp of (typ * operand * operand)
+  | Cmpxchg of (typ * operand * operand)
+  | Xchg of (typ * operand * operand)
   | And of (typ * operand * operand)
   | Or of (typ * operand * operand)
   | Xor of (typ * operand * operand)
@@ -737,6 +739,25 @@ let rec to_ir addr next ss pref =
     let tmp = nv "t" t in
     move tmp (op2e t o1 -* op2e t o2)
     :: set_flags_sub t (op2e t o1) (op2e t o2) (Var tmp)
+  | Cmpxchg(t, src, dst) ->
+    let accumulator = op2e t o_eax in
+    let dst_e = op2e t dst in
+    let src_e = op2e t src in
+    let equal = nv "t" r1 in
+    let equal_v = Var equal in
+    [
+      move equal (accumulator ==* dst_e);
+      move zf equal_v;
+      assn t dst (ite t equal_v src_e dst_e);
+      assn t o_eax (ite t equal_v accumulator dst_e);
+    ]
+  | Xchg(t, src, dst) ->
+    let tmp = nv "t" t in
+    [
+      move tmp (op2e t src);
+      assn t src (op2e t dst);
+      assn t dst (Var tmp);
+    ]
   | And(t, o1, o2) ->
     assn t o1 (op2e t o1 &* op2e t o2)
     :: move oF exp_false
@@ -855,6 +876,8 @@ module ToStr = struct
     | Sub(t,d,s) -> Printf.sprintf "sub %s, %s" (opr d) (opr s)
     | Sbb(t,d,s) -> Printf.sprintf "sbb %s, %s" (opr d) (opr s)
     | Cmp(t,d,s) -> Printf.sprintf "cmp %s, %s" (opr d) (opr s)
+    | Cmpxchg(t,d,s) -> Printf.sprintf "cmpxchg %s, %s" (opr d) (opr s)
+    | Xchg(t,d,s) -> Printf.sprintf "xchg %s, %s" (opr d) (opr s)
     | And(t,d,s) -> Printf.sprintf "and %s, %s" (opr d) (opr s)
     | Or(t,d,s) -> Printf.sprintf "or %s, %s" (opr d) (opr s)
     | Xor(t,d,s) -> Printf.sprintf "xor %s, %s" (opr d) (opr s)
@@ -1077,6 +1100,9 @@ let parse_instr g addr =
     | 0x85 -> let (r, rm, na) = parse_modrm32 na in
 	      let o = if b1 = 0x84 then r8 else opsize in
 	      (Test(o, rm, r), na)
+    | 0x87 ->
+      let (r, rm, na) = parse_modrm opsize na in
+      (Xchg(opsize, r, rm), na)
     | 0x88 -> let (r, rm, na) = parse_modrm r8 na in
 	      (Mov(r8, rm, r), na)
     | 0x89 ->
@@ -1092,6 +1118,9 @@ let parse_instr g addr =
 	      | _ -> failwith "invalid lea (must be address)"
 	      )
     | 0x90 -> (Nop, na)
+    | byte90 when byte90 > 0x90 && byte90 <= 0x97 ->
+      let reg = Oreg (byte90 & 7) in
+      (Xchg(opsize, o_eax, reg), na)
     | 0xa1 ->
       let (addr, na) = parse_disp32 na in
       (Mov(opsize, o_eax, Oaddr(l32 addr)), na)
@@ -1168,10 +1197,11 @@ let parse_instr g addr =
     | 0xfc -> (Cld, na)
     | 0xff -> let (r, rm, na) = parse_modrm32ext na in
 	      (match r with (* Grp 5 *)
-	      | 2 -> (Call(rm, na), na)
-	      | 4 -> (Jump rm, na)
-	      | 6 -> (Push(opsize, rm), na)
-	      | _ -> unimplemented (Printf.sprintf "unsupported opcode: ff/%d" r)
+                | 0 -> (Inc(opsize, rm), na)
+	        | 2 -> (Call(rm, na), na)
+	        | 4 -> (Jump rm, na)
+	        | 6 -> (Push(opsize, rm), na)
+	        | _ -> unimplemented (Printf.sprintf "unsupported opcode: ff/%d" r)
 	      )
     | b1 when b1 < 0x3e && (b1 & 7) < 6 ->
       (
@@ -1243,6 +1273,9 @@ let parse_instr g addr =
              | 3 -> (Stmxcsr rm, na) (* stmxcsr *)
              | _ -> unimplemented (Printf.sprintf "unsupported opcode: ff/%d" r)
           )
+      | 0xb1 ->
+        let r, rm, na = parse_modrm opsize na in
+        (Cmpxchg (opsize, r, rm), na)
       | 0xb6
       | 0xb7 -> let st = if b2 = 0xb6 then r8 else r16 in
 		let r, rm, na = parse_modrm32 na in
