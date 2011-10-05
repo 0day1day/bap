@@ -711,10 +711,10 @@ let alt_bap_from_trace_file filename =
   let c = ref true in
   Status.init "Lifting trace" 0 ;
   while !c do
-	let (tmp_c,revstmts) = 
-	  alt_bap_from_trace_file_range filename off !trace_blocksize in
+    let (tmp_c,revstmts) = 
+      alt_bap_from_trace_file_range filename off !trace_blocksize in
     ir := Util.fast_append revstmts !ir;
-	c := tmp_c;
+    c := tmp_c;
   done;
   let r = List.rev !ir in
   Status.stop () ;
@@ -753,17 +753,58 @@ let bap_from_trace_file ?(atts = true) ?(pin = false) filename =
   else
     old_bap_from_trace_file ~atts ~pin filename
 
+(* SWXXX UGLY! copy and pasted from traces....better place to put/do this? *)
+let endtrace = "This is the final trace block"
+let is_seed_label = (=) "ReadSyscall"
+(** A trace is a sequence of instructions. This function
+    takes a list of ast statements and returns a list of
+    lists of ast stmts. Each one of those sublists will 
+    represent the IL of the executed assembly instruction *)
+let trace_to_blocks trace = 
+  let rec to_blocks blocks current = function
+    | [] -> 
+	  List.rev ((List.rev current)::blocks)
+    | (Ast.Label (Addr _, _) as l)::rest ->
+	  let block = List.rev current in
+	  to_blocks (block::blocks) [l] rest
+    | (Ast.Comment (c, _) as s)::rest when c = endtrace || (is_seed_label c) ->
+	  let block = List.rev current in
+	  to_blocks (block::blocks) [s] rest
+    | x::rest ->
+	  to_blocks blocks (x::current) rest
+  in
+  let blocks = to_blocks [] [] trace in
+    List.filter (fun b -> List.length b > 1) blocks
+
+(** Internal queue for get_stmts *)
+let block_q = ref []
+let offset = ref 0L
+
+let enqueue blocks =
+  block_q := blocks
+
+let dequeue _ =
+  match !block_q with
+  | [] -> None
+  | b::bs -> block_q := bs; Some(b)
+
 (** Get one statement at a time. *)
 let bap_get_stmt_from_trace_file ?(atts = true) ?(rate=1L) ?(pin = false) filename off =
-  (* blah, Stream.from does not use int64 *)
-  let off = ref (Int64.mul (Int64.of_int off) rate) in
-  let (c,ir) = alt_bap_from_trace_file_range filename off rate in
-  if c then Some(List.rev ir) else None
+  match !block_q with
+  | [] ->
+    dprintf "SWXXX Queue is empty; refreshing!";
+    let (_,ir) = alt_bap_from_trace_file_range filename offset rate in
+    let ir = List.rev ir in
+    let blocks = if (rate <> 1L) then trace_to_blocks ir else [ir] in
+    enqueue blocks;
+    dequeue()
+  | _ -> dequeue()
 
-  
+
 (** Return stream of trace instructions raised to the IL *)
 let bap_stream_from_trace_file ?(atts = true) ?(rate=1L) ?(pin = false) filename =
   Stream.from (bap_get_stmt_from_trace_file ~atts ~rate ~pin filename)
+
 
 let get_symbols ?(all=false) {asmp=p} =
   let f = if all then asmir_get_all_symbols else asmir_get_symbols in

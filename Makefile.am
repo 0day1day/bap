@@ -5,17 +5,22 @@
 #include @top_srcdir@/config/recursive.mk
 
 if TESTS_OPT
-TESTPOSTDIRS=tests stpwrap pintraces
+TESTPOSTDIRS=stpwrap
+BAPTESTDIRS=tests pintraces
 endif
 
-SUBDIRS=bigint-3.12 batteries-1.4.0 ounit-1.1.0 pcre-ocaml-release-6.2.2 objsize-0.16 VEX libasmir ocaml utils $(TESTPOSTDIRS)
+BAPDIRS=libasmir ocaml utils $(BAPTESTDIRS)
 
-
-# pintraces removed temporarily
-# stp/ocaml ocaml utils doc
+SUBDIRS=bigint-3.12 batteries-1.4.0 ounit-1.1.0 pcre-ocaml-release-6.2.2 objsize-0.16 VEX $(BAPDIRS) $(TESTPOSTDIRS)
 
 test: all
 	$(MAKE) -C tests test
+
+
+.PHONY: bap-clean cscope
+
+bap-clean: 
+	-for d in $(BAPDIRS); do $(MAKE) -C $$d clean; done
 
 cscope:
 	cscope -b `find . -name "*.[ch]" -or -name "*.hh" -or -name "*.cc" -or -name "*.cpp"`
