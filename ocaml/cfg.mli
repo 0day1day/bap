@@ -59,6 +59,9 @@ sig
       with the given statements. *)
   val create_vertex : G.t -> lang -> G.t * G.V.t
 
+  (** Copy the metadata of a CFG without copying the vertices *)
+  val copy_map : G.t -> G.t
+
   (* extra builder-like stuff *)
   val remove_vertex : G.t -> G.V.t -> G.t
   val remove_edge : G.t -> G.V.t -> G.V.t -> G.t

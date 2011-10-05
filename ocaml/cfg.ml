@@ -63,6 +63,7 @@ sig
   val join_stmts : lang -> lang -> lang
   (*val newid : G.t -> bbid*)
   val create_vertex : G.t -> lang -> G.t * G.V.t
+  val copy_map : G.t -> G.t
 
   (* extra builder-like stuff *)
   val remove_vertex : G.t -> G.V.t -> G.t
@@ -221,6 +222,8 @@ struct
     let map_vertex f c =
       failwith "map_vertex: unimplemented"
 
+    let copy_map {s=s; l=l; nextid = nextid} = {g = G'.empty; s=s; l=l; nextid=nextid}
+
   end (* module G *)
 
   (* Copied from ocamlgraph's Builder.P so that G doesn't eat our extensions *)
@@ -243,6 +246,7 @@ struct
   let join_stmts = G.join_stmts
   let newid = G.newid
   let create_vertex = G.create_vertex
+  let copy_map = G.copy_map
 end
 (* end persistent implementation *)
 
