@@ -93,8 +93,8 @@ type opcode =
   | Ldmxcsr of operand
   | Fnstcw of operand
   | Fldcw of operand
-  | Pmovmskb of (operand * operand)
-  | Pcmpeqb of (operand * operand)
+  | Pmovmskb of (typ * operand * operand)
+  | Pcmpeq of (typ * typ * operand * operand)
   | Leave of typ
   | Interrupt of operand
 
@@ -488,41 +488,40 @@ let rec to_ir addr next ss pref =
     (List.map (fun a -> Assert( (a &* i32 15) =* i32 0, [])) (al))
     @ [d]
     )
-  | Pcmpeqb (dst,src) ->
+  | Pcmpeq (t,elet,dst,src) ->
+      let ncmps = (Typecheck.bits_of_width t) / (Typecheck.bits_of_width elet) in
+      let elebits = Typecheck.bits_of_width elet in
       let src = match src with
-        | Oreg i -> bits2xmme i
-        | Oaddr a -> load xmm_t a
+        | Oreg i -> op2e t src
+        | Oaddr a -> load t a
         | Oimm _ -> failwith "invalid"
       in
-      let dst, dst_expr = match dst with
-        | Oreg i -> bits2xmm i, bits2xmme i
-        | _ -> failwith "invalid"
+      let compare_region i =
+        let byte1 = Extract(big_int_of_int (i*elebits-1), big_int_of_int ((i-1)*elebits), src) in
+        let byte2 = Extract(big_int_of_int (i*elebits-1), big_int_of_int ((i-1)*elebits), op2e t dst) in
+        let tmp = nv ("t" ^ string_of_int i) elet in
+        Var tmp, move tmp (Ite(byte1 ==* byte2, lt (-1L) elet, lt 0L elet))
       in
-      let compare_byte i =
-        let byte1 = Extract(big_int_of_int (i*8-1), big_int_of_int ((i-1)*8), src) in
-        let byte2 = Extract(big_int_of_int (i*8-1), big_int_of_int ((i-1)*8), dst_expr) in
-        let tmp = nv ("t" ^ string_of_int i) r8 in
-        Var tmp, move tmp (Ite(byte1 ==* byte2, it 0xff r8, it 0x00 r8))
-      in
-      let byte_indices = BatList.init 16 (fun i -> i + 1) in (* list 1-16 *)
-      let comparisons = List.map compare_byte byte_indices in
+      let indices = BatList.init ncmps (fun i -> i + 1) in (* list 1-nbytes *)
+      let comparisons = List.map compare_region indices in
       let temps, cmps = List.split comparisons in
       let temps = List.rev temps in
         (* could also be done with shifts *)
       let store_back = List.fold_left (fun acc i -> Concat(acc,i)) (List.hd temps) (List.tl temps) in
-      cmps @ [move dst store_back]
-  | Pmovmskb (dst,src) ->
+      cmps @ [assn t dst store_back]
+  | Pmovmskb (t,dst,src) ->
+      let nbytes = bytes_of_width t in
       let src = match src with
-        | Oreg i -> bits2xmme i
-        | Oaddr a -> load xmm_t a
-        | Oimm _ -> failwith "invalid"
+        | Oreg i -> op2e t src
+        | _ -> failwith "invalid operand"
       in
       let get_bit i = Extract(big_int_of_int (i*8-1), big_int_of_int (i*8-1), src) in
-      let byte_indices = BatList.init 16 (fun i -> i + 1) in (* list 1-16 *)
+      let byte_indices = BatList.init nbytes (fun i -> i + 1) in (* list 1-nbytes *)
       let all_bits = List.map get_bit byte_indices in
       let all_bits = List.rev all_bits in
         (* could also be done with shifts *)
-      let or_together_bits = List.fold_left (fun acc i -> Concat(acc,i)) (it 0 r16) all_bits in
+      let padt = Reg(32 - nbytes) in
+      let or_together_bits = List.fold_left (fun acc i -> Concat(acc,i)) (it 0 padt) all_bits in
       [assn r32 dst or_together_bits]
   | Pxor args ->
     (* Pxor is just a larger xor *)
@@ -544,7 +543,7 @@ let rec to_ir addr next ss pref =
   | Shift(st, s, o1, o2) (*when pref = [] || pref = [pref_opsize]*) ->
     assert (List.mem s [r8; r16; r32]);
     let t1 = nv "t1" s and tmpDEST = nv "tmpDEST" s
-    and bits = Arithmetic.bits_of_width s
+    and bits = Typecheck.bits_of_width s
     and s_f = match st with LSHIFT -> (<<*) | RSHIFT -> (>>*) | ARSHIFT -> (>>>*)
       | _ -> failwith "invalid shift type"
     and count = (op2e s o2) &* (it 31 s)
@@ -575,7 +574,7 @@ let rec to_ir addr next ss pref =
       let e_dst = op2e s dst in
       let e_fill = op2e s fill in
       let e_shift = op2e s shift in
-      let bits = Arithmetic.bits_of_width s in
+      let bits = Typecheck.bits_of_width s in
       let our_of = cast_high r1 (Var tempDEST) ^* cast_high r1 e_dst in
       let ifzero = ite r1 (e_shift ==* it 0 s) in
       let ret1 = e_fill >>* (it bits s -* e_shift) in
@@ -597,7 +596,7 @@ let rec to_ir addr next ss pref =
       let value, shift = match bitbase with
         | Oreg i ->
             let reg = op2e t bitbase in
-            let shift = offset &* it (Arithmetic.bits_of_width t - 1) t in
+            let shift = offset &* it (Typecheck.bits_of_width t - 1) t in
             reg, shift
         | Oaddr a ->
             let byte = load r8 (a +* (offset >>* (it 3 t))) in
@@ -848,8 +847,8 @@ module ToStr = struct
     | Movzx(dt,dst,st,src) -> Printf.sprintf "movzx %s, %s" (opr dst) (opr src)
     | Movsx(dt,dst,st,src) -> Printf.sprintf "movsx %s, %s" (opr dst) (opr src)
     | Movdqa(d,s) -> Printf.sprintf "movdqa %s, %s" (opr d) (opr s)
-    | Pcmpeqb(dst,src) -> Printf.sprintf "pcmpeqb %s, %s" (opr dst) (opr src)
-    | Pmovmskb(dst,src) -> Printf.sprintf "pmovmskb %s, %s" (opr dst) (opr src)
+    | Pcmpeq(t,elet,dst,src) -> Printf.sprintf "pcmpeq %s, %s" (opr dst) (opr src)
+    | Pmovmskb(t,dst,src) -> Printf.sprintf "pmovmskb %s, %s" (opr dst) (opr src)
     | Lea(r,a) -> Printf.sprintf "lea %s, %s" (opr r) (opr (Oaddr a))
     | Call(a, ra) -> Printf.sprintf "call %s" (opr a)
     | Shift _ -> "shift"
@@ -1235,14 +1234,13 @@ let parse_instr g addr =
       | 0x1f -> (Nop, na)
       | 0x31 -> (Rdtsc, na)
       | 0x6f | 0x7f when pref = [0x66] ->
-            (
-	      let r, rm, na = parse_modrm32 na in
-	      let s,d = if b2 = 0x6f then rm, r else r, rm in
-	        (Movdqa(d,s), na)
-            )
-      | 0x74 when pref = [0x66] ->
-          let r, rm, na = parse_modrm32 na in
-          (Pcmpeqb(r, rm), na)
+	let r, rm, na = parse_modrm32 na in
+	let s,d = if b2 = 0x6f then rm, r else r, rm in
+	(Movdqa(d,s), na)
+      | 0x74 | 0x75 | 0x76 as o ->
+        let r, rm, na = parse_modrm32 na in
+        let elet = match o with | 0x74 -> r8 | 0x75 -> r16 | 0x76 -> r32 | _ -> failwith "impossible" in
+        (Pcmpeq(mopsize, elet, r, rm), na)
       | 0x80 | 0x81 | 0x82 | 0x83 | 0x84 | 0x85 | 0x86 | 0x87 | 0x88 | 0x89
       | 0x8c | 0x8d | 0x8e
       | 0x8f ->	let (i,na) = parse_disp32 na in
@@ -1284,12 +1282,12 @@ let parse_instr g addr =
       | 0xbf -> let st = if b2 = 0xbe then r8 else r16 in
 		let r, rm, na = parse_modrm32 na in
 		(Movsx(opsize, r, st, rm), na)
-      | 0xd7 when pref = [0x66] ->
+      | 0xd7 ->
           let r, rm, na = parse_modrm32 na in
-          (Pmovmskb(r, rm), na)
+          (Pmovmskb(mopsize, r, rm), na)
       | 0xef ->
-		let d, s, na = parse_modrm32 na in
-		(Pxor(mopsize,d,s), na)
+	let d, s, na = parse_modrm32 na in
+	(Pxor(mopsize,d,s), na)
       | _ -> unimplemented (Printf.sprintf "unsupported opcode: %02x %02x" b1 b2)
     )
     | n -> unimplemented (Printf.sprintf "unsupported opcode: %02x" n)
