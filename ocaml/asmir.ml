@@ -783,22 +783,35 @@ let offset = ref 0L
 let enqueue blocks =
   block_q := blocks
 
-let dequeue _ =
+let rec dequeue _ =
   match !block_q with
   | [] -> None
-  | b::bs -> block_q := bs; Some(b)
+  | b::bs -> block_q := bs; 
+    match b with 
+    | [] -> dequeue() 
+    | _ -> Some(b)
 
 (** Get one statement at a time. *)
-let bap_get_stmt_from_trace_file ?(atts = true) ?(rate=1L) ?(pin = false) filename off =
-  match !block_q with
-  | [] ->
-    dprintf "SWXXX Queue is empty; refreshing!";
-    let (_,ir) = alt_bap_from_trace_file_range filename offset rate in
-    let ir = List.rev ir in
-    let blocks = if (rate <> 1L) then trace_to_blocks ir else [ir] in
-    enqueue blocks;
-    dequeue()
-  | _ -> dequeue()
+let rec bap_get_stmt_from_trace_file ?(atts = true) ?(rate=1L) ?(pin = false) filename off =
+  let tmp_c = ref false in
+  let next_block = 
+    (match !block_q with
+    | [] ->
+      dprintf "SWXXX Queue is empty; refreshing!";
+      let (c,ir) = alt_bap_from_trace_file_range filename offset rate in
+      tmp_c := c;
+      let ir = List.rev ir in
+      let blocks = if (rate <> 1L) then trace_to_blocks ir else [ir] in
+      enqueue blocks;
+      dequeue()
+    | _ -> dequeue()) in
+  (* Handle the case where the last block on the queue is an empty block but 
+     frames are still left in the trace (c is true) *)
+  match next_block with
+  | None -> 
+    if !tmp_c then bap_get_stmt_from_trace_file ~atts ~rate ~pin filename off 
+    else None
+  | _ -> next_block
 
 
 (** Return stream of trace instructions raised to the IL *)
