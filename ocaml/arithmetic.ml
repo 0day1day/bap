@@ -108,7 +108,7 @@ let binop op ((_,t) as v1) v2 =
   | NEQ -> exp_bool(not (eq_big_int (to_big_int v1) (to_big_int v2)))
   | LSHIFT -> to_val t (shift_left_big_int (to_big_int v1) (toshift t v2))
   | RSHIFT -> to_val t (shift_right_big_int (to_big_int v1) (toshift t v2))
-  | ARSHIFT -> to_val t (shift_right_towards_zero_big_int (to_sbig_int v1) (toshift t v2))
+  | ARSHIFT -> to_val t (shift_right_big_int (to_sbig_int v1) (toshift t v2))
   | DIVIDE -> to_val t (div_big_int (to_big_int v1) (to_big_int v2))
   | SDIVIDE -> to_val t (t_div (to_sbig_int v1) (to_sbig_int v2))
   | MOD -> to_val t (mod_big_int (to_big_int v1) (to_big_int v2))
