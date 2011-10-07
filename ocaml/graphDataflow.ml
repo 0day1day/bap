@@ -40,7 +40,7 @@ sig
   val transfer_function : G.t -> G.V.t -> L.t -> L.t
     
   (** the starting node for the analysis *)
-  val s0 : G.V.t
+  val s0 : G.t -> G.V.t
 
   (** the initial value for analysis. This is what s0 should start
       out with. All other nodes start out with Top *)
@@ -79,7 +79,7 @@ struct
 	out
     in
     List.iter (fun n -> H.add htin n D.L.top) nodes;
-    H.replace htin D.s0 (init g);
+    H.replace htin (D.s0 g) (init g);
     let rec do_work = function
       | [] -> ()
       | b::worklist ->  
@@ -101,7 +101,7 @@ struct
 	  in
 	  do_work newwklist
     in
-    do_work [D.s0];
+    do_work [D.s0 g];
     (dfin, dfout)
 
 end
