@@ -23,6 +23,10 @@ let create c l stmts =
   let c = C.add_vertex c v in
   (C.set_stmts c v stmts, v)
 
+(** Create BB_Entry in a graph *)
+let create_entry g =
+  create g BB_Entry [Comment("entry node",[])]
+
 (** Find BB_Entry in a graph, or raise an exception if not already present. *)
 let find_entry g =
   try
@@ -35,7 +39,7 @@ let find_error g =
   try
     g, C.find_vertex g BB_Error
   with Not_found ->
-    create g BB_Error [Label(Name "BB_ERROR", []); Assert(exp_false, [])]
+    create g BB_Error [Label(Name "BB_Error", []); Assert(exp_false, [])]
 
 (** Find BB_Exit in a graph, or add it if not already present. *)
 let find_exit g =
@@ -53,7 +57,7 @@ let find_indirect g =
 
 (** Build a CFG from a program *)
 let of_prog ?(special_error = true) p =
-  let (tmp, entry) = create (C.empty()) BB_Entry [Comment("entry node",[])] in
+  let (tmp, entry) = create_entry (C.empty()) in
   let (tmp, exit) = find_exit tmp in
   let (tmp, error) = find_error tmp in
   let (c, indirect) = find_indirect tmp in
