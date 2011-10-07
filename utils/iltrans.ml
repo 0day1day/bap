@@ -33,6 +33,12 @@ let output_ast f p =
   pp#close;
   p
 
+let output_ast_cfg f p =
+  let oc = open_out f in
+  Cfg_pp.AstStmtsDot.output_graph oc p;
+  close_out oc;
+  p
+
 let output_ast_bbids f p =
   let oc = open_out f in
   Cfg_pp.AstBBidDot.output_graph oc p;
@@ -125,6 +131,8 @@ let uadd c =
 let speclist =
   ("-pp-ast", Arg.String(fun f -> add(TransformAst(output_ast f))),
    "<file> Pretty print AST to <file>.")
+  ::("-pp-ast-cfg", Arg.String (fun f -> add(TransformAstCfg(output_ast_cfg f))),
+     "<file> Pretty print AST graph to <file> (in Graphviz format)")
   ::("-pp-ast-bbids", Arg.String(fun f -> add(TransformAstCfg(output_ast_bbids f))),
      "<file> Pretty print AST graph to <file> (in Graphviz format) (no stmts)")
   ::("-pp-ast-cdg", Arg.String (fun f -> add(TransformAstCfg(output_ast_cdg f))),

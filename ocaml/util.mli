@@ -12,6 +12,7 @@ val inc : int ref -> unit
 val dec : int ref -> unit
 *)
 
+val list_argmax : ?compare:('b -> 'b -> int) -> ('a -> 'b) -> 'a list -> 'a * 'b
 val list_union : 'a list -> 'a list -> 'a list
 val list_intersection : 'a list -> 'a list -> 'a list
 val list_does_intersect : 'a list -> 'a list -> bool

@@ -492,7 +492,7 @@ struct
 		 [{ctx with pc=get_label e1}]
              | v when is_false_val v -> 
 		 [{ctx with pc=get_label e2}]
-             | _ -> failwith "not a boolean condition"
+             | v -> failwith ("not a boolean condition: " ^ (Pp.ast_exp_to_string (symb_to_exp v)))
           )
       | Assert (e,_) ->
           (match eval_expr delta e with

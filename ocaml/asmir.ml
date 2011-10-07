@@ -827,17 +827,25 @@ let get_section_startaddr p sectionname =
 let get_section_endaddr p sectionname =
   Libasmir.asmir_get_sec_endaddr p.asmp sectionname
 
+let get_start_addr p =
+  Libasmir.asmir_get_start_addr p.asmp
+
+let get_asm_instr_string p s =
+  Libasmir.asmir_string_of_insn p.asmp s
 
 let get_asm_instr_string_range p s e =
   let s = ref s in
   let str = ref "" in
-  while !s < e do
+  (try
+    while !s < e do
 
-    str := !str ^ "; " ^ (Libasmir.asmir_string_of_insn p.asmp !s);
+      str := !str ^ "; " ^ (get_asm_instr_string p !s);
 
-    let len = Int64.of_int (Libasmir.asmir_get_instr_length p.asmp !s) in
-    s := Int64.add !s len
-  done;
+      let len = Int64.of_int (Libasmir.asmir_get_instr_length p.asmp !s) in
+      if len = -1L then raise Exit;
+      s := Int64.add !s len
+    done;
+  with Exit -> ());
   !str
 
 let set_print_warning = Libasmir.asmir_set_print_warning
