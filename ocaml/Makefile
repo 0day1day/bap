@@ -10,6 +10,8 @@ export OUNIT=$(BAP_DIR)/ounit-1.1.0/_build/src/
 export PCRE=$(BAP_DIR)/pcre-ocaml-release-6.2.2/lib
 
 include $(LIBASMIR)/makefile.inc
+export SOLVER=$(BAP_DIR)/solvers
+include $(SOLVER)/makefile.inc
 -include ../../ocaml-proj/Makefile
 
 # Stop annoying warnings about big_int duplication!
@@ -36,8 +38,9 @@ export SOURCES = \
 	ssa.ml \
 	pp.ml \
 	typecheck.ml \
-	ast_convenience.ml \
 	cfg.mli cfg.ml \
+	ast_visitor.mli ast_visitor.ml \
+	ast_convenience.ml \
 	reachable.mli \
 	reachable.ml \
 	prune_unreachable.mli prune_unreachable.ml \
@@ -45,7 +48,9 @@ export SOURCES = \
 	cfg_ast.mli cfg_ast.ml \
 	ssa_visitor.mli ssa_visitor.ml \
 	cfg_ssa.mli cfg_ssa.ml \
-	ast_visitor.mli ast_visitor.ml \
+	memory2array.ml \
+	../solvers/z3/ocaml/z3.ml \
+	solver.ml \
 	debug_snippets.ml \
 	sccvn.mli sccvn.ml \
 	deadcode.mli deadcode.ml \
@@ -60,7 +65,6 @@ export SOURCES = \
 	disasm_i386.ml \
 	disasm.ml \
 	syscall_models.ml \
-	memory2array.ml \
 	gcl.mli gcl.ml \
 	wp.ml \
 	stp_grammar.mly stp_lexer.mll \
@@ -93,6 +97,8 @@ export SOURCES = \
 	test_common.ml \
 	$(PROJSOURCES) \
 
+# XXX: Only compile info_flow and formule_simplify_mem if Z3 is enabled
+
 # Fix the interpreter to work with big ints
 #	interpreter.ml \
 
@@ -110,15 +116,19 @@ export PACKS = bigarray str ocamlgraph unix camomile threads
 export DOCPACKS = ocamlgraph
 export YFLAGS = -v
 
+export USE_CAMLP4 = yes
 
-export CLIBS = asmir vex opcodes bfd iberty stdc++ 
+export CLIBS = asmir vex opcodes bfd iberty stdc++
+export CLIBS += $(SOLVER_CLIBS)
 export CFLAGS = -g
-export LDFLAGS = $(LIBASMIR_LDFLAGS)
+export LDFLAGS = $(LIBASMIR_LDFLAGS) $(SOLVER_LDFLAGS)
+export PPFLAGS = $(SOLVER_PPFLAGS)
 export INCDIRS = $(BIGINT) $(BATT) $(OUNIT) $(PCRE)
 export LIBS = nums batteries oUnit pcre
-export CLIBFLAGS= $(LDFLAGS)
+#export CLIBFLAGS= $(LDFLAGS)
 export RESULTDEPS = $(LIBASMIR)/src/libasmir.a $(VEX_DIR)/libvex.a
-export LIBDIRS = $(LIBASMIR)/src # ../appreplay ../stp ../stp/ocaml
+export LIBDIRS = $(LIBASMIR)/src $(VEX_DIR)
+export LIBDIRS += $(SOLVER_LIBDIRS)
 
 OCAMLLDFLAGS = -thread # just for make top
 OCAMLFLAGS = -thread -warn-error Aelz # -for-pack Bap #-w A

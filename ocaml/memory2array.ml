@@ -131,3 +131,8 @@ class memory2array_visitor () =
 let coerce_prog prog =
   let visitor = new memory2array_visitor () in
   Ast_visitor.prog_accept visitor prog
+
+(** Deend your average expression *)
+let coerce_exp e =
+  let v = new memory2array_visitor () in
+  Ast_visitor.exp_accept v e

@@ -34,6 +34,8 @@ let ( ==* ) a b  = binop EQ a b
 let ( <>* ) a b  = binop NEQ a b
 let ( <* ) a b   = binop LT a b
 let ( >* ) a b   = binop LT b a
+let (<=* ) a b   = binop LE a b
+let (>=* ) a b   = binop LE b a
 (** bitwise equality *)
 let ( =* ) a b   = binop XOR a (unop NOT b)
 
@@ -78,6 +80,32 @@ let parse_ite = function
 	  e1) when Typecheck.infer_ast ~check:false b1 = Reg(1) ->
     Some(b1, e1, Int(zero_big_int, nt))
   | _ -> None
+
+(** Duplicate any shared nodes. Useful for using physical location as
+    a unique identity.
+
+    XXX: I think this would be much faster if we only duplicated
+    things that actually occur more than once.
+*)
+let rec rm_duplicates e =
+  let r = rm_duplicates in
+  let newe = match e with
+  | Load(e1, e2, e3, t) -> Load(r e1, r e2, r e3, t)
+  | Store(e1, e2, e3, e4, t) -> Store(r e1, r e2, r e3, r e4, t)
+  | BinOp(bt, e1, e2) -> BinOp(bt, r e1, r e2)
+  | UnOp(ut, e) -> UnOp(ut, r e)
+  | Var(v) -> Var(v)
+  | Lab(s) -> Lab(s)
+  | Int(i, t) -> Int(i, t)
+  | Cast(ct, t, e) -> Cast(ct, t, r e)
+  | Let(v, e1, e2) -> Let(v, r e1, r e2)
+  | Unknown(s, t) -> Unknown(s, t)
+  | Ite(e1, e2, e3) -> Ite(r e1, r e2, r e3)
+  | Extract(i1, i2, e) -> Extract(i1, i2, r e)
+  | Concat(e1, e2) -> Concat(r e1, r e2)
+  in
+  assert (e != newe);
+  newe
 
 let parse_extract = function
      | Cast(CAST_LOW, t, BinOp(RSHIFT, e', Int(i, t2))) ->
