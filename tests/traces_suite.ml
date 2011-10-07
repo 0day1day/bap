@@ -49,7 +49,7 @@ let concrete_eval_test (ranges, s) =
   let ctx1 = Symbeval.concretely_execute ~s prog in
   let eax1 = biconst 0x2a in
   let (start_addr,end_addr) = find_fun ranges "main" in
-  let main_prog = Ast_convenience.find_prog_chunk prog start_addr end_addr in
+  let main_prog = Test_common.find_prog_chunk prog start_addr end_addr in
   let s = find_call main_prog in 
   let ctx2 = Symbeval.concretely_execute ~s ~i prog in
   let eax2 = Arithmetic.to_big_int(bim1,Type.Reg(32)) in
@@ -60,7 +60,7 @@ let concrete_eval_test (ranges, s) =
   check_eax ctx2 eax2;;
 
 
-let concrete_eval_tear_down _ = Sys.remove il_file;;
+let concrete_eval_tear_down _ = rm_and_ignore il_file;;
 
 
 let suite = "Traces" >:::

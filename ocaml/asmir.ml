@@ -500,8 +500,12 @@ let section_contents prog secs =
 
 
 (** Open a binary file for translation *)
-let open_program filename =
-  let prog = Libasmir.asmir_open_file filename in
+let open_program ?base filename =
+  let base = match base with
+    | None -> -1L
+    | Some(x) -> x
+  in
+  let prog = Libasmir.asmir_open_file filename base in
     (* tell the GC how to free resources associated with prog *)
   Gc.finalise Libasmir.asmir_close prog;
   let secs = Array.to_list (get_all_sections prog)  in
@@ -636,24 +640,25 @@ let trans_frame f =
   let t = Libasmir.asmir_frame_type f in
   match t with
   | Libasmir.FRM_STD2 -> 
-      let bytes, addr, _ = Libasmir.asmir_frame_get_insn_bytes f in
-      (* Array.iter (fun x -> dprintf "Byte: %x" (int_of_char x)) bytes; *)
-      let stmts, _ = byte_insn_to_bap arch addr bytes in
-      stmts
+    let bytes, addr, _ = Libasmir.asmir_frame_get_insn_bytes f in
+    (* Array.iter (fun x -> dprintf "Byte: %x" (int_of_char x)) bytes; *)
+    let stmts, _ = byte_insn_to_bap arch addr bytes in
+    stmts
   | Libasmir.FRM_TAINT -> 
-      [Comment("ReadSyscall", []); Comment("All blocks must have two statements", [])]
+    [Comment("ReadSyscall", []); Comment("All blocks must have two statements", [])]
   | Libasmir.FRM_LOADMOD ->
-      let name, lowaddr, highaddr = Libasmir.asmir_frame_get_loadmod_info f in
-      [Special(Printf.sprintf "Loaded module '%s' at %#Lx to %#Lx" name lowaddr highaddr, []); Comment("All blocks must have two statements", [])]
+    let name, lowaddr, highaddr = Libasmir.asmir_frame_get_loadmod_info f in
+    (* The traceremove attr means that our Traces implementation can safely ignore this Special. *)
+    [Special(Printf.sprintf "Loaded module '%s' at %#Lx to %#Lx" name lowaddr highaddr, []); Comment("All blocks must have two statements", [])]
   | Libasmir.FRM_SYSCALL ->
-	let callno, addr, tid = Libasmir.asmir_frame_get_syscall_info f in
-	[Special(Printf.sprintf "Syscall number %d at %#Lx by thread %d" callno addr tid,[]);
-	 Comment("All blocks must have two statements", [])]
+    let callno, addr, tid = Libasmir.asmir_frame_get_syscall_info f in
+    [Special(Printf.sprintf "Syscall number %d at %#Lx by thread %d" callno addr tid, [StrAttr "TraceKeep"]);
+     Comment("All blocks must have two statements", [])]
   | Libasmir.FRM_EXCEPT ->
-	let exceptno, tid, from_addr, to_addr =
-	  Libasmir.asmir_frame_get_except_info f in
-	[Special(Printf.sprintf "Exception number %d by thread %d at %#Lx to %#Lx" exceptno tid from_addr to_addr,[]);
-	 Comment("All blocks must have two statements", [])]
+    let exceptno, tid, from_addr, to_addr =
+      Libasmir.asmir_frame_get_except_info f in
+    [Special(Printf.sprintf "Exception number %d by thread %d at %#Lx to %#Lx" exceptno tid from_addr to_addr, []);
+     Comment("All blocks must have two statements", [])]
   | _ -> []
 
 (* SWXXX Add buffering around this/let it find a range where alt_bap finds entire range *)

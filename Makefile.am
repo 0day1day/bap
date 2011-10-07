@@ -5,7 +5,7 @@
 #include @top_srcdir@/config/recursive.mk
 
 if TESTS_OPT
-TESTPOSTDIRS=tests stpwrap
+TESTPOSTDIRS=tests stpwrap pintraces
 endif
 
 SUBDIRS=bigint-3.12 batteries-1.4.0 ounit-1.1.0 pcre-ocaml-release-6.2.2 VEX libasmir ocaml utils $(TESTPOSTDIRS)

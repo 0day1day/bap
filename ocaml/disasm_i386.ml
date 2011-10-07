@@ -78,6 +78,8 @@ type opcode =
   | Sub of (typ * operand * operand)
   | Sbb of (typ * operand * operand)
   | Cmp of (typ * operand * operand)
+  | Cmpxchg of (typ * operand * operand)
+  | Xchg of (typ * operand * operand)
   | And of (typ * operand * operand)
   | Or of (typ * operand * operand)
   | Xor of (typ * operand * operand)
@@ -91,6 +93,8 @@ type opcode =
   | Ldmxcsr of operand
   | Fnstcw of operand
   | Fldcw of operand
+  | Pmovmskb of (typ * operand * operand)
+  | Pcmpeq of (typ * typ * operand * operand)
   | Leave of typ
   | Interrupt of operand
 
@@ -170,12 +174,13 @@ let regs : var list =
   ("R_CC_DEP2", reg_32);
   ("R_CC_NDEP", reg_32);
 
-  (* more status flags *)
+  (* status flags/misc *)
   ("R_IDFLAG", reg_32);
   ("R_ACFLAG", reg_32);
   ("R_EMWARN", reg_32);
   ("R_LDT", reg_32);
   ("R_GDT", reg_32);
+  ("R_IP_AT_SYSCALL", reg_32);
 
   (* segment regs *)
   ("R_CS", reg_16);
@@ -189,7 +194,7 @@ let regs : var list =
   ("R_FTOP", reg_32);
   ("R_FPROUND", reg_32);
   ("R_FC3210", reg_32);
-  ("R_IP_AT_SYSCALL", reg_32);
+
     ]
     @ Array.to_list xmms
 
@@ -482,8 +487,42 @@ let rec to_ir addr next ss pref =
     in
     (List.map (fun a -> Assert( (a &* i32 15) =* i32 0, [])) (al))
     @ [d]
-
-  )
+    )
+  | Pcmpeq (t,elet,dst,src) ->
+      let ncmps = (Typecheck.bits_of_width t) / (Typecheck.bits_of_width elet) in
+      let elebits = Typecheck.bits_of_width elet in
+      let src = match src with
+        | Oreg i -> op2e t src
+        | Oaddr a -> load t a
+        | Oimm _ -> failwith "invalid"
+      in
+      let compare_region i =
+        let byte1 = Extract(big_int_of_int (i*elebits-1), big_int_of_int ((i-1)*elebits), src) in
+        let byte2 = Extract(big_int_of_int (i*elebits-1), big_int_of_int ((i-1)*elebits), op2e t dst) in
+        let tmp = nv ("t" ^ string_of_int i) elet in
+        Var tmp, move tmp (Ite(byte1 ==* byte2, lt (-1L) elet, lt 0L elet))
+      in
+      let indices = BatList.init ncmps (fun i -> i + 1) in (* list 1-nbytes *)
+      let comparisons = List.map compare_region indices in
+      let temps, cmps = List.split comparisons in
+      let temps = List.rev temps in
+        (* could also be done with shifts *)
+      let store_back = List.fold_left (fun acc i -> Concat(acc,i)) (List.hd temps) (List.tl temps) in
+      cmps @ [assn t dst store_back]
+  | Pmovmskb (t,dst,src) ->
+      let nbytes = bytes_of_width t in
+      let src = match src with
+        | Oreg i -> op2e t src
+        | _ -> failwith "invalid operand"
+      in
+      let get_bit i = Extract(big_int_of_int (i*8-1), big_int_of_int (i*8-1), src) in
+      let byte_indices = BatList.init nbytes (fun i -> i + 1) in (* list 1-nbytes *)
+      let all_bits = List.map get_bit byte_indices in
+      let all_bits = List.rev all_bits in
+        (* could also be done with shifts *)
+      let padt = Reg(32 - nbytes) in
+      let or_together_bits = List.fold_left (fun acc i -> Concat(acc,i)) (it 0 padt) all_bits in
+      [assn r32 dst or_together_bits]
   | Pxor args ->
     (* Pxor is just a larger xor *)
     to_ir addr next ss pref (Xor(args))
@@ -504,7 +543,7 @@ let rec to_ir addr next ss pref =
   | Shift(st, s, o1, o2) (*when pref = [] || pref = [pref_opsize]*) ->
     assert (List.mem s [r8; r16; r32]);
     let t1 = nv "t1" s and tmpDEST = nv "tmpDEST" s
-    and bits = Arithmetic.bits_of_width s
+    and bits = Typecheck.bits_of_width s
     and s_f = match st with LSHIFT -> (<<*) | RSHIFT -> (>>*) | ARSHIFT -> (>>>*)
       | _ -> failwith "invalid shift type"
     and count = (op2e s o2) &* (it 31 s)
@@ -535,7 +574,7 @@ let rec to_ir addr next ss pref =
       let e_dst = op2e s dst in
       let e_fill = op2e s fill in
       let e_shift = op2e s shift in
-      let bits = Arithmetic.bits_of_width s in
+      let bits = Typecheck.bits_of_width s in
       let our_of = cast_high r1 (Var tempDEST) ^* cast_high r1 e_dst in
       let ifzero = ite r1 (e_shift ==* it 0 s) in
       let ret1 = e_fill >>* (it bits s -* e_shift) in
@@ -557,7 +596,7 @@ let rec to_ir addr next ss pref =
       let value, shift = match bitbase with
         | Oreg i ->
             let reg = op2e t bitbase in
-            let shift = offset &* it (Arithmetic.bits_of_width t - 1) t in
+            let shift = offset &* it (Typecheck.bits_of_width t - 1) t in
             reg, shift
         | Oaddr a ->
             let byte = load r8 (a +* (offset >>* (it 3 t))) in
@@ -699,6 +738,25 @@ let rec to_ir addr next ss pref =
     let tmp = nv "t" t in
     move tmp (op2e t o1 -* op2e t o2)
     :: set_flags_sub t (op2e t o1) (op2e t o2) (Var tmp)
+  | Cmpxchg(t, src, dst) ->
+    let accumulator = op2e t o_eax in
+    let dst_e = op2e t dst in
+    let src_e = op2e t src in
+    let equal = nv "t" r1 in
+    let equal_v = Var equal in
+    [
+      move equal (accumulator ==* dst_e);
+      move zf equal_v;
+      assn t dst (ite t equal_v src_e dst_e);
+      assn t o_eax (ite t equal_v accumulator dst_e);
+    ]
+  | Xchg(t, src, dst) ->
+    let tmp = nv "t" t in
+    [
+      move tmp (op2e t src);
+      assn t src (op2e t dst);
+      assn t dst (Var tmp);
+    ]
   | And(t, o1, o2) ->
     assn t o1 (op2e t o1 &* op2e t o2)
     :: move oF exp_false
@@ -789,6 +847,8 @@ module ToStr = struct
     | Movzx(dt,dst,st,src) -> Printf.sprintf "movzx %s, %s" (opr dst) (opr src)
     | Movsx(dt,dst,st,src) -> Printf.sprintf "movsx %s, %s" (opr dst) (opr src)
     | Movdqa(d,s) -> Printf.sprintf "movdqa %s, %s" (opr d) (opr s)
+    | Pcmpeq(t,elet,dst,src) -> Printf.sprintf "pcmpeq %s, %s" (opr dst) (opr src)
+    | Pmovmskb(t,dst,src) -> Printf.sprintf "pmovmskb %s, %s" (opr dst) (opr src)
     | Lea(r,a) -> Printf.sprintf "lea %s, %s" (opr r) (opr (Oaddr a))
     | Call(a, ra) -> Printf.sprintf "call %s" (opr a)
     | Shift _ -> "shift"
@@ -815,6 +875,8 @@ module ToStr = struct
     | Sub(t,d,s) -> Printf.sprintf "sub %s, %s" (opr d) (opr s)
     | Sbb(t,d,s) -> Printf.sprintf "sbb %s, %s" (opr d) (opr s)
     | Cmp(t,d,s) -> Printf.sprintf "cmp %s, %s" (opr d) (opr s)
+    | Cmpxchg(t,d,s) -> Printf.sprintf "cmpxchg %s, %s" (opr d) (opr s)
+    | Xchg(t,d,s) -> Printf.sprintf "xchg %s, %s" (opr d) (opr s)
     | And(t,d,s) -> Printf.sprintf "and %s, %s" (opr d) (opr s)
     | Or(t,d,s) -> Printf.sprintf "or %s, %s" (opr d) (opr s)
     | Xor(t,d,s) -> Printf.sprintf "xor %s, %s" (opr d) (opr s)
@@ -1037,6 +1099,9 @@ let parse_instr g addr =
     | 0x85 -> let (r, rm, na) = parse_modrm32 na in
 	      let o = if b1 = 0x84 then r8 else opsize in
 	      (Test(o, rm, r), na)
+    | 0x87 ->
+      let (r, rm, na) = parse_modrm opsize na in
+      (Xchg(opsize, r, rm), na)
     | 0x88 -> let (r, rm, na) = parse_modrm r8 na in
 	      (Mov(r8, rm, r), na)
     | 0x89 ->
@@ -1052,6 +1117,9 @@ let parse_instr g addr =
 	      | _ -> failwith "invalid lea (must be address)"
 	      )
     | 0x90 -> (Nop, na)
+    | byte90 when byte90 > 0x90 && byte90 <= 0x97 ->
+      let reg = Oreg (byte90 & 7) in
+      (Xchg(opsize, o_eax, reg), na)
     | 0xa1 ->
       let (addr, na) = parse_disp32 na in
       (Mov(opsize, o_eax, Oaddr(l32 addr)), na)
@@ -1128,10 +1196,11 @@ let parse_instr g addr =
     | 0xfc -> (Cld, na)
     | 0xff -> let (r, rm, na) = parse_modrm32ext na in
 	      (match r with (* Grp 5 *)
-	      | 2 -> (Call(rm, na), na)
-	      | 4 -> (Jump rm, na)
-	      | 6 -> (Push(opsize, rm), na)
-	      | _ -> unimplemented (Printf.sprintf "unsupported opcode: ff/%d" r)
+                | 0 -> (Inc(opsize, rm), na)
+	        | 2 -> (Call(rm, na), na)
+	        | 4 -> (Jump rm, na)
+	        | 6 -> (Push(opsize, rm), na)
+	        | _ -> unimplemented (Printf.sprintf "unsupported opcode: ff/%d" r)
 	      )
     | b1 when b1 < 0x3e && (b1 & 7) < 6 ->
       (
@@ -1165,11 +1234,13 @@ let parse_instr g addr =
       | 0x1f -> (Nop, na)
       | 0x31 -> (Rdtsc, na)
       | 0x6f | 0x7f when pref = [0x66] ->
-            (
-	      let r, rm, na = parse_modrm32 na in
-	      let s,d = if b2 = 0x6f then rm, r else r, rm in
-	        (Movdqa(d,s), na)
-            )
+	let r, rm, na = parse_modrm32 na in
+	let s,d = if b2 = 0x6f then rm, r else r, rm in
+	(Movdqa(d,s), na)
+      | 0x74 | 0x75 | 0x76 as o ->
+        let r, rm, na = parse_modrm32 na in
+        let elet = match o with | 0x74 -> r8 | 0x75 -> r16 | 0x76 -> r32 | _ -> failwith "impossible" in
+        (Pcmpeq(mopsize, elet, r, rm), na)
       | 0x80 | 0x81 | 0x82 | 0x83 | 0x84 | 0x85 | 0x86 | 0x87 | 0x88 | 0x89
       | 0x8c | 0x8d | 0x8e
       | 0x8f ->	let (i,na) = parse_disp32 na in
@@ -1200,6 +1271,9 @@ let parse_instr g addr =
              | 3 -> (Stmxcsr rm, na) (* stmxcsr *)
              | _ -> unimplemented (Printf.sprintf "unsupported opcode: ff/%d" r)
           )
+      | 0xb1 ->
+        let r, rm, na = parse_modrm opsize na in
+        (Cmpxchg (opsize, r, rm), na)
       | 0xb6
       | 0xb7 -> let st = if b2 = 0xb6 then r8 else r16 in
 		let r, rm, na = parse_modrm32 na in
@@ -1208,9 +1282,12 @@ let parse_instr g addr =
       | 0xbf -> let st = if b2 = 0xbe then r8 else r16 in
 		let r, rm, na = parse_modrm32 na in
 		(Movsx(opsize, r, st, rm), na)
+      | 0xd7 ->
+          let r, rm, na = parse_modrm32 na in
+          (Pmovmskb(mopsize, r, rm), na)
       | 0xef ->
-		let d, s, na = parse_modrm32 na in
-		(Pxor(mopsize,d,s), na)
+	let d, s, na = parse_modrm32 na in
+	(Pxor(mopsize,d,s), na)
       | _ -> unimplemented (Printf.sprintf "unsupported opcode: %02x %02x" b1 b2)
     )
     | n -> unimplemented (Printf.sprintf "unsupported opcode: %02x" n)

@@ -377,19 +377,18 @@ struct
 	  else
 	(float_of_int deltay) /. deltat
 
-  let update () = 
+  let update () =
     let p = cpercent () in
-    if p = -1 then
-      if (debug) then Printf.printf "%s...\r" !message
-    else
+    if p = -1 then (
+      if (debug) then Printf.printf "%s...\r" !message)
+    else (
       if (debug) then Printf.printf "%s: %d%% (%f eps)\r" !message p (rate ()) ;
 
       percentage := p;
       last := !current;
       lasttime := Unix.gettimeofday();
-    
-      flush stdout
-      
+      flush stdout)
+
   let init msg size = 
     last := 0 ;
     current := 0 ;

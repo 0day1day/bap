@@ -62,7 +62,7 @@ val x86_regs : Var.t list
 
 val all_regs : Var.t list
 
-val open_program :  string -> asmprogram
+val open_program : ?base:address_t -> string -> asmprogram
 val asmprogram_to_bap : ?init_ro:bool -> asmprogram -> Ast.program
 val asm_addr_to_bap : (*varctx ->*) asmprogram -> address_t -> Ast.program * address_t
 
