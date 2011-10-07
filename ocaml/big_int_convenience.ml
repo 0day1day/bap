@@ -8,7 +8,13 @@ module HashType = struct
   let equal = eq_big_int
   let hash = Hashtbl.hash
 end
+module OrderedType = struct
+  type t = big_int
+  let compare = compare_big_int
+end
 module BIH = Hashtbl.Make(HashType)
+module BIS = Set.Make(OrderedType)
+module BIM = Map.Make(OrderedType)
 
 let bi0 = big_int_of_int 0x0
 let bi1 = big_int_of_int 0x1
