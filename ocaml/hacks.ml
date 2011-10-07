@@ -4,6 +4,7 @@ open Type
 open Ast
 open Util
 
+module C = Cfg.AST
 module D = Debug.Make(struct let name = "Hacks" and default=`Debug end)
 open D
 
@@ -101,3 +102,33 @@ let remove_backedges cfg =
      colors *)
   let backedges = Util.list_unique backedges in
   List.fold_left handle_backedge cfg backedges
+
+(** Fix outgoing edges of [n] in [g] *)
+let repair_node g n =
+  let g, error = Cfg_ast.find_error g in
+  let g, exit = Cfg_ast.find_exit g in
+  let g, indirect = Cfg_ast.find_indirect g in
+  (* Some of this is copied from Cfg_ast.of_prog *)
+  let make_edge g v ?lab t =
+    let dst = lab_of_exp t in
+    let tgt = match dst with
+      | None -> indirect
+      | Some l ->
+	  try (C.find_label g l)
+	  with Not_found ->
+	    wprintf "Jumping to unknown label: %s" (Pp.label_to_string l);
+	    error
+      (* FIXME: should jumping to an unknown address be an error or indirect? *)
+    in
+    C.add_edge_e g (C.G.E.create v lab tgt)
+  in
+  let edges = C.G.succ_e g n in
+  let g = List.fold_left C.remove_edge_e g edges in
+  let stmts = C.get_stmts g n in
+  match List.rev stmts with
+  | Jmp(t, _)::_ -> make_edge g n t
+  | CJmp(_,t,f,_)::_ -> let g = make_edge g n ~lab:true t in
+                     make_edge g n ~lab:false f
+  | Special _::_ -> C.add_edge g n error
+  | Halt _::_ -> C.add_edge g n exit
+  | _ -> (* It's probably fine.  That's why this is in hacks.ml. *) g

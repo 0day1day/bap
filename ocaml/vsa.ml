@@ -605,7 +605,7 @@ struct
 	  )
 	  x y
     end
-    let s0 _ =  G.V.create Cfg.BB_Entry
+    let s0 _ = G.V.create Cfg.BB_Entry
     let init g =
 	VM.add sp [(sp, SI.zero)] L.top (* stack region *)
 
@@ -826,7 +826,7 @@ struct
 	    )
 	    x y
     end
-    let s0 _ =  G.V.create Cfg.BB_Entry
+    let s0 _ = G.V.create Cfg.BB_Entry
       
     (** Creates a lattice element that maps each of the given variables to
 	it's own region. (For use as an inital value in the dataflow problem.)

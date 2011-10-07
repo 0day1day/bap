@@ -1,14 +1,8 @@
 (** Use dataflow analysis to statically identify system call types
 
-    The basic idea is to do constant propagation for the system call
-    id register (%eax) and then see if a constant reaches a system
-    call site.
+    XXX: The lattice is not correct yet.
 
-    XXX: What we really should do is start at the system call sites,
-    and go backwards.  The current structure of graphDataflow makes
-    this a little difficult, because there is only one start node.
-    The reason for this is that a single "int 0x80" could be jumped to
-    by several locations that set the system call id reg.
+    @author ejs
 *)
 
 open Ast
@@ -23,43 +17,57 @@ let syscall_reg = Disasm_i386.eax;;
 module DFSPEC = struct
   module G = Cfg.AST.G
   module L = struct
-    type t = Top | Constant of (big_int * Type.typ) | Syscall of (big_int * Type.typ) | Bottom
-    let top = Top
+    type t = Top | Term | FromSyscall | Syscall of (big_int * Type.typ) | Bottom
+    let top = Top (* Normal blocks are not system calls *)
     let equal x y = match x, y with
       | Top, Top -> true
-      | Bottom, Bottom -> true
-      | Constant(bi1, t1), Constant(bi2, t2) when bi1 ==% bi2 && t1 = t2 -> true
+      | Term, Term -> true
+      | FromSyscall, FromSyscall -> true
       | Syscall(bi1, t1), Syscall(bi2, t2) when bi1 ==% bi2 && t1 = t2 -> true
+      | Bottom, Bottom -> true
       | _ -> false
     let meet x y = match x,y with
       | Top, o -> o
       | o, Top -> o
       | Bottom, _ -> Bottom
       | _, Bottom -> Bottom
-      | (Constant _ as x), (Constant _ as y) when equal x y -> x
-      | (Syscall _ as x), (Syscall _ as y) when equal x y -> x
+      | Term, FromSyscall -> FromSyscall
+      | FromSyscall, Term -> FromSyscall
+      | x, y when equal x y -> x
       | _, _ -> Bottom
   end
 
   let transfer_function g n init =
     let stmts = Cfg.AST.get_stmts g n in
     let process_stmt a s = match s,a with
-      | Move(v, Int(i, t), _), _ -> L.Constant(i, t)
-      | _, L.Syscall _ -> L.Bottom (* After the syscall eax is clobbered *)
-      | s, L.Constant(x) when Ast.is_syscall s -> L.Syscall(x)
+      | Move(v, Int(i, t), _), L.FromSyscall when v=syscall_reg -> L.Syscall(i, t)
+      | Move(v, _, _), _ when v=syscall_reg -> L.meet a L.Term
+      | s, L.Term when Ast.is_syscall s -> L.FromSyscall
       | _, _ -> a
     in
+    (* We don't want to propagate Syscall values across blocks *)
+    let init = match init with
+      | L.Syscall _ -> L.Term
+      | _ -> init
+    in
     List.fold_left process_stmt init stmts
-  let s0 g = snd(Cfg_ast.find_entry g)
-  let init _ = L.Bottom (* EAX is undefined at program start *)
-  let dir = GraphDataflow.Forward
+  let s0 g =
+    (* let check_v v a = *)
+    (*   let stmts = Cfg.AST.get_stmts g v in *)
+    (*   if List.exists is_syscall stmts then v::a *)
+    (*   else a *)
+    (* in *)
+    (* Cfg.AST.G.fold_vertex check_v g [snd(Cfg_ast.find_error g)] *)
+    snd(Cfg_ast.find_exit g)
+  let init _ = L.Term
+  let dir = GraphDataflow.Backward
 
 end
 
 module DF = GraphDataflow.Make(DFSPEC)
 
 let find_syscalls g =
-  let _, out = DF.worklist_iterate g in
+  let inh, out = DF.worklist_iterate g in
   let process_vertex n a =
     match out n with
     | DFSPEC.L.Syscall(i, t) ->
