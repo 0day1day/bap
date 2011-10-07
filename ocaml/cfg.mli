@@ -40,6 +40,9 @@ sig
   (** Gets the statements from a basic block *)
   val get_stmts : G.t -> G.V.t -> lang
 
+  (** Get an empty list of statements *)
+  val default : lang
+
   (** Sets the statements for a basic block *)
   val set_stmts : G.t -> G.V.t -> lang -> G.t
 

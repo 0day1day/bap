@@ -8,8 +8,7 @@ if TESTS_OPT
 TESTPOSTDIRS=tests stpwrap pintraces
 endif
 
-SUBDIRS=bigint-3.12 batteries-1.4.0 ounit-1.1.0 pcre-ocaml-release-6.2.2 VEX libasmir ocaml utils $(TESTPOSTDIRS)
-
+SUBDIRS=bigint-3.12 batteries-1.4.0 ounit-1.1.0 pcre-ocaml-release-6.2.2 VEX libasmir solvers ocaml utils $(TESTPOSTDIRS)
 
 # pintraces removed temporarily
 # stp/ocaml ocaml utils doc

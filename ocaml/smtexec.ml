@@ -25,7 +25,7 @@ class type smtexec =
 object
   method printer : Formulap.fppf
   method solvername : string
-  method solve_formula_file : ?printmodel:bool -> ?timeout:int -> string -> result
+  method solve_formula_file : ?timeout:int -> ?remove:bool -> ?printmodel:bool -> string -> result
   (* XXX: Add other methods *)
 end
 
@@ -41,10 +41,10 @@ end
 (* Output type *)
 module type SOLVER =
 sig
-  val solve_formula_file : ?printmodel:bool -> ?timeout:int -> string -> result (** Solve a formula in a file *)
-  val check_exp_validity : ?timeout:int -> ?exists:(Ast.var list) -> ?foralls:(Ast.var list) -> Ast.exp -> result (** Check validity of an exp *)
+  val solve_formula_file : ?timeout:int -> ?remove:bool -> ?printmodel:bool -> string -> result (** Solve a formula in a file *)
+  val check_exp_validity : ?timeout:int -> ?remove:bool -> ?exists:(Ast.var list) -> ?foralls:(Ast.var list) -> Ast.exp -> result (** Check validity of an exp *)
   val create_cfg_formula :
-    ?exists:Ast.var list ->  ?foralls:Ast.var list -> ?remove:bool
+    ?remove:bool -> ?exists:Ast.var list ->  ?foralls:Ast.var list
     -> Cfg.AST.G.t -> string
   val si : smtexec
 end
@@ -158,7 +158,7 @@ struct
       name
 
     (** Write formula for AST CFG out to random filename and return the filename *)
-    let create_cfg_formula ?(exists=[]) ?(foralls=[]) ?remove p  =
+    let create_cfg_formula ?remove ?(exists=[]) ?(foralls=[]) p  =
       let p = Prune_unreachable.prune_unreachable_ast p in
       let post = Ast.exp_true in
       let (wp, _foralls) = compute_wp_boring p post in
@@ -168,7 +168,7 @@ struct
       (* FIXME: same for exists? *)
       write_formula ~exists ~foralls ?remove wp
 
-    let solve_formula_file ?(printmodel=false) ?(timeout=S.timeout) file =
+    let solve_formula_file ?(timeout=S.timeout) ?(remove=true) ?(printmodel=false) file =
       ignore(alarm timeout);
       let cmdline = S.cmdstr file in
 
@@ -180,14 +180,16 @@ struct
 	ignore(alarm 0);
 
         dprintf "Parsing result...";
-	S.parse_result ~printmodel sout serr pstatus
+        let r = S.parse_result ~printmodel sout serr pstatus in
+        if remove then Unix.unlink file;
+        r
 
       with Alarm_signal(pid) ->
 	kill pid 9;
 	Timeout
 
-    let check_exp_validity ?timeout ?exists ?foralls f =
-      let filename = write_formula ?exists ?foralls f in
+    let check_exp_validity ?timeout ?(remove=true) ?exists ?foralls f =
+      let filename = write_formula ?exists ?foralls ~remove f in
       solve_formula_file ?timeout filename
 
     class c = object(self)

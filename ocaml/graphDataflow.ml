@@ -4,7 +4,7 @@
 *)
 
 open Util
-module List = BatListFull.List
+open BatListFull
 
 module type G =
 sig

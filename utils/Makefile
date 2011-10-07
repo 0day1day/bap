@@ -24,7 +24,7 @@ export RESULTDEPS = $(BAP_OCAMLDIR)/bap.a
 
 # default subprojects to build
 ifndef SUBPROJS
-	export SUBPROJS = $(PROJUTILS) toil iltrans ileval topredicate formula get_functions split streamtrans
+	export SUBPROJS = $(PROJUTILS) toil iltrans ileval topredicate formula get_functions split infoflow streamtrans
 endif
 
 define PROJ_toil
@@ -75,6 +75,13 @@ define PROJ_split
 	DOC_FILES=$(SOURCES)
 endef
 export PROJ_split
+
+define PROJ_infoflow
+	RESULT=infoflow
+	SOURCES = infoflow.ml
+	DOC_FILES=$(SOURCES)
+endef
+export PROJ_INFOFLOW
 
 define PROJ_streamtrans
 	RESULT=streamtrans
