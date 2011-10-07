@@ -5,47 +5,70 @@ open D
 
 open Symbeval
 
-module type STRATEGY =
+
+module type Symb =
 sig
+  module MemL : sig
+    type t
+  end
+
+  module Form : sig
+    include Formula
+  end
+
+  type myctx = (MemL.t,Form.t) ctx
+
+  exception ExcState of string * addr
+  exception Halted of varval option * myctx
+  exception UnknownLabel of label_kind
+  exception AssertFailed of myctx
+  val init : Ast.stmt list -> myctx
+  val eval : myctx -> myctx list
+  val eval_expr : MemL.t -> Ast.exp -> varval
+
+end
+
+module type Strategy =
+  functor (Symbolic:Symb) -> sig
+  type myctx = Symbolic.myctx
   type t
   type data
   type initdata
-  val start_at : ctx -> initdata -> t
-  val pop_next : t -> ((ctx * data) * t) option
-  val add_next_states : t -> ctx -> data -> ctx list -> t
-end
-
-module type Symb =
-sig 
-  val init : Ast.stmt list -> ctx
-  val eval : ctx -> ctx list
+  val start_at : myctx -> initdata -> t
+  val pop_next : t -> ((myctx * data) * t) option
+  val add_next_states : t -> myctx -> data -> myctx list -> t
 end
 
 module NaiveSymb =
 struct
+  include SymbolicSlow
   let init = SymbolicSlow.build_default_context
   let eval = SymbolicSlow.eval
 end
 
 module FastSymb =
 struct
+  include Symbolic
   let init = Symbolic.build_default_context
   let eval = Symbolic.eval
 end
 
-module MakeSearch(S:STRATEGY)(Symbolic:Symb) =
+module MakeSearch(S':Strategy)(Symbolic:Symb) =
 struct
+
+  module S = S'(Symbolic)
+
   let rec search post predicates q =
     match S.pop_next q with
     | None -> predicates
     | Some ((st,d),q) ->
 	let (newstates, predicates) =
 	  try (Symbolic.eval st, predicates) with
-	  | Halted(v,s) ->
-	      let q = symb_to_exp (eval_expr s.delta post) in
-	      let pred = Ast.exp_and q s.pred in
+	  | Symbolic.Halted(v,s) ->
+	      let q = symb_to_exp (Symbolic.eval_expr s.delta post) in
+              let pred = Symbolic.Form.add_to_formula s.pred q Equal in
 	      ([], pred :: predicates)
-	  | AssertFailed {pc=pc} ->
+	  | Symbolic.AssertFailed {pc=pc} ->
 	      wprintf "failed assertion at %Ld\n" pc;
 	      ([], predicates)  (* try other branches *)
 	in
@@ -56,7 +79,7 @@ struct
     let ctx = Symbolic.init prog in
     let predicates = search post [] (S.start_at ctx initdata) in
     if debug then dprintf "Explored %d paths." (List.length predicates);
-    Util.list_join Ast.exp_or predicates
+    Util.list_join Ast.exp_or (List.map Symbolic.Form.output_formula predicates)
 
 end
 
@@ -86,8 +109,10 @@ end
 
 
 module UnboundedBFS = MakeSearch(
+  functor (Symbolic:Symb) ->
   struct
-    type t = ctx Q.t
+    type myctx = Symbolic.myctx
+    type t = Symbolic.myctx Q.t
     type data = unit
     type initdata = unit
     let start_at s () = Q.enqueue Q.empty s
@@ -104,10 +129,12 @@ let bfs_ast_program_fast p q = UnboundedBFSFast.eval_ast_program () p q
 
 
 module MaxdepthBFS = MakeSearch(
+  functor (Symbolic:Symb) ->
   struct
+    type myctx = Symbolic.myctx
     type data = int
     type initdata = int
-    type t = (ctx * data) Q.t
+    type t = (myctx * data) Q.t
     let start_at s i = Q.enqueue Q.empty (s,i)
     let pop_next = Q.dequeue_o
     let add_next_states q st i newstates =
@@ -122,8 +149,10 @@ let bfs_maxdepth_ast_program = MaxdepthBFSNaive.eval_ast_program
 let bfs_maxdepth_ast_program_fast = MaxdepthBFSFast.eval_ast_program
 
 module UnboundedDFS = MakeSearch(
+  functor (Symbolic:Symb) ->
   struct
-    type t = ctx list
+    type myctx = Symbolic.myctx
+    type t = myctx list
     type data = unit
     type initdata = unit
     let start_at s () = [s]
@@ -138,10 +167,12 @@ let dfs_ast_program p q = UnboundedDFSNaive.eval_ast_program () p q
 let dfs_ast_program_fast p q = UnboundedDFSFast.eval_ast_program () p q
 
 module MaxdepthDFS = MakeSearch(
+  functor (Symbolic:Symb) ->
   struct
+    type myctx = Symbolic.myctx
     type data = int
     type initdata = int
-    type t = (ctx * data) list
+    type t = (myctx * data) list
     let start_at s i = [(s,i)]
     let pop_next = function
       | st::rest -> Some(st,rest)
@@ -162,10 +193,12 @@ module EdgeMap = Map.Make(struct type t = int64 * int64 let compare = compare en
 
 (* DFS excluding paths that visit the same point more than N times. *)
 module MaxrepeatDFS = MakeSearch(
+  functor (Symbolic:Symb) ->
   struct
+    type myctx = Symbolic.myctx
     type data = int EdgeMap.t
     type initdata = int
-    type t = (ctx * data) list * int
+    type t = (myctx * data) list * int
     let start_at s i = ([(s,EdgeMap.empty)], i)
     let pop_next = function
       | (st::rest, i) -> Some(st,(rest,i))

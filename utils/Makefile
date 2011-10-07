@@ -84,7 +84,6 @@ define PROJ_streamtrans
 endef
 export PROJ_streamtrans
 
-
 # suffix for bytecode (which when we make all is debug code)
 export BCSUFFIX = .dbg
 

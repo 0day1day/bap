@@ -30,6 +30,31 @@ AC_PROG_CAMLIDL
 #AC_PROG_LATEX
 #AC_PROG_LIBTOOL
 
+# Check for Z3
+
+AC_ARG_WITH([z3-bindings],
+            [AS_HELP_STRING([--with-z3-bindings],
+              [enable support for Z3 bindings])],
+            [with_z3_bindings=yes],
+            [])
+
+AS_IF([test "x$with_z3_bindings" = "xyes"],
+     [AC_CHECK_FILE([solvers/z3-x86],
+        [AC_DEFINE([HAVE_Z3_BINDINGS], [1], [Define if you want to use Z3 bindings])],
+        [AC_MSG_FAILURE([z3 library not found])])])
+
+rm -f solvers/makefile.inc
+if `test "x$with_z3_bindings" = "xyes"`; then
+   echo "SOLVER_PPFLAGS=-D WITH_Z3_BINDINGS" >> solvers/makefile.inc
+   cat >>solvers/makefile.inc <<"EOF"
+SOLVER_LIBDIRS = $(SOLVER)/z3/lib
+SOLVER_LDFLAGS = -Wl,-rpath=$(SOLVER)/z3/lib -fopenmp
+SOLVER_CLIBS = z3stubs z3
+EOF
+else
+   touch solvers/makefile.inc
+fi
+
 # Add -DAMD64 when needed
 if test "$(uname -m)" == "x86_64";
    then export CFLAGS="$CFLAGS -DAMD64";
@@ -64,6 +89,7 @@ dnl fi
 #
 #    AS_HELP_STRING([--with-vex], [Vex directory]),
 #
+
 
 VEX_DIR=`pwd`/'VEX'
 
@@ -139,7 +165,6 @@ echo "VEX_DIR=${VEX_DIR}" >> libasmir/makefile.inc
 echo "LIBASMIR_CXXFLAGS=-I${VEX_DIR}/pub -I`pwd`/src/include $CXXFLAGS" >> libasmir/makefile.inc
 echo "LIBASMIR_LDFLAGS=-L${VEX_DIR} -L`pwd`/src $LDFLAGS" >> libasmir/makefile.inc
 echo "LIBASMIR_LIBS=-lasmir -lvex -lbfd -ldl -liberty" >> libasmir/makefile.inc
-
 AC_SUBST(ASMIR_DIR)
 ASMIR_DIR="`pwd`/libasmir"
 

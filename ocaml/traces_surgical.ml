@@ -221,7 +221,7 @@ let run_and_subst_block state memv block =
       )
     with
 	(* Ignore failed assertions -- assuming that we introduced them *)
-    | AssertFailed _ as _e -> 
+    | TraceConcrete.AssertFailed _ as _e -> 
 	  wprintf "failed assertion: %s" (Pp.ast_stmt_to_string stmt);
 	  (* raise e; *)
 	  let new_pc = Int64.succ state.pc in
@@ -238,9 +238,9 @@ let run_and_subst_block state memv block =
 	    raise e
 	  (* ) else 
 	  ((addr,false)::(info,false)::(List.tl !executed)) *)
-      | UnknownLabel _ ->
+      | TraceConcrete.UnknownLabel _ ->
 	  (addr::info::List.rev (!executed))
-      | Halted _ -> 
+      | TraceConcrete.Halted _ -> 
 	  (addr::info::List.rev (List.tl !executed))
 
 let run_and_subst_blocks blocks memv length =

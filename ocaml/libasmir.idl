@@ -174,6 +174,7 @@ boolean asmir_bap_block_error(bap_block_t b);
 bap_block_t asmir_addr_to_bap(asm_program_t p, address_t addr, [out] address_t *next);
 address_t asmir_get_sec_startaddr(asm_program_t p, [string] const char *sectionname);
 address_t asmir_get_sec_endaddr(asm_program_t p, [string] const char *sectionname);
+address_t asmir_get_start_addr(asm_program_t p);
 int asmir_get_instr_length(asm_program_t p, address_t addr);
 int asmir_bap_blocks_size(bap_blocks_t bs);
 bap_block_t asmir_bap_blocks_get(bap_blocks_t bs, int i);
