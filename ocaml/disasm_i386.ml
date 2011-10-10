@@ -1197,6 +1197,7 @@ let parse_instr g addr =
     | 0xff -> let (r, rm, na) = parse_modrm32ext na in
 	      (match r with (* Grp 5 *)
                 | 0 -> (Inc(opsize, rm), na)
+                | 1 -> (Dec(opsize, rm), na)
 	        | 2 -> (Call(rm, na), na)
 	        | 4 -> (Jump rm, na)
 	        | 6 -> (Push(opsize, rm), na)
