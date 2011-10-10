@@ -41,12 +41,11 @@ let stp = "stp";;
 
 
 let check_stp_path file =
-  let path = Sys.getenv("PATH") in
   print_endline("Checking for stp...");
   match Unix.system("echo 'QUERY(TRUE);' | stp 2> /dev/null") with
   | Unix.WEXITED(0) -> ()
   | _ -> (if (Sys.file_exists file) 
-    then Unix.putenv "PATH" (path^":"^stp_path)
+    then let path = Sys.getenv("PATH") in Unix.putenv "PATH" (path^":"^stp_path)
     else skip_if true 
       ("Skipping test.  Stp is not in PATH and can not find file "^file));;
 
@@ -58,11 +57,13 @@ let gentrace_path = "../pintraces/obj-ia32/";;
 let gentrace = "gentrace.so";;
 let pin_out_suffix = "bap-pin-test.out";;
 
+
 let rec find_pin_out files tag =
   match files with
   | [] -> assert_failure 
     ("Could not find a file with suffix "^tag^pin_out_suffix^" Did pin fail?")
   | f::fs -> if (pmatch ~pat:(tag^pin_out_suffix) f) then f else find_pin_out fs tag;;
+
 
 let check_pin_setup _ =
   (* Only do this if we are running in an x64 environment *)

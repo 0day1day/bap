@@ -8,6 +8,7 @@ export BIGINT=$(BAP_DIR)/bigint-3.12/otherlibs/num
 export BATT=$(BAP_DIR)/batteries-1.4.0/_build/src
 export OUNIT=$(BAP_DIR)/ounit-1.1.0/_build/src/
 export PCRE=$(BAP_DIR)/pcre-ocaml-release-6.2.2/lib
+export OBJSIZE=$(BAP_DIR)/objsize-0.16
 
 include $(LIBASMIR)/makefile.inc
 export SOLVER=$(BAP_DIR)/solvers
@@ -123,8 +124,8 @@ export CLIBS += $(SOLVER_CLIBS)
 export CFLAGS = -g
 export LDFLAGS = $(LIBASMIR_LDFLAGS) $(SOLVER_LDFLAGS)
 export PPFLAGS = $(SOLVER_PPFLAGS)
-export INCDIRS = $(BIGINT) $(BATT) $(OUNIT) $(PCRE)
-export LIBS = nums batteries oUnit pcre
+export INCDIRS = $(BIGINT) $(BATT) $(OUNIT) $(PCRE) $(OBJSIZE)
+export LIBS = nums batteries oUnit pcre objsize
 #export CLIBFLAGS= $(LDFLAGS)
 export RESULTDEPS = $(LIBASMIR)/src/libasmir.a $(VEX_DIR)/libvex.a
 export LIBDIRS = $(LIBASMIR)/src $(VEX_DIR)

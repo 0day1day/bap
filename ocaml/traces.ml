@@ -103,7 +103,7 @@ let name_to_var name =
   try
     Some(Asmir.gamma_lookup gamma name)
   with Failure _ ->
-    wprintf "Did not find %s in gamma" name;
+    if (name <> "Unknown") then wprintf "Did not find %s in gamma" name;
     None
 
 
@@ -374,9 +374,7 @@ let get_int = function
 
 let taint_to_bool n = n != 0
 
-let hd_tl = function
-  | [] -> failwith "empty list"
-  | x::xs -> x, xs
+let hd_tl = Util.hd_tl
 
 let is_mem (Var.V(_,var,t)) =
   (String.length var >= 3) &&
@@ -683,9 +681,9 @@ let trace_length trace =
 
 let print_formula file formula =
   let oc = open_out file in
-  let m2a = new Memory2array.memory2array_visitor () in
-  let formula = Ast_visitor.exp_accept m2a formula in
-  let foralls = List.map (Ast_visitor.rvar_accept m2a) [] in
+  let mem_hash = Var.VarHash.create 1000 in
+  let formula = Memory2array.coerce_exp_state mem_hash formula in
+  let foralls = List.map (Memory2array.coerce_rvar_state mem_hash) [] in
   let p = match !printer with
     | "stp" -> ((new Stp.pp_oc oc) :> Formulap.fpp_oc)
     | "smtlib1" -> ((new Smtlib1.pp_oc oc) :> Formulap.fpp_oc)
@@ -832,7 +830,6 @@ module TraceConcrete = Symbeval.Make(TraceConcreteDef)(FastEval)(TraceConcreteAs
 let check_delta state =
   (* let dsa_concrete_val v = concrete_val (Var.name v) in *)
   (* let dsa_taint_val v = taint_val (Var.name v) in *)
-  let error = ref [] in
   let contains_unknown e =
     let foundone = ref false in
     let v = object(self)
@@ -886,7 +883,6 @@ let check_delta state =
 	    let traceval_str = Pp.ast_exp_to_string traceval in
 	    let evalval_str = Pp.ast_exp_to_string evalval in
 	    wprintf "Difference between %sBAP and trace values in [%s]: %s Trace=%s Eval=%s" s badstmt dsavarname traceval_str evalval_str;
-	    error := (dsavarname, traceval_str, evalval_str)::!error
 	  )
 	  (* If we can't find concrete value, it's probably just a BAP temporary *)
       | _ -> ())
@@ -900,7 +896,7 @@ let check_delta state =
         Hashtbl.iter (check_mem cmem) global.memory
 
   in
-  (VH.iter check_var state.delta; !error)
+  VH.iter check_var state.delta
 
 let counter = ref 1
 
@@ -1004,7 +1000,7 @@ let rec get_next_label blocks =
 	| [] -> None
 
 (** Running each block separately *)
-let run_block ?(next_label = None) ?(log=fun _ -> ()) state memv block prev_block =
+let run_block ?(next_label = None) state memv block =  
   let addr, block = hd_tl block in
   let input_seeds = get_symbolic_seeds memv addr in
   pdebug ("Running block: " ^ (string_of_int !counter) ^ " " ^ (Pp.ast_stmt_to_string addr));
@@ -1013,35 +1009,11 @@ let run_block ?(next_label = None) ?(log=fun _ -> ()) state memv block prev_bloc
   let _ = ignore(update_concrete addr) in
   if !consistency_check then (
     (* remove temps *)
-    (*clean_delta state.delta;
-    check_delta state;*)
+    clean_delta state.delta;
+    check_delta state;
     (* TraceConcrete.print_values state.delta; *)
     (* TraceConcrete.print_mem state.delta; *)
     (* dprintf "Reg size: %d Mem size: %d" (TraceConcrete.num_values state.delta) (TraceConcrete.num_mem_locs state.delta);*)
-
-    (* SWXXX *)
-    let rec process_errors errors = (
-      match errors with
-      | [] -> ()
-      | (dsavarname,traceval,evalval)::es ->
-        (match prev_block with
-        | None -> 
-          log(Printf.sprintf 
-                "No previous block but there's a problem already?!! Register=%s Eval=%s does not match Trace=%s This Block: %s\n" 
-                dsavarname evalval traceval (Pp.ast_stmt_to_string addr))
-        | Some(p_block) ->
-          let p_addr, _ = hd_tl p_block in
-          log(Printf.sprintf 
-                "XXX Register=%s Eval=%s does not match Trace=%s Block:\n %s\n" 
-                dsavarname evalval traceval (Pp.ast_stmt_to_string p_addr)));
-        process_errors es
-	) in
-    clean_delta state.delta;
-    let error =
-      (* remove temps *)
-      check_delta state
-    in
-    process_errors error;
 
     (* Find the registers this block overwrites, and then mark this
        instruction as being the most recent to write them. 
@@ -1060,8 +1032,6 @@ let run_block ?(next_label = None) ?(log=fun _ -> ()) state memv block prev_bloc
     List.iter (fun v -> if not (is_temp v) then VH.replace reg_to_stmt v addr) defs
   );
 
-  log("SWXXX Running block: " ^ (string_of_int !counter) ^ " " ^ (Pp.ast_stmt_to_string addr)^"\n");
-
   (* Assign concrete values to regs/memory *)
   let block = match !use_alt_assignment with
     | true ->
@@ -1078,10 +1048,8 @@ let run_block ?(next_label = None) ?(log=fun _ -> ()) state memv block prev_bloc
   let executed = ref [] in
   let rec eval_block state =
     let stmt = TraceConcrete.inst_fetch state.sigma state.pc in
-    (* pwarn("XXXSW Executing: " ^ (Pp.ast_stmt_to_string stmt)); *)
-    (* pwarn ("XXXSW Current block is: " ^ (Pp.ast_stmt_to_string addr)); *)
     (* pdebug ("Executing: " ^ (Pp.ast_stmt_to_string stmt)); *)
-    (*    Hashtbl.iter (fun k v -> pdebug (Printf.sprintf "%Lx -> %s" k (Pp.ast_exp_to_string v))) concrete_mem ;*)
+       (* Hashtbl.iter (fun k v -> pdebug (Printf.sprintf "%Lx -> %s" k (Pp.ast_exp_to_string v))) concrete_mem ; *)
     let evalf e = match TraceConcrete.eval_expr state.delta e with
       | Symbolic(e) -> e
       | _ -> failwith "Expected symbolic"
@@ -1176,12 +1144,12 @@ let run_block ?(next_label = None) ?(log=fun _ -> ()) state memv block prev_bloc
 			| None -> ());*)
 	  (addr::info::List.rev (List.tl !executed))
 
-let run_blocks ?(log=fun _ -> ()) blocks memv length =
+let run_blocks blocks memv length =
   counter := 1 ;
   Status.init "Concrete Run" length ;
   let state = TraceConcrete.create_state () in
-  let (_,rev_trace,_) = List.fold_left 
-    (fun (prev_block,acc,remaining) block -> 
+  let (rev_trace,_) = List.fold_left 
+    (fun (acc,remaining) block -> 
       Status.inc() ;   
       let hd, block_tail = hd_tl block in
       let concblock =
@@ -1193,10 +1161,9 @@ let run_blocks ?(log=fun _ -> ()) blocks memv length =
 	  block
 	| _ ->
 	  let l = get_next_label remaining in 
-	  run_block ~next_label:(l) ~log state memv block prev_block)
+	  run_block ~next_label:(l) state memv block)
       in
       (
-	(* prev block *) (Some block),
 	(* If we are doing a consistency check, saving the concretized
 	   blocks is just a waste of memory! *)
 	(* new trace *) (if !consistency_check then [] else List.rev_append concblock acc),
@@ -1204,7 +1171,7 @@ let run_blocks ?(log=fun _ -> ()) blocks memv length =
 	| [] -> []
 	| _::tl -> tl)
       ))
-    (None,[],List.tl blocks) blocks
+    ([],List.tl blocks) blocks
   in
   Status.stop () ;
   List.rev rev_trace
@@ -1276,7 +1243,7 @@ let to_dsa p =
 
 (** Perform concolic execution on the trace and
     output a set of constraints *)
-let concrete ?(log=fun _ -> ()) trace =
+let concrete trace = 
   dsa_rev_map := None;
   let trace = Memory2array.coerce_prog trace in
   let trace = remove_specials trace in
@@ -1285,7 +1252,7 @@ let concrete ?(log=fun _ -> ()) trace =
   let blocks = trace_to_blocks trace in
   (*pdebug ("blocks: " ^ (string_of_int (List.length blocks)));*)
   let length = List.length blocks in
-  let actual_trace = run_blocks ~log blocks memv length in
+  let actual_trace = run_blocks blocks memv length in
     actual_trace
 
 (* Normal concrete execution *)

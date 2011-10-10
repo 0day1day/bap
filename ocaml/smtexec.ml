@@ -162,9 +162,9 @@ struct
       let p = Prune_unreachable.prune_unreachable_ast p in
       let post = Ast.exp_true in
       let (wp, _foralls) = compute_wp_boring p post in
-      let m2a = new Memory2array.memory2array_visitor () in
-      let wp = Ast_visitor.exp_accept m2a wp in
-      let foralls = List.map (Ast_visitor.rvar_accept m2a) foralls in
+	  let mem_hash = Var.VarHash.create 1000 in
+      let wp = Memory2array.coerce_exp_state mem_hash wp in
+      let foralls = List.map (Memory2array.coerce_rvar_state mem_hash) foralls in
       (* FIXME: same for exists? *)
       write_formula ~exists ~foralls ?remove wp
 

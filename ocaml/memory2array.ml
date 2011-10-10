@@ -71,8 +71,8 @@ let split_writes array index accesstype endian data =
 
 
 (** This visitor maps each TMem to an array *)
-class memory2array_visitor () =
-  let hash = VarHash.create 1000 in
+class memory2array_visitor hash =
+(*  let hash = VarHash.create 1000 in *)
   object (self)
     inherit Ast_visitor.nop
 
@@ -94,7 +94,6 @@ class memory2array_visitor () =
 
 
     method visit_rvar = self#visit_avar
-
 
     method visit_exp exp =
       (* Printf.printf "Visiting expression %s\n" (Pp.ast_exp_to_string exp); *)
@@ -129,10 +128,23 @@ class memory2array_visitor () =
     broken down to byte-level reads and writes using array variables
     with the same name as the old memory variables.  *)
 let coerce_prog prog =
-  let visitor = new memory2array_visitor () in
+  let hash = VarHash.create 1000 in
+  let visitor = new memory2array_visitor hash in
   Ast_visitor.prog_accept visitor prog
 
-(** Deend your average expression *)
-let coerce_exp e =
-  let v = new memory2array_visitor () in
-  Ast_visitor.exp_accept v e
+let coerce_prog_state hash prog =
+  let visitor = new memory2array_visitor hash in
+  Ast_visitor.prog_accept visitor prog
+
+let coerce_exp exp =
+  let hash = VarHash.create 1000 in
+  let visitor = new memory2array_visitor hash in
+  Ast_visitor.exp_accept visitor exp
+
+let coerce_exp_state hash exp =
+  let visitor = new memory2array_visitor hash in
+  Ast_visitor.exp_accept visitor exp
+
+let coerce_rvar_state hash v =
+  let visitor = new memory2array_visitor hash in
+  Ast_visitor.rvar_accept visitor v
