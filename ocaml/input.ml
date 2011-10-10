@@ -42,7 +42,7 @@ let speclist =
   [
     ("-init-ro", Arg.Set (init_ro), "Access rodata.");
     ("-bin",
-     Arg.String(fun s-> addinput (`Bin s)),
+     Arg.String(fun s -> addinput (`Bin s)),
      "<file> Convert a binary to the IL");
     ("-binrange",
      Arg.Tuple(let f = ref ""
@@ -50,6 +50,14 @@ let speclist =
                [Arg.Set_string f; Arg.String(setint64 s);
                 Arg.String(fun e->addinput(`Binrange(!f, !s, toint64 e)))]),
      "<file> <start> <end> Convert the given range of a binary to the IL");
+    ("-binrecurse",
+     Arg.String(fun s -> addinput (`Binrecurse s)),
+     "<file> Lift binary to the IL using a recursive descent algorithm.");
+    ("-binrecurseat",
+     Arg.Tuple(let f = ref "" in
+               [Arg.Set_string f;
+                Arg.String (fun s -> addinput (`Binrecurseat (!f, toint64 s)))]),
+     "<file> <start> Lift binary to the IL using a recursive descent algorithm starting at <start>.");
     ("-trace",
      Arg.String(fun s ->
 		  set_gc () ;
@@ -74,13 +82,19 @@ let get_program () =
   let get_one (oldp,oldscope) = function
     | `Il f ->
       let newp, newscope = Parser.program_from_file ~scope:oldscope f in
-	List.append newp oldp, newscope
+      List.append newp oldp, newscope
     | `Bin f ->
-	let p = Asmir.open_program f in
-	List.append (Asmir.asmprogram_to_bap ~init_ro:!init_ro p) oldp, oldscope
+      let p = Asmir.open_program f in
+      List.append (Asmir.asmprogram_to_bap ~init_ro:!init_ro p) oldp, oldscope
     | `Binrange (f, s, e) ->
-	let p = Asmir.open_program f in
-	List.append (Asmir.asmprogram_to_bap_range ~init_ro:!init_ro p s e) oldp, oldscope
+      let p = Asmir.open_program f in
+      List.append (Asmir.asmprogram_to_bap_range ~init_ro:!init_ro p s e) oldp, oldscope
+    | `Binrecurse f ->
+      let p = Asmir.open_program f in
+      List.append (fst (Asmir_rdisasm.rdisasm p)) oldp, oldscope
+    | `Binrecurseat (f, s) ->
+      let p = Asmir.open_program f in
+      List.append (fst (Asmir_rdisasm.rdisasm_at p s)) oldp, oldscope
     | `Trace f ->
       List.append (Asmir.bap_from_trace_file ~pin:!pintrace f) oldp, oldscope
   in

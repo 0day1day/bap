@@ -1,0 +1,6 @@
+This dir contains SMT solvers, and their ocaml wrappers.
+
+In order to build bsym, you have to first compile the solvers
+
+Invoke ./install_solvers.sh and cross fingers that everything will be compiled!
+

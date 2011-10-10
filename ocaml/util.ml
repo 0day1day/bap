@@ -7,7 +7,7 @@
     @author Ivan Jager
 *)
 
-open BatString
+(* open BatString -- overrides compare for some reason! *)
 open BatList
 open Big_int
 
@@ -46,6 +46,15 @@ let mapn f n =
   List.rev (foldn (fun l i -> f(n-i)::l) [] n)
   (* List.rev is needed to make side effects happen in the same order *)
 
+(** @return the arg max of [f] where the arguments come from [l] *)
+let list_argmax ?(compare=compare) f = function
+  | [] -> raise (Invalid_argument "list_argmax")
+  | hd::tl ->
+    (List.fold_left
+       (fun ((maxx,maxy) as max) x ->
+         let y = f x in
+         if compare y maxy > 0 then (x,y)
+         else max) (hd, f hd) tl)
 
 (** @return a union b, assuming a and b are sets *)
 let list_union a b = 
@@ -85,7 +94,6 @@ let list_subset a b =
 
 (** @return true when both sets contain the same elements *)
 let list_set_eq a b = list_subset a b && list_subset b a
-
 
 (** [union_find map items], where [map] is a mapping from items to
     their dependencies, finds independent elements in [items] *)
@@ -638,7 +646,7 @@ let big_int_of_string s =
     )
   in
   if is_hex s then
-    f (slice ~first:(String.length hex_prefix) s)
+    f (BatString.slice ~first:(String.length hex_prefix) s)
   else
     (* big_int_of_string handles decimals *)
     Big_int.big_int_of_string s

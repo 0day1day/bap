@@ -9,8 +9,7 @@ TESTPOSTDIRS=stpwrap
 BAPTESTDIRS=tests pintraces
 endif
 
-BAPDIRS=libasmir ocaml utils $(BAPTESTDIRS)
-
+BAPDIRS=libasmir solvers ocaml utils $(BAPTESTDIRS)
 SUBDIRS=bigint-3.12 batteries-1.4.0 ounit-1.1.0 pcre-ocaml-release-6.2.2 objsize-0.16 VEX $(BAPDIRS) $(TESTPOSTDIRS)
 
 test: all

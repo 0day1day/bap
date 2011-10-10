@@ -13,7 +13,7 @@ type prog =
   | AstCfg of astcfg
   | Ssa of ssa
 
-type cmd = 
+type cmd =
   | TransformAst of (ast -> ast)
   | TransformAstCfg of (astcfg -> astcfg)
   | TransformSsa of (ssa -> ssa)
@@ -33,6 +33,12 @@ let output_ast f p =
   pp#close;
   p
 
+let output_ast_cfg f p =
+  let oc = open_out f in
+  Cfg_pp.AstStmtsDot.output_graph oc p;
+  close_out oc;
+  p
+
 let output_ast_bbids f p =
   let oc = open_out f in
   Cfg_pp.AstBBidDot.output_graph oc p;
@@ -40,18 +46,18 @@ let output_ast_bbids f p =
   p
 
 let output_ast_cdg f p =
-  let oc = open_out f in 
-  let cdg = Depgraphs.CDG_AST.compute_cdg p in 
+  let oc = open_out f in
+  let cdg = Depgraphs.CDG_AST.compute_cdg p in
     Cfg_pp.AstBBidDot.output_graph oc cdg;
     close_out oc;
     p
- 
-let output_ast_pdg f p = 
-  let oc = open_out f in 
-  let pdg = Depgraphs.PDG_AST.compute_pdg p in 
+
+let output_ast_pdg f p =
+  let oc = open_out f in
+  let pdg = Depgraphs.PDG_AST.compute_pdg p in
     Cfg_pp.AstStmtsDot.output_graph oc pdg;
     close_out oc;
-    p 
+    p
 
 let output_ssa f p =
   let oc = open_out f in
@@ -65,15 +71,15 @@ let output_ssa_bbids f p =
   p
 
 let output_ssa_cdg f p =
-  let oc = open_out f in 
-  let cdg = Depgraphs.CDG_SSA.compute_cdg p in 
+  let oc = open_out f in
+  let cdg = Depgraphs.CDG_SSA.compute_cdg p in
     Cfg_pp.SsaBBidDot.output_graph oc cdg;
     close_out oc;
     p
 
-let output_ssa_ddg f p = 
-  let oc = open_out f in 
-  let ddg = Depgraphs.DDG_SSA.compute_ddg p in 
+let output_ssa_ddg f p =
+  let oc = open_out f in
+  let ddg = Depgraphs.DDG_SSA.compute_ddg p in
     Cfg_pp.SsaStmtsDot.output_graph oc ddg;
     close_out oc;
     p
@@ -81,14 +87,14 @@ let output_ssa_ddg f p =
 let output_c f p =
   let oc = open_out f in
   let ft = Format.formatter_of_out_channel oc in
-  let pp = new To_c.pp ft in 
+  let pp = new To_c.pp ft in
   pp#ast_program p;
   close_out oc;
   p
 
 let to_dsa p =
   let p,_ = Traces.to_dsa p in
-  p 
+  p
 
 let output_structanal p =
   let cfg = Prune_unreachable.prune_unreachable_ast p in
@@ -111,9 +117,9 @@ let ssa_coalesce = Coalesce.SSA_Coalesce.coalesce
 (*   Memory2scalar.convert_g p Memory2scalar.IndirectROPTIR *)
 
 (* Chop code added *)
-let ast_chop srcbb srcn trgbb trgn p = 
+let ast_chop srcbb srcn trgbb trgn p =
   Ast_slice.CHOP_AST.chop p !srcbb !srcn !trgbb !trgn
-let ssa_chop srcbb srcn trgbb trgn p = 
+let ssa_chop srcbb srcn trgbb trgn p =
   Ssa_slice.CHOP_SSA.chop p !srcbb !srcn !trgbb !trgn
 
 let add c =
@@ -125,6 +131,8 @@ let uadd c =
 let speclist =
   ("-pp-ast", Arg.String(fun f -> add(TransformAst(output_ast f))),
    "<file> Pretty print AST to <file>.")
+  ::("-pp-ast-cfg", Arg.String (fun f -> add(TransformAstCfg(output_ast_cfg f))),
+     "<file> Pretty print AST graph to <file> (in Graphviz format)")
   ::("-pp-ast-bbids", Arg.String(fun f -> add(TransformAstCfg(output_ast_bbids f))),
      "<file> Pretty print AST graph to <file> (in Graphviz format) (no stmts)")
   ::("-pp-ast-cdg", Arg.String (fun f -> add(TransformAstCfg(output_ast_cdg f))),
@@ -149,23 +157,23 @@ let speclist =
      "Convert to the AST.")
   ::("-to-ssa", uadd(ToSsa),
      "Convert to SSA.")
-  :: ("-to-c", Arg.String(fun f -> add(TransformAst(output_c f))), 
+  :: ("-to-c", Arg.String(fun f -> add(TransformAst(output_c f))),
       "<file> Output C to file."
      )
-  ::("-ast-chop", 
-      Arg.Tuple 
-        (let srcbb = ref 0 and srcn = ref 0 
+  ::("-ast-chop",
+      Arg.Tuple
+        (let srcbb = ref 0 and srcn = ref 0
          and trgbb = ref 0 and trgn = ref 0 in
          [Arg.Set_int srcbb ; Arg.Set_int srcn ;
-          Arg.Set_int trgbb ; Arg.Set_int trgn ; 
+          Arg.Set_int trgbb ; Arg.Set_int trgn ;
                uadd(TransformAstCfg(ast_chop srcbb srcn trgbb trgn)) ]),
      "<src-bb> <src-num> <trg-bb> <trg-num> Calculate the chop of an AST")
-  ::("-ssa-chop", 
-      Arg.Tuple 
-        (let srcbb = ref 0 and srcn = ref 0 
+  ::("-ssa-chop",
+      Arg.Tuple
+        (let srcbb = ref 0 and srcn = ref 0
          and trgbb = ref 0 and trgn = ref 0 in
          [Arg.Set_int srcbb ; Arg.Set_int srcn ;
-          Arg.Set_int trgbb ; Arg.Set_int trgn ; 
+          Arg.Set_int trgbb ; Arg.Set_int trgn ;
                uadd(TransformSsa(ssa_chop srcbb srcn trgbb trgn)) ]),
      "<src-bb> <src-num> <trg-bb> <trg-num> Calculate the chop of an AST")
   ::("-sccvn", uadd(TransformSsa sccvn),
@@ -190,19 +198,19 @@ let speclist =
     )
   ::("-trace-cut", Arg.Int(fun i -> add(TransformAst(Util.take i))),
      "<n>  Get the first <n> instructions of the trace")
-  ::("-trace-concrete", 
+  ::("-trace-concrete",
      uadd(TransformAst Traces.concrete),
      "Execute the trace concretely and obtain a straightline trace"
     )
-  ::("-trace-concrete-subst", 
-     uadd(TransformAst Traces.concrete_substitution),
+  ::("-trace-concrete-subst",
+     uadd(TransformAst Traces_surgical.concrete_substitution),
      "Execute the trace concretely and obtain a straightline trace"
     )
-  ::("-trace-slice", 
-     uadd(TransformAst Traces.check_slice),
+  ::("-trace-slice",
+     uadd(TransformAst Traces_surgical.check_slice),
      "Slice a trace based on the overwritten return address"
     )
-  ::("-trace-clean", 
+  ::("-trace-clean",
      uadd(TransformAst Traces.clean),
      "Remove labels and comments from a concretized trace"
     )
@@ -218,12 +226,12 @@ let speclist =
      Arg.Set_int(startdebug),
      "Start debugging at item n."
     )
-  ::("-trace-debug", 
+  ::("-trace-debug",
      uadd(TransformAst Traces.trace_valid_to_invalid),
      "Formula debugging. Prints to files form_val and form_inv"
     )
-  ::("-trace-conc-debug", 
-     Arg.Unit 
+  ::("-trace-conc-debug",
+     Arg.Unit
        (fun () ->
 	  let f = Traces.formula_valid_to_invalid ~min:!startdebug in
 	  add(TransformAst f)
@@ -233,34 +241,34 @@ let speclist =
   ::("-trace-dsa",
      uadd(TransformAst to_dsa),
      "Convert to DSA form.")
-   ::("-trace-target", 
+   ::("-trace-target",
      Arg.String (fun i -> add(TransformAst(Traces.control_flow i))),
      "<addr> Provide the target address <addr>"
-    )   
-   ::("-trace-symbolic-target", 
+    )
+   ::("-trace-symbolic-target",
      uadd(TransformAst Traces.limited_control),
      "Use a symbolic jump target (to determine the amount of control we have)"
-    )   
-   ::("-trace-payload", 
+    )
+   ::("-trace-payload",
      Arg.String (fun p -> add(TransformAst(Traces.add_payload p))),
      "<binstring> Provide a payload to be inserted at the return address (BEWARE of null bytes)"
-    )   
-   ::("-trace-payload-file", 
+    )
+   ::("-trace-payload-file",
      Arg.String (fun p -> add(TransformAst(Traces.add_payload_from_file p))),
      "<binfile> Provide a payload to be inserted at the return address"
     )
-   ::("-trace-payload-after-file", 
+   ::("-trace-payload-after-file",
      Arg.String (fun p -> add(TransformAst(Traces.add_payload_from_file_after ~offset:4L p))),
      "<binfile> Provide a payload to be inserted past the return address"
     )
-   ::("-trace-payload-after", 
+   ::("-trace-payload-after",
      Arg.String (fun p -> add(TransformAst(Traces.add_payload_after ~offset:4L p))),
      "<binstring> Provide a payload to be inserted past the return address (BEWARE of null bytes)"
-    )   
-   ::("-trace-shell", 
+    )
+   ::("-trace-shell",
      Arg.Int (fun off -> add(TransformAst(Traces.inject_shellcode off))),
      "<nopsled> Insert shellcode with a nopsled of the given size"
-    )   
+    )
   ::("-trace-pivot",
      Arg.Tuple(
        let gaddr = ref 0L in
@@ -309,7 +317,7 @@ let speclist =
        ]),
      "<gaddress> <maddress> <sehaddress> <payload file> Use pivot at gaddress to transfer control (by overwriting SEH handler at sehaddress) to payload at maddress."
     )
-  ::("-trace-formula", 
+  ::("-trace-formula",
      Arg.String(fun f -> add(TransformAst(Traces.output_formula f))),
      "<file> Output the STP trace formula to <file>"
     )
@@ -317,27 +325,27 @@ let speclist =
      Arg.Set_string Traces.printer,
      "Set formula format (STP (default) or smtlib1)."
   )
-  ::("-trace-exploit", 
+  ::("-trace-exploit",
      Arg.String(fun f -> add(TransformAst(Traces.output_exploit f))),
      "<file> Output the exploit string to <file>"
     )
-  ::("-trace-assignments", 
+  ::("-trace-assignments",
      uadd(TransformAst(Traces.add_assignments)),
      "Explicitly assign the concrete values to the trace variables"
     )
-  ::("-trace-length", 
+  ::("-trace-length",
      uadd(TransformAst(Traces.trace_length)),
      "Output the length of the trace"
     )
-  ::("-trace-no-padding", 
+  ::("-trace-no-padding",
      Arg.Unit(fun () -> Traces.padding := false),
      "Apply padding for symbolic unused bytes."
-    )   
-  ::("-no-let-bindings", 
+    )
+  ::("-no-let-bindings",
      Arg.Clear Traces.full_symbolic,
      "Disable the usage of let bindings during formula generation"
     )
-  ::("-trace-symbolic-indices", 
+  ::("-trace-symbolic-indices",
      Arg.Set Traces.allow_symbolic_indices,
      "Allow the existence of symbolic indices during formula generation"
     )

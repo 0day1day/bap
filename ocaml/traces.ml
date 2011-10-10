@@ -11,11 +11,11 @@ module DV = Debug.Make(struct let name = "TraceEvalVerbose" and default=`NoDebug
 open D
 
 (** So here's how we will do partial symbolic execution on
-    traces: 
+    traces:
     1. A trace is a list of AST stmts as executed by the
     program
     2. Execute the trace and at each instruction:
-    
+
     a) check if it is a taint introduction stmt
     b) if it is, update the memory context with the symbolic
     variables
@@ -50,12 +50,12 @@ let use_alt_assignment = ref true;;
 let allow_symbolic_indices = ref false
 
 let full_symbolic = ref true
-  
+
 let padding = ref true
 
 let printer = ref "stp"
 
-let memtype = reg_32  
+let memtype = reg_32
 
 let endtrace = "This is the final trace block"
 
@@ -68,7 +68,7 @@ let tassignattr = StrAttr("Tainted Concrete Assignment")
 (* The datastructures that are be used during trace analysis *)
 
 (* A type for all concrete values *)
-type value = 
+type value =
 {
   exp   : Ast.exp;
   usg   : usage;
@@ -83,9 +83,9 @@ type environment =
   symbolicvar: (int,Ast.exp) Hashtbl.t;
 }
 
-(* A global environment to keep the concrete and taint 
+(* A global environment to keep the concrete and taint
    information of the statement block that is analyzed *)
-let global = 
+let global =
   {
   vars        = Hashtbl.create 100;
   memory      = Hashtbl.create 100;
@@ -105,13 +105,13 @@ let name_to_var name =
   with Failure _ ->
     if (name <> "Unknown") then wprintf "Did not find %s in gamma" name;
     None
-      
+
 
 let var_lookup v = try Some(Hashtbl.find global.vars v) with Not_found -> None
 let mem_lookup i = try Some(Hashtbl.find global.memory i) with Not_found -> None
-let sym_lookup i = 
-  try Hashtbl.find global.symbolicvar i 
-  with Not_found -> 
+let sym_lookup i =
+  try Hashtbl.find global.symbolicvar i
+  with Not_found ->
     let newvarname = "symb_" ^ (string_of_int i) in
     let sym_var = Var (Var.newvar newvarname reg_8) in
     let () = Hashtbl.add global.symbolicvar i sym_var in
@@ -137,9 +137,9 @@ let dsa_orig_name dv =
 (** Looks for concrete value information by a DSA name *)
 let dsa_var_lookup dv =
   match dsa_var dv with
-  | Some(v) -> 
+  | Some(v) ->
       var_lookup (Var.name v)
-  | None -> None 
+  | None -> None
 
 let concrete_val name = match (var_lookup name) with
   | Some(e) -> Some(e.exp)
@@ -165,19 +165,19 @@ let taint_mem index = match (mem_lookup index) with
 let bound = Hashtbl.mem global.vars
 let in_memory = Hashtbl.mem global.memory
 
-let add_var var value usage taint = 
-  Hashtbl.replace global.vars var 
+let add_var var value usage taint =
+  Hashtbl.replace global.vars var
     {exp=value;
      usg=usage;
      tnt=taint;}
 let add_mem index value usage taint =
-  Hashtbl.add global.memory index 
+  Hashtbl.add global.memory index
     {exp=value;
      usg=usage;
      tnt=taint;}
 let add_symbolic = Hashtbl.replace global.symbolic
-  
-let add_new_var var value usage taint = 
+
+let add_new_var var value usage taint =
 (*  if not (bound var) then *)
   dprintf "Adding value %s for %s" (Pp.ast_exp_to_string value) var;
   add_var var value usage taint
@@ -204,9 +204,9 @@ let cleanup () =
   Hashtbl.clear global.memory;
   Hashtbl.clear global.symbolic
 
-let conc_mem_fold f = 
+let conc_mem_fold f =
   Hashtbl.fold f global.memory
-let conc_mem_iter f = 
+let conc_mem_iter f =
   Hashtbl.iter f global.memory
 
 
@@ -219,14 +219,14 @@ let symb_re = Str.regexp "^symb_\\([0-9]+\\)$";;
 let get_symb_num (Var.V(_, s, _)) =
   if Str.string_match symb_re s 0 then
     int_of_string(Str.matched_group 1 s)
-  else 
+  else
     failwith ("Expected a symbolic: " ^ s)
 
 (* Return a list of bytes read from a file *)
 let bytes_from_file file =
   let cin = open_in file in
   let bytes = ref [] in
-  let rec get_bytes () = 
+  let rec get_bytes () =
     bytes := (input_byte cin)::!bytes ;
     get_bytes ()
   in
@@ -272,29 +272,29 @@ let isbad v = Hashtbl.mem badregs (Var.name v) || isnotallbad v
 let print_vars () =
   let printone k v = dprintf "Info for register %s %s" k (Pp.ast_exp_to_string v.exp) in
   Hashtbl.iter printone global.vars
-    
+
 (** Build a statement asserting that each operand is equal to its value in the trace
 
     @param h Mapping of vars to dsa vars
 *)
 let assert_vars h =
-  let addone k v a = 
+  let addone k v a =
     match name_to_var k with
-    | Some(realv) -> 
-	(match taint_val (Var.name realv) with 
-	| Some(true) ->
-	    if not (isbad realv) then (
-	      if VH.mem h realv then 
-		let eq = BinOp(EQ, Var(realv), v.exp) in
-		BinOp(AND, eq, a)
-	      else a) else a
-	| _ -> a)
+    | Some(realv) ->
+        (match taint_val (Var.name realv) with
+        | Some(true) ->
+            if not (isbad realv) then (
+              if VH.mem h realv then
+                let eq = BinOp(EQ, Var(realv), v.exp) in
+                BinOp(AND, eq, a)
+              else a) else a
+        | _ -> a)
     | None -> a
   in
   let bige = Hashtbl.fold addone global.vars exp_true in
   Assert(bige, [])
 
-(** Build statements assigning concrete operands 
+(** Build statements assigning concrete operands
 
     @param symbolic Set to true when symbolically executing and false
     when concretely executing.  When symbolic mode is enabled, only
@@ -305,10 +305,10 @@ let assign_vars memv symbolic =
     | true -> [tassignattr]
     | false -> []
   in
-  let addone k v a = 
+  let addone k v a =
     match name_to_var k with
-    | Some(realv) -> 
-	(match symbolic, v.tnt with 
+    | Some(realv) ->
+	(match symbolic, v.tnt with
 	 | true, false (* Symbolic execution, non-tainted *)
 	 | false, _ (* Concrete execution *) ->
 	     Move(realv, v.exp, getattrs v.tnt)::a
@@ -320,7 +320,7 @@ let assign_vars memv symbolic =
        we introduce concrete memory information? We are doing this for
        now. *)
     match symbolic, v.tnt with
-    | true, false (* Symbolic *) 
+    | true, false (* Symbolic *)
     | false, _ (* Concrete *) ->
 	let k = big_int_of_int64 k in
 	Move(memv, Store(Var(memv), Int(k, memtype), v.exp, exp_false, reg_8), getattrs v.tnt)::a
@@ -335,14 +335,14 @@ let assign_vars memv symbolic =
 let symbtoexp = function
   | Symbolic e -> e
   | _ -> failwith "Not a symbolic expression"
-  
-(* The number of bytes needed to represent each type *) 
-let typ_to_bytes = function 
+
+(* The number of bytes needed to represent each type *)
+let typ_to_bytes = function
   | Reg 1 | Reg 8 -> 1
   | Reg 16 -> 2
    | Reg 32 -> 4
   | Reg 64 -> 8
-  | _ -> failwith "not a register" 
+  | _ -> failwith "not a register"
 
 (* Get the ith byte of a value v *)
 let get_byte i v = 
@@ -352,20 +352,20 @@ let get_byte i v =
 let num_to_bit num =
   if bi_is_zero num then bi0 else bi1
 
-(* Wrappers & Useful shorthands to manipulate taint 
+(* Wrappers & Useful shorthands to manipulate taint
    attributes and process taint info *)
-let keep_taint = function 
-  | Context _ -> true 
-  | _ -> false 
-      
-let unwrap_taint = function 
-  | Context c -> c 
+let keep_taint = function
+  | Context _ -> true
+  | _ -> false
+
+let unwrap_taint = function
+  | Context c -> c
   | _ -> failwith "trying to unwrap a non-taint attribute"
-      
+
 (* Keeping only the attributes that contain taint info *)
-let filter_taint atts = 
+let filter_taint atts =
   let atts = List.filter keep_taint atts in
-    List.map unwrap_taint atts     
+    List.map unwrap_taint atts
 
 let get_int = function
   | Int(v, t) -> let (i,_) = Arithmetic.to_val t v in
@@ -384,7 +384,7 @@ let is_mem (Var.V(_,var,t)) =
   | Array _ -> true
   | Reg _ -> false)
 
-let is_temp = 
+let is_temp =
   Disasm.is_temp
 
 let is_tconcassign = (==) tassignattr
@@ -401,34 +401,34 @@ let clean_delta delta =
       VH.remove delta v
   in
   VH.iter clean_var delta
- 
+
 (* This is a total HACK due to VEX's handling of the direction flag *)
-let direction_flag eflags = 
+let direction_flag eflags =
   match num_to_bit (and_big_int eflags (biconst 0x400)) with
     | bi when bi_is_zero bi -> bi1
     | _ -> (big_int_of_int64 0xFFFFFFFFL)
 
 (* Unfortunately we need to special-case the EFLAGS registers
-   since PIN does not provide us with separate registers for 
+   since PIN does not provide us with separate registers for
    the zero, carry etc flags *)
 let add_eflags eflags usage taint =
-  add_var 
-    "R_AF" 
+  add_var
+    "R_AF"
     (Int(num_to_bit (and_big_int eflags (biconst 0x10)), reg_1))
     usage
     taint;
-  add_var 
-    "R_CF" 
+  add_var
+    "R_CF"
     (Int(num_to_bit (and_big_int eflags (biconst 0x01)), reg_1))
     usage
     taint;
-  add_var 
-    "R_ZF" 
+  add_var
+    "R_ZF"
     (Int(num_to_bit (and_big_int eflags (biconst 0x40)), reg_1))
     usage
     taint;
-  add_var 
-    "R_SF" 
+  add_var
+    "R_SF"
     (Int(num_to_bit (and_big_int eflags (biconst 0x80)), reg_1))
     usage
     taint;
@@ -447,10 +447,10 @@ let add_eflags eflags usage taint =
     (Int(num_to_bit (and_big_int eflags (biconst 0x4)), reg_1))
     usage
     taint
-    
+
  (* TODO: handle more EFLAGS registers *)
 
-	  
+
 (** Get the vars used in a program *)
 let allvars p =
   let h = VH.create 570 in
@@ -462,10 +462,10 @@ let allvars p =
       `DoChildren
 
     method visit_rvar = self#visit_avar
-  end 
+  end
   in
   ignore(Ast_visitor.prog_accept vis p);
-  VH.fold (fun k () a -> k::a) h []	
+  VH.fold (fun k () a -> k::a) h []
 
 let find_memv trace =
   let vars = List.filter is_mem (allvars trace) in
@@ -481,8 +481,8 @@ let find_memv trace =
 (********************************************************)
 
 let regs = Hashtbl.create 32
-let () = 
-  List.iter (fun (k,v) -> Hashtbl.add regs k v) 
+let () =
+  List.iter (fun (k,v) -> Hashtbl.add regs k v)
     [
       ("R_AL",("R_EAX",0,reg_32));
       ("R_BL",("R_EBX",0,reg_32));
@@ -505,54 +505,54 @@ let () =
     ]
 
 (********************************************************)
-	  
+
 let is_seed_label = (=) "ReadSyscall"
-      
+
 (* Store the concrete taint info in the global environment *)
-let add_to_conc {name=name; mem=mem; index=index; value=value; 
-		 t=typ; usage=usage; taint=Taint taint} =
-  (* Stores the concrete (known) memory bytes in the global 
+let add_to_conc {name=name; mem=mem; index=index; value=value;
+                 t=typ; usage=usage; taint=Taint taint} =
+  (* Stores the concrete (known) memory bytes in the global
      environment in little endian order *)
-  let add_to_mem index value taint limit = 
+  let add_to_mem index value taint limit =
     let rec add_mem_aux index = function
-      | 0 -> 
-	  ()
-      | n -> 
-	  let byte = get_byte (limit-n+1) value in
+      | 0 ->
+          ()
+      | n ->
+          let byte = get_byte (limit-n+1) value in
             if not (in_memory index) then
-	      add_mem index (Int(byte,reg_8)) usage taint ;
+              add_mem index (Int(byte,reg_8)) usage taint ;
             add_mem_aux (Int64.succ index) (n-1)
     in
       add_mem_aux index
   in
-  let taint = taint_to_bool taint in 
+  let taint = taint_to_bool taint in
     if mem then
       let limit = typ_to_bytes typ in
-	add_to_mem index value taint limit limit 
+        add_to_mem index value taint limit limit
     else
       (* assert (Hashtbl.mem concrete name = false) ; *)
-      let fullname, shift, typ = 
-	try Hashtbl.find regs name
-	with Not_found -> (name, 0,typ)
+      let fullname, shift, typ =
+        try Hashtbl.find regs name
+        with Not_found -> (name, 0,typ)
       in
       let bits = Arithmetic.to_big_int (shift_left_big_int value shift,typ) in
       let fullvalue = Int(bits,typ) in
-	(add_new_var fullname fullvalue usage taint ;
-	 
-	 (* Special case EFLAGS *)
-	 if name = "EFLAGS" then add_eflags value usage taint)
-	
+        (add_new_var fullname fullvalue usage taint ;
+
+         (* Special case EFLAGS *)
+         if name = "EFLAGS" then add_eflags value usage taint)
+
 (* Updating the lookup tables with the concrete values *)
 let update_concrete s =
   match s with
   (* | Label (Name s,atts) when is_seed_label s -> *)
   (*     (\* Taint introduction *\) *)
   (*     List.iter *)
-  (*     	(fun {index=index; taint=Taint taint} -> *)
-  (*     	   (\* Mark the index as symbolic; we don't actually care about *)
-  (*     	      the value *\) *)
-  (*     	   add_symbolic index (Int(0L, reg_8)) *)
-  (*     	) (filter_taint atts); *)
+  (*            (fun {index=index; taint=Taint taint} -> *)
+  (*               (\* Mark the index as symbolic; we don't actually care about *)
+  (*                  the value *\) *)
+  (*               add_symbolic index (Int(0L, reg_8)) *)
+  (*            ) (filter_taint atts); *)
   (*     false *)
   | Comment (s,atts) when is_seed_label s ->
       (* Taint introduction *)
@@ -562,15 +562,15 @@ let update_concrete s =
       	      the value *)
       	   add_symbolic index (Int(bi0, reg_8))
       	) (filter_taint atts);
-      false      
+      false
   | Label (_,atts) ->
       (* Concrete operands *)
       let conc_atts = filter_taint atts in
         if conc_atts != [] then (
-	  cleanup ();
+          cleanup ();
           List.iter add_to_conc conc_atts;
-	  true
-	) else false
+          true
+        ) else false
   | _ -> false
 
 (* (\** Get the address of the next instruction in the trace *\) *)
@@ -590,11 +590,11 @@ let rec get_first_atts = function
   | [] -> failwith "no taint analysis info were found in the trace"
   | (Ast.Label (_,atts))::rest ->
       let taint_atts = filter_taint atts in
-	if taint_atts <> [] then (taint_atts, rest)
-	else get_first_atts rest
-  | s::rest -> 
-      get_first_atts rest 
-      
+        if taint_atts <> [] then (taint_atts, rest)
+        else get_first_atts rest
+  | s::rest ->
+      get_first_atts rest
+
 (** Initializing the trace contexts *)
 (* let init_trace trace ctx =  *)
 (*   let atts,_ = get_first_atts trace in *)
@@ -603,21 +603,21 @@ let rec get_first_atts = function
 (*     (fun {index=index; taint=Taint taint} -> *)
 (*        let varname = "symb_"^(string_of_int taint) in *)
 (*        let newvar = Var (Var.newvar varname reg_8) in *)
-(* 	 add_symbolic index newvar *)
+(*       add_symbolic index newvar *)
 (*     ) atts; *)
 (*     pdebug "Added the initial symbolic seeds"  *)
- 
+
 (** Removing all jumps from the trace *)
 let remove_jumps =
-  let no_jmps = function 
-    | Ast.Jmp _ -> false 
+  let no_jmps = function
+    | Ast.Jmp _ -> false
     | _ -> true
   in
     List.filter no_jmps
 
-(** Removing all specials from the traces *)	
+(** Removing all specials from the traces *)
 let remove_specials =
-  let no_specials = function 
+  let no_specials = function
     | Ast.Special(_, attrs) when not (List.mem (StrAttr "TraceKeep") attrs) -> false
     | _ -> true
   in
@@ -634,28 +634,28 @@ let remove_specials =
 (*       | _ -> `DoChildren *)
 (*   end *)
 (*   in Ast_visitor.prog_accept v *)
-   
+
 (* Appends a Halt instruction to the end of the trace *)
-let append_halt trace = 
+let append_halt trace =
   let halt = Ast.Halt (exp_true, []) in
     Util.fast_append trace [halt]
-      
+
 (** A trace is a sequence of instructions. This function
     takes a list of ast statements and returns a list of
-    lists of ast stmts. Each one of those sublists will 
+    lists of ast stmts. Each one of those sublists will
     represent the IL of the executed assembly instruction *)
-let trace_to_blocks trace = 
+let trace_to_blocks trace =
   let rec to_blocks blocks current = function
-    | [] -> 
-	  List.rev ((List.rev current)::blocks)
+    | [] ->
+        List.rev ((List.rev current)::blocks)
     | (Ast.Label (Addr _, _) as l)::rest ->
-	  let block = List.rev current in
-	  to_blocks (block::blocks) [l] rest
+        let block = List.rev current in
+        to_blocks (block::blocks) [l] rest
     | (Ast.Comment (c, _) as s)::rest when c = endtrace || (is_seed_label c) ->
-	  let block = List.rev current in
-	  to_blocks (block::blocks) [s] rest
+        let block = List.rev current in
+        to_blocks (block::blocks) [s] rest
     | x::rest ->
-	  to_blocks blocks (x::current) rest
+        to_blocks blocks (x::current) rest
   in
   let blocks = to_blocks [] [] trace in
     List.filter (fun b -> List.length b > 1) blocks
@@ -663,19 +663,19 @@ let trace_to_blocks trace =
 (** Strips the last jump of the block *)
 (* let strip_jmp block = *)
 (*   match List.rev block with *)
-(* 	 | (Ast.Jmp _)::rest -> List.rev rest *)
-(* 	 | _ -> block *)
+(*       | (Ast.Jmp _)::rest -> List.rev rest *)
+(*       | _ -> block *)
 
 (*************************************************************)
 (*************************  Printers  ************************)
 (*************************************************************)
 
 let print = Printf.printf
-	     
+
 let print_block =
   List.iter (fun s -> pdebug (Pp.ast_stmt_to_string s))
 
-let trace_length trace = 
+let trace_length trace =
   print "Trace length: %d\n" (List.length trace) ;
   trace
 
@@ -707,18 +707,18 @@ let trace_dce trace =
   (** This visitor traverses trace statements backwards.  Any variable
       referenced in an Assert is considered live. *)
   let rv = object(self)
-    inherit Ast_visitor.nop      
+    inherit Ast_visitor.nop
     method visit_stmt = function
-	Assert _ -> `DoChildren
+        Assert _ -> `DoChildren
       | Move (tv, _, _) when VH.mem rvh tv ->
-	  (* Include this statement, and add referenced vars. *)
-	  VH.remove rvh tv;
-	  `DoChildren
+          (* Include this statement, and add referenced vars. *)
+          VH.remove rvh tv;
+          `DoChildren
       | Move (tv, _, _) as olds when not (VH.mem rvh tv) ->
-	  (* Remove this statement *)
-	  let str = Printf.sprintf "Removed by dce: %s" (Pp.ast_stmt_to_string olds) in
-	  let news = Comment (str, []) in
-	    `ChangeTo news
+          (* Remove this statement *)
+          let str = Printf.sprintf "Removed by dce: %s" (Pp.ast_stmt_to_string olds) in
+          let news = Comment (str, []) in
+            `ChangeTo news
       | _ -> `SkipChildren
     method visit_rvar v =
       VH.replace rvh v ();
@@ -729,63 +729,66 @@ let trace_dce trace =
 
   Status.stop () ;
   final
-    
+
 (*************************************************************)
 (********************  Concrete Execution  *******************)
 (*************************************************************)
 
-module TraceConcreteDef = 
-struct 
-  let lookup_var delta var = 
+module TraceConcreteDef =
+struct
+
+  include MemVHBackEnd
+
+  let lookup_var delta var =
 
     DV.dprintf "looking up %s (concrete)" (Var.name var);
 
     (* print_vars (); *)
 
     match dsa_concrete_val var with
-    | Some(traceval) when not !use_alt_assignment ->	
-    
-	(* First, look up in the trace as long as we are not using the
-	   alternate assignment scheme. The alternate assignment scheme puts
-	   the value in delta, so we just need to look there.
+    | Some(traceval) when not !use_alt_assignment ->
 
-	   If we are not using the alternate scheme, we should update
-	   delta for consistency. *)
-	VH.replace delta var (Symbolic(traceval));
-	Symbolic(traceval)
+        (* First, look up in the trace as long as we are not using the
+           alternate assignment scheme. The alternate assignment scheme puts
+           the value in delta, so we just need to look there.
+
+           If we are not using the alternate scheme, we should update
+           delta for consistency. *)
+        VH.replace delta var (Symbolic(traceval));
+        Symbolic(traceval)
 
     | _ ->
-	
+
 	(* If we can't find it there, then check in delta. Maybe we
 	   updated it (e.g., R_ESP = R_ESP+4) *)
-	
+
 	try DV.dprintf "trying delta"; VH.find delta var
 	with Not_found ->
-	  
+
 	  (* If the variable is memory, it's okay (we'll complain during
 	     lookup_mem if we can't find a value). If not, we're in
 	     trouble! *)
-	  
+
 	  match Var.typ var with
 	  | TMem _
 	  | Array _ ->
               empty_mem var
-	  | Reg _ ->
-	      if not (isbad var) then 
-		wprintf "Unknown variable during eval: %s" (Var.name var);
+          | Reg _ ->
+              if not (isbad var) then
+                wprintf "Unknown variable during eval: %s" (Var.name var);
               Symbolic(Int(bi0, (Var.typ var)))
-	      
+
   let normalize = SymbolicMemL.normalize
-  let update_mem mu pos value endian = 
+  let update_mem mu pos value endian =
     (match mu,pos with
     | ConcreteMem(_), Int(i,t) ->
 	del_mem (int64_of_big_int i)
     | _ -> failwith "Bad memory for concrete evaluation");
     Concrete.update_mem mu pos value endian
 
-  let lookup_mem mu index endian = 
+  let lookup_mem mu index endian =
     (*pdebug ("index at " ^ (Pp.ast_exp_to_string index)) ;*)
-    
+
     (* Look for the data in mu *)
     match mu, index with
     | ConcreteMem(m,v), Int(i,t) -> (
@@ -795,26 +798,31 @@ struct
 	match concrete_mem (int64_of_big_int i) with
 	| Some(traceval) when not !use_alt_assignment ->
 	    traceval
-	| _ -> 
+	| _ ->
 
-	    (* If that doesn't work, check delta *)
+            (* If that doesn't work, check delta *)
 
-	    try AddrMap.find (normalize i t) m
+            try AddrMap.find (normalize i t) m
             with Not_found ->
-	      
+
 	      (* Well, this isn't good... Just make something up *)
 	      wprintf "Unknown memory value during eval: addr %Lx" (int64_of_big_int i);
 	      Int(bi0, reg_8)
-      )              
-	
+      )
+
     | _ -> failwith "Concrete evaluation should never have symbolic memories"
 
-  let assign v ev ctx =
-    dsa_del_var v;
-    Concrete.assign v ev ctx
 end
-  
-module TraceConcrete = Symbeval.Make(TraceConcreteDef)(FastEval)(StdForm)
+
+module TraceConcreteAssign(MemL: MemLookup)(Form: Formula) =
+struct
+  let assign v ev ctx =
+    let module StdAssign = Symbeval.StdAssign(MemL)(Form) in
+    dsa_del_var v;
+    StdAssign.assign v ev ctx
+end
+
+module TraceConcrete = Symbeval.Make(TraceConcreteDef)(FastEval)(TraceConcreteAssign)(StdForm)
 
 (** Check all variables in delta to make sure they agree with operands
     loaded from a trace. We should be able to find bugs in BAP and the
@@ -842,10 +850,10 @@ let check_delta state =
       try
 	let evalbyte = get_int (AddrMap.find addr cm) in
 	let issymb = Hashtbl.mem global.symbolic addr in
-	if (tracebyte <>% evalbyte) && (not issymb) && (not !use_alt_assignment) then wprintf "Consistency error: Tainted memory value (address %Lx, value %s) present in trace does not match value %s in in concrete evaluator" addr (string_of_big_int tracebyte) (string_of_big_int evalbyte)
-      with Not_found -> 
+	if (tracebyte <>% evalbyte) && (not issymb) && (not !use_alt_assignment) then wprintf "Consistency error: Tainted memory value (address %Lx, value %s) present in trace does not match value %s in in concrete evaluator" addr (~% tracebyte) (~% evalbyte)
+      with Not_found ->
 	if not !use_alt_assignment then
-	  wprintf "Consistency error: Tainted memory value (address %Lx, value %s) present in trace but missing in concrete evaluator" addr (string_of_big_int tracebyte)
+	  wprintf "Consistency error: Tainted memory value (address %Lx, value %s) present in trace but missing in concrete evaluator" addr (~% tracebyte)
     )
   in
   let check_var var evalval =
@@ -880,13 +888,13 @@ let check_delta state =
       | _ -> ())
     ) (* probably a temporary *)
     | TMem _
-    | Array _ -> 
-	let cmem = match evalval with
-	  | ConcreteMem(cm, _) -> cm
-	  | _ -> failwith "Concrete execution only"
-	in
-	Hashtbl.iter (check_mem cmem) global.memory
-      
+    | Array _ ->
+        let cmem = match evalval with
+          | ConcreteMem(cm, _) -> cm
+          | _ -> failwith "Concrete execution only"
+        in
+        Hashtbl.iter (check_mem cmem) global.memory
+
   in
   VH.iter check_var state.delta
 
@@ -895,27 +903,27 @@ let counter = ref 1
 let get_symbolic_seeds memv = function
   (* | Ast.Label (Name s,atts) when is_seed_label s -> *)
   (*     List.fold_left *)
-  (* 	(fun acc {index=index; taint=Taint taint} -> *)
-  (* 	   let newvarname = "symb_" ^ (string_of_int taint) in *)
-  (* 	   let sym_var = Var (Var.newvar newvarname reg_8) in *)
-  (* 	     pdebug ("Introducing symbolic: "  *)
-  (* 		     ^(Printf.sprintf "%Lx" index) *)
-  (* 		     ^" -> " *)
-  (* 		     ^(Pp.ast_exp_to_string sym_var)); *)
-  (* 	     add_symbolic index sym_var ; *)
-  (* 	     (\* symbolic variable *\) *)
-  (* 	     let mem = Var(memv) in *)
-  (* 	     let store = Store(mem, Int(index, reg_32), sym_var, exp_false, reg_8) in *)
-  (* 	     (\* let constr = BinOp (EQ, mem, store) in *\) *)
-  (* 	     (\*   ignore (LetBind.add_to_formula exp_true constr Rename) *\) *)
-  (* 	     let move = Move(memv, store, []) in *)
-  (* 	     move::acc				        *)
-  (* 	) [] (filter_taint atts) *)
+  (*    (fun acc {index=index; taint=Taint taint} -> *)
+  (*       let newvarname = "symb_" ^ (string_of_int taint) in *)
+  (*       let sym_var = Var (Var.newvar newvarname reg_8) in *)
+  (*         pdebug ("Introducing symbolic: "  *)
+  (*                 ^(Printf.sprintf "%Lx" index) *)
+  (*                 ^" -> " *)
+  (*                 ^(Pp.ast_exp_to_string sym_var)); *)
+  (*         add_symbolic index sym_var ; *)
+  (*         (\* symbolic variable *\) *)
+  (*         let mem = Var(memv) in *)
+  (*         let store = Store(mem, Int(index, reg_32), sym_var, exp_false, reg_8) in *)
+  (*         (\* let constr = BinOp (EQ, mem, store) in *\) *)
+  (*         (\*   ignore (LetBind.add_to_formula exp_true constr Rename) *\) *)
+  (*         let move = Move(memv, store, []) in *)
+  (*         move::acc                                  *)
+  (*    ) [] (filter_taint atts) *)
   | Ast.Comment (s,atts) when is_seed_label s ->
       List.fold_left
 	(fun acc {index=index; taint=Taint taint} ->
 	   let sym_var = sym_lookup taint in
-	     pdebug ("Introducing symbolic: " 
+	     pdebug ("Introducing symbolic: "
 		     ^(Printf.sprintf "%Lx" index)
 		     ^" -> "
 		     ^(Pp.ast_exp_to_string sym_var));
@@ -926,24 +934,24 @@ let get_symbolic_seeds memv = function
 	     (* let constr = BinOp (EQ, mem, store) in *)
 	     (*   ignore (LetBind.add_to_formula exp_true constr Rename) *)
 	     let move = Move(memv, store, []) in
-	     move::acc				       
+	     move::acc
 	) [] (filter_taint atts)
   | _ -> []
-	
+
 (** Transformations needed for traces. *)
-let trace_transform_stmt stmt evalf = 
+let trace_transform_stmt stmt evalf =
   let exp = ref exp_true in
   let cvis = object(self)
     inherit Ast_visitor.nop
     method visit_exp = function
       | Load(mem, idx, endian, t) ->
-	  let cidx = evalf idx in
-	  exp := BinOp(AND, !exp, BinOp(EQ, cidx, idx));
-	  `ChangeToAndDoChildren(Load(mem, cidx, endian, t))
+          let cidx = evalf idx in
+          exp := BinOp(AND, !exp, BinOp(EQ, cidx, idx));
+          `ChangeToAndDoChildren(Load(mem, cidx, endian, t))
       | Store(mem, idx, value, endian, t) ->
-	  let cidx = evalf idx in
-	  exp := BinOp(AND, !exp, BinOp(EQ, cidx, idx));
-	  `ChangeToAndDoChildren(Store(mem, cidx, value, endian, t))
+          let cidx = evalf idx in
+          exp := BinOp(AND, !exp, BinOp(EQ, cidx, idx));
+          `ChangeToAndDoChildren(Store(mem, cidx, value, endian, t))
       | _ -> `DoChildren
   end
   in
@@ -957,14 +965,14 @@ let trace_transform_stmt stmt evalf =
   let com = Ast.Comment(s, []) in
   let s = match stmt with
     | (Ast.CJmp (e,tl,_,atts1)) when full_exp_eq (evalf e) exp_true ->
-    	[com; Ast.Assert(e,atts1)]
+        [com; Ast.Assert(e,atts1)]
     | (Ast.CJmp (e,_,fl,atts1)) when full_exp_eq (evalf e) exp_false ->
-    	[com; Ast.Assert(UnOp(NOT,e),atts1)]
+        [com; Ast.Assert(UnOp(NOT,e),atts1)]
     | Ast.CJmp _ -> failwith "Evaluation failure!"
     | (Ast.Jmp _) ->
-	[com]
-	  (* Removing assignment of tainted operands: symbolic
-	     execution does not need these *)
+        [com]
+          (* Removing assignment of tainted operands: symbolic
+             execution does not need these *)
     | Ast.Move (_, _, atts) when List.exists is_tconcassign atts -> []
     (* | s when Syscall_models.x86_is_system_call s -> *)
     (*   let eax = evalf (Var Disasm_i386.eax) in *)
@@ -979,7 +987,7 @@ let trace_transform_stmt stmt evalf =
   else
     s
 
-let rec get_next_label blocks = 
+let rec get_next_label blocks =
   match blocks with
 	| block::remaining ->
 	  let addr, block = hd_tl block in
@@ -1027,27 +1035,27 @@ let run_block ?(next_label = None) state memv block =
   (* Assign concrete values to regs/memory *)
   let block = match !use_alt_assignment with
     | true ->
-	let assigns = assign_vars memv false in
-	List.iter 
-	   (fun stmt -> DV.dprintf "assign stmt: %s" (Pp.ast_stmt_to_string stmt)) assigns;	 
-	assigns @ block
+        let assigns = assign_vars memv false in
+        (* List.iter *)
+        (*   (fun stmt -> dprintf "assign stmt: %s" (Pp.ast_stmt_to_string stmt)) assigns;       *)
+        assigns @ block
     | false -> block
   in
 
-  let block = append_halt block in 
+  let block = append_halt block in
   TraceConcrete.initialize_prog state block ;
   clean_delta state.delta;
   let executed = ref [] in
-  let rec eval_block state = 
+  let rec eval_block state =
     let stmt = TraceConcrete.inst_fetch state.sigma state.pc in
     (* pdebug ("Executing: " ^ (Pp.ast_stmt_to_string stmt)); *)
        (* Hashtbl.iter (fun k v -> pdebug (Printf.sprintf "%Lx -> %s" k (Pp.ast_exp_to_string v))) concrete_mem ; *)
     let evalf e = match TraceConcrete.eval_expr state.delta e with
       | Symbolic(e) -> e
-      | _ -> failwith "Expected symbolic" 
+      | _ -> failwith "Expected symbolic"
     in
     executed := Util.fast_append input_seeds !executed ;
-    executed := Util.fast_append (trace_transform_stmt stmt evalf) !executed ; 
+    executed := Util.fast_append (trace_transform_stmt stmt evalf) !executed ;
     (*print_endline (Pp.ast_stmt_to_string stmt) ;*)
 
     (* If we have a system call, run the model instead.
@@ -1077,12 +1085,12 @@ let run_block ?(next_label = None) state memv block =
 	     (* let next = TraceConcrete.inst_fetch newstate.sigma newstate.pc in *)
 	       (*pdebug ("pc: " ^ (Int64.to_string newstate.pc)) ;*)
 	       eval_block newstate
-	 | _ -> 
+	 | _ ->
 	    failwith "multiple targets..."
       )
     with
     (* Ignore failed assertions -- assuming that we introduced them *)
-    | AssertFailed _ as _e -> 
+    | TraceConcrete.AssertFailed _ as _e -> 
 	  wprintf "failed assertion: %s" (Pp.ast_stmt_to_string stmt);
 	  (* raise e; *)
 	  let new_pc = Int64.succ state.pc in
@@ -1090,15 +1098,15 @@ let run_block ?(next_label = None) state memv block =
   in
     try
       eval_block state
-    with 
-      |	Failure s as e -> 
+    with
+      |	Failure s as e ->
 	  pwarn ("block evaluation failed :(\nReason: "^s) ;
 	  List.iter (fun s -> pdebug (Pp.ast_stmt_to_string s)) block ;
 	  (*if !consistency_check then ( *)
 	    raise e
-	  (* ) else 
+	  (* ) else
 	  ((addr,false)::(info,false)::(List.tl !executed)) *)
-      | UnknownLabel lab ->
+      | TraceConcrete.UnknownLabel lab ->
 	  (match next_label, lab with
 	   | Some(l), Addr x when x <> l && !checkall ->
 	       let s =
@@ -1107,7 +1115,7 @@ let run_block ?(next_label = None) state memv block =
            | _ -> ()
 	  );
 	  (addr::info::List.rev (!executed))
-      | Halted (_,ctx)-> 
+      | TraceConcrete.Halted (_,ctx)-> 
 		(*if (!checkall) then
 		  (match next_label with
 			(* XXXSW use pc(?) to reverse lookup label in lambda *)
@@ -1168,7 +1176,7 @@ let run_blocks blocks memv length =
   Status.stop () ;
   List.rev rev_trace
 
-(** Convert a stmt to DSA form 
+(** Convert a stmt to DSA form
 
     @param s The AST program to convert to DSA form
     @param h The map from original var names to most recent dsa var
@@ -1179,7 +1187,7 @@ let run_blocks blocks memv length =
 *)
 let to_dsa_stmt s h rh =
   let dsa_ctr = ref 0 in
-  let new_name (Var.V(_,s,t) as v) = 
+  let new_name (Var.V(_,s,t) as v) =
     if is_mem v then v
     else if is_symbolic v then v
     else (
@@ -1203,11 +1211,11 @@ let to_dsa_stmt s h rh =
 
     method visit_rvar v =
       try
-	`ChangeTo (VH.find h v)
+        `ChangeTo (VH.find h v)
       with Not_found ->
-	dprintf "Unable to find %s during DSA: probably an input" (Var.name v);
-	let nv = replace_var v in
-	`ChangeTo nv
+        dprintf "Unable to find %s during DSA: probably an input" (Var.name v);
+        let nv = replace_var v in
+        `ChangeTo nv
 
     method visit_uvar v =
       VH.remove h v;
@@ -1250,6 +1258,7 @@ let concrete trace =
 (* Normal concrete execution *)
 module TaintConcreteDef =
 struct
+  include MemVHBackEnd
   include Symbeval.Symbolic
 
   let bytes = ref (Array.make 0 0)
@@ -1289,7 +1298,7 @@ struct
 
 end
 
-module TaintConcrete = Symbeval.Make(TaintConcreteDef)(FastEval)(StdForm)
+module TaintConcrete = Symbeval.Make(TaintConcreteDef)(FastEval)(StdAssign)(StdForm)
 
 (** Concretely execute a trace without using any operand information *)
 let concrete_rerun file stmts =
@@ -1304,16 +1313,16 @@ let concrete_rerun file stmts =
      in
      let _ = TaintConcrete.eval_straightline ~step:step initctx in
      failwith "Expected a single state"
-   with 
-     Halted(v, ctx) -> Printf.printf "Halted successfully\n"
-   | AssertFailed ctx -> 
+   with
+     TaintConcrete.Halted(v, ctx) -> Printf.printf "Halted successfully\n"
+   | TaintConcrete.AssertFailed ctx ->
        let stmt = TaintConcrete.inst_fetch ctx.sigma ctx.pc in
        Printf.printf "Assertion failure at %#Lx: %s\n" ctx.pc (Pp.ast_stmt_to_string stmt) ;
        clean_delta ctx.delta ;
        TaintConcrete.print_values ctx.delta;
-       (* TaintConcrete.print_mem ctx.delta *)
+       (* TaintConcrete.print_mem ctx.TaintConcrete.delta *)
    | Failure s -> Printf.printf "Failure: %s\n" s);
-      
+
   Status.stop () ;
 
   stmts
@@ -1323,7 +1332,7 @@ let concrete_rerun file stmts =
 (*************************************************************)
 
 (* Assumptions for the concretization process to be sound:
-   - We can have at most one memory load/store on each 
+   - We can have at most one memory load/store on each
    asm instruction
    - We are doing the lookups/stores in little-endian order
 *)
@@ -1352,19 +1361,19 @@ let formula_size formula =
 module IntSet = Set.Make(Int64)
 let memory_read = ref IntSet.empty
 let memory_write = ref IntSet.empty
-let empty_mem_ind () = 
-  memory_read  := IntSet.empty; 
+let empty_mem_ind () =
+  memory_read  := IntSet.empty;
   memory_write := IntSet.empty
-  
-let get_indices () = 
+
+let get_indices () =
   empty_mem_ind () ;
-  conc_mem_iter 
+  conc_mem_iter
     (fun index value -> match value.usg with
        | RD -> memory_read := IntSet.add index !memory_read
        | WR -> memory_write := IntSet.add index !memory_write
        | RW -> (* Read-Write -> let's store both *)
-	   memory_read := IntSet.add index !memory_read ;
-	   memory_write := IntSet.add index !memory_write
+           memory_read := IntSet.add index !memory_read ;
+           memory_write := IntSet.add index !memory_write
     )
 
 let get_concrete_read_index () =
@@ -1378,50 +1387,11 @@ let get_concrete_write_index () =
     Int(big_int_of_int64 el, reg_32)
 
 
-module LetBind =
+
+module TaintSymbolic =
 struct
-(*
-  module Expression = 
-  struct 
-    type t = Ast.exp
-    let equal = (==)
-    let hash = Hashtbl.hash
-  end
 
-  module ExpHash = Hashtbl.Make(Expression)
-  (* A hashtable to hold the let bindings for several
-     different predicates. FIXME: for now it is just a list
-     but this should really be changed *)
-  let bindings : form list ExpHash.t = ExpHash.create 10
-*)  
-  type form = And of Ast.exp | Let of (Var.t * Ast.exp)
-  let bindings = ref []
-    
-  let add_to_formula formula expression typ =
-    (match expression, typ with
-      | _, Equal -> 
-	  bindings := (And expression) :: !bindings
-      | BinOp(EQ, Var v, value), Rename -> 
-	  bindings := (Let (v,value)) :: !bindings
-   | _ -> failwith "internal error: adding malformed constraint to formula"
-    );
-    StdForm.add_to_formula formula expression typ
-
-  let output_formula () =
-    let rec create_formula acc = function
-      | [] -> acc
-      | (And e1)::rest ->
-	  let acc = BinOp(AND, e1, acc) in
-	    create_formula acc rest
-      | (Let (v,e))::rest ->
-	  let acc = Ast.Let(v, e, acc) in
-	    create_formula acc rest
-    in
-      create_formula exp_true !bindings
-end
-
-module TaintSymbolic = 
-struct 
+  include MemVHBackEnd
 
   let lookup_var delta var =
 
@@ -1445,8 +1415,8 @@ struct
   	   VH.find delta var
 
        | _, _ when is_symbolic var ->
-	   (* If the variable is untainted, but is a symbolic byte that we introduced *)
-	   Symbolic(Var(var))
+           (* If the variable is untainted, but is a symbolic byte that we introduced *)
+           Symbolic(Var(var))
 
        | _, Some(cval) ->
   	   (* Finally, if untainted try to use the concrete value.
@@ -1462,7 +1432,7 @@ struct
   	     Symbolic(cval)
 	   )
        | _, _ ->
-	   DV.dprintf "looking up in delta";
+	   DV.dprintf "looking %s up in delta" (Var.name var);
   	   try VH.find delta var
   	   with Not_found ->
   	     match Var.typ var with
@@ -1476,8 +1446,8 @@ struct
   		 Symbolic(Var(var))
 		       
       )
-	
-	
+
+
   let update_mem mu pos value endian =
     match is_concrete pos with
     | true ->
@@ -1486,14 +1456,14 @@ struct
 	 | _ -> ());
 	Symbolic.update_mem mu pos value endian
     | _  ->
-	Symbolic.update_mem mu pos value endian
-	    
+        Symbolic.update_mem mu pos value endian
+
   (* TODO: add a memory initializer *)
 
-  let rec lookup_mem mu index endian = 
+  let rec lookup_mem mu index endian =
     match index with
     | Int(n,_) ->
-	(try 
+	(try
 	   (* Check if this is a symbolic seed *)
 	   let var = symbolic_mem (int64_of_big_int n) in
 	   (* pdebug ("introducing symbolic: "^(Pp.ast_exp_to_string var)) ; *)
@@ -1506,42 +1476,60 @@ struct
 	     Symbolic.lookup_mem mu index endian
 	)
     | _ ->
-	  (pdebug ("Symbolic memory index at " 
-		   ^ (Pp.ast_exp_to_string index)) ;
-	   Symbolic.lookup_mem mu index endian)
-	      
-  let assign v ev ({delta=delta; pred=pred; pc=pc} as ctx) =
-    (* XXX: Make sure to remove concrete value *)
+          (pdebug ("Symbolic memory index at "
+                   ^ (Pp.ast_exp_to_string index)) ;
+           Symbolic.lookup_mem mu index endian)
 
-    (* let v = dsa_add_map v in *)
-
-    if !full_symbolic then
-      let expr = symb_to_exp ev in
-      let is_worth_storing = (*is_concrete expr &&*) 
-	is_temp (Util.option_unwrap (dsa_var v))
-      in
-      let pred' =
-	if is_worth_storing then (dprintf "Storing %s in delta" (Pp.var_to_string v); (context_update delta v ev ; pred))
-	else
-	  let constr = BinOp (EQ, Var v, expr) in
-	  pdebug ((Var.name v) ^ " = " ^ (Pp.ast_exp_to_string expr)) ;
-	  VH.remove delta v; (* shouldn't matter because of dsa, but remove any old version anyway *)
-	  LetBind.add_to_formula pred constr Rename 
-      in
-	[{ctx with pred=pred'; pc=Int64.succ pc}]
-    else
-      Symbolic.assign v ev ctx
 end
 
-(* If we evaluate temporaries in delta, we need sloweval, otherwise we
-   might have let x = T_123 in foo that goes in the formula, but T_123
-   will not be defined in the formula. *)
-module TraceSymbolic = Symbeval.Make(TaintSymbolic)(SlowEval)(LetBind)
+(** Symbolic assigns are represented as Lets in the formula, except
+    for temporaries.  If you use this, you should clear out temporaries
+    after executing each instruction.
+
+    This should be exactly the same as Symbeval.PredAssign, except
+    that when we call is_temp we need to use the non-dsa variable
+    name.
+*)
+module PredAssignTraces(MemL: MemLookup)(Form: Formula) =
+struct
+  let assign v ev ({delta=delta; pred=pred; pc=pc} as ctx) =
+    let expr = symb_to_exp ev in
+    let is_worth_storing = (*is_concrete expr &&*)
+      Disasm.is_temp (Util.option_unwrap (dsa_var v))
+    in
+    let delta', pred' =
+      if is_worth_storing then (dprintf "Storing %s in delta" (Var.name v);
+                                (MemL.update_var delta v ev, pred))
+      else
+        let constr = BinOp (EQ, Var v, expr) in
+        pdebug ((Var.name v) ^ " = " ^ (Pp.ast_exp_to_string expr)) ;
+        let delta' = MemL.remove_var delta v in (* shouldn't matter because of dsa, but remove any old version anyway *)
+        (delta', Form.add_to_formula pred constr Rename)
+    in
+    {ctx with delta=delta'; pred=pred'; pc=Int64.succ pc}
+end
+
+
+module TraceSymbolicAssign(MemL: MemLookup)(Form: Formula) =
+struct
+  let assign v ev ctx =
+    if !full_symbolic then
+      let module PredAssign = PredAssignTraces(MemL)(Form) in
+      PredAssign.assign v ev ctx
+    else
+      let module StdAssign = StdAssign(MemL)(Form) in
+      StdAssign.assign v ev ctx
+end
+
+(* module LetBindSimplify=Formula_simplify_mem.Test *)
+
+(* Set this to LetBindSimplify to use formula simplificiation *)
+module TraceSymbolic = Symbeval.Make(TaintSymbolic)(SlowEval)(TraceSymbolicAssign)(LetBind)
 
 let status = ref 0
 let count = ref 0
 
-let symbolic_run trace = 
+let symbolic_run trace =
   Status.init "Symbolic Run" (List.length trace) ;
   let h = VH.create 1000 in (* vars to dsa vars *)
   let rh = VH.create 10000 in (* dsa vars to vars *)
@@ -1554,64 +1542,64 @@ let symbolic_run trace =
   let memv = find_memv trace in
   dprintf "Memory variable: %s" (Var.name memv);
   let to_dsa stmt = to_dsa_stmt stmt h rh in
-  let formula = 
-    try 
-      let state = List.fold_left 
-	(fun state stmt ->
-	   let stmts = ref [] in
-	   (* dprintf "Dsa'ified stmt: %s" (Pp.ast_stmt_to_string stmt); *)
-	   Status.inc() ;
-	   let hasconc = update_concrete stmt in
-	   if hasconc && !consistency_check then (
-	     stmts := !stmts @ [assert_vars h]
-	   );
-	   stmts := List.map to_dsa (!stmts @ [stmt]);
-	   (*(if !status >= 3770 && !status <= 3771 then
-	      (count := !count + 1;
-	       (*print_endline (Pp.ast_stmt_to_string stmt) ;*)
-	       (*TraceSymbolic.print_var state.delta "R_EAX" ;*)
-	      let formula = TraceSymbolic.output_formula () in
-		print_formula ("form_" ^ (string_of_int !count)) formula))
-	     ;*)
-	   dprintf "Evaluating stmt %s" (Pp.ast_stmt_to_string stmt);
-	   (match stmt with
-	      | Ast.Label (_,atts) when filter_taint atts != [] -> 
-		  (* Printf.printf "%s\n" ("block no: " ^ (string_of_int !status)); *)
-		  (* Printf.printf "%s\n" (Pp.ast_stmt_to_string stmt); *)
-		  (* We have a new block *)
-		  clean_delta state.delta;
-		  get_indices();
-		  status := !status + 1 ;
-		  (*if !status > 3770 && !status < 3780 then 
-		    let formula = TraceSymbolic.output_formula () in
-		    print_formula ("form_" ^ (string_of_int !status)) formula*)
-	      | _ -> ());
-	   
-	   (* Double fold since we may have to add an assertion *)
-	   List.fold_left
-	     (fun state stmt ->
-		match TraceSymbolic.eval_stmt state stmt with
-		| [next] -> next
-		| _ -> failwith "Jump in a straightline program"
-	     ) state !stmts
-	) state trace
+  let formula =
+    try
+      let state = List.fold_left
+        (fun state stmt ->
+           let stmts = ref [] in
+           (* dprintf "Dsa'ified stmt: %s" (Pp.ast_stmt_to_string stmt); *)
+           Status.inc() ;
+           let hasconc = update_concrete stmt in
+           if hasconc && !consistency_check then (
+             stmts := !stmts @ [assert_vars h]
+           );
+           stmts := List.map to_dsa (!stmts @ [stmt]);
+           (*(if !status >= 3770 && !status <= 3771 then
+              (count := !count + 1;
+               (*print_endline (Pp.ast_stmt_to_string stmt) ;*)
+               (*TraceSymbolic.print_var state.delta "R_EAX" ;*)
+              let formula = TraceSymbolic.output_formula () in
+                print_formula ("form_" ^ (string_of_int !count)) formula))
+             ;*)
+           dprintf "Evaluating stmt %s" (Pp.ast_stmt_to_string stmt);
+           (match stmt with
+              | Ast.Label (_,atts) when filter_taint atts != [] ->
+                  (* Printf.printf "%s\n" ("block no: " ^ (string_of_int !status)); *)
+                  (* Printf.printf "%s\n" (Pp.ast_stmt_to_string stmt); *)
+                  (* We have a new block *)
+                  clean_delta state.delta;
+                  get_indices();
+                  status := !status + 1 ;
+                  (*if !status > 3770 && !status < 3780 then
+                    let formula = TraceSymbolic.output_formula () in
+                    print_formula ("form_" ^ (string_of_int !status)) formula*)
+              | _ -> ());
+
+           (* Double fold since we may have to add an assertion *)
+           List.fold_left
+             (fun state stmt ->
+                match TraceSymbolic.eval_stmt state stmt with
+                | [next] -> next
+                | _ -> failwith "Jump in a straightline program"
+             ) state !stmts
+        ) state trace
       in
-	state.pred
-    with 
-      | Failure fail as e -> 
-	  pdebug ("Symbolic Run Fail: "^fail);
-	  (*state.pred*)
-	  raise e
-      | Halted (_,state) -> 
-	  pdebug "Symbolic Run ... Successful!";
-	  state.pred
-      | AssertFailed _ as e ->
-	  pdebug "Failed assertion ..." ;
-	  (*state.pred*)
-	  raise e
+      state
+    with
+      | Failure fail as e ->
+          pdebug ("Symbolic Run Fail: "^fail);
+          (*state.pred*)
+          raise e
+      | TraceSymbolic.Halted (_,state) ->
+          pdebug "Symbolic Run ... Successful!";
+          state
+      | TraceSymbolic.AssertFailed _ as e ->
+          pdebug "Failed assertion ..." ;
+          (*state.pred*)
+          raise e
   in
   Status.stop () ;
-  dsa_rev_map := None;  
+  dsa_rev_map := None;
   formula
 
 (*************************************************************)
@@ -1650,12 +1638,12 @@ let nopsled n = String.make n nop
 let pin_offset = 400L
 
 (* The last jump of the trace *)
-let get_last_jmp_exp stmts = 
+let get_last_jmp_exp stmts =
   let rev = List.rev stmts in
   let rec get_exp = function
     | [] -> failwith "no jump found"
     | (Ast.Jmp(e, atts))::rest ->
-	((e,atts), rest)
+        ((e,atts), rest)
     | _::rest -> get_exp rest
   in
   let (exp, rev) = get_exp rev in
@@ -1663,47 +1651,47 @@ let get_last_jmp_exp stmts =
     (exp, List.rev rev)
 
 (* Substituting the last jump with assertions *)
-let hijack_control target trace = 
+let hijack_control target trace =
   let ((e, atts), trace) = get_last_jmp_exp trace in
   let ret_constraint = BinOp(EQ,e,target) in
   trace, Ast.Assert(ret_constraint, atts)
-      
+
 (* Setting the return address to an arbitrary value *)
-let control_flow addr trace = 
+let control_flow addr trace =
   let target = big_int_of_string addr in
   let target = Int(target,reg_32) in
   let trace, assertion = hijack_control target trace in
     Util.fast_append trace [assertion]
 
 (* Making the final jump target a symbolic variable. This
-   should be useful for enumerating all possible jump targets *)  
-let limited_control trace = 
+   should be useful for enumerating all possible jump targets *)
+let limited_control trace =
   let target = Var (Var.newvar "s_jump_target" reg_32) in
   let trace, assertion = hijack_control target trace in
     Util.fast_append trace [assertion]
 
 (** Return the last load expression *)
-let get_last_load_exp stmts = 
+let get_last_load_exp stmts =
   let rev = List.rev stmts in
   let rec get_load = function
     | [] -> failwith "no load found"
     | ((Ast.Move(_,Ast.Load(array,index,_,_),_))::rest) as rev ->
-	(array,index, List.rev rev)
-    | s::rest -> 
-	get_load rest
+        (array,index, List.rev rev)
+    | s::rest ->
+        get_load rest
   in
   get_load rev
 
-(** Injecting a payload at an exp 
+(** Injecting a payload at an exp
 
     XXX: Consolidate other payload functions to use this one.
 *)
-let inject_payload_gen addr payload trace = 
+let inject_payload_gen addr payload trace =
   (* XXX: This is probably inefficient. *)
   let mem = Var(find_memv trace) in
   let payload = List.map big_int_of_int payload in
-  let _,assertions = 
-    List.fold_left 
+  let _,assertions =
+    List.fold_left
       (fun (i,acc) value ->
 	 let index = Ast.BinOp(PLUS, addr, Int(i,reg_32)) in
 	 let load = Ast.Load(mem, index, exp_false, reg_8) in
@@ -1715,14 +1703,14 @@ let inject_payload_gen addr payload trace =
 
 
 (* Injecting a payload at an offset past the return address *)
-let inject_payload start payload trace = 
+let inject_payload start payload trace =
   (* TODO: A simple dataflow is missing here *)
   let mem, ind, trace = get_last_load_exp trace in
   dprintf "Injecting shellcode at index: %s" (Pp.ast_exp_to_string ind);
    (* Let's convert to Int64 *)
   let payload = List.map big_int_of_int payload in
-  let _,assertions = 
-    List.fold_left 
+  let _,assertions =
+    List.fold_left
       (fun (i,acc) value ->
 	 let index = Ast.BinOp(PLUS, ind, Int(i,reg_32)) in
 	 let load = Ast.Load(mem, index, exp_false, reg_8) in
@@ -1735,31 +1723,31 @@ let inject_payload start payload trace =
 (* Convert a string to a list of bytes *)
 let string_to_bytes payload =
   let bytes = ref [] in
-    String.iter 
+    String.iter
       (fun c -> bytes := ((int_of_char c)::!bytes)) payload ;
     List.rev !bytes
 
 (* Add an arbitrary payload over the return address *)
-let add_payload ?(offset=0L) payload trace = 
+let add_payload ?(offset=0L) payload trace =
   let payload = string_to_bytes payload in
   let _, index, trace = get_last_load_exp trace in
   let start = BinOp(PLUS, index, Int(big_int_of_int64 offset, reg_32)) in
   let assertions = inject_payload_gen start payload trace in
     Util.fast_append trace assertions
 
-let add_payload_after ?(offset=4L) payload trace = 
+let add_payload_after ?(offset=4L) payload trace =
   let payload = string_to_bytes payload in
   let trace, assertions = inject_payload offset payload trace in
     Util.fast_append trace assertions
 
-let add_payload_from_file ?(offset=0L) file trace = 
+let add_payload_from_file ?(offset=0L) file trace =
   let payload = bytes_from_file file in
   let _, index, trace = get_last_load_exp trace in
   let start = BinOp(PLUS, index, Int(big_int_of_int64 offset, reg_32)) in
   let assertions = inject_payload_gen start payload trace in
     Util.fast_append trace assertions
 
-let add_payload_from_file_after ?(offset=4L) file trace = 
+let add_payload_from_file_after ?(offset=4L) file trace =
   let payload = bytes_from_file file in
   let trace, assertions = inject_payload offset payload trace in
     Util.fast_append trace assertions
@@ -1767,7 +1755,7 @@ let add_payload_from_file_after ?(offset=4L) file trace =
 exception Found_load of Ast.exp
 
 (* Performing shellcode injection *)
-let inject_shellcode nops trace = 
+let inject_shellcode nops trace =
   let payload = (nopsled nops) ^ winshellcode in
   (* Find the expression of the last loaded value *)
   let _,target_addr,_ = get_last_load_exp trace in
@@ -1826,18 +1814,17 @@ let add_seh_pivot_file gaddr sehaddr paddr payloadfile trace =
 (********************  Formula Generation  *******************)
 (*************************************************************)
 
-let generate_formula trace = 
-  LetBind.bindings := [] ;  (*  XXX: temporary hack *)
+let generate_formula trace =
   let trace = concrete trace in
   (* If we leave DCE on, it will screw up the consistency check. *)
   let trace = match !consistency_check || (not !dce) with
     | true -> trace
     | false -> trace_dce trace
   in
-  ignore(symbolic_run trace) ;
-  TraceSymbolic.output_formula ()
+  let finalstate = symbolic_run trace in
+  TraceSymbolic.output_formula finalstate.pred
 
-let output_formula file trace = 
+let output_formula file trace =
   let formula = generate_formula trace in
     (*dprintf "formula size: %Ld\n" (formula_size formula) ;*)
   Status.init "Printing out formula" 0;
@@ -1845,7 +1832,7 @@ let output_formula file trace =
   Status.stop () ;
   trace
 
-      
+
 (*************************************************************)
 (****************  Exploit String Generation  ****************)
 (*************************************************************)
@@ -1864,7 +1851,7 @@ let solution_from_stp_formula file =
   with _ as e -> (* Make sure that we close oc if there is a parse exception *)
     close_in cin;
     raise e
-      
+
 let solve_formula input output =
   (* print "Querying STP for a satisfying answer\n" ;  *)
   flush stdout ;
@@ -1873,12 +1860,12 @@ let solve_formula input output =
   (match Unix.system cmd with
       | Unix.WEXITED 0 -> ()
       | _ -> failwith ("STP query failed, consider increasing"
-			 ^ " the stack with ulimit"));
+                         ^ " the stack with ulimit"));
   Status.stop ()
 
-let output_exploit file trace = 
+let output_exploit file trace =
   ignore (output_formula formula_storage trace) ;
-  solve_formula formula_storage answer_storage ;  
+  solve_formula formula_storage answer_storage ;
   let var_vals = match solution_from_stp_formula answer_storage with
     | Some(x) -> x
     | None -> Printf.printf "Formula was unsatisfiable\n"; failwith "Formula was unsatisfiable"
@@ -1892,7 +1879,7 @@ let output_exploit file trace =
   let var_to_num var = int_of_string (var_to_string_num var) in
   let sort =
     let sort_aux (var1, _) (var2,_) =
-  	compare (var_to_num var1) (var_to_num var2)
+        compare (var_to_num var1) (var_to_num var2)
     in
       List.sort sort_aux
   in
@@ -1901,10 +1888,10 @@ let output_exploit file trace =
     let rec pad n acc = function
       | [] -> List.rev acc
       | ((var,_) as first)::rest when var_to_num var = n ->
-  	  pad (n+1) (first::acc) rest
+          pad (n+1) (first::acc) rest
       | ((var,_)::rest) as more ->
-	  assert ((var_to_num var) >= n);
-  	  pad (n+1) (("",1L)::acc) more
+          assert ((var_to_num var) >= n);
+          pad (n+1) (("",1L)::acc) more
     in
       pad 1 []
   in
@@ -1929,34 +1916,34 @@ let output_exploit file trace =
 
 open Var
 
-let add_assignments trace = 
+let add_assignments trace =
   let varset = Hashtbl.create 100 in
-  let get_vars_from_stmt = 
+  let get_vars_from_stmt =
     let var_visitor = object(self)
       inherit Ast_visitor.nop
-      method visit_rvar v = 
-	let name = Var.name v in
-	  (try
-	     let value = match concrete_val name with
-	       | Some(x) -> x
-	       | None -> failwith "Unhandled"
-	     in
-	     if not (Hashtbl.mem varset name) then
-	       Hashtbl.add varset name (v,value)
-	   with Not_found -> ());
-	  `DoChildren
+      method visit_rvar v =
+        let name = Var.name v in
+          (try
+             let value = match concrete_val name with
+               | Some(x) -> x
+               | None -> failwith "Unhandled"
+             in
+             if not (Hashtbl.mem varset name) then
+               Hashtbl.add varset name (v,value)
+           with Not_found -> ());
+          `DoChildren
     end
     in
       Ast_visitor.stmt_accept var_visitor
   in
-  List.iter 
-    (fun s -> 
+  List.iter
+    (fun s ->
        ignore(update_concrete s) ;
        ignore (get_vars_from_stmt s)
     ) trace;
     let assignments = Hashtbl.fold
       (fun _ (var,value) acc ->
-	 (Ast.Move (var, value, []))::acc 
+         (Ast.Move (var, value, []))::acc
       ) varset []
     in
       Util.fast_append assignments trace
@@ -1967,30 +1954,31 @@ let add_assignments trace =
 
 (* Binary search over the trace IL to see where things go
    wrong. *)
-let trace_valid_to_invalid trace = 
+let trace_valid_to_invalid trace =
   let length = List.length trace in
   let rec bsearch l u =
     Printf.printf "Searching %d %d\n" l u ;
     if l >= u - 1 then (l,u)
-    else 
+    else
       let middle = (l + u) / 2 in
       let trace = Util.take middle trace in
-      try 
-	ignore (output_formula "temp" trace) ;
+      try
+        ignore (output_formula "temp" trace) ;
         ignore (solve_formula "temp" "tempout") ;
-	ignore(Unix.system("cat tempout"));
-	match solution_from_stp_formula "tempout" with
-	| Some _ -> Printf.printf "going higher\n";
-	    bsearch middle u
-	| None -> Printf.printf "going lower\n";
-	    bsearch l middle
-      with 
+        ignore(Unix.system("cat tempout"));
+        match solution_from_stp_formula "tempout" with
+        | Some _ -> Printf.printf "going higher\n";
+            bsearch middle u
+        | None -> Printf.printf "going lower\n";
+            bsearch l middle
+      with
       | Failure _ ->
-	  (Printf.printf "going lower\n";
-	   bsearch l middle)
-      | Symbeval.UnknownLabel _ ->
-	  (Printf.printf "going a little higher\n";
-	   bsearch l (u-1))
+          (Printf.printf "going lower\n";
+           bsearch l middle)
+      | TraceConcrete.UnknownLabel _
+      | TraceSymbolic.UnknownLabel _ ->
+          (Printf.printf "going a little higher\n";
+           bsearch l (u-1))
   in
   let (l,u) = bsearch 1 length in
   ignore (output_formula "form_val" (Util.take l trace)) ;
@@ -1999,11 +1987,10 @@ let trace_valid_to_invalid trace =
 
 (* Binary search over the concretized IL to check where things go
    wrong. *)
-let formula_valid_to_invalid ?(min=1) trace = 
+let formula_valid_to_invalid ?(min=1) trace =
   let sym_and_output trace fname =
-    LetBind.bindings := [] ;  (*  XXX: temporary hack *)
-    ignore(symbolic_run trace);
-    let formula = TraceSymbolic.output_formula () in
+    let finalstate = symbolic_run trace in
+    let formula = TraceSymbolic.output_formula finalstate.pred in
     print_formula fname formula ;
   in
   let trace = concrete trace in
@@ -2017,378 +2004,36 @@ let formula_valid_to_invalid ?(min=1) trace =
   let rec bsearch l u =
     Printf.printf "Searching %d %d\n" l u ;
     if l >= u - 1 then (l,u)
-    else 
+    else
       let middle = (l + u) / 2 in
       let trace = Util.take middle trace in
-      try 
-	sym_and_output trace "temp";
+      try
+        sym_and_output trace "temp";
         ignore (solve_formula "temp" "tempout") ;
-	ignore(Unix.system("cat tempout"));
-	match solution_from_stp_formula "tempout" with
-	| Some _ -> Printf.printf "going higher\n";
-	    bsearch middle u
-	| None -> Printf.printf "going lower\n";
-	    bsearch l middle
-      with 
+        ignore(Unix.system("cat tempout"));
+        match solution_from_stp_formula "tempout" with
+        | Some _ -> Printf.printf "going higher\n";
+            bsearch middle u
+        | None -> Printf.printf "going lower\n";
+            bsearch l middle
+      with
       | Failure _ ->
-	  (Printf.printf "going lower\n";
-	   bsearch l middle)
-      | Symbeval.UnknownLabel _ ->
-	  (Printf.printf "going a little higher\n";
-	   bsearch l (u-1))
+          (Printf.printf "going lower\n";
+           bsearch l middle)
+      | TraceConcrete.UnknownLabel _
+      | TraceSymbolic.UnknownLabel _ ->
+          (Printf.printf "going a little higher\n";
+           bsearch l (u-1))
   in
   let (l,u) = bsearch min length in
   ignore (sym_and_output (Util.take l trace) "form_val") ;
   ignore (sym_and_output (Util.take u trace) "form_inv") ;
   trace
 
-module NameSet = Set.Make(String)
-
-(*************************************************************)
-(******************** Surgical Slicing  **********************)
-(*************************************************************)
-
-(*  Precise Slicing - may result in underapproximations *)
-(*
-  The idea is the following: 
-
-    1. Pass in a straight-line program (assertions instead of cjmps)
-
-    2. Convert all memories to scalars (using mem_42 instead of mem[42])
-
-  Then a program of this form:
-
-    x1 = symb_0
-    x2 = x1 + 1
-    assert (x2 > 0)
-    x3 = 4
-    x3 = x2 - 5
-    assert (x3 = 0)
-
-  should be converted to:
-
-    x1 = symb_0
-    x2 = x1 + 1
-    assert (x2 > 0)
-    x3 = x2 - 5
-    assert (x3 = 0)
-
-  and the formula should be:
-
-    let x1 = symb_0 in
-    let x2 = x1 + 1 in
-     (x2 > 0) &
-     let x3 = x2 - 5 in
-      (x3 = 0)
-
-*)
-
-let mem_name num =  "mem_"^(Printf.sprintf "%Lx" num)
-
-let used_vars = Hashtbl.create 65536
-
-let newvar num t = 
-  if not (Hashtbl.mem used_vars num) then
-    (
-      let v = Var.newvar (mem_name num) t in
-        Hashtbl.add used_vars num v;
-        v
-    )
-  else
-    Hashtbl.find used_vars num
-
-(** Transformations needed for traces. *)
-let trace_transform_stmt2 stmt evalf = 
-  let get_bytes = function
-    | Reg n -> n / 8
-    | _ -> failwith "cannot load mem!"
-  in
-  let load num t bytes = 
-    let rec load_aux acc shift = function
-      | 0 -> acc
-      | n -> 
-          let var = Var (newvar (Int64.add num (Int64.of_int (bytes - n))) reg_8) in
-          let var = Cast(CAST_UNSIGNED, t, var) in
-          let acc = BinOp (OR, BinOp(LSHIFT, var, Int(big_int_of_int64 shift, reg_32)), acc) in
-            load_aux acc (Int64.add shift 8L) (n-1)
-    in
-    let var = Var (newvar num reg_8) in
-    let exp = Cast(CAST_UNSIGNED, t, var) in
-      load_aux exp 8L (bytes-1)
-  in
-  let concretize idx = match evalf idx with
-    | Int (n, t) -> n
-    | _ -> failwith "cannot concretize index"
-  in
-    
-  let cvis = object(self)
-    inherit Ast_visitor.nop
-    method visit_exp = function
-      | Load (mem, idx, _endian, t) ->
-          let num = concretize idx in
-          let bytes = get_bytes t in
-          let exp = load (int64_of_big_int num) t bytes in
-            `ChangeTo exp
-      | _ -> `DoChildren
-    method visit_stmt = function
-      | _ -> `DoChildren
-  end
-  in
-  let break_move num value t bytes =
-    let rec break_aux acc shift = function
-      | 0 -> acc
-      | n ->
-          let var = newvar (Int64.add num (Int64.of_int (bytes-n))) reg_8 in
-          let exp = BinOp (RSHIFT, value, Int(big_int_of_int64 shift, reg_32)) in
-          let exp = Cast(CAST_UNSIGNED, reg_8, exp) in
-          let acc = (Move(var, exp, [])) :: acc in
-            break_aux acc (Int64.add shift 8L) (n - 1)
-    in
-    let var = newvar num reg_8 in
-    let exp = Cast(CAST_UNSIGNED, reg_8, value) in
-      break_aux [Move(var, exp, [])] 8L (bytes - 1)
-  in
-    
-  (* Concretize memory addresses *)
-  let stmt =
-    if not !allow_symbolic_indices then
-      Ast_visitor.stmt_accept cvis stmt
-    else stmt
-  in
-  let s = Printf.sprintf "Removed: %s" (Pp.ast_stmt_to_string stmt) in
-  let com = Ast.Comment(s, []) in
-  let s = match stmt with
-    | (Ast.CJmp (e,tl,_,atts1)) when full_exp_eq (evalf e) exp_true ->
-    	[com; Ast.Assert(e,atts1)]
-    | (Ast.CJmp (e,_,fl,atts1)) when full_exp_eq (evalf e) exp_false ->
-    	[com; Ast.Assert(UnOp(NOT,e),atts1)]
-    | Ast.CJmp _ -> failwith "Evaluation failure!"
-    | (Ast.Jmp _) ->
-	[com]
-	  (* Removing assignment of tainted operands: symbolic
-	     execution does not need these *)
-    | Ast.Move (v, Store(mem, idx, value, _endian, t), _) ->
-        let idx = concretize idx in
-        let bytes = get_bytes t in
-          break_move (int64_of_big_int idx) value t bytes 
-    | Ast.Move (_, _, atts) when List.exists is_tconcassign atts -> []
-    | s -> [s] in
-    (*if not !allow_symbolic_indices && !exp <> exp_true then
-    (* The assertion must come first, since the statement may modify value of the expression! *)
-      s @ [Assert(!exp, [])]
-      else*)
-    s
-
-let get_symbolic_seeds2 memv = function
-  | Ast.Comment (s,atts) when is_seed_label s ->
-      List.fold_left
-	(fun acc {index=index; taint=Taint taint} ->
-	   let newvarname = "symb_" ^ (string_of_int taint) in
-	   let sym_var = Var (Var.newvar newvarname reg_8) in
-	     pdebug ("Introducing symbolic: " 
-		     ^(Printf.sprintf "%Lx" index)
-		     ^" -> "
-		     ^(Pp.ast_exp_to_string sym_var));
-	     add_symbolic index sym_var ;
-	     (* symbolic variable *)
-	     let mem = newvar index reg_8 in
-	     let move = Move(mem, sym_var, []) in
-	     move::acc				       
-	) [] (filter_taint atts)
-  | _ -> []
-
-(** Running each block separately *)
-let run_and_subst_block state memv block = 
-  let addr, block = hd_tl block in
-  let input_seeds = get_symbolic_seeds2 memv addr in
-  pdebug ("Running block: " ^ (string_of_int !counter) ^ " " ^ (Pp.ast_stmt_to_string addr));
-  let info, block = hd_tl block in
-  counter := !counter + 1 ;
-  let _ = ignore(update_concrete addr) in
-  if !consistency_check then (
-    (* remove temps *)
-    clean_delta state.delta;
-    check_delta state;
-    (* TraceConcrete.print_values state.delta; *)
-    (* TraceConcrete.print_mem state.delta; *)
-  );
-
-  (* Assign concrete values to regs/memory *)
-  let block, extra = match !use_alt_assignment with
-    | true ->
-	let assigns = assign_vars memv false in
-	(* List.iter *)
-	(*   (fun stmt -> dprintf "assign stmt: %s" (Pp.ast_stmt_to_string stmt)) assigns;	 *)
-	assigns @ block, List.length assigns
-    | false -> block, 0
-  in
-
-  let place = ref 0 in
-
-  let block = append_halt block in 
-  TraceConcrete.initialize_prog state block ;
-  clean_delta state.delta;
-  let init = TraceConcrete.inst_fetch state.sigma state.pc in
-  let executed = ref [] in
-  let rec eval_block state stmt = 
-    pdebug ("Executing: " ^ (Pp.ast_stmt_to_string stmt));
-    (*    Hashtbl.iter (fun k v -> pdebug (Printf.sprintf "%Lx -> %s" k (Pp.ast_exp_to_string v))) concrete_mem ;*)
-    let evalf e = match TraceConcrete.eval_expr state.delta e with
-      | Symbolic(e) -> e
-      | _ -> failwith "Expected symbolic" 
-    in
-    executed := Util.fast_append input_seeds !executed ;
-      if !place >= extra then (
-    executed := Util.fast_append (trace_transform_stmt2 stmt evalf) !executed ; 
-      );
-        place := !place + 1;
-    (*print_endline (Pp.ast_stmt_to_string stmt) ;*)
-
-    try 
-      (match TraceConcrete.eval_stmt state stmt with
-	 | [newstate] ->
-	     let next = TraceConcrete.inst_fetch newstate.sigma newstate.pc in
-	       (*pdebug ("pc: " ^ (Int64.to_string newstate.pc)) ;*)
-	       eval_block newstate next
-	 | _ -> 
-	    failwith "multiple targets..."
-      )
-    with
-	(* Ignore failed assertions -- assuming that we introduced them *)
-    | AssertFailed _ as _e -> 
-	  wprintf "failed assertion: %s" (Pp.ast_stmt_to_string stmt);
-	  (* raise e; *)
-	  let new_pc = Int64.succ state.pc in
-	  let next = TraceConcrete.inst_fetch state.sigma new_pc in
-	  eval_block {state with pc=new_pc} next
-  in
-    try
-      eval_block state init
-    with 
-      |	Failure s as e -> 
-	  pwarn ("block evaluation failed :(\nReason: "^s) ;
-	  List.iter (fun s -> pdebug (Pp.ast_stmt_to_string s)) block ;
-	  (*if !consistency_check then ( *)
-	    raise e
-	  (* ) else 
-	  ((addr,false)::(info,false)::(List.tl !executed)) *)
-      | UnknownLabel _ ->
-	  (addr::info::List.rev (!executed))
-      | Halted _ -> 
-	  (addr::info::List.rev (List.tl !executed))
-
-let run_and_subst_blocks blocks memv length =
-  counter := 1 ;
-  Status.init "Concrete Substitution Run" length ;
-  let state = TraceConcrete.create_state () in
-  let rev_trace = List.fold_left 
-    (fun acc block -> 
-       Status.inc() ;   
-       List.rev_append (run_and_subst_block state memv block) acc
-    ) [] blocks
-  in
-  Status.stop () ;
-  List.rev rev_trace
-
-let dicer = 
-
-  let process_stmt outset stmt = 
-    let inset = ref NameSet.empty in
-    let delset = ref NameSet.empty in
-    let vis = object(self)
-      inherit Ast_visitor.nop
-      method visit_exp = function
-        | Ast.Var v -> inset := NameSet.add (Var.name v) !inset ; `DoChildren 
-        | _ -> `DoChildren
-    end
-    in
-    let make_sets = function
-      | Ast.Move(v, e, _) ->
-	  let name = Var.name v in
-	    if NameSet.mem name outset then
-	      (
-	        ignore (Ast_visitor.exp_accept vis e );
-	        delset := NameSet.add name !delset
-	      )
-      | Ast.Assert(e,_) ->
-          ignore (Ast_visitor.exp_accept vis e)
-      | _ -> ()
-    in
-      make_sets stmt;
-      !inset, !delset
-  in
-       
-  let rec slicer outset acc = function
-    | [] ->
-        acc
-    | (Ast.Move _ as stmt)::stmts -> 
-        let inset, delset = process_stmt outset stmt in
-        let outset = NameSet.diff outset delset in
-        let outset = NameSet.union outset inset in
-          if NameSet.is_empty inset then
-            slicer outset acc stmts
-          else
-            slicer outset (stmt::acc) stmts
-    | (Ast.Assert _ as stmt)::stmts ->
-        let inset, _ = process_stmt outset stmt in
-        if NameSet.is_empty (NameSet.inter inset outset) then
-          slicer outset acc stmts
-        else
-          slicer outset (stmt::acc) stmts
-    | stmt::stmts ->
-        slicer outset (stmt::acc) stmts
-        
-  in
-    slicer
-
-let concrete_substitution trace = 
-  dsa_rev_map := None;
-  (*let trace = Memory2array.coerce_prog trace in*)
-  let no_specials = remove_specials trace in
-  (* let no_unknowns = remove_unknowns no_specials in *)
-  let memv = find_memv no_specials in
-  let blocks = trace_to_blocks no_specials in
-  (*pdebug ("blocks: " ^ (string_of_int (List.length blocks)));*)
-  let length = List.length blocks in
-  let actual_trace = run_and_subst_blocks blocks memv length in
-    actual_trace
-
-let check_slice trace = 
-  let actual_trace = concrete_substitution trace in
-  let accurate_trace = dicer (NameSet.singleton "ra") [] (List.rev actual_trace) in
-    accurate_trace
-
-let clean = 
+let clean =
   let rec clean_aux acc = function
     | (Comment _) :: ss | (Label _) :: ss -> clean_aux acc ss
     | s :: ss -> clean_aux (s::acc) ss
     | [] -> List.rev acc
   in
     clean_aux []
-
-(*  Approximate/Conservative Slicing  *)
-let slice varname trace = 
-  let rev = List.rev trace in
-  let maps = ref (NameSet.singleton varname) in
-  let vis = object(self)
-    inherit Ast_visitor.nop
-    method visit_exp = function
-      | Ast.Var v -> maps := NameSet.add (Var.name v) !maps ; `DoChildren 
-      | _ -> `DoChildren
-  end
-  in
-  let run_all acc = function 
-    | Ast.Move(v, e, _) as s ->
-	let name = Var.name v in
-	  if NameSet.mem name !maps then
-	    (
-	      ignore( Ast_visitor.exp_accept vis e );
-	      maps := NameSet.remove name !maps ;
-	      s::acc
-	    )
-	  else acc
-    | _ -> acc
-  in
-    List.fold_left run_all [] rev
-		   
-	    
