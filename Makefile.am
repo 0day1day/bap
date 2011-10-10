@@ -6,7 +6,8 @@
 
 if TESTS_OPT
 TESTPOSTDIRS=stpwrap
-BAPTESTDIRS=tests pintraces
+# BAPTESTDIRS=tests pintraces
+BAPTESTDIRS=tests
 endif
 
 BAPDIRS=libasmir solvers ocaml utils $(BAPTESTDIRS)
