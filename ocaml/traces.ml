@@ -1150,7 +1150,7 @@ let run_blocks blocks memv length =
   let state = TraceConcrete.create_state () in
   let (rev_trace,_) = List.fold_left 
     (fun (acc,remaining) block -> 
-      Status.inc() ;   
+      Status.inc();
       let hd, block_tail = hd_tl block in
       let concblock =
 	(match hd with

@@ -51,7 +51,6 @@ define PROJ_baptest
 endef
 export PROJ_baptest
 
-# XXX How to get analyze_test_log to be cleaned?
 define PROJ_analyze_test_log
 	RESULT=analyze_test_log
 	SOURCES = analyze_test_log.ml
