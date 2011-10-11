@@ -200,8 +200,9 @@ struct
                       S.del_set set) s';
       s'
 
-    (** Access solver info. *)
-    method debugs = s
+    (* (\** Access solver info. *\) *)
+    (* method debugs = s *)
+    (* debugs makes subtyping break. *)
 
     (** Push a copy of the constraints onto the constraint stack *)
     method push =
@@ -248,6 +249,7 @@ struct
       S.pp_sol s
   end
 
+  let newsolver () = new solver
 
 end
 
@@ -555,7 +557,7 @@ struct
   let mk_set () =
     {forms = []; forms_stack = Stack.create (); vars=VarHash.create 256; vars_stack = Stack.create ()}
 
-  let del_set () = ()
+  let del_set _ = ()
 
   let rec convert =
     let v vars = object(self)
@@ -604,16 +606,29 @@ struct
 
   let pp_sol _ =
     "unimplemented"
-  let pp_exp = Pp.ast_exp_to_string
+  let pp_exp _ = Pp.ast_exp_to_string
 end
 
-module STPExec = MakeFromExec(Smtexec.STP)
-module STPSMTLIBExec = MakeFromExec(Smtexec.STPSMTLIB)
-module CVC3Exec = MakeFromExec(Smtexec.CVC3)
-module CVC3SMTLIBExec = MakeFromExec(Smtexec.CVC3SMTLIB)
-module YICESExec = MakeFromExec(Smtexec.YICES)
+module STPExec = Make(MakeFromExec(Smtexec.STP))
+module STPSMTLIBExec = Make(MakeFromExec(Smtexec.STPSMTLIB))
+module CVC3Exec = Make(MakeFromExec(Smtexec.CVC3))
+module CVC3SMTLIBExec = Make(MakeFromExec(Smtexec.CVC3SMTLIB))
+module YICESExec = Make(MakeFromExec(Smtexec.YICES))
 
 (*module STP = Make(SIF)*)
+
+let solvers = Hashtbl.create 10 ;;
+List.iter (fun (n,s) -> Hashtbl.add solvers n s)
+  (
+    ("stp", STPExec.newsolver)
+    ::("stp_smtlib", STPSMTLIBExec.newsolver)
+    ::("cvc3", CVC3Exec.newsolver)
+    ::("cvc3_smtlib", CVC3SMTLIBExec.newsolver)
+    ::("yices", YICESExec.newsolver)
+    ::("z3", Z3.newsolver)
+    ::[]
+  )
+
 
 (* XXX: Move me to unit test *)
 let memtest =
