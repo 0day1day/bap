@@ -29,6 +29,7 @@ end
 
 module type SOLVER =
 sig
+  val solvername : string
   val solve_formula_file : ?timeout:int -> ?remove:bool -> ?printmodel:bool -> string -> result (** Solve a formula in a file *)
   val check_exp_validity : ?timeout:int -> ?remove:bool -> ?exists:(Ast.var list) -> ?foralls:(Ast.var list) -> Ast.exp -> result (** Check validity of an exp *)
     (* XXX: check_exp_sat *)

@@ -41,6 +41,7 @@ end
 (* Output type *)
 module type SOLVER =
 sig
+  val solvername : string
   val solve_formula_file : ?timeout:int -> ?remove:bool -> ?printmodel:bool -> string -> result (** Solve a formula in a file *)
   val check_exp_validity : ?timeout:int -> ?remove:bool -> ?exists:(Ast.var list) -> ?foralls:(Ast.var list) -> Ast.exp -> result (** Check validity of an exp *)
   val create_cfg_formula :
@@ -141,6 +142,9 @@ let result_to_string result =
 
 module Make = functor (S: SOLVER_INFO) ->
 struct
+
+  let solvername = S.solvername
+
   (** Write given formula out to random filename and return the filename *)
     let write_formula ?(exists=[]) ?(foralls=[]) ?(remove=true) f  =
       let name, oc = Filename.open_temp_file ("formula" ^ (string_of_int (getpid ())))  ".stp" in

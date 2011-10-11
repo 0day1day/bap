@@ -50,8 +50,6 @@ export SOURCES = \
 	ssa_visitor.mli ssa_visitor.ml \
 	cfg_ssa.mli cfg_ssa.ml \
 	memory2array.ml \
-	../solvers/z3/ocaml/z3.ml \
-	solver.ml \
 	debug_snippets.ml \
 	sccvn.mli sccvn.ml \
 	deadcode.mli deadcode.ml \
@@ -72,6 +70,8 @@ export SOURCES = \
 	cvc3_grammar.mly cvc3_lexer.mll \
 	yices_grammar.mly yices_lexer.mll \
 	smtexec.mli smtexec.ml \
+	../solvers/z3/ocaml/z3.ml \
+	solver.ml \
 	asmirconsts.ml \
 	asmir.mli asmir.ml \
 	asmir_rdisasm.mli asmir_rdisasm.ml \
