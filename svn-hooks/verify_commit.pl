@@ -131,7 +131,7 @@ if($getpin) {
 
 # make test
 print "Making test\n";
-check_system("make test-pin");
+check_system("make test");
 
 # leave $local_path before removing it
 chdir '/';
