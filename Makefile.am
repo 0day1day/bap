@@ -13,12 +13,19 @@ endif
 BAPDIRS=libasmir solvers ocaml utils $(BAPTESTDIRS)
 SUBDIRS=bigint-3.12 batteries-1.4.0 ounit-1.1.0 pcre-ocaml-release-6.2.2 objsize-0.16 VEX $(BAPDIRS) $(TESTPOSTDIRS)
 
+
+all-pin: BAPDIRS += pintraces
+all-pin: all
+
 test: all
 	$(MAKE) -C tests test
 
+test-pin: BAPDIRS += pintraces
+test-pin: test
 
 .PHONY: bap-clean cscope
 
+bap-clean: BAPDIRS += pintraces
 bap-clean: 
 	-for d in $(BAPDIRS); do $(MAKE) -C $$d clean; done
 
