@@ -60,6 +60,14 @@ if test "$(uname -m)" == "x86_64";
    then export CFLAGS="$CFLAGS -DAMD64";
 fi
 
+# Check for PIN
+PIN_HOME=${PIN_HOME:=$(pwd)/pin}
+AC_CHECK_FILE([$PIN_HOME],
+              [HAVE_PIN=true],
+              [HAVE_PIN=false; AC_MSG_WARN([Pin not found. BAP pintraces will be unavailable.])])
+
+AM_CONDITIONAL([HAVE_PIN], [test x$HAVE_PIN = xtrue])
+
 # Checks for ocaml libraries
 ocamlfind query ocamlgraph
 if test $? != 0; then
@@ -154,7 +162,7 @@ fi
 #AC_CHECK_LIB([asmir], [libasmir_version])
 AC_CHECK_LIB([bfd], [bfd_init])
 AC_CHECK_LIB([iberty], [xmalloc])
-AC_CHECK_LIB([vex], [LibVEX_Version])
+#AC_CHECK_LIB([vex], [LibVEX_Version])
 
 AC_SUBST(VEX_DIR)
 

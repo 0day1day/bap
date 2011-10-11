@@ -3,6 +3,7 @@ include C/Makefile.defs
 
 export BAP_DIR=$(CURDIR)/..
 
+.PHONY: $(BAP_DIR)/../tests-proj/Makefile
 -include $(BAP_DIR)/../tests-proj/Makefile
 
 export BAP_OCAMLDIR=$(BAP_DIR)/ocaml
@@ -71,9 +72,11 @@ ASM:
 CTESTS:
 	make -C C
 
+.PHONY: tags
 tags: TAGS
 
-TAGS: $(SOURCES)
+.PHONY: TAGS
+TAGS:
 	-otags $^
 
 %:
