@@ -2,8 +2,6 @@
 # Do not copy, disclose, or distribute without explicit written
 # permission.
 
-#include @top_srcdir@/config/recursive.mk
-
 if TESTS_OPT
 TESTPOSTDIRS=stpwrap tests
 endif
