@@ -802,7 +802,6 @@ let rec bap_get_stmt_from_trace_file ?(atts = true) ?(rate=1L) ?(pin = false) fi
   let next_block = 
     (match !block_q with
     | [] ->
-      dprintf "SWXXX Queue is empty; refreshing!";
       let (c,ir) = alt_bap_from_trace_file_range filename offset rate in
       tmp_c := c;
       let ir = List.rev ir in

@@ -877,12 +877,19 @@ let check_delta state =
           else (
 	    let badstmt =
 	      try
-		Pp.ast_stmt_to_string (VH.find reg_to_stmt var)
-	      with Not_found -> ("Unable to find statement that set register "^(Var.name var)^". This is probably because BAP never set it, but was supposed to!")
+		List.fold_left 
+		  (fun s stmt -> 
+		    s^"{"^(Pp.ast_stmt_to_string stmt)^"}\n") "" 
+		  (VH.find_all reg_to_stmt var)
+	      with Not_found -> 
+		("Unable to find statement that set register "^
+		    (Var.name var)^
+		    ". This is probably because BAP never set it, but was supposed to!")
 	    in
 	    let traceval_str = Pp.ast_exp_to_string traceval in
 	    let evalval_str = Pp.ast_exp_to_string evalval in
-	    wprintf "Difference between %sBAP and trace values in [%s]: %s Trace=%s Eval=%s" s badstmt dsavarname traceval_str evalval_str;
+	    wprintf "Difference between %sBAP and trace values for [*%s* Trace=%s Eval=%s]" s dsavarname traceval_str evalval_str;
+	    wprintf "This is due to one of the following statments:\n%s"  badstmt;
 	  )
 	  (* If we can't find concrete value, it's probably just a BAP temporary *)
       | _ -> ())
@@ -1027,7 +1034,7 @@ let run_block ?(next_label = None) state memv block =
     | Not_found -> (* Verify everything in block is label or comment. 
 		      Warn and ignore otherwise *) List.hd block) 
   in
-
+  let block = List.filter (fun b -> if b == addr then false else true) block in
   let input_seeds = get_symbolic_seeds memv addr in
   pdebug ("Running block: " ^ (string_of_int !counter) ^ " " ^ (Pp.ast_stmt_to_string addr));
   counter := !counter + 1 ;
@@ -1045,6 +1052,7 @@ let run_block ?(next_label = None) state memv block =
 
        Note: This must come after check_delta
     *)
+    
     let finddefs p =
       let l = ref [] in
       List.iter 
@@ -1054,8 +1062,26 @@ let run_block ?(next_label = None) state memv block =
       !l
     in
     let defs = finddefs block in
-    List.iter (fun v -> if not (is_temp v) then VH.replace reg_to_stmt v addr) defs
+    List.iter 
+      (fun v -> if not (is_temp v) 
+	then ((*VH.remove_all reg_to_stmt v;*)
+	  while VH.mem reg_to_stmt v do
+	    VH.remove reg_to_stmt v
+	  done;
+	  VH.add reg_to_stmt v addr))
+      defs;
+    (* Find all sys call statments in block *)
+    let sys_stmts = List.filter Syscall_models.x86_is_system_call block in
+    (* Add all registers to each syscall stmt *)
+    List.iter 
+      (fun s -> (List.iter (fun v -> VH.add reg_to_stmt v addr) Asmir.x86_regs))
+      sys_stmts;
   );
+
+  (* Don't execute specials now that we've potentially recorded them *)
+  let block = remove_specials block in
+
+  List.iter (fun b -> pdebug ("SWXXX Running stmt: "  ^ (Pp.ast_stmt_to_string b))) block;
 
   (* Assign concrete values to regs/memory *)
   let block = match !use_alt_assignment with
