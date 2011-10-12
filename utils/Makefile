@@ -1,5 +1,7 @@
 export BAP_DIR=$(CURDIR)/..
 
+# Don't send request to build Makefile to OCamlMakefile!
+.PHONY: ../../utils-proj/Makefile
 -include ../../utils-proj/Makefile
 
 export BAP_OCAMLDIR=$(BAP_DIR)/ocaml
