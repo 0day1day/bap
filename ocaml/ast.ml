@@ -101,20 +101,6 @@ let newlab =
      c := i + 1;
      Name(pref^string_of_int i))
 
-(** Create a single target cjmp. Uses a hopefully-unique label for the other. *)
-let cjmp c t =
-  let l = newlab ~pref:"nocjmp" () in
-  CJmp(c, t, exp_of_lab l, [])
-  :: Label(l, [])
-  :: []
-
-(** Create a single target cjmp with inverted condition.  Uses a hopefully-unique label for the other. *)
-let ncjmp c t =
-  let l = newlab ~pref:"nocjmp" () in
-  CJmp(c, exp_of_lab l, t, [])
-  :: Label(l, [])
-  :: []
-
 let num_exp = function
   | Load _ -> 0
   | Store _ -> 1

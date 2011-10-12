@@ -20,6 +20,7 @@ let mk_attr lab string =
   | "address" -> Address(Int64.of_string string)
   | "set" when string = "liveout" -> Liveout
   | "set" when string = "initro" -> InitRO
+  | "set" when string = "synthetic" -> Synthetic
   | "str" | "attr" -> StrAttr string
   | "tid" -> ThreadId(int_of_string string)
   | _ -> err ("Unknown attribute @"^lab)

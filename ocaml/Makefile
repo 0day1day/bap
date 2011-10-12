@@ -90,14 +90,14 @@ export SOURCES = \
 	unroll.ml \
 	hacks.ml \
 	coalesce.ml \
+	utils_common.ml \
+	test_common.ml \
 	template.ml \
 	traces.ml \
 	traces_surgical.ml \
 	syscall_id.ml \
 	traces_merge.ml \
 	graphDataflowW.ml \
-	utils_common.ml \
-	test_common.ml \
 	$(PROJSOURCES) \
 
 # XXX: Only compile info_flow and formule_simplify_mem if Z3 is enabled
