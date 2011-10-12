@@ -45,11 +45,13 @@ AS_IF([test "x$with_z3_bindings" = "xyes"],
 
 rm -f solvers/makefile.inc
 if `test "x$with_z3_bindings" = "xyes"`; then
-   echo "SOLVER_PPFLAGS=-D WITH_Z3_BINDINGS" >> solvers/makefile.inc
    cat >>solvers/makefile.inc <<"EOF"
+SOLVER_SOURCES=$(SOLVER)/z3/ocaml/z3.ml
+SOLVER_PPFLAGS=-D WITH_Z3_BINDINGS
 SOLVER_LIBDIRS = $(SOLVER)/z3/lib
 SOLVER_LDFLAGS = -Wl,-rpath=$(SOLVER)/z3/lib -fopenmp
 SOLVER_CLIBS = z3stubs z3
+
 EOF
 else
    touch solvers/makefile.inc
