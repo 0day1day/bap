@@ -1000,11 +1000,36 @@ let rec get_next_label blocks =
 	| [] -> None
 
 (** Running each block separately *)
-let run_block ?(next_label = None) state memv block =  
-  let addr, block = hd_tl block in
+let run_block ?(next_label = None) state memv block = 
+  (** Search for metadata.  It will either be a comment with endseed or a label
+      with a context attribute.  If found update_concrete on that stmt, and if 
+      it was a label set addr to that; execute the block.  If it's not found
+      verify that all stmts are labels and comments.  Otherwise print a warning 
+  *)
+  let addr = 
+    (try
+      List.find 
+	(fun s ->
+	  (match s with
+	  | Comment (s,atts) when is_seed_label s -> true
+	  | Label (_,atts) ->
+	    (try 
+	      let _ = List.find 
+		(fun a -> match a with 
+		| Context _ -> true
+		| _ -> false) 
+		atts in
+	      true
+	    with Not_found -> false)
+	  | _ -> false)) 
+	block  
+    with
+    | Not_found -> (* Verify everything in block is label or comment. 
+		      Warn and ignore otherwise *) List.hd block) 
+  in
+
   let input_seeds = get_symbolic_seeds memv addr in
   pdebug ("Running block: " ^ (string_of_int !counter) ^ " " ^ (Pp.ast_stmt_to_string addr));
-  let info, block = hd_tl block in
   counter := !counter + 1 ;
   let _ = ignore(update_concrete addr) in
   if !consistency_check then (
@@ -1105,44 +1130,45 @@ let run_block ?(next_label = None) state memv block =
 	  (*if !consistency_check then ( *)
 	    raise e
 	  (* ) else
-	  ((addr,false)::(info,false)::(List.tl !executed)) *)
+	  ((addr,false)::(List.tl !executed)) *)
       | TraceConcrete.UnknownLabel lab ->
-	  (match next_label, lab with
-	   | Some(l), Addr x when x <> l && !checkall ->
-	       let s =
-		 Printf.sprintf "Unknown label address (0x%Lx) does not equal the next label (0x%Lx)" x l in
-	       pwarn (s ^ "\nCurrent block is: " ^ (Pp.ast_stmt_to_string addr))
-           | _ -> ()
-	  );
-	  (addr::info::List.rev (!executed))
+	(match next_label, lab with
+	| Some(l), Addr x when x <> l && !checkall ->
+	  let s =
+	    Printf.sprintf "Unknown label address (0x%Lx) does not equal the next label (0x%Lx)" x l in
+	  pwarn (s ^ "\nCurrent block is: " ^ (Pp.ast_stmt_to_string addr))
+        | _ -> ()
+	);
+	(addr::List.rev (!executed))
       | TraceConcrete.Halted (_,ctx)-> 
-		(*if (!checkall) then
-		  (match next_label with
-			(* XXXSW use pc(?) to reverse lookup label in lambda *)
-			(* XXXSW compare this to next_label and warn if not equal *)
-			| Some(l) -> 
-			  let f hash_label hash_addr = 
-				pwarn ("XXXSW Halt label = " ^ (Pp.label_to_string hash_label));
-				pwarn (Printf.sprintf "XXXSW Halt addr = 0x%Lx" hash_addr);
-				
-			  in
-			  let s sigma_addr sigma_stmt =
-				pwarn ("XXXSW Sigma stmt = " ^ (Pp.ast_stmt_to_string sigma_stmt));
-				pwarn (Printf.sprintf "XXXSW Sigma addr = 0x%Lx" sigma_addr);
-			  in
-			  pwarn ("Current block is: " ^ (Pp.ast_stmt_to_string addr));
-			  pwarn (Printf.sprintf "XXXSW Halt pc = 0x%Lx" state.pc);
-			  pwarn (Printf.sprintf "XXXSW Halt next_label = 0x%Lx" l);
+	  (*if (!checkall) then
+	    (match next_label with
+	  (* XXXSW use pc(?) to reverse lookup label in lambda *)
+	  (* XXXSW compare this to next_label and warn if not equal *)
+	    | Some(l) -> 
+	    let f hash_label hash_addr = 
+	    pwarn ("XXXSW Halt label = " ^ (Pp.label_to_string hash_label));
+	    pwarn (Printf.sprintf "XXXSW Halt addr = 0x%Lx" hash_addr);
+	    
+	    in
+	    let s sigma_addr sigma_stmt =
+	    pwarn ("XXXSW Sigma stmt = " ^ (Pp.ast_stmt_to_string sigma_stmt));
+	    pwarn (Printf.sprintf "XXXSW Sigma addr = 0x%Lx" sigma_addr);
+	    in
+	    pwarn ("Current block is: " ^ (Pp.ast_stmt_to_string addr));
+	    pwarn (Printf.sprintf "XXXSW Halt pc = 0x%Lx" state.pc);
+	    pwarn (Printf.sprintf "XXXSW Halt next_label = 0x%Lx" l);
 
-			  (* label_decode state.lambda next_label *)
-			  Hashtbl.iter f state.lambda;
-			  Hashtbl.iter s state.sigma;
-			  pwarn ("XXXSW Context from Halted");
-			  Hashtbl.iter f ctx.lambda;
-			  Hashtbl.iter s ctx.sigma;
-			  
-			| None -> ());*)
-	  (addr::info::List.rev (List.tl !executed))
+	  (* label_decode state.lambda next_label *)
+	    Hashtbl.iter f state.lambda;
+	    Hashtbl.iter s state.sigma;
+	    pwarn ("XXXSW Context from Halted");
+	    Hashtbl.iter f ctx.lambda;
+	    Hashtbl.iter s ctx.sigma;
+	    
+	    | None -> ());*)
+	(addr::List.rev (List.tl !executed))
+
 
 let run_blocks blocks memv length =
   counter := 1 ;

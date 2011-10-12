@@ -57,7 +57,7 @@ type opcode =
   | Movs of typ
   | Movzx of typ * operand * typ * operand (* dsttyp, dst, srctyp, src *)
   | Movsx of typ * operand * typ * operand (* dsttyp, dst, srctyp, src *)
-  | Movdqa of operand * operand (* dst, src *)
+  | Movdq of typ * operand * operand * bool (* dst, src *)
   | Lea of operand * Ast.exp
   | Call of operand * int64 (* int64 is RA *)
   | Shift of binop_type * typ * operand * operand
@@ -471,22 +471,25 @@ let rec to_ir addr next ss pref =
     [assn t dst (cast_unsigned t (op2e ts src))]
   | Movsx(t, dst, ts, src) when pref = [] ->
     [assn t dst (cast_signed t (op2e ts src))]
-  | Movdqa(d,s) -> (
+  | Movdq(t, d, s, align) -> (
     let (s, al) = match s with
-      | Oreg i -> bits2xmme i, []
-      | Oaddr a -> load xmm_t a, [a]
+      | Oreg i -> op2e t s, []
+      | Oaddr a -> op2e t s, [a]
       | Oimm _ -> failwith "invalid"
     in
     let (d, al) = match d with
-      (* FIXME: should this be a single move with two stores? *)
-      | Oreg i ->
-	let r = bits2xmm i in
-	move r s, []
-      | Oaddr a -> store xmm_t a s, a::al
+      | Oreg i -> assn t d s, al
+	(* let r = op2e t d in *)
+	(* move r s, al *)
+      | Oaddr a -> assn t d s, a::al
       | Oimm _ -> failwith "invalid"
     in
-    (List.map (fun a -> Assert( (a &* i32 15) =* i32 0, [])) (al))
-    @ [d]
+    let al =
+      if align then 
+	List.map (fun a -> Assert( (a &* i32 15) =* i32 0, [])) (al) 
+      else []
+    in
+    d::al 
     )
   | Pcmpeq (t,elet,dst,src) ->
       let ncmps = (Typecheck.bits_of_width t) / (Typecheck.bits_of_width elet) in
@@ -846,7 +849,9 @@ module ToStr = struct
     | Movs(t) -> "movs"
     | Movzx(dt,dst,st,src) -> Printf.sprintf "movzx %s, %s" (opr dst) (opr src)
     | Movsx(dt,dst,st,src) -> Printf.sprintf "movsx %s, %s" (opr dst) (opr src)
-    | Movdqa(d,s) -> Printf.sprintf "movdqa %s, %s" (opr d) (opr s)
+    | Movdq(t,d,s,align) -> 
+      let asm = if align then "movdqa" else "movdqu" in
+      Printf.sprintf "%s %s, %s" asm (opr d) (opr s)
     | Pcmpeq(t,elet,dst,src) -> Printf.sprintf "pcmpeq %s, %s" (opr dst) (opr src)
     | Pmovmskb(t,dst,src) -> Printf.sprintf "pmovmskb %s, %s" (opr dst) (opr src)
     | Lea(r,a) -> Printf.sprintf "lea %s, %s" (opr r) (opr (Oaddr a))
@@ -1237,7 +1242,11 @@ let parse_instr g addr =
       | 0x6f | 0x7f when pref = [0x66] ->
 	let r, rm, na = parse_modrm32 na in
 	let s,d = if b2 = 0x6f then rm, r else r, rm in
-	(Movdqa(d,s), na)
+	let align = (match pref with 
+	  | [0x66] -> true
+	  | [0xf3] -> false
+	  | _ -> failwith "Unimplemented") in
+	(Movdq(opsize,d,s,align), na)
       | 0x74 | 0x75 | 0x76 as o ->
         let r, rm, na = parse_modrm32 na in
         let elet = match o with | 0x74 -> r8 | 0x75 -> r16 | 0x76 -> r32 | _ -> failwith "impossible" in
