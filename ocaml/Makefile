@@ -70,7 +70,6 @@ export SOURCES = \
 	cvc3_grammar.mly cvc3_lexer.mll \
 	yices_grammar.mly yices_lexer.mll \
 	smtexec.mli smtexec.ml \
-	../solvers/z3/ocaml/z3.ml \
 	solver.ml \
 	asmirconsts.ml \
 	asmir.mli asmir.ml \
@@ -96,6 +95,7 @@ export SOURCES = \
 	graphDataflowW.ml \
 	utils_common.ml \
 	test_common.ml \
+	$(SOLVER_SOURCES) \
 	$(PROJSOURCES) \
 
 # XXX: Only compile info_flow and formule_simplify_mem if Z3 is enabled
@@ -149,7 +149,7 @@ TAGS: $(SOURCES)
 	-otags $^
 
 runtop:	top
-	./bap.top -I $(BIGINT)
+	./bap.top -I $(BIGINT) -I $(BATT)
 
 # You may also tell "make" at the command-line what kind of target to
 # produce (e.g. "make nc").  Here all the possibilities with shortcuts
