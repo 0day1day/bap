@@ -49,7 +49,7 @@ module DFSPEC = struct
       | _ -> Bottom
 
     let meet x y =
-      let meet_term x y = if x = y then x else NoTerm in
+      let meet_term x y = if x = y then x else Term in
       let meet_map x y =
         AddrMap.fold
           (fun k yv xmap ->
@@ -82,11 +82,14 @@ module DFSPEC = struct
         L.Term, AddrMap.add addr L.FromSyscall newm
       | _, _ -> a
     in
-    (* (\* We don't want to propagate Syscall values across blocks *\) *)
-    (* let init = match init with *)
-    (*   | L.Syscall _ -> L.Term *)
-    (*   | _ -> init *)
-    (* in *)
+    (* We don't want to propagate Syscall values across blocks *)
+    let init = match init with
+      | t, m -> t, (AddrMap.map
+                      (fun v -> match v with
+                      | L.Syscall _ -> L.Bottom
+                      | x -> x)
+                      m)
+    in
     List.fold_left process_stmt init stmts
   let s0 g =
     (* let check_v v a = *)
@@ -104,18 +107,19 @@ end
 module DF = GraphDataflow.Make(DFSPEC)
 
 let find_syscalls g =
-  let _inh, _out = DF.worklist_iterate g in
+  let inh, out = DF.worklist_iterate g in
   let process_vertex n a =
-    (* match out n with *)
-    (* | DFSPEC.L.Syscall(i, t) -> *)
-    (*   let i = int_of_big_int i in *)
-    (*   dprintf "Found syscall %d! yay" i; *)
-    (*   if debug then ( *)
-    (*     let stmts = Cfg.AST.get_stmts g n in *)
-    (*     Debug_snippets.print_ast stmts; *)
-    (*   ); *)
-    (*   (n, i)::a *)
-    (* | _ -> a *)
-    a
+    match out n with
+    | DFSPEC.L.Term, m ->
+      AddrMap.fold (fun k v acc -> match k, v with
+      | addr, DFSPEC.L.Syscall(i, t) ->
+        dprintf "Found syscall %s! yay" (~% i);
+        if debug then (
+          let stmts = Cfg.AST.get_stmts g n in
+          Debug_snippets.print_ast stmts;
+        );
+        (n, int_of_big_int i)::acc
+      | _ -> acc) m a
+    | _ -> a
   in
   Cfg.AST.G.fold_vertex process_vertex g []
