@@ -1,12 +1,12 @@
 (*pp camlp4o pa_macro.cmo *)
 
 (** A module to convert AST formulas to expressions for SMT Solvers.
-    currently we support the following solvers.
 
     @author Thanassis Avgerinos, Sang Kil Cha, ejs
 *)
 
 open Ast
+open Ast_convenience
 open Big_int_convenience
 open Printf
 open Type
@@ -58,6 +58,7 @@ sig
   val push : set -> unit
   val pop : set -> unit
 
+  (* XXX: What does pp_sol do? *)
   val pp_sol  : set -> string            (* print solution *)
   val pp_exp  : set -> exp -> string     (* expression printer *)
 
@@ -199,8 +200,9 @@ struct
                       S.del_set set) s';
       s'
 
-    (** Access solver info. *)
-    method debugs = s
+    (* (\** Access solver info. *\) *)
+    (* method debugs = s *)
+    (* debugs makes subtyping break. *)
 
     (** Push a copy of the constraints onto the constraint stack *)
     method push =
@@ -247,6 +249,7 @@ struct
       S.pp_sol s
   end
 
+  let newsolver () = new solver
 
 end
 
@@ -281,9 +284,9 @@ struct
     {ctx = ctx; vars=VarHash.create 256; vars_stack = Stack.create ()}
 
   let del_set {ctx=ctx; vars=vars; vars_stack=vs} =
-    del_context ctx;
-    Stack.clear vs;
-    VarHash.clear vars
+    del_context ctx
+    (* Stack.clear vs; *)
+    (* VarHash.clear vars *)
 
   let bool_to_bv ctx cond invert =
     let booltyp = mk_bv_sort ctx 1 in
@@ -535,8 +538,99 @@ module Z3 = Make(ZIF)
 module Z3 = Make(NullSolver)
   END;;
 
-  (*module STP = Make(SIF)*)
+(** Build a solver module from a Smtexec module *)
+module MakeFromExec(S:Smtexec.SOLVER) =
+struct
+  let name = S.solvername
 
+  type varmap = Ast.exp VarHash.t
+
+  type set = {
+    mutable forms : (Ast.exp list);
+    forms_stack : (Ast.exp list) Stack.t;
+    mutable vars : varmap;
+    vars_stack : varmap Stack.t;
+  }
+  type exp = Ast.exp
+  type model = unit
+
+  let mk_set () =
+    {forms = []; forms_stack = Stack.create (); vars=VarHash.create 256; vars_stack = Stack.create ()}
+
+  let del_set _ = ()
+
+  let rec convert =
+    let v vars = object(self)
+      inherit Ast_visitor.nop
+      method visit_exp = function
+        | Var v ->
+          let newv = (try VarHash.find vars v
+            with Not_found ->
+              (Var v)) in
+          `ChangeToAndDoChildren newv
+        | e -> `DoChildren
+    end in
+    (fun {vars=vars} e ->
+      Ast_visitor.exp_accept (v vars) e)
+
+  let add_binding {vars=vars} v e =
+    (* let e = convert set e in *)
+    VarHash.add vars v e (* Extend context *)
+
+  let del_binding {vars=vars} v =
+    VarHash.remove vars v
+
+  let add_constraint ctx e =
+    ctx.forms <- e :: ctx.forms
+
+  let is_sat {forms=forms} =
+    let f = List.fold_left
+      (fun f e -> binop AND f e)
+      exp_true
+      forms
+    in
+    (* If NOT e is NOT invalid, then e is satisfiable *)
+    let validf = unop NOT f in
+    (S.check_exp_validity validf) = Smtexec.Invalid
+
+  let get_model _ = failwith "unimplemented"
+  let model_exp _ = failwith "unimplemented"
+
+  let push {forms=forms; forms_stack=forms_stack; vars=vars; vars_stack = vs} =
+    Stack.push (VarHash.copy vars) vs;
+    Stack.push forms forms_stack
+
+  let pop ctx =
+    let () = ctx.vars <- Stack.pop ctx.vars_stack in
+    ctx.forms <- Stack.pop ctx.forms_stack
+
+  let pp_sol _ =
+    "unimplemented"
+  let pp_exp _ = Pp.ast_exp_to_string
+end
+
+module STPExec = Make(MakeFromExec(Smtexec.STP))
+module STPSMTLIBExec = Make(MakeFromExec(Smtexec.STPSMTLIB))
+module CVC3Exec = Make(MakeFromExec(Smtexec.CVC3))
+module CVC3SMTLIBExec = Make(MakeFromExec(Smtexec.CVC3SMTLIB))
+module YICESExec = Make(MakeFromExec(Smtexec.YICES))
+
+(*module STP = Make(SIF)*)
+
+let solvers = Hashtbl.create 10 ;;
+List.iter (fun (n,s) -> Hashtbl.add solvers n s)
+  (
+    ("stp", STPExec.newsolver)
+    ::("stp_smtlib", STPSMTLIBExec.newsolver)
+    ::("cvc3", CVC3Exec.newsolver)
+    ::("cvc3_smtlib", CVC3SMTLIBExec.newsolver)
+    ::("yices", YICESExec.newsolver)
+    ::("z3", Z3.newsolver)
+    ::[]
+  )
+
+
+(* XXX: Move me to unit test *)
 let memtest =
   let mem = newvar "mem" (TMem reg_32) in
   (* let store = Store(Var(mem), Int(42L, reg_32), Int(42L, reg_32), exp_false, reg_32) in *)

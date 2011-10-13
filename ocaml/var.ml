@@ -29,7 +29,7 @@ end
 
 include V
 
-module VarHash = Hashtbl.Make(V)
+module VarHash = BatHashtbl.Make(V)
 module VarMap = Map.Make(V)
 module VarSet = Set.Make(V)
 

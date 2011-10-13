@@ -3,6 +3,7 @@ include C/Makefile.defs
 
 export BAP_DIR=$(CURDIR)/..
 
+.PHONY: $(BAP_DIR)/../tests-proj/Makefile
 -include $(BAP_DIR)/../tests-proj/Makefile
 
 export BAP_OCAMLDIR=$(BAP_DIR)/ocaml
@@ -12,14 +13,15 @@ export BATT=$(BAP_DIR)/batteries-1.4.0/_build/src
 export OUNIT=$(BAP_DIR)/ounit-1.1.0/_build/src/
 export PCRE=$(BAP_DIR)/pcre-ocaml-release-6.2.2/lib
 export OCAMLGRAPH=$(BAP_DIR)/ocamlgraph-1.8
+export OBJSIZE=$(BAP_DIR)/objsize-0.16
 
 # Stop annoying warnings about big_int duplication!
 export OCAMLFIND_IGNORE_DUPS_IN=$(BAP_DIR)/bigint-3.12/otherlibs/num
 
 #export PACKS = oUnit bigarray str ocamlgraph extlib unix
 export PACKS = bigarray str unix camomile
-export LIBS = nums batteries oUnit pcre graph ../ocaml/bap
-export INCDIRS = $(BAP_OCAMLDIR) $(BIGINT) $(BATT) $(OUNIT) $(PCRE) $(OCAMLGRAPH)
+export LIBS = nums batteries oUnit pcre objsize graph bap
+export INCDIRS = $(BAP_OCAMLDIR) $(BIGINT) $(BATT) $(OUNIT) $(PCRE) $(OCAMLGRAPH) $(OBJSIZE)
 
 # Include sources from ../ocaml in the automatically generated dependencies.
 export SOURCE_DIRS_IN = $(BAP_OCAMLDIR) $(BAP_PROJ_OCAMLDIR)
@@ -51,7 +53,6 @@ define PROJ_baptest
 endef
 export PROJ_baptest
 
-# XXX How to get analyze_test_log to be cleaned?
 define PROJ_analyze_test_log
 	RESULT=analyze_test_log
 	SOURCES = analyze_test_log.ml
@@ -72,9 +73,11 @@ ASM:
 CTESTS:
 	make -C C
 
+.PHONY: tags
 tags: TAGS
 
-TAGS: $(SOURCES)
+.PHONY: TAGS
+TAGS:
 	-otags $^
 
 %:

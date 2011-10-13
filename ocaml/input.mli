@@ -22,3 +22,6 @@ val init_ro : bool ref
 
 (* This really should go elsewhere! *)
 val set_gc : unit -> unit
+
+(* Rate to stream frames at *)
+val streamrate : int64 ref

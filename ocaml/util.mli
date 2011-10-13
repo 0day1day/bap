@@ -3,6 +3,7 @@ val curry : ('a * 'b -> 'c) -> 'a -> 'b -> 'c
 val uncurry : ('a -> 'b -> 'c) -> ('a * 'b -> 'c)
 val ( <@ ) : ('a -> 'b) -> ('c -> 'a) -> 'c -> 'b
 
+val hd_tl : 'a list -> ('a * 'a list)
 val foldn : ?t:int -> ('a -> int -> 'a) -> 'a -> int -> 'a
 val foldn64 : ?t:int64 -> ('a -> int64 -> 'a) -> 'a -> int64 -> 'a
 val mapn : (int -> 'a) -> int -> 'a list
@@ -95,3 +96,5 @@ val binary_of_int64 : ?pad:int -> int64 -> string
 val binary_of_big_int : ?pad:int -> Big_int.big_int -> string
 val hex_of_big_int : ?pad:int -> Big_int.big_int -> string
 val big_int_of_string : string -> Big_int.big_int
+
+val print_obj_info : string -> 'a -> unit

@@ -2,24 +2,28 @@
 # Do not copy, disclose, or distribute without explicit written
 # permission.
 
-#include @top_srcdir@/config/recursive.mk
-
 if TESTS_OPT
-TESTPOSTDIRS=tests stpwrap pintraces
+TESTPOSTDIRS=stpwrap
+BAPTESTDIRS=tests
 endif
 
-SUBDIRS=bigint-3.12 batteries-1.4.0 ounit-1.1.0 pcre-ocaml-release-6.2.2 ocamlgraph-1.8 VEX libasmir solvers ocaml utils $(TESTPOSTDIRS)
+if HAVE_PIN
+PINTRACES=pintraces
+endif
 
-# pintraces removed temporarily
-# stp/ocaml ocaml utils doc
+BAPDIRS=libasmir solvers ocaml utils $(BAPTESTDIRS) $(PINTRACES)
+SUBDIRS=bigint-3.12 batteries-1.4.0 ounit-1.1.0 pcre-ocaml-release-6.2.2 ocamlgraph-1.8 objsize-0.16 VEX $(BAPDIRS) $(TESTPOSTDIRS)
 
 test: all
 	$(MAKE) -C tests test
 
+.PHONY: cscope
+
 cscope:
 	cscope -b `find . -name "*.[ch]" -or -name "*.hh" -or -name "*.cc" -or -name "*.cpp"`
 
-#regression:
-#	cd $(top_srcdir)/../regression/ocaml;./test.sh
+.PHONY: bap-clean
+bap-clean:
+	for d in $(BAPDIRS); do $(MAKE) -C $$d clean; done
 
 all-local: tags

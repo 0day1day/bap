@@ -45,11 +45,13 @@ AS_IF([test "x$with_z3_bindings" = "xyes"],
 
 rm -f solvers/makefile.inc
 if `test "x$with_z3_bindings" = "xyes"`; then
-   echo "SOLVER_PPFLAGS=-D WITH_Z3_BINDINGS" >> solvers/makefile.inc
    cat >>solvers/makefile.inc <<"EOF"
+SOLVER_SOURCES=$(SOLVER)/z3/ocaml/z3.ml
+SOLVER_PPFLAGS=-D WITH_Z3_BINDINGS
 SOLVER_LIBDIRS = $(SOLVER)/z3/lib
 SOLVER_LDFLAGS = -Wl,-rpath=$(SOLVER)/z3/lib -fopenmp
 SOLVER_CLIBS = z3stubs z3
+
 EOF
 else
    touch solvers/makefile.inc
@@ -59,6 +61,14 @@ fi
 if test "$(uname -m)" == "x86_64";
    then export CFLAGS="$CFLAGS -DAMD64";
 fi
+
+# Check for PIN
+PIN_HOME=${PIN_HOME:=$(pwd)/pin}
+AC_CHECK_FILE([$PIN_HOME],
+              [HAVE_PIN=true],
+              [HAVE_PIN=false; AC_MSG_WARN([Pin not found. BAP pintraces will be unavailable.])])
+
+AM_CONDITIONAL([HAVE_PIN], [test x$HAVE_PIN = xtrue])
 
 # Checks for ocaml libraries
 dnl ocamlfind query ocamlgraph
@@ -154,7 +164,7 @@ fi
 #AC_CHECK_LIB([asmir], [libasmir_version])
 AC_CHECK_LIB([bfd], [bfd_init])
 AC_CHECK_LIB([iberty], [xmalloc])
-AC_CHECK_LIB([vex], [LibVEX_Version])
+#AC_CHECK_LIB([vex], [LibVEX_Version])
 
 AC_SUBST(VEX_DIR)
 

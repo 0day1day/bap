@@ -9,6 +9,7 @@ export BATT=$(BAP_DIR)/batteries-1.4.0/_build/src
 export OUNIT=$(BAP_DIR)/ounit-1.1.0/_build/src/
 export PCRE=$(BAP_DIR)/pcre-ocaml-release-6.2.2/lib
 export OCAMLGRAPH=$(BAP_DIR)/ocamlgraph-1.8
+export OBJSIZE=$(BAP_DIR)/objsize-0.16
 
 include $(LIBASMIR)/makefile.inc
 export SOLVER=$(BAP_DIR)/solvers
@@ -50,8 +51,6 @@ export SOURCES = \
 	ssa_visitor.mli ssa_visitor.ml \
 	cfg_ssa.mli cfg_ssa.ml \
 	memory2array.ml \
-	../solvers/z3/ocaml/z3.ml \
-	solver.ml \
 	debug_snippets.ml \
 	sccvn.mli sccvn.ml \
 	deadcode.mli deadcode.ml \
@@ -72,6 +71,7 @@ export SOURCES = \
 	cvc3_grammar.mly cvc3_lexer.mll \
 	yices_grammar.mly yices_lexer.mll \
 	smtexec.mli smtexec.ml \
+	solver.ml \
 	asmirconsts.ml \
 	asmir.mli asmir.ml \
 	asmir_rdisasm.mli asmir_rdisasm.ml \
@@ -90,14 +90,15 @@ export SOURCES = \
 	unroll.ml \
 	hacks.ml \
 	coalesce.ml \
+	traces.ml \
+	traces_surgical.ml \
 	utils_common.ml \
 	test_common.ml \
 	template.ml \
-	traces.ml \
-	traces_surgical.ml \
 	syscall_id.ml \
 	traces_merge.ml \
 	graphDataflowW.ml \
+	$(SOLVER_SOURCES) \
 	$(PROJSOURCES) \
 
 # XXX: Only compile info_flow and formule_simplify_mem if Z3 is enabled
@@ -126,8 +127,8 @@ export CLIBS += $(SOLVER_CLIBS)
 export CFLAGS = -g
 export LDFLAGS = $(LIBASMIR_LDFLAGS) $(SOLVER_LDFLAGS)
 export PPFLAGS = $(SOLVER_PPFLAGS)
-export INCDIRS = $(BIGINT) $(BATT) $(OUNIT) $(PCRE) $(OCAMLGRAPH)
-export LIBS = nums batteries oUnit pcre graph
+export INCDIRS = $(BIGINT) $(BATT) $(OUNIT) $(PCRE) $(OCAMLGRAPH) $(OBJSIZE)
+export LIBS = nums batteries oUnit pcre graph objsize
 #export CLIBFLAGS= $(LDFLAGS)
 export RESULTDEPS = $(LIBASMIR)/src/libasmir.a $(VEX_DIR)/libvex.a
 export LIBDIRS = $(LIBASMIR)/src $(VEX_DIR)
@@ -151,7 +152,7 @@ TAGS: $(SOURCES)
 	-otags $^
 
 runtop:	top
-	./bap.top -I $(BIGINT)
+	./bap.top -I $(BIGINT) -I $(BATT)
 
 # You may also tell "make" at the command-line what kind of target to
 # produce (e.g. "make nc").  Here all the possibilities with shortcuts
