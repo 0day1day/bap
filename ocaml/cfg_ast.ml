@@ -228,9 +228,10 @@ let to_prog c =
 	    assert (C.G.V.equal dst d);
 	    let j = Jmp(exp_of_lab (get_label dst), []) in
 	    BH.replace hrevstmts src (j::get_revstmts src)
-	| _ ->
+	| l ->
+          let dests = List.fold_left (fun s n -> s^" "^v2s n) "" l in
 	    failwith("Cfg_ast.to_prog: no jump at end of block with > 1 succ: "
-		     ^ v2s src)
+		     ^ v2s src ^ " points to"^dests)
   in
   (* join traces without jumps *)
   grow_traces (fun b suc -> normal b && joinable suc && not(has_jump b));

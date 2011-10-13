@@ -70,7 +70,11 @@ let vn_compare vn1 vn2 = match vn1,vn2 with
       let c1 = compare t1 t2 in
       if c1 <> 0 then c1
       else compare_big_int i1 i2
-  | _, _ -> compare vn1 vn2
+  | _, _ ->
+    let getnum = function
+      | Top -> 0 | Hash _ -> 1 | HInt _ -> 2
+    in
+    compare (getnum vn1) (getnum vn2)
 
 let vn_eq vn1 vn2 = (vn_compare vn1 vn2) = 0
 
@@ -110,8 +114,9 @@ let expid_eq e1 e2 =
   else (
     let l1,l2,l3,l4,l5,l6,l7,l8 = getargs e1 in
     let r1,r2,r3,r4,r5,r6,r7,r8 = getargs e2 in
+    let phil = (List.length l2) == (List.length r2) in
     let b1 = List.for_all2 (==) l1 r1 in
-    let b2 = List.for_all2 (==) l2 r2 in
+    let b2 = if phil then List.for_all2 (==) l2 r2 else false in
     let b3 = List.for_all2 (=) l3 r3 in
     let b4 = List.for_all2 (=) l4 r4 in
     let b5 = List.for_all2 (=) l5 r5 in
@@ -125,7 +130,7 @@ let expid_eq e1 e2 =
          subexpressions are structurally, but not physically,
          equal. *)
       List.for_all2 Ssa.full_value_eq l1 r1
-      && List.for_all2 vn_eq l2 r2
+      && if phil then List.for_all2 vn_eq l2 r2 else false
     else
       false)
 
@@ -432,7 +437,7 @@ let rpo ~opt cfg =
 	 if oldvn <>! temp (*&& temp <> top*) then (
 	   assert(temp <>! top); (* FIXME: prove this is always true *)
 	   changed := true;
-	   dprintf "Updating %s -> %s" (Pp.var_to_string v) (hash_to_string temp);
+	   dprintf "Updating %s -> %s (was %s)" (Pp.var_to_string v) (hash_to_string temp) (hash_to_string oldvn);
 	   VH.replace info.vn_h v temp
 	 ) )
       moves
