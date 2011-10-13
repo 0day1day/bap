@@ -3,6 +3,7 @@ open BatListFull
 let init_ro = ref false
 let inputs = ref []
 and streaminputs = ref None
+and streamrate = ref 1L (* Unless specified grab one frame at a time *)
 and pintrace = ref false
 
 (* Set garbage collector options whenever we see -trace. *)
@@ -15,9 +16,18 @@ let set_gc () =
 	Gc.max_overhead = 100; (* compact after 100% overhead *)
     }
 
+let toint64 s =
+  try Int64.of_string s
+  with Failure "int_of_string" -> raise(Arg.Bad("invalid int64: "^s))
+ 
+let setint64 r s =  r := toint64 s
+
+
 let stream_speclist =
   (* let addinput i = streaminputs := i :: !streaminputs in *)
   [
+	("-rate",
+	 Arg.String(setint64 streamrate), "<rate> Stream at rate frames");
     ("-tracestream",
      Arg.String(fun s -> streaminputs := Some(`Tracestream s)),
      "<file> Read a trace to be processed as a stream.");
@@ -29,11 +39,6 @@ let stream_speclist =
 
 let speclist =
   let addinput i = inputs := i :: !inputs in
-  let toint64 s =
-    try Int64.of_string s
-    with Failure "int_of_string" -> raise(Arg.Bad("invalid int64: "^s))
-  in
-  let setint64 r s =  r := toint64 s in
   [
     ("-init-ro", Arg.Set (init_ro), "Access rodata.");
     ("-bin",
@@ -103,7 +108,8 @@ let get_program () =
 
 let get_stream_program () = match !streaminputs with
   | None -> raise(Arg.Bad "No input specified")
-  | Some(`Tracestream f) -> Asmir.bap_stream_from_trace_file ~pin:!pintrace f
+  | Some(`Tracestream f) -> 
+	Asmir.bap_stream_from_trace_file ~rate:!streamrate ~pin:!pintrace f
 
 
 (*  with fixme -> raise(Arg.Bad "Could not open input file")*)

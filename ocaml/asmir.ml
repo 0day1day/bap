@@ -661,15 +661,15 @@ let trans_frame f =
      Comment("All blocks must have two statements", [])]
   | _ -> []
 
-(* SWXXX Add buffering around this/let it find a range where alt_bap finds entire range *)
-let alt_bap_from_trace_file filename =
+
+let alt_bap_from_trace_file_range filename off reqframes =
   let add_operands stmts f =
     let ops = tr_frame_attrs f in
     match stmts with
     | Label (l,a)::others ->
-	Label (l,a@ops)::others
+	  Label (l,a@ops)::others
     | Comment (s,a)::others ->
-	Comment (s,a@ops)::others
+	  Comment (s,a@ops)::others
     | others when ops <> [] -> Comment("Attrs without label.", ops)::others
     | others -> others
   in
@@ -677,41 +677,53 @@ let alt_bap_from_trace_file filename =
     let stmts = trans_frame f in
     add_operands stmts f
   in
-  let ir = ref [] in
-  let off = ref 0L in
   let c = ref true in
-  (* might be better to just grab the length of the trace in advance :*( *)
+  let revstmts = ref [] in
+  (* flush VEX buffers *)
+  let () = Libasmir.asmir_free_vex_buffers () in
+  let trace_frames = 
+	Libasmir.asmir_frames_from_trace_file filename !off reqframes in
+  let numframes = Libasmir.asmir_frames_length trace_frames in
+  (*dprintf "Got %d frames" numframes;*)
+  if numframes = 0 || numframes = -1 then (
+    c := false
+  ) else (
+    if ((Int64.of_int numframes) <> reqframes) then 
+      dprintf "Got %d frames which <> requested frames %s" 
+		numframes (Int64.to_string reqframes);
+    revstmts := 
+	  Util.foldn
+      (fun acc n ->
+		let frameno = numframes-1-n in
+		(* dprintf "frame %d" frameno; *)
+		let stmts = 
+		  raise_frame (Libasmir.asmir_frames_get trace_frames frameno) in
+		List.rev_append stmts acc) 
+	  [] (numframes-1);
+    off := Int64.add !off (Int64.of_int numframes);
+  (* let moreir = tr_bap_blocks_t_no_asm g bap_blocks in *)
+  (* Build ir backwards *)
+  (* ir := List.rev_append moreir !ir; *)
+  );
+  asmir_frames_destroy trace_frames;
+  (!c, !revstmts)
+
+
+let alt_bap_from_trace_file filename =
+  let off = ref 0L in
+  let ir = ref [] in
+  let c = ref true in
   Status.init "Lifting trace" 0 ;
   while !c do
-    (*dprintf "Calling the trace again.... ";*)
-    (* flush VEX buffers *)
-    let () = Libasmir.asmir_free_vex_buffers () in
-    let trace_frames = Libasmir.asmir_frames_from_trace_file filename !off !trace_blocksize in
-    let numframes = Libasmir.asmir_frames_length trace_frames in
-    (*dprintf "Got %d frames" numframes;*)
-    if numframes = 0 || numframes = -1 then (
-      c := false
-    ) else (
-      let revstmts = Util.foldn
-	(fun acc n ->
-	   let frameno = numframes-1-n in
-	   (* dprintf "frame %d" frameno; *)
-	   let stmts = raise_frame (Libasmir.asmir_frames_get trace_frames frameno) in
-	   List.rev_append stmts acc) [] (numframes-1) in
-      ir := Util.fast_append revstmts !ir;
-
-      (* let moreir = tr_bap_blocks_t_no_asm g bap_blocks in *)
-	(* Build ir backwards *)
-	(* ir := List.rev_append moreir !ir; *)
-	off := Int64.add !off !trace_blocksize
-    );
-
-    asmir_frames_destroy trace_frames;
-
+    let (tmp_c,revstmts) = 
+      alt_bap_from_trace_file_range filename off !trace_blocksize in
+    ir := Util.fast_append revstmts !ir;
+    c := tmp_c;
   done;
   let r = List.rev !ir in
   Status.stop () ;
   r
+
 
 (* deprecated *)  
 let old_bap_from_trace_file ?(atts = true) ?(pin = false) filename =
@@ -745,26 +757,71 @@ let bap_from_trace_file ?(atts = true) ?(pin = false) filename =
   else
     old_bap_from_trace_file ~atts ~pin filename
 
-(** Get one statement at a time.
+(* SWXXX UGLY! copy and pasted from traces....better place to put/do this? *)
+let endtrace = "This is the final trace block"
+let is_seed_label = (=) "ReadSyscall"
+(** A trace is a sequence of instructions. This function
+    takes a list of ast statements and returns a list of
+    lists of ast stmts. Each one of those sublists will 
+    represent the IL of the executed assembly instruction *)
+let trace_to_blocks trace = 
+  let rec to_blocks blocks current = function
+    | [] -> 
+	  List.rev ((List.rev current)::blocks)
+    | (Ast.Label (Addr _, _) as l)::rest ->
+	  let block = List.rev current in
+	  to_blocks (block::blocks) [l] rest
+    | (Ast.Comment (c, _) as s)::rest when c = endtrace || (is_seed_label c) ->
+	  let block = List.rev current in
+	  to_blocks (block::blocks) [s] rest
+    | x::rest ->
+	  to_blocks blocks (x::current) rest
+  in
+  let blocks = to_blocks [] [] trace in
+    List.filter (fun b -> List.length b > 1) blocks
 
-    XXX: Use an internal buffer
-*)
-let bap_get_stmt_from_trace_file ?(atts = true) ?(pin = false) filename off =
-  let off = Int64.of_int off in (* blah, Stream.from does not use int64 *)
-  let g = gamma_create x86_mem x86_regs in
-  (* SWXXX this is the old way, use alt_bap_from_trace_file instead *)
-  (* SWXXX this has no buffer at all; will parse entire trace for every instruction *)
-  let bap_blocks = Libasmir.asmir_bap_from_trace_file filename off 1L atts pin in
-  let numblocks = Libasmir.asmir_bap_blocks_size bap_blocks in
-  match numblocks with
-  | -1 -> None
-  | _ -> Some(let ir = tr_bap_blocks_t_trace_asm g bap_blocks in
-              let () = destroy_bap_blocks bap_blocks in
-              ir)
-  
+(** Internal queue for get_stmts *)
+let block_q = ref []
+let offset = ref 0L
+
+let enqueue blocks =
+  block_q := blocks
+
+let rec dequeue _ =
+  match !block_q with
+  | [] -> None
+  | b::bs -> block_q := bs; 
+    match b with 
+    | [] -> dequeue() 
+    | _ -> Some(b)
+
+(** SWXXX Rename; this is a block *)
+(** Get one statement at a time. *)
+let rec bap_get_stmt_from_trace_file ?(atts = true) ?(rate=1L) ?(pin = false) filename off =
+  let tmp_c = ref false in
+  let next_block = 
+    (match !block_q with
+    | [] ->
+      let (c,ir) = alt_bap_from_trace_file_range filename offset rate in
+      tmp_c := c;
+      let ir = List.rev ir in
+      let blocks = if (rate <> 1L) then trace_to_blocks ir else [ir] in
+      enqueue blocks;
+      dequeue()
+    | _ -> dequeue()) in
+  (* Handle the case where the last block on the queue is an empty block but 
+     frames are still left in the trace (c is true) *)
+  match next_block with
+  | None -> 
+    if !tmp_c then bap_get_stmt_from_trace_file ~atts ~rate ~pin filename off 
+    else None
+  | _ -> next_block
+
+
 (** Return stream of trace instructions raised to the IL *)
-let bap_stream_from_trace_file ?(atts = true) ?(pin = false) filename =
-  Stream.from (bap_get_stmt_from_trace_file ~atts:atts ~pin:pin filename)
+let bap_stream_from_trace_file ?(atts = true) ?(rate=1L) ?(pin = false) filename =
+  Stream.from (bap_get_stmt_from_trace_file ~atts ~rate ~pin filename)
+
 
 let get_symbols ?(all=false) {asmp=p} =
   let f = if all then asmir_get_all_symbols else asmir_get_symbols in

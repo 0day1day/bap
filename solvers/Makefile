@@ -25,6 +25,9 @@ endif
 
 all:	z3
 
+.PHONY: tags
+tags:
+
 .PHONY: clean
 clean:
 

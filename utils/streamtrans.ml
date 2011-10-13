@@ -1,11 +1,11 @@
 let usage = "Usage: "^Sys.argv.(0)^" <input options> [transformations and outputs]\n\
              Transform BAP IL programs. "
 
-(* open Bap*)
+open BatListFull
 
 type ast = Ast.program
 (*type astcfg = Cfg.AST.G.t
-type ssa = Cfg.SSA.G.t*)
+  type ssa = Cfg.SSA.G.t*)
 
 type prog =
   | Ast of ast
@@ -13,7 +13,10 @@ type prog =
 type cmd = 
   | TransformAst of (ast -> ast)
 
-let concrete_state = Traces.TraceConcrete.create_state ()
+let concrete_state = Traces.TraceConcrete.create_state ();;
+let mem_hash = Var.VarHash.create 1000;;
+(* HACK to make sure default memory has a map to normalized memory *)
+ignore(Memory2array.coerce_rvar_state mem_hash Asmir.x86_mem);;
 
 let pipeline = ref []
 
@@ -25,30 +28,21 @@ let uadd c =
 
 (** Prints the block *)
 let prints block =
-  Printf.printf "new block\n";
+  print_endline "new block";
   List.iter
     (fun stmt ->
-       Printf.printf "Stmt: %s\n" (Pp.ast_stmt_to_string stmt)
+      print_endline ("Stmt: "^ (Pp.ast_stmt_to_string stmt))
     ) block;
-  Printf.printf "end block\n";
+  print_endline "end block";
   block
 
 (** Concretely executes a block *)
-let concrete block =
-  let no_specials = Traces.remove_specials block in
-  (* SWXXX use disasm.mem(?) instead *)
-  let memv = Traces.find_memv no_specials in
-  let trace = 
-	try
-	  (* SWXXX modify to use range (should look a lot like loop in traces.ml) *)
-	  (* SWXXX do memory2array at block level *)
-	  Traces.run_block concrete_state memv no_specials None
-	with Failure "empty list" -> (*Printf.printf "run blocks failed\n";*) [] in
-  trace
+let concrete block = Utils_common.stream_concrete mem_hash concrete_state block
+
 
 let speclist =
   ("-print", uadd(TransformAst(prints)),
-     "Print each statement in the trace.")
+   "Print each statement in the trace.")
   ::("-concrete", uadd(TransformAst(concrete)),
      "Concretely execute each block.")
   :: Input.stream_speclist
@@ -66,14 +60,17 @@ let prog =
 
 let rec apply_cmd prog = function
   | TransformAst f -> (
-      match prog with
-      | Ast p -> Ast(f p)
-    )
+    match prog with
+    | Ast p -> Ast(f p)
+  )
 ;;
+
+Traces.checkall := true;
+Traces.consistency_check := true;
 
 Stream.iter
   (fun block ->
-     ignore(List.fold_left apply_cmd (Ast block) pipeline)
+    ignore(List.fold_left apply_cmd (Ast block) pipeline)
   ) prog
 
 

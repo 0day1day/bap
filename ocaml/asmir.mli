@@ -70,7 +70,7 @@ val asmprogram_to_bap_range : ?init_ro:bool -> asmprogram -> address_t -> addres
 
 val bap_from_trace_file : ?atts:bool -> ?pin:bool -> string -> Ast.program
 
-val bap_stream_from_trace_file : ?atts:bool -> ?pin:bool -> string -> (Ast.stmt list) Stream.t
+val bap_stream_from_trace_file : ?atts:bool -> ?rate:int64 -> ?pin:bool -> string -> (Ast.stmt list) Stream.t
 
 val get_symbols : ?all:bool -> asmprogram -> asymbol array
 

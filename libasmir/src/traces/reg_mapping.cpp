@@ -681,21 +681,21 @@ switch (id) {
 */
     // case REG_XMM0 = case REG_XMM_BASE:
     case REG_XMM0:
-      return string("XMM0");
+      return string("R_XMM0");
     case REG_XMM1:
-      return string("XMM1");
+      return string("R_XMM1");
     case REG_XMM2:
-      return string("XMM2");
+      return string("R_XMM2");
     case REG_XMM3:
-      return string("XMM3");
+      return string("R_XMM3");
     case REG_XMM4:
-      return string("XMM4");
+      return string("R_XMM4");
     case REG_XMM5:
-      return string("XMM5");
+      return string("R_XMM5");
     case REG_XMM6:
-      return string("XMM6");
+      return string("R_XMM6");
     case REG_XMM7:
-      return string("XMM7");
+      return string("R_XMM7");
     
       //#if defined(TARGET_IA32E)
     // additional xmm registers in the Intel(R) 64 architecture
@@ -744,9 +744,10 @@ switch (id) {
 #else    
     case REG_YMM_LAST = case REG_YMM7:
 #endif
-    
-    case REG_MXCSR:
-
+      */    
+ case REG_MXCSR:
+     return string("R_MXCSR");
+        /*
     case REG_DR_BASE:
     case REG_DR0 = case REG_DR_BASE:
     case REG_DR1:

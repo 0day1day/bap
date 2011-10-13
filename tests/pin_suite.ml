@@ -29,7 +29,6 @@ let pin_trace_setup _ =
 
 
 let pin_trace_test pin_out = 
-(*  let _ =  in *)
   let prog = Asmir.bap_from_trace_file ~pin:true pin_out in
   typecheck prog;
   Traces.consistency_check := true;

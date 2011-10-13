@@ -1171,7 +1171,7 @@ Stmt *translate_stmt( IRStmt *stmt, IRSB *irbb, vector<Stmt *> *irout )
     Stmt *result = NULL;
 
     switch ( stmt->tag )
-    {
+        {
         case Ist_NoOp:
             result = new Comment("NoOp");
             break;
@@ -1185,26 +1185,32 @@ Stmt *translate_stmt( IRStmt *stmt, IRSB *irbb, vector<Stmt *> *irout )
             result = translate_put(stmt, irbb, irout);
             break;
         case Ist_PutI:
-	    result = new Special(uTag + "PutI");
-	    break;
+            result = new Special(uTag + "PutI");
+            break;
         case Ist_WrTmp:
             result = translate_tmp_st(stmt, irbb, irout);
             break;
         case Ist_Store:
             result = translate_store(stmt, irbb, irout);
             break;
+        case Ist_CAS:
+            result = new Special(uTag + "CAS");
+            break;
+        case Ist_LLSC:
+            result = new Special(uTag + "LLSC");
+            break;
         case Ist_Dirty:
-	    result = new Special(uTag + "Dirty");
+            result = new Special(uTag + "Dirty");
             break;
         case Ist_MFence:
-	    result = new Comment(sTag + "MFence"); 
+            result = new Comment(sTag + "MFence"); 
             break;
         case Ist_Exit:
             result = translate_exit(stmt, irbb, irout);
             break;
         default:
             throw "Unrecognized statement type";
-    }
+        }
 
     assert(result);
 
@@ -1227,7 +1233,10 @@ Stmt *translate_jumpkind( IRSB *irbb, vector<Stmt *> *irout )
     if ( irbb->jumpkind == Ijk_Boring && irbb->stmts[irbb->stmts_used-1]->tag != Ist_Exit )     
       if ( irbb->stmts[0]->Ist.IMark.addr + irbb->stmts[0]->Ist.IMark.len 
             == irbb->next->Iex.Const.con->Ico.U32 )
+      {
+        Exp::destroy(dest);
         return NULL;
+      }
   }
   else
     dest = translate_expr( irbb->next, irbb, irout );
@@ -1247,10 +1256,13 @@ Stmt *translate_jumpkind( IRSB *irbb, vector<Stmt *> *irout )
         case Ijk_Ret:
           if(!translate_calls_and_returns)
             result = new Jmp(dest);
-          else
+          else {
+            Exp::destroy(dest);
             result = new Return(NULL);
+          }
           break;
         case Ijk_NoDecode:
+          Exp::destroy(dest);
           result = new Special("VEX decode error");
           break;
         case Ijk_Sys_syscall:
@@ -1259,15 +1271,11 @@ Stmt *translate_jumpkind( IRSB *irbb, vector<Stmt *> *irout )
         case Ijk_Sys_sysenter:
           // Since these will create a special (insert_specials), we
           // won't translate these as a jump here.
+          Exp::destroy(dest);
           return NULL;
           break;
         default:
-          //
-          // TODO:
-          // It's occurred to me that whenever we throw due to an
-          // unrecognized something, the unused objects created above
-          // are leaked, e.g. dest in this case.
-          //
+          Exp::destroy(dest);
           throw "Unrecognized jump kind";    
     }
 
