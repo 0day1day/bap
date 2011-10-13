@@ -174,18 +174,18 @@ let list_unique l =
   List.iter (fun x -> Hashtbl.replace h x ()) l;
   Hashtbl.fold (fun k () ul -> k::ul) h [] 
 
-let rec split_common_prefix la lb = 
+let rec split_common_prefix ?(eq=(=)) la lb = 
   match la,lb with
   | [], _ -> ([], la, lb)
   | _, [] -> ([], la, lb)
   | h1::t1, h2::t2 ->
-      if h1 = h2 then
-	let (a,b,c) = split_common_prefix t1 t2 in
+      if eq h1 h2 then
+	let (a,b,c) = split_common_prefix ~eq t1 t2 in
 	(h1::a, b, c)
       else ([], la, lb)
 
-let split_common_suffix la lb =
-  let (s,rla,rlb) = split_common_prefix (List.rev la) (List.rev lb) in
+let split_common_suffix ?(eq=(=)) la lb =
+  let (s,rla,rlb) = split_common_prefix ~eq (List.rev la) (List.rev lb) in
   (List.rev s, List.rev rla, List.rev rlb)
 
 (** a composition operator. [(f <@ g) x] = [f(g x)] *)

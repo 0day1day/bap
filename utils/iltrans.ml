@@ -375,8 +375,8 @@ let speclist =
   :: ("-unroll",
       Arg.Int (fun i -> add (TransformAstCfg(Unroll.unroll_loops ~count:i))),
       "<n> Unroll loops n times")
-  :: ("-rm-backedges", uadd(TransformAstCfg Hacks.remove_backedges),
-      "Remove backedges")
+  :: ("-rm-cycles", uadd(TransformAstCfg Hacks.remove_cycles),
+      "Remove cycles")
   :: ("-typecheck", uadd(TransformAst typecheck),
       "Typecheck program")
   :: Input.speclist

@@ -66,7 +66,7 @@ let of_prog ?(special_error = true) p =
   let postponed_edges = Hashtbl.create 5700 in
   let indirect_target = ref false in
   let add_indirect = function
-    | Addr _ -> indirect_target := true
+    | Addr _ as l -> dprintf "lab %s" (Pp.label_to_string l); indirect_target := true
     | Name _ -> ()
   in
   let add_new c revstmts addpred =

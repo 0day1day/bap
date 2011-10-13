@@ -26,8 +26,8 @@ type exp = Ast.exp
     [Assign] assigns a value to an lvalue.
     [Seq(a,b)] evaluates [a] and then moves on to [b].
     [Choice(a,b)] 
-    [Assume] goes on to the next expression in the sequence if it is true.
-    [Assert] doesn't start when the condition is not true.
+    [Assert] goes on to the next expression in the sequence if it is true.
+    [Assume] doesn't start when the condition is not true.
 *)
 type t =
   | Assume of exp
@@ -37,8 +37,37 @@ type t =
   | Seq of t * t
   | Skip 
 
-
-
+let rec gcl_equal s1 s2 =
+  let num = function
+    | Assume _ -> 0
+    | Assign _ -> 1
+    | Assert _ -> 2
+    | Choice _ -> 3
+    | Seq _ -> 4
+    | Skip -> 5
+  in
+  let getargs = function
+    | Assume(e) -> [], e::[], []
+    | Assert(e) -> [], e::[], []
+    | Assign(v, e) -> v::[], e::[], []
+    | Choice(s1,s2)
+    | Seq(s1,s2) -> [], [], s1::s2::[]
+    | Skip -> [], [], []
+  in
+  if num s1 <> num s2 then
+    false
+  else
+    let l1,l2,l3 = getargs s1
+    and r1,r2,r3 = getargs s2 in
+    let b1 = List.for_all2 (Var.equal) l1 r1 in
+    let b2 = List.for_all2 quick_exp_eq l2 r2 in
+    let b3 = List.for_all2 (==) l3 r3 in
+    if b1 && b2 && b3 then
+      true
+    else
+      b1 &&
+        List.for_all2 full_exp_eq l2 r2 &&
+        List.for_all2 gcl_equal l3 r3
 
 (** Convert a straightline trace into GCL.
 
@@ -87,6 +116,33 @@ type cfg_gcl =
   | Cunchoice of cfg_gcl * cfg_gcl (* unfinished choice *)
   | CSeq of cfg_gcl list
 
+let rec cgcl_equal s1 s2 =
+  let num = function
+    | CAssign _ -> 0
+    | CChoice _ -> 1
+    | Cunchoice _ -> 2
+    | CSeq _ -> 3
+  in
+  let getargs = function
+    | CAssign(v) -> v::[], [], []
+    | CChoice(e,t1,t2) -> [], e::[], t1::t2::[]
+    | Cunchoice(t1, t2) -> [], [], t1::t2::[]
+    | CSeq(tlist) -> [], [], tlist
+  in
+  if num s1 <> num s2 then
+    false
+  else
+    let l1,l2,l3 = getargs s1
+    and r1,r2,r3 = getargs s2 in
+    let b1 = List.for_all2 (CA.G.V.equal) l1 r1 in
+    let b2 = List.for_all2 quick_exp_eq l2 r2 in
+    let b3 = List.for_all2 (==) l3 r3 in
+    if b1 && b2 && b3 then
+      true
+    else
+      b1 &&
+        List.for_all2 full_exp_eq l2 r2 &&
+        List.for_all2 cgcl_equal l3 r3
 
 
 (** [of_cfg cfg exit_node] will compute a function from entry node to 
@@ -101,7 +157,7 @@ let of_astcfg ?entry ?exit cfg =
   in
   (* our latice isa list option of GCL expressions to be put in sequence *)
   let meet l1 l2 =
-    let (su, g1, g2) = split_common_suffix l1 l2 in
+    let (su, g1, g2) = split_common_suffix ~eq:cgcl_equal l1 l2 in
     Cunchoice(CSeq g1, CSeq g2)  :: su
   in
     (* a skip in this context is a CSeq(CSeq [],..) and the like *)
@@ -140,7 +196,7 @@ let of_astcfg ?entry ?exit cfg =
   let find_target e =
     match lab_of_exp e with
     | Some l -> CA.find_label cfg l
-    | _ -> failwith "indirect jump not supported yet"
+    | _ -> failwith ("indirect jump not supported yet: "^(Pp.ast_exp_to_string e))
   in
   let b_to_string b = Cfg.bbid_to_string (CA.G.V.label b) in
   (* transfer function *)

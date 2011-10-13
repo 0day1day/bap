@@ -53,7 +53,7 @@ let assert_noof p =
   List.flatten il
 	   
 
-let remove_backedges cfg =
+let remove_cycles cfg =
   let module C = Cfg.AST in
   let a = [StrAttr "added by remove_backedeges"] in
   let assert_false = Assert(exp_false, a) in
@@ -92,15 +92,14 @@ let remove_backedges cfg =
       in
       setcolor v true;
       let edges = C.G.fold_succ_e walk_edge cfg v edges in
-      setcolor v false;
       edges
     in
     walk entry []
   in
+  dprintf "Finding edges";
   let backedges = find_backedges cfg in
-  (* SUPER HACK ALERT XXXXXXXX. Fix the above algorithm; don't use two
-     colors *)
-  let backedges = Util.list_unique backedges in
+  (* I don't think we need this anymore... *)
+  (* let backedges = Util.list_unique backedges in *)
   List.fold_left handle_backedge cfg backedges
 
 (** Fix outgoing edges of [n] in [g] *)
@@ -132,3 +131,15 @@ let repair_node g n =
   | Special _::_ -> C.add_edge g n error
   | Halt _::_ -> C.add_edge g n exit
   | _ -> (* It's probably fine.  That's why this is in hacks.ml. *) g
+
+(** Repair cfg whose graph is inconsistent with its statements *)
+let repair_cfg g =
+  (* XXX: Better implementation *)
+  let p = Cfg_ast.to_prog g in
+  let oc = open_out "p.out" in
+  let pp = new Pp.pp_oc oc in
+  pp#ast_program p;
+  pp#close;
+  let cfg = Cfg_ast.of_prog p in
+  let cfg, entry = Cfg_ast.find_entry cfg in
+  Reachable.AST.remove_unreachable cfg entry

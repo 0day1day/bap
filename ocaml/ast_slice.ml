@@ -1,5 +1,6 @@
 (** A module to perform chopping on ASTs *)
 
+open Ast
 open Cfg
 open Depgraphs
 
@@ -33,6 +34,40 @@ end
 
 module Comp = Graph.Components.Make(SG);;
 
+(* Rewrite missing labels to BB_Error *)
+let rewrite_missing_labels cfg =
+  let missing g l =
+    try ignore(Cfg.AST.find_label g l); false
+    with Not_found -> Printf.fprintf stderr "Label %s missing\n\n" (Pp.label_to_string l); true
+  in
+  AST.G.fold_vertex
+    (fun v g ->
+      let stmts = AST.get_stmts g v in
+      match List.rev stmts with
+      | Jmp (e, a)::o ->
+        (match lab_of_exp e with
+        | Some l when missing g l ->
+          AST.set_stmts g v (List.rev (Jmp(Lab("BB_Error"), a)::o))
+        | _ -> g
+        )
+      | CJmp(c, e1, e2, a)::o ->
+        let e1', c1 = match lab_of_exp e1 with
+          | Some l when missing g l ->
+            Lab("BB_Error"), true
+          | _ -> e1, false
+        in
+        let e2', c2 = match lab_of_exp e2 with
+          | Some l when missing g l ->
+            Lab("BB_Error"), true
+          | _ -> e2, false
+        in
+        if c1 || c2 then
+          AST.set_stmts g v (List.rev (CJmp(c, e1', e2', a)::o))
+        else
+          g
+      | _ -> g
+    ) cfg cfg
+
 (* Calculating the strongly connected component *)
  let get_scc cfg src trg = 
  (* Adding a temporary back-edge *)
@@ -51,7 +86,8 @@ module Comp = Graph.Components.Make(SG);;
      ) cfg cfg
    in
    (* Removing the back-edge *)
-   if edgeadded then AST.remove_edge scc trg src else scc
+   let scc = if edgeadded then AST.remove_edge scc trg src else scc in
+   rewrite_missing_labels scc
 
  let compute_cds cfg h =
   let cdg = CDG_AST.compute_cdg cfg in
@@ -80,14 +116,14 @@ module Comp = Graph.Components.Make(SG);;
      try
       let stmts1 = AST.get_stmts cfg v1 in
       match List.hd (List.rev stmts1) with
-      | Ast.CJmp _ ->
+      | CJmp _ ->
         let num = List.length stmts1 - 1 in
         let stmts2 = AST.get_stmts cfg v2 in
         ignore
         (List.fold_left
          (fun id s ->
            match s with 
-           | Ast.Jmp _ -> Hashtbl.add dds (v2,id) (v1,num) ; id + 1
+           | Jmp _ -> Hashtbl.add dds (v2,id) (v1,num) ; id + 1
            | _ -> id + 1
          ) 0 stmts2
         )
@@ -117,7 +153,7 @@ module Comp = Graph.Components.Make(SG);;
    in
    let vis = get_reachable DDG_AST.SS.empty [(node,stmt)] in
    let not_changable = function
-    | Ast.Label _ | Ast.Comment _ -> true
+    | Label _ | Comment _ -> true
     | _ -> false
    in
    let tmp = AST.G.fold_vertex
