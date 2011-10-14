@@ -175,10 +175,13 @@ let to_prog c =
 	    | [] -> ()
 	    | suc::rest ->
 		match bh_find_option tails suc with
-		| Some succtail when cond tail suc ->
-		    dprintf "to_prog: joining %s with %s" (v2s tail) (v2s suc);
+		| Some succtail when cond tail suc &&
+                                     suc <> head ->
+                  assert (succtail <> head);
+                  assert (suc <> head);
+		    dprintf "to_prog: joining %s .. %s with %s .. %s" (v2s head) (v2s tail) (v2s suc) (v2s succtail);
 		    BH.add joined tail suc;
-		    BH.replace tails head (BH.find tails suc);
+		    BH.replace tails head succtail;
 		    BH.remove tails suc;
 		    grow_trace cond head
 		| _ -> (* suc is part of another trace, or cond failed *)
@@ -207,7 +210,7 @@ let to_prog c =
     try BH.find labs b
     with Not_found ->
       let rec find_label = function
-	| Label(l,[])::_ -> Some l
+	| Label(l,_)::_ -> Some l
 	| Comment _ :: xs -> find_label xs
 	| _ -> None
       in
