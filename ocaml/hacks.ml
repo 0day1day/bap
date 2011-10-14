@@ -51,32 +51,35 @@ let assert_noof p =
     ) p
   in
   List.flatten il
-	   
+
 
 let remove_cycles cfg =
   let module C = Cfg.AST in
-  let a = [StrAttr "added by remove_backedeges"] in
-  let assert_false = Assert(exp_false, a) in
+  let a = StrAttr "added by remove_cycles" in
+  (* let assert_false = Assert(exp_false, a) in *)
+  let assert_false = Jmp(Lab("Bb_error"), a::[]) in
   let cfg, error = Cfg_ast.find_error cfg in
   let handle_backedge cfg e =
     let s = C.G.E.src e in
+    let l = C.G.E.label e in
     let revstmts = List.rev (C.get_stmts cfg s) in
     let revstmts = match revstmts with
       | Jmp(t,_)::rest ->
 	  assert_false::rest
       | CJmp(c,t1,t2,attrs)::rest ->
 	(* e is the label we are REMOVING *)
-	  let (t,c) = match C.G.E.label e with
-	    | Some true -> (t2, exp_not c)
-	    | Some false -> (t1, c)
-	    | None -> failwith "missing edge label from cjmp"
-	  in
-	Jmp(t, attrs)::Assert(c,a)::rest
+	(match l with
+	| Some true -> CJmp(c, Lab("BB_Error"), t2, a::attrs)
+	| Some false -> CJmp(c, t1, Lab("BB_Error"), a::attrs)
+	| None -> failwith "missing edge label from cjmp")
+          ::rest
       | rest -> assert_false::rest
     in
     let cfg = C.set_stmts cfg s (List.rev revstmts) in
     let cfg = C.remove_edge_e cfg e in
-    if C.G.succ cfg s = [] then C.add_edge cfg s error else cfg
+    let newedge = C.G.E.create s l (C.G.V.create Cfg.BB_Error) in
+    let cfg = C.add_edge_e cfg newedge in
+    cfg
   in
   let find_backedges cfg =
     let module H = Hashtbl.Make(Cfg.BBid) in

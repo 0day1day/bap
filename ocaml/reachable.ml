@@ -7,9 +7,11 @@ module type B =
 sig
   include Graph.Builder.S
   (* val empty : unit -> G.t *)
+
   val remove_vertex : G.t -> G.V.t -> G.t
   val copy_map : G.t -> G.t
-  (* val add_vertex : G.t -> G.V.t -> G.t *)
+  val vlabel_to_string : G.V.label -> string
+ (* val add_vertex : G.t -> G.V.t -> G.t *)
   (* val add_edge_e : G.t -> G.E.t -> G.t *)
 end
 
@@ -70,7 +72,7 @@ struct
    let u = unreachable g v in
    let count = ref 0 in
    D.dprintf "removing %d" (List.length u);
-   let g = List.fold_left (fun a v -> incr count; (*D.dprintf "removed %d" !count;*) BI.remove_vertex a v) g u in
+   let g = List.fold_left (fun a v -> incr count; D.dprintf "removing %s" (BI.vlabel_to_string (BI.G.V.label v)); (*D.dprintf "removed %d" !count;*) BI.remove_vertex a v) g u in
    D.dprintf "removed %d" !count;
    g
 

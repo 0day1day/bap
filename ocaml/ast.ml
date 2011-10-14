@@ -274,6 +274,10 @@ let full_stmt_eq s1 s2 =
     else
       false
 
+let full_stmts_eq s1 s2 =
+  if (List.length s1) <> (List.length s2) then false
+  else List.for_all2 full_stmt_eq s1 s2
+
 let is_true = (===) exp_true
 let is_false = (===) exp_false
 

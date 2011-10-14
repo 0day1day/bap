@@ -67,6 +67,12 @@ sig
   val remove_edge : G.t -> G.V.t -> G.V.t -> G.t
   val remove_edge_e : G.t -> G.E.t -> G.t
 
+  (** Convert a vertex label to a string
+
+      XXX: Remove this or put in V
+  *)
+  val vlabel_to_string : G.V.label -> string
+
 end
 
 

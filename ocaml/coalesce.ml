@@ -51,9 +51,6 @@ struct
               C.default
               all_stmts
           in
-          let big_stmt_block = C.join_stmts init_stmts big_stmt_block in
-          (* Replace the contents of init *)
-          let graph = C.set_stmts graph init big_stmt_block in
           (* add the edges to the successors *)
           let successors_of_successors_e = G.succ_e graph (List.hd successors) in
           let newsuccessors = G.succ graph (List.hd successors) in
@@ -64,6 +61,10 @@ struct
           let graph = List.fold_left add_edge graph successors_of_successors_e in
           (* Remove unused successors *)
           let graph = List.fold_left C.remove_vertex graph successors in
+
+          (* Replace the contents of init *)
+          let big_stmt_block = C.join_stmts init_stmts big_stmt_block in
+          let graph = C.set_stmts graph init big_stmt_block in
           add_visited init;
           (newsuccessors, graph)
         )

@@ -70,6 +70,8 @@ sig
   val remove_edge : G.t -> G.V.t -> G.V.t -> G.t
   val remove_edge_e : G.t -> G.E.t -> G.t
 
+  val vlabel_to_string : G.V.label -> string
+
 end
 
 type ('a,'b,'c) pcfg =
@@ -86,6 +88,7 @@ sig
   val default : t
   val join : t -> t -> t
   val iter_labels : (label->unit) -> t -> unit
+  val to_string : t -> string
 end
 
 (* Begin persistent implementation *)
@@ -190,7 +193,17 @@ struct
     let set_stmts c v s =
       let c = remove_labels c v in
       let sm = BM.add v s c.s in
-      let lm = fold_labels (fun l lm -> LM.add l v lm) s c.l in
+      let lm = fold_labels
+        (fun l lm ->
+          (* dprintf "Adding label %s to bbid %s" (Pp.label_to_string l) (bbid_to_string (V.label v)); *)
+          if debug && LM.mem l lm then (
+            (* wprintf "stmt: %s" (Lang.to_string s); *)
+            let oldstmts = get_stmts c (LM.find l lm) in
+            let newstmts = s in
+            wprintf "Duplicate of %s:\n\noldstmts: %s\n\n newstmts: %s" (Pp.label_to_string l) (Lang.to_string oldstmts) (Lang.to_string newstmts);
+            failwith (Printf.sprintf "Duplicate of %s" (Pp.label_to_string l)));
+          LM.add l v lm
+        ) s c.l in
       { c with l=lm; s=sm }
 
     let newid c =
@@ -247,6 +260,9 @@ struct
   let newid = G.newid
   let create_vertex = G.create_vertex
   let copy_map = G.copy_map
+
+  let vlabel_to_string = bbid_to_string
+
 end
 (* end persistent implementation *)
 
@@ -261,6 +277,7 @@ struct
     | _ -> BatList.append sl1 sl2
   let iter_labels f =
     List.iter (function Ast.Label(l, _) -> f l  | _ -> () )
+  let to_string stmts = List.fold_left (fun acc s -> acc^" "^(Pp.ast_stmt_to_string s)) "" stmts
 end
 
 module LangSSA =
@@ -277,6 +294,7 @@ struct
       | Ssa.Comment _ :: xs -> g xs
       | _ -> ()
     in g
+  let to_string stmts = List.fold_left (fun acc s -> acc^" "^(Pp.ssa_stmt_to_string s)) "" stmts
 end
 
 module AST = Make(LangAST)

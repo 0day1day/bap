@@ -41,7 +41,7 @@ let to_ssapassgcl cfg post =
 
 
 let compute_wp_boring cfg post =
-  let (gcl, post) = to_ssagcl cfg post in
+  let (gcl, post) = to_ssagcl ~usedc:!usedc ~usesccvn:!usesccvn cfg post in
   (Wp.wp gcl post, [])
 
 let compute_dwp ?(k=1) cfg post =

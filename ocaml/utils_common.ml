@@ -17,14 +17,14 @@ let rename_astexp f =
   Ast_visitor.exp_accept vis;;
 
 
-let to_ssagcl cfg post =
+let to_ssagcl ?(usedc=true) ?(usesccvn=true) cfg post =
   let cfg = Hacks.remove_cycles cfg in
   let cfg = Coalesce.AST_Coalesce.coalesce cfg in
   let {Cfg_ssa.cfg=cfg; to_ssavar=tossa} = Cfg_ssa.trans_cfg cfg in
   let p = rename_astexp tossa post in
   let cfg =
     let vars = Formulap.freevars p in
-    Ssa_simp.simp_cfg ~liveout:vars ~usedc:true ~usesccvn:true cfg
+    Ssa_simp.simp_cfg ~liveout:vars ~usedc ~usesccvn cfg
   in
   let cfg = Cfg_ssa.to_astcfg cfg in
   let gcl = Gcl.of_astcfg cfg in

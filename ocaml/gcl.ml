@@ -91,7 +91,11 @@ let rec of_rev_straightline ?(acc=Skip) trace =
   in
   (* fold_left of reversed list, rather than fold_right, because
    * fold_right is not tail recursive *)
-  List.fold_left prepend acc trace
+  try
+    List.fold_left prepend acc trace
+  with e ->
+    Debug_snippets.print_ast trace;
+    raise e
 
 let of_straightline trace = of_rev_straightline(List.rev trace)
 
@@ -202,7 +206,7 @@ let of_astcfg ?entry ?exit cfg =
   let b_to_string b = Cfg.bbid_to_string (CA.G.V.label b) in
   (* transfer function *)
   let f_t n = function
-    | Cunchoice(bb1, bb2)::rest as exp -> 
+    | Cunchoice(bb1, bb2)::rest as exp ->
 	(match find_cjmp (CA.get_stmts cfg n) with
 	 | Some(cond,tt,ft) ->
 	     let (bbt,bbf) =
@@ -211,10 +215,13 @@ let of_astcfg ?entry ?exit cfg =
 		 (b1,b2,bt,bf) when b1 = bt && b2 = bf -> (bb1,bb2)
 	       | (b1,b2,bt,bf) when b2 = bt && b1 = bf -> (bb2,bb1)
 	       | (b1,b2,bt,bf) ->
-		   failwith(Printf.sprintf "choice seems to not correspond to cjmp %s %s %s %s at %s"
+		   failwith(Printf.sprintf "choice seems to not correspond to cjmp %s %s %s %s %s %s %s %s at %s. %s"
 			      (b_to_string b1) (b_to_string b2)
 			      (b_to_string bt) (b_to_string bf)
-			      (b_to_string n) )
+                              (Pp.ast_exp_to_string tt) (Cfg_ast.v2s (find_target tt))
+                              (Pp.ast_exp_to_string ft) (Cfg_ast.v2s (find_target ft))
+			      (b_to_string n)
+                              (Pp.ast_stmt_to_string (List.hd (List.rev (CA.get_stmts cfg n)))))
 	     in
 	     CAssign n::CChoice(cond, bbt, bbf)::rest
 	 | None -> (* No CJmp found *)
