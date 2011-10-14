@@ -83,10 +83,11 @@ let rec of_rev_straightline ?(acc=Skip) trace =
     | Comment _
     | Label _ ->
 	g
-    | Halt _
-    | Special _ -> 
-	invalid_arg "Found halt or special in straightline code"
-    | Ast.Assert(e, _) -> Seq(Assert(e), g) 
+    | Halt _ ->
+      invalid_arg "Found halt in straightline code"
+    | Special _ ->
+	invalid_arg "Found special in straightline code"
+    | Ast.Assert(e, _) -> Seq(Assert(e), g)
   in
   (* fold_left of reversed list, rather than fold_right, because
    * fold_right is not tail recursive *)

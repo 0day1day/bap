@@ -38,7 +38,7 @@ module Comp = Graph.Components.Make(SG);;
 let rewrite_missing_labels cfg =
   let missing g l =
     try ignore(Cfg.AST.find_label g l); false
-    with Not_found -> Printf.fprintf stderr "Label %s missing\n\n" (Pp.label_to_string l); true
+    with Not_found -> (*Printf.fprintf stderr "Label %s missing\n" (Pp.label_to_string l);*) true
   in
   AST.G.fold_vertex
     (fun v g ->
