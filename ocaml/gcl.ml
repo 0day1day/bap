@@ -245,7 +245,7 @@ let of_astcfg ?entry ?exit cfg =
 	let bb_s = CA.get_stmts cfg b in
 	match List.rev bb_s with
 	| [] -> Skip
-	| (Jmp _ | CJmp _)::rest -> of_rev_straightline rest
+	| ((Jmp _ | CJmp _ | Halt _) as s)::rest -> dprintf "Skipping %s" (Pp.ast_stmt_to_string s); of_rev_straightline rest
 	| _ -> of_straightline bb_s
   in
 

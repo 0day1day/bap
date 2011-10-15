@@ -39,7 +39,7 @@ let find_error g =
   try
     g, C.find_vertex g BB_Error
   with Not_found ->
-    create g BB_Error [Label(Name "BB_Error", []); Assert(exp_false, []); Jmp(Lab("BB_Error"), [])]
+    create g BB_Error [Label(Name "BB_Error", []); Assert(exp_false, [])]
 
 (** Find BB_Exit in a graph, or add it if not already present. *)
 let find_exit g =
@@ -121,6 +121,7 @@ let of_prog ?(special_error = true) p =
 	| CJmp(_,t,f,_) -> for_later ~lab:true t; for_later ~lab:false f; c
 	| Special _ -> C.add_edge c v error
 	| Halt _ -> C.add_edge c v exit
+        | Assert(e,_) when e === exp_false -> C.add_edge c v error
 	| _ -> failwith "impossible"
       in
       (c, [], true, None)
@@ -139,10 +140,12 @@ let of_prog ?(special_error = true) p =
 	add_indirect_edge_to l;
 	let c,v = add_new_bb c cur addpred in
 	(c, [s], true, Some v)
+    | Assert(e,_) when e === exp_false ->
+      g()
     | Move _ | Assert _ ->
-	  (c, s::cur, false, addpred)
+      (c, s::cur, false, addpred)
     | Comment _ ->
-	(c, s::cur, onlylabs, addpred)
+      (c, s::cur, onlylabs, addpred)
   in
   let (c,last,_,addpred) = List.fold_left f (c,[],true,Some entry) p in
   let c = match last with

@@ -46,6 +46,12 @@ let mapn f n =
   List.rev (foldn (fun l i -> f(n-i)::l) [] n)
   (* List.rev is needed to make side effects happen in the same order *)
 
+let rec list_mem ?(eq=(=)) ele = function
+  | hd::tl ->
+    if eq hd ele then true
+    else list_mem ~eq ele tl
+  | [] -> false
+
 (** @return the arg max of [f] where the arguments come from [l] *)
 let list_argmax ?(compare=compare) f = function
   | [] -> raise (Invalid_argument "list_argmax")

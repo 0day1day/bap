@@ -52,6 +52,7 @@ let assert_noof p =
   in
   List.flatten il
 
+type color = White | Gray | Black
 
 let remove_cycles cfg =
   let module C = Cfg.AST in
@@ -85,16 +86,18 @@ let remove_cycles cfg =
     let module H = Hashtbl.Make(Cfg.BBid) in
     let h = H.create (C.G.nb_vertex cfg)
     and entry = C.find_vertex cfg Cfg.BB_Entry in
-    let color v = try H.find h (C.G.V.label v) with Not_found -> false
+    let color v = try H.find h (C.G.V.label v) with Not_found -> White
     and setcolor v c = H.replace h (C.G.V.label v) c in
     let rec walk v edges=
       let walk_edge e edges =
 	let d = C.G.E.dst e in
-	if color d then e::edges
-	else walk d edges
+	if color d = White then walk d edges
+	else if color d = Gray then e::edges
+        else edges
       in
-      setcolor v true;
+      setcolor v Gray;
       let edges = C.G.fold_succ_e walk_edge cfg v edges in
+      setcolor v Black;
       edges
     in
     walk entry []
