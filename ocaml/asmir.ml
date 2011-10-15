@@ -9,7 +9,7 @@
 
 open Asmirconsts
 open Ast
-open Big_int
+open Big_int_Z
 open BatListFull
 open Libasmir
 open Libbfd

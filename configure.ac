@@ -215,4 +215,4 @@ AC_CONFIG_FILES([Makefile
 AC_OUTPUT
 
 # Configure ocaml 3.12
-(cd bigint-3.12 && ./configure)
+(cd zarith-1.0 && ./configure)

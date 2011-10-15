@@ -1,7 +1,7 @@
 (** A module to perform trace analysis *)
 
 open Ast
-open Big_int
+open Big_int_Z
 open Big_int_convenience
 open Symbeval
 open Type
@@ -1117,7 +1117,7 @@ let run_block ?(next_label = None) state memv block =
       let eax = evalf (Var Disasm_i386.eax) in
       let stmts = (match eax with
         | Int(i, _) ->
-          Syscall_models.linux_syscall_to_il (Big_int.int_of_big_int i)
+          Syscall_models.linux_syscall_to_il (int_of_big_int i)
         | _ -> failwith "Unexpected evaluation problem") in
       (* Hack: Remember the next pc; we will clobber this *)
       let newpc = Int64.succ state.pc in

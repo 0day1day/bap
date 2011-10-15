@@ -2,7 +2,7 @@
 open Type
 open Ast
 open Ast_convenience
-open Big_int
+open Big_int_Z
 open Big_int_convenience
 open Typecheck
 

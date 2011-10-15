@@ -1,7 +1,7 @@
 (* T E S T I N G *)
 
 open Ast
-open Big_int
+open Big_int_Z
 open Int64
 open Type
   
