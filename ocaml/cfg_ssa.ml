@@ -487,7 +487,6 @@ let list_count p =
   List.fold_left (fun a e -> if p e then a+1 else a) 0
 
 
-(* FIXME: It might be good to have a different type for a CFG with phis removed *)
 let rm_phis ?(dsa=false) ?(attrs=[]) cfg =
   let size = C.G.fold_vertex
     (fun b a ->
@@ -538,7 +537,7 @@ let rm_phis ?(dsa=false) ?(attrs=[]) cfg =
   let append_move b l p cfg=
     (* note that since stmts are reversed, we can prepend
        instead of appending. We must still be careful to not put
-       assignmenst after a jump. *)
+       assignments after a jump. *)
     let move = Move(l,Val(Var p), attrs) in
     C.set_stmts cfg b
       (match C.get_stmts cfg b with
@@ -571,7 +570,7 @@ let rm_phis ?(dsa=false) ?(attrs=[]) cfg =
 	phis
     )
     else (
-    (* assingn the variables the phi assigns at the end of each block a variable
+    (* assign the variables the phi assigns at the end of each block a variable
        the phi references is assigned. *)
     List.fold_left
       (fun cfg (l, vars) -> 
@@ -670,7 +669,7 @@ let cfg2ast tm cfg =
 (** Convert an SSA CFG to an AST CFG. *)
 let to_astcfg ?(remove_temps=true) ?(dsa=false) c =
   let tm = if remove_temps then create_tm c else VH.create 1 in
-  cfg2ast tm (rm_phis ~dsa:dsa c)
+  cfg2ast tm (rm_phis ~dsa c)
 
 (** Convert an SSA CFG to an AST program. *)
 let to_ast ?(remove_temps=true) c =

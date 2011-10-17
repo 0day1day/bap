@@ -160,7 +160,7 @@ let of_astcfg ?entry ?exit cfg =
     | None -> CA.G.V.create Cfg.BB_Entry
     | Some x -> x
   in
-  (* our latice isa list option of GCL expressions to be put in sequence *)
+  (* our latice is a list option of GCL expressions to be put in sequence *)
   let meet l1 l2 =
     let (su, g1, g2) = split_common_suffix ~eq:cgcl_equal l1 l2 in
     Cunchoice(CSeq g1, CSeq g2)  :: su
@@ -299,7 +299,8 @@ let rec remove_skips = function
 module C = Cfg.SSA
 
 let passified_of_ssa ?entry ?exit cfg =
-  let ast = Cfg_ssa.to_astcfg ~dsa:true cfg in
+  (* XXX: THIS MAY BE WRONG!!! XXX *)
+  let ast = Cfg_ssa.to_astcfg ~dsa:false cfg in
   let convert = function
     | Some v -> Some(CA.find_vertex ast (C.G.V.label v))
     | None -> None
