@@ -820,6 +820,7 @@ let rec bap_get_stmt_from_trace_file ?(atts = true) ?(rate=1L) ?(pin = false) fi
 
 (** Return stream of trace instructions raised to the IL *)
 let bap_stream_from_trace_file ?(atts = true) ?(rate=1L) ?(pin = false) filename =
+  DTest.pdebug ("SWXXX Stream opened from "^filename);
   Stream.from (bap_get_stmt_from_trace_file ~atts ~rate ~pin filename)
 
 
