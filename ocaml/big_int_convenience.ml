@@ -1,6 +1,6 @@
 (** Convenience functions for Big_ints *)
 
-open Big_int
+open Big_int_Z
 open BatString
 
 module HashType = struct

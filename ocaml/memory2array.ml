@@ -13,7 +13,7 @@ module D = Debug.Make(struct let name="memory2array" and default=`Debug end)
 open D
 
 open Ast
-open Big_int
+open Big_int_Z
 open Type
 open Var
 

@@ -9,7 +9,7 @@ open D
 
 let get_addr expr =
   match expr with
-  | Ast.Int (i, _) -> Some (Big_int.int64_of_big_int i)
+  | Ast.Int (i, _) -> Some (Big_int_Z.int64_of_big_int i)
   | _ -> None
 
 let collect_some f l x =

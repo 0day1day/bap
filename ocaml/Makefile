@@ -4,7 +4,7 @@ export BAP_DIR=$(CURDIR)/..
 
 export OCAMLMAKEFILE=OCamlMakefile
 export LIBASMIR=../libasmir
-export BIGINT=$(BAP_DIR)/bigint-3.12/otherlibs/num
+export BIGINT=$(BAP_DIR)/zarith-1.0
 export BATT=$(BAP_DIR)/batteries-1.4.0/_build/src
 export OUNIT=$(BAP_DIR)/ounit-1.1.0/_build/src/
 export PCRE=$(BAP_DIR)/pcre-ocaml-release-6.2.2/lib
@@ -16,7 +16,7 @@ include $(SOLVER)/makefile.inc
 -include ../../ocaml-proj/Makefile
 
 # Stop annoying warnings about big_int duplication!
-export OCAMLFIND_IGNORE_DUPS_IN=$(BAP_DIR)/bigint-3.12/otherlibs/num
+#export OCAMLFIND_IGNORE_DUPS_IN=$(BAP_DIR)/bigint-3.12/otherlibs/num
 
 #export INCDIRS += ../stp ../stp/ocaml
 #export EXTLIBDIRS += ../stp ../stp/ocaml
@@ -110,7 +110,7 @@ DOC_FILES := $(filter %.mli, $(SOURCES)) $(filter %.ml, $(SOURCES))
 
 
 # ocamlfind packages required
-export PACKS = bigarray str ocamlgraph unix camomile threads
+export PACKS = bigarray str num ocamlgraph unix camomile threads
 # ocamlfind packages for ocamldoc
 # don't include packages in /usr/lib/ocaml, this will cause ocamldoc
 # to complain about conflicts with our local big_int
@@ -125,7 +125,7 @@ export CFLAGS = -g
 export LDFLAGS = $(LIBASMIR_LDFLAGS) $(SOLVER_LDFLAGS)
 export PPFLAGS = $(SOLVER_PPFLAGS)
 export INCDIRS = $(BIGINT) $(BATT) $(OUNIT) $(PCRE) $(OBJSIZE)
-export LIBS = nums batteries oUnit pcre objsize
+export LIBS = zarith batteries oUnit pcre objsize
 #export CLIBFLAGS= $(LDFLAGS)
 export RESULTDEPS = $(LIBASMIR)/src/libasmir.a $(VEX_DIR)/libvex.a
 export LIBDIRS = $(LIBASMIR)/src $(VEX_DIR)
