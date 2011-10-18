@@ -181,14 +181,16 @@ let list_unique l =
   Hashtbl.fold (fun k () ul -> k::ul) h [] 
 
 let rec split_common_prefix ?(eq=(=)) la lb = 
-  match la,lb with
-  | [], _ -> ([], la, lb)
-  | _, [] -> ([], la, lb)
-  | h1::t1, h2::t2 ->
+  let rec split_common_prefix_h acc la lb =
+    match la,lb with
+    | [], _ -> (List.rev acc, la, lb)
+    | _, [] -> (List.rev acc, la, lb)
+    | h1::t1, h2::t2 ->
       if eq h1 h2 then
-	let (a,b,c) = split_common_prefix ~eq t1 t2 in
-	(h1::a, b, c)
-      else ([], la, lb)
+	split_common_prefix_h (h1::acc) t1 t2
+      else (List.rev acc, la, lb)
+  in
+  split_common_prefix_h [] la lb
 
 let split_common_suffix ?(eq=(=)) la lb =
   let (s,rla,rlb) = split_common_prefix ~eq (List.rev la) (List.rev lb) in

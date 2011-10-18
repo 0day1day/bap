@@ -17,6 +17,7 @@ open D
 
 module VH = Var.VarHash
 module C = Cfg.SSA
+module BH = Cfg.BH
 module CA = Cfg.AST
 module Dom = Dominator.Make(C.G)
 
@@ -548,15 +549,73 @@ let rm_phis ?(dsa=false) ?(attrs=[]) cfg =
 	   move::stmts )
   in
   let cfg =
+    (* Documentation note:
+
+       Consider A <- PHI(X, Y).  Normally when we convert out of SSA
+       we would add assignments A <- X where X is defined, and A <- Y
+       where Y is defined.  However:
+
+       X1 = 1
+       cjmp foo, "t1", "t2"
+       label t1:
+       X2 = 2
+       label t2:
+       X3 = Phi(X1, X2)
+
+       If you push the assignment all the way up to where X1 is
+       assigned, when foo is true you'd be assigning X3 twice (e.g., violating DSA).
+
+       (Thanks to Ivan Jager for the example)
+
+       So, when we are converting to DSA we put the assignments
+       directly in the predecessor.  *)
+
     if dsa then (
       let idom = Dom.compute_idom cfg entry in
+      let dominators = Dom.idom_to_dominators idom in
+
+      let oc = open_out "ssa.dot" in
+      Cfg_pp.SsaStmtsDot.output_graph oc cfg;
+      close_out oc;
+
+      (* let domassns = *)
+      (*   let () = dprintf "Building domassns" in *)
+      (*   let domassns = BH.create (C.G.nb_vertex cfg) in *)
+      (*   let rec fill_assns initassns cfg bb = *)
+      (*     dprintf "Visiting bb %s" (v2s bb); *)
+      (*     (\* The dominating blocks set acc assignments *\) *)
+      (*     let newassns = List.fold_left (fun l s -> match s with Move(v,_,_) -> v::l | _ -> l) initassns (C.get_stmts cfg bb) in *)
+      (*     (\* Add current assignments to domassns *\) *)
+      (*     List.iter (fun v -> dprintf "addv: %s" (Pp.var_to_string v)) newassns; *)
+      (*     let () = BH.add domassns (C.G.V.label bb) newassns in *)
+      (*     List.iter (fill_assns newassns cfg) (dom_tree bb) *)
+      (*   in *)
+      (*   let () = fill_assns [] cfg entry in *)
+      (*   let () = dprintf "... done" in *)
+      (*   domassns *)
+      (* in *)
+
       (* add an assignment for l to the end of v *)
       let dsa_push (l,vars) cfg bb =
+
+        dprintf "dsa_push %s" (List.fold_left (fun s v -> s^" "^(Pp.var_to_string v)) "" vars);
+
 	let rec find_var bb = (* walk up idom tree starting at bb *)
 	  try List.find (fun v -> bb = (VH.find assn v)) vars
 	  with Not_found -> find_var (idom bb)
 	in
 	let v = find_var bb in
+        (* let vbb = VH.find assn v in *)
+        dprintf "%s assigned in bb %s, we are at %s" (Pp.var_to_string v) (v2s (VH.find assn v)) (v2s bb);
+        (* A node can be its own predecessor, so we should also look at ourself. *)
+        let vl = bb :: dominators bb in
+        (* List.iter (fun v -> dprintf "BB %s dominates" (v2s v)) vl; *)
+        let vbbs = List.map (fun v -> (v, VH.find assn v)) vars in
+        let vbbs = List.filter (fun (v,bb) -> List.mem bb vl) vbbs in
+        List.iter (fun (v,bb) -> dprintf "Merge %s %s" (Pp.var_to_string v) (v2s bb)) vbbs;
+        (match vbbs with
+        | (v',_)::[] -> assert (v = v')
+        | _ -> assert false);
 	append_move bb l v cfg
       in
       (* assign the variable the phi assigns at the end of each of it's
@@ -573,7 +632,7 @@ let rm_phis ?(dsa=false) ?(attrs=[]) cfg =
     (* assign the variables the phi assigns at the end of each block a variable
        the phi references is assigned. *)
     List.fold_left
-      (fun cfg (l, vars) -> 
+      (fun cfg (l, vars) ->
 	 dprintf "rm_phis: adding assignments for %s" (Pp.var_to_string l);
 	 List.fold_left (fun cfg p -> append_move (VH.find assn p) l p cfg) cfg vars
       )

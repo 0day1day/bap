@@ -37,37 +37,37 @@ type t =
   | Seq of t * t
   | Skip 
 
-let rec gcl_equal s1 s2 =
-  let num = function
-    | Assume _ -> 0
-    | Assign _ -> 1
-    | Assert _ -> 2
-    | Choice _ -> 3
-    | Seq _ -> 4
-    | Skip -> 5
-  in
-  let getargs = function
-    | Assume(e) -> [], e::[], []
-    | Assert(e) -> [], e::[], []
-    | Assign(v, e) -> v::[], e::[], []
-    | Choice(s1,s2)
-    | Seq(s1,s2) -> [], [], s1::s2::[]
-    | Skip -> [], [], []
-  in
-  if num s1 <> num s2 then
-    false
-  else
-    let l1,l2,l3 = getargs s1
-    and r1,r2,r3 = getargs s2 in
-    let b1 = List.for_all2 (Var.equal) l1 r1 in
-    let b2 = List.for_all2 quick_exp_eq l2 r2 in
-    let b3 = List.for_all2 (==) l3 r3 in
-    if b1 && b2 && b3 then
-      true
-    else
-      b1 &&
-        List.for_all2 full_exp_eq l2 r2 &&
-        List.for_all2 gcl_equal l3 r3
+(* let rec gcl_equal s1 s2 = *)
+(*   let num = function *)
+(*     | Assume _ -> 0 *)
+(*     | Assign _ -> 1 *)
+(*     | Assert _ -> 2 *)
+(*     | Choice _ -> 3 *)
+(*     | Seq _ -> 4 *)
+(*     | Skip -> 5 *)
+(*   in *)
+(*   let getargs = function *)
+(*     | Assume(e) -> [], e::[], [] *)
+(*     | Assert(e) -> [], e::[], [] *)
+(*     | Assign(v, e) -> v::[], e::[], [] *)
+(*     | Choice(s1,s2) *)
+(*     | Seq(s1,s2) -> [], [], s1::s2::[] *)
+(*     | Skip -> [], [], [] *)
+(*   in *)
+(*   if num s1 <> num s2 then *)
+(*     false *)
+(*   else *)
+(*     let l1,l2,l3 = getargs s1 *)
+(*     and r1,r2,r3 = getargs s2 in *)
+(*     let b1 = List.for_all2 (Var.equal) l1 r1 in *)
+(*     let b2 = List.for_all2 quick_exp_eq l2 r2 in *)
+(*     let b3 = List.for_all2 (==) l3 r3 in *)
+(*     if b1 && b2 && b3 then *)
+(*       true *)
+(*     else *)
+(*       b1 && *)
+(*         List.for_all2 full_exp_eq l2 r2 && *)
+(*         List.for_all2 gcl_equal l3 r3 *)
 
 (** Convert a straightline trace into GCL.
 
@@ -121,33 +121,33 @@ type cfg_gcl =
   | Cunchoice of cfg_gcl * cfg_gcl (* unfinished choice *)
   | CSeq of cfg_gcl list
 
-let rec cgcl_equal s1 s2 =
-  let num = function
-    | CAssign _ -> 0
-    | CChoice _ -> 1
-    | Cunchoice _ -> 2
-    | CSeq _ -> 3
-  in
-  let getargs = function
-    | CAssign(v) -> v::[], [], []
-    | CChoice(e,t1,t2) -> [], e::[], t1::t2::[]
-    | Cunchoice(t1, t2) -> [], [], t1::t2::[]
-    | CSeq(tlist) -> [], [], tlist
-  in
-  if num s1 <> num s2 then
-    false
-  else
-    let l1,l2,l3 = getargs s1
-    and r1,r2,r3 = getargs s2 in
-    let b1 = List.for_all2 (CA.G.V.equal) l1 r1 in
-    let b2 = List.for_all2 quick_exp_eq l2 r2 in
-    let b3 = List.for_all2 (==) l3 r3 in
-    if b1 && b2 && b3 then
-      true
-    else
-      b1 &&
-        List.for_all2 full_exp_eq l2 r2 &&
-        List.for_all2 cgcl_equal l3 r3
+(* let rec cgcl_equal s1 s2 = *)
+(*   let num = function *)
+(*     | CAssign _ -> 0 *)
+(*     | CChoice _ -> 1 *)
+(*     | Cunchoice _ -> 2 *)
+(*     | CSeq _ -> 3 *)
+(*   in *)
+(*   let getargs = function *)
+(*     | CAssign(v) -> v::[], [], [] *)
+(*     | CChoice(e,t1,t2) -> [], e::[], t1::t2::[] *)
+(*     | Cunchoice(t1, t2) -> [], [], t1::t2::[] *)
+(*     | CSeq(tlist) -> [], [], tlist *)
+(*   in *)
+(*   if num s1 <> num s2 then *)
+(*     false *)
+(*   else *)
+(*     let l1,l2,l3 = getargs s1 *)
+(*     and r1,r2,r3 = getargs s2 in *)
+(*     let b1 = List.for_all2 (CA.G.V.equal) l1 r1 in *)
+(*     let b2 = List.for_all2 quick_exp_eq l2 r2 in *)
+(*     let b3 = List.for_all2 (==) l3 r3 in *)
+(*     if b1 && b2 && b3 then *)
+(*       true *)
+(*     else *)
+(*       b1 && *)
+(*         List.for_all2 full_exp_eq l2 r2 && *)
+(*         List.for_all2 cgcl_equal l3 r3 *)
 
 
 (** [of_cfg cfg exit_node] will compute a function from entry node to 
@@ -162,7 +162,7 @@ let of_astcfg ?entry ?exit cfg =
   in
   (* our latice is a list option of GCL expressions to be put in sequence *)
   let meet l1 l2 =
-    let (su, g1, g2) = split_common_suffix ~eq:cgcl_equal l1 l2 in
+    let (su, g1, g2) = split_common_suffix l1 l2 in
     Cunchoice(CSeq g1, CSeq g2)  :: su
   in
     (* a skip in this context is a CSeq(CSeq [],..) and the like *)
@@ -258,18 +258,22 @@ let of_astcfg ?entry ?exit cfg =
   (*BH.add h exit []; *)
   let compute_at b =
     let last_gcl = match CA.G.succ cfg b with
-      | [p] -> get p
-      | [x;y] -> meet (get x) (get y)
-      | s when CA.G.V.equal exit b -> assert(s=[]); []
-      | [] -> (* can never reach exit from here *)
+      | [p] -> dprintf "one"; get p
+      | [x;y] -> dprintf "meet"; meet (get x) (get y)
+      | s when CA.G.V.equal exit b -> dprintf "huh"; assert(s=[]); []
+      | [] -> dprintf "empty"; (* can never reach exit from here *)
 	  assert(CA.G.V.label b = Cfg.BB_Error);
 	  [CAssign b] (* BB_Error should contain an assert(false) *)
       | _ -> failwith("indirect jmp unsupported. "^b_to_string b^" had too many successors")
     in
+    dprintf "done last_gcl";
     let gcl = f_t b last_gcl in
+    dprintf "done f_t";
     BH.add h b gcl
   in
+  dprintf "before toposort";
   Toposort.iter compute_at cfg;
+  dprintf "done with toposort";
   cgcl_to_gcl (CSeq(get entry))
 
 
@@ -299,14 +303,15 @@ let rec remove_skips = function
 module C = Cfg.SSA
 
 let passified_of_ssa ?entry ?exit cfg =
-  (* XXX: THIS MAY BE WRONG!!! XXX *)
-  let ast = Cfg_ssa.to_astcfg ~dsa:false cfg in
+  let ast = Cfg_ssa.to_astcfg ~dsa:true cfg in
   let convert = function
     | Some v -> Some(CA.find_vertex ast (C.G.V.label v))
     | None -> None
   in
   let entry = convert entry and exit = convert exit in
+  dprintf "Converting cfg to gcl";
   let gcl = of_astcfg ?entry ?exit ast in
+  dprintf "Done converting cfg to gcl";
   let vars = ref [] in
   let rec convert_gcl g = 
     match g with
