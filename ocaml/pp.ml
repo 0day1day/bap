@@ -3,7 +3,7 @@
     @todo Write .mli
 *)
 
-open Big_int
+open Big_int_Z
 open Big_int_convenience
 open Type
 module VH = Var.VarHash

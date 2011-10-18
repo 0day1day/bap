@@ -7,7 +7,7 @@
 
 module VM = Var.VarMap
 
-open Big_int
+open Big_int_Z
 open Util
 open Type
 open Ssa
