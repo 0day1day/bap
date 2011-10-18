@@ -9,7 +9,7 @@
 
 (* open BatString -- overrides compare for some reason! *)
 open BatList
-open Big_int
+open Big_int_Z
 
 (** The identity function *)
 let id = fun x -> x
@@ -570,8 +570,8 @@ let binary_of_int64 ?pad n =
 
 (** Convert big integer to binary represented as a string *)
 let binary_of_big_int ?pad n = 
-  let getb n = Big_int.and_big_int n (big_int_of_int 1) in (* Get lsb *)
-  let getrest n = Big_int.shift_right_big_int n 1 in (* Get all but lsb *)
+  let getb n = Big_int_Z.and_big_int n (big_int_of_int 1) in (* Get lsb *)
+  let getrest n = Big_int_Z.shift_right_big_int n 1 in (* Get all but lsb *)
   let zeroextend s = match pad with
     | None -> s
     | Some(l) -> 
@@ -592,8 +592,8 @@ let binary_of_big_int ?pad n =
     time, instead of just a nibble.
 *)
 let hex_of_big_int ?pad n = 
-  let getn n = Big_int.and_big_int n (big_int_of_int 0xf) in (* Get lsnibble *)
-  let getrest n = Big_int.shift_right_big_int n 4 in (* Get all but lsnibble *)
+  let getn n = Big_int_Z.and_big_int n (big_int_of_int 0xf) in (* Get lsnibble *)
+  let getrest n = Big_int_Z.shift_right_big_int n 4 in (* Get all but lsnibble *)
   let zeroextend s = match pad with
     | None -> s
     | Some(l) -> 
@@ -603,7 +603,7 @@ let hex_of_big_int ?pad n =
   in
   let (<=%) = le_big_int in
   let rec f = function
-    | bi when bi <=% (big_int_of_int 0xf) -> Printf.sprintf "%x" (Big_int.int_of_big_int bi)
+    | bi when bi <=% (big_int_of_int 0xf) -> Printf.sprintf "%x" (Big_int_Z.int_of_big_int bi)
     | n -> (f (getrest n)) ^ (f (getn n))
   in
   zeroextend (f n)
@@ -636,13 +636,13 @@ let big_int_of_string s =
   let rec f s =
     let len = hex_to_bitlen s in
     if len <= numbits then
-      let bi = Big_int.big_int_of_int64 (Int64.of_string ("0x"^s)) in
+      let bi = Big_int_Z.big_int_of_int64 (Int64.of_string ("0x"^s)) in
       let (>=%) = ge_big_int in
       assert (bi >=% zero_big_int);
       bi
     else (
-      (* Printf.printf "getmost: %s v: %s\n" (getmost s) (Big_int.string_of_big_int (f (getmost s))); *)
-      (* Printf.printf "getrest: %s v: %s\n" (getrest s) (Big_int.string_of_big_int (f (getrest s))); *)
+      (* Printf.printf "getmost: %s v: %s\n" (getmost s) (Big_int_Z.string_of_big_int (f (getmost s))); *)
+      (* Printf.printf "getrest: %s v: %s\n" (getrest s) (Big_int_Z.string_of_big_int (f (getrest s))); *)
       let (|%) = or_big_int in
       let (<<%) = shift_left_big_int in
       let bi = (f (getmost s) <<% (hex_to_bitlen (getrest s))) |% (f (getrest s)) in
@@ -655,7 +655,7 @@ let big_int_of_string s =
     f (BatString.slice ~first:(String.length hex_prefix) s)
   else
     (* big_int_of_string handles decimals *)
-    Big_int.big_int_of_string s
+    Big_int_Z.big_int_of_string s
 
 
 (* Print the size of an object *)

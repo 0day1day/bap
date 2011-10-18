@@ -214,8 +214,8 @@ AC_CONFIG_FILES([Makefile
                  libasmir/src/Makefile])
 AC_OUTPUT
 
-# Configure ocaml 3.12
-(cd bigint-3.12 && ./configure)
-
 # Configure ocamlgraph
 (cd ocamlgraph-1.8 && ./configure)
+
+# Configure zarith
+(cd zarith-1.0 && ./configure)

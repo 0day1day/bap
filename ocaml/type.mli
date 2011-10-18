@@ -69,7 +69,7 @@ type context =
    mem   : bool;
    t     : typ;
    index : int64;
-   value : Big_int.big_int;
+   value : Big_int_Z.big_int;
    usage : usage;
    taint : taint_type
  }

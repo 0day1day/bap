@@ -2,7 +2,7 @@
     separate file so it can use functions from Typecheck and elsewhere. *)
 
 open Ast
-open Big_int
+open Big_int_Z
 open Big_int_convenience
 open Type
 open Typecheck

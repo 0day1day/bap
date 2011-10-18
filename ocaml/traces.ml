@@ -2,7 +2,7 @@
 
 open Ast
 open BatListFull
-open Big_int
+open Big_int_Z
 open Big_int_convenience
 open Symbeval
 open Type
@@ -1029,6 +1029,7 @@ let run_block ?(next_label = None) ?(log=fun _ -> ()) ?(transformf = (fun s _ ->
       it was a label set addr to that; execute the block.  If it's not found
       verify that all stmts are labels and comments.  Otherwise print a warning 
   *)
+  pdebug("SWXXX In run_block");
   let addr = 
     (try
       List.find 
@@ -1044,11 +1045,12 @@ let run_block ?(next_label = None) ?(log=fun _ -> ()) ?(transformf = (fun s _ ->
 		atts in
 	      true
 	    with Not_found -> false)
-	  | _ -> false)) 
+	  | _ -> false))
 	block  
-    with
-    | Not_found -> (* Verify everything in block is label or comment. 
-		      Warn and ignore otherwise *) List.hd block) 
+     with
+    (* Verify everything in block is label or comment. 
+       Warn and ignore otherwise *) 
+     | Not_found -> List.hd block)
   in
   let block = List.filter (fun b -> if b == addr then false else true) block in
   let input_seeds = get_symbolic_seeds memv addr in
@@ -1086,12 +1088,16 @@ let run_block ?(next_label = None) ?(log=fun _ -> ()) ?(transformf = (fun s _ ->
 	  done;
 	  VH.add reg_to_stmt v addr))
       defs;
-    (* Find all sys call statments in block *)
-    let sys_stmts = List.filter Syscall_models.x86_is_system_call block in
+    (* Find all special statments in block *)
+    let special_stmts = 
+      List.filter 
+	(fun stmt -> match stmt with |Special _ -> true | _ -> false) 
+	block 
+    in
     (* Add all registers to each syscall stmt *)
     List.iter 
       (fun s -> (List.iter (fun v -> VH.add reg_to_stmt v addr) Asmir.x86_regs))
-      sys_stmts;
+      special_stmts;
   );
 
   (* Don't execute specials now that we've potentially recorded them *)
@@ -1133,13 +1139,13 @@ let run_block ?(next_label = None) ?(log=fun _ -> ()) ?(transformf = (fun s _ ->
       let eax = evalf (Var Disasm_i386.eax) in
       let stmts = (match eax with
         | Int(i, _) ->
-          Syscall_models.linux_syscall_to_il (Big_int.int_of_big_int i)
+          Syscall_models.linux_syscall_to_il (int_of_big_int i)
         | _ -> failwith "Unexpected evaluation problem") in
       (* Hack: Remember the next pc; we will clobber this *)
       let newpc = Int64.succ state.pc in
       let newstate = List.fold_left
         (fun state stmt ->
-          let isspecial = match stmt with Special _ -> true | _ -> false in
+	  let isspecial = match stmt with Special _ -> true | _ -> false in
           if isspecial then state else
             match TraceConcrete.eval_stmt state stmt with
             | x::[] -> x

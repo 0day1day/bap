@@ -32,7 +32,7 @@
 *)
 
 
-open Big_int
+open Big_int_Z
 open Big_int_convenience
 open Type
 open Ssa

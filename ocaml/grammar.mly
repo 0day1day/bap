@@ -4,7 +4,7 @@
 (* $Id$ *)
 
 open Ast
-open Big_int
+open Big_int_Z
 open Grammar_scope
 open Type
 
@@ -48,7 +48,7 @@ let casttype_of_string = function
 %}
 
 %token <string> ID
-%token <Big_int.big_int> INT
+%token <Big_int_Z.big_int> INT
 %token <string> STRING
 %token <string> COMMENT
 
