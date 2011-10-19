@@ -131,7 +131,9 @@ if($getpin) {
 
 # make test
 print "Making test\n";
-check_system("make -j test");
+# zarith does not support make -j
+#check_system("make -j test");
+check_system("make test");
 
 # leave $local_path before removing it
 chdir '/';
