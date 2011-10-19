@@ -42,7 +42,8 @@ struct
   (** function from [x] to a list of nodes immediately dominated by [x] *)
   type dom_tree = G.V.t -> G.V.t list
 
-  (** function from node to a list of nodes that dominate it. *)
+  (** function from node to a list of nodes that dominate it.  the
+      list is sorted by depth in the dominator tree. *)
   type dominators = G.V.t -> G.V.t list
 
   (** [dom x y] returns true iff [x] dominates [y] *)

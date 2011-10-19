@@ -582,6 +582,8 @@ let rm_phis ?(dsa=false) ?(attrs=[]) cfg =
       Cfg_pp.SsaStmtsDot.output_graph oc cfg;
       close_out oc;
 
+      (* Map each node to a list of nodes above it in the dominator
+         tree. The closest ancestor is first in the list. *)
       (* let domassns = *)
       (*   let () = dprintf "Building domassns" in *)
       (*   let domassns = BH.create (C.G.nb_vertex cfg) in *)
@@ -604,22 +606,31 @@ let rm_phis ?(dsa=false) ?(attrs=[]) cfg =
 
         (* dprintf "dsa_push %s" (List.fold_left (fun s v -> s^" "^(Pp.var_to_string v)) "" vars); *)
 
-	let rec find_var bb = (* walk up idom tree starting at bb *)
-	  try List.find (fun v -> bb = (VH.find assn v)) vars
-	  with Not_found -> find_var (idom bb)
-	in
-	let v = find_var bb in
+	(* let rec find_var bb = (\* walk up idom tree starting at bb *\) *)
+        (*   (\* dprintf " at %s" (v2s bb); *\) *)
+	(*   try List.find (fun v -> bb = (VH.find assn v)) vars *)
+	(*   with Not_found -> find_var (idom bb) *)
+	(* in *)
+	(* let _v' = find_var bb in *)
         (* let vbb = VH.find assn v in *)
-        dprintf "%s assigned in bb %s, we are at %s" (Pp.var_to_string v) (v2s (VH.find assn v)) (v2s bb);
-        (* A node can be its own predecessor, so we should also look at ourself. *)
-        let vl = bb :: dominators bb in
+        (* dprintf "%s assigned in bb %s, we are at %s" (Pp.var_to_string v) (v2s (VH.find assn v)) (v2s bb); *)
+        (* A node can be its own predecessor, so we should also look
+           at ourself. Dominators is sorted by dominance, with the most
+           dominant node first, but we want to look at less dominant
+           nodes with higher priority, so we need to reverse the list. *)
+        let vl = bb :: (List.rev (dominators bb)) in
         (* List.iter (fun v -> dprintf "BB %s dominates" (v2s v)) vl; *)
-        let vbbs = List.map (fun v -> (v, VH.find assn v)) vars in
-        let vbbs = List.filter (fun (v,bb) -> List.mem bb vl) vbbs in
-        List.iter (fun (v,bb) -> dprintf "Merge %s %s" (Pp.var_to_string v) (v2s bb)) vbbs;
-        (match vbbs with
-        | (v',_)::[] -> assert (v = v')
-        | _ -> assert false);
+        let assocl = List.map (fun v -> (VH.find assn v, v)) vars in
+        (* let vbbs = List.filter (fun (v,bb) -> List.mem bb vl) vbbs in *)
+        let v =
+          let mybb = List.find (fun bb ->
+            try ignore(List.assoc bb assocl); true
+            with Not_found -> false) vl
+          in
+          List.assoc mybb assocl
+        in
+        (* dprintf "Found it: %s" (Pp.var_to_string myv); *)
+        (* assert(myv = v); *)
 	append_move bb l v cfg
       in
       (* assign the variable the phi assigns at the end of each of it's
@@ -627,6 +638,7 @@ let rm_phis ?(dsa=false) ?(attrs=[]) cfg =
       List.fold_left
 	(fun cfg ((l, vars) as p) -> 
 	   dprintf "rm_phis: adding assignments for %s" (Pp.var_to_string l);
+          (* dprintf "There are %d preds" (List.length (C.G.pred cfg (VH.find assn l))); *)
 	   List.fold_left (dsa_push p) cfg (C.G.pred cfg (VH.find assn l))
 	)
 	cfg

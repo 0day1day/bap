@@ -2,13 +2,14 @@
 
     Type declarations for the Guarded Command Language, and a function
     to traslate a VinE trace into GCL.
-    
+
     Other generally useful functions that deal with the GCL should be
-    added here.  
+    added here.
 
     @author: Ivan Jager
 *)
 
+open BatListFull
 open Type
 open Util
 open Ast
@@ -121,6 +122,18 @@ type cfg_gcl =
   | Cunchoice of cfg_gcl * cfg_gcl (* unfinished choice *)
   | CSeq of cfg_gcl list
 
+let rec cfggcl_size = function
+  | CAssign _ -> 1
+  | CChoice(_, g1, g2)
+  | Cunchoice(g1, g2) -> (cfggcl_size g1) + (cfggcl_size g2)
+  | CSeq(l) -> List.fold_left (fun s n -> s + (cfggcl_size n)) 0 l
+
+let rec string_of_cfggcl = function
+  | CAssign(v) -> Cfg_ast.v2s v
+  | CChoice(e, g1, g2) -> "CChoice("^Pp.ast_exp_to_string e^", "^string_of_cfggcl g1^", "^string_of_cfggcl g2^")"
+  | Cunchoice(g1, g2) -> "Cunchoice("^string_of_cfggcl g1^", "^string_of_cfggcl g2^")"
+  | CSeq(l) -> (List.fold_left (fun s g -> s^", "^string_of_cfggcl g) "CSeq(" l)^")"
+
 (* let rec cgcl_equal s1 s2 = *)
 (*   let num = function *)
 (*     | CAssign _ -> 0 *)
@@ -162,32 +175,53 @@ let of_astcfg ?entry ?exit cfg =
   in
   (* our latice is a list option of GCL expressions to be put in sequence *)
   let meet l1 l2 =
-    let (su, g1, g2) = split_common_suffix l1 l2 in
+    (* dprintf "l1: %d l2: %d" (cfggcl_size (CSeq l1)) (cfggcl_size (CSeq l2)); *)
+    (* let (su, g1, g2) = split_common_suffix ~eq:(=) l1 l2 in *)
+    dprintf "l1: %s\nl2: %s" (string_of_cfggcl (CSeq l1)) (string_of_cfggcl (CSeq l2));
+    let (su, g1, g2) = split_common_suffix ~eq:(==) l1 l2 in
+    (* assert (su = su'); *)
+    dprintf "suffix: %s" (string_of_cfggcl (CSeq su));
+    (* dprintf "Suffix length %d" (cfggcl_size (CSeq su)); *)
+    (* dprintf "%s <> %s" (string_of_cfggcl (List.hd (List.rev g1))) (string_of_cfggcl (List.hd (List.rev g2))); *)
     Cunchoice(CSeq g1, CSeq g2)  :: su
   in
-    (* a skip in this context is a CSeq(CSeq [],..) and the like *)
-  let rec remove_skips g = 
-    match g with
-    | CAssign _ -> g
-    | CSeq [] -> g
-    | CSeq [x] -> x
-    | CSeq sl ->
-	(* <@ is the composition operator from bap_util. This
-	   recursively goes through sl and calls remove_skips on
-	   each list item, along with the filtering. *)
-	CSeq(list_filter_some
-	       ((function CSeq[] -> None | x -> Some x) <@ remove_skips) sl )
-    | CChoice(c,s1,s2) -> CChoice(c, remove_skips s1, remove_skips s2)
-    | Cunchoice(s1,s2) -> Cunchoice(remove_skips s1, remove_skips s2)
-  in
-    (* finds first assignment *)
-  let rec find_first s =
-    match remove_skips s with
-    | CAssign b -> b
-    | CSeq(h::_) -> find_first h
-    | CSeq [] -> failwith "shouldn't ever get here tnh99btcn"
-    | CChoice _ -> failwith "shouldn't ever get here tnh9rh203"
-    | Cunchoice _ -> failwith "shouldn't ever get here tnh982h9o"
+  (* a skip in this context is a CSeq(CSeq [],..) and the like *)
+  (* let rec remove_skips g = *)
+  (*   match g with *)
+  (*   | CAssign _ -> g *)
+  (*   | CSeq [] -> g *)
+  (*   | CSeq [x] -> x *)
+  (*   | CSeq sl -> *)
+  (*       (\* <@ is the composition operator from bap_util. This *)
+  (*          recursively goes through sl and calls remove_skips on *)
+  (*          each list item, along with the filtering. *\) *)
+  (*       CSeq(list_filter_some *)
+  (*              ((function CSeq[] -> None | x -> Some x) <@ remove_skips) sl ) *)
+  (*   | CChoice(c,s1,s2) -> CChoice(c, remove_skips s1, remove_skips s2) *)
+  (*   | Cunchoice(s1,s2) -> Cunchoice(remove_skips s1, remove_skips s2) *)
+  (* in *)
+  (*   (\* finds first assignment *\) *)
+  (* let rec find_first s = *)
+  (*   match remove_skips s with *)
+  (*   | CAssign b -> b *)
+  (*   | CSeq(h::_) -> find_first h *)
+  (*   | CSeq [] -> failwith "shouldn't ever get here tnh99btcn" *)
+  (*   | CChoice _ -> failwith "shouldn't ever get here tnh9rh203" *)
+  (*   | Cunchoice _ -> failwith "shouldn't ever get here tnh982h9o" *)
+  (* in *)
+  (* finds first assignment *)
+  let find_first s =
+    let rec find_first_h s =
+      (* dprintf "skip town"; *)
+      (* let s = remove_skips s in *)
+      (* dprintf "done skip town"; *)
+      match s with
+      | CAssign b -> Some b
+      | CSeq l -> Util.list_existssome find_first_h l
+      | CChoice _ -> failwith "shouldn't ever get here tnh9rh203"
+      | Cunchoice _ -> failwith "shouldn't ever get here tnh982h9o"
+    in
+    Util.option_unwrap (find_first_h s)
   in
     (* find cjmp in a block. assumes it is the last statement in the
        block *)
@@ -207,11 +241,23 @@ let of_astcfg ?entry ?exit cfg =
   (* transfer function *)
   let f_t n = function
     | Cunchoice(bb1, bb2)::rest as exp ->
+      dprintf "a";
 	(match find_cjmp (CA.get_stmts cfg n) with
 	 | Some(cond,tt,ft) ->
+           dprintf "abc";
 	     let (bbt,bbf) =
-	       match (find_first (CSeq(bb1::rest)), find_first (CSeq(bb2::rest)),
-		      find_target tt, find_target ft) with
+               dprintf "x";
+               let x = find_first (CSeq(bb1::rest)) in
+               dprintf "y";
+               let y =find_first (CSeq(bb2::rest)) in
+               dprintf "z";
+               let z = find_target tt in
+               dprintf "z'";
+               let z' = find_target ft in
+               dprintf "done z'";
+               match x,y,z,z' with
+	       (* match (find_first (CSeq(bb1::rest)), find_first (CSeq(bb2::rest)), *)
+	       (*        find_target tt, find_target ft) with *)
 		 (b1,b2,bt,bf) when b1 = bt && b2 = bf -> (bb1,bb2)
 	       | (b1,b2,bt,bf) when b2 = bt && b1 = bf -> (bb2,bb1)
 	       | (b1,b2,bt,bf) ->
@@ -228,7 +274,7 @@ let of_astcfg ?entry ?exit cfg =
 	     dprintf "Warning: CJmp expected but not found at end of %s." (b_to_string n);
 	     CAssign n::exp
 	)
-    | exp -> CAssign n::exp
+    | exp -> dprintf "B"; CAssign n::exp
   in
   let rec cgcl_to_gcl = function
     | CChoice(cond, e1, e2) ->
@@ -245,7 +291,7 @@ let of_astcfg ?entry ?exit cfg =
 	let bb_s = CA.get_stmts cfg b in
 	match List.rev bb_s with
 	| [] -> Skip
-	| ((Jmp _ | CJmp _ | Halt _) as s)::rest -> dprintf "Skipping %s" (Pp.ast_stmt_to_string s); of_rev_straightline rest
+	| (Jmp _ | CJmp _ | Halt _)::rest -> of_rev_straightline rest
 	| _ -> of_straightline bb_s
   in
 
@@ -257,6 +303,7 @@ let of_astcfg ?entry ?exit cfg =
   in
   (*BH.add h exit []; *)
   let compute_at b =
+    dprintf "Computing at %s" (Cfg_ast.v2s b);
     let last_gcl = match CA.G.succ cfg b with
       | [p] -> dprintf "one"; get p
       | [x;y] -> dprintf "meet"; meet (get x) (get y)
