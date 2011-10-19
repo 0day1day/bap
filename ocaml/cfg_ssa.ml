@@ -323,7 +323,6 @@ let rec trans_cfg cfg =
     in
     dprintf "going on to children";
     (* rename children *)
-    (* List.iter (fun n -> dprintf "Dominates %s" (v2s n)) (dom_tree b); *)
     let ssa = List.fold_left rename_block ssa (dom_tree b) in
     let () =
       (* Update any phis in our successors *)
@@ -332,10 +331,15 @@ let rec trans_cfg cfg =
 	   let s = C.G.V.label s in
 	   List.iter
 	     (fun v ->
-		try 
+		try
 		  let (p,vs) = Hashtbl.find phis (s,v) in
-		  let v' = try lookup v with Not_found -> v  in
-		    Hashtbl.replace phis (s,v) (p, v'::vs)
+                  (* Note that lookup v will return different results
+                     for each predecessor. There is also no guarantee
+                     that each predecessor will have a unique
+                     definition. *)
+		  let v' = lookup v in
+                  if List.mem v' vs then ()
+                  else Hashtbl.replace phis (s,v) (p, v'::vs)
 		with Not_found ->
 		  failwith("phi for variable "^Pp.var_to_string v
 			   ^" not found in "^Cfg.bbid_to_string s)
@@ -344,7 +348,7 @@ let rec trans_cfg cfg =
 	)
 	(C.G.succ ssa b)
     in
-   (* save context for exit node *)
+    (* save context for exit node *)
     (if bbid = BB_Exit then (
       (* dprintf "Exit ctx:"; *)
       (* VH.iter (fun k v -> dprintf "%s -> %s" (Pp.var_to_string k) (Pp.var_to_string v)) vh_ctx; *)
@@ -598,7 +602,7 @@ let rm_phis ?(dsa=false) ?(attrs=[]) cfg =
       (* add an assignment for l to the end of v *)
       let dsa_push (l,vars) cfg bb =
 
-        dprintf "dsa_push %s" (List.fold_left (fun s v -> s^" "^(Pp.var_to_string v)) "" vars);
+        (* dprintf "dsa_push %s" (List.fold_left (fun s v -> s^" "^(Pp.var_to_string v)) "" vars); *)
 
 	let rec find_var bb = (* walk up idom tree starting at bb *)
 	  try List.find (fun v -> bb = (VH.find assn v)) vars
