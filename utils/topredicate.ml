@@ -32,9 +32,6 @@ let to_ssapassgcl cfg post =
   let cfg = Hacks.remove_cycles cfg in
   let cfg = Coalesce.AST_Coalesce.coalesce cfg in
   let {Cfg_ssa.cfg=cfg; to_ssavar=tossa} = Cfg_ssa.trans_cfg cfg in
-  let oc = open_out "ssa.dot" in
-  Cfg_pp.SsaStmtsDot.output_graph oc cfg;
-  close_out oc;
   let p = rename_astexp tossa post in
   let cfg =
     let vars = Formulap.freevars p in

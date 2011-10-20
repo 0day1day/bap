@@ -462,7 +462,7 @@ let split_edges c =
     in
     let newl = mklabel c in
     let el = E.label e in
-    let (t1,t2,tf) = match el with
+    let (t1,t2,_) = match el with
       | Some true -> (Lab newl, t2, t1)
       | Some false -> (t1, Lab newl, t2)
       | None -> failwith "Unlabeled edges from cjmp"
@@ -516,6 +516,10 @@ let rm_phis ?(dsa=false) ?(attrs=[]) cfg =
   Var.VarSet.iter (fun v -> VH.add assn v entry) (uninitialized cfg);
   (* split edges if needed *)
   let cfg = if dsa then split_edges cfg else cfg in
+      let oc = open_out "ssa.dot" in
+      Cfg_pp.SsaStmtsDot.output_graph oc cfg;
+      close_out oc;
+
   let cfg, phis =
     (* Remove all the phis from all the BBs *)
     (* FIXME: make this readable *)
@@ -577,10 +581,6 @@ let rm_phis ?(dsa=false) ?(attrs=[]) cfg =
     if dsa then (
       let idom = Dom.compute_idom cfg entry in
       let dominators = Dom.idom_to_dominators idom in
-
-      let oc = open_out "ssa.dot" in
-      Cfg_pp.SsaStmtsDot.output_graph oc cfg;
-      close_out oc;
 
       (* Map each node to a list of nodes above it in the dominator
          tree. The closest ancestor is first in the list. *)

@@ -306,7 +306,12 @@ let of_astcfg ?entry ?exit cfg =
     dprintf "Computing at %s" (Cfg_ast.v2s b);
     let last_gcl = match CA.G.succ cfg b with
       | [p] -> dprintf "one"; get p
-      | [x;y] -> dprintf "meet"; meet (get x) (get y)
+      | [x;y] -> dprintf "meet";
+        let rx = Reachable.AST.reachable cfg x in
+        let ry = Reachable.AST.reachable cfg y in
+        let r = Util.list_intersection rx ry in
+        dprintf "reachable intersection = %s" (String.concat " " (List.map Cfg_ast.v2s r));
+        meet (get x) (get y)
       | s when CA.G.V.equal exit b -> dprintf "huh"; assert(s=[]); []
       | [] -> dprintf "empty"; (* can never reach exit from here *)
 	  assert(CA.G.V.label b = Cfg.BB_Error);
