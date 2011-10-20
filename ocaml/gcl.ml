@@ -122,17 +122,17 @@ type cfg_gcl =
   | Cunchoice of cfg_gcl * cfg_gcl (* unfinished choice *)
   | CSeq of cfg_gcl list
 
-let rec cfggcl_size = function
+let rec cgcl_size = function
   | CAssign _ -> 1
   | CChoice(_, g1, g2)
-  | Cunchoice(g1, g2) -> (cfggcl_size g1) + (cfggcl_size g2)
-  | CSeq(l) -> List.fold_left (fun s n -> s + (cfggcl_size n)) 0 l
+  | Cunchoice(g1, g2) -> (cgcl_size g1) + (cgcl_size g2)
+  | CSeq(l) -> List.fold_left (fun s n -> s + (cgcl_size n)) 0 l
 
-let rec string_of_cfggcl = function
+let rec string_of_cgcl = function
   | CAssign(v) -> Cfg_ast.v2s v
-  | CChoice(e, g1, g2) -> "CChoice("^Pp.ast_exp_to_string e^", "^string_of_cfggcl g1^", "^string_of_cfggcl g2^")"
-  | Cunchoice(g1, g2) -> "Cunchoice("^string_of_cfggcl g1^", "^string_of_cfggcl g2^")"
-  | CSeq(l) -> (List.fold_left (fun s g -> s^", "^string_of_cfggcl g) "CSeq(" l)^")"
+  | CChoice(e, g1, g2) -> "CChoice("^Pp.ast_exp_to_string e^", "^string_of_cgcl g1^", "^string_of_cgcl g2^")"
+  | Cunchoice(g1, g2) -> "Cunchoice("^string_of_cgcl g1^", "^string_of_cgcl g2^")"
+  | CSeq(l) -> (List.fold_left (fun s g -> s^", "^string_of_cgcl g) "CSeq(" l)^")"
 
 (* let rec cgcl_equal s1 s2 = *)
 (*   let num = function *)
@@ -175,14 +175,14 @@ let of_astcfg ?entry ?exit cfg =
   in
   (* our latice is a list option of GCL expressions to be put in sequence *)
   let meet l1 l2 =
-    (* dprintf "l1: %d l2: %d" (cfggcl_size (CSeq l1)) (cfggcl_size (CSeq l2)); *)
+    (* dprintf "l1: %d l2: %d" (cgcl_size (CSeq l1)) (cgcl_size (CSeq l2)); *)
     (* let (su, g1, g2) = split_common_suffix ~eq:(=) l1 l2 in *)
-    dprintf "l1: %s\nl2: %s" (string_of_cfggcl (CSeq l1)) (string_of_cfggcl (CSeq l2));
+    dprintf "l1: %s\nl2: %s" (string_of_cgcl (CSeq l1)) (string_of_cgcl (CSeq l2));
     let (su, g1, g2) = split_common_suffix ~eq:(==) l1 l2 in
     (* assert (su = su'); *)
-    dprintf "suffix: %s" (string_of_cfggcl (CSeq su));
-    (* dprintf "Suffix length %d" (cfggcl_size (CSeq su)); *)
-    (* dprintf "%s <> %s" (string_of_cfggcl (List.hd (List.rev g1))) (string_of_cfggcl (List.hd (List.rev g2))); *)
+    dprintf "suffix: %s" (string_of_cgcl (CSeq su));
+    (* dprintf "Suffix length %d" (cgcl_size (CSeq su)); *)
+    (* dprintf "%s <> %s" (string_of_cgcl (List.hd (List.rev g1))) (string_of_cgcl (List.hd (List.rev g2))); *)
     Cunchoice(CSeq g1, CSeq g2)  :: su
   in
   (* a skip in this context is a CSeq(CSeq [],..) and the like *)
@@ -325,7 +325,7 @@ let of_astcfg ?entry ?exit cfg =
   in
   dprintf "before toposort";
   Toposort.iter compute_at cfg;
-  dprintf "done with toposort";
+  dprintf "done with toposort, size=%d" (cgcl_size (CSeq(get entry)));
   cgcl_to_gcl (CSeq(get entry))
 
 

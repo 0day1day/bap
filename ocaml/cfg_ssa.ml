@@ -516,9 +516,18 @@ let rm_phis ?(dsa=false) ?(attrs=[]) cfg =
   Var.VarSet.iter (fun v -> VH.add assn v entry) (uninitialized cfg);
   (* split edges if needed *)
   let cfg = if dsa then split_edges cfg else cfg in
-      let oc = open_out "ssa.dot" in
-      Cfg_pp.SsaStmtsDot.output_graph oc cfg;
-      close_out oc;
+
+(*  let ra = Reachable.SSA.reachable cfg (C.G.V.create (BB 1027)) in
+  let rb = Reachable.SSA.reachable cfg (C.G.V.create (BB 1205)) in
+  Cfg_pp.FunSsaAttributor.f := (fun g v -> match List.mem v ra, List.mem v rb with
+  | true, true -> [`Comment("both")]
+  | true, false -> [`Comment("a")]
+  | false, true -> [`Comment("b")]
+  | false, false -> [`Comment("unreach")]); *)
+
+  let oc = open_out "ssa.dot" in
+  Cfg_pp.SsaStmtsAttDot.output_graph oc cfg;
+  close_out oc;
 
   let cfg, phis =
     (* Remove all the phis from all the BBs *)

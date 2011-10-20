@@ -42,6 +42,27 @@ struct
   let edge_attributes _ = []
 end
 
+module DefAttributor =
+struct
+  let vertex_attributes _ _ = []
+  and edge_attributes _ _ = []
+end
+
+(* FIXME: Instead of having two of these we should take the graph
+   module and type f accordingly *)
+module FunSsaAttributor =
+struct
+  let f = ref (fun g v -> raise Not_found)
+  include DefAttributor
+  let vertex_attributes (g:'a) (v:'b) = try !f g v with Not_found -> []
+end
+
+module FunAstAttributor =
+struct
+  let f = ref (fun g v -> raise Not_found)
+  include DefAttributor
+  let vertex_attributes (g:'a) (v:'b) = try !f g v with Not_found -> []
+end
 
 let edge_labels f e =
   match f e with
@@ -58,6 +79,8 @@ let edge_labels_ast = edge_labels CA.G.E.label
 module MakeCfgPrinter
   (G:Graph.Sig.G with type V.label = Cfg.bbid and type E.label = bool option)
   (Printer:sig val print: G.t -> G.V.t -> string end)
+  (Attributor:sig val vertex_attributes: G.t -> G.V.t -> Graph.Graphviz.DotAttributes.vertex list ;;
+                  val edge_attributes: G.t -> G.E.t -> Graph.Graphviz.DotAttributes.edge list end)
   : (DOTTYG with type t = G.t and type V.t = G.V.t * G.t and type E.t =  G.E.t * G.t)
   =
 struct
@@ -87,13 +110,13 @@ struct
 
   include DefAttrs
 
-  let vertex_name(v,g) = Cfg.bbid_to_string (G.V.label v)
+  let vertex_name (v,g) = Cfg.bbid_to_string (G.V.label v)
 
   let vertex_attributes (v,g) =
     (* FIXME: The Dot module really should be the one doing the escaping here *)
-    [`Label (String.escaped(Printer.print g v))]
+    `Label (String.escaped(Printer.print g v)) :: Attributor.vertex_attributes g v
 
-  let edge_attributes = edge_labels E.label
+  let edge_attributes ((e,g) as e') = (edge_labels E.label e') @ Attributor.edge_attributes g e
 
 end
 
@@ -133,10 +156,10 @@ struct
   let edge_attributes = edge_labels_ast
 end
 
-module SsaStmtsPrinter = MakeCfgPrinter (CS.G) (PrintSsaStmts)
+module SsaStmtsPrinter = MakeCfgPrinter (CS.G) (PrintSsaStmts) (DefAttributor)
 module SsaStmtsDot = Graph.Graphviz.Dot(SsaStmtsPrinter)
 
-module AstStmtsPrinter = MakeCfgPrinter (CA.G) (PrintAstStmts)
+module AstStmtsPrinter = MakeCfgPrinter (CA.G) (PrintAstStmts) (DefAttributor)
 module AstStmtsDot = Graph.Graphviz.Dot (AstStmtsPrinter)
 
 module SsaBBidPrinter =
@@ -156,3 +179,9 @@ struct
   let edge_attributes = edge_labels_ast
 end
 module AstBBidDot = Graph.Graphviz.Dot(AstBBidPrinter)
+
+module SsaStmtsAttPrinter = MakeCfgPrinter (CS.G) (PrintSsaStmts) (FunSsaAttributor)
+module SsaStmtsAttDot = Graph.Graphviz.Dot(SsaStmtsAttPrinter)
+
+module AstStmtsAttPrinter = MakeCfgPrinter (CA.G) (PrintAstStmts) (FunAstAttributor)
+module AstStmtsAttDot = Graph.Graphviz.Dot(AstStmtsAttPrinter)
