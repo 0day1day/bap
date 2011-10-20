@@ -784,8 +784,7 @@ let trace_to_blocks trace =
 let block_q = ref []
 let offset = ref 0L
 
-let enqueue blocks =
-  block_q := blocks
+let enqueue blocks = block_q := blocks   
 
 let rec dequeue _ =
   match !block_q with
@@ -820,7 +819,9 @@ let rec bap_get_stmt_from_trace_file ?(atts = true) ?(rate=1L) ?(pin = false) fi
 
 (** Return stream of trace instructions raised to the IL *)
 let bap_stream_from_trace_file ?(atts = true) ?(rate=1L) ?(pin = false) filename =
-  DTest.pdebug ("SWXXX Stream opened from "^filename);
+  (* Reset queue parameters.  Should this be done outside of Asmir?*)
+  block_q := [];
+  offset := 0L;
   Stream.from (bap_get_stmt_from_trace_file ~atts ~rate ~pin filename)
 
 
