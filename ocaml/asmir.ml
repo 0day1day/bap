@@ -697,7 +697,8 @@ let alt_bap_from_trace_file_range filename off reqframes =
 		let frameno = numframes-1-n in
 		(* dprintf "frame %d" frameno; *)
 		let stmts = 
-		  raise_frame (Libasmir.asmir_frames_get trace_frames frameno) in
+		  raise_frame (Libasmir.asmir_frames_get trace_frames frameno)
+		in
 		List.rev_append stmts acc) 
 	  [] (numframes-1);
     off := Int64.add !off (Int64.of_int numframes);
@@ -735,7 +736,9 @@ let old_bap_from_trace_file ?(atts = true) ?(pin = false) filename =
   Status.init "Lifting trace" 0 ;
   while !c do
     (*dprintf "Calling the trace again.... ";*)
-    let bap_blocks = Libasmir.asmir_bap_from_trace_file filename !off !trace_blocksize atts pin in
+    let bap_blocks = 
+      Libasmir.asmir_bap_from_trace_file filename !off !trace_blocksize atts pin
+    in
     let numblocks = Libasmir.asmir_bap_blocks_size bap_blocks in
     if numblocks = -1 then (
       c := false
@@ -780,23 +783,21 @@ let trace_to_blocks trace =
   let blocks = to_blocks [] [] trace in
     List.filter (fun b -> List.length b > 1) blocks
 
-(** Internal queue for get_stmts *)
-let block_q = ref []
-let offset = ref 0L
-
-let enqueue blocks = block_q := blocks   
-
-let rec dequeue _ =
-  match !block_q with
-  | [] -> None
-  | b::bs -> block_q := bs; 
-    match b with 
-    | [] -> dequeue() 
-    | _ -> Some(b)
-
 (** SWXXX Rename; this is a block *)
 (** Get one statement at a time. *)
-let rec bap_get_stmt_from_trace_file ?(atts = true) ?(rate=1L) ?(pin = false) filename off =
+let rec bap_get_stmt_from_trace_file ?(atts = true) ?(rate=1L) ?(pin = false) filename block_q offset off = 
+  (* There is a difference between the file offset and the stream off(set) *)
+  let enqueue blocks = 
+    Util.print_obj_info "block_q" block_q; 
+    block_q := blocks in
+  let rec dequeue _ =
+    match !block_q with
+    | [] -> None
+    | b::bs -> block_q := bs; 
+      match b with 
+      | [] -> dequeue() 
+      | _ -> Some(b)
+  in
   let tmp_c = ref false in
   let next_block = 
     (match !block_q with
@@ -812,17 +813,20 @@ let rec bap_get_stmt_from_trace_file ?(atts = true) ?(rate=1L) ?(pin = false) fi
      frames are still left in the trace (c is true) *)
   match next_block with
   | None -> 
-    if !tmp_c then bap_get_stmt_from_trace_file ~atts ~rate ~pin filename off 
+    if !tmp_c then 
+      bap_get_stmt_from_trace_file ~atts ~rate ~pin filename block_q offset off 
     else None
   | _ -> next_block
 
 
 (** Return stream of trace instructions raised to the IL *)
 let bap_stream_from_trace_file ?(atts = true) ?(rate=1L) ?(pin = false) filename =
-  (* Reset queue parameters.  Should this be done outside of Asmir?*)
-  block_q := [];
-  offset := 0L;
-  Stream.from (bap_get_stmt_from_trace_file ~atts ~rate ~pin filename)
+  let block_q = ref [] in
+  let offset = ref 0L in
+  Gc.finalise (fun h -> 
+    (DTest.pdebug("Finalized block_q for "^filename))) block_q;
+  Stream.from (
+    bap_get_stmt_from_trace_file ~atts ~rate ~pin filename block_q offset)
 
 
 let get_symbols ?(all=false) {asmp=p} =
