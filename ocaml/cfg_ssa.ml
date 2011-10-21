@@ -525,10 +525,6 @@ let rm_phis ?(dsa=false) ?(attrs=[]) cfg =
   | false, true -> [`Comment("b")]
   | false, false -> [`Comment("unreach")]); *)
 
-  let oc = open_out "ssa.dot" in
-  Cfg_pp.SsaStmtsAttDot.output_graph oc cfg;
-  close_out oc;
-
   let cfg, phis =
     (* Remove all the phis from all the BBs *)
     (* FIXME: make this readable *)

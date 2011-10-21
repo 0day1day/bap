@@ -355,6 +355,9 @@ let rec remove_skips = function
 module C = Cfg.SSA
 
 let passified_of_ssa ?entry ?exit cfg =
+  let oc = open_out "ssa.dot" in
+  Cfg_pp.SsaStmtsDot.output_graph oc cfg;
+  close_out oc;
   let ast = Cfg_ssa.to_astcfg ~dsa:true cfg in
   let convert = function
     | Some v -> Some(CA.find_vertex ast (C.G.V.label v))
