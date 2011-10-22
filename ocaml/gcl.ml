@@ -76,7 +76,7 @@ type t =
     jump to the label following them. (Ie, any jump must be a no-op)
 *)
 let rec of_rev_straightline ?(acc=Skip) trace =
-  let rec prepend g = function
+  let prepend g = function
     | Move(l,e,_) -> Seq(Assign(l,e), g)
     | CJmp _
     | Jmp _ ->
@@ -177,10 +177,9 @@ let of_astcfg ?entry ?exit cfg =
   let meet l1 l2 =
     (* dprintf "l1: %d l2: %d" (cgcl_size (CSeq l1)) (cgcl_size (CSeq l2)); *)
     (* let (su, g1, g2) = split_common_suffix ~eq:(=) l1 l2 in *)
-    dprintf "l1: %s\nl2: %s" (string_of_cgcl (CSeq l1)) (string_of_cgcl (CSeq l2));
+    (* dprintf "l1: %s\nl2: %s" (string_of_cgcl (CSeq l1)) (string_of_cgcl (CSeq l2)); *)
     let (su, g1, g2) = split_common_suffix ~eq:(==) l1 l2 in
-    (* assert (su = su'); *)
-    dprintf "suffix: %s" (string_of_cgcl (CSeq su));
+    (* dprintf "suffix: %s" (string_of_cgcl (CSeq su)); *)
     (* dprintf "Suffix length %d" (cgcl_size (CSeq su)); *)
     (* dprintf "%s <> %s" (string_of_cgcl (List.hd (List.rev g1))) (string_of_cgcl (List.hd (List.rev g2))); *)
     Cunchoice(CSeq g1, CSeq g2)  :: su
@@ -241,23 +240,11 @@ let of_astcfg ?entry ?exit cfg =
   (* transfer function *)
   let f_t n = function
     | Cunchoice(bb1, bb2)::rest as exp ->
-      dprintf "a";
 	(match find_cjmp (CA.get_stmts cfg n) with
 	 | Some(cond,tt,ft) ->
-           dprintf "abc";
 	     let (bbt,bbf) =
-               dprintf "x";
-               let x = find_first (CSeq(bb1::rest)) in
-               dprintf "y";
-               let y =find_first (CSeq(bb2::rest)) in
-               dprintf "z";
-               let z = find_target tt in
-               dprintf "z'";
-               let z' = find_target ft in
-               dprintf "done z'";
-               match x,y,z,z' with
-	       (* match (find_first (CSeq(bb1::rest)), find_first (CSeq(bb2::rest)), *)
-	       (*        find_target tt, find_target ft) with *)
+	       match (find_first (CSeq(bb1::rest)), find_first (CSeq(bb2::rest)),
+	              find_target tt, find_target ft) with
 		 (b1,b2,bt,bf) when b1 = bt && b2 = bf -> (bb1,bb2)
 	       | (b1,b2,bt,bf) when b2 = bt && b1 = bf -> (bb2,bb1)
 	       | (b1,b2,bt,bf) ->
@@ -274,27 +261,58 @@ let of_astcfg ?entry ?exit cfg =
 	     dprintf "Warning: CJmp expected but not found at end of %s." (b_to_string n);
 	     CAssign n::exp
 	)
-    | exp -> dprintf "B"; CAssign n::exp
+    | exp -> CAssign n::exp
   in
-  let rec cgcl_to_gcl = function
-    | CChoice(cond, e1, e2) ->
-	Choice(Seq(Assume cond, cgcl_to_gcl e1),
-	       Seq(Assume(exp_not cond), cgcl_to_gcl e2) )
-    | Cunchoice(e1, e2) ->
-	pwarn "generating an unguarded choice";
-	Choice(cgcl_to_gcl e1, cgcl_to_gcl e2)
-    | CSeq(e'::es) ->
-	List.fold_left (fun a b -> Seq(a,cgcl_to_gcl b)) (cgcl_to_gcl e') es
-    | CSeq [] ->
-	Skip
-    | CAssign b -> 
-	let bb_s = CA.get_stmts cfg b in
-	match List.rev bb_s with
-	| [] -> Skip
-	| (Jmp _ | CJmp _ | Halt _)::rest -> of_rev_straightline rest
-	| _ -> of_straightline bb_s
+  (* let rec cgcl_to_gcl = function *)
+  (*   | CChoice(cond, e1, e2) -> *)
+  (*       Choice(Seq(Assume cond, cgcl_to_gcl e1), *)
+  (*              Seq(Assume(exp_not cond), cgcl_to_gcl e2) ) *)
+  (*   | Cunchoice(e1, e2) -> *)
+  (*       pwarn "generating an unguarded choice"; *)
+  (*       Choice(cgcl_to_gcl e1, cgcl_to_gcl e2) *)
+  (*   | CSeq(e'::es) -> *)
+  (*       List.fold_left (fun a b -> Seq(a,cgcl_to_gcl b)) (cgcl_to_gcl e') es *)
+  (*   | CSeq [] -> *)
+  (*       Skip *)
+  (*   | CAssign b -> *)
+  (*       let bb_s = CA.get_stmts cfg b in *)
+  (*       match List.rev bb_s with *)
+  (*       | [] -> Skip *)
+  (*       | (Jmp _ | CJmp _ | Halt _)::rest -> of_rev_straightline rest *)
+  (*       | _ -> of_straightline bb_s *)
+  (* in *)
+  let cgcl_to_gcl s =
+    (* k is a continuation *)
+    let rec c s k = match s with
+      | CChoice(cond, e1, e2) ->
+        c e1 (fun ce1 ->
+          c e2 (fun ce2 ->
+            k (Choice(Seq(Assume cond, ce1),
+                      Seq(Assume(exp_not cond), ce2)))))
+      | Cunchoice(e1, e2) ->
+        pwarn "generating an unguarded choice";
+        c e1 (fun ce1 ->
+          c e2 (fun ce2 ->
+            k (Choice(ce1, ce2))))
+      | CSeq [] ->
+        k Skip
+      | CSeq(e::[]) ->
+      (* This isn't really a Seq at all! *)
+        c e (fun ce -> k ce)
+      | CSeq(e::es) ->
+        (* dprintf "l: %d" (List.length (e::es)); *)
+        c e (fun ce -> c (CSeq es) (fun ces -> k (Seq(ce, ces))))
+      | CAssign b ->
+        let bb_s = CA.get_stmts cfg b in
+        let e = match List.rev bb_s with
+          | [] -> Skip
+          | (Jmp _ | CJmp _ | Halt _)::rest -> of_rev_straightline rest
+          | _ -> of_straightline bb_s
+        in
+        k e
+    in
+    c s Util.id
   in
-
   let module BH = Hashtbl.Make(CA.G.V) in
   let h = BH.create (CA.G.nb_vertex cfg) in
   let get b =
@@ -303,29 +321,23 @@ let of_astcfg ?entry ?exit cfg =
   in
   (*BH.add h exit []; *)
   let compute_at b =
-    dprintf "Computing at %s" (Cfg_ast.v2s b);
     let last_gcl = match CA.G.succ cfg b with
-      | [p] -> dprintf "one"; get p
-      | [x;y] -> dprintf "meet";
-        let rx = Reachable.AST.reachable cfg x in
-        let ry = Reachable.AST.reachable cfg y in
-        let r = Util.list_intersection rx ry in
-        dprintf "reachable intersection = %s" (String.concat " " (List.map Cfg_ast.v2s r));
+      | [p] -> get p
+      | [x;y] ->
+        (* let rx = Reachable.AST.reachable cfg x in *)
+        (* let ry = Reachable.AST.reachable cfg y in *)
+        (* let r = Util.list_intersection rx ry in *)
+        (* dprintf "reachable intersection = %s" (String.concat " " (List.map Cfg_ast.v2s r)); *)
         meet (get x) (get y)
-      | s when CA.G.V.equal exit b -> dprintf "huh"; assert(s=[]); []
-      | [] -> dprintf "empty"; (* can never reach exit from here *)
-	  assert(CA.G.V.label b = Cfg.BB_Error);
-	  [CAssign b] (* BB_Error should contain an assert(false) *)
+      | s when CA.G.V.equal b exit -> assert(s=[]); []
+      | s when CA.G.V.label b = Cfg.BB_Error -> assert(s=[]); []
       | _ -> failwith("indirect jmp unsupported. "^b_to_string b^" had too many successors")
     in
-    dprintf "done last_gcl";
     let gcl = f_t b last_gcl in
-    dprintf "done f_t";
     BH.add h b gcl
   in
-  dprintf "before toposort";
   Toposort.iter compute_at cfg;
-  dprintf "done with toposort, size=%d" (cgcl_size (CSeq(get entry)));
+  dprintf "cgcl_to_gcl";
   cgcl_to_gcl (CSeq(get entry))
 
 
@@ -355,9 +367,6 @@ let rec remove_skips = function
 module C = Cfg.SSA
 
 let passified_of_ssa ?entry ?exit cfg =
-  let oc = open_out "ssa.dot" in
-  Cfg_pp.SsaStmtsDot.output_graph oc cfg;
-  close_out oc;
   let ast = Cfg_ssa.to_astcfg ~dsa:true cfg in
   let convert = function
     | Some v -> Some(CA.find_vertex ast (C.G.V.label v))
