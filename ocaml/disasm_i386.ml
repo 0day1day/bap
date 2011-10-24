@@ -79,6 +79,7 @@ type opcode =
   | Sbb of (typ * operand * operand)
   | Cmp of (typ * operand * operand)
   | Cmpxchg of (typ * operand * operand)
+  | Xadd of (typ * operand * operand)
   | Xchg of (typ * operand * operand)
   | And of (typ * operand * operand)
   | Or of (typ * operand * operand)
@@ -753,6 +754,13 @@ let rec to_ir addr next ss pref =
       assn t dst (ite t equal_v src_e dst_e);
       assn t o_eax (ite t equal_v accumulator dst_e);
     ]
+  | Xadd(t, dst, src) ->
+    let tmp = nv "t" t in
+    move tmp (op2e t dst +* op2e t src)
+    :: assn t src (op2e t dst)
+    :: assn t dst (Var tmp)
+    :: let s = Var tmp and src = op2e t src and dst = op2e t dst in
+       set_flags_add t s src dst
   | Xchg(t, src, dst) ->
     let tmp = nv "t" t in
     [
@@ -881,6 +889,7 @@ module ToStr = struct
     | Sbb(t,d,s) -> Printf.sprintf "sbb %s, %s" (opr d) (opr s)
     | Cmp(t,d,s) -> Printf.sprintf "cmp %s, %s" (opr d) (opr s)
     | Cmpxchg(t,d,s) -> Printf.sprintf "cmpxchg %s, %s" (opr d) (opr s)
+    | Xadd(t,d,s) -> Printf.sprintf "xadd %s, %s" (opr d) (opr s)
     | Xchg(t,d,s) -> Printf.sprintf "xchg %s, %s" (opr d) (opr s)
     | And(t,d,s) -> Printf.sprintf "and %s, %s" (opr d) (opr s)
     | Or(t,d,s) -> Printf.sprintf "or %s, %s" (opr d) (opr s)
@@ -1294,6 +1303,9 @@ let parse_instr g addr =
       | 0xbf -> let st = if b2 = 0xbe then r8 else r16 in
 		let r, rm, na = parse_modrm32 na in
 		(Movsx(opsize, r, st, rm), na)
+      | 0xc1 ->
+          let r, rm, na = parse_modrm32 na in
+          (Xadd(opsize, r, rm), na)
       | 0xd7 ->
           let r, rm, na = parse_modrm32 na in
           (Pmovmskb(mopsize, r, rm), na)
