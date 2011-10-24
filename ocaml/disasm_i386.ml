@@ -1095,8 +1095,10 @@ let parse_instr g addr =
 	      let opsize = if b1 land 1 = 0 then r8 else opsize in
 	      (match r with (* Grp 1 *)
 	      | 0 -> (Add(opsize, rm, o2), na)
+              | 1 -> (Or(opsize, rm, o2), na)
 	      | 4 -> (And(opsize, rm, o2), na)
 	      | 5 -> (Sub(opsize, rm, o2), na)
+              | 6 -> (Xor(opsize, rm, o2), na)
 	      | 7 -> (Cmp(opsize, rm, o2), na)
 	      | _ -> unimplemented (Printf.sprintf "unsupported opcode: %02x/%d" b1 r)
 	      )
