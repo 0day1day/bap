@@ -70,6 +70,51 @@ module RToposort = Graph.Topological.Make(RevCFG);;
 (** Same as [wp] but for unstructured programs. *)
 let uwp ?(simp=Util.id) ((cfg,ugclmap):Ugcl.t) (q:exp) : exp =
   dprintf "Starting uwp";
+  (* Block -> exp *)
+  let wpvar = BH.create (CA.G.nb_vertex cfg) in
+  let lookupwpvar = BH.find wpvar in
+  let setwp bbid q =
+    assert (not (BH.mem wpvar bbid));
+    BH.add wpvar bbid q;
+  in
+  let rec compute_at bb =
+    (* Find the weakest precondition from the program exit to our
+       successors *)
+    let bbid = CA.G.V.label bb in
+    let q_in = match CA.G.succ cfg bb with
+      | [] when bbid = Cfg.BB_Exit ->
+        q (* The user supplied q *)
+      | [] when bbid = Cfg.BB_Error ->
+        exp_true (* The default postcondition is exp_true.  Note that
+                    BB_Error contains an assert false, so this doesn't really
+                    matter. *)
+      | [] -> failwith (Printf.sprintf "BB %s has no successors but should" (Cfg_ast.v2s bb))
+      | s -> (* Get the conjunction of our successors' preconditions *)
+        let get_wp bb = lookupwpvar (CA.G.V.label bb) in
+        simp (List.fold_left (fun acc bb -> binop AND acc (get_wp bb)) (get_wp (List.hd s)) (List.tl s))
+    in
+    let rec wp q s k =
+      (*  We use CPS to avoid stack overflows *)
+      match s with
+      | Ugcl.Skip -> k q
+      | Ugcl.Assume e ->
+        k (simp(exp_implies e q))
+      | Ugcl.Seq(s1, s2) ->
+        wp q s2 (fun x -> wp x s1 k)
+      | Ugcl.Assign(t, e) ->
+        k(simp(Let(t, e, q)))
+      | Ugcl.Assert e ->
+        k (simp(exp_and e q))
+    in
+    let q_out = wp q_in (ugclmap bbid) Util.id in
+    setwp bbid q_out
+  in
+  RToposort.iter compute_at cfg;
+  lookupwpvar Cfg.BB_Entry
+
+(** Same as [wp] but for unstructured programs. *)
+let efficient_uwp ?(simp=Util.id) ((cfg,ugclmap):Ugcl.t) (q:exp) : exp =
+  dprintf "Starting uwp";
   (* Block -> var *)
   let wpvar = BH.create (CA.G.nb_vertex cfg) in
   (* Var -> exp *)
@@ -126,7 +171,8 @@ let uwp ?(simp=Util.id) ((cfg,ugclmap):Ugcl.t) (q:exp) : exp =
   let build_exp bige (v,e) =
     Let(v, e, bige)
   in
-  (* FIXME: We shouldn't refer to Entry here *)
+  (* FIXME: We shouldn't use entry here *)
+  (* FIXME: R => Start_ok *)
   List.fold_left build_exp (Var(lookupwpvar Cfg.BB_Entry)) assigns
 
 (** the efficient weakest precondition wp(p,q):Q where Q is guaranteed
