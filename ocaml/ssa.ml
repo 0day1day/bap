@@ -114,34 +114,28 @@ let quick_exp_eq e1 e2 =
       true else false
 
 (** full_exp_eq e1 e2 returns true if and only if e1 and e2 are
-    structurally equivalent.
-
-    This function should be equivalent to =, except that it understands
-    Big_int's, which are abstract values.
-
-    XXX: Can we make this tail recursive?
-*)
-let rec full_exp_eq e1 e2 =
-  if (num_exp e1) <> (num_exp e2) then false else
-    let l1,l2,l3,l4,l5,l6,l7,l8 = getargs_exp e1 in
-    let r1,r2,r3,r4,r5,r6,r7,r8 = getargs_exp e2 in
-    let b1 = List.for_all2 (==) l1 r1 in (* vals must be == *)
-    let b2 = List.for_all2 (=) l2 r2 in
-    let b3 = List.for_all2 (=) l3 r3 in
-    let b4 = List.for_all2 (=) l4 r4 in
-    let b5 = List.for_all2 (=) l5 r5 in
-    let b6 = List.for_all2 (=) l6 r6 in
-    let b7 = List.for_all2 (=) l7 r7 in
-    let b8 = List.for_all2 (eq_big_int) l8 r8 in
-    if b1 & b2 & b3 & b4 & b5 & b6 & b7 & b8 then
-      true
-    else if b2 & b3 & b4 & b5 & b6 & b7 & b8 then
-      (* e1 and e2 are not physically equal.  But maybe the
-         subexpressions are structurally, but not physically,
-         equal. *)
-      List.for_all2 full_value_eq l1 r1
-    else (* If something else differs, we are definitely not equal. *)
-      false
+    structurally equivalent. *)
+let rec full_exp_eq e1 e2 = e1 = e2
+  (* if (num_exp e1) <> (num_exp e2) then false else *)
+  (*   let l1,l2,l3,l4,l5,l6,l7,l8 = getargs_exp e1 in *)
+  (*   let r1,r2,r3,r4,r5,r6,r7,r8 = getargs_exp e2 in *)
+  (*   let b1 = List.for_all2 (==) l1 r1 in (\* vals must be == *\) *)
+  (*   let b2 = List.for_all2 (=) l2 r2 in *)
+  (*   let b3 = List.for_all2 (=) l3 r3 in *)
+  (*   let b4 = List.for_all2 (=) l4 r4 in *)
+  (*   let b5 = List.for_all2 (=) l5 r5 in *)
+  (*   let b6 = List.for_all2 (=) l6 r6 in *)
+  (*   let b7 = List.for_all2 (=) l7 r7 in *)
+  (*   let b8 = List.for_all2 (eq_big_int) l8 r8 in *)
+  (*   if b1 & b2 & b3 & b4 & b5 & b6 & b7 & b8 then *)
+  (*     true *)
+  (*   else if b2 & b3 & b4 & b5 & b6 & b7 & b8 then *)
+  (*     (\* e1 and e2 are not physically equal.  But maybe the *)
+  (*        subexpressions are structurally, but not physically, *)
+  (*        equal. *\) *)
+  (*     List.for_all2 full_value_eq l1 r1 *)
+  (*   else (\* If something else differs, we are definitely not equal. *\) *)
+  (*     false *)
 
 let num_stmt = function
   | Move _ -> 0
@@ -186,28 +180,24 @@ let quick_stmt_eq s1 s2 =
       false
 
 (** full_stmt_eq returns true if and only if e1 and e2 are
-    structurally equivalent.
-
-    This function should be equivalent to =, except that it understands
-    Big_int's, which are abstract values.
-*)
-let full_stmt_eq s1 s2 =
-  if (num_stmt s1) <> (num_stmt s2) then false else
-    let l1,l2,l3,l4,l5,l6 = getargs_stmt s1 in
-    let r1,r2,r3,r4,r5,r6 = getargs_stmt s2 in
-    let b1 = List.for_all2 (==) l1 r1 in (* e must use == *)
-    let b2 = List.for_all2 (=) l2 r2 in
-    let b3 = List.for_all2 (=) l3 r3 in
-    let b4 = List.for_all2 (=) l4 r4 in
-    let b5 = List.for_all2 (=) l5 r5 in
-    let b6 = List.for_all2 (==) l6 r6 in
-    if b1 & b2 & b3 & b4 & b5 & b6 then
-      true
-    else if b2 & b3 & b4 & b5 then
-      (* e1 and e2 are not physically equal.  But maybe the
-         subexpressions are structurally, but not physically,
-         equal. *)
-      List.for_all2 full_exp_eq l6 r6
-      && List.for_all2 full_value_eq l1 r1
-    else
-      false
+    structurally equivalent. *)
+let full_stmt_eq s1 s2 = s1 = s2
+  (* if (num_stmt s1) <> (num_stmt s2) then false else *)
+  (*   let l1,l2,l3,l4,l5,l6 = getargs_stmt s1 in *)
+  (*   let r1,r2,r3,r4,r5,r6 = getargs_stmt s2 in *)
+  (*   let b1 = List.for_all2 (==) l1 r1 in (\* e must use == *\) *)
+  (*   let b2 = List.for_all2 (=) l2 r2 in *)
+  (*   let b3 = List.for_all2 (=) l3 r3 in *)
+  (*   let b4 = List.for_all2 (=) l4 r4 in *)
+  (*   let b5 = List.for_all2 (=) l5 r5 in *)
+  (*   let b6 = List.for_all2 (==) l6 r6 in *)
+  (*   if b1 & b2 & b3 & b4 & b5 & b6 then *)
+  (*     true *)
+  (*   else if b2 & b3 & b4 & b5 then *)
+  (*     (\* e1 and e2 are not physically equal.  But maybe the *)
+  (*        subexpressions are structurally, but not physically, *)
+  (*        equal. *\) *)
+  (*     List.for_all2 full_exp_eq l6 r6 *)
+  (*     && List.for_all2 full_value_eq l1 r1 *)
+  (*   else *)
+  (*     false *)
