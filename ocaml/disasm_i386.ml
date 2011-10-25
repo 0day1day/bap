@@ -79,7 +79,7 @@ type opcode =
   | Sbb of (typ * operand * operand)
   | Cmp of (typ * operand * operand)
   | Cmpxchg of (typ * operand * operand)
-  | Cmpxchg8b of (typ * operand)
+  | Cmpxchg8b of operand
   | Xadd of (typ * operand * operand)
   | Xchg of (typ * operand * operand)
   | And of (typ * operand * operand)
@@ -755,14 +755,14 @@ let rec to_ir addr next ss pref =
       assn t dst (ite t equal_v src_e dst_e);
       assn t o_eax (ite t equal_v accumulator dst_e);
     ]
-  | Cmpxchg8b(t, o) -> (* only 32bit case *)
+  | Cmpxchg8b o -> (* only 32bit case *)
     let accumulator = Concat((op2e r32 o_edx),(op2e r32 o_eax)) in
     let dst_e = op2e r64 o in
     let src_e = Concat((op2e r32 o_ecx),(op2e r32 o_ebx)) in
     let dst_low_e = Extract(biconst 63, biconst 32, dst_e) in
     let dst_hi_e = Extract(biconst 31, bi0, dst_e) in
-    let eax_e = op2e t o_eax in
-    let edx_e = op2e t o_edx in
+    let eax_e = op2e r32 o_eax in
+    let edx_e = op2e r32 o_edx in
     let equal = nv "t" r1 in
     let equal_v = Var equal in
     [
@@ -907,7 +907,7 @@ module ToStr = struct
     | Sbb(t,d,s) -> Printf.sprintf "sbb %s, %s" (opr d) (opr s)
     | Cmp(t,d,s) -> Printf.sprintf "cmp %s, %s" (opr d) (opr s)
     | Cmpxchg(t,d,s) -> Printf.sprintf "cmpxchg %s, %s" (opr d) (opr s)
-    | Cmpxchg8b(t,o) -> Printf.sprintf "cmpxchg8b %s" (opr o)
+    | Cmpxchg8b(o) -> Printf.sprintf "cmpxchg8b %s" (opr o)
     | Xadd(t,d,s) -> Printf.sprintf "xadd %s, %s" (opr d) (opr s)
     | Xchg(t,d,s) -> Printf.sprintf "xchg %s, %s" (opr d) (opr s)
     | And(t,d,s) -> Printf.sprintf "and %s, %s" (opr d) (opr s)
@@ -1328,7 +1328,7 @@ let parse_instr g addr =
       | 0xc7 ->
           let r, rm, na = parse_modrm32ext na in
           (match r with
-            | 1 -> (Cmpxchg8b(opsize, rm), na)
+            | 1 -> (Cmpxchg8b(rm), na)
             | _ -> unimplemented (Printf.sprintf "unsupported opcode: 0fc7 family")
           )
       | 0xd7 ->
