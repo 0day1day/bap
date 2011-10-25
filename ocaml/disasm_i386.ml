@@ -757,10 +757,10 @@ let rec to_ir addr next ss pref =
     ]
   | Cmpxchg8b(t, o) -> (* only 32bit case *)
     let accumulator = Concat((op2e r32 o_edx),(op2e r32 o_eax)) in
-    let dst_e = Cast(CAST_HIGH, r64, (op2e r32 o)) in
+    let dst_e = op2e r64 o in
     let src_e = Concat((op2e r32 o_ecx),(op2e r32 o_ebx)) in
-    let dst_low_e = Cast(CAST_LOW, r32, BinOp(RSHIFT, dst_e, Int(big_int_of_int 32, r32))) in
-    let dst_hi_e = Cast(CAST_LOW, r32, dst_e) in
+    let dst_low_e = Extract(biconst 63, biconst 32, dst_e) in
+    let dst_hi_e = Extract(biconst 31, bi0, dst_e) in
     let eax_e = op2e t o_eax in
     let edx_e = op2e t o_edx in
     let equal = nv "t" r1 in
