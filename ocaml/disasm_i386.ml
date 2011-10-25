@@ -79,6 +79,7 @@ type opcode =
   | Sbb of (typ * operand * operand)
   | Cmp of (typ * operand * operand)
   | Cmpxchg of (typ * operand * operand)
+  | Cmpxchg8b of (typ * operand)
   | Xadd of (typ * operand * operand)
   | Xchg of (typ * operand * operand)
   | And of (typ * operand * operand)
@@ -754,6 +755,23 @@ let rec to_ir addr next ss pref =
       assn t dst (ite t equal_v src_e dst_e);
       assn t o_eax (ite t equal_v accumulator dst_e);
     ]
+  | Cmpxchg8b(t, o) -> (* only 32bit case *)
+    let accumulator = Concat((op2e r32 o_edx),(op2e r32 o_eax)) in
+    let dst_e = Cast(CAST_HIGH, r64, (op2e r32 o)) in
+    let src_e = Concat((op2e r32 o_ecx),(op2e r32 o_ebx)) in
+    let dst_low_e = Cast(CAST_LOW, r32, BinOp(RSHIFT, dst_e, Int(big_int_of_int 32, r32))) in
+    let dst_hi_e = Cast(CAST_LOW, r32, dst_e) in
+    let eax_e = op2e t o_eax in
+    let edx_e = op2e t o_edx in
+    let equal = nv "t" r1 in
+    let equal_v = Var equal in
+    [
+      move equal (accumulator ==* dst_e);
+      move zf equal_v;
+      assn r64 o (ite r64 equal_v src_e dst_e);
+      assn r32 o_eax (ite r32 equal_v eax_e dst_low_e);
+      assn r32 o_edx (ite r32 equal_v edx_e dst_hi_e)
+    ]
   | Xadd(t, dst, src) ->
     let tmp = nv "t" t in
     move tmp (op2e t dst +* op2e t src)
@@ -889,6 +907,7 @@ module ToStr = struct
     | Sbb(t,d,s) -> Printf.sprintf "sbb %s, %s" (opr d) (opr s)
     | Cmp(t,d,s) -> Printf.sprintf "cmp %s, %s" (opr d) (opr s)
     | Cmpxchg(t,d,s) -> Printf.sprintf "cmpxchg %s, %s" (opr d) (opr s)
+    | Cmpxchg8b(t,o) -> Printf.sprintf "cmpxchg8b %s" (opr o)
     | Xadd(t,d,s) -> Printf.sprintf "xadd %s, %s" (opr d) (opr s)
     | Xchg(t,d,s) -> Printf.sprintf "xchg %s, %s" (opr d) (opr s)
     | And(t,d,s) -> Printf.sprintf "and %s, %s" (opr d) (opr s)
@@ -1253,7 +1272,7 @@ let parse_instr g addr =
       | 0x6f | 0x7f when pref = [0x66] ->
 	let r, rm, na = parse_modrm32 na in
 	let s,d = if b2 = 0x6f then rm, r else r, rm in
-	let align = (match pref with 
+	let align = (match pref with
 	  | [0x66] -> true
 	  | [0xf3] -> false
 	  | _ -> failwith "Unimplemented") in
@@ -1306,6 +1325,12 @@ let parse_instr g addr =
       | 0xc1 ->
           let r, rm, na = parse_modrm32 na in
           (Xadd(opsize, r, rm), na)
+      | 0xc7 ->
+          let r, rm, na = parse_modrm32ext na in
+          (match r with
+            | 1 -> (Cmpxchg8b(opsize, rm), na)
+            | _ -> unimplemented (Printf.sprintf "unsupported opcode: 0fc7 family")
+          )
       | 0xd7 ->
           let r, rm, na = parse_modrm32 na in
           (Pmovmskb(mopsize, r, rm), na)
