@@ -102,7 +102,7 @@ let remove_cycles cfg =
     in
     walk entry []
   in
-  dprintf "Finding edges";
+  dprintf "Removing backedges";
   let backedges = find_backedges cfg in
   (* I don't think we need this anymore... *)
   (* let backedges = Util.list_unique backedges in *)

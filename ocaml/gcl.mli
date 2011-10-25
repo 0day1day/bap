@@ -7,7 +7,15 @@ type t =
   | Seq of t * t
   | Skip
 
-(*val of_straightline : ?acc:t -> Ast.stmt list -> t*)
+(* (\** Intermediate form of gcl *\) *)
+(* type gclhelp = *)
+(*   | CAssign of Cfg.AST.G.V.t *)
+(*   | CChoice of exp * gclhelp * gclhelp (\* bb with cjmp, true  and false branches *\) *)
+(*   | Cunchoice of gclhelp * gclhelp (\* unfinished choice *\) *)
+(*   | CSeq of gclhelp list *)
+
+(* val gclhelp_of_astcfg : ?entry:Cfg.AST.G.V.t -> ?exit:Cfg.AST.G.V.t -> Cfg.AST.G.t -> gclhelp *)
+
 val of_astcfg : ?entry:Cfg.AST.G.V.t -> ?exit:Cfg.AST.G.V.t -> Cfg.AST.G.t -> t
 val of_ast : Ast.program -> t
 val remove_skips : t -> t

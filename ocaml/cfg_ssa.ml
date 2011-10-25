@@ -474,7 +474,7 @@ let split_edges c =
     let c = C.add_edge c v d in
     let c = C.remove_edge_e c e in
     C.set_stmts c s (List.rev revs)
-    
+
   in
   let edges_to_split =
     C.G.fold_edges_e
@@ -561,7 +561,8 @@ let rm_phis ?(dsa=false) ?(attrs=[]) cfg =
     C.set_stmts cfg b
       (match C.get_stmts cfg b with
        | (Jmp _ as j)::stmts
-       | (CJmp _ as j)::stmts ->
+       | (CJmp _ as j)::stmts
+       | (Halt _ as j)::stmts ->
 	   j::move::stmts
        | stmts ->
 	   move::stmts )

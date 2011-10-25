@@ -5,13 +5,16 @@
 *)
 
 open Ast
+open Ast_convenience
 open Type
 open Gcl
 
 module D = Debug.Make(struct let name = "WP" and default=`Debug end)
 open D
 
+module BH = Cfg.BH
 module VH = Var.VarHash
+
 
 let exp_or a b =
   if a == exp_false then b
@@ -51,8 +54,80 @@ let wp ?(simp=Util.id) (p:Gcl.t) (q:exp) : exp =
   in
   wp q p  (fun x->x)
 
+module CA = Cfg.AST
 
+module RevCFG =
+struct
+  type t = CA.G.t
+  module V = CA.G.V
+  let iter_vertex = CA.G.iter_vertex
+  let iter_succ = CA.G.iter_pred
+  let in_degree = CA.G.out_degree
+end
 
+module RToposort = Graph.Topological.Make(RevCFG);;
+
+(** Same as [wp] but for unstructured programs. *)
+let uwp ?(simp=Util.id) ((cfg,ugclmap):Ugcl.t) (q:exp) : exp =
+  dprintf "Starting uwp";
+  (* Block -> var *)
+  let wpvar = BH.create (CA.G.nb_vertex cfg) in
+  (* Var -> exp *)
+  let varexp = VH.create (CA.G.nb_vertex cfg) in
+  let lookupwpvar = BH.find wpvar in
+  let setwp bbid q =
+    let v = Var.newvar (Printf.sprintf "q_pre_%s" (Cfg.bbid_to_string bbid)) reg_1 in
+    assert (not (BH.mem wpvar bbid));
+    BH.add wpvar bbid v;
+    VH.add varexp v q
+  in
+  let rec compute_at bb =
+    (* Find the weakest precondition from the program exit to our
+       successors *)
+    let bbid = CA.G.V.label bb in
+    let q_in = match CA.G.succ cfg bb with
+      | [] when bbid = Cfg.BB_Exit ->
+        q (* The user supplied q *)
+      | [] when bbid = Cfg.BB_Error ->
+        exp_true (* The default postcondition is exp_true.  Note that
+                    BB_Error contains an assert false, so this doesn't really
+                    matter. *)
+      | [] -> failwith (Printf.sprintf "BB %s has no successors but should" (Cfg_ast.v2s bb))
+      | s -> (* Get the conjunction of our successors' preconditions *)
+        let get_wp bb = Var(lookupwpvar (CA.G.V.label bb)) in
+        List.fold_left (fun acc bb -> binop AND acc (get_wp bb)) (get_wp (List.hd s)) (List.tl s)
+    in
+    let rec wp q s k =
+      (*  We use CPS to avoid stack overflows *)
+      match s with
+      | Ugcl.Skip -> k q
+      | Ugcl.Assume e ->
+        k (simp(exp_implies e q))
+      | Ugcl.Seq(s1, s2) ->
+        wp q s2 (fun x -> wp x s1 k)
+      | Ugcl.Assign(t, e) ->
+        k(simp(Let(t, e, q)))
+      | Ugcl.Assert e ->
+        k (simp(exp_and e q))
+    in
+    let q_out = wp q_in (ugclmap bbid) Util.id in
+    setwp bbid q_out
+  in
+  RToposort.iter compute_at cfg;
+(* Now we have a precondition for every block in terms of
+   postcondition variables of its successors. We just need to visit in
+   topological order and build up the whole expression now. *)
+  let build_assigns bb acc =
+    let bbid = CA.G.V.label bb in
+    let v = lookupwpvar bbid in
+    (v, VH.find varexp v)::acc
+  in
+  let assigns = RToposort.fold build_assigns cfg [] in
+  let build_exp bige (v,e) =
+    Let(v, e, bige)
+  in
+  (* FIXME: We shouldn't refer to Entry here *)
+  List.fold_left build_exp (Var(lookupwpvar Cfg.BB_Entry)) assigns
 
 (** the efficient weakest precondition wp(p,q):Q where Q is guaranteed
     to be linear in the size of p.  This version expects p to be

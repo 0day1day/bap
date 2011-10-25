@@ -113,14 +113,14 @@ struct
   let in_degree = CA.G.out_degree
 end
 
-module Toposort = Graph.Topological.Make(RevCFG);;
+module RToposort = Graph.Topological.Make(RevCFG);;
 
-(* type used internaly by of_cfg *)
-type cfg_gcl =
+(* intermediate type used by of_astcfg *)
+type gclhelp =
   | CAssign of CA.G.V.t
-  | CChoice of exp * cfg_gcl * cfg_gcl (* bb with cjmp, true  and false branches *)
-  | Cunchoice of cfg_gcl * cfg_gcl (* unfinished choice *)
-  | CSeq of cfg_gcl list
+  | CChoice of exp * gclhelp * gclhelp (* bb with cjmp, true  and false branches *)
+  | Cunchoice of gclhelp * gclhelp (* unfinished choice *)
+  | CSeq of gclhelp list
 
 let rec cgcl_size = function
   | CAssign _ -> 1
@@ -162,10 +162,9 @@ let rec string_of_cgcl = function
 (*         List.for_all2 full_exp_eq l2 r2 && *)
 (*         List.for_all2 cgcl_equal l3 r3 *)
 
-
-(** [of_cfg cfg exit_node] will compute a function from entry node to 
-    gcl between the entry node and the exit node. [cfg] must be acyclic. *)
-let of_astcfg ?entry ?exit cfg =
+(** [gclhelp_of_cfg cfg entry_node exit_node] returns an intermediate form that
+    is between CFGs and the GCL. [cfg] must be acyclic. *)
+let gclhelp_of_astcfg ?entry ?exit cfg =
   let exit = match exit with
     | None -> CA.G.V.create Cfg.BB_Exit
     | Some x -> x
@@ -263,24 +262,35 @@ let of_astcfg ?entry ?exit cfg =
 	)
     | exp -> CAssign n::exp
   in
-  (* let rec cgcl_to_gcl = function *)
-  (*   | CChoice(cond, e1, e2) -> *)
-  (*       Choice(Seq(Assume cond, cgcl_to_gcl e1), *)
-  (*              Seq(Assume(exp_not cond), cgcl_to_gcl e2) ) *)
-  (*   | Cunchoice(e1, e2) -> *)
-  (*       pwarn "generating an unguarded choice"; *)
-  (*       Choice(cgcl_to_gcl e1, cgcl_to_gcl e2) *)
-  (*   | CSeq(e'::es) -> *)
-  (*       List.fold_left (fun a b -> Seq(a,cgcl_to_gcl b)) (cgcl_to_gcl e') es *)
-  (*   | CSeq [] -> *)
-  (*       Skip *)
-  (*   | CAssign b -> *)
-  (*       let bb_s = CA.get_stmts cfg b in *)
-  (*       match List.rev bb_s with *)
-  (*       | [] -> Skip *)
-  (*       | (Jmp _ | CJmp _ | Halt _)::rest -> of_rev_straightline rest *)
-  (*       | _ -> of_straightline bb_s *)
-  (* in *)
+  let module BH = Hashtbl.Make(CA.G.V) in
+  let h = BH.create (CA.G.nb_vertex cfg) in
+  let get b =
+    try BH.find h b
+    with Not_found -> failwith("no GCL at "^b_to_string b)
+  in
+  (*BH.add h exit []; *)
+  let compute_at b =
+    let last_gcl = match CA.G.succ cfg b with
+      | [p] -> get p
+      | [x;y] ->
+        (* let rx = Reachable.AST.reachable cfg x in *)
+        (* let ry = Reachable.AST.reachable cfg y in *)
+        (* let r = Util.list_intersection rx ry in *)
+        (* dprintf "reachable intersection = %s" (String.concat " " (List.map Cfg_ast.v2s r)); *)
+        meet (get x) (get y)
+      | s when CA.G.V.equal b exit -> assert(s=[]); []
+      | s when CA.G.V.label b = Cfg.BB_Error -> assert(s=[]); []
+      | _ -> failwith("indirect jmp unsupported. "^b_to_string b^" had too many successors")
+    in
+    let gcl = f_t b last_gcl in
+    BH.add h b gcl
+  in
+  RToposort.iter compute_at cfg;
+  (CSeq (get entry))
+
+(** [of_cfg cfg entry_node exit_node] will compute a function from entry node to 
+    gcl between the entry node and the exit node. [cfg] must be acyclic. *)
+let of_astcfg ?entry ?exit cfg =
   let cgcl_to_gcl s =
     (* k is a continuation *)
     let rec c s k = match s with
@@ -313,33 +323,7 @@ let of_astcfg ?entry ?exit cfg =
     in
     c s Util.id
   in
-  let module BH = Hashtbl.Make(CA.G.V) in
-  let h = BH.create (CA.G.nb_vertex cfg) in
-  let get b =
-    try BH.find h b
-    with Not_found -> failwith("no GCL at "^b_to_string b)
-  in
-  (*BH.add h exit []; *)
-  let compute_at b =
-    let last_gcl = match CA.G.succ cfg b with
-      | [p] -> get p
-      | [x;y] ->
-        (* let rx = Reachable.AST.reachable cfg x in *)
-        (* let ry = Reachable.AST.reachable cfg y in *)
-        (* let r = Util.list_intersection rx ry in *)
-        (* dprintf "reachable intersection = %s" (String.concat " " (List.map Cfg_ast.v2s r)); *)
-        meet (get x) (get y)
-      | s when CA.G.V.equal b exit -> assert(s=[]); []
-      | s when CA.G.V.label b = Cfg.BB_Error -> assert(s=[]); []
-      | _ -> failwith("indirect jmp unsupported. "^b_to_string b^" had too many successors")
-    in
-    let gcl = f_t b last_gcl in
-    BH.add h b gcl
-  in
-  Toposort.iter compute_at cfg;
-  dprintf "cgcl_to_gcl";
-  cgcl_to_gcl (CSeq(get entry))
-
+  cgcl_to_gcl (gclhelp_of_astcfg ?entry ?exit cfg)
 
 let of_ast p =
   of_astcfg (Prune_unreachable.prune_unreachable_ast (Cfg_ast.of_prog p))
