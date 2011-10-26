@@ -487,11 +487,11 @@ let rec to_ir addr next ss pref =
       | Oimm _ -> failwith "invalid"
     in
     let al =
-      if align then 
-	List.map (fun a -> Assert( (a &* i32 15) =* i32 0, [])) (al) 
+      if align then
+	List.map (fun a -> Assert( (a &* i32 15) ==* i32 0, [])) (al)
       else []
     in
-    d::al 
+    d::al
     )
   | Pcmpeq (t,elet,dst,src) ->
       let ncmps = (Typecheck.bits_of_width t) / (Typecheck.bits_of_width elet) in
@@ -875,7 +875,7 @@ module ToStr = struct
     | Movs(t) -> "movs"
     | Movzx(dt,dst,st,src) -> Printf.sprintf "movzx %s, %s" (opr dst) (opr src)
     | Movsx(dt,dst,st,src) -> Printf.sprintf "movsx %s, %s" (opr dst) (opr src)
-    | Movdq(t,d,s,align) -> 
+    | Movdq(t,d,s,align) ->
       let asm = if align then "movdqa" else "movdqu" in
       Printf.sprintf "%s %s, %s" asm (opr d) (opr s)
     | Pcmpeq(t,elet,dst,src) -> Printf.sprintf "pcmpeq %s, %s" (opr dst) (opr src)
@@ -1276,7 +1276,7 @@ let parse_instr g addr =
 	  | [0x66] -> true
 	  | [0xf3] -> false
 	  | _ -> failwith "Unimplemented") in
-	(Movdq(opsize,d,s,align), na)
+	(Movdq(mopsize,d,s,align), na)
       | 0x74 | 0x75 | 0x76 as o ->
         let r, rm, na = parse_modrm32 na in
         let elet = match o with | 0x74 -> r8 | 0x75 -> r16 | 0x76 -> r32 | _ -> failwith "impossible" in
