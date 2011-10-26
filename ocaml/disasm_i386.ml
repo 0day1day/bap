@@ -58,6 +58,7 @@ type opcode =
   | Movzx of typ * operand * typ * operand (* dsttyp, dst, srctyp, src *)
   | Movsx of typ * operand * typ * operand (* dsttyp, dst, srctyp, src *)
   | Movdq of typ * operand * operand * bool (* dst, src *)
+  | Movaps of typ * operand * operand
   | Lea of operand * Ast.exp
   | Call of operand * int64 (* int64 is RA *)
   | Shift of binop_type * typ * operand * operand
@@ -493,6 +494,8 @@ let rec to_ir addr next ss pref =
     in
     d::al
     )
+  | Movaps(t, d, s) -> (* movaps, movapd are essentially the same as Movdq *)
+    to_ir addr next ss pref (Movdq(t, d, s, true))
   | Pcmpeq (t,elet,dst,src) ->
       let ncmps = (Typecheck.bits_of_width t) / (Typecheck.bits_of_width elet) in
       let elebits = Typecheck.bits_of_width elet in
@@ -691,7 +694,7 @@ let rec to_ir addr next ss pref =
       unimplemented "unsupported flags in scas"
   | Stos(Reg bits as t) ->
     let stmts = [store_s seg_es t edi_e (op2e t (o_eax));
-		 string_incr t edi]
+                 string_incr t edi]
     in
     if pref = [] then
       stmts
@@ -878,6 +881,7 @@ module ToStr = struct
     | Movdq(t,d,s,align) ->
       let asm = if align then "movdqa" else "movdqu" in
       Printf.sprintf "%s %s, %s" asm (opr d) (opr s)
+    | Movaps(_, dst,src) -> Printf.sprintf "movaps %s, %s" (opr dst) (opr src)
     | Pcmpeq(t,elet,dst,src) -> Printf.sprintf "pcmpeq %s, %s" (opr dst) (opr src)
     | Pmovmskb(t,dst,src) -> Printf.sprintf "pmovmskb %s, %s" (opr dst) (opr src)
     | Lea(r,a) -> Printf.sprintf "lea %s, %s" (opr r) (opr (Oaddr a))
@@ -1268,6 +1272,9 @@ let parse_instr g addr =
       let b2 = Char.code (g na) and na = s na in
       match b2 with (* Table A-3 *)
       | 0x1f -> (Nop, na)
+      | 0x28 when pref = [] || pref = [0x66] ->
+        let (r, rm, na) = parse_modrm32 na in
+        Movaps(mopsize, r, rm), na
       | 0x31 -> (Rdtsc, na)
       | 0x6f | 0x7f when pref = [0x66] ->
 	let r, rm, na = parse_modrm32 na in
