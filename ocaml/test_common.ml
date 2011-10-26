@@ -6,6 +6,7 @@ open Big_int_convenience
 open OUnit
 open Pcre
 open Type
+open BatListFull
 
 exception RangeNotFound of int64 * int64
 
@@ -55,7 +56,7 @@ let pin_path = ref "../pin/";;
 let pin = "pin";;
 let gentrace_path = "../pintraces/obj-ia32/";;
 let gentrace = "gentrace.so";;
-let pin_out_suffix = "bap-pin-test.out";;
+let pin_out_suffix = "-bap-pin-test.out";;
 
 
 let rec find_pin_out files tag =

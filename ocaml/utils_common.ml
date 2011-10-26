@@ -4,7 +4,7 @@ open Ast
 module D=Debug.Make(struct let name = "Utils_common" and default=`NoDebug end)
 open D
 open Type
-
+open BatListFull
 
 (* For solving predicates *)
 let rename_astexp f =

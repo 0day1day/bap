@@ -6,6 +6,8 @@ open Ast_convenience
 open Big_int_Z
 open Big_int_convenience
 open Type
+open BatListFull
+
 module VH=Var.VarHash
 
 module D = Debug.Make(struct let name = "Disasm_i386" and default=`NoDebug end)

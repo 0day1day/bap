@@ -2,6 +2,7 @@
 
 open Cfg
 open Depgraphs
+open BatListFull
 
 module CHOP_AST =
 struct

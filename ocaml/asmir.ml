@@ -789,7 +789,9 @@ let rec bap_get_stmt_from_trace_file ?(atts = true) ?(rate=1L) ?(pin = false) fi
   (* There is a difference between the file offset and the stream off(set) *)
   let enqueue blocks = 
     Util.print_obj_info "block_q" block_q; 
-    block_q := blocks in
+    Util.print_mem_usage();
+    block_q := blocks
+  in
   let rec dequeue _ =
     match !block_q with
     | [] -> None
@@ -819,12 +821,13 @@ let rec bap_get_stmt_from_trace_file ?(atts = true) ?(rate=1L) ?(pin = false) fi
   | _ -> next_block
 
 
+let f filename = fun x -> (DTest.pdebug("Finalized block_q for "^filename));;
+
 (** Return stream of trace instructions raised to the IL *)
 let bap_stream_from_trace_file ?(atts = true) ?(rate=1L) ?(pin = false) filename =
   let block_q = ref [] in
   let offset = ref 0L in
-  Gc.finalise (fun h -> 
-    (DTest.pdebug("Finalized block_q for "^filename))) block_q;
+  Gc.finalise (f filename) block_q;
   Stream.from (
     bap_get_stmt_from_trace_file ~atts ~rate ~pin filename block_q offset)
 
