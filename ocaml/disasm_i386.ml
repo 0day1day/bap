@@ -543,7 +543,8 @@ let rec to_ir addr next ss pref =
       let src_e = op2e t src in
       let imm = op2e t imm in
       let concat = dst_e ++* src_e in
-      let shift = concat >>* (imm <<* (i32 3)) in
+      let t_concat = Typecheck.infer_ast ~check:false concat in
+      let shift = concat >>* (cast_unsigned t_concat (imm <<* (it 3 t))) in
       let high, low = match t with
         | Reg 128 -> biconst 127, bi0
         | Reg 64 -> biconst 63, bi0
