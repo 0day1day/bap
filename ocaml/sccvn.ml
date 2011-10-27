@@ -264,19 +264,11 @@ let opt_expid info var exp =
   match eid with
   (* constant folding *)
   | Bin(op, HInt v1, HInt v2) ->
-      (* Arithmetic can fail when regs are too big. We catch it here
-	 and don't simplify.  This is kind of a hack. *)      
-      (try
-	toconst (Arithmetic.binop op v1 v2)
-      with ArithmeticEx _ -> eid)
+    toconst (Arithmetic.binop op v1 v2)
   | Un(op, HInt v) ->
-      (try
-	 toconst (Arithmetic.unop op v)
-       with ArithmeticEx _ -> eid)
+    toconst (Arithmetic.unop op v)
   | Cst(ct, t, HInt v) ->
-      (try
-	 toconst (Arithmetic.cast ct v t)
-       with ArithmeticEx _ -> eid)
+    toconst (Arithmetic.cast ct v t)
   | It(HInt(bi,t), x, _) when bi_is_one bi ->
       sameas x
   | It(HInt(bi,t), _, y) when bi_is_zero bi ->
@@ -285,13 +277,9 @@ let opt_expid info var exp =
       sameas x
   (* XXX: Extract(Shift) optimizations *)
   | Ex(h, l, HInt v) ->
-      (try
-	 toconst (Arithmetic.extract h l v)
-       with ArithmeticEx _ -> eid)
+    toconst (Arithmetic.extract h l v)
   | Con(HInt lv, HInt rv) ->
-      (try
-	 toconst (Arithmetic.concat lv rv)
-       with ArithmeticEx _ -> eid)
+    toconst (Arithmetic.concat lv rv)
   (* phis can be constant*)
   | Ph(x::xs) as eid -> (
       match

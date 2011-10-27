@@ -517,18 +517,9 @@ let rm_phis ?(dsa=false) ?(attrs=[]) cfg =
   (* split edges if needed *)
   let cfg = if dsa then split_edges cfg else cfg in
 
-(*  let ra = Reachable.SSA.reachable cfg (C.G.V.create (BB 1027)) in
-  let rb = Reachable.SSA.reachable cfg (C.G.V.create (BB 1205)) in
-  Cfg_pp.FunSsaAttributor.f := (fun g v -> match List.mem v ra, List.mem v rb with
-  | true, true -> [`Comment("both")]
-  | true, false -> [`Comment("a")]
-  | false, true -> [`Comment("b")]
-  | false, false -> [`Comment("unreach")]); *)
-  (* let oc = open_out "ssa.dot" in *)
-  (* Cfg_pp.SsaStmtsAttDot.output_graph oc cfg; *)
-  (* close_out oc; *)
-
-
+  let oc = open_out "ssa.dot" in
+  Cfg_pp.SsaStmtsDot.output_graph oc cfg;
+  close_out oc;
 
   let cfg, phis =
     (* Remove all the phis from all the BBs *)
@@ -632,8 +623,10 @@ let rm_phis ?(dsa=false) ?(attrs=[]) cfg =
         let vl = bb :: (List.rev (dominators bb)) in
         (* List.iter (fun v -> dprintf "BB %s dominates" (v2s v)) vl; *)
         let assocl = List.map (fun v -> (VH.find assn v, v)) vars in
+        List.iter (fun v -> dprintf "Var %s assigned in %s" (Pp.var_to_string v) (v2s (VH.find assn v))) vars;
         (* let vbbs = List.filter (fun (v,bb) -> List.mem bb vl) vbbs in *)
         let v =
+          (* dprintf "Looking for var in %s %s" (v2s bb) (List.fold_left (fun s v -> s^" "^(Pp.var_to_string v)) "" vars); *)
           let mybb = List.find (fun bb ->
             try ignore(List.assoc bb assocl); true
             with Not_found -> false) vl

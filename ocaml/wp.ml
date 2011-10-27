@@ -172,7 +172,6 @@ let efficient_uwp ?(simp=Util.id) ((cfg,ugclmap):Ugcl.t) (q:exp) : exp =
     Let(v, e, bige)
   in
   (* FIXME: We shouldn't use entry here *)
-  (* FIXME: R => Start_ok *)
   List.fold_left build_exp (Var(lookupwpvar Cfg.BB_Entry)) assigns
 
 (** the efficient weakest precondition wp(p,q):Q where Q is guaranteed
@@ -403,9 +402,9 @@ let dwp ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (p:Gcl.t) =
   let (vo, _, n, w) = dwp_pred_help ~simp ~less_duplication ~k p in
   match vo with
   | Some v ->
-      (fun q -> (exp_and v (exp_and (exp_not w) (exp_and n q))))
+      (fun q -> (exp_and v (exp_and (exp_not w) (exp_implies n q))))
   | None ->
-      (fun q -> (exp_and (exp_not w) (exp_and n q)))
+      (fun q -> (exp_and (exp_not w) (exp_implies n q)))
 
 
 let dwp_let ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (p:Gcl.t) =
