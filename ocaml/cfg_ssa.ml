@@ -620,13 +620,12 @@ let rm_phis ?(dsa=false) ?(attrs=[]) cfg =
            at ourself. Dominators is sorted by dominance, with the most
            dominant node first, but we want to look at less dominant
            nodes with higher priority, so we need to reverse the list. *)
+        (* dprintf "Looking for var in %s %s" (v2s bb) (List.fold_left (fun s v -> s^" "^(Pp.var_to_string v)) "" vars); *)
         let vl = bb :: (List.rev (dominators bb)) in
-        List.iter (fun v -> dprintf "BB %s dominates" (v2s v)) vl;
+        (* List.iter (fun v -> dprintf "BB %s dominates" (v2s v)) vl; *)
         let assocl = List.map (fun v -> (VH.find assn v, v)) vars in
-        List.iter (fun v -> dprintf "Var %s assigned in %s" (Pp.var_to_string v) (v2s (VH.find assn v))) vars;
-        (* let vbbs = List.filter (fun (v,bb) -> List.mem bb vl) vbbs in *)
+        (* List.iter (fun v -> dprintf "Var %s assigned in %s" (Pp.var_to_string v) (v2s (VH.find assn v))) vars; *)
         let v =
-          (* dprintf "Looking for var in %s %s" (v2s bb) (List.fold_left (fun s v -> s^" "^(Pp.var_to_string v)) "" vars); *)
           let mybb = List.find (fun bb ->
             try ignore(List.assoc bb assocl); true
             with Not_found -> false) vl
