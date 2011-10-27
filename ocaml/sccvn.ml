@@ -192,9 +192,9 @@ let defsite cfg =
   G.iter_vertex
     (fun b ->
        let rec addone i = function
-	 | Move(l,_,_) -> VH.add defsites l (b,i)
-	 | _ -> ()
-	 in
+         | Move(l,_,_) -> VH.add defsites l (b,i)
+         | _ -> ()
+         in
        List.iteri addone (C.get_stmts cfg b)
     )
     cfg;
@@ -212,11 +212,11 @@ let add_const =
      let eid = Const c in
      let h = match c with
        | Int(i,t) ->
-	   HInt(i,t)
+           HInt(i,t)
        | _ ->
-	   let v = Var.newvar name typ in
-	   VH.add info.vn2eid v eid;
-	   Hash v
+           let v = Var.newvar name typ in
+           VH.add info.vn2eid v eid;
+           Hash v
      in
      EH.add info.eid2vn eid h;
      h )
@@ -224,26 +224,26 @@ let add_const =
 let get_expid info =
   let vn = function
     | (Int _ | Lab _) as v -> (
-	try EH.find info.eid2vn (Const v)
-	with Not_found ->
-	  add_const info v
+        try EH.find info.eid2vn (Const v)
+        with Not_found ->
+          add_const info v
       )
     | Var x -> (
-	try VH.find info.vn_h x
-	with Not_found ->
-	  failwith("get_expid: unknown var: "^Pp.var_to_string x)
+        try VH.find info.vn_h x
+        with Not_found ->
+          failwith("get_expid: unknown var: "^Pp.var_to_string x)
       )
   in
   fun var -> function
     | Val(Var _ as v) ->
-	vn2eid info (vn v) 
+        vn2eid info (vn v) 
     | Val v -> Const v
     | Ite(c,v1,v2) -> It(vn c, vn v1, vn v2)
     | Extract(h,l,e) -> Ex(h,l, vn e)
     | Concat(le,re) -> Con(vn le, vn re)
     | BinOp((PLUS|TIMES|AND|OR|XOR|EQ|NEQ) as op,v1,v2) ->
-	let (h1,h2) = (vn v1, vn v2) in
-	if h1 <=! h2 then Bin(op, h1, h2) else Bin(op, h2, h1)
+        let (h1,h2) = (vn v1, vn v2) in
+        if h1 <=! h2 then Bin(op, h1, h2) else Bin(op, h2, h1)
     | BinOp(op,v1,v2) -> Bin(op, vn v1, vn v2)
     | UnOp(op, v) -> Un(op, vn v)
     | Cast(ct, t, v) -> Cst(ct,t, vn v)
@@ -283,9 +283,9 @@ let opt_expid info var exp =
   (* phis can be constant*)
   | Ph(x::xs) as eid -> (
       match
-	List.fold_left
-	  (function Some x -> meet x | None -> (fun _ -> None))
-	  (Some x) xs
+        List.fold_left
+          (function Some x -> meet x | None -> (fun _ -> None))
+          (Some x) xs
       with
       | None -> eid
       | Some(HInt v) -> toconst v
@@ -323,7 +323,7 @@ let opt_expid info var exp =
       Const(Ssa.val_false)
   | Bin(LE, _, HInt(i,t)) when bi_is_minusone (Arithmetic.to_sbig_int (i,t)) ->
       Const(Ssa.val_true)
-	(* TODO: add SLT and SLE. Requires canonicalized ints *)
+        (* TODO: add SLT and SLE. Requires canonicalized ints *)
   | Bin(EQ, x, (HInt(bi,t))) when t = (Reg 1) && bi_is_zero bi ->
       sameas x
   (* | Bin(EQ, x, (HInt(0L,t))) when t = (Reg 1) -> *)
@@ -348,10 +348,10 @@ let lookup ~opt info var exp =
       | Const(Var _) -> top
       | Const(Int(i,t)) -> HInt(i,t)
       | _ ->
-	  let h = Hash var in
-	  EH.add info.eid2vn eid h;
-	  VH.add info.vn2eid var eid;
-	  h
+          let h = Hash var in
+          EH.add info.eid2vn eid h;
+          VH.add info.vn2eid var eid;
+          h
   with Not_found -> (* no VNs for subexpressions yet *)
     top
       
@@ -377,30 +377,31 @@ let rpo ~opt cfg =
      all equivalent. *)
   let filter l = function
     | Move(v,e, _) ->
-	VH.add info.vn_h v top;
-	(v,e)::l
+        VH.add info.vn_h v top;
+        (v,e)::l
     | _ -> l
   in
   let moves = (* extract the moves only once *)
-    fold_postfix_component
+    (* previous: fold_postfix_component *)
+    C.G.fold_vertex
       (fun b l ->
-	 List.fold_left filter l (List.rev(C.get_stmts cfg b))
+         List.fold_left filter l (List.rev(C.get_stmts cfg b))
       )
-      cfg (C.G.V.create Cfg.BB_Entry) []
+      cfg []
   in
   let () = (* add all other uninitialized vars as unique *)
     let vis = object
       inherit Ssa_visitor.nop
       method visit_rvar x =
-	if not(VH.mem info.vn_h x) then (
-	  dprintf "Adding uninitialized variable %s" (Pp.var_to_string x);
-	  let h = Hash x
-	  and eid = Unique x in
-	  VH.add info.vn_h x h;
-	  VH.add info.vn2eid x eid;
-	  EH.add info.eid2vn eid h;
-	);
-	`DoChildren
+        if not(VH.mem info.vn_h x) then (
+          dprintf "Adding uninitialized variable %s" (Pp.var_to_string x);
+          let h = Hash x
+          and eid = Unique x in
+          VH.add info.vn_h x h;
+          VH.add info.vn2eid x eid;
+          EH.add info.eid2vn eid h;
+        );
+        `DoChildren
     end
     in
     C.G.iter_vertex
@@ -420,15 +421,15 @@ let rpo ~opt cfg =
     incr count;
     List.iter
       (fun (v,e) ->
-	 let oldvn = vn v in
-	 let temp = lookup v e in
-	 if oldvn <>! temp (*&& temp <> top*) then (
-	   assert(temp <>! top); (* FIXME: prove this is always true *)
-	   changed := true;
-	   dprintf "Updating %s -> %s (was %s)" (Pp.var_to_string v) (hash_to_string temp) (hash_to_string oldvn);
-	   VH.replace info.vn_h v temp
-	 ) )
-      moves
+         let oldvn = vn v in
+         let temp = lookup v e in
+         if oldvn <>! temp (*&& temp <> top*) then (
+           assert(temp <>! top); (* FIXME: prove this is always true *)
+           changed := true;
+           dprintf "Updating %s -> %s (was %s)" (Pp.var_to_string v) (hash_to_string temp) (hash_to_string oldvn);
+           VH.replace info.vn_h v temp
+         ) )
+      moves;
   done;
   (******** END OF ALGORITHM FROM PAPER ******)
   let inverse = Hashtbl.create (VH.length info.vn_h) in
@@ -438,11 +439,11 @@ let rpo ~opt cfg =
 (*  let () =
     if debug then (
       List.iter
-	(fun (v,_) ->
-	   let h = vn v in
-	   let v2s = Pp.var_to_string in
-	   pdebug (v2s v^" = "^hash_to_string h^" "^List.fold_left (fun s v -> s^v2s v^" ") "[" (hash2equiv h) ^"]"))
-	moves
+        (fun (v,_) ->
+           let h = vn v in
+           let v2s = Pp.var_to_string in
+           pdebug (v2s v^" = "^hash_to_string h^" "^List.fold_left (fun s v -> s^v2s v^" ") "[" (hash2equiv h) ^"]"))
+        moves
     )
   in*)
   (vn,hash2equiv,vn2eid)
@@ -454,15 +455,15 @@ let hash_replacement hash2equiv vn2eid defsite psdom =
     let rec extract_roots found = function
       | [] -> found
       | first::rest ->
-	  let (min,rest) =
-	    List.fold_left
-	      (fun (m,r) x -> if lt m x then (m,x::r) else (x,m::r))
-	      (first,[]) rest
-	  in
-	  if List.exists (fun x -> lt x min) found then
-	    found
-	  else
-	    extract_roots (min::found) rest
+          let (min,rest) =
+            List.fold_left
+              (fun (m,r) x -> if lt m x then (m,x::r) else (x,m::r))
+              (first,[]) rest
+          in
+          if List.exists (fun x -> lt x min) found then
+            found
+          else
+            extract_roots (min::found) rest
     in
     let var_defsites = List.rev_map (fun x -> (x, defsite x)) vars in
     List.map fst (extract_roots [] var_defsites)
@@ -481,20 +482,20 @@ let hash_replacement hash2equiv vn2eid defsite psdom =
       match rest with
       | [] -> None
       | v'::tl ->
-	  let p' = defsite v' in
-	  if psdom p' p then
-	    Some v'
-	  else find_best p tl
+          let p' = defsite v' in
+          if psdom p' p then
+            Some v'
+          else find_best p tl
     in
     match vn2eid hash with
     | Unique v when psdom (defsite v) pos ->
-	Some(Var v)
+        Some(Var v)
     | Const c ->
-	Some c
+        Some c
     | _ ->
-	match find_best pos (hash2equiv hash) with
-	| Some v -> Some(Var v)
-	| None -> None
+        match find_best pos (hash2equiv hash) with
+        | Some v -> Some(Var v)
+        | None -> None
 
 (** Use SCCVN to elliminate redundant expressions, replacing them with a
     previously computed value. Some variables will no longer be used after
@@ -518,27 +519,27 @@ let replacer ?(opt=true) cfg =
     method set_pos p = pos <- p
     method visit_value = function
       | Ssa.Var v ->
-	  (match hash_replacement pos (vn v) with
-	   | Some(Ssa.Var var) when v == var -> `SkipChildren
-	   | Some v' ->
-	       changed := true;
-	       dprintf "Replacing var %s with %s" (Pp.var_to_string v) (Pp.value_to_string v');
-	       `ChangeTo v'
-	   | None -> `SkipChildren
-	  )
+          (match hash_replacement pos (vn v) with
+           | Some(Ssa.Var var) when v == var -> `SkipChildren
+           | Some v' ->
+               changed := true;
+               dprintf "Replacing var %s with %s" (Pp.var_to_string v) (Pp.value_to_string v');
+               `ChangeTo v'
+           | None -> `SkipChildren
+          )
       | _  -> `SkipChildren
 
     method visit_stmt = function
       | Ssa.Move(_,Val _, _) -> (* visit value will handle that properly *)
-	  `DoChildren
+          `DoChildren
       | Ssa.Move(v,e, a) -> (
-	  match hash_replacement pos (vn v) with
-	  | Some vl ->
-	      changed := true;
-	      dprintf "Replacing exp %s with %s" (Pp.ssa_exp_to_string e) (Pp.value_to_string vl);
-	      `ChangeTo(Move(v, Val vl, a))
-	  | None -> `DoChildren
-	)
+          match hash_replacement pos (vn v) with
+          | Some vl ->
+              changed := true;
+              dprintf "Replacing exp %s with %s" (Pp.ssa_exp_to_string e) (Pp.value_to_string vl);
+              `ChangeTo(Move(v, Val vl, a))
+          | None -> `DoChildren
+        )
       | _ -> `DoChildren
   end
   in
@@ -546,11 +547,11 @@ let replacer ?(opt=true) cfg =
   let replace b cfg =
     let stmts = 
       List.mapi
-	(fun i s ->
-	   vis#set_pos (b,i);
-	   Ssa_visitor.stmt_accept vis s
-	)
-	(C.get_stmts cfg b)
+        (fun i s ->
+           vis#set_pos (b,i);
+           Ssa_visitor.stmt_accept vis s
+        )
+        (C.get_stmts cfg b)
     in
     if !changed then (
       somechange := true;
