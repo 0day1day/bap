@@ -99,6 +99,7 @@ type opcode =
   | Fldcw of operand
   | Pmovmskb of (typ * operand * operand)
   | Pcmpeq of (typ * typ * operand * operand)
+  | Palignr of (typ * operand * operand * operand)
   | Leave of typ
   | Interrupt of operand
 
@@ -537,6 +538,21 @@ let rec to_ir addr next ss pref =
       let padt = Reg(32 - nbytes) in
       let or_together_bits = List.fold_left (fun acc i -> Concat(acc,i)) (it 0 padt) all_bits in
       [assn r32 dst or_together_bits]
+  | Palignr (t,dst,src,imm) ->
+      let dst_e = op2e t dst in
+      let src_e = op2e t src in
+      let imm = op2e t imm in
+      let concat = dst_e ++* src_e in
+      let shift = concat >>* (imm <<* (i32 3)) in
+      let high, low = match t with
+        | Reg 128 -> biconst 127, bi0
+        | Reg 64 -> biconst 63, bi0
+        | _ -> failwith "impossible: used non 64/128-bit operand in palignr"
+      in
+      let result = Extract (high, low, shift) in
+      let addresses = List.fold_left (fun acc -> function Oaddr a -> a::acc | _ -> acc) [] [src;dst] in
+      List.map (fun addr -> Assert( (addr &* i32 15) ==* i32 0, [])) addresses
+      @ [assn t dst result]
   | Pxor args ->
     (* Pxor is just a larger xor *)
     to_ir addr next ss pref (Xor(args))
@@ -886,6 +902,7 @@ module ToStr = struct
     | Movsx(dt,dst,st,src) -> Printf.sprintf "movsx %s, %s" (opr dst) (opr src)
     | Movdq(t,d,s,align,name) ->
       Printf.sprintf "%s %s, %s" name (opr d) (opr s)
+    | Palignr(t,dst,src,imm) -> Printf.sprintf "palignr %s, %s, %s" (opr dst) (opr src) (opr imm)
     | Pcmpeq(t,elet,dst,src) -> Printf.sprintf "pcmpeq %s, %s" (opr dst) (opr src)
     | Pmovmskb(t,dst,src) -> Printf.sprintf "pmovmskb %s, %s" (opr dst) (opr src)
     | Lea(r,a) -> Printf.sprintf "lea %s, %s" (opr r) (opr (Oaddr a))
@@ -1276,6 +1293,15 @@ let parse_instr g addr =
       match b2 with (* Table A-3 *)
       | 0x1f -> (Nop, na)
       | 0x31 -> (Rdtsc, na)
+      | 0x3a ->
+          let b3 = Char.code (g na) and na = s na in
+          (match b3 with
+             | 0x0f ->
+                 let (r, rm, na) = parse_modrm prefix.opsize na in
+	         let (i, na) = parse_imm8 na in
+                 (Palignr(prefix.mopsize, r, rm, i), na)
+             | b3 -> failwith (Printf.sprintf "unsupported opcode %02x %02x %02x" b1 b2 b3)
+          )
       | 0x28 | 0x29 | 0x6f | 0x7f ->
 	let opsize, align, name =
           if prefix.opsize = r16 then
