@@ -18,6 +18,7 @@
 open Ast
 open Big_int_Z
 open Big_int_convenience
+(*open BatListFull*)
 open Type
 
 module VH = Var.VarHash

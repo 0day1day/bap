@@ -352,7 +352,7 @@ struct
           var)
     | Int (n, t) ->
         let typ = mk_bv_sort ctx (get_bits t) in
-          mk_numeral ctx (Big_int.string_of_big_int n) typ
+          mk_numeral ctx (Big_int_Z.string_of_big_int n) typ
     | BinOp (op, e1, e2) ->
         let e1 = convert set e1 in
         let e2 = convert set e2 in

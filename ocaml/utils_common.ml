@@ -4,7 +4,7 @@ open Ast
 module D=Debug.Make(struct let name = "Utils_common" and default=`NoDebug end)
 open D
 open Type
-
+open BatListFull
 
 (* For solving predicates *)
 let rename_astexp f =
@@ -50,10 +50,7 @@ let typecheck p =
   p
 
 let stream_concrete ?(tag = "") mem_hash concrete_state block =
-  pdebug ("SWXXX In stream_concrete for tag "^tag);
   let block = Memory2array.coerce_prog_state mem_hash block in
   let memv = Var.VarHash.find mem_hash Asmir.x86_mem in
-  Util.print_obj_info "concrete_state" concrete_state;
-  pdebug ("SWXXX Running on tag "^tag);
   ignore(Traces.run_block concrete_state memv block);
   []

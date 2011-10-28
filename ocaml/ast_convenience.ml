@@ -39,6 +39,8 @@ let (>=* ) a b   = binop LE b a
 (** bitwise equality *)
 let ( =* ) a b   = binop XOR a (unop NOT b)
 
+let ( ++* ) a b   = Concat (a, b)
+
 let cast_low t e = Cast(CAST_LOW, t, e)
 let cast_high t e = Cast(CAST_HIGH, t, e)
 let cast_signed t e = Cast(CAST_SIGNED, t, e)

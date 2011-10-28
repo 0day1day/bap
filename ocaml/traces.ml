@@ -5,6 +5,7 @@ open Big_int_Z
 open Big_int_convenience
 open Symbeval
 open Type
+open BatListFull
 
 module D = Debug.Make(struct let name = "TraceEval" and default=`NoDebug end)
 module DV = Debug.Make(struct let name = "TraceEvalVerbose" and default=`NoDebug end)
@@ -1013,7 +1014,6 @@ let run_block ?(next_label = None) state memv block =
       it was a label set addr to that; execute the block.  If it's not found
       verify that all stmts are labels and comments.  Otherwise print a warning 
   *)
-  pdebug("SWXXX In run_block");
   let addr = 
     (try
       List.find 
@@ -1086,8 +1086,6 @@ let run_block ?(next_label = None) state memv block =
 
   (* Don't execute specials now that we've potentially recorded them *)
   let block = remove_specials block in
-
-  List.iter (fun b -> pdebug ("SWXXX Running stmt: "  ^ (Pp.ast_stmt_to_string b))) block;
 
   (* Assign concrete values to regs/memory *)
   let block = match !use_alt_assignment with
@@ -1939,7 +1937,7 @@ let output_exploit file trace =
     let sort_aux (var1, _) (var2,_) =
         compare (var_to_num var1) (var_to_num var2)
     in
-      List.sort sort_aux
+      List.sort ~cmp:sort_aux
   in
     (* Padding unused symbolic bytes *)
   let pad_unused =

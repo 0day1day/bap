@@ -133,6 +133,7 @@ if($getpin) {
 print "Making test\n";
 check_system("make -j test");
 
+
 # leave $local_path before removing it
 chdir '/';
 # remove /tmp/trunk
