@@ -12,6 +12,7 @@ open Big_int_Z
 open Big_int_convenience
 open Type
 open Util
+open BatListFull
 
 module VH = Var.VarHash
 

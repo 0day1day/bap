@@ -662,7 +662,9 @@ let big_int_of_string s =
 
 (* Print the size of an object *)
 let print_obj_info title value = 
-  let module D = Debug.Make(struct let name = "UtilSize" and default=`NoDebug end) in
+  let module D = 
+	Debug.Make(struct let name = "UtilSize" and default=`NoDebug end) 
+  in
   let i = Objsize.objsize value in
   D.dprintf "%S : data_words=%i headers=%i depth=%i\n    \
 bytes_without_headers=%i bytes_with_headers=%i"
@@ -670,3 +672,43 @@ bytes_without_headers=%i bytes_with_headers=%i"
     (Objsize.size_without_headers i)
     (Objsize.size_with_headers i);
   D.dprintf "%S : total size in MB = %i" title ((Objsize.size_with_headers i) / 1048576)
+
+
+(* Deal with system calls (stolen from 
+   http://rosettacode.org/wiki/Execute_a_system_command#OCaml ) *)
+let check_exit_status = 
+  let warn = "warning: the process was" in
+  function
+  | Unix.WEXITED 0 -> ()
+  | Unix.WEXITED r -> 
+    Printf.eprintf "%s terminated with exit code (%d)\n%!" warn r
+  | Unix.WSIGNALED n ->
+    Printf.eprintf "%s killed by a signal (number: %d)\n%!" warn n
+  | Unix.WSTOPPED n -> 
+    Printf.eprintf "%s stopped by a signal (number: %d)\n%!" warn n
+;;
+ 
+let syscall ?(env=[| |]) cmd =
+  let ic, oc, ec = Unix.open_process_full cmd env in
+  let buf1 = Buffer.create 96
+  and buf2 = Buffer.create 48 in
+  (try
+     while true do Buffer.add_channel buf1 ic 1 done
+   with End_of_file -> ());
+  (try
+     while true do Buffer.add_channel buf2 ec 1 done
+   with End_of_file -> ());
+  let exit_status = Unix.close_process_full (ic, oc, ec) in
+  check_exit_status exit_status;
+  (Buffer.contents buf1,
+   Buffer.contents buf2)
+
+(* Print the memory use of this proccess *)
+let print_mem_usage _ =
+  let module D = 
+	Debug.Make(struct let name = "UtilMemUse" and default=`NoDebug end) 
+  in
+  let pid = Unix.getpid() in
+  let cmd = "ps auxw | grep "^(string_of_int pid) in
+  let (out1,out2) = syscall cmd in
+  D.pdebug (out1^out2)

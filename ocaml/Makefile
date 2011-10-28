@@ -140,8 +140,10 @@ OCAMLFLAGS = -thread -warn-error Aelz # -for-pack Bap #-w A
 # merge everything but descriptions.
 OCAMLDOCFLAGS = -m avlsoper
 
-all: dcl ncl #top
-	@echo $(PROJSOURCES)
+all:
+	# There are issues when dcl and ncl are built together
+	$(MAKE) dcl
+	$(MAKE) ncl
 
 bap_lib_doc: all htdoc
 

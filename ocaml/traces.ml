@@ -6,6 +6,7 @@ open Big_int_Z
 open Big_int_convenience
 open Symbeval
 open Type
+open BatListFull
 
 module D = Debug.Make(struct let name = "Traces" and default=`NoDebug end)
 module DV = Debug.Make(struct let name = "TracesVerbose" and default=`NoDebug end)
@@ -1029,7 +1030,6 @@ let run_block ?(next_label = None) ?(log=fun _ -> ()) ?(transformf = (fun s _ ->
       it was a label set addr to that; execute the block.  If it's not found
       verify that all stmts are labels and comments.  Otherwise print a warning 
   *)
-  pdebug("SWXXX In run_block");
   let addr = 
     (try
       List.find 
@@ -1102,8 +1102,6 @@ let run_block ?(next_label = None) ?(log=fun _ -> ()) ?(transformf = (fun s _ ->
 
   (* Don't execute specials now that we've potentially recorded them *)
   let block = remove_specials block in
-
-  List.iter (fun b -> pdebug ("SWXXX Running stmt: "  ^ (Pp.ast_stmt_to_string b))) block;
 
   (* Assign concrete values to regs/memory *)
   let block = match !use_alt_assignment with

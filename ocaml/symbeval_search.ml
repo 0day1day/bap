@@ -4,7 +4,7 @@ module D = Debug.Make(struct let name = "SearchFSE" and default=`Debug end)
 open D
 
 open Symbeval
-
+open BatListFull
 
 module type Symb =
 sig

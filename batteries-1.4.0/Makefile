@@ -16,9 +16,7 @@ ifdef DESTDIR
 OCAMLFIND_DEST += -destdir $(DESTDIR)
 endif
 
-export OCAMLFIND_IGNORE_DUPS_IN=num
-
-OCAMLBUILD ?= ocamlbuild -no-hygiene -I num
+OCAMLBUILD ?= ocamlbuild
 
 ifeq ($(uname_S),Darwin)
   BATTERIES_NATIVE ?= yes

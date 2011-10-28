@@ -3,6 +3,7 @@
 open Type
 open Ast
 open Util
+open BatListFull
 
 module C = Cfg.AST
 module D = Debug.Make(struct let name = "Hacks" and default=`Debug end)
