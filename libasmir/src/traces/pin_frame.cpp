@@ -397,6 +397,32 @@ ostream &KeyFrame::serialize(ostream &out, uint16_t sz)
 
 }
 
+ostream &KeyFrameGeneral::serialize(ostream &out, uint16_t sz)
+{
+
+  sz += 8 + 4 + (4*numRegs) + (4*numRegs) + 4 + (4*numMems) + (1*numMems);
+  for (unsigned int i = 0; i < numRegs; i++) {
+    sz += bytesOfType(regTypes[i]);
+  }
+
+   ostream &out2 = Frame::serialize(out, sz);
+
+   WRITE(out2, pos); // 8
+
+   WRITE(out2, numRegs); // 4
+   out2.write((const char *) &regIds, numRegs * sizeof(regIds[0])); // 4*numRegs
+   out2.write((const char *) &regTypes, numRegs * sizeof(regTypes[0])); // 4*numRegs
+   for (unsigned int i = 0; i < numRegs; i++) {
+     out2.write((const char *) &(regValues[i]), bytesOfType(regTypes[i])); // variable
+   }
+   WRITE(out2, numMems); // 4
+   out2.write((const char *) &memAddrs, numMems * sizeof(memAddrs[0])); // 4*numMems
+   out2.write((const char *) &memValues, numMems * sizeof(memValues[0])); // 1*numMems
+
+   return out2;
+}
+
+
 istream &KeyFrame::unserializePart(istream &in)
 {
 
@@ -422,6 +448,35 @@ istream &KeyFrame::unserializePart(istream &in)
    return in;
 
 }
+
+istream &KeyFrameGeneral::unserializePart(istream &in)
+{
+
+   READ(in, pos);
+   READ(in, numRegs);
+
+   // Read register information
+   regIds = new uint32_t[numRegs];
+   regTypes = new uint32_t[numRegs];
+   regValues = new PIN_REGISTER[numRegs];
+   in.read((char *) &regIds, numRegs * sizeof(regIds[0]));
+   in.read((char *) &regTypes, numRegs * sizeof(regTypes[0]));
+   for (unsigned int i = 0; i < numRegs; i++) {
+     in.read((char *) &(regValues[i]), bytesOfType(regTypes[i]));
+   }
+
+   // Read memory information
+   READ(in, numMems);
+
+   memAddrs = new uint32_t[numMems];
+   memValues = new uint8_t[numMems];
+   in.read((char *) &memAddrs, numMems * sizeof(memAddrs[0]));
+   in.read((char *) &memValues, numMems * sizeof(memValues[0]));
+   
+   return in;
+
+}
+
 
 void KeyFrame::setAll(uint32_t eax, uint32_t ebx, uint32_t ecx, uint32_t edx,
                       uint32_t esi, uint32_t edi, uint32_t esp, uint32_t ebp,
