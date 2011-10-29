@@ -31,7 +31,11 @@ int main(int argc, char *argv[]) {
     ss << r;
     //std::cout << ss.str() << std::endl;
 
+#ifdef _WIN32
+	string cmd("..\\pin\\pin.bat -t .\\obj-ia32\\ctxtest.dll -reg " + ss.str() + " -- .\\listregs.exe");
+#else
     string cmd("../pin/pin -t ./obj-ia32/ctxtest.so -reg " + ss.str() + " -- ./listregs");
+#endif
     //std::cout << "cmd: " << cmd << std::endl;
     
     if (0 == system(cmd.c_str())) {

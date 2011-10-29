@@ -126,12 +126,12 @@ pivottest: $(OBJDIR)pivot.o pivottest.cpp
 listregs: listregs.cpp
 	$(CXX) -o $@ $^ $(CXXFLAGS) $(PIN_CXXFLAGS)
 
-pinregs.h : listregs $(OBJDIR)ctxtest.so
+pinregs.h : listregs $(OBJDIR)ctxtest$(PINTOOL_SUFFIX)
 	./listregs pinregs.h
 
-$(TOOLS): $(PIN_LIBNAMES)
-
 gentrace.cpp : pinregs.h
+
+$(TOOLS): $(PIN_LIBNAMES)
 
 $(TOOLS): %$(PINTOOL_SUFFIX) : %.o $(OBJS)
 	${PIN_LD} $(PIN_LDFLAGS) $(LINK_DEBUG) ${LINK_OUT}$@ $(OBJS) $< ${PIN_LPATHS} $(PIN_LIBS) $(DBG)
