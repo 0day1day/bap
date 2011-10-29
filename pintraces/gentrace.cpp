@@ -8,18 +8,23 @@
 #include <vector>
 #include <cstring>
 #include <stdint.h>
+#include <cstdlib>
 #include <time.h>
 
 #include "pin_frame.h"
 #include "pin_trace.h"
 #include "cache.h"
 
-#include "pin_frame.cpp"
-#include "pin_trace.cpp"
+//#include "pin_frame.cpp"
+//#include "pin_trace.cpp"
 
 #include "pivot.h"
 
 #include "pin_taint.h"
+
+#include "pinregs.h"
+
+using namespace pintrace;
 
 const ADDRINT ehandler_fs_offset = 0;
 const ADDRINT ehandler_nptr_offset = 0;
@@ -1014,6 +1019,7 @@ VOID AppendBuffer(ADDRINT addr,
   va_start(va, values_count);
 
   static int firstTaint = true;
+  static int firstLogged = true;
   REG r;
 
    //LOG("APPEND: " + hexstr(addr) + "\n");
@@ -1074,6 +1080,22 @@ VOID AppendBuffer(ADDRINT addr,
      /* This instruction is tainted, or we're logging all
       * instructions */
 
+     if (firstLogged) {
+       cerr << "First logged instruction" << endl;
+       firstLogged = false;
+
+       /* Create a KeyFrameGeneral frame with the initial state.
+        *
+        * It's scary that c++ allows this */
+       for (int32_t *reg = pinctxregs; *reg != -1; reg++) {
+         REG r = static_cast<REG> (*reg);
+         cerr << "Reg: " << REG_StringShort(r) << endl;
+         PIN_GetContextReg(ctx, r);
+         /* XXX: Put these registers into a KeyFrameGeneral */
+       }
+
+     }
+     
      if (has_taint && firstTaint) {
        cerr << "First tainted instruction" << endl;
        LOG("First tainted instruction.\n");

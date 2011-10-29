@@ -1,0 +1,45 @@
+/** Automatically generate the list of PIN registers accessible
+ * through the context interface
+ *
+ * @author ejs
+ */
+
+#include "pin.H"
+
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <cstdlib>
+#include <cassert>
+
+int main(int argc, char *argv[]) {
+
+  if (argc != 2) {
+    std::cout << "Expected one filename argument" << std::endl;
+    exit(1);
+  }
+
+  std::ofstream out(argv[1]);
+  assert (out.good());
+  out << "/* Null terminated list of PIN register ids that can be accessed from the context */" << std::endl;
+  out << "int32_t pinctxregs[] = { ";
+  
+  for (REG r = static_cast<REG> (0); r <= REG_LAST; r = static_cast<REG> (r+1)) {
+    //std::cerr << "Trying " << r << std::endl;
+
+    std::stringstream ss;
+    ss << r;
+    //std::cout << ss.str() << std::endl;
+
+    string cmd("../pin/pin -t ./obj-ia32/ctxtest.so -reg " + ss.str() + " -- ./listregs");
+    //std::cout << "cmd: " << cmd << std::endl;
+    
+    if (0 == system(cmd.c_str())) {
+      //std::cerr << "success" << std::endl;
+      out << r << ", ";
+    }
+  } // end of for loop
+  out << "-1 }; ";
+
+  return 0;
+}
