@@ -1033,7 +1033,7 @@ else
   endif
 endif
 
-.mli.cmi: $(EXTRADEPS)
+%.cmi:                  %.mli $(EXTRADEPS)
 			$(QUIET)pp=`sed -n -e '/^#/d' -e 's/(\*pp \([^*]*\) \*)/\1/p;q' $<`; \
 			if [ -z "$$pp" ]; then \
 			  $(ECHO) $(REAL_OCAMLFIND) $(INTF_OCAMLC) $(OCAML_FIND_PACKAGES) \
@@ -1051,7 +1051,9 @@ endif
 				$(OCAMLFLAGS) $(INCFLAGS) $<; \
 			fi
 
-.ml.cmi .ml.$(EXT_OBJ) .ml.cmx .ml.cmo: $(EXTRADEPS)
+# A .cmi file can be created by creating it's implementation
+%$(EXT_OBJ) %.cmi : %$(IMPL_SUF) $(EXTRADEPS) ;
+%$(IMPL_SUF) : %.ml $(EXTRADEPS)
 			$(QUIET)pp=`sed -n -e '/^#/d' -e 's/(\*pp \([^*]*\) \*)/\1/p;q' $<`; \
 			if [ -z "$$pp" ]; then \
 			  $(ECHO) $(REAL_OCAMLFIND) $(REAL_OCAMLC) $(OCAML_FIND_PACKAGES) \
