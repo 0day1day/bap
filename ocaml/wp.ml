@@ -13,16 +13,6 @@ open D
 
 module VH = Var.VarHash
 
-let exp_or a b =
-  if a == exp_false then b
-  else if b == exp_false then a
-  else exp_or a b
-
-let exp_and a b =
-  if a == exp_false || b == exp_false then exp_false
-  else exp_and a b
-
-
 (** wp(p,q), applying simp to simplify each intermediate expression
     during the calculation.  See "A Discipline of Programming" by
     Dijkstra, or CMU-CS-08-159 (Brumley's thesis), chapter 3.2.
