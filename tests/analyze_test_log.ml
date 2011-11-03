@@ -93,7 +93,12 @@ let process_list asms =
       asms
   );;
 
-
+(* SWXXX Also collect stats on:
+   Run time per binary
+   Total run time
+   Average size of binarys (number of instructions processed)
+   Average memory use
+*)
 let process_line l = (
   match !wrong_register with
   | Some(r) -> (
@@ -147,7 +152,7 @@ let _ =
   (try
      while true do process_line (input_line !log) done
    with End_of_file -> (close_in !log));
-  print_out "BAP unknown Summary:";
+  print_out "Unknown Instruction Summary:";
   print_hashtbl bap_unknown_hashtbl;
   flush !out;
   
