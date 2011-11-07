@@ -40,6 +40,10 @@ let rec rm_and_ignore_list paths =
 let stp_path = "../stpwrap/stp/bin/";;
 let stp = "stp";;
 
+let does_stp_work () =
+  if (Smtexec.STP.check_exp_validity exp_true) = Smtexec.Valid then
+    true
+  else false
 
 let check_stp_path file =
   print_endline("Checking for stp...");

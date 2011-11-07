@@ -7,6 +7,7 @@ export BAP_DIR=$(CURDIR)/..
 export BAP_OCAMLDIR=$(BAP_DIR)/ocaml
 export BIGINT=$(BAP_DIR)/zarith-1.0
 export BATT=$(BAP_DIR)/batteries-1.4.0/_build/src
+export OUNIT=$(BAP_DIR)/ounit-1.1.0/_build/src
 export PCRE=$(BAP_DIR)/pcre-ocaml-release-6.2.2/lib
 export OBJSIZE=$(BAP_DIR)/objsize-0.16
 export OCAMLMAKEFILE=$(BAP_OCAMLDIR)/OCamlMakefile
@@ -16,8 +17,8 @@ export OCAMLMAKEFILE=$(BAP_OCAMLDIR)/OCamlMakefile
 
 # ocamlfind packages required
 export PACKS = bigarray str num ocamlgraph unix camomile
-export LIBS = zarith batteries objsize pcre bap  
-export INCDIRS = $(BAP_OCAMLDIR) $(BIGINT) $(BATT) $(PCRE) $(OBJSIZE)
+export LIBS = zarith batteries objsize oUnit pcre bap
+export INCDIRS = $(BAP_OCAMLDIR) $(BIGINT) $(BATT) $(OUNIT) $(PCRE) $(OBJSIZE)
 
 # Include sources from ../ocaml in the automatically generated dependencies.
 export SOURCE_DIRS_IN = $(BAP_OCAMLDIR) $(BAP_PROJ_OCAMLDIR)

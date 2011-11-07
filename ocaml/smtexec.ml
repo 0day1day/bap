@@ -185,7 +185,7 @@ struct
 
         dprintf "Parsing result...";
         let r = S.parse_result ~printmodel sout serr pstatus in
-        if remove then Unix.unlink file;
+        if remove then (try Unix.unlink file with _ -> ());
         r
 
       with Alarm_signal(pid) ->
