@@ -659,7 +659,10 @@ let trans_frame f =
       Libasmir.asmir_frame_get_except_info f in
     [Special(Printf.sprintf "Exception number %d by thread %d at %#Lx to %#Lx" exceptno tid from_addr to_addr, []);
      Comment("All blocks must have two statements", [])]
-  | _ -> []
+  | Libasmir.FRM_KEY_GENERAL ->
+    [Comment("Key frame state", []);
+     Comment("All blocks must have two statements", [])]
+  | Libasmir.FRM_STD | Libasmir.FRM_KEY | Libasmir.FRM_NONE -> []
 
 
 let alt_bap_from_trace_file_range filename off reqframes =

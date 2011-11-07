@@ -1,4 +1,5 @@
 #include "pin.H"
+#include "pin_misc.h"
 
 #include <cassert>
 #include <iostream>
@@ -433,26 +434,6 @@ ThreadInfo_t* NewThreadInfo(void) {
   PIN_SetThreadData(tl_key, ti, PIN_ThreadId());
 
   return ti;
-}
-
-/** Given a REG, return a trace type (or VT_NONE for failure) */
-static uint32_t GetTypeOfReg(REG r) {
-  if (REG_is_gr8(r)) return VT_REG8;
-  if (REG_is_gr16(r)) return VT_REG16;
-  if (REG_is_gr32(r)) return VT_REG32;
-  if (REG_is_gr64(r)) return VT_REG64;
-
-  string s = REG_StringShort(r);
-
-  if (s == "eip" || s == "eflags") {
-    // No problem for these
-    return VT_REG32;
-  }
-
-  // Otherwise, print a warning...
-  
-  cerr << "Warning: Unknown register size of register " << REG_StringShort(r) << endl;
-  return VT_NONE;
 }
 
 static uint32_t GetRegType(INS ins, uint32_t i) {
@@ -1084,18 +1065,22 @@ VOID AppendBuffer(ADDRINT addr,
        cerr << "First logged instruction" << endl;
        firstLogged = false;
 
-       /* Create a KeyFrameGeneral frame with the initial state.
-        *
-        * It's scary that c++ allows this */
-       for (int32_t *reg = pinctxregs; *reg != -1; reg++) {
-         REG r = static_cast<REG> (*reg);
-         cerr << "Reg: " << REG_StringShort(r) << endl;
-         PIN_GetContextReg(ctx, r);
-         /* XXX: Put these registers into a KeyFrameGeneral */
-       }
+       KeyFrameGeneral kf;
+       kf.pos = -1; // Not correct
+       kf.numRegs = pinctxregs_size;
+       kf.regIds = new uint32_t[pinctxregs_size];
+       kf.regTypes = new uint32_t[pinctxregs_size];
+       kf.regValues = new union pintrace::PIN_REGISTER[pinctxregs_size];
+       kf.numMems = 0; // For now
 
+       for (uint32_t i = 0; i < pinctxregs_size; i++) {
+         kf.regIds[i] = pinctxregs[i];
+         kf.regTypes[i] = GetTypeOfReg(static_cast<REG> (kf.regIds[i]));
+         kf.regValues[i].dword[0] = PIN_GetContextReg(ctx, static_cast<REG> (kf.regIds[i]));
+       }
+       g_tw->add(kf);
      }
-     
+
      if (has_taint && firstTaint) {
        cerr << "First tainted instruction" << endl;
        LOG("First tainted instruction.\n");

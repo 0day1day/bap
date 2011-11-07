@@ -44,7 +44,7 @@ asmir_get_all_sections(asm_program_t prog,
 
 enum frame_type_t {
   FRM_NONE = 0, FRM_KEY, FRM_STD, FRM_LOADMOD, FRM_SYSCALL, FRM_TAINT, 
-  FRM_STD2, FRM_EXCEPT };
+  FRM_STD2, FRM_EXCEPT, FRM_KEY_GENERAL };
 
 enum exp_type_t {
   BINOP, UNOP, CONSTANT, MEM, TEMP, PHI, CAST,

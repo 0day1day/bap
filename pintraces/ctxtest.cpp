@@ -1,6 +1,8 @@
 /** Test if register n is in the context. */
 
 #include "pin.H"
+#include "pin_frame.h"
+#include "pin_misc.h"
 
 #include <iostream>
 #include <sstream>
@@ -22,7 +24,7 @@ int main(int argc, char *argv[]) {
   PIN_Init(argc, argv);
 
   cout << Num << endl;
-  
+
   if (Num == -1) {
     cout << "You must define a reg" << endl;
     return 1;
@@ -32,6 +34,8 @@ int main(int argc, char *argv[]) {
 
   PIN_GetContextReg(&fakectx, static_cast<REG> (Num.Value()));
 
+  assert (GetTypeOfReg(static_cast<REG> (Num.Value())) != VT_NONE);
+  
   TRACE_AddInstrumentFunction(InstrTrace, 0);
 
   exit(0);

@@ -4,6 +4,7 @@
 #include <cstring>
 
 #include "pin_frame.h"
+//#include "pin_taint.h"
 
 using namespace std;
 using namespace pintrace;
@@ -42,7 +43,7 @@ uint32_t bitsOfType(uint32_t t) {
         break;
 
       default:
-        cerr << "Invalid type" << endl;
+        cerr << "Invalid type: " << t << endl;
         assert(false);
         
   }
@@ -89,6 +90,9 @@ Frame *Frame::unserialize(istream &in, bool noskip)
          break;
        case FRM_KEY:
          f = new KeyFrame;
+         break;
+       case FRM_KEY_GENERAL:
+         f = new KeyFrameGeneral;
          break;
        case FRM_LOADMOD:
          f = new LoadModuleFrame;
@@ -410,14 +414,14 @@ ostream &KeyFrameGeneral::serialize(ostream &out, uint16_t sz)
    WRITE(out2, pos); // 8
 
    WRITE(out2, numRegs); // 4
-   out2.write((const char *) &regIds, numRegs * sizeof(regIds[0])); // 4*numRegs
-   out2.write((const char *) &regTypes, numRegs * sizeof(regTypes[0])); // 4*numRegs
+   out2.write((const char *) regIds, numRegs * sizeof(regIds[0])); // 4*numRegs
+   out2.write((const char *) regTypes, numRegs * sizeof(regTypes[0])); // 4*numRegs
    for (unsigned int i = 0; i < numRegs; i++) {
-     out2.write((const char *) &(regValues[i]), bytesOfType(regTypes[i])); // variable
+     out2.write((const char *) regValues, bytesOfType(regTypes[i])); // variable
    }
    WRITE(out2, numMems); // 4
-   out2.write((const char *) &memAddrs, numMems * sizeof(memAddrs[0])); // 4*numMems
-   out2.write((const char *) &memValues, numMems * sizeof(memValues[0])); // 1*numMems
+   out2.write((const char *) memAddrs, numMems * sizeof(memAddrs[0])); // 4*numMems
+   out2.write((const char *) memValues, numMems * sizeof(memValues[0])); // 1*numMems
 
    return out2;
 }
@@ -457,12 +461,15 @@ istream &KeyFrameGeneral::unserializePart(istream &in)
 
    // Read register information
    regIds = new uint32_t[numRegs];
+   assert(regIds);
    regTypes = new uint32_t[numRegs];
+   assert(regTypes);
    regValues = new PIN_REGISTER[numRegs];
-   in.read((char *) &regIds, numRegs * sizeof(regIds[0]));
-   in.read((char *) &regTypes, numRegs * sizeof(regTypes[0]));
+   assert(regValues);
+   in.read((char *) regIds, numRegs * sizeof(regIds[0]));
+   in.read((char *) regTypes, numRegs * sizeof(regTypes[0]));
    for (unsigned int i = 0; i < numRegs; i++) {
-     in.read((char *) &(regValues[i]), bytesOfType(regTypes[i]));
+     in.read((char *) regValues, bytesOfType(regTypes[i]));
    }
 
    // Read memory information
@@ -470,13 +477,77 @@ istream &KeyFrameGeneral::unserializePart(istream &in)
 
    memAddrs = new uint32_t[numMems];
    memValues = new uint8_t[numMems];
-   in.read((char *) &memAddrs, numMems * sizeof(memAddrs[0]));
-   in.read((char *) &memValues, numMems * sizeof(memValues[0]));
+   in.read((char *) memAddrs, numMems * sizeof(memAddrs[0]));
+   in.read((char *) memValues, numMems * sizeof(memValues[0]));
    
    return in;
 
 }
 
+#ifdef GET_OPERANDS
+conc_map_vec * KeyFrameGeneral::getOperands()
+{
+  conc_map_vec * concrete_pairs = new vector<conc_map *>();
+  int i, type, t, usage; bool mem;
+  size_t bytes;
+  string name;
+  const_val_t index, value;
+  conc_map * map;
+  for ( i = 0 ; i < numRegs ; i ++ )
+    {
+      big_val_t tval;
+      switch (regTypes[i])
+	{
+            case VT_REG128:
+            case VT_REG64:
+            case VT_REG32:
+            case VT_REG16:
+            case VT_REG8:
+              bytes = bytesOfType(regTypes[i]);
+              name = pin_register_name(regIds[i]);
+              mem = false;
+              value = 0;
+              for (int j = 0; j < ((bytes + (sizeof(const_val_t)-1))/sizeof(const_val_t)); j++) {
+                /* Insert each chunk, while preserving the byte order */
+                memcpy(&value, &(regValues[i].byte[j*sizeof(const_val_t)]), sizeof(const_val_t));
+                //cerr << hex << "Pushing back name " << name << " value: " << value << " bytes: " << bytes << endl;
+                tval.push_back(value);
+              }
+
+              usage = 0;
+              t = 0;
+              map = new ConcPair(name,mem,get_type(regTypes[i]),index,
+                                 tval,usage,t);
+              concrete_pairs->push_back(map);
+              break;
+
+            default:
+              assert(false);
+              break;
+        }
+    }
+
+  for (i = 0; i < numMems; i++) {
+    bytes = 1;
+    name = "mem";
+    mem = true;
+    index = memAddrs[i] ;
+
+    value = memValues[i];
+    //cerr << hex << "Pushing back mem " << value << endl;
+    big_val_t tval;
+    tval.push_back(value);
+
+    usage = 0 ;
+    t = 0;
+    map = new ConcPair(name,mem,get_type(VT_MEM8),index,
+                       tval,usage,t);
+    concrete_pairs->push_back(map);
+  }
+
+  return concrete_pairs;
+}
+#endif
 
 void KeyFrame::setAll(uint32_t eax, uint32_t ebx, uint32_t ecx, uint32_t edx,
                       uint32_t esi, uint32_t edi, uint32_t esp, uint32_t ebp,

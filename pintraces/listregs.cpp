@@ -1,5 +1,6 @@
 /** Automatically generate the list of PIN registers accessible
- * through the context interface
+ * through the context interface. We only list registers whose types
+ * we know.
  *
  * @author ejs
  */
@@ -19,6 +20,7 @@ int main(int argc, char *argv[]) {
     exit(1);
   }
 
+  size_t count = 0;
   std::ofstream out(argv[1]);
   assert (out.good());
   out << "/* Null terminated list of PIN register ids that can be accessed from the context */" << std::endl;
@@ -40,10 +42,16 @@ int main(int argc, char *argv[]) {
     
     if (0 == system(cmd.c_str())) {
       //std::cerr << "success" << std::endl;
+      count++;
       out << r << ", ";
     }
   } // end of for loop
   out << "-1 }; ";
 
+  out << endl << endl;
+
+  out << "/* Number of meaningful entries in pinctxregs */" << endl;
+  out << "size_t pinctxregs_size = " << count << ";" << endl;
+  
   return 0;
 }

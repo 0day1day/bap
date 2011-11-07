@@ -503,16 +503,34 @@ enum FrameType {
         memAddrs = NULL;
         memValues = NULL;
       }
-     ~KeyFrameGeneral() {
-       if (regIds) delete regIds;
-       if (regTypes) delete regTypes;
-       if (regValues) delete regValues;
-       if (memAddrs) delete memAddrs;
-       if (memValues) delete memValues;
+     /* Do a deep copy in the copy constructor */
+     KeyFrameGeneral(const KeyFrameGeneral &copy) : Frame(FRM_KEY_GENERAL) {
+       pos = copy.pos;
+       numRegs = copy.numRegs;
+       regIds = new uint32_t[numRegs];
+       std::copy(copy.regIds, copy.regIds+numRegs, regIds);
+       regTypes = new uint32_t[numRegs];
+       std::copy(copy.regTypes, copy.regTypes+numRegs, regTypes);
+       regValues = new union PIN_REGISTER[numRegs];
+       std::copy(copy.regValues, copy.regValues+numRegs, regValues);
+       numMems = copy.numMems;
+       memAddrs = new uint32_t[numMems];
+       std::copy(copy.memAddrs, copy.memAddrs+numMems, memAddrs);
+       memValues = new uint8_t[numMems];
+       std::copy(copy.memValues, copy.memValues+numMems, memValues);
      }
-      virtual std::ostream &serialize(std::ostream &out, uint16_t sz = 0);
-      virtual std::istream &unserializePart(std::istream &in);
-
+     ~KeyFrameGeneral() {
+       if (regIds) delete[] regIds;
+       if (regTypes) delete[] regTypes;
+       if (regValues) delete[] regValues;
+       if (memAddrs) delete[] memAddrs;
+       if (memValues) delete[] memValues;
+     }
+     virtual std::ostream &serialize(std::ostream &out, uint16_t sz = 0);
+     virtual std::istream &unserializePart(std::istream &in);
+#ifdef GET_OPERANDS
+     conc_map_vec * getOperands();
+#endif
    };
   
    /*
