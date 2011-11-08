@@ -198,3 +198,20 @@ let find_prog_chunk prog start_addr end_addr =
       )
   in
   List.rev (find_prog_chunk_k prog (Some start_addr) end_addr [])
+
+let summarize r =
+  match r with 
+  | RError(p,s) ->
+	Format.printf "Error: %s\n" ((string_of_path p) ^ "\n  " ^ s)
+  | RFailure (p,s) ->
+	Format.printf "Failure: %s\n" ((string_of_path p) ^ "\n  " ^ s)
+  | RSkip (p,s) -> 
+	Format.printf "Skiped: %s\n" ((string_of_path p) ^ "\n  " ^ s)
+  | RTodo (p,s) -> 
+	Format.printf "Todo: %s\n" ((string_of_path p) ^ "\n  " ^ s)
+  | RSuccess p -> ();;
+
+let rec summarize_results res =
+  match res with
+  | [] -> None
+  | r::rs -> summarize r; summarize_results rs;;
