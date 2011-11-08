@@ -36,6 +36,10 @@ const ADDRINT ehandler_size = 8;
     when the handler is called. */
 const ADDRINT ehandler_esp_offset = 0xe0;
 
+const ADDRINT page_size = (1 << 12);
+const ADDRINT num_pages = (1LL << 32) / page_size;
+const ADDRINT max_dump_addr = 0xc0000000;
+
 const int maxSehLength = 10;
 
 #ifdef _WIN32
@@ -1064,6 +1068,7 @@ VOID AppendBuffer(ADDRINT addr,
      if (firstLogged) {
        cerr << "First logged instruction" << endl;
        firstLogged = false;
+       std::map<addr_t, uint8_t> memmap;
 
        KeyFrameGeneral kf;
        kf.pos = -1; // Not correct
@@ -1078,6 +1083,35 @@ VOID AppendBuffer(ADDRINT addr,
          kf.regTypes[i] = GetTypeOfReg(static_cast<REG> (kf.regIds[i]));
          kf.regValues[i].dword[0] = PIN_GetContextReg(ctx, static_cast<REG> (kf.regIds[i]));
        }
+
+       for (uint8_t *p = 0; p < (uint8_t*)max_dump_addr; p += page_size) {
+         uint8_t buf;
+         if (PIN_SafeCopy(&buf, p, 1) == 1) {
+           cerr << "new page dude " << (uint32_t) p << endl;
+           /* Cool, this page is mapped. */
+           for (uint8_t *addr = p; addr < p + page_size; addr++) {
+             assert(PIN_SafeCopy(&buf, addr, 1) == 1);
+             //cerr << "Address " << (uint32_t)addr << " is mapped to " << (uint32_t) buf << endl;
+             memmap[(addr_t)(addr)] = buf;
+           }
+         }
+       }
+
+       cerr << "done" << endl;
+
+       kf.numMems = memmap.size();
+       kf.memAddrs = new uint32_t[kf.numMems];
+       kf.memValues = new uint8_t[kf.numMems];
+       {
+         typedef std::map<addr_t, uint8_t>::iterator it;
+         int j = 0;
+         for (it i = memmap.begin(); i != memmap.end(); i++, j++) {
+           kf.memAddrs[j] = (*i).first;
+           kf.memValues[j] = (*i).second;
+           cerr << "Addr: " << (*i).first << " value: " << (uint32_t) ((*i).second) << endl;
+         }
+       }
+
        g_tw->add(kf);
      }
 
