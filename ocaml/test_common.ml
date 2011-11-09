@@ -56,9 +56,11 @@ let check_stp_path file =
 
 
 (** pin helpers **)
-let pin_path = ref "../pin/";;
+let pin_path = 
+  let path = Sys.getenv("PIN_HOME") in
+  if path = "" then ref "../pin/" else ref path;;
 let pin = "pin";;
-let gentrace_path = "../pintraces/obj-ia32/";;
+let gentrace_path = (!pin_path)^"obj-ia32/";;
 let gentrace = "gentrace.so";;
 let pin_out_suffix = "-bap-pin-test.out";;
 
