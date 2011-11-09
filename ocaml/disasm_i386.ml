@@ -3,6 +3,7 @@
 open Int64
 open Ast
 open Ast_convenience
+open BatPervasives
 open Big_int_Z
 open Big_int_convenience
 open Type
@@ -65,6 +66,7 @@ type opcode =
   | Shift of binop_type * typ * operand * operand
   | Shiftd of binop_type * typ * operand * operand * operand
   | Bt of typ * operand * operand
+  | Bsf of typ * operand * operand
   | Jump of operand
   | Jcc of operand * Ast.exp
   | Setcc of typ * operand * Ast.exp
@@ -642,6 +644,24 @@ let rec to_ir addr next ss pref =
 	move af (Unknown ("AF undefined after bt", r1));
 	move pf (Unknown ("PF undefined after bt", r1))
       ]
+  | Bsf(t, dst, src) ->
+    let source_is_zero = nv "t" r1 in
+    let source_is_zero_v = Var source_is_zero in
+    let src_e = op2e t src in
+    let bits = Typecheck.bits_of_width t in
+    let check_bit next_value bitindex =
+      ite t (Extract(biconst bitindex,biconst bitindex,src_e) ==* it 1 r1) (it bitindex t) next_value
+    in
+    let first_one = fold check_bit (it (bits-1) t) ((bits-2) --- 0) in
+    (try
+    [
+      move source_is_zero (src_e ==* it 0 t);
+      move zf (ite t source_is_zero_v (it 1 t) (it 0 t));
+      assn t dst (ite t source_is_zero_v (Unknown ("destination", t)) first_one);
+    ]
+    with _ ->
+      prerr_endline "wtf??";
+      [])
   | Hlt ->
     [Jmp(Lab "General_protection fault", [])]
   | Rdtsc ->
@@ -922,6 +942,7 @@ module ToStr = struct
     | Dec (t, o) -> Printf.sprintf "dec %s" (opr o)
     | Jump a -> Printf.sprintf "jmp %s" (opr a)
     | Bt(t,d,s) -> Printf.sprintf "bt %s, %s" (opr d) (opr s)
+    | Bsf(t,d,s) -> Printf.sprintf "bsf %s, %s" (opr d) (opr s)
     | Jcc _ -> "jcc"
     | Setcc _ -> "setcc"
     | Cmps _ -> "cmps"
@@ -1364,10 +1385,13 @@ let parse_instr g addr =
       | 0xb7 -> let st = if b2 = 0xb6 then r8 else r16 in
 		let r, rm, na = parse_modrm32 na in
 		(Movzx(prefix.opsize, r, st, rm), na)
+      | 0xbc ->
+          let r, rm, na = parse_modrm prefix.opsize na in
+          (Bsf (prefix.opsize, r, rm), na)
       | 0xbe
       | 0xbf -> let st = if b2 = 0xbe then r8 else r16 in
-		let r, rm, na = parse_modrm32 na in
-		(Movsx(prefix.opsize, r, st, rm), na)
+          let r, rm, na = parse_modrm32 na in
+          (Movsx(prefix.opsize, r, st, rm), na)
       | 0xc1 ->
           let r, rm, na = parse_modrm32 na in
           (Xadd(prefix.opsize, r, rm), na)
