@@ -56,9 +56,9 @@ let check_stp_path file =
 
 
 (** pin helpers **)
-let pin_path = 
-  let path = Sys.getenv("PIN_HOME") in
-  if path = "" then ref "../pin/" else ref path;;
+let pin_path = (*ref "../pin/";;*)
+  let path = try Sys.getenv("PIN_HOME") with Not_found -> "../pin/" in
+  ref path;;
 let pin = "pin";;
 let gentrace_path = (!pin_path)^"obj-ia32/";;
 let gentrace = "gentrace.so";;
