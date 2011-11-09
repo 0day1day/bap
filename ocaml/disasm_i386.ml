@@ -653,15 +653,11 @@ let rec to_ir addr next ss pref =
       ite t (Extract(biconst bitindex,biconst bitindex,src_e) ==* it 1 r1) (it bitindex t) next_value
     in
     let first_one = fold check_bit (it (bits-1) t) ((bits-2) --- 0) in
-    (try
     [
       move source_is_zero (src_e ==* it 0 t);
       move zf (ite t source_is_zero_v (it 1 t) (it 0 t));
-      assn t dst (ite t source_is_zero_v (Unknown ("destination", t)) first_one);
+      assn t dst (ite t source_is_zero_v (Unknown ("bsf: destination undefined when source is zero", t)) first_one);
     ]
-    with _ ->
-      prerr_endline "wtf??";
-      [])
   | Hlt ->
     [Jmp(Lab "General_protection fault", [])]
   | Rdtsc ->
@@ -755,7 +751,7 @@ let rec to_ir addr next ss pref =
     [assn t o (load_s seg_ss t esp_e);
      move esp (esp_e +* i32 (bytes_of_width t)) ]
   | Add(t, o1, o2) ->
-    let tmp = nv "t" t and tmp2 = nv "t" t in
+    let tmp = nv "t1" t and tmp2 = nv "t2" t in
     move tmp (op2e t o1)
     :: move tmp2 (op2e t o2)
     :: assn t o1 (op2e t o1 +* Var tmp2)
