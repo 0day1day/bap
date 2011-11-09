@@ -735,10 +735,11 @@ let rec to_ir addr next ss pref =
     [assn t o (load_s seg_ss t esp_e);
      move esp (esp_e +* i32 (bytes_of_width t)) ]
   | Add(t, o1, o2) ->
-    let tmp = nv "t" t in
+    let tmp = nv "t" t and tmp2 = nv "t" t in
     move tmp (op2e t o1)
-    :: assn t o1 (op2e t o1 +* op2e t o2)
-    :: let s1 = Var tmp and s2 = op2e t o2 and r = op2e t o1 in
+    :: move tmp2 (op2e t o2)
+    :: assn t o1 (op2e t o1 +* Var tmp2)
+    :: let s1 = Var tmp and s2 = Var tmp2 and r = op2e t o1 in
        set_flags_add t s1 s2 r
   | Inc(t, o) (* o = o + 1 *) ->
     let tmp = nv "t" t in
