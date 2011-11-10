@@ -22,7 +22,7 @@ my $true = 1;
 my $mail = '/usr/bin/mail';
 my $svnlook = '/usr/bin/svnlook';
 my ($revision, $repos);
-my $getpin = 0;
+my $getpin;
 my $merged;
 my $subj;
 #my $to = 'swhitman@andrew.cmu.edu';
@@ -114,7 +114,7 @@ print "Finished checking out repository $rep_url\n";
 
 # Set path variable so autogen will work
 $ENV{'PATH'} = '/bin:/usr/bin';
-$ENV{'PIN_HOME'} = '/home/swhitman/pin/';
+#$ENV{'PIN_HOME'} = '/home/swhitman/pin/';
 
 # configure
 print "Configuring\n";
@@ -122,12 +122,13 @@ check_system("./autogen.sh");
 check_system("./configure");
 
 # getpin?
-if($getpin) {
+if(defined $getpin) {
     print "Getting pin\n";
     chdir "pintraces";
     check_system("./getpin.sh");
     chdir "../";
 }
+
 
 # make test
 print "Making test\n";
