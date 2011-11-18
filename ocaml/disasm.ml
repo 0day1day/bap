@@ -19,6 +19,7 @@ let is_temp (Var.V(_, s, t)) =
   ((String.length s > 2) && (String.sub s 0 2 = "T_"))
   || s = "ra"
   || s = "t1"
+  || s = "t2"
   || s = "tmpDEST"
   || s = "src1"
   || s = "src2"
