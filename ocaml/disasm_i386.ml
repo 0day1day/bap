@@ -1464,5 +1464,5 @@ let disasm_instr g addr =
   let (pref, op, na) = parse_instr g addr in
   let (_, ss, pref) =  parse_prefixes pref op in
   let ir = ToIR.to_ir addr na ss pref op in
-  let asm = try Some(ToStr.to_string pref op) with Failure _ -> None in
+  let asm = try Some(ToStr.to_string pref op) with Disasm_i386_exception _ -> None in
   (ToIR.add_labels ?asm addr ir, na)
