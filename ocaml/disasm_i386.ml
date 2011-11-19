@@ -352,7 +352,7 @@ let eaddr16 = function
   | 5 -> Var edi
   | 6 -> Var ebp
   | 7 -> Var ebx
-  | _ -> failwith "eaddr16 takes only 0-7"
+  | _ -> disfailwith "eaddr16 takes only 0-7"
 
 let eaddr16e b = cast_low r16 (eaddr16 b)
 
@@ -393,7 +393,7 @@ let assn_s s t v e =
     move v ((Var v &* l32 0xffff00ffL) |* (cast_unsigned r32 e <<* i32 8))
   | Oreg _ -> unimplemented "assignment to sub registers"
   | Oaddr a -> store_s s t a e
-  | Oimm _ -> failwith "disasm_i386: Can't assign to an immediate value"
+  | Oimm _ -> disfailwith "disasm_i386: Can't assign to an immediate value"
 
 let bytes_of_width = function
   | Reg x when x land 7 = 0 -> x/8
@@ -508,14 +508,14 @@ let rec to_ir addr next ss pref =
     let (s, al) = match s with
       | Oreg i -> op2e t s, []
       | Oaddr a -> op2e t s, [a]
-      | Oimm _ -> failwith "invalid"
+      | Oimm _ -> disfailwith "invalid"
     in
     let (d, al) = match d with
       | Oreg i -> assn t d s, al
 	(* let r = op2e t d in *)
 	(* move r s, al *)
       | Oaddr a -> assn t d s, a::al
-      | Oimm _ -> failwith "invalid"
+      | Oimm _ -> disfailwith "invalid"
     in
     let al =
       if align then
@@ -529,7 +529,7 @@ let rec to_ir addr next ss pref =
       let src = match src with
         | Oreg i -> op2e t src
         | Oaddr a -> load t a
-        | Oimm _ -> failwith "invalid"
+        | Oimm _ -> disfailwith "invalid"
       in
       let compare_region i =
         let byte1 = Extract(big_int_of_int (i*elebits-1), big_int_of_int ((i-1)*elebits), src) in
@@ -548,7 +548,7 @@ let rec to_ir addr next ss pref =
       let nbytes = bytes_of_width t in
       let src = match src with
         | Oreg i -> op2e t src
-        | _ -> failwith "invalid operand"
+        | _ -> disfailwith "invalid operand"
       in
       let get_bit i = Extract(big_int_of_int (i*8-1), big_int_of_int (i*8-1), src) in
       let byte_indices = BatList.init nbytes (fun i -> i + 1) in (* list 1-nbytes *)
@@ -568,7 +568,7 @@ let rec to_ir addr next ss pref =
       let high, low = match t with
         | Reg 128 -> biconst 127, bi0
         | Reg 64 -> biconst 63, bi0
-        | _ -> failwith "impossible: used non 64/128-bit operand in palignr"
+        | _ -> disfailwith "impossible: used non 64/128-bit operand in palignr"
       in
       let result = Extract (high, low, shift) in
       let addresses = List.fold_left (fun acc -> function Oaddr a -> a::acc | _ -> acc) [] [src;dst] in
@@ -596,7 +596,7 @@ let rec to_ir addr next ss pref =
     let t1 = nt "t1" s and tmpDEST = nt "tmpDEST" s
     and bits = Typecheck.bits_of_width s
     and s_f = match st with LSHIFT -> (<<*) | RSHIFT -> (>>*) | ARSHIFT -> (>>>*)
-      | _ -> failwith "invalid shift type"
+      | _ -> disfailwith "invalid shift type"
     and count = (op2e s o2) &* (it 31 s)
     and e1 = op2e s o1 in
     let ifzero = ite r1 (count ==* (it 0 s))
@@ -604,7 +604,7 @@ let rec to_ir addr next ss pref =
       | LSHIFT -> Cast(CAST_HIGH, r1, e1) ^* cf_e
       | RSHIFT -> Cast(CAST_HIGH, r1, Var tmpDEST)
       | ARSHIFT -> exp_false
-      | _ -> failwith "imposible"
+      | _ -> disfailwith "imposible"
     in
     [move tmpDEST e1;
      if st = LSHIFT then
@@ -653,7 +653,7 @@ let rec to_ir addr next ss pref =
             let byte = load r8 (a +* (offset >>* (it 3 t))) in
             let shift = (cast_low r8 offset) &* (it 7 r8) in
             byte, shift
-        | Oimm _ -> failwith "Immediate bases not allowed"
+        | Oimm _ -> disfailwith "Immediate bases not allowed"
       in
       [
         move cf (cast_low r1 (value >>* shift));
@@ -1090,14 +1090,14 @@ let parse_instr g addr =
     | 0 -> (match rm with
       | 6 -> let (disp, na) = parse_disp16 (s a) in (r, Oaddr(l16 disp), na)
       | n when n < 8 -> (r, Oaddr(eaddr16 rm), s a)
-      | _ -> failwith "Impossible"
+      | _ -> disfailwith "Impossible"
     )
     | 1 | 2 ->
       let (base, na) = eaddr16 rm, na in
       let (disp, na) = if m = 1 then parse_disp8 na else (*2*) parse_disp16 na in
       (r, Oaddr(base +* l16 disp), na)
     | 3 -> (r, Oreg rm, s a)
-    | _ -> failwith "Impossible"
+    | _ -> disfailwith "Impossible"
   in
   let parse_modrm16 a =
     let (r, rm, na) = parse_modrm16ext a in
@@ -1121,7 +1121,7 @@ let parse_instr g addr =
       let (disp, na) = if m = 1 then parse_disp8 na else (*2*) parse_disp32 na in
       (r, Oaddr(base +* l32 disp), na)
     | 3 -> (r, Oreg rm, s a)
-    | _ -> failwith "Impossible"
+    | _ -> disfailwith "Impossible"
   in
   let parse_modrm32 a =
     let (r, rm, na) = parse_modrm32ext a in
@@ -1210,7 +1210,7 @@ let parse_instr g addr =
     | 0x8d -> let (r, rm, na) = parse_modrm prefix.opsize na in
 	      (match rm with
 	      | Oaddr a -> (Lea(r, a), na)
-	      | _ -> failwith "invalid lea (must be address)"
+	      | _ -> disfailwith "invalid lea (must be address)"
 	      )
     | 0x90 -> (Nop, na)
     | byte90 when byte90 > 0x90 && byte90 <= 0x97 ->
@@ -1242,12 +1242,12 @@ let parse_instr g addr =
     | 0xc6
     | 0xc7 -> let t = if b1 = 0xc6 then r8 else prefix.opsize in
 	      let (e, rm, na) = parse_modrm32ext na in
-              if e<>0 then failwith "Invalid opcode";
+              if e<>0 then disfailwith "Invalid opcode";
 	      (* assert (e=0); (\* others are invalid opcodes, so we should check *\) *)
 	      let (i,na) = parse_immz t na in
 	      (match e with (* Grp 11 *)
 	      | 0 -> (Mov(t, rm, i), na)
-	      | _ -> failwith "invalid opcode"
+	      | _ -> disfailwith "invalid opcode"
 	      )
     | 0xcd -> let (i,na) = parse_imm8 na in
 	      (Interrupt(i), na)
@@ -1272,7 +1272,7 @@ let parse_instr g addr =
 		| 0xc0 -> parse_imm8 na
 		| 0xd0 -> (Oimm 1L, na)
 		| 0xd2 -> (o_ecx, na)
-		| _ -> failwith "impossible"
+		| _ -> disfailwith "impossible"
 	      in
 	      (match r with (* Grp 2 *)
 	      | 4 -> (Shift(LSHIFT, opsize, rm, amt), na)
@@ -1311,7 +1311,7 @@ let parse_instr g addr =
 	  | 6 -> Xor a
 	  | 7 -> Cmp a
 	  | _ -> unimplemented (Printf.sprintf "unsupported opcode: %02x" b1)
-(*	  | _ -> failwith "impossible" *)
+(*	  | _ -> disfailwith "impossible" *)
 	in
 	let t = if (b1 & 1) = 0  then r8 else prefix.opsize in
 	let (o1, o2, na) = match b1 & 6 with
@@ -1321,7 +1321,7 @@ let parse_instr g addr =
 		 (r, rm, na)
 	  | 4 -> let i, na = parse_immz t na in
 		 (o_eax, i, na)
-	  | _ -> failwith "impossible"
+	  | _ -> disfailwith "impossible"
 	in
 	(ins(t, o1, o2), na)
       )
@@ -1360,7 +1360,7 @@ let parse_instr g addr =
 	(Movdq(opsize,d,s,align,name), na)
       | 0x74 | 0x75 | 0x76 as o ->
         let r, rm, na = parse_modrm32 na in
-        let elet = match o with | 0x74 -> r8 | 0x75 -> r16 | 0x76 -> r32 | _ -> failwith "impossible" in
+        let elet = match o with | 0x74 -> r8 | 0x75 -> r16 | 0x76 -> r32 | _ -> disfailwith "impossible" in
         (Pcmpeq(prefix.mopsize, elet, r, rm), na)
       | 0x80 | 0x81 | 0x82 | 0x83 | 0x84 | 0x85 | 0x86 | 0x87 | 0x88 | 0x89
       | 0x8c | 0x8d | 0x8e
