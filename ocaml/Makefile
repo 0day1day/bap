@@ -61,6 +61,7 @@ export SOURCES = \
 	smtlib2.ml \
 	libbfd.idl \
 	libasmir.idl \
+	disasm_temp.ml \
 	disasm_i386.ml \
 	disasm.ml \
 	syscall_models.ml \

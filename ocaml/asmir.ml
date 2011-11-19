@@ -565,13 +565,13 @@ let asm_addr_to_bap {asmp=prog; arch=arch; get=get} addr =
   in
   if (!always_vex) then fallback() 
   else (
-	try 
+    try 
       let (ir,na) as v = 
-		(try (Disasm.disasm_instr arch get addr)
-		 with Failure s -> 
-		   DTest.dprintf "BAP unknown disasm_instr %Lx: %s" addr s;
-		   DV.dprintf "disasm_instr %Lx: %s" addr s; raise Disasm.Unimplemented
-		)
+	(try (Disasm.disasm_instr arch get addr)
+	 with Disasm_i386.Disasm_i386_exception s -> 
+	   DTest.dprintf "BAP unknown disasm_instr %Lx: %s" addr s;
+	   DV.dprintf "disasm_instr %Lx: %s" addr s; raise Disasm.Unimplemented
+	)
       in
       DV.dprintf "Disassembled %Lx directly" addr;
       (* if DCheck.debug then check_equivalence addr v (fallback()); *)
