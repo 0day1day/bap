@@ -37,6 +37,7 @@ export SOURCES = \
 	arithmetic.ml \
 	ast.ml \
 	ssa.ml \
+	disasm_temp.ml \
 	pp.ml \
 	typecheck.ml \
 	cfg.mli cfg.ml \
@@ -61,7 +62,6 @@ export SOURCES = \
 	smtlib2.ml \
 	libbfd.idl \
 	libasmir.idl \
-	disasm_temp.ml \
 	disasm_i386.ml \
 	disasm.ml \
 	syscall_models.ml \
