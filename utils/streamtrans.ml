@@ -27,22 +27,21 @@ let uadd c =
   Arg.Unit(fun()-> add c)
 
 (** Prints the block *)
-let prints block =
-  print_endline "new block";
-  List.iter
-    (fun stmt ->
-      print_endline ("Stmt: "^ (Pp.ast_stmt_to_string stmt))
-    ) block;
-  print_endline "end block";
-  block
+let prints f =
+  let oc = open_out f in
+  let pp = new Pp.pp_oc oc in
+  (fun block ->
+    (* List.iter (fun s -> pp#ast_stmt s) block; *)
+    pp#ast_program block;
+    block)
 
 (** Concretely executes a block *)
 let concrete block = Utils_common.stream_concrete mem_hash concrete_state block
 
 
 let speclist =
-  ("-print", uadd(TransformAst(prints)),
-   "Print each statement in the trace.")
+  ("-print", Arg.String(fun f -> add(TransformAst(prints f))),
+   "<file> Print each statement in the trace to file.")
   ::("-concrete", uadd(TransformAst(concrete)),
      "Concretely execute each block.")
   :: Input.stream_speclist
