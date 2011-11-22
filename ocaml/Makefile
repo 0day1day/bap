@@ -37,6 +37,7 @@ export SOURCES = \
 	arithmetic.ml \
 	ast.ml \
 	ssa.ml \
+	disasm_temp.ml \
 	pp.ml \
 	typecheck.ml \
 	cfg.mli cfg.ml \
@@ -126,7 +127,6 @@ export LDFLAGS = $(LIBASMIR_LDFLAGS) $(SOLVER_LDFLAGS)
 export PPFLAGS = $(SOLVER_PPFLAGS)
 export INCDIRS = $(BIGINT) $(BATT) $(OUNIT) $(PCRE) $(OBJSIZE)
 export LIBS = zarith batteries oUnit pcre objsize
-#export CLIBFLAGS= $(LDFLAGS)
 export RESULTDEPS = $(LIBASMIR)/src/libasmir.a $(VEX_DIR)/libvex.a
 export LIBDIRS = $(LIBASMIR)/src $(VEX_DIR)
 export LIBDIRS += $(SOLVER_LIBDIRS)
@@ -137,7 +137,7 @@ OCAMLFLAGS = -thread -warn-error Aelz # -for-pack Bap #-w A
 OCAMLDOCFLAGS = -m avlsoper
 
 all:
-	# There are issues when dcl and ncl are built together
+#	There are issues when dcl and ncl are built together
 	$(MAKE) dcl
 	$(MAKE) ncl
 

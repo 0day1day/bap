@@ -12,12 +12,14 @@ To build BAP on x86, do the following:
   $ make test
 
 Configure should report any dependencies you do not have.  You can
-satisfy most dependencies on Ubuntu 11.04 by running:
+satisfy most dependencies on Ubuntu 11.04/11.10 by running:
 
   $ sudo apt-get install ocaml ocaml-native-compilers ocaml-findlib camlidl \
     libocamlgraph-ocaml-dev libextlib-ocaml-dev binutils-dev automake \
     libcamomile-ocaml-dev otags libpcre3-dev camlp4-extra bison flex \
-    zlib1g-dev libgmp3-dev
+    zlib1g-dev libgmp3-dev g++
+
+XXX: Does this work for Debian too?
 
 On x86_64 add the following packages:
     gcc-multilib g++-multilib

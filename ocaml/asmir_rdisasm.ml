@@ -3,9 +3,11 @@
     @author Ricky
 *)
 
+open Ast
 open BatListFull
 module D = Debug.Make(struct let name = "Asmir_rdisasm" and default=`NoDebug end)
 open D
+open Type
 
 let get_addr expr =
   match expr with
@@ -71,10 +73,13 @@ module Int64Set = Set.Make(
     let compare = Int64.compare
   end)
 
-(** Recursively disassemble [p] beginning at [startaddr]. If [max] is
-    defined, raises {!Asmir.Disassembly_error} if more than [max] IL
-    statements are discovered during lifting. *)
-let rdisasm_at ?max p startaddr =
+type callback = addr -> addr -> stmt list -> bool
+let default _ _ _ = true
+
+(** Recursively disassemble [p] beginning at [startaddr]. If [f] is
+    defined and [f addr stmts] returns false, raises
+    {!Asmir.Disassembly_error}. *)
+let rdisasm_at ?(f=default) p startaddr =
   let seen = ref Int64Set.empty in
   let out = ref [] in
   let outasm = ref "" in
@@ -89,9 +94,7 @@ let rdisasm_at ?max p startaddr =
       out := statements :: !out;
       outasm := !outasm ^ "; " ^ asm;
       numstmts := !numstmts + (List.length statements);
-      (match max with
-      | Some(n) when !numstmts > n -> raise Asmir.Disassembly_error
-      | _ -> ());
+      if not (f addr next statements) then raise Asmir.Disassembly_error;
       List.iter
         (fun x -> if not (Int64Set.mem x !seen)
           then (Queue.push x stack; seen := Int64Set.add x !seen)
@@ -106,6 +109,12 @@ let rdisasm_at ?max p startaddr =
   List.concat (List.rev !out), !outasm
 
 (** Recursively disassemble [p] beginning at the program's defined start
-    address.  [max] behaves the same as in {!rdisasm_at}. *)
-let rdisasm ?max p =
-  rdisasm_at ?max p (Asmir.get_start_addr p)
+    address.  [f] behaves the same as in {!rdisasm_at}. *)
+let rdisasm ?(f=default) p =
+  rdisasm_at ~f p (Asmir.get_start_addr p)
+
+let max_callback n =
+  let ctr = ref 0 in
+  (fun _ _ _ ->
+    incr ctr;
+    if !ctr > n then false else true)

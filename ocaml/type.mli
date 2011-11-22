@@ -3,9 +3,11 @@
     @author Ivan Jager
 *)
 
+type addr = int64
+
 type label = 
   | Name of string (** For named labels*)
-  | Addr of int64 (** For addresses. Cast REG_type as unsigned when comparing. *)
+  | Addr of addr (** For addresses. Cast REG_type as unsigned when comparing. *)
 
 
 (** The IR type of a BAP expression *)
@@ -68,7 +70,7 @@ type context =
    name  : string;
    mem   : bool;
    t     : typ;
-   index : int64;
+   index : addr;
    value : Big_int_Z.big_int;
    usage : usage;
    taint : taint_type
@@ -77,7 +79,7 @@ type context =
 type attribute = 
   | Pos of pos  (** The position of a statement in the source file *)
   | Asm of string
-  | Address of int64
+  | Address of addr
   | Liveout (** the variable assigned in this move should be considered live *)
   | StrAttr of string (** Generic printable and parseable attribute *)
   | Context of context         (** An attribute containing the concrete values

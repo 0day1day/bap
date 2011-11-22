@@ -1,3 +1,5 @@
+.NOTPARALLEL:
+
 -include Makefile.conf
 
 EXAMPLES = $(filter-out examples/OMakefile examples/CVS, $(wildcard examples/*))

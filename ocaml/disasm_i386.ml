@@ -3,6 +3,7 @@
 open Int64
 open Ast
 open Ast_convenience
+open BatPervasives
 open Big_int_Z
 open Big_int_convenience
 open Type
@@ -47,6 +48,8 @@ open D
 
 (* type segment = CS | SS | DS | ES | FS | GS *)
 
+exception Disasm_i386_exception of string
+
 type operand =
   | Oreg of int
   | Oaddr of Ast.exp
@@ -65,6 +68,7 @@ type opcode =
   | Shift of binop_type * typ * operand * operand
   | Shiftd of binop_type * typ * operand * operand * operand
   | Bt of typ * operand * operand
+  | Bsf of typ * operand * operand
   | Jump of operand
   | Jcc of operand * Ast.exp
   | Setcc of typ * operand * Ast.exp
@@ -127,7 +131,10 @@ type prefix = {
   (* add more as needed *)
 }
 
-let unimplemented s  = failwith ("disasm_i386: unimplemented feature: "^s)
+(** disfailwith is a non-fatal disassembly exception. *)
+let disfailwith s = raise (Disasm_i386_exception s)
+
+let unimplemented s  = disfailwith ("disasm_i386: unimplemented feature: "^s)
 
 let (&) = (land)
 and (>>) = (lsr)
@@ -145,7 +152,20 @@ let r64 = Ast.reg_64
 let r128 = Reg 128
 let xmm_t = Reg 128
 
+(** Only use this for registers, not temporaries *)
 let nv = Var.newvar
+
+(** Create a new temporary
+
+    Makes sure that the temporary name is found by Disasm.is_temp.
+    Always use this for making temporaries.
+*)
+let nt s t =
+  let v = nv s t in
+  if not (Disasm_temp.is_temp v) then
+    failwith ("Variable "^(Var.name v)^" expected to be found as temporary but was not");
+  v
+
 (* registers *)
 
 let ebp = nv "R_EBP" r32
@@ -332,7 +352,7 @@ let eaddr16 = function
   | 5 -> Var edi
   | 6 -> Var ebp
   | 7 -> Var ebx
-  | _ -> failwith "eaddr16 takes only 0-7"
+  | _ -> disfailwith "eaddr16 takes only 0-7"
 
 let eaddr16e b = cast_low r16 (eaddr16 b)
 
@@ -373,7 +393,7 @@ let assn_s s t v e =
     move v ((Var v &* l32 0xffff00ffL) |* (cast_unsigned r32 e <<* i32 8))
   | Oreg _ -> unimplemented "assignment to sub registers"
   | Oaddr a -> store_s s t a e
-  | Oimm _ -> failwith "disasm_i386: Can't assign to an immediate value"
+  | Oimm _ -> disfailwith "disasm_i386: Can't assign to an immediate value"
 
 let bytes_of_width = function
   | Reg x when x land 7 = 0 -> x/8
@@ -459,7 +479,7 @@ let rec to_ir addr next ss pref =
   function
   | Nop -> []
   | Retn when pref = [] ->
-    let t = nv "ra" r32 in
+    let t = nt "ra" r32 in
     [move t (load_s seg_ss r32 esp_e);
      move esp (esp_e +* (i32 4));
      Jmp(Var t, [StrAttr "ret"])
@@ -488,14 +508,14 @@ let rec to_ir addr next ss pref =
     let (s, al) = match s with
       | Oreg i -> op2e t s, []
       | Oaddr a -> op2e t s, [a]
-      | Oimm _ -> failwith "invalid"
+      | Oimm _ -> disfailwith "invalid"
     in
     let (d, al) = match d with
       | Oreg i -> assn t d s, al
 	(* let r = op2e t d in *)
 	(* move r s, al *)
       | Oaddr a -> assn t d s, a::al
-      | Oimm _ -> failwith "invalid"
+      | Oimm _ -> disfailwith "invalid"
     in
     let al =
       if align then
@@ -509,12 +529,12 @@ let rec to_ir addr next ss pref =
       let src = match src with
         | Oreg i -> op2e t src
         | Oaddr a -> load t a
-        | Oimm _ -> failwith "invalid"
+        | Oimm _ -> disfailwith "invalid"
       in
       let compare_region i =
         let byte1 = Extract(big_int_of_int (i*elebits-1), big_int_of_int ((i-1)*elebits), src) in
         let byte2 = Extract(big_int_of_int (i*elebits-1), big_int_of_int ((i-1)*elebits), op2e t dst) in
-        let tmp = nv ("t" ^ string_of_int i) elet in
+        let tmp = nt ("t" ^ string_of_int i) elet in
         Var tmp, move tmp (Ite(byte1 ==* byte2, lt (-1L) elet, lt 0L elet))
       in
       let indices = BatList.init ncmps (fun i -> i + 1) in (* list 1-nbytes *)
@@ -528,7 +548,7 @@ let rec to_ir addr next ss pref =
       let nbytes = bytes_of_width t in
       let src = match src with
         | Oreg i -> op2e t src
-        | _ -> failwith "invalid operand"
+        | _ -> disfailwith "invalid operand"
       in
       let get_bit i = Extract(big_int_of_int (i*8-1), big_int_of_int (i*8-1), src) in
       let byte_indices = BatList.init nbytes (fun i -> i + 1) in (* list 1-nbytes *)
@@ -548,7 +568,7 @@ let rec to_ir addr next ss pref =
       let high, low = match t with
         | Reg 128 -> biconst 127, bi0
         | Reg 64 -> biconst 63, bi0
-        | _ -> failwith "impossible: used non 64/128-bit operand in palignr"
+        | _ -> disfailwith "impossible: used non 64/128-bit operand in palignr"
       in
       let result = Extract (high, low, shift) in
       let addresses = List.fold_left (fun acc -> function Oaddr a -> a::acc | _ -> acc) [] [src;dst] in
@@ -573,10 +593,10 @@ let rec to_ir addr next ss pref =
     [assn t o1 (cast_unsigned t c)]
   | Shift(st, s, o1, o2) ->
     assert (List.mem s [r8; r16; r32]);
-    let t1 = nv "t1" s and tmpDEST = nv "tmpDEST" s
+    let t1 = nt "t1" s and tmpDEST = nt "tmpDEST" s
     and bits = Typecheck.bits_of_width s
     and s_f = match st with LSHIFT -> (<<*) | RSHIFT -> (>>*) | ARSHIFT -> (>>>*)
-      | _ -> failwith "invalid shift type"
+      | _ -> disfailwith "invalid shift type"
     and count = (op2e s o2) &* (it 31 s)
     and e1 = op2e s o1 in
     let ifzero = ite r1 (count ==* (it 0 s))
@@ -584,7 +604,7 @@ let rec to_ir addr next ss pref =
       | LSHIFT -> Cast(CAST_HIGH, r1, e1) ^* cf_e
       | RSHIFT -> Cast(CAST_HIGH, r1, Var tmpDEST)
       | ARSHIFT -> exp_false
-      | _ -> failwith "imposible"
+      | _ -> disfailwith "imposible"
     in
     [move tmpDEST e1;
      if st = LSHIFT then
@@ -601,19 +621,19 @@ let rec to_ir addr next ss pref =
      move af (ifzero af_e (Unknown("AF undefined after shift", r1)))
     ]
   | Shiftd(_st, s, dst, fill, shift) ->
-      let tempDEST = nv "tempDEST" s in
+      let tmpDEST = nt "tmpDEST" s in
       let e_dst = op2e s dst in
       let e_fill = op2e s fill in
       let e_shift = op2e s shift in
       let bits = Typecheck.bits_of_width s in
-      let our_of = cast_high r1 (Var tempDEST) ^* cast_high r1 e_dst in
+      let our_of = cast_high r1 (Var tmpDEST) ^* cast_high r1 e_dst in
       let ifzero = ite r1 (e_shift ==* it 0 s) in
       let ret1 = e_fill >>* (it bits s -* e_shift) in
       let ret2 = e_dst <<* e_shift in
       let result = ret1 |* ret2 in
       let t2 = (e_dst >>* (it bits s -* e_shift)) in
       [
-        move tempDEST e_dst;
+        move tmpDEST e_dst;
         move cf (ifzero cf_e (Cast(CAST_LOW, r1, t2)));
         assn s dst result;
         move oF (ifzero of_e (ite r1 (e_shift ==* i32 1) (our_of) (it 0 r1)));
@@ -633,7 +653,7 @@ let rec to_ir addr next ss pref =
             let byte = load r8 (a +* (offset >>* (it 3 t))) in
             let shift = (cast_low r8 offset) &* (it 7 r8) in
             byte, shift
-        | Oimm _ -> failwith "Immediate bases not allowed"
+        | Oimm _ -> disfailwith "Immediate bases not allowed"
       in
       [
         move cf (cast_low r1 (value >>* shift));
@@ -642,6 +662,20 @@ let rec to_ir addr next ss pref =
 	move af (Unknown ("AF undefined after bt", r1));
 	move pf (Unknown ("PF undefined after bt", r1))
       ]
+  | Bsf(t, dst, src) ->
+    let source_is_zero = nt "t" r1 in
+    let source_is_zero_v = Var source_is_zero in
+    let src_e = op2e t src in
+    let bits = Typecheck.bits_of_width t in
+    let check_bit next_value bitindex =
+      ite t (Extract(biconst bitindex,biconst bitindex,src_e) ==* it 1 r1) (it bitindex t) next_value
+    in
+    let first_one = fold check_bit (it (bits-1) t) ((bits-2) --- 0) in
+    [
+      move source_is_zero (src_e ==* it 0 t);
+      move zf (ite t source_is_zero_v (it 1 t) (it 0 t));
+      assn t dst (ite t source_is_zero_v (Unknown ("bsf: destination undefined when source is zero", t)) first_one);
+    ]
   | Hlt ->
     [Jmp(Lab "General_protection fault", [])]
   | Rdtsc ->
@@ -655,7 +689,7 @@ let rec to_ir addr next ss pref =
   | Stmxcsr (dst) ->
       let dst = match dst with
         | Oaddr addr -> addr
-        | _ -> failwith "stmxcsr argument cannot be non-memory"
+        | _ -> disfailwith "stmxcsr argument cannot be non-memory"
       in
       [
         store r32 dst (Var mxcsr);(*(Unknown ("stmxcsr", r32));*)
@@ -663,7 +697,7 @@ let rec to_ir addr next ss pref =
   | Ldmxcsr (src) ->
       let src = match src with
         | Oaddr addr -> addr
-        | _ -> failwith "ldmxcsr argument cannot be non-memory"
+        | _ -> disfailwith "ldmxcsr argument cannot be non-memory"
       in
       [
         move mxcsr (load r32 src);
@@ -671,7 +705,7 @@ let rec to_ir addr next ss pref =
   | Fnstcw (dst) ->
       let dst = match dst with
         | Oaddr addr -> addr
-        | _ -> failwith "fnstcw argument cannot be non-memory"
+        | _ -> disfailwith "fnstcw argument cannot be non-memory"
       in
       [
         store r16 dst (Var fpu_ctrl);
@@ -679,13 +713,13 @@ let rec to_ir addr next ss pref =
   | Fldcw (src) ->
       let src = match src with
         | Oaddr addr -> addr
-        | _ -> failwith "fldcw argument cannot be non-memory"
+        | _ -> disfailwith "fldcw argument cannot be non-memory"
       in
       [
         move fpu_ctrl (load r16 src);
       ]
   | Cmps(Reg bits as t) ->
-    let src1 = nv "src1" t and src2 = nv "src2" t and tmpres = nv "tmp" t in
+    let src1 = nt "src1" t and src2 = nt "src2" t and tmpres = nt "tmp" t in
     let stmts =
       move src1 (op2e t esiaddr)
       :: move src2 (op2e_s seg_es t ediaddr)
@@ -701,7 +735,7 @@ let rec to_ir addr next ss pref =
     else
       unimplemented "unsupported flags in cmps"
   | Scas(Reg bits as t) ->
-    let src1 = nv "src1" t and src2 = nv "src2" t and tmpres = nv "tmp" t in
+    let src1 = nt "src1" t and src2 = nt "src2" t and tmpres = nt "tmp" t in
     let stmts =
       move src1 (cast_low t (Var eax))
       :: move src2 (op2e_s seg_es t ediaddr)
@@ -726,7 +760,7 @@ let rec to_ir addr next ss pref =
     else
       unimplemented "unsupported prefix for stos"
   | Push(t, o) ->
-    let tmp = nv "t" t in (* only really needed when o involves esp *)
+    let tmp = nt "t" t in (* only really needed when o involves esp *)
     move tmp (op2e t o)
     :: move esp (esp_e -* i32 (bytes_of_width t))
     :: store_s seg_ss t esp_e (Var tmp) (* FIXME: can ss be overridden? *)
@@ -735,28 +769,29 @@ let rec to_ir addr next ss pref =
     [assn t o (load_s seg_ss t esp_e);
      move esp (esp_e +* i32 (bytes_of_width t)) ]
   | Add(t, o1, o2) ->
-    let tmp = nv "t" t in
+    let tmp = nt "t1" t and tmp2 = nt "t2" t in
     move tmp (op2e t o1)
-    :: assn t o1 (op2e t o1 +* op2e t o2)
-    :: let s1 = Var tmp and s2 = op2e t o2 and r = op2e t o1 in
+    :: move tmp2 (op2e t o2)
+    :: assn t o1 (op2e t o1 +* Var tmp2)
+    :: let s1 = Var tmp and s2 = Var tmp2 and r = op2e t o1 in
        set_flags_add t s1 s2 r
   | Inc(t, o) (* o = o + 1 *) ->
-    let tmp = nv "t" t in
+    let tmp = nt "t" t in
     move tmp (op2e t o)
     :: assn t o (op2e t o +* it 1 t)
     :: set_aopszf_add t (Var tmp) (it 1 t) (op2e t o)
   | Dec(t, o) (* o = o - 1 *) ->
-    let tmp = nv "t" t in
+    let tmp = nt "t" t in
     move tmp (op2e t o)
     :: assn t o (op2e t o -* it 1 t)
     :: set_aopszf_sub t (Var tmp) (it 1 t) (op2e t o) (* CF is maintained *)
   | Sub(t, o1, o2) (* o1 = o1 - o2 *) ->
-    let oldo1 = nv "t" t in
+    let oldo1 = nt "t" t in
     move oldo1 (op2e t o1)
     :: assn t o1 (op2e t o1 -* op2e t o2)
     :: set_flags_sub t (Var oldo1) (op2e t o2) (op2e t o1)
   | Sbb(t, o1, o2) ->
-    let tmp = nv "t" t in
+    let tmp = nt "t" t in
     let s1 = Var tmp and s2 = (op2e t o2) +* cast_unsigned t cf_e and r = op2e t o1 in
     move tmp r
     :: assn t o1 (r -* s2)
@@ -766,14 +801,14 @@ let rec to_ir addr next ss pref =
     ::move af (Unknown("AF for sbb unimplemented", r1))
     ::set_pszf t r
   | Cmp(t, o1, o2) ->
-    let tmp = nv "t" t in
+    let tmp = nt "t" t in
     move tmp (op2e t o1 -* op2e t o2)
     :: set_flags_sub t (op2e t o1) (op2e t o2) (Var tmp)
   | Cmpxchg(t, src, dst) ->
     let accumulator = op2e t o_eax in
     let dst_e = op2e t dst in
     let src_e = op2e t src in
-    let equal = nv "t" r1 in
+    let equal = nt "t" r1 in
     let equal_v = Var equal in
     [
       move equal (accumulator ==* dst_e);
@@ -789,7 +824,7 @@ let rec to_ir addr next ss pref =
     let dst_hi_e = Extract(biconst 31, bi0, dst_e) in
     let eax_e = op2e r32 o_eax in
     let edx_e = op2e r32 o_edx in
-    let equal = nv "t" r1 in
+    let equal = nt "t" r1 in
     let equal_v = Var equal in
     [
       move equal (accumulator ==* dst_e);
@@ -799,14 +834,14 @@ let rec to_ir addr next ss pref =
       assn r32 o_edx (ite r32 equal_v edx_e dst_hi_e)
     ]
   | Xadd(t, dst, src) ->
-    let tmp = nv "t" t in
+    let tmp = nt "t" t in
     move tmp (op2e t dst +* op2e t src)
     :: assn t src (op2e t dst)
     :: assn t dst (Var tmp)
     :: let s = Var tmp and src = op2e t src and dst = op2e t dst in
        set_flags_add t s src dst
   | Xchg(t, src, dst) ->
-    let tmp = nv "t" t in
+    let tmp = nt "t" t in
     [
       move tmp (op2e t src);
       assn t src (op2e t dst);
@@ -836,7 +871,7 @@ let rec to_ir addr next ss pref =
     :: move af (Unknown("AF is undefined after xor", r1))
     :: set_pszf t (op2e t o1)
   | Test(t, o1, o2) ->
-    let tmp = nv "t" t in
+    let tmp = nt "t" t in
     move tmp (op2e t o1 &* op2e t o2)
     :: move oF exp_false
     :: move cf exp_false
@@ -921,6 +956,7 @@ module ToStr = struct
     | Dec (t, o) -> Printf.sprintf "dec %s" (opr o)
     | Jump a -> Printf.sprintf "jmp %s" (opr a)
     | Bt(t,d,s) -> Printf.sprintf "bt %s, %s" (opr d) (opr s)
+    | Bsf(t,d,s) -> Printf.sprintf "bsf %s, %s" (opr d) (opr s)
     | Jcc _ -> "jcc"
     | Setcc _ -> "setcc"
     | Cmps _ -> "cmps"
@@ -948,7 +984,7 @@ module ToStr = struct
     (*_ -> unimplemented "op2str"*)
 
   let to_string pref op =
-    failwith "fallback to libdisasm"
+    disfailwith "fallback to libdisasm"
     (* prefs2str pref ^ op2str op *)
 end (* ToStr *)
 
@@ -963,7 +999,7 @@ let cc_to_exp i =
     | 0x8 -> sf_e
     | 0xc -> sf_e ^* of_e
     | 0xe -> zf_e |* (sf_e ^* of_e)
-    | _ -> failwith "unsupported condition code"
+    | _ -> disfailwith "unsupported condition code"
   in
   if (i & 1) = 0 then cc else exp_not cc
 
@@ -1027,7 +1063,7 @@ let parse_instr g addr =
     | Reg 8 ->  parse_disp8
     | Reg 16 -> parse_disp16
     | Reg 32 -> parse_disp32
-    | _ -> failwith "unsupported displacement size"
+    | _ -> disfailwith "unsupported displacement size"
   in
   let parse_sib m a =
     (* ISR 2.1.5 Table 2-3 *)
@@ -1054,14 +1090,14 @@ let parse_instr g addr =
     | 0 -> (match rm with
       | 6 -> let (disp, na) = parse_disp16 (s a) in (r, Oaddr(l16 disp), na)
       | n when n < 8 -> (r, Oaddr(eaddr16 rm), s a)
-      | _ -> failwith "Impossible"
+      | _ -> disfailwith "Impossible"
     )
     | 1 | 2 ->
       let (base, na) = eaddr16 rm, na in
       let (disp, na) = if m = 1 then parse_disp8 na else (*2*) parse_disp16 na in
       (r, Oaddr(base +* l16 disp), na)
     | 3 -> (r, Oreg rm, s a)
-    | _ -> failwith "Impossible"
+    | _ -> disfailwith "Impossible"
   in
   let parse_modrm16 a =
     let (r, rm, na) = parse_modrm16ext a in
@@ -1085,7 +1121,7 @@ let parse_instr g addr =
       let (disp, na) = if m = 1 then parse_disp8 na else (*2*) parse_disp32 na in
       (r, Oaddr(base +* l32 disp), na)
     | 3 -> (r, Oreg rm, s a)
-    | _ -> failwith "Impossible"
+    | _ -> disfailwith "Impossible"
   in
   let parse_modrm32 a =
     let (r, rm, na) = parse_modrm32ext a in
@@ -1107,9 +1143,9 @@ let parse_instr g addr =
   in
   let parse_immz t a = match t with
     | Reg 8 -> parse_imm8 a (* t=r8 when operand is Ib rather than Iz *)
-    | Reg 16 -> failwith "parse_imm16 a"
+    | Reg 16 -> disfailwith "parse_imm16 a"
     | Reg 32 | Reg 64 -> parse_imm32 a
-    | _ -> failwith "parse_immz unsupported size"
+    | _ -> disfailwith "parse_immz unsupported size"
   in
   let parse_immv = parse_immz in (* until we do amd64 *)
   let get_opcode pref prefix a =
@@ -1174,7 +1210,7 @@ let parse_instr g addr =
     | 0x8d -> let (r, rm, na) = parse_modrm prefix.opsize na in
 	      (match rm with
 	      | Oaddr a -> (Lea(r, a), na)
-	      | _ -> failwith "invalid lea (must be address)"
+	      | _ -> disfailwith "invalid lea (must be address)"
 	      )
     | 0x90 -> (Nop, na)
     | byte90 when byte90 > 0x90 && byte90 <= 0x97 ->
@@ -1206,12 +1242,12 @@ let parse_instr g addr =
     | 0xc6
     | 0xc7 -> let t = if b1 = 0xc6 then r8 else prefix.opsize in
 	      let (e, rm, na) = parse_modrm32ext na in
-              if e<>0 then failwith "Invalid opcode";
+              if e<>0 then disfailwith "Invalid opcode";
 	      (* assert (e=0); (\* others are invalid opcodes, so we should check *\) *)
 	      let (i,na) = parse_immz t na in
 	      (match e with (* Grp 11 *)
 	      | 0 -> (Mov(t, rm, i), na)
-	      | _ -> failwith "invalid opcode"
+	      | _ -> disfailwith "invalid opcode"
 	      )
     | 0xcd -> let (i,na) = parse_imm8 na in
 	      (Interrupt(i), na)
@@ -1236,7 +1272,7 @@ let parse_instr g addr =
 		| 0xc0 -> parse_imm8 na
 		| 0xd0 -> (Oimm 1L, na)
 		| 0xd2 -> (o_ecx, na)
-		| _ -> failwith "impossible"
+		| _ -> disfailwith "impossible"
 	      in
 	      (match r with (* Grp 2 *)
 	      | 4 -> (Shift(LSHIFT, opsize, rm, amt), na)
@@ -1275,7 +1311,7 @@ let parse_instr g addr =
 	  | 6 -> Xor a
 	  | 7 -> Cmp a
 	  | _ -> unimplemented (Printf.sprintf "unsupported opcode: %02x" b1)
-(*	  | _ -> failwith "impossible" *)
+(*	  | _ -> disfailwith "impossible" *)
 	in
 	let t = if (b1 & 1) = 0  then r8 else prefix.opsize in
 	let (o1, o2, na) = match b1 & 6 with
@@ -1285,7 +1321,7 @@ let parse_instr g addr =
 		 (r, rm, na)
 	  | 4 -> let i, na = parse_immz t na in
 		 (o_eax, i, na)
-	  | _ -> failwith "impossible"
+	  | _ -> disfailwith "impossible"
 	in
 	(ins(t, o1, o2), na)
       )
@@ -1301,7 +1337,7 @@ let parse_instr g addr =
                  let (r, rm, na) = parse_modrm prefix.opsize na in
 	         let (i, na) = parse_imm8 na in
                  (Palignr(prefix.mopsize, r, rm, i), na)
-             | b3 -> failwith (Printf.sprintf "unsupported opcode %02x %02x %02x" b1 b2 b3)
+             | b3 -> disfailwith (Printf.sprintf "unsupported opcode %02x %02x %02x" b1 b2 b3)
           )
       | 0x28 | 0x29 | 0x6f | 0x7f ->
 	let opsize, align, name =
@@ -1309,7 +1345,7 @@ let parse_instr g addr =
             let name = match b2 with
               | 0x6f | 0x7f -> "movdqa"
               | 0x28 | 0x29 -> "movapd"
-              | _ -> failwith "opcode case missing, please fill it in"
+              | _ -> disfailwith "opcode case missing, please fill it in"
             in
             prefix.mopsize, true, name
           else if prefix.repeat then
@@ -1317,14 +1353,14 @@ let parse_instr g addr =
           else if pref = [] && (b2 = 0x28 || b2 = 0x29) then
             r128, true, "movaps"
           else
-            failwith "Unimplemented"
+            disfailwith "Unimplemented"
         in
 	let r, rm, na = parse_modrm32 na in
 	let s,d = if b2 = 0x6f || b2 = 0x28 then rm, r else r, rm in
 	(Movdq(opsize,d,s,align,name), na)
       | 0x74 | 0x75 | 0x76 as o ->
         let r, rm, na = parse_modrm32 na in
-        let elet = match o with | 0x74 -> r8 | 0x75 -> r16 | 0x76 -> r32 | _ -> failwith "impossible" in
+        let elet = match o with | 0x74 -> r8 | 0x75 -> r16 | 0x76 -> r32 | _ -> disfailwith "impossible" in
         (Pcmpeq(prefix.mopsize, elet, r, rm), na)
       | 0x80 | 0x81 | 0x82 | 0x83 | 0x84 | 0x85 | 0x86 | 0x87 | 0x88 | 0x89
       | 0x8c | 0x8d | 0x8e
@@ -1363,10 +1399,13 @@ let parse_instr g addr =
       | 0xb7 -> let st = if b2 = 0xb6 then r8 else r16 in
 		let r, rm, na = parse_modrm32 na in
 		(Movzx(prefix.opsize, r, st, rm), na)
+      | 0xbc ->
+          let r, rm, na = parse_modrm prefix.opsize na in
+          (Bsf (prefix.opsize, r, rm), na)
       | 0xbe
       | 0xbf -> let st = if b2 = 0xbe then r8 else r16 in
-		let r, rm, na = parse_modrm32 na in
-		(Movsx(prefix.opsize, r, st, rm), na)
+          let r, rm, na = parse_modrm32 na in
+          (Movsx(prefix.opsize, r, st, rm), na)
       | 0xc1 ->
           let r, rm, na = parse_modrm32 na in
           (Xadd(prefix.opsize, r, rm), na)
@@ -1425,5 +1464,5 @@ let disasm_instr g addr =
   let (pref, op, na) = parse_instr g addr in
   let (_, ss, pref) =  parse_prefixes pref op in
   let ir = ToIR.to_ir addr na ss pref op in
-  let asm = try Some(ToStr.to_string pref op) with Failure _ -> None in
+  let asm = try Some(ToStr.to_string pref op) with Disasm_i386_exception _ -> None in
   (ToIR.add_labels ?asm addr ir, na)

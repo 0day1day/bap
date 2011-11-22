@@ -567,7 +567,7 @@ let update_concrete s =
   | Label (_,atts) ->
       (* Concrete operands *)
       let conc_atts = filter_taint atts in
-        if conc_atts != [] then (
+        if conc_atts <> [] then (
           cleanup ();
           List.iter add_to_conc conc_atts;
           true
@@ -1040,8 +1040,12 @@ let run_block ?(next_label = None) state memv block =
   let input_seeds = get_symbolic_seeds memv addr in
   pdebug ("Running block: " ^ (string_of_int !counter) ^ " " ^ (Pp.ast_stmt_to_string addr));
   counter := !counter + 1 ;
-  let _ = ignore(update_concrete addr) in
-  if !consistency_check then (
+  let () = ignore(update_concrete addr) in
+  if not !consistency_check then (
+    (* If we are not doing a consistency check, there's no reason to
+       keep delta around. cleanup_delta completely clears delta *)
+    TraceConcrete.cleanup_delta state.delta
+  ) else (
     (* remove temps *)
     clean_delta state.delta;
     check_delta state;
