@@ -62,6 +62,7 @@ let unop_to_string = function
 
 
 let reasonable_size_varctx = 10000
+let printed_varctx_warning = ref false
 type varctx = string VH.t * (string,unit) Hashtbl.t
 
 let var_to_string ?ctx (Var.V(id,name,t) as v) =
@@ -70,9 +71,11 @@ let var_to_string ?ctx (Var.V(id,name,t) as v) =
 	name ^ "_" ^ string_of_int id ^ ":" ^ typ_to_string t
   | Some(vars,names) ->
     if debug then (
-      if Hashtbl.length names > reasonable_size_varctx ||
-        VH.length vars > reasonable_size_varctx then
-        wprintf "varctx is getting very large"
+      if (not !printed_varctx_warning) &&
+        (Hashtbl.length names > reasonable_size_varctx ||
+        VH.length vars > reasonable_size_varctx) then (
+          printed_varctx_warning := true;
+          wprintf "varctx is getting very large")
     );
     try VH.find vars v
     with Not_found ->
