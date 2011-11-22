@@ -61,7 +61,8 @@ let unop_to_string = function
   | NOT -> "~"
 
 
-
+let reasonable_size_varctx = 10000
+let printed_varctx_warning = ref false
 type varctx = string VH.t * (string,unit) Hashtbl.t
 
 let var_to_string ?ctx (Var.V(id,name,t) as v) =
@@ -69,19 +70,26 @@ let var_to_string ?ctx (Var.V(id,name,t) as v) =
   | None ->
 	name ^ "_" ^ string_of_int id ^ ":" ^ typ_to_string t
   | Some(vars,names) ->
-      try VH.find vars v
-      with Not_found ->
-	let rec trystring (s, `F next) =
-	  if Hashtbl.mem names s then
-	    trystring (next s)
-	  else (
-	    let s' = s ^":"^ typ_to_string t in
-	    VH.add vars v s';
-	    Hashtbl.add names s ();
-	    s')
-	in
-	let rec more x = (x^"_", `F more) in
-	trystring (name, `F (fun _ -> (name ^ "_" ^ string_of_int id, `F more)))
+    if debug then (
+      if (not !printed_varctx_warning) &&
+        (Hashtbl.length names > reasonable_size_varctx ||
+        VH.length vars > reasonable_size_varctx) then (
+          printed_varctx_warning := true;
+          wprintf "varctx is getting very large")
+    );
+    try VH.find vars v
+    with Not_found ->
+      let rec trystring (s, `F next) =
+	if Hashtbl.mem names s then
+	  trystring (next s)
+	else (
+	  let s' = s ^":"^ typ_to_string t in
+	  VH.add vars v s';
+	  Hashtbl.add names s ();
+	  s')
+      in
+      let rec more x = (x^"_", `F more) in
+      trystring (name, `F (fun _ -> (name ^ "_" ^ string_of_int id, `F more)))
 
 class pp ft =
   let pp = F.pp_print_string ft
@@ -112,7 +120,7 @@ object (self)
     | Liveout -> pp "@set \"liveout\""
     | StrAttr s -> pp "@str \""; pp s; pc '\"'
     | Context {name=s; mem=mem; value=v; index=i; t=Reg bits; taint=Taint t} -> 
-	let ts = string_of_int t in
+      let ts = string_of_int t in
 	(*if t = Taint then "tainted" else "untainted" in*)
 	let ind = if mem then "[0x"^(Int64.format "%Lx" i)^"]" else "" in
 	pp "@context "; pp (s^ ind ^" = 0x"^(Util.hex_of_big_int v)^ ", " ^ ts
@@ -137,9 +145,9 @@ object (self)
     | (bi, Reg 1) when bi_is_minusone bi -> pp "true"
     | (bi,t) ->
         if (abs_big_int bi) <% bia
-	then pp (string_of_big_int bi)
+        then pp (string_of_big_int bi)
         else pp ("0x"^(Util.hex_of_big_int (Arithmetic.to_big_int (i,t))));
-	pp ":"; self#typ t
+        pp ":"; self#typ t
 
 
   (* prec tells us how much parenthization we need. 0 means it doesn't need
@@ -467,20 +475,40 @@ let ft =
   let ft = Format.formatter_of_buffer buf in
   Format.pp_set_all_formatter_output_functions ft ~out ~flush:ignore ~spaces ~newline:ignore;
   ft
-let strpp = new pp ft
+
+let pp2string_with_pp pp f v =
+  Format.pp_open_box ft 0;
+  f pp v;
+  Format.pp_print_flush ft ();
+  let s = Buffer.contents buf in
+  Buffer.reset buf;
+  s
 
 let pp2string f v =
-     Format.pp_open_box ft 0;
-     f strpp v;
-     Format.pp_print_flush ft ();
-     let s = Buffer.contents buf in
-     Buffer.reset buf;
-     s
+  let strpp = new pp ft in
+  pp2string_with_pp strpp f v
 
+(** Create a context for use with *_to_string_in_varctx functions. *)
+let make_varctx () =
+  new pp ft
 
+(* These functions will not remember variable names across separate
+   invocations *)
 let value_to_string = pp2string (fun p -> p#ssa_value)
 let label_to_string = pp2string (fun p -> p#label)
 let ssa_exp_to_string = pp2string (fun p -> p#ssa_exp)
 let ssa_stmt_to_string = pp2string (fun p -> p#ssa_stmt)
 let ast_exp_to_string = pp2string (fun p -> p#ast_exp ~prec:0)
 let ast_stmt_to_string = pp2string (fun p -> p#ast_stmt)
+
+(* These functions store variable names in the specified ctx
+   argument. The ctx can be created by [make_varctx]
+
+   XXX: Create pp.mli so that callers do not know type of ctx
+*)
+let value_to_string_in_varctx ctx = pp2string_with_pp ctx (fun p -> p#ssa_value)
+let label_to_string_in_varctx ctx = pp2string_with_pp ctx (fun p -> p#label)
+let ssa_exp_to_string_in_varctx ctx = pp2string_with_pp ctx (fun p -> p#ssa_exp)
+let ssa_stmt_to_string_in_varctx ctx = pp2string_with_pp ctx (fun p -> p#ssa_stmt)
+let ast_exp_to_string_in_varctx ctx = pp2string_with_pp ctx (fun p -> p#ast_exp ~prec:0)
+let ast_stmt_to_string_in_varctx ctx = pp2string_with_pp ctx (fun p -> p#ast_stmt)

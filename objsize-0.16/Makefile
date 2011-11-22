@@ -1,3 +1,5 @@
+.NOTPARALLEL:
+
 all : lib tests
 lib : objsize.cma objsize.cmxa
 

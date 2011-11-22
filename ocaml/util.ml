@@ -709,6 +709,9 @@ let print_mem_usage _ =
 	Debug.Make(struct let name = "UtilMemUse" and default=`NoDebug end) 
   in
   let pid = Unix.getpid() in
-  let cmd = "ps auxw | grep "^(string_of_int pid) in
+  let cmd = 
+    "ps auxw | grep \'^[a-zA-Z]\\{1,\\}[[:space:]]\\{1,\\}"^
+      (string_of_int pid)^"\'"
+  in
   let (out1,out2) = syscall cmd in
   D.pdebug (out1^out2)

@@ -40,6 +40,10 @@ let rec rm_and_ignore_list paths =
 let stp_path = "../stpwrap/stp/bin/";;
 let stp = "stp";;
 
+let does_stp_work () =
+  if (Smtexec.STP.check_exp_validity exp_true) = Smtexec.Valid then
+    true
+  else false
 
 let check_stp_path file =
   print_endline("Checking for stp...");
@@ -52,7 +56,9 @@ let check_stp_path file =
 
 
 (** pin helpers **)
-let pin_path = ref "../pin/";;
+let pin_path = (*ref "../pin/";;*)
+  let path = try Sys.getenv("PIN_HOME") with Not_found -> "../pin/" in
+  ref path;;
 let pin = "pin";;
 let gentrace_path = "../pintraces/obj-ia32/";;
 let gentrace = "gentrace.so";;
@@ -194,3 +200,20 @@ let find_prog_chunk prog start_addr end_addr =
       )
   in
   List.rev (find_prog_chunk_k prog (Some start_addr) end_addr [])
+
+let summarize r =
+  match r with 
+  | RError(p,s) ->
+	Format.printf "Error: %s\n" ((string_of_path p) ^ "\n  " ^ s)
+  | RFailure (p,s) ->
+	Format.printf "Failure: %s\n" ((string_of_path p) ^ "\n  " ^ s)
+  | RSkip (p,s) -> 
+	Format.printf "Skiped: %s\n" ((string_of_path p) ^ "\n  " ^ s)
+  | RTodo (p,s) -> 
+	Format.printf "Todo: %s\n" ((string_of_path p) ^ "\n  " ^ s)
+  | RSuccess p -> ();;
+
+let rec summarize_results res =
+  match res with
+  | [] -> None
+  | r::rs -> summarize r; summarize_results rs;;

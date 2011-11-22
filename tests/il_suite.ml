@@ -26,5 +26,5 @@ let test_input_nop () =
 let suite = "IL" >::: 
   [
 	"test_input_fails" >:: test_input_fails;
-	"test_input_nop" >:: test_input_nop;
+	(* "test_input_nop" >:: test_input_nop; *)
   ]
