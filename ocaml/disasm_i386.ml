@@ -766,8 +766,17 @@ let rec to_ir addr next ss pref =
     :: store_s seg_ss t esp_e (Var tmp) (* FIXME: can ss be overridden? *)
     :: []
   | Pop(t, o) ->
-    [assn t o (load_s seg_ss t esp_e);
-     move esp (esp_e +* i32 (bytes_of_width t)) ]
+    (* From the manual:
+
+       "The POP ESP instruction increments the stack pointer (ESP)
+       before data at the old top of stack is written into the
+       destination"
+
+       So, effectively there is no incrementation.
+    *)
+    assn t o (load_s seg_ss t esp_e)
+    :: if o = o_esp then []
+      else [move esp (esp_e +* i32 (bytes_of_width t))]
   | Add(t, o1, o2) ->
     let tmp = nt "t1" t and tmp2 = nt "t2" t in
     move tmp (op2e t o1)
