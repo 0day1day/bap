@@ -172,7 +172,7 @@ struct
       (* FIXME: same for exists? *)
       write_formula ~exists ~foralls ?remove wp
 
-    let solve_formula_file ?(timeout=S.timeout) ?(remove=true) ?(printmodel=false) file =
+    let solve_formula_file ?(timeout=S.timeout) ?(remove=false) ?(printmodel=false) file =
       ignore(alarm timeout);
       let cmdline = S.cmdstr file in
 
@@ -194,7 +194,7 @@ struct
 
     let check_exp_validity ?timeout ?(remove=true) ?exists ?foralls f =
       let filename = write_formula ?exists ?foralls ~remove f in
-      solve_formula_file ?timeout filename
+      solve_formula_file ~remove ?timeout filename
 
     class c = object(self)
       method solvername = S.solvername
