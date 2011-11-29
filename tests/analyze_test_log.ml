@@ -8,6 +8,10 @@ let log = ref stdin;;
 let out = ref stdout;;
 let verbose = ref false;;
 
+let total_run_time = ref "0";;
+let block_count = ref "0";;
+let total_traces = ref 0;;
+
 let bap_unknown_hashtbl = Hashtbl.create 100;;
 let probably_right_hashtbl = Hashtbl.create 100;;
 let small_hashtbl = Hashtbl.create 100;;
@@ -45,8 +49,14 @@ let insert_item hashtbl item =
   Hashtbl.replace hashtbl item (count+1);;
 
 
+(* regexps for matching general information *)
+let total_run_time_regexp = regexp "tests in: ([0-9]+\.[0-9]+) seconds\.$";;
+let total_blocks_regexp = regexp "^TraceEval: Running block: ([0-9]+)";;
+let trace_count_regexp = regexp "^LongNightly: Processing trace-file";;
+
+(* regexps for matching incorrect and unknown assembley instructions *)
 let bap_regexp = regexp "^AsmirTest: BAP unknown disasm_instr \S+: disasm_i386: unimplemented feature: unsupported opcode: (.*)$";;
-let vex_regexp = regexp "^vex x86->IR: unhandled instruction bytes: (.*)$";;
+let vex_regexp = regexp "vex x86->IR: unhandled instruction bytes: (.*)$";;
 let trace_eval_regexp = regexp "^WARNING \(TraceEval\): Difference between BAP and trace values for \[\*(R_\S*)\* Trace=(\S*) Eval=(\S*)\]";;
 let trace_eval_regexp2 = regexp "^WARNING \(TraceEval\): This is due to one of the following statments:";;
 let stmt_regexp = regexp "^\{addr .*asm (\".*?\") (.*)\}$";;
@@ -95,7 +105,6 @@ let process_list asms =
 
 (* SWXXX Also collect stats on:
    Run time per binary
-   Total run time
    Average size of binarys (number of instructions processed)
    Average memory use
 *)
@@ -141,8 +150,27 @@ let process_line l = (
 	    print_out ("Trace = "^Array.get matches 1);
 	    print_out ("Eval = "^Array.get matches 2);
 	  )
-	with Not_found ->  () (*print_out ("Unknown line: "^l)*)
-      )
+	(* Take care of general stats *)
+	with Not_found ->  (
+	  try 
+	    let matches =
+	      extract ~rex:total_run_time_regexp ~full_match: false l 
+	    in
+	    total_run_time := Array.get matches 0
+	  with Not_found -> (
+	    try 
+	      let matches =
+		extract ~rex:total_blocks_regexp ~full_match: false l 
+	      in    
+	      block_count := Array.get matches 0
+	    with Not_found -> (
+	      if (pmatch ~rex:trace_count_regexp l) then
+		(incr total_traces)
+	      else () (*print_out ("Unknown line: "^l)*)
+	    )
+	  )
+	)
+      ) 
     )
   )
 );;
@@ -152,6 +180,13 @@ let _ =
   (try
      while true do process_line (input_line !log) done
    with End_of_file -> (close_in !log));
+  
+  print_out "General Run Stats:";
+  print_out ("Total run time : " ^ !total_run_time ^ " seconds");
+  print_out ("Number of traces : " ^ string_of_int !total_traces);
+  print_out ("Total number of blocks : " ^ !block_count);
+  flush !out;
+
   print_out "Unknown Instruction Summary:";
   print_hashtbl bap_unknown_hashtbl;
   flush !out;

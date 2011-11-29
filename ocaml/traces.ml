@@ -1007,6 +1007,9 @@ let rec get_next_label blocks =
 		|	Failure _ -> None)
 	| [] -> None
 
+(* SWXXX General finalization function *)
+let fin tag = fun x -> (pdebug ("Run block finalized "^tag));;
+
 (** Running each block separately *)
 let run_block ?(next_label = None) state memv block = 
   (** Search for metadata.  It will either be a comment with endseed or a label
@@ -1032,14 +1035,14 @@ let run_block ?(next_label = None) state memv block =
 	  | _ -> false))
 	block  
      with
-    (* Verify everything in block is label or comment. 
+    (* SWXXX Verify everything in block is label or comment. 
        Warn and ignore otherwise *) 
      | Not_found -> List.hd block)
   in
   let block = List.filter (fun b -> if b == addr then false else true) block in
   let input_seeds = get_symbolic_seeds memv addr in
   pdebug ("Running block: " ^ (string_of_int !counter) ^ " " ^ (Pp.ast_stmt_to_string addr));
-  counter := !counter + 1 ;
+  counter := !counter + 1;
   let () = ignore(update_concrete addr) in
   if not !consistency_check then (
     (* If we are not doing a consistency check, there's no reason to
