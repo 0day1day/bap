@@ -62,7 +62,7 @@ type opcode =
   | Movs of typ
   | Movzx of typ * operand * typ * operand (* dsttyp, dst, srctyp, src *)
   | Movsx of typ * operand * typ * operand (* dsttyp, dst, srctyp, src *)
-  | Movdq of typ * operand * operand * bool * string (* dst, src *)
+  | Movdq of typ * operand * typ * operand * bool * string (* dst, src *)
   | Lea of operand * Ast.exp
   | Call of operand * int64 (* int64 is RA *)
   | Shift of binop_type * typ * operand * operand
@@ -104,6 +104,7 @@ type opcode =
   | Pmovmskb of (typ * operand * operand)
   | Pcmpeq of (typ * typ * operand * operand)
   | Palignr of (typ * operand * operand * operand)
+  | Pshufd of operand * operand * operand
   | Leave of typ
   | Interrupt of operand
 
@@ -504,17 +505,22 @@ let rec to_ir addr next ss pref =
     [assn t dst (cast_unsigned t (op2e ts src))]
   | Movsx(t, dst, ts, src) when pref = [] ->
     [assn t dst (cast_signed t (op2e ts src))]
-  | Movdq(t, d, s, align, _name) ->
+  | Movdq(td, d, ts, s, align, _name) ->
     let (s, al) = match s with
-      | Oreg i -> op2e t s, []
-      | Oaddr a -> op2e t s, [a]
+      | Oreg i -> op2e ts s, []
+      | Oaddr a -> op2e ts s, [a]
       | Oimm _ -> disfailwith "invalid"
     in
+    let s =
+      if td > ts then cast_unsigned td s
+      else if td < ts then cast_low td s
+      else s
+    in
     let (d, al) = match d with
-      | Oreg i -> assn t d s, al
+      | Oreg i -> assn td d s, al
 	(* let r = op2e t d in *)
 	(* move r s, al *)
-      | Oaddr a -> assn t d s, a::al
+      | Oaddr a -> assn td d s, a::al
       | Oimm _ -> disfailwith "invalid"
     in
     let al =
@@ -574,6 +580,30 @@ let rec to_ir addr next ss pref =
       let addresses = List.fold_left (fun acc -> function Oaddr a -> a::acc | _ -> acc) [] [src;dst] in
       List.map (fun addr -> Assert( (addr &* i32 15) ==* i32 0, [])) addresses
       @ [assn t dst result]
+  | Pshufd (dst, src, imm) ->
+      let t = r128 in (* pshufd is only defined for 128-bits *)
+      let src_e = op2e t src in
+      let imm_e = op2e t imm in
+      let get_dword prev_dwords ndword =
+        let high = 2 * ndword + 1 |> big_int_of_int in
+        let low = 2 * ndword |> big_int_of_int in
+        let encoding = cast_unsigned t (Extract (high, low, imm_e)) in
+        let shift = encoding ** (it 32 t) in
+        let dword = src_e >>* shift in
+        let dword = cast_low r32 dword in
+        match prev_dwords with
+          | None ->
+              Some dword
+          | Some dwords ->
+              Some (Concat(dwords, dword))
+        in
+      let dst_dwords = fold get_dword None (0--3) in
+      (match dst_dwords with
+         | Some dwords ->
+             [assn t dst dwords]
+         | None ->
+             disfailwith "failed to read dwords for pshufd"
+      )
   | Pxor args ->
     (* Pxor is just a larger xor *)
     to_ir addr next ss pref (Xor(args))
@@ -945,9 +975,10 @@ module ToStr = struct
     | Movs(t) -> "movs"
     | Movzx(dt,dst,st,src) -> Printf.sprintf "movzx %s, %s" (opr dst) (opr src)
     | Movsx(dt,dst,st,src) -> Printf.sprintf "movsx %s, %s" (opr dst) (opr src)
-    | Movdq(t,d,s,align,name) ->
+    | Movdq(td,d,ts,s,align,name) ->
       Printf.sprintf "%s %s, %s" name (opr d) (opr s)
     | Palignr(t,dst,src,imm) -> Printf.sprintf "palignr %s, %s, %s" (opr dst) (opr src) (opr imm)
+    | Pshufd(dst,src,imm) -> Printf.sprintf "palignr %s, %s, %s" (opr dst) (opr src) (opr imm)
     | Pcmpeq(t,elet,dst,src) -> Printf.sprintf "pcmpeq %s, %s" (opr dst) (opr src)
     | Pmovmskb(t,dst,src) -> Printf.sprintf "pmovmskb %s, %s" (opr dst) (opr src)
     | Lea(r,a) -> Printf.sprintf "lea %s, %s" (opr r) (opr (Oaddr a))
@@ -1348,25 +1379,33 @@ let parse_instr g addr =
                  (Palignr(prefix.mopsize, r, rm, i), na)
              | b3 -> disfailwith (Printf.sprintf "unsupported opcode %02x %02x %02x" b1 b2 b3)
           )
-      | 0x28 | 0x29 | 0x6f | 0x7f ->
-	let opsize, align, name =
+      | 0x28 | 0x29 | 0x6e | 0x7e | 0x6f | 0x7f ->
+	let tdest, tsrc, align, name =
           if prefix.opsize = r16 then
-            let name = match b2 with
-              | 0x6f | 0x7f -> "movdqa"
-              | 0x28 | 0x29 -> "movapd"
+            let name, align, tsrc = match b2 with
+              | 0x28 | 0x29 -> "movapd", true, prefix.mopsize
+              | 0x6f | 0x7f -> "movdqa", true, prefix.mopsize
+              | 0x6e | 0x7e -> "movd", false, r32
               | _ -> disfailwith "opcode case missing, please fill it in"
             in
-            prefix.mopsize, true, name
+            prefix.mopsize, tsrc, align, name
           else if prefix.repeat then
-            r128, false, "movdqu"
+            r128, r128, false, "movdqu"
           else if pref = [] && (b2 = 0x28 || b2 = 0x29) then
-            r128, true, "movaps"
+            r128, r128, true, "movaps"
           else
             disfailwith "Unimplemented"
         in
 	let r, rm, na = parse_modrm32 na in
-	let s,d = if b2 = 0x6f || b2 = 0x28 then rm, r else r, rm in
-	(Movdq(opsize,d,s,align,name), na)
+	let (tsrc, s), (tdest, d) = match b2 with
+          | 0x6f | 0x6e | 0x28 -> (tsrc, rm), (tdest, r)
+          | _ -> (tdest, r), (tsrc, rm)
+        in
+	(Movdq(tdest,d,tsrc,s,align,name), na)
+      | 0x70 when prefix.opsize = r16 ->
+          let r, rm, na = parse_modrm prefix.opsize na in
+          let i, na = parse_imm8 na in
+          (Pshufd(r, rm, i), na)
       | 0x74 | 0x75 | 0x76 as o ->
         let r, rm, na = parse_modrm32 na in
         let elet = match o with | 0x74 -> r8 | 0x75 -> r16 | 0x76 -> r32 | _ -> disfailwith "impossible" in
