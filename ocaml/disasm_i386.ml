@@ -511,9 +511,10 @@ let rec to_ir addr next ss pref =
       | Oaddr a -> op2e ts s, [a]
       | Oimm _ -> disfailwith "invalid"
     in
+    let b = Typecheck.bits_of_width in
     let s =
-      if td > ts then cast_unsigned td s
-      else if td < ts then cast_low td s
+      if b td > b ts then cast_unsigned td s
+      else if b td < b ts then cast_low td s
       else s
     in
     let (d, al) = match d with
@@ -1381,25 +1382,26 @@ let parse_instr g addr =
           )
       | 0x28 | 0x29 | 0x6e | 0x7e | 0x6f | 0x7f ->
 	let tdest, tsrc, align, name =
-          if prefix.opsize = r16 then
-            let name, align, tsrc = match b2 with
-              | 0x28 | 0x29 -> "movapd", true, prefix.mopsize
-              | 0x6f | 0x7f -> "movdqa", true, prefix.mopsize
-              | 0x6e | 0x7e -> "movd", false, r32
-              | _ -> disfailwith "opcode case missing, please fill it in"
-            in
-            prefix.mopsize, tsrc, align, name
-          else if prefix.repeat then
+          if prefix.repeat then
             r128, r128, false, "movdqu"
           else if pref = [] && (b2 = 0x28 || b2 = 0x29) then
             r128, r128, true, "movaps"
           else
-            disfailwith "Unimplemented"
+            let name, align, tsrc, tdest = match b2 with
+              | 0x28 | 0x29 -> "movapd", true, prefix.mopsize, prefix.mopsize
+              | 0x6f | 0x7f -> "movdqa", true, prefix.mopsize, prefix.mopsize
+              | 0x6e -> (* Move doubleword from r/m32 to mm *)
+                "movd", false, r32, prefix.mopsize
+              | 0x7e -> (* Move doubleword from mm to r/m32 *)
+                "movd", false, prefix.mopsize, r32
+              | _ -> disfailwith "mov opcode case missing, please fill it in"
+            in
+            tdest, tsrc, align, name
         in
 	let r, rm, na = parse_modrm32 na in
 	let (tsrc, s), (tdest, d) = match b2 with
           | 0x6f | 0x6e | 0x28 -> (tsrc, rm), (tdest, r)
-          | _ -> (tdest, r), (tsrc, rm)
+          | _ -> (tsrc, r), (tdest, rm)
         in
 	(Movdq(tdest,d,tsrc,s,align,name), na)
       | 0x70 when prefix.opsize = r16 ->

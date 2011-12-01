@@ -10,7 +10,8 @@ open Typecheck
 
 (* exp helpers *)
 let binop op a b = match (a,b) with
-  | (Int(a, at), Int(b, bt)) when at = bt ->
+  | (Int(a, at), Int(b, bt)) ->
+    assert (at = bt);
     let (i,t) = Arithmetic.binop op (a,at) (b,bt) in
     Int(i,t)
   | _ -> BinOp(op, a, b)
@@ -20,6 +21,18 @@ let unop op a = match a with
       let (i,t) = Arithmetic.unop op (a,at) in
       Int(i,t)
   | _ -> UnOp(op, a)
+
+let concat a b = match a,b with
+  | Int(a, at), Int(b, bt) ->
+    let (i,t) = Arithmetic.concat (a,at) (b,bt) in
+    Int(i,t)
+  | _ -> Concat(a, b)
+
+let extract h l e = match e with
+  | Int(i, t) ->
+    let (i,t) = Arithmetic.extract h l (i,t) in
+    Int(i,t)
+  | _ -> Extract(h, l, e)
 
 let ( +* ) a b   = binop PLUS a b
 let ( -* ) a b   = binop MINUS a b
@@ -39,7 +52,7 @@ let (>=* ) a b   = binop LE b a
 (** bitwise equality *)
 let ( =* ) a b   = binop XOR a (unop NOT b)
 
-let ( ++* ) a b   = Concat (a, b)
+let ( ++* ) a b   = concat a b
 
 let cast_low t e = Cast(CAST_LOW, t, e)
 let cast_high t e = Cast(CAST_HIGH, t, e)
