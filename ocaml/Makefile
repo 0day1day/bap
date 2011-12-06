@@ -98,7 +98,6 @@ export SOURCES = \
 	test_common.ml \
 	template.ml \
 	syscall_id.ml \
-	traces_merge.ml \
 	graphDataflowW.ml \
 	$(SOLVER_SOURCES) \
 	$(PROJSOURCES) \
