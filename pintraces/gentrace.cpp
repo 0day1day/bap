@@ -1,5 +1,4 @@
 #include "pin.H"
-#include "pin_misc.h"
 
 #include <cassert>
 #include <iostream>
@@ -23,8 +22,6 @@
 
 #include "pin_taint.h"
 
-#include "pinregs.h"
-
 using namespace pintrace;
 
 const ADDRINT ehandler_fs_offset = 0;
@@ -35,10 +32,6 @@ const ADDRINT ehandler_size = 8;
 /** The offset esp has from when the exception is initially handled to
     when the handler is called. */
 const ADDRINT ehandler_esp_offset = 0xe0;
-
-const ADDRINT page_size = (1 << 12);
-const ADDRINT num_pages = (1LL << 32) / page_size;
-const ADDRINT max_dump_addr = 0xc0000000;
 
 const int maxSehLength = 10;
 
@@ -438,6 +431,26 @@ ThreadInfo_t* NewThreadInfo(void) {
   PIN_SetThreadData(tl_key, ti, PIN_ThreadId());
 
   return ti;
+}
+
+/** Given a REG, return a trace type (or VT_NONE for failure) */
+static uint32_t GetTypeOfReg(REG r) {
+  if (REG_is_gr8(r)) return VT_REG8;
+  if (REG_is_gr16(r)) return VT_REG16;
+  if (REG_is_gr32(r)) return VT_REG32;
+  if (REG_is_gr64(r)) return VT_REG64;
+
+  string s = REG_StringShort(r);
+
+  if (s == "eip" || s == "eflags") {
+    // No problem for these
+    return VT_REG32;
+  }
+
+  // Otherwise, print a warning...
+  
+  cerr << "Warning: Unknown register size of register " << REG_StringShort(r) << endl;
+  return VT_NONE;
 }
 
 static uint32_t GetRegType(INS ins, uint32_t i) {
@@ -1068,53 +1081,8 @@ VOID AppendBuffer(ADDRINT addr,
      if (firstLogged) {
        cerr << "First logged instruction" << endl;
        firstLogged = false;
-       std::map<addr_t, uint8_t> memmap;
-
-       KeyFrameGeneral kf;
-       kf.pos = -1; // Not correct
-       kf.numRegs = pinctxregs_size;
-       kf.regIds = new uint32_t[pinctxregs_size];
-       kf.regTypes = new uint32_t[pinctxregs_size];
-       kf.regValues = new union pintrace::PIN_REGISTER[pinctxregs_size];
-       kf.numMems = 0; // For now
-
-       for (uint32_t i = 0; i < pinctxregs_size; i++) {
-         kf.regIds[i] = pinctxregs[i];
-         kf.regTypes[i] = GetTypeOfReg(static_cast<REG> (kf.regIds[i]));
-         kf.regValues[i].dword[0] = PIN_GetContextReg(ctx, static_cast<REG> (kf.regIds[i]));
-       }
-
-       for (uint8_t *p = 0; p < (uint8_t*)max_dump_addr; p += page_size) {
-         uint8_t buf;
-         if (PIN_SafeCopy(&buf, p, 1) == 1) {
-           cerr << "new page dude " << (uint32_t) p << endl;
-           /* Cool, this page is mapped. */
-           for (uint8_t *addr = p; addr < p + page_size; addr++) {
-             assert(PIN_SafeCopy(&buf, addr, 1) == 1);
-             //cerr << "Address " << (uint32_t)addr << " is mapped to " << (uint32_t) buf << endl;
-             memmap[(addr_t)(addr)] = buf;
-           }
-         }
-       }
-
-       cerr << "done" << endl;
-
-       kf.numMems = memmap.size();
-       kf.memAddrs = new uint32_t[kf.numMems];
-       kf.memValues = new uint8_t[kf.numMems];
-       {
-         typedef std::map<addr_t, uint8_t>::iterator it;
-         int j = 0;
-         for (it i = memmap.begin(); i != memmap.end(); i++, j++) {
-           kf.memAddrs[j] = (*i).first;
-           kf.memValues[j] = (*i).second;
-           cerr << "Addr: " << (*i).first << " value: " << (uint32_t) ((*i).second) << endl;
-         }
-       }
-
-       g_tw->add(kf);
      }
-
+     
      if (has_taint && firstTaint) {
        cerr << "First tainted instruction" << endl;
        LOG("First tainted instruction.\n");

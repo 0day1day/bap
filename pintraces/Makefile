@@ -69,7 +69,7 @@ endif
 ##############################################################
 
 
-TOOL_ROOTS = gentrace ctxtest
+TOOL_ROOTS = gentrace #ctxtest
 
 TOOLS = $(TOOL_ROOTS:%=$(OBJDIR)%$(PINTOOL_SUFFIX))
 
@@ -129,7 +129,7 @@ listregs: listregs.cpp
 pinregs.h : listregs $(OBJDIR)ctxtest$(PINTOOL_SUFFIX)
 	./listregs pinregs.h
 
-gentrace.cpp : pinregs.h
+#gentrace.cpp : pinregs.h
 
 $(TOOLS): $(PIN_LIBNAMES)
 
