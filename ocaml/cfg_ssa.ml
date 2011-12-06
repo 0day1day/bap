@@ -517,10 +517,6 @@ let rm_phis ?(dsa=false) ?(attrs=[]) cfg =
   (* split edges if needed *)
   let cfg = if dsa then split_edges cfg else cfg in
 
-  let oc = open_out "ssa.dot" in
-  Cfg_pp.SsaStmtsDot.output_graph oc cfg;
-  close_out oc;
-
   let cfg, phis =
     (* Remove all the phis from all the BBs *)
     (* FIXME: make this readable *)

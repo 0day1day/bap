@@ -58,7 +58,7 @@ module RToposort = Graph.Topological.Make(RevCFG);;
 
 (** Same as [wp] but for unstructured programs. *)
 let uwp ?(simp=Util.id) ((cfg,ugclmap):Ugcl.t) (q:exp) : exp =
-  dprintf "Starting uwp";
+  (* dprintf "Starting uwp"; *)
   (* Block -> exp *)
   let wpvar = BH.create (CA.G.nb_vertex cfg) in
   let lookupwpvar = BH.find wpvar in
@@ -103,7 +103,7 @@ let uwp ?(simp=Util.id) ((cfg,ugclmap):Ugcl.t) (q:exp) : exp =
 
 (** Same as [wp] but for unstructured programs. *)
 let efficient_uwp ?(simp=Util.id) ((cfg,ugclmap):Ugcl.t) (q:exp) : exp =
-  dprintf "Starting uwp";
+  (* dprintf "Starting uwp"; *)
   (* Block -> var *)
   let wpvar = BH.create (CA.G.nb_vertex cfg) in
   (* Var -> exp *)

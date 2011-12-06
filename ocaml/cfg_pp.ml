@@ -48,21 +48,21 @@ struct
   and edge_attributes _ _ = []
 end
 
-(* FIXME: Instead of having two of these we should take the graph
-   module and type f accordingly *)
-module FunSsaAttributor =
-struct
-  let f = ref (fun g v -> raise Not_found)
-  include DefAttributor
-  let vertex_attributes (g:'a) (v:'b) = try !f g v with Not_found -> []
-end
+(* (\* FIXME: Instead of having two of these we should take the graph *)
+(*    module and type f accordingly *\) *)
+(* module FunSsaAttributor = *)
+(* struct *)
+(*   let f = ref (fun g v -> raise Not_found) *)
+(*   include DefAttributor *)
+(*   let vertex_attributes (g:'a) (v:'b) = try !f g v with Not_found -> [] *)
+(* end *)
 
-module FunAstAttributor =
-struct
-  let f = ref (fun g v -> raise Not_found)
-  include DefAttributor
-  let vertex_attributes (g:'a) (v:'b) = try !f g v with Not_found -> []
-end
+(* module FunAstAttributor = *)
+(* struct *)
+(*   let f = ref (fun g v -> raise Not_found) *)
+(*   include DefAttributor *)
+(*   let vertex_attributes (g:'a) (v:'b) = try !f g v with Not_found -> [] *)
+(* end *)
 
 let edge_labels f e =
   match f e with
@@ -180,8 +180,8 @@ struct
 end
 module AstBBidDot = Graph.Graphviz.Dot(AstBBidPrinter)
 
-module SsaStmtsAttPrinter = MakeCfgPrinter (CS.G) (PrintSsaStmts) (FunSsaAttributor)
+module SsaStmtsAttPrinter = MakeCfgPrinter (CS.G) (PrintSsaStmts) (DefAttributor)
 module SsaStmtsAttDot = Graph.Graphviz.Dot(SsaStmtsAttPrinter)
 
-module AstStmtsAttPrinter = MakeCfgPrinter (CA.G) (PrintAstStmts) (FunAstAttributor)
+module AstStmtsAttPrinter = MakeCfgPrinter (CA.G) (PrintAstStmts) (DefAttributor)
 module AstStmtsAttDot = Graph.Graphviz.Dot(AstStmtsAttPrinter)
