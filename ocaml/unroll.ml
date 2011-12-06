@@ -147,11 +147,11 @@ let unroll_loop ?(count=8) cfg head body =
 
   let cfg = C.G.fold_vertex rename_targets cfg cfg in
 
-  let oc = Pervasives.open_out "unroll.dot" in
-  (*let ssa_func_cfg = Cfg_ssa.of_astcfg cfg in
-  Cfg_pp.SsaStmtsDot.output_graph oc ssa_func_cfg;*)
-  Cfg_pp.AstBBidDot.output_graph oc cfg;
-  Pervasives.close_out oc;
+  (* let oc = Pervasives.open_out "unroll.dot" in *)
+  (* (\*let ssa_func_cfg = Cfg_ssa.of_astcfg cfg in *)
+  (* Cfg_pp.SsaStmtsDot.output_graph oc ssa_func_cfg;*\) *)
+  (* Cfg_pp.AstBBidDot.output_graph oc cfg; *)
+  (* Pervasives.close_out oc; *)
   cfg
 (*
   let rename_targets cfg v =

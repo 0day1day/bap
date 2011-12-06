@@ -143,10 +143,10 @@ let repair_node g n =
 let repair_cfg g =
   (* XXX: Better implementation *)
   let p = Cfg_ast.to_prog g in
-  let oc = open_out "p.out" in
-  let pp = new Pp.pp_oc oc in
-  pp#ast_program p;
-  pp#close;
+  (* let oc = open_out "p.out" in *)
+  (* let pp = new Pp.pp_oc oc in *)
+  (* pp#ast_program p; *)
+  (* pp#close; *)
   let cfg = Cfg_ast.of_prog p in
   let cfg, entry = Cfg_ast.find_entry cfg in
   Reachable.AST.remove_unreachable cfg entry

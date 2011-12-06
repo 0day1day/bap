@@ -357,9 +357,7 @@ let passified_of_ssa ?entry ?exit cfg =
     | None -> None
   in
   let entry = convert entry and exit = convert exit in
-  dprintf "Converting cfg to gcl";
   let gcl = of_astcfg ?entry ?exit ast in
-  dprintf "Done converting cfg to gcl";
   let vars = ref [] in
   let rec convert_gcl g = 
     match g with
