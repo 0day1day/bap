@@ -1052,7 +1052,7 @@ endif
 			fi
 
 # A .cmi file can be created by creating it's implementation
-%$(EXT_OBJ) %.cmi : %$(IMPL_SUF) $(EXTRADEPS) ;
+%.$(EXT_OBJ) %.cmi : %$(IMPL_SUF) $(EXTRADEPS) ;
 %$(IMPL_SUF) : %.ml $(EXTRADEPS)
 			$(QUIET)pp=`sed -n -e '/^#/d' -e 's/(\*pp \([^*]*\) \*)/\1/p;q' $<`; \
 			if [ -z "$$pp" ]; then \

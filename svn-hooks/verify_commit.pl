@@ -114,7 +114,7 @@ print "Finished checking out repository $rep_url\n";
 
 # Set path variable so autogen will work
 $ENV{'PATH'} = '/bin:/usr/bin';
-#$ENV{'PIN_HOME'} = '/home/swhitman/pin/';
+$ENV{'PIN_HOME'} = '/home/swhitman/pin/';
 
 # configure
 print "Configuring\n";
