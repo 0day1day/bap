@@ -80,5 +80,9 @@ tags: TAGS
 TAGS:
 	-otags $^
 
+debug: dc
+	@echo ocamldebug -I $(BIGINT) -I $(BAP_OCAMLDIR) -I $(BATT) -I $(OUNIT) -I $(PCRE) -I $(OBJSIZE) program
+
 %:
 	make -f $(OCAMLMAKEFILE) subprojs SUBTARGET=$@
+

@@ -49,6 +49,7 @@ let bime = big_int_of_int (-0xe)
 let bimf = big_int_of_int (-0xf)
 
 let biconst i = big_int_of_int i
+let bi = biconst
 let biconst32 i = big_int_of_int32 i
 let biconst64 i = big_int_of_int64 i
 
