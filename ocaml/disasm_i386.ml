@@ -107,6 +107,7 @@ type opcode =
   | Pshufd of operand * operand * operand
   | Leave of typ
   | Interrupt of operand
+  | Sysenter
 
 (* prefix names *)
 let pref_lock = 0xf0
@@ -926,6 +927,8 @@ let rec to_ir addr next ss pref =
     ::to_ir addr next ss pref (Pop(t, o_ebp))
   | Interrupt(Oimm i) ->
     [Special(Printf.sprintf "int %Lx" i, [])]
+  | Sysenter ->
+    [Special("syscall", [])]
   | _ -> unimplemented "to_ir"
 
 let add_labels ?(asm) a ir =
@@ -1022,7 +1025,7 @@ module ToStr = struct
     | Cld -> "cld"
     | Leave _ -> "leave"
     | Interrupt(o) -> Printf.sprintf "int %s" (opr o)
-    (*_ -> unimplemented "op2str"*)
+    | Sysenter -> "sysenter"
 
   let to_string pref op =
     disfailwith "fallback to libdisasm"
@@ -1371,6 +1374,7 @@ let parse_instr g addr =
       match b2 with (* Table A-3 *)
       | 0x1f -> (Nop, na)
       | 0x31 -> (Rdtsc, na)
+      | 0x34 -> (Sysenter, na)
       | 0x3a ->
           let b3 = Char.code (g na) and na = s na in
           (match b3 with
