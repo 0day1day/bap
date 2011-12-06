@@ -29,7 +29,8 @@ let compute_dwp1 cfg post =
 
 
 let to_ssapassgcl cfg post =
-  let cfg = Hacks.remove_backedges cfg in
+  let cfg = Hacks.remove_cycles cfg in
+  let cfg = Coalesce.AST_Coalesce.coalesce cfg in
   let {Cfg_ssa.cfg=cfg; to_ssavar=tossa} = Cfg_ssa.trans_cfg cfg in
   let p = rename_astexp tossa post in
   let cfg =
@@ -39,10 +40,29 @@ let to_ssapassgcl cfg post =
   let (gcl, _) = Gcl.passified_of_ssa cfg in
   (gcl, p)
 
+let to_ugcl passify cfg post =
+  let cfg = Hacks.remove_cycles cfg in
+  let cfg = Coalesce.AST_Coalesce.coalesce cfg in
+  let {Cfg_ssa.cfg=cfg; to_ssavar=tossa} = Cfg_ssa.trans_cfg cfg in
+  let p = rename_astexp tossa post in
+  let cfg =
+    let vars = Formulap.freevars p in
+    Ssa_simp.simp_cfg ~liveout:vars ~usedc:!usedc ~usesccvn:!usesccvn cfg
+  in
+  let gcl = Ugcl.of_ssacfg ~passify:passify cfg in
+  (gcl, p)
 
 let compute_wp_boring cfg post =
-  let (gcl, post) = to_ssagcl cfg post in
+  let (gcl, post) = to_ssagcl ~usedc:!usedc ~usesccvn:!usesccvn cfg post in
   (Wp.wp gcl post, [])
+
+let compute_uwp_boring cfg post =
+  let (ugcl, p) = to_ugcl false cfg post in
+  (Wp.uwp ugcl p, [])
+
+let compute_uwp_passify cfg post =
+  let (ugcl, p) = to_ugcl true cfg post in
+  (Wp.efficient_uwp ugcl p, [])
 
 let compute_dwp ?(k=1) cfg post =
   let (gcl,p) = to_ssapassgcl cfg post in
@@ -130,6 +150,10 @@ let speclist =
      "<suffix> Add <suffix> to each variable name.")
   ::("-wp", Arg.Unit(fun()-> compute_wp := compute_wp_boring),
      "Use Dijkstra's WP, except with let instead of substitution.")
+  ::("-uwp", Arg.Unit(fun()-> compute_wp := compute_uwp_boring),
+     "Use WP for Unstructured Programs")
+  ::("-uwpe", Arg.Unit(fun()-> compute_wp := compute_uwp_passify),
+     "Use efficient WP for Unstructured Programs")
   ::("-dwp", Arg.Unit(fun()-> compute_wp := compute_dwp),
      "Use efficient directionless weakest precondition instead of the default")
   ::("-dwpk", Arg.Int(fun i-> compute_wp := compute_dwp ~k:i),

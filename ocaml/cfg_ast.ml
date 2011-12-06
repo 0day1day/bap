@@ -23,6 +23,10 @@ let create c l stmts =
   let c = C.add_vertex c v in
   (C.set_stmts c v stmts, v)
 
+(** Create BB_Entry in a graph *)
+let create_entry g =
+  create g BB_Entry [Comment("entry node",[])]
+
 (** Find BB_Entry in a graph, or raise an exception if not already present. *)
 let find_entry g =
   try
@@ -35,7 +39,7 @@ let find_error g =
   try
     g, C.find_vertex g BB_Error
   with Not_found ->
-    create g BB_Error [Label(Name "BB_ERROR", []); Assert(exp_false, [])]
+    create g BB_Error [Label(Name "BB_Error", []); Assert(exp_false, [])]
 
 (** Find BB_Exit in a graph, or add it if not already present. *)
 let find_exit g =
@@ -53,7 +57,7 @@ let find_indirect g =
 
 (** Build a CFG from a program *)
 let of_prog ?(special_error = true) p =
-  let (tmp, entry) = create (C.empty()) BB_Entry [Comment("entry node",[])] in
+  let (tmp, entry) = create_entry (C.empty()) in
   let (tmp, exit) = find_exit tmp in
   let (tmp, error) = find_error tmp in
   let (c, indirect) = find_indirect tmp in
@@ -61,18 +65,42 @@ let of_prog ?(special_error = true) p =
 
   let postponed_edges = Hashtbl.create 5700 in
   let indirect_target = ref false in
-  let add_indirect = function
+  let add_indirect_edge_to = function
     | Addr _ -> indirect_target := true
     | Name _ -> ()
   in
-  let add_new c revstmts addpred =
-    let c,v = C.create_vertex c (List.rev revstmts) in
-    dprintf "of_prog: added vertex %s" (v2s v);
-    let c = 
-      if !indirect_target then (
-      indirect_target := false;
-      C.add_edge c indirect v
-    ) else c
+  (* Check for a bb already in the graph that has the same statements.
+     This can happen for entry, exit, etc. *)
+  let find_duplicate c revstmts stmts = match stmts with
+    | Label(l, _)::_ ->
+      (try
+         let v = C.find_label c l in
+         let ostmts = C.get_stmts c v in
+         (* At this point, we are redefining a label which is bad.  If
+            the existing block and the new block are identical, we'll
+            just silently use the old block.  If not, C.set_stmts will
+            raise an exception because we are defining a label twice. *)
+         if full_stmts_eq stmts ostmts then
+           Some(v) else None
+       with Not_found -> None) (* The label does not exist *)
+    | _ -> None
+  in
+  let add_new_bb c revstmts addpred =
+    let stmts = List.rev revstmts in
+    let c,v = match find_duplicate c revstmts stmts with
+      | Some(v) ->
+        dprintf "Not adding duplicate bb of %s" (v2s v);
+        c,v
+      | None ->
+        let c,v = C.create_vertex c stmts in
+        dprintf "of_prog: added vertex %s" (v2s v);
+        let c =
+          if !indirect_target then (
+            indirect_target := false;
+            C.add_edge c indirect v)
+          else c
+        in
+        c,v
     in
     match addpred with
     | None -> (c,v)
@@ -86,13 +114,14 @@ let of_prog ?(special_error = true) p =
   *)
   let f (c, cur,onlylabs, addpred) s =
     let g () =
-      let (c,v) = add_new c (s::cur) addpred in
+      let (c,v) = add_new_bb c (s::cur) addpred in
       let for_later ?lab t = Hashtbl.add postponed_edges v (lab,t) in
       let c = match s with
 	| Jmp(t, _) -> for_later t; c
 	| CJmp(_,t,f,_) -> for_later ~lab:true t; for_later ~lab:false f; c
 	| Special _ -> C.add_edge c v error
 	| Halt _ -> C.add_edge c v exit
+        | Assert(e,_) when e === exp_false -> C.add_edge c v error
 	| _ -> failwith "impossible"
       in
       (c, [], true, None)
@@ -105,21 +134,23 @@ let of_prog ?(special_error = true) p =
     | Special _ (* specials are not error *) ->
 	(c, s::cur, onlylabs, addpred)
     | Label(l,_) when onlylabs ->
-	add_indirect l;
+	add_indirect_edge_to l;
 	(c, s::cur, true, addpred)
     | Label(l,_) ->
-	add_indirect l;
-	let c,v = add_new c cur addpred in
+	add_indirect_edge_to l;
+	let c,v = add_new_bb c cur addpred in
 	(c, [s], true, Some v)
+    | Assert(e,_) when e === exp_false ->
+      g()
     | Move _ | Assert _ ->
-	  (c, s::cur, false, addpred)
+      (c, s::cur, false, addpred)
     | Comment _ ->
-	(c, s::cur, onlylabs, addpred)
+      (c, s::cur, onlylabs, addpred)
   in
   let (c,last,_,addpred) = List.fold_left f (c,[],true,Some entry) p in
   let c = match last with
     | _::_ ->
-	let c,v = add_new c last addpred in
+	let c,v = add_new_bb c last addpred in
 	C.add_edge c v exit
     | [] -> match addpred with
       | None -> c
@@ -171,10 +202,13 @@ let to_prog c =
 	    | [] -> ()
 	    | suc::rest ->
 		match bh_find_option tails suc with
-		| Some succtail when cond tail suc ->
-		    dprintf "to_prog: joining %s with %s" (v2s tail) (v2s suc);
+		| Some succtail when cond tail suc &&
+                                     suc <> head ->
+                  assert (succtail <> head);
+                  assert (suc <> head);
+		    dprintf "to_prog: joining %s .. %s with %s .. %s" (v2s head) (v2s tail) (v2s suc) (v2s succtail);
 		    BH.add joined tail suc;
-		    BH.replace tails head (BH.find tails suc);
+		    BH.replace tails head succtail;
 		    BH.remove tails suc;
 		    grow_trace cond head
 		| _ -> (* suc is part of another trace, or cond failed *)
@@ -203,7 +237,7 @@ let to_prog c =
     try BH.find labs b
     with Not_found ->
       let rec find_label = function
-	| Label(l,[])::_ -> Some l
+	| Label(l,_)::_ -> Some l
 	| Comment _ :: xs -> find_label xs
 	| _ -> None
       in
@@ -224,9 +258,10 @@ let to_prog c =
 	    assert (C.G.V.equal dst d);
 	    let j = Jmp(exp_of_lab (get_label dst), []) in
 	    BH.replace hrevstmts src (j::get_revstmts src)
-	| _ ->
+	| l ->
+          let dests = List.fold_left (fun s n -> s^" "^v2s n) "" l in
 	    failwith("Cfg_ast.to_prog: no jump at end of block with > 1 succ: "
-		     ^ v2s src)
+		     ^ v2s src ^ " points to"^dests)
   in
   (* join traces without jumps *)
   grow_traces (fun b suc -> normal b && joinable suc && not(has_jump b));

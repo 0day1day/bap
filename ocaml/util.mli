@@ -13,6 +13,7 @@ val inc : int ref -> unit
 val dec : int ref -> unit
 *)
 
+val list_mem : ?eq:('a -> 'a -> bool) -> 'a -> 'a list -> bool
 val list_argmax : ?compare:('b -> 'b -> int) -> ('a -> 'b) -> 'a list -> 'a * 'b
 val list_union : 'a list -> 'a list -> 'a list
 val list_intersection : 'a list -> 'a list -> 'a list
@@ -52,8 +53,8 @@ val get_hash_keys : ?sort_keys:bool -> ('a, 'b) Hashtbl.t -> 'a list
 val change_ext : string -> string -> string
 val list_directory : ?sort_files:bool -> string -> string list
 
-val split_common_prefix : 'a list -> 'a list -> 'a list * 'a list * 'a list
-val split_common_suffix : 'a list -> 'a list -> 'a list * 'a list * 'a list
+val split_common_prefix : ?eq:('a -> 'a -> bool) -> 'a list -> 'a list -> 'a list * 'a list * 'a list
+val split_common_suffix : ?eq:('a -> 'a -> bool) -> 'a list -> 'a list -> 'a list * 'a list * 'a list
 
 val option_unwrap : ('a option) -> 'a
 val option_map : ('a -> 'b) -> 'a option -> 'b option

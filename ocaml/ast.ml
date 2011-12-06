@@ -101,20 +101,6 @@ let newlab =
      c := i + 1;
      Name(pref^string_of_int i))
 
-(** Create a single target cjmp. Uses a hopefully-unique label for the other. *)
-let cjmp c t =
-  let l = newlab ~pref:"nocjmp" () in
-  CJmp(c, t, exp_of_lab l, [])
-  :: Label(l, [])
-  :: []
-
-(** Create a single target cjmp with inverted condition.  Uses a hopefully-unique label for the other. *)
-let ncjmp c t =
-  let l = newlab ~pref:"nocjmp" () in
-  CJmp(c, exp_of_lab l, t, [])
-  :: Label(l, [])
-  :: []
-
 let num_exp = function
   | Load _ -> 0
   | Store _ -> 1
@@ -278,5 +264,24 @@ let full_stmt_eq s1 s2 = s1 = s2
 (*     else *)
 (*       false *)
 
+let is_indirectjump s =
+  let is_indirect_exp e = match lab_of_exp e with
+    | Some _ -> false
+    | None -> true
+  in
+match s with
+| Jmp(e, _) -> is_indirect_exp e (* Only jumps to labels are direct *)
+| CJmp(_, e1, e2, _) -> is_indirect_exp e1 || is_indirect_exp e2
+| _ -> false
+
+let is_syscall = function
+  | Special(("syscall"|"int 80"), _) -> true
+  | _ -> false
+
+let full_stmts_eq s1 s2 =
+  if (List.length s1) <> (List.length s2) then false
+  else List.for_all2 full_stmt_eq s1 s2
+
 let is_true a = a === exp_true
 let is_false a = a === exp_false
+

@@ -3,7 +3,7 @@
 (* Based off Vine_dataflow.DeadCode *)
 open Ssa
 
-module Debug = Debug.Make(struct let name = "DeadCode" and default=`NoDebug end)
+module Debug = Debug.Make(struct let name = "Deadcode" and default=`NoDebug end)
 module VH = Var.VarHash
 module C = Cfg.SSA
 module BH = Hashtbl.Make(C.G.V)

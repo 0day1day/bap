@@ -51,20 +51,23 @@ let linux_get_name = function
 
 (* Fill in system call models as needed *)
 let linux_get_model = function
-  | 1 as eax ->
+  | 1 ->
       (* exit *)
-      Some [
-        Comment (linux_get_name eax ^ " model", []);
-        (* Exit code is in ebx *)
-        Halt(Var Disasm_i386.ebx, []);
-      ]
+      (* Exit code is in ebx *)
+    Some(Halt(Var Disasm_i386.ebx, [])
+         :: [])
+  | 252 ->
+    (* exit group *)
+    Some(Halt(Var Disasm_i386.ebx, [])
+         :: [])
   | _ ->
       None
 
 let linux_syscall_to_il eax =
   match linux_get_model eax with
     | Some model ->
-        model
+      Comment((linux_get_name eax) ^ " model", [])
+      :: model
     | None ->
         let sys_name = linux_get_name eax in
         Special (sys_name, [])

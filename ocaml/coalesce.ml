@@ -3,6 +3,9 @@
 open BatListFull
 open Cfg
 
+module D=Debug.Make(struct let name="Coalesce" and default=`NoDebug end)
+open D
+
 module MakeCoalesce (C: CFG) =
 struct
   module G = C.G
@@ -40,7 +43,7 @@ struct
         in
         (* let's get the immediate successor nodes that follow the node.
            In this context, immediate means: n1 -> n2 -> n3 -> (n4|n5)
-           should return [n1; n2; n3] *)
+           should return [n3; n2; n1] *)
         let successors = immediate_succs [] init in
         if successors <> [] then (
           (* Now let's coalesce them cleverly *)
@@ -48,12 +51,9 @@ struct
           let all_stmts = List.map (C.get_stmts graph) successors in
           let big_stmt_block =
             List.fold_left (fun stmts ith_stmt -> C.join_stmts ith_stmt stmts)
-              C.default
-              all_stmts
+              (List.hd all_stmts)
+              (List.tl all_stmts)
           in
-          let big_stmt_block = C.join_stmts init_stmts big_stmt_block in
-          (* Replace the contents of init *)
-          let graph = C.set_stmts graph init big_stmt_block in
           (* add the edges to the successors *)
           let successors_of_successors_e = G.succ_e graph (List.hd successors) in
           let newsuccessors = G.succ graph (List.hd successors) in
@@ -64,6 +64,10 @@ struct
           let graph = List.fold_left add_edge graph successors_of_successors_e in
           (* Remove unused successors *)
           let graph = List.fold_left C.remove_vertex graph successors in
+
+          (* Replace the contents of init *)
+          let big_stmt_block = C.join_stmts init_stmts big_stmt_block in
+          let graph = C.set_stmts graph init big_stmt_block in
           add_visited init;
           (newsuccessors, graph)
         )

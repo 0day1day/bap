@@ -73,6 +73,7 @@ val bap_from_trace_file : ?atts:bool -> ?pin:bool -> string -> Ast.program
 val bap_stream_from_trace_file : ?atts:bool -> ?rate:int64 -> ?pin:bool -> string -> (Ast.stmt list) Stream.t
 
 val get_symbols : ?all:bool -> asmprogram -> asymbol array
+val find_symbol : asmprogram -> string -> asymbol
 
 val get_function_ranges : asmprogram -> (string * address_t * address_t) list
 
@@ -80,6 +81,10 @@ val get_all_asections : asmprogram -> section_ptr array
 
 val get_section_startaddr : asmprogram -> string -> address_t
 val get_section_endaddr : asmprogram -> string -> address_t
+
+(** Lowest address of program in memory *)
+val get_base_address : asmprogram -> address_t
+(** Start address of program *)
 val get_start_addr : asmprogram -> address_t
 
 val get_asm_instr_string : asmprogram -> address_t -> string

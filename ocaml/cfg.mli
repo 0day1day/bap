@@ -24,6 +24,9 @@ module BBid :
     val equal : 'a -> 'a -> bool
   end
 
+module BS : Set.S with type elt = BBid.t
+module BH : Hashtbl.S with type key = BBid.t
+module BM : Map.S with type key = BBid.t
 
 module type CFG =
 sig
@@ -56,10 +59,19 @@ sig
       with the given statements. *)
   val create_vertex : G.t -> lang -> G.t * G.V.t
 
+  (** Copy the metadata of a CFG without copying the vertices *)
+  val copy_map : G.t -> G.t
+
   (* extra builder-like stuff *)
   val remove_vertex : G.t -> G.V.t -> G.t
   val remove_edge : G.t -> G.V.t -> G.V.t -> G.t
   val remove_edge_e : G.t -> G.E.t -> G.t
+
+  (** Convert a vertex label to a string
+
+      XXX: Remove this or put in V
+  *)
+  val vlabel_to_string : G.V.label -> string
 
 end
 

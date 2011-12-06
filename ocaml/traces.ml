@@ -1,14 +1,15 @@
 (** A module to perform trace analysis *)
 
 open Ast
+open BatListFull
 open Big_int_Z
 open Big_int_convenience
 open Symbeval
 open Type
 open BatListFull
 
-module D = Debug.Make(struct let name = "TraceEval" and default=`NoDebug end)
-module DV = Debug.Make(struct let name = "TraceEvalVerbose" and default=`NoDebug end)
+module D = Debug.Make(struct let name = "Traces" and default=`NoDebug end)
+module DV = Debug.Make(struct let name = "TracesVerbose" and default=`NoDebug end)
 open D
 
 (** So here's how we will do partial symbolic execution on
@@ -616,7 +617,22 @@ let remove_jumps =
   in
     List.filter no_jmps
 
-(** Removing all specials from the traces *)
+(** Detect 'loaded module' specials *)
+let is_loaded =
+  let loaded = Str.regexp "^Loaded module " in
+  function
+    | Ast.Special(s, attrs) when Str.string_match loaded s 0 -> true
+    | _ -> false
+
+(** Remove 'Loaded module' specials *)
+let remove_loaded = 
+  let rs = function
+    | Ast.Special(s, attrs) as sfull when is_loaded sfull -> Ast.Comment(s, attrs)
+    | s -> s
+  in
+  List.map rs
+
+(** Removing all specials from the traces *)	
 let remove_specials =
   let no_specials = function
     | Ast.Special(_, attrs) when not (List.mem (StrAttr "TraceKeep") attrs) -> false
@@ -1011,8 +1027,8 @@ let rec get_next_label blocks =
 let fin tag = fun x -> (pdebug ("Run block finalized "^tag));;
 
 (** Running each block separately *)
-let run_block ?(next_label = None) state memv block = 
-  (** Search for metadata.  It will either be a comment with endseed or a label
+let run_block ?(next_label = None) ?(log=fun _ -> ()) ?(transformf = (fun s _ -> [s])) state memv block =  
+  (* Search for metadata.  It will either be a comment with endseed or a label
       with a context attribute.  If found update_concrete on that stmt, and if 
       it was a label set addr to that; execute the block.  If it's not found
       verify that all stmts are labels and comments.  Otherwise print a warning 
@@ -1117,7 +1133,7 @@ let run_block ?(next_label = None) state memv block =
       | _ -> failwith "Expected symbolic"
     in
     executed := Util.fast_append input_seeds !executed ;
-    executed := Util.fast_append (trace_transform_stmt stmt evalf) !executed ;
+    executed := Util.fast_append (transformf stmt evalf) !executed ; 
     (*print_endline (Pp.ast_stmt_to_string stmt) ;*)
 
     (* If we have a system call, run the model instead.
@@ -1224,7 +1240,7 @@ let run_blocks blocks memv length =
 	  block
 	| _ ->
 	  let l = get_next_label remaining in 
-	  run_block ~next_label:(l) state memv block)
+	  run_block ~next_label:(l) ~transformf:trace_transform_stmt state memv block)
       in
       (
 	(* If we are doing a consistency check, saving the concretized

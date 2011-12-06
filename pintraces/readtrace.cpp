@@ -26,7 +26,7 @@ int main(int argc, char **argv) {
 
       pintrace::Frame *f = tr.next();
 
-     // printf("No: %u Type: %d\n", tr.pos(), f->type);
+      printf("No: %u Type: %d\n", tr.pos(), f->type);
       
       switch(f->type) {
           case FRM_STD:
@@ -102,7 +102,14 @@ int main(int argc, char **argv) {
             printf("frame num = %Lx", kf->pos);
             break;
          }
-      case FRM_LOADMOD:
+          case FRM_KEY_GENERAL:
+          {
+            pintrace::KeyFrameGeneral *kf = (pintrace::KeyFrameGeneral *) f;
+            printf("Keyframe General.\n");
+            printf("Number of regs: %x\n", kf->numRegs);
+            break;
+          }
+          case FRM_LOADMOD:
          {
             pintrace::LoadModuleFrame *lm = (pintrace::LoadModuleFrame *) f;
             printf("Load Module.\n");

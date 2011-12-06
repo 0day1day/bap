@@ -11,6 +11,6 @@ val hash : t -> int
 val equal : t -> t -> bool
 val compare : t -> t -> int
 
-module VarHash : BatHashtbl.S with type key = t
+module VarHash : Hashtbl.S with type key = t
 module VarMap : Map.S with type key = t
 module VarSet : Set.S with type elt = t

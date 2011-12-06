@@ -10,7 +10,6 @@
 #include <set>
 #include <vector>
 #include <string.h>
-#include "pin.H"
 #include "pin_frame.h"
 
 // Size of temporary buffers

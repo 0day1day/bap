@@ -4,10 +4,13 @@ $Id$
 *)
 module type B =
 sig
-  module G : Graph.Traverse.G
-
+  include Graph.Builder.S
+  (* val empty : unit -> G.t *)
   val remove_vertex : G.t -> G.V.t -> G.t
-
+  val copy_map : G.t -> G.t
+  val vlabel_to_string : G.V.label -> string
+  (* val add_vertex : G.t -> G.V.t -> G.t *)
+  (* val add_edge_e : G.t -> G.E.t -> G.t *)
 end
 
 module type Reach =
@@ -26,6 +29,7 @@ module type Reach =
     val unreachable : gt -> vt -> vt list
       
     val remove_unreachable : gt -> vt -> gt      
+    val remove_unreachable_copy : gt -> vt -> gt      
   end
 
 module Make :

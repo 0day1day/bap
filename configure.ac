@@ -71,11 +71,11 @@ AC_CHECK_FILE([$PIN_HOME],
 AM_CONDITIONAL([HAVE_PIN], [test x$HAVE_PIN = xtrue])
 
 # Checks for ocaml libraries
-ocamlfind query ocamlgraph
-if test $? != 0; then
-    echo "bap needs libocamlgraph-ocaml-dev"
-    exit -1
-fi
+dnl ocamlfind query ocamlgraph
+dnl if test $? != 0; then
+dnl     echo "bap needs libocamlgraph-ocaml-dev"
+dnl     exit -1
+dnl fi
 dnl ocamlfind query extlib
 dnl if test $? != 0; then
 dnl     echo "bap needs libextlib-ocaml-dev"
@@ -213,6 +213,9 @@ AC_CONFIG_FILES([Makefile
                  libasmir/apps/Makefile
                  libasmir/src/Makefile])
 AC_OUTPUT
+
+# Configure ocamlgraph
+(cd ocamlgraph-1.8 && ./configure)
 
 # Configure zarith
 (cd zarith-1.0 && ./configure)
