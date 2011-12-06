@@ -1,6 +1,9 @@
 open BatListFull
 open Type
 
+module D = Debug.Make(struct let name = "Cfg" and default=`NoDebug end)
+open D
+
 (* a label map *)
 module LM = Map.Make(struct type t = label let compare=compare end)
 
@@ -31,6 +34,7 @@ struct
   let equal = (=)
 end
 
+module BS = Set.Make(BBid)
 module BH = Hashtbl.Make(BBid)
 module BM = Map.Make(BBid)
 
@@ -59,11 +63,14 @@ sig
   val join_stmts : lang -> lang -> lang
   (*val newid : G.t -> bbid*)
   val create_vertex : G.t -> lang -> G.t * G.V.t
+  val copy_map : G.t -> G.t
 
   (* extra builder-like stuff *)
   val remove_vertex : G.t -> G.V.t -> G.t
   val remove_edge : G.t -> G.V.t -> G.V.t -> G.t
   val remove_edge_e : G.t -> G.E.t -> G.t
+
+  val vlabel_to_string : G.V.label -> string
 
 end
 
@@ -81,14 +88,14 @@ sig
   val default : t
   val join : t -> t -> t
   val iter_labels : (label->unit) -> t -> unit
+  val to_string : t -> string
 end
 
 (* Begin persistent implementation *)
 module MakeP (Lang: Language) =
 struct
   (* A simple implementation for now... We can worry about optimizing later. *)
-  (* FIXME: we really want a labeled bidirectional graph *)
-  module G' = Graph.Persistent.Digraph.ConcreteLabeled(BBid)(E)
+  module G' = Graph.Persistent.Digraph.ConcreteBidirectionalLabeled(BBid)(E)
 
   type lang = Lang.t
 
@@ -116,19 +123,20 @@ struct
 
     (* boring wrappers *)
 
-    let is_empty     x = G'.is_empty x.g
-    let nb_vertex    x = G'.nb_vertex x.g
-    let nb_edges     x = G'.nb_edges     x.g
-    let out_degree   x = G'.out_degree	 x.g
-    let in_degree    x = G'.in_degree	 x.g
-    let mem_vertex   x = G'.mem_vertex	 x.g
-    let mem_edge     x = G'.mem_edge     x.g
-    let mem_edge_e   x = G'.mem_edge_e   x.g
-    let find_edge    x = G'.find_edge	 x.g
-    let succ	     x = G'.succ	 x.g
-    let pred	     x = G'.pred	 x.g
-    let succ_e	     x = G'.succ_e	 x.g
-    let pred_e	     x = G'.pred_e       x.g
+    let is_empty    	 x = G'.is_empty        x.g
+    let nb_vertex        x = G'.nb_vertex       x.g
+    let nb_edges         x = G'.nb_edges        x.g
+    let out_degree       x = G'.out_degree      x.g
+    let in_degree        x = G'.in_degree       x.g
+    let mem_vertex       x = G'.mem_vertex      x.g
+    let mem_edge         x = G'.mem_edge        x.g
+    let mem_edge_e       x = G'.mem_edge_e      x.g
+    let find_edge        x = G'.find_edge	x.g
+    let find_all_edges   x = G'.find_all_edges	x.g
+    let succ	         x = G'.succ            x.g
+    let pred	         x = G'.pred            x.g
+    let succ_e	         x = G'.succ_e          x.g
+    let pred_e	         x = G'.pred_e          x.g
 
     let iter_vertex  x y = G'.iter_vertex x y.g
     let iter_edges   x y = G'.iter_edges  x y.g
@@ -185,7 +193,17 @@ struct
     let set_stmts c v s =
       let c = remove_labels c v in
       let sm = BM.add v s c.s in
-      let lm = fold_labels (fun l lm -> LM.add l v lm) s c.l in
+      let lm = fold_labels
+        (fun l lm ->
+          (* dprintf "Adding label %s to bbid %s" (Pp.label_to_string l) (bbid_to_string (V.label v)); *)
+          if debug && LM.mem l lm then (
+            (* wprintf "stmt: %s" (Lang.to_string s); *)
+            let oldstmts = get_stmts c (LM.find l lm) in
+            let newstmts = s in
+            wprintf "Duplicate of %s:\n\noldstmts: %s\n\n newstmts: %s" (Pp.label_to_string l) (Lang.to_string oldstmts) (Lang.to_string newstmts);
+            failwith (Printf.sprintf "Duplicate of %s" (Pp.label_to_string l)));
+          LM.add l v lm
+        ) s c.l in
       { c with l=lm; s=sm }
 
     let newid c =
@@ -217,6 +235,8 @@ struct
     let map_vertex f c =
       failwith "map_vertex: unimplemented"
 
+    let copy_map {s=s; l=l; nextid = nextid} = {g = G'.empty; s=s; l=l; nextid=nextid}
+
   end (* module G *)
 
   (* Copied from ocamlgraph's Builder.P so that G doesn't eat our extensions *)
@@ -239,6 +259,10 @@ struct
   let join_stmts = G.join_stmts
   let newid = G.newid
   let create_vertex = G.create_vertex
+  let copy_map = G.copy_map
+
+  let vlabel_to_string = bbid_to_string
+
 end
 (* end persistent implementation *)
 
@@ -253,6 +277,7 @@ struct
     | _ -> BatList.append sl1 sl2
   let iter_labels f =
     List.iter (function Ast.Label(l, _) -> f l  | _ -> () )
+  let to_string stmts = List.fold_left (fun acc s -> acc^" "^(Pp.ast_stmt_to_string s)) "" stmts
 end
 
 module LangSSA =
@@ -269,6 +294,7 @@ struct
       | Ssa.Comment _ :: xs -> g xs
       | _ -> ()
     in g
+  let to_string stmts = List.fold_left (fun acc s -> acc^" "^(Pp.ssa_stmt_to_string s)) "" stmts
 end
 
 module AST = Make(LangAST)

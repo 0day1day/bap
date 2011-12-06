@@ -330,6 +330,13 @@ conc_map_vec * asmir_frame_get_operands(trace_frame_t *tf) {
         return f->getOperands();
         break;
       }
+
+      case pintrace::FRM_KEY_GENERAL:
+      {
+        pintrace::KeyFrameGeneral *f = dynamic_cast <pintrace::KeyFrameGeneral*> (tf);
+        return f->getOperands();
+        break;
+      }
       
       default:
         return NULL;

@@ -362,6 +362,9 @@ let speclist =
      Arg.Clear Traces.dce,
      "Disable trace optimizations"
     )
+  ::("-trace-merge",
+     uadd(TransformAst(Traces_merge.do_merge)),
+     "This will do something specific later.")
   :: ("-normalize-mem", uadd(TransformAst Memory2array.coerce_prog),
       "Normalize memory accesses as array accesses")
   :: ("-prune-cfg",
@@ -372,8 +375,8 @@ let speclist =
   :: ("-unroll",
       Arg.Int (fun i -> add (TransformAstCfg(Unroll.unroll_loops ~count:i))),
       "<n> Unroll loops n times")
-  :: ("-rm-backedges", uadd(TransformAstCfg Hacks.remove_backedges),
-      "Remove backedges")
+  :: ("-rm-cycles", uadd(TransformAstCfg Hacks.remove_cycles),
+      "Remove cycles")
   :: ("-typecheck", uadd(TransformAst typecheck),
       "Typecheck program")
   :: Input.speclist

@@ -7,6 +7,19 @@ open Big_int_convenience
 open Type
 open Typecheck
 
+(** Create a single target cjmp. Uses a hopefully-unique label for the other. *)
+let cjmp c t =
+  let l = newlab ~pref:"nocjmp" () in
+  CJmp(c, t, exp_of_lab l, [])
+  :: Label(l, [])
+  :: []
+
+(** Create a single target cjmp with inverted condition.  Uses a hopefully-unique label for the other. *)
+let ncjmp c t =
+  let l = newlab ~pref:"nocjmp" () in
+  CJmp(c, exp_of_lab l, t, [])
+  :: Label(l, [])
+  :: []
 
 (* exp helpers *)
 let binop op a b = match (a,b) with

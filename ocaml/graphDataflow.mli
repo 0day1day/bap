@@ -54,7 +54,7 @@ module type DATAFLOW =
     val transfer_function : G.t -> G.V.t -> L.t -> L.t
       
     (** the starting node for the analysis *)
-    val s0 : G.V.t
+    val s0 : G.t -> G.V.t
 
     (** the initial value for analysis. This is what s0 should start
 	out with. All other nodes start out with Top *)

@@ -69,11 +69,12 @@ endif
 ##############################################################
 
 
-TOOL_ROOTS = gentrace 
+TOOL_ROOTS = gentrace #ctxtest
 
 TOOLS = $(TOOL_ROOTS:%=$(OBJDIR)%$(PINTOOL_SUFFIX))
 
-OBJS = $(OBJDIR)pin_taint.o $(OBJDIR)winsyscalls.o $(OBJDIR)pivot.o
+#OBJS = $(OBJDIR)pin_taint.o $(OBJDIR)pin_frame.o $(OBJDIR)winsyscalls.o $(OBJDIR)pivot.o
+OBJS = $(OBJDIR)pivot.o $(OBJDIR)pin_trace.o $(OBJDIR)pin_taint.o $(OBJDIR)pin_frame.o $(OBJDIR)winsyscalls.o $(OBJDIR)pin_misc.o
 
 CXXFLAGS += -I../libasmir/include -I../libasmir/src/traces
 
@@ -85,35 +86,35 @@ TRACEDIR = ../libasmir/src/traces
 #
 ##############################################################
 
-all: tools reader
+all: listregs tools reader
 tools: $(OBJDIR) $(TOOLS)
 test: $(OBJDIR) $(TOOL_ROOTS:%=%.test)
-
-gentrace.test: $(OBJDIR)cp-pin.exe
-	$(MAKE) -k -C MyPinTool PIN_HOME=$(PIN_HOME)
-
-$(OBJDIR)cp-pin.exe:
-	$(CXX) $(PIN_HOME)/source/tools/Tests/cp-pin.cpp $(APP_CXXFLAGS) -o $(OBJDIR)cp-pin.exe
 
 $(OBJDIR):
 	-mkdir "$(OBJDIR)"
 
-$(OBJDIR)gentrace.o : gentrace.cpp $(OBJDIR)pivot.o $(OBJDIR)pin_taint.o $(OBJDIR)pin_frame.o $(OBJDIR)pin_trace.o $(OBJDIR)winsyscalls.o
+#$(OBJDIR)gentrace.o : gentrace.cpp 
+#	$(CXX) -c $(CXXFLAGS) $(PIN_CXXFLAGS) ${OUTOPT}$@ $<
+
+#$(OBJDIR)pivot.o : pivot.cpp
+#	$(CXX) -c $(CXXFLAGS) $(PIN_CXXFLAGS) ${OUTOPT}$@ $<
+
+#$(OBJDIR)pin_frame.o : $(TRACEDIR)/pin_frame.cpp
+#	$(CXX) -c $(CXXFLAGS) $(PIN_CXXFLAGS) ${OUTOPT}$@ $<
+
+#$(OBJDIR)pin_trace.o : $(TRACEDIR)/pin_trace.cpp
+#	$(CXX) -c $(CXXFLAGS) $(PIN_CXXFLAGS) ${OUTOPT}$@ $<
+
+#$(OBJDIR)pin_taint.o : $(TRACEDIR)/pin_taint.cpp
+#	$(CXX) -c $(CXXFLAGS) $(PIN_CXXFLAGS) ${OUTOPT}$@ $<
+
+#$(OBJDIR)winsyscalls.o : $(TRACEDIR)/winsyscalls.cpp
+#	$(CXX) -c $(CXXFLAGS) $(PIN_CXXFLAGS) ${OUTOPT}$@ $<
+
+$(OBJDIR)%.o : $(TRACEDIR)/%.cpp
 	$(CXX) -c $(CXXFLAGS) $(PIN_CXXFLAGS) ${OUTOPT}$@ $<
 
-$(OBJDIR)pivot.o : pivot.cpp
-	$(CXX) -c $(CXXFLAGS) $(PIN_CXXFLAGS) ${OUTOPT}$@ $<
-
-$(OBJDIR)pin_frame.o : $(TRACEDIR)/pin_frame.cpp
-	$(CXX) -c $(CXXFLAGS) $(PIN_CXXFLAGS) ${OUTOPT}$@ $<
-
-$(OBJDIR)pin_trace.o : $(TRACEDIR)/pin_trace.cpp
-	$(CXX) -c $(CXXFLAGS) $(PIN_CXXFLAGS) ${OUTOPT}$@ $<
-
-$(OBJDIR)pin_taint.o : $(TRACEDIR)/pin_taint.cpp
-	$(CXX) -c $(CXXFLAGS) $(PIN_CXXFLAGS) ${OUTOPT}$@ $<
-
-$(OBJDIR)winsyscalls.o : $(TRACEDIR)/winsyscalls.cpp
+$(OBJDIR)%.o : %.cpp
 	$(CXX) -c $(CXXFLAGS) $(PIN_CXXFLAGS) ${OUTOPT}$@ $<
 
 reader: readtrace.cpp $(OBJDIR)pin_frame.o $(OBJDIR)pin_trace.o
@@ -122,15 +123,22 @@ reader: readtrace.cpp $(OBJDIR)pin_frame.o $(OBJDIR)pin_trace.o
 pivottest: $(OBJDIR)pivot.o pivottest.cpp
 	$(CXX) -o $@ $^ $(CXXFLAGS) $(PIN_CXXFLAGS)
 
+listregs: listregs.cpp
+	$(CXX) -o $@ $^ $(CXXFLAGS) $(PIN_CXXFLAGS)
+
+pinregs.h : listregs $(OBJDIR)ctxtest$(PINTOOL_SUFFIX)
+	./listregs pinregs.h
+
+#gentrace.cpp : pinregs.h
+
 $(TOOLS): $(PIN_LIBNAMES)
 
-$(TOOLS): %$(PINTOOL_SUFFIX) : %.o
+$(TOOLS): %$(PINTOOL_SUFFIX) : %.o $(OBJS)
 	${PIN_LD} $(PIN_LDFLAGS) $(LINK_DEBUG) ${LINK_OUT}$@ $(OBJS) $< ${PIN_LPATHS} $(PIN_LIBS) $(DBG)
-
 
 ## cleaning
 clean:
-	-$(RM) "$(OBJDIR)" *.out *.tested *.failed makefile.copy reader
+	-$(RM) "$(OBJDIR)" *.out *.tested *.failed makefile.copy reader pinregs.h listregs
 
 tags: 
 

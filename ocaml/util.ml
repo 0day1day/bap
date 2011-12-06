@@ -46,6 +46,12 @@ let mapn f n =
   List.rev (foldn (fun l i -> f(n-i)::l) [] n)
   (* List.rev is needed to make side effects happen in the same order *)
 
+let rec list_mem ?(eq=(=)) ele = function
+  | hd::tl ->
+    if eq hd ele then true
+    else list_mem ~eq ele tl
+  | [] -> false
+
 (** @return the arg max of [f] where the arguments come from [l] *)
 let list_argmax ?(compare=compare) f = function
   | [] -> raise (Invalid_argument "list_argmax")
@@ -174,18 +180,20 @@ let list_unique l =
   List.iter (fun x -> Hashtbl.replace h x ()) l;
   Hashtbl.fold (fun k () ul -> k::ul) h [] 
 
-let rec split_common_prefix la lb = 
-  match la,lb with
-  | [], _ -> ([], la, lb)
-  | _, [] -> ([], la, lb)
-  | h1::t1, h2::t2 ->
-      if h1 = h2 then
-	let (a,b,c) = split_common_prefix t1 t2 in
-	(h1::a, b, c)
-      else ([], la, lb)
+let rec split_common_prefix ?(eq=(=)) la lb = 
+  let rec split_common_prefix_h acc la lb =
+    match la,lb with
+    | [], _ -> (List.rev acc, la, lb)
+    | _, [] -> (List.rev acc, la, lb)
+    | h1::t1, h2::t2 ->
+      if eq h1 h2 then
+	split_common_prefix_h (h1::acc) t1 t2
+      else (List.rev acc, la, lb)
+  in
+  split_common_prefix_h [] la lb
 
-let split_common_suffix la lb =
-  let (s,rla,rlb) = split_common_prefix (List.rev la) (List.rev lb) in
+let split_common_suffix ?(eq=(=)) la lb =
+  let (s,rla,rlb) = split_common_prefix ~eq (List.rev la) (List.rev lb) in
   (List.rev s, List.rev rla, List.rev rlb)
 
 (** a composition operator. [(f <@ g) x] = [f(g x)] *)

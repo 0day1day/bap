@@ -89,7 +89,7 @@ enum FrameType {
    // Invalid frame type.
    FRM_NONE = 0,
 
-   // Keyframe. Supplies all register values and invalidates cache.
+   // Keyframe. Supplies some register values
    FRM_KEY = 1,
 
    // "Regular" frame. Sufficient to handle majority of x86 instructions.
@@ -108,6 +108,10 @@ enum FrameType {
 
    // Exception frame
    FRM_EXCEPT = 7,
+
+   // Better key frame. Can supply all register values,
+   // memory mappings, or both
+   FRM_KEY_GENERAL = 8,
 };
 
 
@@ -471,6 +475,64 @@ enum FrameType {
 
    };
 
+   /*
+    * KeyFrameGeneral: Keyframe, contains many register or memory locations
+    *
+    * Packed format:
+    *    8 bytes -> Position (pos)
+    *    4 bytes -> numRegs
+    *    4 bytes -> numMems
+    *    The rest is variable.
+    */
+   struct KeyFrameGeneral : public Frame {
+
+     uint64_t pos;
+     uint32_t numRegs; /* Number of registers */
+     uint32_t* regIds; /* Array of numRegs register ids */
+     uint32_t* regTypes; /* Array of numRegs register types */
+     PIN_REGISTER* regValues; /* Array of numRegs values */
+     uint32_t numMems; /* Number of memory locations included */
+     uint32_t* memAddrs; /* Array of numMems memory addresses */
+     uint8_t* memValues; /* Array of numMems memory values */
+     
+
+      KeyFrameGeneral() : Frame(FRM_KEY_GENERAL) {
+        regIds = NULL;
+        regTypes = NULL;
+        regValues = NULL;
+        memAddrs = NULL;
+        memValues = NULL;
+      }
+     /* Do a deep copy in the copy constructor */
+     KeyFrameGeneral(const KeyFrameGeneral &copy) : Frame(FRM_KEY_GENERAL) {
+       pos = copy.pos;
+       numRegs = copy.numRegs;
+       regIds = new uint32_t[numRegs];
+       std::copy(copy.regIds, copy.regIds+numRegs, regIds);
+       regTypes = new uint32_t[numRegs];
+       std::copy(copy.regTypes, copy.regTypes+numRegs, regTypes);
+       regValues = new union PIN_REGISTER[numRegs];
+       std::copy(copy.regValues, copy.regValues+numRegs, regValues);
+       numMems = copy.numMems;
+       memAddrs = new uint32_t[numMems];
+       std::copy(copy.memAddrs, copy.memAddrs+numMems, memAddrs);
+       memValues = new uint8_t[numMems];
+       std::copy(copy.memValues, copy.memValues+numMems, memValues);
+     }
+     ~KeyFrameGeneral() {
+       if (regIds) delete[] regIds;
+       if (regTypes) delete[] regTypes;
+       if (regValues) delete[] regValues;
+       if (memAddrs) delete[] memAddrs;
+       if (memValues) delete[] memValues;
+     }
+     virtual std::ostream &serialize(std::ostream &out, uint16_t sz = 0);
+     virtual std::istream &unserializePart(std::istream &in);
+#ifdef GET_OPERANDS
+     conc_map_vec * getOperands();
+#endif
+   };
+  
    /*
     * LoadModuleFrame : Records information about a loaded module.
     *

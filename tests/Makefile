@@ -12,15 +12,16 @@ export BIGINT=$(BAP_DIR)/zarith-1.0
 export BATT=$(BAP_DIR)/batteries-1.4.0/_build/src
 export OUNIT=$(BAP_DIR)/ounit-1.1.0/_build/src/
 export PCRE=$(BAP_DIR)/pcre-ocaml-release-6.2.2/lib
+export OCAMLGRAPH=$(BAP_DIR)/ocamlgraph-1.8
 export OBJSIZE=$(BAP_DIR)/objsize-0.16
 
 # Stop annoying warnings about big_int duplication!
 #export OCAMLFIND_IGNORE_DUPS_IN=$(BAP_DIR)/bigint-3.12/otherlibs/num
 
 #export PACKS = oUnit bigarray str ocamlgraph extlib unix
-export PACKS = bigarray str num ocamlgraph unix camomile
-export LIBS = zarith batteries oUnit pcre objsize bap
-export INCDIRS = $(BAP_OCAMLDIR) $(BIGINT) $(BATT) $(OUNIT) $(PCRE) $(OBJSIZE)
+export PACKS = bigarray str num unix camomile
+export LIBS = zarith batteries oUnit pcre objsize graph bap
+export INCDIRS = $(BAP_OCAMLDIR) $(BIGINT) $(BATT) $(OUNIT) $(PCRE) $(OCAMLGRAPH) $(OBJSIZE)
 
 # Include sources from ../ocaml in the automatically generated dependencies.
 export SOURCE_DIRS_IN = $(BAP_OCAMLDIR) $(BAP_PROJ_OCAMLDIR)

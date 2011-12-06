@@ -5,6 +5,7 @@ open Ast
 open Util
 open BatListFull
 
+module C = Cfg.AST
 module D = Debug.Make(struct let name = "Hacks" and default=`Debug end)
 open D
 
@@ -51,54 +52,101 @@ let assert_noof p =
     ) p
   in
   List.flatten il
-	   
 
-let remove_backedges cfg =
+type color = White | Gray | Black
+
+let remove_cycles cfg =
   let module C = Cfg.AST in
-  let a = [StrAttr "added by remove_backedeges"] in
-  let assert_false = Assert(exp_false, a) in
+  let a = StrAttr "added by remove_cycles" in
+  (* let assert_false = Assert(exp_false, a) in *)
+  let assert_false = Jmp(Lab("Bb_error"), a::[]) in
   let cfg, error = Cfg_ast.find_error cfg in
   let handle_backedge cfg e =
     let s = C.G.E.src e in
+    let l = C.G.E.label e in
     let revstmts = List.rev (C.get_stmts cfg s) in
     let revstmts = match revstmts with
       | Jmp(t,_)::rest ->
 	  assert_false::rest
       | CJmp(c,t1,t2,attrs)::rest ->
 	(* e is the label we are REMOVING *)
-	  let (t,c) = match C.G.E.label e with
-	    | Some true -> (t2, exp_not c)
-	    | Some false -> (t1, c)
-	    | None -> failwith "missing edge label from cjmp"
-	  in
-	Jmp(t, attrs)::Assert(c,a)::rest
+	(match l with
+	| Some true -> CJmp(c, Lab("BB_Error"), t2, a::attrs)
+	| Some false -> CJmp(c, t1, Lab("BB_Error"), a::attrs)
+	| None -> failwith "missing edge label from cjmp")
+          ::rest
       | rest -> assert_false::rest
     in
     let cfg = C.set_stmts cfg s (List.rev revstmts) in
     let cfg = C.remove_edge_e cfg e in
-    if C.G.succ cfg s = [] then C.add_edge cfg s error else cfg
+    let newedge = C.G.E.create s l (C.G.V.create Cfg.BB_Error) in
+    let cfg = C.add_edge_e cfg newedge in
+    cfg
   in
   let find_backedges cfg =
     let module H = Hashtbl.Make(Cfg.BBid) in
     let h = H.create (C.G.nb_vertex cfg)
     and entry = C.find_vertex cfg Cfg.BB_Entry in
-    let color v = try H.find h (C.G.V.label v) with Not_found -> false
+    let color v = try H.find h (C.G.V.label v) with Not_found -> White
     and setcolor v c = H.replace h (C.G.V.label v) c in
     let rec walk v edges=
       let walk_edge e edges =
 	let d = C.G.E.dst e in
-	if color d then e::edges
-	else walk d edges
+	if color d = White then walk d edges
+	else if color d = Gray then e::edges
+        else edges
       in
-      setcolor v true;
+      setcolor v Gray;
       let edges = C.G.fold_succ_e walk_edge cfg v edges in
-      setcolor v false;
+      setcolor v Black;
       edges
     in
     walk entry []
   in
+  dprintf "Removing backedges";
   let backedges = find_backedges cfg in
-  (* SUPER HACK ALERT XXXXXXXX. Fix the above algorithm; don't use two
-     colors *)
-  let backedges = Util.list_unique backedges in
+  (* I don't think we need this anymore... *)
+  (* let backedges = Util.list_unique backedges in *)
   List.fold_left handle_backedge cfg backedges
+
+(** Fix outgoing edges of [n] in [g] *)
+let repair_node g n =
+  let g, error = Cfg_ast.find_error g in
+  let g, exit = Cfg_ast.find_exit g in
+  let g, indirect = Cfg_ast.find_indirect g in
+  (* Some of this is copied from Cfg_ast.of_prog *)
+  let make_edge g v ?lab t =
+    let dst = lab_of_exp t in
+    let tgt = match dst with
+      | None -> indirect
+      | Some l ->
+	  try (C.find_label g l)
+	  with Not_found ->
+	    wprintf "Jumping to unknown label: %s" (Pp.label_to_string l);
+	    error
+      (* FIXME: should jumping to an unknown address be an error or indirect? *)
+    in
+    C.add_edge_e g (C.G.E.create v lab tgt)
+  in
+  let edges = C.G.succ_e g n in
+  let g = List.fold_left C.remove_edge_e g edges in
+  let stmts = C.get_stmts g n in
+  match List.rev stmts with
+  | Jmp(t, _)::_ -> make_edge g n t
+  | CJmp(_,t,f,_)::_ -> let g = make_edge g n ~lab:true t in
+                     make_edge g n ~lab:false f
+  | Special _::_ -> C.add_edge g n error
+  | Halt _::_ -> C.add_edge g n exit
+  | _ -> (* It's probably fine.  That's why this is in hacks.ml. *) g
+
+(** Repair cfg whose graph is inconsistent with its statements *)
+let repair_cfg g =
+  (* XXX: Better implementation *)
+  let p = Cfg_ast.to_prog g in
+  let oc = open_out "p.out" in
+  let pp = new Pp.pp_oc oc in
+  pp#ast_program p;
+  pp#close;
+  let cfg = Cfg_ast.of_prog p in
+  let cfg, entry = Cfg_ast.find_entry cfg in
+  Reachable.AST.remove_unreachable cfg entry

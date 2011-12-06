@@ -8,6 +8,7 @@ export BIGINT=$(BAP_DIR)/zarith-1.0
 export BATT=$(BAP_DIR)/batteries-1.4.0/_build/src
 export OUNIT=$(BAP_DIR)/ounit-1.1.0/_build/src/
 export PCRE=$(BAP_DIR)/pcre-ocaml-release-6.2.2/lib
+export OCAMLGRAPH=$(BAP_DIR)/ocamlgraph-1.8
 export OBJSIZE=$(BAP_DIR)/objsize-0.16
 
 include $(LIBASMIR)/makefile.inc
@@ -66,6 +67,7 @@ export SOURCES = \
 	disasm.ml \
 	syscall_models.ml \
 	gcl.mli gcl.ml \
+	ugcl.ml \
 	wp.ml \
 	stp_grammar.mly stp_lexer.mll \
 	cvc3_grammar.mly cvc3_lexer.mll \
@@ -90,12 +92,14 @@ export SOURCES = \
 	unroll.ml \
 	hacks.ml \
 	coalesce.ml \
-	template.ml \
 	traces.ml \
 	traces_surgical.ml \
-	graphDataflowW.ml \
 	utils_common.ml \
 	test_common.ml \
+	template.ml \
+	syscall_id.ml \
+	traces_merge.ml \
+	graphDataflowW.ml \
 	$(SOLVER_SOURCES) \
 	$(PROJSOURCES) \
 
@@ -111,11 +115,11 @@ DOC_FILES := $(filter %.mli, $(SOURCES)) $(filter %.ml, $(SOURCES))
 
 
 # ocamlfind packages required
-export PACKS = bigarray str num ocamlgraph unix camomile threads
+export PACKS = bigarray str num unix camomile threads
 # ocamlfind packages for ocamldoc
 # don't include packages in /usr/lib/ocaml, this will cause ocamldoc
 # to complain about conflicts with our local big_int
-export DOCPACKS = ocamlgraph
+export DOCPACKS = ocamlgraph 
 export YFLAGS = -v
 
 export USE_CAMLP4 = yes
@@ -125,8 +129,8 @@ export CLIBS += $(SOLVER_CLIBS)
 export CFLAGS = -g
 export LDFLAGS = $(LIBASMIR_LDFLAGS) $(SOLVER_LDFLAGS)
 export PPFLAGS = $(SOLVER_PPFLAGS)
-export INCDIRS = $(BIGINT) $(BATT) $(OUNIT) $(PCRE) $(OBJSIZE)
-export LIBS = zarith batteries oUnit pcre objsize
+export INCDIRS = $(BIGINT) $(BATT) $(OUNIT) $(PCRE) $(OCAMLGRAPH) $(OBJSIZE)
+export LIBS = zarith batteries oUnit pcre graph objsize
 export RESULTDEPS = $(LIBASMIR)/src/libasmir.a $(VEX_DIR)/libvex.a
 export LIBDIRS = $(LIBASMIR)/src $(VEX_DIR)
 export LIBDIRS += $(SOLVER_LIBDIRS)

@@ -49,7 +49,7 @@ let doit = match !rangeonly with
          let cfg = Prune_unreachable.prune_unreachable_ast cfg in
          let cfg = if !unroll then
              let cfg = Unroll.unroll_loops cfg in
-             Hacks.remove_backedges cfg
+             Hacks.remove_cycles cfg
            else cfg
          in
          let cfg = Prune_unreachable.prune_unreachable_ast cfg in

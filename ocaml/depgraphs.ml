@@ -635,7 +635,7 @@ struct
 	) stmts;
       !lref
     
-    let s0 = Cfg.AST.G.V.create Cfg.BB_Entry
+    let s0 _ = Cfg.AST.G.V.create Cfg.BB_Entry
 
     (* Set each variable to undefined at the starting point *)
     let init (g:G.t) = 

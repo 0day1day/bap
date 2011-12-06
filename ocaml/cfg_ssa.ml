@@ -17,6 +17,7 @@ open D
 
 module VH = Var.VarHash
 module C = Cfg.SSA
+module BH = Cfg.BH
 module CA = Cfg.AST
 module Dom = Dominator.Make(C.G)
 
@@ -322,7 +323,6 @@ let rec trans_cfg cfg =
     in
     dprintf "going on to children";
     (* rename children *)
-    (* List.iter (fun n -> dprintf "Dominates %s" (v2s n)) (dom_tree b); *)
     let ssa = List.fold_left rename_block ssa (dom_tree b) in
     let () =
       (* Update any phis in our successors *)
@@ -331,10 +331,15 @@ let rec trans_cfg cfg =
 	   let s = C.G.V.label s in
 	   List.iter
 	     (fun v ->
-		try 
+		try
 		  let (p,vs) = Hashtbl.find phis (s,v) in
-		  let v' = try lookup v with Not_found -> v  in
-		    Hashtbl.replace phis (s,v) (p, v'::vs)
+                  (* Note that lookup v will return different results
+                     for each predecessor. There is also no guarantee
+                     that each predecessor will have a unique
+                     definition. *)
+		  let v' = lookup v in
+                  if List.mem v' vs then ()
+                  else Hashtbl.replace phis (s,v) (p, v'::vs)
 		with Not_found ->
 		  failwith("phi for variable "^Pp.var_to_string v
 			   ^" not found in "^Cfg.bbid_to_string s)
@@ -343,7 +348,7 @@ let rec trans_cfg cfg =
 	)
 	(C.G.succ ssa b)
     in
-   (* save context for exit node *)
+    (* save context for exit node *)
     (if bbid = BB_Exit then (
       (* dprintf "Exit ctx:"; *)
       (* VH.iter (fun k v -> dprintf "%s -> %s" (Pp.var_to_string k) (Pp.var_to_string v)) vh_ctx; *)
@@ -457,7 +462,7 @@ let split_edges c =
     in
     let newl = mklabel c in
     let el = E.label e in
-    let (t1,t2,tf) = match el with
+    let (t1,t2,_) = match el with
       | Some true -> (Lab newl, t2, t1)
       | Some false -> (t1, Lab newl, t2)
       | None -> failwith "Unlabeled edges from cjmp"
@@ -469,7 +474,7 @@ let split_edges c =
     let c = C.add_edge c v d in
     let c = C.remove_edge_e c e in
     C.set_stmts c s (List.rev revs)
-    
+
   in
   let edges_to_split =
     C.G.fold_edges_e
@@ -487,7 +492,6 @@ let list_count p =
   List.fold_left (fun a e -> if p e then a+1 else a) 0
 
 
-(* FIXME: It might be good to have a different type for a CFG with phis removed *)
 let rm_phis ?(dsa=false) ?(attrs=[]) cfg =
   let size = C.G.fold_vertex
     (fun b a ->
@@ -512,6 +516,11 @@ let rm_phis ?(dsa=false) ?(attrs=[]) cfg =
   Var.VarSet.iter (fun v -> VH.add assn v entry) (uninitialized cfg);
   (* split edges if needed *)
   let cfg = if dsa then split_edges cfg else cfg in
+
+  let oc = open_out "ssa.dot" in
+  Cfg_pp.SsaStmtsDot.output_graph oc cfg;
+  close_out oc;
+
   let cfg, phis =
     (* Remove all the phis from all the BBs *)
     (* FIXME: make this readable *)
@@ -538,26 +547,93 @@ let rm_phis ?(dsa=false) ?(attrs=[]) cfg =
   let append_move b l p cfg=
     (* note that since stmts are reversed, we can prepend
        instead of appending. We must still be careful to not put
-       assignmenst after a jump. *)
+       assignments after a jump. *)
     let move = Move(l,Val(Var p), attrs) in
     C.set_stmts cfg b
       (match C.get_stmts cfg b with
        | (Jmp _ as j)::stmts
-       | (CJmp _ as j)::stmts ->
+       | (CJmp _ as j)::stmts
+       | (Halt _ as j)::stmts ->
 	   j::move::stmts
        | stmts ->
 	   move::stmts )
   in
   let cfg =
+    (* Documentation note:
+
+       Consider A <- PHI(X, Y).  Normally when we convert out of SSA
+       we would add assignments A <- X where X is defined, and A <- Y
+       where Y is defined.  However:
+
+       X1 = 1
+       cjmp foo, "t1", "t2"
+       label t1:
+       X2 = 2
+       label t2:
+       X3 = Phi(X1, X2)
+
+       If you push the assignment all the way up to where X1 is
+       assigned, when foo is true you'd be assigning X3 twice (e.g., violating DSA).
+
+       (Thanks to Ivan Jager for the example)
+
+       So, when we are converting to DSA we put the assignments
+       directly in the predecessor.  *)
+
     if dsa then (
       let idom = Dom.compute_idom cfg entry in
+      let dominators = Dom.idom_to_dominators idom in
+
+      (* Map each node to a list of nodes above it in the dominator
+         tree. The closest ancestor is first in the list. *)
+      (* let domassns = *)
+      (*   let () = dprintf "Building domassns" in *)
+      (*   let domassns = BH.create (C.G.nb_vertex cfg) in *)
+      (*   let rec fill_assns initassns cfg bb = *)
+      (*     dprintf "Visiting bb %s" (v2s bb); *)
+      (*     (\* The dominating blocks set acc assignments *\) *)
+      (*     let newassns = List.fold_left (fun l s -> match s with Move(v,_,_) -> v::l | _ -> l) initassns (C.get_stmts cfg bb) in *)
+      (*     (\* Add current assignments to domassns *\) *)
+      (*     List.iter (fun v -> dprintf "addv: %s" (Pp.var_to_string v)) newassns; *)
+      (*     let () = BH.add domassns (C.G.V.label bb) newassns in *)
+      (*     List.iter (fill_assns newassns cfg) (dom_tree bb) *)
+      (*   in *)
+      (*   let () = fill_assns [] cfg entry in *)
+      (*   let () = dprintf "... done" in *)
+      (*   domassns *)
+      (* in *)
+
       (* add an assignment for l to the end of v *)
       let dsa_push (l,vars) cfg bb =
-	let rec find_var bb = (* walk up idom tree starting at bb *)
-	  try List.find (fun v -> bb = (VH.find assn v)) vars
-	  with Not_found -> find_var (idom bb)
-	in
-	let v = find_var bb in
+
+        (* dprintf "dsa_push %s" (List.fold_left (fun s v -> s^" "^(Pp.var_to_string v)) "" vars); *)
+
+	(* let rec find_var bb = (\* walk up idom tree starting at bb *\) *)
+        (*   (\* dprintf " at %s" (v2s bb); *\) *)
+	(*   try List.find (fun v -> bb = (VH.find assn v)) vars *)
+	(*   with Not_found -> find_var (idom bb) *)
+	(* in *)
+	(* let _v' = find_var bb in *)
+        (* let vbb = VH.find assn v in *)
+        (* dprintf "%s assigned in bb %s, we are at %s" (Pp.var_to_string v) (v2s (VH.find assn v)) (v2s bb); *)
+        (* A node can be its own predecessor, so we should also look
+           at ourself. Dominators is sorted by dominance, with the most
+           dominant node first, but we want to look at less dominant
+           nodes with higher priority, so we need to reverse the list. *)
+        (* dprintf "Looking for var in %s %s" (v2s bb) (List.fold_left (fun s v -> s^" "^(Pp.var_to_string v)) "" vars); *)
+        let vl = bb :: (List.rev (dominators bb)) in
+        (* List.iter (fun v -> dprintf "BB %s dominates" (v2s v)) vl; *)
+        let assocl = List.map (fun v -> (VH.find assn v, v)) vars in
+        (* List.iter (fun v -> dprintf "Var %s assigned in %s" (Pp.var_to_string v) (v2s (VH.find assn v))) vars; *)
+        let v =
+          let mybb = List.find (fun bb ->
+            try ignore(List.assoc bb assocl); true
+            with Not_found -> false) vl
+          in
+          List.assoc mybb assocl
+        in
+        (* dprintf "Found it: %s" (Pp.var_to_string myv); *)
+        (* assert(myv = v); *)
 	append_move bb l v cfg
       in
       (* assign the variable the phi assigns at the end of each of it's
@@ -565,16 +641,17 @@ let rm_phis ?(dsa=false) ?(attrs=[]) cfg =
       List.fold_left
 	(fun cfg ((l, vars) as p) -> 
 	   dprintf "rm_phis: adding assignments for %s" (Pp.var_to_string l);
+          (* dprintf "There are %d preds" (List.length (C.G.pred cfg (VH.find assn l))); *)
 	   List.fold_left (dsa_push p) cfg (C.G.pred cfg (VH.find assn l))
 	)
 	cfg
 	phis
     )
     else (
-    (* assingn the variables the phi assigns at the end of each block a variable
+    (* assign the variables the phi assigns at the end of each block a variable
        the phi references is assigned. *)
     List.fold_left
-      (fun cfg (l, vars) -> 
+      (fun cfg (l, vars) ->
 	 dprintf "rm_phis: adding assignments for %s" (Pp.var_to_string l);
 	 List.fold_left (fun cfg p -> append_move (VH.find assn p) l p cfg) cfg vars
       )
@@ -670,7 +747,7 @@ let cfg2ast tm cfg =
 (** Convert an SSA CFG to an AST CFG. *)
 let to_astcfg ?(remove_temps=true) ?(dsa=false) c =
   let tm = if remove_temps then create_tm c else VH.create 1 in
-  cfg2ast tm (rm_phis ~dsa:dsa c)
+  cfg2ast tm (rm_phis ~dsa c)
 
 (** Convert an SSA CFG to an AST program. *)
 let to_ast ?(remove_temps=true) c =

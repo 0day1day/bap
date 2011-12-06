@@ -43,8 +43,10 @@
 
 namespace pintrace { // We will use namespace to avoid collision
 
+  typedef uint32_t addr_t;
+
   typedef std::map<uint64_t, uint64_t> toc_map;
-  
+
    class TraceExn {
    public:
       const std::string msg;
