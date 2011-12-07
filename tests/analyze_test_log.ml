@@ -51,14 +51,14 @@ let insert_item hashtbl item =
 
 (* regexps for matching general information *)
 let total_run_time_regexp = regexp "tests in: ([0-9]+\.[0-9]+) seconds\.$";;
-let total_blocks_regexp = regexp "^TraceEval: Running block: ([0-9]+)";;
+let total_blocks_regexp = regexp "^Traces: Running block: ([0-9]+)";;
 let trace_count_regexp = regexp "^LongNightly: Processing trace-file";;
 
 (* regexps for matching incorrect and unknown assembley instructions *)
 let bap_regexp = regexp "^AsmirTest: BAP unknown disasm_instr \S+: disasm_i386: unimplemented feature: unsupported opcode: (.*)$";;
 let vex_regexp = regexp "vex x86->IR: unhandled instruction bytes: (.*)$";;
-let trace_eval_regexp = regexp "^WARNING \(TraceEval\): Difference between BAP and trace values for \[\*(R_\S*)\* Trace=(\S*) Eval=(\S*)\]";;
-let trace_eval_regexp2 = regexp "^WARNING \(TraceEval\): This is due to one of the following statments:";;
+let trace_eval_regexp = regexp "^WARNING \(Traces\): Difference between BAP and trace values for \[\*(R_\S*)\* Trace=(\S*) Eval=(\S*)\]";;
+let trace_eval_regexp2 = regexp "^WARNING \(Traces\): This is due to one of the following statments:";;
 let stmt_regexp = regexp "^\{addr .*asm (\".*?\") (.*)\}$";;
 let asm_regexp = regexp "^\"(.*)\"";;
 let first_word_regexp = regexp "^(\S*)";;
@@ -195,7 +195,7 @@ let _ =
   print_hashtbl small_hashtbl;
   flush !out;
 
-  print_out "Likely special attribution Summary:";
+  print_out "Incorrect but Likely due to special Summary:";
   print_hashtbl probably_right_hashtbl;
   flush !out;
 
