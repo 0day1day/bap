@@ -197,10 +197,16 @@ let _ =
   print_out ("Total number of instructions : " ^ !block_count);
   print_out ("Total number of unknown instructions : " 
 	     ^ string_of_int !total_unknown);		 
-  print_out ("Percentage of unknown blocks : "^(string_of_float (one_decimal_percent !total_unknown (int_of_string !block_count)))^"%");
+  let unknown_percent = 
+    (string_of_float 
+       (one_decimal_percent !total_unknown (int_of_string !block_count))) in
+  print_out ("Percentage of unknown blocks : "^unknown_percent^"%");
   print_out ("Total number of wrong instructions : " 
 	     ^ string_of_int !total_wrong);
-  print_out ("Percentage of incorrect blocks : "^(string_of_float (one_decimal_percent !total_wrong (int_of_string !block_count)))^"%");
+  let wrong_percent = 
+    (string_of_float 
+       (one_decimal_percent !total_wrong (int_of_string !block_count)))
+  print_out ("Percentage of incorrect blocks : "^wrong_percent^"%");
   flush !out;
 
   print_out "Unknown Instruction Summary:";
