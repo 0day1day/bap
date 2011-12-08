@@ -205,7 +205,7 @@ let _ =
 	     ^ string_of_int !total_wrong);
   let wrong_percent = 
     (string_of_float 
-       (one_decimal_percent !total_wrong (int_of_string !block_count)))
+       (one_decimal_percent !total_wrong (int_of_string !block_count))) in
   print_out ("Percentage of incorrect blocks : "^wrong_percent^"%");
   flush !out;
 
