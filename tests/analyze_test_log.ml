@@ -13,6 +13,8 @@ let block_count = ref "0";;
 let total_traces = ref 0;;
 
 let bap_unknown_hashtbl = Hashtbl.create 100;;
+let total_unknown = ref 0;;
+let total_wrong = ref 0;;
 let probably_right_hashtbl = Hashtbl.create 100;;
 let small_hashtbl = Hashtbl.create 100;;
 
@@ -30,13 +32,19 @@ let () = Arg.parse speclist anon usage;;
 
 let print_out str = output_string !out (str^"\n"); flush !out;;
 
+let one_decimal_percent a b = 
+  (ceil ((float_of_int (a * 1000)) /. (float_of_int b))) /. (float_of_int 10)
 
 (* Print the key value pairs in order *)
-let print_hashtbl table =
+let print_hashtbl ?(total = None) table =
   let create_list key value k = (key,value)::k in
   let hash_list = Hashtbl.fold create_list table [] in
   let print_item (key,value) = 
-	print_out (key^" : "^(string_of_int value))
+    match total with
+    | None -> print_out (key^" : "^(string_of_int value))
+    | Some(x) -> 
+      print_out (key^" : "^(string_of_int value)^" : "
+		 ^(string_of_float (one_decimal_percent value x)^"%"))
   in
   (* Print list in descending order *)
   let cmp (_,value1) (_,value2) = compare value2 value1 in
@@ -94,6 +102,7 @@ let process_list asms =
       (fun (asm,r) -> 
 	let asm = (get_match first_word_regexp asm)^" "^r in
 	insert_item small_hashtbl asm;
+	incr total_wrong;
 	if (!verbose) then (
     	  print_out "Definitly got wrong:";
     	  print_out ("Asm = "^asm);
@@ -129,6 +138,7 @@ let process_line l = (
       let matches = extract ~rex:bap_regexp ~full_match:false l in
       let bap_instr = Array.get matches 0 in
       insert_item bap_unknown_hashtbl bap_instr;
+      incr total_unknown;
     (*if (!verbose) then 
       print_out ("Unknown BAP instructions: "^bap_instr);*)
     with Not_found -> (
@@ -184,15 +194,21 @@ let _ =
   print_out "General Run Stats:";
   print_out ("Total run time : " ^ !total_run_time ^ " seconds");
   print_out ("Number of traces : " ^ string_of_int !total_traces);
-  print_out ("Total number of blocks : " ^ !block_count);
+  print_out ("Total number of instructions : " ^ !block_count);
+  print_out ("Total number of unknown instructions : " 
+	     ^ string_of_int !total_unknown);		 
+  print_out ("Percentage of unknown blocks : "^(string_of_float (one_decimal_percent !total_unknown (int_of_string !block_count)))^"%");
+  print_out ("Total number of wrong instructions : " 
+	     ^ string_of_int !total_wrong);
+  print_out ("Percentage of incorrect blocks : "^(string_of_float (one_decimal_percent !total_wrong (int_of_string !block_count)))^"%");
   flush !out;
 
   print_out "Unknown Instruction Summary:";
-  print_hashtbl bap_unknown_hashtbl;
+  print_hashtbl ~total:(Some(!total_unknown)) bap_unknown_hashtbl;
   flush !out;
   
   print_out "Incorrect Implementation Summary:";
-  print_hashtbl small_hashtbl;
+  print_hashtbl ~total:(Some(!total_wrong)) small_hashtbl;
   flush !out;
 
   print_out "Incorrect but Likely due to special Summary:";
