@@ -78,10 +78,10 @@ let of_prog ?(special_error = true) p =
          let ostmts = C.get_stmts c v in
          (* At this point, we are redefining a label which is bad.  If
             the existing block and the new block are identical, we'll
-            just silently use the old block.  If not, C.set_stmts will
-            raise an exception because we are defining a label twice. *)
+            just silently use the old block.  If not, raise an
+            exception because we are defining a label twice. *)
          if full_stmts_eq stmts ostmts then
-           Some(v) else None
+           Some(v) else failwith (Printf.sprintf "Duplicate label usage: label %s" (Pp.label_to_string l))
        with Not_found -> None) (* The label does not exist *)
     | _ -> None
   in
