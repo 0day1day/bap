@@ -121,7 +121,7 @@ let of_prog ?(special_error = true) p =
 	| CJmp(_,t,f,_) -> for_later ~lab:true t; for_later ~lab:false f; c
 	| Special _ -> C.add_edge c v error
 	| Halt _ -> C.add_edge c v exit
-        | Assert(e,_) when e === exp_false -> C.add_edge c v error
+        | Assert(e,_) when e === exp_false -> if v <> error then C.add_edge c v error else c
 	| _ -> failwith "impossible"
       in
       (c, [], true, None)
