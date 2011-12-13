@@ -83,7 +83,7 @@ class memory2array_visitor hash =
 	  let array =
 	    try VarHash.find hash avar
 	    with Not_found ->
-	      let newarrvar = newvar (Var.name avar) (Array(idxt,Reg(bitwidth))) in
+	      let newarrvar = newvar ((Var.name avar)^"_array") (Array(idxt,Reg(bitwidth))) in
 	      VarHash.add hash avar newarrvar;
 	      newarrvar
 	  in
