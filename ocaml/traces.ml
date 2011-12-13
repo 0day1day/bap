@@ -1005,7 +1005,7 @@ let trace_transform_stmt stmt evalf =
     (*     Syscall_models.linux_syscall_to_il (Big_int.int_of_big_int i) *)
     (*   | _ -> failwith "Unexpected evaluation problem") *)
     | s -> [s] in
-  if not !allow_symbolic_indices && full_exp_eq !exp exp_true then
+  if not !allow_symbolic_indices && not (is_true !exp) then
     (* The assertion must come first, since the statement may modify value of the expression! *)
     s @ [Assert(!exp, [])]
   else
