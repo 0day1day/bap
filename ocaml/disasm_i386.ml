@@ -71,6 +71,7 @@ type opcode =
   | Call of operand * int64 (* int64 is RA *)
   | Shift of binop_type * typ * operand * operand
   | Shiftd of binop_type * typ * operand * operand * operand
+  | Ror of typ * operand * operand
   | Bt of typ * operand * operand
   | Bsf of typ * operand * operand
   | Jump of operand
@@ -671,6 +672,10 @@ let rec to_ir addr next ss pref =
       let e_fill = op2e s fill in
       let e_shift = op2e s shift in
       let bits = Typecheck.bits_of_width s in
+      let our_cf =  match st with
+	| LSHIFT -> Cast(CAST_LOW, r1, (e_dst >>* (it bits s -* e_shift)))
+	| RSHIFT -> Cast(CAST_HIGH, r1, (e_dst <<* (it bits s -* e_shift)))
+	| _ -> disfailwith "imposible" in
       let our_of = cast_high r1 (Var tmpDEST) ^* cast_high r1 e_dst in
       let unk_of = 
 	Unknown ("OF undefined after shiftd of more then 1 bit", r1) in
@@ -684,15 +689,11 @@ let rec to_ir addr next ss pref =
 	| RSHIFT -> e_dst >>* e_shift
 	| _ -> disfailwith "imposible" in
       let result = ret1 |* ret2 in
-      let t2 =  match st with
-	| LSHIFT -> (e_dst >>* (it bits s -* e_shift))
-	| RSHIFT -> (e_dst <<* (it bits s -* e_shift))
-	| _ -> disfailwith "imposible" in
       (* SWXXX If shift is greater than the operand size, dst and
 	 flags are undefined *)
       [
         move tmpDEST e_dst;
-        move cf (ifzero cf_e (Cast(CAST_LOW, r1, t2)));
+        move cf (ifzero cf_e our_cf);
         assn s dst result;
 	(* For a 1-bit shift, the OF flag is set if a sign change occurred; 
 	   otherwise, it is cleared. For shifts greater than 1 bit, the OF flag 
@@ -703,6 +704,8 @@ let rec to_ir addr next ss pref =
         move pf (ifzero pf_e (compute_pf s e_dst));
         move af (ifzero af_e (Unknown ("AF undefined after shiftd", r1)))
       ]
+  | Ror(t, src, count) -> 
+    disfailwith "SWXXX unimplemented ror"
   | Bt(t, bitoffset, bitbase) ->
       let offset = op2e t bitoffset in
       let value, shift = match bitbase with
@@ -1018,6 +1021,7 @@ module ToStr = struct
     | Call(a, ra) -> Printf.sprintf "call %s" (opr a)
     | Shift _ -> "shift"
     | Shiftd _ -> "shiftd"
+    | Ror (_,dst,count) -> Printf.sprintf "ror %s, %s" (opr dst) (opr count)
     | Hlt -> "hlt"
     | Rdtsc -> "rdtsc"
     | Cpuid -> "cpuid"
