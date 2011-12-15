@@ -14,7 +14,11 @@ module VH=Var.VarHash
 module D = Debug.Make(struct let name = "Disasm_i386" and default=`NoDebug end)
 open D
 
-(* To help understand this file, please refer to the
+(* 
+   Note: In general, the function g is the get memory function.  The variable
+   na refers to the next address or next instruction.
+
+   To help understand this file, please refer to the
    Intel Instruction Set Reference. For consistency, any section numbers
    here are wrt Order Number: 253666-035US June 2010 and 253667-035US.
 
@@ -646,6 +650,7 @@ let rec to_ir addr next ss pref =
       | ARSHIFT -> exp_false
       | _ -> disfailwith "imposible"
     in
+    let unk_of = Unknown("OF undefined after shift", r1) in
     [move tmpDEST e1;
      if st = LSHIFT then
        move t1 (e1 >>* ((it bits s) -* count))
@@ -654,33 +659,49 @@ let rec to_ir addr next ss pref =
      ;
      move cf (ifzero cf_e (Cast(CAST_LOW, r1, Var t1)));
      assn s o1 (s_f e1 count);
-     move oF (ifzero of_e (ite r1 (count ==* (it 1 s)) (our_of) (Unknown("OF <- undefined", r1))));
+     move oF (ifzero of_e (ite r1 (count ==* (it 1 s)) (our_of) (unk_of)));
      move sf (ifzero sf_e (compute_sf e1));
      move zf (ifzero zf_e (compute_zf s e1));
      move pf (ifzero pf_e (compute_pf s e1));
      move af (ifzero af_e (Unknown("AF undefined after shift", r1)))
     ]
-  | Shiftd(_st, s, dst, fill, shift) ->
+  | Shiftd(st, s, dst, fill, shift) ->
       let tmpDEST = nt "tmpDEST" s in
       let e_dst = op2e s dst in
       let e_fill = op2e s fill in
       let e_shift = op2e s shift in
       let bits = Typecheck.bits_of_width s in
       let our_of = cast_high r1 (Var tmpDEST) ^* cast_high r1 e_dst in
+      let unk_of = 
+	Unknown ("OF undefined after shiftd of more then 1 bit", r1) in
       let ifzero = ite r1 (e_shift ==* it 0 s) in
-      let ret1 = e_fill >>* (it bits s -* e_shift) in
-      let ret2 = e_dst <<* e_shift in
+      let ret1 = match st with
+	| LSHIFT -> e_fill >>* (it bits s -* e_shift)
+	| RSHIFT -> e_fill <<* (it bits s -* e_shift)
+	| _ -> disfailwith "imposible" in
+      let ret2 = match st with
+	| LSHIFT -> e_dst <<* e_shift
+	| RSHIFT -> e_dst >>* e_shift
+	| _ -> disfailwith "imposible" in
       let result = ret1 |* ret2 in
-      let t2 = (e_dst >>* (it bits s -* e_shift)) in
+      let t2 =  match st with
+	| LSHIFT -> (e_dst >>* (it bits s -* e_shift))
+	| RSHIFT -> (e_dst <<* (it bits s -* e_shift))
+	| _ -> disfailwith "imposible" in
+      (* SWXXX If shift is greater than the operand size, dst and
+	 flags are undefined *)
       [
         move tmpDEST e_dst;
         move cf (ifzero cf_e (Cast(CAST_LOW, r1, t2)));
         assn s dst result;
-        move oF (ifzero of_e (ite r1 (e_shift ==* i32 1) (our_of) (it 0 r1)));
+	(* For a 1-bit shift, the OF flag is set if a sign change occurred; 
+	   otherwise, it is cleared. For shifts greater than 1 bit, the OF flag 
+	   is undefined. *)
+        move oF (ifzero of_e (ite r1 (e_shift ==* i32 1) (our_of) (unk_of)));
         move sf (ifzero sf_e (compute_sf e_dst));
         move zf (ifzero zf_e (compute_zf s e_dst));
         move pf (ifzero pf_e (compute_pf s e_dst));
-        move af (ifzero af_e (Unknown ("AF undefined after shift", r1)))
+        move af (ifzero af_e (Unknown ("AF undefined after shiftd", r1)))
       ]
   | Bt(t, bitoffset, bitbase) ->
       let offset = op2e t bitoffset in
@@ -950,7 +971,6 @@ end (* ToIR *)
 
 module ToStr = struct
 
-  (* SWXXX Unused...get rid of this? *)
   let pref2str = function
 (*  | Lock -> "lock"
   | Repnz -> "repnz"
@@ -1237,7 +1257,8 @@ let parse_instr g addr =
     | 0x83 -> let (r, rm, na) = parse_modrm32ext na in
 	      let (o2, na) =
 		(* for 0x83, imm8 needs to be sign extended *)
-		if b1 = 0x81 then parse_immz prefix.opsize na else parse_simm8 na
+		if b1 = 0x81 then parse_immz prefix.opsize na 
+		else parse_simm8 na
 	      in
 	      let opsize = if b1 land 1 = 0 then r8 else prefix.opsize in
 	      (match r with (* Grp 1 *)
@@ -1247,7 +1268,8 @@ let parse_instr g addr =
 	      | 5 -> (Sub(opsize, rm, o2), na)
               | 6 -> (Xor(opsize, rm, o2), na)
 	      | 7 -> (Cmp(opsize, rm, o2), na)
-	      | _ -> unimplemented (Printf.sprintf "unsupported opcode: %02x/%d" b1 r)
+	      | _ -> unimplemented 
+		(Printf.sprintf "unsupported opcode: %02x/%d" b1 r)
 	      )
     | 0x84
     | 0x85 -> let (r, rm, na) = parse_modrm32 na in
