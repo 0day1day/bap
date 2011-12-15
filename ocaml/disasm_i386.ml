@@ -71,7 +71,7 @@ type opcode =
   | Call of operand * int64 (* int64 is RA *)
   | Shift of binop_type * typ * operand * operand
   | Shiftd of binop_type * typ * operand * operand * operand
-  | Ror of typ * operand * operand
+  | Rotate of binop_type * typ * operand * operand * bool (* left or right, type, src/dest op, shift op, use carry flag *)
   | Bt of typ * operand * operand
   | Bsf of typ * operand * operand
   | Jump of operand
@@ -673,9 +673,10 @@ let rec to_ir addr next ss pref =
       let e_shift = op2e s shift in
       let bits = Typecheck.bits_of_width s in
       let our_cf =  match st with
-	| LSHIFT -> Cast(CAST_LOW, r1, (e_dst >>* (it bits s -* e_shift)))
-	| RSHIFT -> Cast(CAST_HIGH, r1, (e_dst <<* (it bits s -* e_shift)))
+	| LSHIFT -> cast_low r1 (e_dst >>* (it bits s -* e_shift))
+	| RSHIFT -> cast_high r1 (e_dst <<* (it bits s -* e_shift))
 	| _ -> disfailwith "imposible" in
+      (* SWXXX is the of correct for left and right shifts? *)
       let our_of = cast_high r1 (Var tmpDEST) ^* cast_high r1 e_dst in
       let unk_of = 
 	Unknown ("OF undefined after shiftd of more then 1 bit", r1) in
@@ -704,8 +705,37 @@ let rec to_ir addr next ss pref =
         move pf (ifzero pf_e (compute_pf s e_dst));
         move af (ifzero af_e (Unknown ("AF undefined after shiftd", r1)))
       ]
-  | Ror(t, src, count) -> 
-    disfailwith "SWXXX unimplemented ror"
+  | Rotate(rt, s, op, shift, use_cf) ->
+    (* SWXXX implement use_cf *)
+    let e_op = op2e s op in
+    let e_shift = op2e s shift in
+    let bits = Typecheck.bits_of_width s in
+    let our_cf = match rt with
+      | LSHIFT -> cast_low r1 e_op
+      | RSHIFT -> cast_high r1 e_op 
+      | _ -> disfailwith "imposible" in
+    let our_of = match rt with
+      | LSHIFT -> cf_e ^* cast_high r1 e_op
+      | RSHIFT -> cast_low r1 e_op ^* cast_low r1 (e_op >>* it 1 s)
+      | _ -> disfailwith "imposible" in
+    let unk_of =
+      Unknown ("OF undefined after rotate of more then 1 bit", r1) in
+    let ifzero = ite r1 (e_shift ==* it 0 s) in
+    let ret1 = match rt with
+    	| LSHIFT -> e_op <<* e_shift
+    	| RSHIFT -> e_op >>* e_shift
+    	| _ -> disfailwith "imposible" in
+    let ret2 = match rt with
+    	| LSHIFT -> e_op >>* (it bits s -* e_shift)
+    	| RSHIFT -> e_op <<* (it bits s -* e_shift)
+    	| _ -> disfailwith "imposible" in
+    let result = ret1 |* ret2 in
+    [
+      assn s op result;
+      (* cf must be set before of *)
+      move cf (ifzero cf_e our_cf);
+      move oF (ifzero of_e (ite r1 (e_shift ==* it 1 s) (our_of) (unk_of)));
+    ]
   | Bt(t, bitoffset, bitbase) ->
       let offset = op2e t bitoffset in
       let value, shift = match bitbase with
@@ -1021,7 +1051,12 @@ module ToStr = struct
     | Call(a, ra) -> Printf.sprintf "call %s" (opr a)
     | Shift _ -> "shift"
     | Shiftd _ -> "shiftd"
-    | Ror (_,dst,count) -> Printf.sprintf "ror %s, %s" (opr dst) (opr count)
+    | Rotate (rt, _, src, shift, use_cf) -> 
+      let base = match rt with
+	| LSHIFT -> if (use_cf) then "rcl" else "rol"
+	| RSHIFT -> if (use_cf) then "rcr" else "ror"
+	| _ -> disfailwith "imposible" in
+      Printf.sprintf "%s %s, %s" base (opr src) (opr shift)
     | Hlt -> "hlt"
     | Rdtsc -> "rdtsc"
     | Cpuid -> "cpuid"
@@ -1359,6 +1394,11 @@ let parse_instr g addr =
 		| _ -> disfailwith "impossible"
 	      in
 	      (match r with (* Grp 2 *)
+	      | 0 -> (Rotate(LSHIFT, opsize, rm, amt, false),na)
+	      | 1 -> (Rotate(RSHIFT, opsize, rm, amt, false),na)
+		(* SWXXX Implement these *)
+	      (*| 2 -> (Rotate(LSHIFT, opsize, rm, amt, true),na)
+	      | 3 -> (Rotate(RSHIFT, opsize, rm, amt, true),na) *)
 	      | 4 -> (Shift(LSHIFT, opsize, rm, amt), na)
 	      | 5 -> (Shift(RSHIFT, opsize, rm, amt), na)
 	      | 7 -> (Shift(ARSHIFT, opsize, rm, amt), na)
