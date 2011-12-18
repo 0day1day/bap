@@ -636,105 +636,110 @@ let rec to_ir addr next ss pref =
     cjmp c (op2e r32 o)
   | Setcc(t, o1, c) ->
     [assn t o1 (cast_unsigned t c)]
-  | Shift(st, s, o1, o2) -> 
+  | Shift(st, s, dst, shift) -> 
     assert (List.mem s [r8; r16; r32]);
-    let t1 = nt "t1" s and tmpDEST = nt "tmpDEST" s
-    and bits = Typecheck.bits_of_width s
+    let origCOUNT, origDEST = nt "origCOUNT" s, nt "origDEST" s
+    and size = it (Typecheck.bits_of_width s) s
     and s_f = match st with LSHIFT -> (<<*) | RSHIFT -> (>>*) 
       | ARSHIFT -> (>>>*) | _ -> disfailwith "invalid shift type"
-    and count = (op2e s o2) &* (it 31 s)
-    and e1 = op2e s o1 in
-    let ifzero = ite r1 (count ==* (it 0 s))
-    and our_of = match st with
-      | LSHIFT -> Cast(CAST_HIGH, r1, e1) ^* cf_e
-      | RSHIFT -> Cast(CAST_HIGH, r1, Var tmpDEST)
+    and count = (op2e s shift) &* (it 31 s)
+    and dste = op2e s dst in
+    let ifzero = ite r1 (Var origCOUNT ==* (it 0 s))
+    and new_of = match st with
+      | LSHIFT -> (cast_high r1 dste) ^* cf_e
+      | RSHIFT -> cast_high r1 (Var origDEST)
       | ARSHIFT -> exp_false
       | _ -> disfailwith "imposible"
     in
     let unk_of = Unknown("OF undefined after shift", r1) in
-    [move tmpDEST e1;
-     if st = LSHIFT then
-       move t1 (e1 >>* ((it bits s) -* count))
-     else
-       move t1 (e1 >>* (count -* (it 1 s)))
-     ;
-     move cf (ifzero cf_e (Cast(CAST_LOW, r1, Var t1)));
-     assn s o1 (s_f e1 count);
-     move oF (ifzero of_e (ite r1 (count ==* (it 1 s)) (our_of) (unk_of)));
-     move sf (ifzero sf_e (compute_sf e1));
-     move zf (ifzero zf_e (compute_zf s e1));
-     move pf (ifzero pf_e (compute_pf s e1));
+    let new_cf = match st with
+      | LSHIFT -> cast_low r1 (Var origDEST >>* (size -* Var origCOUNT))
+      | RSHIFT|ARSHIFT -> cast_high r1 (Var origDEST <<* (size -* Var origCOUNT))
+      | _ -> failwith "impossible"
+    in
+    [move origDEST dste;
+     move origCOUNT count;
+     assn s dst (s_f dste count);
+     move cf (ifzero cf_e new_cf);
+     move oF (ifzero of_e (ite r1 (Var origCOUNT ==* (it 1 s)) new_of unk_of));
+     move sf (ifzero sf_e (compute_sf dste));
+     move zf (ifzero zf_e (compute_zf s dste));
+     move pf (ifzero pf_e (compute_pf s dste));
      move af (ifzero af_e (Unknown("AF undefined after shift", r1)))
     ]
-  | Shiftd(st, s, dst, fill, shift) ->
-      let tmpDEST = nt "tmpDEST" s in
+  | Shiftd(st, s, dst, fill, count) ->
+      let origDEST, origCOUNT = nt "origDEST" s, nt "origCOUNT" s in
       let e_dst = op2e s dst in
       let e_fill = op2e s fill in
-      let e_shift = op2e s shift in
-      let bits = Typecheck.bits_of_width s in
-      let our_cf =  match st with
-	| LSHIFT -> cast_low r1 (e_dst >>* (it bits s -* e_shift))
-	| RSHIFT -> cast_high r1 (e_dst <<* (it bits s -* e_shift))
+      (* count mod 32 *)
+      let e_count = (op2e s count) &* (it 31 s) in
+      let size = it (Typecheck.bits_of_width s) s in
+      let new_cf =  match st with
+	| LSHIFT -> cast_low r1 (Var origDEST >>* (size -* Var origCOUNT))
+	| RSHIFT -> cast_high r1 (Var origDEST <<* (size -* Var origCOUNT))
 	| _ -> disfailwith "imposible" in
-      (* SWXXX is the of correct for left and right shifts? *)
-      let our_of = cast_high r1 (Var tmpDEST) ^* cast_high r1 e_dst in
+      let ifzero = ite r1 ((Var origCOUNT) ==* (it 0 s)) in
+      let new_of = cast_high r1 (Var origDEST) ^* cast_high r1 e_dst in
       let unk_of = 
 	Unknown ("OF undefined after shiftd of more then 1 bit", r1) in
-      let ifzero = ite r1 (e_shift ==* it 0 s) in
       let ret1 = match st with
-	| LSHIFT -> e_fill >>* (it bits s -* e_shift)
-	| RSHIFT -> e_fill <<* (it bits s -* e_shift)
+	| LSHIFT -> e_fill >>* (size -* Var origCOUNT)
+	| RSHIFT -> e_fill <<* (size -* Var origCOUNT)
 	| _ -> disfailwith "imposible" in
       let ret2 = match st with
-	| LSHIFT -> e_dst <<* e_shift
-	| RSHIFT -> e_dst >>* e_shift
+	| LSHIFT -> e_dst <<* Var origCOUNT
+	| RSHIFT -> e_dst >>* Var origCOUNT
 	| _ -> disfailwith "imposible" in
       let result = ret1 |* ret2 in
       (* SWXXX If shift is greater than the operand size, dst and
 	 flags are undefined *)
       [
-        move tmpDEST e_dst;
-        move cf (ifzero cf_e our_cf);
+        move origDEST e_dst;
+	move origCOUNT e_count;
         assn s dst result;
+        move cf (ifzero cf_e new_cf);
 	(* For a 1-bit shift, the OF flag is set if a sign change occurred; 
 	   otherwise, it is cleared. For shifts greater than 1 bit, the OF flag 
 	   is undefined. *)
-        move oF (ifzero of_e (ite r1 (e_shift ==* i32 1) (our_of) (unk_of)));
+        move oF (ifzero of_e (ite r1 ((Var origCOUNT) ==* i32 1) new_of unk_of));
         move sf (ifzero sf_e (compute_sf e_dst));
         move zf (ifzero zf_e (compute_zf s e_dst));
         move pf (ifzero pf_e (compute_pf s e_dst));
         move af (ifzero af_e (Unknown ("AF undefined after shiftd", r1)))
       ]
-  | Rotate(rt, s, op, shift, use_cf) ->
+  | Rotate(rt, s, dst, shift, use_cf) ->
     (* SWXXX implement use_cf *)
-    let e_op = op2e s op in
-    let e_shift = op2e s shift in
-    let bits = Typecheck.bits_of_width s in
-    let our_cf = match rt with
-      | LSHIFT -> cast_low r1 e_op
-      | RSHIFT -> cast_high r1 e_op 
+    if use_cf then unimplemented "rotate use_vf";
+    let origCOUNT = nt "origCOUNT" s in
+    let e_dst = op2e s dst in
+    let e_shift = op2e s shift &* it 31 s in
+    let size = it (Typecheck.bits_of_width s) s in
+    let new_cf = match rt with
+      | LSHIFT -> cast_low r1 e_dst
+      | RSHIFT -> cast_high r1 e_dst 
       | _ -> disfailwith "imposible" in
-    let our_of = match rt with
-      | LSHIFT -> cf_e ^* cast_high r1 e_op
-      | RSHIFT -> cast_low r1 e_op ^* cast_low r1 (e_op >>* it 1 s)
+    let new_of = match rt with
+      | LSHIFT -> cf_e ^* cast_high r1 e_dst
+      | RSHIFT -> cast_high r1 e_dst ^* cast_high r1 (e_dst <<* it 1 s)
       | _ -> disfailwith "imposible" in
     let unk_of =
       Unknown ("OF undefined after rotate of more then 1 bit", r1) in
-    let ifzero = ite r1 (e_shift ==* it 0 s) in
+    let ifzero = ite r1 (Var origCOUNT ==* it 0 s) in
     let ret1 = match rt with
-    	| LSHIFT -> e_op <<* e_shift
-    	| RSHIFT -> e_op >>* e_shift
+    	| LSHIFT -> e_dst <<* Var origCOUNT
+    	| RSHIFT -> e_dst >>* Var origCOUNT
     	| _ -> disfailwith "imposible" in
     let ret2 = match rt with
-    	| LSHIFT -> e_op >>* (it bits s -* e_shift)
-    	| RSHIFT -> e_op <<* (it bits s -* e_shift)
+    	| LSHIFT -> e_dst >>* (size -* Var origCOUNT)
+    	| RSHIFT -> e_dst <<* (size -* Var origCOUNT)
     	| _ -> disfailwith "imposible" in
     let result = ret1 |* ret2 in
     [
-      assn s op result;
+      move origCOUNT e_shift;
+      assn s dst result;
       (* cf must be set before of *)
-      move cf (ifzero cf_e our_cf);
-      move oF (ifzero of_e (ite r1 (e_shift ==* it 1 s) (our_of) (unk_of)));
+      move cf (ifzero cf_e new_cf);
+      move oF (ifzero of_e (ite r1 (Var origCOUNT ==* it 1 s) new_of unk_of));
     ]
   | Bt(t, bitoffset, bitbase) ->
       let offset = op2e t bitoffset in
