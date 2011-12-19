@@ -1,3 +1,5 @@
+.NOTPARALLEL:
+
 OCAMLMAKEFILE = ../OCamlMakefile
 
 CLIBS = $(subst -l,,$(filter -l%, $(shell pcre-config --libs)))
