@@ -1,0 +1,24 @@
+.alias [
+       .name thread-id
+       .type uint64
+]
+
+.alias [
+       .name address
+       .type uint64
+]
+
+.alias [
+       .name bit-length
+       .type int
+]
+
+.alias [
+       .name taint-id
+       .type uint64
+]
+
+.alias [
+       .name exception-number
+       .type uint64
+]

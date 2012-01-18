@@ -1,0 +1,146 @@
+% Frame representing the execution of a single assembly instruction
+.record [
+        .name std-frame
+
+        % Address of the instruction
+        .field [
+               .type address
+        ]
+
+        % Thread id that executed the instruction
+        .field [
+               .type thread-id
+        ]
+
+        % Raw bytes of the instruction
+        .field [
+               .name rawbytes
+               .type binary
+        ]
+
+        % Operands read/written by the instruction
+        .field [
+               .type operand-list
+        ]
+
+]
+
+% Operand list
+.list [
+      .name operand-list
+      .type operand-info
+]
+
+
+% Operand
+.variant [
+         .name operand-info
+
+         .option [
+                 .type mem-operand
+         ]
+
+         .option [
+                 .type reg-operand
+         ]
+]
+
+% Represent a register operand value
+.record [
+        .name reg-operand
+
+        % Size in bits
+        .field [
+               .type bit-length
+        ]
+
+        % Register name
+        .field [
+               .name name
+               .type string
+        ]
+
+        % Usage (read, written, both)
+        .field [
+               .type operand-usage
+        ]
+
+        % Taint information
+        .field [
+               .type taint-info
+        ]
+]
+
+% Represent a memory operand value
+.record [
+        .name mem-operand
+
+        % Size in bits
+        .field [
+               .type bit-length
+        ]
+
+        % Address
+        .field [
+               .type address
+        ]
+
+        % Usage (read, written, both)
+        .field [
+               .type operand-usage
+        ]
+
+        % Taint information
+        .field [
+               .type taint-info
+        ]
+]
+
+% Operand usage
+.record [
+      .name operand-usage
+
+      % Is this operand read during this instruction?
+      .field [
+             .name read
+             .type bool
+      ]
+
+      % Is this operand written to?
+      .field [
+             .name written
+             .type bool
+      ]
+
+      % Is this operand used as the index of a memory lookup?
+      .field [
+             .name index
+             .type bool
+      ]
+
+      % Is this operand used as the base of a memory lookup?
+      .field [
+             .name base
+             .type bool
+      ]
+]
+
+% Taint information
+.variant [
+         .name taint-info
+
+         % Operand not tainted
+         .option [
+                 .name no-taint
+         ]
+
+         % Taint from a single source
+         .option [
+                 .type taint-id
+         ]
+
+         % Taint from more than one source
+         .option [
+                 .name taint-multiple
+         ]
+]
