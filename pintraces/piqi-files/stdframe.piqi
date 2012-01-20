@@ -1,3 +1,7 @@
+.include [
+         .module types
+]
+
 % Frame representing the execution of a single assembly instruction
 .record [
         .name std-frame

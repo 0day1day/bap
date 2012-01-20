@@ -1,0 +1,12 @@
+
+message syscall_frame {
+    required uint64 address = 1;
+    required uint64 thread_id = 2;
+    required uint64 number = 3;
+    required argument_list argument_list = 4;
+}
+
+message argument_list {
+    repeated sint64 elem = 1;
+}
+

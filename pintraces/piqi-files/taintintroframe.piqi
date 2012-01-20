@@ -1,3 +1,7 @@
+.include [
+         .module types
+]
+
 % Represent tainted bytes being introduced to memory
 .record [
         .name taint-intro-frame

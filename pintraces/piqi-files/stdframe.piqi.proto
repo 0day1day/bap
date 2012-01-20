@@ -1,0 +1,44 @@
+
+message std_frame {
+    required uint64 address = 1;
+    required uint64 thread_id = 2;
+    required bytes rawbytes = 3;
+    required operand_list operand_list = 4;
+}
+
+message operand_list {
+    repeated operand_info elem = 1;
+}
+
+message operand_info {
+    optional mem_operand mem_operand = 1;
+    optional reg_operand reg_operand = 2;
+}
+
+message reg_operand {
+    required sint32 bit_length = 1;
+    required string name = 2;
+    required operand_usage operand_usage = 3;
+    required taint_info taint_info = 4;
+}
+
+message mem_operand {
+    required sint32 bit_length = 1;
+    required uint64 address = 2;
+    required operand_usage operand_usage = 3;
+    required taint_info taint_info = 4;
+}
+
+message operand_usage {
+    required bool read = 1;
+    required bool written = 2;
+    required bool index = 3;
+    required bool base = 4;
+}
+
+message taint_info {
+    optional bool no_taint = 1;
+    optional uint64 taint_id = 2;
+    optional bool taint_multiple = 3;
+}
+

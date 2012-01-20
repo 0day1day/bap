@@ -1,0 +1,8 @@
+
+message exception_frame {
+    required uint64 exception_number = 1;
+    optional uint64 thread_id = 2;
+    required uint64 from_addr = 3;
+    required uint64 to_addr = 4;
+}
+

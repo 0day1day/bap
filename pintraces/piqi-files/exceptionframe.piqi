@@ -1,3 +1,7 @@
+.include [
+         .module types
+]
+
 % Represent an exception
 .record [
         .name exception-frame

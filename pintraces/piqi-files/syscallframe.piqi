@@ -1,3 +1,7 @@
+.include [
+         .module types
+]
+
 % Represent a system call
 .record [
         .name syscall-frame
