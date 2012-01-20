@@ -84,6 +84,7 @@ type opcode =
   | Push of typ * operand
   | Pop of typ * operand
   | Add of (typ * operand * operand)
+  | Adc of (typ * operand * operand)
   | Inc of typ * operand
   | Dec of typ * operand
   | Sub of (typ * operand * operand)
@@ -883,6 +884,13 @@ let rec to_ir addr next ss pref =
     :: assn t o1 (op2e t o1 +* Var tmp2)
     :: let s1 = Var tmp and s2 = Var tmp2 and r = op2e t o1 in
        set_flags_add t s1 s2 r
+  | Adc(t, o1, o2) ->
+    let tmp = nt "t1" t and tmp2 = nt "t2" t in
+    move tmp (op2e t o1)
+    :: move tmp2 (op2e t o2)
+    :: assn t o1 (op2e t o1 +* Var tmp2 +* Cast(CAST_UNSIGNED,t,cf_e))
+    :: let s1 = Var tmp and s2 = Var tmp2 and r = op2e t o1 in
+       set_flags_add t s1 s2 r
   | Inc(t, o) (* o = o + 1 *) ->
     let tmp = nt "t" t in
     move tmp (op2e t o)
@@ -1082,6 +1090,7 @@ module ToStr = struct
     | Push(t,o) -> Printf.sprintf "push %s" (opr o)
     | Pop(t,o) -> Printf.sprintf "pop %s" (opr o)
     | Add(t,d,s) -> Printf.sprintf "add %s, %s" (opr d) (opr s)
+    | Adc(t,d,s) -> Printf.sprintf "adc %s, %s" (opr d) (opr s)
     | Sub(t,d,s) -> Printf.sprintf "sub %s, %s" (opr d) (opr s)
     | Sbb(t,d,s) -> Printf.sprintf "sbb %s, %s" (opr d) (opr s)
     | Cmp(t,d,s) -> Printf.sprintf "cmp %s, %s" (opr d) (opr s)
@@ -1277,7 +1286,7 @@ let parse_instr g addr =
     let b1 = Char.code (g a)
     and na = s a in
     match b1 with (* Table A-2 *)
-	(*** most of 00 to 3d are near the end ***)
+	(*** 00 to 3d are near the end ***)
     | 0x40 | 0x41 | 0x42 | 0x43 | 0x44 | 0x45 | 0x46 | 0x47 ->
       (Inc(prefix.opsize, Oreg(b1 & 7)), na)
     | 0x48 | 0x49 | 0x4a | 0x4b | 0x4c | 0x4d | 0x4e | 0x4f ->
@@ -1308,25 +1317,25 @@ let parse_instr g addr =
 	      (match r with (* Grp 1 *)
 	      | 0 -> (Add(opsize, rm, o2), na)
               | 1 -> (Or(opsize, rm, o2), na)
+	      | 2 -> (Adc(opsize, rm, o2), na)
+	      | 3 -> (Sbb(opsize, rm, o2), na)
 	      | 4 -> (And(opsize, rm, o2), na)
 	      | 5 -> (Sub(opsize, rm, o2), na)
               | 6 -> (Xor(opsize, rm, o2), na)
 	      | 7 -> (Cmp(opsize, rm, o2), na)
-	      | _ -> unimplemented 
-		(Printf.sprintf "unsupported opcode: %02x/%d" b1 r)
+	      | _ -> disfailwith  
+		(Printf.sprintf "impossible opcode: %02x/%d" b1 r)
 	      )
     | 0x84
     | 0x85 -> let (r, rm, na) = parse_modrm32 na in
 	      let o = if b1 = 0x84 then r8 else prefix.opsize in
 	      (Test(o, rm, r), na)
-    | 0x87 ->
-      let (r, rm, na) = parse_modrm prefix.opsize na in
-      (Xchg(prefix.opsize, r, rm), na)
+    | 0x87 -> let (r, rm, na) = parse_modrm prefix.opsize na in
+	      (Xchg(prefix.opsize, r, rm), na)
     | 0x88 -> let (r, rm, na) = parse_modrm r8 na in
 	      (Mov(r8, rm, r), na)
-    | 0x89 ->
-      let (r, rm, na) = parse_modrm32 na in
-      (Mov(prefix.opsize, rm, r), na)
+    | 0x89 -> let (r, rm, na) = parse_modrm32 na in
+	      (Mov(prefix.opsize, rm, r), na)
     | 0x8a -> let (r, rm, na) = parse_modrm r8 na in
 	      (Mov(r8, r, rm), na)
     | 0x8b -> let (r, rm, na) = parse_modrm32 na in
@@ -1340,9 +1349,8 @@ let parse_instr g addr =
     | byte90 when byte90 > 0x90 && byte90 <= 0x97 ->
       let reg = Oreg (byte90 & 7) in
       (Xchg(prefix.opsize, o_eax, reg), na)
-    | 0xa1 ->
-      let (addr, na) = parse_disp32 na in
-      (Mov(prefix.opsize, o_eax, Oaddr(l32 addr)), na)
+    | 0xa1 -> let (addr, na) = parse_disp32 na in
+	      (Mov(prefix.opsize, o_eax, Oaddr(l32 addr)), na)
     | 0xa3 -> let (addr, na) = parse_disp32 na in
 	      (Mov(prefix.opsize, Oaddr(l32 addr), o_eax), na)
     | 0xa4 -> (Movs r8, na)
@@ -1366,12 +1374,10 @@ let parse_instr g addr =
     | 0xc6
     | 0xc7 -> let t = if b1 = 0xc6 then r8 else prefix.opsize in
 	      let (e, rm, na) = parse_modrm32ext na in
-              if e<>0 then disfailwith "Invalid opcode";
-	      (* assert (e=0); (\* others are invalid opcodes, so we should check *\) *)
 	      let (i,na) = parse_immz t na in
 	      (match e with (* Grp 11 *)
 	      | 0 -> (Mov(t, rm, i), na)
-	      | _ -> disfailwith "invalid opcode"
+	      | _ -> disfailwith (Printf.sprintf "Invalid opcode: %02x/%d" b1 e)
 	      )
     | 0xcd -> let (i,na) = parse_imm8 na in
 	      (Interrupt(i), na)
@@ -1396,20 +1402,24 @@ let parse_instr g addr =
 		| 0xc0 -> parse_imm8 na
 		| 0xd0 -> (Oimm 1L, na)
 		| 0xd2 -> (o_ecx, na)
-		| _ -> disfailwith "impossible"
+		| _ -> 
+		  disfailwith (Printf.sprintf "impossible opcode: %02x/%d" b1 r)
 	      in
 	      (match r with (* Grp 2 *)
 	      | 0 -> (Rotate(LSHIFT, opsize, rm, amt, false),na)
 	      | 1 -> (Rotate(RSHIFT, opsize, rm, amt, false),na)
 		(* SWXXX Implement these *)
-	      (*| 2 -> (Rotate(LSHIFT, opsize, rm, amt, true),na)
-	      | 3 -> (Rotate(RSHIFT, opsize, rm, amt, true),na) *)
+	      | 2 -> unimplemented 
+		(* (Rotate(LSHIFT, opsize, rm, amt, true),na) *)
+		(Printf.sprintf "unsupported opcode: %02x/%d" b1 r)
+	      | 3 -> unimplemented 
+		(* (Rotate(RSHIFT, opsize, rm, amt, true),na) *)
+		(Printf.sprintf "unsupported opcode: %02x/%d" b1 r)
 	      | 4 -> (Shift(LSHIFT, opsize, rm, amt), na)
 	      | 5 -> (Shift(RSHIFT, opsize, rm, amt), na)
 	      | 7 -> (Shift(ARSHIFT, opsize, rm, amt), na)
-		(* Grp 2 Rolls *)
-	      | _ -> unimplemented 
-		(Printf.sprintf "unsupported opcode: %02x/%d" b1 r)
+	      | _ -> disfailwith 
+		(Printf.sprintf "impossible opcode: %02x/%d" b1 r)
 	      )
     | 0xf4 -> (Hlt, na)
     | 0xf6
@@ -1418,33 +1428,55 @@ let parse_instr g addr =
 	      (match r with (* Grp 3 *)
 	       | 0 -> let (imm, na) = parse_immz t na in (Test(t, rm, imm), na)
 	       | 2 -> (Not(t, rm), na)
-	       | _ -> unimplemented 
-		 (Printf.sprintf "unsupported opcode: %02x/%d" b1 r)
+	       | 3 -> unimplemented (* Neg *)
+		 (Printf.sprintf "unsupported opcode: %02x/%d" b1 r) 
+	       | 4 -> unimplemented (* mul *)
+		 (Printf.sprintf "unsupported opcode: %02x/%d" b1 r) 
+	       | 5 -> unimplemented (* imul *)
+		 (Printf.sprintf "unsupported opcode: %02x/%d" b1 r) 
+	       | 6 -> unimplemented (* div *)
+		 (Printf.sprintf "unsupported opcode: %02x/%d" b1 r) 
+	       | 7 -> unimplemented (* idiv *)
+		 (Printf.sprintf "unsupported opcode: %02x/%d" b1 r) 
+	       | _ -> 
+		 disfailwith (Printf.sprintf "impossible opcode: %02x/%d" b1 r)
+
 	      )
     | 0xfc -> (Cld, na)
+    | 0xfe -> let (r, rm, na) = parse_modrm32ext na in
+	      (match r with (* Grp 4 *)
+                | 0 -> (Inc(r8, rm), na)
+                | 1 -> (Dec(r8, rm), na)
+	        | _ -> disfailwith 
+		  (Printf.sprintf "impossible opcode: %02x/%d" b1 r)
+	      )
     | 0xff -> let (r, rm, na) = parse_modrm32ext na in
 	      (match r with (* Grp 5 *)
                 | 0 -> (Inc(prefix.opsize, rm), na)
                 | 1 -> (Dec(prefix.opsize, rm), na)
 	        | 2 -> (Call(rm, na), na)
+		| 3 -> unimplemented (* callf *)
+		  (Printf.sprintf "unsupported opcode: %02x/%d" b1 r) 
 	        | 4 -> (Jump rm, na)
+		| 5 -> unimplemented (* jmpf *)
+		  (Printf.sprintf "unsupported opcode: %02x/%d" b1 r)
 	        | 6 -> (Push(prefix.opsize, rm), na)
-	        | _ -> unimplemented 
-		  (Printf.sprintf "unsupported opcode: ff/%d" r)
+	        | _ -> disfailwith 
+		  (Printf.sprintf "impossible opcode: %02x/%d" b1 r)
 	      )
+    (*** 00 to 3d ***)
     | b1 when b1 < 0x3e && (b1 & 7) < 6 ->
       (
 	let ins a = match b1 >> 3 with
 	  | 0 -> Add a
 	  | 1 -> Or a
-	  (*| 2 -> Adc a*)
+	  | 2 -> Adc a
 	  | 3 -> Sbb a
 	  | 4 -> And a
 	  | 5 -> Sub a
 	  | 6 -> Xor a
 	  | 7 -> Cmp a
-	  | _ -> unimplemented (Printf.sprintf "unsupported opcode: %02x" b1)
-(*	  | _ -> disfailwith "impossible" *)
+	  | _ -> disfailwith (Printf.sprintf "impossible opcode: %02x" b1)
 	in
 	let t = if (b1 & 1) = 0  then r8 else prefix.opsize in
 	let (o1, o2, na) = match b1 & 6 with
@@ -1454,7 +1486,7 @@ let parse_instr g addr =
 		 (r, rm, na)
 	  | 4 -> let i, na = parse_immz t na in
 		 (o_eax, i, na)
-	  | _ -> disfailwith "impossible"
+	  | _ -> disfailwith (Printf.sprintf "impossible opcode: %02x" b1)
 	in
 	(ins(t, o1, o2), na)
       )
@@ -1476,10 +1508,13 @@ let parse_instr g addr =
           )
       | 0x28 | 0x29 | 0x6e | 0x7e | 0x6f | 0x7f ->
         let t, name, align, tsrc, tdest = match b2 with
-          | 0x28 | 0x29 when prefix.opsize_override -> r128, "movapd", true, r128, r128
-          | 0x28 | 0x29 when not prefix.opsize_override -> r128, "movaps", true, r128, r128
+          | 0x28 | 0x29 when prefix.opsize_override -> 
+	    r128, "movapd", true, r128, r128
+          | 0x28 | 0x29 when not prefix.opsize_override -> 
+	    r128, "movaps", true, r128, r128
           | 0x6f | 0x7f when prefix.repeat -> r128, "movdqu", false, r128, r128
-          | 0x6f | 0x7f when prefix.opsize_override -> r128, "movdqa", true, r128, r128
+          | 0x6f | 0x7f when prefix.opsize_override -> 
+	    r128, "movdqa", true, r128, r128
           | 0x6e -> r32, "movd", false, r32, prefix.mopsize
           | 0x7e -> r32, "movd", false, prefix.mopsize, r32
           | 0x6f | 0x7f -> r64, "movq", false, r64, r64
