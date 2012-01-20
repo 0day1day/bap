@@ -432,11 +432,11 @@ let rep_wrap ?check_zf ~addr ~next stmts =
 let reta = [StrAttr "ret"]
 and calla = [StrAttr "call"]
 
-let compute_sf result = Cast(CAST_HIGH, r1, result)
+let compute_sf result = cast_high r1 result
 let compute_zf t result = Int(bi0, t) ==* result
 let compute_pf t r =
   (* extra parens do not change semantics but do make it pretty print nicer *)
-  exp_not (Cast(CAST_LOW, r1, (((((((r >>* it 7 t) ^* (r >>* it 6 t)) ^* (r >>* it 5 t)) ^* (r >>* it 4 t)) ^* (r >>* it 3 t)) ^* (r >>* it 2 t)) ^* (r >>* it 1 t)) ^* r))
+  exp_not (cast_low r1 ((((((((r >>* it 7 t) ^* (r >>* it 6 t)) ^* (r >>* it 5 t)) ^* (r >>* it 4 t)) ^* (r >>* it 3 t)) ^* (r >>* it 2 t)) ^* (r >>* it 1 t)) ^* r))
 
 let set_sf r = move sf (compute_sf r)
 let set_zf t r = move zf (compute_zf t r)
@@ -473,7 +473,7 @@ let set_flags_add t s1 s2 r =
 let set_aopszf_sub t s1 s2 r =
   let bit4 = it (1 lsl 4) t in
   move af (bit4 ==* ((bit4 &* ((r ^* s1) ^* s2))))
-  ::move oF (Cast(CAST_HIGH, r1, (s1 ^* s2) &* (s1 ^* r) ))
+  ::move oF (cast_high r1 ((s1 ^* s2) &* (s1 ^* r)))
   ::set_pszf t r
 let set_flags_sub t s1 s2 r =
   move cf (s2 >* s1)
@@ -888,7 +888,7 @@ let rec to_ir addr next ss pref =
     let tmp = nt "t1" t and tmp2 = nt "t2" t in
     move tmp (op2e t o1)
     :: move tmp2 (op2e t o2)
-    :: assn t o1 (op2e t o1 +* Var tmp2 +* Cast(CAST_UNSIGNED,t,cf_e))
+    :: assn t o1 (op2e t o1 +* Var tmp2 +* cast_unsigned t cf_e)
     :: let s1 = Var tmp and s2 = Var tmp2 and r = op2e t o1 in
        set_flags_add t s1 s2 r
   | Inc(t, o) (* o = o + 1 *) ->
