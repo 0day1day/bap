@@ -298,6 +298,11 @@ typedef enum
     REG_EMM_LAST = REG_EMM7,
 
     REG_MXT,
+
+    // REG_X87 is a representative of the X87 fp state - is is NOT available for explicit use in ANY
+    // of the Pin APIs. It also MUST appear before the xmm,ymm and mxcsr register in order to ensure
+    // correct reconciliation order
+    REG_X87,
     
     REG_XMM_BASE,
     REG_FIRST_FP_REG = REG_XMM_BASE,
@@ -455,9 +460,6 @@ typedef enum
 #if !defined(TARGET_DOXYGEN)
     REG_MACHINE_LAST = REG_FPST_LAST, /* last machine register */
 
-    // REG_X87 is a representative of the X87 fp state - is is NOT available for explicit use in ANY
-    // of the Pin APIs.
-    REG_X87,
 
     /* these are the two registers implementing the eflags in pin
        REG_STATUS_FLAGS represents the OF, SF, ZF, AF, PF and CF flags.
@@ -591,6 +593,8 @@ typedef enum
     REG_PIN_R15W,
     REG_PIN_R15D,
 #endif
+    REG_PIN_X87,
+    REG_PIN_MXCSR,
 
     /* ! @todoshould be REG_PIN_THREAD_ID ?*/
     // Every thread is assigned an index so we can implement tls
@@ -603,6 +607,9 @@ typedef enum
     REG_PIN_INDIRREG,  // virtual reg holding indirect jmp target value
     REG_PIN_IPRELADDR, // virtual reg holding ip-rel address value
     REG_PIN_SYSENTER_RESUMEADDR, // virtual reg holding the resume address from sysenter
+    REG_PIN_VMENTER, // virtual reg holding the address of VmEnter
+                     // actually it is the spill slot of this register that holds
+                     // the address
     
     // ISA-independent gr regs holding temporary values
     REG_PIN_T_BASE,
@@ -779,4 +786,5 @@ typedef enum
 
 
 } REG;
+
 #endif

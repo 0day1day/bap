@@ -59,14 +59,14 @@ let insert_item hashtbl item =
 
 (* regexps for matching general information *)
 let total_run_time_regexp = regexp "tests in: ([0-9]+\.[0-9]+) seconds\.$";;
-let total_blocks_regexp = regexp "^Traces: Running block: ([0-9]+)";;
+let total_blocks_regexp = regexp "^Trace(Eval|s): Running block: ([0-9]+)";;
 let trace_count_regexp = regexp "^LongNightly: Processing trace-file";;
 
 (* regexps for matching incorrect and unknown assembley instructions *)
 let bap_regexp = regexp "^AsmirTest: BAP unknown disasm_instr \S+: disasm_i386: unimplemented feature: unsupported opcode: (.*)$";;
 let vex_regexp = regexp "vex x86->IR: unhandled instruction bytes: (.*)$";;
-let trace_eval_regexp = regexp "^WARNING \(Traces\): Difference between BAP and trace values for \[\*(R_\S*)\* Trace=(\S*) Eval=(\S*)\]";;
-let trace_eval_regexp2 = regexp "^WARNING \(Traces\): This is due to one of the following statments:";;
+let trace_eval_regexp = regexp "^WARNING \(Trace(Eval|s)\): Difference between BAP and trace values for \[\*(R_\S*)\* Trace=(\S*) Eval=(\S*)\]";;
+let trace_eval_regexp2 = regexp "^WARNING \(Trace(Eval|s)\): This is due to one of the following statments:";;
 let stmt_regexp = regexp "^\{addr .*asm (\".*?\") (.*)\}$";;
 let asm_regexp = regexp "^\"(.*)\"";;
 let first_word_regexp = regexp "^(\S*)";;
@@ -88,6 +88,7 @@ let process_list asms =
       (fun (asm,r) -> 
 	let asm = (get_match first_word_regexp asm)^" "^r in
 	insert_item probably_right_hashtbl asm;
+	(* insert_item probably_right_hashtbl (asm^" "^r); *)
 	if (!verbose) then (
 	  print_out "Probably got right, but just in case:";
     	  print_out ("Asm = "^asm);
@@ -100,8 +101,9 @@ let process_list asms =
     (* No special indicates these were instructions we definitely got wrong *)
     List.map 
       (fun (asm,r) -> 
-	let asm = (get_match first_word_regexp asm)^" "^r in
-	insert_item small_hashtbl asm;
+	let asm = (get_match first_word_regexp asm)^" "^r in 
+      insert_item small_hashtbl asm; 
+	(*insert_item small_hashtbl (asm^" "^r);*)
 	incr total_wrong;
 	if (!verbose) then (
     	  print_out "Definitly got wrong:";
@@ -115,7 +117,6 @@ let process_list asms =
 (* SWXXX Also collect stats on:
    Run time per binary
    Average size of binarys (number of instructions processed)
-   Average memory use
 *)
 let process_line l = (
   match !wrong_register with
@@ -153,12 +154,12 @@ let process_line l = (
 	  let matches =
 	    extract ~rex:trace_eval_regexp ~full_match:false l 
 	  in
-	  wrong_register := Some(Array.get matches 0);
+	  wrong_register := Some(Array.get matches 1);
 	  if (!verbose) then (
 	    print_out "The following belongs to the below lines:";
-	    print_out ("Reg = "^Array.get matches 0);
-	    print_out ("Trace = "^Array.get matches 1);
-	    print_out ("Eval = "^Array.get matches 2);
+	    print_out ("Reg = "^Array.get matches 1);
+	    print_out ("Trace = "^Array.get matches 2);
+	    print_out ("Eval = "^Array.get matches 3);
 	  )
 	(* Take care of general stats *)
 	with Not_found ->  (
@@ -172,7 +173,8 @@ let process_line l = (
 	      let matches =
 		extract ~rex:total_blocks_regexp ~full_match: false l 
 	      in    
-	      block_count := Array.get matches 0
+	      (* First match is really just an or *)
+	      block_count := Array.get matches 1
 	    with Not_found -> (
 	      if (pmatch ~rex:trace_count_regexp l) then
 		(incr total_traces)
