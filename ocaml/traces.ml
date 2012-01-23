@@ -1,6 +1,7 @@
 (** A module to perform trace analysis *)
 
 open Ast
+open Ast_convenience
 open BatListFull
 open Big_int_Z
 open Big_int_convenience
@@ -987,14 +988,21 @@ let trace_transform_stmt stmt evalf =
   in
   let s = Printf.sprintf "Removed: %s" (Pp.ast_stmt_to_string stmt) in
   let com = Ast.Comment(s, []) in
+  let concretize_jump_target e evalf =
+    let v = evalf e in
+    let e = binop EQ e v in
+    let () = assert (e <> exp_false) in
+    if e = exp_true then []
+    else [Assert (e, [])]
+  in
   let s = match stmt with
     | (Ast.CJmp (e,tl,_,atts1)) when full_exp_eq (evalf e) exp_true ->
-        [com; Ast.Assert(e,atts1)]
+      com :: Ast.Assert(e,atts1) :: concretize_jump_target tl evalf
     | (Ast.CJmp (e,_,fl,atts1)) when full_exp_eq (evalf e) exp_false ->
-        [com; Ast.Assert(UnOp(NOT,e),atts1)]
+      com :: Ast.Assert(UnOp(NOT,e),atts1) :: concretize_jump_target fl evalf
     | Ast.CJmp _ -> failwith "Evaluation failure!"
-    | (Ast.Jmp _) ->
-        [com]
+    | (Ast.Jmp (e, _)) ->
+      com :: concretize_jump_target e evalf
           (* Removing assignment of tainted operands: symbolic
              execution does not need these *)
     | Ast.Move (_, _, atts) when List.exists is_tconcassign atts -> []
