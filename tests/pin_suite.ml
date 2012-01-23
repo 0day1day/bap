@@ -18,7 +18,7 @@ let pin_trace_setup _ =
   let args = 
 	["-t"; (gentrace_path^gentrace); "-taint-files"; taint_file; 
 	 "-o"; tag^pin_out_suffix; "--"; bof; taint_file ] in
-  let exit_code = Unix.WEXITED(1) in
+  let exit_code = Unix.WEXITED(0) in
   check_pin_setup();
   (* check_file (pin_path^pin); *)
   (* check_file (gentrace_path^gentrace); *)
