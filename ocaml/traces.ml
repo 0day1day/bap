@@ -989,11 +989,13 @@ let trace_transform_stmt stmt evalf =
   let s = Printf.sprintf "Removed: %s" (Pp.ast_stmt_to_string stmt) in
   let com = Ast.Comment(s, []) in
   let concretize_jump_target e evalf =
-    let v = evalf e in
-    let e = binop EQ e v in
-    let () = assert (e <> exp_false) in
-    if e = exp_true then []
-    else [Assert (e, [])]
+    match evalf e with
+    | Lab _ -> [] (* Can't concretize string labels *)
+    | v -> (
+      let e = binop EQ e v in
+      let () = assert (e <> exp_false) in
+      if e = exp_true then []
+      else [Assert (e, [])])
   in
   let s = match stmt with
     | (Ast.CJmp (e,tl,_,atts1)) when full_exp_eq (evalf e) exp_true ->
