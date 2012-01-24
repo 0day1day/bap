@@ -101,6 +101,7 @@ type opcode =
   | Test of typ * operand * operand
   | Not of typ * operand
   | Neg of typ * operand
+  | Imul of typ * (operand * operand) * typ * operand * typ * operand (* dsttyp, (dst1,dst2), src1typ, src1, src2typ, src2 *)
   | Cld
   | Rdtsc
   | Cpuid
@@ -987,14 +988,12 @@ let rec to_ir addr next ss pref =
   | Not(t, o) ->
     [assn t o (exp_not (op2e t o))]
   | Neg(t, o) ->
-    (* o = -o. if o == 0 then cf = 0 else cf = 1 *)
     let tmp = nt "t" t in
-    [ 
-      move tmp (op2e t o);
-      assn t o (it 0 t -* op2e t o);
-      move cf (ite r1 (Var tmp ==* it 0 t) (it 0 r1) (it 1 r1));
-    ]
-(*    :: set_aopszf_sub t (Var tmp) (op2e t o) (it 0 t)*)
+    move tmp (op2e t o)
+    ::assn t o (it 0 t -* op2e t o)
+    ::move cf (ite r1 (Var tmp ==* it 0 t) (it 0 r1) (it 1 r1))
+    ::set_aopszf_sub t (Var tmp) (it 0 t) (op2e t o)
+  | Imul (dt, (dst1,dst2), st1, src1, st2, src2) -> unimplemented "Imul"
   | Cld ->
     [Move(dflag, i32 1, [])]
   | Leave t when pref = [] -> (* #UD if Lock prefix is used *)
@@ -1105,6 +1104,7 @@ module ToStr = struct
     | Test(t,d,s) -> Printf.sprintf "test %s, %s" (opr d) (opr s)
     | Not(t,o) -> Printf.sprintf "not %s" (opr o)
     | Neg(t,o) -> Printf.sprintf "neg %s" (opr o)
+    | Imul (dt, (dst1,dst2), st1, src1, st2, src2) -> Printf.sprintf "imul %s, %s, %s" (opr dst1) (opr src1) (opr src2)
     | Cld -> "cld"
     | Leave _ -> "leave"
     | Interrupt(o) -> Printf.sprintf "int %s" (opr o)
@@ -1432,7 +1432,8 @@ let parse_instr g addr =
 	       | 3 -> (Neg(t, rm), na)
 	       | 4 -> unimplemented (* mul *)
 		 (Printf.sprintf "unsupported opcode: %02x/%d" b1 r) 
-	       | 5 -> unimplemented (* imul *)
+	       | 5 -> (*(Imul(t, (rm,rm), t, rm, t, rm), na)*)
+		 unimplemented (* mul *)
 		 (Printf.sprintf "unsupported opcode: %02x/%d" b1 r) 
 	       | 6 -> unimplemented (* div *)
 		 (Printf.sprintf "unsupported opcode: %02x/%d" b1 r) 
