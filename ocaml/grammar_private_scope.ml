@@ -2,7 +2,8 @@
 
 open Grammar_scope
 
-let cur_scope = ref (default_scope ())
+let default_scope () = create_scope_from_decls Asmir.all_regs
+let cur_scope : Scope.t ref = ref (default_scope ())
 
 let get_scope () = !cur_scope
 let set_scope s = cur_scope := s
@@ -15,7 +16,4 @@ let reset_scope () = set_scope (default_scope ())
    defined pretty early.  As a compromise, I am going to have Grammar
    (e.g. this file) grab the x86/ARM decls and put them into the default
    scope. It's ugly, and feel free to fix it if you can do better. *)
-
-let () = set_scope (create_scope_from_decls Asmir.all_regs);;
-
 

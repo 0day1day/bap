@@ -241,7 +241,6 @@ match !stpout with
 match !pstpout with
 | None -> ()
 | Some oc ->
-    let mem_hash = Var.VarHash.create 1000 in
     let foralls = List.map (Memory2array.coerce_rvar_state m2a_state) foralls in 
     let pp = (((!solver)#printer) :> Formulap.fppf) in
     let p = pp ~suffix:!suffix oc in

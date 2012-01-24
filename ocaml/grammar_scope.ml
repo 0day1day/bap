@@ -28,7 +28,7 @@ module Scope = struct
     List.iter (fun v -> Hashtbl.add h (Var.name v) v) decls;
     (h, Stack.create() )
 
-  let defscope () : t = create []
+  let empty_scope () : t = create []
 
   let add_var scope n v =
     Hashtbl.add (fst scope) n v;
@@ -66,6 +66,6 @@ module Scope = struct
 
 end
 
-let default_scope = Scope.defscope
+let empty_scope = Scope.empty_scope
 let create_scope_from_decls decls = Scope.create decls
 
