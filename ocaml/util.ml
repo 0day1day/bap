@@ -715,3 +715,4 @@ let print_mem_usage _ =
   in
   let (out1,out2) = syscall cmd in
   D.pdebug (out1^out2)
+

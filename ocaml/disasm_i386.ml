@@ -100,6 +100,7 @@ type opcode =
   | Pxor of (typ * operand * operand)
   | Test of typ * operand * operand
   | Not of typ * operand
+  | Neg of typ * operand
   | Cld
   | Rdtsc
   | Cpuid
@@ -983,8 +984,17 @@ let rec to_ir addr next ss pref =
     :: move cf exp_false
     :: move af (Unknown("AF is undefined after and", r1))
     :: set_pszf t (Var tmp)
-  | Not(t, o1) ->
-    [assn t o1 (exp_not (op2e t o1))]
+  | Not(t, o) ->
+    [assn t o (exp_not (op2e t o))]
+  | Neg(t, o) ->
+    (* o = -o. if o == 0 then cf = 0 else cf = 1 *)
+    let tmp = nt "t" t in
+    [ 
+      move tmp (op2e t o);
+      assn t o (it 0 t -* op2e t o);
+      move cf (ite r1 (Var tmp ==* it 0 t) (it 0 r1) (it 1 r1));
+    ]
+(*    :: set_aopszf_sub t (Var tmp) (op2e t o) (it 0 t)*)
   | Cld ->
     [Move(dflag, i32 1, [])]
   | Leave t when pref = [] -> (* #UD if Lock prefix is used *)
@@ -1094,6 +1104,7 @@ module ToStr = struct
     | Pxor(t,d,s)  -> Printf.sprintf "pxor %s, %s" (opr d) (opr s)
     | Test(t,d,s) -> Printf.sprintf "test %s, %s" (opr d) (opr s)
     | Not(t,o) -> Printf.sprintf "not %s" (opr o)
+    | Neg(t,o) -> Printf.sprintf "neg %s" (opr o)
     | Cld -> "cld"
     | Leave _ -> "leave"
     | Interrupt(o) -> Printf.sprintf "int %s" (opr o)
@@ -1418,8 +1429,7 @@ let parse_instr g addr =
 	      (match r with (* Grp 3 *)
 	       | 0 -> let (imm, na) = parse_immz t na in (Test(t, rm, imm), na)
 	       | 2 -> (Not(t, rm), na)
-	       | 3 -> unimplemented (* Neg *)
-		 (Printf.sprintf "unsupported opcode: %02x/%d" b1 r) 
+	       | 3 -> (Neg(t, rm), na)
 	       | 4 -> unimplemented (* mul *)
 		 (Printf.sprintf "unsupported opcode: %02x/%d" b1 r) 
 	       | 5 -> unimplemented (* imul *)
