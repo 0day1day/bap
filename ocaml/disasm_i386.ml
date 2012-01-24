@@ -488,7 +488,7 @@ let rec to_ir addr next ss pref =
   function
   | Nop -> []
   | Retn when pref = [] ->
-    let t = nt "ra" r32 in
+    let t = nt "tret" r32 in
     [move t (load_s seg_ss r32 esp_e);
      move esp (esp_e +* (i32 4));
      Jmp(Var t, [StrAttr "ret"])
@@ -639,7 +639,7 @@ let rec to_ir addr next ss pref =
     [assn t o1 (cast_unsigned t c)]
   | Shift(st, s, dst, shift) -> 
     assert (List.mem s [r8; r16; r32]);
-    let origCOUNT, origDEST = nt "origCOUNT" s, nt "origDEST" s
+    let origCOUNT, origDEST = nt "tCOUNT" s, nt "tDEST" s
     and size = it (Typecheck.bits_of_width s) s
     and s_f = match st with LSHIFT -> (<<*) | RSHIFT -> (>>*) 
       | ARSHIFT -> (>>>*) | _ -> disfailwith "invalid shift type"
@@ -669,7 +669,7 @@ let rec to_ir addr next ss pref =
      move af (ifzero af_e (Unknown("AF undefined after shift", r1)))
     ]
   | Shiftd(st, s, dst, fill, count) ->
-      let origDEST, origCOUNT = nt "origDEST" s, nt "origCOUNT" s in
+      let origDEST, origCOUNT = nt "tDEST" s, nt "tCOUNT" s in
       let e_dst = op2e s dst in
       let e_fill = op2e s fill in
       (* count mod 32 *)
@@ -711,7 +711,7 @@ let rec to_ir addr next ss pref =
   | Rotate(rt, s, dst, shift, use_cf) ->
     (* SWXXX implement use_cf *)
     if use_cf then unimplemented "rotate use_vf";
-    let origCOUNT = nt "origCOUNT" s in
+    let origCOUNT = nt "tCOUNT" s in
     let e_dst = op2e s dst in
     let e_shift = op2e s shift &* it 31 s in
     let size = it (Typecheck.bits_of_width s) s in
@@ -819,7 +819,7 @@ let rec to_ir addr next ss pref =
         move fpu_ctrl (load r16 src);
       ]
   | Cmps(Reg bits as t) ->
-    let src1 = nt "src1" t and src2 = nt "src2" t and tmpres = nt "tmp" t in
+    let src1 = nt "tsrc1" t and src2 = nt "tsrc2" t and tmpres = nt "tmp" t in
     let stmts =
       move src1 (op2e t esiaddr)
       :: move src2 (op2e_s seg_es t ediaddr)
@@ -835,7 +835,7 @@ let rec to_ir addr next ss pref =
     else
       unimplemented "unsupported flags in cmps"
   | Scas(Reg bits as t) ->
-    let src1 = nt "src1" t and src2 = nt "src2" t and tmpres = nt "tmp" t in
+    let src1 = nt "tsrc1" t and src2 = nt "tsrc2" t and tmpres = nt "tmp" t in
     let stmts =
       move src1 (cast_low t (Var eax))
       :: move src2 (op2e_s seg_es t ediaddr)
