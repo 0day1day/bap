@@ -321,7 +321,7 @@ let concrete_substitution trace =
 
 let check_slice trace = 
   let actual_trace = concrete_substitution trace in
-  let accurate_trace = dicer (NameSet.singleton "tret") [] (List.rev actual_trace) in
+  let accurate_trace = dicer (NameSet.singleton "ra") [] (List.rev actual_trace) in
     accurate_trace
 
 (*  Approximate/Conservative Slicing  *)
