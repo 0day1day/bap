@@ -191,6 +191,7 @@ let speclist =
 let anon x = raise(Arg.Bad("Unexpected argument: '"^x^"'"))
 let () = Arg.parse speclist anon usage
 
+let m2a_state = Memory2array.create_state ()
 
 let prog,scope =
   try Input.get_program()
@@ -198,7 +199,10 @@ let prog,scope =
     Arg.usage speclist (s^"\n"^usage);
     exit 1
 
-let post,_ = Parser.exp_from_string ~scope !post
+let post,scope = Parser.exp_from_string ~scope !post
+
+let prog = Memory2array.coerce_prog_state ~scope m2a_state prog
+let post = Memory2array.coerce_exp_state ~scope m2a_state post
 
 let cfg = Cfg_ast.of_prog prog
 let cfg = Prune_unreachable.prune_unreachable_ast cfg
@@ -216,9 +220,7 @@ match !irout with
 match !stpout with
 | None -> ()
 | Some oc ->
-    let mem_hash = Var.VarHash.create 1000 in
-    let wp = Memory2array.coerce_exp_state mem_hash wp in
-    let foralls = List.map (Memory2array.coerce_rvar_state mem_hash) foralls in 
+    let foralls = List.map (Memory2array.coerce_rvar_state ~scope m2a_state) foralls in 
     let pp = (((!solver)#printer) :> Formulap.fppf) in
     let p = pp ~suffix:!suffix oc in
     if !assert_vars then (
@@ -239,9 +241,7 @@ match !stpout with
 match !pstpout with
 | None -> ()
 | Some oc ->
-    let mem_hash = Var.VarHash.create 1000 in
-    let wp = Memory2array.coerce_exp_state mem_hash wp in
-    let foralls = List.map (Memory2array.coerce_rvar_state mem_hash) foralls in 
+    let foralls = List.map (Memory2array.coerce_rvar_state m2a_state) foralls in 
     let pp = (((!solver)#printer) :> Formulap.fppf) in
     let p = pp ~suffix:!suffix oc in
 	p#forall foralls;

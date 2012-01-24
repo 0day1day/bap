@@ -5,30 +5,26 @@
     The evaluator uses this information to throw away any state stored
     for these temporaries once control passes out of an assembly block.
 *)
-let is_temp (Var.V(_, s, t)) =
+
+let temp_prefix = "T_"
+let temp_prefix_len = String.length temp_prefix
+
+let is_temp_name s =
   (* First try VEX style vars *)
-  ((String.length s > 2) && (String.sub s 0 2 = "T_"))
-  || s = "ra"
-  || s = "t1"
-  || s = "t2"
-  || s = "t3"
-  || s = "t4"
-  || s = "t5"
-  || s = "t6"
-  || s = "t7"
-  || s = "t8"
-  || s = "t9"
-  || s = "t10"
-  || s = "t11"
-  || s = "t12"
-  || s = "t13"
-  || s = "t14"
-  || s = "t15"
-  || s = "t16"
-  || s = "tmpDEST"
-  || s = "origDEST"
-  || s = "origCOUNT"
-  || s = "src1"
-  || s = "src2"
-  || s = "tmp"
-  || s = "t"
+  (String.length s > temp_prefix_len) && (String.sub s 0 2 = temp_prefix)
+
+let is_temp (Var.V(_, s, _)) =
+  is_temp_name s
+
+(** Create a new temporary
+
+    Makes sure that the temporary name is found by Disasm.is_temp.
+    Always use this for making temporaries.
+*)
+let nt s t =
+  if (is_temp_name s) then
+    Var.newvar s t
+  else
+    let newname = temp_prefix^s in
+    let () = assert (is_temp_name newname) in
+    Var.newvar (newname) t

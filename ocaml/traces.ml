@@ -269,14 +269,17 @@ let () =
      ::"R_PF"
      ::[])
 
-let isnotallbad v = if not !checkall then Hashtbl.mem checkallregs (Var.name v) else false
+let isnotallbad v = if not !checkall then Hashtbl.mem checkallregs (Var.name v) 
+  else false
 let isbad v = Hashtbl.mem badregs (Var.name v) || isnotallbad v
 
 let print_vars () =
-  let printone k v = dprintf "Info for register %s %s" k (Pp.ast_exp_to_string v.exp) in
+  let printone k v = 
+    dprintf "Info for register %s %s" k (Pp.ast_exp_to_string v.exp) in
   Hashtbl.iter printone global.vars
 
-(** Build a statement asserting that each operand is equal to its value in the trace
+(** Build a statement asserting that each operand is equal to its value in the 
+    trace
 
     @param h Mapping of vars to dsa vars
 *)
@@ -326,7 +329,8 @@ let assign_vars memv symbolic =
     | true, false (* Symbolic *)
     | false, _ (* Concrete *) ->
 	let k = big_int_of_int64 k in
-	Move(memv, Store(Var(memv), Int(k, memtype), v.exp, exp_false, reg_8), getattrs v.tnt)::a
+	Move(memv, Store(Var(memv), Int(k, memtype), v.exp, exp_false, reg_8),
+	     getattrs v.tnt)::a
     | true, true -> a
   in
   let bige = Hashtbl.fold addone global.vars [] in
@@ -628,7 +632,8 @@ let is_loaded =
 (** Remove 'Loaded module' specials *)
 let remove_loaded = 
   let rs = function
-    | Ast.Special(s, attrs) as sfull when is_loaded sfull -> Ast.Comment(s, attrs)
+    | Ast.Special(s, attrs) as sfull when is_loaded sfull 
+	-> Ast.Comment(s, attrs)
     | s -> s
   in
   List.map rs
@@ -636,7 +641,8 @@ let remove_loaded =
 (** Removing all specials from the traces *)	
 let remove_specials =
   let no_specials = function
-    | Ast.Special(_, attrs) when not (List.mem (StrAttr "TraceKeep") attrs) -> false
+    | Ast.Special(_, attrs) when not (List.mem (StrAttr "TraceKeep") attrs) 
+	-> false
     | _ -> true
   in
     List.filter no_specials
@@ -734,7 +740,8 @@ let trace_dce trace =
           `DoChildren
       | Move (tv, _, _) as olds when not (VH.mem rvh tv) ->
           (* Remove this statement *)
-          let str = Printf.sprintf "Removed by dce: %s" (Pp.ast_stmt_to_string olds) in
+          let str = 
+	    Printf.sprintf "Removed by dce: %s" (Pp.ast_stmt_to_string olds) in
           let news = Comment (str, []) in
             `ChangeTo news
       | _ -> `SkipChildren
@@ -824,7 +831,8 @@ struct
             with Not_found ->
 
 	      (* Well, this isn't good... Just make something up *)
-	      wprintf "Unknown memory value during eval: addr %Lx" (int64_of_big_int i);
+	      wprintf "Unknown memory value during eval: addr %Lx" 
+		(int64_of_big_int i);
 	      Int(bi0, reg_8)
       )
 
@@ -840,7 +848,8 @@ struct
     StdAssign.assign v ev ctx
 end
 
-module TraceConcrete = Symbeval.Make(TraceConcreteDef)(FastEval)(TraceConcreteAssign)(StdForm)
+module TraceConcrete = 
+  Symbeval.Make(TraceConcreteDef)(FastEval)(TraceConcreteAssign)(StdForm)
 
 (** Check all variables in delta to make sure they agree with operands
     loaded from a trace. We should be able to find bugs in BAP and the
@@ -868,7 +877,8 @@ let check_delta state =
       try
 	let evalbyte = get_int (AddrMap.find addr cm) in
 	let issymb = Hashtbl.mem global.symbolic addr in
-	if (tracebyte <>% evalbyte) && (not issymb) && (not !use_alt_assignment) then wprintf "Consistency error: Tainted memory value (address %Lx, value %s) present in trace does not match value %s in in concrete evaluator" addr (~% tracebyte) (~% evalbyte)
+	if (tracebyte <>% evalbyte) && (not issymb) && (not !use_alt_assignment)
+	then wprintf "Consistency error: Tainted memory value (address %Lx, value %s) present in trace does not match value %s in in concrete evaluator" addr (~% tracebyte) (~% evalbyte)
       with Not_found ->
 	if not !use_alt_assignment then
 	  wprintf "Consistency error: Tainted memory value (address %Lx, value %s) present in trace but missing in concrete evaluator" addr (~% tracebyte)
@@ -902,14 +912,16 @@ let check_delta state =
 	      with Not_found -> 
 		("Unable to find statement that set register "^
 		    (Var.name var)^
-		    ". This is probably because BAP never set it, but was supposed to!")
+		    ". This is probably because BAP never set it, but was"^
+		    " supposed to!")
 	    in
 	    let traceval_str = Pp.ast_exp_to_string traceval in
 	    let evalval_str = Pp.ast_exp_to_string evalval in
 	    wprintf "Difference between %sBAP and trace values for [*%s* Trace=%s Eval=%s]" s dsavarname traceval_str evalval_str;
 	    wprintf "This is due to one of the following statments:\n%s"  badstmt;
 	  )
-	  (* If we can't find concrete value, it's probably just a BAP temporary *)
+	  (* If we can't find concrete value, it's probably just a BAP 
+	     temporary *)
       | _ -> ())
     ) (* probably a temporary *)
     | TMem _
@@ -955,7 +967,8 @@ let get_symbolic_seeds memv = function
 	     add_symbolic index sym_var ;
 	     (* symbolic variable *)
 	     let mem = Var(memv) in
-	     let store = Store(mem, Int(big_int_of_int64 index, reg_32), sym_var, exp_false, reg_8) in
+	     let store = Store(mem, Int(big_int_of_int64 index, reg_32), 
+			       sym_var, exp_false, reg_8) in
 	     (* let constr = BinOp (EQ, mem, store) in *)
 	     (*   ignore (LetBind.add_to_formula exp_true constr Rename) *)
 	     let move = Move(memv, store, []) in
@@ -1016,7 +1029,8 @@ let trace_transform_stmt stmt evalf =
     (*   | _ -> failwith "Unexpected evaluation problem") *)
     | s -> [s] in
   if not !allow_symbolic_indices && not (is_true !exp) then
-    (* The assertion must come first, since the statement may modify value of the expression! *)
+    (* The assertion must come first, since the statement may modify value of 
+       the expression! *)
     s @ [Assert(!exp, [])]
   else
     s
@@ -1032,9 +1046,6 @@ let rec get_next_label blocks =
 	  with
 		|	Failure _ -> None)
 	| [] -> None
-
-(* SWXXX General finalization function *)
-let fin tag = fun x -> (pdebug ("Run block finalized "^tag));;
 
 (** Running each block separately *)
 let run_block ?(next_label = None) ?(log=fun _ -> ()) ?(transformf = (fun s _ -> [s])) state memv block =  
@@ -1067,7 +1078,8 @@ let run_block ?(next_label = None) ?(log=fun _ -> ()) ?(transformf = (fun s _ ->
   in
   let block = List.filter (fun b -> if b == addr then false else true) block in
   let input_seeds = get_symbolic_seeds memv addr in
-  pdebug ("Running block: " ^ (string_of_int !counter) ^ " " ^ (Pp.ast_stmt_to_string addr));
+  pdebug ("Running block: " ^ (string_of_int !counter) ^ " " 
+	  ^ (Pp.ast_stmt_to_string addr));
   counter := !counter + 1;
   let () = ignore(update_concrete addr) in
   if not !consistency_check then (
@@ -1255,8 +1267,10 @@ let run_blocks blocks memv length =
       (
 	(* If we are doing a consistency check, saving the concretized
 	   blocks is just a waste of memory! *)
-	(* new trace *) (if !consistency_check then [] else List.rev_append concblock acc),
-        (* remaining *) (match remaining with
+	(* new trace *) 
+	(if !consistency_check then [] else List.rev_append concblock acc),
+        (* remaining *) 
+	(match remaining with
 	| [] -> []
 	| _::tl -> tl)
       ))
@@ -1364,7 +1378,9 @@ struct
 	  let byte = big_int_of_int ((!bytes).(n)) in
 	  Symbolic(Int(byte, t))
 	with
-	  Invalid_argument _ -> failwith ("Input outside of input file range: " ^ (string_of_int n) ^ "/" ^ (string_of_int (Array.length !bytes)))
+	  Invalid_argument _ -> 
+	    failwith ("Input outside of input file range: "^(string_of_int n)^
+			 "/"^(string_of_int (Array.length !bytes)))
       ) else (
 	dprintf "Variable %s not found" s;
 	match t with
@@ -1442,7 +1458,8 @@ let formula_size formula =
     | Ast.Cast (_, _, e) -> Int64.one + size e
     | Ast.Unknown _ -> Int64.one
     | Ast.Load (ea, ei,  _, _) -> Int64.one + (size ea) + (size ei)
-    | Ast.Store (ea, ei, ev, _, _) -> Int64.one + (size ea) + (size ei) + (size ev)
+    | Ast.Store (ea, ei, ev, _, _) -> 
+      Int64.one + (size ea) + (size ei) + (size ev)
     | Ast.Let (_, el, eb) -> Int64.one + (size el) + (size eb)
   in
     size formula
@@ -1495,7 +1512,8 @@ struct
     let unknown = !full_symbolic && not (VH.mem delta var) in
       (match dsa_taint_val var, dsa_concrete_val var with
        | Some(true), _ when unknown ->
-  	   (* If the variable is tainted and we don't have a formula for it, it is symbolic *)
+  	   (* If the variable is tainted and we don't have a formula for it, it
+	      is symbolic *)
 	   (* DV.dprintf "symbolic"; *)
   	   Symbolic (Var var)
        | Some(true), _ ->
@@ -1504,7 +1522,8 @@ struct
   	   VH.find delta var
 
        | _, _ when is_symbolic var ->
-           (* If the variable is untainted, but is a symbolic byte that we introduced *)
+           (* If the variable is untainted, but is a symbolic byte that we 
+	      introduced *)
            Symbolic(Var(var))
 
        | _, Some(cval) ->
@@ -1513,7 +1532,8 @@ struct
   	      probably a temporary. *)
 	   (* DV.dprintf "Using concrete value"; *)
 	   if !use_alt_assignment then (
-	     (* In the alternate scheme, all concretes are added right to the formula *)
+	     (* In the alternate scheme, all concretes are added right to the 
+		formula *)
 	     VH.remove delta var;
 	     Symbolic(Var(var))
 	   ) else (
@@ -1526,7 +1546,8 @@ struct
   	   with Not_found ->
   	     match Var.typ var with
   	     | TMem _ 
-	     | Array _ -> (* DV.dprintf "new memory %s" (Var.name var); *) empty_smem var
+	     | Array _ -> (* DV.dprintf "new memory %s" (Var.name var); *) 
+	       empty_smem var
   	     | _ ->
 		 (match dsa_var var with
 		 | Some(x) -> if not (isbad x) then
@@ -1957,7 +1978,8 @@ let output_exploit file trace =
   solve_formula formula_storage answer_storage ;
   let var_vals = match solution_from_stp_formula answer_storage with
     | Some(x) -> x
-    | None -> Printf.printf "Formula was unsatisfiable\n"; failwith "Formula was unsatisfiable"
+    | None -> Printf.printf "Formula was unsatisfiable\n"; 
+      failwith "Formula was unsatisfiable"
   in
     (* The variables that we care about *)
   let is_input v = String.sub v 0 4 = "symb" in

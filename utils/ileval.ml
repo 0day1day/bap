@@ -28,7 +28,7 @@ let pipeline = ref []
 (* Initialization statements *)
 let inits = ref []
 
-let scope = ref (Grammar_scope.default_scope ())
+let scope = ref (Grammar_private_scope.default_scope ())
 
 let cexecute_at s p =
   let () = ignore(Symbeval.concretely_execute p ~i:(List.rev !inits) ~s) in

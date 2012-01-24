@@ -100,6 +100,8 @@ type opcode =
   | Pxor of (typ * operand * operand)
   | Test of typ * operand * operand
   | Not of typ * operand
+  | Neg of typ * operand
+  | Imul of typ * (operand * operand) * typ * operand * typ * operand (* dsttyp, (dst1,dst2), src1typ, src1, src2typ, src2 *)
   | Cld
   | Rdtsc
   | Cpuid
@@ -163,17 +165,7 @@ let xmm_t = Reg 128
 
 (** Only use this for registers, not temporaries *)
 let nv = Var.newvar
-
-(** Create a new temporary
-
-    Makes sure that the temporary name is found by Disasm.is_temp.
-    Always use this for making temporaries.
-*)
-let nt s t =
-  let v = nv s t in
-  if not (Disasm_temp.is_temp v) then
-    failwith ("Variable "^(Var.name v)^" expected to be found as temporary but was not");
-  v
+let nt = Disasm_temp.nt
 
 (* registers *)
 
@@ -993,8 +985,15 @@ let rec to_ir addr next ss pref =
     :: move cf exp_false
     :: move af (Unknown("AF is undefined after and", r1))
     :: set_pszf t (Var tmp)
-  | Not(t, o1) ->
-    [assn t o1 (exp_not (op2e t o1))]
+  | Not(t, o) ->
+    [assn t o (exp_not (op2e t o))]
+  | Neg(t, o) ->
+    let tmp = nt "t" t in
+    move tmp (op2e t o)
+    ::assn t o (it 0 t -* op2e t o)
+    ::move cf (ite r1 (Var tmp ==* it 0 t) (it 0 r1) (it 1 r1))
+    ::set_aopszf_sub t (Var tmp) (it 0 t) (op2e t o)
+  | Imul (dt, (dst1,dst2), st1, src1, st2, src2) -> unimplemented "Imul"
   | Cld ->
     [Move(dflag, i32 1, [])]
   | Leave t when pref = [] -> (* #UD if Lock prefix is used *)
@@ -1104,6 +1103,8 @@ module ToStr = struct
     | Pxor(t,d,s)  -> Printf.sprintf "pxor %s, %s" (opr d) (opr s)
     | Test(t,d,s) -> Printf.sprintf "test %s, %s" (opr d) (opr s)
     | Not(t,o) -> Printf.sprintf "not %s" (opr o)
+    | Neg(t,o) -> Printf.sprintf "neg %s" (opr o)
+    | Imul (dt, (dst1,dst2), st1, src1, st2, src2) -> Printf.sprintf "imul %s, %s, %s" (opr dst1) (opr src1) (opr src2)
     | Cld -> "cld"
     | Leave _ -> "leave"
     | Interrupt(o) -> Printf.sprintf "int %s" (opr o)
@@ -1428,11 +1429,11 @@ let parse_instr g addr =
 	      (match r with (* Grp 3 *)
 	       | 0 -> let (imm, na) = parse_immz t na in (Test(t, rm, imm), na)
 	       | 2 -> (Not(t, rm), na)
-	       | 3 -> unimplemented (* Neg *)
-		 (Printf.sprintf "unsupported opcode: %02x/%d" b1 r) 
+	       | 3 -> (Neg(t, rm), na)
 	       | 4 -> unimplemented (* mul *)
 		 (Printf.sprintf "unsupported opcode: %02x/%d" b1 r) 
-	       | 5 -> unimplemented (* imul *)
+	       | 5 -> (*(Imul(t, (rm,rm), t, rm, t, rm), na)*)
+		 unimplemented (* mul *)
 		 (Printf.sprintf "unsupported opcode: %02x/%d" b1 r) 
 	       | 6 -> unimplemented (* div *)
 		 (Printf.sprintf "unsupported opcode: %02x/%d" b1 r) 

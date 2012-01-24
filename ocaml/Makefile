@@ -44,6 +44,8 @@ export SOURCES = \
 	cfg.mli cfg.ml \
 	ast_visitor.mli ast_visitor.ml \
 	ast_convenience.ml \
+	grammar_scope.ml \
+	memory2array.ml \
 	reachable.mli \
 	reachable.ml \
 	prune_unreachable.mli prune_unreachable.ml \
@@ -51,7 +53,6 @@ export SOURCES = \
 	cfg_ast.mli cfg_ast.ml \
 	ssa_visitor.mli ssa_visitor.ml \
 	cfg_ssa.mli cfg_ssa.ml \
-	memory2array.ml \
 	debug_snippets.ml \
 	sccvn.mli sccvn.ml \
 	deadcode.mli deadcode.ml \
@@ -74,10 +75,11 @@ export SOURCES = \
 	yices_grammar.mly yices_lexer.mll \
 	smtexec.mli smtexec.ml \
 	solver.ml \
-	asmirconsts.ml \
+	asmir_vars.ml \
+	asmir_consts.ml \
 	asmir.mli asmir.ml \
 	asmir_rdisasm.mli asmir_rdisasm.ml \
-	grammar_scope.ml \
+	grammar_private_scope.ml \
 	grammar.mly lexer.mll \
 	parser.ml \
 	input.mli input.ml \
