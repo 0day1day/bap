@@ -12,12 +12,13 @@
 module D = Debug.Make(struct let name="memory2array" and default=`Debug end)
 open D
 
-open BatListFull
 open Ast
+open BatListFull
 open Big_int_Z
+open Grammar_scope
 open Type
+open Util
 open Var
-
 
 (** How big is normalized index? *)
 let bitwidth = 8
@@ -72,28 +73,66 @@ let split_writes array index accesstype endian data =
 
 
 (** This visitor maps each TMem to an array *)
-class memory2array_visitor hash =
+class memory2array_visitor ?scope hash =
 (*  let hash = VarHash.create 1000 in *)
-  object (self)
-    inherit Ast_visitor.nop
 
-    method visit_avar avar =
-      match Var.typ(avar) with
-      |	TMem(idxt) ->
-	  let array =
-	    try VarHash.find hash avar
-	    with Not_found ->
-	      let newarrvar = newvar ((Var.name avar)^"_array") (Array(idxt,Reg(bitwidth))) in
-	      VarHash.add hash avar newarrvar;
-	      newarrvar
-	  in
-          `ChangeToAndDoChildren array (* Do we need to recurse on the avar? *)
-      |	_ ->  `DoChildren
+  let get_array_var (Var.V(_, _, t) as avar) =
+    match t with
+    | TMem (idxt) ->
+      let array =
+        try VarHash.find hash avar
+        with Not_found ->
+        (* We haven't mapped variable v before. If a scope of
+           variables was provided, let's see if v_array is in
+           scope. *)
+          let new_name = (Var.name avar)^"_array" in
+          let new_type = Array (idxt, Reg bitwidth) in
+          let make_new_var () = newvar new_name new_type in
+	  let newarrvar = match scope with
+            | Some(scope) ->
+              (try Scope.get_lval_if_defined scope new_name (Some new_type)
+              with Not_found -> make_new_var ())
+            | None ->
+              make_new_var ()
+          in
 
+          (* Map in the m2a hash *)
+	  VarHash.add hash avar newarrvar;
 
-    method visit_rvar = self#visit_avar
+          (* Update the scope if defined *)
+          (match scope with
+          | Some(scope) ->
+          (* First, ensure that if new_name is already in Scope, that
+             it maps to newarrvar.  If not, the memory2array hash and
+             Scope are out of sync, which indicates someone did
+             something bad. *)
+            (try assert (Var.equal (Scope.get_lval_if_defined scope new_name (Some new_type)) newarrvar)
+             with Not_found -> (* If not in Scope, it's okay *) ());
 
-    method visit_exp exp =
+            (* Now, update the Scope *)
+            ignore(Scope.add_var scope new_name newarrvar);
+
+          | None -> ());
+
+	  newarrvar
+      in
+      array
+    | _ -> failwith "get_array_var expects a TMem variable only"
+  in
+
+object (self)
+  inherit Ast_visitor.nop
+
+  method visit_avar avar =
+    match Var.typ(avar) with
+    |	TMem(idxt) ->
+      `ChangeToAndDoChildren (get_array_var avar)
+    |	_ ->
+      `DoChildren
+
+  method visit_rvar = self#visit_avar
+
+  method visit_exp exp =
       (* Printf.printf "Visiting expression %s\n" (Pp.ast_exp_to_string exp); *)
       match exp with
       | Load(arr,idx,endian,t) -> ((* Printf.printf "Load %s\n" (Pp.ast_exp_to_string exp); *)
@@ -125,24 +164,27 @@ class memory2array_visitor hash =
 (** deend your average program. Returns new program where all memory
     broken down to byte-level reads and writes using array variables
     with the same name as the old memory variables.  *)
+
+let create_state () = VarHash.create 1000
+
 let coerce_prog prog =
-  let hash = VarHash.create 1000 in
+  let hash = create_state () in
   let visitor = new memory2array_visitor hash in
   Ast_visitor.prog_accept visitor prog
 
-let coerce_prog_state hash prog =
-  let visitor = new memory2array_visitor hash in
+let coerce_prog_state ?scope hash prog =
+  let visitor = new memory2array_visitor ?scope hash in
   Ast_visitor.prog_accept visitor prog
 
 let coerce_exp exp =
-  let hash = VarHash.create 1000 in
+  let hash = create_state () in
   let visitor = new memory2array_visitor hash in
   Ast_visitor.exp_accept visitor exp
 
-let coerce_exp_state hash exp =
-  let visitor = new memory2array_visitor hash in
+let coerce_exp_state ?scope hash exp =
+  let visitor = new memory2array_visitor ?scope hash in
   Ast_visitor.exp_accept visitor exp
 
-let coerce_rvar_state hash v =
-  let visitor = new memory2array_visitor hash in
+let coerce_rvar_state ?scope hash v =
+  let visitor = new memory2array_visitor ?scope hash in
   Ast_visitor.rvar_accept visitor v

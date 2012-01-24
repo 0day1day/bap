@@ -376,6 +376,8 @@ let speclist =
       "Remove cycles")
   :: ("-typecheck", uadd(TransformAst typecheck),
       "Typecheck program")
+  :: ("-uniqueify-labels", uadd(TransformAst Hacks.uniqueify_labels),
+      "Ensure all labels are unique")
   :: Input.speclist
 
 let anon x = raise(Arg.Bad("Unexpected argument: '"^x^"'"))

@@ -1,6 +1,11 @@
 (** Bap interface to the parser. *)
 
+open Grammar_private_scope
 open Grammar_scope
+
+(* Note: Even though scope is imperative, we need to return it since the
+   user might not have specified the input scope, but may be interested
+   in the output scope. *)
 
 let program_from_lexbuf ?(scope=default_scope ()) l =
   set_scope scope;

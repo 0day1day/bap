@@ -28,45 +28,44 @@ module Scope = struct
     List.iter (fun v -> Hashtbl.add h (Var.name v) v) decls;
     (h, Stack.create() )
 
-  let defscope () = create Asmir.all_regs
-  let cur_scope = ref (defscope ())
+  let defscope () : t = create []
 
-  let add n t =
-    let v = Var.newvar (stripnum n) t in
-    Hashtbl.add (fst !cur_scope) n v;
+  let add_var scope n v =
+    Hashtbl.add (fst scope) n v;
     v
 
-  let add_push n t =
-    Stack.push n (snd !cur_scope);
-    add n t
+  let add scope n t =
+    let v = Var.newvar (stripnum n) t in
+    add_var scope n v
 
-  let pop () =
-    let (h,s) = !cur_scope in
+  let add_push scope n t =
+    Stack.push n (snd scope);
+    add scope n t
+
+  let pop scope =
+    let (h,s) = scope in
     let n = Stack.pop s in
     Hashtbl.remove h n
 
+  (** Gets lval if defined, otherwise raises Not_found *)
+  let get_lval_if_defined scope n t =
+    let n = stripnum n in
+    let v = Hashtbl.find (fst scope) n in
+    if t = None || t = Some(Var.typ v)
+    then v
+    else err ("Variable '"^n^"' used with inconsistent type: "^(Pp.typ_to_string (Var.typ v))^" "^(Pp.typ_to_string (Util.option_unwrap t)))
 
-  let get_lval n t =
+  let get_lval scope n t =
     let n = stripnum n in
     try
-      let v = Hashtbl.find (fst !cur_scope) n in
-      if t = None || t = Some(Var.typ v)
-      then v
-      else err ("Variable '"^n^"' used with inconsistent type")
+      get_lval_if_defined scope n t
     with Not_found ->
-      (* Printf.printf "%s not found\n" n; *)
       match t with
-      | Some t -> add n t
+      | Some t -> add scope n t
       | None -> err ("Type was never declared for '"^n^"'")
 
 end
 
-let get_scope () = !Scope.cur_scope
-let set_scope s = Scope.cur_scope := s
 let default_scope = Scope.defscope
-let reset_scope () = set_scope (default_scope ())
-
-(* let scope_create = Scope.create *)
-(* let scope_set s = Scope.cur_scope := s *)
-(* let scope_default = Scope.defscope *)
+let create_scope_from_decls decls = Scope.create decls
 

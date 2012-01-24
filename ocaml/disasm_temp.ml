@@ -27,4 +27,4 @@ let nt s t =
   else
     let newname = temp_prefix^s in
     let () = assert (is_temp_name newname) in
-    Var.newvar (newname^s) t
+    Var.newvar (newname) t

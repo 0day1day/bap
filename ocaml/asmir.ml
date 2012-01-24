@@ -7,7 +7,7 @@
     @author Ivan Jager
 *)
 
-open Asmirconsts
+open Asmir_consts
 open Ast
 open Big_int_Z
 open BatListFull
@@ -387,35 +387,10 @@ let tr_bap_blocks_t_no_asm g bs =
   let size = Libasmir.asmir_bap_blocks_size bs -1 in
     foldn (fun i n -> tr_bap_block_t_no_asm g (asmir_bap_blocks_get bs n)@i) [] size
 
-let x86_regs = Disasm_i386.regs
-let x86_mem = Disasm_i386.mem
-(* let x86_mem_external = Ast.Var (x86_mem) *)
-
-let arm_regs =
-  List.map (fun n -> Var.newvar n reg_32)
-    [ "R0";     
-      "R1";     
-      "R2";     
-      "R3";     
-      "R4";     
-      "R5";     
-      "R6";     
-      "R7";     
-      "R8";     
-      "R9";     
-      "R10";    
-      "R11";    
-      "R12";    
-      "R13";    
-      "R14";    
-      "R15";    
-      "CC";
-      "CC_OP";	 
-      "CC_DEP1";
-      "CC_DEP2";
-    ]
-
-let all_regs = x86_mem :: x86_regs @ arm_regs
+let x86_regs = Asmir_vars.x86_regs
+let x86_mem = Asmir_vars.x86_mem
+let arm_regs = Asmir_vars.arm_regs
+let all_regs = Asmir_vars.all_regs
 
 let decls_for_arch = function
   | Bfd_arch_i386 -> x86_mem::x86_regs
