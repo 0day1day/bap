@@ -9,12 +9,6 @@ open Grammar_scope
 open Grammar_private_scope
 open Type
 
-let parse_error str =
-  let {Lexing.pos_fname=f; pos_lnum=sl; pos_bol=sb; pos_cnum=sc} =
-    Parsing.symbol_start_pos()
-  and {Lexing.pos_lnum=el; pos_bol=eb; pos_cnum=ec } = Parsing.symbol_end_pos() in
-  Printf.eprintf "%s:%i:%i-%i:%i: %s\n" f sl (sc-sb) el (ec-eb) str
-
 let mk_attr lab string =
   match lab with
   | "asm" -> Asm string
