@@ -101,7 +101,7 @@ type opcode =
   | Test of typ * operand * operand
   | Not of typ * operand
   | Neg of typ * operand
-  | Imul of typ * (operand * operand) * typ * operand * typ * operand (* dsttyp, (dst1,dst2), src1typ, src1, src2typ, src2 *)
+  | Imul of typ * (operand * operand option) * operand * operand (* typ, (dst1,dst2), src1, src2 *)
   | Cld
   | Rdtsc
   | Cpuid
@@ -900,7 +900,9 @@ let rec to_ir addr next ss pref =
     :: set_flags_sub t (Var oldo1) (op2e t o2) (op2e t o1)
   | Sbb(t, o1, o2) ->
     let tmp = nt "t" t in
-    let s1 = Var tmp and s2 = (op2e t o2) +* cast_unsigned t cf_e and r = op2e t o1 in
+    let s1 = Var tmp 
+    and s2 = (op2e t o2) +* cast_unsigned t cf_e 
+    and r = op2e t o1 in
     move tmp r
     :: assn t o1 (r -* s2)
     (* FIXME: sanity check this *)
@@ -993,7 +995,17 @@ let rec to_ir addr next ss pref =
     ::assn t o (it 0 t -* op2e t o)
     ::move cf (ite r1 (Var tmp ==* it 0 t) (it 0 r1) (it 1 r1))
     ::set_aopszf_sub t (Var tmp) (it 0 t) (op2e t o)
-  | Imul (dt, (dst1,dst2), st1, src1, st2, src2) -> unimplemented "Imul"
+  | Imul (t, (dst1,dstop), src1, src2) -> 
+    [
+      (match dstop with
+      | Some(dst2) -> unimplemented "Imul"
+      | None ->  assn t dst1 (op2e t src1 ** op2e t src2) 
+      );
+      move sf (Unknown("SF is undefined after imul", r1));
+      move zf (Unknown("ZF is undefined after imul", r1));
+      move af (Unknown("AF is undefined after imul", r1));
+      move pf (Unknown("PF is undefined after imul", r1))
+    ]
   | Cld ->
     [Move(dflag, i32 1, [])]
   | Leave t when pref = [] -> (* #UD if Lock prefix is used *)
@@ -1104,7 +1116,13 @@ module ToStr = struct
     | Test(t,d,s) -> Printf.sprintf "test %s, %s" (opr d) (opr s)
     | Not(t,o) -> Printf.sprintf "not %s" (opr o)
     | Neg(t,o) -> Printf.sprintf "neg %s" (opr o)
-    | Imul (dt, (dst1,dst2), st1, src1, st2, src2) -> Printf.sprintf "imul %s, %s, %s" (opr dst1) (opr src1) (opr src2)
+    | Imul (t, (dst1,dstop), src1, src2) -> 
+      (match dstop with
+      | Some(dst2) ->
+	Printf.sprintf 
+	  "imul %s:%s, %s, %s" (opr dst1) (opr dst2) (opr src1) (opr src2)
+      | None ->
+	Printf.sprintf "imul %s, %s, %s" (opr dst1) (opr src1) (opr src2))
     | Cld -> "cld"
     | Leave _ -> "leave"
     | Interrupt(o) -> Printf.sprintf "int %s" (opr o)
@@ -1278,10 +1296,13 @@ let parse_instr g addr =
     | _ -> disfailwith "parse_immz unsupported size"
   in
   let parse_immv = parse_immz in (* until we do amd64 *)
+(*  let parse_immb = parse_imm8 in *)
+  let parse_simmb = parse_simm8 in
   let get_opcode pref prefix a =
     (* We should rename these, since the 32 at the end is misleading. *)
     let parse_disp32, parse_modrm32, parse_modrm32ext =
-      if prefix.addrsize_override then parse_disp16, parse_modrm16, parse_modrm16ext
+      if prefix.addrsize_override 
+      then parse_disp16, parse_modrm16, parse_modrm16ext
       else parse_disp32, parse_modrm32, parse_modrm32ext
     in
     let b1 = Char.code (g a)
@@ -1301,6 +1322,11 @@ let parse_instr g addr =
 	if b1=0x68 then parse_immz prefix.opsize na else parse_simm8 na 
       in
       (Push(prefix.opsize, o), na)
+    | 0x69 | 0x6b ->
+      let (r, rm, na) = parse_modrm prefix.opsize na in
+      let (o, na) = parse_simmb na in
+      (* SWXXX extended the imm to opsize here? *)
+      (Imul(prefix.opsize, (r,None), rm, o), na)
     | 0x70 | 0x71 | 0x72 | 0x73 | 0x74 | 0x75 | 0x76 | 0x77 | 0x78 | 0x79
     | 0x7c | 0x7d | 0x7e
     | 0x7f -> let (i,na) = parse_disp8 na in
@@ -1432,9 +1458,12 @@ let parse_instr g addr =
 	       | 3 -> (Neg(t, rm), na)
 	       | 4 -> unimplemented (* mul *)
 		 (Printf.sprintf "unsupported opcode: %02x/%d" b1 r) 
-	       | 5 -> (*(Imul(t, (rm,rm), t, rm, t, rm), na)*)
-		 unimplemented (* mul *)
-		 (Printf.sprintf "unsupported opcode: %02x/%d" b1 r) 
+	       | 5 -> (match b1 with 
+		 | 0xf6 -> (Imul(t, (o_eax,None), o_eax, rm), na)
+		 | 0xf7 -> (Imul(t, (o_edx,Some(o_eax)), o_eax, rm), na)
+		 | _ -> disfailwith
+		   (Printf.sprintf "impossible opcode: %02x/%d" b1 r)
+	       )
 	       | 6 -> unimplemented (* div *)
 		 (Printf.sprintf "unsupported opcode: %02x/%d" b1 r) 
 	       | 7 -> unimplemented (* idiv *)
@@ -1577,6 +1606,9 @@ let parse_instr g addr =
              | _ -> unimplemented 
 	       (Printf.sprintf "unsupported opcode: %02x %02x/%d" b1 b2 r)
           )
+      | 0xaf ->
+	let (r, rm, na) = parse_modrm prefix.opsize na in
+	(Imul(prefix.opsize, (r,None), r, rm), na)
       | 0xb1 ->
         let r, rm, na = parse_modrm prefix.opsize na in
         (Cmpxchg (prefix.opsize, r, rm), na)
