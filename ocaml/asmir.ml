@@ -602,28 +602,30 @@ let asmprogram_to_bap ?(init_ro=false) p =
   else ir
 
 (* Returns a single ASM instruction (as a list IL statements) from a
-   sequence of bytes. `offset' denotes the starting offset in the
-   byte array. *)
-let byte_insn_to_bap ?(offset=0L) arch addr bytes =
+   sequence of bytes. *)
+let byte_insn_to_bap arch addr bytes =
   let prog = Libasmir.byte_insn_to_asmp arch addr bytes in
-  let offset = Int64.sub addr offset in
-  let get a = bytes.(Int64.to_int (Int64.sub a offset)) in
+  let get a = bytes.(Int64.to_int (Int64.sub a addr)) in
   let (pr, n) = asm_addr_to_bap {asmp=prog; arch=arch; secs=[]; get=get} addr in
   Libasmir.asmir_close prog;
   pr, Int64.sub n addr
 
-(* Transforms a byte sequence (byte array), starting at index `index'
-   with length `len' to a list of lists of IL statements *)
-let byte_sequence_to_bap bytes index len arch addr =
-  let rec read_all acc index =
-    if index > len-1 then List.rev acc
+(* Transforms a byte sequence (byte array), to a list of lists of IL
+   statements *)
+let byte_sequence_to_bap bytes arch addr =
+  let prog = Libasmir.byte_insn_to_asmp arch addr bytes in
+  let len = Array.length bytes in
+  let end_addr = Int64.add addr (Int64.of_int len) in
+  let get a = bytes.(Int64.to_int (Int64.sub a addr)) in
+  let rec read_all acc cur_addr =
+    if cur_addr >= end_addr then List.rev acc
     else
-      let index64 = Int64.of_int index in
-      let addr = Int64.add addr index64 in
-      let prog, n = byte_insn_to_bap ~offset:index64 arch addr bytes in
-      read_all (prog::acc) (index + Int64.to_int n)
+      let prog, next = asm_addr_to_bap {asmp=prog; arch=arch; secs=[]; get=get} cur_addr in
+      read_all (prog::acc) next
   in
-  read_all [] index
+  let il = read_all [] addr in
+  Libasmir.asmir_close prog;
+  il
 
 (* Get stmts for a frame *)
 let trans_frame f =
