@@ -994,6 +994,7 @@ let rec to_ir addr next ss pref =
     move tmp (op2e t o)
     ::assn t o (it 0 t -* op2e t o)
     ::move cf (ite r1 (Var tmp ==* it 0 t) (it 0 r1) (it 1 r1))
+      (* XXX Only set OF if o is MIN_INT *)
     ::set_aopszf_sub t (Var tmp) (it 0 t) (op2e t o)
   | Imul (t, (dst1,dstop), src1, src2) -> 
     [
@@ -1184,8 +1185,6 @@ let parse_instr g addr =
     | _ -> None
   in*)
   let parse_disp8 a =
-    (* This has too many conversions, but the below code doesn't handle
-       signedness correctly. *)
     (int64_of_big_int (Arithmetic.to_sbig_int (big_int_of_int (Char.code (g a)), r8)), s a)
   (* let r n = Int64.shift_left (Int64.of_int (Char.code (g (Int64.add a (Int64.of_int n))))) (8*n) in *)
   (*   let d = r 0 in *)
@@ -1282,12 +1281,18 @@ let parse_instr g addr =
   let parse_modrm opsize a = parse_modrm32 a in
   let parse_imm8 a = (* not sign extended *)
     (Oimm(Int64.of_int (Char.code (g a))), s a)
-  and parse_simm8 a = (* sign extended *)
-    let (d, na) = parse_disp8 a in
-    (Oimm d, na)
   and parse_imm32 a =
     let (l,na) = parse_disp32 a in
     (Oimm l, na)
+  and parse_simm8 a = (* sign extended *)
+    let (d, na) = parse_disp8 a in
+    (Oimm d, na)
+  and parse_simm16 a = 
+    let (d, na) = parse_disp16 a in
+    (Oimm d, na)
+  and parse_simm32 a = 
+    let (d, na) = parse_disp32 a in
+    (Oimm d, na)
   in
   let parse_immz t a = match t with
     | Reg 8 -> parse_imm8 a (* t=r8 when operand is Ib rather than Iz *)
@@ -1298,6 +1303,8 @@ let parse_instr g addr =
   let parse_immv = parse_immz in (* until we do amd64 *)
 (*  let parse_immb = parse_imm8 in *)
   let parse_simmb = parse_simm8 in
+  let parse_simmw = parse_simm16 in
+  let parse_simmd = parse_simm32 in
   let get_opcode pref prefix a =
     (* We should rename these, since the 32 at the end is misleading. *)
     let parse_disp32, parse_modrm32, parse_modrm32ext =
@@ -1324,9 +1331,23 @@ let parse_instr g addr =
       (Push(prefix.opsize, o), na)
     | 0x69 | 0x6b ->
       let (r, rm, na) = parse_modrm prefix.opsize na in
-      let (o, na) = parse_simmb na in
-      (* SWXXX extended the imm to opsize here? *)
-      (Imul(prefix.opsize, (r,None), rm, o), na)
+      let ((o, na), ot) = 
+	if b1 = 0x6b then (parse_simmb na, Reg 8) else 
+	  if (prefix.opsize = (Reg 16)) then (parse_simmw na, Reg 16) 
+	  else (parse_simmd na, Reg 32)
+      in
+      (* sign extend to opsize *)
+      let sign_ext op = 
+	(match op with
+	| Oimm d ->
+	  let (v,_) = 
+	    Arithmetic.cast CAST_SIGNED ((big_int_of_int64 d), ot) prefix.opsize
+	  in
+	  (Oimm (int64_of_big_int v)) 
+	| _ -> disfailwith "sign_ext only handles Oimm"
+	)
+      in
+      (Imul(prefix.opsize, (r,None), rm, (sign_ext o)), na)
     | 0x70 | 0x71 | 0x72 | 0x73 | 0x74 | 0x75 | 0x76 | 0x77 | 0x78 | 0x79
     | 0x7c | 0x7d | 0x7e
     | 0x7f -> let (i,na) = parse_disp8 na in
@@ -1524,18 +1545,6 @@ let parse_instr g addr =
       let b2 = Char.code (g na) and na = s na in
       match b2 with (* Table A-3 *)
       | 0x1f -> (Nop, na)
-      | 0x31 -> (Rdtsc, na)
-      | 0x34 -> (Sysenter, na)
-      | 0x3a ->
-          let b3 = Char.code (g na) and na = s na in
-          (match b3 with
-             | 0x0f ->
-                 let (r, rm, na) = parse_modrm prefix.opsize na in
-	         let (i, na) = parse_imm8 na in
-                 (Palignr(prefix.mopsize, r, rm, i), na)
-             | b3 -> disfailwith 
-	       (Printf.sprintf "unsupported opcode %02x %02x %02x" b1 b2 b3)
-          )
       | 0x28 | 0x29 | 0x6e | 0x7e | 0x6f | 0x7f ->
         let t, name, align, tsrc, tdest = match b2 with
           | 0x28 | 0x29 when prefix.opsize_override -> 
@@ -1556,6 +1565,22 @@ let parse_instr g addr =
           | _ -> r, rm
         in
 	(Movdq(t, tdest,d,tsrc,s,align,name), na)
+      | 0x31 -> (Rdtsc, na)
+      | 0x34 -> (Sysenter, na)
+      | 0x3a ->
+          let b3 = Char.code (g na) and na = s na in
+          (match b3 with
+             | 0x0f ->
+                 let (r, rm, na) = parse_modrm prefix.opsize na in
+	         let (i, na) = parse_imm8 na in
+                 (Palignr(prefix.mopsize, r, rm, i), na)
+             | b3 -> disfailwith 
+	       (Printf.sprintf "unsupported opcode %02x %02x %02x" b1 b2 b3)
+          )
+      (*| 0x40 | 0x41 | 0x42 | 0x43 | 0x44 | 0x45 | 0x46 | 0x47 | 0x48 | 0x49 
+	| 0x4a | 0x4b | 0x4c | 0x4d | 0x4e | 0x4f ->*)
+	(* conditional move: cmov *)
+      (* Conditional moves of 8-bit register operands are not supported *)
       | 0x70 when prefix.opsize = r16 ->
           let r, rm, na = parse_modrm prefix.opsize na in
           let i, na = parse_imm8 na in
