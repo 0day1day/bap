@@ -462,11 +462,15 @@ let set_flags_add t s1 s2 r =
   ::set_aopszf_add t s1 s2 r
 
 (* Helper functions to set flags for subtracting *)
-let set_aopszf_sub t s1 s2 r =
+let set_apszf_sub t s1 s2 r =
   let bit4 = it (1 lsl 4) t in
   move af (bit4 ==* ((bit4 &* ((r ^* s1) ^* s2))))
-  ::move oF (cast_high r1 ((s1 ^* s2) &* (s1 ^* r)))
   ::set_pszf t r
+
+let set_aopszf_sub t s1 s2 r =
+  move oF (cast_high r1 ((s1 ^* s2) &* (s1 ^* r)))
+  ::set_apszf_sub t s1 s2 r
+
 let set_flags_sub t s1 s2 r =
   move cf (s2 >* s1)
   ::set_aopszf_sub t s1 s2 r
@@ -991,16 +995,28 @@ let rec to_ir addr next ss pref =
     [assn t o (exp_not (op2e t o))]
   | Neg(t, o) ->
     let tmp = nt "t" t in
+    let min_int = 
+      Ast_convenience.binop LSHIFT (it 1 t) (it ((Typecheck.bits_of_width t)-1) t)
+    in
     move tmp (op2e t o)
     ::assn t o (it 0 t -* op2e t o)
     ::move cf (ite r1 (Var tmp ==* it 0 t) (it 0 r1) (it 1 r1))
-      (* XXX Only set OF if o is MIN_INT *)
-    ::set_aopszf_sub t (Var tmp) (it 0 t) (op2e t o)
+    ::move oF (ite r1 (Var tmp ==* min_int) (it 1 r1) (it 0 r1))
+    ::set_apszf_sub t (Var tmp) (it 0 t) (op2e t o)
   | Imul (t, (dst1,dstop), src1, src2) -> 
     [
       (match dstop with
-      | Some(dst2) -> unimplemented "Imul"
+      | Some(dst2) -> 
+	(* For the one operand form of the instruction, the CF and OF flags are 
+	   set when significant bits are carried into the upper half of the 
+	   result and cleared when the result fitsexactly in the lower half of 
+	   the result. *)
+	unimplemented "Imul"
       | None ->  assn t dst1 (op2e t src1 ** op2e t src2) 
+      (* For the two- and three-operand forms of the instruction, the CF and OF 
+	 flags are set when the result must be truncated to fit in the 
+	 destination operand size and cleared when the result fits exactly in 
+	 the destination operand size. *)
       );
       move sf (Unknown("SF is undefined after imul", r1));
       move zf (Unknown("ZF is undefined after imul", r1));
