@@ -649,9 +649,13 @@ let rec to_ir addr next ss pref =
       | _ -> disfailwith "imposible"
     in
     let unk_of = Unknown("OF undefined after shift", r1) in
-    let new_cf = match st with
+    let new_cf = 
+      (* undefined for SHL and SHR instructions where the count is greater than 
+	 or equal to the size (in bits) of the destination operand *)
+      match st with
       | LSHIFT -> cast_low r1 (Var origDEST >>* (size -* Var origCOUNT))
-      | RSHIFT|ARSHIFT -> cast_high r1 (Var origDEST <<* (size -* Var origCOUNT))
+      | RSHIFT | ARSHIFT ->
+	cast_high r1 (Var origDEST <<* (size -* Var origCOUNT))
       | _ -> failwith "impossible"
     in
     [move origDEST dste;
@@ -1243,7 +1247,8 @@ let parse_instr g addr =
     let base, na = if (b & 7) <> 5 then (bits2reg32e (b & 7), s a) else
 	match m with
 	| 0 -> let (i,na) = parse_disp32 (s a) in (l32 i, na)
-	| _ -> unimplemented "unsupported opcode: sib ebp +? disp"
+	| _ -> unimplemented 
+	  (Printf.sprintf "unsupported opcode: sib ebp +? disp b=%02x" b)
     in
     if idx = 4 then (base, na) else
       let idx = bits2reg32e idx in
