@@ -1184,24 +1184,35 @@ let parse_instr g addr =
     | 0x67 -> Some Address_size
     | _ -> None
   in*)
-  let parse_disp8 a =
-    (int64_of_big_int (Arithmetic.to_sbig_int (big_int_of_int (Char.code (g a)), r8)), s a)
-  (* let r n = Int64.shift_left (Int64.of_int (Char.code (g (Int64.add a (Int64.of_int n))))) (8*n) in *)
-  (*   let d = r 0 in *)
-  (*   (d, (Int64.succ a)) *)
-  and parse_disp16 a =
-    (* XXX: Does this handle negative displacements correctly? *)
+  let parse_int8 a =
+    (Int64.of_int (Char.code (g a)), s a)
+  and parse_int16 a =
     let r n = Int64.shift_left (Int64.of_int (Char.code (g (Int64.add a (Int64.of_int n))))) (8*n) in
     let d = r 0 in
     let d = Int64.logor d (r 1) in
     (d, (Int64.add a 2L))
-  and parse_disp32 a =
+  and parse_int32 a =
     let r n = Int64.shift_left (Int64.of_int (Char.code (g (Int64.add a (Int64.of_int n))))) (8*n) in
     let d = r 0 in
     let d = Int64.logor d (r 1) in
     let d = Int64.logor d (r 2) in
     let d = Int64.logor d (r 3) in
     (d, (Int64.add a 4L))
+  in
+  let to_signed i t = int64_of_big_int (Arithmetic.to_sbig_int (big_int_of_int64 i, t)) in
+  let parse_sint8 a =
+    let (i, na) = parse_int8 a in
+    (to_signed i reg_8, na)
+  and parse_sint16 a =
+    let (i, na) = parse_int16 a in
+    (to_signed i reg_16, na)
+  and parse_sint32 a =
+    let (i, na) = parse_int32 a in
+    (to_signed i reg_32, na)
+  in
+  let parse_disp8 = parse_sint8
+  and parse_disp16 = parse_sint16
+  and parse_disp32 = parse_sint32
   in
   let parse_disp:(Type.typ -> int64 -> int64 * int64) = function
     | Reg 8 ->  parse_disp8
@@ -1279,24 +1290,28 @@ let parse_instr g addr =
     (Oreg(bits2xmm r), rm, na) *)
   in
   let parse_modrm opsize a = parse_modrm32 a in
+  (* Parse 8-bits as unsigned integer *)
   let parse_imm8 a = (* not sign extended *)
-    (Oimm(Int64.of_int (Char.code (g a))), s a)
-  and parse_imm32 a =
-    let (l,na) = parse_disp32 a in
-    (Oimm l, na)
+    let (i, na) = parse_int8 a in
+    (Oimm i, na)
   and parse_simm8 a = (* sign extended *)
-    let (d, na) = parse_disp8 a in
-    (Oimm d, na)
-  and parse_simm16 a = 
-    let (d, na) = parse_disp16 a in
-    (Oimm d, na)
-  and parse_simm32 a = 
-    let (d, na) = parse_disp32 a in
-    (Oimm d, na)
+    let (i, na) = parse_sint8 a in
+    (Oimm i, na)
+  and parse_imm16 a =
+    let (i, na) = parse_int16 a in
+    (Oimm i, na)
+  and parse_simm16 a =
+    let (i, na) = parse_sint16 a in
+    (Oimm i, na)
+  and parse_imm32 a =
+    let (i, na) = parse_int32 a in
+    (Oimm i, na)
+  and parse_simm32 a =
+    let (i, na) = parse_sint32 a in
+    (Oimm i, na)
   in
   let parse_immz t a = match t with
-    | Reg 8 -> parse_imm8 a (* t=r8 when operand is Ib rather than Iz *)
-    | Reg 16 -> disfailwith "parse_imm16 a"
+    | Reg 16 -> parse_imm16 a
     | Reg 32 | Reg 64 -> parse_imm32 a
     | _ -> disfailwith "parse_immz unsupported size"
   in
