@@ -1017,11 +1017,14 @@ let rec to_ir addr next ss pref =
 	   the result. *)
 	unimplemented "Imul"
       | None ->  assn t dst1 (op2e t src1 ** op2e t src2) 
-      (* For the two- and three-operand forms of the instruction, the CF and OF 
+      (* SWXXX Do this!
+	 For the two- and three-operand forms of the instruction, the CF and OF 
 	 flags are set when the result must be truncated to fit in the 
 	 destination operand size and cleared when the result fits exactly in 
 	 the destination operand size. *)
       );
+      move oF exp_false;
+      move cf exp_false;
       move sf (Unknown("SF is undefined after imul", r1));
       move zf (Unknown("ZF is undefined after imul", r1));
       move af (Unknown("AF is undefined after imul", r1));
@@ -1219,7 +1222,8 @@ let parse_instr g addr =
     let d = Int64.logor d (r 3) in
     (d, (Int64.add a 4L))
   in
-  let to_signed i t = int64_of_big_int (Arithmetic.to_sbig_int (big_int_of_int64 i, t)) in
+  let to_signed i t = 
+    int64_of_big_int (Arithmetic.to_sbig_int (big_int_of_int64 i, t)) in
   let parse_sint8 a =
     let (i, na) = parse_int8 a in
     (to_signed i reg_8, na)
@@ -1247,8 +1251,12 @@ let parse_instr g addr =
     let base, na = if (b & 7) <> 5 then (bits2reg32e (b & 7), s a) else
 	match m with
 	| 0 -> let (i,na) = parse_disp32 (s a) in (l32 i, na)
-	| _ -> unimplemented 
-	  (Printf.sprintf "unsupported opcode: sib ebp +? disp b=%02x" b)
+	| 1 -> unimplemented 
+	  (Printf.sprintf "unsupported opcode: sib ebp +? disp8 + ebp b=%02x" b)
+	| 2 -> unimplemented 
+	  (Printf.sprintf "unsupported opcode: sib ebp +? disp32 + ebp b=%02x" b)
+	| _ -> disfailwith 
+	  (Printf.sprintf "impossible opcode: sib ebp +? disp b=%02x" b)
     in
     if idx = 4 then (base, na) else
       let idx = bits2reg32e idx in
@@ -1337,10 +1345,21 @@ let parse_instr g addr =
     | _ -> disfailwith "parse_immz unsupported size"
   in
   let parse_immv = parse_immz in (* until we do amd64 *)
-(*  let parse_immb = parse_imm8 in *)
+  let parse_immb = parse_imm8 in
+(*  let parse_immw = parse_imm16 in 
+  let parse_immd = parse_imm32 in *)
   let parse_simmb = parse_simm8 in
   let parse_simmw = parse_simm16 in
   let parse_simmd = parse_simm32 in
+  (* sign extend op of type ot to size *)
+  let sign_ext ot op size = (match op with
+    | Oimm d ->
+      let (v,_) = 
+	Arithmetic.cast CAST_SIGNED ((big_int_of_int64 d), ot) size
+      in
+      (Oimm (int64_of_big_int v)) 
+    | _ -> disfailwith "sign_ext only handles Oimm"
+  ) in
   let get_opcode pref prefix a =
     (* We should rename these, since the 32 at the end is misleading. *)
     let parse_disp32, parse_modrm32, parse_modrm32ext =
@@ -1368,48 +1387,37 @@ let parse_instr g addr =
     | 0x69 | 0x6b ->
       let (r, rm, na) = parse_modrm prefix.opsize na in
       let ((o, na), ot) = 
-	if b1 = 0x6b then (parse_simmb na, Reg 8) else 
-	  if (prefix.opsize = (Reg 16)) then (parse_simmw na, Reg 16) 
-	  else (parse_simmd na, Reg 32)
+	if b1 = 0x6b then (parse_simmb na, r8) else 
+	  if (prefix.opsize = r16) then (parse_simmw na, r16) 
+	  else (parse_simmd na, r32)
       in
-      (* sign extend to opsize *)
-      let sign_ext op = 
-	(match op with
-	| Oimm d ->
-	  let (v,_) = 
-	    Arithmetic.cast CAST_SIGNED ((big_int_of_int64 d), ot) prefix.opsize
-	  in
-	  (Oimm (int64_of_big_int v)) 
-	| _ -> disfailwith "sign_ext only handles Oimm"
-	)
-      in
-      (Imul(prefix.opsize, (r,None), rm, (sign_ext o)), na)
+      (Imul(prefix.opsize, (r,None), rm, (sign_ext ot o prefix.opsize)), na)
     | 0x70 | 0x71 | 0x72 | 0x73 | 0x74 | 0x75 | 0x76 | 0x77 | 0x78 | 0x79
-    | 0x7c | 0x7d | 0x7e
-    | 0x7f -> let (i,na) = parse_disp8 na in
-	      (Jcc(Oimm(Int64.add i na), cc_to_exp b1), na)
+    | 0x7c | 0x7d | 0x7e | 0x7f -> 
+      let (i,na) = parse_disp8 na in
+      (Jcc(Oimm(Int64.add i na), cc_to_exp b1), na)
     | 0xc3 -> (Retn, na)
     | 0xc9 -> (Leave prefix.opsize, na)
-    | 0x80 | 0x81 | 0x82
-    | 0x83 -> let (r, rm, na) = parse_modrm32ext na in
-	      let (o2, na) =
-		(* for 0x83, imm8 needs to be sign extended *)
-		if b1 = 0x81 then parse_immz prefix.opsize na 
-		else parse_simm8 na
-	      in
-	      let opsize = if b1 land 1 = 0 then r8 else prefix.opsize in
-	      (match r with (* Grp 1 *)
-	      | 0 -> (Add(opsize, rm, o2), na)
-              | 1 -> (Or(opsize, rm, o2), na)
-	      | 2 -> (Adc(opsize, rm, o2), na)
-	      | 3 -> (Sbb(opsize, rm, o2), na)
-	      | 4 -> (And(opsize, rm, o2), na)
-	      | 5 -> (Sub(opsize, rm, o2), na)
-              | 6 -> (Xor(opsize, rm, o2), na)
-	      | 7 -> (Cmp(opsize, rm, o2), na)
-	      | _ -> disfailwith  
-		(Printf.sprintf "impossible opcode: %02x/%d" b1 r)
-	      )
+    | 0x80 | 0x81 | 0x82 | 0x83 -> 
+      let (r, rm, na) = parse_modrm32ext na in
+      let (o2, na) =
+	if b1 = 0x81 then parse_immz prefix.opsize na
+	else let (o,na) = (parse_simmb na)
+	     in ((sign_ext r8 o prefix.opsize), na)
+      in
+      let opsize = if b1 land 1 = 0 then r8 else prefix.opsize in
+      (match r with (* Grp 1 *)
+      | 0 -> (Add(opsize, rm, o2), na)
+      | 1 -> (Or(opsize, rm, o2), na)
+      | 2 -> (Adc(opsize, rm, o2), na)
+      | 3 -> (Sbb(opsize, rm, o2), na)
+      | 4 -> (And(opsize, rm, o2), na)
+      | 5 -> (Sub(opsize, rm, o2), na)
+      | 6 -> (Xor(opsize, rm, o2), na)
+      | 7 -> (Cmp(opsize, rm, o2), na)
+      | _ -> disfailwith  
+	(Printf.sprintf "impossible opcode: %02x/%d" b1 r)
+      )
     | 0x84
     | 0x85 -> let (r, rm, na) = parse_modrm32 na in
 	      let o = if b1 = 0x84 then r8 else prefix.opsize in
@@ -1551,7 +1559,7 @@ let parse_instr g addr =
 	        | _ -> disfailwith 
 		  (Printf.sprintf "impossible opcode: %02x/%d" b1 r)
 	      )
-    (*** 00 to 3d ***)
+    (*** 00 to 3e ***)
     | b1 when b1 < 0x3e && (b1 & 7) < 6 ->
       (
 	let ins a = match b1 >> 3 with
@@ -1566,13 +1574,15 @@ let parse_instr g addr =
 	  | _ -> disfailwith (Printf.sprintf "impossible opcode: %02x" b1)
 	in
 	let t = if (b1 & 1) = 0  then r8 else prefix.opsize in
-	let (o1, o2, na) = match b1 & 6 with
-	  | 0 -> let r, rm, na = parse_modrm t na in
+	let (o1, o2, na) = match b1 & 7 with
+	  | 0 | 1 -> let r, rm, na = parse_modrm t na in
 		 (rm, r, na)
-	  | 2 -> let r, rm, na = parse_modrm t na in
+	  | 2 | 3 -> let r, rm, na = parse_modrm t na in
 		 (r, rm, na)
-	  | 4 -> let i, na = parse_immz t na in
+	  | 4 -> let i, na = parse_immb na in
 		 (o_eax, i, na)
+	  | 5 ->let i, na = parse_immz t na in
+		  (o_eax, i, na)
 	  | _ -> disfailwith (Printf.sprintf "impossible opcode: %02x" b1)
 	in
 	(ins(t, o1, o2), na)
