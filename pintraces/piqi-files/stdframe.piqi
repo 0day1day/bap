@@ -37,8 +37,33 @@
 
 
 % Operand
+.record [
+        .name operand-info
+
+        .field [
+                 .type operand-info-specific
+        ]
+
+
+        % Size in bits
+        .field [
+               .type bit-length
+        ]
+
+        % Usage (read, written, both)
+        .field [
+               .type operand-usage
+        ]
+
+        % Taint information
+        .field [
+               .type taint-info
+        ]
+]
+
+% Memory/register specific part of operand
 .variant [
-         .name operand-info
+         .name operand-info-specific
 
          .option [
                  .type mem-operand
@@ -52,26 +77,10 @@
 % Represent a register operand value
 .record [
         .name reg-operand
-
-        % Size in bits
-        .field [
-               .type bit-length
-        ]
-
         % Register name
         .field [
                .name name
                .type string
-        ]
-
-        % Usage (read, written, both)
-        .field [
-               .type operand-usage
-        ]
-
-        % Taint information
-        .field [
-               .type taint-info
         ]
 ]
 
@@ -79,24 +88,9 @@
 .record [
         .name mem-operand
 
-        % Size in bits
-        .field [
-               .type bit-length
-        ]
-
         % Address
         .field [
                .type address
-        ]
-
-        % Usage (read, written, both)
-        .field [
-               .type operand-usage
-        ]
-
-        % Taint information
-        .field [
-               .type taint-info
         ]
 ]
 

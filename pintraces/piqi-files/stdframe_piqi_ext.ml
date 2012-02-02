@@ -17,6 +17,7 @@ let _exception_number_piqtype = Piqirun_ext.find_piqtype "stdframe/exception-num
 let _std_frame_piqtype = Piqirun_ext.find_piqtype "stdframe/std-frame"
 let _operand_list_piqtype = Piqirun_ext.find_piqtype "stdframe/operand-list"
 let _operand_info_piqtype = Piqirun_ext.find_piqtype "stdframe/operand-info"
+let _operand_info_specific_piqtype = Piqirun_ext.find_piqtype "stdframe/operand-info-specific"
 let _reg_operand_piqtype = Piqirun_ext.find_piqtype "stdframe/reg-operand"
 let _mem_operand_piqtype = Piqirun_ext.find_piqtype "stdframe/mem-operand"
 let _operand_usage_piqtype = Piqirun_ext.find_piqtype "stdframe/operand-usage"
@@ -36,6 +37,7 @@ let parse_exception_number x (format :Piqirun_ext.input_format) = let x_pb = Piq
 let parse_std_frame x (format :Piqirun_ext.input_format) = let x_pb = Piqirun_ext.convert _std_frame_piqtype format `pb x in let buf = Piqirun.init_from_string x_pb in Stdframe_piqi.parse_std_frame buf
 let parse_operand_list x (format :Piqirun_ext.input_format) = let x_pb = Piqirun_ext.convert _operand_list_piqtype format `pb x in let buf = Piqirun.init_from_string x_pb in Stdframe_piqi.parse_operand_list buf
 let parse_operand_info x (format :Piqirun_ext.input_format) = let x_pb = Piqirun_ext.convert _operand_info_piqtype format `pb x in let buf = Piqirun.init_from_string x_pb in Stdframe_piqi.parse_operand_info buf
+let parse_operand_info_specific x (format :Piqirun_ext.input_format) = let x_pb = Piqirun_ext.convert _operand_info_specific_piqtype format `pb x in let buf = Piqirun.init_from_string x_pb in Stdframe_piqi.parse_operand_info_specific buf
 let parse_reg_operand x (format :Piqirun_ext.input_format) = let x_pb = Piqirun_ext.convert _reg_operand_piqtype format `pb x in let buf = Piqirun.init_from_string x_pb in Stdframe_piqi.parse_reg_operand buf
 let parse_mem_operand x (format :Piqirun_ext.input_format) = let x_pb = Piqirun_ext.convert _mem_operand_piqtype format `pb x in let buf = Piqirun.init_from_string x_pb in Stdframe_piqi.parse_mem_operand buf
 let parse_operand_usage x (format :Piqirun_ext.input_format) = let x_pb = Piqirun_ext.convert _operand_usage_piqtype format `pb x in let buf = Piqirun.init_from_string x_pb in Stdframe_piqi.parse_operand_usage buf
@@ -55,6 +57,7 @@ let gen_exception_number ?opts x (format :Piqirun_ext.output_format) = let buf =
 let gen_std_frame ?opts x (format :Piqirun_ext.output_format) = let buf =  Stdframe_piqi.gen_std_frame x in let x_pb = Piqirun.to_string buf in Piqirun_ext.convert _std_frame_piqtype `pb format x_pb ?opts
 let gen_operand_list ?opts x (format :Piqirun_ext.output_format) = let buf =  Stdframe_piqi.gen_operand_list x in let x_pb = Piqirun.to_string buf in Piqirun_ext.convert _operand_list_piqtype `pb format x_pb ?opts
 let gen_operand_info ?opts x (format :Piqirun_ext.output_format) = let buf =  Stdframe_piqi.gen_operand_info x in let x_pb = Piqirun.to_string buf in Piqirun_ext.convert _operand_info_piqtype `pb format x_pb ?opts
+let gen_operand_info_specific ?opts x (format :Piqirun_ext.output_format) = let buf =  Stdframe_piqi.gen_operand_info_specific x in let x_pb = Piqirun.to_string buf in Piqirun_ext.convert _operand_info_specific_piqtype `pb format x_pb ?opts
 let gen_reg_operand ?opts x (format :Piqirun_ext.output_format) = let buf =  Stdframe_piqi.gen_reg_operand x in let x_pb = Piqirun.to_string buf in Piqirun_ext.convert _reg_operand_piqtype `pb format x_pb ?opts
 let gen_mem_operand ?opts x (format :Piqirun_ext.output_format) = let buf =  Stdframe_piqi.gen_mem_operand x in let x_pb = Piqirun.to_string buf in Piqirun_ext.convert _mem_operand_piqtype `pb format x_pb ?opts
 let gen_operand_usage ?opts x (format :Piqirun_ext.output_format) = let buf =  Stdframe_piqi.gen_operand_usage x in let x_pb = Piqirun.to_string buf in Piqirun_ext.convert _operand_usage_piqtype `pb format x_pb ?opts
@@ -87,6 +90,8 @@ let print_operand_list x = Pervasives.print_endline (gen_operand_list x `piq)
  let prerr_operand_list x = Pervasives.prerr_endline (gen_operand_list x `piq)
 let print_operand_info x = Pervasives.print_endline (gen_operand_info x `piq)
  let prerr_operand_info x = Pervasives.prerr_endline (gen_operand_info x `piq)
+let print_operand_info_specific x = Pervasives.print_endline (gen_operand_info_specific x `piq)
+ let prerr_operand_info_specific x = Pervasives.prerr_endline (gen_operand_info_specific x `piq)
 let print_reg_operand x = Pervasives.print_endline (gen_reg_operand x `piq)
  let prerr_reg_operand x = Pervasives.prerr_endline (gen_reg_operand x `piq)
 let print_mem_operand x = Pervasives.print_endline (gen_mem_operand x `piq)
