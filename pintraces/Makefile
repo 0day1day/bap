@@ -73,12 +73,15 @@ TOOL_ROOTS = gentrace #ctxtest
 
 TOOLS = $(TOOL_ROOTS:%=$(OBJDIR)%$(PINTOOL_SUFFIX))
 
-#OBJS = $(OBJDIR)pin_taint.o $(OBJDIR)pin_frame.o $(OBJDIR)winsyscalls.o $(OBJDIR)pivot.o
-OBJS = $(OBJDIR)pivot.o $(OBJDIR)pin_trace.o $(OBJDIR)pin_taint.o $(OBJDIR)pin_frame.o $(OBJDIR)winsyscalls.o $(OBJDIR)pin_misc.o
+FORMATOBJS = $(OBJDIR)exceptionframe.piqi.pb.o $(OBJDIR)stdframe.piqi.pb.o $(OBJDIR)taintintroframe.piqi.pb.o $(OBJDIR)types.piqi.pb.o
+
+OBJS = $(OBJDIR)pivot.o $(OBJDIR)pin_trace.o $(OBJDIR)pin_taint.o $(OBJDIR)pin_frame.o $(OBJDIR)winsyscalls.o $(OBJDIR)pin_misc.o $(FORMATOBJS)
 
 CXXFLAGS += -I../libasmir/include -I../libasmir/src/traces
 
 TRACEDIR = ../libasmir/src/traces
+
+TRACEFORMATDIR = ./trace-format
 
 ##############################################################
 #
@@ -115,6 +118,9 @@ $(OBJDIR)%.o : $(TRACEDIR)/%.cpp
 	$(CXX) -c $(CXXFLAGS) $(PIN_CXXFLAGS) ${OUTOPT}$@ $<
 
 $(OBJDIR)%.o : %.cpp
+	$(CXX) -c $(CXXFLAGS) $(PIN_CXXFLAGS) ${OUTOPT}$@ $<
+
+$(OBJDIR)%.o : $(TRACEFORMATDIR)/%.cc
 	$(CXX) -c $(CXXFLAGS) $(PIN_CXXFLAGS) ${OUTOPT}$@ $<
 
 reader: readtrace.cpp $(OBJDIR)pin_frame.o $(OBJDIR)pin_trace.o
