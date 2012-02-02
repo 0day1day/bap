@@ -79,9 +79,13 @@ OBJS = $(OBJDIR)pivot.o $(OBJDIR)pin_trace.o $(OBJDIR)pin_taint.o $(OBJDIR)pin_f
 
 CXXFLAGS += -I../libasmir/include -I../libasmir/src/traces
 
-TRACEDIR = ../libasmir/src/traces
+ROOT = ..
+
+TRACEDIR = $(ROOT)/libasmir/src/traces
 
 TRACEFORMATDIR = ./trace-format
+
+PROTOBUFDIR = $(ROOT)/protobuf/src
 
 ##############################################################
 #
@@ -121,7 +125,7 @@ $(OBJDIR)%.o : %.cpp
 	$(CXX) -c $(CXXFLAGS) $(PIN_CXXFLAGS) ${OUTOPT}$@ $<
 
 $(OBJDIR)%.o : $(TRACEFORMATDIR)/%.cc
-	$(CXX) -I$(TRACEFORMATDIR) -c $(CXXFLAGS) $(PIN_CXXFLAGS) ${OUTOPT}$@ $<
+	$(CXX) -I$(PROTOBUFDIR) -c $(CXXFLAGS) $(PIN_CXXFLAGS) ${OUTOPT}$@ $<
 
 reader: readtrace.cpp $(OBJDIR)pin_frame.o $(OBJDIR)pin_trace.o
 	$(CXX) -o $@ $^ $(CXXFLAGS)
