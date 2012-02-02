@@ -1,4 +1,8 @@
 #include "pin.H"
+#include "exceptionframe.piqi.pb.h"
+#include "stdframe.piqi.pb.h"
+#include "syscallframe.piqi.pb.h"
+#include "types.piqi.pb.h"
 
 #include <cassert>
 #include <iostream>
@@ -512,6 +516,10 @@ static uint32_t GetByteSize(uint32_t vtype) {
   return -1;
 }
 
+static uint32_t GetBitSize(uint32_t type) {
+  return GetByteSize(type) * 8;
+}
+
 void LLOG(const char *str) {
 #if DEBUG_LOCK
   LOG(str);
@@ -580,7 +588,15 @@ VOID FlushInstructions()
 
   for(uint32_t i = 0; i < g_bufidx; i++) {
 
-      StdFrame2 f;
+    std_frame fnew;
+    fnew.set_address(g_buffer[i].addr);
+    fnew.set_thread_id(g_buffer[i].tid);
+    /* Ew. */
+    fnew.set_rawbytes((void*)(&(g_buffer[i].rawbytes0)), g_buffer[i].insn_length);
+
+    /* Add operands */
+    
+    StdFrame2 f;
       f.addr = g_buffer[i].addr;
       f.tid = g_buffer[i].tid;
       f.insn_length = g_buffer[i].insn_length;
@@ -601,7 +617,46 @@ VOID FlushInstructions()
 
       for (uint32_t j = 0; j < g_buffer[i].values_count; j++) {
 
+        operand_info *o = fnew.mutable_operand_list()->mutable_elem(j);
+
          ValSpecRec &v = g_buffer[i].valspecs[j];
+
+         if (tracker->isMem(v.type)) {
+           o->mutable_mem_operand()->set_bit_length(GetBitSize(v.type));
+           o->mutable_mem_operand()->set_address(v.loc);
+           o->mutable_mem_operand()->mutable_operand_usage()->set_read(v.usage & RD);
+           o->mutable_mem_operand()->mutable_operand_usage()->set_written(v.usage & WR);
+           /* XXX: Implement index and base */
+           switch (v.taint) {
+               case 0:
+                 o->mutable_mem_operand()->mutable_taint_info()->set_no_taint(true);
+                 break;
+               case -1:
+                 o->mutable_mem_operand()->mutable_taint_info()->set_taint_multiple(true);
+                 break;
+               default:
+                 o->mutable_mem_operand()->mutable_taint_info()->set_taint_id(v.taint);
+                 break;
+           }
+
+         } else {
+           o->mutable_reg_operand()->set_bit_length(GetBitSize(v.type));
+           o->mutable_reg_operand()->set_name("foo");
+           o->mutable_reg_operand()->mutable_operand_usage()->set_read(v.usage & RD);
+           o->mutable_reg_operand()->mutable_operand_usage()->set_written(v.usage & WR);
+           /* XXX: Implement index and base */
+           switch (v.taint) {
+               case 0:
+                 o->mutable_reg_operand()->mutable_taint_info()->set_no_taint(true);
+                 break;
+               case -1:
+                 o->mutable_reg_operand()->mutable_taint_info()->set_taint_multiple(true);
+                 break;
+               default:
+                 o->mutable_reg_operand()->mutable_taint_info()->set_taint_id(v.taint);
+                 break;
+           }
+         }
 
          // Copying types, usage, location, and taint is always the same.
          f.types[newcnt] = v.type;

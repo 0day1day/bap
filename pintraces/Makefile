@@ -77,8 +77,6 @@ FORMATOBJS = $(OBJDIR)exceptionframe.piqi.pb.o $(OBJDIR)stdframe.piqi.pb.o $(OBJ
 
 OBJS = $(OBJDIR)pivot.o $(OBJDIR)pin_trace.o $(OBJDIR)pin_taint.o $(OBJDIR)pin_frame.o $(OBJDIR)winsyscalls.o $(OBJDIR)pin_misc.o $(FORMATOBJS)
 
-CXXFLAGS += -I../libasmir/include -I../libasmir/src/traces
-
 ROOT = ..
 
 TRACEDIR = $(ROOT)/libasmir/src/traces
@@ -86,6 +84,8 @@ TRACEDIR = $(ROOT)/libasmir/src/traces
 TRACEFORMATDIR = ./trace-format
 
 PROTOBUFDIR = $(ROOT)/protobuf/src
+
+CXXFLAGS += -I../libasmir/include -I../libasmir/src/traces -I $(TRACEFORMATDIR) -I $(PROTOBUFDIR)
 
 ##############################################################
 #
@@ -125,7 +125,7 @@ $(OBJDIR)%.o : %.cpp
 	$(CXX) -c $(CXXFLAGS) $(PIN_CXXFLAGS) ${OUTOPT}$@ $<
 
 $(OBJDIR)%.o : $(TRACEFORMATDIR)/%.cc
-	$(CXX) -I$(PROTOBUFDIR) -c $(CXXFLAGS) $(PIN_CXXFLAGS) ${OUTOPT}$@ $<
+	$(CXX) -c $(CXXFLAGS) $(PIN_CXXFLAGS) ${OUTOPT}$@ $<
 
 reader: readtrace.cpp $(OBJDIR)pin_frame.o $(OBJDIR)pin_trace.o
 	$(CXX) -o $@ $^ $(CXXFLAGS)
