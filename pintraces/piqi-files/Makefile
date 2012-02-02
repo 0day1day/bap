@@ -1,3 +1,5 @@
+TRACEFORMATDIR=$(CURDIR)/../trace-format/
+
 PIQIFILES=$(wildcard *.piqi)
 PROTOFILES=$(addsuffix .proto, $(PIQIFILES))
 MLFILES=$(addsuffix _piqi.ml, $(basename $(PIQIFILES)))
@@ -21,3 +23,7 @@ all: $(PROTOCFILES) $(PROTOHFILES) $(MLFILES) $(MLEXTFILES)
 
 clean:
 	rm -f $(PROTOFILES) $(MLFILES) $(MLEXTFILES) $(PROTOCFILES) $(PROTOHFILES)
+
+.PHONY: install
+install: $(PROTOCFILES) $(PROTOHFILES)
+	cp $^ $(TRACEFORMATDIR)

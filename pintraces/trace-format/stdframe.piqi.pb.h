@@ -33,6 +33,7 @@ void protobuf_ShutdownFile_stdframe_2epiqi_2eproto();
 class std_frame;
 class operand_list;
 class operand_info;
+class operand_info_specific;
 class reg_operand;
 class mem_operand;
 class operand_usage;
@@ -296,6 +297,121 @@ class operand_info : public ::google::protobuf::Message {
   
   // accessors -------------------------------------------------------
   
+  // required .operand_info_specific operand_info_specific = 1;
+  inline bool has_operand_info_specific() const;
+  inline void clear_operand_info_specific();
+  static const int kOperandInfoSpecificFieldNumber = 1;
+  inline const ::operand_info_specific& operand_info_specific() const;
+  inline ::operand_info_specific* mutable_operand_info_specific();
+  inline ::operand_info_specific* release_operand_info_specific();
+  
+  // required sint32 bit_length = 2;
+  inline bool has_bit_length() const;
+  inline void clear_bit_length();
+  static const int kBitLengthFieldNumber = 2;
+  inline ::google::protobuf::int32 bit_length() const;
+  inline void set_bit_length(::google::protobuf::int32 value);
+  
+  // required .operand_usage operand_usage = 3;
+  inline bool has_operand_usage() const;
+  inline void clear_operand_usage();
+  static const int kOperandUsageFieldNumber = 3;
+  inline const ::operand_usage& operand_usage() const;
+  inline ::operand_usage* mutable_operand_usage();
+  inline ::operand_usage* release_operand_usage();
+  
+  // required .taint_info taint_info = 4;
+  inline bool has_taint_info() const;
+  inline void clear_taint_info();
+  static const int kTaintInfoFieldNumber = 4;
+  inline const ::taint_info& taint_info() const;
+  inline ::taint_info* mutable_taint_info();
+  inline ::taint_info* release_taint_info();
+  
+  // @@protoc_insertion_point(class_scope:operand_info)
+ private:
+  inline void set_has_operand_info_specific();
+  inline void clear_has_operand_info_specific();
+  inline void set_has_bit_length();
+  inline void clear_has_bit_length();
+  inline void set_has_operand_usage();
+  inline void clear_has_operand_usage();
+  inline void set_has_taint_info();
+  inline void clear_has_taint_info();
+  
+  ::google::protobuf::UnknownFieldSet _unknown_fields_;
+  
+  ::operand_info_specific* operand_info_specific_;
+  ::operand_usage* operand_usage_;
+  ::taint_info* taint_info_;
+  ::google::protobuf::int32 bit_length_;
+  
+  mutable int _cached_size_;
+  ::google::protobuf::uint32 _has_bits_[(4 + 31) / 32];
+  
+  friend void  protobuf_AddDesc_stdframe_2epiqi_2eproto();
+  friend void protobuf_AssignDesc_stdframe_2epiqi_2eproto();
+  friend void protobuf_ShutdownFile_stdframe_2epiqi_2eproto();
+  
+  void InitAsDefaultInstance();
+  static operand_info* default_instance_;
+};
+// -------------------------------------------------------------------
+
+class operand_info_specific : public ::google::protobuf::Message {
+ public:
+  operand_info_specific();
+  virtual ~operand_info_specific();
+  
+  operand_info_specific(const operand_info_specific& from);
+  
+  inline operand_info_specific& operator=(const operand_info_specific& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  
+  inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const {
+    return _unknown_fields_;
+  }
+  
+  inline ::google::protobuf::UnknownFieldSet* mutable_unknown_fields() {
+    return &_unknown_fields_;
+  }
+  
+  static const ::google::protobuf::Descriptor* descriptor();
+  static const operand_info_specific& default_instance();
+  
+  void Swap(operand_info_specific* other);
+  
+  // implements Message ----------------------------------------------
+  
+  operand_info_specific* New() const;
+  void CopyFrom(const ::google::protobuf::Message& from);
+  void MergeFrom(const ::google::protobuf::Message& from);
+  void CopyFrom(const operand_info_specific& from);
+  void MergeFrom(const operand_info_specific& from);
+  void Clear();
+  bool IsInitialized() const;
+  
+  int ByteSize() const;
+  bool MergePartialFromCodedStream(
+      ::google::protobuf::io::CodedInputStream* input);
+  void SerializeWithCachedSizes(
+      ::google::protobuf::io::CodedOutputStream* output) const;
+  ::google::protobuf::uint8* SerializeWithCachedSizesToArray(::google::protobuf::uint8* output) const;
+  int GetCachedSize() const { return _cached_size_; }
+  private:
+  void SharedCtor();
+  void SharedDtor();
+  void SetCachedSize(int size) const;
+  public:
+  
+  ::google::protobuf::Metadata GetMetadata() const;
+  
+  // nested types ----------------------------------------------------
+  
+  // accessors -------------------------------------------------------
+  
   // optional .mem_operand mem_operand = 1;
   inline bool has_mem_operand() const;
   inline void clear_mem_operand();
@@ -312,7 +428,7 @@ class operand_info : public ::google::protobuf::Message {
   inline ::reg_operand* mutable_reg_operand();
   inline ::reg_operand* release_reg_operand();
   
-  // @@protoc_insertion_point(class_scope:operand_info)
+  // @@protoc_insertion_point(class_scope:operand_info_specific)
  private:
   inline void set_has_mem_operand();
   inline void clear_has_mem_operand();
@@ -332,7 +448,7 @@ class operand_info : public ::google::protobuf::Message {
   friend void protobuf_ShutdownFile_stdframe_2epiqi_2eproto();
   
   void InitAsDefaultInstance();
-  static operand_info* default_instance_;
+  static operand_info_specific* default_instance_;
 };
 // -------------------------------------------------------------------
 
@@ -390,17 +506,10 @@ class reg_operand : public ::google::protobuf::Message {
   
   // accessors -------------------------------------------------------
   
-  // required sint32 bit_length = 1;
-  inline bool has_bit_length() const;
-  inline void clear_bit_length();
-  static const int kBitLengthFieldNumber = 1;
-  inline ::google::protobuf::int32 bit_length() const;
-  inline void set_bit_length(::google::protobuf::int32 value);
-  
-  // required string name = 2;
+  // required string name = 1;
   inline bool has_name() const;
   inline void clear_name();
-  static const int kNameFieldNumber = 2;
+  static const int kNameFieldNumber = 1;
   inline const ::std::string& name() const;
   inline void set_name(const ::std::string& value);
   inline void set_name(const char* value);
@@ -408,42 +517,17 @@ class reg_operand : public ::google::protobuf::Message {
   inline ::std::string* mutable_name();
   inline ::std::string* release_name();
   
-  // required .operand_usage operand_usage = 3;
-  inline bool has_operand_usage() const;
-  inline void clear_operand_usage();
-  static const int kOperandUsageFieldNumber = 3;
-  inline const ::operand_usage& operand_usage() const;
-  inline ::operand_usage* mutable_operand_usage();
-  inline ::operand_usage* release_operand_usage();
-  
-  // required .taint_info taint_info = 4;
-  inline bool has_taint_info() const;
-  inline void clear_taint_info();
-  static const int kTaintInfoFieldNumber = 4;
-  inline const ::taint_info& taint_info() const;
-  inline ::taint_info* mutable_taint_info();
-  inline ::taint_info* release_taint_info();
-  
   // @@protoc_insertion_point(class_scope:reg_operand)
  private:
-  inline void set_has_bit_length();
-  inline void clear_has_bit_length();
   inline void set_has_name();
   inline void clear_has_name();
-  inline void set_has_operand_usage();
-  inline void clear_has_operand_usage();
-  inline void set_has_taint_info();
-  inline void clear_has_taint_info();
   
   ::google::protobuf::UnknownFieldSet _unknown_fields_;
   
   ::std::string* name_;
-  ::operand_usage* operand_usage_;
-  ::taint_info* taint_info_;
-  ::google::protobuf::int32 bit_length_;
   
   mutable int _cached_size_;
-  ::google::protobuf::uint32 _has_bits_[(4 + 31) / 32];
+  ::google::protobuf::uint32 _has_bits_[(1 + 31) / 32];
   
   friend void  protobuf_AddDesc_stdframe_2epiqi_2eproto();
   friend void protobuf_AssignDesc_stdframe_2epiqi_2eproto();
@@ -508,56 +592,24 @@ class mem_operand : public ::google::protobuf::Message {
   
   // accessors -------------------------------------------------------
   
-  // required sint32 bit_length = 1;
-  inline bool has_bit_length() const;
-  inline void clear_bit_length();
-  static const int kBitLengthFieldNumber = 1;
-  inline ::google::protobuf::int32 bit_length() const;
-  inline void set_bit_length(::google::protobuf::int32 value);
-  
-  // required uint64 address = 2;
+  // required uint64 address = 1;
   inline bool has_address() const;
   inline void clear_address();
-  static const int kAddressFieldNumber = 2;
+  static const int kAddressFieldNumber = 1;
   inline ::google::protobuf::uint64 address() const;
   inline void set_address(::google::protobuf::uint64 value);
   
-  // required .operand_usage operand_usage = 3;
-  inline bool has_operand_usage() const;
-  inline void clear_operand_usage();
-  static const int kOperandUsageFieldNumber = 3;
-  inline const ::operand_usage& operand_usage() const;
-  inline ::operand_usage* mutable_operand_usage();
-  inline ::operand_usage* release_operand_usage();
-  
-  // required .taint_info taint_info = 4;
-  inline bool has_taint_info() const;
-  inline void clear_taint_info();
-  static const int kTaintInfoFieldNumber = 4;
-  inline const ::taint_info& taint_info() const;
-  inline ::taint_info* mutable_taint_info();
-  inline ::taint_info* release_taint_info();
-  
   // @@protoc_insertion_point(class_scope:mem_operand)
  private:
-  inline void set_has_bit_length();
-  inline void clear_has_bit_length();
   inline void set_has_address();
   inline void clear_has_address();
-  inline void set_has_operand_usage();
-  inline void clear_has_operand_usage();
-  inline void set_has_taint_info();
-  inline void clear_has_taint_info();
   
   ::google::protobuf::UnknownFieldSet _unknown_fields_;
   
   ::google::protobuf::uint64 address_;
-  ::operand_usage* operand_usage_;
-  ::taint_info* taint_info_;
-  ::google::protobuf::int32 bit_length_;
   
   mutable int _cached_size_;
-  ::google::protobuf::uint32 _has_bits_[(4 + 31) / 32];
+  ::google::protobuf::uint32 _has_bits_[(1 + 31) / 32];
   
   friend void  protobuf_AddDesc_stdframe_2epiqi_2eproto();
   friend void protobuf_AssignDesc_stdframe_2epiqi_2eproto();
@@ -951,29 +1003,142 @@ operand_list::mutable_elem() {
 
 // operand_info
 
-// optional .mem_operand mem_operand = 1;
-inline bool operand_info::has_mem_operand() const {
+// required .operand_info_specific operand_info_specific = 1;
+inline bool operand_info::has_operand_info_specific() const {
   return (_has_bits_[0] & 0x00000001u) != 0;
 }
-inline void operand_info::set_has_mem_operand() {
+inline void operand_info::set_has_operand_info_specific() {
   _has_bits_[0] |= 0x00000001u;
 }
-inline void operand_info::clear_has_mem_operand() {
+inline void operand_info::clear_has_operand_info_specific() {
   _has_bits_[0] &= ~0x00000001u;
 }
-inline void operand_info::clear_mem_operand() {
+inline void operand_info::clear_operand_info_specific() {
+  if (operand_info_specific_ != NULL) operand_info_specific_->::operand_info_specific::Clear();
+  clear_has_operand_info_specific();
+}
+inline const ::operand_info_specific& operand_info::operand_info_specific() const {
+  return operand_info_specific_ != NULL ? *operand_info_specific_ : *default_instance_->operand_info_specific_;
+}
+inline ::operand_info_specific* operand_info::mutable_operand_info_specific() {
+  set_has_operand_info_specific();
+  if (operand_info_specific_ == NULL) operand_info_specific_ = new ::operand_info_specific;
+  return operand_info_specific_;
+}
+inline ::operand_info_specific* operand_info::release_operand_info_specific() {
+  clear_has_operand_info_specific();
+  ::operand_info_specific* temp = operand_info_specific_;
+  operand_info_specific_ = NULL;
+  return temp;
+}
+
+// required sint32 bit_length = 2;
+inline bool operand_info::has_bit_length() const {
+  return (_has_bits_[0] & 0x00000002u) != 0;
+}
+inline void operand_info::set_has_bit_length() {
+  _has_bits_[0] |= 0x00000002u;
+}
+inline void operand_info::clear_has_bit_length() {
+  _has_bits_[0] &= ~0x00000002u;
+}
+inline void operand_info::clear_bit_length() {
+  bit_length_ = 0;
+  clear_has_bit_length();
+}
+inline ::google::protobuf::int32 operand_info::bit_length() const {
+  return bit_length_;
+}
+inline void operand_info::set_bit_length(::google::protobuf::int32 value) {
+  set_has_bit_length();
+  bit_length_ = value;
+}
+
+// required .operand_usage operand_usage = 3;
+inline bool operand_info::has_operand_usage() const {
+  return (_has_bits_[0] & 0x00000004u) != 0;
+}
+inline void operand_info::set_has_operand_usage() {
+  _has_bits_[0] |= 0x00000004u;
+}
+inline void operand_info::clear_has_operand_usage() {
+  _has_bits_[0] &= ~0x00000004u;
+}
+inline void operand_info::clear_operand_usage() {
+  if (operand_usage_ != NULL) operand_usage_->::operand_usage::Clear();
+  clear_has_operand_usage();
+}
+inline const ::operand_usage& operand_info::operand_usage() const {
+  return operand_usage_ != NULL ? *operand_usage_ : *default_instance_->operand_usage_;
+}
+inline ::operand_usage* operand_info::mutable_operand_usage() {
+  set_has_operand_usage();
+  if (operand_usage_ == NULL) operand_usage_ = new ::operand_usage;
+  return operand_usage_;
+}
+inline ::operand_usage* operand_info::release_operand_usage() {
+  clear_has_operand_usage();
+  ::operand_usage* temp = operand_usage_;
+  operand_usage_ = NULL;
+  return temp;
+}
+
+// required .taint_info taint_info = 4;
+inline bool operand_info::has_taint_info() const {
+  return (_has_bits_[0] & 0x00000008u) != 0;
+}
+inline void operand_info::set_has_taint_info() {
+  _has_bits_[0] |= 0x00000008u;
+}
+inline void operand_info::clear_has_taint_info() {
+  _has_bits_[0] &= ~0x00000008u;
+}
+inline void operand_info::clear_taint_info() {
+  if (taint_info_ != NULL) taint_info_->::taint_info::Clear();
+  clear_has_taint_info();
+}
+inline const ::taint_info& operand_info::taint_info() const {
+  return taint_info_ != NULL ? *taint_info_ : *default_instance_->taint_info_;
+}
+inline ::taint_info* operand_info::mutable_taint_info() {
+  set_has_taint_info();
+  if (taint_info_ == NULL) taint_info_ = new ::taint_info;
+  return taint_info_;
+}
+inline ::taint_info* operand_info::release_taint_info() {
+  clear_has_taint_info();
+  ::taint_info* temp = taint_info_;
+  taint_info_ = NULL;
+  return temp;
+}
+
+// -------------------------------------------------------------------
+
+// operand_info_specific
+
+// optional .mem_operand mem_operand = 1;
+inline bool operand_info_specific::has_mem_operand() const {
+  return (_has_bits_[0] & 0x00000001u) != 0;
+}
+inline void operand_info_specific::set_has_mem_operand() {
+  _has_bits_[0] |= 0x00000001u;
+}
+inline void operand_info_specific::clear_has_mem_operand() {
+  _has_bits_[0] &= ~0x00000001u;
+}
+inline void operand_info_specific::clear_mem_operand() {
   if (mem_operand_ != NULL) mem_operand_->::mem_operand::Clear();
   clear_has_mem_operand();
 }
-inline const ::mem_operand& operand_info::mem_operand() const {
+inline const ::mem_operand& operand_info_specific::mem_operand() const {
   return mem_operand_ != NULL ? *mem_operand_ : *default_instance_->mem_operand_;
 }
-inline ::mem_operand* operand_info::mutable_mem_operand() {
+inline ::mem_operand* operand_info_specific::mutable_mem_operand() {
   set_has_mem_operand();
   if (mem_operand_ == NULL) mem_operand_ = new ::mem_operand;
   return mem_operand_;
 }
-inline ::mem_operand* operand_info::release_mem_operand() {
+inline ::mem_operand* operand_info_specific::release_mem_operand() {
   clear_has_mem_operand();
   ::mem_operand* temp = mem_operand_;
   mem_operand_ = NULL;
@@ -981,28 +1146,28 @@ inline ::mem_operand* operand_info::release_mem_operand() {
 }
 
 // optional .reg_operand reg_operand = 2;
-inline bool operand_info::has_reg_operand() const {
+inline bool operand_info_specific::has_reg_operand() const {
   return (_has_bits_[0] & 0x00000002u) != 0;
 }
-inline void operand_info::set_has_reg_operand() {
+inline void operand_info_specific::set_has_reg_operand() {
   _has_bits_[0] |= 0x00000002u;
 }
-inline void operand_info::clear_has_reg_operand() {
+inline void operand_info_specific::clear_has_reg_operand() {
   _has_bits_[0] &= ~0x00000002u;
 }
-inline void operand_info::clear_reg_operand() {
+inline void operand_info_specific::clear_reg_operand() {
   if (reg_operand_ != NULL) reg_operand_->::reg_operand::Clear();
   clear_has_reg_operand();
 }
-inline const ::reg_operand& operand_info::reg_operand() const {
+inline const ::reg_operand& operand_info_specific::reg_operand() const {
   return reg_operand_ != NULL ? *reg_operand_ : *default_instance_->reg_operand_;
 }
-inline ::reg_operand* operand_info::mutable_reg_operand() {
+inline ::reg_operand* operand_info_specific::mutable_reg_operand() {
   set_has_reg_operand();
   if (reg_operand_ == NULL) reg_operand_ = new ::reg_operand;
   return reg_operand_;
 }
-inline ::reg_operand* operand_info::release_reg_operand() {
+inline ::reg_operand* operand_info_specific::release_reg_operand() {
   clear_has_reg_operand();
   ::reg_operand* temp = reg_operand_;
   reg_operand_ = NULL;
@@ -1013,37 +1178,15 @@ inline ::reg_operand* operand_info::release_reg_operand() {
 
 // reg_operand
 
-// required sint32 bit_length = 1;
-inline bool reg_operand::has_bit_length() const {
+// required string name = 1;
+inline bool reg_operand::has_name() const {
   return (_has_bits_[0] & 0x00000001u) != 0;
 }
-inline void reg_operand::set_has_bit_length() {
+inline void reg_operand::set_has_name() {
   _has_bits_[0] |= 0x00000001u;
 }
-inline void reg_operand::clear_has_bit_length() {
-  _has_bits_[0] &= ~0x00000001u;
-}
-inline void reg_operand::clear_bit_length() {
-  bit_length_ = 0;
-  clear_has_bit_length();
-}
-inline ::google::protobuf::int32 reg_operand::bit_length() const {
-  return bit_length_;
-}
-inline void reg_operand::set_bit_length(::google::protobuf::int32 value) {
-  set_has_bit_length();
-  bit_length_ = value;
-}
-
-// required string name = 2;
-inline bool reg_operand::has_name() const {
-  return (_has_bits_[0] & 0x00000002u) != 0;
-}
-inline void reg_operand::set_has_name() {
-  _has_bits_[0] |= 0x00000002u;
-}
 inline void reg_operand::clear_has_name() {
-  _has_bits_[0] &= ~0x00000002u;
+  _has_bits_[0] &= ~0x00000001u;
 }
 inline void reg_operand::clear_name() {
   if (name_ != &::google::protobuf::internal::kEmptyString) {
@@ -1093,99 +1236,19 @@ inline ::std::string* reg_operand::release_name() {
   }
 }
 
-// required .operand_usage operand_usage = 3;
-inline bool reg_operand::has_operand_usage() const {
-  return (_has_bits_[0] & 0x00000004u) != 0;
-}
-inline void reg_operand::set_has_operand_usage() {
-  _has_bits_[0] |= 0x00000004u;
-}
-inline void reg_operand::clear_has_operand_usage() {
-  _has_bits_[0] &= ~0x00000004u;
-}
-inline void reg_operand::clear_operand_usage() {
-  if (operand_usage_ != NULL) operand_usage_->::operand_usage::Clear();
-  clear_has_operand_usage();
-}
-inline const ::operand_usage& reg_operand::operand_usage() const {
-  return operand_usage_ != NULL ? *operand_usage_ : *default_instance_->operand_usage_;
-}
-inline ::operand_usage* reg_operand::mutable_operand_usage() {
-  set_has_operand_usage();
-  if (operand_usage_ == NULL) operand_usage_ = new ::operand_usage;
-  return operand_usage_;
-}
-inline ::operand_usage* reg_operand::release_operand_usage() {
-  clear_has_operand_usage();
-  ::operand_usage* temp = operand_usage_;
-  operand_usage_ = NULL;
-  return temp;
-}
-
-// required .taint_info taint_info = 4;
-inline bool reg_operand::has_taint_info() const {
-  return (_has_bits_[0] & 0x00000008u) != 0;
-}
-inline void reg_operand::set_has_taint_info() {
-  _has_bits_[0] |= 0x00000008u;
-}
-inline void reg_operand::clear_has_taint_info() {
-  _has_bits_[0] &= ~0x00000008u;
-}
-inline void reg_operand::clear_taint_info() {
-  if (taint_info_ != NULL) taint_info_->::taint_info::Clear();
-  clear_has_taint_info();
-}
-inline const ::taint_info& reg_operand::taint_info() const {
-  return taint_info_ != NULL ? *taint_info_ : *default_instance_->taint_info_;
-}
-inline ::taint_info* reg_operand::mutable_taint_info() {
-  set_has_taint_info();
-  if (taint_info_ == NULL) taint_info_ = new ::taint_info;
-  return taint_info_;
-}
-inline ::taint_info* reg_operand::release_taint_info() {
-  clear_has_taint_info();
-  ::taint_info* temp = taint_info_;
-  taint_info_ = NULL;
-  return temp;
-}
-
 // -------------------------------------------------------------------
 
 // mem_operand
 
-// required sint32 bit_length = 1;
-inline bool mem_operand::has_bit_length() const {
+// required uint64 address = 1;
+inline bool mem_operand::has_address() const {
   return (_has_bits_[0] & 0x00000001u) != 0;
 }
-inline void mem_operand::set_has_bit_length() {
+inline void mem_operand::set_has_address() {
   _has_bits_[0] |= 0x00000001u;
 }
-inline void mem_operand::clear_has_bit_length() {
-  _has_bits_[0] &= ~0x00000001u;
-}
-inline void mem_operand::clear_bit_length() {
-  bit_length_ = 0;
-  clear_has_bit_length();
-}
-inline ::google::protobuf::int32 mem_operand::bit_length() const {
-  return bit_length_;
-}
-inline void mem_operand::set_bit_length(::google::protobuf::int32 value) {
-  set_has_bit_length();
-  bit_length_ = value;
-}
-
-// required uint64 address = 2;
-inline bool mem_operand::has_address() const {
-  return (_has_bits_[0] & 0x00000002u) != 0;
-}
-inline void mem_operand::set_has_address() {
-  _has_bits_[0] |= 0x00000002u;
-}
 inline void mem_operand::clear_has_address() {
-  _has_bits_[0] &= ~0x00000002u;
+  _has_bits_[0] &= ~0x00000001u;
 }
 inline void mem_operand::clear_address() {
   address_ = GOOGLE_ULONGLONG(0);
@@ -1197,64 +1260,6 @@ inline ::google::protobuf::uint64 mem_operand::address() const {
 inline void mem_operand::set_address(::google::protobuf::uint64 value) {
   set_has_address();
   address_ = value;
-}
-
-// required .operand_usage operand_usage = 3;
-inline bool mem_operand::has_operand_usage() const {
-  return (_has_bits_[0] & 0x00000004u) != 0;
-}
-inline void mem_operand::set_has_operand_usage() {
-  _has_bits_[0] |= 0x00000004u;
-}
-inline void mem_operand::clear_has_operand_usage() {
-  _has_bits_[0] &= ~0x00000004u;
-}
-inline void mem_operand::clear_operand_usage() {
-  if (operand_usage_ != NULL) operand_usage_->::operand_usage::Clear();
-  clear_has_operand_usage();
-}
-inline const ::operand_usage& mem_operand::operand_usage() const {
-  return operand_usage_ != NULL ? *operand_usage_ : *default_instance_->operand_usage_;
-}
-inline ::operand_usage* mem_operand::mutable_operand_usage() {
-  set_has_operand_usage();
-  if (operand_usage_ == NULL) operand_usage_ = new ::operand_usage;
-  return operand_usage_;
-}
-inline ::operand_usage* mem_operand::release_operand_usage() {
-  clear_has_operand_usage();
-  ::operand_usage* temp = operand_usage_;
-  operand_usage_ = NULL;
-  return temp;
-}
-
-// required .taint_info taint_info = 4;
-inline bool mem_operand::has_taint_info() const {
-  return (_has_bits_[0] & 0x00000008u) != 0;
-}
-inline void mem_operand::set_has_taint_info() {
-  _has_bits_[0] |= 0x00000008u;
-}
-inline void mem_operand::clear_has_taint_info() {
-  _has_bits_[0] &= ~0x00000008u;
-}
-inline void mem_operand::clear_taint_info() {
-  if (taint_info_ != NULL) taint_info_->::taint_info::Clear();
-  clear_has_taint_info();
-}
-inline const ::taint_info& mem_operand::taint_info() const {
-  return taint_info_ != NULL ? *taint_info_ : *default_instance_->taint_info_;
-}
-inline ::taint_info* mem_operand::mutable_taint_info() {
-  set_has_taint_info();
-  if (taint_info_ == NULL) taint_info_ = new ::taint_info;
-  return taint_info_;
-}
-inline ::taint_info* mem_operand::release_taint_info() {
-  clear_has_taint_info();
-  ::taint_info* temp = taint_info_;
-  taint_info_ = NULL;
-  return temp;
 }
 
 // -------------------------------------------------------------------
