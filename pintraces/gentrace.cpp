@@ -617,45 +617,30 @@ VOID FlushInstructions()
 
       for (uint32_t j = 0; j < g_buffer[i].values_count; j++) {
 
-        operand_info *o = fnew.mutable_operand_list()->mutable_elem(j);
+        ValSpecRec &v = g_buffer[i].valspecs[j];
 
-         ValSpecRec &v = g_buffer[i].valspecs[j];
+        operand_info *o = fnew.mutable_operand_list()->mutable_elem(j);
+        o->set_bit_length(GetBitSize(v.type));
+        o->mutable_operand_usage()->set_read(v.usage & RD);
+        o->mutable_operand_usage()->set_written(v.usage & WR);
+        /* XXX: Implement index and base */
+        switch (v.taint) {
+            case 0:
+              o->mutable_taint_info()->set_no_taint(true);
+              break;
+            case -1:
+              o->mutable_taint_info()->set_taint_multiple(true);
+              break;
+            default:
+              o->mutable_taint_info()->set_taint_id(v.taint);
+              break;
+        }
 
          if (tracker->isMem(v.type)) {
-           o->mutable_mem_operand()->set_bit_length(GetBitSize(v.type));
-           o->mutable_mem_operand()->set_address(v.loc);
-           o->mutable_mem_operand()->mutable_operand_usage()->set_read(v.usage & RD);
-           o->mutable_mem_operand()->mutable_operand_usage()->set_written(v.usage & WR);
-           /* XXX: Implement index and base */
-           switch (v.taint) {
-               case 0:
-                 o->mutable_mem_operand()->mutable_taint_info()->set_no_taint(true);
-                 break;
-               case -1:
-                 o->mutable_mem_operand()->mutable_taint_info()->set_taint_multiple(true);
-                 break;
-               default:
-                 o->mutable_mem_operand()->mutable_taint_info()->set_taint_id(v.taint);
-                 break;
-           }
+           o->mutable_operand_info_specific()->mutable_mem_operand()->set_address(v.loc);
 
          } else {
-           o->mutable_reg_operand()->set_bit_length(GetBitSize(v.type));
-           o->mutable_reg_operand()->set_name("foo");
-           o->mutable_reg_operand()->mutable_operand_usage()->set_read(v.usage & RD);
-           o->mutable_reg_operand()->mutable_operand_usage()->set_written(v.usage & WR);
-           /* XXX: Implement index and base */
-           switch (v.taint) {
-               case 0:
-                 o->mutable_reg_operand()->mutable_taint_info()->set_no_taint(true);
-                 break;
-               case -1:
-                 o->mutable_reg_operand()->mutable_taint_info()->set_taint_multiple(true);
-                 break;
-               default:
-                 o->mutable_reg_operand()->mutable_taint_info()->set_taint_id(v.taint);
-                 break;
-           }
+           o->mutable_operand_info_specific()->mutable_reg_operand()->set_name(REG_StringShort((REG)v.loc));
          }
 
          // Copying types, usage, location, and taint is always the same.
@@ -667,6 +652,8 @@ VOID FlushInstructions()
          // Now copying the value is the same, too.  But, we could be
          // more efficient and copy less bytes...
          memcpy(&(f.values[newcnt]), &(v.value), sizeof(LEVEL_VM::PIN_REGISTER));
+
+         o->set_value(&(v.value), GetByteSize(v.type));
          
 
          switch (v.type) {

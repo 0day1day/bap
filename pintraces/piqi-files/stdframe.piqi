@@ -59,6 +59,12 @@
         .field [
                .type taint-info
         ]
+
+        % Value
+        .field [
+               .name value
+               .type binary
+        ]
 ]
 
 % Memory/register specific part of operand

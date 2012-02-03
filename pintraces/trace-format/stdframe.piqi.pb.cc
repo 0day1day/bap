@@ -83,11 +83,12 @@ void protobuf_AssignDesc_stdframe_2epiqi_2eproto() {
       ::google::protobuf::MessageFactory::generated_factory(),
       sizeof(operand_list));
   operand_info_descriptor_ = file->message_type(2);
-  static const int operand_info_offsets_[4] = {
+  static const int operand_info_offsets_[5] = {
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(operand_info, operand_info_specific_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(operand_info, bit_length_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(operand_info, operand_usage_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(operand_info, taint_info_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(operand_info, value_),
   };
   operand_info_reflection_ =
     new ::google::protobuf::internal::GeneratedMessageReflection(
@@ -243,19 +244,19 @@ void protobuf_AddDesc_stdframe_2epiqi_2eproto() {
     "dress\030\001 \002(\004\022\021\n\tthread_id\030\002 \002(\004\022\020\n\010rawbyt"
     "es\030\003 \002(\014\022#\n\014operand_list\030\004 \002(\0132\r.operand"
     "_list\"+\n\014operand_list\022\033\n\004elem\030\001 \003(\0132\r.op"
-    "erand_info\"\241\001\n\014operand_info\0225\n\025operand_i"
+    "erand_info\"\260\001\n\014operand_info\0225\n\025operand_i"
     "nfo_specific\030\001 \002(\0132\026.operand_info_specif"
     "ic\022\022\n\nbit_length\030\002 \002(\021\022%\n\roperand_usage\030"
     "\003 \002(\0132\016.operand_usage\022\037\n\ntaint_info\030\004 \002("
-    "\0132\013.taint_info\"]\n\025operand_info_specific\022"
-    "!\n\013mem_operand\030\001 \001(\0132\014.mem_operand\022!\n\013re"
-    "g_operand\030\002 \001(\0132\014.reg_operand\"\033\n\013reg_ope"
-    "rand\022\014\n\004name\030\001 \002(\t\"\036\n\013mem_operand\022\017\n\007add"
-    "ress\030\001 \002(\004\"K\n\roperand_usage\022\014\n\004read\030\001 \002("
-    "\010\022\017\n\007written\030\002 \002(\010\022\r\n\005index\030\003 \002(\010\022\014\n\004bas"
-    "e\030\004 \002(\010\"H\n\ntaint_info\022\020\n\010no_taint\030\001 \001(\010\022"
-    "\020\n\010taint_id\030\002 \001(\004\022\026\n\016taint_multiple\030\003 \001("
-    "\010", 641);
+    "\0132\013.taint_info\022\r\n\005value\030\005 \002(\014\"]\n\025operand"
+    "_info_specific\022!\n\013mem_operand\030\001 \001(\0132\014.me"
+    "m_operand\022!\n\013reg_operand\030\002 \001(\0132\014.reg_ope"
+    "rand\"\033\n\013reg_operand\022\014\n\004name\030\001 \002(\t\"\036\n\013mem"
+    "_operand\022\017\n\007address\030\001 \002(\004\"K\n\roperand_usa"
+    "ge\022\014\n\004read\030\001 \002(\010\022\017\n\007written\030\002 \002(\010\022\r\n\005ind"
+    "ex\030\003 \002(\010\022\014\n\004base\030\004 \002(\010\"H\n\ntaint_info\022\020\n\010"
+    "no_taint\030\001 \001(\010\022\020\n\010taint_id\030\002 \001(\004\022\026\n\016tain"
+    "t_multiple\030\003 \001(\010", 656);
   ::google::protobuf::MessageFactory::InternalRegisterGeneratedFile(
     "stdframe.piqi.proto", &protobuf_RegisterTypes);
   std_frame::default_instance_ = new std_frame();
@@ -841,6 +842,7 @@ const int operand_info::kOperandInfoSpecificFieldNumber;
 const int operand_info::kBitLengthFieldNumber;
 const int operand_info::kOperandUsageFieldNumber;
 const int operand_info::kTaintInfoFieldNumber;
+const int operand_info::kValueFieldNumber;
 #endif  // !_MSC_VER
 
 operand_info::operand_info()
@@ -866,6 +868,7 @@ void operand_info::SharedCtor() {
   bit_length_ = 0;
   operand_usage_ = NULL;
   taint_info_ = NULL;
+  value_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
   ::memset(_has_bits_, 0, sizeof(_has_bits_));
 }
 
@@ -874,6 +877,9 @@ operand_info::~operand_info() {
 }
 
 void operand_info::SharedDtor() {
+  if (value_ != &::google::protobuf::internal::kEmptyString) {
+    delete value_;
+  }
   if (this != default_instance_) {
     delete operand_info_specific_;
     delete operand_usage_;
@@ -912,6 +918,11 @@ void operand_info::Clear() {
     }
     if (has_taint_info()) {
       if (taint_info_ != NULL) taint_info_->::taint_info::Clear();
+    }
+    if (has_value()) {
+      if (value_ != &::google::protobuf::internal::kEmptyString) {
+        value_->clear();
+      }
     }
   }
   ::memset(_has_bits_, 0, sizeof(_has_bits_));
@@ -977,6 +988,20 @@ bool operand_info::MergePartialFromCodedStream(
         } else {
           goto handle_uninterpreted;
         }
+        if (input->ExpectTag(42)) goto parse_value;
+        break;
+      }
+      
+      // required bytes value = 5;
+      case 5: {
+        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
+            ::google::protobuf::internal::WireFormatLite::WIRETYPE_LENGTH_DELIMITED) {
+         parse_value:
+          DO_(::google::protobuf::internal::WireFormatLite::ReadBytes(
+                input, this->mutable_value()));
+        } else {
+          goto handle_uninterpreted;
+        }
         if (input->ExpectAtEnd()) return true;
         break;
       }
@@ -1022,6 +1047,12 @@ void operand_info::SerializeWithCachedSizes(
       4, this->taint_info(), output);
   }
   
+  // required bytes value = 5;
+  if (has_value()) {
+    ::google::protobuf::internal::WireFormatLite::WriteBytes(
+      5, this->value(), output);
+  }
+  
   if (!unknown_fields().empty()) {
     ::google::protobuf::internal::WireFormat::SerializeUnknownFields(
         unknown_fields(), output);
@@ -1054,6 +1085,13 @@ void operand_info::SerializeWithCachedSizes(
     target = ::google::protobuf::internal::WireFormatLite::
       WriteMessageNoVirtualToArray(
         4, this->taint_info(), target);
+  }
+  
+  // required bytes value = 5;
+  if (has_value()) {
+    target =
+      ::google::protobuf::internal::WireFormatLite::WriteBytesToArray(
+        5, this->value(), target);
   }
   
   if (!unknown_fields().empty()) {
@@ -1095,6 +1133,13 @@ int operand_info::ByteSize() const {
           this->taint_info());
     }
     
+    // required bytes value = 5;
+    if (has_value()) {
+      total_size += 1 +
+        ::google::protobuf::internal::WireFormatLite::BytesSize(
+          this->value());
+    }
+    
   }
   if (!unknown_fields().empty()) {
     total_size +=
@@ -1134,6 +1179,9 @@ void operand_info::MergeFrom(const operand_info& from) {
     if (from.has_taint_info()) {
       mutable_taint_info()->::taint_info::MergeFrom(from.taint_info());
     }
+    if (from.has_value()) {
+      set_value(from.value());
+    }
   }
   mutable_unknown_fields()->MergeFrom(from.unknown_fields());
 }
@@ -1151,7 +1199,7 @@ void operand_info::CopyFrom(const operand_info& from) {
 }
 
 bool operand_info::IsInitialized() const {
-  if ((_has_bits_[0] & 0x0000000f) != 0x0000000f) return false;
+  if ((_has_bits_[0] & 0x0000001f) != 0x0000001f) return false;
   
   if (has_operand_info_specific()) {
     if (!this->operand_info_specific().IsInitialized()) return false;
@@ -1168,6 +1216,7 @@ void operand_info::Swap(operand_info* other) {
     std::swap(bit_length_, other->bit_length_);
     std::swap(operand_usage_, other->operand_usage_);
     std::swap(taint_info_, other->taint_info_);
+    std::swap(value_, other->value_);
     std::swap(_has_bits_[0], other->_has_bits_[0]);
     _unknown_fields_.Swap(&other->_unknown_fields_);
     std::swap(_cached_size_, other->_cached_size_);

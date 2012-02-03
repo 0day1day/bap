@@ -328,6 +328,17 @@ class operand_info : public ::google::protobuf::Message {
   inline ::taint_info* mutable_taint_info();
   inline ::taint_info* release_taint_info();
   
+  // required bytes value = 5;
+  inline bool has_value() const;
+  inline void clear_value();
+  static const int kValueFieldNumber = 5;
+  inline const ::std::string& value() const;
+  inline void set_value(const ::std::string& value);
+  inline void set_value(const char* value);
+  inline void set_value(const void* value, size_t size);
+  inline ::std::string* mutable_value();
+  inline ::std::string* release_value();
+  
   // @@protoc_insertion_point(class_scope:operand_info)
  private:
   inline void set_has_operand_info_specific();
@@ -338,16 +349,19 @@ class operand_info : public ::google::protobuf::Message {
   inline void clear_has_operand_usage();
   inline void set_has_taint_info();
   inline void clear_has_taint_info();
+  inline void set_has_value();
+  inline void clear_has_value();
   
   ::google::protobuf::UnknownFieldSet _unknown_fields_;
   
   ::operand_info_specific* operand_info_specific_;
   ::operand_usage* operand_usage_;
   ::taint_info* taint_info_;
+  ::std::string* value_;
   ::google::protobuf::int32 bit_length_;
   
   mutable int _cached_size_;
-  ::google::protobuf::uint32 _has_bits_[(4 + 31) / 32];
+  ::google::protobuf::uint32 _has_bits_[(5 + 31) / 32];
   
   friend void  protobuf_AddDesc_stdframe_2epiqi_2eproto();
   friend void protobuf_AssignDesc_stdframe_2epiqi_2eproto();
@@ -1110,6 +1124,64 @@ inline ::taint_info* operand_info::release_taint_info() {
   ::taint_info* temp = taint_info_;
   taint_info_ = NULL;
   return temp;
+}
+
+// required bytes value = 5;
+inline bool operand_info::has_value() const {
+  return (_has_bits_[0] & 0x00000010u) != 0;
+}
+inline void operand_info::set_has_value() {
+  _has_bits_[0] |= 0x00000010u;
+}
+inline void operand_info::clear_has_value() {
+  _has_bits_[0] &= ~0x00000010u;
+}
+inline void operand_info::clear_value() {
+  if (value_ != &::google::protobuf::internal::kEmptyString) {
+    value_->clear();
+  }
+  clear_has_value();
+}
+inline const ::std::string& operand_info::value() const {
+  return *value_;
+}
+inline void operand_info::set_value(const ::std::string& value) {
+  set_has_value();
+  if (value_ == &::google::protobuf::internal::kEmptyString) {
+    value_ = new ::std::string;
+  }
+  value_->assign(value);
+}
+inline void operand_info::set_value(const char* value) {
+  set_has_value();
+  if (value_ == &::google::protobuf::internal::kEmptyString) {
+    value_ = new ::std::string;
+  }
+  value_->assign(value);
+}
+inline void operand_info::set_value(const void* value, size_t size) {
+  set_has_value();
+  if (value_ == &::google::protobuf::internal::kEmptyString) {
+    value_ = new ::std::string;
+  }
+  value_->assign(reinterpret_cast<const char*>(value), size);
+}
+inline ::std::string* operand_info::mutable_value() {
+  set_has_value();
+  if (value_ == &::google::protobuf::internal::kEmptyString) {
+    value_ = new ::std::string;
+  }
+  return value_;
+}
+inline ::std::string* operand_info::release_value() {
+  clear_has_value();
+  if (value_ == &::google::protobuf::internal::kEmptyString) {
+    return NULL;
+  } else {
+    ::std::string* temp = value_;
+    value_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
+    return temp;
+  }
 }
 
 // -------------------------------------------------------------------

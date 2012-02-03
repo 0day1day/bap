@@ -219,3 +219,6 @@ AC_OUTPUT
 
 # Configure zarith
 (cd zarith-1.0 && ./configure)
+
+# Configure google protobuf
+(cd protobuf && ./configure)
