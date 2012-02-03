@@ -1,8 +1,4 @@
 #include "pin.H"
-#include "exceptionframe.piqi.pb.h"
-#include "stdframe.piqi.pb.h"
-#include "syscallframe.piqi.pb.h"
-#include "types.piqi.pb.h"
 
 #include <cassert>
 #include <iostream>
@@ -19,6 +15,9 @@
 #include "pin_trace.h"
 #include "cache.h"
 
+/* The new trace container format */
+#include "trace.container.hpp"
+
 //#include "pin_frame.cpp"
 //#include "pin_trace.cpp"
 
@@ -27,6 +26,7 @@
 #include "pin_taint.h"
 
 using namespace pintrace;
+using namespace SerializedTrace;
 
 const ADDRINT ehandler_fs_offset = 0;
 const ADDRINT ehandler_nptr_offset = 0;
@@ -336,6 +336,7 @@ typedef struct ThreadInfo_s {
 int g_counter = 0;
 
 TraceWriter *g_tw;
+TraceContainerWriter *g_twnew;
 
 // A taint tracker
 TaintTracker * tracker;
@@ -588,11 +589,11 @@ VOID FlushInstructions()
 
   for(uint32_t i = 0; i < g_bufidx; i++) {
 
-    std_frame fnew;
-    fnew.set_address(g_buffer[i].addr);
-    fnew.set_thread_id(g_buffer[i].tid);
+    frame fnew;
+    fnew.mutable_std_frame()->set_address(g_buffer[i].addr);
+    fnew.mutable_std_frame()->set_thread_id(g_buffer[i].tid);
     /* Ew. */
-    fnew.set_rawbytes((void*)(&(g_buffer[i].rawbytes0)), g_buffer[i].insn_length);
+    fnew.mutable_std_frame()->set_rawbytes((void*)(&(g_buffer[i].rawbytes0)), g_buffer[i].insn_length);
 
     /* Add operands */
     
@@ -619,7 +620,7 @@ VOID FlushInstructions()
 
         ValSpecRec &v = g_buffer[i].valspecs[j];
 
-        operand_info *o = fnew.mutable_operand_list()->mutable_elem(j);
+        operand_info *o = fnew.mutable_std_frame()->mutable_operand_list()->mutable_elem(j);
         o->set_bit_length(GetBitSize(v.type));
         o->mutable_operand_usage()->set_read(v.usage & RD);
         o->mutable_operand_usage()->set_written(v.usage & WR);
@@ -689,7 +690,7 @@ VOID FlushInstructions()
       f.values_count = newcnt;
 
       g_tw->add(f);
-
+      g_twnew->add(fnew);
    }
 
    // Update counts.
@@ -2474,6 +2475,7 @@ VOID FollowChild(THREADID threadid, const CONTEXT* ctxt, VOID * arg)
   g_threadname[i++] = 'c';
 
   g_tw = new TraceWriter((g_threadname + KnobOut.Value()).c_str());
+  g_twnew = new TraceContainerWriter((g_threadname + KnobOut.Value() + ".new").c_str(), default_frames_per_toc_entry, true);
   
   g_bufidx = 0;
   g_kfcount = 0;

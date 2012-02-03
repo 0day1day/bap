@@ -22,7 +22,7 @@ satisfy most dependencies on Ubuntu 11.04/11.10 by running:
 XXX: Does this work for Debian too?
 
 On x86_64 add the following packages:
-    gcc-multilib g++-multilib
+    gcc-multilib g++-multilib lib32z1-dev
 
 To compile the documentation, you also need
   $ sudo aptitude install texlive-base texlive-latex-base \

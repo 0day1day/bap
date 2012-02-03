@@ -5,18 +5,31 @@
  */
 
 #include "trace.container.hpp"
+#include <iostream>
 
 #define WRITE(x) { ofs.write((const char *)(&(x)), sizeof(x)); }
 
 namespace SerializedTrace {
 
   TraceContainerWriter::TraceContainerWriter(const char *filename,
-                                             uint64_t frames_per_toc_entry_in)
+                                             uint64_t frames_per_toc_entry_in,
+                                             bool auto_finish_in)
     : ofs ( filename, std::ios_base::binary | std::ios_base::out | std::ios_base::trunc ),
       num_frames (0),
-      frames_per_toc_entry (frames_per_toc_entry_in)
+      frames_per_toc_entry (frames_per_toc_entry_in),
+      auto_finish (auto_finish_in),
+      is_finished (false)
   {
     ofs.exceptions( std::ios_base::failbit | std::ios_base::badbit | std::ios_base::eofbit );
+  }
+
+  TraceContainerWriter::~TraceContainerWriter(void) {
+    /** Call finish if it has not been called already ANd if
+        auto_finish is set. */
+    if (is_finished && auto_finish) {
+      std::cout << "Auto finishing trace container" << std::endl;
+      finish();
+    }
   }
 
   void TraceContainerWriter::add(frame &f) {
@@ -61,7 +74,8 @@ namespace SerializedTrace {
     ofs.seekp(toc_offset_offset);
     WRITE(toc_offset);
 
-    /* Finally, close the file. */
+    /* Finally, close the file and mark us as finished. */
     ofs.close();
+    is_finished = true;
   }
 };

@@ -88,6 +88,10 @@ PROTOBUFDIR = $(ROOT)/protobuf/src
 
 CXXFLAGS += -I../libasmir/include -I../libasmir/src/traces -I$(TRACEFORMATDIR) -I$(TRACEFORMATPBDIR) -I$(PROTOBUFDIR)
 
+# XXX We should probably use libtool
+LIB_PATHS = -L$(PROTOBUFDIR)/.libs
+LIBS = -pthread  -pthread -lprotobuf -lz -lpthread
+
 ##############################################################
 #
 # build rules
@@ -148,7 +152,7 @@ pinregs.h : listregs $(OBJDIR)ctxtest$(PINTOOL_SUFFIX)
 $(TOOLS): $(PIN_LIBNAMES)
 
 $(TOOLS): %$(PINTOOL_SUFFIX) : %.o $(OBJS)
-	${PIN_LD} $(PIN_LDFLAGS) $(LINK_DEBUG) ${LINK_OUT}$@ $(OBJS) $< ${PIN_LPATHS} $(PIN_LIBS) $(DBG)
+	${PIN_LD} $(PIN_LDFLAGS) $(LINK_DEBUG) ${LINK_OUT}$@ $(OBJS) $< ${PIN_LPATHS} $(PIN_LIBS) $(DBG) $(LIB_PATHS) $(LIBS)
 
 ## cleaning
 clean:

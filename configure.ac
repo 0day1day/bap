@@ -221,4 +221,6 @@ AC_OUTPUT
 (cd zarith-1.0 && ./configure)
 
 # Configure google protobuf
-(cd protobuf && ./configure)
+# Note: protobuf must be compiled for 32-bit because it is linked by pintraces
+# code, which is 32-bit
+(cd protobuf && CFLAGS=-m32 CXXFLAGS=-m32 ./configure)
