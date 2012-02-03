@@ -73,7 +73,7 @@ TOOL_ROOTS = gentrace #ctxtest
 
 TOOLS = $(TOOL_ROOTS:%=$(OBJDIR)%$(PINTOOL_SUFFIX))
 
-FORMATOBJS = $(OBJDIR)exceptionframe.piqi.pb.o $(OBJDIR)stdframe.piqi.pb.o $(OBJDIR)taintintroframe.piqi.pb.o $(OBJDIR)types.piqi.pb.o
+FORMATOBJS = $(OBJDIR)exceptionframe.piqi.pb.o $(OBJDIR)stdframe.piqi.pb.o $(OBJDIR)taintintroframe.piqi.pb.o $(OBJDIR)types.piqi.pb.o $(OBJDIR)trace.container.o
 
 OBJS = $(OBJDIR)pivot.o $(OBJDIR)pin_trace.o $(OBJDIR)pin_taint.o $(OBJDIR)pin_frame.o $(OBJDIR)winsyscalls.o $(OBJDIR)pin_misc.o $(FORMATOBJS)
 
@@ -82,10 +82,11 @@ ROOT = ..
 TRACEDIR = $(ROOT)/libasmir/src/traces
 
 TRACEFORMATDIR = ./trace-format
+TRACEFORMATPBDIR = $(TRACEFORMATDIR)/pb
 
 PROTOBUFDIR = $(ROOT)/protobuf/src
 
-CXXFLAGS += -I../libasmir/include -I../libasmir/src/traces -I $(TRACEFORMATDIR) -I $(PROTOBUFDIR)
+CXXFLAGS += -I../libasmir/include -I../libasmir/src/traces -I$(TRACEFORMATDIR) -I$(TRACEFORMATPBDIR) -I$(PROTOBUFDIR)
 
 ##############################################################
 #
@@ -124,7 +125,10 @@ $(OBJDIR)%.o : $(TRACEDIR)/%.cpp
 $(OBJDIR)%.o : %.cpp
 	$(CXX) -c $(CXXFLAGS) $(PIN_CXXFLAGS) ${OUTOPT}$@ $<
 
-$(OBJDIR)%.o : $(TRACEFORMATDIR)/%.cc
+$(OBJDIR)%.o : $(TRACEFORMATPBDIR)/%.cc
+	$(CXX) -c $(CXXFLAGS) $(PIN_CXXFLAGS) ${OUTOPT}$@ $<
+
+$(OBJDIR)%.o : $(TRACEFORMATDIR)/%.cpp
 	$(CXX) -c $(CXXFLAGS) $(PIN_CXXFLAGS) ${OUTOPT}$@ $<
 
 reader: readtrace.cpp $(OBJDIR)pin_frame.o $(OBJDIR)pin_trace.o

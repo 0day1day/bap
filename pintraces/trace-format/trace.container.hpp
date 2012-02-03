@@ -1,3 +1,6 @@
+#ifndef TRACE_CONTAINER_HPP
+#define TRACE_CONTAINER_HPP
+
 /**
  * $Id$
  *
@@ -22,12 +25,19 @@
  *    <uint64_t offset of trace frame ceil(n/m)> ]]
  */
 
+#include <fstream>
+#include <stdint.h>
 #include <vector>
+#include "frame.piqi.pb.h"
 
 namespace SerializedTrace {
 
   const uint64_t magic_number = 7456879624156307493LL;
   const uint64_t default_frames_per_toc_entry = 10000;
+
+  const uint64_t magic_numer_offset = 0LL;
+  const uint64_t num_trace_frames_offset = 8LL;
+  const uint64_t toc_offset_offset = 16LL;
 
   class TraceContainerWriter {
 
@@ -40,16 +50,16 @@ namespace SerializedTrace {
 
     /** Add [frame] to the trace.
      * XXX: Add general frame type to Piqi */
-    add(void);
+    void add(frame &f);
 
     /** Finish the trace.  Builds and writes the table of contents to
      * the file. Closes the file. */
-    finish(void);
+    void finish(void);
 
     protected:
 
     /** Output fstream for trace container file. */
-    ofstream ofs;
+    std::ofstream ofs;
 
     /** The toc entries for frames added so far. */
     std::vector<uint64_t> toc;
@@ -58,6 +68,8 @@ namespace SerializedTrace {
     uint64_t num_frames;
 
     /** Frames per toc entry. */
-    uint64_t frames_per_toc_entry;
+    const uint64_t frames_per_toc_entry;
   };
 };
+
+#endif
