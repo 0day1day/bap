@@ -48,10 +48,16 @@ namespace SerializedTrace {
 
     protected:
 
+    /** Output fstream for trace container file. */
+    ofstream ofs;
+
     /** The toc entries for frames added so far. */
     std::vector<uint64_t> toc;
 
     /** Number of frames added to the trace. */
     uint64_t num_frames;
+
+    /** Frames per toc entry. */
+    uint64_t frames_per_toc_entry;
   };
 };
