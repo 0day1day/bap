@@ -616,15 +616,23 @@ VOID FlushInstructions()
 
       // Go through each value and remove the ones that are cached.
 
+      /* The operand_list is a required field, so we must access it
+         even if there are no operands or protobuffers will complain to
+         us. */
+      fnew.mutable_std_frame()->mutable_operand_list();
+
       for (uint32_t j = 0; j < g_buffer[i].values_count; j++) {
 
         ValSpecRec &v = g_buffer[i].valspecs[j];
 
-        operand_info *o = fnew.mutable_std_frame()->mutable_operand_list()->mutable_elem(j);
+        operand_info *o = fnew.mutable_std_frame()->mutable_operand_list()->add_elem();
         o->set_bit_length(GetBitSize(v.type));
         o->mutable_operand_usage()->set_read(v.usage & RD);
         o->mutable_operand_usage()->set_written(v.usage & WR);
         /* XXX: Implement index and base */
+        o->mutable_operand_usage()->set_index(false);
+        o->mutable_operand_usage()->set_base(false);
+
         switch (v.taint) {
             case 0:
               o->mutable_taint_info()->set_no_taint(true);
@@ -2551,7 +2559,8 @@ VOID Cleanup()
    LOG("Finalizing trace...\n");
 
    g_tw->finalize(toc);
-
+   g_twnew->finish();
+   
    delete toc;
 
    LOG("done.\n");
@@ -2679,6 +2688,7 @@ int main(int argc, char *argv[])
    ss << PIN_GetPid() << "-" << KnobOut.Value();
    
    g_tw = new TraceWriter(ss.str().c_str());
+   g_twnew = new TraceContainerWriter((ss.str() + ".new").c_str(), default_frames_per_toc_entry, true);
 
    g_bufidx = 0;
    g_kfcount = 0;

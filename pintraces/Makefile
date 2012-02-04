@@ -73,11 +73,13 @@ TOOL_ROOTS = gentrace #ctxtest
 
 TOOLS = $(TOOL_ROOTS:%=$(OBJDIR)%$(PINTOOL_SUFFIX))
 
-FORMATOBJS = $(OBJDIR)exceptionframe.piqi.pb.o $(OBJDIR)stdframe.piqi.pb.o $(OBJDIR)taintintroframe.piqi.pb.o $(OBJDIR)types.piqi.pb.o $(OBJDIR)trace.container.o
+FORMATOBJS = $(OBJDIR)frame.piqi.pb.o $(OBJDIR)types.piqi.pb.o $(OBJDIR)trace.container.o
+
+#FORMATOBJS = $(OBJDIR)frame.piqi.pb.o $(OBJDIR)exceptionframe.piqi.pb.o $(OBJDIR)stdframe.piqi.pb.o $(OBJDIR)taintintroframe.piqi.pb.o $(OBJDIR)types.piqi.pb.o $(OBJDIR)trace.container.o
 
 OBJS = $(OBJDIR)pivot.o $(OBJDIR)pin_trace.o $(OBJDIR)pin_taint.o $(OBJDIR)pin_frame.o $(OBJDIR)winsyscalls.o $(OBJDIR)pin_misc.o $(FORMATOBJS)
 
-ROOT = ..
+ROOT = $(realpath ..)
 
 TRACEDIR = $(ROOT)/libasmir/src/traces
 
@@ -89,8 +91,9 @@ PROTOBUFDIR = $(ROOT)/protobuf/src
 CXXFLAGS += -I../libasmir/include -I../libasmir/src/traces -I$(TRACEFORMATDIR) -I$(TRACEFORMATPBDIR) -I$(PROTOBUFDIR)
 
 # XXX We should probably use libtool
-LIB_PATHS = -L$(PROTOBUFDIR)/.libs
-LIBS = -pthread  -pthread -lprotobuf -lz -lpthread
+PROTOBUFLIBDIR = $(PROTOBUFDIR)/.libs
+LIB_PATHS = -L$(PROTOBUFLIBDIR)
+LIBS = -Wl,-rpath=$(PROTOBUFLIBDIR) -pthread  -pthread -lprotobuf -lz -lpthread
 
 ##############################################################
 #

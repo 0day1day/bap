@@ -27,7 +27,6 @@ namespace SerializedTrace {
     /** Call finish if it has not been called already ANd if
         auto_finish is set. */
     if (is_finished && auto_finish) {
-      std::cout << "Auto finishing trace container" << std::endl;
       finish();
     }
   }

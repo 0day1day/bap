@@ -25,8 +25,10 @@
  *    <uint64_t offset of trace frame ceil(n/m)> ]]
  */
 
+#include <exception>
 #include <fstream>
 #include <stdint.h>
+#include <string>
 #include <vector>
 #include "frame.piqi.pb.h"
 
@@ -83,6 +85,60 @@ namespace SerializedTrace {
     /** True if [finish()] been called on this writer. */
     bool is_finished;
   };
+
+  class TraceContainerReader {
+
+  public:
+
+    /** Read exception */
+    class TraceException: public std::exception
+    {
+
+    public:
+      TraceException(std::string s)
+        : msg (s)
+        { }
+
+      ~TraceException(void) throw ();
+
+      virtual const char* what() const throw()
+        {
+          return msg.c_str();
+        }
+
+    private:
+
+      std::string msg;
+    };
+
+    /** Creates a trace container reader that reads from [filename]. */
+    TraceContainerReader(const char *filename) throw (std::ifstream::failure);
+
+    /** Destructor. */
+    ~TraceContainerReader(void) throw ();
+
+    /** Returns the number of frames in the trace. */
+    uint64_t num_frames(void) throw ();
+
+    /** Seek to frame number [frame_number]. */
+    void seek(uint64_t frame_number) throw (TraceException);;
+
+    /** Seek to first frame. */
+    void seek_first(void) throw ();
+
+    /** Return the frame pointed to by the frame pointer. Advances the
+        frame pointer by one after. */
+    frame get_frame(void) throw (TraceException);
+
+    /** Return [num_frames] starting at the frame pointed to by the
+        frame pointer. If there are not that many frames until the end
+        of the trace, returns all until the end of the trace.  The
+        frame pointer is set one frame after the last frame returned.
+        If the last frame returned is the last frame in the trace, the
+        frame pointer will point to an invalid frame. */
+    std::vector<frame> get_frames(uint64_t num_frames) throw (TraceException);
+  };
+
 };
 
 #endif
