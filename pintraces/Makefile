@@ -39,7 +39,7 @@ TARGET=ia32
 PIN_KIT=$(PIN_HOME)
 KIT=1
 TESTAPP=$(OBJDIR)cp-pin.exe
-DEBUG=0
+DEBUG=1
 
 TARGET_COMPILER?=gnu
 ifdef OS
@@ -101,7 +101,7 @@ LIBS = -Wl,-rpath=$(PROTOBUFLIBDIR) -pthread  -pthread -lprotobuf -lz -lpthread
 #
 ##############################################################
 
-all: listregs tools reader
+all: listregs tools reader newreadtrace
 tools: $(OBJDIR) $(TOOLS)
 test: $(OBJDIR) $(TOOL_ROOTS:%=%.test)
 
@@ -140,6 +140,9 @@ $(OBJDIR)%.o : $(TRACEFORMATDIR)/%.cpp
 
 reader: readtrace.cpp $(OBJDIR)pin_frame.o $(OBJDIR)pin_trace.o
 	$(CXX) -o $@ $^ $(CXXFLAGS)
+
+newreadtrace : newreadtrace.cpp $(FORMATOBJS)
+	$(CXX) -o $@ $^ $(CXXFLAGS) $(LIB_PATHS) $(LIBS)
 
 pivottest: $(OBJDIR)pivot.o pivottest.cpp
 	$(CXX) -o $@ $^ $(CXXFLAGS) $(PIN_CXXFLAGS)

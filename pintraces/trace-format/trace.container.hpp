@@ -13,7 +13,7 @@
  *
  * [<uint64_t magic number>
  *  <uint64_t n = number of trace frames>
- *  <uint64_t offset of field m (below) >
+ *  <uint64_t offset of field m (below)>
  *  [ <trace frame 0>
  *    ..............
  *    <trace frame n> ]
@@ -27,6 +27,7 @@
 
 #include <exception>
 #include <fstream>
+#include <memory>
 #include <stdint.h>
 #include <string>
 #include <vector>
@@ -42,6 +43,27 @@ namespace SerializedTrace {
   const uint64_t magic_numer_offset = 0LL;
   const uint64_t num_trace_frames_offset = 8LL;
   const uint64_t toc_offset_offset = 16LL;
+  const uint64_t first_frame_offset = 24LL;
+
+    class TraceException: public std::exception
+    {
+
+    public:
+      TraceException(std::string s)
+        : msg (s)
+        { }
+
+      ~TraceException(void) throw () { }
+
+      virtual const char* what() const throw()
+        {
+          return msg.c_str();
+        }
+
+    private:
+
+      std::string msg;
+    };
 
   class TraceContainerWriter {
 
@@ -52,18 +74,17 @@ namespace SerializedTrace {
         every [frames_per_toc_entry] entries.*/
     TraceContainerWriter(const char *filename,
                          uint64_t frames_per_toc_entry = default_frames_per_toc_entry,
-                         bool auto_finish = default_auto_finish);
+                         bool auto_finish = default_auto_finish) throw (std::ofstream::failure, TraceException);
 
     /** Destructor that calls finish if auto_finish is true. */
-    ~TraceContainerWriter(void);
+    ~TraceContainerWriter(void) throw ();
 
-    /** Add [frame] to the trace.
-     * XXX: Add general frame type to Piqi */
-    void add(frame &f);
+    /** Add [frame] to the trace. */
+    void add(frame &f) throw (std::ofstream::failure, TraceException);
 
     /** Finish the trace.  Builds and writes the table of contents to
      * the file. Closes the file. */
-    void finish(void);
+    void finish(void) throw (std::ofstream::failure);
 
     protected:
 
@@ -90,45 +111,22 @@ namespace SerializedTrace {
 
   public:
 
-    /** Read exception */
-    class TraceException: public std::exception
-    {
-
-    public:
-      TraceException(std::string s)
-        : msg (s)
-        { }
-
-      ~TraceException(void) throw ();
-
-      virtual const char* what() const throw()
-        {
-          return msg.c_str();
-        }
-
-    private:
-
-      std::string msg;
-    };
-
     /** Creates a trace container reader that reads from [filename]. */
-    TraceContainerReader(const char *filename) throw (std::ifstream::failure);
+    TraceContainerReader(const char *filename) throw (std::ifstream::failure, TraceException);
 
     /** Destructor. */
     ~TraceContainerReader(void) throw ();
 
     /** Returns the number of frames in the trace. */
-    uint64_t num_frames(void) throw ();
+    uint64_t get_num_frames(void) throw ();
 
-    /** Seek to frame number [frame_number]. */
+    /** Seek to frame number [frame_number]. The frame is numbered
+     * 0. */
     void seek(uint64_t frame_number) throw (TraceException);;
-
-    /** Seek to first frame. */
-    void seek_first(void) throw ();
 
     /** Return the frame pointed to by the frame pointer. Advances the
         frame pointer by one after. */
-    frame get_frame(void) throw (TraceException);
+    std::auto_ptr<frame> get_frame(void) throw (std::ifstream::failure, TraceException);
 
     /** Return [num_frames] starting at the frame pointed to by the
         frame pointer. If there are not that many frames until the end
@@ -136,9 +134,37 @@ namespace SerializedTrace {
         frame pointer is set one frame after the last frame returned.
         If the last frame returned is the last frame in the trace, the
         frame pointer will point to an invalid frame. */
-    std::vector<frame> get_frames(uint64_t num_frames) throw (TraceException);
-  };
+    std::auto_ptr<std::vector<frame> > get_frames(uint64_t num_frames) throw (std::ifstream::failure, TraceException);
 
+    /** Return true if frame pointer is at the end of the trace. */
+    bool end_of_trace(void) throw ();
+
+  protected:
+    /** ifstream to read trace from. */
+    std::ifstream ifs;
+
+    /** The toc entries from the trace. */
+    std::vector<uint64_t> toc;
+
+    /** Number of frames in the trace. */
+    uint64_t num_frames;
+
+    /** Number of frames per toc entry. */
+    uint64_t frames_per_toc_entry;
+
+    /** Current frame number. */
+    uint64_t current_frame;
+
+    /** Return true if [frame_num] is at the end of the trace. */
+    bool end_of_trace_num(uint64_t frame_num) throw ();
+
+    /** Raise exception if [frame_num] is at the end of the trace. */
+    void check_end_of_trace_num(uint64_t frame_num, std::string msg) throw (TraceException);
+
+    /** Raise exception if frame pointer is at the end of the trace. */
+    void check_end_of_trace(std::string msg) throw (TraceException);
+
+  };
 };
 
 #endif

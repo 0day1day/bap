@@ -2688,7 +2688,7 @@ int main(int argc, char *argv[])
    ss << PIN_GetPid() << "-" << KnobOut.Value();
    
    g_tw = new TraceWriter(ss.str().c_str());
-   g_twnew = new TraceContainerWriter((ss.str() + ".new").c_str(), default_frames_per_toc_entry, true);
+   g_twnew = new TraceContainerWriter((ss.str() + ".new").c_str(), default_frames_per_toc_entry, false);
 
    g_bufidx = 0;
    g_kfcount = 0;
