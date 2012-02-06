@@ -7,7 +7,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.59)
-AC_INIT(Bap, 0.1, dbrumley@cmu.edu)
+AC_INIT(Bap, 0.1, bap-dev@lists.andrew.cmu.edu)
 AC_CONFIG_SRCDIR([libasmir/src/asm_program.c])
 AC_CONFIG_HEADER([libasmir/config.h])
 
@@ -71,6 +71,12 @@ AC_CHECK_FILE([$PIN_HOME],
 AM_CONDITIONAL([HAVE_PIN], [test x$HAVE_PIN = xtrue])
 
 # Checks for ocaml libraries
+ocamlfind query ocamlgraph
+if test $? != 0; then
+   echo "bap requires libbitstring-ocaml-dev"
+   exit -1
+fi
+
 dnl ocamlfind query ocamlgraph
 dnl if test $? != 0; then
 dnl     echo "bap needs libocamlgraph-ocaml-dev"

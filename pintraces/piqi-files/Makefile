@@ -1,4 +1,5 @@
 TRACEFORMATDIR=$(CURDIR)/../trace-format/
+MLDIR=$(CURDIR)/../../libtrace/src/ocaml/piqi
 
 PIQIFILES=$(wildcard *.piqi)
 PROTOFILES=$(addsuffix .proto, $(PIQIFILES))
@@ -24,6 +25,11 @@ all: $(PROTOCFILES) $(PROTOHFILES) $(MLFILES) $(MLEXTFILES)
 clean:
 	rm -f $(PROTOFILES) $(MLFILES) $(MLEXTFILES) $(PROTOCFILES) $(PROTOHFILES)
 
-.PHONY: install
-install: $(PROTOCFILES) $(PROTOHFILES)
+.PHONY: install-pb install-piqi install
+install-pb: $(PROTOCFILES) $(PROTOHFILES)
 	cp $^ $(TRACEFORMATDIR)
+
+install-piqi: $(MLFILES) $(MLEXTFILES)
+	cp $^ $(MLDIR)
+
+install: install-pb install-piqi
