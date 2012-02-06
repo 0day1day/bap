@@ -2,7 +2,7 @@ all:	stp/bin/stp
 
 stp/bin/stp:
 ifeq (,$(shell which stp))
-	cd ./stp && ./scripts/configure && make 
+	cd ./stp && ./scripts/configure && $(MAKE)
 else 
 	@echo "stp is already in path; Not making STP." 
 endif
