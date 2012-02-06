@@ -1,5 +1,6 @@
+ROOTDIR=$(CURDIR)/../../
 TRACEFORMATDIR=$(CURDIR)/../trace-format/
-MLDIR=$(CURDIR)/../../libtrace/src/ocaml/piqi
+MLDIR=$(ROOTDIR)/libtrace/src/ocaml/piqi
 
 PIQIFILES=$(wildcard *.piqi)
 PROTOFILES=$(addsuffix .proto, $(PIQIFILES))
@@ -8,17 +9,25 @@ MLEXTFILES=$(addsuffix _piqi_ext.ml, $(basename $(PIQIFILES)))
 PROTOCFILES=$(addsuffix .piqi.pb.cc, $(basename $(PIQIFILES)))
 PROTOHFILES=$(addsuffix .piqi.pb.h, $(basename $(PIQIFILES)))
 
+PIQIDIR=$(ROOTDIR)/piqi/piqi/bin
+PIQI=$(PIQIDIR)/piqi
+PIQIC=$(PIQIDIR)/piqic
+PROTOC=$(ROOTDIR)/protobuf/src/protoc
+
+PIQIFLAGS = --pp
+#PIQIFLAGS = --pp --leave-tmp-files
+
 %.piqi.proto : %.piqi
-	piqi to-proto $<
+	$(PIQI) to-proto $<
 
 %.piqi.pb.cc %.piqi.pb.hh : %.piqi.proto
-	protoc $< --cpp_out=.
+	$(PROTOC) $< --cpp_out=.
 
-%_piqi.ml : %.piqi
-	piqic ocaml $<
+#%_piqi.ml : %.piqi
+#	piqic ocaml $(PIQIFLAGS) $<
 
-%_piqi_ext.ml : %.piqi
-	piqic ocaml-ext $<
+%_piqi.ml %_piqi_ext.ml : %.piqi
+	$(PIQIC) ocaml-ext $(PIQIFLAGS) $<
 
 all: $(PROTOCFILES) $(PROTOHFILES) $(MLFILES) $(MLEXTFILES)
 

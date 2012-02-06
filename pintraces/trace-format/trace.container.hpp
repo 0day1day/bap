@@ -9,7 +9,8 @@
  * be in memory before being written) or input (the whole trace would
  * need to be unserialized to get one frame).
  *
- * The trace format is extremely simple:
+ * The trace format is extremely simple. All numbers are
+ * little-endian.
  *
  * [<uint64_t magic number>
  *  <uint64_t n = number of trace frames>

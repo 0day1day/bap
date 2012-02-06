@@ -11,11 +11,11 @@ object
   method finish : unit
 end
 
-class reader : string ->
-object
-  method get_num_frames : int64
-  method seek : int64
-  method get_frame : frame
-  method get_frames : frame list
-  method end_of_trace : bool
-end
+(* class reader : string -> *)
+(* object *)
+(*   method get_num_frames : int64 *)
+(*   method seek : int64 *)
+(*   method get_frame : frame *)
+(*   method get_frames : frame list *)
+(*   method end_of_trace : bool *)
+(* end *)

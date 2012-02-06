@@ -1,15 +1,16 @@
 OCAMLMAKEFILE = ./OCamlMakefile
 
 ROOTDIR = $(CURDIR)/../../..
+PIQIBUILDDIR = $(ROOTDIR)/piqi/piqi/build/lib/ocaml
 
-PIQILIBDIR = $(ROOTDIR)/piqi/piqi/build/lib/ocaml/piqirun
-INCDIRS += $(PIQILIBDIR)
-LIBDIRS += $(PIQILIBDIR)
+export OCAMLPATH += $(PIQIBUILDDIR)
 
-LIBS = piqirun
+PACKS = piqi.lib
+
 SOURCES = piqi/frame_piqi.mli \
 	  piqi/frame_piqi.ml \
-	  trace_container.mli
+	  trace_container.mli \
+	  trace_container.ml
 RESULT  = libtrace
 
 all:	ncl dcl
