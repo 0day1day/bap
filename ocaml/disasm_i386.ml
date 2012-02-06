@@ -1248,15 +1248,12 @@ let parse_instr g addr =
     (* ISR 2.1.5 Table 2-3 *)
     let b = Char.code (g a) in
     let ss = b >> 6 and idx = (b>>3) & 7 in
-    let base, na = if (b & 7) <> 5 then (bits2reg32e (b & 7), s a) else
-	match m with
-	| 0 -> let (i,na) = parse_disp32 (s a) in (l32 i, na)
-	| 1 -> unimplemented 
-	  (Printf.sprintf "unsupported opcode: sib ebp +? disp8 + ebp b=%02x" b)
-	| 2 -> unimplemented 
-	  (Printf.sprintf "unsupported opcode: sib ebp +? disp32 + ebp b=%02x" b)
-	| _ -> disfailwith 
-	  (Printf.sprintf "impossible opcode: sib ebp +? disp b=%02x" b)
+    let base, na = 
+      match ((b & 7), m) with (* base register, MOD *)
+      | 5, 0 -> let (i,na) = parse_disp32 (s a) in (l32 i, na)
+      | _, 0 | _, 1 | _, 2 -> (bits2reg32e (b & 7), s a)
+      | _ -> disfailwith 
+	(Printf.sprintf "impossible opcode: sib ebp +? disp b=%02x" b)
     in
     if idx = 4 then (base, na) else
       let idx = bits2reg32e idx in
@@ -1518,7 +1515,10 @@ let parse_instr g addr =
     | 0xf7 -> let t = if b1 = 0xf6 then r8 else prefix.opsize in
 	      let (r, rm, na) = parse_modrm32ext na in
 	      (match r with (* Grp 3 *)
-	       | 0 -> let (imm, na) = parse_immz t na in (Test(t, rm, imm), na)
+	       | 0 -> let (imm, na) = 
+			if (b1 = 0xf7) then parse_immz t na else parse_immb na
+		      in 
+		      (Test(t, rm, imm), na)
 	       | 2 -> (Not(t, rm), na)
 	       | 3 -> (Neg(t, rm), na)
 	       | 4 -> unimplemented (* mul *)
