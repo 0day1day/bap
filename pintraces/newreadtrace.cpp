@@ -3,6 +3,7 @@
  * New c++ trace reader.  Tests c++ TraceContainerReader API.
  */
 
+#include <cassert>
 #include <exception>
 #include <iostream>
 #include "trace.container.hpp"
@@ -13,16 +14,17 @@ void print(frame &f) {
   std::cout << f.DebugString() << std::endl;
 }
 
-void go(const char *f) {
+void print_all(const char *f) {
+  uint64_t ctr = 0;
+
   TraceContainerReader t(f);
 
-  // t.seek(0);
+  while (!t.end_of_trace()) {
+    ctr++;
+    print(*(t.get_frame()));
+  }
 
-  // t.seek(10000);
-
-  // t.seek(0);
-
-  print(*(t.get_frame()));
+  assert(ctr == t.get_num_frames());
 }
 
 int main(int argc, char **argv) {
@@ -33,5 +35,5 @@ int main(int argc, char **argv) {
     exit(1);
   }
 
-  go(argv[1]);
+  print_all(argv[1]);
 }

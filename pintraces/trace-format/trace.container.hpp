@@ -14,15 +14,20 @@
  * [<uint64_t magic number>
  *  <uint64_t n = number of trace frames>
  *  <uint64_t offset of field m (below)>
- *  [ <trace frame 0>
+ *  [ <uint64_t sizeof(trace frame 0)>
+ *    <trace frame 0>
  *    ..............
+ *    <uint64_t sizeof(trace frame n)>
  *    <trace frame n> ]
  *  <uint64_t m, where a table of contents entry is given
  *  for m, 2m, 3m, ..., ceil(n/m)>
- *  [ <uint64_t offset of trace frame m>
- *    <uint64_t offset of trace frame 2m>
+ *  [ <uint64_t offset of sizeof(trace frame m)>
+ *    <uint64_t offset of sizeof(trace frame 2m)>
  *    ...
- *    <uint64_t offset of trace frame ceil(n/m)> ]]
+ *    <uint64_t offset of sizeof(trace frame ceil(n/m))> ]]
+ *
+ *  One additional feature that might be nice is log_2(n) lookup
+ *  time using a hierarchical toc.
  */
 
 #include <exception>

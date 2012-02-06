@@ -48,11 +48,23 @@ namespace SerializedTrace {
       toc.push_back(ofs.tellp());
     }
 
-    /* Serialize to the file */
-    if (!(f.SerializeToOstream(&ofs))) {
+    /* Serialize to string so we can get the length. */
+    std::string s;
+    if (!(f.SerializeToString(&s))) {
       throw (TraceException("Unable to serialize frame to ostream"));
     }
 
+    /* Write the length before the frame. */
+    uint64_t len = s.length();
+    WRITE(len);
+
+    /* Write the frame. */
+    std::streampos old_offset = ofs.tellp();
+
+    ofs << s;
+
+    /* Double-check our size. */
+    assert ((uint64_t)old_offset + len == (uint64_t)ofs.tellp());
   }
 
   void TraceContainerWriter::finish(void) throw (std::ofstream::failure) {
@@ -158,8 +170,10 @@ namespace SerializedTrace {
     }
 
     while (current_frame != frame_number) {
-      frame f;
-      f.ParseFromIstream(&ifs);
+      /* Read frame length and skip that far ahead. */
+      uint64_t frame_len;
+      READ(frame_len);
+      ifs.seekg((uint64_t)ifs.tellg() + frame_len);
       current_frame++;
     }
   }
@@ -168,11 +182,21 @@ namespace SerializedTrace {
     /* Make sure we are in bounds. */
     check_end_of_trace("get_frame() on non-existant frame");
 
-    std::cerr << "Here at " << ifs.tellg() << std::endl;
+    uint64_t frame_len;
+    READ(frame_len);
+
+    /* Yup, this is allowed, but maybe not super efficient. We could
+     * use an auto_ptr and put this on the heap if it's too slow. */
+    char buf[frame_len];
+
+    /* Read the frame into buf. */
+    ifs.read(buf, frame_len);
+
+    std::string sbuf(buf, frame_len);
 
     std::auto_ptr<frame> f(new frame);
-    if (!(f->ParseFromIstream(&ifs))) {
-      throw (TraceException("Unable to parse from istream"));
+    if (!(f->ParseFromString(sbuf))) {
+      throw (TraceException("Unable to parse from string"));
     }
     current_frame++;
 
