@@ -601,13 +601,31 @@ let asmprogram_to_bap ?(init_ro=false) p =
     get_rodata_assignments ~prepend_to:ir m p
   else ir
 
-(* translate byte sequence to bap ir *)
-let byte_insn_to_bap arch addr byteinsn =
-  let prog = Libasmir.byte_insn_to_asmp arch addr byteinsn in
-  let get a = Array.get byteinsn (Int64.to_int (Int64.sub a addr)) in
+(* Returns a single ASM instruction (as a list IL statements) from a
+   sequence of bytes. *)
+let byte_insn_to_bap arch addr bytes =
+  let prog = Libasmir.byte_insn_to_asmp arch addr bytes in
+  let get a = bytes.(Int64.to_int (Int64.sub a addr)) in
   let (pr, n) = asm_addr_to_bap {asmp=prog; arch=arch; secs=[]; get=get} addr in
   Libasmir.asmir_close prog;
   pr, Int64.sub n addr
+
+(* Transforms a byte sequence (byte array), to a list of lists of IL
+   statements *)
+let byte_sequence_to_bap bytes arch addr =
+  let prog = Libasmir.byte_insn_to_asmp arch addr bytes in
+  let len = Array.length bytes in
+  let end_addr = Int64.add addr (Int64.of_int len) in
+  let get a = bytes.(Int64.to_int (Int64.sub a addr)) in
+  let rec read_all acc cur_addr =
+    if cur_addr >= end_addr then List.rev acc
+    else
+      let prog, next = asm_addr_to_bap {asmp=prog; arch=arch; secs=[]; get=get} cur_addr in
+      read_all (prog::acc) next
+  in
+  let il = read_all [] addr in
+  Libasmir.asmir_close prog;
+  il
 
 (* Get stmts for a frame *)
 let trans_frame f =

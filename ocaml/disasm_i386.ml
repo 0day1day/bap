@@ -101,7 +101,7 @@ type opcode =
   | Test of typ * operand * operand
   | Not of typ * operand
   | Neg of typ * operand
-  | Imul of typ * (operand * operand) * typ * operand * typ * operand (* dsttyp, (dst1,dst2), src1typ, src1, src2typ, src2 *)
+  | Imul of typ * (operand * operand option) * operand * operand (* typ, (dst1,dst2), src1, src2 *)
   | Cld
   | Rdtsc
   | Cpuid
@@ -462,11 +462,15 @@ let set_flags_add t s1 s2 r =
   ::set_aopszf_add t s1 s2 r
 
 (* Helper functions to set flags for subtracting *)
-let set_aopszf_sub t s1 s2 r =
+let set_apszf_sub t s1 s2 r =
   let bit4 = it (1 lsl 4) t in
   move af (bit4 ==* ((bit4 &* ((r ^* s1) ^* s2))))
-  ::move oF (cast_high r1 ((s1 ^* s2) &* (s1 ^* r)))
   ::set_pszf t r
+
+let set_aopszf_sub t s1 s2 r =
+  move oF (cast_high r1 ((s1 ^* s2) &* (s1 ^* r)))
+  ::set_apszf_sub t s1 s2 r
+
 let set_flags_sub t s1 s2 r =
   move cf (s2 >* s1)
   ::set_aopszf_sub t s1 s2 r
@@ -645,9 +649,13 @@ let rec to_ir addr next ss pref =
       | _ -> disfailwith "imposible"
     in
     let unk_of = Unknown("OF undefined after shift", r1) in
-    let new_cf = match st with
+    let new_cf = 
+      (* undefined for SHL and SHR instructions where the count is greater than 
+	 or equal to the size (in bits) of the destination operand *)
+      match st with
       | LSHIFT -> cast_low r1 (Var origDEST >>* (size -* Var origCOUNT))
-      | RSHIFT|ARSHIFT -> cast_high r1 (Var origDEST <<* (size -* Var origCOUNT))
+      | RSHIFT | ARSHIFT ->
+	cast_high r1 (Var origDEST <<* (size -* Var origCOUNT))
       | _ -> failwith "impossible"
     in
     [move origDEST dste;
@@ -900,7 +908,9 @@ let rec to_ir addr next ss pref =
     :: set_flags_sub t (Var oldo1) (op2e t o2) (op2e t o1)
   | Sbb(t, o1, o2) ->
     let tmp = nt "t" t in
-    let s1 = Var tmp and s2 = (op2e t o2) +* cast_unsigned t cf_e and r = op2e t o1 in
+    let s1 = Var tmp 
+    and s2 = (op2e t o2) +* cast_unsigned t cf_e 
+    and r = op2e t o1 in
     move tmp r
     :: assn t o1 (r -* s2)
     (* FIXME: sanity check this *)
@@ -989,11 +999,37 @@ let rec to_ir addr next ss pref =
     [assn t o (exp_not (op2e t o))]
   | Neg(t, o) ->
     let tmp = nt "t" t in
+    let min_int = 
+      Ast_convenience.binop LSHIFT (it 1 t) (it ((Typecheck.bits_of_width t)-1) t)
+    in
     move tmp (op2e t o)
     ::assn t o (it 0 t -* op2e t o)
     ::move cf (ite r1 (Var tmp ==* it 0 t) (it 0 r1) (it 1 r1))
-    ::set_aopszf_sub t (Var tmp) (it 0 t) (op2e t o)
-  | Imul (dt, (dst1,dst2), st1, src1, st2, src2) -> unimplemented "Imul"
+    ::move oF (ite r1 (Var tmp ==* min_int) (it 1 r1) (it 0 r1))
+    ::set_apszf_sub t (Var tmp) (it 0 t) (op2e t o)
+  | Imul (t, (dst1,dstop), src1, src2) -> 
+    [
+      (match dstop with
+      | Some(dst2) -> 
+	(* For the one operand form of the instruction, the CF and OF flags are 
+	   set when significant bits are carried into the upper half of the 
+	   result and cleared when the result fitsexactly in the lower half of 
+	   the result. *)
+	unimplemented "Imul"
+      | None ->  assn t dst1 (op2e t src1 ** op2e t src2) 
+      (* SWXXX Do this!
+	 For the two- and three-operand forms of the instruction, the CF and OF 
+	 flags are set when the result must be truncated to fit in the 
+	 destination operand size and cleared when the result fits exactly in 
+	 the destination operand size. *)
+      );
+      move oF exp_false;
+      move cf exp_false;
+      move sf (Unknown("SF is undefined after imul", r1));
+      move zf (Unknown("ZF is undefined after imul", r1));
+      move af (Unknown("AF is undefined after imul", r1));
+      move pf (Unknown("PF is undefined after imul", r1))
+    ]
   | Cld ->
     [Move(dflag, i32 1, [])]
   | Leave t when pref = [] -> (* #UD if Lock prefix is used *)
@@ -1104,7 +1140,13 @@ module ToStr = struct
     | Test(t,d,s) -> Printf.sprintf "test %s, %s" (opr d) (opr s)
     | Not(t,o) -> Printf.sprintf "not %s" (opr o)
     | Neg(t,o) -> Printf.sprintf "neg %s" (opr o)
-    | Imul (dt, (dst1,dst2), st1, src1, st2, src2) -> Printf.sprintf "imul %s, %s, %s" (opr dst1) (opr src1) (opr src2)
+    | Imul (t, (dst1,dstop), src1, src2) -> 
+      (match dstop with
+      | Some(dst2) ->
+	Printf.sprintf 
+	  "imul %s:%s, %s, %s" (opr dst1) (opr dst2) (opr src1) (opr src2)
+      | None ->
+	Printf.sprintf "imul %s, %s, %s" (opr dst1) (opr src1) (opr src2))
     | Cld -> "cld"
     | Leave _ -> "leave"
     | Interrupt(o) -> Printf.sprintf "int %s" (opr o)
@@ -1165,26 +1207,36 @@ let parse_instr g addr =
     | 0x67 -> Some Address_size
     | _ -> None
   in*)
-  let parse_disp8 a =
-    (* This has too many conversions, but the below code doesn't handle
-       signedness correctly. *)
-    (int64_of_big_int (Arithmetic.to_sbig_int (big_int_of_int (Char.code (g a)), r8)), s a)
-  (* let r n = Int64.shift_left (Int64.of_int (Char.code (g (Int64.add a (Int64.of_int n))))) (8*n) in *)
-  (*   let d = r 0 in *)
-  (*   (d, (Int64.succ a)) *)
-  and parse_disp16 a =
-    (* XXX: Does this handle negative displacements correctly? *)
+  let parse_int8 a =
+    (Int64.of_int (Char.code (g a)), s a)
+  and parse_int16 a =
     let r n = Int64.shift_left (Int64.of_int (Char.code (g (Int64.add a (Int64.of_int n))))) (8*n) in
     let d = r 0 in
     let d = Int64.logor d (r 1) in
     (d, (Int64.add a 2L))
-  and parse_disp32 a =
+  and parse_int32 a =
     let r n = Int64.shift_left (Int64.of_int (Char.code (g (Int64.add a (Int64.of_int n))))) (8*n) in
     let d = r 0 in
     let d = Int64.logor d (r 1) in
     let d = Int64.logor d (r 2) in
     let d = Int64.logor d (r 3) in
     (d, (Int64.add a 4L))
+  in
+  let to_signed i t = 
+    int64_of_big_int (Arithmetic.to_sbig_int (big_int_of_int64 i, t)) in
+  let parse_sint8 a =
+    let (i, na) = parse_int8 a in
+    (to_signed i reg_8, na)
+  and parse_sint16 a =
+    let (i, na) = parse_int16 a in
+    (to_signed i reg_16, na)
+  and parse_sint32 a =
+    let (i, na) = parse_int32 a in
+    (to_signed i reg_32, na)
+  in
+  let parse_disp8 = parse_sint8
+  and parse_disp16 = parse_sint16
+  and parse_disp32 = parse_sint32
   in
   let parse_disp:(Type.typ -> int64 -> int64 * int64) = function
     | Reg 8 ->  parse_disp8
@@ -1196,10 +1248,12 @@ let parse_instr g addr =
     (* ISR 2.1.5 Table 2-3 *)
     let b = Char.code (g a) in
     let ss = b >> 6 and idx = (b>>3) & 7 in
-    let base, na = if (b & 7) <> 5 then (bits2reg32e (b & 7), s a) else
-	match m with
-	| 0 -> let (i,na) = parse_disp32 (s a) in (l32 i, na)
-	| _ -> unimplemented "unsupported opcode: sib ebp +? disp"
+    let base, na = 
+      match ((b & 7), m) with (* base register, MOD *)
+      | 5, 0 ->  disfailwith 
+	(Printf.sprintf "impossible opcode; should have been handled already: sib +? disp b=%02x" b)
+      | _, 0 | _, 1 | _, 2 -> (bits2reg32e (b & 7), s a)
+      | _ -> disfailwith (Printf.sprintf "impossible opcode: sib b=%02x" b)
     in
     if idx = 4 then (base, na) else
       let idx = bits2reg32e idx in
@@ -1262,26 +1316,52 @@ let parse_instr g addr =
     (Oreg(bits2xmm r), rm, na) *)
   in
   let parse_modrm opsize a = parse_modrm32 a in
+  (* Parse 8-bits as unsigned integer *)
   let parse_imm8 a = (* not sign extended *)
-    (Oimm(Int64.of_int (Char.code (g a))), s a)
+    let (i, na) = parse_int8 a in
+    (Oimm i, na)
   and parse_simm8 a = (* sign extended *)
-    let (d, na) = parse_disp8 a in
-    (Oimm d, na)
+    let (i, na) = parse_sint8 a in
+    (Oimm i, na)
+  and parse_imm16 a =
+    let (i, na) = parse_int16 a in
+    (Oimm i, na)
+  and parse_simm16 a =
+    let (i, na) = parse_sint16 a in
+    (Oimm i, na)
   and parse_imm32 a =
-    let (l,na) = parse_disp32 a in
-    (Oimm l, na)
+    let (i, na) = parse_int32 a in
+    (Oimm i, na)
+  and parse_simm32 a =
+    let (i, na) = parse_sint32 a in
+    (Oimm i, na)
   in
   let parse_immz t a = match t with
-    | Reg 8 -> parse_imm8 a (* t=r8 when operand is Ib rather than Iz *)
-    | Reg 16 -> disfailwith "parse_imm16 a"
+    | Reg 16 -> parse_imm16 a
     | Reg 32 | Reg 64 -> parse_imm32 a
     | _ -> disfailwith "parse_immz unsupported size"
   in
   let parse_immv = parse_immz in (* until we do amd64 *)
+  let parse_immb = parse_imm8 in
+(*  let parse_immw = parse_imm16 in 
+  let parse_immd = parse_imm32 in *)
+  let parse_simmb = parse_simm8 in
+  let parse_simmw = parse_simm16 in
+  let parse_simmd = parse_simm32 in
+  (* sign extend op of type ot to size *)
+  let sign_ext ot op size = (match op with
+    | Oimm d ->
+      let (v,_) = 
+	Arithmetic.cast CAST_SIGNED ((big_int_of_int64 d), ot) size
+      in
+      (Oimm (int64_of_big_int v)) 
+    | _ -> disfailwith "sign_ext only handles Oimm"
+  ) in
   let get_opcode pref prefix a =
     (* We should rename these, since the 32 at the end is misleading. *)
     let parse_disp32, parse_modrm32, parse_modrm32ext =
-      if prefix.addrsize_override then parse_disp16, parse_modrm16, parse_modrm16ext
+      if prefix.addrsize_override 
+      then parse_disp16, parse_modrm16, parse_modrm16ext
       else parse_disp32, parse_modrm32, parse_modrm32ext
     in
     let b1 = Char.code (g a)
@@ -1301,32 +1381,40 @@ let parse_instr g addr =
 	if b1=0x68 then parse_immz prefix.opsize na else parse_simm8 na 
       in
       (Push(prefix.opsize, o), na)
+    | 0x69 | 0x6b ->
+      let (r, rm, na) = parse_modrm prefix.opsize na in
+      let ((o, na), ot) = 
+	if b1 = 0x6b then (parse_simmb na, r8) else 
+	  if (prefix.opsize = r16) then (parse_simmw na, r16) 
+	  else (parse_simmd na, r32)
+      in
+      (Imul(prefix.opsize, (r,None), rm, (sign_ext ot o prefix.opsize)), na)
     | 0x70 | 0x71 | 0x72 | 0x73 | 0x74 | 0x75 | 0x76 | 0x77 | 0x78 | 0x79
-    | 0x7c | 0x7d | 0x7e
-    | 0x7f -> let (i,na) = parse_disp8 na in
-	      (Jcc(Oimm(Int64.add i na), cc_to_exp b1), na)
+    | 0x7c | 0x7d | 0x7e | 0x7f -> 
+      let (i,na) = parse_disp8 na in
+      (Jcc(Oimm(Int64.add i na), cc_to_exp b1), na)
     | 0xc3 -> (Retn, na)
     | 0xc9 -> (Leave prefix.opsize, na)
-    | 0x80 | 0x81 | 0x82
-    | 0x83 -> let (r, rm, na) = parse_modrm32ext na in
-	      let (o2, na) =
-		(* for 0x83, imm8 needs to be sign extended *)
-		if b1 = 0x81 then parse_immz prefix.opsize na 
-		else parse_simm8 na
-	      in
-	      let opsize = if b1 land 1 = 0 then r8 else prefix.opsize in
-	      (match r with (* Grp 1 *)
-	      | 0 -> (Add(opsize, rm, o2), na)
-              | 1 -> (Or(opsize, rm, o2), na)
-	      | 2 -> (Adc(opsize, rm, o2), na)
-	      | 3 -> (Sbb(opsize, rm, o2), na)
-	      | 4 -> (And(opsize, rm, o2), na)
-	      | 5 -> (Sub(opsize, rm, o2), na)
-              | 6 -> (Xor(opsize, rm, o2), na)
-	      | 7 -> (Cmp(opsize, rm, o2), na)
-	      | _ -> disfailwith  
-		(Printf.sprintf "impossible opcode: %02x/%d" b1 r)
-	      )
+    | 0x80 | 0x81 | 0x82 | 0x83 -> 
+      let (r, rm, na) = parse_modrm32ext na in
+      let (o2, na) =
+	if b1 = 0x81 then parse_immz prefix.opsize na
+	else let (o,na) = (parse_simmb na)
+	     in ((sign_ext r8 o prefix.opsize), na)
+      in
+      let opsize = if b1 land 1 = 0 then r8 else prefix.opsize in
+      (match r with (* Grp 1 *)
+      | 0 -> (Add(opsize, rm, o2), na)
+      | 1 -> (Or(opsize, rm, o2), na)
+      | 2 -> (Adc(opsize, rm, o2), na)
+      | 3 -> (Sbb(opsize, rm, o2), na)
+      | 4 -> (And(opsize, rm, o2), na)
+      | 5 -> (Sub(opsize, rm, o2), na)
+      | 6 -> (Xor(opsize, rm, o2), na)
+      | 7 -> (Cmp(opsize, rm, o2), na)
+      | _ -> disfailwith  
+	(Printf.sprintf "impossible opcode: %02x/%d" b1 r)
+      )
     | 0x84
     | 0x85 -> let (r, rm, na) = parse_modrm32 na in
 	      let o = if b1 = 0x84 then r8 else prefix.opsize in
@@ -1427,14 +1515,20 @@ let parse_instr g addr =
     | 0xf7 -> let t = if b1 = 0xf6 then r8 else prefix.opsize in
 	      let (r, rm, na) = parse_modrm32ext na in
 	      (match r with (* Grp 3 *)
-	       | 0 -> let (imm, na) = parse_immz t na in (Test(t, rm, imm), na)
+	       | 0 -> let (imm, na) = 
+			if (b1 = 0xf7) then parse_immz t na else parse_immb na
+		      in 
+		      (Test(t, rm, imm), na)
 	       | 2 -> (Not(t, rm), na)
 	       | 3 -> (Neg(t, rm), na)
 	       | 4 -> unimplemented (* mul *)
 		 (Printf.sprintf "unsupported opcode: %02x/%d" b1 r) 
-	       | 5 -> (*(Imul(t, (rm,rm), t, rm, t, rm), na)*)
-		 unimplemented (* mul *)
-		 (Printf.sprintf "unsupported opcode: %02x/%d" b1 r) 
+	       | 5 -> (match b1 with 
+		 | 0xf6 -> (Imul(t, (o_eax,None), o_eax, rm), na)
+		 | 0xf7 -> (Imul(t, (o_edx,Some(o_eax)), o_eax, rm), na)
+		 | _ -> disfailwith
+		   (Printf.sprintf "impossible opcode: %02x/%d" b1 r)
+	       )
 	       | 6 -> unimplemented (* div *)
 		 (Printf.sprintf "unsupported opcode: %02x/%d" b1 r) 
 	       | 7 -> unimplemented (* idiv *)
@@ -1465,7 +1559,7 @@ let parse_instr g addr =
 	        | _ -> disfailwith 
 		  (Printf.sprintf "impossible opcode: %02x/%d" b1 r)
 	      )
-    (*** 00 to 3d ***)
+    (*** 00 to 3e ***)
     | b1 when b1 < 0x3e && (b1 & 7) < 6 ->
       (
 	let ins a = match b1 >> 3 with
@@ -1480,13 +1574,15 @@ let parse_instr g addr =
 	  | _ -> disfailwith (Printf.sprintf "impossible opcode: %02x" b1)
 	in
 	let t = if (b1 & 1) = 0  then r8 else prefix.opsize in
-	let (o1, o2, na) = match b1 & 6 with
-	  | 0 -> let r, rm, na = parse_modrm t na in
+	let (o1, o2, na) = match b1 & 7 with
+	  | 0 | 1 -> let r, rm, na = parse_modrm t na in
 		 (rm, r, na)
-	  | 2 -> let r, rm, na = parse_modrm t na in
+	  | 2 | 3 -> let r, rm, na = parse_modrm t na in
 		 (r, rm, na)
-	  | 4 -> let i, na = parse_immz t na in
+	  | 4 -> let i, na = parse_immb na in
 		 (o_eax, i, na)
+	  | 5 ->let i, na = parse_immz t na in
+		  (o_eax, i, na)
 	  | _ -> disfailwith (Printf.sprintf "impossible opcode: %02x" b1)
 	in
 	(ins(t, o1, o2), na)
@@ -1495,18 +1591,6 @@ let parse_instr g addr =
       let b2 = Char.code (g na) and na = s na in
       match b2 with (* Table A-3 *)
       | 0x1f -> (Nop, na)
-      | 0x31 -> (Rdtsc, na)
-      | 0x34 -> (Sysenter, na)
-      | 0x3a ->
-          let b3 = Char.code (g na) and na = s na in
-          (match b3 with
-             | 0x0f ->
-                 let (r, rm, na) = parse_modrm prefix.opsize na in
-	         let (i, na) = parse_imm8 na in
-                 (Palignr(prefix.mopsize, r, rm, i), na)
-             | b3 -> disfailwith 
-	       (Printf.sprintf "unsupported opcode %02x %02x %02x" b1 b2 b3)
-          )
       | 0x28 | 0x29 | 0x6e | 0x7e | 0x6f | 0x7f ->
         let t, name, align, tsrc, tdest = match b2 with
           | 0x28 | 0x29 when prefix.opsize_override -> 
@@ -1527,6 +1611,22 @@ let parse_instr g addr =
           | _ -> r, rm
         in
 	(Movdq(t, tdest,d,tsrc,s,align,name), na)
+      | 0x31 -> (Rdtsc, na)
+      | 0x34 -> (Sysenter, na)
+      | 0x3a ->
+          let b3 = Char.code (g na) and na = s na in
+          (match b3 with
+             | 0x0f ->
+                 let (r, rm, na) = parse_modrm prefix.opsize na in
+	         let (i, na) = parse_imm8 na in
+                 (Palignr(prefix.mopsize, r, rm, i), na)
+             | b3 -> disfailwith 
+	       (Printf.sprintf "unsupported opcode %02x %02x %02x" b1 b2 b3)
+          )
+      (*| 0x40 | 0x41 | 0x42 | 0x43 | 0x44 | 0x45 | 0x46 | 0x47 | 0x48 | 0x49 
+	| 0x4a | 0x4b | 0x4c | 0x4d | 0x4e | 0x4f ->*)
+	(* conditional move: cmov *)
+      (* Conditional moves of 8-bit register operands are not supported *)
       | 0x70 when prefix.opsize = r16 ->
           let r, rm, na = parse_modrm prefix.opsize na in
           let i, na = parse_imm8 na in
@@ -1577,6 +1677,9 @@ let parse_instr g addr =
              | _ -> unimplemented 
 	       (Printf.sprintf "unsupported opcode: %02x %02x/%d" b1 b2 r)
           )
+      | 0xaf ->
+	let (r, rm, na) = parse_modrm prefix.opsize na in
+	(Imul(prefix.opsize, (r,None), r, rm), na)
       | 0xb1 ->
         let r, rm, na = parse_modrm prefix.opsize na in
         (Cmpxchg (prefix.opsize, r, rm), na)
