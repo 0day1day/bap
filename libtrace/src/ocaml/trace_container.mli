@@ -5,9 +5,9 @@ val default_auto_finish : bool
 
 type frame = Frame_piqi.frame
 
-class writer : string -> ?frames_per_toc_entry : int64 -> ?auto_finish : bool ->
+class writer : ?frames_per_toc_entry : int64 -> ?auto_finish : bool -> string ->
 object
-  method add : frame
+  method add : frame -> unit
   method finish : unit
 end
 
