@@ -2569,6 +2569,8 @@ VOID Cleanup()
 
    LOG("Time taken: " + decstr((UINT64) (endtime - g_timer)));
 
+   exit(0);
+
 }
 
 INT32 Usage()

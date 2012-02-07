@@ -239,3 +239,6 @@ and cpptoken = parse
   | _ { 
       raise(LexError "Unexpected cpp characters")
       }
+and ruleTail acc = parse
+  | eof { acc }
+  | _* as str { ruleTail (acc^str) lexbuf }

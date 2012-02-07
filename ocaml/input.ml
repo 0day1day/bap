@@ -103,7 +103,7 @@ let get_program () =
   (*   | arg::args -> cat (List.rev_append (List.rev (get_one arg)) p) args *)
   (* in *)
   try
-    List.fold_left get_one ([], Grammar_scope.default_scope ()) (List.rev !inputs)
+    List.fold_left get_one ([], Grammar_private_scope.default_scope ()) (List.rev !inputs)
   with _ -> failwith "An exception occured while lifting"
 
 let get_stream_program () = match !streaminputs with

@@ -93,8 +93,11 @@ val get_asm_instr_string_range : asmprogram -> address_t -> address_t -> string
 val is_load : section_ptr -> bool
 val is_code : section_ptr -> bool
 
-val byte_insn_to_bap : 
+val byte_insn_to_bap :
   bfd_architecture -> address_t -> char array -> Ast.program * int64
+
+val byte_sequence_to_bap :
+  char array -> bfd_architecture -> address_t -> Ast.program list
 
 val set_print_warning : bool -> unit
 

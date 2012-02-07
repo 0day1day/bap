@@ -381,14 +381,15 @@ let rpo ~opt cfg =
         (v,e)::l
     | _ -> l
   in
-  let moves = (* extract the moves only once *)
-    (* previous: fold_postfix_component *)
-    C.G.fold_vertex
+  let moves=
+    (* This has to be in postfix order for the algorithm to be correct! *)
+    fold_postfix_component
       (fun b l ->
-         List.fold_left filter l (List.rev(C.get_stmts cfg b))
+        List.fold_left filter l (List.rev(C.get_stmts cfg b))
       )
-      cfg []
+      cfg (C.G.V.create Cfg.BB_Entry) []
   in
+
   let () = (* add all other uninitialized vars as unique *)
     let vis = object
       inherit Ssa_visitor.nop

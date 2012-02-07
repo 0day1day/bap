@@ -67,17 +67,24 @@ let ( =* ) a b   = binop XOR a (unop NOT b)
 
 let ( ++* ) a b   = concat a b
 
-let cast_low t e = Cast(CAST_LOW, t, e)
-let cast_high t e = Cast(CAST_HIGH, t, e)
-let cast_signed t e = Cast(CAST_SIGNED, t, e)
-let cast_unsigned t = function
-  | Cast(CAST_UNSIGNED, Reg t', e) when Arithmetic.bits_of_width t >= t' ->
-    Cast(CAST_UNSIGNED, t, e)
+let cast ct tnew = function
+  | Int(i,t) -> let (i',t') = Arithmetic.cast ct (i,t) tnew in
+                Int(i',t')
+  | e -> Cast(ct, tnew, e)
+
+let cast_low = cast CAST_LOW
+let cast_high = cast CAST_HIGH
+let cast_signed = cast CAST_SIGNED
+let rec cast_unsigned tnew = function
+  | Int(i,t) -> let (i',t') = Arithmetic.cast CAST_UNSIGNED (i,t) tnew in
+                Int(i',t')
+  | Cast(CAST_UNSIGNED, Reg t', e) when Arithmetic.bits_of_width tnew >= t' ->
+    (* Recurse, since we might be able to simplify e further now *)
+    cast_unsigned tnew e
   | e ->
-    Cast(CAST_UNSIGNED, t, e)
+    Cast(CAST_UNSIGNED, tnew, e)
 
 let exp_ite ?t b e1 e2 =
-  (* FIXME: were we going to add a native if-then-else thing? *)
   (* type inference shouldn't be needed when t is specified, but we're paranoid *)
   let tb = Typecheck.infer_ast ~check:false b in
   let t1 = Typecheck.infer_ast ~check:false e1 in

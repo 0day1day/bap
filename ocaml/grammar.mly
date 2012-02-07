@@ -6,13 +6,8 @@
 open Ast
 open Big_int_Z
 open Grammar_scope
+open Grammar_private_scope
 open Type
-
-let parse_error str =
-  let {Lexing.pos_fname=f; pos_lnum=sl; pos_bol=sb; pos_cnum=sc} =
-    Parsing.symbol_start_pos()
-  and {Lexing.pos_lnum=el; pos_bol=eb; pos_cnum=ec } = Parsing.symbol_end_pos() in
-  Printf.eprintf "%s:%i:%i-%i:%i: %s\n" f sl (sc-sb) el (ec-eb) str
 
 let mk_attr lab string =
   match lab with
@@ -43,7 +38,6 @@ let casttype_of_string = function
   | "high"    -> CAST_HIGH    
   | "low"     -> CAST_LOW     
   | s -> err("Unexpected cast type '"^s^"'")
-
 
 %}
 
@@ -76,7 +70,7 @@ let casttype_of_string = function
 %nonassoc IF THEN ELSE
 %left WITH
 /* If the precedence for any of these changes, pp.ml needs to be updated
-   accordingly, so that it can parethesize things properly */
+    accordingly, so that it can parethesize things properly */
 %nonassoc CONCAT
 %nonassoc EXTRACT
 %left OR
@@ -92,42 +86,42 @@ let casttype_of_string = function
 %%
 
 program: 
-| stmtlist EOF { $1 }
+      | stmtlist EOF { $1 }
 
-stmtlist:
-| revstmtlist  { List.rev $1 }
+          stmtlist:
+      | revstmtlist  { List.rev $1 }
 
-/* This is needed, because if we say stmtlist := stmt stmtlist, then the parser
-   needs to put all the stmts on a stack, since it can't process them until
-   it parses the last one. Said stack is limited to Sys.max_array_length, which
-   means than on i386, we woulddn't be able to parse a stmtlist of more than
-   about 4 million.
-   This is confirmed at
-   http://plus.kaist.ac.kr/~shoh/ocaml/ocamllex-ocamlyacc/ocamlyacc-tutorial/sec-recursive-rules.html
- */
-revstmtlist:
-| revstmtlist stmt  {  $2 :: $1 }
-| { [] }
+        /* This is needed, because if we say stmtlist := stmt stmtlist, then the parser
+      needs to put all the stmts on a stack, since it can't process them until
+        it parses the last one. Said stack is limited to Sys.max_array_length, which
+          means than on i386, we woulddn't be able to parse a stmtlist of more than
+              about 4 million.
+              This is confirmed at
+              http://plus.kaist.ac.kr/~shoh/ocaml/ocamllex-ocamlyacc/ocamlyacc-tutorial/sec-recursive-rules.html
+            */
+              revstmtlist:
+        | revstmtlist stmt  {  $2 :: $1 }
+        | { [] }
 
-stmt:
-| JMP expr attrs semi { Jmp($2, $3) }
-| CJMP expr COMMA expr COMMA expr attrs semi { CJmp($2, $4, $6, $7)  }
-| SPECIAL STRING attrs semi { Special($2, $3)}
-| lval ASSIGN expr attrs semi { Move($1, $3, $4) }
-| lval EQUAL expr attrs semi { Move($1, $3, $4) }
-| HALT expr attrs semi { Halt($2, $3) }
-| ASSERT expr attrs semi { Assert($2, $3) } 
-| LABEL ID attrs { Label(Name $2, $3) }
-| ADDR INT attrs { Label(Addr (int64_of_big_int $2), $3) }
-| COMMENT attrs { Comment($1, $2) }
+            stmt:
+        | JMP expr attrs semi { Jmp($2, $3) }
+        | CJMP expr COMMA expr COMMA expr attrs semi { CJmp($2, $4, $6, $7)  }
+        | SPECIAL STRING attrs semi { Special($2, $3)}
+        | lval ASSIGN expr attrs semi { Move($1, $3, $4) }
+        | lval EQUAL expr attrs semi { Move($1, $3, $4) }
+        | HALT expr attrs semi { Halt($2, $3) }
+        | ASSERT expr attrs semi { Assert($2, $3) } 
+        | LABEL ID attrs { Label(Name $2, $3) }
+        | ADDR INT attrs { Label(Addr (int64_of_big_int $2), $3) }
+        | COMMENT attrs { Comment($1, $2) }
 
 
-plusminusint:
-| INT { $1 }
-| MINUS INT { minus_big_int $2 }
+            plusminusint:
+        | INT { $1 }
+        | MINUS INT { minus_big_int $2 }
 
-context:
-| ID LSQUARE INT RSQUARE EQUAL INT COMMA plusminusint COMMA styp { {name=$1; mem=true; t=$10; index=int64_of_big_int $3; value=$6; usage=RD; (* XXX fix me *) taint=Taint(int_of_big_int $8)} } /* memory */
+            context:
+        | ID LSQUARE INT RSQUARE EQUAL INT COMMA plusminusint COMMA styp { {name=$1; mem=true; t=$10; index=int64_of_big_int $3; value=$6; usage=RD; (* XXX fix me *) taint=Taint(int_of_big_int $8)} } /* memory */
 | ID EQUAL INT COMMA plusminusint COMMA typ { {name=$1; mem=false; t=$7; index=0L; value=$3; usage=RD; (* XXX fix me *) taint=Taint(int_of_big_int $5)} } /* non memory */
 
 attrs:
@@ -140,7 +134,7 @@ attr:
 
 lval:
 | ID opttyp { 
-    Scope.get_lval $1 $2
+    Scope.get_lval (get_scope ()) $1 $2
   } 
 
 opttyp:
@@ -158,7 +152,7 @@ styp:
 
 
 letstart:
-| LET ID COLON typ ASSIGN expr { (Scope.add_push $2 $4, $6) }
+| LET ID COLON typ ASSIGN expr { (Scope.add_push (get_scope()) $2 $4, $6) }
 
 expr:
 | LPAREN expr RPAREN { $2 }
@@ -194,7 +188,7 @@ expr:
 | lval               { Var($1) } 
 | IF expr THEN expr ELSE expr      
       { Ite($2, $4, $6) }
-| letstart IN expr   { Scope.pop();
+| letstart IN expr   { Scope.pop (get_scope());
 		       let (x,y) = $1 in
 		       Let(x,y, $3) } 
 | EXTRACT COLON INT COLON INT COLON LSQUARE expr RSQUARE { Extract($3, $5, $8) }

@@ -12,13 +12,13 @@ let create_input_file _ =
   let out = open_out taint_file in
   output_string out "helloooooooooooooooooo\n";
   close_out out;;
-  
+
 
 let pin_trace_setup _ =
-  let args = 
-	["-t"; (gentrace_path^gentrace); "-taint-files"; taint_file; 
+  let args =
+	["-t"; (gentrace_path^gentrace); "-taint-files"; taint_file;
 	 "-o"; tag^pin_out_suffix; "--"; bof; taint_file ] in
-  let exit_code = Unix.WEXITED(1) in
+  let exit_code = Unix.WEXITED(0) in
   check_pin_setup();
   (* check_file (pin_path^pin); *)
   (* check_file (gentrace_path^gentrace); *)
@@ -28,7 +28,7 @@ let pin_trace_setup _ =
   find_pin_out (Array.to_list (Sys.readdir "./")) tag;;
 
 
-let pin_trace_test pin_out = 
+let pin_trace_test pin_out =
   let prog = Asmir.bap_from_trace_file ~pin:true pin_out in
   typecheck prog;
   Traces.consistency_check := true;
@@ -38,7 +38,7 @@ let pin_trace_test pin_out =
 
 
 (* Note: This will leave the files pin.log and pintool.log by intention *)
-let pin_trace_cleanup pin_out = 
+let pin_trace_cleanup pin_out =
   rm_and_ignore_list [pin_out ; exploit_file ; taint_file];;
 (*  Sys.remove pin_out; Sys.remove exploit_file; Sys.remove taint_file;; *)
 

@@ -5,7 +5,7 @@ export BAP_DIR=$(CURDIR)/..
 export OCAMLMAKEFILE=OCamlMakefile
 export LIBASMIR=../libasmir
 export BIGINT=$(BAP_DIR)/zarith-1.0
-export BATT=$(BAP_DIR)/batteries-1.4.0/_build/src
+export BATT=$(BAP_DIR)/batteries/_build/src
 export OUNIT=$(BAP_DIR)/ounit-1.1.0/_build/src/
 export PCRE=$(BAP_DIR)/pcre-ocaml-release-6.2.2/lib
 export OCAMLGRAPH=$(BAP_DIR)/ocamlgraph-1.8
@@ -44,6 +44,8 @@ export SOURCES = \
 	cfg.mli cfg.ml \
 	ast_visitor.mli ast_visitor.ml \
 	ast_convenience.ml \
+	grammar_scope.ml \
+	memory2array.ml \
 	reachable.mli \
 	reachable.ml \
 	prune_unreachable.mli prune_unreachable.ml \
@@ -51,7 +53,6 @@ export SOURCES = \
 	cfg_ast.mli cfg_ast.ml \
 	ssa_visitor.mli ssa_visitor.ml \
 	cfg_ssa.mli cfg_ssa.ml \
-	memory2array.ml \
 	debug_snippets.ml \
 	sccvn.mli sccvn.ml \
 	deadcode.mli deadcode.ml \
@@ -74,10 +75,11 @@ export SOURCES = \
 	yices_grammar.mly yices_lexer.mll \
 	smtexec.mli smtexec.ml \
 	solver.ml \
-	asmirconsts.ml \
+	asmir_vars.ml \
+	asmir_consts.ml \
 	asmir.mli asmir.ml \
 	asmir_rdisasm.mli asmir_rdisasm.ml \
-	grammar_scope.ml \
+	grammar_private_scope.ml \
 	grammar.mly lexer.mll \
 	parser.ml \
 	input.mli input.ml \
@@ -118,7 +120,7 @@ export PACKS = bigarray str num unix camomile threads bitstring
 # ocamlfind packages for ocamldoc
 # don't include packages in /usr/lib/ocaml, this will cause ocamldoc
 # to complain about conflicts with our local big_int
-export DOCPACKS = ocamlgraph 
+export DOCPACKS = ocamlgraph
 export YFLAGS = -v
 
 export USE_CAMLP4 = yes
@@ -185,4 +187,4 @@ runtop:	top
 include $(OCAMLMAKEFILE)
 
 bap.dot: $(DOC_FILES)
-	 ocamlfind ocamldoc -I /usr/lib/ocaml/3.10.2/ -package str,ocamlgraph,extlib,unix,sqlite3 -dot -o bap.dot -m avlsoper $(DOC_FILES)
+	 ocamlfind ocamldoc -package str,ocamlgraph,unix -dot -o bap.dot -m avlsoper $(DOC_FILES)

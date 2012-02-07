@@ -132,6 +132,7 @@ let num_exp = function
     | Let(v1,e1,e2) -> [e1;e2], [], [], [], [v1], [], [], []
     | Unknown(s1,t1) -> [], [t1], [], [], [], [s1], [], []
 
+(*
 (** quick_exp_eq e1 e2 returns true if and only if the subexpressions
     in e1 and e2 are *physically* equal. *)
 let quick_exp_eq e1 e2 =
@@ -148,6 +149,38 @@ let quick_exp_eq e1 e2 =
     let b8 = List.for_all2 (==) l8 r8 in
     if b1 & b2 & b3 & b4 & b5 & b6 & b7 & b8 then
       true else false
+*)
+
+let quick_exp_eq e1 e2 =
+  match e1, e2 with
+    | Int (i1, t1), Int (i2, t2) ->
+      t1 == t2 && i1 == i2
+    | Var v1, Var v2 ->
+      v1 == v2
+    | BinOp (op1, e11, e12), BinOp (op2, e21, e22) ->
+      op1 == op2 && e11 == e21 && e12 == e22
+    | UnOp (op1, e1), UnOp (op2, e2) ->
+      op1 == op2 && e1 == e2
+    | Cast (ct1, t1, e1), Cast (ct2, t2, e2) ->
+      ct1 == ct2 && t1 == t2 && e1 == e2
+    | Extract (h1, l1, e1), Extract (h2, l2, e2) ->
+      h1 == h2 && l1 == l2 && e1 == e2
+    | Concat (e11, e12), Concat (e21, e22) ->
+      e11 == e21 && e12 == e22
+    | Lab l1, Lab l2 ->
+      l1 == l2
+    | Ite (b11, e11, e12), Ite (b21, e21, e22) ->
+      b11 == b21 && e11 == e21 && e12 == e22
+    | Load (e11, e12, e13, t1), Load (e21, e22, e23, t2) ->
+      t1 == t2 && e11 == e21 && e12 == e22 && e13 == e23
+    | Store (e11, e12, e13, e14, t1), Store (e21, e22, e23, e24, t2) ->
+      t1 == t2 && e11 == e21 && e12 == e22 && e13 == e23 && e14 == e24
+    | Let (v1, e11, e12), Let (v2, e21, e22) ->
+      v1 == v2 && e11 == e21 && e12 == e22
+    | Unknown (s1, t1), Unknown (s2, t2) ->
+      s1 == s2 && t1 == t2
+    | _, _ ->
+      false
 
 (** full_exp_eq e1 e2 returns true if and only if e1 and e2 are
     structurally equivalent. *)

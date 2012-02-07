@@ -150,3 +150,38 @@ let repair_cfg g =
   let cfg = Cfg_ast.of_prog p in
   let cfg, entry = Cfg_ast.find_entry cfg in
   Reachable.AST.remove_unreachable cfg entry
+
+(** Rename labels so they are always unique.  This is useful for traces. *)
+let uniqueify_labels p =
+  let lh = Hashtbl.create 1000 in
+  let find_new_label l =
+    let strl = match l with
+      | Name(s) -> s
+      | Addr(a) -> Printf.sprintf "addr_%Lx" a
+    in
+    let n =
+      try (Hashtbl.find lh strl)+1
+      with Not_found -> 0 in
+    Hashtbl.replace lh strl n;
+        (* Keep the first name unique to make sure cjmptrace labels
+           don't get broken *)
+    let newname =
+      if n = 0 then strl else
+        (strl^"_unique_"^(string_of_int n))
+    in
+    Name(newname)
+  in
+  let renamelabels = object(self)
+    inherit Ast_visitor.nop
+    method visit_stmt = function
+      | Label(l, attrs) ->
+        `ChangeTo (Label(find_new_label l, attrs))
+      | _ -> `SkipChildren
+
+    method visit_exp e = match lab_of_exp e with
+    | Some l -> `ChangeToAndDoChildren (exp_of_lab (find_new_label l))
+    | None -> `DoChildren
+  end
+  in
+  Ast_visitor.prog_accept renamelabels p
+
