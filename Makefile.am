@@ -1,7 +1,3 @@
-# Owned and copyright BitBlaze, 2007. All rights reserved.
-# Do not copy, disclose, or distribute without explicit written
-# permission.
-
 if TESTS_OPT
 TESTPOSTDIRS=stpwrap
 BAPTESTDIRS=tests
@@ -12,7 +8,7 @@ PINTRACES=pintraces
 endif
 
 BAPDIRS=libasmir solvers ocaml utils $(BAPTESTDIRS) $(PINTRACES)
-SUBDIRS=protobuf piqi zarith-1.0 batteries ounit-1.1.0 pcre-ocaml-release-6.2.2 ocamlgraph-1.8 objsize-0.16 VEX $(BAPDIRS) $(TESTPOSTDIRS)
+SUBDIRS=protobuf piqi libtrace zarith-1.0 batteries ounit-1.1.0 pcre-ocaml-release-6.2.2 ocamlgraph-1.8 objsize-0.16 VEX $(BAPDIRS) $(TESTPOSTDIRS)
 
 test: all
 	$(MAKE) -C tests test

@@ -28,7 +28,7 @@ AC_PROG_OCAMLFIND
 AC_PROG_CAMLIDL
 # This isn't essential
 #AC_PROG_LATEX
-#AC_PROG_LIBTOOL
+AC_PROG_LIBTOOL
 
 # Check for Z3
 
@@ -184,6 +184,8 @@ echo "LIBASMIR_LIBS=-lasmir -lvex -lbfd -ldl -liberty" >> libasmir/makefile.inc
 AC_SUBST(ASMIR_DIR)
 ASMIR_DIR="`pwd`/libasmir"
 
+AC_SUBST(BAP_DIR)
+BAP_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 # Checks for header files.
 AC_HEADER_STDC
@@ -217,7 +219,10 @@ AM_CONDITIONAL([TESTS_OPT], [ test ! -f NOTESTS ])
 AC_CONFIG_FILES([Makefile
                  libasmir/Makefile
                  libasmir/apps/Makefile
-                 libasmir/src/Makefile])
+                 libasmir/src/Makefile
+                 libtrace/Makefile
+                 libtrace/src/Makefile
+                 libtrace/src/cpp/Makefile])
 AC_OUTPUT
 
 # Configure ocamlgraph

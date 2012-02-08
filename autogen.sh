@@ -1,3 +1,4 @@
+libtoolize
 aclocal
 autoconf
 autoheader
