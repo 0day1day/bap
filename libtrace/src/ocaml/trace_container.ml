@@ -1,3 +1,10 @@
+(** $Id$
+    Trace container implementation.
+
+    Bugs:
+    We keep track of things as Int64's, but ML's IO only uses ints.
+*)
+
 exception TraceException of string
 
 type frame = Frame_piqi.frame
@@ -18,6 +25,28 @@ let write_i64 oc i64 =
   let () = BatIO.write_i64 output i64 in
   let binary = BatIO.close_out output in
   output_string oc binary
+
+let read_i64 ic =
+  let s = "" in
+  (* Read 8 bytes into s *)
+  let () = really_input ic s (pos_in ic) 8 in
+  (* Seek ahead, because it's not automatic *)
+  let () = seek_in ic ((pos_in ic) + 8) in
+  let input = BatIO.input_string s in
+  let i = BatIO.read_i64 input in
+  let () = BatIO.close_in input in
+  i
+
+(** [foldn f i n] is f (... (f (f i n) (n-1)) ...) 0 *)
+let rec foldn64 ?(t=0L) f i n =
+  let (-) = Int64.sub in
+  match n-t with
+  | 0L -> f i n
+  | _ when n>t -> foldn64 ~t f (f i n) (n-1L)
+  | n when n == -1L -> i (* otags has trouble with '-1L' *)
+  | _ -> raise (Invalid_argument "negative index number in foldn64")
+
+(* End helpers *)
 
 class writer ?(frames_per_toc_entry = default_frames_per_toc_entry) ?(auto_finish=default_auto_finish) filename =
   (* Open the trace file *)
@@ -77,11 +106,96 @@ object(self)
     is_finished <- true
 end
 
-(* class reader filename = *)
-(* object(self) *)
-(*   method get_num_frames = num_frames *)
-(*   method seek offset = () *)
-(*   method get_frame = () *)
-(*   method get_frames = [get_frame] *)
-(*   method end_of_trace = true *)
-(* end *)
+class reader filename =
+  let ic = open_in_bin filename in
+  (* Verify magic number *)
+  let () = if read_i64 ic <> magic_number then
+      raise (TraceException "Magic number is incorrect") in
+  (* Read number of trace frames. *)
+  let num_frames = read_i64 ic in
+  (* Find offset of toc. *)
+  let toc_offset = read_i64 ic in
+  (* Find the toc. *)
+  let () = seek_in ic (Int64.to_int toc_offset) in
+  (* Read number of frames per toc entry. *)
+  let frames_per_toc_entry = read_i64 ic in
+  (* Read each toc entry. *)
+  let toc =
+    let toc_rev = foldn64
+      (fun acc _ ->
+        (read_i64 ic) :: acc
+      ) [] num_frames in
+    Array.of_list (List.rev toc_rev)
+  in
+  (* We should be at the end of the file now. *)
+  let () = assert ((pos_in ic) = (in_channel_length ic)) in
+  object(self)
+    val mutable current_frame = 0L
+
+    method get_num_frames = num_frames
+
+    method seek frame_number =
+      (* First, make sure the frame is in range. *)
+      let () = self#check_end_of_trace_num frame_number "seek to non-existant frame" in
+
+      (* Find the closest toc entry, if any. *)
+      let toc_number = Int64.div frame_number frames_per_toc_entry in
+
+      current_frame <- (match toc_number with
+      | 0L -> let () = seek_in ic (Int64.to_int first_frame_offset) in
+              0L
+      | _ -> let () = seek_in ic (Int64.to_int (Array.get toc (Int64.to_int (Int64.pred toc_number)))) in
+             Int64.mul toc_number frames_per_toc_entry);
+
+      while current_frame <> frame_number do
+        (* Read frame length and skip that far ahead. *)
+        let frame_len = read_i64 ic in
+        let () = seek_in ic (Int64.to_int (Int64.add (Int64.of_int (pos_in ic)) frame_len)) in
+        current_frame <- Int64.succ current_frame
+      done
+
+    method get_frame : frame =
+      let () = self#check_end_of_trace "get_frame on non-existant frame" in
+
+      let frame_len = read_i64 ic in
+
+      let buf = "" in
+      (* Read the frame info buf. *)
+      let () = really_input ic buf (Int64.to_int frame_len) (pos_in ic) in
+
+      let f = Frame_piqi.parse_frame (Piqirun.init_from_string buf) in
+
+      (* Skip ahead to next frame since really_input is really_retarded. *)
+      let () = seek_in ic (Int64.to_int (Int64.add (Int64.of_int (pos_in ic)) frame_len)) in
+      let () = current_frame <- Int64.succ current_frame in
+
+      f
+
+    method get_frames num_frames =
+      let () = self#check_end_of_trace "get_frame on non-existant frame" in
+
+      (* The number of frames we copy is bounded by the number of
+         frames left in the trace. *)
+      let num_frames = max num_frames (Int64.sub num_frames current_frame) in
+
+      List.rev (foldn64 (fun l _ -> self#get_frame :: l) [] num_frames)
+
+    method end_of_trace =
+      self#end_of_trace_num current_frame
+
+    method private end_of_trace_num frame_num =
+      if Int64.succ frame_num > num_frames then
+        true
+      else
+        false
+
+    method private check_end_of_trace_num frame_num msg =
+      if self#end_of_trace_num frame_num then
+        raise (TraceException msg)
+
+    method private check_end_of_trace msg =
+      if self#end_of_trace then
+        raise (TraceException msg)
+
+    initializer self#seek 0L
+  end
