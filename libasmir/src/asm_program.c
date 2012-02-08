@@ -79,7 +79,7 @@ void asmir_close(asm_program_t *p)
   // FIXME: free sections
   bfd_close_all_done(p->abfd);
   free(p);
-  vx_FreeAll();
+  //vx_FreeAll();
 }
 
 static int ignore() {

@@ -21,11 +21,6 @@
 
 #include "ir_printer.h"
 
-extern "C" 
-{
-#include "libvex.h"
-}
-
 #include "irtoir.h"
 
 using namespace std;
@@ -41,8 +36,8 @@ void usage( char *progname )
     printf("Usage: %s filename [option]\n", progname);
     printf("Options:\n");
     printf("\t0 - Print only assembly\n");
-    printf("\t1 - Print only VEX IR\n");
-    printf("\t2 - Print only Vine IR [Default]\n");
+    //    printf("\t1 - Print only VEX IR\n");
+    //printf("\t2 - Print only Vine IR [Default]\n");
 }
 
 
@@ -68,41 +63,6 @@ void print_prog_insns( asm_program_t *prog )
   }
 }
 
-
-void print_vex_ir(asm_program_t *prog, vector<bap_block_t *> vblocks )
-{
-
-    unsigned int i;
-
-    for ( i = 0; i < vblocks.size(); i++ )
-    {
-        bap_block_t *block = vblocks.at(i);
-        assert(block);
-
-        cout << endl << "VEX Block " << i << endl;
-
-        cout << "   ";
-        cout << asmir_string_of_insn(prog, block->inst);
-        cout << endl;
-
-        if ( block->vex_ir != NULL )
-            ppIRSB(block->vex_ir);
-        else
-            cout << "   Unhandled by VEX" << endl;
-
-    }
-}
-
-
-
-void print_prog_ir(asm_program_t *prog)
-{
-  vector<bap_block_t *> bap_blocks = generate_vex_ir(prog);    
-  bap_blocks = generate_bap_ir(prog, bap_blocks);
-
-  //print_globals();
-  print_bap_ir(prog, bap_blocks);
-}
 
 //======================================================================
 //
@@ -137,47 +97,47 @@ int main(int argc, char *argv[])
     assert(prog);
 
 
-    if(print_option == '2'){
-      print_prog_ir(prog);
-      return 0;
-    }
+    // if(print_option == '2'){
+    //   print_prog_ir(prog);
+    //   return 0;
+    // }
 
     //
     // Translate asm to VEX IR
     //
-    cerr << "Translating asm to VEX IR." << endl;
-    if ( print_option > '0' )
-    {
-        bap_blocks = generate_vex_ir(prog);
-    }
+    // cerr << "Translating asm to VEX IR." << endl;
+    // if ( print_option > '0' )
+    // {
+    //     bap_blocks = generate_vex_ir(prog);
+    // }
 
-    //
-    // Translate VEX IR to Vine IR
-    //
-    cerr << "Translating VEX IR to Vine IR." << endl;
-    if ( print_option > '1' )
-    {
-      bap_blocks = generate_bap_ir(prog, bap_blocks);
-    }
+    // //
+    // // Translate VEX IR to Vine IR
+    // //
+    // cerr << "Translating VEX IR to Vine IR." << endl;
+    // if ( print_option > '1' )
+    // {
+    //   bap_blocks = generate_bap_ir(prog, bap_blocks);
+    // }
 
     cerr << "Printing output:" << endl;
-    // 
-    // Print all the instructions in the disassembled program
-    //
+    // // 
+    // // Print all the instructions in the disassembled program
+    // //
     if ( print_option == '0' )
-        print_prog_insns(prog);
+         print_prog_insns(prog);
 
-    //
-    // Print the VEX IR output
-    //
-    else if ( print_option == '1' )
-      print_vex_ir(prog, bap_blocks);
+    // //
+    // // Print the VEX IR output
+    // //
+    // else if ( print_option == '1' )
+    //   print_vex_ir(prog, bap_blocks);
 
-    //
-    // Print the Vine IR output
-    //
-    else if ( print_option == '2' )
-      print_bap_ir(prog, bap_blocks);
+    // //
+    // // Print the Vine IR output
+    // //
+    // else if ( print_option == '2' )
+    //   print_bap_ir(prog, bap_blocks);
 
 
     //

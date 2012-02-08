@@ -167,25 +167,25 @@ byte_insn_to_asmp(bfd_architecture arch, address_t addr, unsigned char *bb_bytes
 
 
 // moved from ir_program.cpp
-bap_block_t* asmir_addr_to_bap(asm_program_t *p, address_t addr, address_t *next)
-{
+// bap_block_t* asmir_addr_to_bap(asm_program_t *p, address_t addr, address_t *next)
+// {
 
-  // Set longjmp to handle possible VEX errors
-  jmp_buf_set = 1;
-  if (setjmp(vex_error) != 0) {
-    /* There was an exception */
-    jmp_buf_set = 0;
-    cerr << "There was an exception in asmir_addr_to_bap" << endl;
-    return NULL;
-  }
+//   // Set longjmp to handle possible VEX errors
+//   jmp_buf_set = 1;
+//   if (setjmp(vex_error) != 0) {
+//     /* There was an exception */
+//     jmp_buf_set = 0;
+//     cerr << "There was an exception in asmir_addr_to_bap" << endl;
+//     return NULL;
+//   }
   
-  translate_init();
-  bap_block_t * bap_block = generate_vex_ir(p, addr);
-  generate_bap_ir_block(p, bap_block);
-  if (next)
-      *next = addr + asmir_get_instr_length(p, addr);
-  return bap_block;
-}
+//   translate_init();
+//   bap_block_t * bap_block = generate_vex_ir(p, addr);
+//   generate_bap_ir_block(p, bap_block);
+//   if (next)
+//       *next = addr + asmir_get_instr_length(p, addr);
+//   return bap_block;
+// }
 
 bap_blocks_t * asmir_bap_from_trace_file(char * filename, 
                                          uint64_t offset,

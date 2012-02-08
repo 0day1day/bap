@@ -9,6 +9,8 @@
 
 typedef struct bap_block_s bap_block_t;
 
+typedef  unsigned long long int   ULong;
+typedef  ULong     Addr64;
 
 //
 // VEX headers (inside Valgrind/VEX/pub)
@@ -16,7 +18,6 @@ typedef struct bap_block_s bap_block_t;
 
 #include "pin_frame.h"
 #include "asm_program.h"
-#include "vexmem.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -24,7 +25,6 @@ extern "C"
 #endif
 
 
-#include "libvex.h"
 
 #ifdef __cplusplus
 }
@@ -42,93 +42,13 @@ extern "C"
 struct bap_block_s
 {
   bfd_vma         inst;
-  IRSB            *vex_ir;
+    //  IRSB            *vex_ir;
   vector<Stmt *>  *bap_ir;
 };
 
-
-
-
-//======================================================================
-// 
-// Translation functions. These should not be used directly unless you
-// understand exactly how they work and have a specific need for them.
-// If you just wanna translate a program, see generate_vex_ir and 
-// generate_bap_ir at the bottom. They wrap these functions and
-// provide an easier interface for translation. 
-//
-//======================================================================
-
-extern "C" {
-//
-// Initializes VEX. This function must be called before translate_insn
-// can be used. 
-// vexir.c
-void translate_init();
-
-//
-// Translates 1 asm instruction (in byte form) into a block of VEX IR
-//
-// \param insn_start Pointer to bytes of instruction
-// \param insn_addr Address of the instruction in its own address space
-// \return An IRSB containing the VEX IR translation of the given instruction
-// vexir.c
-IRSB *translate_insn( VexArch guest, unsigned char *insn_start, unsigned int insn_addr );
-}
-
-
-//======================================================================
-// 
-// Utility functions that wrap the raw translation functions.
-// These are what should be used to do the actual translation.
-// See print-ir.cpp in ../../apps for examples of how to use these.
-//
-//======================================================================
-
-
-// Take an instrs and translate it into a VEX IR block
-// and store it in a bap block
-//bap_block_t* generate_vex_ir(VexArch guest, Instruction *inst);
-bap_block_t* generate_vex_ir(asm_program_t *prog, address_t inst);
-
-//
-// Take a vector of instrs and translate it into VEX IR blocks
-// and store them in a vector of bap blocks
-//
-// \param instrs the list of instructions to translate
-// \return A vector of bap blocks. Only the inst and vex_ir fields in
-//         the bap block are valid at this point.
-//
-
-//vector<bap_block_t *> generate_vex_ir(asm_program_t *prog, const vector<Instruction *> &instrs);
-
-//
-// Take a disassembled function and translate it into VEX IR blocks
-// and store them in a vector of bap blocks
-//
-// \param func A disassembled function
-// \return A vector of bap blocks. Only the inst and vex_ir fields in
-//         the bap block are valid at this point.
-//
-//vector<bap_block_t *> generate_vex_ir(asm_program_t *prog, asm_function_t *func);
-
-//
-// Take a disassembled program and translate it into VEX IR blocks
-// and store them in a vector of bap blocks
-//
-// \param prog A disassembled program
-// \return A vector of bap blocks. Only the inst and vex_ir fields in
-//         the bap block are valid at this point.
-//
-vector<bap_block_t *> generate_vex_ir( asm_program_t *prog );
-
-// Same as generate_vex_ir, but only for an address range
-vector<bap_block_t *> generate_vex_ir(asm_program_t *prog,
-					address_t start,
-					address_t end);
-
 // Take a bap block that has gone through VEX translation and translate it
 // to Vine IR.
+// *DEPRECIATED*
 void generate_bap_ir_block( asm_program_t *prog, bap_block_t *block );
 
 //
@@ -140,13 +60,6 @@ void generate_bap_ir_block( asm_program_t *prog, bap_block_t *block );
 //
 vector<bap_block_t *> generate_bap_ir( asm_program_t *prog, vector<bap_block_t *> vblocks );
 
-
-VexArch vexarch_of_bfdarch(bfd_architecture arch);
-
-// Get global variables declaractions for this arch
-//vector<VarDecl *> get_reg_decls(VexArch arch);
-
-
 extern "C" {
   typedef struct vector<bap_block_t *> bap_blocks_t;
 
@@ -154,7 +67,7 @@ extern "C" {
   struct bap_block_s
   {
     bfd_vma         inst;
-    IRSB            *vex_ir;
+      //    IRSB            *vex_ir;
     struct vector_Stmt  *bap_ir;
   };
 
@@ -180,7 +93,6 @@ extern "C" {
   /* extern bap_blocks_t * asmir_asmprogram_to_bap(asm_program_t *prog); */
   /* extern bap_blocks_t * asmir_asmprogram_range_to_bap(asm_program_t *prog, address_t start, address_t end); */
   extern asm_program_t* byte_insn_to_asmp(bfd_architecture arch, address_t addr, unsigned char *bb_bytes, unsigned int len);
-  extern bap_block_t* asmir_addr_to_bap(asm_program_t *p, address_t addr, address_t *next);
 
   extern int asmir_bap_blocks_size(bap_blocks_t *bs);
   extern bap_block_t * asmir_bap_blocks_get(bap_blocks_t *bs, int i);

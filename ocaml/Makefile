@@ -125,15 +125,15 @@ export YFLAGS = -v
 
 export USE_CAMLP4 = yes
 
-export CLIBS = asmir vex opcodes bfd iberty stdc++
+export CLIBS = asmir opcodes bfd iberty stdc++
 export CLIBS += $(SOLVER_CLIBS)
 export CFLAGS = -g
 export LDFLAGS = $(LIBASMIR_LDFLAGS) $(SOLVER_LDFLAGS)
 export PPFLAGS = $(SOLVER_PPFLAGS)
 export INCDIRS = $(BIGINT) $(BATT) $(OUNIT) $(PCRE) $(OCAMLGRAPH) $(OBJSIZE)
 export LIBS = zarith batteries oUnit pcre graph objsize
-export RESULTDEPS = $(LIBASMIR)/src/libasmir.a $(VEX_DIR)/libvex.a
-export LIBDIRS = $(LIBASMIR)/src $(VEX_DIR)
+export RESULTDEPS = $(LIBASMIR)/src/libasmir.a 
+export LIBDIRS = $(LIBASMIR)/src 
 export LIBDIRS += $(SOLVER_LIBDIRS)
 
 OCAMLLDFLAGS = -thread # just for make top

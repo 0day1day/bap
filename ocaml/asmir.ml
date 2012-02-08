@@ -520,55 +520,31 @@ let get_asm = function
 
 (** Translate only one address of a  Libasmir.asm_program_t to Vine *)
 let asm_addr_to_bap {asmp=prog; arch=arch; get=get} addr =
-  let fallback() =
-    let g = gamma_for_arch arch in
-    let (block, next) = Libasmir.asmir_addr_to_bap prog addr in
-    if Libasmir.asmir_bap_block_error block then
-      (* We are unable to lift this address. Decode errors are
-         converted to a Special("VEX Decode Error"), so this is a
-         non-Decode error.
-
-         Unfortunately, we get no idea of the instruction length when
-         this happens, so we'll optimistically increase by one.  *)
-      let asm = Libasmir.asmir_string_of_insn prog addr in
-      (Disasm_i386.ToIR.add_labels ~asm addr (Special("VEX General Error", [])::[]), Int64.succ addr)
-    else
-      (* Success: vine gave us a block to translate *)
-      let ir = tr_bap_block_t g prog block in
-      destroy_bap_block block;
-      (ir, next)
-  in
-  if (!always_vex) then fallback() 
-  else (
-    try 
-      let (ir,na) as v = 
-	(try (Disasm.disasm_instr arch get addr)
-	 with Disasm_i386.Disasm_i386_exception s -> 
-	   DTest.dprintf "BAP unknown disasm_instr %Lx: %s" addr s;
-	   DV.dprintf "disasm_instr %Lx: %s" addr s; raise Disasm.Unimplemented
-	)
-      in
-      DV.dprintf "Disassembled %Lx directly" addr;
-      (* if DCheck.debug then check_equivalence addr v (fallback()); *)
-	  (* If we don't have a string disassembly, use binutils disassembler *)
-      (match ir with
-      | Label(l, [])::rest ->
-		(Label(l, [Asm(Libasmir.asmir_string_of_insn prog addr)])::rest,
-		 na)
-      | _ -> v)
-	with Disasm.Unimplemented ->
-      DV.dprintf "Disassembling %Lx through VEX" addr;
-      fallback()
+  (try 
+     let (ir,na) as v = Disasm.disasm_instr arch get addr in
+     DV.dprintf "Disassembled %Lx directly" addr;
+     (match ir with
+     | Label(l, [])::rest ->
+       (Label(l, [Asm(Libasmir.asmir_string_of_insn prog addr)])::rest,
+	na)
+     | _ -> v)
+   with Disasm_i386.Disasm_i386_exception s -> 
+     DTest.dprintf "BAP unknown disasm_instr %Lx: %s" addr s;
+     DV.dprintf "disasm_instr %Lx: %s" addr s; 
+     ([Special(Printf.sprintf "Unknown instruction at %Lx: %s " addr s, []);
+       Comment("All blocks must have two statements", [])],
+      Int64.succ addr)
   )
 
 let flatten ll =
 	List.rev (List.fold_left (fun accu l -> List.rev_append l accu) [] ll)
 
-(* asmprogram_to_bap_range p st en will read bytes at [st,en) from p and translate them to bap *)
+(* asmprogram_to_bap_range p st en will read bytes at [st,en) from p and 
+   translate them to bap *)
 let asmprogram_to_bap_range ?(init_ro = false) p st en =
   let rec f l s =
     (* This odd structure is to ensure tail-recursion *)
-    let t = 
+    let t =
       try Some(asm_addr_to_bap p s)
       with Memory_error -> None in
     match t with
@@ -591,8 +567,8 @@ let asmprogram_section_to_bap p s =
 
 (** Translate an entire Libasmir.asm_program_t into a Vine program *)
 let asmprogram_to_bap ?(init_ro=false) p =
-  let irs = List.map 
-	(fun s -> 
+  let irs = List.map
+	(fun s ->
 	  if is_code s then asmprogram_section_to_bap p s else []) p.secs in
   let ir = flatten irs in
   if init_ro then
@@ -675,8 +651,6 @@ let alt_bap_from_trace_file_range filename off reqframes =
   in
   let c = ref true in
   let revstmts = ref [] in
-  (* flush VEX buffers *)
-  let () = Libasmir.asmir_free_vex_buffers () in
   let trace_frames = 
 	Libasmir.asmir_frames_from_trace_file filename !off reqframes in
   let numframes = Libasmir.asmir_frames_length trace_frames in

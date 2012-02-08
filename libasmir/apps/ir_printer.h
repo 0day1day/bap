@@ -17,11 +17,6 @@
 
 #include "ir_printer.h"
 
-extern "C" 
-{
-#include "libvex.h"
-}
-
 #include "irtoir.h"
 //#include "typecheck_ir.h"
 //#include "irdeendianizer.h"

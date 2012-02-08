@@ -6,7 +6,7 @@
 
 //#include "typecheck_ir.h"
 #include "irtoir-internal.h"
-#include "libvex_guest_x86.h"
+//#include "libvex_guest_x86.h"
 
 //
 // Register offsets, copied from VEX/priv/guest_x86/toIR.c

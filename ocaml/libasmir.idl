@@ -171,7 +171,7 @@ void destroy_memory_data(memory_data_t md);
 //bap_blocks_t asmir_asmprogram_range_to_bap(asm_program_t prog, address_t start, address_t end);
 boolean asmir_bap_blocks_error(bap_blocks_t b);
 boolean asmir_bap_block_error(bap_block_t b);
-bap_block_t asmir_addr_to_bap(asm_program_t p, address_t addr, [out] address_t *next);
+
 address_t asmir_get_sec_startaddr(asm_program_t p, [string] const char *sectionname);
 address_t asmir_get_sec_endaddr(asm_program_t p, [string] const char *sectionname);
 address_t asmir_get_start_addr(asm_program_t p);
@@ -222,6 +222,3 @@ byte_insn_to_ir_c(address_t addr, [size_is(len)] char *bb_bytes, int len);
 asm_program_t
 byte_insn_to_asmp(enum bfd_architecture arch, address_t addr,
 		  [size_is(len)] char *bb_bytes, int len);
-
-// free vex buffers
-void asmir_free_vex_buffers(void);

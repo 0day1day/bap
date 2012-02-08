@@ -12,7 +12,7 @@ PINTRACES=pintraces
 endif
 
 BAPDIRS=libasmir solvers ocaml utils $(BAPTESTDIRS) $(PINTRACES)
-SUBDIRS=zarith-1.0 batteries ounit-1.1.0 pcre-ocaml-release-6.2.2 ocamlgraph-1.8 objsize-0.16 VEX $(BAPDIRS) $(TESTPOSTDIRS)
+SUBDIRS=zarith-1.0 batteries ounit-1.1.0 pcre-ocaml-release-6.2.2 ocamlgraph-1.8 objsize-0.16 $(BAPDIRS) $(TESTPOSTDIRS)
 
 test: all
 	$(MAKE) -C tests test
