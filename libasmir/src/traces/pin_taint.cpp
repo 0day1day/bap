@@ -337,6 +337,7 @@ std::vector<TaintFrame> TaintTracker::recvHelper(uint32_t fd, void *ptr, size_t 
     cerr << "Tainting " << len << " bytes of recv @" << addr << endl;
     return introMemTaintFromFd(fd, addr, len);
   } else {
+    /* Empty vector */
     std::vector<TaintFrame> tfs;
     return tfs;
   }
@@ -461,7 +462,7 @@ std::vector<TaintFrame> TaintTracker::taintEnv(char **env)
 #endif
 
 /** This function is called right before a system call. */
-bool TaintTracker::taintPreSC(uint32_t callno, uint32_t *args, /* out */ uint32_t &state)
+bool TaintTracker::taintPreSC(uint32_t callno, const uint64_t *args, /* out */ uint32_t &state)
 {
   //cout << "Syscall no: " << callno << endl << "Args:" ;
   //for ( int i = 0 ; i < MAX_SYSCALL_ARGS ; i ++ )
@@ -605,7 +606,7 @@ bool TaintTracker::taintPreSC(uint32_t callno, uint32_t *args, /* out */ uint32_
 
  /** This function is called immediately following a system call. */
 std::vector<TaintFrame> TaintTracker::taintPostSC(const uint32_t bytes, 
-                                     uint32_t *args,
+                                     const uint64_t *args,
                                      uint32_t &addr,
                                      uint32_t &length,
 				     const uint32_t state)

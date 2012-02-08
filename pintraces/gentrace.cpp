@@ -301,7 +301,7 @@ static bool dontLog(ADDRINT addr) {
 typedef struct SyscallInfo_s {
 
   /** Frame for system call */
-  SyscallFrame sf;
+  frame sf;
 
   /** State shared between taintIntro and taintStart */
   uint32_t state;
@@ -697,7 +697,7 @@ VOID FlushInstructions()
 
       f.values_count = newcnt;
 
-      g_tw->add(f);
+      //      g_tw->add(f);
       g_twnew->add(fnew);
    }
 
@@ -2221,19 +2221,16 @@ VOID SyscallEntry(THREADID tid, CONTEXT *ctx, SYSCALL_STANDARD std, VOID *v)
   //  if (!g_active) return;
 
   // Get the address from instruction pointer (should be EIP).
-  si.sf.addr = (uint32_t) PIN_GetContextReg(ctx, REG_INST_PTR);
-  
-  si.sf.tid = tid;
-  
-  si.sf.callno = (uint32_t) PIN_GetSyscallNumber(ctx, std);
-  
+  si.sf.mutable_syscall_frame()->set_address(PIN_GetContextReg(ctx, REG_INST_PTR));
+
+  si.sf.mutable_syscall_frame()->set_thread_id(tid);
+
+  si.sf.mutable_syscall_frame()->set_number(PIN_GetSyscallNumber(ctx, std));
+
   for (int i = 0; i < MAX_SYSCALL_ARGS; i++)
   {
     if (i < PLAT_SYSCALL_ARGS) {
-      si.sf.args[i] = 
-        (uint32_t) PIN_GetSyscallArgument(ctx, std, i);
-    } else {
-        si.sf.args[i] = (uint32_t)NULL;
+      si.sf.mutable_syscall_frame()->mutable_argument_list()->add_elem(PIN_GetSyscallArgument(ctx, std, i));
     }
   }
 
@@ -2248,10 +2245,10 @@ VOID SyscallEntry(THREADID tid, CONTEXT *ctx, SYSCALL_STANDARD std, VOID *v)
   FlushBuffer(true, ctx, tid, false);
 
   if (LogAllSyscalls.Value()) {
-    g_tw->add(si.sf);
+    g_twnew->add(si.sf);
   }
   
-  if (tracker->taintPreSC(si.sf.callno, si.sf.args, si.state)) {
+  if (tracker->taintPreSC(si.sf.mutable_syscall_frame()->number(), (const uint64_t *) (si.sf.syscall_frame().argument_list().elem().data()), si.state)) {
     // Do we need to do anything here? ...
   }
   
@@ -2290,7 +2287,7 @@ VOID SyscallExit(THREADID tid, CONTEXT *ctx, SYSCALL_STANDARD std, VOID *v)
   
   // Check to see if we need to introduce tainted bytes as a result of this
   // sytem call
-  std::vector<TaintFrame> tfs = tracker->taintPostSC(PIN_GetSyscallReturn(ctx, std), si.sf.args, addr, length, si.state);
+  std::vector<TaintFrame> tfs = tracker->taintPostSC(PIN_GetSyscallReturn(ctx, std), (const uint64_t*) (si.sf.syscall_frame().argument_list().elem().data()), addr, length, si.state);
 
   if (tfs.size() > 0) {
     if (!g_taint_introduced) {

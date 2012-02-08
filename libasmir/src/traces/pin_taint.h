@@ -97,10 +97,10 @@ namespace pintrace { // We will use namespace to avoid collision
      /** A function to introduce taint in the contexts. Writes
 	 information to state; this state must be passed to
 	 taintIntro */
-     bool taintPreSC(uint32_t callno, uint32_t * args, uint32_t &state);
+     bool taintPreSC(uint32_t callno, const uint64_t * args, uint32_t &state);
 
      std::vector<TaintFrame> taintPostSC(const uint32_t bytes, 
-                            uint32_t * args, 
+                            const uint64_t * args, 
                             uint32_t &addr,
                             uint32_t &length,
 			    const uint32_t state);
