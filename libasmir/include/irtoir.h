@@ -12,22 +12,10 @@ typedef struct bap_block_s bap_block_t;
 typedef  unsigned long long int   ULong;
 typedef  ULong     Addr64;
 
-//
-// VEX headers (inside Valgrind/VEX/pub)
-//
-
 #include "pin_frame.h"
 #include "asm_program.h"
 
 #ifdef __cplusplus
-extern "C"
-{
-#endif
-
-
-
-#ifdef __cplusplus
-}
 
 #include <vector>
 
@@ -36,13 +24,11 @@ extern "C"
 //
 // A struct that encapsulates the stages of translation of 1 asm instruction.
 // inst is the original instruction.
-// vex_ir is inst translated into a block of VEX IR.
 // bap_ir is inst translated into a block of Vine IR from its VEX IR translation.
 //
 struct bap_block_s
 {
   bfd_vma         inst;
-    //  IRSB            *vex_ir;
   vector<Stmt *>  *bap_ir;
 };
 
@@ -67,7 +53,6 @@ extern "C" {
   struct bap_block_s
   {
     bfd_vma         inst;
-      //    IRSB            *vex_ir;
     struct vector_Stmt  *bap_ir;
   };
 
@@ -77,16 +62,6 @@ extern "C" {
 
   extern void asmir_set_print_warning(bool value);
   extern bool asmir_get_print_warning();
-
-  /*
-  /// Enable/disable eflags thunks code. 
-  extern void set_use_eflags_thunks(bool value);
-  extern bool get_use_eflags_thunks();
-  /// If 1, calls/returns translated as Call/Return.
-  /// If 0, calls/returns translated as Jmp
-  extern void set_call_return_translation(int value);
-  extern Stmt** gen_eflags_helpers_c();
-  */
 
   extern void asmir_set_use_simple_segments(bool value);
 
