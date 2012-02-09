@@ -1,6 +1,9 @@
 AM_CXXFLAGS = -I./pb -I@BAP_DIR@/protobuf/src
+AM_CXXFLAGS += -m32
 
-# Build a libtool library
-lib_LTLIBRARIES = libtrace.la
-libtrace_la_SOURCES = pb/frame.piqi.pb.h trace.container.cpp
+lib_LIBRARIES = libtrace.a
+libtrace_a_SOURCES = pb/frame.piqi.pb.h pb/frame.piqi.pb.cc trace.container.cpp
 
+# Don't auto-link LIBS coming from autoconf, because we might not have
+# 32-bit equivalents!
+LIBS =
