@@ -63,7 +63,7 @@ let total_blocks_regexp = regexp "^Trace(Eval|s): Running block: ([0-9]+)";;
 let trace_count_regexp = regexp "^LongNightly: Processing trace-file";;
 
 (* regexps for matching incorrect and unknown assembley instructions *)
-let bap_regexp = regexp "^AsmirTest: BAP unknown disasm_instr \S+: disasm_i386: unimplemented feature: unsupported opcode: (.*)$";;
+let bap_regexp = regexp "^AsmirTest: BAP unknown disasm_instr \S+: (.*)$";;
 let vex_regexp = regexp "vex x86->IR: unhandled instruction bytes: (.*)$";;
 let trace_eval_regexp = regexp "^WARNING \(Trace(Eval|s)\): Difference between BAP and trace values for \[\*(R_\S*)\* Trace=(\S*) Eval=(\S*)\]";;
 let trace_eval_regexp2 = regexp "^WARNING \(Trace(Eval|s)\): This is due to one of the following statments:";;
