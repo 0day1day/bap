@@ -22,6 +22,10 @@
          .module modloadframe
 ]
 
+.include [
+         .module keyframe
+]
+
 % Holder of any type of frame
 .variant [
          .name frame
@@ -44,5 +48,9 @@
 
          .option [
                  .type modload-frame
+         ]
+
+         .option [
+                 .type key-frame
          ]
 ]

@@ -13,6 +13,10 @@ module rec Frame_piqi :
                    | `taint_multiple
                  ]
                
+               type value_source_tag =
+                 [ | `no_thread_id | `thread_id of Frame_piqi.thread_id
+                 ]
+               
                type frame =
                  [
                    | `std_frame of Frame_piqi.std_frame
@@ -20,6 +24,7 @@ module rec Frame_piqi :
                    | `exception_frame of Frame_piqi.exception_frame
                    | `taint_intro_frame of Frame_piqi.taint_intro_frame
                    | `modload_frame of Frame_piqi.modload_frame
+                   | `key_frame of Frame_piqi.key_frame
                  ]
                
                type uint64 = int64
@@ -36,8 +41,6 @@ module rec Frame_piqi :
                
                type exception_number = Frame_piqi.uint64
                
-               type std_frame = Std_frame.t
-               
                type operand_list = Frame_piqi.operand_info list
                
                type operand_info = Operand_info.t
@@ -47,6 +50,8 @@ module rec Frame_piqi :
                type mem_operand = Mem_operand.t
                
                type operand_usage = Operand_usage.t
+               
+               type std_frame = Std_frame.t
                
                type syscall_frame = Syscall_frame.t
                
@@ -64,18 +69,17 @@ module rec Frame_piqi :
                
                type modload_frame = Modload_frame.t
                
+               type key_frame = Key_frame.t
+               
+               type tagged_value_lists = Frame_piqi.tagged_value_list list
+               
+               type tagged_value_list = Tagged_value_list.t
+               
+               type value_list = Frame_piqi.value_info list
+               
+               type value_info = Value_info.t
+               
              end = Frame_piqi
-and
-  Std_frame :
-    sig
-      type t =
-        { mutable address : Frame_piqi.address;
-          mutable thread_id : Frame_piqi.thread_id;
-          mutable rawbytes : Frame_piqi.binary;
-          mutable operand_list : Frame_piqi.operand_list
-        }
-      
-    end = Std_frame
 and
   Operand_info :
     sig
@@ -103,6 +107,17 @@ and
         }
       
     end = Operand_usage
+and
+  Std_frame :
+    sig
+      type t =
+        { mutable address : Frame_piqi.address;
+          mutable thread_id : Frame_piqi.thread_id;
+          mutable rawbytes : Frame_piqi.binary;
+          mutable operand_list : Frame_piqi.operand_list
+        }
+      
+    end = Std_frame
 and
   Syscall_frame :
     sig
@@ -149,6 +164,32 @@ and
         }
       
     end = Modload_frame
+and
+  Key_frame :
+    sig
+      type t = { mutable tagged_value_lists : Frame_piqi.tagged_value_lists }
+      
+    end = Key_frame
+and
+  Tagged_value_list :
+    sig
+      type t =
+        { mutable value_source_tag : Frame_piqi.value_source_tag;
+          mutable value_list : Frame_piqi.value_list
+        }
+      
+    end = Tagged_value_list
+and
+  Value_info :
+    sig
+      type t =
+        { mutable operand_info_specific : Frame_piqi.operand_info_specific;
+          mutable bit_length : Frame_piqi.bit_length;
+          mutable taint_info : Frame_piqi.taint_info option;
+          mutable value : Frame_piqi.binary
+        }
+      
+    end = Value_info
   
 include Frame_piqi
   
@@ -172,21 +213,6 @@ and parse_taint_id x = parse_uint64 x
 and packed_parse_taint_id x = packed_parse_uint64 x
 and parse_exception_number x = parse_uint64 x
 and packed_parse_exception_number x = packed_parse_uint64 x
-and parse_std_frame x =
-  let x = Piqirun.parse_record x in
-  let (_address, x) = Piqirun.parse_required_field 1 parse_address x in
-  let (_thread_id, x) = Piqirun.parse_required_field 2 parse_thread_id x in
-  let (_rawbytes, x) = Piqirun.parse_required_field 3 parse_binary x in
-  let (_operand_list, x) =
-    Piqirun.parse_required_field 4 parse_operand_list x
-  in
-    (Piqirun.check_unparsed_fields x;
-     {
-       Std_frame.address = _address;
-       Std_frame.thread_id = _thread_id;
-       Std_frame.rawbytes = _rawbytes;
-       Std_frame.operand_list = _operand_list;
-     })
 and parse_operand_list x = Piqirun.parse_list parse_operand_info x
 and parse_operand_info x =
   let x = Piqirun.parse_record x in
@@ -243,6 +269,21 @@ and parse_taint_info x =
     | 2 -> let res = parse_taint_id x in `taint_id res
     | 3 when x = (Piqirun.Varint 1) -> `taint_multiple
     | _ -> Piqirun.error_variant x code
+and parse_std_frame x =
+  let x = Piqirun.parse_record x in
+  let (_address, x) = Piqirun.parse_required_field 1 parse_address x in
+  let (_thread_id, x) = Piqirun.parse_required_field 2 parse_thread_id x in
+  let (_rawbytes, x) = Piqirun.parse_required_field 3 parse_binary x in
+  let (_operand_list, x) =
+    Piqirun.parse_required_field 4 parse_operand_list x
+  in
+    (Piqirun.check_unparsed_fields x;
+     {
+       Std_frame.address = _address;
+       Std_frame.thread_id = _thread_id;
+       Std_frame.rawbytes = _rawbytes;
+       Std_frame.operand_list = _operand_list;
+     })
 and parse_syscall_frame x =
   let x = Piqirun.parse_record x in
   let (_address, x) = Piqirun.parse_required_field 1 parse_address x in
@@ -303,6 +344,48 @@ and parse_modload_frame x =
        Modload_frame.low_address = _low_address;
        Modload_frame.high_address = _high_address;
      })
+and parse_key_frame x =
+  let x = Piqirun.parse_record x in
+  let (_tagged_value_lists, x) =
+    Piqirun.parse_required_field 1 parse_tagged_value_lists x
+  in
+    (Piqirun.check_unparsed_fields x;
+     { Key_frame.tagged_value_lists = _tagged_value_lists; })
+and parse_tagged_value_lists x = Piqirun.parse_list parse_tagged_value_list x
+and parse_tagged_value_list x =
+  let x = Piqirun.parse_record x in
+  let (_value_source_tag, x) =
+    Piqirun.parse_required_field 1 parse_value_source_tag x in
+  let (_value_list, x) = Piqirun.parse_required_field 2 parse_value_list x
+  in
+    (Piqirun.check_unparsed_fields x;
+     {
+       Tagged_value_list.value_source_tag = _value_source_tag;
+       Tagged_value_list.value_list = _value_list;
+     })
+and parse_value_source_tag x =
+  let (code, x) = Piqirun.parse_variant x
+  in
+    match code with
+    | 1 when x = (Piqirun.Varint 1) -> `no_thread_id
+    | 2 -> let res = parse_thread_id x in `thread_id res
+    | _ -> Piqirun.error_variant x code
+and parse_value_list x = Piqirun.parse_list parse_value_info x
+and parse_value_info x =
+  let x = Piqirun.parse_record x in
+  let (_operand_info_specific, x) =
+    Piqirun.parse_required_field 1 parse_operand_info_specific x in
+  let (_bit_length, x) = Piqirun.parse_required_field 2 parse_bit_length x in
+  let (_taint_info, x) = Piqirun.parse_optional_field 3 parse_taint_info x in
+  let (_value, x) = Piqirun.parse_required_field 4 parse_binary x
+  in
+    (Piqirun.check_unparsed_fields x;
+     {
+       Value_info.operand_info_specific = _operand_info_specific;
+       Value_info.bit_length = _bit_length;
+       Value_info.taint_info = _taint_info;
+       Value_info.value = _value;
+     })
 and parse_frame x =
   let (code, x) = Piqirun.parse_variant x
   in
@@ -312,6 +395,7 @@ and parse_frame x =
     | 3 -> let res = parse_exception_frame x in `exception_frame res
     | 4 -> let res = parse_taint_intro_frame x in `taint_intro_frame res
     | 5 -> let res = parse_modload_frame x in `modload_frame res
+    | 6 -> let res = parse_key_frame x in `key_frame res
     | _ -> Piqirun.error_variant x code
   
 let rec gen__uint64 code x = Piqirun.int64_to_varint code x
@@ -334,18 +418,6 @@ and gen__taint_id code x = gen__uint64 code x
 and packed_gen__taint_id x = packed_gen__uint64 x
 and gen__exception_number code x = gen__uint64 code x
 and packed_gen__exception_number x = packed_gen__uint64 x
-and gen__std_frame code x =
-  let _address =
-    Piqirun.gen_required_field 1 gen__address x.Std_frame.address in
-  let _thread_id =
-    Piqirun.gen_required_field 2 gen__thread_id x.Std_frame.thread_id in
-  let _rawbytes =
-    Piqirun.gen_required_field 3 gen__binary x.Std_frame.rawbytes in
-  let _operand_list =
-    Piqirun.gen_required_field 4 gen__operand_list x.Std_frame.operand_list
-  in
-    Piqirun.gen_record code
-      [ _address; _thread_id; _rawbytes; _operand_list ]
 and gen__operand_list code x = Piqirun.gen_list gen__operand_info code x
 and gen__operand_info code x =
   let _operand_info_specific =
@@ -389,6 +461,18 @@ and gen__taint_info code (x : Frame_piqi.taint_info) =
        | `no_taint -> Piqirun.gen_bool_field 1 true
        | `taint_id x -> gen__taint_id 2 x
        | `taint_multiple -> Piqirun.gen_bool_field 3 true) ]
+and gen__std_frame code x =
+  let _address =
+    Piqirun.gen_required_field 1 gen__address x.Std_frame.address in
+  let _thread_id =
+    Piqirun.gen_required_field 2 gen__thread_id x.Std_frame.thread_id in
+  let _rawbytes =
+    Piqirun.gen_required_field 3 gen__binary x.Std_frame.rawbytes in
+  let _operand_list =
+    Piqirun.gen_required_field 4 gen__operand_list x.Std_frame.operand_list
+  in
+    Piqirun.gen_record code
+      [ _address; _thread_id; _rawbytes; _operand_list ]
 and gen__syscall_frame code x =
   let _address =
     Piqirun.gen_required_field 1 gen__address x.Syscall_frame.address in
@@ -436,6 +520,39 @@ and gen__modload_frame code x =
   let _high_address =
     Piqirun.gen_required_field 3 gen__address x.Modload_frame.high_address
   in Piqirun.gen_record code [ _module_name; _low_address; _high_address ]
+and gen__key_frame code x =
+  let _tagged_value_lists =
+    Piqirun.gen_required_field 1 gen__tagged_value_lists
+      x.Key_frame.tagged_value_lists
+  in Piqirun.gen_record code [ _tagged_value_lists ]
+and gen__tagged_value_lists code x =
+  Piqirun.gen_list gen__tagged_value_list code x
+and gen__tagged_value_list code x =
+  let _value_source_tag =
+    Piqirun.gen_required_field 1 gen__value_source_tag
+      x.Tagged_value_list.value_source_tag in
+  let _value_list =
+    Piqirun.gen_required_field 2 gen__value_list
+      x.Tagged_value_list.value_list
+  in Piqirun.gen_record code [ _value_source_tag; _value_list ]
+and gen__value_source_tag code (x : Frame_piqi.value_source_tag) =
+  Piqirun.gen_record code
+    [ (match x with
+       | `no_thread_id -> Piqirun.gen_bool_field 1 true
+       | `thread_id x -> gen__thread_id 2 x) ]
+and gen__value_list code x = Piqirun.gen_list gen__value_info code x
+and gen__value_info code x =
+  let _operand_info_specific =
+    Piqirun.gen_required_field 1 gen__operand_info_specific
+      x.Value_info.operand_info_specific in
+  let _bit_length =
+    Piqirun.gen_required_field 2 gen__bit_length x.Value_info.bit_length in
+  let _taint_info =
+    Piqirun.gen_optional_field 3 gen__taint_info x.Value_info.taint_info in
+  let _value = Piqirun.gen_required_field 4 gen__binary x.Value_info.value
+  in
+    Piqirun.gen_record code
+      [ _operand_info_specific; _bit_length; _taint_info; _value ]
 and gen__frame code (x : Frame_piqi.frame) =
   Piqirun.gen_record code
     [ (match x with
@@ -443,7 +560,8 @@ and gen__frame code (x : Frame_piqi.frame) =
        | `syscall_frame x -> gen__syscall_frame 2 x
        | `exception_frame x -> gen__exception_frame 3 x
        | `taint_intro_frame x -> gen__taint_intro_frame 4 x
-       | `modload_frame x -> gen__modload_frame 5 x) ]
+       | `modload_frame x -> gen__modload_frame 5 x
+       | `key_frame x -> gen__key_frame 6 x) ]
   
 let gen_uint64 x = gen__uint64 (-1) x
   
@@ -467,8 +585,6 @@ let gen_taint_id x = gen__taint_id (-1) x
   
 let gen_exception_number x = gen__exception_number (-1) x
   
-let gen_std_frame x = gen__std_frame (-1) x
-  
 let gen_operand_list x = gen__operand_list (-1) x
   
 let gen_operand_info x = gen__operand_info (-1) x
@@ -482,6 +598,8 @@ let gen_mem_operand x = gen__mem_operand (-1) x
 let gen_operand_usage x = gen__operand_usage (-1) x
   
 let gen_taint_info x = gen__taint_info (-1) x
+  
+let gen_std_frame x = gen__std_frame (-1) x
   
 let gen_syscall_frame x = gen__syscall_frame (-1) x
   
@@ -499,9 +617,21 @@ let gen_taint_intro x = gen__taint_intro (-1) x
   
 let gen_modload_frame x = gen__modload_frame (-1) x
   
+let gen_key_frame x = gen__key_frame (-1) x
+  
+let gen_tagged_value_lists x = gen__tagged_value_lists (-1) x
+  
+let gen_tagged_value_list x = gen__tagged_value_list (-1) x
+  
+let gen_value_source_tag x = gen__value_source_tag (-1) x
+  
+let gen_value_list x = gen__value_list (-1) x
+  
+let gen_value_info x = gen__value_info (-1) x
+  
 let gen_frame x = gen__frame (-1) x
   
 let piqi =
-  [ "\226\202\2304\005frame\160\148\209H\129\248\174h\234\134\149\130\004&\130\153\170d!\218\164\238\191\004\tthread-id\210\171\158\194\006\012\218\164\238\191\004\006uint64\234\134\149\130\004$\130\153\170d\031\218\164\238\191\004\007address\210\171\158\194\006\012\218\164\238\191\004\006uint64\234\134\149\130\004$\130\153\170d\031\218\164\238\191\004\nbit-length\210\171\158\194\006\t\218\164\238\191\004\003int\234\134\149\130\004%\130\153\170d \218\164\238\191\004\btaint-id\210\171\158\194\006\012\218\164\238\191\004\006uint64\234\134\149\130\004-\130\153\170d(\218\164\238\191\004\016exception-number\210\171\158\194\006\012\218\164\238\191\004\006uint64\234\134\149\130\004\186\001\138\233\142\251\014\179\001\210\203\242$\031\154\182\154\152\004\006\248\149\210\152\t\001\210\171\158\194\006\r\218\164\238\191\004\007address\210\203\242$!\154\182\154\152\004\006\248\149\210\152\t\001\210\171\158\194\006\015\218\164\238\191\004\tthread-id\210\203\242$,\154\182\154\152\004\006\248\149\210\152\t\001\218\164\238\191\004\brawbytes\210\171\158\194\006\012\218\164\238\191\004\006binary\210\203\242$$\154\182\154\152\004\006\248\149\210\152\t\001\210\171\158\194\006\018\218\164\238\191\004\012operand-list\218\164\238\191\004\tstd-frame\234\134\149\130\0040\242\197\227\236\003*\218\164\238\191\004\012operand-list\210\171\158\194\006\018\218\164\238\191\004\012operand-info\234\134\149\130\004\241\001\138\233\142\251\014\234\001\210\203\242$-\154\182\154\152\004\006\248\149\210\152\t\001\210\171\158\194\006\027\218\164\238\191\004\021operand-info-specific\210\203\242$\"\154\182\154\152\004\006\248\149\210\152\t\001\210\171\158\194\006\016\218\164\238\191\004\nbit-length\210\203\242$%\154\182\154\152\004\006\248\149\210\152\t\001\210\171\158\194\006\019\218\164\238\191\004\roperand-usage\210\203\242$\"\154\182\154\152\004\006\248\149\210\152\t\001\210\171\158\194\006\016\218\164\238\191\004\ntaint-info\210\203\242$)\154\182\154\152\004\006\248\149\210\152\t\001\218\164\238\191\004\005value\210\171\158\194\006\012\218\164\238\191\004\006binary\218\164\238\191\004\012operand-info\234\134\149\130\004[\170\136\200\184\014U\218\164\238\191\004\021operand-info-specific\170\183\218\222\005\023\210\171\158\194\006\017\218\164\238\191\004\011mem-operand\170\183\218\222\005\023\210\171\158\194\006\017\218\164\238\191\004\011reg-operand\234\134\149\130\004D\138\233\142\251\014>\210\203\242$(\154\182\154\152\004\006\248\149\210\152\t\001\218\164\238\191\004\004name\210\171\158\194\006\012\218\164\238\191\004\006string\218\164\238\191\004\011reg-operand\234\134\149\130\004;\138\233\142\251\0145\210\203\242$\031\154\182\154\152\004\006\248\149\210\152\t\001\210\171\158\194\006\r\218\164\238\191\004\007address\218\164\238\191\004\011mem-operand\234\134\149\130\004\202\001\138\233\142\251\014\195\001\210\203\242$&\154\182\154\152\004\006\248\149\210\152\t\001\218\164\238\191\004\004read\210\171\158\194\006\n\218\164\238\191\004\004bool\210\203\242$)\154\182\154\152\004\006\248\149\210\152\t\001\218\164\238\191\004\007written\210\171\158\194\006\n\218\164\238\191\004\004bool\210\203\242$'\154\182\154\152\004\006\248\149\210\152\t\001\218\164\238\191\004\005index\210\171\158\194\006\n\218\164\238\191\004\004bool\210\203\242$&\154\182\154\152\004\006\248\149\210\152\t\001\218\164\238\191\004\004base\210\171\158\194\006\n\218\164\238\191\004\004bool\218\164\238\191\004\roperand-usage\234\134\149\130\004^\170\136\200\184\014X\218\164\238\191\004\ntaint-info\170\183\218\222\005\014\218\164\238\191\004\bno-taint\170\183\218\222\005\020\210\171\158\194\006\014\218\164\238\191\004\btaint-id\170\183\218\222\005\020\218\164\238\191\004\014taint-multiple\234\134\149\130\004\189\001\138\233\142\251\014\182\001\210\203\242$\031\154\182\154\152\004\006\248\149\210\152\t\001\210\171\158\194\006\r\218\164\238\191\004\007address\210\203\242$!\154\182\154\152\004\006\248\149\210\152\t\001\210\171\158\194\006\015\218\164\238\191\004\tthread-id\210\203\242$*\154\182\154\152\004\006\248\149\210\152\t\001\218\164\238\191\004\006number\210\171\158\194\006\012\218\164\238\191\004\006uint64\210\203\242$%\154\182\154\152\004\006\248\149\210\152\t\001\210\171\158\194\006\019\218\164\238\191\004\rargument-list\218\164\238\191\004\rsyscall-frame\234\134\149\130\004-\242\197\227\236\003'\218\164\238\191\004\rargument-list\210\171\158\194\006\014\218\164\238\191\004\bargument\234\134\149\130\004$\130\153\170d\031\218\164\238\191\004\bargument\210\171\158\194\006\011\218\164\238\191\004\005int64\234\134\149\130\004\211\001\138\233\142\251\014\204\001\210\203\242$(\154\182\154\152\004\006\248\149\210\152\t\001\210\171\158\194\006\022\218\164\238\191\004\016exception-number\210\203\242$!\154\182\154\152\004\006\128\250\213\155\015\001\210\171\158\194\006\015\218\164\238\191\004\tthread-id\210\203\242$.\154\182\154\152\004\006\128\250\213\155\015\001\218\164\238\191\004\tfrom-addr\210\171\158\194\006\r\218\164\238\191\004\007address\210\203\242$,\154\182\154\152\004\006\128\250\213\155\015\001\218\164\238\191\004\007to-addr\210\171\158\194\006\r\218\164\238\191\004\007address\218\164\238\191\004\015exception-frame\234\134\149\130\004J\138\233\142\251\014D\210\203\242$(\154\182\154\152\004\006\248\149\210\152\t\001\210\171\158\194\006\022\218\164\238\191\004\016taint-intro-list\218\164\238\191\004\017taint-intro-frame\234\134\149\130\0043\242\197\227\236\003-\218\164\238\191\004\016taint-intro-list\210\171\158\194\006\017\218\164\238\191\004\011taint-intro\234\134\149\130\004j\138\233\142\251\014d\210\203\242$)\154\182\154\152\004\006\248\149\210\152\t\001\218\164\238\191\004\004addr\210\171\158\194\006\r\218\164\238\191\004\007address\210\203\242$ \154\182\154\152\004\006\248\149\210\152\t\001\210\171\158\194\006\014\218\164\238\191\004\btaint-id\218\164\238\191\004\011taint-intro\234\134\149\130\004\185\001\138\233\142\251\014\178\001\210\203\242$/\154\182\154\152\004\006\248\149\210\152\t\001\218\164\238\191\004\011module-name\210\171\158\194\006\012\218\164\238\191\004\006string\210\203\242$0\154\182\154\152\004\006\248\149\210\152\t\001\218\164\238\191\004\011low-address\210\171\158\194\006\r\218\164\238\191\004\007address\210\203\242$1\154\182\154\152\004\006\248\149\210\152\t\001\218\164\238\191\004\012high-address\210\171\158\194\006\r\218\164\238\191\004\007address\218\164\238\191\004\rmodload-frame\234\134\149\130\004\175\001\170\136\200\184\014\168\001\218\164\238\191\004\005frame\170\183\218\222\005\021\210\171\158\194\006\015\218\164\238\191\004\tstd-frame\170\183\218\222\005\025\210\171\158\194\006\019\218\164\238\191\004\rsyscall-frame\170\183\218\222\005\027\210\171\158\194\006\021\218\164\238\191\004\015exception-frame\170\183\218\222\005\029\210\171\158\194\006\023\218\164\238\191\004\017taint-intro-frame\170\183\218\222\005\025\210\171\158\194\006\019\218\164\238\191\004\rmodload-frame" ]
+  [ "\226\202\2304\005frame\160\148\209H\129\248\174h\234\134\149\130\004&\130\153\170d!\218\164\238\191\004\tthread-id\210\171\158\194\006\012\218\164\238\191\004\006uint64\234\134\149\130\004$\130\153\170d\031\218\164\238\191\004\007address\210\171\158\194\006\012\218\164\238\191\004\006uint64\234\134\149\130\004$\130\153\170d\031\218\164\238\191\004\nbit-length\210\171\158\194\006\t\218\164\238\191\004\003int\234\134\149\130\004%\130\153\170d \218\164\238\191\004\btaint-id\210\171\158\194\006\012\218\164\238\191\004\006uint64\234\134\149\130\004-\130\153\170d(\218\164\238\191\004\016exception-number\210\171\158\194\006\012\218\164\238\191\004\006uint64\234\134\149\130\0040\242\197\227\236\003*\218\164\238\191\004\012operand-list\210\171\158\194\006\018\218\164\238\191\004\012operand-info\234\134\149\130\004\241\001\138\233\142\251\014\234\001\210\203\242$-\154\182\154\152\004\006\248\149\210\152\t\001\210\171\158\194\006\027\218\164\238\191\004\021operand-info-specific\210\203\242$\"\154\182\154\152\004\006\248\149\210\152\t\001\210\171\158\194\006\016\218\164\238\191\004\nbit-length\210\203\242$%\154\182\154\152\004\006\248\149\210\152\t\001\210\171\158\194\006\019\218\164\238\191\004\roperand-usage\210\203\242$\"\154\182\154\152\004\006\248\149\210\152\t\001\210\171\158\194\006\016\218\164\238\191\004\ntaint-info\210\203\242$)\154\182\154\152\004\006\248\149\210\152\t\001\218\164\238\191\004\005value\210\171\158\194\006\012\218\164\238\191\004\006binary\218\164\238\191\004\012operand-info\234\134\149\130\004[\170\136\200\184\014U\218\164\238\191\004\021operand-info-specific\170\183\218\222\005\023\210\171\158\194\006\017\218\164\238\191\004\011mem-operand\170\183\218\222\005\023\210\171\158\194\006\017\218\164\238\191\004\011reg-operand\234\134\149\130\004D\138\233\142\251\014>\210\203\242$(\154\182\154\152\004\006\248\149\210\152\t\001\218\164\238\191\004\004name\210\171\158\194\006\012\218\164\238\191\004\006string\218\164\238\191\004\011reg-operand\234\134\149\130\004;\138\233\142\251\0145\210\203\242$\031\154\182\154\152\004\006\248\149\210\152\t\001\210\171\158\194\006\r\218\164\238\191\004\007address\218\164\238\191\004\011mem-operand\234\134\149\130\004\202\001\138\233\142\251\014\195\001\210\203\242$&\154\182\154\152\004\006\248\149\210\152\t\001\218\164\238\191\004\004read\210\171\158\194\006\n\218\164\238\191\004\004bool\210\203\242$)\154\182\154\152\004\006\248\149\210\152\t\001\218\164\238\191\004\007written\210\171\158\194\006\n\218\164\238\191\004\004bool\210\203\242$'\154\182\154\152\004\006\248\149\210\152\t\001\218\164\238\191\004\005index\210\171\158\194\006\n\218\164\238\191\004\004bool\210\203\242$&\154\182\154\152\004\006\248\149\210\152\t\001\218\164\238\191\004\004base\210\171\158\194\006\n\218\164\238\191\004\004bool\218\164\238\191\004\roperand-usage\234\134\149\130\004^\170\136\200\184\014X\218\164\238\191\004\ntaint-info\170\183\218\222\005\014\218\164\238\191\004\bno-taint\170\183\218\222\005\020\210\171\158\194\006\014\218\164\238\191\004\btaint-id\170\183\218\222\005\020\218\164\238\191\004\014taint-multiple\234\134\149\130\004\186\001\138\233\142\251\014\179\001\210\203\242$\031\154\182\154\152\004\006\248\149\210\152\t\001\210\171\158\194\006\r\218\164\238\191\004\007address\210\203\242$!\154\182\154\152\004\006\248\149\210\152\t\001\210\171\158\194\006\015\218\164\238\191\004\tthread-id\210\203\242$,\154\182\154\152\004\006\248\149\210\152\t\001\218\164\238\191\004\brawbytes\210\171\158\194\006\012\218\164\238\191\004\006binary\210\203\242$$\154\182\154\152\004\006\248\149\210\152\t\001\210\171\158\194\006\018\218\164\238\191\004\012operand-list\218\164\238\191\004\tstd-frame\234\134\149\130\004\189\001\138\233\142\251\014\182\001\210\203\242$\031\154\182\154\152\004\006\248\149\210\152\t\001\210\171\158\194\006\r\218\164\238\191\004\007address\210\203\242$!\154\182\154\152\004\006\248\149\210\152\t\001\210\171\158\194\006\015\218\164\238\191\004\tthread-id\210\203\242$*\154\182\154\152\004\006\248\149\210\152\t\001\218\164\238\191\004\006number\210\171\158\194\006\012\218\164\238\191\004\006uint64\210\203\242$%\154\182\154\152\004\006\248\149\210\152\t\001\210\171\158\194\006\019\218\164\238\191\004\rargument-list\218\164\238\191\004\rsyscall-frame\234\134\149\130\004-\242\197\227\236\003'\218\164\238\191\004\rargument-list\210\171\158\194\006\014\218\164\238\191\004\bargument\234\134\149\130\004$\130\153\170d\031\218\164\238\191\004\bargument\210\171\158\194\006\011\218\164\238\191\004\005int64\234\134\149\130\004\211\001\138\233\142\251\014\204\001\210\203\242$(\154\182\154\152\004\006\248\149\210\152\t\001\210\171\158\194\006\022\218\164\238\191\004\016exception-number\210\203\242$!\154\182\154\152\004\006\128\250\213\155\015\001\210\171\158\194\006\015\218\164\238\191\004\tthread-id\210\203\242$.\154\182\154\152\004\006\128\250\213\155\015\001\218\164\238\191\004\tfrom-addr\210\171\158\194\006\r\218\164\238\191\004\007address\210\203\242$,\154\182\154\152\004\006\128\250\213\155\015\001\218\164\238\191\004\007to-addr\210\171\158\194\006\r\218\164\238\191\004\007address\218\164\238\191\004\015exception-frame\234\134\149\130\004J\138\233\142\251\014D\210\203\242$(\154\182\154\152\004\006\248\149\210\152\t\001\210\171\158\194\006\022\218\164\238\191\004\016taint-intro-list\218\164\238\191\004\017taint-intro-frame\234\134\149\130\0043\242\197\227\236\003-\218\164\238\191\004\016taint-intro-list\210\171\158\194\006\017\218\164\238\191\004\011taint-intro\234\134\149\130\004j\138\233\142\251\014d\210\203\242$)\154\182\154\152\004\006\248\149\210\152\t\001\218\164\238\191\004\004addr\210\171\158\194\006\r\218\164\238\191\004\007address\210\203\242$ \154\182\154\152\004\006\248\149\210\152\t\001\210\171\158\194\006\014\218\164\238\191\004\btaint-id\218\164\238\191\004\011taint-intro\234\134\149\130\004\185\001\138\233\142\251\014\178\001\210\203\242$/\154\182\154\152\004\006\248\149\210\152\t\001\218\164\238\191\004\011module-name\210\171\158\194\006\012\218\164\238\191\004\006string\210\203\242$0\154\182\154\152\004\006\248\149\210\152\t\001\218\164\238\191\004\011low-address\210\171\158\194\006\r\218\164\238\191\004\007address\210\203\242$1\154\182\154\152\004\006\248\149\210\152\t\001\218\164\238\191\004\012high-address\210\171\158\194\006\r\218\164\238\191\004\007address\218\164\238\191\004\rmodload-frame\234\134\149\130\004D\138\233\142\251\014>\210\203\242$*\154\182\154\152\004\006\248\149\210\152\t\001\210\171\158\194\006\024\218\164\238\191\004\018tagged-value-lists\218\164\238\191\004\tkey-frame\234\134\149\130\004;\242\197\227\236\0035\218\164\238\191\004\018tagged-value-lists\210\171\158\194\006\023\218\164\238\191\004\017tagged-value-list\234\134\149\130\004\136\001\138\233\142\251\014\129\001\210\203\242$>\154\182\154\152\004\006\248\149\210\152\t\001\218\164\238\191\004\016value-source-tag\210\171\158\194\006\022\218\164\238\191\004\016value-source-tag\210\203\242$\"\154\182\154\152\004\006\248\149\210\152\t\001\210\171\158\194\006\016\218\164\238\191\004\nvalue-list\218\164\238\191\004\017tagged-value-list\234\134\149\130\004O\170\136\200\184\014I\218\164\238\191\004\016value-source-tag\170\183\218\222\005\018\218\164\238\191\004\012no-thread-id\170\183\218\222\005\021\210\171\158\194\006\015\218\164\238\191\004\tthread-id\234\134\149\130\004,\242\197\227\236\003&\218\164\238\191\004\nvalue-list\210\171\158\194\006\016\218\164\238\191\004\nvalue-info\234\134\149\130\004\197\001\138\233\142\251\014\190\001\210\203\242$-\154\182\154\152\004\006\248\149\210\152\t\001\210\171\158\194\006\027\218\164\238\191\004\021operand-info-specific\210\203\242$\"\154\182\154\152\004\006\248\149\210\152\t\001\210\171\158\194\006\016\218\164\238\191\004\nbit-length\210\203\242$\"\154\182\154\152\004\006\128\250\213\155\015\001\210\171\158\194\006\016\218\164\238\191\004\ntaint-info\210\203\242$)\154\182\154\152\004\006\248\149\210\152\t\001\218\164\238\191\004\005value\210\171\158\194\006\012\218\164\238\191\004\006binary\218\164\238\191\004\nvalue-info\234\134\149\130\004\202\001\170\136\200\184\014\195\001\218\164\238\191\004\005frame\170\183\218\222\005\021\210\171\158\194\006\015\218\164\238\191\004\tstd-frame\170\183\218\222\005\025\210\171\158\194\006\019\218\164\238\191\004\rsyscall-frame\170\183\218\222\005\027\210\171\158\194\006\021\218\164\238\191\004\015exception-frame\170\183\218\222\005\029\210\171\158\194\006\023\218\164\238\191\004\017taint-intro-frame\170\183\218\222\005\025\210\171\158\194\006\019\218\164\238\191\004\rmodload-frame\170\183\218\222\005\021\210\171\158\194\006\015\218\164\238\191\004\tkey-frame" ]
   
 

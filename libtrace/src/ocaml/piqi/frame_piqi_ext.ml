@@ -25,8 +25,6 @@ let _taint_id_piqtype = Piqirun_ext.find_piqtype "frame/taint-id"
 let _exception_number_piqtype =
   Piqirun_ext.find_piqtype "frame/exception-number"
   
-let _std_frame_piqtype = Piqirun_ext.find_piqtype "frame/std-frame"
-  
 let _operand_list_piqtype = Piqirun_ext.find_piqtype "frame/operand-list"
   
 let _operand_info_piqtype = Piqirun_ext.find_piqtype "frame/operand-info"
@@ -41,6 +39,8 @@ let _mem_operand_piqtype = Piqirun_ext.find_piqtype "frame/mem-operand"
 let _operand_usage_piqtype = Piqirun_ext.find_piqtype "frame/operand-usage"
   
 let _taint_info_piqtype = Piqirun_ext.find_piqtype "frame/taint-info"
+  
+let _std_frame_piqtype = Piqirun_ext.find_piqtype "frame/std-frame"
   
 let _syscall_frame_piqtype = Piqirun_ext.find_piqtype "frame/syscall-frame"
   
@@ -60,6 +60,21 @@ let _taint_intro_list_piqtype =
 let _taint_intro_piqtype = Piqirun_ext.find_piqtype "frame/taint-intro"
   
 let _modload_frame_piqtype = Piqirun_ext.find_piqtype "frame/modload-frame"
+  
+let _key_frame_piqtype = Piqirun_ext.find_piqtype "frame/key-frame"
+  
+let _tagged_value_lists_piqtype =
+  Piqirun_ext.find_piqtype "frame/tagged-value-lists"
+  
+let _tagged_value_list_piqtype =
+  Piqirun_ext.find_piqtype "frame/tagged-value-list"
+  
+let _value_source_tag_piqtype =
+  Piqirun_ext.find_piqtype "frame/value-source-tag"
+  
+let _value_list_piqtype = Piqirun_ext.find_piqtype "frame/value-list"
+  
+let _value_info_piqtype = Piqirun_ext.find_piqtype "frame/value-info"
   
 let _frame_piqtype = Piqirun_ext.find_piqtype "frame/frame"
   
@@ -108,10 +123,6 @@ let parse_exception_number x (format : Piqirun_ext.input_format) =
   let buf = Piqirun.init_from_string x_pb
   in Frame_piqi.parse_exception_number buf
   
-let parse_std_frame x (format : Piqirun_ext.input_format) =
-  let x_pb = Piqirun_ext.convert _std_frame_piqtype format `pb x in
-  let buf = Piqirun.init_from_string x_pb in Frame_piqi.parse_std_frame buf
-  
 let parse_operand_list x (format : Piqirun_ext.input_format) =
   let x_pb = Piqirun_ext.convert _operand_list_piqtype format `pb x in
   let buf = Piqirun.init_from_string x_pb
@@ -144,6 +155,10 @@ let parse_operand_usage x (format : Piqirun_ext.input_format) =
 let parse_taint_info x (format : Piqirun_ext.input_format) =
   let x_pb = Piqirun_ext.convert _taint_info_piqtype format `pb x in
   let buf = Piqirun.init_from_string x_pb in Frame_piqi.parse_taint_info buf
+  
+let parse_std_frame x (format : Piqirun_ext.input_format) =
+  let x_pb = Piqirun_ext.convert _std_frame_piqtype format `pb x in
+  let buf = Piqirun.init_from_string x_pb in Frame_piqi.parse_std_frame buf
   
 let parse_syscall_frame x (format : Piqirun_ext.input_format) =
   let x_pb = Piqirun_ext.convert _syscall_frame_piqtype format `pb x in
@@ -182,6 +197,33 @@ let parse_modload_frame x (format : Piqirun_ext.input_format) =
   let x_pb = Piqirun_ext.convert _modload_frame_piqtype format `pb x in
   let buf = Piqirun.init_from_string x_pb
   in Frame_piqi.parse_modload_frame buf
+  
+let parse_key_frame x (format : Piqirun_ext.input_format) =
+  let x_pb = Piqirun_ext.convert _key_frame_piqtype format `pb x in
+  let buf = Piqirun.init_from_string x_pb in Frame_piqi.parse_key_frame buf
+  
+let parse_tagged_value_lists x (format : Piqirun_ext.input_format) =
+  let x_pb = Piqirun_ext.convert _tagged_value_lists_piqtype format `pb x in
+  let buf = Piqirun.init_from_string x_pb
+  in Frame_piqi.parse_tagged_value_lists buf
+  
+let parse_tagged_value_list x (format : Piqirun_ext.input_format) =
+  let x_pb = Piqirun_ext.convert _tagged_value_list_piqtype format `pb x in
+  let buf = Piqirun.init_from_string x_pb
+  in Frame_piqi.parse_tagged_value_list buf
+  
+let parse_value_source_tag x (format : Piqirun_ext.input_format) =
+  let x_pb = Piqirun_ext.convert _value_source_tag_piqtype format `pb x in
+  let buf = Piqirun.init_from_string x_pb
+  in Frame_piqi.parse_value_source_tag buf
+  
+let parse_value_list x (format : Piqirun_ext.input_format) =
+  let x_pb = Piqirun_ext.convert _value_list_piqtype format `pb x in
+  let buf = Piqirun.init_from_string x_pb in Frame_piqi.parse_value_list buf
+  
+let parse_value_info x (format : Piqirun_ext.input_format) =
+  let x_pb = Piqirun_ext.convert _value_info_piqtype format `pb x in
+  let buf = Piqirun.init_from_string x_pb in Frame_piqi.parse_value_info buf
   
 let parse_frame x (format : Piqirun_ext.input_format) =
   let x_pb = Piqirun_ext.convert _frame_piqtype format `pb x in
@@ -242,11 +284,6 @@ let gen_exception_number x (format : Piqirun_ext.output_format) =
   let x_pb = Piqirun.to_string buf
   in Piqirun_ext.convert _exception_number_piqtype `pb format x_pb
   
-let gen_std_frame x (format : Piqirun_ext.output_format) =
-  let buf = Frame_piqi.gen_std_frame x in
-  let x_pb = Piqirun.to_string buf
-  in Piqirun_ext.convert _std_frame_piqtype `pb format x_pb
-  
 let gen_operand_list x (format : Piqirun_ext.output_format) =
   let buf = Frame_piqi.gen_operand_list x in
   let x_pb = Piqirun.to_string buf
@@ -281,6 +318,11 @@ let gen_taint_info x (format : Piqirun_ext.output_format) =
   let buf = Frame_piqi.gen_taint_info x in
   let x_pb = Piqirun.to_string buf
   in Piqirun_ext.convert _taint_info_piqtype `pb format x_pb
+  
+let gen_std_frame x (format : Piqirun_ext.output_format) =
+  let buf = Frame_piqi.gen_std_frame x in
+  let x_pb = Piqirun.to_string buf
+  in Piqirun_ext.convert _std_frame_piqtype `pb format x_pb
   
 let gen_syscall_frame x (format : Piqirun_ext.output_format) =
   let buf = Frame_piqi.gen_syscall_frame x in
@@ -321,6 +363,36 @@ let gen_modload_frame x (format : Piqirun_ext.output_format) =
   let buf = Frame_piqi.gen_modload_frame x in
   let x_pb = Piqirun.to_string buf
   in Piqirun_ext.convert _modload_frame_piqtype `pb format x_pb
+  
+let gen_key_frame x (format : Piqirun_ext.output_format) =
+  let buf = Frame_piqi.gen_key_frame x in
+  let x_pb = Piqirun.to_string buf
+  in Piqirun_ext.convert _key_frame_piqtype `pb format x_pb
+  
+let gen_tagged_value_lists x (format : Piqirun_ext.output_format) =
+  let buf = Frame_piqi.gen_tagged_value_lists x in
+  let x_pb = Piqirun.to_string buf
+  in Piqirun_ext.convert _tagged_value_lists_piqtype `pb format x_pb
+  
+let gen_tagged_value_list x (format : Piqirun_ext.output_format) =
+  let buf = Frame_piqi.gen_tagged_value_list x in
+  let x_pb = Piqirun.to_string buf
+  in Piqirun_ext.convert _tagged_value_list_piqtype `pb format x_pb
+  
+let gen_value_source_tag x (format : Piqirun_ext.output_format) =
+  let buf = Frame_piqi.gen_value_source_tag x in
+  let x_pb = Piqirun.to_string buf
+  in Piqirun_ext.convert _value_source_tag_piqtype `pb format x_pb
+  
+let gen_value_list x (format : Piqirun_ext.output_format) =
+  let buf = Frame_piqi.gen_value_list x in
+  let x_pb = Piqirun.to_string buf
+  in Piqirun_ext.convert _value_list_piqtype `pb format x_pb
+  
+let gen_value_info x (format : Piqirun_ext.output_format) =
+  let buf = Frame_piqi.gen_value_info x in
+  let x_pb = Piqirun.to_string buf
+  in Piqirun_ext.convert _value_info_piqtype `pb format x_pb
   
 let gen_frame x (format : Piqirun_ext.output_format) =
   let buf = Frame_piqi.gen_frame x in
@@ -373,10 +445,6 @@ let print_exception_number x =
 let prerr_exception_number x =
   Pervasives.prerr_endline (gen_exception_number x `piq)
   
-let print_std_frame x = Pervasives.print_endline (gen_std_frame x `piq)
-  
-let prerr_std_frame x = Pervasives.prerr_endline (gen_std_frame x `piq)
-  
 let print_operand_list x = Pervasives.print_endline (gen_operand_list x `piq)
   
 let prerr_operand_list x = Pervasives.prerr_endline (gen_operand_list x `piq)
@@ -408,6 +476,10 @@ let prerr_operand_usage x =
 let print_taint_info x = Pervasives.print_endline (gen_taint_info x `piq)
   
 let prerr_taint_info x = Pervasives.prerr_endline (gen_taint_info x `piq)
+  
+let print_std_frame x = Pervasives.print_endline (gen_std_frame x `piq)
+  
+let prerr_std_frame x = Pervasives.prerr_endline (gen_std_frame x `piq)
   
 let print_syscall_frame x =
   Pervasives.print_endline (gen_syscall_frame x `piq)
@@ -452,6 +524,36 @@ let print_modload_frame x =
   
 let prerr_modload_frame x =
   Pervasives.prerr_endline (gen_modload_frame x `piq)
+  
+let print_key_frame x = Pervasives.print_endline (gen_key_frame x `piq)
+  
+let prerr_key_frame x = Pervasives.prerr_endline (gen_key_frame x `piq)
+  
+let print_tagged_value_lists x =
+  Pervasives.print_endline (gen_tagged_value_lists x `piq)
+  
+let prerr_tagged_value_lists x =
+  Pervasives.prerr_endline (gen_tagged_value_lists x `piq)
+  
+let print_tagged_value_list x =
+  Pervasives.print_endline (gen_tagged_value_list x `piq)
+  
+let prerr_tagged_value_list x =
+  Pervasives.prerr_endline (gen_tagged_value_list x `piq)
+  
+let print_value_source_tag x =
+  Pervasives.print_endline (gen_value_source_tag x `piq)
+  
+let prerr_value_source_tag x =
+  Pervasives.prerr_endline (gen_value_source_tag x `piq)
+  
+let print_value_list x = Pervasives.print_endline (gen_value_list x `piq)
+  
+let prerr_value_list x = Pervasives.prerr_endline (gen_value_list x `piq)
+  
+let print_value_info x = Pervasives.print_endline (gen_value_info x `piq)
+  
+let prerr_value_info x = Pervasives.prerr_endline (gen_value_info x `piq)
   
 let print_frame x = Pervasives.print_endline (gen_frame x `piq)
   

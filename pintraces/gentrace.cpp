@@ -132,7 +132,6 @@ KNOB<int> KnobTrigCount(KNOB_MODE_WRITEONCE, "pintool",
 KNOB<uint64_t> KnobLogLimit(KNOB_MODE_WRITEONCE, "pintool",
                             "log-limit", "0",
                             "Number of instructions to limit logging to.");
-
 KNOB<bool> LogAllSyscalls(KNOB_MODE_WRITEONCE, "pintool",
 		       "log-syscalls", "false",
 		       "Log system calls (even those unrelated to taint)");
@@ -154,6 +153,10 @@ KNOB<bool> LogAllBeforeTaint(KNOB_MODE_WRITEONCE, "pintool",
 KNOB<bool> LogOneAfter(KNOB_MODE_WRITEONCE, "pintool",
                   "logone-after", "false",
                   "Log the first instruction outside of the log range (taint-start/end), and then exit.");
+
+KNOB<bool> LogKeyFrames(KNOB_MODE_WRITEONCE, "pintool",
+                        "log-key-frames", "false",
+                        "Periodically output key frames containing important program values");
 
 KNOB<string> TaintedFiles(KNOB_MODE_APPEND, "pintool",
                           "taint-files", "", 
@@ -335,7 +338,7 @@ typedef struct ThreadInfo_s {
 
 int g_counter = 0;
 
-TraceWriter *g_tw;
+//TraceWriter *g_tw;
 TraceContainerWriter *g_twnew;
 
 // A taint tracker
@@ -444,13 +447,39 @@ static uint32_t GetTypeOfReg(REG r) {
 
   string s = REG_StringShort(r);
 
-  if (s == "eip" || s == "eflags") {
-    // No problem for these
-    return VT_REG32;
+  switch (r) {
+      case REG_SEG_CS:
+      case REG_SEG_DS:
+      case REG_SEG_ES:
+      case REG_SEG_FS:
+      case REG_SEG_GS:
+      case REG_SEG_SS:
+        return VT_REG16;
+        break;
+
+      case REG_INST_PTR:
+      case REG_EFLAGS:
+      case REG_MXCSR:
+        return VT_REG32;
+        break;
+
+      case REG_XMM0:
+      case REG_XMM1:
+      case REG_XMM2:
+      case REG_XMM3:
+      case REG_XMM4:
+      case REG_XMM5:
+      case REG_XMM6:
+      case REG_XMM7:
+        return VT_REG128;
+        break;
+
+      default:
+        break;
   }
 
   // Otherwise, print a warning...
-  
+
   cerr << "Warning: Unknown register size of register " << REG_StringShort(r) << endl;
   return VT_NONE;
 }
@@ -593,109 +622,74 @@ VOID FlushInstructions()
     fnew.mutable_std_frame()->set_rawbytes((void*)(&(g_buffer[i].rawbytes0)), g_buffer[i].insn_length);
 
     /* Add operands */
-    
-    StdFrame2 f;
-      f.addr = g_buffer[i].addr;
-      f.tid = g_buffer[i].tid;
-      f.insn_length = g_buffer[i].insn_length;
 
-      //LOG(hexstr(f.addr) + ": writing.\n");
+    // Go through each value and remove the ones that are cached.
 
-      if (f.insn_length > MAX_INSN_BYTES) {
-         LOG("Error! f.insn_length is too long!\n");
+    /* The operand_list is a required field, so we must access it
+       even if there are no operands or protobuffers will complain to
+       us. */
+    fnew.mutable_std_frame()->mutable_operand_list();
+
+    for (uint32_t j = 0; j < g_buffer[i].values_count; j++) {
+
+      ValSpecRec &v = g_buffer[i].valspecs[j];
+
+      operand_info *o = fnew.mutable_std_frame()->mutable_operand_list()->add_elem();
+      o->set_bit_length(GetBitSize(v.type));
+      o->mutable_operand_usage()->set_read(v.usage & RD);
+      o->mutable_operand_usage()->set_written(v.usage & WR);
+      /* XXX: Implement index and base */
+      o->mutable_operand_usage()->set_index(false);
+      o->mutable_operand_usage()->set_base(false);
+
+      switch (v.taint) {
+          case 0:
+            o->mutable_taint_info()->set_no_taint(true);
+            break;
+          case -1:
+            o->mutable_taint_info()->set_taint_multiple(true);
+            break;
+          default:
+            o->mutable_taint_info()->set_taint_id(v.taint);
+            break;
       }
 
-      memcpy((char *) f.rawbytes, (char *) &(g_buffer[i].rawbytes0), f.insn_length);
+      if (tracker->isMem(v.type)) {
+        o->mutable_operand_info_specific()->mutable_mem_operand()->set_address(v.loc);
 
-      f.clearCache();
+      } else {
+        o->mutable_operand_info_specific()->mutable_reg_operand()->set_name(REG_StringShort((REG)v.loc));
+      }
 
-      uint32_t newcnt = 0;
+      o->set_value(&(v.value), GetByteSize(v.type));
 
-      // Go through each value and remove the ones that are cached.
+      switch (v.type) {
 
-      /* The operand_list is a required field, so we must access it
-         even if there are no operands or protobuffers will complain to
-         us. */
-      fnew.mutable_std_frame()->mutable_operand_list();
+          case VT_MEM256:
+          case VT_REG128:
+          case VT_MEM128:
+          case VT_REG64:
+          case VT_MEM64:
+            //cerr << "WARN: Incomplete code" << endl;
+            break;
 
-      for (uint32_t j = 0; j < g_buffer[i].values_count; j++) {
+          case VT_REG32:
+          case VT_REG16:
+          case VT_REG8:
+          case VT_MEM32:
+          case VT_MEM16:
+          case VT_MEM8:
+            break;
 
-        ValSpecRec &v = g_buffer[i].valspecs[j];
-
-        operand_info *o = fnew.mutable_std_frame()->mutable_operand_list()->add_elem();
-        o->set_bit_length(GetBitSize(v.type));
-        o->mutable_operand_usage()->set_read(v.usage & RD);
-        o->mutable_operand_usage()->set_written(v.usage & WR);
-        /* XXX: Implement index and base */
-        o->mutable_operand_usage()->set_index(false);
-        o->mutable_operand_usage()->set_base(false);
-
-        switch (v.taint) {
-            case 0:
-              o->mutable_taint_info()->set_no_taint(true);
-              break;
-            case -1:
-              o->mutable_taint_info()->set_taint_multiple(true);
-              break;
-            default:
-              o->mutable_taint_info()->set_taint_id(v.taint);
-              break;
-        }
-
-         if (tracker->isMem(v.type)) {
-           o->mutable_operand_info_specific()->mutable_mem_operand()->set_address(v.loc);
-
-         } else {
-           o->mutable_operand_info_specific()->mutable_reg_operand()->set_name(REG_StringShort((REG)v.loc));
-         }
-
-         // Copying types, usage, location, and taint is always the same.
-         f.types[newcnt] = v.type;
-         f.usages[newcnt] = v.usage;
-         f.locs[newcnt] = v.loc;
-         f.taint[newcnt] = v.taint;
-
-         // Now copying the value is the same, too.  But, we could be
-         // more efficient and copy less bytes...
-         memcpy(&(f.values[newcnt]), &(v.value), sizeof(LEVEL_VM::PIN_REGISTER));
-
-         o->set_value(&(v.value), GetByteSize(v.type));
-         
-
-         switch (v.type) {
-
-	 case VT_MEM256:
-	 case VT_REG128:
-	 case VT_MEM128:
-	 case VT_REG64:
-	 case VT_MEM64:
-	   //cerr << "WARN: Incomplete code" << endl;
-	   break;
-	   
-	 case VT_REG32:
-	 case VT_REG16:
-	 case VT_REG8:
-	 case VT_MEM32:
-	 case VT_MEM16:
-	 case VT_MEM8:
-	   break;
-               
-         default:
+          default:
             // We're in trouble if we don't know the type.
 
-           assert(false);
-           
-         }
+            assert(false);
 
-         newcnt++;
-         
       }
+    }
 
-
-      f.values_count = newcnt;
-
-      //      g_tw->add(f);
-      g_twnew->add(fnew);
+    g_twnew->add(fnew);
    }
 
    // Update counts.
@@ -704,6 +698,22 @@ VOID FlushInstructions()
 
    g_bufidx = 0;
 
+}
+
+/* Add a PIN register to a value list. Helper function for FlushBuffer */
+VOID AddRegister(tagged_value_list *tol, const CONTEXT *ctx, REG r, THREADID threadid) {
+  tol->mutable_value_source_tag()->set_thread_id(threadid);
+  value_info *v = tol->mutable_value_list()->add_elem();
+  v->mutable_operand_info_specific()->mutable_reg_operand()->set_name(REG_StringShort(r));
+  size_t s_bytes = GetByteSize(GetTypeOfReg(r));
+  v->set_bit_length(s_bytes * 8);
+
+  /* Make sure this register even fits in the context.  PIN would
+     probably throw an error, but it's good to be paranoid. */
+  assert (s_bytes <= sizeof(ADDRINT));
+  ADDRINT regv = PIN_GetContextReg(ctx, r);
+  v->set_value((void*)(&regv), s_bytes);
+  //std::copy((uint8_t*) (&regv), ((uint8_t*) (&regv)) + s_bytes, v->
 }
 
 //
@@ -723,49 +733,36 @@ VOID FlushBuffer(BOOL addKeyframe, const CONTEXT *ctx, THREADID threadid, BOOL n
 
   FlushInstructions();
 
-   
+
    // Check to see if we should insert a keyframe here.
-   if (addKeyframe && (g_kfcount >= KEYFRAME_FREQ)) {
+   if (addKeyframe && (g_kfcount >= KEYFRAME_FREQ) && LogKeyFrames) {
 
       //LOG("Inserting keyframe:\n");
       //LOG("  addr: " + hexstr(PIN_GetContextReg(ctx, REG_EIP)) + "\n");
 
      assert(ctx);
 
-      KeyFrame kf;
-      kf.pos = g_tw->count();
-      kf.setAll((uint32_t) PIN_GetContextReg(ctx, REG_EAX),
-                (uint32_t) PIN_GetContextReg(ctx, REG_EBX),
-                (uint32_t) PIN_GetContextReg(ctx, REG_ECX),
-                (uint32_t) PIN_GetContextReg(ctx, REG_EDX),
-                (uint32_t) PIN_GetContextReg(ctx, REG_ESI),
-                (uint32_t) PIN_GetContextReg(ctx, REG_EDI),
-                (uint32_t) PIN_GetContextReg(ctx, REG_ESP),
-                (uint32_t) PIN_GetContextReg(ctx, REG_EBP),
-                (uint32_t) PIN_GetContextReg(ctx, REG_EFLAGS),
-                (uint16_t) PIN_GetContextReg(ctx, REG_SEG_CS),
-                (uint16_t) PIN_GetContextReg(ctx, REG_SEG_DS),
-                (uint16_t) PIN_GetContextReg(ctx, REG_SEG_SS),
-                (uint16_t) PIN_GetContextReg(ctx, REG_SEG_ES),
-                (uint16_t) PIN_GetContextReg(ctx, REG_SEG_FS),
-                (uint16_t) PIN_GetContextReg(ctx, REG_SEG_GS)
-                );
+     frame f;
+     tagged_value_list *tol = f.mutable_key_frame()->mutable_tagged_value_lists()->add_elem();
+     AddRegister(tol, ctx, REG_EAX, threadid);
+     AddRegister(tol, ctx, REG_EBX, threadid);
+     AddRegister(tol, ctx, REG_ECX, threadid);
+     AddRegister(tol, ctx, REG_EDX, threadid);
+     AddRegister(tol, ctx, REG_ESI, threadid);
+     AddRegister(tol, ctx, REG_EDI, threadid);
+     AddRegister(tol, ctx, REG_ESP, threadid);
+     AddRegister(tol, ctx, REG_EBP, threadid);
+     AddRegister(tol, ctx, REG_EFLAGS, threadid);
+     AddRegister(tol, ctx, REG_SEG_CS, threadid);
+     AddRegister(tol, ctx, REG_SEG_DS, threadid);
+     AddRegister(tol, ctx, REG_SEG_SS, threadid);
+     AddRegister(tol, ctx, REG_SEG_ES, threadid);
+     AddRegister(tol, ctx, REG_SEG_FS, threadid);
+     AddRegister(tol, ctx, REG_SEG_GS, threadid);
 
+     g_twnew->add(f);
 
-      // And then add the keyframe.
-      g_tw->add(kf);
-
-      // // Now repopulate the register cache.
-      // g_regcache.setAll(kf.eax, kf.ebx, kf.ecx, kf.edx,
-      //                   kf.esi, kf.edi, kf.esp, kf.ebp,
-      //                   kf.eflags,
-      //                   kf.cs, kf.ds, kf.ss,
-      //                   kf.es, kf.fs, kf.gs);
-                        
-      // // Finally clear the data cache.
-      // g_memcache.clearAll();
-
-      g_kfcount = 0;
+     g_kfcount = 0;
 
    }
 
@@ -2464,7 +2461,6 @@ VOID FollowChild(THREADID threadid, const CONTEXT* ctxt, VOID * arg)
   assert(i < BUFFER_SIZE);
   g_threadname[i++] = 'c';
 
-  g_tw = new TraceWriter((g_threadname + KnobOut.Value()).c_str());
   g_twnew = new TraceContainerWriter((g_threadname + KnobOut.Value() + ".new").c_str(), default_frames_per_toc_entry, true);
   
   g_bufidx = 0;
@@ -2654,7 +2650,6 @@ int main(int argc, char *argv[])
 
    ss << PIN_GetPid() << "-" << KnobOut.Value();
    
-   g_tw = new TraceWriter(ss.str().c_str());
    g_twnew = new TraceContainerWriter((ss.str() + ".new").c_str(), default_frames_per_toc_entry, false);
 
    g_bufidx = 0;

@@ -30,7 +30,6 @@ void  protobuf_AddDesc_frame_2epiqi_2eproto();
 void protobuf_AssignDesc_frame_2epiqi_2eproto();
 void protobuf_ShutdownFile_frame_2epiqi_2eproto();
 
-class std_frame;
 class operand_list;
 class operand_info;
 class operand_info_specific;
@@ -38,6 +37,7 @@ class reg_operand;
 class mem_operand;
 class operand_usage;
 class taint_info;
+class std_frame;
 class syscall_frame;
 class argument_list;
 class exception_frame;
@@ -45,126 +45,15 @@ class taint_intro_frame;
 class taint_intro_list;
 class taint_intro;
 class modload_frame;
+class key_frame;
+class tagged_value_lists;
+class tagged_value_list;
+class value_source_tag;
+class value_list;
+class value_info;
 class frame;
 
 // ===================================================================
-
-class std_frame : public ::google::protobuf::Message {
- public:
-  std_frame();
-  virtual ~std_frame();
-  
-  std_frame(const std_frame& from);
-  
-  inline std_frame& operator=(const std_frame& from) {
-    CopyFrom(from);
-    return *this;
-  }
-  
-  inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const {
-    return _unknown_fields_;
-  }
-  
-  inline ::google::protobuf::UnknownFieldSet* mutable_unknown_fields() {
-    return &_unknown_fields_;
-  }
-  
-  static const ::google::protobuf::Descriptor* descriptor();
-  static const std_frame& default_instance();
-  
-  void Swap(std_frame* other);
-  
-  // implements Message ----------------------------------------------
-  
-  std_frame* New() const;
-  void CopyFrom(const ::google::protobuf::Message& from);
-  void MergeFrom(const ::google::protobuf::Message& from);
-  void CopyFrom(const std_frame& from);
-  void MergeFrom(const std_frame& from);
-  void Clear();
-  bool IsInitialized() const;
-  
-  int ByteSize() const;
-  bool MergePartialFromCodedStream(
-      ::google::protobuf::io::CodedInputStream* input);
-  void SerializeWithCachedSizes(
-      ::google::protobuf::io::CodedOutputStream* output) const;
-  ::google::protobuf::uint8* SerializeWithCachedSizesToArray(::google::protobuf::uint8* output) const;
-  int GetCachedSize() const { return _cached_size_; }
-  private:
-  void SharedCtor();
-  void SharedDtor();
-  void SetCachedSize(int size) const;
-  public:
-  
-  ::google::protobuf::Metadata GetMetadata() const;
-  
-  // nested types ----------------------------------------------------
-  
-  // accessors -------------------------------------------------------
-  
-  // required uint64 address = 1;
-  inline bool has_address() const;
-  inline void clear_address();
-  static const int kAddressFieldNumber = 1;
-  inline ::google::protobuf::uint64 address() const;
-  inline void set_address(::google::protobuf::uint64 value);
-  
-  // required uint64 thread_id = 2;
-  inline bool has_thread_id() const;
-  inline void clear_thread_id();
-  static const int kThreadIdFieldNumber = 2;
-  inline ::google::protobuf::uint64 thread_id() const;
-  inline void set_thread_id(::google::protobuf::uint64 value);
-  
-  // required bytes rawbytes = 3;
-  inline bool has_rawbytes() const;
-  inline void clear_rawbytes();
-  static const int kRawbytesFieldNumber = 3;
-  inline const ::std::string& rawbytes() const;
-  inline void set_rawbytes(const ::std::string& value);
-  inline void set_rawbytes(const char* value);
-  inline void set_rawbytes(const void* value, size_t size);
-  inline ::std::string* mutable_rawbytes();
-  inline ::std::string* release_rawbytes();
-  
-  // required .operand_list operand_list = 4;
-  inline bool has_operand_list() const;
-  inline void clear_operand_list();
-  static const int kOperandListFieldNumber = 4;
-  inline const ::operand_list& operand_list() const;
-  inline ::operand_list* mutable_operand_list();
-  inline ::operand_list* release_operand_list();
-  
-  // @@protoc_insertion_point(class_scope:std_frame)
- private:
-  inline void set_has_address();
-  inline void clear_has_address();
-  inline void set_has_thread_id();
-  inline void clear_has_thread_id();
-  inline void set_has_rawbytes();
-  inline void clear_has_rawbytes();
-  inline void set_has_operand_list();
-  inline void clear_has_operand_list();
-  
-  ::google::protobuf::UnknownFieldSet _unknown_fields_;
-  
-  ::google::protobuf::uint64 address_;
-  ::google::protobuf::uint64 thread_id_;
-  ::std::string* rawbytes_;
-  ::operand_list* operand_list_;
-  
-  mutable int _cached_size_;
-  ::google::protobuf::uint32 _has_bits_[(4 + 31) / 32];
-  
-  friend void  protobuf_AddDesc_frame_2epiqi_2eproto();
-  friend void protobuf_AssignDesc_frame_2epiqi_2eproto();
-  friend void protobuf_ShutdownFile_frame_2epiqi_2eproto();
-  
-  void InitAsDefaultInstance();
-  static std_frame* default_instance_;
-};
-// -------------------------------------------------------------------
 
 class operand_list : public ::google::protobuf::Message {
  public:
@@ -856,6 +745,123 @@ class taint_info : public ::google::protobuf::Message {
 };
 // -------------------------------------------------------------------
 
+class std_frame : public ::google::protobuf::Message {
+ public:
+  std_frame();
+  virtual ~std_frame();
+  
+  std_frame(const std_frame& from);
+  
+  inline std_frame& operator=(const std_frame& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  
+  inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const {
+    return _unknown_fields_;
+  }
+  
+  inline ::google::protobuf::UnknownFieldSet* mutable_unknown_fields() {
+    return &_unknown_fields_;
+  }
+  
+  static const ::google::protobuf::Descriptor* descriptor();
+  static const std_frame& default_instance();
+  
+  void Swap(std_frame* other);
+  
+  // implements Message ----------------------------------------------
+  
+  std_frame* New() const;
+  void CopyFrom(const ::google::protobuf::Message& from);
+  void MergeFrom(const ::google::protobuf::Message& from);
+  void CopyFrom(const std_frame& from);
+  void MergeFrom(const std_frame& from);
+  void Clear();
+  bool IsInitialized() const;
+  
+  int ByteSize() const;
+  bool MergePartialFromCodedStream(
+      ::google::protobuf::io::CodedInputStream* input);
+  void SerializeWithCachedSizes(
+      ::google::protobuf::io::CodedOutputStream* output) const;
+  ::google::protobuf::uint8* SerializeWithCachedSizesToArray(::google::protobuf::uint8* output) const;
+  int GetCachedSize() const { return _cached_size_; }
+  private:
+  void SharedCtor();
+  void SharedDtor();
+  void SetCachedSize(int size) const;
+  public:
+  
+  ::google::protobuf::Metadata GetMetadata() const;
+  
+  // nested types ----------------------------------------------------
+  
+  // accessors -------------------------------------------------------
+  
+  // required uint64 address = 1;
+  inline bool has_address() const;
+  inline void clear_address();
+  static const int kAddressFieldNumber = 1;
+  inline ::google::protobuf::uint64 address() const;
+  inline void set_address(::google::protobuf::uint64 value);
+  
+  // required uint64 thread_id = 2;
+  inline bool has_thread_id() const;
+  inline void clear_thread_id();
+  static const int kThreadIdFieldNumber = 2;
+  inline ::google::protobuf::uint64 thread_id() const;
+  inline void set_thread_id(::google::protobuf::uint64 value);
+  
+  // required bytes rawbytes = 3;
+  inline bool has_rawbytes() const;
+  inline void clear_rawbytes();
+  static const int kRawbytesFieldNumber = 3;
+  inline const ::std::string& rawbytes() const;
+  inline void set_rawbytes(const ::std::string& value);
+  inline void set_rawbytes(const char* value);
+  inline void set_rawbytes(const void* value, size_t size);
+  inline ::std::string* mutable_rawbytes();
+  inline ::std::string* release_rawbytes();
+  
+  // required .operand_list operand_list = 4;
+  inline bool has_operand_list() const;
+  inline void clear_operand_list();
+  static const int kOperandListFieldNumber = 4;
+  inline const ::operand_list& operand_list() const;
+  inline ::operand_list* mutable_operand_list();
+  inline ::operand_list* release_operand_list();
+  
+  // @@protoc_insertion_point(class_scope:std_frame)
+ private:
+  inline void set_has_address();
+  inline void clear_has_address();
+  inline void set_has_thread_id();
+  inline void clear_has_thread_id();
+  inline void set_has_rawbytes();
+  inline void clear_has_rawbytes();
+  inline void set_has_operand_list();
+  inline void clear_has_operand_list();
+  
+  ::google::protobuf::UnknownFieldSet _unknown_fields_;
+  
+  ::google::protobuf::uint64 address_;
+  ::google::protobuf::uint64 thread_id_;
+  ::std::string* rawbytes_;
+  ::operand_list* operand_list_;
+  
+  mutable int _cached_size_;
+  ::google::protobuf::uint32 _has_bits_[(4 + 31) / 32];
+  
+  friend void  protobuf_AddDesc_frame_2epiqi_2eproto();
+  friend void protobuf_AssignDesc_frame_2epiqi_2eproto();
+  friend void protobuf_ShutdownFile_frame_2epiqi_2eproto();
+  
+  void InitAsDefaultInstance();
+  static std_frame* default_instance_;
+};
+// -------------------------------------------------------------------
+
 class syscall_frame : public ::google::protobuf::Message {
  public:
   syscall_frame();
@@ -1532,6 +1538,563 @@ class modload_frame : public ::google::protobuf::Message {
 };
 // -------------------------------------------------------------------
 
+class key_frame : public ::google::protobuf::Message {
+ public:
+  key_frame();
+  virtual ~key_frame();
+  
+  key_frame(const key_frame& from);
+  
+  inline key_frame& operator=(const key_frame& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  
+  inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const {
+    return _unknown_fields_;
+  }
+  
+  inline ::google::protobuf::UnknownFieldSet* mutable_unknown_fields() {
+    return &_unknown_fields_;
+  }
+  
+  static const ::google::protobuf::Descriptor* descriptor();
+  static const key_frame& default_instance();
+  
+  void Swap(key_frame* other);
+  
+  // implements Message ----------------------------------------------
+  
+  key_frame* New() const;
+  void CopyFrom(const ::google::protobuf::Message& from);
+  void MergeFrom(const ::google::protobuf::Message& from);
+  void CopyFrom(const key_frame& from);
+  void MergeFrom(const key_frame& from);
+  void Clear();
+  bool IsInitialized() const;
+  
+  int ByteSize() const;
+  bool MergePartialFromCodedStream(
+      ::google::protobuf::io::CodedInputStream* input);
+  void SerializeWithCachedSizes(
+      ::google::protobuf::io::CodedOutputStream* output) const;
+  ::google::protobuf::uint8* SerializeWithCachedSizesToArray(::google::protobuf::uint8* output) const;
+  int GetCachedSize() const { return _cached_size_; }
+  private:
+  void SharedCtor();
+  void SharedDtor();
+  void SetCachedSize(int size) const;
+  public:
+  
+  ::google::protobuf::Metadata GetMetadata() const;
+  
+  // nested types ----------------------------------------------------
+  
+  // accessors -------------------------------------------------------
+  
+  // required .tagged_value_lists tagged_value_lists = 1;
+  inline bool has_tagged_value_lists() const;
+  inline void clear_tagged_value_lists();
+  static const int kTaggedValueListsFieldNumber = 1;
+  inline const ::tagged_value_lists& tagged_value_lists() const;
+  inline ::tagged_value_lists* mutable_tagged_value_lists();
+  inline ::tagged_value_lists* release_tagged_value_lists();
+  
+  // @@protoc_insertion_point(class_scope:key_frame)
+ private:
+  inline void set_has_tagged_value_lists();
+  inline void clear_has_tagged_value_lists();
+  
+  ::google::protobuf::UnknownFieldSet _unknown_fields_;
+  
+  ::tagged_value_lists* tagged_value_lists_;
+  
+  mutable int _cached_size_;
+  ::google::protobuf::uint32 _has_bits_[(1 + 31) / 32];
+  
+  friend void  protobuf_AddDesc_frame_2epiqi_2eproto();
+  friend void protobuf_AssignDesc_frame_2epiqi_2eproto();
+  friend void protobuf_ShutdownFile_frame_2epiqi_2eproto();
+  
+  void InitAsDefaultInstance();
+  static key_frame* default_instance_;
+};
+// -------------------------------------------------------------------
+
+class tagged_value_lists : public ::google::protobuf::Message {
+ public:
+  tagged_value_lists();
+  virtual ~tagged_value_lists();
+  
+  tagged_value_lists(const tagged_value_lists& from);
+  
+  inline tagged_value_lists& operator=(const tagged_value_lists& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  
+  inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const {
+    return _unknown_fields_;
+  }
+  
+  inline ::google::protobuf::UnknownFieldSet* mutable_unknown_fields() {
+    return &_unknown_fields_;
+  }
+  
+  static const ::google::protobuf::Descriptor* descriptor();
+  static const tagged_value_lists& default_instance();
+  
+  void Swap(tagged_value_lists* other);
+  
+  // implements Message ----------------------------------------------
+  
+  tagged_value_lists* New() const;
+  void CopyFrom(const ::google::protobuf::Message& from);
+  void MergeFrom(const ::google::protobuf::Message& from);
+  void CopyFrom(const tagged_value_lists& from);
+  void MergeFrom(const tagged_value_lists& from);
+  void Clear();
+  bool IsInitialized() const;
+  
+  int ByteSize() const;
+  bool MergePartialFromCodedStream(
+      ::google::protobuf::io::CodedInputStream* input);
+  void SerializeWithCachedSizes(
+      ::google::protobuf::io::CodedOutputStream* output) const;
+  ::google::protobuf::uint8* SerializeWithCachedSizesToArray(::google::protobuf::uint8* output) const;
+  int GetCachedSize() const { return _cached_size_; }
+  private:
+  void SharedCtor();
+  void SharedDtor();
+  void SetCachedSize(int size) const;
+  public:
+  
+  ::google::protobuf::Metadata GetMetadata() const;
+  
+  // nested types ----------------------------------------------------
+  
+  // accessors -------------------------------------------------------
+  
+  // repeated .tagged_value_list elem = 1;
+  inline int elem_size() const;
+  inline void clear_elem();
+  static const int kElemFieldNumber = 1;
+  inline const ::tagged_value_list& elem(int index) const;
+  inline ::tagged_value_list* mutable_elem(int index);
+  inline ::tagged_value_list* add_elem();
+  inline const ::google::protobuf::RepeatedPtrField< ::tagged_value_list >&
+      elem() const;
+  inline ::google::protobuf::RepeatedPtrField< ::tagged_value_list >*
+      mutable_elem();
+  
+  // @@protoc_insertion_point(class_scope:tagged_value_lists)
+ private:
+  
+  ::google::protobuf::UnknownFieldSet _unknown_fields_;
+  
+  ::google::protobuf::RepeatedPtrField< ::tagged_value_list > elem_;
+  
+  mutable int _cached_size_;
+  ::google::protobuf::uint32 _has_bits_[(1 + 31) / 32];
+  
+  friend void  protobuf_AddDesc_frame_2epiqi_2eproto();
+  friend void protobuf_AssignDesc_frame_2epiqi_2eproto();
+  friend void protobuf_ShutdownFile_frame_2epiqi_2eproto();
+  
+  void InitAsDefaultInstance();
+  static tagged_value_lists* default_instance_;
+};
+// -------------------------------------------------------------------
+
+class tagged_value_list : public ::google::protobuf::Message {
+ public:
+  tagged_value_list();
+  virtual ~tagged_value_list();
+  
+  tagged_value_list(const tagged_value_list& from);
+  
+  inline tagged_value_list& operator=(const tagged_value_list& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  
+  inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const {
+    return _unknown_fields_;
+  }
+  
+  inline ::google::protobuf::UnknownFieldSet* mutable_unknown_fields() {
+    return &_unknown_fields_;
+  }
+  
+  static const ::google::protobuf::Descriptor* descriptor();
+  static const tagged_value_list& default_instance();
+  
+  void Swap(tagged_value_list* other);
+  
+  // implements Message ----------------------------------------------
+  
+  tagged_value_list* New() const;
+  void CopyFrom(const ::google::protobuf::Message& from);
+  void MergeFrom(const ::google::protobuf::Message& from);
+  void CopyFrom(const tagged_value_list& from);
+  void MergeFrom(const tagged_value_list& from);
+  void Clear();
+  bool IsInitialized() const;
+  
+  int ByteSize() const;
+  bool MergePartialFromCodedStream(
+      ::google::protobuf::io::CodedInputStream* input);
+  void SerializeWithCachedSizes(
+      ::google::protobuf::io::CodedOutputStream* output) const;
+  ::google::protobuf::uint8* SerializeWithCachedSizesToArray(::google::protobuf::uint8* output) const;
+  int GetCachedSize() const { return _cached_size_; }
+  private:
+  void SharedCtor();
+  void SharedDtor();
+  void SetCachedSize(int size) const;
+  public:
+  
+  ::google::protobuf::Metadata GetMetadata() const;
+  
+  // nested types ----------------------------------------------------
+  
+  // accessors -------------------------------------------------------
+  
+  // required .value_source_tag value_source_tag = 1;
+  inline bool has_value_source_tag() const;
+  inline void clear_value_source_tag();
+  static const int kValueSourceTagFieldNumber = 1;
+  inline const ::value_source_tag& value_source_tag() const;
+  inline ::value_source_tag* mutable_value_source_tag();
+  inline ::value_source_tag* release_value_source_tag();
+  
+  // required .value_list value_list = 2;
+  inline bool has_value_list() const;
+  inline void clear_value_list();
+  static const int kValueListFieldNumber = 2;
+  inline const ::value_list& value_list() const;
+  inline ::value_list* mutable_value_list();
+  inline ::value_list* release_value_list();
+  
+  // @@protoc_insertion_point(class_scope:tagged_value_list)
+ private:
+  inline void set_has_value_source_tag();
+  inline void clear_has_value_source_tag();
+  inline void set_has_value_list();
+  inline void clear_has_value_list();
+  
+  ::google::protobuf::UnknownFieldSet _unknown_fields_;
+  
+  ::value_source_tag* value_source_tag_;
+  ::value_list* value_list_;
+  
+  mutable int _cached_size_;
+  ::google::protobuf::uint32 _has_bits_[(2 + 31) / 32];
+  
+  friend void  protobuf_AddDesc_frame_2epiqi_2eproto();
+  friend void protobuf_AssignDesc_frame_2epiqi_2eproto();
+  friend void protobuf_ShutdownFile_frame_2epiqi_2eproto();
+  
+  void InitAsDefaultInstance();
+  static tagged_value_list* default_instance_;
+};
+// -------------------------------------------------------------------
+
+class value_source_tag : public ::google::protobuf::Message {
+ public:
+  value_source_tag();
+  virtual ~value_source_tag();
+  
+  value_source_tag(const value_source_tag& from);
+  
+  inline value_source_tag& operator=(const value_source_tag& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  
+  inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const {
+    return _unknown_fields_;
+  }
+  
+  inline ::google::protobuf::UnknownFieldSet* mutable_unknown_fields() {
+    return &_unknown_fields_;
+  }
+  
+  static const ::google::protobuf::Descriptor* descriptor();
+  static const value_source_tag& default_instance();
+  
+  void Swap(value_source_tag* other);
+  
+  // implements Message ----------------------------------------------
+  
+  value_source_tag* New() const;
+  void CopyFrom(const ::google::protobuf::Message& from);
+  void MergeFrom(const ::google::protobuf::Message& from);
+  void CopyFrom(const value_source_tag& from);
+  void MergeFrom(const value_source_tag& from);
+  void Clear();
+  bool IsInitialized() const;
+  
+  int ByteSize() const;
+  bool MergePartialFromCodedStream(
+      ::google::protobuf::io::CodedInputStream* input);
+  void SerializeWithCachedSizes(
+      ::google::protobuf::io::CodedOutputStream* output) const;
+  ::google::protobuf::uint8* SerializeWithCachedSizesToArray(::google::protobuf::uint8* output) const;
+  int GetCachedSize() const { return _cached_size_; }
+  private:
+  void SharedCtor();
+  void SharedDtor();
+  void SetCachedSize(int size) const;
+  public:
+  
+  ::google::protobuf::Metadata GetMetadata() const;
+  
+  // nested types ----------------------------------------------------
+  
+  // accessors -------------------------------------------------------
+  
+  // optional bool no_thread_id = 1;
+  inline bool has_no_thread_id() const;
+  inline void clear_no_thread_id();
+  static const int kNoThreadIdFieldNumber = 1;
+  inline bool no_thread_id() const;
+  inline void set_no_thread_id(bool value);
+  
+  // optional uint64 thread_id = 2;
+  inline bool has_thread_id() const;
+  inline void clear_thread_id();
+  static const int kThreadIdFieldNumber = 2;
+  inline ::google::protobuf::uint64 thread_id() const;
+  inline void set_thread_id(::google::protobuf::uint64 value);
+  
+  // @@protoc_insertion_point(class_scope:value_source_tag)
+ private:
+  inline void set_has_no_thread_id();
+  inline void clear_has_no_thread_id();
+  inline void set_has_thread_id();
+  inline void clear_has_thread_id();
+  
+  ::google::protobuf::UnknownFieldSet _unknown_fields_;
+  
+  ::google::protobuf::uint64 thread_id_;
+  bool no_thread_id_;
+  
+  mutable int _cached_size_;
+  ::google::protobuf::uint32 _has_bits_[(2 + 31) / 32];
+  
+  friend void  protobuf_AddDesc_frame_2epiqi_2eproto();
+  friend void protobuf_AssignDesc_frame_2epiqi_2eproto();
+  friend void protobuf_ShutdownFile_frame_2epiqi_2eproto();
+  
+  void InitAsDefaultInstance();
+  static value_source_tag* default_instance_;
+};
+// -------------------------------------------------------------------
+
+class value_list : public ::google::protobuf::Message {
+ public:
+  value_list();
+  virtual ~value_list();
+  
+  value_list(const value_list& from);
+  
+  inline value_list& operator=(const value_list& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  
+  inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const {
+    return _unknown_fields_;
+  }
+  
+  inline ::google::protobuf::UnknownFieldSet* mutable_unknown_fields() {
+    return &_unknown_fields_;
+  }
+  
+  static const ::google::protobuf::Descriptor* descriptor();
+  static const value_list& default_instance();
+  
+  void Swap(value_list* other);
+  
+  // implements Message ----------------------------------------------
+  
+  value_list* New() const;
+  void CopyFrom(const ::google::protobuf::Message& from);
+  void MergeFrom(const ::google::protobuf::Message& from);
+  void CopyFrom(const value_list& from);
+  void MergeFrom(const value_list& from);
+  void Clear();
+  bool IsInitialized() const;
+  
+  int ByteSize() const;
+  bool MergePartialFromCodedStream(
+      ::google::protobuf::io::CodedInputStream* input);
+  void SerializeWithCachedSizes(
+      ::google::protobuf::io::CodedOutputStream* output) const;
+  ::google::protobuf::uint8* SerializeWithCachedSizesToArray(::google::protobuf::uint8* output) const;
+  int GetCachedSize() const { return _cached_size_; }
+  private:
+  void SharedCtor();
+  void SharedDtor();
+  void SetCachedSize(int size) const;
+  public:
+  
+  ::google::protobuf::Metadata GetMetadata() const;
+  
+  // nested types ----------------------------------------------------
+  
+  // accessors -------------------------------------------------------
+  
+  // repeated .value_info elem = 1;
+  inline int elem_size() const;
+  inline void clear_elem();
+  static const int kElemFieldNumber = 1;
+  inline const ::value_info& elem(int index) const;
+  inline ::value_info* mutable_elem(int index);
+  inline ::value_info* add_elem();
+  inline const ::google::protobuf::RepeatedPtrField< ::value_info >&
+      elem() const;
+  inline ::google::protobuf::RepeatedPtrField< ::value_info >*
+      mutable_elem();
+  
+  // @@protoc_insertion_point(class_scope:value_list)
+ private:
+  
+  ::google::protobuf::UnknownFieldSet _unknown_fields_;
+  
+  ::google::protobuf::RepeatedPtrField< ::value_info > elem_;
+  
+  mutable int _cached_size_;
+  ::google::protobuf::uint32 _has_bits_[(1 + 31) / 32];
+  
+  friend void  protobuf_AddDesc_frame_2epiqi_2eproto();
+  friend void protobuf_AssignDesc_frame_2epiqi_2eproto();
+  friend void protobuf_ShutdownFile_frame_2epiqi_2eproto();
+  
+  void InitAsDefaultInstance();
+  static value_list* default_instance_;
+};
+// -------------------------------------------------------------------
+
+class value_info : public ::google::protobuf::Message {
+ public:
+  value_info();
+  virtual ~value_info();
+  
+  value_info(const value_info& from);
+  
+  inline value_info& operator=(const value_info& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  
+  inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const {
+    return _unknown_fields_;
+  }
+  
+  inline ::google::protobuf::UnknownFieldSet* mutable_unknown_fields() {
+    return &_unknown_fields_;
+  }
+  
+  static const ::google::protobuf::Descriptor* descriptor();
+  static const value_info& default_instance();
+  
+  void Swap(value_info* other);
+  
+  // implements Message ----------------------------------------------
+  
+  value_info* New() const;
+  void CopyFrom(const ::google::protobuf::Message& from);
+  void MergeFrom(const ::google::protobuf::Message& from);
+  void CopyFrom(const value_info& from);
+  void MergeFrom(const value_info& from);
+  void Clear();
+  bool IsInitialized() const;
+  
+  int ByteSize() const;
+  bool MergePartialFromCodedStream(
+      ::google::protobuf::io::CodedInputStream* input);
+  void SerializeWithCachedSizes(
+      ::google::protobuf::io::CodedOutputStream* output) const;
+  ::google::protobuf::uint8* SerializeWithCachedSizesToArray(::google::protobuf::uint8* output) const;
+  int GetCachedSize() const { return _cached_size_; }
+  private:
+  void SharedCtor();
+  void SharedDtor();
+  void SetCachedSize(int size) const;
+  public:
+  
+  ::google::protobuf::Metadata GetMetadata() const;
+  
+  // nested types ----------------------------------------------------
+  
+  // accessors -------------------------------------------------------
+  
+  // required .operand_info_specific operand_info_specific = 1;
+  inline bool has_operand_info_specific() const;
+  inline void clear_operand_info_specific();
+  static const int kOperandInfoSpecificFieldNumber = 1;
+  inline const ::operand_info_specific& operand_info_specific() const;
+  inline ::operand_info_specific* mutable_operand_info_specific();
+  inline ::operand_info_specific* release_operand_info_specific();
+  
+  // required sint32 bit_length = 2;
+  inline bool has_bit_length() const;
+  inline void clear_bit_length();
+  static const int kBitLengthFieldNumber = 2;
+  inline ::google::protobuf::int32 bit_length() const;
+  inline void set_bit_length(::google::protobuf::int32 value);
+  
+  // optional .taint_info taint_info = 3;
+  inline bool has_taint_info() const;
+  inline void clear_taint_info();
+  static const int kTaintInfoFieldNumber = 3;
+  inline const ::taint_info& taint_info() const;
+  inline ::taint_info* mutable_taint_info();
+  inline ::taint_info* release_taint_info();
+  
+  // required bytes value = 4;
+  inline bool has_value() const;
+  inline void clear_value();
+  static const int kValueFieldNumber = 4;
+  inline const ::std::string& value() const;
+  inline void set_value(const ::std::string& value);
+  inline void set_value(const char* value);
+  inline void set_value(const void* value, size_t size);
+  inline ::std::string* mutable_value();
+  inline ::std::string* release_value();
+  
+  // @@protoc_insertion_point(class_scope:value_info)
+ private:
+  inline void set_has_operand_info_specific();
+  inline void clear_has_operand_info_specific();
+  inline void set_has_bit_length();
+  inline void clear_has_bit_length();
+  inline void set_has_taint_info();
+  inline void clear_has_taint_info();
+  inline void set_has_value();
+  inline void clear_has_value();
+  
+  ::google::protobuf::UnknownFieldSet _unknown_fields_;
+  
+  ::operand_info_specific* operand_info_specific_;
+  ::taint_info* taint_info_;
+  ::std::string* value_;
+  ::google::protobuf::int32 bit_length_;
+  
+  mutable int _cached_size_;
+  ::google::protobuf::uint32 _has_bits_[(4 + 31) / 32];
+  
+  friend void  protobuf_AddDesc_frame_2epiqi_2eproto();
+  friend void protobuf_AssignDesc_frame_2epiqi_2eproto();
+  friend void protobuf_ShutdownFile_frame_2epiqi_2eproto();
+  
+  void InitAsDefaultInstance();
+  static value_info* default_instance_;
+};
+// -------------------------------------------------------------------
+
 class frame : public ::google::protobuf::Message {
  public:
   frame();
@@ -1626,6 +2189,14 @@ class frame : public ::google::protobuf::Message {
   inline ::modload_frame* mutable_modload_frame();
   inline ::modload_frame* release_modload_frame();
   
+  // optional .key_frame key_frame = 6;
+  inline bool has_key_frame() const;
+  inline void clear_key_frame();
+  static const int kKeyFrameFieldNumber = 6;
+  inline const ::key_frame& key_frame() const;
+  inline ::key_frame* mutable_key_frame();
+  inline ::key_frame* release_key_frame();
+  
   // @@protoc_insertion_point(class_scope:frame)
  private:
   inline void set_has_std_frame();
@@ -1638,6 +2209,8 @@ class frame : public ::google::protobuf::Message {
   inline void clear_has_taint_intro_frame();
   inline void set_has_modload_frame();
   inline void clear_has_modload_frame();
+  inline void set_has_key_frame();
+  inline void clear_has_key_frame();
   
   ::google::protobuf::UnknownFieldSet _unknown_fields_;
   
@@ -1646,9 +2219,10 @@ class frame : public ::google::protobuf::Message {
   ::exception_frame* exception_frame_;
   ::taint_intro_frame* taint_intro_frame_;
   ::modload_frame* modload_frame_;
+  ::key_frame* key_frame_;
   
   mutable int _cached_size_;
-  ::google::protobuf::uint32 _has_bits_[(5 + 31) / 32];
+  ::google::protobuf::uint32 _has_bits_[(6 + 31) / 32];
   
   friend void  protobuf_AddDesc_frame_2epiqi_2eproto();
   friend void protobuf_AssignDesc_frame_2epiqi_2eproto();
@@ -1661,141 +2235,6 @@ class frame : public ::google::protobuf::Message {
 
 
 // ===================================================================
-
-// std_frame
-
-// required uint64 address = 1;
-inline bool std_frame::has_address() const {
-  return (_has_bits_[0] & 0x00000001u) != 0;
-}
-inline void std_frame::set_has_address() {
-  _has_bits_[0] |= 0x00000001u;
-}
-inline void std_frame::clear_has_address() {
-  _has_bits_[0] &= ~0x00000001u;
-}
-inline void std_frame::clear_address() {
-  address_ = GOOGLE_ULONGLONG(0);
-  clear_has_address();
-}
-inline ::google::protobuf::uint64 std_frame::address() const {
-  return address_;
-}
-inline void std_frame::set_address(::google::protobuf::uint64 value) {
-  set_has_address();
-  address_ = value;
-}
-
-// required uint64 thread_id = 2;
-inline bool std_frame::has_thread_id() const {
-  return (_has_bits_[0] & 0x00000002u) != 0;
-}
-inline void std_frame::set_has_thread_id() {
-  _has_bits_[0] |= 0x00000002u;
-}
-inline void std_frame::clear_has_thread_id() {
-  _has_bits_[0] &= ~0x00000002u;
-}
-inline void std_frame::clear_thread_id() {
-  thread_id_ = GOOGLE_ULONGLONG(0);
-  clear_has_thread_id();
-}
-inline ::google::protobuf::uint64 std_frame::thread_id() const {
-  return thread_id_;
-}
-inline void std_frame::set_thread_id(::google::protobuf::uint64 value) {
-  set_has_thread_id();
-  thread_id_ = value;
-}
-
-// required bytes rawbytes = 3;
-inline bool std_frame::has_rawbytes() const {
-  return (_has_bits_[0] & 0x00000004u) != 0;
-}
-inline void std_frame::set_has_rawbytes() {
-  _has_bits_[0] |= 0x00000004u;
-}
-inline void std_frame::clear_has_rawbytes() {
-  _has_bits_[0] &= ~0x00000004u;
-}
-inline void std_frame::clear_rawbytes() {
-  if (rawbytes_ != &::google::protobuf::internal::kEmptyString) {
-    rawbytes_->clear();
-  }
-  clear_has_rawbytes();
-}
-inline const ::std::string& std_frame::rawbytes() const {
-  return *rawbytes_;
-}
-inline void std_frame::set_rawbytes(const ::std::string& value) {
-  set_has_rawbytes();
-  if (rawbytes_ == &::google::protobuf::internal::kEmptyString) {
-    rawbytes_ = new ::std::string;
-  }
-  rawbytes_->assign(value);
-}
-inline void std_frame::set_rawbytes(const char* value) {
-  set_has_rawbytes();
-  if (rawbytes_ == &::google::protobuf::internal::kEmptyString) {
-    rawbytes_ = new ::std::string;
-  }
-  rawbytes_->assign(value);
-}
-inline void std_frame::set_rawbytes(const void* value, size_t size) {
-  set_has_rawbytes();
-  if (rawbytes_ == &::google::protobuf::internal::kEmptyString) {
-    rawbytes_ = new ::std::string;
-  }
-  rawbytes_->assign(reinterpret_cast<const char*>(value), size);
-}
-inline ::std::string* std_frame::mutable_rawbytes() {
-  set_has_rawbytes();
-  if (rawbytes_ == &::google::protobuf::internal::kEmptyString) {
-    rawbytes_ = new ::std::string;
-  }
-  return rawbytes_;
-}
-inline ::std::string* std_frame::release_rawbytes() {
-  clear_has_rawbytes();
-  if (rawbytes_ == &::google::protobuf::internal::kEmptyString) {
-    return NULL;
-  } else {
-    ::std::string* temp = rawbytes_;
-    rawbytes_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
-    return temp;
-  }
-}
-
-// required .operand_list operand_list = 4;
-inline bool std_frame::has_operand_list() const {
-  return (_has_bits_[0] & 0x00000008u) != 0;
-}
-inline void std_frame::set_has_operand_list() {
-  _has_bits_[0] |= 0x00000008u;
-}
-inline void std_frame::clear_has_operand_list() {
-  _has_bits_[0] &= ~0x00000008u;
-}
-inline void std_frame::clear_operand_list() {
-  if (operand_list_ != NULL) operand_list_->::operand_list::Clear();
-  clear_has_operand_list();
-}
-inline const ::operand_list& std_frame::operand_list() const {
-  return operand_list_ != NULL ? *operand_list_ : *default_instance_->operand_list_;
-}
-inline ::operand_list* std_frame::mutable_operand_list() {
-  set_has_operand_list();
-  if (operand_list_ == NULL) operand_list_ = new ::operand_list;
-  return operand_list_;
-}
-inline ::operand_list* std_frame::release_operand_list() {
-  clear_has_operand_list();
-  ::operand_list* temp = operand_list_;
-  operand_list_ = NULL;
-  return temp;
-}
-
-// -------------------------------------------------------------------
 
 // operand_list
 
@@ -2309,6 +2748,141 @@ inline void taint_info::set_taint_multiple(bool value) {
 
 // -------------------------------------------------------------------
 
+// std_frame
+
+// required uint64 address = 1;
+inline bool std_frame::has_address() const {
+  return (_has_bits_[0] & 0x00000001u) != 0;
+}
+inline void std_frame::set_has_address() {
+  _has_bits_[0] |= 0x00000001u;
+}
+inline void std_frame::clear_has_address() {
+  _has_bits_[0] &= ~0x00000001u;
+}
+inline void std_frame::clear_address() {
+  address_ = GOOGLE_ULONGLONG(0);
+  clear_has_address();
+}
+inline ::google::protobuf::uint64 std_frame::address() const {
+  return address_;
+}
+inline void std_frame::set_address(::google::protobuf::uint64 value) {
+  set_has_address();
+  address_ = value;
+}
+
+// required uint64 thread_id = 2;
+inline bool std_frame::has_thread_id() const {
+  return (_has_bits_[0] & 0x00000002u) != 0;
+}
+inline void std_frame::set_has_thread_id() {
+  _has_bits_[0] |= 0x00000002u;
+}
+inline void std_frame::clear_has_thread_id() {
+  _has_bits_[0] &= ~0x00000002u;
+}
+inline void std_frame::clear_thread_id() {
+  thread_id_ = GOOGLE_ULONGLONG(0);
+  clear_has_thread_id();
+}
+inline ::google::protobuf::uint64 std_frame::thread_id() const {
+  return thread_id_;
+}
+inline void std_frame::set_thread_id(::google::protobuf::uint64 value) {
+  set_has_thread_id();
+  thread_id_ = value;
+}
+
+// required bytes rawbytes = 3;
+inline bool std_frame::has_rawbytes() const {
+  return (_has_bits_[0] & 0x00000004u) != 0;
+}
+inline void std_frame::set_has_rawbytes() {
+  _has_bits_[0] |= 0x00000004u;
+}
+inline void std_frame::clear_has_rawbytes() {
+  _has_bits_[0] &= ~0x00000004u;
+}
+inline void std_frame::clear_rawbytes() {
+  if (rawbytes_ != &::google::protobuf::internal::kEmptyString) {
+    rawbytes_->clear();
+  }
+  clear_has_rawbytes();
+}
+inline const ::std::string& std_frame::rawbytes() const {
+  return *rawbytes_;
+}
+inline void std_frame::set_rawbytes(const ::std::string& value) {
+  set_has_rawbytes();
+  if (rawbytes_ == &::google::protobuf::internal::kEmptyString) {
+    rawbytes_ = new ::std::string;
+  }
+  rawbytes_->assign(value);
+}
+inline void std_frame::set_rawbytes(const char* value) {
+  set_has_rawbytes();
+  if (rawbytes_ == &::google::protobuf::internal::kEmptyString) {
+    rawbytes_ = new ::std::string;
+  }
+  rawbytes_->assign(value);
+}
+inline void std_frame::set_rawbytes(const void* value, size_t size) {
+  set_has_rawbytes();
+  if (rawbytes_ == &::google::protobuf::internal::kEmptyString) {
+    rawbytes_ = new ::std::string;
+  }
+  rawbytes_->assign(reinterpret_cast<const char*>(value), size);
+}
+inline ::std::string* std_frame::mutable_rawbytes() {
+  set_has_rawbytes();
+  if (rawbytes_ == &::google::protobuf::internal::kEmptyString) {
+    rawbytes_ = new ::std::string;
+  }
+  return rawbytes_;
+}
+inline ::std::string* std_frame::release_rawbytes() {
+  clear_has_rawbytes();
+  if (rawbytes_ == &::google::protobuf::internal::kEmptyString) {
+    return NULL;
+  } else {
+    ::std::string* temp = rawbytes_;
+    rawbytes_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
+    return temp;
+  }
+}
+
+// required .operand_list operand_list = 4;
+inline bool std_frame::has_operand_list() const {
+  return (_has_bits_[0] & 0x00000008u) != 0;
+}
+inline void std_frame::set_has_operand_list() {
+  _has_bits_[0] |= 0x00000008u;
+}
+inline void std_frame::clear_has_operand_list() {
+  _has_bits_[0] &= ~0x00000008u;
+}
+inline void std_frame::clear_operand_list() {
+  if (operand_list_ != NULL) operand_list_->::operand_list::Clear();
+  clear_has_operand_list();
+}
+inline const ::operand_list& std_frame::operand_list() const {
+  return operand_list_ != NULL ? *operand_list_ : *default_instance_->operand_list_;
+}
+inline ::operand_list* std_frame::mutable_operand_list() {
+  set_has_operand_list();
+  if (operand_list_ == NULL) operand_list_ = new ::operand_list;
+  return operand_list_;
+}
+inline ::operand_list* std_frame::release_operand_list() {
+  clear_has_operand_list();
+  ::operand_list* temp = operand_list_;
+  operand_list_ = NULL;
+  return temp;
+}
+
+// -------------------------------------------------------------------
+
 // syscall_frame
 
 // required uint64 address = 1;
@@ -2745,6 +3319,349 @@ inline void modload_frame::set_high_address(::google::protobuf::uint64 value) {
 
 // -------------------------------------------------------------------
 
+// key_frame
+
+// required .tagged_value_lists tagged_value_lists = 1;
+inline bool key_frame::has_tagged_value_lists() const {
+  return (_has_bits_[0] & 0x00000001u) != 0;
+}
+inline void key_frame::set_has_tagged_value_lists() {
+  _has_bits_[0] |= 0x00000001u;
+}
+inline void key_frame::clear_has_tagged_value_lists() {
+  _has_bits_[0] &= ~0x00000001u;
+}
+inline void key_frame::clear_tagged_value_lists() {
+  if (tagged_value_lists_ != NULL) tagged_value_lists_->::tagged_value_lists::Clear();
+  clear_has_tagged_value_lists();
+}
+inline const ::tagged_value_lists& key_frame::tagged_value_lists() const {
+  return tagged_value_lists_ != NULL ? *tagged_value_lists_ : *default_instance_->tagged_value_lists_;
+}
+inline ::tagged_value_lists* key_frame::mutable_tagged_value_lists() {
+  set_has_tagged_value_lists();
+  if (tagged_value_lists_ == NULL) tagged_value_lists_ = new ::tagged_value_lists;
+  return tagged_value_lists_;
+}
+inline ::tagged_value_lists* key_frame::release_tagged_value_lists() {
+  clear_has_tagged_value_lists();
+  ::tagged_value_lists* temp = tagged_value_lists_;
+  tagged_value_lists_ = NULL;
+  return temp;
+}
+
+// -------------------------------------------------------------------
+
+// tagged_value_lists
+
+// repeated .tagged_value_list elem = 1;
+inline int tagged_value_lists::elem_size() const {
+  return elem_.size();
+}
+inline void tagged_value_lists::clear_elem() {
+  elem_.Clear();
+}
+inline const ::tagged_value_list& tagged_value_lists::elem(int index) const {
+  return elem_.Get(index);
+}
+inline ::tagged_value_list* tagged_value_lists::mutable_elem(int index) {
+  return elem_.Mutable(index);
+}
+inline ::tagged_value_list* tagged_value_lists::add_elem() {
+  return elem_.Add();
+}
+inline const ::google::protobuf::RepeatedPtrField< ::tagged_value_list >&
+tagged_value_lists::elem() const {
+  return elem_;
+}
+inline ::google::protobuf::RepeatedPtrField< ::tagged_value_list >*
+tagged_value_lists::mutable_elem() {
+  return &elem_;
+}
+
+// -------------------------------------------------------------------
+
+// tagged_value_list
+
+// required .value_source_tag value_source_tag = 1;
+inline bool tagged_value_list::has_value_source_tag() const {
+  return (_has_bits_[0] & 0x00000001u) != 0;
+}
+inline void tagged_value_list::set_has_value_source_tag() {
+  _has_bits_[0] |= 0x00000001u;
+}
+inline void tagged_value_list::clear_has_value_source_tag() {
+  _has_bits_[0] &= ~0x00000001u;
+}
+inline void tagged_value_list::clear_value_source_tag() {
+  if (value_source_tag_ != NULL) value_source_tag_->::value_source_tag::Clear();
+  clear_has_value_source_tag();
+}
+inline const ::value_source_tag& tagged_value_list::value_source_tag() const {
+  return value_source_tag_ != NULL ? *value_source_tag_ : *default_instance_->value_source_tag_;
+}
+inline ::value_source_tag* tagged_value_list::mutable_value_source_tag() {
+  set_has_value_source_tag();
+  if (value_source_tag_ == NULL) value_source_tag_ = new ::value_source_tag;
+  return value_source_tag_;
+}
+inline ::value_source_tag* tagged_value_list::release_value_source_tag() {
+  clear_has_value_source_tag();
+  ::value_source_tag* temp = value_source_tag_;
+  value_source_tag_ = NULL;
+  return temp;
+}
+
+// required .value_list value_list = 2;
+inline bool tagged_value_list::has_value_list() const {
+  return (_has_bits_[0] & 0x00000002u) != 0;
+}
+inline void tagged_value_list::set_has_value_list() {
+  _has_bits_[0] |= 0x00000002u;
+}
+inline void tagged_value_list::clear_has_value_list() {
+  _has_bits_[0] &= ~0x00000002u;
+}
+inline void tagged_value_list::clear_value_list() {
+  if (value_list_ != NULL) value_list_->::value_list::Clear();
+  clear_has_value_list();
+}
+inline const ::value_list& tagged_value_list::value_list() const {
+  return value_list_ != NULL ? *value_list_ : *default_instance_->value_list_;
+}
+inline ::value_list* tagged_value_list::mutable_value_list() {
+  set_has_value_list();
+  if (value_list_ == NULL) value_list_ = new ::value_list;
+  return value_list_;
+}
+inline ::value_list* tagged_value_list::release_value_list() {
+  clear_has_value_list();
+  ::value_list* temp = value_list_;
+  value_list_ = NULL;
+  return temp;
+}
+
+// -------------------------------------------------------------------
+
+// value_source_tag
+
+// optional bool no_thread_id = 1;
+inline bool value_source_tag::has_no_thread_id() const {
+  return (_has_bits_[0] & 0x00000001u) != 0;
+}
+inline void value_source_tag::set_has_no_thread_id() {
+  _has_bits_[0] |= 0x00000001u;
+}
+inline void value_source_tag::clear_has_no_thread_id() {
+  _has_bits_[0] &= ~0x00000001u;
+}
+inline void value_source_tag::clear_no_thread_id() {
+  no_thread_id_ = false;
+  clear_has_no_thread_id();
+}
+inline bool value_source_tag::no_thread_id() const {
+  return no_thread_id_;
+}
+inline void value_source_tag::set_no_thread_id(bool value) {
+  set_has_no_thread_id();
+  no_thread_id_ = value;
+}
+
+// optional uint64 thread_id = 2;
+inline bool value_source_tag::has_thread_id() const {
+  return (_has_bits_[0] & 0x00000002u) != 0;
+}
+inline void value_source_tag::set_has_thread_id() {
+  _has_bits_[0] |= 0x00000002u;
+}
+inline void value_source_tag::clear_has_thread_id() {
+  _has_bits_[0] &= ~0x00000002u;
+}
+inline void value_source_tag::clear_thread_id() {
+  thread_id_ = GOOGLE_ULONGLONG(0);
+  clear_has_thread_id();
+}
+inline ::google::protobuf::uint64 value_source_tag::thread_id() const {
+  return thread_id_;
+}
+inline void value_source_tag::set_thread_id(::google::protobuf::uint64 value) {
+  set_has_thread_id();
+  thread_id_ = value;
+}
+
+// -------------------------------------------------------------------
+
+// value_list
+
+// repeated .value_info elem = 1;
+inline int value_list::elem_size() const {
+  return elem_.size();
+}
+inline void value_list::clear_elem() {
+  elem_.Clear();
+}
+inline const ::value_info& value_list::elem(int index) const {
+  return elem_.Get(index);
+}
+inline ::value_info* value_list::mutable_elem(int index) {
+  return elem_.Mutable(index);
+}
+inline ::value_info* value_list::add_elem() {
+  return elem_.Add();
+}
+inline const ::google::protobuf::RepeatedPtrField< ::value_info >&
+value_list::elem() const {
+  return elem_;
+}
+inline ::google::protobuf::RepeatedPtrField< ::value_info >*
+value_list::mutable_elem() {
+  return &elem_;
+}
+
+// -------------------------------------------------------------------
+
+// value_info
+
+// required .operand_info_specific operand_info_specific = 1;
+inline bool value_info::has_operand_info_specific() const {
+  return (_has_bits_[0] & 0x00000001u) != 0;
+}
+inline void value_info::set_has_operand_info_specific() {
+  _has_bits_[0] |= 0x00000001u;
+}
+inline void value_info::clear_has_operand_info_specific() {
+  _has_bits_[0] &= ~0x00000001u;
+}
+inline void value_info::clear_operand_info_specific() {
+  if (operand_info_specific_ != NULL) operand_info_specific_->::operand_info_specific::Clear();
+  clear_has_operand_info_specific();
+}
+inline const ::operand_info_specific& value_info::operand_info_specific() const {
+  return operand_info_specific_ != NULL ? *operand_info_specific_ : *default_instance_->operand_info_specific_;
+}
+inline ::operand_info_specific* value_info::mutable_operand_info_specific() {
+  set_has_operand_info_specific();
+  if (operand_info_specific_ == NULL) operand_info_specific_ = new ::operand_info_specific;
+  return operand_info_specific_;
+}
+inline ::operand_info_specific* value_info::release_operand_info_specific() {
+  clear_has_operand_info_specific();
+  ::operand_info_specific* temp = operand_info_specific_;
+  operand_info_specific_ = NULL;
+  return temp;
+}
+
+// required sint32 bit_length = 2;
+inline bool value_info::has_bit_length() const {
+  return (_has_bits_[0] & 0x00000002u) != 0;
+}
+inline void value_info::set_has_bit_length() {
+  _has_bits_[0] |= 0x00000002u;
+}
+inline void value_info::clear_has_bit_length() {
+  _has_bits_[0] &= ~0x00000002u;
+}
+inline void value_info::clear_bit_length() {
+  bit_length_ = 0;
+  clear_has_bit_length();
+}
+inline ::google::protobuf::int32 value_info::bit_length() const {
+  return bit_length_;
+}
+inline void value_info::set_bit_length(::google::protobuf::int32 value) {
+  set_has_bit_length();
+  bit_length_ = value;
+}
+
+// optional .taint_info taint_info = 3;
+inline bool value_info::has_taint_info() const {
+  return (_has_bits_[0] & 0x00000004u) != 0;
+}
+inline void value_info::set_has_taint_info() {
+  _has_bits_[0] |= 0x00000004u;
+}
+inline void value_info::clear_has_taint_info() {
+  _has_bits_[0] &= ~0x00000004u;
+}
+inline void value_info::clear_taint_info() {
+  if (taint_info_ != NULL) taint_info_->::taint_info::Clear();
+  clear_has_taint_info();
+}
+inline const ::taint_info& value_info::taint_info() const {
+  return taint_info_ != NULL ? *taint_info_ : *default_instance_->taint_info_;
+}
+inline ::taint_info* value_info::mutable_taint_info() {
+  set_has_taint_info();
+  if (taint_info_ == NULL) taint_info_ = new ::taint_info;
+  return taint_info_;
+}
+inline ::taint_info* value_info::release_taint_info() {
+  clear_has_taint_info();
+  ::taint_info* temp = taint_info_;
+  taint_info_ = NULL;
+  return temp;
+}
+
+// required bytes value = 4;
+inline bool value_info::has_value() const {
+  return (_has_bits_[0] & 0x00000008u) != 0;
+}
+inline void value_info::set_has_value() {
+  _has_bits_[0] |= 0x00000008u;
+}
+inline void value_info::clear_has_value() {
+  _has_bits_[0] &= ~0x00000008u;
+}
+inline void value_info::clear_value() {
+  if (value_ != &::google::protobuf::internal::kEmptyString) {
+    value_->clear();
+  }
+  clear_has_value();
+}
+inline const ::std::string& value_info::value() const {
+  return *value_;
+}
+inline void value_info::set_value(const ::std::string& value) {
+  set_has_value();
+  if (value_ == &::google::protobuf::internal::kEmptyString) {
+    value_ = new ::std::string;
+  }
+  value_->assign(value);
+}
+inline void value_info::set_value(const char* value) {
+  set_has_value();
+  if (value_ == &::google::protobuf::internal::kEmptyString) {
+    value_ = new ::std::string;
+  }
+  value_->assign(value);
+}
+inline void value_info::set_value(const void* value, size_t size) {
+  set_has_value();
+  if (value_ == &::google::protobuf::internal::kEmptyString) {
+    value_ = new ::std::string;
+  }
+  value_->assign(reinterpret_cast<const char*>(value), size);
+}
+inline ::std::string* value_info::mutable_value() {
+  set_has_value();
+  if (value_ == &::google::protobuf::internal::kEmptyString) {
+    value_ = new ::std::string;
+  }
+  return value_;
+}
+inline ::std::string* value_info::release_value() {
+  clear_has_value();
+  if (value_ == &::google::protobuf::internal::kEmptyString) {
+    return NULL;
+  } else {
+    ::std::string* temp = value_;
+    value_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
+    return temp;
+  }
+}
+
+// -------------------------------------------------------------------
+
 // frame
 
 // optional .std_frame std_frame = 1;
@@ -2889,6 +3806,35 @@ inline ::modload_frame* frame::release_modload_frame() {
   clear_has_modload_frame();
   ::modload_frame* temp = modload_frame_;
   modload_frame_ = NULL;
+  return temp;
+}
+
+// optional .key_frame key_frame = 6;
+inline bool frame::has_key_frame() const {
+  return (_has_bits_[0] & 0x00000020u) != 0;
+}
+inline void frame::set_has_key_frame() {
+  _has_bits_[0] |= 0x00000020u;
+}
+inline void frame::clear_has_key_frame() {
+  _has_bits_[0] &= ~0x00000020u;
+}
+inline void frame::clear_key_frame() {
+  if (key_frame_ != NULL) key_frame_->::key_frame::Clear();
+  clear_has_key_frame();
+}
+inline const ::key_frame& frame::key_frame() const {
+  return key_frame_ != NULL ? *key_frame_ : *default_instance_->key_frame_;
+}
+inline ::key_frame* frame::mutable_key_frame() {
+  set_has_key_frame();
+  if (key_frame_ == NULL) key_frame_ = new ::key_frame;
+  return key_frame_;
+}
+inline ::key_frame* frame::release_key_frame() {
+  clear_has_key_frame();
+  ::key_frame* temp = key_frame_;
+  key_frame_ = NULL;
   return temp;
 }
 
