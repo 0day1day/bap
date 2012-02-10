@@ -34,6 +34,9 @@
 
 #ifdef _MSC_VER
 #include <io.h>
+#define read _read
+#define write _write
+#define close _close
 #else
 #include <unistd.h>
 #include <sys/types.h>
@@ -56,6 +59,10 @@ namespace io {
 // Win32 lseek is broken:  If invoked on a non-seekable file descriptor, its
 // return value is undefined.  We re-define it to always produce an error.
 #define lseek(fd, offset, origin) ((off_t)-1)
+#endif
+
+#ifdef _MSC_VER
+
 #endif
 
 namespace {
