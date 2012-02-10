@@ -973,7 +973,7 @@ void* GetEnvWWrap(CONTEXT *ctx, AFUNPTR fp, THREADID tid) {
   LLOG("Got callback lock\n");
 
   std::vector<frame> frms = tracker->taintEnv(NULL, (wchar_t*) ret);
-  g_twnew->add<std::vector<frame>> (frms);
+  g_twnew->add<std::vector<frame> > (frms);
 
   ReleaseLock(&lock);
   LLOG("Releasing callback lock\n");
@@ -1009,7 +1009,7 @@ void* GetEnvAWrap(CONTEXT *ctx, AFUNPTR fp, THREADID tid) {
   LLOG("Got callback lock\n");
 
   std::vector<frame> frms = tracker->taintEnv((char*) ret, NULL);
-  g_twnew->add<std::vector<frame>> (frms);
+  g_twnew->add<std::vector<frame> > (frms);
 
   ReleaseLock(&lock);
   LLOG("Releasing callback lock\n");
@@ -1819,11 +1819,9 @@ VOID ThreadStart(THREADID threadid, CONTEXT *ctx, INT32 flags, VOID *v)
     char **argv = (char**) (PIN_GetContextReg(ctx, REG_ESP)+4);
     char **env = (char**) (PIN_GetContextReg(ctx, REG_ESP)+(argc+1)*4);
     std::vector<frame> frms = tracker->taintArgs(argc, argv);
-    g_twnew->add<std::vector<frame>> (frms);
-    FrameOption_t fo = tracker->taintEnv(env);
-    if (fo.b) {
-      g_twnew->add(fo.f);
-    }
+    g_twnew->add<std::vector<frame> > (frms);
+    frms = tracker->taintEnv(env);
+    g_twnew->add <std::vector<frame> > (frms);
 #else /* windows */
     /* On windows, we don't taint argc and argv, but rather taint the
        output of GetComamndLineA and GetCommandLineW.  On recent
@@ -1832,7 +1830,7 @@ VOID ThreadStart(THREADID threadid, CONTEXT *ctx, INT32 flags, VOID *v)
     wchar_t *wptr = WINDOWS::GetCommandLineW();
 
     std::vector<frame> frms = tracker->taintArgs(aptr, wptr);
-    g_twnew->add<std::vector<frame>> (frms);
+    g_twnew->add<std::vector<frame> > (frms);
 #endif
   }
 

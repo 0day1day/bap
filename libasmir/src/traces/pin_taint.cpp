@@ -459,7 +459,7 @@ std::vector<frame> TaintTracker::taintEnv(char **env)
       uint32_t addr = (uint32_t)env[i]+equal+1;
       cerr << "Tainting environment variable: " << var << " @" << (int)addr << endl;
       FrameOption_t fo = introMemTaint(addr, len, "environment variable", -1);
-      if (fo.b) { fv.add(fo.f); }
+      if (fo.b) { fv.push_back(fo.f); }
     }
   }
   return std::vector<frame> ();

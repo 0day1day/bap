@@ -91,7 +91,7 @@ namespace SerializedTrace {
     /** Add all frames in container [c] to the trace. */
     template <typename C>
     void add(C &c) throw (std::ofstream::failure, TraceException) {
-      for (C::iterator i = c.begin(); i != c.end(); i++) {
+      for (typename C::iterator i = c.begin(); i != c.end(); i++) {
     	add(*i);
       }
     }
