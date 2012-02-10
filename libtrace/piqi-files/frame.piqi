@@ -18,6 +18,10 @@
          .module taintintroframe
 ]
 
+.include [
+         .module modloadframe
+]
+
 % Holder of any type of frame
 .variant [
          .name frame
@@ -36,5 +40,9 @@
 
          .option [
                  .type taint-intro-frame
+         ]
+
+         .option [
+                 .type modload-frame
          ]
 ]

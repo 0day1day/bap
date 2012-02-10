@@ -4,7 +4,7 @@ ROOTDIR = $(CURDIR)/../../..
 PIQIBUILDDIR = $(ROOTDIR)/piqi/piqi/build/lib/ocaml
 BATT = $(ROOTDIR)/batteries/_build/src
 
-export OCAMLPATH += $(PIQIBUILDDIR)
+export OCAMLPATH = $(PIQIBUILDDIR)
 
 PACKS = piqi.lib
 
@@ -17,6 +17,8 @@ RESULT  = libtrace
 INCDIRS += $(BATT)
 LIBS += batteries
 
-all:	ncl dcl
+all:
+	$(MAKE) ncl
+	$(MAKE) dcl
 
 include $(OCAMLMAKEFILE)

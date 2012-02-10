@@ -341,9 +341,6 @@ TraceContainerWriter *g_twnew;
 // A taint tracker
 TaintTracker * tracker;
 
-// Vector used to collect TOC entries.
-vector<uint32_t> g_toc;
-
 FrameBuf g_buffer[BUFFER_SIZE];
 uint32_t g_bufidx;
 
@@ -754,9 +751,6 @@ VOID FlushBuffer(BOOL addKeyframe, const CONTEXT *ctx, THREADID threadid, BOOL n
                 (uint16_t) PIN_GetContextReg(ctx, REG_SEG_GS)
                 );
 
-
-      // Add entry to TOC.
-      g_toc.push_back(g_tw->offset());
 
       // And then add the keyframe.
       g_tw->add(kf);
@@ -1856,20 +1850,14 @@ VOID ModLoad(IMG img, VOID *v)
 
   cerr << "This is modload()" << endl;
 
-   LoadModuleFrame f;
-   f.low_addr = IMG_LowAddress(img);
-   f.high_addr = IMG_HighAddress(img);
-   f.start_addr = IMG_StartAddress(img);
-   f.load_offset = IMG_LoadOffset(img);
+  const string &name = IMG_Name(img);
+  
+  frame f;
+  f.mutable_modload_frame()->set_module_name(name);
+  f.mutable_modload_frame()->set_low_address(IMG_LowAddress(img));
+  f.mutable_modload_frame()->set_high_address(IMG_HighAddress(img));
 
-   const string &name = IMG_Name(img);
-
-   size_t sz = name.size() < 64 ? name.size() : 63;
-
-   memset(&(f.name), 0, 64);
-   memcpy(&(f.name), name.c_str(), sz);
-
-   g_tw->add(f);
+  g_twnew->add(f);
 
 #ifdef _WIN32
    // Try to find kernel32
@@ -2349,22 +2337,15 @@ VOID ExceptionHandler(THREADID threadid, CONTEXT_CHANGE_REASON reason, const CON
   // SWHITMANXXX Get information and put it into exception frame here
   // XXX Put this into frame buffer
 
-  ExceptionFrame ef;
-  cerr << "context change" << endl;
-  LLOG("Exception!\n");
-  // Get the address from instruction pointer (should be EIP).
-  if (from)
-    ef.from_addr = (uint32_t) PIN_GetContextReg(from, REG_INST_PTR);
-  else
-    ef.from_addr = -1;
-
-  // Fatal signals have no 'to' context
-  if (to)
-    ef.to_addr = (uint32_t) PIN_GetContextReg(to, REG_INST_PTR);
-  else
-    ef.to_addr = -1;
-  ef.tid = threadid;
-  ef.exception = info;
+  frame f;
+  f.mutable_exception_frame()->set_exception_number(info);
+  f.mutable_exception_frame()->set_thread_id(threadid);
+  if (from) {
+    f.mutable_exception_frame()->set_from_addr(PIN_GetContextReg(from, REG_INST_PTR));
+  }
+  if (to) {
+    f.mutable_exception_frame()->set_to_addr(PIN_GetContextReg(to, REG_INST_PTR));
+  }
 
   GetLock(&lock, threadid+1);  
   LLOG("got except lock!\n");
@@ -2372,7 +2353,7 @@ VOID ExceptionHandler(THREADID threadid, CONTEXT_CHANGE_REASON reason, const CON
   // If we want the exception to be the last thing in the trace when
   // we crash, then we need to flush.
   FlushBuffer(false, from, threadid, false);
-  g_tw->add(ef);
+  g_twnew->add(f);
 
   if (reason == CONTEXT_CHANGE_REASON_FATALSIGNAL) {
     std::cerr << "Received fatal signal " << info << endl;
@@ -2545,24 +2526,7 @@ VOID Fini(INT32 code, VOID *v)
 // Caller responsible for mutual exclusion
 VOID Cleanup()
 {
-   // Build TOC array.
-
-   LOG("Building TOC...\n");
-   cerr << "There are " << g_toc.size() << " elements in the TOC" << endl;
-   
-   uint32_t *toc = new uint32_t[g_toc.size() + 1];
-
-   toc[0] = g_toc.size();
-   for(uint32_t i = 0; i < toc[0]; i++)
-      toc[i+1] = g_toc[i];
-   
-   LOG("done.\n");
-   LOG("Finalizing trace...\n");
-
-   g_tw->finalize(toc);
    g_twnew->finish();
-   
-   delete toc;
 
    LOG("done.\n");
 

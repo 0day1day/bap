@@ -44,6 +44,7 @@ class exception_frame;
 class taint_intro_frame;
 class taint_intro_list;
 class taint_intro;
+class modload_frame;
 class frame;
 
 // ===================================================================
@@ -1121,14 +1122,14 @@ class exception_frame : public ::google::protobuf::Message {
   inline ::google::protobuf::uint64 thread_id() const;
   inline void set_thread_id(::google::protobuf::uint64 value);
   
-  // required uint64 from_addr = 3;
+  // optional uint64 from_addr = 3;
   inline bool has_from_addr() const;
   inline void clear_from_addr();
   static const int kFromAddrFieldNumber = 3;
   inline ::google::protobuf::uint64 from_addr() const;
   inline void set_from_addr(::google::protobuf::uint64 value);
   
-  // required uint64 to_addr = 4;
+  // optional uint64 to_addr = 4;
   inline bool has_to_addr() const;
   inline void clear_to_addr();
   static const int kToAddrFieldNumber = 4;
@@ -1425,6 +1426,112 @@ class taint_intro : public ::google::protobuf::Message {
 };
 // -------------------------------------------------------------------
 
+class modload_frame : public ::google::protobuf::Message {
+ public:
+  modload_frame();
+  virtual ~modload_frame();
+  
+  modload_frame(const modload_frame& from);
+  
+  inline modload_frame& operator=(const modload_frame& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  
+  inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const {
+    return _unknown_fields_;
+  }
+  
+  inline ::google::protobuf::UnknownFieldSet* mutable_unknown_fields() {
+    return &_unknown_fields_;
+  }
+  
+  static const ::google::protobuf::Descriptor* descriptor();
+  static const modload_frame& default_instance();
+  
+  void Swap(modload_frame* other);
+  
+  // implements Message ----------------------------------------------
+  
+  modload_frame* New() const;
+  void CopyFrom(const ::google::protobuf::Message& from);
+  void MergeFrom(const ::google::protobuf::Message& from);
+  void CopyFrom(const modload_frame& from);
+  void MergeFrom(const modload_frame& from);
+  void Clear();
+  bool IsInitialized() const;
+  
+  int ByteSize() const;
+  bool MergePartialFromCodedStream(
+      ::google::protobuf::io::CodedInputStream* input);
+  void SerializeWithCachedSizes(
+      ::google::protobuf::io::CodedOutputStream* output) const;
+  ::google::protobuf::uint8* SerializeWithCachedSizesToArray(::google::protobuf::uint8* output) const;
+  int GetCachedSize() const { return _cached_size_; }
+  private:
+  void SharedCtor();
+  void SharedDtor();
+  void SetCachedSize(int size) const;
+  public:
+  
+  ::google::protobuf::Metadata GetMetadata() const;
+  
+  // nested types ----------------------------------------------------
+  
+  // accessors -------------------------------------------------------
+  
+  // required string module_name = 1;
+  inline bool has_module_name() const;
+  inline void clear_module_name();
+  static const int kModuleNameFieldNumber = 1;
+  inline const ::std::string& module_name() const;
+  inline void set_module_name(const ::std::string& value);
+  inline void set_module_name(const char* value);
+  inline void set_module_name(const char* value, size_t size);
+  inline ::std::string* mutable_module_name();
+  inline ::std::string* release_module_name();
+  
+  // required uint64 low_address = 2;
+  inline bool has_low_address() const;
+  inline void clear_low_address();
+  static const int kLowAddressFieldNumber = 2;
+  inline ::google::protobuf::uint64 low_address() const;
+  inline void set_low_address(::google::protobuf::uint64 value);
+  
+  // required uint64 high_address = 3;
+  inline bool has_high_address() const;
+  inline void clear_high_address();
+  static const int kHighAddressFieldNumber = 3;
+  inline ::google::protobuf::uint64 high_address() const;
+  inline void set_high_address(::google::protobuf::uint64 value);
+  
+  // @@protoc_insertion_point(class_scope:modload_frame)
+ private:
+  inline void set_has_module_name();
+  inline void clear_has_module_name();
+  inline void set_has_low_address();
+  inline void clear_has_low_address();
+  inline void set_has_high_address();
+  inline void clear_has_high_address();
+  
+  ::google::protobuf::UnknownFieldSet _unknown_fields_;
+  
+  ::std::string* module_name_;
+  ::google::protobuf::uint64 low_address_;
+  ::google::protobuf::uint64 high_address_;
+  
+  mutable int _cached_size_;
+  ::google::protobuf::uint32 _has_bits_[(3 + 31) / 32];
+  
+  friend void  protobuf_AddDesc_frame_2epiqi_2eproto();
+  friend void protobuf_AssignDesc_frame_2epiqi_2eproto();
+  friend void protobuf_ShutdownFile_frame_2epiqi_2eproto();
+  
+  void InitAsDefaultInstance();
+  static modload_frame* default_instance_;
+};
+// -------------------------------------------------------------------
+
 class frame : public ::google::protobuf::Message {
  public:
   frame();
@@ -1511,6 +1618,14 @@ class frame : public ::google::protobuf::Message {
   inline ::taint_intro_frame* mutable_taint_intro_frame();
   inline ::taint_intro_frame* release_taint_intro_frame();
   
+  // optional .modload_frame modload_frame = 5;
+  inline bool has_modload_frame() const;
+  inline void clear_modload_frame();
+  static const int kModloadFrameFieldNumber = 5;
+  inline const ::modload_frame& modload_frame() const;
+  inline ::modload_frame* mutable_modload_frame();
+  inline ::modload_frame* release_modload_frame();
+  
   // @@protoc_insertion_point(class_scope:frame)
  private:
   inline void set_has_std_frame();
@@ -1521,6 +1636,8 @@ class frame : public ::google::protobuf::Message {
   inline void clear_has_exception_frame();
   inline void set_has_taint_intro_frame();
   inline void clear_has_taint_intro_frame();
+  inline void set_has_modload_frame();
+  inline void clear_has_modload_frame();
   
   ::google::protobuf::UnknownFieldSet _unknown_fields_;
   
@@ -1528,9 +1645,10 @@ class frame : public ::google::protobuf::Message {
   ::syscall_frame* syscall_frame_;
   ::exception_frame* exception_frame_;
   ::taint_intro_frame* taint_intro_frame_;
+  ::modload_frame* modload_frame_;
   
   mutable int _cached_size_;
-  ::google::protobuf::uint32 _has_bits_[(4 + 31) / 32];
+  ::google::protobuf::uint32 _has_bits_[(5 + 31) / 32];
   
   friend void  protobuf_AddDesc_frame_2epiqi_2eproto();
   friend void protobuf_AssignDesc_frame_2epiqi_2eproto();
@@ -2365,7 +2483,7 @@ inline void exception_frame::set_thread_id(::google::protobuf::uint64 value) {
   thread_id_ = value;
 }
 
-// required uint64 from_addr = 3;
+// optional uint64 from_addr = 3;
 inline bool exception_frame::has_from_addr() const {
   return (_has_bits_[0] & 0x00000004u) != 0;
 }
@@ -2387,7 +2505,7 @@ inline void exception_frame::set_from_addr(::google::protobuf::uint64 value) {
   from_addr_ = value;
 }
 
-// required uint64 to_addr = 4;
+// optional uint64 to_addr = 4;
 inline bool exception_frame::has_to_addr() const {
   return (_has_bits_[0] & 0x00000008u) != 0;
 }
@@ -2521,6 +2639,112 @@ inline void taint_intro::set_taint_id(::google::protobuf::uint64 value) {
 
 // -------------------------------------------------------------------
 
+// modload_frame
+
+// required string module_name = 1;
+inline bool modload_frame::has_module_name() const {
+  return (_has_bits_[0] & 0x00000001u) != 0;
+}
+inline void modload_frame::set_has_module_name() {
+  _has_bits_[0] |= 0x00000001u;
+}
+inline void modload_frame::clear_has_module_name() {
+  _has_bits_[0] &= ~0x00000001u;
+}
+inline void modload_frame::clear_module_name() {
+  if (module_name_ != &::google::protobuf::internal::kEmptyString) {
+    module_name_->clear();
+  }
+  clear_has_module_name();
+}
+inline const ::std::string& modload_frame::module_name() const {
+  return *module_name_;
+}
+inline void modload_frame::set_module_name(const ::std::string& value) {
+  set_has_module_name();
+  if (module_name_ == &::google::protobuf::internal::kEmptyString) {
+    module_name_ = new ::std::string;
+  }
+  module_name_->assign(value);
+}
+inline void modload_frame::set_module_name(const char* value) {
+  set_has_module_name();
+  if (module_name_ == &::google::protobuf::internal::kEmptyString) {
+    module_name_ = new ::std::string;
+  }
+  module_name_->assign(value);
+}
+inline void modload_frame::set_module_name(const char* value, size_t size) {
+  set_has_module_name();
+  if (module_name_ == &::google::protobuf::internal::kEmptyString) {
+    module_name_ = new ::std::string;
+  }
+  module_name_->assign(reinterpret_cast<const char*>(value), size);
+}
+inline ::std::string* modload_frame::mutable_module_name() {
+  set_has_module_name();
+  if (module_name_ == &::google::protobuf::internal::kEmptyString) {
+    module_name_ = new ::std::string;
+  }
+  return module_name_;
+}
+inline ::std::string* modload_frame::release_module_name() {
+  clear_has_module_name();
+  if (module_name_ == &::google::protobuf::internal::kEmptyString) {
+    return NULL;
+  } else {
+    ::std::string* temp = module_name_;
+    module_name_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
+    return temp;
+  }
+}
+
+// required uint64 low_address = 2;
+inline bool modload_frame::has_low_address() const {
+  return (_has_bits_[0] & 0x00000002u) != 0;
+}
+inline void modload_frame::set_has_low_address() {
+  _has_bits_[0] |= 0x00000002u;
+}
+inline void modload_frame::clear_has_low_address() {
+  _has_bits_[0] &= ~0x00000002u;
+}
+inline void modload_frame::clear_low_address() {
+  low_address_ = GOOGLE_ULONGLONG(0);
+  clear_has_low_address();
+}
+inline ::google::protobuf::uint64 modload_frame::low_address() const {
+  return low_address_;
+}
+inline void modload_frame::set_low_address(::google::protobuf::uint64 value) {
+  set_has_low_address();
+  low_address_ = value;
+}
+
+// required uint64 high_address = 3;
+inline bool modload_frame::has_high_address() const {
+  return (_has_bits_[0] & 0x00000004u) != 0;
+}
+inline void modload_frame::set_has_high_address() {
+  _has_bits_[0] |= 0x00000004u;
+}
+inline void modload_frame::clear_has_high_address() {
+  _has_bits_[0] &= ~0x00000004u;
+}
+inline void modload_frame::clear_high_address() {
+  high_address_ = GOOGLE_ULONGLONG(0);
+  clear_has_high_address();
+}
+inline ::google::protobuf::uint64 modload_frame::high_address() const {
+  return high_address_;
+}
+inline void modload_frame::set_high_address(::google::protobuf::uint64 value) {
+  set_has_high_address();
+  high_address_ = value;
+}
+
+// -------------------------------------------------------------------
+
 // frame
 
 // optional .std_frame std_frame = 1;
@@ -2636,6 +2860,35 @@ inline ::taint_intro_frame* frame::release_taint_intro_frame() {
   clear_has_taint_intro_frame();
   ::taint_intro_frame* temp = taint_intro_frame_;
   taint_intro_frame_ = NULL;
+  return temp;
+}
+
+// optional .modload_frame modload_frame = 5;
+inline bool frame::has_modload_frame() const {
+  return (_has_bits_[0] & 0x00000010u) != 0;
+}
+inline void frame::set_has_modload_frame() {
+  _has_bits_[0] |= 0x00000010u;
+}
+inline void frame::clear_has_modload_frame() {
+  _has_bits_[0] &= ~0x00000010u;
+}
+inline void frame::clear_modload_frame() {
+  if (modload_frame_ != NULL) modload_frame_->::modload_frame::Clear();
+  clear_has_modload_frame();
+}
+inline const ::modload_frame& frame::modload_frame() const {
+  return modload_frame_ != NULL ? *modload_frame_ : *default_instance_->modload_frame_;
+}
+inline ::modload_frame* frame::mutable_modload_frame() {
+  set_has_modload_frame();
+  if (modload_frame_ == NULL) modload_frame_ = new ::modload_frame;
+  return modload_frame_;
+}
+inline ::modload_frame* frame::release_modload_frame() {
+  clear_has_modload_frame();
+  ::modload_frame* temp = modload_frame_;
+  modload_frame_ = NULL;
   return temp;
 }
 

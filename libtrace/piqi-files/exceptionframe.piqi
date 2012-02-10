@@ -21,11 +21,13 @@
         .field [
                .name from-addr
                .type address
+               .optional
         ]
 
         % Address the exception transferred control to
         .field [
                .name to-addr
                .type address
+               .optional
         ]
 ]

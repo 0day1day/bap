@@ -57,6 +57,9 @@ const ::google::protobuf::internal::GeneratedMessageReflection*
 const ::google::protobuf::Descriptor* taint_intro_descriptor_ = NULL;
 const ::google::protobuf::internal::GeneratedMessageReflection*
   taint_intro_reflection_ = NULL;
+const ::google::protobuf::Descriptor* modload_frame_descriptor_ = NULL;
+const ::google::protobuf::internal::GeneratedMessageReflection*
+  modload_frame_reflection_ = NULL;
 const ::google::protobuf::Descriptor* frame_descriptor_ = NULL;
 const ::google::protobuf::internal::GeneratedMessageReflection*
   frame_reflection_ = NULL;
@@ -300,12 +303,30 @@ void protobuf_AssignDesc_frame_2epiqi_2eproto() {
       ::google::protobuf::DescriptorPool::generated_pool(),
       ::google::protobuf::MessageFactory::generated_factory(),
       sizeof(taint_intro));
-  frame_descriptor_ = file->message_type(14);
-  static const int frame_offsets_[4] = {
+  modload_frame_descriptor_ = file->message_type(14);
+  static const int modload_frame_offsets_[3] = {
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(modload_frame, module_name_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(modload_frame, low_address_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(modload_frame, high_address_),
+  };
+  modload_frame_reflection_ =
+    new ::google::protobuf::internal::GeneratedMessageReflection(
+      modload_frame_descriptor_,
+      modload_frame::default_instance_,
+      modload_frame_offsets_,
+      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(modload_frame, _has_bits_[0]),
+      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(modload_frame, _unknown_fields_),
+      -1,
+      ::google::protobuf::DescriptorPool::generated_pool(),
+      ::google::protobuf::MessageFactory::generated_factory(),
+      sizeof(modload_frame));
+  frame_descriptor_ = file->message_type(15);
+  static const int frame_offsets_[5] = {
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(frame, std_frame_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(frame, syscall_frame_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(frame, exception_frame_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(frame, taint_intro_frame_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(frame, modload_frame_),
   };
   frame_reflection_ =
     new ::google::protobuf::internal::GeneratedMessageReflection(
@@ -359,6 +380,8 @@ void protobuf_RegisterTypes(const ::std::string&) {
   ::google::protobuf::MessageFactory::InternalRegisterGeneratedMessage(
     taint_intro_descriptor_, &taint_intro::default_instance());
   ::google::protobuf::MessageFactory::InternalRegisterGeneratedMessage(
+    modload_frame_descriptor_, &modload_frame::default_instance());
+  ::google::protobuf::MessageFactory::InternalRegisterGeneratedMessage(
     frame_descriptor_, &frame::default_instance());
 }
 
@@ -393,6 +416,8 @@ void protobuf_ShutdownFile_frame_2epiqi_2eproto() {
   delete taint_intro_list_reflection_;
   delete taint_intro::default_instance_;
   delete taint_intro_reflection_;
+  delete modload_frame::default_instance_;
+  delete modload_frame_reflection_;
   delete frame::default_instance_;
   delete frame_reflection_;
 }
@@ -425,16 +450,19 @@ void protobuf_AddDesc_frame_2epiqi_2eproto() {
     "(\004\022%\n\rargument_list\030\004 \002(\0132\016.argument_lis"
     "t\"\035\n\rargument_list\022\014\n\004elem\030\001 \003(\022\"b\n\017exce"
     "ption_frame\022\030\n\020exception_number\030\001 \002(\004\022\021\n"
-    "\tthread_id\030\002 \001(\004\022\021\n\tfrom_addr\030\003 \002(\004\022\017\n\007t"
-    "o_addr\030\004 \002(\004\"@\n\021taint_intro_frame\022+\n\020tai"
+    "\tthread_id\030\002 \001(\004\022\021\n\tfrom_addr\030\003 \001(\004\022\017\n\007t"
+    "o_addr\030\004 \001(\004\"@\n\021taint_intro_frame\022+\n\020tai"
     "nt_intro_list\030\001 \002(\0132\021.taint_intro_list\"."
     "\n\020taint_intro_list\022\032\n\004elem\030\001 \003(\0132\014.taint"
     "_intro\"-\n\013taint_intro\022\014\n\004addr\030\001 \002(\004\022\020\n\010t"
-    "aint_id\030\002 \002(\004\"\247\001\n\005frame\022\035\n\tstd_frame\030\001 \001"
-    "(\0132\n.std_frame\022%\n\rsyscall_frame\030\002 \001(\0132\016."
-    "syscall_frame\022)\n\017exception_frame\030\003 \001(\0132\020"
-    ".exception_frame\022-\n\021taint_intro_frame\030\004 "
-    "\001(\0132\022.taint_intro_frame", 1223);
+    "aint_id\030\002 \002(\004\"O\n\rmodload_frame\022\023\n\013module"
+    "_name\030\001 \002(\t\022\023\n\013low_address\030\002 \002(\004\022\024\n\014high"
+    "_address\030\003 \002(\004\"\316\001\n\005frame\022\035\n\tstd_frame\030\001 "
+    "\001(\0132\n.std_frame\022%\n\rsyscall_frame\030\002 \001(\0132\016"
+    ".syscall_frame\022)\n\017exception_frame\030\003 \001(\0132"
+    "\020.exception_frame\022-\n\021taint_intro_frame\030\004"
+    " \001(\0132\022.taint_intro_frame\022%\n\rmodload_fram"
+    "e\030\005 \001(\0132\016.modload_frame", 1343);
   ::google::protobuf::MessageFactory::InternalRegisterGeneratedFile(
     "frame.piqi.proto", &protobuf_RegisterTypes);
   std_frame::default_instance_ = new std_frame();
@@ -451,6 +479,7 @@ void protobuf_AddDesc_frame_2epiqi_2eproto() {
   taint_intro_frame::default_instance_ = new taint_intro_frame();
   taint_intro_list::default_instance_ = new taint_intro_list();
   taint_intro::default_instance_ = new taint_intro();
+  modload_frame::default_instance_ = new modload_frame();
   frame::default_instance_ = new frame();
   std_frame::default_instance_->InitAsDefaultInstance();
   operand_list::default_instance_->InitAsDefaultInstance();
@@ -466,6 +495,7 @@ void protobuf_AddDesc_frame_2epiqi_2eproto() {
   taint_intro_frame::default_instance_->InitAsDefaultInstance();
   taint_intro_list::default_instance_->InitAsDefaultInstance();
   taint_intro::default_instance_->InitAsDefaultInstance();
+  modload_frame::default_instance_->InitAsDefaultInstance();
   frame::default_instance_->InitAsDefaultInstance();
   ::google::protobuf::internal::OnShutdown(&protobuf_ShutdownFile_frame_2epiqi_2eproto);
 }
@@ -3375,7 +3405,7 @@ bool exception_frame::MergePartialFromCodedStream(
         break;
       }
       
-      // required uint64 from_addr = 3;
+      // optional uint64 from_addr = 3;
       case 3: {
         if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
             ::google::protobuf::internal::WireFormatLite::WIRETYPE_VARINT) {
@@ -3391,7 +3421,7 @@ bool exception_frame::MergePartialFromCodedStream(
         break;
       }
       
-      // required uint64 to_addr = 4;
+      // optional uint64 to_addr = 4;
       case 4: {
         if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
             ::google::protobuf::internal::WireFormatLite::WIRETYPE_VARINT) {
@@ -3435,12 +3465,12 @@ void exception_frame::SerializeWithCachedSizes(
     ::google::protobuf::internal::WireFormatLite::WriteUInt64(2, this->thread_id(), output);
   }
   
-  // required uint64 from_addr = 3;
+  // optional uint64 from_addr = 3;
   if (has_from_addr()) {
     ::google::protobuf::internal::WireFormatLite::WriteUInt64(3, this->from_addr(), output);
   }
   
-  // required uint64 to_addr = 4;
+  // optional uint64 to_addr = 4;
   if (has_to_addr()) {
     ::google::protobuf::internal::WireFormatLite::WriteUInt64(4, this->to_addr(), output);
   }
@@ -3463,12 +3493,12 @@ void exception_frame::SerializeWithCachedSizes(
     target = ::google::protobuf::internal::WireFormatLite::WriteUInt64ToArray(2, this->thread_id(), target);
   }
   
-  // required uint64 from_addr = 3;
+  // optional uint64 from_addr = 3;
   if (has_from_addr()) {
     target = ::google::protobuf::internal::WireFormatLite::WriteUInt64ToArray(3, this->from_addr(), target);
   }
   
-  // required uint64 to_addr = 4;
+  // optional uint64 to_addr = 4;
   if (has_to_addr()) {
     target = ::google::protobuf::internal::WireFormatLite::WriteUInt64ToArray(4, this->to_addr(), target);
   }
@@ -3498,14 +3528,14 @@ int exception_frame::ByteSize() const {
           this->thread_id());
     }
     
-    // required uint64 from_addr = 3;
+    // optional uint64 from_addr = 3;
     if (has_from_addr()) {
       total_size += 1 +
         ::google::protobuf::internal::WireFormatLite::UInt64Size(
           this->from_addr());
     }
     
-    // required uint64 to_addr = 4;
+    // optional uint64 to_addr = 4;
     if (has_to_addr()) {
       total_size += 1 +
         ::google::protobuf::internal::WireFormatLite::UInt64Size(
@@ -3568,7 +3598,7 @@ void exception_frame::CopyFrom(const exception_frame& from) {
 }
 
 bool exception_frame::IsInitialized() const {
-  if ((_has_bits_[0] & 0x0000000d) != 0x0000000d) return false;
+  if ((_has_bits_[0] & 0x00000001) != 0x00000001) return false;
   
   return true;
 }
@@ -4266,10 +4296,316 @@ void taint_intro::Swap(taint_intro* other) {
 // ===================================================================
 
 #ifndef _MSC_VER
+const int modload_frame::kModuleNameFieldNumber;
+const int modload_frame::kLowAddressFieldNumber;
+const int modload_frame::kHighAddressFieldNumber;
+#endif  // !_MSC_VER
+
+modload_frame::modload_frame()
+  : ::google::protobuf::Message() {
+  SharedCtor();
+}
+
+void modload_frame::InitAsDefaultInstance() {
+}
+
+modload_frame::modload_frame(const modload_frame& from)
+  : ::google::protobuf::Message() {
+  SharedCtor();
+  MergeFrom(from);
+}
+
+void modload_frame::SharedCtor() {
+  _cached_size_ = 0;
+  module_name_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
+  low_address_ = GOOGLE_ULONGLONG(0);
+  high_address_ = GOOGLE_ULONGLONG(0);
+  ::memset(_has_bits_, 0, sizeof(_has_bits_));
+}
+
+modload_frame::~modload_frame() {
+  SharedDtor();
+}
+
+void modload_frame::SharedDtor() {
+  if (module_name_ != &::google::protobuf::internal::kEmptyString) {
+    delete module_name_;
+  }
+  if (this != default_instance_) {
+  }
+}
+
+void modload_frame::SetCachedSize(int size) const {
+  GOOGLE_SAFE_CONCURRENT_WRITES_BEGIN();
+  _cached_size_ = size;
+  GOOGLE_SAFE_CONCURRENT_WRITES_END();
+}
+const ::google::protobuf::Descriptor* modload_frame::descriptor() {
+  protobuf_AssignDescriptorsOnce();
+  return modload_frame_descriptor_;
+}
+
+const modload_frame& modload_frame::default_instance() {
+  if (default_instance_ == NULL) protobuf_AddDesc_frame_2epiqi_2eproto();  return *default_instance_;
+}
+
+modload_frame* modload_frame::default_instance_ = NULL;
+
+modload_frame* modload_frame::New() const {
+  return new modload_frame;
+}
+
+void modload_frame::Clear() {
+  if (_has_bits_[0 / 32] & (0xffu << (0 % 32))) {
+    if (has_module_name()) {
+      if (module_name_ != &::google::protobuf::internal::kEmptyString) {
+        module_name_->clear();
+      }
+    }
+    low_address_ = GOOGLE_ULONGLONG(0);
+    high_address_ = GOOGLE_ULONGLONG(0);
+  }
+  ::memset(_has_bits_, 0, sizeof(_has_bits_));
+  mutable_unknown_fields()->Clear();
+}
+
+bool modload_frame::MergePartialFromCodedStream(
+    ::google::protobuf::io::CodedInputStream* input) {
+#define DO_(EXPRESSION) if (!(EXPRESSION)) return false
+  ::google::protobuf::uint32 tag;
+  while ((tag = input->ReadTag()) != 0) {
+    switch (::google::protobuf::internal::WireFormatLite::GetTagFieldNumber(tag)) {
+      // required string module_name = 1;
+      case 1: {
+        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
+            ::google::protobuf::internal::WireFormatLite::WIRETYPE_LENGTH_DELIMITED) {
+          DO_(::google::protobuf::internal::WireFormatLite::ReadString(
+                input, this->mutable_module_name()));
+          ::google::protobuf::internal::WireFormat::VerifyUTF8String(
+            this->module_name().data(), this->module_name().length(),
+            ::google::protobuf::internal::WireFormat::PARSE);
+        } else {
+          goto handle_uninterpreted;
+        }
+        if (input->ExpectTag(16)) goto parse_low_address;
+        break;
+      }
+      
+      // required uint64 low_address = 2;
+      case 2: {
+        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
+            ::google::protobuf::internal::WireFormatLite::WIRETYPE_VARINT) {
+         parse_low_address:
+          DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
+                   ::google::protobuf::uint64, ::google::protobuf::internal::WireFormatLite::TYPE_UINT64>(
+                 input, &low_address_)));
+          set_has_low_address();
+        } else {
+          goto handle_uninterpreted;
+        }
+        if (input->ExpectTag(24)) goto parse_high_address;
+        break;
+      }
+      
+      // required uint64 high_address = 3;
+      case 3: {
+        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
+            ::google::protobuf::internal::WireFormatLite::WIRETYPE_VARINT) {
+         parse_high_address:
+          DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
+                   ::google::protobuf::uint64, ::google::protobuf::internal::WireFormatLite::TYPE_UINT64>(
+                 input, &high_address_)));
+          set_has_high_address();
+        } else {
+          goto handle_uninterpreted;
+        }
+        if (input->ExpectAtEnd()) return true;
+        break;
+      }
+      
+      default: {
+      handle_uninterpreted:
+        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
+            ::google::protobuf::internal::WireFormatLite::WIRETYPE_END_GROUP) {
+          return true;
+        }
+        DO_(::google::protobuf::internal::WireFormat::SkipField(
+              input, tag, mutable_unknown_fields()));
+        break;
+      }
+    }
+  }
+  return true;
+#undef DO_
+}
+
+void modload_frame::SerializeWithCachedSizes(
+    ::google::protobuf::io::CodedOutputStream* output) const {
+  // required string module_name = 1;
+  if (has_module_name()) {
+    ::google::protobuf::internal::WireFormat::VerifyUTF8String(
+      this->module_name().data(), this->module_name().length(),
+      ::google::protobuf::internal::WireFormat::SERIALIZE);
+    ::google::protobuf::internal::WireFormatLite::WriteString(
+      1, this->module_name(), output);
+  }
+  
+  // required uint64 low_address = 2;
+  if (has_low_address()) {
+    ::google::protobuf::internal::WireFormatLite::WriteUInt64(2, this->low_address(), output);
+  }
+  
+  // required uint64 high_address = 3;
+  if (has_high_address()) {
+    ::google::protobuf::internal::WireFormatLite::WriteUInt64(3, this->high_address(), output);
+  }
+  
+  if (!unknown_fields().empty()) {
+    ::google::protobuf::internal::WireFormat::SerializeUnknownFields(
+        unknown_fields(), output);
+  }
+}
+
+::google::protobuf::uint8* modload_frame::SerializeWithCachedSizesToArray(
+    ::google::protobuf::uint8* target) const {
+  // required string module_name = 1;
+  if (has_module_name()) {
+    ::google::protobuf::internal::WireFormat::VerifyUTF8String(
+      this->module_name().data(), this->module_name().length(),
+      ::google::protobuf::internal::WireFormat::SERIALIZE);
+    target =
+      ::google::protobuf::internal::WireFormatLite::WriteStringToArray(
+        1, this->module_name(), target);
+  }
+  
+  // required uint64 low_address = 2;
+  if (has_low_address()) {
+    target = ::google::protobuf::internal::WireFormatLite::WriteUInt64ToArray(2, this->low_address(), target);
+  }
+  
+  // required uint64 high_address = 3;
+  if (has_high_address()) {
+    target = ::google::protobuf::internal::WireFormatLite::WriteUInt64ToArray(3, this->high_address(), target);
+  }
+  
+  if (!unknown_fields().empty()) {
+    target = ::google::protobuf::internal::WireFormat::SerializeUnknownFieldsToArray(
+        unknown_fields(), target);
+  }
+  return target;
+}
+
+int modload_frame::ByteSize() const {
+  int total_size = 0;
+  
+  if (_has_bits_[0 / 32] & (0xffu << (0 % 32))) {
+    // required string module_name = 1;
+    if (has_module_name()) {
+      total_size += 1 +
+        ::google::protobuf::internal::WireFormatLite::StringSize(
+          this->module_name());
+    }
+    
+    // required uint64 low_address = 2;
+    if (has_low_address()) {
+      total_size += 1 +
+        ::google::protobuf::internal::WireFormatLite::UInt64Size(
+          this->low_address());
+    }
+    
+    // required uint64 high_address = 3;
+    if (has_high_address()) {
+      total_size += 1 +
+        ::google::protobuf::internal::WireFormatLite::UInt64Size(
+          this->high_address());
+    }
+    
+  }
+  if (!unknown_fields().empty()) {
+    total_size +=
+      ::google::protobuf::internal::WireFormat::ComputeUnknownFieldsSize(
+        unknown_fields());
+  }
+  GOOGLE_SAFE_CONCURRENT_WRITES_BEGIN();
+  _cached_size_ = total_size;
+  GOOGLE_SAFE_CONCURRENT_WRITES_END();
+  return total_size;
+}
+
+void modload_frame::MergeFrom(const ::google::protobuf::Message& from) {
+  GOOGLE_CHECK_NE(&from, this);
+  const modload_frame* source =
+    ::google::protobuf::internal::dynamic_cast_if_available<const modload_frame*>(
+      &from);
+  if (source == NULL) {
+    ::google::protobuf::internal::ReflectionOps::Merge(from, this);
+  } else {
+    MergeFrom(*source);
+  }
+}
+
+void modload_frame::MergeFrom(const modload_frame& from) {
+  GOOGLE_CHECK_NE(&from, this);
+  if (from._has_bits_[0 / 32] & (0xffu << (0 % 32))) {
+    if (from.has_module_name()) {
+      set_module_name(from.module_name());
+    }
+    if (from.has_low_address()) {
+      set_low_address(from.low_address());
+    }
+    if (from.has_high_address()) {
+      set_high_address(from.high_address());
+    }
+  }
+  mutable_unknown_fields()->MergeFrom(from.unknown_fields());
+}
+
+void modload_frame::CopyFrom(const ::google::protobuf::Message& from) {
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+void modload_frame::CopyFrom(const modload_frame& from) {
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+bool modload_frame::IsInitialized() const {
+  if ((_has_bits_[0] & 0x00000007) != 0x00000007) return false;
+  
+  return true;
+}
+
+void modload_frame::Swap(modload_frame* other) {
+  if (other != this) {
+    std::swap(module_name_, other->module_name_);
+    std::swap(low_address_, other->low_address_);
+    std::swap(high_address_, other->high_address_);
+    std::swap(_has_bits_[0], other->_has_bits_[0]);
+    _unknown_fields_.Swap(&other->_unknown_fields_);
+    std::swap(_cached_size_, other->_cached_size_);
+  }
+}
+
+::google::protobuf::Metadata modload_frame::GetMetadata() const {
+  protobuf_AssignDescriptorsOnce();
+  ::google::protobuf::Metadata metadata;
+  metadata.descriptor = modload_frame_descriptor_;
+  metadata.reflection = modload_frame_reflection_;
+  return metadata;
+}
+
+
+// ===================================================================
+
+#ifndef _MSC_VER
 const int frame::kStdFrameFieldNumber;
 const int frame::kSyscallFrameFieldNumber;
 const int frame::kExceptionFrameFieldNumber;
 const int frame::kTaintIntroFrameFieldNumber;
+const int frame::kModloadFrameFieldNumber;
 #endif  // !_MSC_VER
 
 frame::frame()
@@ -4282,6 +4618,7 @@ void frame::InitAsDefaultInstance() {
   syscall_frame_ = const_cast< ::syscall_frame*>(&::syscall_frame::default_instance());
   exception_frame_ = const_cast< ::exception_frame*>(&::exception_frame::default_instance());
   taint_intro_frame_ = const_cast< ::taint_intro_frame*>(&::taint_intro_frame::default_instance());
+  modload_frame_ = const_cast< ::modload_frame*>(&::modload_frame::default_instance());
 }
 
 frame::frame(const frame& from)
@@ -4296,6 +4633,7 @@ void frame::SharedCtor() {
   syscall_frame_ = NULL;
   exception_frame_ = NULL;
   taint_intro_frame_ = NULL;
+  modload_frame_ = NULL;
   ::memset(_has_bits_, 0, sizeof(_has_bits_));
 }
 
@@ -4309,6 +4647,7 @@ void frame::SharedDtor() {
     delete syscall_frame_;
     delete exception_frame_;
     delete taint_intro_frame_;
+    delete modload_frame_;
   }
 }
 
@@ -4345,6 +4684,9 @@ void frame::Clear() {
     }
     if (has_taint_intro_frame()) {
       if (taint_intro_frame_ != NULL) taint_intro_frame_->::taint_intro_frame::Clear();
+    }
+    if (has_modload_frame()) {
+      if (modload_frame_ != NULL) modload_frame_->::modload_frame::Clear();
     }
   }
   ::memset(_has_bits_, 0, sizeof(_has_bits_));
@@ -4408,6 +4750,20 @@ bool frame::MergePartialFromCodedStream(
         } else {
           goto handle_uninterpreted;
         }
+        if (input->ExpectTag(42)) goto parse_modload_frame;
+        break;
+      }
+      
+      // optional .modload_frame modload_frame = 5;
+      case 5: {
+        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
+            ::google::protobuf::internal::WireFormatLite::WIRETYPE_LENGTH_DELIMITED) {
+         parse_modload_frame:
+          DO_(::google::protobuf::internal::WireFormatLite::ReadMessageNoVirtual(
+               input, mutable_modload_frame()));
+        } else {
+          goto handle_uninterpreted;
+        }
         if (input->ExpectAtEnd()) return true;
         break;
       }
@@ -4454,6 +4810,12 @@ void frame::SerializeWithCachedSizes(
       4, this->taint_intro_frame(), output);
   }
   
+  // optional .modload_frame modload_frame = 5;
+  if (has_modload_frame()) {
+    ::google::protobuf::internal::WireFormatLite::WriteMessageMaybeToArray(
+      5, this->modload_frame(), output);
+  }
+  
   if (!unknown_fields().empty()) {
     ::google::protobuf::internal::WireFormat::SerializeUnknownFields(
         unknown_fields(), output);
@@ -4488,6 +4850,13 @@ void frame::SerializeWithCachedSizes(
     target = ::google::protobuf::internal::WireFormatLite::
       WriteMessageNoVirtualToArray(
         4, this->taint_intro_frame(), target);
+  }
+  
+  // optional .modload_frame modload_frame = 5;
+  if (has_modload_frame()) {
+    target = ::google::protobuf::internal::WireFormatLite::
+      WriteMessageNoVirtualToArray(
+        5, this->modload_frame(), target);
   }
   
   if (!unknown_fields().empty()) {
@@ -4529,6 +4898,13 @@ int frame::ByteSize() const {
           this->taint_intro_frame());
     }
     
+    // optional .modload_frame modload_frame = 5;
+    if (has_modload_frame()) {
+      total_size += 1 +
+        ::google::protobuf::internal::WireFormatLite::MessageSizeNoVirtual(
+          this->modload_frame());
+    }
+    
   }
   if (!unknown_fields().empty()) {
     total_size +=
@@ -4568,6 +4944,9 @@ void frame::MergeFrom(const frame& from) {
     if (from.has_taint_intro_frame()) {
       mutable_taint_intro_frame()->::taint_intro_frame::MergeFrom(from.taint_intro_frame());
     }
+    if (from.has_modload_frame()) {
+      mutable_modload_frame()->::modload_frame::MergeFrom(from.modload_frame());
+    }
   }
   mutable_unknown_fields()->MergeFrom(from.unknown_fields());
 }
@@ -4598,6 +4977,9 @@ bool frame::IsInitialized() const {
   if (has_taint_intro_frame()) {
     if (!this->taint_intro_frame().IsInitialized()) return false;
   }
+  if (has_modload_frame()) {
+    if (!this->modload_frame().IsInitialized()) return false;
+  }
   return true;
 }
 
@@ -4607,6 +4989,7 @@ void frame::Swap(frame* other) {
     std::swap(syscall_frame_, other->syscall_frame_);
     std::swap(exception_frame_, other->exception_frame_);
     std::swap(taint_intro_frame_, other->taint_intro_frame_);
+    std::swap(modload_frame_, other->modload_frame_);
     std::swap(_has_bits_[0], other->_has_bits_[0]);
     _unknown_fields_.Swap(&other->_unknown_fields_);
     std::swap(_cached_size_, other->_cached_size_);

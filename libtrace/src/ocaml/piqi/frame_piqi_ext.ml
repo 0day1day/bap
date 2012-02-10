@@ -59,6 +59,8 @@ let _taint_intro_list_piqtype =
   
 let _taint_intro_piqtype = Piqirun_ext.find_piqtype "frame/taint-intro"
   
+let _modload_frame_piqtype = Piqirun_ext.find_piqtype "frame/modload-frame"
+  
 let _frame_piqtype = Piqirun_ext.find_piqtype "frame/frame"
   
 let parse_uint64 x (format : Piqirun_ext.input_format) =
@@ -175,6 +177,11 @@ let parse_taint_intro_list x (format : Piqirun_ext.input_format) =
 let parse_taint_intro x (format : Piqirun_ext.input_format) =
   let x_pb = Piqirun_ext.convert _taint_intro_piqtype format `pb x in
   let buf = Piqirun.init_from_string x_pb in Frame_piqi.parse_taint_intro buf
+  
+let parse_modload_frame x (format : Piqirun_ext.input_format) =
+  let x_pb = Piqirun_ext.convert _modload_frame_piqtype format `pb x in
+  let buf = Piqirun.init_from_string x_pb
+  in Frame_piqi.parse_modload_frame buf
   
 let parse_frame x (format : Piqirun_ext.input_format) =
   let x_pb = Piqirun_ext.convert _frame_piqtype format `pb x in
@@ -310,6 +317,11 @@ let gen_taint_intro x (format : Piqirun_ext.output_format) =
   let x_pb = Piqirun.to_string buf
   in Piqirun_ext.convert _taint_intro_piqtype `pb format x_pb
   
+let gen_modload_frame x (format : Piqirun_ext.output_format) =
+  let buf = Frame_piqi.gen_modload_frame x in
+  let x_pb = Piqirun.to_string buf
+  in Piqirun_ext.convert _modload_frame_piqtype `pb format x_pb
+  
 let gen_frame x (format : Piqirun_ext.output_format) =
   let buf = Frame_piqi.gen_frame x in
   let x_pb = Piqirun.to_string buf
@@ -434,6 +446,12 @@ let prerr_taint_intro_list x =
 let print_taint_intro x = Pervasives.print_endline (gen_taint_intro x `piq)
   
 let prerr_taint_intro x = Pervasives.prerr_endline (gen_taint_intro x `piq)
+  
+let print_modload_frame x =
+  Pervasives.print_endline (gen_modload_frame x `piq)
+  
+let prerr_modload_frame x =
+  Pervasives.prerr_endline (gen_modload_frame x `piq)
   
 let print_frame x = Pervasives.print_endline (gen_frame x `piq)
   

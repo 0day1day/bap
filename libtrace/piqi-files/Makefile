@@ -1,13 +1,15 @@
 ROOTDIR=$(CURDIR)/../../
-TRACEFORMATDIR=$(CURDIR)/../trace-format/
+TRACEFORMATDIR=$(ROOTDIR)/libtrace/src/cpp/pb
 MLDIR=$(ROOTDIR)/libtrace/src/ocaml/piqi
 
-PIQIFILES=$(wildcard *.piqi)
+# I don't think we need to compile all piqi files actually, only frame.piqi
+PIQIFILE=frame.piqi
+OTHERPIQIFILES=$(filter-out $(PIQIFILE), $(wildcard *.piqi))
 PROTOFILES=$(addsuffix .proto, $(PIQIFILES))
-MLFILES=$(addsuffix _piqi.ml, $(basename $(PIQIFILES)))
-MLEXTFILES=$(addsuffix _piqi_ext.ml, $(basename $(PIQIFILES)))
-PROTOCFILES=$(addsuffix .piqi.pb.cc, $(basename $(PIQIFILES)))
-PROTOHFILES=$(addsuffix .piqi.pb.h, $(basename $(PIQIFILES)))
+MLFILES=$(addsuffix _piqi.ml, $(basename $(PIQIFILE)))
+MLEXTFILES=$(addsuffix _piqi_ext.ml, $(basename $(PIQIFILE)))
+PROTOCFILES=$(addsuffix .piqi.pb.cc, $(basename $(PIQIFILE)))
+PROTOHFILES=$(addsuffix .piqi.pb.h, $(basename $(PIQIFILE)))
 
 PIQIDIR=$(ROOTDIR)/piqi/piqi/bin
 PIQI=$(PIQIDIR)/piqi
@@ -16,6 +18,11 @@ PROTOC=$(ROOTDIR)/protobuf/src/protoc
 
 PIQIFLAGS = --pp
 #PIQIFLAGS = --pp --leave-tmp-files
+
+all: $(PROTOCFILES) $(PROTOHFILES) $(MLFILES) $(MLEXTFILES)
+
+$(PIQIFILE) : $(OTHERPIQIFILES)
+	touch $@
 
 %.piqi.proto : %.piqi
 	$(PIQI) to-proto $<
@@ -28,8 +35,6 @@ PIQIFLAGS = --pp
 
 %_piqi.ml %_piqi_ext.ml : %.piqi
 	$(PIQIC) ocaml-ext $(PIQIFLAGS) $<
-
-all: $(PROTOCFILES) $(PROTOHFILES) $(MLFILES) $(MLEXTFILES)
 
 clean:
 	rm -f $(PROTOFILES) $(MLFILES) $(MLEXTFILES) $(PROTOCFILES) $(PROTOHFILES)

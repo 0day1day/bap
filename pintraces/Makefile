@@ -85,6 +85,7 @@ TRACEDIR = $(ROOT)/libasmir/src/traces
 
 TRACEFORMATDIR = $(ROOT)/libtrace/src/cpp
 TRACEFORMATPBDIR = $(TRACEFORMATDIR)/pb
+LIBTRACE = $(TRACEFORMATDIR)/libtrace.a
 
 PROTOBUFDIR = $(ROOT)/protobuf/src
 
@@ -92,8 +93,8 @@ CXXFLAGS += -I../libasmir/include -I../libasmir/src/traces -I$(TRACEFORMATDIR) -
 
 # XXX We should probably use libtool
 PROTOBUFLIBDIR = $(PROTOBUFDIR)/.libs
-LIB_PATHS = -L$(PROTOBUFLIBDIR) -L$(TRACEFORMATDIR)
-LIBS = -ltrace -Wl,-rpath=$(PROTOBUFLIBDIR) -pthread  -pthread -lprotobuf -lz -lpthread
+LIB_PATHS = -L$(PROTOBUFLIBDIR)
+LIBS = -Wl,-rpath=$(PROTOBUFLIBDIR) -pthread  -pthread -lprotobuf -lz -lpthread
 
 ##############################################################
 #
@@ -141,7 +142,7 @@ $(OBJDIR)%.o : $(TRACEFORMATDIR)/%.cpp
 reader: readtrace.cpp $(OBJDIR)pin_frame.o $(OBJDIR)pin_trace.o
 	$(CXX) -o $@ $^ $(CXXFLAGS)
 
-newreadtrace : newreadtrace.cpp $(FORMATOBJS)
+newreadtrace : newreadtrace.cpp $(LIBTRACE)
 	$(CXX) -o $@ $^ $(CXXFLAGS) $(LIB_PATHS) $(LIBS)
 
 pivottest: $(OBJDIR)pivot.o pivottest.cpp
@@ -157,7 +158,7 @@ pinregs.h : listregs $(OBJDIR)ctxtest$(PINTOOL_SUFFIX)
 
 $(TOOLS): $(PIN_LIBNAMES)
 
-$(TOOLS): %$(PINTOOL_SUFFIX) : %.o $(OBJS)
+$(TOOLS): %$(PINTOOL_SUFFIX) : %.o $(OBJS) $(LIBTRACE)
 	${PIN_LD} $(PIN_LDFLAGS) $(LINK_DEBUG) ${LINK_OUT}$@ $(OBJS) $< ${PIN_LPATHS} $(PIN_LIBS) $(DBG) $(LIB_PATHS) $(LIBS)
 
 ## cleaning
