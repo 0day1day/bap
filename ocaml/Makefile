@@ -1,5 +1,7 @@
 # $Id$
 
+.NOTPARALLEL:
+
 export BAP_DIR=$(CURDIR)/..
 
 export OCAMLMAKEFILE=OCamlMakefile
@@ -141,7 +143,7 @@ OCAMLFLAGS = -thread -warn-error Aelz # -for-pack Bap #-w A
 # merge everything but descriptions.
 OCAMLDOCFLAGS = -m avlsoper
 
-all: | dcl ncl
+all: dcl ncl
 
 bap_lib_doc: all htdoc
 
