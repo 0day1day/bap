@@ -116,7 +116,7 @@ DOC_FILES := $(filter %.mli, $(SOURCES)) $(filter %.ml, $(SOURCES))
 
 
 # ocamlfind packages required
-export PACKS = bigarray str num unix camomile threads bitstring
+export PACKS = bigarray str num unix camomile threads
 # ocamlfind packages for ocamldoc
 # don't include packages in /usr/lib/ocaml, this will cause ocamldoc
 # to complain about conflicts with our local big_int

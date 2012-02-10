@@ -1827,10 +1827,14 @@ VOID ThreadStart(THREADID threadid, CONTEXT *ctx, INT32 flags, VOID *v)
     int argc = *(int*)(PIN_GetContextReg(ctx, REG_ESP));
     char **argv = (char**) (PIN_GetContextReg(ctx, REG_ESP)+4);
     char **env = (char**) (PIN_GetContextReg(ctx, REG_ESP)+(argc+1)*4);
-    std::vector<TaintFrame> frms = tracker->taintArgs(argc, argv);
-    g_tw->add(frms);
-    frms = tracker->taintEnv(env);
-    g_tw->add(frms);
+    std::vector<frame> frms = tracker->taintArgs(argc, argv);
+    for (std::vector<frame>::iterator i = frms.begin(); i != frms.end(); i++) {
+      g_twnew->add(*i);
+    }
+    FrameOption_t fo = tracker->taintEnv(env);
+    if (fo.b) {
+      g_twnew->add(fo.f);
+    }
 #else /* windows */
     /* On windows, we don't taint argc and argv, but rather taint the
        output of GetComamndLineA and GetCommandLineW.  On recent
@@ -2287,14 +2291,14 @@ VOID SyscallExit(THREADID tid, CONTEXT *ctx, SYSCALL_STANDARD std, VOID *v)
   
   // Check to see if we need to introduce tainted bytes as a result of this
   // sytem call
-  std::vector<TaintFrame> tfs = tracker->taintPostSC(PIN_GetSyscallReturn(ctx, std), (const uint64_t*) (si.sf.syscall_frame().argument_list().elem().data()), addr, length, si.state);
+  FrameOption_t fo = tracker->taintPostSC(PIN_GetSyscallReturn(ctx, std), (const uint64_t*) (si.sf.syscall_frame().argument_list().elem().data()), addr, length, si.state);
 
-  if (tfs.size() > 0) {
+  if (fo.b) {
     if (!g_taint_introduced) {
       // Activate taint tracking
       TActivate();
     }
-    g_tw->add(tfs);
+    g_twnew->add(fo.f);
   }
 
   //printf("syscall out %d\n", si.sf.callno);
