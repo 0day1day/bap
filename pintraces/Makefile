@@ -24,7 +24,7 @@
 #    Pin was installed. This can also be set on the command line,
 #    or as an environment variable.
 #
-PIN_HOME = ../pin/
+PIN_HOME ?= ../pin/
 
 
 # We only support ia32
