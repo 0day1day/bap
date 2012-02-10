@@ -185,14 +185,16 @@ namespace SerializedTrace {
     uint64_t frame_len;
     READ(frame_len);
 
-    /* Yup, this is allowed, but maybe not super efficient. We could
-     * use an auto_ptr and put this on the heap if it's too slow. */
-    char buf[frame_len];
+	/* We really just want a variable sized array, but MS VC++ doesn't support C99 yet. 
+	 *
+	 * http://stackoverflow.com/questions/5246900/enabling-vlasvariable-length-arrays-in-ms-visual-c
+	*/
+    auto_vec<char> buf ( new char[frame_len] );
 
     /* Read the frame into buf. */
-    ifs.read(buf, frame_len);
+    ifs.read(buf.get(), frame_len);
 
-    std::string sbuf(buf, frame_len);
+    std::string sbuf(buf.get(), frame_len);
 
     std::auto_ptr<frame> f(new frame);
     if (!(f->ParseFromString(sbuf))) {

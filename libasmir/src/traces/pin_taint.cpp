@@ -350,6 +350,7 @@ FrameOption_t TaintTracker::recvHelper(uint32_t fd, void *ptr, size_t len) {
 std::vector<frame> TaintTracker::taintArgs(char *cmdA, wchar_t *cmdW)
 {
   std::vector<frame> frms;
+  FrameOption_t fo;
   std::vector<frame> tfrms;
   if (taint_args) {
     size_t lenA = strlen(cmdA);
@@ -359,11 +360,11 @@ std::vector<frame> TaintTracker::taintArgs(char *cmdA, wchar_t *cmdW)
     cerr << "Tainting multibyte command-line arguments: " << bytesA << " bytes @ " << (unsigned int)(cmdA) << endl;
     
     /* Taint multibyte command line */
-    frms = introMemTaint((uint32_t)cmdA, bytesA, "Tainted Arguments", -1);
-
+    fo = introMemTaint((uint32_t)cmdA, bytesA, "Tainted Arguments", -1);
+    if (fo.b) { frms.push_back(fo.f); }
     cerr << "Tainting wide command-line arguments: " << bytesW << " bytes @ " << (unsigned int)(cmdW) << endl;
-    tfrms = introMemTaint((uint32_t)cmdW, bytesW, "Tainted Arguments", -1);
-    frms.insert(frms.end(), tfrms.begin(), tfrms.end());
+    fo = introMemTaint((uint32_t)cmdW, bytesW, "Tainted Arguments", -1);
+    if (fo.b) { frms.push_back(fo.f); }
   }
   return frms;
 }
@@ -398,6 +399,7 @@ std::vector<frame> TaintTracker::taintEnv(char *env, wchar_t *wenv)
    * ...
    * \x00\x00
    */
+  std::vector<frame> fv;
   //  std::vector<frame> frms;
 
   // /* Multibyte strings */
@@ -434,18 +436,20 @@ std::vector<frame> TaintTracker::taintEnv(char *env, wchar_t *wenv)
 	uint32_t numBytes = numChars * sizeof(wchar_t);
         uint32_t addr = (uint32_t) (wenv+equal+1);
         cerr << "Tainting environment variable: " << var << " @" << (int)addr << " " << numChars << " bytes" << endl;
-	return introMemTaint(addr, numBytes, "Environment Variable", -1);
-
+	FrameOption_t fo = introMemTaint(addr, numBytes, "Environment Variable", -1);
+	if (fo.b) { fv.push_back(fo.f); }
       }
     }
   }
 
-
-  return std::vector<frame> ();
+  return fv;
 }
 #else /* unix */
-FrameOption_t TaintTracker::taintEnv(char **env)
+std::vector<frame> TaintTracker::taintEnv(char **env)
 {
+
+  std::vector<frame> fv;
+
   for ( int i = 1 ; env[i] ; i++ ) {
     string var(env[i]);
     int equal = var.find('=');
@@ -454,10 +458,11 @@ FrameOption_t TaintTracker::taintEnv(char **env)
       uint32_t len = strlen(env[i]) - var.size();
       uint32_t addr = (uint32_t)env[i]+equal+1;
       cerr << "Tainting environment variable: " << var << " @" << (int)addr << endl;
-      return introMemTaint(addr, len, "environment variable", -1);
+      FrameOption_t fo = introMemTaint(addr, len, "environment variable", -1);
+      if (fo.b) { fv.add(fo.f); }
     }
   }
-  return FrameOption_t(false);
+  return std::vector<frame> ();
 }
 #endif
 

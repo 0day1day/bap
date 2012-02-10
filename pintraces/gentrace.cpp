@@ -927,17 +927,17 @@ void AfterRecv(THREADID tid, int ret, char *f) {
 	numbytes = ret;
       }
 
-      std::vector<TaintFrame> tfs = tracker->recvHelper(ri.fd, ri.addr, numbytes);
+      FrameOption_t fo = tracker->recvHelper(ri.fd, ri.addr, numbytes);
       ReleaseLock(&lock);
       
-      if (tfs.size() > 0) {
+      if (fo.b) {
 	
 	if (!g_taint_introduced) {
 	  TActivate();
 	}
 	
 	GetLock(&lock, tid+1);
-	g_tw->add(tfs);
+	g_twnew->add(fo.f);
 	ReleaseLock(&lock);
       }
     } else {
@@ -972,8 +972,8 @@ void* GetEnvWWrap(CONTEXT *ctx, AFUNPTR fp, THREADID tid) {
   GetLock(&lock, tid+1);
   LLOG("Got callback lock\n");
 
-  std::vector<TaintFrame> frms = tracker->taintEnv(NULL, (wchar_t*) ret);
-  g_tw->add(frms);
+  std::vector<frame> frms = tracker->taintEnv(NULL, (wchar_t*) ret);
+  g_twnew->add<std::vector<frame>> (frms);
 
   ReleaseLock(&lock);
   LLOG("Releasing callback lock\n");
@@ -1008,8 +1008,8 @@ void* GetEnvAWrap(CONTEXT *ctx, AFUNPTR fp, THREADID tid) {
   GetLock(&lock, tid+1);
   LLOG("Got callback lock\n");
 
-  std::vector<TaintFrame> frms = tracker->taintEnv((char*) ret, NULL);
-  g_tw->add(frms);
+  std::vector<frame> frms = tracker->taintEnv((char*) ret, NULL);
+  g_twnew->add<std::vector<frame>> (frms);
 
   ReleaseLock(&lock);
   LLOG("Releasing callback lock\n");
@@ -1819,9 +1819,7 @@ VOID ThreadStart(THREADID threadid, CONTEXT *ctx, INT32 flags, VOID *v)
     char **argv = (char**) (PIN_GetContextReg(ctx, REG_ESP)+4);
     char **env = (char**) (PIN_GetContextReg(ctx, REG_ESP)+(argc+1)*4);
     std::vector<frame> frms = tracker->taintArgs(argc, argv);
-    for (std::vector<frame>::iterator i = frms.begin(); i != frms.end(); i++) {
-      g_twnew->add(*i);
-    }
+    g_twnew->add<std::vector<frame>> (frms);
     FrameOption_t fo = tracker->taintEnv(env);
     if (fo.b) {
       g_twnew->add(fo.f);
@@ -1833,8 +1831,8 @@ VOID ThreadStart(THREADID threadid, CONTEXT *ctx, INT32 flags, VOID *v)
     char *aptr = WINDOWS::GetCommandLineA();
     wchar_t *wptr = WINDOWS::GetCommandLineW();
 
-    std::vector<TaintFrame> frms = tracker->taintArgs(aptr, wptr);
-    g_tw->add(frms);
+    std::vector<frame> frms = tracker->taintArgs(aptr, wptr);
+    g_twnew->add<std::vector<frame>> (frms);
 #endif
   }
 

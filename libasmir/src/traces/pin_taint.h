@@ -135,9 +135,9 @@ namespace pintrace { // We will use namespace to avoid collision
 #endif
 
 #ifdef _WIN32
-     FrameOption_t taintEnv(char *env, wchar_t *wenv);
+     std::vector<frame> taintEnv(char *env, wchar_t *wenv);
 #else
-     FrameOption_t taintEnv(char **env);
+     std::vector<frame> taintEnv(char **env);
 #endif
 
      // A function to propagate taint

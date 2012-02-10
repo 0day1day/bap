@@ -88,6 +88,14 @@ namespace SerializedTrace {
     /** Add [frame] to the trace. */
     void add(frame &f) throw (std::ofstream::failure, TraceException);
 
+    /** Add all frames in container [c] to the trace. */
+    template <typename C>
+    void add(C &c) throw (std::ofstream::failure, TraceException) {
+      for (C::iterator i = c.begin(); i != c.end(); i++) {
+    	add(*i);
+      }
+    }
+
     /** Finish the trace.  Builds and writes the table of contents to
      * the file. Closes the file. */
     void finish(void) throw (std::ofstream::failure);
@@ -171,6 +179,18 @@ namespace SerializedTrace {
     void check_end_of_trace(std::string msg) throw (TraceException);
 
   };
+  
+  /* A minimal smart pointer class for arrays. */
+  template< typename T_ >
+  struct auto_vec{
+    T_* t_;
+    auto_vec( T_* t ): t_( t ) {}
+    ~auto_vec() { delete[] t_; }
+    T_* get() const { return t_; }
+    T_* operator->() const { return get(); }
+    T_& operator*() const { return *get(); }
+  };
+  
 };
 
 #endif

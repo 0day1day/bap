@@ -57,7 +57,7 @@ endif
 
 ifeq ($(TARGET_COMPILER),ms)
     include $(PIN_HOME)/source/tools/makefile.ms.config
-    CXXFLAGS +=  -Iddk-inc 
+    CXXFLAGS +=  -Iddk-inc
     PIN=$(PIN_HOME)/pin.bat
 	RM = del /Q
 endif
