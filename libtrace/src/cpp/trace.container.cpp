@@ -12,10 +12,10 @@
 
 namespace SerializedTrace {
 
-  TraceContainerWriter::TraceContainerWriter(const char *filename,
+  TraceContainerWriter::TraceContainerWriter(std::string filename,
                                              uint64_t frames_per_toc_entry_in,
                                              bool auto_finish_in) throw (std::ofstream::failure, TraceException)
-    : ofs ( filename, std::ios_base::binary | std::ios_base::out | std::ios_base::trunc ),
+    : ofs ( filename.c_str(), std::ios_base::binary | std::ios_base::out | std::ios_base::trunc ),
       num_frames (0),
       frames_per_toc_entry (frames_per_toc_entry_in),
       auto_finish (auto_finish_in),
@@ -26,9 +26,10 @@ namespace SerializedTrace {
   }
 
   TraceContainerWriter::~TraceContainerWriter(void) throw () {
+
     /** Call finish if it has not been called already ANd if
         auto_finish is set. */
-    if (is_finished && auto_finish) {
+    if (!is_finished && auto_finish) {
       try {
         finish();
       }
@@ -102,8 +103,8 @@ namespace SerializedTrace {
     is_finished = true;
   }
 
-  TraceContainerReader::TraceContainerReader(const char *filename) throw (std::ifstream::failure, TraceException)
-    : ifs ( filename, std::ios_base::binary | std::ios_base::in )
+  TraceContainerReader::TraceContainerReader(std::string filename) throw (std::ifstream::failure, TraceException)
+    : ifs ( filename.c_str(), std::ios_base::binary | std::ios_base::in )
   {
     ifs.exceptions( std::ios_base::failbit | std::ios_base::badbit | std::ios_base::eofbit );
 
@@ -153,6 +154,10 @@ namespace SerializedTrace {
     return num_frames;
   }
 
+  uint64_t TraceContainerReader::get_frames_per_toc_entry(void) throw () {
+    return frames_per_toc_entry;
+  }
+  
   void TraceContainerReader::seek(uint64_t frame_number) throw (TraceException) {
     /* First, make sure the frame is in range. */
     check_end_of_trace_num(frame_number, "seek() to non-existant frame");

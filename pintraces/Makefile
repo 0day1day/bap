@@ -102,7 +102,7 @@ LIBS = $(LIBTRACE) -Wl,-rpath=$(PROTOBUFLIBDIR) -pthread  -pthread -lprotobuf -l
 #
 ##############################################################
 
-all: listregs tools reader newreadtrace
+all: listregs tools reader
 tools: $(OBJDIR) $(TOOLS)
 test: $(OBJDIR) $(TOOL_ROOTS:%=%.test)
 

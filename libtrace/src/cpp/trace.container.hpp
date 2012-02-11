@@ -78,7 +78,7 @@ namespace SerializedTrace {
     /** Creates a trace container writer that will output to
         [filename]. An entry will be added to the table of contents
         every [frames_per_toc_entry] entries.*/
-    TraceContainerWriter(const char *filename,
+    TraceContainerWriter(std::string filename,
                          uint64_t frames_per_toc_entry = default_frames_per_toc_entry,
                          bool auto_finish = default_auto_finish) throw (std::ofstream::failure, TraceException);
 
@@ -126,13 +126,16 @@ namespace SerializedTrace {
   public:
 
     /** Creates a trace container reader that reads from [filename]. */
-    TraceContainerReader(const char *filename) throw (std::ifstream::failure, TraceException);
+    TraceContainerReader(std::string filename) throw (std::ifstream::failure, TraceException);
 
     /** Destructor. */
     ~TraceContainerReader(void) throw ();
 
     /** Returns the number of frames in the trace. */
     uint64_t get_num_frames(void) throw ();
+
+    /** Returns the number of frames per toc entry. */
+    uint64_t get_frames_per_toc_entry(void) throw ();
 
     /** Seek to frame number [frame_number]. The frame is numbered
      * 0. */
