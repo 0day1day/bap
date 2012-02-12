@@ -9,11 +9,13 @@ class writer : ?frames_per_toc_entry : int64 -> ?auto_finish : bool -> string ->
 object
   method add : frame -> unit
   method finish : unit
+  method has_finished : bool
 end
 
 class reader : string ->
 object
   method get_num_frames : int64
+  method get_frames_per_toc_entry : int64
   method seek : int64 -> unit
   method get_frame : frame
   method get_frames : int64 -> frame list

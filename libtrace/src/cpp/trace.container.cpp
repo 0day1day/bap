@@ -68,7 +68,11 @@ namespace SerializedTrace {
     assert ((uint64_t)old_offset + len == (uint64_t)ofs.tellp());
   }
 
-  void TraceContainerWriter::finish(void) throw (std::ofstream::failure) {
+  void TraceContainerWriter::finish(void) throw (std::ofstream::failure,TraceException) {
+    if (is_finished) {
+      throw (TraceException("finish called twice"));
+    }
+
     /* Save the offset where we will write the toc. */
     uint64_t toc_offset = ofs.tellp();
 
@@ -101,6 +105,10 @@ namespace SerializedTrace {
     /* Finally, close the file and mark us as finished. */
     ofs.close();
     is_finished = true;
+  }
+
+  bool TraceContainerWriter::has_finished(void) throw () {
+    return is_finished;
   }
 
   TraceContainerReader::TraceContainerReader(std::string filename) throw (std::ifstream::failure, TraceException)
@@ -190,22 +198,14 @@ namespace SerializedTrace {
     uint64_t frame_len;
     READ(frame_len);
 
-    std::cerr << "frame len " << frame_len << std::endl;
-
-	/* We really just want a variable sized array, but MS VC++ doesn't support C99 yet.
-	 *
-	 * http://stackoverflow.com/questions/5246900/enabling-vlasvariable-length-arrays-in-ms-visual-c
-	*/
+    /* We really just want a variable sized array, but MS VC++ doesn't support C99 yet.
+     *
+     * http://stackoverflow.com/questions/5246900/enabling-vlasvariable-length-arrays-in-ms-visual-c
+     */
     auto_vec<char> buf ( new char[frame_len] );
-
-    std::cerr << "I am at location " << ifs.tellg() << std::endl;
 
     /* Read the frame into buf. */
     ifs.read(buf.get(), frame_len);
-
-    for (int i = 0; i < frame_len; i++) {
-      std::cerr << std::hex << "i: " << i << " " << (unsigned) (buf.get()[i]) << std::endl;
-    }
 
     std::string sbuf(buf.get(), frame_len);
 

@@ -27,11 +27,9 @@ let write_i64 oc i64 =
   output_string oc binary
 
 let read_i64 ic =
-  Printf.printf "at: %d\n" (pos_in ic);
   let s = String.create 8 in
   (* Read 8 bytes into s *)
   let () = really_input ic s 0 8 in
-  Printf.printf "ok!\n";
   let input = BatIO.input_string s in
   let i = BatIO.read_i64 input in
   let () = BatIO.close_in input in
@@ -61,6 +59,8 @@ object(self)
   val auto_finish = auto_finish
   val mutable is_finished = false
 
+  initializer Gc.finalise (fun self -> if not self#has_finished then self#finish) self
+
   method add (frame:frame) =
     let () = num_frames <- Int64.succ num_frames in
     if Int64.rem num_frames frames_per_toc_entry = 0L then
@@ -83,6 +83,8 @@ object(self)
         = (Int64.of_int (pos_out oc)));
 
   method finish =
+    if is_finished then raise (TraceException "finish called twice");
+
     let toc_offset = Int64.of_int (pos_out oc) in
     (* Make sure the toc is the right size. *)
     let () = assert ((Int64.div num_frames frames_per_toc_entry) = Int64.of_int (List.length toc)) in
@@ -104,6 +106,9 @@ object(self)
     (* Finally close the final and mark us as finished. *)
     let () = close_out oc in
     is_finished <- true
+
+    method has_finished = is_finished
+
 end
 
 class reader filename =
@@ -120,11 +125,9 @@ class reader filename =
   (* Read number of frames per toc entry. *)
   let frames_per_toc_entry = read_i64 ic in
   (* Read each toc entry. *)
-  let () = Printf.fprintf stderr "here we go\n" in
   let toc =
     let toc_rev = foldn64 ~t:1L
       (fun acc n ->
-        Printf.printf "n: %Lx\n" n;
         (read_i64 ic) :: acc
       ) [] (Int64.div num_frames frames_per_toc_entry) in
     Array.of_list (List.rev toc_rev)
@@ -135,6 +138,8 @@ class reader filename =
     val mutable current_frame = 0L
 
     method get_num_frames = num_frames
+
+    method get_frames_per_toc_entry = frames_per_toc_entry
 
     method seek frame_number =
       (* First, make sure the frame is in range. *)
@@ -161,18 +166,9 @@ class reader filename =
 
       let frame_len = read_i64 ic in
 
-      let buf = String.make (4*(Int64.to_int frame_len)) 'a' in
-      for i = 0 to (String.length buf)-1 do
-        Printf.printf "i: %d %x\n" i (Char.code (String.get buf i))
-      done;
+      let buf = String.create (Int64.to_int frame_len) in
       (* Read the frame info buf. *)
-      Printf.printf "I am at %d\n" (pos_in ic);
-      let () = really_input ic buf (Int64.to_int frame_len) 0 in
-      Printf.printf "parsing.. length = %Ld\n" frame_len;
-      for i = 0 to (String.length buf)-1 do
-        Printf.printf "i: %d %x\n" i (Char.code (String.get buf i))
-      done;
-      Printf.printf "\n wtf %d\n" (pos_in ic);
+      let () = really_input ic buf 0 (Int64.to_int frame_len) in
       let f = Frame_piqi.parse_frame (Piqirun.init_from_string buf) in
       let () = current_frame <- Int64.succ current_frame in
 

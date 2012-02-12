@@ -29,8 +29,14 @@ define PROJ_readtrace
 endef
 export PROJ_readtrace
 
+define PROJ_copytrace
+	SOURCES = copytrace.ml
+	RESULT = copytrace
+endef
+export PROJ_copytrace
+
 ifndef SUBPROJS
-	export SUBPROJS = readtrace
+	export SUBPROJS = readtrace copytrace
 endif
 
 all:	nc dc

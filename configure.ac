@@ -222,6 +222,7 @@ AC_CONFIG_FILES([Makefile
                  libasmir/src/Makefile
                  libtrace/Makefile
                  libtrace/src/Makefile
+                 libtrace/src/cpp/utils/Makefile
                  libtrace/src/cpp/Makefile])
 AC_OUTPUT
 

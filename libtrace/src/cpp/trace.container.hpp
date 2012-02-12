@@ -98,8 +98,11 @@ namespace SerializedTrace {
 
     /** Finish the trace.  Builds and writes the table of contents to
      * the file. Closes the file. */
-    void finish(void) throw (std::ofstream::failure);
+    void finish(void) throw (std::ofstream::failure,TraceException);
 
+    /** Returns true iff finish() has not been called on this trace. */
+    bool has_finished(void) throw ();
+    
     protected:
 
     /** Output fstream for trace container file. */
