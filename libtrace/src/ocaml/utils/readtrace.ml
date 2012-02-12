@@ -13,6 +13,9 @@ let print_all f =
   done;;
 
 let () =
-  if Array.Length Sys.argv = 2 then
-    print_all Sys.argv.(1);;
+  if Array.length Sys.argv = 2 then
+    print_all Sys.argv.(1)
+  else
+    Printf.fprintf stderr "Usage: readtrace <trace>\n"
+;;
 

@@ -27,11 +27,11 @@ let write_i64 oc i64 =
   output_string oc binary
 
 let read_i64 ic =
-  let s = "" in
+  Printf.printf "at: %d\n" (pos_in ic);
+  let s = String.create 8 in
   (* Read 8 bytes into s *)
-  let () = really_input ic s (pos_in ic) 8 in
-  (* Seek ahead, because it's not automatic *)
-  let () = seek_in ic ((pos_in ic) + 8) in
+  let () = really_input ic s 0 8 in
+  Printf.printf "ok!\n";
   let input = BatIO.input_string s in
   let i = BatIO.read_i64 input in
   let () = BatIO.close_in input in
@@ -120,11 +120,13 @@ class reader filename =
   (* Read number of frames per toc entry. *)
   let frames_per_toc_entry = read_i64 ic in
   (* Read each toc entry. *)
+  let () = Printf.fprintf stderr "here we go\n" in
   let toc =
-    let toc_rev = foldn64
-      (fun acc _ ->
+    let toc_rev = foldn64 ~t:1L
+      (fun acc n ->
+        Printf.printf "n: %Lx\n" n;
         (read_i64 ic) :: acc
-      ) [] num_frames in
+      ) [] (Int64.div num_frames frames_per_toc_entry) in
     Array.of_list (List.rev toc_rev)
   in
   (* We should be at the end of the file now. *)
@@ -159,14 +161,19 @@ class reader filename =
 
       let frame_len = read_i64 ic in
 
-      let buf = "" in
+      let buf = String.make (4*(Int64.to_int frame_len)) 'a' in
+      for i = 0 to (String.length buf)-1 do
+        Printf.printf "i: %d %x\n" i (Char.code (String.get buf i))
+      done;
       (* Read the frame info buf. *)
-      let () = really_input ic buf (Int64.to_int frame_len) (pos_in ic) in
-
+      Printf.printf "I am at %d\n" (pos_in ic);
+      let () = really_input ic buf (Int64.to_int frame_len) 0 in
+      Printf.printf "parsing.. length = %Ld\n" frame_len;
+      for i = 0 to (String.length buf)-1 do
+        Printf.printf "i: %d %x\n" i (Char.code (String.get buf i))
+      done;
+      Printf.printf "\n wtf %d\n" (pos_in ic);
       let f = Frame_piqi.parse_frame (Piqirun.init_from_string buf) in
-
-      (* Skip ahead to next frame since really_input is really_retarded. *)
-      let () = seek_in ic (Int64.to_int (Int64.add (Int64.of_int (pos_in ic)) frame_len)) in
       let () = current_frame <- Int64.succ current_frame in
 
       f

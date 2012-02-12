@@ -157,7 +157,7 @@ namespace SerializedTrace {
   uint64_t TraceContainerReader::get_frames_per_toc_entry(void) throw () {
     return frames_per_toc_entry;
   }
-  
+
   void TraceContainerReader::seek(uint64_t frame_number) throw (TraceException) {
     /* First, make sure the frame is in range. */
     check_end_of_trace_num(frame_number, "seek() to non-existant frame");
@@ -190,14 +190,22 @@ namespace SerializedTrace {
     uint64_t frame_len;
     READ(frame_len);
 
-	/* We really just want a variable sized array, but MS VC++ doesn't support C99 yet. 
+    std::cerr << "frame len " << frame_len << std::endl;
+
+	/* We really just want a variable sized array, but MS VC++ doesn't support C99 yet.
 	 *
 	 * http://stackoverflow.com/questions/5246900/enabling-vlasvariable-length-arrays-in-ms-visual-c
 	*/
     auto_vec<char> buf ( new char[frame_len] );
 
+    std::cerr << "I am at location " << ifs.tellg() << std::endl;
+
     /* Read the frame into buf. */
     ifs.read(buf.get(), frame_len);
+
+    for (int i = 0; i < frame_len; i++) {
+      std::cerr << std::hex << "i: " << i << " " << (unsigned) (buf.get()[i]) << std::endl;
+    }
 
     std::string sbuf(buf.get(), frame_len);
 

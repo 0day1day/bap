@@ -1,1 +1,1 @@
-SUBDIRS=cpp ocaml
+SUBDIRS=cpp ocaml ocaml/utils

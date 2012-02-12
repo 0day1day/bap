@@ -10,6 +10,7 @@ PACKS = piqi.lib
 
 SOURCES = piqi/frame_piqi.mli \
 	  piqi/frame_piqi.ml \
+	  piqi/frame_piqi_ext.ml \
 	  trace_container.mli \
 	  trace_container.ml
 RESULT  = libtrace

@@ -12,9 +12,9 @@ LIBINSTALL_FILES = \
 
 # we're not building byte-code library by default, only when requested
 # explicitly, e.g. from top-level Makefile
-ifneq ($(findstring bcl,$(MAKECMDGOALS)),)
+#ifneq ($(findstring bcl,$(MAKECMDGOALS)),)
 LIBINSTALL_FILES += $(RESULT).cma
-endif
+#endif
 
 
 PACKS += xmlm
@@ -55,7 +55,7 @@ PIQICC = ../piqicc/piqicc
 PIQICC_FLAGS = -I $(PIQI_ROOT)
 
 
-all: ncl
+all: ncl dcl
 
 
 debug: dcl install
