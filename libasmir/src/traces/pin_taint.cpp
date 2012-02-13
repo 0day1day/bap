@@ -84,7 +84,23 @@ TaintTracker::TaintTracker(ValSpecRec * env)
     taint_net(false),
     taint_args(false),
     pf(defaultPolicy)
-{}
+{
+#ifdef _WIN32
+
+// Windows versions from 
+// http://msdn.microsoft.com/en-us/library/aa383745(v=vs.85).aspx
+#if NTDDI_VERSION == 0x06010000
+  #define WIN_VER OS_SEVEN_SP0
+#elif NTDDI_VERSION == 0x05010300
+  #define WIN_VER OS_XP_SP3
+#endif
+
+  for ( unsigned i = 0; i < total_syscall_num; i++ ) {
+    const char * name = syscall_array[i];
+    syscall_map.insert( std::pair<unsigned int, unsigned int>( get_syscall(name, WIN_VER), i ) );
+  }
+#endif
+}
 
 //
 void TaintTracker::setCount(uint32_t cnt)
@@ -117,7 +133,7 @@ void TaintTracker::setTaintStdin()
   fdInfo_t fd(string("stdin"), 0);
   fds[STDIN_FILENO] = fd;
 #else
-  assert(FALSE);
+  assert(false);
 #endif
 }
 
@@ -471,6 +487,10 @@ bool TaintTracker::taintPreSC(uint32_t callno, uint32_t *args, /* out */ uint32_
   
   bool reading_tainted = false;
   char filename[128];
+
+#ifdef _WIN32
+  callno = syscall_map[callno];
+#endif
   
   switch (callno) {
 #ifndef _WIN32 /* unix */
@@ -524,6 +544,8 @@ bool TaintTracker::taintPreSC(uint32_t callno, uint32_t *args, /* out */ uint32_
       size_t origsize;
       size_t convertedChars;
       
+      cerr << "In createfilewin" << endl;
+
       pattr = reinterpret_cast<WINDOWS::POBJECT_ATTRIBUTES> (args[2]);
       assert(pattr);
       assert(pattr->ObjectName);

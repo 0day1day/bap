@@ -1250,8 +1250,7 @@ let parse_instr g addr =
     let ss = b >> 6 and idx = (b>>3) & 7 in
     let base, na = 
       match ((b & 7), m) with (* base register, MOD *)
-      | 5, 0 ->  disfailwith 
-	(Printf.sprintf "impossible opcode; should have been handled already: sib +? disp b=%02x" b)
+      | 5, 0 -> let (i,na) = parse_disp32(s a) in (l32 i, na)
       | _, 0 | _, 1 | _, 2 -> (bits2reg32e (b & 7), s a)
       | _ -> disfailwith (Printf.sprintf "impossible opcode: sib b=%02x" b)
     in

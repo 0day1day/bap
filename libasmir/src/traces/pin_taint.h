@@ -205,6 +205,10 @@ namespace pintrace { // We will use namespace to avoid collision
      // The taint policy function
      TAINT_POLICY_FUN pf;
 
+#ifdef _WIN32
+     std::map<unsigned int, unsigned int> syscall_map;
+#endif
+
      void addTaintToWritten(context &delta, uint32_t tag);
       
      uint32_t combineTaint(uint32_t oldtag, uint32_t newtag);

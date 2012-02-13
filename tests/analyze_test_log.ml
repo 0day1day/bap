@@ -58,18 +58,18 @@ let insert_item hashtbl item =
 
 
 (* regexps for matching general information *)
-let total_run_time_regexp = regexp "tests in: ([0-9]+\.[0-9]+) seconds\.$";;
+let total_run_time_regexp = regexp "tests in: ([0-9]+\\.[0-9]+) seconds\\.$";;
 let total_blocks_regexp = regexp "^Trace(Eval|s): Running block: ([0-9]+)";;
 let trace_count_regexp = regexp "^LongNightly: Processing trace-file";;
 
 (* regexps for matching incorrect and unknown assembley instructions *)
-let bap_regexp = regexp "^AsmirTest: BAP unknown disasm_instr \S+: disasm_i386: unimplemented feature: unsupported opcode: (.*)$";;
+let bap_regexp = regexp "^AsmirTest: BAP unknown disasm_instr \\S+: (.*)$";;
 let vex_regexp = regexp "vex x86->IR: unhandled instruction bytes: (.*)$";;
-let trace_eval_regexp = regexp "^WARNING \(Trace(Eval|s)\): Difference between BAP and trace values for \[\*(R_\S*)\* Trace=(\S*) Eval=(\S*)\]";;
-let trace_eval_regexp2 = regexp "^WARNING \(Trace(Eval|s)\): This is due to one of the following statments:";;
-let stmt_regexp = regexp "^\{addr .*asm (\".*?\") (.*)\}$";;
+let trace_eval_regexp = regexp "^WARNING \\(Trace(Eval|s)\\): Difference between BAP and trace values for \\[\\*(R_\\S*)\\* Trace=(\\S*) Eval=(\\S*)\\]";;
+let trace_eval_regexp2 = regexp "^WARNING \\(Trace(Eval|s)\\): This is due to one of the following statments:";;
+let stmt_regexp = regexp "^\\{addr .*asm (\".*?\") (.*)\\}$";;
 let asm_regexp = regexp "^\"(.*)\"";;
-let first_word_regexp = regexp "^(\S*)";;
+let first_word_regexp = regexp "^(\\S*)";;
 let special_regexp = regexp "(int|sysenter)";;
 
 let get_match rex text = 
@@ -128,7 +128,7 @@ let process_line l = (
     	let asm = get_match asm_regexp (Array.get stmts 0) in
 	asm_buff := (asm,r)::(!asm_buff)
       with Not_found -> 
-	process_list !asm_buff;
+	ignore(process_list !asm_buff);
 	(* Reset counters as we are no longer analyzing the list of bad
 	   instructions *)
 	wrong_register := None;
