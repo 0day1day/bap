@@ -1,5 +1,5 @@
 (** High level interface to libasmir.
-    
+
     The functions in this file should be used instead of calling Libasmir functions
     directly. These functions should be easier to use, and, unlike the Libasmir
     ones, will handle garbage collection.
@@ -11,6 +11,7 @@ open Asmir_consts
 open Ast
 open Big_int_Z
 open BatListFull
+open Frame_piqi
 open Libasmir
 open Libbfd
 open Type
@@ -657,46 +658,146 @@ let trans_frame f =
      Comment("All blocks must have two statements", [])]
   | Libasmir.FRM_STD | Libasmir.FRM_KEY | Libasmir.FRM_NONE -> []
 
+let add_operands stmts ops =
+  match stmts with
+  | Label (l,a)::others ->
+    Label (l,a@ops)::others
+  | Comment (s,a)::others ->
+    Comment (s,a@ops)::others
+  | others when ops <> [] -> Comment("Attrs without label.", ops)::others
+  | others -> others
 
-let alt_bap_from_trace_file_range filename off reqframes =
-  let add_operands stmts f =
-    let ops = tr_frame_attrs f in
-    match stmts with
-    | Label (l,a)::others ->
-	  Label (l,a@ops)::others
-    | Comment (s,a)::others ->
-	  Comment (s,a@ops)::others
-    | others when ops <> [] -> Comment("Attrs without label.", ops)::others
-    | others -> others
+(* New trace file format *)
+let new_bap_from_trace_file filename =
+  let arch = Libbfd.Bfd_arch_i386 in
+  let get_attrs =
+    let convert_taint = function
+      | `no_taint -> Taint 0
+      | `taint_id(id) -> Taint (Int64.to_int id)
+      | `taint_multiple -> Taint (-1)
+    in
+    let convert_usage = function
+      | {Operand_usage.read=true; Operand_usage.written=true} -> Type.RW
+      | {Operand_usage.read=true} -> Type.RD
+      | {Operand_usage.written=true} -> Type.WR
+      | _ -> (* Trace usage undefined; assuming read *) Type.RD
+    in
+    let convert_operand_info = function
+      | {Operand_info.operand_info_specific=`mem_operand({Mem_operand.address=a});
+         Operand_info.bit_length=b;
+         Operand_info.operand_usage=use;
+         Operand_info.taint_info=t;
+         Operand_info.value=v} ->
+        Context({name="mem";
+                 mem=true;
+                 t=Reg b;
+                 index=a;
+                 value=Util.big_int_of_binstring ~e:Util.Little v;
+                 usage=convert_usage use;
+                 taint=convert_taint t})
+      | {Operand_info.operand_info_specific=`reg_operand({Reg_operand.name=n});
+         Operand_info.bit_length=b;
+         Operand_info.operand_usage=use;
+         Operand_info.taint_info=t;
+         Operand_info.value=v} ->
+        Context({name=n;
+                 mem=false;
+                 t=Reg b;
+                 index=0L;
+                 value=Util.big_int_of_binstring ~e:Util.Little v;
+                 usage=convert_usage use;
+                 taint=convert_taint t})
+    in
+    let convert_taint_info = function
+      | {Taint_intro.addr=a;
+         Taint_intro.taint_id=tid} ->
+        Context({name="mem";
+                 mem=true;
+                 t=Reg 8;
+                 index=a;
+                 value=Big_int_convenience.bi0;
+                 usage=WR;
+                 taint=Taint (Int64.to_int tid)})
+    in
+    function
+      | `std_frame({Std_frame.operand_list=ol}) -> List.map convert_operand_info ol
+      | `syscall_frame _ -> []
+      | `exception_frame _ -> []
+      | `taint_intro_frame({Taint_intro_frame.taint_intro_list=til}) -> List.map convert_taint_info til
+      | `modload_frame _ -> []
+      | `key_frame _ -> []
   in
   let raise_frame f =
+    let get_stmts =
+      function
+    | `std_frame(f) ->
+      (* Convert string to byte array *)
+      let a = Array.of_list (BatString.to_list f.Std_frame.rawbytes) in
+      let stmts, _ = byte_insn_to_bap arch f.Std_frame.address a in
+      stmts
+    | `syscall_frame({Syscall_frame.number=callno;
+                      Syscall_frame.address=addr;
+                      Syscall_frame.thread_id=tid}) ->
+      [Special(Printf.sprintf "Syscall number %Ld at %#Lx by thread %Ld" callno addr tid, [StrAttr "TraceKeep"]); Comment("All blocks must have two statements", [])]
+    | `exception_frame({Exception_frame.exception_number=exceptno;
+                        Exception_frame.thread_id=Some tid;
+                        Exception_frame.from_addr=Some from_addr;
+                        Exception_frame.to_addr=Some to_addr}) ->
+      [Special(Printf.sprintf "Exception number %Ld by thread %Ld at %#Lx to %#Lx" exceptno tid from_addr to_addr, []);
+       Comment("All blocks must have two statements", [])]
+    | `exception_frame({Exception_frame.exception_number=exceptno}) ->
+      [Special(Printf.sprintf "Exception number %Ld" exceptno, []);
+       Comment("All blocks must have two statements", [])]
+    | `taint_intro_frame(f) ->
+      [Comment("ReadSyscall", []); Comment("All blocks must have two statements", [])]
+    | `modload_frame({Modload_frame.module_name=name;
+                      Modload_frame.low_address=lowaddr;
+                      Modload_frame.high_address=highaddr}) ->
+      [Special(Printf.sprintf "Loaded module '%s' at %#Lx to %#Lx" name lowaddr highaddr, []); Comment("All blocks must have two statements", [])]
+    | `key_frame _ ->
+      (* Implement key frame later *)
+      []
+    in
+    add_operands (get_stmts f) (get_attrs f)
+  in
+  let out = ref [] in
+  let r = new Trace_container.reader filename in
+  while not r#end_of_trace do
+    let frames = r#get_frames !trace_blocksize in
+    out := List.rev_append (List.flatten (List.map raise_frame frames)) !out;
+  done;
+
+  List.rev !out
+
+let alt_bap_from_trace_file_range filename off reqframes =
+  let raise_frame f =
     let stmts = trans_frame f in
-    add_operands stmts f
+    add_operands stmts (tr_frame_attrs f)
   in
   let c = ref true in
   let revstmts = ref [] in
   (* flush VEX buffers *)
   let () = Libasmir.asmir_free_vex_buffers () in
-  let trace_frames = 
-	Libasmir.asmir_frames_from_trace_file filename !off reqframes in
+  let trace_frames =
+    Libasmir.asmir_frames_from_trace_file filename !off reqframes in
   let numframes = Libasmir.asmir_frames_length trace_frames in
   (*dprintf "Got %d frames" numframes;*)
   if numframes = 0 || numframes = -1 then (
     c := false
   ) else (
-    if ((Int64.of_int numframes) <> reqframes) then 
-      dprintf "Got %d frames which <> requested frames %s" 
-		numframes (Int64.to_string reqframes);
-    revstmts := 
-	  Util.foldn
+    if ((Int64.of_int numframes) <> reqframes) then
+      dprintf "Got %d frames which <> requested frames %s"
+	numframes (Int64.to_string reqframes);
+    revstmts :=
+      Util.foldn
       (fun acc n ->
-		let frameno = numframes-1-n in
-		(* dprintf "frame %d" frameno; *)
-		let stmts = 
-		  raise_frame (Libasmir.asmir_frames_get trace_frames frameno)
-		in
-		List.rev_append stmts acc) 
-	  [] (numframes-1);
+	let frameno = numframes-1-n in
+	(* dprintf "frame %d" frameno; *)
+	let stmts =
+	  raise_frame (Libasmir.asmir_frames_get trace_frames frameno)
+	in
+	List.rev_append stmts acc)
+      [] (numframes-1);
     off := Int64.add !off (Int64.of_int numframes);
   (* let moreir = tr_bap_blocks_t_no_asm g bap_blocks in *)
   (* Build ir backwards *)

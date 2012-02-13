@@ -218,11 +218,11 @@ namespace SerializedTrace {
     return f;
   }
 
-  std::auto_ptr<std::vector<frame> > TraceContainerReader::get_frames(uint64_t num_frames) throw (std::ifstream::failure, TraceException) {
+  std::auto_ptr<std::vector<frame> > TraceContainerReader::get_frames(uint64_t requested_frames) throw (std::ifstream::failure, TraceException) {
     check_end_of_trace("get_frames() on non-existant frame");
 
     std::auto_ptr<std::vector<frame> > frames(new std::vector<frame>);
-    for (uint64_t i = 0; i < num_frames && current_frame < num_frames; i++) {
+    for (uint64_t i = 0; i < requested_frames && current_frame < num_frames; i++) {
       frames->push_back(*(get_frame()));
     }
 

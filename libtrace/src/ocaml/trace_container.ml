@@ -174,14 +174,14 @@ class reader filename =
 
       f
 
-    method get_frames num_frames =
+    method get_frames requested_frames =
       let () = self#check_end_of_trace "get_frame on non-existant frame" in
 
       (* The number of frames we copy is bounded by the number of
          frames left in the trace. *)
-      let num_frames = max num_frames (Int64.sub num_frames current_frame) in
+      let num_frames = min requested_frames (Int64.sub num_frames current_frame) in
 
-      List.rev (foldn64 (fun l _ -> self#get_frame :: l) [] num_frames)
+      List.rev (foldn64 ~t:1L (fun l n -> self#get_frame :: l) [] num_frames)
 
     method end_of_trace =
       self#end_of_trace_num current_frame

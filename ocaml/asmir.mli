@@ -68,6 +68,8 @@ val asm_addr_to_bap : (*varctx ->*) asmprogram -> address_t -> Ast.program * add
 
 val asmprogram_to_bap_range : ?init_ro:bool -> asmprogram -> address_t -> address_t  -> Ast.program
 
+val new_bap_from_trace_file : string -> Ast.program
+
 val bap_from_trace_file : ?atts:bool -> ?pin:bool -> string -> Ast.program
 
 val bap_stream_from_trace_file : ?atts:bool -> ?rate:int64 -> ?pin:bool -> string -> (Ast.stmt list) Stream.t

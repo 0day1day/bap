@@ -10,6 +10,8 @@ export OUNIT=$(BAP_DIR)/ounit-1.1.0/_build/src/
 export PCRE=$(BAP_DIR)/pcre-ocaml-release-6.2.2/lib
 export OCAMLGRAPH=$(BAP_DIR)/ocamlgraph-1.8
 export OBJSIZE=$(BAP_DIR)/objsize-0.16
+export LIBTRACE=$(BAP_DIR)/libtrace/src/ocaml
+export PIQIBUILDDIR=$(BAP_DIR)/piqi/piqi/build/lib/ocaml
 
 include $(LIBASMIR)/makefile.inc
 export SOLVER=$(BAP_DIR)/solvers
@@ -116,7 +118,7 @@ DOC_FILES := $(filter %.mli, $(SOURCES)) $(filter %.ml, $(SOURCES))
 
 
 # ocamlfind packages required
-export PACKS = bigarray str num unix camomile threads
+export PACKS = bigarray str num unix camomile threads piqi.lib
 # ocamlfind packages for ocamldoc
 # don't include packages in /usr/lib/ocaml, this will cause ocamldoc
 # to complain about conflicts with our local big_int
@@ -127,14 +129,15 @@ export USE_CAMLP4 = yes
 
 export CLIBS = asmir vex opcodes bfd iberty stdc++
 export CLIBS += $(SOLVER_CLIBS)
+export OCAMLPATH = $(PIQIBUILDDIR)
 export CFLAGS = -g
 export LDFLAGS = $(LIBASMIR_LDFLAGS) $(SOLVER_LDFLAGS)
 export PPFLAGS = $(SOLVER_PPFLAGS)
-export INCDIRS = $(BIGINT) $(BATT) $(OUNIT) $(PCRE) $(OCAMLGRAPH) $(OBJSIZE)
-export LIBS = zarith batteries oUnit pcre graph objsize
-export RESULTDEPS = $(LIBASMIR)/src/libasmir.a $(VEX_DIR)/libvex.a
+export INCDIRS = $(BIGINT) $(BATT) $(OUNIT) $(PCRE) $(OCAMLGRAPH) $(OBJSIZE) $(LIBTRACE) $(LIBTRACE)/piqi
+export LIBS = zarith batteries oUnit pcre graph objsize libtrace
+export RESULTDEPS = $(LIBASMIR)/src/libasmir.a $(VEX_DIR)/libvex.a $(LIBTRACE)/libtrace.cmxa
 export LIBDIRS = $(LIBASMIR)/src $(VEX_DIR)
-export LIBDIRS += $(SOLVER_LIBDIRS)
+export LIBDIRS += $(SOLVER_LIBDIRS) $(LIBTRACE)
 
 OCAMLLDFLAGS = -thread # just for make top
 OCAMLFLAGS = -thread -warn-error Aelz # -for-pack Bap #-w A

@@ -63,6 +63,11 @@ let speclist =
 		  set_gc () ;
 		  addinput (`Trace s)),
      "<file> Read in a trace and lift it to the IL");
+    ("-newtrace",
+     Arg.String(fun s ->
+		  set_gc () ;
+		  addinput (`Newtrace s)),
+     "<file> Read in a new trace and lift it to the IL");
     ("-il",
      Arg.String(fun s -> addinput (`Il s)),
      "<file> Read input from an IL file.");
@@ -97,11 +102,9 @@ let get_program () =
       List.append (fst (Asmir_rdisasm.rdisasm_at p s)) oldp, oldscope
     | `Trace f ->
       List.append (Asmir.bap_from_trace_file ~pin:!pintrace f) oldp, oldscope
+    | `Newtrace f ->
+      List.append (Asmir.new_bap_from_trace_file f) oldp, oldscope
   in
- (* let rec cat p = function *)
-  (*   | [] -> p *)
-  (*   | arg::args -> cat (List.rev_append (List.rev (get_one arg)) p) args *)
-  (* in *)
   try
     List.fold_left get_one ([], Grammar_private_scope.default_scope ()) (List.rev !inputs)
   with _ -> failwith "An exception occured while lifting"
