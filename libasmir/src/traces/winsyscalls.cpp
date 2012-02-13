@@ -455,3 +455,11 @@ auto_ptr<string> get_name(uint32_t num, os_t os) {
   return s;
 }
 
+uint32_t get_syscall (const char* name, os_t os) {
+  for(int i = 0; i < numRows; i++) {
+    if (syscalls[i].name == name) {
+      return syscalls[i].x[os];
+    }
+  }
+  return 0;
+}

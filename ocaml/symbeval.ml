@@ -3,16 +3,6 @@
 (** TODO list:
  *
  *  - Cleanup & make readable
- *
- *  - Still experimental -- needs testing
- *
- *  - Need to figure out a way to show uninitialized memories
- *    and variables (because right now Unknown + name is used)
- *
- *  - We need to figure out what we are going to do with
- *    symbolic memory accesses.
- *
- *  - Some sort of mapping from variables to instance variables.
  *)
 
 open Ast
@@ -817,7 +807,10 @@ let concretely_execute ?s ?(i=[]) p =
   in
   let ctx = match s with
     | Some(s) -> {ctx with pc = Concrete.label_decode ctx.lambda (Addr s)}
-    | None -> ctx
+    | None ->
+      (* Explicitly set pc to 0, since executing any init statements
+         will (unintentionally) increment pc. *)
+      {ctx with pc = 0L}
   in
   let ctx = step ctx in
   Concrete.print_values ctx.delta;
