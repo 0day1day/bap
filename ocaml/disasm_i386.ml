@@ -485,8 +485,10 @@ let rec to_ir addr next ss pref =
   | Nop -> []
   | Retn (op, far_ret) when pref = [] ->
     let temp = nt "ra" r32 in
-    let load_stmt = move temp (load_s seg_ss r32 esp_e)
-      (*if far_ret then (* TODO Mess with segment selectors here *) else*)
+    let load_stmt = if far_ret 
+      then (* TODO Mess with segment selectors here *)  
+    	unimplemented "long retn not supported"  
+      else move temp (load_s seg_ss r32 esp_e)
     in
     let esp_stmts = 
       move esp (esp_e +* (i32 (bytes_of_width r32)))::
@@ -1472,10 +1474,10 @@ let parse_instr g addr =
 	      (Mov(prefix.opsize, Oreg(b1 & 7), i), na)
     | 0xc2 | 0xc3 (* Near ret *)
     | 0xca | 0xcb (* Far ret *)-> 
-      let far_ret = if (b1 = 0xc2 or b1 = 0xc3) then true else false in
+      let far_ret = if (b1 = 0xc2 or b1 = 0xc3) then false else true in
       if (b1 = 0xc3 or b1 = 0xcb) then (Retn(None, far_ret), na) 
       else let (imm,na) = parse_immw na in 
-	   (Retn(Some(prefix.opsize, imm), far_ret), na)
+	   (Retn(Some(r32, imm), far_ret), na)
     | 0xc6
     | 0xc7 -> let t = if b1 = 0xc6 then r8 else prefix.opsize in
 	      let (e, rm, na) = parse_modrm32ext na in
