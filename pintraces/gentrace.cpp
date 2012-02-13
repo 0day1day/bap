@@ -2457,7 +2457,7 @@ VOID FollowChild(THREADID threadid, const CONTEXT* ctxt, VOID * arg)
   assert(i < BUFFER_SIZE);
   g_threadname[i++] = 'c';
 
-  g_twnew = new TraceContainerWriter((g_threadname + KnobOut.Value()).c_str(), default_frames_per_toc_entry, true);
+  g_twnew = new TraceContainerWriter((g_threadname + KnobOut.Value()).c_str(), default_frames_per_toc_entry, false);
   
   g_bufidx = 0;
   g_kfcount = 0;

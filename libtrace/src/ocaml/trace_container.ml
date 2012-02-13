@@ -42,7 +42,7 @@ let rec foldn64 ?(t=0L) f i n =
   | 0L -> f i n
   | _ when n>t -> foldn64 ~t f (f i n) (n-1L)
   | n when n == -1L -> i (* otags has trouble with '-1L' *)
-  | _ -> raise (Invalid_argument "negative index number in foldn64")
+  | w -> raise (Invalid_argument "negative index number in foldn64")
 
 (* End helpers *)
 
@@ -125,11 +125,13 @@ class reader filename =
   (* Read number of frames per toc entry. *)
   let frames_per_toc_entry = read_i64 ic in
   (* Read each toc entry. *)
+  let toc_size = Int64.div num_frames frames_per_toc_entry in
   let toc =
-    let toc_rev = foldn64 ~t:1L
+    let toc_rev = foldn64
       (fun acc n ->
-        (read_i64 ic) :: acc
-      ) [] (Int64.div num_frames frames_per_toc_entry) in
+        if n = 0L then acc else
+          (read_i64 ic) :: acc
+      ) [] toc_size in
     Array.of_list (List.rev toc_rev)
   in
   (* We should be at the end of the file now. *)
