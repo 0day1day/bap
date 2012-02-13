@@ -13,6 +13,7 @@
 
 #include "pin_frame.h"
 #include "pin_trace.h"
+#include "reg_mapping_pin.h"
 #include "cache.h"
 
 /* The new trace container format */
@@ -658,7 +659,7 @@ VOID FlushInstructions()
         o->mutable_operand_info_specific()->mutable_mem_operand()->set_address(v.loc);
 
       } else {
-        o->mutable_operand_info_specific()->mutable_reg_operand()->set_name(REG_StringShort((REG)v.loc));
+        o->mutable_operand_info_specific()->mutable_reg_operand()->set_name(pin_register_name((REG)v.loc));
       }
 
       o->set_value(&(v.value), GetByteSize(v.type));

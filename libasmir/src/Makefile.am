@@ -27,6 +27,7 @@ libasmir_a_SOURCES = \
 	./traces/trace_v41.cpp \
 	./traces/trace_v50.cpp \
 	./traces/reg_mapping.cpp \
+	./traces/reg_mapping_pin.cpp \
         ./traces/pin_frame.h ./traces/pin_frame.cpp \
         ./traces/pin_trace.h ./traces/pin_trace.cpp
 libasmir_a_LIBADD = @VEX_DIR@/libvex.a @BAP_DIR@/libtrace/src/cpp/libtrace.a
