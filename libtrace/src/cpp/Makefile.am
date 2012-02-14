@@ -1,4 +1,4 @@
-AM_CXXFLAGS = -I./pb -I@BAP_DIR@/protobuf/src
+AM_CXXFLAGS = -I./pb -I@LIBTRACE_DIR@/protobuf/src
 AM_CXXFLAGS += -m32
 
 lib_LIBRARIES = libtrace.a

@@ -219,11 +219,7 @@ AM_CONDITIONAL([TESTS_OPT], [ test ! -f NOTESTS ])
 AC_CONFIG_FILES([Makefile
                  libasmir/Makefile
                  libasmir/apps/Makefile
-                 libasmir/src/Makefile
-                 libtrace/Makefile
-                 libtrace/src/Makefile
-                 libtrace/src/cpp/utils/Makefile
-                 libtrace/src/cpp/Makefile])
+                 libasmir/src/Makefile])
 AC_OUTPUT
 
 # Configure ocamlgraph
@@ -232,7 +228,5 @@ AC_OUTPUT
 # Configure zarith
 (cd zarith-1.0 && ./configure)
 
-# Configure google protobuf
-# Note: protobuf must be compiled for 32-bit because it is linked by pintraces
-# code, which is 32-bit
-(cd protobuf && CFLAGS=-m32 CXXFLAGS=-m32 ./configure)
+# Configure libtrace
+(cd libtrace && ./configure --with-batteries="$BAP_DIR/batteries/_build/src")

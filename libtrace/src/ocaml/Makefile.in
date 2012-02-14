@@ -1,8 +1,9 @@
 OCAMLMAKEFILE = ./OCamlMakefile
 
-ROOTDIR = $(CURDIR)/../../..
+ROOTDIR = @LIBTRACE_DIR@
 PIQIBUILDDIR = $(ROOTDIR)/piqi/piqi/build/lib/ocaml
-BATT = $(ROOTDIR)/batteries/_build/src
+BATT = @BAT_DIR@
+#BATT = $(ROOTDIR)/batteries/_build/src
 
 export OCAMLPATH = $(PIQIBUILDDIR)
 

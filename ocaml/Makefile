@@ -13,7 +13,7 @@ export PCRE=$(BAP_DIR)/pcre-ocaml-release-6.2.2/lib
 export OCAMLGRAPH=$(BAP_DIR)/ocamlgraph-1.8
 export OBJSIZE=$(BAP_DIR)/objsize-0.16
 export LIBTRACE=$(BAP_DIR)/libtrace/src/ocaml
-export PIQIBUILDDIR=$(BAP_DIR)/piqi/piqi/build/lib/ocaml
+export PIQIBUILDDIR=$(BAP_DIR)/libtrace/piqi/piqi/build/lib/ocaml
 
 include $(LIBASMIR)/makefile.inc
 export SOLVER=$(BAP_DIR)/solvers

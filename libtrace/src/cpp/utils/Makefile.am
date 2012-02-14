@@ -1,7 +1,7 @@
-AM_CXXFLAGS = -I../pb -I.. -I@BAP_DIR@/protobuf/src
+AM_CXXFLAGS = -I../pb -I.. -I@LIBTRACE_DIR@/protobuf/src
 AM_CXXFLAGS += -m32
 
-utils_LDADD = ../libtrace.a @BAP_DIR@/protobuf/src/.libs/libprotobuf.a -lpthread
+utils_LDADD = ../libtrace.a @LIBTRACE_DIR@/protobuf/src/.libs/libprotobuf.a -lpthread
 
 bin_PROGRAMS = readtrace copytrace
 readtrace_SOURCES = readtrace.cpp

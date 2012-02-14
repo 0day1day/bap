@@ -1,1 +1,1 @@
-SUBDIRS=src
+SUBDIRS=piqi protobuf src

@@ -2,11 +2,12 @@
 
 export OCAMLMAKEFILE = ../OCamlMakefile
 
-ROOTDIR = $(realpath $(CURDIR)/../../../..)
+ROOTDIR = @LIBTRACE_DIR@
 PIQIBUILDDIR = $(ROOTDIR)/piqi/piqi/build/lib/ocaml
-BATT = $(ROOTDIR)/batteries/_build/src
+BATT = @BAT_DIR@
+#BATT = $(ROOTDIR)/batteries/_build/src
 LIBTRACEDIR = $(realpath ..)
-ZARITHDIR = $(ROOTDIR)/zarith-1.0
+#ZARITHDIR = $(ROOTDIR)/zarith-1.0
 
 export BCSUFFIX = .dbg
 
@@ -16,12 +17,12 @@ export PACKS = piqi.lib unix camomile num
 
 export INCDIRS += $(BATT)
 export INCDIRS += $(LIBTRACEDIR) $(LIBTRACEDIR)/piqi
-export INCDIRS += $(ZARITHDIR)
+#export INCDIRS += $(ZARITHDIR)
 
 export LIBDIRS += $(LIBTRACEDIR)
 #export LIBDIRS += $(ZARITHDIR)
 
-export LIBS += batteries zarith libtrace
+export LIBS += batteries libtrace
 
 define PROJ_readtrace
 	SOURCES = readtrace.ml
