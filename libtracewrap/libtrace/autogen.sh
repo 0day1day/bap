@@ -2,4 +2,4 @@ aclocal -I m4
 autoconf
 autoheader
 automake --add-missing --copy
-#(cd protobuf && ./autogen.sh)
+(cd protobuf && ./autogen.sh)
