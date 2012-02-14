@@ -83,11 +83,11 @@ ROOT = $(realpath ..)
 
 TRACEDIR = $(ROOT)/libasmir/src/traces
 
-TRACEFORMATDIR = $(ROOT)/libtrace/src/cpp
+TRACEFORMATDIR = $(ROOT)/libtracewrap/libtrace/src/cpp
 TRACEFORMATPBDIR = $(TRACEFORMATDIR)/pb
 LIBTRACE = $(TRACEFORMATDIR)/libtrace.a
 
-PROTOBUFDIR = $(ROOT)/libtrace/protobuf/src
+PROTOBUFDIR = $(ROOT)/libtracewrap/libtrace/protobuf/src
 
 CXXFLAGS += -I../libasmir/include -I../libasmir/src/traces -I$(TRACEFORMATDIR) -I$(TRACEFORMATPBDIR) -I$(PROTOBUFDIR)
 

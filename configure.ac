@@ -219,7 +219,8 @@ AM_CONDITIONAL([TESTS_OPT], [ test ! -f NOTESTS ])
 AC_CONFIG_FILES([Makefile
                  libasmir/Makefile
                  libasmir/apps/Makefile
-                 libasmir/src/Makefile])
+                 libasmir/src/Makefile
+                 libtracewrap/Makefile])
 AC_OUTPUT
 
 # Configure ocamlgraph
@@ -227,6 +228,3 @@ AC_OUTPUT
 
 # Configure zarith
 (cd zarith-1.0 && ./configure)
-
-# Configure libtrace
-(cd libtrace && ./configure --with-batteries="$BAP_DIR/batteries/_build/src")

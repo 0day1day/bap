@@ -30,4 +30,4 @@ libasmir_a_SOURCES = \
 	./traces/reg_mapping_pin.cpp \
         ./traces/pin_frame.h ./traces/pin_frame.cpp \
         ./traces/pin_trace.h ./traces/pin_trace.cpp
-libasmir_a_LIBADD = @VEX_DIR@/libvex.a @BAP_DIR@/libtrace/src/cpp/libtrace.a
+libasmir_a_LIBADD = @VEX_DIR@/libvex.a @BAP_DIR@/libtracewrap/libtrace/src/cpp/libtrace.a

@@ -1,0 +1,12 @@
+# $Id$
+# Wrapper to configure and build libtrace
+
+.PHONY: all
+all: all
+
+%:	CONFIGURED
+	make -C libtrace $@
+
+CONFIGURED:
+	cd libtrace && ./autogen.sh && ./configure --with-batteries=@BAP_DIR@/batteries/_build/src
+	touch CONFIGURED
