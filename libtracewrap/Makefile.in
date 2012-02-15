@@ -1,6 +1,9 @@
 # $Id$
 # Wrapper to configure and build libtrace
 
+.PHONY: default
+default: all
+
 %:	CONFIGURED
 	make -C libtrace $@
 

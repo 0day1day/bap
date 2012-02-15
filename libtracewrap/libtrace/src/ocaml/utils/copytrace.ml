@@ -10,7 +10,7 @@ let copy_all r w =
 let () =
   if Array.length Sys.argv = 3 then
     let r = new reader Sys.argv.(1) in
-    let w = new writer ~frames_per_toc_entry:(r#get_frames_per_toc_entry) Sys.argv.(2) in
+    let w = new writer ~arch:r#get_arch ~machine:r#get_machine ~frames_per_toc_entry:(r#get_frames_per_toc_entry) Sys.argv.(2) in
     copy_all r w;
     w#finish
   else

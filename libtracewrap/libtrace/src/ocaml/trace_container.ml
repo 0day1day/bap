@@ -12,13 +12,22 @@ type frame = Frame_piqi.frame
 (* XXX: Auto-pull this from C++ header file *)
 let default_frames_per_toc_entry = 10000L
 and default_auto_finish = false
+and default_arch = Arch.Bfd_arch_i386
+and default_machine = 0L
 
 (* Internal definitions *)
 let magic_number = 7456879624156307493L
 and magic_number_offset = 0L
-and num_trace_frames_offset = 8L
-and toc_offset_offset = 16L
-and first_frame_offset = 24L
+and trace_version_offset = 8L
+and bfd_arch_offset = 16L
+and bfd_machine_offset = 24L
+and num_trace_frames_offset = 32L
+and toc_offset_offset = 40L
+and first_frame_offset = 48L
+
+let out_trace_version = 1L
+and lowest_supported_version = 1L
+and highest_supported_version = 1L
 
 let write_i64 oc i64 =
   let output = BatIO.output_string () in
@@ -46,7 +55,7 @@ let rec foldn64 ?(t=0L) f i n =
 
 (* End helpers *)
 
-class writer ?(frames_per_toc_entry = default_frames_per_toc_entry) ?(auto_finish=default_auto_finish) filename =
+class writer ?(arch=default_arch) ?(machine=default_machine) ?(frames_per_toc_entry = default_frames_per_toc_entry) ?(auto_finish=default_auto_finish) filename =
   (* Open the trace file *)
   let oc = open_out_bin filename in
   (* Seek to the first frame *)
@@ -97,6 +106,16 @@ object(self)
     (* Magic number. *)
     let () = seek_out oc (Int64.to_int magic_number_offset) in
     let () = write_i64 oc magic_number in
+    (* Trace version. *)
+    let () = seek_out oc (Int64.to_int trace_version_offset) in
+    let () = write_i64 oc out_trace_version in
+    (* CPU architecture. *)
+    let () = seek_out oc (Int64.to_int bfd_arch_offset) in
+    (* Goodbye type safety! *)
+    let () = write_i64 oc (Int64.of_int (Obj.magic arch)) in
+    (* Machine type. *)
+    let () = seek_out oc (Int64.to_int bfd_machine_offset) in
+    let () = write_i64 oc machine in
     (* Number of trace frames. *)
     let () = seek_out oc (Int64.to_int num_trace_frames_offset) in
     let () = write_i64 oc num_frames in
@@ -116,6 +135,17 @@ class reader filename =
   (* Verify magic number *)
   let () = if read_i64 ic <> magic_number then
       raise (TraceException "Magic number is incorrect") in
+  (* Trace version *)
+  let trace_version = read_i64 ic in
+  let () = if trace_version < lowest_supported_version ||
+      trace_version > highest_supported_version then
+    raise (TraceException "Unsupported trace version") in
+  (* Read arch type, break type safety *)
+  let archnum = read_i64 ic in
+  let () = if not (archnum < (Int64.of_int (Obj.magic Arch.Bfd_arch_last))) then
+      raise (TraceException "Invalid architecture") in
+  let arch : Arch.bfd_architecture = Obj.magic (Int64.to_int archnum) in
+  let machine = read_i64 ic in
   (* Read number of trace frames. *)
   let num_frames = read_i64 ic in
   (* Find offset of toc. *)
@@ -142,6 +172,12 @@ class reader filename =
     method get_num_frames = num_frames
 
     method get_frames_per_toc_entry = frames_per_toc_entry
+
+    method get_arch = arch
+
+    method get_machine = machine
+
+    method get_trace_version = trace_version
 
     method seek frame_number =
       (* First, make sure the frame is in range. *)

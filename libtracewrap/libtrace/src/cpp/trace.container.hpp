@@ -1,6 +1,8 @@
 #ifndef TRACE_CONTAINER_HPP
 #define TRACE_CONTAINER_HPP
 
+#include "arch.hpp"
+
 /**
  * $Id$
  *
@@ -13,6 +15,9 @@
  * little-endian.
  *
  * [<uint64_t magic number>
+ *  <uint64_t trace version number>
+ *  <uint64_t bfd_architecture>
+ *  <uint64_t bfd_machine, 0 for unspecified>
  *  <uint64_t n = number of trace frames>
  *  <uint64_t offset of field m (below)>
  *  [ <uint64_t sizeof(trace frame 0)>
@@ -42,14 +47,23 @@
 namespace SerializedTrace {
 
   const uint64_t magic_number = 7456879624156307493LL;
-  const uint64_t default_frames_per_toc_entry = 10000;
 
+  const uint64_t default_frames_per_toc_entry = 10000;
   const uint64_t default_auto_finish = false;
+  const bfd_architecture default_arch = bfd_arch_i386;
+  const uint64_t default_machine = bfd_mach_i386_i386;
 
   const uint64_t magic_numer_offset = 0LL;
-  const uint64_t num_trace_frames_offset = 8LL;
-  const uint64_t toc_offset_offset = 16LL;
-  const uint64_t first_frame_offset = 24LL;
+  const uint64_t trace_version_offset = 8LL;
+  const uint64_t bfd_arch_offset = 16LL;
+  const uint64_t bfd_machine_offset = 24LL;
+  const uint64_t num_trace_frames_offset = 32LL;
+  const uint64_t toc_offset_offset = 40LL;
+  const uint64_t first_frame_offset = 48LL;
+
+  const uint64_t out_trace_version = 1LL;
+  const uint64_t lowest_supported_version = 1LL;
+  const uint64_t highest_supported_version = out_trace_version;
 
     class TraceException: public std::exception
     {
@@ -79,6 +93,8 @@ namespace SerializedTrace {
         [filename]. An entry will be added to the table of contents
         every [frames_per_toc_entry] entries.*/
     TraceContainerWriter(std::string filename,
+                         bfd_architecture arch = default_arch,
+                         uint64_t machine = default_machine,
                          uint64_t frames_per_toc_entry = default_frames_per_toc_entry,
                          bool auto_finish = default_auto_finish) throw (std::ofstream::failure, TraceException);
 
@@ -102,7 +118,7 @@ namespace SerializedTrace {
 
     /** Returns true iff finish() has not been called on this trace. */
     bool has_finished(void) throw ();
-    
+
     protected:
 
     /** Output fstream for trace container file. */
@@ -116,6 +132,12 @@ namespace SerializedTrace {
 
     /** Frames per toc entry. */
     const uint64_t frames_per_toc_entry;
+
+    /** Architecture. */
+    const bfd_architecture arch;
+
+    /** Machine type. */
+    const uint64_t mach;
 
     /** Call [finish()] in destructor if not already done. */
     bool auto_finish;
@@ -139,6 +161,15 @@ namespace SerializedTrace {
 
     /** Returns the number of frames per toc entry. */
     uint64_t get_frames_per_toc_entry(void) throw ();
+
+    /** Returns the architecture of the trace. */
+    bfd_architecture get_arch(void) throw ();
+
+    /** Returns the machine type (sub-architecture) of the trace. */
+    uint64_t get_machine(void) throw ();
+
+    /** Returns trace version. */
+    uint64_t get_trace_version(void) throw ();
 
     /** Seek to frame number [frame_number]. The frame is numbered
      * 0. */
@@ -166,11 +197,20 @@ namespace SerializedTrace {
     /** The toc entries from the trace. */
     std::vector<uint64_t> toc;
 
+    /** Trace version. */
+    uint64_t trace_version;
+
     /** Number of frames in the trace. */
     uint64_t num_frames;
 
     /** Number of frames per toc entry. */
     uint64_t frames_per_toc_entry;
+
+    /** CPU architecture. */
+    bfd_architecture arch;
+
+    /** Machine type. */
+    uint64_t mach;
 
     /** Current frame number. */
     uint64_t current_frame;

@@ -26,7 +26,7 @@ int main(int argc, char **argv) {
   std::string dstfile(argv[2]);
 
   TraceContainerReader r(srcfile);
-  TraceContainerWriter w(dstfile, r.get_frames_per_toc_entry(), true);
+  TraceContainerWriter w(dstfile, r.get_arch(), r.get_machine(), r.get_frames_per_toc_entry(), true);
 
   copy_all(r, w);
 }

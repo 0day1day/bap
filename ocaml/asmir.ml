@@ -669,7 +669,6 @@ let add_operands stmts ops =
 
 (* New trace file format *)
 let new_bap_from_trace_file filename =
-  let arch = Libbfd.Bfd_arch_i386 in
   let get_attrs =
     let convert_taint = function
       | `no_taint -> Taint 0
@@ -727,7 +726,7 @@ let new_bap_from_trace_file filename =
       | `modload_frame _ -> []
       | `key_frame _ -> []
   in
-  let raise_frame f =
+  let raise_frame arch f =
     let get_stmts =
       function
     | `std_frame(f) ->
@@ -764,7 +763,8 @@ let new_bap_from_trace_file filename =
   let r = new Trace_container.reader filename in
   while not r#end_of_trace do
     let frames = r#get_frames !trace_blocksize in
-    out := List.rev_append (List.flatten (List.map raise_frame frames)) !out;
+    (* XXX: Remove use of Obj.magic in an elegant way... *)
+    out := List.rev_append (List.flatten (List.map (raise_frame (Obj.magic r#get_arch)) frames)) !out;
   done;
 
   List.rev !out

@@ -13,11 +13,15 @@
 namespace SerializedTrace {
 
   TraceContainerWriter::TraceContainerWriter(std::string filename,
+                                             bfd_architecture arch,
+                                             uint64_t machine,
                                              uint64_t frames_per_toc_entry_in,
                                              bool auto_finish_in) throw (std::ofstream::failure, TraceException)
     : ofs ( filename.c_str(), std::ios_base::binary | std::ios_base::out | std::ios_base::trunc ),
       num_frames (0),
       frames_per_toc_entry (frames_per_toc_entry_in),
+      arch (arch),
+      mach (machine),
       auto_finish (auto_finish_in),
       is_finished (false)
   {
@@ -94,6 +98,19 @@ namespace SerializedTrace {
     ofs.seekp(magic_numer_offset);
     WRITE(magic_number);
 
+    /* Trace version. */
+    ofs.seekp(trace_version_offset);
+    WRITE(out_trace_version);
+
+    /* CPU architecture. */
+    ofs.seekp(bfd_arch_offset);
+    uint64_t archt = (uint64_t) arch;
+    WRITE(archt);
+
+    /* Machine type. */
+    ofs.seekp(bfd_machine_offset);
+    WRITE(mach);
+
     /* Numer of trace frames */
     ofs.seekp(num_trace_frames_offset);
     WRITE(num_frames);
@@ -122,6 +139,18 @@ namespace SerializedTrace {
     if (magic_number_read != magic_number) {
       throw (TraceException("Magic number not found in trace"));
     }
+
+    READ(trace_version);
+    if (trace_version > highest_supported_version ||
+        trace_version < lowest_supported_version) {
+      throw (TraceException("Unsupported trace version"));
+    }
+
+    uint64_t archt;
+    READ(archt);
+    arch = (bfd_architecture) archt;
+
+    READ(mach);
 
     /* Read number of trace frames. */
     READ(num_frames);
@@ -164,6 +193,18 @@ namespace SerializedTrace {
 
   uint64_t TraceContainerReader::get_frames_per_toc_entry(void) throw () {
     return frames_per_toc_entry;
+  }
+
+  bfd_architecture TraceContainerReader::get_arch(void) throw () {
+    return arch;
+  }
+
+  uint64_t TraceContainerReader::get_machine(void) throw () {
+    return mach;
+  }
+
+  uint64_t TraceContainerReader::get_trace_version(void) throw () {
+    return trace_version;
   }
 
   void TraceContainerReader::seek(uint64_t frame_number) throw (TraceException) {

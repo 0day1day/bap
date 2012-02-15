@@ -84,12 +84,13 @@ ROOT = $(realpath ..)
 TRACEDIR = $(ROOT)/libasmir/src/traces
 
 TRACEFORMATDIR = $(ROOT)/libtracewrap/libtrace/src/cpp
+TRACEFORMATCOMMON = $(ROOT)/libtracewrap/libtrace/src/common
 TRACEFORMATPBDIR = $(TRACEFORMATDIR)/pb
 LIBTRACE = $(TRACEFORMATDIR)/libtrace.a
 
 PROTOBUFDIR = $(ROOT)/libtracewrap/libtrace/protobuf/src
 
-CXXFLAGS += -I../libasmir/include -I../libasmir/src/traces -I$(TRACEFORMATDIR) -I$(TRACEFORMATPBDIR) -I$(PROTOBUFDIR)
+CXXFLAGS += -I$(TRACEFORMATCOMMON) -I../libasmir/include -I../libasmir/src/traces -I$(TRACEFORMATDIR) -I$(TRACEFORMATPBDIR) -I$(PROTOBUFDIR)
 
 # XXX We should probably use libtool
 PROTOBUFLIBDIR = $(PROTOBUFDIR)/.libs
