@@ -1,6 +1,6 @@
-BAP_DIR=..\..\..
-PROTODIR=$(BAP_DIR)\protobuf
-CXXFLAGS = /MT /O2 /EHsc -I./pb -I$(PROTODIR)/src
+TRACE_DIR=..\..
+PROTODIR=$(TRACE_DIR)\protobuf
+CXXFLAGS = /nologo /MT /O2 /EHsc -I./pb -I$(PROTODIR)/src -I$(TRACE_DIR)/src/common
 #CXXFLAGS += -m32
 LDFLAGS =
 
@@ -10,7 +10,7 @@ RM = del /F
 
 OBJS = pb\frame.piqi.pb.obj trace.container.obj
 
-LIBPROTOBUF=$(BAP_DIR)/protobuf/vsprojects/Release/libprotobuf.lib
+LIBPROTOBUF=$(TRACE_DIR)/protobuf/vsprojects/Release/libprotobuf.lib
 
 all: libtrace.a
 
