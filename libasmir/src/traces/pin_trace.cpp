@@ -34,7 +34,15 @@ void TraceReader::open(const char *filename)
   frm_pos = 0;
   
   infile.exceptions(ios::eofbit | ios::failbit | ios::badbit);
-  infile.open(filename, ios::in | ios::binary);
+  try {
+      infile.open(filename, ios::in | ios::binary);
+  } catch (const std::ios_base::failure& e) {
+      std::cout << "TraceReader::open: Could not open file " << filename
+                << "\nCaught ios_base::failure: \n"
+                << e.what() << '\n'
+                << "Exiting...\n";
+      exit(-1);
+  }
   infile.read((char *) &header, sizeof(TraceHeader));
   
   if (header.magic != TRACE_MAGIC) {

@@ -60,7 +60,7 @@ type operand =
   | Oimm of int64 (* XXX: Should this be big_int? *)
 
 type opcode =
-  | Retn
+  | Retn of ((typ * operand) option) * bool (* bytes to release, far/near ret *)
   | Nop
   | Mov of typ * operand * operand (* dst, src *)
   | Movs of typ
@@ -483,12 +483,23 @@ let rec to_ir addr next ss pref =
   and assn = assn_s ss in
   function
   | Nop -> []
-  | Retn when pref = [] ->
-    let t = nt "ra" r32 in
-    [move t (load_s seg_ss r32 esp_e);
-     move esp (esp_e +* (i32 4));
-     Jmp(Var t, [StrAttr "ret"])
-    ]
+  | Retn (op, far_ret) when pref = [] ->
+    let temp = nt "ra" r32 in
+    let load_stmt = if far_ret 
+      then (* TODO Mess with segment selectors here *)  
+    	unimplemented "long retn not supported"  
+      else move temp (load_s seg_ss r32 esp_e)
+    in
+    let esp_stmts = 
+      move esp (esp_e +* (i32 (bytes_of_width r32)))::
+	(match op with 
+	| None -> []
+	| Some(t, src) -> 
+	  [move esp (esp_e +* (op2e t src))]
+      ) in
+      load_stmt::
+      esp_stmts@
+      [Jmp(Var temp, [StrAttr "ret"])]
   | Mov(t, dst,src) when pref = [] || pref = [pref_addrsize] ->
     [assn t dst (op2e t src)]
   | Movs(Reg bits as t) ->
@@ -1083,7 +1094,10 @@ module ToStr = struct
     | Oaddr a -> Pp.ast_exp_to_string a
 
   let op2str = function
-    | Retn -> "ret"
+    | Retn (op, _) -> 
+      (match op with 
+      | Some (_,src) -> Printf.sprintf "ret %s" (opr src)
+      | None -> "ret")
     | Nop -> "nop"
     | Mov(t,d,s) -> Printf.sprintf "mov %s, %s" (opr d) (opr s)
     | Movs(t) -> "movs"
@@ -1342,8 +1356,8 @@ let parse_instr g addr =
   in
   let parse_immv = parse_immz in (* until we do amd64 *)
   let parse_immb = parse_imm8 in
-(*  let parse_immw = parse_imm16 in 
-  let parse_immd = parse_imm32 in *)
+  let parse_immw = parse_imm16 in 
+  (* let parse_immd = parse_imm32 in *)
   let parse_simmb = parse_simm8 in
   let parse_simmw = parse_simm16 in
   let parse_simmd = parse_simm32 in
@@ -1375,9 +1389,10 @@ let parse_instr g addr =
       (Push(prefix.opsize, Oreg(b1 & 7)), na)
     | 0x58 | 0x59 | 0x5a | 0x5b | 0x5c | 0x5d | 0x5e | 0x5f ->
       (Pop(prefix.opsize, Oreg(b1 & 7)), na)
-    | 0x68 (* | 0x6a *) ->
+    | 0x68 | 0x6a  ->
       let (o, na) = 
-	if b1=0x68 then parse_immz prefix.opsize na else parse_simm8 na 
+	(* SWXXX Sign extend these? *)
+	if b1=0x68 then parse_immz prefix.opsize na else parse_immb na 
       in
       (Push(prefix.opsize, o), na)
     | 0x69 | 0x6b ->
@@ -1392,8 +1407,6 @@ let parse_instr g addr =
     | 0x7c | 0x7d | 0x7e | 0x7f -> 
       let (i,na) = parse_disp8 na in
       (Jcc(Oimm(Int64.add i na), cc_to_exp b1), na)
-    | 0xc3 -> (Retn, na)
-    | 0xc9 -> (Leave prefix.opsize, na)
     | 0x80 | 0x81 | 0x82 | 0x83 -> 
       let (r, rm, na) = parse_modrm32ext na in
       let (o2, na) =
@@ -1459,14 +1472,23 @@ let parse_instr g addr =
     | 0xb8 | 0xb9 | 0xba | 0xbb | 0xbc | 0xbd | 0xbe
     | 0xbf -> let (i, na) = parse_immv prefix.opsize na in
 	      (Mov(prefix.opsize, Oreg(b1 & 7), i), na)
+    | 0xc2 | 0xc3 (* Near ret *)
+    | 0xca | 0xcb (* Far ret *)-> 
+      let far_ret = if (b1 = 0xc2 or b1 = 0xc3) then false else true in
+      if (b1 = 0xc3 or b1 = 0xcb) then (Retn(None, far_ret), na) 
+      else let (imm,na) = parse_immw na in 
+	   (Retn(Some(r32, imm), far_ret), na)
     | 0xc6
     | 0xc7 -> let t = if b1 = 0xc6 then r8 else prefix.opsize in
 	      let (e, rm, na) = parse_modrm32ext na in
-	      let (i,na) = parse_immz t na in
+	      let (i,na) = 
+		if b1 = 0xc6 then parse_immb na else parse_immz t na 
+	      in
 	      (match e with (* Grp 11 *)
 	      | 0 -> (Mov(t, rm, i), na)
 	      | _ -> disfailwith (Printf.sprintf "Invalid opcode: %02x/%d" b1 e)
 	      )
+    | 0xc9 -> (Leave prefix.opsize, na)
     | 0xcd -> let (i,na) = parse_imm8 na in
 	      (Interrupt(i), na)
     | 0xd9 ->
