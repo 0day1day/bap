@@ -784,8 +784,6 @@ end
 (** The new protobuffers/piqi serialized trace format. *)
 module SerializedTrace = struct
 
-  type archt = Trace_container.arch = Libbfd.bfd_architecture
-
   let new_bap_from_trace_frames ?n r =
     let get_attrs =
       let convert_taint = function
