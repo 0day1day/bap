@@ -132,7 +132,7 @@ let inject_stmt prog start_addr asm stmt =
 	| Ast.Label(Type.Addr(addr),attrs) -> 
 	  (match attrs with
 	  | [Type.Asm(asm)] ->
-	    if (pmatch ~pat:"ret" asm) then (List.rev k)@(s::l::inj_stmt::ss)
+	    if (pmatch ~pat:asm_str asm) then (List.rev k)@(s::l::inj_stmt::ss)
 	    else inject_stmt_k ss starta asm_str inj_stmt (l::s::k)
 	  | _ -> inject_stmt_k ss starta asm_str inj_stmt (l::s::k)
 	  )
