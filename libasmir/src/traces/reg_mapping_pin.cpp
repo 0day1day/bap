@@ -680,7 +680,9 @@ switch (id) {
 #endif
     case REG_LAST
 */
-default: return "Unknown";
+
+    default:
+      return "Unknown";
 
 } 
 

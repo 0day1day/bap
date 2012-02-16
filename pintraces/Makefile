@@ -90,7 +90,7 @@ LIBTRACE = $(TRACEFORMATDIR)/libtrace.a
 
 PROTOBUFDIR = $(ROOT)/libtracewrap/libtrace/protobuf/src
 
-CXXFLAGS += -I$(TRACEFORMATCOMMON) -I../libasmir/include -I../libasmir/src/traces -I$(TRACEFORMATDIR) -I$(TRACEFORMATPBDIR) -I$(PROTOBUFDIR)
+CXXFLAGS += -I$(TRACEFORMATCOMMON) -I../libasmir/include -I../libasmir/src/traces -I$(TRACEFORMATDIR) -I$(TRACEFORMATPBDIR) -I$(PROTOBUFDIR) -DUSING_PIN
 
 # XXX We should probably use libtool
 PROTOBUFLIBDIR = $(PROTOBUFDIR)/.libs

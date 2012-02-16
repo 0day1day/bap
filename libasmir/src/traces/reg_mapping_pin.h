@@ -5,9 +5,10 @@ using namespace std;
 
 string pin_register_name(uint32_t id);
 
-//namespace reg_mapping {
+#ifdef USING_PIN
+#include "pin.H"
+#else
 
-#ifndef PIN_H
 typedef enum
 {
     REG_INVALID_ = 0,
@@ -718,5 +719,5 @@ typedef enum
 
 
 } REG;
+
 #endif
-//}
