@@ -31,7 +31,7 @@ let stream_speclist =
     ("-tracestream",
      Arg.String(fun s -> streaminputs := Some(`Tracestream s)),
      "<file> Read a PinTrace to be processed as a stream.");
-    ("-newtracestream",
+    ("-serializedtracestream",
      Arg.String(fun s -> streaminputs := Some(`Serializedtracestream s)),
      "<file> Read a SerializedTrace to be processed as a stream.");
     ("-pin",
@@ -65,7 +65,7 @@ let speclist =
 		  set_gc () ;
 		  addinput (`Trace s)),
      "<file> Read in a trace and lift it to the IL");
-    ("-newtrace",
+    ("-serializedtrace",
      Arg.String(fun s ->
 		  set_gc () ;
 		  addinput (`Serializedtrace s)),
