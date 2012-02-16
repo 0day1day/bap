@@ -1,0 +1,24 @@
+% The current Piqi self-specification
+%
+% This file contains specification for piqi as it is supported by "piqi"
+% command-line utility.
+% 
+% Copyright 2009, 2010, 2011 Anton Lavrik
+
+
+.module piqi.org/piqi
+
+.proto-package "piqi_org.piqi"
+
+
+% base Piqi:
+.include [ .module piqi.org/piqi-base ]
+
+% extensions:
+.include [ .module piqi.org/piqi-proto ]
+.include [ .module piqi.org/piqi-json ]
+.include [ .module piqi.org/piqi-getopt ]
+
+
+.custom-field ocaml-module
+

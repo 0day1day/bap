@@ -98,5 +98,8 @@ val binary_of_big_int : ?pad:int -> Big_int_Z.big_int -> string
 val hex_of_big_int : ?pad:int -> Big_int_Z.big_int -> string
 val big_int_of_string : string -> Big_int_Z.big_int
 
+type endian = Little | Big
+val big_int_of_binstring : ?e:endian -> string -> Big_int_Z.big_int
+
 val print_obj_info : string -> 'a -> unit
 val print_mem_usage : unit -> unit

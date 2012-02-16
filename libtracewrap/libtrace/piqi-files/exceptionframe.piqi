@@ -1,0 +1,33 @@
+.include [
+         .module types
+]
+
+% Represent an exception
+.record [
+        .name exception-frame
+
+        % Number representing the exception type
+        .field [
+               .type exception-number
+        ]
+
+        % Thread the exception occured in
+        .field [
+               .type thread-id
+               .optional
+        ]
+
+        % Address the exception occured at
+        .field [
+               .name from-addr
+               .type address
+               .optional
+        ]
+
+        % Address the exception transferred control to
+        .field [
+               .name to-addr
+               .type address
+               .optional
+        ]
+]
