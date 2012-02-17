@@ -3,7 +3,7 @@ open BatListFull
 let init_ro = ref false
 let inputs = ref []
 and streaminputs = ref None
-and streamrate = ref 1L (* Unless specified grab one frame at a time *)
+and streamrate = ref 10000L (* Unless specified grab one frame at a time *)
 and pintrace = ref false
 
 (* Set garbage collector options whenever we see -trace. *)
@@ -30,8 +30,10 @@ let stream_speclist =
 	 Arg.String(setint64 streamrate), "<rate> Stream at rate frames");
     ("-tracestream",
      Arg.String(fun s -> streaminputs := Some(`Tracestream s)),
-     "<file> Read a trace to be processed as a stream.");
-
+     "<file> Read a PinTrace to be processed as a stream.");
+    ("-serializedtracestream",
+     Arg.String(fun s -> streaminputs := Some(`Serializedtracestream s)),
+     "<file> Read a SerializedTrace to be processed as a stream.");
     ("-pin",
      Arg.Set pintrace,
      "Enable pin trace.");
@@ -63,6 +65,11 @@ let speclist =
 		  set_gc () ;
 		  addinput (`Trace s)),
      "<file> Read in a trace and lift it to the IL");
+    ("-serializedtrace",
+     Arg.String(fun s ->
+		  set_gc () ;
+		  addinput (`Serializedtrace s)),
+     "<file> Read in a SerializedTrace and lift it to the IL");
     ("-il",
      Arg.String(fun s -> addinput (`Il s)),
      "<file> Read input from an IL file.");
@@ -97,11 +104,9 @@ let get_program () =
       List.append (fst (Asmir_rdisasm.rdisasm_at p s)) oldp, oldscope
     | `Trace f ->
       List.append (Asmir.bap_from_trace_file ~pin:!pintrace f) oldp, oldscope
+    | `Serializedtrace f ->
+      List.append (Asmir.serialized_bap_from_trace_file f) oldp, oldscope
   in
- (* let rec cat p = function *)
-  (*   | [] -> p *)
-  (*   | arg::args -> cat (List.rev_append (List.rev (get_one arg)) p) args *)
-  (* in *)
   try
     List.fold_left get_one ([], Grammar_private_scope.default_scope ()) (List.rev !inputs)
   with _ -> failwith "An exception occured while lifting"
@@ -109,7 +114,9 @@ let get_program () =
 let get_stream_program () = match !streaminputs with
   | None -> raise(Arg.Bad "No input specified")
   | Some(`Tracestream f) -> 
-	Asmir.bap_stream_from_trace_file ~rate:!streamrate ~pin:!pintrace f
+    Asmir.bap_stream_from_trace_file ~rate:!streamrate ~pin:!pintrace f
+  | Some(`Serializedtracestream f) ->
+    Asmir.serialized_bap_stream_from_trace_file !streamrate f
 
 
 (*  with fixme -> raise(Arg.Bad "Could not open input file")*)

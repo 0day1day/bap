@@ -1,3 +1,5 @@
+.NOTPARALLEL:
+
 ##########################################################################
 #                                                                        #
 #  Ocamlgraph: a generic graph library for OCaml                         #

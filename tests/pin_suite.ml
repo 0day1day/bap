@@ -29,7 +29,7 @@ let pin_trace_setup _ =
 
 
 let pin_trace_test pin_out =
-  let prog = Asmir.bap_from_trace_file ~pin:true pin_out in
+  let prog = Asmir.serialized_bap_from_trace_file pin_out in
   typecheck prog;
   Traces.consistency_check := true;
   ignore(Traces.concrete prog);

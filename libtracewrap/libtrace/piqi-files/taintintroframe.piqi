@@ -1,0 +1,33 @@
+.include [
+         .module types
+]
+
+% Represent tainted bytes being introduced to memory
+.record [
+        .name taint-intro-frame
+
+        .field [
+               .type taint-intro-list
+        ]
+]
+
+.list [
+      .name taint-intro-list
+      .type taint-intro
+]
+
+% An address and its corresponding taint identifier
+.record [
+        .name taint-intro
+
+        % The address the tainted byte is at
+        .field [
+               .name addr
+               .type address
+        ]
+
+        % The taint identifier
+        .field [
+               .type taint-id
+        ]
+]

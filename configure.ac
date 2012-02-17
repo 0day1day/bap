@@ -7,7 +7,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.59)
-AC_INIT(Bap, 0.1, dbrumley@cmu.edu)
+AC_INIT(Bap, 0.1, bap-dev@lists.andrew.cmu.edu)
 AC_CONFIG_SRCDIR([libasmir/src/asm_program.c])
 AC_CONFIG_HEADER([libasmir/config.h])
 
@@ -71,6 +71,12 @@ AC_CHECK_FILE([$PIN_HOME],
 AM_CONDITIONAL([HAVE_PIN], [test x$HAVE_PIN = xtrue])
 
 # Checks for ocaml libraries
+ocamlfind query ocamlgraph
+if test $? != 0; then
+   echo "bap requires libbitstring-ocaml-dev"
+   exit -1
+fi
+
 dnl ocamlfind query ocamlgraph
 dnl if test $? != 0; then
 dnl     echo "bap needs libocamlgraph-ocaml-dev"
@@ -178,6 +184,8 @@ echo "LIBASMIR_LIBS=-lasmir -lvex -lbfd -ldl -liberty" >> libasmir/makefile.inc
 AC_SUBST(ASMIR_DIR)
 ASMIR_DIR="`pwd`/libasmir"
 
+AC_SUBST(BAP_DIR)
+BAP_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 # Checks for header files.
 AC_HEADER_STDC
@@ -211,7 +219,8 @@ AM_CONDITIONAL([TESTS_OPT], [ test ! -f NOTESTS ])
 AC_CONFIG_FILES([Makefile
                  libasmir/Makefile
                  libasmir/apps/Makefile
-                 libasmir/src/Makefile])
+                 libasmir/src/Makefile
+                 libtracewrap/Makefile])
 AC_OUTPUT
 
 # Configure ocamlgraph
