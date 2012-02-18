@@ -6,10 +6,6 @@
    See http://llvm.org/docs/tutorial/OCamlLangImpl3.html for tutorial.
 *)
 
-(*===----------------------------------------------------------------------===
- * Code Generation
- *===----------------------------------------------------------------------===*)
-
 open Ast
 open Big_int_convenience
 open Llvm
@@ -135,12 +131,7 @@ object(self)
       let idxt = pointer_type (self#convert_type t) in
       let idx'' = build_inttoptr idx' idxt "load_address" builder in
       build_load idx'' "load" builder
-    | Ast.Store(Var m, idx, v, e, t) when memimpl = Real ->
-      let idx' = self#convert_exp idx in
-      let idxt = pointer_type (self#convert_type t) in
-      let idx'' = build_inttoptr idx' idxt "load_address" builder in
-      let v' = self#convert_exp v in
-      build_store v' idx'' builder
+    | Ast.Store _ -> failwith "Stores are not proper expressions"
     | _ -> failwith "Unsupported exp"
 
   (* (\** Create an anonymous function to compute e *\) *)
@@ -170,8 +161,20 @@ object(self)
       let exp = self#convert_exp e in
       let mem = self#convert_var v in
       ignore(build_store exp mem builder)
-    | Move(v, e, _) when Typecheck.is_mem_type (Var.typ v) ->
-      ignore(self#convert_exp e)
+    (* Simple memory write we understand *)
+    (* XXX: How do we make sure this is a write to "the big global
+       memory"? *)
+    | Move(mv, Ast.Store(Var m,i,v,e,t), _) when memimpl = Real ->
+      let idx' = self#convert_exp i in
+      let idxt = pointer_type (self#convert_type t) in
+      let idx'' = build_inttoptr idx' idxt "load_address" builder in
+      let v' = self#convert_exp v in
+      ignore(build_store v' idx'' builder)
+    (* XXX: How do we make sure this is a write to "the big global
+       memory"? *)
+    (* A complicated memory write we need to simplify *)
+    | Move(v, _, _) as s when Typecheck.is_mem_type (Var.typ v) ->
+      List.iter self#convert_straightline_stmt (Flatten_mem.flatten_stores s)
     | Comment _ -> ()
     | _ -> failwith "convert_straightline_stmt: Unimplemented"
 

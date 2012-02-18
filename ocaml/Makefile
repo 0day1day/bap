@@ -46,11 +46,12 @@ export SOURCES = \
 	pp.ml \
 	typecheck.ml \
 	ast_convenience.ml \
-	llvm_codegen.ml \
 	cfg.mli cfg.ml \
 	ast_visitor.mli ast_visitor.ml \
 	grammar_scope.ml \
 	memory2array.ml \
+	flatten_mem.ml \
+	llvm_codegen.ml \
 	reachable.mli \
 	reachable.ml \
 	prune_unreachable.mli prune_unreachable.ml \

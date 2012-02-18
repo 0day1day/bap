@@ -29,6 +29,13 @@ let prog,scope =
     Arg.usage speclist (s^"\n"^usage);
     exit 1
 
+(* let () = *)
+(*   List.iter (fun s -> *)
+(*     List.iter (fun s -> *)
+(*       Printf.printf "%s\n" (Pp.ast_stmt_to_string s) *)
+(*     ) (Flatten_mem.flatten_stores s) *)
+(*   ) prog *)
+
 let () =
   let codegen = new Llvm_codegen.codegen in
   let f = codegen#convert_straightline_f prog in
