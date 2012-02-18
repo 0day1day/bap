@@ -11,6 +11,7 @@
  *===----------------------------------------------------------------------===*)
 
 open Ast
+open Big_int_convenience
 open Llvm
 open Type
 
@@ -47,7 +48,12 @@ let rec codegen_exp = function
       | AND -> build_and
       | OR -> build_or
       | XOR -> build_xor
-      | _ -> failwith "Unsupported binop"
+      | EQ -> build_icmp (Llvm.Icmp.Eq)
+      | NEQ -> build_icmp (Llvm.Icmp.Ne)
+      | LT -> build_icmp (Llvm.Icmp.Ult)
+      | LE -> build_icmp (Llvm.Icmp.Ule)
+      | SLT -> build_icmp (Llvm.Icmp.Slt)
+      | SLE -> build_icmp (Llvm.Icmp.Sle)
     in
     bf le1 le2 (Pp.binop_to_string bop^"_tmp") builder
   | _ -> failwith "Unsupported exp"
@@ -60,7 +66,7 @@ let codegen_exp_helper e =
   position_at_end bb builder;
   let ret = codegen_exp e in
   ignore(build_ret ret builder);
-  (*Llvm_analysis.assert_valid_function f;*)
+  Llvm_analysis.assert_valid_function f;
   f
 
   (* | Ast.Variable name -> *)
