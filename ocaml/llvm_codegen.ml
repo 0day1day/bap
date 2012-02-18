@@ -10,6 +10,7 @@ open Ast
 open Big_int_convenience
 open Llvm
 open Llvm_executionengine
+open Llvm_scalar_opts
 open Type
 
 (** Context for conversion functions *)
@@ -33,6 +34,29 @@ class codegen =
   let destroy obj = dispose_module the_module in
   (* XXX: Garbage collect execengine *)
   let execengine = ExecutionEngine.create the_module in
+  let the_fpm = PassManager.create_function the_module in
+  (* Set up the optimizer pipeline.  Start with registering info about
+   * how the target lays out data structures. *)
+  let () = Llvm_target.TargetData.add (ExecutionEngine.target_data execengine) the_fpm in
+
+  (* Promote allocas to registers. *)
+  (* let () = add_memory_to_register_promotion the_fpm in *)
+
+  (* Do simple "peephole" optimizations and bit-twiddling optzn. *)
+  let () = add_instruction_combination the_fpm in
+
+  (* reassociate expressions. *)
+  let () = add_reassociation the_fpm in
+
+  (* Eliminate Common SubExpressions. *)
+  let () = add_gvn the_fpm in
+
+  (* Simplify the control flow graph (deleting unreachable blocks, etc). *)
+  let () = add_cfg_simplification the_fpm in
+
+  let () = ignore (PassManager.initialize the_fpm) in
+
+  (* Find assert function to be called on Assert statements *)
   let assertf = match lookup_function "fake_assert" the_module with
     | None ->
       declare_function "fake_assert" (function_type (void_type context) [| i32_type context |]) the_module
@@ -148,8 +172,8 @@ object(self)
 
   (** Convert a single straight-line statement *)
   method convert_straightline_stmt = function
-    | Jmp _ | CJmp _ | Label _ | Special _ ->
-      failwith "convert_straightline_stmt: Non-straightline statement type"
+    | (Jmp _ | CJmp _ | Label _ | Special _) as s ->
+      failwith (Printf.sprintf "convert_straightline_stmt: Non-straightline statement type %s" (Pp.ast_stmt_to_string s))
     | Assert(e, _) ->
       let e' = self#convert_exp e in
       (* Convert to 32-bit to call fake_assert *)
@@ -164,7 +188,7 @@ object(self)
     (* Simple memory write we understand *)
     (* XXX: How do we make sure this is a write to "the big global
        memory"? *)
-    | Move(mv, Ast.Store(Var m,i,v,e,t), _) when memimpl = Real ->
+    | Move(mv, Ast.Store(Var m,i,v,e,t), _) when Typecheck.is_mem_type (Var.typ mv) && memimpl = Real ->
       let idx' = self#convert_exp i in
       let idxt = pointer_type (self#convert_type t) in
       let idx'' = build_inttoptr idx' idxt "load_address" builder in
@@ -191,6 +215,8 @@ object(self)
     let f = self#anon_fun ~t:rt () in
     self#convert_straightline p;
     Llvm_analysis.assert_valid_function f;
+    (* Optimize! *)
+    ignore(PassManager.run_function f the_fpm);
     f
 
   (** Execute lazy value l in the allocbb, and then return to the end

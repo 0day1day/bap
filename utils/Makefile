@@ -20,7 +20,7 @@ export OCAMLMAKEFILE=$(BAP_OCAMLDIR)/OCamlMakefile
 #export OCAMLFIND_IGNORE_DUPS_IN=$(BAP_DIR)/bigint-3.12/otherlibs/num
 
 # ocamlfind packages required
-export PACKS = bigarray str num unix camomile piqi.lib llvm llvm.analysis llvm.executionengine
+export PACKS = bigarray str num unix camomile piqi.lib llvm llvm.analysis llvm.executionengine llvm.target llvm.scalar_opts
 export LIBS = zarith batteries objsize oUnit graph pcre libtrace bap
 export INCDIRS = $(BAP_OCAMLDIR) $(BIGINT) $(BATT) $(OUNIT) $(PCRE) $(OCAMLGRAPH) $(OBJSIZE) $(LIBTRACE)
 export OCAMLPATH = $(PIQIBUILDDIR)
@@ -36,7 +36,7 @@ export RESULTDEPS = $(BAP_OCAMLDIR)/bap.a
 
 # default subprojects to build
 ifndef SUBPROJS
-	export SUBPROJS = $(PROJUTILS) toil iltrans ileval topredicate formula get_functions split streamtrans codegen
+	export SUBPROJS = $(PROJUTILS) codegen toil iltrans ileval topredicate formula get_functions split streamtrans
 endif
 
 define PROJ_toil

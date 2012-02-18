@@ -50,6 +50,7 @@ export SOURCES = \
 	ast_visitor.mli ast_visitor.ml \
 	grammar_scope.ml \
 	memory2array.ml \
+	flatten_mem.mli \
 	flatten_mem.ml \
 	llvm_codegen.ml \
 	reachable.mli \
@@ -122,7 +123,7 @@ DOC_FILES := $(filter %.mli, $(SOURCES)) $(filter %.ml, $(SOURCES))
 
 
 # ocamlfind packages required
-export PACKS = bigarray str num unix camomile threads piqi.lib llvm llvm.analysis llvm.executionengine
+export PACKS = bigarray str num unix camomile threads piqi.lib llvm llvm.analysis llvm.executionengine llvm.target llvm.scalar_opts
 # ocamlfind packages for ocamldoc
 # don't include packages in /usr/lib/ocaml, this will cause ocamldoc
 # to complain about conflicts with our local big_int
