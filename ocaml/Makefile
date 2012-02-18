@@ -45,10 +45,10 @@ export SOURCES = \
 	disasm_temp.ml \
 	pp.ml \
 	typecheck.ml \
+	ast_convenience.ml \
 	llvm_codegen.ml \
 	cfg.mli cfg.ml \
 	ast_visitor.mli ast_visitor.ml \
-	ast_convenience.ml \
 	grammar_scope.ml \
 	memory2array.ml \
 	reachable.mli \

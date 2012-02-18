@@ -17,11 +17,16 @@ open Llvm_executionengine
 open Type
 
 (** Context for conversion functions *)
-type ctx = { vars: (Var.t, llvalue) Hashtbl.t }
+type ctx = {
+  vars: (Var.t, llvalue) Hashtbl.t;
+  mutable allocbb: llbasicblock option
+           }
 
-let new_ctx () = { vars=Hashtbl.create 100 }
+let new_ctx () = { vars=Hashtbl.create 100; allocbb=None }
 
 type varuse = Store | Load
+
+type memimpl = Real | Functional
 
 class codegen =
 
@@ -44,6 +49,8 @@ object(self)
 
   val ctx = new_ctx ()
 
+  val memimpl = Real
+
   method convert_type = function
     | Reg n -> integer_type context n
     | _ -> failwith "No idea how to handle memories yet"
@@ -52,17 +59,48 @@ object(self)
   method convert_var (Var.V(_, s, t) as v) =
     try Hashtbl.find ctx.vars v
     with Not_found ->
-      (* XXX: Put this alloca somewhere appropriate *)
-      let a = build_alloca (self#convert_type t) s builder in
+      let a = self#in_alloc (lazy (build_alloca (self#convert_type t) s builder)) in
       Hashtbl.add ctx.vars v a;
       a
 
   (** Compile LLVM code to evaluate an Ast.exp. *)
   method convert_exp = function
+    | Ite _ as ite -> self#convert_exp (Ast_convenience.rm_ite ite)
+    | Extract _ as e -> self#convert_exp (Ast_convenience.rm_extract e)
+    | Concat _ as c -> self#convert_exp (Ast_convenience.rm_concat c)
     | Int(i, t) ->
       let lt = self#convert_type t in
       (try const_of_int64 lt (Big_int_Z.int64_of_big_int i) (*signed?*) false
        with Failure _ -> const_int_of_string lt (Big_int_Z.string_of_big_int i) 10)
+    | Cast(ct, tto, e) ->
+      let tto' = self#convert_type tto in
+      let e' = self#convert_exp e in
+      (match ct with
+      | CAST_UNSIGNED -> build_zext e' tto' "cast_unsigned" builder
+      | CAST_SIGNED -> build_sext e' tto' "cast_signed" builder
+      | CAST_HIGH ->
+        (* HHHLLLLLL
+
+           If want to get the H bits, we need to shift right by W-H *)
+        let t = Typecheck.infer_ast e in
+        let amount = Typecheck.bits_of_width t -
+          Typecheck.bits_of_width tto in
+        let () = assert (amount >= 0) in
+        let amount = self#convert_exp (Int(biconst amount, t)) in
+        let shifted = build_lshr e' amount "high_to_low" builder in
+        build_trunc shifted tto' "cast_high" builder
+      | CAST_LOW -> build_trunc e' tto' "cast_low" builder)
+    | UnOp(uop, e) ->
+      let e' = self#convert_exp e in
+      (match uop with
+      | NEG ->
+        let zero = self#convert_exp (Int(bi0, Typecheck.infer_ast e)) in
+        (* LLVM has no neg *)
+        build_sub zero e' "neg" builder
+      | NOT ->
+        let negone = self#convert_exp (Int(bim1, Typecheck.infer_ast e)) in
+        (* LLVM has no bitwise not *)
+        build_xor negone e' "bwnot" builder)
     | BinOp(bop, e1, e2) ->
       let le1 = self#convert_exp e1 in
       let le2 = self#convert_exp e2 in
@@ -91,6 +129,18 @@ object(self)
     | Var(v) ->
       let mem = self#convert_var v in
       build_load mem (Var.name v) builder
+    (* How do we handle this properly? *)
+    | Ast.Load(Var m, idx, e, t) when memimpl = Real (*&& m = (Var Asmir.x86_mem) *) ->
+      let idx' = self#convert_exp idx in
+      let idxt = pointer_type (self#convert_type t) in
+      let idx'' = build_inttoptr idx' idxt "load_address" builder in
+      build_load idx'' "load" builder
+    | Ast.Store(Var m, idx, v, e, t) when memimpl = Real ->
+      let idx' = self#convert_exp idx in
+      let idxt = pointer_type (self#convert_type t) in
+      let idx'' = build_inttoptr idx' idxt "load_address" builder in
+      let v' = self#convert_exp v in
+      build_store v' idx'' builder
     | _ -> failwith "Unsupported exp"
 
   (* (\** Create an anonymous function to compute e *\) *)
@@ -116,10 +166,13 @@ object(self)
       ignore(build_call assertf [| c |] "" builder)
     | Halt(e, _) ->
       ignore(build_ret (self#convert_exp e) builder)
-    | Move(v, e, _) ->
+    | Move(v, e, _) when Typecheck.is_integer_type (Var.typ v) ->
       let exp = self#convert_exp e in
       let mem = self#convert_var v in
       ignore(build_store exp mem builder)
+    | Move(v, e, _) when Typecheck.is_mem_type (Var.typ v) ->
+      ignore(self#convert_exp e)
+    | Comment _ -> ()
     | _ -> failwith "convert_straightline_stmt: Unimplemented"
 
   (** Convert straight-line code (multiple statements) *)
@@ -137,9 +190,27 @@ object(self)
     Llvm_analysis.assert_valid_function f;
     f
 
+  (** Execute lazy value l in the allocbb, and then return to the end
+      of the bb the builder was in. *)
+  method in_alloc l =
+    match ctx.allocbb with
+    | None -> failwith "in_alloc: Called with no allocbb set"
+    | Some(allocbb) ->
+      let save = insertion_block builder in
+      (* In the beginning *)
+      let () = position_builder (instr_begin allocbb) builder in
+      let r = Lazy.force l in
+      let () = position_at_end save builder in
+      r
+
   method anon_fun ?(t = void_type context) () =
     let f = declare_function "" (function_type t [||]) the_module in
+    let allocbb = append_block context "allocs" f in
+    let () = ctx.allocbb <- Some allocbb in
     let bb = append_block context "entry" f in
+    (* Add branch from allocbb to entry bb *)
+    position_at_end allocbb builder;
+    ignore(build_br bb builder);
     position_at_end bb builder;
     f
 

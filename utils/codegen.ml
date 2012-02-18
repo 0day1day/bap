@@ -10,10 +10,13 @@ let usage = "Usage: "^Sys.argv.(0)^" <input options> [options]\n\
              Translate programs to the IL. "
 
 let out = ref None
+let exec = ref false
 
 let speclist =
   ("-o", Arg.String (fun f -> out := Some(open_out f)),
    "<file> Print output to <file> rather than stdout.")
+  :: ("-exec", Arg.Set exec,
+      "Execute the generated code. (DANGEROUS)")
   :: Input.speclist
 
 let anon x =
@@ -28,10 +31,12 @@ let prog,scope =
 
 let () =
   let codegen = new Llvm_codegen.codegen in
-  codegen#dump;
   let f = codegen#convert_straightline_f prog in
   Llvm.dump_value f;
-  Printf.printf "result: %d\n" (GenericValue.as_int (codegen#run_fun f))
+  (* codegen#dump; *)
+  if !exec then
+    Printf.printf "result: %d\n" (GenericValue.as_int (codegen#run_fun f))
+
 
 (*   Printf.printf "llvm: "; flush stdout; Llvm.dump_value (codegen#convert_exp_helper exp) *)
 (* let () = Printf.printf "bap: %s\n" (Pp.ast_exp_to_string exp); *)
