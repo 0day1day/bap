@@ -4,24 +4,35 @@
    Code generation tester.
 *)
 
-let usage = "Usage: "^Sys.argv.(0)^" [options] <expression to be compiled>\n\
+open Llvm_executionengine
+
+let usage = "Usage: "^Sys.argv.(0)^" <input options> [options]\n\
              Translate programs to the IL. "
 
-let exp = ref None
 let out = ref None
 
 let speclist =
   ("-o", Arg.String (fun f -> out := Some(open_out f)),
    "<file> Print output to <file> rather than stdout.")
-  ::[]
+  :: Input.speclist
 
-let anon x = match !exp with
-  | None -> exp := Some(fst(Parser.exp_from_string x))
-  | Some _ -> raise (Arg.Bad("Expected only one anonymous argument"))
+let anon x =
+  raise (Arg.Bad("Expected only one anonymous argument"))
 let () = Arg.parse speclist anon usage
 
-let () = if !exp = None then Arg.usage speclist ("The expression to be compiled was not specified\n"^usage);;
+let prog,scope =
+  try Input.get_program()
+  with Arg.Bad s ->
+    Arg.usage speclist (s^"\n"^usage);
+    exit 1
 
-let exp = match !exp with | Some(x) -> x | None -> failwith "impossible"
-let () = Printf.printf "llvm: "; flush stdout; Llvm.dump_value (Llvm_codegen.codegen_exp_helper exp)
-let () = Printf.printf "bap: %s\n" (Pp.ast_exp_to_string exp)
+let () =
+  let codegen = new Llvm_codegen.codegen in
+  codegen#dump;
+  let f = codegen#convert_straightline_f prog in
+  Llvm.dump_value f;
+  Printf.printf "result: %d\n" (GenericValue.as_int (codegen#run_fun f))
+
+(*   Printf.printf "llvm: "; flush stdout; Llvm.dump_value (codegen#convert_exp_helper exp) *)
+(* let () = Printf.printf "bap: %s\n" (Pp.ast_exp_to_string exp); *)
+(*   Gc.full_major() *)
