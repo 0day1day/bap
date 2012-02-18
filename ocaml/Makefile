@@ -45,6 +45,7 @@ export SOURCES = \
 	disasm_temp.ml \
 	pp.ml \
 	typecheck.ml \
+	llvm_codegen.ml \
 	cfg.mli cfg.ml \
 	ast_visitor.mli ast_visitor.ml \
 	ast_convenience.ml \
@@ -120,7 +121,7 @@ DOC_FILES := $(filter %.mli, $(SOURCES)) $(filter %.ml, $(SOURCES))
 
 
 # ocamlfind packages required
-export PACKS = bigarray str num unix camomile threads piqi.lib
+export PACKS = bigarray str num unix camomile threads piqi.lib llvm
 # ocamlfind packages for ocamldoc
 # don't include packages in /usr/lib/ocaml, this will cause ocamldoc
 # to complain about conflicts with our local big_int
