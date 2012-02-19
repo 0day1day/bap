@@ -8,6 +8,8 @@
 
 open Ast
 open Big_int_convenience
+module D = Debug.Make(struct let name = "Llvm_codegen" and default=`Debug end)
+open D
 open Llvm
 open Llvm_executionengine
 open Llvm_scalar_opts
@@ -15,11 +17,18 @@ open Type
 
 (** Context for conversion functions *)
 type ctx = {
+  globalvars: (Var.t, llvalue) Hashtbl.t;
   vars: (Var.t, llvalue) Hashtbl.t;
+  letvars: (Var.t, llvalue) Hashtbl.t;
   mutable allocbb: llbasicblock option
            }
 
-let new_ctx () = { vars=Hashtbl.create 100; allocbb=None }
+let new_ctx () = { globalvars = Hashtbl.create 100;
+                   vars=Hashtbl.create 100;
+                   letvars=Hashtbl.create 100;
+                   allocbb=None
+                 }
+let opts = ref true
 
 type varuse = Store | Load
 
@@ -40,7 +49,8 @@ class codegen =
   let () = Llvm_target.TargetData.add (ExecutionEngine.target_data execengine) the_fpm in
 
   (* Promote allocas to registers. *)
-  (* let () = add_memory_to_register_promotion the_fpm in *)
+  let () = if !opts then (
+  let () = add_memory_to_register_promotion the_fpm in
 
   (* Do simple "peephole" optimizations and bit-twiddling optzn. *)
   let () = add_instruction_combination the_fpm in
@@ -52,8 +62,8 @@ class codegen =
   let () = add_gvn the_fpm in
 
   (* Simplify the control flow graph (deleting unreachable blocks, etc). *)
-  let () = add_cfg_simplification the_fpm in
-
+  add_cfg_simplification the_fpm)
+  in
   let () = ignore (PassManager.initialize the_fpm) in
 
   (* Find assert function to be called on Assert statements *)
@@ -75,19 +85,45 @@ object(self)
     | Reg n -> integer_type context n
     | _ -> failwith "No idea how to handle memories yet"
 
-  (** Convert a Var to its LLVM pointer *)
-  method convert_var (Var.V(_, s, t) as v) =
+  (** Convert a var to its global LLVM pointer *)
+  method convert_global_var (Var.V(_, s, t) as v) =
+    try Hashtbl.find ctx.globalvars v
+    with Not_found ->
+      let init = self#convert_exp (Int(bi0, t)) in
+      let a = define_global s init the_module in
+      Hashtbl.add ctx.globalvars v a;
+      a
+
+  method convert_temp_var (Var.V(_, s, t) as v) =
     try Hashtbl.find ctx.vars v
     with Not_found ->
-      let a = self#in_alloc (lazy (build_alloca (self#convert_type t) s builder)) in
+      let a = self#in_alloc
+        (lazy (let a = build_alloca (self#convert_type t) s builder in
+               a)) in
       Hashtbl.add ctx.vars v a;
       a
+
+  method convert_let_var (Var.V(_, s, t) as v) =
+    Hashtbl.find ctx.letvars v
+
+  (** Convert a Var to its LLVM pointer *)
+  method convert_var (Var.V(_, s, t) as v) =
+    if not (Disasm.is_temp v) then self#convert_global_var v
+    else self#convert_temp_var v
 
   (** Compile LLVM code to evaluate an Ast.exp. *)
   method convert_exp = function
     | Ite _ as ite -> self#convert_exp (Ast_convenience.rm_ite ite)
     | Extract _ as e -> self#convert_exp (Ast_convenience.rm_extract e)
     | Concat _ as c -> self#convert_exp (Ast_convenience.rm_concat c)
+    | Let(v, e, e') ->
+      dprintf "here goes";
+      Hashtbl.add ctx.letvars v (self#convert_exp e);
+      dprintf "added v";
+      let save = self#convert_exp e' in
+      Hashtbl.remove ctx.letvars v;
+      dprintf "boooooya";
+      save
     | Int(i, t) ->
       let lt = self#convert_type t in
       (try const_of_int64 lt (Big_int_Z.int64_of_big_int i) (*signed?*) false
@@ -147,8 +183,12 @@ object(self)
       in
       bf le1 le2 (Pp.binop_to_string bop^"_tmp") builder
     | Var(v) ->
-      let mem = self#convert_var v in
-      build_load mem (Var.name v) builder
+      dprintf "Var %s" (Var.name v);
+      (try self#convert_let_var v
+       with Not_found ->
+         dprintf "Couldn't find let %s" (Var.name v);
+         let mem = self#convert_var v in
+         build_load mem ("load_var_"^(Var.name v)) builder)
     (* How do we handle this properly? *)
     | Ast.Load(Var m, idx, e, t) when memimpl = Real (*&& m = (Var Asmir.x86_mem) *) ->
       let idx' = self#convert_exp idx in
@@ -171,7 +211,7 @@ object(self)
   (*   f *)
 
   (** Convert a single straight-line statement *)
-  method convert_straightline_stmt = function
+  method private convert_straightline_stmt = function
     | (Jmp _ | CJmp _ | Label _ | Special _) as s ->
       failwith (Printf.sprintf "convert_straightline_stmt: Non-straightline statement type %s" (Pp.ast_stmt_to_string s))
     | Assert(e, _) ->
@@ -203,17 +243,18 @@ object(self)
     | _ -> failwith "convert_straightline_stmt: Unimplemented"
 
   (** Convert straight-line code (multiple statements) *)
-  method convert_straightline p =
+  method private convert_straightline p =
     List.iter self#convert_straightline_stmt p;
 
   method convert_straightline_f p =
-    let rt = match List.rev p with
-    | Halt(e, _)::_ ->
-      self#convert_type (Typecheck.infer_ast e)
-    | _ -> failwith "Must end in halt"
+    let p, halte = match Ast_convenience.last_meaningful_stmt p with
+      | Halt (e, _) -> p, e
+      | _ -> List.rev (Halt (exp_true, []) :: List.rev p), exp_true
     in
+    let rt = self#convert_type (Typecheck.infer_ast halte) in
     let f = self#anon_fun ~t:rt () in
     self#convert_straightline p;
+    self#dump;
     Llvm_analysis.assert_valid_function f;
     (* Optimize! *)
     ignore(PassManager.run_function f the_fpm);
@@ -221,7 +262,7 @@ object(self)
 
   (** Execute lazy value l in the allocbb, and then return to the end
       of the bb the builder was in. *)
-  method in_alloc l =
+  method private in_alloc l =
     match ctx.allocbb with
     | None -> failwith "in_alloc: Called with no allocbb set"
     | Some(allocbb) ->
@@ -232,7 +273,7 @@ object(self)
       let () = position_at_end save builder in
       r
 
-  method anon_fun ?(t = void_type context) () =
+  method private anon_fun ?(t = void_type context) () =
     let f = declare_function "" (function_type t [||]) the_module in
     let allocbb = append_block context "allocs" f in
     let () = ctx.allocbb <- Some allocbb in
@@ -246,7 +287,21 @@ object(self)
   method dump =
     dump_module the_module
 
-  method run_fun f =
+  method private initialize_contexts ctx =
+    let stmts = List.fold_left
+      (fun acc (k,v) ->
+        (match v with | Int _ -> () | _ -> failwith "Only constant initialization allowed!");
+        Move(k,v,[]) :: acc)
+      [Halt (exp_true, [])] ctx in
+    let f = self#convert_straightline_f stmts in
+    Llvm_analysis.assert_valid_function f;
+    ignore(self#run_fun f);
+    delete_function f
+
+  method run_fun ?ctx f =
+    (match ctx with
+    | None -> ()
+    | Some x -> self#initialize_contexts x);
     ExecutionEngine.run_function f [||] execengine
 
 end

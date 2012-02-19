@@ -52,7 +52,6 @@ export SOURCES = \
 	memory2array.ml \
 	flatten_mem.mli \
 	flatten_mem.ml \
-	llvm_codegen.ml \
 	reachable.mli \
 	reachable.ml \
 	prune_unreachable.mli prune_unreachable.ml \
@@ -73,6 +72,7 @@ export SOURCES = \
 	libasmir.idl \
 	disasm_i386.ml \
 	disasm.ml \
+	llvm_codegen.ml \
 	syscall_models.ml \
 	gcl.mli gcl.ml \
 	ugcl.ml \

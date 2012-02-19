@@ -4,6 +4,8 @@
    Code generation tester.
 *)
 
+open Ast
+open Big_int_convenience
 open Llvm_executionengine
 
 let usage = "Usage: "^Sys.argv.(0)^" <input options> [options]\n\
@@ -39,10 +41,11 @@ let prog,scope =
 let () =
   let codegen = new Llvm_codegen.codegen in
   let f = codegen#convert_straightline_f prog in
-  Llvm.dump_value f;
-  (* codegen#dump; *)
+  (* Llvm.dump_value f; *)
+  let ctx = [(Disasm_i386.esp, Int(biconst 1234, reg_32))] in
+  codegen#dump;
   if !exec then
-    Printf.printf "result: %d\n" (GenericValue.as_int (codegen#run_fun f))
+    Printf.printf "result: %d\n" (GenericValue.as_int (codegen#run_fun ~ctx f));
 
 
 (*   Printf.printf "llvm: "; flush stdout; Llvm.dump_value (codegen#convert_exp_helper exp) *)
