@@ -1,4 +1,3 @@
-
 (** Generally useful things.
 
     This module contains functions that are used in BAP, but which are

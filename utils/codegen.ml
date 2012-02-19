@@ -31,6 +31,8 @@ let prog,scope =
     Arg.usage speclist (s^"\n"^usage);
     exit 1
 
+let cfg = Cfg_ast.of_prog prog;;
+
 (* let prog = Memory2array.coerce_prog prog *)
 
 (* let () = *)
@@ -42,7 +44,8 @@ let prog,scope =
 
 let () =
   let codegen = new Llvm_codegen.codegen in
-  let f = codegen#convert_straightline_f prog in
+  let f = codegen#convert_cfg cfg in
+  (* let f = codegen#convert_straightline_f prog in *)
   (* Llvm.dump_value f; *)
   let ctx = [(Disasm_i386.esp, Int(biconst 1234, reg_32))] in
   codegen#dump;

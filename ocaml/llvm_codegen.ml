@@ -8,6 +8,7 @@
 
 open Ast
 open Big_int_convenience
+module CA = Cfg.AST
 module D = Debug.Make(struct let name = "Llvm_codegen" and default=`Debug end)
 open D
 open Llvm
@@ -33,6 +34,9 @@ let opts = ref true
 type varuse = Store | Load
 
 type memimpl = Real | Func | FuncMulti
+
+(** Topological sort for CFG conversion *)
+module Toposort = Graph.Topological.Make(CA.G)
 
 class codegen =
 
@@ -255,7 +259,8 @@ object(self)
   method private convert_straightline_stmt s = 
     (* dprintf "Converting stmt %s" (Pp.ast_stmt_to_string s); *)
     match s with
-    | (Jmp _ | CJmp _ | Label _ | Special _) as s ->
+    | Label _ -> (* Labels can be safely ignored, they are already handled by the CFG *) ()
+    | (Jmp _ | CJmp _ | Special _) as s ->
       failwith (Printf.sprintf "convert_straightline_stmt: Non-straightline statement type %s" (Pp.ast_stmt_to_string s))
     | Assert(e, _) ->
       let e' = self#convert_exp e in
@@ -320,6 +325,118 @@ object(self)
     (* Optimize until fixed point *)
     while PassManager.run_function f the_fpm do () done;
     f
+
+  method private convert_jump_statement rt s succs = match succs, s with
+  (* If there are no successors, return now. *)
+  | _, Some (Halt(e, _)) ->
+    build_ret (self#convert_exp e) builder
+  | [], _ ->
+    wprintf "Program exit without returning a value";
+    if rt = void_type context then build_ret_void builder
+    (* If no halt, we'll say undefined *)
+    else build_ret (undef rt) builder
+(* Unconditional branch *)
+  | [x], _ -> build_br x builder
+(* Conditional branch. The first element is the true branch. *)
+  | [x;y], Some(CJmp(e, _, _, _)) ->
+    let e' = self#convert_exp e in
+    build_cond_br e' x y builder
+  | _ -> failwith "convert_jump_statement: Invalid CFG"
+
+(** Convert a cfg to llvm IR.
+
+    XXX: Handle return values? Maybe by scanning all Halts in the
+    program and using that type?
+*)
+  method convert_cfg cfg =
+
+    let halt_type =
+      let t = ref None in
+      let v = object(self)
+        inherit Ast_visitor.nop
+        method visit_stmt s =
+          match s, !t with
+          | Halt(e, _), None ->
+            t := Some(Typecheck.infer_ast ~check:false e);
+            `SkipChildren
+          | Halt(e, _), Some t when (Typecheck.infer_ast ~check:false e) = t ->
+            `SkipChildren
+          | Halt(e, _), Some t when (Typecheck.infer_ast ~check:false e) <> t ->
+            failwith "Program is not well typed: multiple return value types"
+          | _ ->
+            `SkipChildren
+      end
+      in
+      ignore(Ast_visitor.cfg_accept v cfg);
+      (* Haskell functors would be nice :( *)
+      match !t with
+      | Some x -> self#convert_type x
+      | None -> void_type context
+    in
+    dprintf "type: %s" (string_of_lltype halt_type);
+    (* Map bb to llvm bb *)
+    let f = self#anon_fun ~t:halt_type () in
+    let module H = Hashtbl.Make(CA.G.V) in
+    let h = H.create 1000 in
+    let get_llvmbb bb =
+      try H.find h bb
+      with Not_found ->
+        let llvmbb = append_block context (Cfg_ast.v2s bb) f in
+        H.add h bb llvmbb;
+        llvmbb
+    in
+    let firstbb = ref true in
+    Toposort.iter (fun bb ->
+      (* Create a new LLVM bb for this bb *)
+      let llvmbb = get_llvmbb bb in
+
+      (* If this is the entry node, we are building the "entry" block,
+         and need to branch to llvmbb. *)
+      if (!firstbb || CA.G.V.label bb = Cfg.BB_Entry) then (
+        (* If one of these is true, both had better be true. *)
+        assert (!firstbb && CA.G.V.label bb = Cfg.BB_Entry);
+
+        ignore(build_br llvmbb builder);
+        firstbb := false);
+
+      (* Go to new bb *)
+      position_at_end llvmbb builder;
+
+      (* Find the successor bbs. If there are two, make sure the true
+         branch is first in the list. *)
+
+      let succbbs =
+        List.map CA.G.E.dst
+          (match CA.G.succ_e cfg bb with
+          | [] -> []
+          | [x] -> [x]
+          | [x;y] when CA.G.E.label x = Some true
+                  && CA.G.E.label y = Some false -> [x;y]
+          | [y;x] when CA.G.E.label x = Some true
+                  && CA.G.E.label y = Some false -> [x;y]
+          | _ -> failwith "invalid cfg")
+      in
+      let succllvmbbs = List.map get_llvmbb succbbs in
+
+      let stmts = CA.get_stmts cfg bb in
+      let cfstmt, straightline_stmts = match List.rev stmts with
+        | (Halt _ as j::tl) | (Jmp _ as j::tl) | (CJmp _ as j::tl) -> Some(j), tl
+        | _ -> None, stmts
+      in
+
+      (* Convert the straightline statements *)
+      self#convert_straightline straightline_stmts;
+      (* Convert the jump *)
+      ignore(self#convert_jump_statement halt_type cfstmt succllvmbbs);
+
+    ) cfg;
+    self#dump;
+    Llvm_analysis.assert_valid_function f;
+    (* Optimize until fixed point.  Ehh that didn't work so well. *)
+    let countdown = ref 5 in
+    while !countdown != 0 && PassManager.run_function f the_fpm do dprintf "Optimizing"; decr countdown; done;
+    f
+
 
   (** Execute lazy value l in the allocbb, and then return to the end
       of the bb the builder was in. *)
