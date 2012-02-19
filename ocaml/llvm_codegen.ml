@@ -32,7 +32,7 @@ let opts = ref true
 
 type varuse = Store | Load
 
-type memimpl = Real | Functional
+type memimpl = Real | Func | FuncMulti
 
 class codegen =
 
@@ -50,19 +50,24 @@ class codegen =
 
   (* Promote allocas to registers. *)
   let () = if !opts then (
-  let () = add_memory_to_register_promotion the_fpm in
 
-  (* Do simple "peephole" optimizations and bit-twiddling optzn. *)
-  let () = add_instruction_combination the_fpm in
+    (* Aggregate to scalar opts *)
+    let () = add_scalar_repl_aggregation the_fpm in
 
-  (* reassociate expressions. *)
-  let () = add_reassociation the_fpm in
+    (* Promote allocas to registers *)
+    let () = add_memory_to_register_promotion the_fpm in
 
-  (* Eliminate Common SubExpressions. *)
-  let () = add_gvn the_fpm in
+    (* Do simple "peephole" optimizations and bit-twiddling optzn. *)
+    let () = add_instruction_combination the_fpm in
 
-  (* Simplify the control flow graph (deleting unreachable blocks, etc). *)
-  add_cfg_simplification the_fpm)
+    (* reassociate expressions. *)
+    let () = add_reassociation the_fpm in
+
+    (* Eliminate Common SubExpressions. *)
+    let () = add_gvn the_fpm in
+
+    (* Simplify the control flow graph (deleting unreachable blocks, etc). *)
+    add_cfg_simplification the_fpm)
   in
   let () = ignore (PassManager.initialize the_fpm) in
 
@@ -73,14 +78,24 @@ class codegen =
     | Some x -> x
   in
   (* XXX: Right way to do C++ name mangling? *)
-  let setm = match lookup_function "_Z10set_memoryyh" the_module with
+  let setm = match lookup_function "set_memory" the_module with
     | None ->
       declare_function "set_memory" (function_type (void_type context) [| i64_type context; i8_type context |]) the_module
+    | Some x -> x
+  in
+  let setmmulti = match lookup_function "set_memory_multi" the_module with
+    | None ->
+      declare_function "set_memory_multi" (function_type (void_type context) [| i64_type context; pointer_type (i8_type context); i32_type context |]) the_module
     | Some x -> x
   in
   let getm = match lookup_function "get_memory" the_module with
     | None ->
       declare_function "get_memory" (function_type (i8_type context) [| i64_type context |]) the_module
+    | Some x -> x
+  in
+  let getmmulti = match lookup_function "get_memory_multi" the_module with
+    | None ->
+      declare_function "get_memory_multi" (function_type (void_type context) [| i64_type context; pointer_type (i8_type context); i32_type context |]) the_module
     | Some x -> x
   in
 
@@ -90,7 +105,7 @@ object(self)
 
   val ctx = new_ctx ()
 
-  val memimpl = Functional
+  val memimpl = FuncMulti
 
   method convert_type = function
     | Reg n -> integer_type context n
@@ -124,7 +139,7 @@ object(self)
 
   (** Compile LLVM code to evaluate an Ast.exp. *)
   method convert_exp e =
-    dprintf "converting e: %s" (Pp.ast_exp_to_string e);
+    (* dprintf "converting e: %s" (Pp.ast_exp_to_string e); *)
     match e with
     | Ite _ as ite -> self#convert_exp (Ast_convenience.rm_ite ite)
     | Extract _ as e -> self#convert_exp (Ast_convenience.rm_extract e)
@@ -209,9 +224,18 @@ object(self)
       let idxt = pointer_type (self#convert_type t) in
       let idx'' = build_inttoptr idx' idxt "load_address" builder in
       build_load idx'' "load" builder
-    | Ast.Load(Var m, idx, e, t) when memimpl = Functional ->
+    | Ast.Load(Var m, idx, e, t) when memimpl = Func ->
       let idx' = self#convert_exp (Cast(CAST_UNSIGNED, reg_64, idx)) in
       build_call getm [| idx' |] "getm_result" builder
+    | Ast.Load(Var m, idx, e, t) when memimpl = FuncMulti ->
+      (* Alloc a buffer, call getmmulti, and then load from the buffer. *)
+      let t' = self#convert_type t in
+      let idx' = self#convert_exp (Cast(CAST_UNSIGNED, reg_64, idx)) in
+      let alloc = build_alloca t' "multi_load_buf" builder in
+      let alloc' = build_bitcast alloc (pointer_type (i8_type context)) "array_convert" builder in
+      let nbytes = self#convert_exp (Int(biconst (Typecheck.bytes_of_width t), reg_32)) in
+      ignore(build_call getmmulti [| idx'; alloc'; nbytes |] "" builder);
+      build_load alloc "load_multiload" builder
     | Ast.Store _ -> failwith "Stores are not proper expressions"
     | _ -> failwith "Unsupported exp"
 
@@ -229,7 +253,7 @@ object(self)
 
   (** Convert a single straight-line statement *)
   method private convert_straightline_stmt s = 
-    dprintf "Converting stmt %s" (Pp.ast_stmt_to_string s);
+    (* dprintf "Converting stmt %s" (Pp.ast_stmt_to_string s); *)
     match s with
     | (Jmp _ | CJmp _ | Label _ | Special _) as s ->
       failwith (Printf.sprintf "convert_straightline_stmt: Non-straightline statement type %s" (Pp.ast_stmt_to_string s))
@@ -253,11 +277,25 @@ object(self)
       let idx'' = build_inttoptr idx' idxt "load_address" builder in
       let v' = self#convert_exp v in
       ignore(build_store v' idx'' builder)
-    | Move(mv, Ast.Store(Var m,i,v,e,t), _) when Typecheck.is_mem_type (Var.typ mv) && memimpl = Functional ->
+    | Move(mv, Ast.Store(Var m,i,v,e,t), _) when Typecheck.is_mem_type (Var.typ mv) && memimpl = Func ->
       assert (t = reg_8);
       let idx' = self#convert_exp (Cast(CAST_UNSIGNED, reg_64, i)) in
       let v' = self#convert_exp v in
       ignore(build_call setm [| idx'; v' |] "" builder);
+    | Move(mv, Ast.Store(Var m,i,v,e,t), _) when Typecheck.is_mem_type (Var.typ mv) && memimpl = FuncMulti ->
+      (* We are going to create a stack slot, copy the value there,
+         and then call setmmulti. Hopefully LLVM's optimizers will get
+         rid of this copy... *)
+      let t' = self#convert_type t in
+      let idx' = self#convert_exp (Cast(CAST_UNSIGNED, reg_64, i)) in
+      let v' = self#convert_exp v in
+      let alloc = build_alloca t' "multi_store_buf" builder in
+      ignore(build_store v' alloc builder);
+      let alloc' = build_bitcast alloc (pointer_type (i8_type context)) "array_convert" builder in
+      let nbytes = self#convert_exp (Int(biconst (Typecheck.bytes_of_width t), reg_32)) in
+      ignore(build_call setmmulti [| idx'; alloc'; nbytes |] "" builder);
+    | Move(mv, Ast.Store(Var m,i,v,e,t), _) when Typecheck.is_mem_type (Var.typ mv) ->
+      failwith "Unhandled memory store"
     (* XXX: How do we make sure this is a write to "the big global
        memory"? *)
     (* A complicated memory write we need to simplify *)
@@ -278,10 +316,9 @@ object(self)
     let rt = self#convert_type (Typecheck.infer_ast halte) in
     let f = self#anon_fun ~t:rt () in
     self#convert_straightline p;
-    self#dump;
     Llvm_analysis.assert_valid_function f;
-    (* Optimize! *)
-    ignore(PassManager.run_function f the_fpm);
+    (* Optimize until fixed point *)
+    while PassManager.run_function f the_fpm do () done;
     f
 
   (** Execute lazy value l in the allocbb, and then return to the end
