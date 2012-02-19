@@ -4,13 +4,18 @@
 
     $Id$
 
+    XXX: explode_mem_let should probably make new statements with
+    temporary unique variables instead of blowing up the expressions.
+
     @author ejs
 *)
 
 open Ast
+module D = Debug.Make(struct let name = "Flatten_mem" and default=`Debug end)
+open D
 
-(* Explode Let(x,e,e') for e' with memory types. *)
-let explode_mem_let e =
+(* Explode Let(x,e,e') when [f e] is true *)
+let explode_mem_let f e =
   let h = Hashtbl.create 1000 in
   let v = object(self)
     inherit Ast_visitor.nop
@@ -24,11 +29,13 @@ let explode_mem_let e =
     method visit_exp = function
       | Var(v) ->
         (* Do we have a value from a Let binding to return? *)
-        (try `ChangeToAndDoChildren(Hashtbl.find h v)
+        (try `ChangeTo(Hashtbl.find h v)
          with Not_found ->
            (* Nope, leave it alone *)
            `DoChildren)
-      | Let(v,e,e') when Typecheck.is_mem_type (Typecheck.infer_ast ~check:false e') ->
+      | Let(v,e,e') as bige when f bige ->
+        (* Recurse on e, removing any Lets *)
+        let e = Ast_visitor.exp_accept self e in
         let () = self#push_assign v e in
         let newe' = Ast_visitor.exp_accept self e' in
         let () = self#pop_assign v in
@@ -40,8 +47,8 @@ let explode_mem_let e =
   Ast_visitor.exp_accept v e
 
 let flatten_memexp_rev memvl atts e =
-  (* Remove lets *)
-  let e = explode_mem_let e in
+  (* Remove lets that return a memory type *)
+  let e = explode_mem_let (fun _ -> true) e in
   let rec flatten_memexp_rev memvl atts = function
     | Var _ as e -> e, []
     | Store(Var _,_,_,_,_) as e -> e, []
@@ -68,10 +75,20 @@ let flatten_memexp memvl atts e =
     memv, idx2, value2)) :: []]. Statements that are not memory writes
     are passed through unchanged.  Lets with memory types are exploded.
 *)
-let rec flatten_stores = function
+let flatten_stores = function
   | Move(memvl, e, att) when Typecheck.is_mem_type (Var.typ memvl) ->
     let e', revstmts = flatten_memexp memvl att e in
     let revstmts = Move(memvl, e', att) :: revstmts in
     List.rev revstmts
   | s -> [s]
 
+(** Converts a Load expression e into a form that can be sequentially
+    evaluated concretely.  This means that there are no Let bindings that
+    bind a memory state to a variable, because that cannot be implemented
+    concretely. *)
+let flatten_loads e =
+  explode_mem_let
+    (function
+      | Let(v,_,_) when Typecheck.is_mem_type (Var.typ v) -> true
+      | Let _ -> true
+      | _ -> false) e

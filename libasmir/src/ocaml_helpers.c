@@ -37,7 +37,3 @@ int64_t bfd_section_get_flags(asection *s) {
 void asmir_free_vex_buffers(void) {
   vx_FreeAll();
 }
-
-void fake_assert(uint32_t b) {
-  assert(b);
-}

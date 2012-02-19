@@ -31,6 +31,8 @@ let prog,scope =
     Arg.usage speclist (s^"\n"^usage);
     exit 1
 
+let prog = Memory2array.coerce_prog prog
+
 (* let () = *)
 (*   List.iter (fun s -> *)
 (*     List.iter (fun s -> *)

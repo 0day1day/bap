@@ -72,6 +72,17 @@ class codegen =
       declare_function "fake_assert" (function_type (void_type context) [| i32_type context |]) the_module
     | Some x -> x
   in
+  (* XXX: Right way to do C++ name mangling? *)
+  let setm = match lookup_function "_Z10set_memoryyh" the_module with
+    | None ->
+      declare_function "set_memory" (function_type (void_type context) [| i64_type context; i8_type context |]) the_module
+    | Some x -> x
+  in
+  let getm = match lookup_function "get_memory" the_module with
+    | None ->
+      declare_function "get_memory" (function_type (i8_type context) [| i64_type context |]) the_module
+    | Some x -> x
+  in
 
 object(self)
 
@@ -79,7 +90,7 @@ object(self)
 
   val ctx = new_ctx ()
 
-  val memimpl = Real
+  val memimpl = Functional
 
   method convert_type = function
     | Reg n -> integer_type context n
@@ -112,18 +123,23 @@ object(self)
     else self#convert_temp_var v
 
   (** Compile LLVM code to evaluate an Ast.exp. *)
-  method convert_exp = function
+  method convert_exp e =
+    dprintf "converting e: %s" (Pp.ast_exp_to_string e);
+    match e with
     | Ite _ as ite -> self#convert_exp (Ast_convenience.rm_ite ite)
     | Extract _ as e -> self#convert_exp (Ast_convenience.rm_extract e)
     | Concat _ as c -> self#convert_exp (Ast_convenience.rm_concat c)
-    | Let(v, e, e') ->
-      dprintf "here goes";
-      Hashtbl.add ctx.letvars v (self#convert_exp e);
-      dprintf "added v";
+    (* Let for integer types *)
+    | Let(v, e, e') when Typecheck.is_integer_type (Var.typ v)
+        && Typecheck.is_integer_type (Typecheck.infer_ast ~check:false e') ->
+      let () = Hashtbl.add ctx.letvars v (self#convert_exp e) in
       let save = self#convert_exp e' in
       Hashtbl.remove ctx.letvars v;
-      dprintf "boooooya";
       save
+    (* Let for memory bindings that return integer type (Loads) needs to be flattened *)
+    | Let(v, e, e') as bige when Typecheck.is_mem_type (Var.typ v)
+        && Typecheck.is_integer_type (Typecheck.infer_ast ~check:false e') ->
+      self#convert_exp (Flatten_mem.flatten_loads bige)
     | Int(i, t) ->
       let lt = self#convert_type t in
       (try const_of_int64 lt (Big_int_Z.int64_of_big_int i) (*signed?*) false
@@ -183,10 +199,8 @@ object(self)
       in
       bf le1 le2 (Pp.binop_to_string bop^"_tmp") builder
     | Var(v) ->
-      dprintf "Var %s" (Var.name v);
       (try self#convert_let_var v
        with Not_found ->
-         dprintf "Couldn't find let %s" (Var.name v);
          let mem = self#convert_var v in
          build_load mem ("load_var_"^(Var.name v)) builder)
     (* How do we handle this properly? *)
@@ -195,6 +209,9 @@ object(self)
       let idxt = pointer_type (self#convert_type t) in
       let idx'' = build_inttoptr idx' idxt "load_address" builder in
       build_load idx'' "load" builder
+    | Ast.Load(Var m, idx, e, t) when memimpl = Functional ->
+      let idx' = self#convert_exp (Cast(CAST_UNSIGNED, reg_64, idx)) in
+      build_call getm [| idx' |] "getm_result" builder
     | Ast.Store _ -> failwith "Stores are not proper expressions"
     | _ -> failwith "Unsupported exp"
 
@@ -211,7 +228,9 @@ object(self)
   (*   f *)
 
   (** Convert a single straight-line statement *)
-  method private convert_straightline_stmt = function
+  method private convert_straightline_stmt s = 
+    dprintf "Converting stmt %s" (Pp.ast_stmt_to_string s);
+    match s with
     | (Jmp _ | CJmp _ | Label _ | Special _) as s ->
       failwith (Printf.sprintf "convert_straightline_stmt: Non-straightline statement type %s" (Pp.ast_stmt_to_string s))
     | Assert(e, _) ->
@@ -234,6 +253,11 @@ object(self)
       let idx'' = build_inttoptr idx' idxt "load_address" builder in
       let v' = self#convert_exp v in
       ignore(build_store v' idx'' builder)
+    | Move(mv, Ast.Store(Var m,i,v,e,t), _) when Typecheck.is_mem_type (Var.typ mv) && memimpl = Functional ->
+      assert (t = reg_8);
+      let idx' = self#convert_exp (Cast(CAST_UNSIGNED, reg_64, i)) in
+      let v' = self#convert_exp v in
+      ignore(build_call setm [| idx'; v' |] "" builder);
     (* XXX: How do we make sure this is a write to "the big global
        memory"? *)
     (* A complicated memory write we need to simplify *)
