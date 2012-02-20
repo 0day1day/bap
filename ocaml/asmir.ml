@@ -785,6 +785,7 @@ end
 module SerializedTrace = struct
 
   let new_bap_from_trace_frames ?n r =
+    print_mem_usage();
     let get_attrs =
       let convert_taint = function
         | `no_taint -> Taint 0
