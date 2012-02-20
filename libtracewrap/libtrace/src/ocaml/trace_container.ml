@@ -38,7 +38,9 @@ let write_i64 oc i64 =
 let read_i64 ic =
   let s = String.create 8 in
   (* Read 8 bytes into s *)
+  Printf.fprintf stderr "here we go\n";
   let () = really_input ic s 0 8 in
+  Printf.fprintf stderr "here we gone\n";
   let input = BatIO.input_string s in
   let i = BatIO.read_i64 input in
   let () = BatIO.close_in input in
@@ -59,7 +61,7 @@ class writer ?(arch=default_arch) ?(machine=default_machine) ?(frames_per_toc_en
   (* Open the trace file *)
   let oc = open_out_bin filename in
   (* Seek to the first frame *)
-  let () = seek_out oc (Int64.to_int first_frame_offset) in
+  let () = LargeFile.seek_out oc first_frame_offset in
 object(self)
 
   val mutable toc = []
@@ -104,23 +106,23 @@ object(self)
     (* Now we need to write the magic number, number of trace frames,
        and the offset of field m at the start of the trace. *)
     (* Magic number. *)
-    let () = seek_out oc (Int64.to_int magic_number_offset) in
+    let () = LargeFile.seek_out oc magic_number_offset in
     let () = write_i64 oc magic_number in
     (* Trace version. *)
-    let () = seek_out oc (Int64.to_int trace_version_offset) in
+    let () = LargeFile.seek_out oc trace_version_offset in
     let () = write_i64 oc out_trace_version in
     (* CPU architecture. *)
-    let () = seek_out oc (Int64.to_int bfd_arch_offset) in
+    let () = LargeFile.seek_out oc bfd_arch_offset in
     (* Goodbye type safety! *)
     let () = write_i64 oc (Int64.of_int (Obj.magic arch)) in
     (* Machine type. *)
-    let () = seek_out oc (Int64.to_int bfd_machine_offset) in
+    let () = LargeFile.seek_out oc bfd_machine_offset in
     let () = write_i64 oc machine in
     (* Number of trace frames. *)
-    let () = seek_out oc (Int64.to_int num_trace_frames_offset) in
+    let () = LargeFile.seek_out oc num_trace_frames_offset in
     let () = write_i64 oc num_frames in
     (* Offset of toc. *)
-    let () = seek_out oc (Int64.to_int toc_offset_offset) in
+    let () = LargeFile.seek_out oc toc_offset_offset in
     let () = write_i64 oc toc_offset in
     (* Finally close the final and mark us as finished. *)
     let () = close_out oc in
@@ -131,7 +133,9 @@ object(self)
 end
 
 class reader filename =
+  let () = Printf.fprintf stderr "wtf\n" in
   let ic = open_in_bin filename in
+  let () = Printf.fprintf stderr "wtf\n" in
   (* Verify magic number *)
   let () = if read_i64 ic <> magic_number then
       raise (TraceException "Magic number is incorrect") in
@@ -149,9 +153,13 @@ class reader filename =
   (* Read number of trace frames. *)
   let num_frames = read_i64 ic in
   (* Find offset of toc. *)
+  let () = Printf.fprintf stderr "reading from %x\n" (pos_in ic) in
   let toc_offset = read_i64 ic in
   (* Find the toc. *)
-  let () = seek_in ic (Int64.to_int toc_offset) in
+  let () = Printf.fprintf stderr "toc: %Lx %x\n" toc_offset (Int64.to_int toc_offset) in
+  (* let () = Printf.fprintf stderr "length %x\n" (in_channel_length ic) in *)
+  let () = LargeFile.seek_in ic toc_offset in
+  let () = Printf.fprintf stderr "sweet?\n" in
   (* Read number of frames per toc entry. *)
   let frames_per_toc_entry = read_i64 ic in
   (* Read each toc entry. *)
@@ -165,7 +173,7 @@ class reader filename =
     Array.of_list (List.rev toc_rev)
   in
   (* We should be at the end of the file now. *)
-  let () = assert ((pos_in ic) = (in_channel_length ic)) in
+  let () = assert ((LargeFile.pos_in ic) = (LargeFile.in_channel_length ic)) in
   object(self)
     val mutable current_frame = 0L
 
@@ -187,19 +195,20 @@ class reader filename =
       let toc_number = Int64.div frame_number frames_per_toc_entry in
 
       current_frame <- (match toc_number with
-      | 0L -> let () = seek_in ic (Int64.to_int first_frame_offset) in
+      | 0L -> let () = LargeFile.seek_in ic first_frame_offset in
               0L
-      | _ -> let () = seek_in ic (Int64.to_int (Array.get toc (Int64.to_int (Int64.pred toc_number)))) in
+      | _ -> let () = LargeFile.seek_in ic (Array.get toc (Int64.to_int (Int64.pred toc_number))) in
              Int64.mul toc_number frames_per_toc_entry);
 
       while current_frame <> frame_number do
         (* Read frame length and skip that far ahead. *)
         let frame_len = read_i64 ic in
-        let () = seek_in ic (Int64.to_int (Int64.add (Int64.of_int (pos_in ic)) frame_len)) in
+        let () = LargeFile.seek_in ic (Int64.add (Int64.of_int (pos_in ic)) frame_len) in
         current_frame <- Int64.succ current_frame
       done
 
     method get_frame : frame =
+      let print x = Printf.printf "Object was just gc\n" in
       let () = self#check_end_of_trace "get_frame on non-existant frame" in
 
       let frame_len = read_i64 ic in
@@ -208,6 +217,7 @@ class reader filename =
       (* Read the frame info buf. *)
       let () = really_input ic buf 0 (Int64.to_int frame_len) in
       let f = Frame_piqi.parse_frame (Piqirun.init_from_string buf) in
+      Gc.finalise print f;
       let () = current_frame <- Int64.succ current_frame in
 
       f
