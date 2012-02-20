@@ -206,7 +206,6 @@ class reader filename =
       done
 
     method get_frame : frame =
-      let print x = Printf.printf "Object was just gc\n" in
       let () = self#check_end_of_trace "get_frame on non-existant frame" in
 
       let frame_len = read_i64 ic in
@@ -215,7 +214,6 @@ class reader filename =
       (* Read the frame info buf. *)
       let () = really_input ic buf 0 (Int64.to_int frame_len) in
       let f = Frame_piqi.parse_frame (Piqirun.init_from_string buf) in
-      Gc.finalise print f;
       let () = current_frame <- Int64.succ current_frame in
 
       f
