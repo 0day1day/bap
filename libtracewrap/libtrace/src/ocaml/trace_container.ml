@@ -131,9 +131,7 @@ object(self)
 end
 
 class reader filename =
-  let () = Printf.fprintf stderr "wtf\n" in
   let ic = open_in_bin filename in
-  let () = Printf.fprintf stderr "wtf\n" in
   (* Verify magic number *)
   let () = if read_i64 ic <> magic_number then
       raise (TraceException "Magic number is incorrect") in
@@ -151,13 +149,9 @@ class reader filename =
   (* Read number of trace frames. *)
   let num_frames = read_i64 ic in
   (* Find offset of toc. *)
-  let () = Printf.fprintf stderr "reading from %x\n" (pos_in ic) in
   let toc_offset = read_i64 ic in
   (* Find the toc. *)
-  let () = Printf.fprintf stderr "toc: %Lx %x\n" toc_offset (Int64.to_int toc_offset) in
-  (* let () = Printf.fprintf stderr "length %x\n" (in_channel_length ic) in *)
   let () = LargeFile.seek_in ic toc_offset in
-  let () = Printf.fprintf stderr "sweet?\n" in
   (* Read number of frames per toc entry. *)
   let frames_per_toc_entry = read_i64 ic in
   (* Read each toc entry. *)
