@@ -38,9 +38,7 @@ let write_i64 oc i64 =
 let read_i64 ic =
   let s = String.create 8 in
   (* Read 8 bytes into s *)
-  Printf.fprintf stderr "here we go\n";
   let () = really_input ic s 0 8 in
-  Printf.fprintf stderr "here we gone\n";
   let input = BatIO.input_string s in
   let i = BatIO.read_i64 input in
   let () = BatIO.close_in input in
