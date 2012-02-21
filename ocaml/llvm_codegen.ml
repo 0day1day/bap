@@ -52,7 +52,6 @@ class codegen =
    * how the target lays out data structures. *)
   let () = Llvm_target.TargetData.add (ExecutionEngine.target_data execengine) the_fpm in
 
-  (* Promote allocas to registers. *)
   let () = if !opts then (
 
     (* Aggregate to scalar opts *)

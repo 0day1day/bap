@@ -788,13 +788,16 @@ module Concrete = Make(ConcreteMemL)(FastEval)(StdAssign)(StdForm)
 (** Execute a program concretely *)
 let concretely_execute ?s ?(i=[]) p =
   let rec step ctx =
-    try
-      let s = Concrete.inst_fetch ctx.sigma ctx.pc in
-	  dprintf "Executing: %s" (Pp.ast_stmt_to_string s);
-      match Concrete.eval ctx with
-      | [next] -> step next
-      | _ -> failwith "step"
-    with Concrete.Halted _ -> ctx
+    let s = Concrete.inst_fetch ctx.sigma ctx.pc in
+    dprintf "Executing: %s" (Pp.ast_stmt_to_string s);
+    let nextctxs = try Some(Concrete.eval ctx) with
+        Concrete.Halted _ -> None
+    in
+    match nextctxs with
+    | Some [next] -> step next
+    | Some _ -> failwith "step"
+    (* Done recursing *)
+    | None -> ctx
   in
   let ctx = Concrete.build_default_context p in
   (* Evaluate initialization statements *)
