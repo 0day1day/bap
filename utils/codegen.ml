@@ -43,7 +43,7 @@ let cfg = Cfg_ast.of_prog prog;;
 (*   ) prog *)
 
 let () =
-  let codegen = new Llvm_codegen.codegen in
+  let codegen = new Llvm_codegen.codegen Llvm_codegen.FuncMulti in
   let f = codegen#convert_cfg cfg in
   (* let f = codegen#convert_straightline_f prog in *)
   (* Llvm.dump_value f; *)

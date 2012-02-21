@@ -16,29 +16,33 @@ open Llvm_executionengine
 open Llvm_scalar_opts
 open Type
 
+module VH = Var.VarHash
+
 (** Context for conversion functions *)
 type ctx = {
-  globalvars: (Var.t, llvalue) Hashtbl.t;
-  vars: (Var.t, llvalue) Hashtbl.t;
-  letvars: (Var.t, llvalue) Hashtbl.t;
+  globalvars: llvalue VH.t;
+  vars: llvalue VH.t;
+  letvars: llvalue VH.t;
   mutable allocbb: llbasicblock option
            }
 
-let new_ctx () = { globalvars = Hashtbl.create 100;
-                   vars=Hashtbl.create 100;
-                   letvars=Hashtbl.create 100;
+let new_ctx () = { globalvars = VH.create 100;
+                   vars=VH.create 100;
+                   letvars=VH.create 100;
                    allocbb=None
                  }
 let opts = ref true
 
 type varuse = Store | Load
 
-type memimpl = Real | Func | FuncMulti
+type memimpl = Real (** Use "real" memory; unsafe *)
+               | Func (** Use memory functions, one byte at a time *)
+               | FuncMulti (** Use memory functions, multiple bytes at a time *)
 
 (** Topological sort for CFG conversion *)
 module Toposort = Graph.Topological.Make(CA.G)
 
-class codegen =
+class codegen memimpl =
 
   let () = ignore (initialize_native_target ()) in
   let context = global_context () in
@@ -108,7 +112,7 @@ object(self)
 
   val ctx = new_ctx ()
 
-  val memimpl = FuncMulti
+  val memimpl = memimpl
 
   method convert_type = function
     | Reg n -> integer_type context n
@@ -116,24 +120,24 @@ object(self)
 
   (** Convert a var to its global LLVM pointer *)
   method convert_global_var (Var.V(_, s, t) as v) =
-    try Hashtbl.find ctx.globalvars v
+    try VH.find ctx.globalvars v
     with Not_found ->
       let init = self#convert_exp (Int(bi0, t)) in
       let a = define_global s init the_module in
-      Hashtbl.add ctx.globalvars v a;
+      VH.add ctx.globalvars v a;
       a
 
   method convert_temp_var (Var.V(_, s, t) as v) =
-    try Hashtbl.find ctx.vars v
+    try VH.find ctx.vars v
     with Not_found ->
       let a = self#in_alloc
         (lazy (let a = build_alloca (self#convert_type t) s builder in
                a)) in
-      Hashtbl.add ctx.vars v a;
+      VH.add ctx.vars v a;
       a
 
   method convert_let_var (Var.V(_, s, t) as v) =
-    Hashtbl.find ctx.letvars v
+    VH.find ctx.letvars v
 
   (** Convert a Var to its LLVM pointer *)
   method convert_var (Var.V(_, s, t) as v) =
@@ -150,9 +154,9 @@ object(self)
     (* Let for integer types *)
     | Let(v, e, e') when Typecheck.is_integer_type (Var.typ v)
         && Typecheck.is_integer_type (Typecheck.infer_ast ~check:false e') ->
-      let () = Hashtbl.add ctx.letvars v (self#convert_exp e) in
+      let () = VH.add ctx.letvars v (self#convert_exp e) in
       let save = self#convert_exp e' in
-      Hashtbl.remove ctx.letvars v;
+      VH.remove ctx.letvars v;
       save
     (* Let for memory bindings that return integer type (Loads) needs to be flattened *)
     | Let(v, e, e') as bige when Typecheck.is_mem_type (Var.typ v)
@@ -464,16 +468,45 @@ object(self)
   method dump =
     dump_module the_module
 
+  val set_value_h = VH.create 1000
+  method private set_value v c =
+    let build_setter () =
+      let f = declare_function "" (function_type (void_type context) [| self#convert_type (Var.typ v) |]) the_module in
+      let bb = append_block context "setbb" f in
+      position_at_end bb builder;
+      let p = param f 0 in
+      ignore(build_store p (self#convert_var v) builder);
+      ignore(build_ret_void builder);
+      Llvm_analysis.assert_valid_function f;
+      self#dump;
+      f
+    in
+    let setf = try VH.find set_value_h v
+      with Not_found -> let newf = build_setter () in
+                        let newf = function
+                          | Int(va, _) ->
+                            ignore(ExecutionEngine.run_function newf
+                                     (* XXX: Fix me for > int64 *)
+                                     [|GenericValue.of_int64 (self#convert_type (Var.typ v))
+                                         (Big_int_Z.int64_of_big_int va)|] execengine)
+                          | _ -> failwith "Expected a constant"
+                        in
+                        VH.add set_value_h v newf;
+                        newf
+    in
+    setf c
+
   method private initialize_contexts ctx =
-    let stmts = List.fold_left
-      (fun acc (k,v) ->
-        (match v with | Int _ -> () | _ -> failwith "Only constant initialization allowed!");
-        Move(k,v,[]) :: acc)
-      [Halt (exp_true, [])] ctx in
-    let f = self#convert_straightline_f stmts in
-    Llvm_analysis.assert_valid_function f;
-    ignore(self#run_fun f);
-    delete_function f
+    (* let stmts = List.fold_left *)
+    (*   (fun acc (k,v) -> *)
+    (*     (match v with | Int _ -> () | _ -> failwith "Only constant initialization allowed!"); *)
+    (*     Move(k,v,[]) :: acc) *)
+    (*   [Halt (exp_true, [])] ctx in *)
+    (* let f = self#convert_straightline_f stmts in *)
+    (* Llvm_analysis.assert_valid_function f; *)
+    (* ignore(self#run_fun f); *)
+    (* delete_function f *)
+    List.iter (fun (k,v) -> self#set_value k v) ctx
 
   method run_fun ?ctx f =
     (match ctx with

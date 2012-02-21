@@ -790,14 +790,15 @@ let concretely_execute ?s ?(i=[]) p =
   let rec step ctx =
     let s = Concrete.inst_fetch ctx.sigma ctx.pc in
     dprintf "Executing: %s" (Pp.ast_stmt_to_string s);
-    let nextctxs = try Some(Concrete.eval ctx) with
-        Concrete.Halted _ -> None
+    let nextctxs = try Concrete.eval ctx, None with
+        Concrete.Halted (v, ctx) -> [ctx], v
     in
     match nextctxs with
-    | Some [next] -> step next
-    | Some _ -> failwith "step"
+    | [next], None -> step next
+    |  _, None -> failwith "step"
     (* Done recursing *)
-    | None -> ctx
+    | [ctx], v -> ctx, v
+    | _, Some _ -> failwith "step"
   in
   let ctx = Concrete.build_default_context p in
   (* Evaluate initialization statements *)
@@ -815,9 +816,12 @@ let concretely_execute ?s ?(i=[]) p =
          will (unintentionally) increment pc. *)
       {ctx with pc = 0L}
   in
-  let ctx = step ctx in
+  let ctx, v = step ctx in
   Concrete.print_values ctx.delta;
   Concrete.print_mem ctx.delta;
+  (match v with
+  | Some(Symbolic v) -> Printf.printf "result: %s\n" (Pp.ast_exp_to_string v)
+  | _ -> Printf.printf "no result\n");
   ctx
 
 let eval_expr = Symbolic.eval_expr
