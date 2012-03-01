@@ -7,6 +7,6 @@ default: all
 %:	CONFIGURED
 	make -C libtrace $@
 
-CONFIGURED:
+CONFIGURED: libtrace/Makefile.am libtrace/configure.ac
 	(cd libtrace && ./autogen.sh && ./configure --with-batteries=@BAP_DIR@/batteries/_build/src)
 	touch CONFIGURED

@@ -785,6 +785,7 @@ end
 module SerializedTrace = struct
 
   let new_bap_from_trace_frames ?n r =
+    print_mem_usage();
     let get_attrs =
       let convert_taint = function
         | `no_taint -> Taint 0
@@ -887,7 +888,7 @@ module SerializedTrace = struct
       let frames = r#get_frames blocksize in
     (* XXX: Remove use of Obj.magic in an elegant way... *)
       out := List.rev_append (List.flatten (List.map (raise_frame (Obj.magic r#get_arch)) frames)) !out;
-      counter := Int64.succ !counter
+      counter := Int64.add !counter (Int64.of_int (List.length frames));
     done;
 
     List.rev !out
