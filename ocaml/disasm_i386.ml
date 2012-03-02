@@ -112,6 +112,7 @@ type opcode =
   | Pmovmskb of (typ * operand * operand)
   | Pcmpeq of (typ * typ * operand * operand)
   | Palignr of (typ * operand * operand * operand)
+  | Pcmpistri of (typ * operand * operand * operand)
   | Pshufd of operand * operand * operand
   | Leave of typ
   | Interrupt of operand
@@ -602,6 +603,52 @@ let rec to_ir addr next ss pref =
       let addresses = List.fold_left (fun acc -> function Oaddr a -> a::acc | _ -> acc) [] [src;dst] in
       List.map (fun addr -> Assert( (addr &* i32 15) ==* i32 0, [])) addresses
       @ [assn t dst result]
+  | Pcmpistri(t,dst,src,imm) ->
+      let dst_e = op2e t dst in
+      let src_e = op2e t src in
+      (*let imm = op2e t imm in*) (* only handles imm == 0xc *)
+      let get_bit i =
+        let fold_cmp acc j =
+          let dst_e_byte = Extract(biconst (j*8+7), biconst (j*8), dst_e) in
+          let src_e_byte = Extract(biconst ((i+j)*8+7), biconst ((i+j)*8), src_e) in
+          Ite(BinOp(EQ, Int(bi0, reg_8), dst_e_byte),
+            exp_true,
+            Ite(BinOp(NEQ, src_e_byte, dst_e_byte),
+              exp_false,
+              acc
+            )
+          )
+        in
+        (fold fold_cmp exp_true ((15-i)---0))
+      in
+      let contains_null e =
+        fold (fun acc i ->
+          Ite(BinOp(EQ, Extract(biconst (i*8+7), biconst (i*8), e), Int(bi0, reg_8)),
+            exp_true,
+            acc
+          )
+        ) exp_false (0--15)
+      in
+      let lsb e =
+        fold (fun acc i ->
+          Ite(BinOp(EQ, exp_true, Extract(biconst i, biconst i, e)),
+            Int(biconst i, reg_32),
+            acc
+          )
+        ) (Int(biconst 16, reg_32)) (0--15)
+      in
+      let bits = map get_bit (0--15) in
+      let res_e = reduce (fun acc f -> Concat(f, acc)) bits in
+      let int_res_2 = nt "IntRes2" reg_32 in
+      move int_res_2 res_e
+      :: move ecx (lsb (Var int_res_2))
+      :: move cf (BinOp(NEQ, (Var int_res_2), Int(bi0, reg_32)))
+      :: move zf (contains_null dst_e)
+      :: move sf (contains_null src_e)
+      :: move oF (Extract(bi0, bi0, (Var int_res_2)))
+      :: move af (Int(bi0, reg_1))
+      :: move pf (Int(bi0, reg_1))
+      :: []
   | Pshufd (dst, src, imm) ->
       let t = r128 in (* pshufd is only defined for 128-bits *)
       let src_e = op2e t src in
@@ -1106,6 +1153,7 @@ module ToStr = struct
     | Movdq(_t,td,d,ts,s,align,name) ->
       Printf.sprintf "%s %s, %s" name (opr d) (opr s)
     | Palignr(t,dst,src,imm) -> Printf.sprintf "palignr %s, %s, %s" (opr dst) (opr src) (opr imm)
+    | Pcmpistri(t,dst,src,imm) -> Printf.sprintf "pcmpistri %s, %s, %s" (opr dst) (opr src) (opr imm)
     | Pshufd(dst,src,imm) -> Printf.sprintf "palignr %s, %s, %s" (opr dst) (opr src) (opr imm)
     | Pcmpeq(t,elet,dst,src) -> Printf.sprintf "pcmpeq %s, %s" (opr dst) (opr src)
     | Pmovmskb(t,dst,src) -> Printf.sprintf "pmovmskb %s, %s" (opr dst) (opr src)
@@ -1641,7 +1689,14 @@ let parse_instr g addr =
                  let (r, rm, na) = parse_modrm prefix.opsize na in
 	         let (i, na) = parse_imm8 na in
                  (Palignr(prefix.mopsize, r, rm, i), na)
-             | b3 -> disfailwith 
+             | 0x63 ->
+                 let (r, rm, na) = parse_modrm prefix.opsize na in
+                 let (i, na) = parse_imm8 na in
+                 (match i with
+                   | Oimm 0xcL -> (Pcmpistri(prefix.mopsize, r, rm, i), na)
+                   | Oimm op  -> disfailwith (Printf.sprintf "unsopported pcmpistri op %02Lx" op)
+                   | _ -> disfailwith "unsopported non-imm op for pcmpisgtri")
+             | b4 -> disfailwith 
 	       (Printf.sprintf "unsupported opcode %02x %02x %02x" b1 b2 b3)
           )
       (*| 0x40 | 0x41 | 0x42 | 0x43 | 0x44 | 0x45 | 0x46 | 0x47 | 0x48 | 0x49 
