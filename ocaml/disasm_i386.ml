@@ -607,7 +607,7 @@ let rec to_ir addr next ss pref =
       let dst_e = op2e t dst in
       let src_e = op2e t src in
       (* only handles imm == 0xc *)
-      assert (imm = 0xcL);
+      assert (imm = Oimm 0xcL);
       let get_bit i =
         let fold_cmp acc j =
           let dst_e_byte = Extract(biconst (j*8+7), biconst (j*8), dst_e) in
