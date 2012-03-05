@@ -124,7 +124,7 @@ export PACKS = bigarray str num unix camomile threads piqi.lib
 # ocamlfind packages for ocamldoc
 # don't include packages in /usr/lib/ocaml, this will cause ocamldoc
 # to complain about conflicts with our local big_int
-export DOCPACKS = ocamlgraph
+export DOCPACKS = bigarray str num unix camomile threads piqi.lib
 export YFLAGS = -v
 
 export USE_CAMLP4 = yes

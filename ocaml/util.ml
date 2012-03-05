@@ -1,8 +1,4 @@
-
-(** Generally useful things.
-
-    This module contains functions that are used in BAP, but which are
-    not at all BAP specific.
+(** Utility functions that are not BAP specific.
 
     @author Ivan Jager
 *)
