@@ -1026,6 +1026,7 @@ VOID AppendBuffer(ADDRINT addr,
 
     for (unsigned int i = 0; i < values_count; i++) {
         values[i].type.type = (RegMemEnum_t)va_arg(va, uint32_t);
+        XXX Add validation function.
         assert( -1 < values[i].type.type && values[i].type.type < 3);
         values[i].type.size = va_arg(va, uint32_t);
         values[i].loc = va_arg(va, uint32_t);
@@ -1144,6 +1145,7 @@ VOID AppendBuffer(ADDRINT addr,
                     FPSTATE fpState;
                     void * fpValue;
                     uint32_t s_i;
+                    XXX Only getFPState once per instruction.
                     PIN_GetContextFPState(ctx, &fpState);
 
                     // Figure out which st register we are using
