@@ -558,15 +558,15 @@ let update_concrete s =
   (*               add_symbolic index (Int(0L, reg_8)) *)
   (*            ) (filter_taint atts); *)
   (*     false *)
-  | Comment (s,atts) when is_seed_label s ->
-      (* Taint introduction *)
-      List.iter
-      	(fun {index=index; taint=Taint taint} ->
-      	   (* Mark the index as symbolic; we don't actually care about
-      	      the value *)
-      	   add_symbolic index (Int(bi0, reg_8))
-      	) (filter_taint atts);
-      false
+  (* | Comment (s,atts) when is_seed_label s -> *)
+  (*     (\* Taint introduction *\) *)
+  (*     List.iter *)
+  (*     	(fun {index=index; taint=Taint taint} -> *)
+  (*     	   (\* Mark the index as symbolic; we don't actually care about *)
+  (*     	      the value *\) *)
+  (*     	   add_symbolic index (Int(bi0, reg_8)) *)
+  (*     	) (filter_taint atts); *)
+  (*     false *)
   | Label (_,atts) ->
       (* Concrete operands *)
       let conc_atts = filter_taint atts in
@@ -843,18 +843,20 @@ let check_delta state =
     !foundone
   in
   let check_mem cm addr v =
-    () (* XXX: check_mem doesn't work for use_alt_assignment? *)
-    (* if v.tnt then ( *)
-    (*   let tracebyte = get_int v.exp in *)
-    (*   try *)
-    (*     let evalbyte = get_int (AddrMap.find addr cm) in *)
-    (*     let issymb = Hashtbl.mem global.symbolic addr in *)
-    (*     if (tracebyte <>% evalbyte) && (not issymb) && (not !use_alt_assignment) *)
-    (*     then wprintf "Consistency error: Tainted memory value (address %Lx, value %s) present in trace does not match value %s in in concrete evaluator" addr (~% tracebyte) (~% evalbyte) *)
-    (*   with Not_found -> *)
-    (*     if not !use_alt_assignment then *)
-    (*       wprintf "Consistency error: Tainted memory value (address %Lx, value %s) present in trace but missing in concrete evaluator" addr (~% tracebyte) *)
-    (* ) *)
+    if v.tnt || !checkall then (
+      let tracebyte = get_int v.exp in
+      try
+        let evalbyte = get_int (AddrMap.find addr cm) in
+        let issymb = Hashtbl.mem global.symbolic addr in
+        if (tracebyte <>% evalbyte) && (not issymb)
+        then wprintf "Consistency error: Tainted memory value (address %Lx, value %s) present in trace does not match value %s in in concrete evaluator" addr (~% tracebyte) (~% evalbyte)
+      with Not_found ->
+        (* Even if checkall is enabled, we don't get an initial memory
+           dump, so we should not report an error unless the value is
+           tainted. *)
+        if v.tnt then
+          wprintf "Consistency error: Tainted memory value (address %Lx, value %s) present in trace but missing in concrete evaluator" addr (~% tracebyte)
+    )
   in
   let check_var var evalval =
     match Var.typ var with
@@ -930,7 +932,7 @@ let get_symbolic_seeds memv = function
   (*    ) [] (filter_taint atts) *)
   | Ast.Comment (s,atts) when is_seed_label s ->
       List.fold_left
-	(fun acc {index=index; taint=Taint taint} ->
+	(fun (accl,accr) {index=index; taint=Taint taint; value=value} ->
 	   let sym_var = sym_lookup taint in
 	     pdebug ("Introducing symbolic: "
 		     ^(Printf.sprintf "%Lx" index)
@@ -939,14 +941,17 @@ let get_symbolic_seeds memv = function
 	     add_symbolic index sym_var ;
 	     (* symbolic variable *)
 	     let mem = Var(memv) in
-	     let store = Store(mem, Int(big_int_of_int64 index, reg_32), 
+	     let store = Store(mem, Int(big_int_of_int64 index, reg_32),
 			       sym_var, exp_false, reg_8) in
+             let store_concrete = Store(mem, Int(big_int_of_int64 index, reg_32),
+                                        Int(value, reg_8), exp_false, reg_8) in
 	     (* let constr = BinOp (EQ, mem, store) in *)
 	     (*   ignore (LetBind.add_to_formula exp_true constr Rename) *)
 	     let move = Move(memv, store, []) in
-	     move::acc
-	) [] (filter_taint atts)
-  | _ -> []
+             let move_concrete = Move(memv, store_concrete, []) in
+	     move::accl, move_concrete::accr
+	) ([],[]) (filter_taint atts)
+  | _ -> ([],[])
 
 (** Transformations needed for traces. *)
 let trace_transform_stmt stmt evalf =
@@ -1049,7 +1054,7 @@ let run_block ?(next_label = None) ?(log=fun _ -> ()) ?(transformf = (fun s _ ->
      | Not_found -> List.hd block)
   in
   let block = List.filter (fun b -> if b == addr then false else true) block in
-  let input_seeds = get_symbolic_seeds memv addr in
+  let input_seeds, input_seeds_concrete = get_symbolic_seeds memv addr in
   pdebug ("Running block: " ^ (string_of_int !counter) ^ " " 
 	  ^ (Pp.ast_stmt_to_string addr));
   counter := !counter + 1;
@@ -1109,7 +1114,7 @@ let run_block ?(next_label = None) ?(log=fun _ -> ()) ?(transformf = (fun s _ ->
     let assigns = assign_vars memv false in
     (* List.iter *)
     (*   (fun stmt -> dprintf "assign stmt: %s" (Pp.ast_stmt_to_string stmt)) assigns;       *)
-    assigns @ block
+    assigns @ input_seeds_concrete @ block
   in
 
   let block = append_halt block in
