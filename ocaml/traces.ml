@@ -928,7 +928,7 @@ let check_delta state =
     | Array _ ->
         let cmem = match evalval with
           | ConcreteMem(cm, _) -> cm
-          | _ -> failwith "Concrete execution only"
+          | Symbolic(e) -> failwith ("Concrete execution only: "^ (Pp.ast_exp_to_string e))
         in
         Hashtbl.iter (check_mem cmem) global.memory
 

@@ -84,6 +84,21 @@ union PIN_REGISTER
 #define VT_MEM128   (MEM_BASE+0x4)
 #define VT_MEM256   (MEM_BASE+0x5)
 
+    typedef enum {
+        NONE = 0,
+        REGISTER = 1,
+        MEM = 2,
+    } RegMemEnum_t;
+
+    
+    typedef struct RegMem_s {
+        RegMemEnum_t type;  
+        uint32_t size;   // In bits
+    } RegMem_t;
+
+
+    static const RegMem_t INVALIDREGMEM = { NONE, 8 };
+    
 enum FrameType {
 
    // Invalid frame type.
