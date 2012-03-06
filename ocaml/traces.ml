@@ -45,10 +45,6 @@ let reg_to_stmt = VH.create 20;;
 
 let dce = ref true;;
 
-(** Alternate assignment uses assign statements rather than
-    overloading lookup_var/mem in the evaluator. *)
-let use_alt_assignment = ref true;;
-
 (* Concretizing as much as possible *)
 let allow_symbolic_indices = ref false
 
@@ -109,6 +105,7 @@ let name_to_var name =
     if (name <> "Unknown") then wprintf "Did not find %s in gamma" name;
     None
 
+(* XXX: Delete as many of these as possible *)
 
 let var_lookup v = try Some(Hashtbl.find global.vars v) with Not_found -> None
 let mem_lookup i = try Some(Hashtbl.find global.memory i) with Not_found -> None
@@ -768,40 +765,21 @@ struct
 
     DV.dprintf "looking up %s (concrete)" (Var.name var);
 
-    (* print_vars (); *)
-
-    match dsa_concrete_val var with
-    | Some(traceval) when not !use_alt_assignment ->
-
-        (* First, look up in the trace as long as we are not using the
-           alternate assignment scheme. The alternate assignment scheme puts
-           the value in delta, so we just need to look there.
-
-           If we are not using the alternate scheme, we should update
-           delta for consistency. *)
-        VH.replace delta var (Symbolic(traceval));
-        Symbolic(traceval)
-
-    | _ ->
-
-	(* If we can't find it there, then check in delta. Maybe we
-	   updated it (e.g., R_ESP = R_ESP+4) *)
-
-	try DV.dprintf "trying delta"; VH.find delta var
-	with Not_found ->
+    try DV.dprintf "trying delta"; VH.find delta var
+    with Not_found ->
 
 	  (* If the variable is memory, it's okay (we'll complain during
 	     lookup_mem if we can't find a value). If not, we're in
 	     trouble! *)
 
-	  match Var.typ var with
-	  | TMem _
-	  | Array _ ->
-              empty_mem var
-          | Reg _ ->
-              if not (isbad var) then
-                wprintf "Unknown variable during eval: %s" (Var.name var);
-              Symbolic(Int(bi0, (Var.typ var)))
+      match Var.typ var with
+      | TMem _
+      | Array _ ->
+        empty_mem var
+      | Reg _ ->
+        if not (isbad var) then
+          wprintf "Unknown variable during eval: %s" (Var.name var);
+        Symbolic(Int(bi0, (Var.typ var)))
 
   let normalize = SymbolicMemL.normalize
   let update_mem mu pos value endian =
@@ -818,22 +796,15 @@ struct
     match mu, index with
     | ConcreteMem(m,v), Int(i,t) -> (
 
-	(* First, search the trace memory (not when using alternate
-	   assignment -- see lookup_var) *)
-	match concrete_mem (int64_of_big_int i) with
-	| Some(traceval) when not !use_alt_assignment ->
-	    traceval
-	| _ ->
+      (* If that doesn't work, check delta *)
 
-            (* If that doesn't work, check delta *)
+      try AddrMap.find (normalize i t) m
+      with Not_found ->
 
-            try AddrMap.find (normalize i t) m
-            with Not_found ->
-
-	      (* Well, this isn't good... Just make something up *)
-	      wprintf "Unknown memory value during eval: addr %Lx" 
-		(int64_of_big_int i);
-	      Int(bi0, reg_8)
+	(* Well, this isn't good... Just make something up *)
+	wprintf "Unknown memory value during eval: addr %Lx"
+	  (int64_of_big_int i);
+	Int(bi0, reg_8)
       )
 
     | _ -> failwith "Concrete evaluation should never have symbolic memories"
@@ -872,17 +843,18 @@ let check_delta state =
     !foundone
   in
   let check_mem cm addr v =
-    if v.tnt then (
-      let tracebyte = get_int v.exp in
-      try
-	let evalbyte = get_int (AddrMap.find addr cm) in
-	let issymb = Hashtbl.mem global.symbolic addr in
-	if (tracebyte <>% evalbyte) && (not issymb) && (not !use_alt_assignment)
-	then wprintf "Consistency error: Tainted memory value (address %Lx, value %s) present in trace does not match value %s in in concrete evaluator" addr (~% tracebyte) (~% evalbyte)
-      with Not_found ->
-	if not !use_alt_assignment then
-	  wprintf "Consistency error: Tainted memory value (address %Lx, value %s) present in trace but missing in concrete evaluator" addr (~% tracebyte)
-    )
+    () (* XXX: check_mem doesn't work for use_alt_assignment? *)
+    (* if v.tnt then ( *)
+    (*   let tracebyte = get_int v.exp in *)
+    (*   try *)
+    (*     let evalbyte = get_int (AddrMap.find addr cm) in *)
+    (*     let issymb = Hashtbl.mem global.symbolic addr in *)
+    (*     if (tracebyte <>% evalbyte) && (not issymb) && (not !use_alt_assignment) *)
+    (*     then wprintf "Consistency error: Tainted memory value (address %Lx, value %s) present in trace does not match value %s in in concrete evaluator" addr (~% tracebyte) (~% evalbyte) *)
+    (*   with Not_found -> *)
+    (*     if not !use_alt_assignment then *)
+    (*       wprintf "Consistency error: Tainted memory value (address %Lx, value %s) present in trace but missing in concrete evaluator" addr (~% tracebyte) *)
+    (* ) *)
   in
   let check_var var evalval =
     match Var.typ var with
@@ -1133,13 +1105,11 @@ let run_block ?(next_label = None) ?(log=fun _ -> ()) ?(transformf = (fun s _ ->
   let block = remove_specials block in
 
   (* Assign concrete values to regs/memory *)
-  let block = match !use_alt_assignment with
-    | true ->
-        let assigns = assign_vars memv false in
-        (* List.iter *)
-        (*   (fun stmt -> dprintf "assign stmt: %s" (Pp.ast_stmt_to_string stmt)) assigns;       *)
-        assigns @ block
-    | false -> block
+  let block =
+    let assigns = assign_vars memv false in
+    (* List.iter *)
+    (*   (fun stmt -> dprintf "assign stmt: %s" (Pp.ast_stmt_to_string stmt)) assigns;       *)
+    assigns @ block
   in
 
   let block = append_halt block in
@@ -1527,19 +1497,14 @@ struct
            Symbolic(Var(var))
 
        | _, Some(cval) ->
-  	   (* Finally, if untainted try to use the concrete value.
-  	      Otherwise, see if we can find the value in delta; it's
-  	      probably a temporary. *)
-	   (* DV.dprintf "Using concrete value"; *)
-	   if !use_alt_assignment then (
-	     (* In the alternate scheme, all concretes are added right to the 
-		formula *)
-	     VH.remove delta var;
-	     Symbolic(Var(var))
-	   ) else (
-	     VH.remove delta var;
-  	     Symbolic(cval)
-	   )
+  	 (* Finally, if untainted try to use the concrete value.
+  	    Otherwise, see if we can find the value in delta; it's
+  	    probably a temporary. *)
+
+	 (* In the alternate scheme, all concretes are added right to the 
+	    formula *)
+	 VH.remove delta var;
+	 Symbolic(Var(var))
        | _, _ ->
 	   DV.dprintf "looking %s up in delta" (Var.name var);
   	   try VH.find delta var
@@ -1554,7 +1519,6 @@ struct
   		   wprintf "Variable not found during evaluation: %s" name
 		 | _ -> ());
   		 Symbolic(Var(var))
-		       
       )
 
 
