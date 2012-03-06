@@ -711,10 +711,12 @@ struct
   let eval_symb_let = false
 end
 
-module SlowEval =
+module AlwaysEvalLet =
 struct
   let eval_symb_let = true
 end
+(** Deprecated name *)
+module SlowEval = AlwaysEvalLet
 
 (** Just build a straightforward expression; does not use Lets *)
 module StdForm =
@@ -783,7 +785,7 @@ end
 module Symbolic = Make(SymbolicMemL)(FastEval)(StdAssign)(StdForm)
 module SymbolicSlow = Make(SymbolicMemL)(SlowEval)(StdAssign)(StdForm)
 
-module Concrete = Make(ConcreteMemL)(FastEval)(StdAssign)(StdForm)
+module Concrete = Make(ConcreteMemL)(AlwaysEvalLet)(StdAssign)(StdForm)
 
 (** Execute a program concretely *)
 let concretely_execute ?s ?(i=[]) p =

@@ -804,8 +804,9 @@ struct
               Symbolic(Int(bi0, (Var.typ var)))
 
   let normalize = SymbolicMemL.normalize
+
   let update_mem mu pos value endian =
-    (match mu,pos with
+    (match mu, pos with
     | ConcreteMem(_), Int(i,t) ->
 	del_mem (int64_of_big_int i)
     | _ -> failwith "Bad memory for concrete evaluation");
@@ -849,7 +850,7 @@ struct
 end
 
 module TraceConcrete = 
-  Symbeval.Make(TraceConcreteDef)(FastEval)(TraceConcreteAssign)(StdForm)
+  Symbeval.Make(TraceConcreteDef)(AlwaysEvalLet)(TraceConcreteAssign)(StdForm)
 
 (** Check all variables in delta to make sure they agree with operands
     loaded from a trace. We should be able to find bugs in BAP and the
@@ -928,7 +929,7 @@ let check_delta state =
     | Array _ ->
         let cmem = match evalval with
           | ConcreteMem(cm, _) -> cm
-          | Symbolic(e) -> failwith ("Concrete execution only: "^ (Pp.ast_exp_to_string e))
+          | Symbolic(e) -> failwith (Printf.sprintf "Concrete execution only: %s=%s" (Var.name var) (Pp.ast_exp_to_string e))
         in
         Hashtbl.iter (check_mem cmem) global.memory
 

@@ -3,7 +3,7 @@ open BatListFull
 let init_ro = ref false
 let inputs = ref []
 and streaminputs = ref None
-and streamrate = ref 10000L (* Unless specified grab one frame at a time *)
+and streamrate = ref 10000L (* Unless specified grab this many frames at a time *)
 and pintrace = ref false
 
 (* Set garbage collector options whenever we see -trace. *)
