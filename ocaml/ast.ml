@@ -318,3 +318,12 @@ let full_stmts_eq s1 s2 =
 let is_true a = a === exp_true
 let is_false a = a === exp_false
 
+let get_attrs = function
+  | Move(_,_,a)
+  | Jmp(_,a)
+  | CJmp(_,_,_,a)
+  | Label(_,a)
+  | Halt(_,a)
+  | Assert(_,a)
+  | Comment(_,a)
+  | Special(_,a) -> a

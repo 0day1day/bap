@@ -60,6 +60,10 @@ let endtrace = "This is the final trace block"
 
 let tassignattr = StrAttr("Tainted Concrete Assignment")
 
+(** Statements we want to execute during concrete execution, but do
+    not want to keep in the final output *)
+let dontkeepattr = StrAttr "Do not include in concrete trace output"
+
 (*************************************************************)
 (**********************  Datastructures  *********************)
 (*************************************************************)
@@ -948,7 +952,7 @@ let get_symbolic_seeds memv = function
 	     (* let constr = BinOp (EQ, mem, store) in *)
 	     (*   ignore (LetBind.add_to_formula exp_true constr Rename) *)
 	     let move = Move(memv, store, []) in
-             let move_concrete = Move(memv, store_concrete, []) in
+             let move_concrete = Move(memv, store_concrete, [dontkeepattr]) in
 	     move::accl, move_concrete::accr
 	) ([],[]) (filter_taint atts)
   | _ -> ([],[])
@@ -1005,12 +1009,14 @@ let trace_transform_stmt stmt evalf =
     (*     Syscall_models.linux_syscall_to_il (Big_int.int_of_big_int i) *)
     (*   | _ -> failwith "Unexpected evaluation problem") *)
     | s -> [s] in
-  if not !allow_symbolic_indices && not (is_true !exp) then
-    (* The assertion must come first, since the statement may modify value of 
-       the expression! *)
-    s @ [Assert(!exp, [])]
-  else
-    s
+  let s =
+    if not !allow_symbolic_indices && not (is_true !exp) then
+      (* The assertion must come first, since the statement may modify value of 
+         the expression! *)
+      s @ [Assert(!exp, [])]
+    else
+      s
+  in List.filter (fun s -> (List.mem dontkeepattr (get_attrs s)) = false) s
 
 let rec get_next_label blocks =
   match blocks with
@@ -1121,6 +1127,7 @@ let run_block ?(next_label = None) ?(log=fun _ -> ()) ?(transformf = (fun s _ ->
   TraceConcrete.initialize_prog state block ;
   clean_delta state.delta;
   let executed = ref [] in
+  executed := Util.fast_append input_seeds !executed;
   let rec eval_block state =
     let stmt = TraceConcrete.inst_fetch state.sigma state.pc in
     (* pdebug ("Executing: " ^ (Pp.ast_stmt_to_string stmt)); *)
@@ -1129,7 +1136,6 @@ let run_block ?(next_label = None) ?(log=fun _ -> ()) ?(transformf = (fun s _ ->
       | Symbolic(e) -> e
       | _ -> failwith "Expected symbolic"
     in
-    executed := Util.fast_append input_seeds !executed ;
     executed := Util.fast_append (transformf stmt evalf) !executed ; 
     (*print_endline (Pp.ast_stmt_to_string stmt) ;*)
 
