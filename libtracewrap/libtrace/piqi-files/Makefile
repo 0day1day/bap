@@ -1,6 +1,6 @@
-ROOTDIR=$(CURDIR)/../../
-TRACEFORMATDIR=$(ROOTDIR)/libtrace/src/cpp/pb
-MLDIR=$(ROOTDIR)/libtrace/src/ocaml/piqi
+ROOTDIR=$(CURDIR)/..
+TRACEFORMATDIR=$(ROOTDIR)/src/cpp/pb
+MLDIR=$(ROOTDIR)/src/ocaml/piqi
 
 # I don't think we need to compile all piqi files actually, only frame.piqi
 PIQIFILE=frame.piqi

@@ -245,6 +245,9 @@ FrameOption_t TaintTracker::introMemTaint(uint32_t addr, uint32_t length, const 
       taint_intro* tfi = fb.f.mutable_taint_intro_frame()->mutable_taint_intro_list()->add_elem();
       tfi->set_taint_id(t);
       tfi->set_addr(addr+i);
+      uint8_t value;
+      assert (PIN_SafeCopy((void*) &value, (void*) (addr+i), 1) == 1);
+      tfi->set_value((void*) &value, 1);
     }
     fb.b = true;
     return fb;
