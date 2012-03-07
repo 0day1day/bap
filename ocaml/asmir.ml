@@ -826,12 +826,17 @@ module SerializedTrace = struct
       in
       let convert_taint_info = function
         | {Taint_intro.addr=a;
-           Taint_intro.taint_id=tid} ->
+           Taint_intro.taint_id=tid;
+           Taint_intro.value=value} ->
+          let v = match value with
+            | Some x -> Util.big_int_of_binstring ~e:Util.Little x
+            | None -> Big_int_convenience.bi0
+          in
           Context({name="mem";
                    mem=true;
                    t=Reg 8;
                    index=a;
-                   value=Big_int_convenience.bi0;
+                   value=v;
                    usage=WR;
                    taint=Taint (Int64.to_int tid)})
       in

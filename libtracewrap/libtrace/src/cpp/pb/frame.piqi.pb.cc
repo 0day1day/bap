@@ -306,9 +306,10 @@ void protobuf_AssignDesc_frame_2epiqi_2eproto() {
       ::google::protobuf::MessageFactory::generated_factory(),
       sizeof(taint_intro_list));
   taint_intro_descriptor_ = file->message_type(13);
-  static const int taint_intro_offsets_[2] = {
+  static const int taint_intro_offsets_[3] = {
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(taint_intro, addr_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(taint_intro, taint_id_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(taint_intro, value_),
   };
   taint_intro_reflection_ =
     new ::google::protobuf::internal::GeneratedMessageReflection(
@@ -592,27 +593,28 @@ void protobuf_AddDesc_frame_2epiqi_2eproto() {
     "o_addr\030\004 \001(\004\"@\n\021taint_intro_frame\022+\n\020tai"
     "nt_intro_list\030\001 \002(\0132\021.taint_intro_list\"."
     "\n\020taint_intro_list\022\032\n\004elem\030\001 \003(\0132\014.taint"
-    "_intro\"-\n\013taint_intro\022\014\n\004addr\030\001 \002(\004\022\020\n\010t"
-    "aint_id\030\002 \002(\004\"O\n\rmodload_frame\022\023\n\013module"
-    "_name\030\001 \002(\t\022\023\n\013low_address\030\002 \002(\004\022\024\n\014high"
-    "_address\030\003 \002(\004\"<\n\tkey_frame\022/\n\022tagged_va"
-    "lue_lists\030\001 \002(\0132\023.tagged_value_lists\"6\n\022"
-    "tagged_value_lists\022 \n\004elem\030\001 \003(\0132\022.tagge"
-    "d_value_list\"a\n\021tagged_value_list\022+\n\020val"
-    "ue_source_tag\030\001 \002(\0132\021.value_source_tag\022\037"
-    "\n\nvalue_list\030\002 \002(\0132\013.value_list\";\n\020value"
-    "_source_tag\022\024\n\014no_thread_id\030\001 \001(\010\022\021\n\tthr"
-    "ead_id\030\002 \001(\004\"\'\n\nvalue_list\022\031\n\004elem\030\001 \003(\013"
-    "2\013.value_info\"\207\001\n\nvalue_info\0225\n\025operand_"
-    "info_specific\030\001 \002(\0132\026.operand_info_speci"
-    "fic\022\022\n\nbit_length\030\002 \002(\021\022\037\n\ntaint_info\030\003 "
-    "\001(\0132\013.taint_info\022\r\n\005value\030\004 \002(\014\"\355\001\n\005fram"
-    "e\022\035\n\tstd_frame\030\001 \001(\0132\n.std_frame\022%\n\rsysc"
-    "all_frame\030\002 \001(\0132\016.syscall_frame\022)\n\017excep"
-    "tion_frame\030\003 \001(\0132\020.exception_frame\022-\n\021ta"
-    "int_intro_frame\030\004 \001(\0132\022.taint_intro_fram"
-    "e\022%\n\rmodload_frame\030\005 \001(\0132\016.modload_frame"
-    "\022\035\n\tkey_frame\030\006 \001(\0132\n.key_frame", 1831);
+    "_intro\"<\n\013taint_intro\022\014\n\004addr\030\001 \002(\004\022\020\n\010t"
+    "aint_id\030\002 \002(\004\022\r\n\005value\030\003 \001(\014\"O\n\rmodload_"
+    "frame\022\023\n\013module_name\030\001 \002(\t\022\023\n\013low_addres"
+    "s\030\002 \002(\004\022\024\n\014high_address\030\003 \002(\004\"<\n\tkey_fra"
+    "me\022/\n\022tagged_value_lists\030\001 \002(\0132\023.tagged_"
+    "value_lists\"6\n\022tagged_value_lists\022 \n\004ele"
+    "m\030\001 \003(\0132\022.tagged_value_list\"a\n\021tagged_va"
+    "lue_list\022+\n\020value_source_tag\030\001 \002(\0132\021.val"
+    "ue_source_tag\022\037\n\nvalue_list\030\002 \002(\0132\013.valu"
+    "e_list\";\n\020value_source_tag\022\024\n\014no_thread_"
+    "id\030\001 \001(\010\022\021\n\tthread_id\030\002 \001(\004\"\'\n\nvalue_lis"
+    "t\022\031\n\004elem\030\001 \003(\0132\013.value_info\"\207\001\n\nvalue_i"
+    "nfo\0225\n\025operand_info_specific\030\001 \002(\0132\026.ope"
+    "rand_info_specific\022\022\n\nbit_length\030\002 \002(\021\022\037"
+    "\n\ntaint_info\030\003 \001(\0132\013.taint_info\022\r\n\005value"
+    "\030\004 \002(\014\"\355\001\n\005frame\022\035\n\tstd_frame\030\001 \001(\0132\n.st"
+    "d_frame\022%\n\rsyscall_frame\030\002 \001(\0132\016.syscall"
+    "_frame\022)\n\017exception_frame\030\003 \001(\0132\020.except"
+    "ion_frame\022-\n\021taint_intro_frame\030\004 \001(\0132\022.t"
+    "aint_intro_frame\022%\n\rmodload_frame\030\005 \001(\0132"
+    "\016.modload_frame\022\035\n\tkey_frame\030\006 \001(\0132\n.key"
+    "_frame", 1846);
   ::google::protobuf::MessageFactory::InternalRegisterGeneratedFile(
     "frame.piqi.proto", &protobuf_RegisterTypes);
   operand_list::default_instance_ = new operand_list();
@@ -4212,6 +4214,7 @@ void taint_intro_list::Swap(taint_intro_list* other) {
 #ifndef _MSC_VER
 const int taint_intro::kAddrFieldNumber;
 const int taint_intro::kTaintIdFieldNumber;
+const int taint_intro::kValueFieldNumber;
 #endif  // !_MSC_VER
 
 taint_intro::taint_intro()
@@ -4232,6 +4235,7 @@ void taint_intro::SharedCtor() {
   _cached_size_ = 0;
   addr_ = GOOGLE_ULONGLONG(0);
   taint_id_ = GOOGLE_ULONGLONG(0);
+  value_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
   ::memset(_has_bits_, 0, sizeof(_has_bits_));
 }
 
@@ -4240,6 +4244,9 @@ taint_intro::~taint_intro() {
 }
 
 void taint_intro::SharedDtor() {
+  if (value_ != &::google::protobuf::internal::kEmptyString) {
+    delete value_;
+  }
   if (this != default_instance_) {
   }
 }
@@ -4268,6 +4275,11 @@ void taint_intro::Clear() {
   if (_has_bits_[0 / 32] & (0xffu << (0 % 32))) {
     addr_ = GOOGLE_ULONGLONG(0);
     taint_id_ = GOOGLE_ULONGLONG(0);
+    if (has_value()) {
+      if (value_ != &::google::protobuf::internal::kEmptyString) {
+        value_->clear();
+      }
+    }
   }
   ::memset(_has_bits_, 0, sizeof(_has_bits_));
   mutable_unknown_fields()->Clear();
@@ -4306,6 +4318,20 @@ bool taint_intro::MergePartialFromCodedStream(
         } else {
           goto handle_uninterpreted;
         }
+        if (input->ExpectTag(26)) goto parse_value;
+        break;
+      }
+      
+      // optional bytes value = 3;
+      case 3: {
+        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
+            ::google::protobuf::internal::WireFormatLite::WIRETYPE_LENGTH_DELIMITED) {
+         parse_value:
+          DO_(::google::protobuf::internal::WireFormatLite::ReadBytes(
+                input, this->mutable_value()));
+        } else {
+          goto handle_uninterpreted;
+        }
         if (input->ExpectAtEnd()) return true;
         break;
       }
@@ -4338,6 +4364,12 @@ void taint_intro::SerializeWithCachedSizes(
     ::google::protobuf::internal::WireFormatLite::WriteUInt64(2, this->taint_id(), output);
   }
   
+  // optional bytes value = 3;
+  if (has_value()) {
+    ::google::protobuf::internal::WireFormatLite::WriteBytes(
+      3, this->value(), output);
+  }
+  
   if (!unknown_fields().empty()) {
     ::google::protobuf::internal::WireFormat::SerializeUnknownFields(
         unknown_fields(), output);
@@ -4354,6 +4386,13 @@ void taint_intro::SerializeWithCachedSizes(
   // required uint64 taint_id = 2;
   if (has_taint_id()) {
     target = ::google::protobuf::internal::WireFormatLite::WriteUInt64ToArray(2, this->taint_id(), target);
+  }
+  
+  // optional bytes value = 3;
+  if (has_value()) {
+    target =
+      ::google::protobuf::internal::WireFormatLite::WriteBytesToArray(
+        3, this->value(), target);
   }
   
   if (!unknown_fields().empty()) {
@@ -4379,6 +4418,13 @@ int taint_intro::ByteSize() const {
       total_size += 1 +
         ::google::protobuf::internal::WireFormatLite::UInt64Size(
           this->taint_id());
+    }
+    
+    // optional bytes value = 3;
+    if (has_value()) {
+      total_size += 1 +
+        ::google::protobuf::internal::WireFormatLite::BytesSize(
+          this->value());
     }
     
   }
@@ -4414,6 +4460,9 @@ void taint_intro::MergeFrom(const taint_intro& from) {
     if (from.has_taint_id()) {
       set_taint_id(from.taint_id());
     }
+    if (from.has_value()) {
+      set_value(from.value());
+    }
   }
   mutable_unknown_fields()->MergeFrom(from.unknown_fields());
 }
@@ -4440,6 +4489,7 @@ void taint_intro::Swap(taint_intro* other) {
   if (other != this) {
     std::swap(addr_, other->addr_);
     std::swap(taint_id_, other->taint_id_);
+    std::swap(value_, other->value_);
     std::swap(_has_bits_[0], other->_has_bits_[0]);
     _unknown_fields_.Swap(&other->_unknown_fields_);
     std::swap(_cached_size_, other->_cached_size_);
