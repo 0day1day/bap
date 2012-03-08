@@ -176,11 +176,11 @@ void PIVOT_testpivot(pivot_set ps, CONTEXT *ctx, TaintTracker &tt) {
         case MEMPIVOT:
         {
           char tempbuf[1];
-          uint32_t t = tt.getMemTaint(a, VT_MEM8);
+          uint32_t t = tt.getMemTaint(a, pintrace::INVALIDREGMEM);
           size_t consecTainted = 0;
           uint32_t readable = PIN_SafeCopy(tempbuf, (void*)a, 1);
           
-          for (uint32_t base = a; tt.getMemTaint(base, VT_MEM8) != NOTAINT; base++, consecTainted++) { 
+          for (uint32_t base = a; tt.getMemTaint(base, pintrace::INVALIDREGMEM) != NOTAINT; base++, consecTainted++) { 
             /* .... */
           }
           

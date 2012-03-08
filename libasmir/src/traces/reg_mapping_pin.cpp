@@ -383,16 +383,18 @@ switch (id) {
     case REG_FPDP_OFF:
     case REG_FPDP_SEL:
     case REG_FP_LAST = case REG_FPDP_SEL:
-    
+
     case REG_ST_BASE:
-    case REG_ST0 = case REG_ST_BASE:
-    case REG_ST1:
-    case REG_ST2:
-    case REG_ST3:
-    case REG_ST4:
-    case REG_ST5:
-    case REG_ST6:
-    case REG_ST7:
+    */    
+ case REG_ST0: return string("R_ST0");
+ case REG_ST1: return string("R_ST1");
+ case REG_ST2: return string("R_ST2");
+ case REG_ST3: return string("R_ST3");
+ case REG_ST4: return string("R_ST4");
+ case REG_ST5: return string("R_ST5");
+ case REG_ST6: return string("R_ST6");
+ case REG_ST7: return string("R_ST7");
+        /*
 #if !defined(TARGET_DOXYGEN)
     case REG_ST_LAST = case REG_ST7:
     case REG_FPST_LAST = case REG_ST_LAST:

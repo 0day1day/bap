@@ -58,6 +58,12 @@ uint32_t bytesOfType(uint32_t t) {
   return (b / 8);
 }
 
+// Returns true if rm is a valid RegMem_t
+bool pintrace::valid_regmem_type(RegMem_t rm) {
+    return (pintrace::NONE <= rm.type && rm.type <= pintrace::MEM);
+}
+
+
 Frame *Frame::unserialize(istream &in, bool noskip)
 {
 

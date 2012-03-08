@@ -786,8 +786,9 @@ struct
         Symbolic(Int(bi0, (Var.typ var)))
 
   let normalize = SymbolicMemL.normalize
+
   let update_mem mu pos value endian =
-    (match mu,pos with
+    (match mu, pos with
     | ConcreteMem(_), Int(i,t) ->
 	del_mem (int64_of_big_int i)
     | _ -> failwith "Bad memory for concrete evaluation");
@@ -824,7 +825,7 @@ struct
 end
 
 module TraceConcrete = 
-  Symbeval.Make(TraceConcreteDef)(FastEval)(TraceConcreteAssign)(StdForm)
+  Symbeval.Make(TraceConcreteDef)(AlwaysEvalLet)(TraceConcreteAssign)(StdForm)
 
 (** Check all variables in delta to make sure they agree with operands
     loaded from a trace. We should be able to find bugs in BAP and the
@@ -850,10 +851,13 @@ let check_delta state =
     if v.tnt || !checkall then (
       let tracebyte = get_int v.exp in
       try
-        let evalbyte = get_int (AddrMap.find addr cm) in
-        let issymb = Hashtbl.mem global.symbolic addr in
-        if (tracebyte <>% evalbyte) && (not issymb)
-        then wprintf "Consistency error: Tainted memory value (address %Lx, value %s) present in trace does not match value %s in in concrete evaluator" addr (~% tracebyte) (~% evalbyte)
+        match AddrMap.find addr cm with
+        | Int(v, t) -> let evalbyte = fst (Arithmetic.to_val t v) in
+                       let issymb = Hashtbl.mem global.symbolic addr in
+                       if (tracebyte <>% evalbyte) && (not issymb)
+                       then wprintf "Consistency error: Tainted memory value (address %Lx, value %s) present in trace does not match value %s in concrete evaluator" addr (~% tracebyte) (~% evalbyte)
+        | e when contains_unknown e -> ()
+        | e -> failwith (Printf.sprintf "Expected Int or expression containing an unknown but got %s" (Pp.ast_exp_to_string e))
       with Not_found ->
         (* Even if checkall is enabled, we don't get an initial memory
            dump, so we should not report an error unless the value is
@@ -906,7 +910,7 @@ let check_delta state =
     | Array _ ->
         let cmem = match evalval with
           | ConcreteMem(cm, _) -> cm
-          | _ -> failwith "Concrete execution only"
+          | Symbolic(e) -> failwith (Printf.sprintf "Concrete execution only: %s=%s" (Var.name var) (Pp.ast_exp_to_string e))
         in
         Hashtbl.iter (check_mem cmem) global.memory
 

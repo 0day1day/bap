@@ -56,7 +56,7 @@ typedef std::map<var,t> context;
 /********************************************/
 
 struct ValSpecRec {
-  uint32_t type;               // Type of value specifier.
+  pintrace::RegMem_t type;               // Type of value specifier.
   uint32_t loc;                // Location of this value.
   pintrace::PIN_REGISTER value;// Actual value.
   uint32_t usage;              // Operand usage (R, RW, W, etc)
@@ -182,17 +182,17 @@ namespace pintrace { // We will use namespace to avoid collision
 
      uint32_t getRegTaint(context &delta, uint32_t reg_int);
 
-     uint32_t getMemTaint(uint32_t addr, uint32_t type);
+     uint32_t getMemTaint(uint32_t addr, RegMem_t type);
 
      void untaintMem(uint32_t addr);
+       
+     static uint32_t getSize(RegMem_t type);
 
-     static uint32_t getSize(uint32_t type);
+     static bool isValid(RegMem_t type);
 
-     static bool isValid(uint32_t type);
+     static bool isReg(RegMem_t type);
 
-     static bool isReg(uint32_t type);
-
-     static bool isMem(uint32_t type);
+     static bool isMem(RegMem_t type);
     
      
    private:

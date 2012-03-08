@@ -163,6 +163,7 @@ let addr_t = r32
 let r64 = Ast.reg_64
 let r128 = Reg 128
 let xmm_t = Reg 128
+let st_t = Reg 80
 
 (** Only use this for registers, not temporaries *)
 let nv = Var.newvar
@@ -198,6 +199,9 @@ and mxcsr = nv "R_MXCSR" r32
 
 let xmms = Array.init 8 (fun i -> nv (Printf.sprintf "R_XMM%d" i) xmm_t)
 
+(* floating point registers *)
+let st = Array.init 8 (fun i -> nv (Printf.sprintf "R_ST%d" i) st_t)
+
 let regs : var list =
   ebp::esp::esi::edi::eip::eax::ebx::ecx::edx::eflags::cf::pf::af::zf::sf::oF::dflag::fs_base::gs_base::fpu_ctrl::mxcsr::
   List.map (fun (n,t) -> Var.newvar n t)
@@ -232,6 +236,7 @@ let regs : var list =
 
     ]
     @ Array.to_list xmms
+    @ Array.to_list st   (* floating point *)
 
 let o_eax = Oreg 0
 and o_ecx = Oreg 1
