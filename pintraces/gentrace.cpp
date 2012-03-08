@@ -1026,8 +1026,8 @@ VOID AppendBuffer(ADDRINT addr,
 
     for (unsigned int i = 0; i < values_count; i++) {
         values[i].type.type = (RegMemEnum_t)va_arg(va, uint32_t);
-        XXX Add validation function.
-        assert( -1 < values[i].type.type && values[i].type.type < 3);
+        assert(valid_regmem_type(values[i].type));
+        
         values[i].type.size = va_arg(va, uint32_t);
         values[i].loc = va_arg(va, uint32_t);
         values[i].value.dword[0] = va_arg(va, uint32_t);			
@@ -1041,7 +1041,8 @@ VOID AppendBuffer(ADDRINT addr,
     /* Perform taint propagation and checking */
 
     bool abort = false;
-    bool log_addr = ((start_addr <= addr) && (addr <= end_addr)) || LogOneAfter.Value();
+    bool log_addr =
+        ((start_addr <= addr) && (addr <= end_addr)) || LogOneAfter.Value();
     bool log_all =
         ((LogAllAfterTaint.Value() && !firstTaint)
          || LogAllBeforeTaint.Value());
@@ -1114,8 +1115,13 @@ VOID AppendBuffer(ADDRINT addr,
   
         //g_buffer[g_bufidx].valspecs[i].taint = values[i].taint;             
 
+        // Values for floating point operations
+        bool got_FP_state = false;
+        FPSTATE fpState;
+        void * fpValue;
+        uint32_t s_i;
+        
         // Store information to the buffer
-
         for (unsigned int i = 0; i < values_count; i++) {
 
             g_buffer[g_bufidx].valspecs[i].type = values[i].type;		
@@ -1142,11 +1148,12 @@ VOID AppendBuffer(ADDRINT addr,
                     break;                                                   
 
                 case P_FPX87:
-                    FPSTATE fpState;
-                    void * fpValue;
-                    uint32_t s_i;
-                    XXX Only getFPState once per instruction.
-                    PIN_GetContextFPState(ctx, &fpState);
+                    if(!got_FP_state) {
+                        /* This is relativly expensive, so only do it once per
+                           instruction */
+                        PIN_GetContextFPState(ctx, &fpState);
+                        got_FP_state = true;
+                    }
 
                     // Figure out which st register we are using
                     s_i = r - REG_ST_BASE;

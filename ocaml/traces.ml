@@ -45,10 +45,6 @@ let reg_to_stmt = VH.create 20;;
 
 let dce = ref true;;
 
-(** Alternate assignment uses assign statements rather than
-    overloading lookup_var/mem in the evaluator. *)
-let use_alt_assignment = ref true;;
-
 (* Concretizing as much as possible *)
 let allow_symbolic_indices = ref false
 
@@ -63,6 +59,10 @@ let memtype = reg_32
 let endtrace = "This is the final trace block"
 
 let tassignattr = StrAttr("Tainted Concrete Assignment")
+
+(** Statements we want to execute during concrete execution, but do
+    not want to keep in the final output *)
+let dontkeepattr = StrAttr "Do not include in concrete trace output"
 
 (*************************************************************)
 (**********************  Datastructures  *********************)
@@ -109,6 +109,7 @@ let name_to_var name =
     if (name <> "Unknown") then wprintf "Did not find %s in gamma" name;
     None
 
+(* XXX: Delete as many of these as possible *)
 
 let var_lookup v = try Some(Hashtbl.find global.vars v) with Not_found -> None
 let mem_lookup i = try Some(Hashtbl.find global.memory i) with Not_found -> None
@@ -561,15 +562,15 @@ let update_concrete s =
   (*               add_symbolic index (Int(0L, reg_8)) *)
   (*            ) (filter_taint atts); *)
   (*     false *)
-  | Comment (s,atts) when is_seed_label s ->
-      (* Taint introduction *)
-      List.iter
-      	(fun {index=index; taint=Taint taint} ->
-      	   (* Mark the index as symbolic; we don't actually care about
-      	      the value *)
-      	   add_symbolic index (Int(bi0, reg_8))
-      	) (filter_taint atts);
-      false
+  (* | Comment (s,atts) when is_seed_label s -> *)
+  (*     (\* Taint introduction *\) *)
+  (*     List.iter *)
+  (*     	(fun {index=index; taint=Taint taint} -> *)
+  (*     	   (\* Mark the index as symbolic; we don't actually care about *)
+  (*     	      the value *\) *)
+  (*     	   add_symbolic index (Int(bi0, reg_8)) *)
+  (*     	) (filter_taint atts); *)
+  (*     false *)
   | Label (_,atts) ->
       (* Concrete operands *)
       let conc_atts = filter_taint atts in
@@ -768,40 +769,21 @@ struct
 
     DV.dprintf "looking up %s (concrete)" (Var.name var);
 
-    (* print_vars (); *)
-
-    match dsa_concrete_val var with
-    | Some(traceval) when not !use_alt_assignment ->
-
-        (* First, look up in the trace as long as we are not using the
-           alternate assignment scheme. The alternate assignment scheme puts
-           the value in delta, so we just need to look there.
-
-           If we are not using the alternate scheme, we should update
-           delta for consistency. *)
-        VH.replace delta var (Symbolic(traceval));
-        Symbolic(traceval)
-
-    | _ ->
-
-	(* If we can't find it there, then check in delta. Maybe we
-	   updated it (e.g., R_ESP = R_ESP+4) *)
-
-	try DV.dprintf "trying delta"; VH.find delta var
-	with Not_found ->
+    try DV.dprintf "trying delta"; VH.find delta var
+    with Not_found ->
 
 	  (* If the variable is memory, it's okay (we'll complain during
 	     lookup_mem if we can't find a value). If not, we're in
 	     trouble! *)
 
-	  match Var.typ var with
-	  | TMem _
-	  | Array _ ->
-              empty_mem var
-          | Reg _ ->
-              if not (isbad var) then
-                wprintf "Unknown variable during eval: %s" (Var.name var);
-              Symbolic(Int(bi0, (Var.typ var)))
+      match Var.typ var with
+      | TMem _
+      | Array _ ->
+        empty_mem var
+      | Reg _ ->
+        if not (isbad var) then
+          wprintf "Unknown variable during eval: %s" (Var.name var);
+        Symbolic(Int(bi0, (Var.typ var)))
 
   let normalize = SymbolicMemL.normalize
 
@@ -819,22 +801,15 @@ struct
     match mu, index with
     | ConcreteMem(m,v), Int(i,t) -> (
 
-	(* First, search the trace memory (not when using alternate
-	   assignment -- see lookup_var) *)
-	match concrete_mem (int64_of_big_int i) with
-	| Some(traceval) when not !use_alt_assignment ->
-	    traceval
-	| _ ->
+      (* If that doesn't work, check delta *)
 
-            (* If that doesn't work, check delta *)
+      try AddrMap.find (normalize i t) m
+      with Not_found ->
 
-            try AddrMap.find (normalize i t) m
-            with Not_found ->
-
-	      (* Well, this isn't good... Just make something up *)
-	      wprintf "Unknown memory value during eval: addr %Lx" 
-		(int64_of_big_int i);
-	      Int(bi0, reg_8)
+	(* Well, this isn't good... Just make something up *)
+	wprintf "Unknown memory value during eval: addr %Lx"
+	  (int64_of_big_int i);
+	Int(bi0, reg_8)
       )
 
     | _ -> failwith "Concrete evaluation should never have symbolic memories"
@@ -873,16 +848,19 @@ let check_delta state =
     !foundone
   in
   let check_mem cm addr v =
-    if v.tnt then (
+    if v.tnt || !checkall then (
       let tracebyte = get_int v.exp in
       try
-	let evalbyte = get_int (AddrMap.find addr cm) in
-	let issymb = Hashtbl.mem global.symbolic addr in
-	if (tracebyte <>% evalbyte) && (not issymb) && (not !use_alt_assignment)
-	then wprintf "Consistency error: Tainted memory value (address %Lx, value %s) present in trace does not match value %s in in concrete evaluator" addr (~% tracebyte) (~% evalbyte)
+        let evalbyte = get_int (AddrMap.find addr cm) in
+        let issymb = Hashtbl.mem global.symbolic addr in
+        if (tracebyte <>% evalbyte) && (not issymb)
+        then wprintf "Consistency error: Tainted memory value (address %Lx, value %s) present in trace does not match value %s in in concrete evaluator" addr (~% tracebyte) (~% evalbyte)
       with Not_found ->
-	if not !use_alt_assignment then
-	  wprintf "Consistency error: Tainted memory value (address %Lx, value %s) present in trace but missing in concrete evaluator" addr (~% tracebyte)
+        (* Even if checkall is enabled, we don't get an initial memory
+           dump, so we should not report an error unless the value is
+           tainted. *)
+        if v.tnt then
+          wprintf "Consistency error: Tainted memory value (address %Lx, value %s) present in trace but missing in concrete evaluator" addr (~% tracebyte)
     )
   in
   let check_var var evalval =
@@ -959,7 +937,7 @@ let get_symbolic_seeds memv = function
   (*    ) [] (filter_taint atts) *)
   | Ast.Comment (s,atts) when is_seed_label s ->
       List.fold_left
-	(fun acc {index=index; taint=Taint taint} ->
+	(fun (accl,accr) {index=index; taint=Taint taint; value=value} ->
 	   let sym_var = sym_lookup taint in
 	     pdebug ("Introducing symbolic: "
 		     ^(Printf.sprintf "%Lx" index)
@@ -968,14 +946,17 @@ let get_symbolic_seeds memv = function
 	     add_symbolic index sym_var ;
 	     (* symbolic variable *)
 	     let mem = Var(memv) in
-	     let store = Store(mem, Int(big_int_of_int64 index, reg_32), 
+	     let store = Store(mem, Int(big_int_of_int64 index, reg_32),
 			       sym_var, exp_false, reg_8) in
+             let store_concrete = Store(mem, Int(big_int_of_int64 index, reg_32),
+                                        Int(value, reg_8), exp_false, reg_8) in
 	     (* let constr = BinOp (EQ, mem, store) in *)
 	     (*   ignore (LetBind.add_to_formula exp_true constr Rename) *)
 	     let move = Move(memv, store, []) in
-	     move::acc
-	) [] (filter_taint atts)
-  | _ -> []
+             let move_concrete = Move(memv, store_concrete, [dontkeepattr]) in
+	     move::accl, move_concrete::accr
+	) ([],[]) (filter_taint atts)
+  | _ -> ([],[])
 
 (** Transformations needed for traces. *)
 let trace_transform_stmt stmt evalf =
@@ -1029,12 +1010,14 @@ let trace_transform_stmt stmt evalf =
     (*     Syscall_models.linux_syscall_to_il (Big_int.int_of_big_int i) *)
     (*   | _ -> failwith "Unexpected evaluation problem") *)
     | s -> [s] in
-  if not !allow_symbolic_indices && not (is_true !exp) then
-    (* The assertion must come first, since the statement may modify value of 
-       the expression! *)
-    s @ [Assert(!exp, [])]
-  else
-    s
+  let s =
+    if not !allow_symbolic_indices && not (is_true !exp) then
+      (* The assertion must come first, since the statement may modify value of 
+         the expression! *)
+      s @ [Assert(!exp, [])]
+    else
+      s
+  in List.filter (fun s -> (List.mem dontkeepattr (get_attrs s)) = false) s
 
 let rec get_next_label blocks =
   match blocks with
@@ -1078,7 +1061,7 @@ let run_block ?(next_label = None) ?(log=fun _ -> ()) ?(transformf = (fun s _ ->
      | Not_found -> List.hd block)
   in
   let block = List.filter (fun b -> if b == addr then false else true) block in
-  let input_seeds = get_symbolic_seeds memv addr in
+  let input_seeds, input_seeds_concrete = get_symbolic_seeds memv addr in
   pdebug ("Running block: " ^ (string_of_int !counter) ^ " " 
 	  ^ (Pp.ast_stmt_to_string addr));
   counter := !counter + 1;
@@ -1134,19 +1117,18 @@ let run_block ?(next_label = None) ?(log=fun _ -> ()) ?(transformf = (fun s _ ->
   let block = remove_specials block in
 
   (* Assign concrete values to regs/memory *)
-  let block = match !use_alt_assignment with
-    | true ->
-        let assigns = assign_vars memv false in
-        (* List.iter *)
-        (*   (fun stmt -> dprintf "assign stmt: %s" (Pp.ast_stmt_to_string stmt)) assigns;       *)
-        assigns @ block
-    | false -> block
+  let block =
+    let assigns = assign_vars memv false in
+    (* List.iter *)
+    (*   (fun stmt -> dprintf "assign stmt: %s" (Pp.ast_stmt_to_string stmt)) assigns;       *)
+    assigns @ input_seeds_concrete @ block
   in
 
   let block = append_halt block in
   TraceConcrete.initialize_prog state block ;
   clean_delta state.delta;
   let executed = ref [] in
+  executed := Util.fast_append input_seeds !executed;
   let rec eval_block state =
     let stmt = TraceConcrete.inst_fetch state.sigma state.pc in
     (* pdebug ("Executing: " ^ (Pp.ast_stmt_to_string stmt)); *)
@@ -1155,7 +1137,6 @@ let run_block ?(next_label = None) ?(log=fun _ -> ()) ?(transformf = (fun s _ ->
       | Symbolic(e) -> e
       | _ -> failwith "Expected symbolic"
     in
-    executed := Util.fast_append input_seeds !executed ;
     executed := Util.fast_append (transformf stmt evalf) !executed ; 
     (*print_endline (Pp.ast_stmt_to_string stmt) ;*)
 
@@ -1528,19 +1509,14 @@ struct
            Symbolic(Var(var))
 
        | _, Some(cval) ->
-  	   (* Finally, if untainted try to use the concrete value.
-  	      Otherwise, see if we can find the value in delta; it's
-  	      probably a temporary. *)
-	   (* DV.dprintf "Using concrete value"; *)
-	   if !use_alt_assignment then (
-	     (* In the alternate scheme, all concretes are added right to the 
-		formula *)
-	     VH.remove delta var;
-	     Symbolic(Var(var))
-	   ) else (
-	     VH.remove delta var;
-  	     Symbolic(cval)
-	   )
+  	 (* Finally, if untainted try to use the concrete value.
+  	    Otherwise, see if we can find the value in delta; it's
+  	    probably a temporary. *)
+
+	 (* In the alternate scheme, all concretes are added right to the 
+	    formula *)
+	 VH.remove delta var;
+	 Symbolic(Var(var))
        | _, _ ->
 	   DV.dprintf "looking %s up in delta" (Var.name var);
   	   try VH.find delta var
@@ -1555,7 +1531,6 @@ struct
   		   wprintf "Variable not found during evaluation: %s" name
 		 | _ -> ());
   		 Symbolic(Var(var))
-		       
       )
 
 

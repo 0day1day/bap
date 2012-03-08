@@ -98,6 +98,8 @@ union PIN_REGISTER
 
 
     static const RegMem_t INVALIDREGMEM = { NONE, 8 };
+
+    extern bool valid_regmem_type(RegMem_t rm);
     
 enum FrameType {
 

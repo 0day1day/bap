@@ -30,4 +30,15 @@
         .field [
                .type taint-id
         ]
+
+        % Initial concrete value when introduced.
+
+        % This is important for consistency checking;
+        % a taint engine should be able to predict
+        % the value of all tainted values at all times.
+        .field [
+               .name value
+               .type binary
+               .optional
+        ]
 ]
