@@ -851,10 +851,13 @@ let check_delta state =
     if v.tnt || !checkall then (
       let tracebyte = get_int v.exp in
       try
-        let evalbyte = get_int (AddrMap.find addr cm) in
-        let issymb = Hashtbl.mem global.symbolic addr in
-        if (tracebyte <>% evalbyte) && (not issymb)
-        then wprintf "Consistency error: Tainted memory value (address %Lx, value %s) present in trace does not match value %s in concrete evaluator" addr (~% tracebyte) (~% evalbyte)
+        match AddrMap.find addr cm with
+        | Int(v, t) -> let evalbyte = fst (Arithmetic.to_val t v) in
+                       let issymb = Hashtbl.mem global.symbolic addr in
+                       if (tracebyte <>% evalbyte) && (not issymb)
+                       then wprintf "Consistency error: Tainted memory value (address %Lx, value %s) present in trace does not match value %s in concrete evaluator" addr (~% tracebyte) (~% evalbyte)
+        | e when contains_unknown e -> ()
+        | e -> failwith (Printf.sprintf "Expected Int or expression containing an unknown but got %s" (Pp.ast_exp_to_string e))
       with Not_found ->
         (* Even if checkall is enabled, we don't get an initial memory
            dump, so we should not report an error unless the value is
