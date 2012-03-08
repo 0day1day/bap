@@ -854,7 +854,7 @@ let check_delta state =
         let evalbyte = get_int (AddrMap.find addr cm) in
         let issymb = Hashtbl.mem global.symbolic addr in
         if (tracebyte <>% evalbyte) && (not issymb)
-        then wprintf "Consistency error: Tainted memory value (address %Lx, value %s) present in trace does not match value %s in in concrete evaluator" addr (~% tracebyte) (~% evalbyte)
+        then wprintf "Consistency error: Tainted memory value (address %Lx, value %s) present in trace does not match value %s in concrete evaluator" addr (~% tracebyte) (~% evalbyte)
       with Not_found ->
         (* Even if checkall is enabled, we don't get an initial memory
            dump, so we should not report an error unless the value is
