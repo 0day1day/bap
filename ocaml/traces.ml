@@ -1111,22 +1111,22 @@ let run_block ?(next_label = None) ?(log=fun _ -> ()) ?(transformf = (fun s _ ->
 	(*(fun stmt -> match stmt with |Special _ -> true | _ -> false) *)
 	block 
     in
-    let remove_previous_syscalls register = 
-      let stmts = (VH.find_all reg_to_stmt register) in
-      let rec filter_syscalls calls k = match calls with
-	| [] -> k
-	| c::cs -> 
-	  if (Syscall_models.x86_is_system_call c) 
-	  then filter_syscalls cs k else filter_syscalls cs (c::k)
-      in
-      let filtered_stmts = filter_syscalls stmts [] in
-      while VH.mem reg_to_stmt register do
-	VH.remove reg_to_stmt register
-      done;
-      (* SW This is really ugly...there's got to be a better way?! *)
-      List.iter (fun i -> VH.add reg_to_stmt register i) filtered_stmts
-    in
-    (List.iter remove_previous_syscalls Asmir.x86_regs);
+    (* let remove_previous_syscalls register =  *)
+    (*   let stmts = (VH.find_all reg_to_stmt register) in *)
+    (*   let rec filter_syscalls calls k = match calls with *)
+    (* 	| [] -> k *)
+    (* 	| c::cs ->  *)
+    (* 	  if (Syscall_models.x86_is_system_call c)  *)
+    (* 	  then filter_syscalls cs k else filter_syscalls cs (c::k) *)
+    (*   in *)
+    (*   let filtered_stmts = filter_syscalls stmts [] in *)
+    (*   while VH.mem reg_to_stmt register do *)
+    (* 	VH.remove reg_to_stmt register *)
+    (*   done; *)
+    (*   (\* SW This is really ugly...there's got to be a better way?! *\) *)
+    (*   List.iter (fun i -> VH.add reg_to_stmt register i) filtered_stmts *)
+    (* in *)
+    (* (List.iter remove_previous_syscalls Asmir.x86_regs); *)
     (* Add all registers to each syscall stmt *)
     List.iter 
       (fun s -> (List.iter (fun v -> VH.add reg_to_stmt v addr) Asmir.x86_regs))
