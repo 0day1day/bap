@@ -1120,8 +1120,6 @@ let run_block ?(next_label = None) ?(log=fun _ -> ()) ?(transformf = (fun s _ ->
       block;
   );
 
-  Util.print_obj_info "reg_to_stmt" reg_to_stmt;
-
   (* Don't execute specials now that we've potentially recorded them *)
   let block = remove_specials block in
 
