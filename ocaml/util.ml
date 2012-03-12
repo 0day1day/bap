@@ -260,6 +260,12 @@ struct
 	h1 true
     in
       subtbl h1 h2 && subtbl h2 h1
+
+  (* Work around buggy replace in older versions of ocaml *)
+  let hashtbl_replace table x y =
+    H.remove table x;
+    H.add table x y
+
 end
 
 (* GRR, Hashtbl doesn't ascribe to the Hashtbl.S signature *)
@@ -280,8 +286,6 @@ let trim_newline s =
   if String.length s > 0 && String.get s ((String.length s) -1) = '\n'
   then	String.sub s 0 ((String.length s)-2)
   else	s
-
-
 		    
   
 let apply_option f k = 

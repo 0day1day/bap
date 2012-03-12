@@ -69,6 +69,7 @@ module HashUtil :
   functor (H : Hashtbl.S) ->
     sig
       val hashtbl_eq : ?eq:('a -> 'a -> bool) -> 'a H.t -> 'a H.t -> bool
+      val hashtbl_replace : 'a H.t -> H.key -> 'a -> unit
     end
 val hashtbl_eq :
   ?eq:('a -> 'a -> bool) -> ('b, 'a) Hashtbl.t -> ('b, 'a) Hashtbl.t -> bool
