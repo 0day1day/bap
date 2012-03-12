@@ -39,9 +39,12 @@ let consistency_check = ref false;;
 (** Option used to force checking of an entire trace. *)
 let checkall = ref false;;
 
+(** For each register, map it to an assignment or a system call. *)
+type stmt_info = { assignstmt: stmt option; syscallstmt: stmt option }
+
 (* Map each register to the assembly instruction that set it. Useful
    for interpreting consistency failures. *)
-let reg_to_stmt = VH.create 20;;
+let reg_to_stmt : stmt_info VH.t = VH.create 20;;
 
 let dce = ref true;;
 
@@ -887,10 +890,18 @@ let check_delta state =
           else (
 	    let badstmt =
 	      try
-		List.fold_left 
-		  (fun s stmt -> 
-		    s^"{"^(Pp.ast_stmt_to_string stmt)^"}\n") "" 
-		  (VH.find_all reg_to_stmt var)
+                let sinfo = VH.find reg_to_stmt var in
+                let s =
+                  match sinfo.assignstmt with
+                  | Some(stmt) -> "{"^(Pp.ast_stmt_to_string stmt)^"}\n"
+                  | None -> ""
+                in
+                let s =
+                  match sinfo.syscallstmt with
+                  | Some(stmt) -> s^
+                    "{"^(Pp.ast_stmt_to_string stmt)^"}\n"
+                  | None -> s
+                in s
 	      with Not_found -> 
 		("Unable to find statement that set register "^
 		    (Var.name var)^
@@ -1086,51 +1097,22 @@ let run_block ?(next_label = None) ?(log=fun _ -> ()) ?(transformf = (fun s _ ->
 
        Note: This must come after check_delta
     *)
-    
-    let finddefs p =
-      let l = ref [] in
-      List.iter 
-	(function
-	  | Move(v, _, _) -> l := v :: !l
-	  | _ -> ()) p;
-      !l
-    in
-    let defs = finddefs block in
-    List.iter 
-      (fun v -> if not (is_temp v) 
-	then ((*VH.remove_all reg_to_stmt v;*)
-	  while VH.mem reg_to_stmt v do
-	    VH.remove reg_to_stmt v
-	  done;
-	  VH.add reg_to_stmt v addr))
-      defs;
-    (* Find all syscall statments in block *)
-    let syscall_stmts = 
-      List.filter 
-	Syscall_models.x86_is_system_call
-	(*(fun stmt -> match stmt with |Special _ -> true | _ -> false) *)
-	block 
-    in
-    (* let remove_previous_syscalls register =  *)
-    (*   let stmts = (VH.find_all reg_to_stmt register) in *)
-    (*   let rec filter_syscalls calls k = match calls with *)
-    (* 	| [] -> k *)
-    (* 	| c::cs ->  *)
-    (* 	  if (Syscall_models.x86_is_system_call c)  *)
-    (* 	  then filter_syscalls cs k else filter_syscalls cs (c::k) *)
-    (*   in *)
-    (*   let filtered_stmts = filter_syscalls stmts [] in *)
-    (*   while VH.mem reg_to_stmt register do *)
-    (* 	VH.remove reg_to_stmt register *)
-    (*   done; *)
-    (*   (\* SW This is really ugly...there's got to be a better way?! *\) *)
-    (*   List.iter (fun i -> VH.add reg_to_stmt register i) filtered_stmts *)
-    (* in *)
-    (* (List.iter remove_previous_syscalls Asmir.x86_regs); *)
-    (* Add all registers to each syscall stmt *)
-    List.iter 
-      (fun s -> (List.iter (fun v -> VH.add reg_to_stmt v addr) Asmir.x86_regs))
-      syscall_stmts;
+    List.iter
+      (function
+        | Move(v, _, _) ->
+          (* An explicit assignment *)
+          VH.replace reg_to_stmt v {assignstmt=Some addr; syscallstmt=None}
+        | Special _ as s when Syscall_models.x86_is_system_call s ->
+          (* A special could potentially overwrite all registers *)
+          let replace_syscall newsyscallstmt register =
+            let assignstmt = try (VH.find reg_to_stmt register).assignstmt
+              with Not_found -> None
+            in
+            VH.replace reg_to_stmt register {assignstmt=assignstmt; syscallstmt=Some newsyscallstmt}
+          in
+          List.iter (replace_syscall s) Asmir.x86_regs
+        | _ -> ())
+      block;
   );
 
   (* Don't execute specials now that we've potentially recorded them *)
