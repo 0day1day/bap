@@ -39,8 +39,18 @@ let consistency_check = ref false;;
 (** Option used to force checking of an entire trace. *)
 let checkall = ref false;;
 
-(** For each register, map it to an assignment or a system call. *)
-type stmt_info = { assignstmt: stmt option; syscallstmt: stmt option }
+(** For each register, map it to an assignment and record the value of
+    !current_time when the assignment happened. *)
+type stmt_info = { assignstmt: stmt; assigned_time: int }
+
+(** Current time in executor (number of statements executed) *)
+let current_time = ref 0
+
+(** Last special concretely executed *)
+let last_special = ref (Ast.Comment("No specials executed", []))
+
+(** The time that the last special was assigned at *)
+let last_time = ref 0
 
 (* Map each register to the assembly instruction that set it. Useful
    for interpreting consistency failures. *)
@@ -890,31 +900,23 @@ let check_delta state =
           else (
 	    let badstmt =
 	      try
-                let sinfo = VH.find reg_to_stmt var in
-                let s =
-                  match sinfo.assignstmt with
-                  | Some(stmt) -> "{"^(Pp.ast_stmt_to_string stmt)^"}\n"
-                  | None -> ""
-                in
-                let s =
-                  match sinfo.syscallstmt with
-                  | Some(stmt) -> s^
-                    "{"^(Pp.ast_stmt_to_string stmt)^"}\n"
-                  | None -> s
-                in s
-	      with Not_found -> 
-		("Unable to find statement that set register "^
-		    (Var.name var)^
-		    ". This is probably because BAP never set it, but was"^
-		    " supposed to!")
+                let {assignstmt=assignstmt; assigned_time=assigned_time} = VH.find reg_to_stmt var in
+                let s = "{"^(Pp.ast_stmt_to_string assignstmt)^"}\n" in
+                if assigned_time <= !last_time then
+                  (* The special happened after our assignment *)
+                  s^"{"^(Pp.ast_stmt_to_string !last_special)^"}\n"
+                else s
+	      with Not_found ->
+                (* This is a little weird if this happens... *)
+                "{"^(Pp.ast_stmt_to_string !last_special)^"}"
 	    in
 	    let traceval_str = Pp.ast_exp_to_string traceval in
 	    let evalval_str = Pp.ast_exp_to_string evalval in
 	    wprintf "Difference between %sBAP and trace values for [*%s* Trace=%s Eval=%s]" s dsavarname traceval_str evalval_str;
 	    wprintf "This is due to one of the following statments:\n%s"  badstmt;
 	  )
-	  (* If we can't find concrete value, it's probably just a BAP 
-	     temporary *)
+      (* If we can't find concrete value, it's probably just a BAP 
+	 temporary *)
       | _ -> ())
     ) (* probably a temporary *)
     | TMem _
@@ -1097,20 +1099,20 @@ let run_block ?(next_label = None) ?(log=fun _ -> ()) ?(transformf = (fun s _ ->
 
        Note: This must come after check_delta
     *)
+    let get_counter () =
+      let c = !current_time in
+      incr current_time;
+      c
+    in
     List.iter
       (function
         | Move(v, _, _) ->
           (* An explicit assignment *)
-          VH.replace reg_to_stmt v {assignstmt=Some addr; syscallstmt=None}
+          VH.replace reg_to_stmt v {assignstmt=addr; assigned_time=get_counter ()}
         | Special _ as s when Syscall_models.x86_is_system_call s ->
           (* A special could potentially overwrite all registers *)
-          let replace_syscall newsyscallstmt register =
-            let assignstmt = try (VH.find reg_to_stmt register).assignstmt
-              with Not_found -> None
-            in
-            VH.replace reg_to_stmt register {assignstmt=assignstmt; syscallstmt=Some newsyscallstmt}
-          in
-          List.iter (replace_syscall s) Asmir.x86_regs
+          last_time := get_counter();
+          last_special := s;
         | _ -> ())
       block;
   );
