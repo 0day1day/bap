@@ -900,7 +900,9 @@ let check_delta state =
           else (
 	    let badstmt =
 	      try
-                let {assignstmt=assignstmt; assigned_time=assigned_time} = VH.find reg_to_stmt var in
+                let {assignstmt=assignstmt; assigned_time=assigned_time} = 
+		  VH.find reg_to_stmt var 
+		in
                 let s = "{"^(Pp.ast_stmt_to_string assignstmt)^"}\n" in
                 if assigned_time <= !last_time then
                   (* The special happened after our assignment *)
@@ -1115,7 +1117,7 @@ let run_block ?(next_label = None) ?(log=fun _ -> ()) ?(transformf = (fun s _ ->
         | Special _ as s when Syscall_models.x86_is_system_call s ->
           (* A special could potentially overwrite all registers *)
           last_time := get_counter();
-          last_special := s;
+          last_special := addr;
         | _ -> ())
       block;
   );
