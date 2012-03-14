@@ -74,10 +74,15 @@ let compute_flanagansaxe ?(k=1) cfg post =
 
 (* FIXME: Why did I think we needed SSA here? *)
 let compute_fse cfg post =
-  let {Cfg_ssa.cfg=ssa; to_ssavar=tossa} = Cfg_ssa.trans_cfg cfg in
-  let ast = Cfg_ssa.to_ast ssa in
-  let p = rename_astexp tossa post in
-  (Eval.fse p ast, [])
+  (* let {Cfg_ssa.cfg=ssa; to_ssavar=tossa} = Cfg_ssa.trans_cfg cfg in *)
+  let ast = Cfg_ast.to_prog cfg in
+  (* let p = rename_astexp tossa post in *)
+  (Eval.fse post ast, [])
+
+(* DWP paper *)
+let compute_fse_unpass cfg post =
+  let efse = Efse.of_astcfg cfg in
+  (Efse.fse_unpass efse post, [])
 
 let extract_vars e =
   let rec h v = function
@@ -174,8 +179,10 @@ let speclist =
      "<n> FSE with breath first search, limiting search depth to n.")
   ::("-fse-maxrepeat", Arg.Int(fun i-> compute_wp := compute_fse_maxrepeat i),
      "<n> FSE excluding walks that visit a point more than n times.")
-  ::("-fast-fse", Arg.Set fast_fse,
+  ::("-fse-fast", Arg.Set fast_fse,
      "Perform FSE without full substitution.")
+  ::("-fse-dwp-paper", Arg.Unit(fun () -> compute_wp := compute_fse_unpass),
+     "Use inefficient FSE algorithm for unpassified programs in DWP paper.")
   ::("-noopt", Arg.Unit (fun () -> usedc := false; usesccvn := false),
      "Do not perform any optimizations on the SSA CFG.")
   ::("-opt", Arg.Unit (fun () -> usedc := true; usesccvn := true),

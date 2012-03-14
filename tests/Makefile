@@ -1,3 +1,5 @@
+.NOPARALLEL:
+
 # XXX Fix this so it actually works
 include C/Makefile.defs
 
@@ -65,7 +67,7 @@ export PROJ_analyze_test_log
 
 export BCSUFFIX = .dbg
 
-all: | $(TARGETS)
+all: $(TARGETS)
 
 test: all
 	./bap_test_suite
