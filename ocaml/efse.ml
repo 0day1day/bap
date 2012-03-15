@@ -201,7 +201,7 @@ struct
 
 (** Inefficient fse algorithm for passified programs. *)
 let fse_pass ?(cf=true) p post =
-  let eval delta e = if cf then sub_eval delta (D.simplify delta e) else sub_eval delta e in
+  let eval delta e = if cf then sub_eval delta (D.simplify delta e) else e in
   let rec fse_pass delta pi = function
     | [] -> pi
     | Assign(v, e)::tl ->
@@ -216,7 +216,7 @@ let fse_pass ?(cf=true) p post =
       let value = eval delta e in
       (match value with
       | Ast.Int(bi, Reg 1) when bi_is_zero bi ->
-        (* Assert false = false *)
+        (* Assert false = false, pi \land false = false *)
         Ast.exp_false
       | Ast.Int(bi, Reg 1) when bi_is_one bi ->
         (* Assert true = true, pi \land true = pi *)
@@ -241,24 +241,45 @@ let fse_pass ?(cf=true) p post =
   in
   fse_pass (D.create ()) post p
 
+(** Efficient fse algorithm for passified programs. *)
+let efse ?(cf=true) p pi =
+  let eval delta e = if cf then sub_eval delta (D.simplify delta e) else e in
+  let rec efse delta pi = function
+    | [] -> pi
+    | Assign(v, e)::tl ->
+      let value = eval delta e in
+      let delta',pi' = match value with
+        | Ast.Int _ -> D.set delta v value, pi
+        | _ -> delta, Ast.exp_and pi (Ast.exp_eq (Ast.Var v) e) in
+      efse delta' pi' tl
+    | Assert e::tl ->
+      let value = eval delta e in
+      (match value with
+      | Ast.Int(bi, Reg 1) when bi_is_zero bi ->
+        (* Assert false = false, pi \land false = false *)
+        Ast.exp_false
+      | Ast.Int(bi, Reg 1) when bi_is_one bi ->
+        (* Assert true = true, pi \land true = pi *)
+        efse delta pi tl
+      | _ ->
+        let pi' = Ast.exp_and pi value in
+        efse delta pi' tl)
+    | Ite(e, s1, s2)::tl ->
+      let value_t = eval delta e in
+      (match value_t with
+      | Ast.Int(bi, Reg 1) when bi_is_zero bi ->
+        efse delta pi (s2@tl)
+      | Ast.Int(bi, Reg 1) when bi_is_one bi ->
+        efse delta pi (s1@tl)
+      | _ ->
+        let pi_t = efse delta e s1 in
+        let pi_f = efse delta (Ast.exp_not e) s2 in
+        Ast.exp_and (Ast.exp_and pi (Ast.exp_or pi_t pi_f)) (efse delta Ast.exp_true tl))
+  in
+  efse (D.create ()) pi p
+
 end
 
 module VMBack = Make(VMDelta)
 include VMBack
 
-(** Efficient fse algorithm for passified programs. *)
-let efse p pi =
-  let rec efse pi = function
-    | [] -> pi
-    | Assign(v, e)::tl ->
-      let pi' = Ast.exp_and pi (Ast.exp_eq (Ast.Var v) e) in
-      efse pi' tl
-    | Assert e::tl ->
-      let pi' = Ast.exp_and pi e in
-      efse pi' tl
-    | Ite(e, s1, s2)::tl ->
-      let pi_t = efse e s1 in
-      let pi_f = efse (Ast.exp_not e) s2 in
-      Ast.exp_and (Ast.exp_and pi (Ast.exp_or pi_t pi_f)) (efse Ast.exp_true tl)
-  in
-  efse pi p
