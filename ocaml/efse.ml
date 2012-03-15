@@ -99,13 +99,15 @@ end
 
 module VMDelta =
 struct
-  type t = exp VM.t
+  type t = Symbeval.varval VM.t
   let create () =
     VM.empty
   let set h v e =
-    VM.add v e h
+    VM.add v (Symbeval.Symbolic e) h
   let get h v =
-    VM.find v h
+    match VM.find v h with
+    | Symbeval.Symbolic e -> e
+    | Symbeval.ConcreteMem(m,v) -> Symbeval.symb_to_exp (Symbeval.conc2symb m v)
   let simplify d e = e
 end
 

@@ -798,7 +798,7 @@ struct
           wprintf "Unknown variable during eval: %s" (Var.name var);
         Symbolic(Int(bi0, (Var.typ var)))
 
-  let normalize = SymbolicMemL.normalize
+  let normalize = Symbeval.normalize
 
   let update_mem mu pos value endian =
     (match mu, pos with
@@ -826,6 +826,8 @@ struct
       )
 
     | _ -> failwith "Concrete evaluation should never have symbolic memories"
+
+  include Symbeval.BuildMemLPrinters(MemVHBackEnd)
 
 end
 
@@ -1382,7 +1384,7 @@ struct
       )
 
   let lookup_mem mu index endian =
-    let normalize = SymbolicMemL.normalize in
+    let normalize = Symbeval.normalize in
     match mu, index with
     | ConcreteMem(m,v), Int(i,t) ->
 	(try AddrMap.find (normalize i t) m
@@ -1574,6 +1576,8 @@ struct
           (pdebug ("Symbolic memory index at "
                    ^ (Pp.ast_exp_to_string index)) ;
            Symbolic.lookup_mem mu index endian)
+
+  include Symbeval.BuildMemLPrinters(MemVHBackEnd)
 
 end
 

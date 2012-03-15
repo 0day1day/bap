@@ -74,7 +74,6 @@ export SOURCES = \
 	gcl.mli gcl.ml \
 	ugcl.ml \
 	wp.ml \
-	efse.ml \
 	stp_grammar.mly stp_lexer.mll \
 	cvc3_grammar.mly cvc3_lexer.mll \
 	yices_grammar.mly yices_lexer.mll \
@@ -93,6 +92,7 @@ export SOURCES = \
 	vsa.ml \
 	eval.ml \
 	symbeval.ml symbeval_search.ml \
+	efse.ml \
 	ast_slice.ml \
 	ssa_slice.ml \
 	structural_analysis.ml \

@@ -109,6 +109,19 @@ let symb_to_string = function
   | Symbolic e -> "Symbolic "^(Pp.ast_exp_to_string e)
   | ConcreteMem m -> "Memory"
 
+(* Converting concrete memory to symbolic *)
+let conc2symb memory v =
+  pdebug "Concrete to symbolic" ;
+  (* FIXME: a better symbolism for uninitialized memories *)
+  let init = Var v in
+  pdebug "The point of no return" ;
+  Symbolic (AddrMap.fold
+	      (fun k v m -> Store (m,Int(big_int_of_int64 k,reg_32),v,exp_false,reg_8))
+	      memory init)
+
+(* Normalize a memory address, setting high bits to 0. *)
+let normalize i t = int64_of_big_int (Arithmetic.to_big_int (i,t))
+
 module type MemLookup =
 sig
 
@@ -136,7 +149,6 @@ sig
   val update_mem : varval -> Ast.exp -> Ast.exp -> Ast.exp -> varval
   (** Lookup memory *)
   val lookup_mem : varval -> Ast.exp -> Ast.exp -> Ast.exp
-
 end
 
 module type EvalTune =
@@ -521,44 +533,7 @@ struct
   let copy delta = VH.copy delta
   let clear delta = VH.clear delta; delta
   let create () = VH.create 5000
-
-  let print_values delta =
-    pdebug "contents of variables" ;
-    VH.iter
-      (fun k v ->
-  	 match k,v with
-  	   | var,Symbolic e ->
-               pdebug ((Pp.var_to_string var) ^ " = " ^ (Pp.ast_exp_to_string e))
-  	   | _ -> ()
-      ) delta
-
-  let print_mem delta =
-    pdebug "contents of memories" ;
-    VH.iter
-      (fun k v ->
-  	 match k,v with
-  	   | var, ConcreteMem(mem,_) ->
-               pdebug ("memory " ^ (Var.name var)) ;
-               AddrMap.iter
-  		 (fun i v ->
-  		    pdebug((Printf.sprintf "%Lx" i)
-  			   ^ " -> " ^ (Pp.ast_exp_to_string v))
-  		 )
-  		 mem
-  	   | _ -> ()
-      ) delta
-
-  let print_var delta name =
-    VH.iter
-      (fun var exp ->
-  	 match exp with
-  	   | Symbolic e ->
-  	       let varname = Var.name var in
-  		 if varname = name then
-  		   pdebug (varname ^ " = "
-  			   ^ (Pp.ast_exp_to_string e))
-  	   | _ -> ()
-      ) delta
+  let fold delta f i = VH.fold f delta i
 
   (** Number of variable locations stored in state *)
   let num_values delta =
@@ -581,6 +556,8 @@ struct
 	   | _ -> count
       ) delta 0
 
+  let find_var = VH.find
+
   let update_var a b c =
     VH.replace a b c; a
 
@@ -596,43 +573,7 @@ struct
   let create () = VM.empty
   let clear delta = create ()
 
-  let print_values delta =
-    pdebug "contents of variables" ;
-    VM.iter
-      (fun k v ->
-  	 match k,v with
-  	   | var,Symbolic e ->
-               pdebug ((Pp.var_to_string var) ^ " = " ^ (Pp.ast_exp_to_string e))
-  	   | _ -> ()
-      ) delta
-
-  let print_mem delta =
-    pdebug "contents of memories" ;
-    VM.iter
-      (fun k v ->
-  	 match k,v with
-  	   | var, ConcreteMem(mem,_) ->
-               pdebug ("memory " ^ (Var.name var)) ;
-               AddrMap.iter
-  		 (fun i v ->
-  		    pdebug((Printf.sprintf "%Lx" i)
-  			   ^ " -> " ^ (Pp.ast_exp_to_string v))
-  		 )
-  		 mem
-  	   | _ -> ()
-      ) delta
-
-  let print_var delta name =
-    VM.iter
-      (fun var exp ->
-  	 match exp with
-  	   | Symbolic e ->
-  	       let varname = Var.name var in
-  		 if varname = name then
-  		   pdebug (varname ^ " = "
-  			   ^ (Pp.ast_exp_to_string e))
-  	   | _ -> ()
-      ) delta
+  let fold delta f i = VM.fold f delta i
 
   (** Number of variable locations stored in state *)
   let num_values delta =
@@ -655,20 +596,86 @@ struct
 	   | _ -> count
       ) delta 0
 
+  let find_var a b =
+    VM.find b a
+
   let update_var a b c =
-    VM.add a b c
+    VM.add b c a
 
   let remove_var delta var =
-    VM.remove delta var
+    VM.remove var delta
 end
 
-module SymbolicMemL =
+module type MemBackEnd =
+sig
+  type t
+  val copy : t -> t
+  val clear : t -> t
+  val create : unit -> t
+  val fold : t -> (var -> varval -> 'acc -> 'acc) -> 'acc -> 'acc
+  val num_values : t -> int
+  val find_var : t -> var -> varval
+  val update_var : t -> var -> varval -> t
+  val remove_var : t -> var -> t
+end
+
+module type Foldable =
+sig
+  type t
+  val fold : t -> (var -> varval -> 'acc -> 'acc) -> 'acc -> 'acc
+end
+
+module BuildMemLPrinters(F:Foldable) =
+struct
+  let print_values delta =
+    pdebug "contents of variables" ;
+    F.fold
+      delta
+      (fun k v () ->
+  	 match k,v with
+  	   | var,Symbolic e ->
+               pdebug ((Pp.var_to_string var) ^ " = " ^ (Pp.ast_exp_to_string e))
+  	   | _ -> ()
+      ) ()
+
+  let print_mem delta =
+    pdebug "contents of memories" ;
+    F.fold
+      delta
+      (fun k v () ->
+  	 match k,v with
+  	   | var, ConcreteMem(mem,_) ->
+               pdebug ("memory " ^ (Var.name var)) ;
+               AddrMap.iter
+  		 (fun i v ->
+  		    pdebug((Printf.sprintf "%Lx" i)
+  			   ^ " -> " ^ (Pp.ast_exp_to_string v))
+  		 )
+  		 mem
+  	   | _ -> ()
+      ) ()
+
+  let print_var delta name =
+    F.fold
+      delta
+      (fun var exp () ->
+  	 match exp with
+  	   | Symbolic e ->
+  	       let varname = Var.name var in
+  		 if varname = name then
+  		   pdebug (varname ^ " = "
+  			   ^ (Pp.ast_exp_to_string e))
+  	   | _ -> ()
+      ) ()
+end
+
+module BuildSymbolicMemL(BE:MemBackEnd) =
 struct
 
-  include MemVHBackEnd
+  include BE
 
   let lookup_var delta var =
-    try VH.find delta var
+    try find_var delta var
     with Not_found ->
       match Var.typ var with
 	| TMem _
@@ -676,19 +683,6 @@ struct
 	    empty_mem var
 	| Reg _ ->
 	    Symbolic(Var var)
-
-  (* Converting concrete memory to symbolic *)
-  let conc2symb memory v =
-    pdebug "Concrete to symbolic" ;
-    (* FIXME: a better symbolism for uninitialized memories *)
-    let init = Var v in
-      pdebug "The point of no return" ;
-      Symbolic (AddrMap.fold
-		  (fun k v m -> Store (m,Int(big_int_of_int64 k,reg_32),v,exp_false,reg_8))
-		  memory init)
-
-  (* Normalize a memory address, setting high bits to 0. *)
-  let normalize i t = int64_of_big_int (Arithmetic.to_big_int (i,t))
 
   let rec update_mem mu pos value endian =
     (*pdebug "Update mem" ;*)
@@ -713,15 +707,19 @@ struct
       | Symbolic mem, _ -> Load (mem,index,endian,reg_8)
       | ConcreteMem(m,v),_ -> lookup_mem (conc2symb m v) index endian
 
+  include BuildMemLPrinters(BE)
+
 end
 
-module ConcreteMemL =
+module SymbolicMemL = BuildSymbolicMemL(MemVHBackEnd)
+
+module BuildConcreteMemL(BE:MemBackEnd) =
 struct
 
-  include MemVHBackEnd
+  include BE
 
   let lookup_var delta var =
-    try VH.find delta var
+    try find_var delta var
     with Not_found ->
       match Var.typ var with
 	| TMem _
@@ -729,8 +727,6 @@ struct
 	    empty_mem var
 	| Reg n as t ->
 	    Symbolic(Int(bi0, t))
-
-  let normalize = SymbolicMemL.normalize
 
   let rec update_mem mu pos value endian =
     (*pdebug "Update mem" ;*)
@@ -749,7 +745,10 @@ struct
 	  )
       | _ -> failwith "Symbolic memory or address in concrete evaluation"
 
+  include BuildMemLPrinters(BE)
 end
+
+module ConcreteMemL = BuildConcreteMemL(MemVHBackEnd)
 
 (** Symbolic assigns are represented as Lets in the formula, except
     for temporaries.  If you use this, you should clear out temporaries
@@ -860,7 +859,10 @@ end
 module Symbolic = Make(SymbolicMemL)(FastEval)(StdAssign)(StdForm)
 module SymbolicSlow = Make(SymbolicMemL)(SlowEval)(StdAssign)(StdForm)
 
+(** Concrete evaluator based on Hashtables *)
 module Concrete = Make(ConcreteMemL)(AlwaysEvalLet)(StdAssign)(StdForm)
+(** Concrete evaluator based on Maps *)
+module ConcreteMap = Make(BuildConcreteMemL(MemVMBackEnd))(AlwaysEvalLet)(StdAssign)(StdForm)
 
 (** Execute a program concretely *)
 let concretely_execute ?s ?(i=[]) p =
