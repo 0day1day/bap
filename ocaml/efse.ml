@@ -1,5 +1,6 @@
 (** Implementation of [efse] algorithm from DWP paper. *)
 
+module CA = Cfg.AST
 module VM = Var.VarMap
 type var = Ast.var
 type exp = Ast.exp
@@ -8,6 +9,15 @@ type stmt = | Assign of (var * exp)
             | Assert of exp
             | Ite of (exp * prog * prog)
 and prog = stmt list
+
+let rec stmt_to_string = function
+  | Assign(v,e) -> Printf.sprintf "%s = %s" (Var.name v) (Pp.ast_exp_to_string e)
+  | Assert e -> Printf.sprintf "Assert %s" (Pp.ast_exp_to_string e)
+  | Ite(e, s1, s2) -> Printf.sprintf "If %s Then (%s) Else (%s)" (Pp.ast_exp_to_string e) (prog_to_string s1) (prog_to_string s2)
+and prog_to_string = function
+  | [] -> "/* Skip */"
+  | x::[] -> stmt_to_string x
+  | x::tl -> (stmt_to_string x)^"; "^(prog_to_string tl)
 
 module ToEfse = struct
   let of_rev_straightline stmts =
@@ -50,8 +60,29 @@ module ToEfse = struct
       c s Util.id
     in
     cgcl_to_fse (Gcl.gclhelp_of_astcfg ?entry ?exit cfg)
+
+  let passified_of_ssa ?entry ?exit cfg =
+    let ast = Cfg_ssa.to_astcfg ~dsa:true cfg in
+    let convert = function
+      | Some v -> Some(CA.find_vertex ast (Cfg.SSA.G.V.label v))
+      | None -> None
+    in
+    let entry = convert entry and exit = convert exit in
+    of_astcfg ?entry ?exit ast
+
+  let passified_of_astcfg ?entry ?exit cfg =
+    let {Cfg_ssa.cfg=ssa; to_ssavar=tossa} = Cfg_ssa.trans_cfg cfg in
+    let convert = function
+      | Some v -> Some(Cfg.SSA.find_vertex ssa (CA.G.V.label v))
+      | None -> None
+    in
+    let entry = convert entry and exit = convert exit in
+    let g = passified_of_ssa ?entry ?exit ssa in
+    (g,tossa)
+
+
 end
-let of_astcfg = ToEfse.of_astcfg
+include ToEfse
 
 module type Delta =
 sig
@@ -123,24 +154,27 @@ struct
     fse_unpass (D.create ()) post p
 
 (** Inefficient fse algorithm for passified programs. *)
-let rec fse_pass delta pi = function
-  | [] -> pi
-  | Assign(v, e)::tl ->
-    let value = sub_eval delta e in
-    let pi' = Ast.exp_and pi (Ast.exp_eq (Ast.Var v) value) in
-    fse_pass delta pi' tl
-  | Assert(e)::tl ->
-    let value = sub_eval delta e in
-    let pi' = Ast.exp_and pi value in
-    fse_pass delta pi' tl
-  | Ite(e, s1, s2)::tl ->
-    let value_t = sub_eval delta e in
-    let pi_t = Ast.exp_and pi value_t in
-    let value_f = Ast.exp_not value_t in
-    let pi_f = Ast.exp_and pi value_f in
-    let fse_t = fse_pass delta pi_t (s1@tl) in
-    let fse_f = fse_pass delta pi_f (s2@tl) in
-    Ast.exp_or fse_t fse_f
+let fse_pass p post =
+  let rec fse_pass delta pi = function
+    | [] -> pi
+    | Assign(v, e)::tl ->
+      let value = sub_eval delta e in
+      let pi' = Ast.exp_and pi (Ast.exp_eq (Ast.Var v) value) in
+      fse_pass delta pi' tl
+    | Assert(e)::tl ->
+      let value = sub_eval delta e in
+      let pi' = Ast.exp_and pi value in
+      fse_pass delta pi' tl
+    | Ite(e, s1, s2)::tl ->
+      let value_t = sub_eval delta e in
+      let pi_t = Ast.exp_and pi value_t in
+      let value_f = Ast.exp_not value_t in
+      let pi_f = Ast.exp_and pi value_f in
+      let fse_t = fse_pass delta pi_t (s1@tl) in
+      let fse_f = fse_pass delta pi_f (s2@tl) in
+      Ast.exp_or fse_t fse_f
+  in
+  fse_pass (D.create ()) post p
 
 end
 
@@ -148,15 +182,18 @@ module VMBack = Make(VMDelta)
 include VMBack
 
 (** Efficient fse algorithm for passified programs. *)
-let rec efse pi = function
-  | [] -> pi
-  | Assign(v, e)::tl ->
-    let pi' = Ast.exp_and pi (Ast.exp_eq (Ast.Var v) e) in
-    efse pi' tl
-  | Assert e::tl ->
-    let pi' = Ast.exp_and pi e in
-    efse pi' tl
-  | Ite(e, s1, s2)::tl ->
-    let pi_t = efse e s1 in
-    let pi_f = efse (Ast.exp_not e) s2 in
-    Ast.exp_and (Ast.exp_and pi (Ast.exp_and pi_t pi_f)) (efse Ast.exp_true tl)
+let efse p pi =
+  let rec efse pi = function
+    | [] -> pi
+    | Assign(v, e)::tl ->
+      let pi' = Ast.exp_and pi (Ast.exp_eq (Ast.Var v) e) in
+      efse pi' tl
+    | Assert e::tl ->
+      let pi' = Ast.exp_and pi e in
+      efse pi' tl
+    | Ite(e, s1, s2)::tl ->
+      let pi_t = efse e s1 in
+      let pi_f = efse (Ast.exp_not e) s2 in
+      Ast.exp_and (Ast.exp_and pi (Ast.exp_or pi_t pi_f)) (efse Ast.exp_true tl)
+  in
+  efse pi p

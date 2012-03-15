@@ -84,6 +84,18 @@ let compute_fse_unpass cfg post =
   let efse = Efse.of_astcfg cfg in
   (Efse.fse_unpass efse post, [])
 
+let compute_fse_pass cfg post =
+  let (efse, tossa) = Efse.passified_of_astcfg cfg in
+  let post = rename_astexp tossa post in
+  (Efse.fse_pass efse post, [])
+
+let compute_efse_pass cfg post =
+  let (efse, tossa) = Efse.passified_of_astcfg cfg in
+  let post = rename_astexp tossa post in
+  (Efse.efse efse post, [])
+
+(* end DWP paper *)
+
 let extract_vars e =
   let rec h v = function
     | BinOp(AND, BinOp(EQ,Var v1, e1), BinOp(EQ,Var v2, e2)) ->
@@ -181,8 +193,12 @@ let speclist =
      "<n> FSE excluding walks that visit a point more than n times.")
   ::("-fse-fast", Arg.Set fast_fse,
      "Perform FSE without full substitution.")
-  ::("-fse-dwp-paper", Arg.Unit(fun () -> compute_wp := compute_fse_unpass),
+  ::("-fse-unpass-dwp-paper", Arg.Unit(fun () -> compute_wp := compute_fse_unpass),
      "Use inefficient FSE algorithm for unpassified programs in DWP paper.")
+  ::("-fse-pass-dwp-paper", Arg.Unit(fun () -> compute_wp := compute_fse_pass),
+     "Use inefficient FSE algorithm for passified programs in DWP paper.")
+  ::("-efse-pass-dwp-paper", Arg.Unit(fun () -> compute_wp := compute_efse_pass),
+     "Use efficient FSE algorithm for passified programs in DWP paper.")
   ::("-noopt", Arg.Unit (fun () -> usedc := false; usesccvn := false),
      "Do not perform any optimizations on the SSA CFG.")
   ::("-opt", Arg.Unit (fun () -> usedc := true; usesccvn := true),
