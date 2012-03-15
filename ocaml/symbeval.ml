@@ -857,6 +857,7 @@ end
 
 
 module Symbolic = Make(SymbolicMemL)(FastEval)(StdAssign)(StdForm)
+module SymbolicMap = Make(BuildSymbolicMemL(MemVMBackEnd))(FastEval)(StdAssign)(StdForm)
 module SymbolicSlow = Make(SymbolicMemL)(SlowEval)(StdAssign)(StdForm)
 
 (** Concrete evaluator based on Hashtables *)

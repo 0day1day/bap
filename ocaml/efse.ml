@@ -1,6 +1,8 @@
 (** Implementation of [efse] algorithm from DWP paper. *)
 
+open Big_int_convenience
 module CA = Cfg.AST
+open Type
 module VM = Var.VarMap
 type var = Ast.var
 type exp = Ast.exp
@@ -9,6 +11,37 @@ type stmt = | Assign of (var * exp)
             | Assert of exp
             | Ite of (exp * prog * prog)
 and prog = stmt list
+
+(* EFSE's lookup functions raise Not_found as soon as a variable would
+   be Symbolic *)
+module CFMemL =
+struct
+  open Ast
+  open Symbeval
+  include BuildSymbolicMemL(MemVMBackEnd)
+
+  let lookup_var delta var =
+    match lookup_var delta var with
+    | Symbolic(Int(_)) as x -> x
+    | ConcreteMem _ as x -> x
+    | _ -> raise Not_found
+
+  (* let rec update_mem mu pos value endian = *)
+  (*   (\*pdebug "Update mem" ;*\) *)
+  (*   match mu, pos with *)
+  (*     | ConcreteMem (m,v), Int(p,t) -> *)
+  (*         ConcreteMem(AddrMap.add (normalize p t) value m, v) *)
+  (*     | _ -> failwith "Symbolic memory in concrete evaluation" *)
+
+  let rec lookup_mem mu index endian =
+    (*pdebug "Lookup mem" ;*)
+    match lookup_mem mu index endian with
+    | Int _ as x -> x
+    | _ -> raise Not_found
+
+end
+
+module ConcreteMap = Symbeval.Make(CFMemL)(Symbeval.AlwaysEvalLet)(Symbeval.StdAssign)(Symbeval.StdForm)
 
 let rec stmt_to_string = function
   | Assign(v,e) -> Printf.sprintf "%s = %s" (Var.name v) (Pp.ast_exp_to_string e)
@@ -104,11 +137,18 @@ struct
     VM.empty
   let set h v e =
     VM.add v (Symbeval.Symbolic e) h
-  let get h v =
-    match VM.find v h with
+  let unwrap_symb = function
     | Symbeval.Symbolic e -> e
     | Symbeval.ConcreteMem(m,v) -> Symbeval.symb_to_exp (Symbeval.conc2symb m v)
-  let simplify d e = e
+  let get h v =
+    unwrap_symb (VM.find v h)
+  let simplify d e =
+    (* Reduce to constant if possible *)
+    try (
+      match unwrap_symb (ConcreteMap.eval_expr d e) with
+      | Ast.Int _ as x -> x
+      | _ -> raise Not_found
+    ) with Not_found -> e
 end
 
 module Make(D:Delta) =
@@ -136,19 +176,20 @@ struct
     Ast_visitor.exp_accept v e
 
 (** Inefficient fse algorithm for unpassified programs. *)
-  let fse_unpass p post =
+  let fse_unpass ?(cf=true) p post =
+    let eval delta e = if cf then sub_eval delta (D.simplify delta e) else sub_eval delta e in
     let rec fse_unpass delta pi = function
       | [] -> pi
       | Assign(v, e)::tl ->
-        let value = sub_eval delta e in
+        let value = eval delta e in
         let delta' = D.set delta v value in
         fse_unpass delta' pi tl
       | Assert(e)::tl ->
-        let value = sub_eval delta e in
+        let value = eval delta e in
         let pi' = Ast.exp_and pi value in
         fse_unpass delta pi' tl
       | Ite(e, s1, s2)::tl ->
-        let value_t = sub_eval delta e in
+        let value_t = eval delta e in
         let pi_t = Ast.exp_and pi value_t in
         let value_f = Ast.exp_not value_t in
         let pi_f = Ast.exp_and pi value_f in
@@ -159,25 +200,44 @@ struct
     fse_unpass (D.create ()) post p
 
 (** Inefficient fse algorithm for passified programs. *)
-let fse_pass p post =
+let fse_pass ?(cf=true) p post =
+  let eval delta e = if cf then sub_eval delta (D.simplify delta e) else sub_eval delta e in
   let rec fse_pass delta pi = function
     | [] -> pi
     | Assign(v, e)::tl ->
-      let value = sub_eval delta e in
-      let pi' = Ast.exp_and pi (Ast.exp_eq (Ast.Var v) value) in
-      fse_pass delta pi' tl
+      let value = eval delta e in
+      let delta',pi' = match value with
+        | Ast.Int _ -> D.set delta v value (** Update for constants, no need to add to pi *),
+          pi
+        | _ -> delta, Ast.exp_and pi (Ast.exp_eq (Ast.Var v) value)
+      in
+      fse_pass delta' pi' tl
     | Assert(e)::tl ->
-      let value = sub_eval delta e in
-      let pi' = Ast.exp_and pi value in
-      fse_pass delta pi' tl
+      let value = eval delta e in
+      (match value with
+      | Ast.Int(bi, Reg 1) when bi_is_zero bi ->
+        (* Assert false = false *)
+        Ast.exp_false
+      | Ast.Int(bi, Reg 1) when bi_is_one bi ->
+        (* Assert true = true, pi \land true = pi *)
+        fse_pass delta pi tl
+      | _ ->
+        let pi' = Ast.exp_and pi value in
+        fse_pass delta pi' tl)
     | Ite(e, s1, s2)::tl ->
-      let value_t = sub_eval delta e in
-      let pi_t = Ast.exp_and pi value_t in
-      let value_f = Ast.exp_not value_t in
-      let pi_f = Ast.exp_and pi value_f in
-      let fse_t = fse_pass delta pi_t (s1@tl) in
-      let fse_f = fse_pass delta pi_f (s2@tl) in
-      Ast.exp_or fse_t fse_f
+      let value_t = eval delta e in
+      (match value_t with
+      | Ast.Int(bi, Reg 1) when bi_is_zero bi ->
+        fse_pass delta pi (s2@tl)
+      | Ast.Int(bi, Reg 1) when bi_is_one bi ->
+        fse_pass delta pi (s1@tl)
+      | _ ->
+        let pi_t = Ast.exp_and pi value_t in
+        let value_f = Ast.exp_not value_t in
+        let pi_f = Ast.exp_and pi value_f in
+        let fse_t = fse_pass delta pi_t (s1@tl) in
+        let fse_f = fse_pass delta pi_f (s2@tl) in
+        Ast.exp_or fse_t fse_f)
   in
   fse_pass (D.create ()) post p
 
