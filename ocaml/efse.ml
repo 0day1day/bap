@@ -93,6 +93,8 @@ sig
   val get : t -> var -> exp
   (** Getter method.  Raises [Not_found] exception if variable is
       not set. *)
+  val simplify : t -> exp -> exp
+  (** [simplify d e] simplifies exp in context d. *)
 end
 
 module VMDelta =
@@ -104,6 +106,7 @@ struct
     VM.add v e h
   let get h v =
     VM.find v h
+  let simplify d e = e
 end
 
 module Make(D:Delta) =

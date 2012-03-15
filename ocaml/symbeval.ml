@@ -12,6 +12,7 @@ open Big_int_convenience
 open Type
 
 module VH = Var.VarHash
+module VM = Var.VarMap
 
 module D = Debug.Make(struct let name = "SymbEval" and default=`NoDebug end)
 open D
@@ -32,7 +33,7 @@ type form_type = Equal | Rename
 
 type ('a,'b) ctx = {
   pred: 'b;
-  delta: 'a;
+  mutable delta: 'a;
   sigma: (addr, instr) Hashtbl.t;
   lambda: (label_kind, addr) Hashtbl.t;
   pc: addr; (* Should be int *)
@@ -117,7 +118,7 @@ sig
   (** Initial lookup table *)
   val create : unit -> t
   (** Clear the lookup table *)
-  val clear : t -> unit
+  val clear : t -> t
   (** Deep copy the lookup table *)
   val copy : t -> t
   (** Print vars *)
@@ -246,7 +247,7 @@ struct
          ) state.pc prog_stmts )
 
   let cleanup_delta state =
-    MemL.clear state
+    state.delta <- MemL.clear state.delta
 
   let build_default_context prog_stmts =
     let state = create_state() in
@@ -518,7 +519,7 @@ struct
   type t = varval VH.t
 
   let copy delta = VH.copy delta
-  let clear delta = VH.clear delta
+  let clear delta = VH.clear delta; delta
   let create () = VH.create 5000
 
   let print_values delta =
@@ -585,6 +586,80 @@ struct
 
   let remove_var delta var =
     VH.remove delta var; delta
+end
+
+module MemVMBackEnd =
+struct
+  type t = varval VM.t
+
+  let copy delta = delta
+  let create () = VM.empty
+  let clear delta = create ()
+
+  let print_values delta =
+    pdebug "contents of variables" ;
+    VM.iter
+      (fun k v ->
+  	 match k,v with
+  	   | var,Symbolic e ->
+               pdebug ((Pp.var_to_string var) ^ " = " ^ (Pp.ast_exp_to_string e))
+  	   | _ -> ()
+      ) delta
+
+  let print_mem delta =
+    pdebug "contents of memories" ;
+    VM.iter
+      (fun k v ->
+  	 match k,v with
+  	   | var, ConcreteMem(mem,_) ->
+               pdebug ("memory " ^ (Var.name var)) ;
+               AddrMap.iter
+  		 (fun i v ->
+  		    pdebug((Printf.sprintf "%Lx" i)
+  			   ^ " -> " ^ (Pp.ast_exp_to_string v))
+  		 )
+  		 mem
+  	   | _ -> ()
+      ) delta
+
+  let print_var delta name =
+    VM.iter
+      (fun var exp ->
+  	 match exp with
+  	   | Symbolic e ->
+  	       let varname = Var.name var in
+  		 if varname = name then
+  		   pdebug (varname ^ " = "
+  			   ^ (Pp.ast_exp_to_string e))
+  	   | _ -> ()
+      ) delta
+
+  (** Number of variable locations stored in state *)
+  let num_values delta =
+    VM.fold (fun _ _ n -> n+1) delta 0
+
+  (** Number of concrete memory locations stored in state *)
+  let num_mem_locs delta =
+    (** Number of bindings in map
+
+	XXX: This is inefficient; switch to BatMaps which support cardinality
+    *)
+    let map_length m =
+      AddrMap.fold (fun _ _ c -> c+1) m 0
+    in
+    VM.fold
+      (fun k v count  ->
+	 match k,v with
+	   | var, ConcreteMem(mem,_) ->
+             count + (map_length mem)
+	   | _ -> count
+      ) delta 0
+
+  let update_var a b c =
+    VM.add a b c
+
+  let remove_var delta var =
+    VM.remove delta var
 end
 
 module SymbolicMemL =

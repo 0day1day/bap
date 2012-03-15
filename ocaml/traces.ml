@@ -1087,7 +1087,7 @@ let run_block ?(next_label = None) ?(log=fun _ -> ()) ?(transformf = (fun s _ ->
   if not !consistency_check then (
     (* If we are not doing a consistency check, there's no reason to
        keep delta around. cleanup_delta completely clears delta *)
-    TraceConcrete.cleanup_delta state.delta
+    TraceConcrete.cleanup_delta state
   ) else (
     (* remove temps *)
     clean_delta state.delta;
