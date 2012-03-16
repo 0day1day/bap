@@ -1546,7 +1546,7 @@ struct
 
 
   let update_mem mu pos value endian =
-    match is_concrete pos with
+    match is_concrete_scalar pos with
     | true ->
 	(match pos with
 	 | Int (n, _) -> del_symbolic (int64_of_big_int n)

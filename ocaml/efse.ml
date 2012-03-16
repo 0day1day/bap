@@ -2,6 +2,8 @@
 
 open Big_int_convenience
 module CA = Cfg.AST
+module D = Debug.Make(struct let name = "Efse" and default = `NoDebug end)
+open D
 open Type
 module VM = Var.VarMap
 type var = Ast.var
@@ -12,39 +14,10 @@ type stmt = | Assign of (var * exp)
             | Ite of (exp * prog * prog)
 and prog = stmt list
 
-(* EFSE's lookup functions raise Not_found as soon as a variable would
-   be Symbolic *)
-module CFMemL =
-struct
-  open Ast
-  open Symbeval
-  include BuildSymbolicMemL(MemVMBackEnd)
-
-  let lookup_var delta var =
-    match lookup_var delta var with
-    | Symbolic(Int(_)) as x -> x
-    | ConcreteMem _ as x -> x
-    | _ -> raise Not_found
-
-  (* let rec update_mem mu pos value endian = *)
-  (*   (\*pdebug "Update mem" ;*\) *)
-  (*   match mu, pos with *)
-  (*     | ConcreteMem (m,v), Int(p,t) -> *)
-  (*         ConcreteMem(AddrMap.add (normalize p t) value m, v) *)
-  (*     | _ -> failwith "Symbolic memory in concrete evaluation" *)
-
-  let rec lookup_mem mu index endian =
-    (*pdebug "Lookup mem" ;*)
-    match lookup_mem mu index endian with
-    | Int _ as x -> x
-    | _ -> raise Not_found
-
-end
-
-module ConcreteMap = Symbeval.Make(CFMemL)(Symbeval.AlwaysEvalLet)(Symbeval.StdAssign)(Symbeval.StdForm)
+module SymbolicMap = Symbeval.SymbolicSlowMap
 
 let rec stmt_to_string = function
-  | Assign(v,e) -> Printf.sprintf "%s = %s" (Var.name v) (Pp.ast_exp_to_string e)
+  | Assign(v,e) -> Printf.sprintf "%s = %s" (Pp.var_to_string v) (Pp.ast_exp_to_string e)
   | Assert e -> Printf.sprintf "Assert %s" (Pp.ast_exp_to_string e)
   | Ite(e, s1, s2) -> Printf.sprintf "If %s Then (%s) Else (%s)" (Pp.ast_exp_to_string e) (prog_to_string s1) (prog_to_string s2)
 and prog_to_string = function
@@ -117,16 +90,23 @@ module ToEfse = struct
 end
 include ToEfse
 
+
+let unwrap_symb = function
+  | Symbeval.Symbolic e -> e
+  | Symbeval.ConcreteMem(m,v) -> Symbeval.symb_to_exp (Symbeval.conc2symb m v)
+
 module type Delta =
 sig
   type t
   val create : unit -> t
-  val set : t -> var -> exp -> t
+  val set : t -> var -> Symbeval.varval -> t
   (** Setter method *)
-  val get : t -> var -> exp
+  val get : t -> var -> Symbeval.varval
   (** Getter method.  Raises [Not_found] exception if variable is
       not set. *)
-  val simplify : t -> exp -> exp
+  val set_exp : t -> var -> exp -> t
+  val get_exp : t -> var -> exp
+  val simplify : t -> exp -> Symbeval.varval
   (** [simplify d e] simplifies exp in context d. *)
 end
 
@@ -136,19 +116,17 @@ struct
   let create () =
     VM.empty
   let set h v e =
-    VM.add v (Symbeval.Symbolic e) h
-  let unwrap_symb = function
-    | Symbeval.Symbolic e -> e
-    | Symbeval.ConcreteMem(m,v) -> Symbeval.symb_to_exp (Symbeval.conc2symb m v)
+    dprintf "Setting %s to %s" (Pp.var_to_string v) (Symbeval.symb_to_string e);
+    VM.add v e h
   let get h v =
-    unwrap_symb (VM.find v h)
+    VM.find v h
+  let get_exp h v =
+    unwrap_symb (get h v)
+  let set_exp h v e =
+    set h v (Symbeval.Symbolic e)
   let simplify d e =
     (* Reduce to constant if possible *)
-    try (
-      match unwrap_symb (ConcreteMap.eval_expr d e) with
-      | Ast.Int _ as x -> x
-      | _ -> raise Not_found
-    ) with Not_found -> e
+    SymbolicMap.eval_expr d e
 end
 
 module Make(D:Delta) =
@@ -168,7 +146,7 @@ struct
           (try
           (* do NOT do children, because expressions are already
              evaluated. *)
-            `ChangeTo (D.get delta v)
+            `ChangeTo (D.get_exp delta v)
           with Not_found ->
             `DoChildren)
         | _ -> `DoChildren
@@ -177,7 +155,17 @@ struct
 
 (** Inefficient fse algorithm for unpassified programs. *)
   let fse_unpass ?(cf=true) p post =
-    let eval delta e = if cf then sub_eval delta (D.simplify delta e) else sub_eval delta e in
+    let eval delta e = if cf
+      then D.simplify delta e
+      else Symbeval.Symbolic e
+    in
+    (* let eval delta e = if cf then ( *)
+    (*   let x = D.simplify delta e in *)
+    (*   if Symbeval.is_concrete_mem_or_scalar x then x *)
+    (*   else Symbeval.Symbolic (sub_eval delta e) *)
+    (* ) else Symbeval.Symbolic (sub_eval delta e) *)
+    (* in *)
+    let eval_exp delta e = unwrap_symb (eval delta e) in
     let rec fse_unpass delta pi = function
       | [] -> pi
       | Assign(v, e)::tl ->
@@ -185,11 +173,11 @@ struct
         let delta' = D.set delta v value in
         fse_unpass delta' pi tl
       | Assert(e)::tl ->
-        let value = eval delta e in
+        let value = eval_exp delta e in
         let pi' = Ast.exp_and pi value in
         fse_unpass delta pi' tl
       | Ite(e, s1, s2)::tl ->
-        let value_t = eval delta e in
+        let value_t = eval_exp delta e in
         let pi_t = Ast.exp_and pi value_t in
         let value_f = Ast.exp_not value_t in
         let pi_f = Ast.exp_and pi value_f in
@@ -201,19 +189,23 @@ struct
 
 (** Inefficient fse algorithm for passified programs. *)
 let fse_pass ?(cf=true) p post =
-  let eval delta e = if cf then sub_eval delta (D.simplify delta e) else e in
+  let eval delta e = if cf
+    then D.simplify delta e
+    else Symbeval.Symbolic e
+  in
+  let eval_exp delta e = unwrap_symb (eval delta e) in
   let rec fse_pass delta pi = function
     | [] -> pi
     | Assign(v, e)::tl ->
       let value = eval delta e in
-      let delta',pi' = match value with
-        | Ast.Int _ -> D.set delta v value (** Update for constants, no need to add to pi *),
+      let delta',pi' = if Symbeval.is_concrete_mem_or_scalar value then
+        D.set delta v value (** Update for constants, no need to add to pi *),
           pi
-        | _ -> delta, Ast.exp_and pi (Ast.exp_eq (Ast.Var v) value)
+        else delta, Ast.exp_and pi (Ast.exp_eq (Ast.Var v) (unwrap_symb value))
       in
       fse_pass delta' pi' tl
     | Assert(e)::tl ->
-      let value = eval delta e in
+      let value = eval_exp delta e in
       (match value with
       | Ast.Int(bi, Reg 1) when bi_is_zero bi ->
         (* Assert false = false, pi \land false = false *)
@@ -225,7 +217,7 @@ let fse_pass ?(cf=true) p post =
         let pi' = Ast.exp_and pi value in
         fse_pass delta pi' tl)
     | Ite(e, s1, s2)::tl ->
-      let value_t = eval delta e in
+      let value_t = eval_exp delta e in
       (match value_t with
       | Ast.Int(bi, Reg 1) when bi_is_zero bi ->
         fse_pass delta pi (s2@tl)
@@ -243,17 +235,29 @@ let fse_pass ?(cf=true) p post =
 
 (** Efficient fse algorithm for passified programs. *)
 let efse ?(cf=true) p pi =
-  let eval delta e = if cf then sub_eval delta (D.simplify delta e) else e in
+  let eval delta e = if cf
+    then D.simplify delta e
+    else Symbeval.Symbolic e
+  in
+  (* let eval delta e = if cf then ( *)
+  (*   let x = D.simplify delta e in *)
+  (*   if Symbeval.is_concrete_mem_or_scalar x then x *)
+  (*   else Symbeval.Symbolic e *)
+  (* ) else Symbeval.Symbolic e *)
+  (* in *)
+  let eval_exp delta e = unwrap_symb (eval delta e) in
   let rec efse delta pi = function
     | [] -> pi
-    | Assign(v, e)::tl ->
+    | Assign(v, e) as s::tl ->
       let value = eval delta e in
-      let delta',pi' = match value with
-        | Ast.Int _ -> D.set delta v value, pi
-        | _ -> delta, Ast.exp_and pi (Ast.exp_eq (Ast.Var v) e) in
+      dprintf "stmt: %s\nevaluated %s to %s, concrete = %b" (stmt_to_string s) (Pp.ast_exp_to_string e) (Pp.ast_exp_to_string (unwrap_symb value)) (Symbeval.is_concrete_mem_or_scalar value);
+      let delta',pi' = if Symbeval.is_concrete_mem_or_scalar value
+        then D.set delta v value, pi
+        else delta, Ast.exp_and pi (Ast.exp_eq (Ast.Var v) (unwrap_symb value)) in
       efse delta' pi' tl
     | Assert e::tl ->
-      let value = eval delta e in
+      let value = eval_exp delta e in
+      dprintf "Evaluated %s to %s" (Pp.ast_exp_to_string e) (Pp.ast_exp_to_string value);
       (match value with
       | Ast.Int(bi, Reg 1) when bi_is_zero bi ->
         (* Assert false = false, pi \land false = false *)
@@ -265,7 +269,7 @@ let efse ?(cf=true) p pi =
         let pi' = Ast.exp_and pi value in
         efse delta pi' tl)
     | Ite(e, s1, s2)::tl ->
-      let value_t = eval delta e in
+      let value_t = eval_exp delta e in
       (match value_t with
       | Ast.Int(bi, Reg 1) when bi_is_zero bi ->
         efse delta pi (s2@tl)

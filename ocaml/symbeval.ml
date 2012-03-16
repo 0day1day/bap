@@ -81,8 +81,12 @@ let is_symbolic = function
   | Symbolic (Int _) -> false
   | ConcreteMem _ -> false
   | _ -> true
-let is_concrete = function
+let is_concrete_scalar = function
   | Int _ -> true
+  | _ -> false
+let is_concrete_mem_or_scalar = function
+  | Symbolic(Int _) -> true
+  | ConcreteMem _ -> true
   | _ -> false
 let is_concrete_mem = function
   | ConcreteMem _ -> true
@@ -857,7 +861,7 @@ end
 
 
 module Symbolic = Make(SymbolicMemL)(FastEval)(StdAssign)(StdForm)
-module SymbolicMap = Make(BuildSymbolicMemL(MemVMBackEnd))(FastEval)(StdAssign)(StdForm)
+module SymbolicSlowMap = Make(BuildSymbolicMemL(MemVMBackEnd))(SlowEval)(StdAssign)(StdForm)
 module SymbolicSlow = Make(SymbolicMemL)(SlowEval)(StdAssign)(StdForm)
 
 (** Concrete evaluator based on Hashtables *)
