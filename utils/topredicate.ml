@@ -92,6 +92,11 @@ let compute_fse_pass cfg post =
 let compute_efse_pass cfg post =
   let (efse, tossa) = Efse.passified_of_astcfg cfg in
   let post = rename_astexp tossa post in
+  (Efse.efse efse post, [])
+
+let compute_efse_feaspass cfg post =
+  let (efse, tossa) = Efse.passified_of_astcfg cfg in
+  let post = rename_astexp tossa post in
   (Efse.efse_feas efse post, [])
 
 (* end DWP paper *)
@@ -199,6 +204,8 @@ let speclist =
      "Use inefficient FSE algorithm for passified programs in DWP paper.")
   ::("-efse-pass-dwp-paper", Arg.Unit(fun () -> compute_wp := compute_efse_pass),
      "Use efficient FSE algorithm for passified programs in DWP paper.")
+  ::("-efse-pass-feas-dwp-paper", Arg.Unit(fun () -> compute_wp := compute_efse_feaspass),
+     "Use efficient FSE algorithm for passified programs in DWP paper with feasibility checking.")
   ::("-noopt", Arg.Unit (fun () -> usedc := false; usesccvn := false),
      "Do not perform any optimizations on the SSA CFG.")
   ::("-opt", Arg.Unit (fun () -> usedc := true; usesccvn := true),

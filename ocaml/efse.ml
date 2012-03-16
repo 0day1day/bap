@@ -70,6 +70,7 @@ module ToEfse = struct
       in
       c s Util.id
     in
+    if debug then Pp.output_varnums := true;
     let gcl = Gcl.gclhelp_of_astcfg ?entry ?exit cfg in
     dprintf "gcl: %s" (Gcl.gclhelp_to_string gcl);
     let fse = cgcl_to_fse (Gcl.gclhelp_of_astcfg ?entry ?exit cfg) in
@@ -285,15 +286,14 @@ let efse ?(cf=true) p pi =
       | Ast.Int(bi, Reg 1) when bi_is_one bi ->
         efse delta pi (s1@tl)
       | _ ->
-        let pi_t = efse delta e s1 in
-        let pi_f = efse delta (Ast.exp_not e) s2 in
+        let pi_t = efse delta value_t s1 in
+        let pi_f = efse delta (Ast.exp_not value_t) s2 in
         Ast.exp_and (Ast.exp_and pi (Ast.exp_or pi_t pi_f)) (efse delta Ast.exp_true tl))
   in
   efse (D.create ()) pi p
 
 (** Efficient fse algorithm for passified programs with feasibility testing. *)
 let efse_feas ?(cf=true) p pi =
-  if debug then Pp.output_varnums := true;
   let eval delta e = if cf
     then D.simplify delta e
     else Symbeval.Symbolic e
@@ -336,7 +336,8 @@ let efse_feas ?(cf=true) p pi =
         ) else
           efse delta pi' solver tl)
     | Ite(e, s1, s2)::tl ->
-      let true_sat, false_sat = match eval_exp delta e with
+      let value_t = eval_exp delta e in
+      let true_sat, false_sat = match value_t with
       | Ast.Int(bi, Reg 1) when bi_is_one bi ->
         Valid, Unsat
       | Ast.Int(bi, Reg 1) when bi_is_zero bi ->
@@ -369,10 +370,10 @@ let efse_feas ?(cf=true) p pi =
         efse delta pi solver (s2@tl)
       | (Valid|Sat), (Valid|Sat) ->
         solver#push;
-        let pi_t = efse delta e solver s1 in
+        let pi_t = efse delta value_t solver s1 in
         solver#pop;
         solver#push;
-        let pi_f = efse delta (Ast.exp_not e) solver s2 in
+        let pi_f = efse delta (Ast.exp_not value_t) solver s2 in
         solver#pop;
         let new_constraint = Ast.exp_or pi_t pi_f in
         dprintf "Adding constraint %s" (Pp.ast_exp_to_string new_constraint);
