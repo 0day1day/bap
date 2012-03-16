@@ -17,6 +17,7 @@ let assert_vars = ref false
 let usedc = ref true
 let usesccvn = ref true
 let solve = ref false
+let dwpcf = ref true
 
 (* Select which solver to use *)
 let solver = ref (Smtexec.STP.si);;
@@ -82,22 +83,22 @@ let compute_fse cfg post =
 (* DWP paper *)
 let compute_fse_unpass cfg post =
   let efse = Efse.of_astcfg cfg in
-  (Efse.fse_unpass efse post, [])
+  (Efse.fse_unpass ~cf:!dwpcf efse post, [])
 
 let compute_fse_pass cfg post =
   let (efse, tossa) = Efse.passified_of_astcfg cfg in
   let post = rename_astexp tossa post in
-  (Efse.fse_pass efse post, [])
+  (Efse.fse_pass ~cf:!dwpcf efse post, [])
 
 let compute_efse_pass cfg post =
   let (efse, tossa) = Efse.passified_of_astcfg cfg in
   let post = rename_astexp tossa post in
-  (Efse.efse efse post, [])
+  (Efse.efse ~cf:!dwpcf efse post, [])
 
 let compute_efse_feaspass cfg post =
   let (efse, tossa) = Efse.passified_of_astcfg cfg in
   let post = rename_astexp tossa post in
-  (Efse.efse_feas efse post, [])
+  (Efse.efse_feas ~cf:!dwpcf efse post, [])
 
 (* end DWP paper *)
 
@@ -206,6 +207,8 @@ let speclist =
      "Use efficient FSE algorithm for passified programs in DWP paper.")
   ::("-efse-pass-feas-dwp-paper", Arg.Unit(fun () -> compute_wp := compute_efse_feaspass),
      "Use efficient FSE algorithm for passified programs in DWP paper with feasibility checking.")
+  ::("-nocf-dwp-paper", Arg.Clear dwpcf,
+     "Do not use constant folding in DWP paper algorithms")
   ::("-noopt", Arg.Unit (fun () -> usedc := false; usesccvn := false),
      "Do not perform any optimizations on the SSA CFG.")
   ::("-opt", Arg.Unit (fun () -> usedc := true; usesccvn := true),
