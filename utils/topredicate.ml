@@ -92,7 +92,7 @@ let compute_fse_pass cfg post =
 let compute_efse_pass cfg post =
   let (efse, tossa) = Efse.passified_of_astcfg cfg in
   let post = rename_astexp tossa post in
-  (Efse.efse efse post, [])
+  (Efse.efse_feas efse post, [])
 
 (* end DWP paper *)
 

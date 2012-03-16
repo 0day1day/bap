@@ -26,7 +26,7 @@ type exp = Ast.exp
     [Skip] does nothing.
     [Assign] assigns a value to an lvalue.
     [Seq(a,b)] evaluates [a] and then moves on to [b].
-    [Choice(a,b)] 
+    [Choice(a,b)]
     [Assert] goes on to the next expression in the sequence if it is true.
     [Assume] doesn't start when the condition is not true.
 *)
@@ -121,6 +121,16 @@ type gclhelp =
   | CChoice of exp * gclhelp * gclhelp (* bb with cjmp, true  and false branches *)
   | Cunchoice of gclhelp * gclhelp (* unfinished choice *)
   | CSeq of gclhelp list
+
+let rec gclhelp_to_string = function
+  | CAssign bb -> Printf.sprintf "CAssign(%s)" (Cfg_ast.v2s bb)
+  | CChoice(e, g1, g2) -> Printf.sprintf "CChoice(%s, (%s), (%s))" (Pp.ast_exp_to_string e) (gclhelp_to_string g1) (gclhelp_to_string g2)
+  | Cunchoice(g1, g2) -> Printf.sprintf "Cunchoice((%s), (%s))" (gclhelp_to_string g1) (gclhelp_to_string g2)
+  | CSeq([]) -> "Skip"
+  | CSeq(hd::tl) ->
+    "CSeq("^(List.fold_left (fun acc s ->
+      acc^"; "^(gclhelp_to_string s)
+    ) (gclhelp_to_string hd) tl)^")"
 
 let rec cgcl_size = function
   | CAssign _ -> 1

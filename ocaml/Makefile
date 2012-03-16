@@ -92,13 +92,13 @@ export SOURCES = \
 	vsa.ml \
 	eval.ml \
 	symbeval.ml symbeval_search.ml \
+	hacks.ml \
+	coalesce.ml \
+	structural_analysis.ml \
+	unroll.ml \
 	efse.ml \
 	ast_slice.ml \
 	ssa_slice.ml \
-	structural_analysis.ml \
-	unroll.ml \
-	hacks.ml \
-	coalesce.ml \
 	traces.ml \
 	traces_surgical.ml \
 	utils_common.ml \

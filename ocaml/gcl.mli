@@ -16,6 +16,7 @@ type gclhelp =
   | CSeq of gclhelp list
 
 val gclhelp_of_astcfg : ?entry:Cfg.AST.G.V.t -> ?exit:Cfg.AST.G.V.t -> Cfg.AST.G.t -> gclhelp
+val gclhelp_to_string : gclhelp -> string
 
 val of_astcfg : ?entry:Cfg.AST.G.V.t -> ?exit:Cfg.AST.G.V.t -> Cfg.AST.G.t -> t
 val of_ast : Ast.program -> t

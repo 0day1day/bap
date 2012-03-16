@@ -14,6 +14,8 @@ type stmt = | Assign of (var * exp)
             | Ite of (exp * prog * prog)
 and prog = stmt list
 
+type maybe = Valid | Sat | Unsat
+
 module SymbolicMap = Symbeval.SymbolicSlowMap
 
 let rec stmt_to_string = function
@@ -52,8 +54,11 @@ module ToEfse = struct
         | Gcl.CSeq [] ->
           k []
         | Gcl.CSeq(e::es) ->
-        (* dprintf "l: %d" (List.length (e::es)); *)
-          c e (fun ce -> c (Gcl.CSeq es) (fun ces -> k ce@ces))
+          (* dprintf "l: %d" (List.length (e::es)); *)
+          c e (fun ce -> c (Gcl.CSeq es) (fun ces ->
+            (* holy parenthesization bug! Grr ML why does @ have
+               higher precedence than function application? *)
+            k (ce@ces)))
         | Gcl.CAssign b ->
           let bb_s = Cfg.AST.get_stmts cfg b in
           let e = match List.rev bb_s with
@@ -65,7 +70,11 @@ module ToEfse = struct
       in
       c s Util.id
     in
-    cgcl_to_fse (Gcl.gclhelp_of_astcfg ?entry ?exit cfg)
+    let gcl = Gcl.gclhelp_of_astcfg ?entry ?exit cfg in
+    dprintf "gcl: %s" (Gcl.gclhelp_to_string gcl);
+    let fse = cgcl_to_fse (Gcl.gclhelp_of_astcfg ?entry ?exit cfg) in
+    dprintf "fse: %s" (prog_to_string fse);
+    fse
 
   let passified_of_ssa ?entry ?exit cfg =
     let ast = Cfg_ssa.to_astcfg ~dsa:true cfg in
@@ -281,6 +290,89 @@ let efse ?(cf=true) p pi =
         Ast.exp_and (Ast.exp_and pi (Ast.exp_or pi_t pi_f)) (efse delta Ast.exp_true tl))
   in
   efse (D.create ()) pi p
+
+(** Efficient fse algorithm for passified programs with feasibility testing. *)
+let efse_feas ?(cf=true) p pi =
+  let eval delta e = if cf
+    then D.simplify delta e
+    else Symbeval.Symbolic e
+  in
+  let eval_exp delta e = unwrap_symb (eval delta e) in
+  let rec efse delta pi solver = function
+    | [] -> pi
+    | Assign(v, e) as s::tl ->
+      let value = eval delta e in
+      dprintf "stmt: %s\nevaluated %s to %s, concrete = %b" (stmt_to_string s) (Pp.ast_exp_to_string e) (Pp.ast_exp_to_string (unwrap_symb value)) (Symbeval.is_concrete_mem_or_scalar value);
+      let delta',pi' = if Symbeval.is_concrete_mem_or_scalar value
+        then D.set delta v value, pi
+        else
+          let new_constraint = Ast.exp_eq (Ast.Var v) (unwrap_symb value) in
+          dprintf "new constraint %s" (Pp.ast_exp_to_string new_constraint);
+          let () = solver#add_constraint new_constraint in
+          delta, Ast.exp_and pi new_constraint in
+      efse delta' pi' solver tl
+    | Assert e::tl ->
+      let value = eval_exp delta e in
+      (match value with
+      | Ast.Int(bi, Reg 1) when bi_is_zero bi ->
+        (* Assert false = false, pi \land false = false *)
+        Ast.exp_false
+      | Ast.Int(bi, Reg 1) when bi_is_one bi ->
+        (* Assert true = true, pi \land true = pi *)
+        efse delta pi solver tl
+      | _ ->
+        let pi' = Ast.exp_and pi value in
+        dprintf "adding constraint %s" (Pp.ast_exp_to_string value);
+        solver#add_constraint value;
+        if (not solver#is_sat) then
+          Ast.exp_false
+        else
+          efse delta pi' solver tl)
+    | (Ite(e, s1, s2)::tl) as p ->
+      let true_sat, false_sat = match eval_exp delta e with
+      | Ast.Int(bi, Reg 1) when bi_is_one bi ->
+        Valid, Unsat
+      | Ast.Int(bi, Reg 1) when bi_is_zero bi ->
+        Unsat, Valid
+      | _ ->
+        solver#push;
+        solver#add_constraint e;
+        let t = solver#is_sat in
+        dprintf "true branch sat %b" t;
+        solver#pop;
+        solver#push;
+        solver#add_constraint (Ast.exp_not e);
+        let f = solver#is_sat in
+        dprintf "false branch sat %b" f;
+        solver#pop;
+        let convert = function | true -> Sat | false -> Unsat in
+        convert t, convert f
+      in
+      match true_sat, false_sat with
+      (* If one branch condition is Unsat, then this means pi => e
+         or pi => \lnot e, and we do not need to put e (or \lnot e) in
+         the new pi. *)
+      | (Valid|Sat), Unsat ->
+        dprintf "Only looking at true branch";
+        (* if true then x else y == x *)
+        efse delta pi solver (s1@tl)
+      | Unsat, (Valid|Sat) ->
+        dprintf "Only looking at false branch";
+        (* if false then x else y == y *)
+        efse delta pi solver (s2@tl)
+      | (Valid|Sat), (Valid|Sat) ->
+        let pi_t = efse delta e solver s1 in
+        let pi_f = efse delta (Ast.exp_not e) solver s2 in
+        let new_constraint = Ast.exp_or pi_t pi_f in
+        solver#add_constraint new_constraint;
+        Ast.exp_and (Ast.exp_and pi new_constraint) (efse delta Ast.exp_true solver tl)
+      | Unsat, Unsat ->
+        failwith "Efse: We should never reach here because this is an infeasible path"
+  in
+  let s = new Solver.Z3.solver in
+  s#add_constraint pi;
+  dprintf "initial sat %b" s#is_sat;
+  efse (D.create ()) pi s p
 
 end
 
