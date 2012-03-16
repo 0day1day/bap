@@ -293,12 +293,18 @@ let efse ?(cf=true) p pi =
 
 (** Efficient fse algorithm for passified programs with feasibility testing. *)
 let efse_feas ?(cf=true) p pi =
+  if debug then Pp.output_varnums := true;
   let eval delta e = if cf
     then D.simplify delta e
     else Symbeval.Symbolic e
   in
   let eval_exp delta e = unwrap_symb (eval delta e) in
-  let rec efse delta pi solver = function
+  let rec efse delta pi solver stmts =
+    (match stmts with
+    | stmt::_ ->
+      dprintf "Executing %s" (stmt_to_string stmt)
+    | _ -> ());
+    match stmts with
     | [] -> pi
     | Assign(v, e) as s::tl ->
       let value = eval delta e in
@@ -324,11 +330,12 @@ let efse_feas ?(cf=true) p pi =
         let pi' = Ast.exp_and pi value in
         dprintf "adding constraint %s" (Pp.ast_exp_to_string value);
         solver#add_constraint value;
-        if (not solver#is_sat) then
+        if (not solver#is_sat) then (
+          dprintf "Unsatisfiable assertion, returning false";
           Ast.exp_false
-        else
+        ) else
           efse delta pi' solver tl)
-    | (Ite(e, s1, s2)::tl) as p ->
+    | Ite(e, s1, s2)::tl ->
       let true_sat, false_sat = match eval_exp delta e with
       | Ast.Int(bi, Reg 1) when bi_is_one bi ->
         Valid, Unsat
@@ -361,9 +368,14 @@ let efse_feas ?(cf=true) p pi =
         (* if false then x else y == y *)
         efse delta pi solver (s2@tl)
       | (Valid|Sat), (Valid|Sat) ->
+        solver#push;
         let pi_t = efse delta e solver s1 in
+        solver#pop;
+        solver#push;
         let pi_f = efse delta (Ast.exp_not e) solver s2 in
+        solver#pop;
         let new_constraint = Ast.exp_or pi_t pi_f in
+        dprintf "Adding constraint %s" (Pp.ast_exp_to_string new_constraint);
         solver#add_constraint new_constraint;
         Ast.exp_and (Ast.exp_and pi new_constraint) (efse delta Ast.exp_true solver tl)
       | Unsat, Unsat ->
