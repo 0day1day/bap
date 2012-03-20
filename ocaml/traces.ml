@@ -1111,9 +1111,7 @@ let run_block ?(next_label = None) ?(log=fun _ -> ()) ?(transformf = (fun s _ ->
         | Move(v, _, _) ->
           (* An explicit assignment *)
 	  if not (is_temp v) then 
-	    let module HU = Util.HashUtil(VH) in
-            HU.hashtbl_replace 
-	      reg_to_stmt v {assignstmt=addr; assigned_time=get_counter ()}
+            VH.replace reg_to_stmt v {assignstmt=addr; assigned_time=get_counter ()}
         | Special _ as s when Syscall_models.x86_is_system_call s ->
           (* A special could potentially overwrite all registers *)
           last_time := get_counter();
