@@ -686,11 +686,11 @@ let rec to_ir addr next ss pref =
     [assn r32 r a]
   | Call(o1, ra) when pref = [] ->
     let target = op2e r32 o1 in
-    if List.mem esp (Formulap.freevars target) 
-    then unimplemented "call with esp as base";
-    [move esp (esp_e -* i32 4);
+    let t = nt "target" r32 in
+    [move t target;
+     move esp (esp_e -* i32 4);
      store_s None r32 esp_e (l32 ra);
-     Jmp(target, calla)]
+     Jmp(Var t, calla)]
   | Jump(o) ->
     [ Jmp(op2e r32 o, [])]
   | Jcc(o, c) ->
