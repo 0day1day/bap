@@ -109,8 +109,8 @@ let deadcode p =
   fst(Deadcode.do_dce p)
 let jumpelim p =
   fst(Ssa_simp_misc.cfg_jumpelim p)
-let ast_coalesce = Coalesce.AST_Coalesce.coalesce
-let ssa_coalesce = Coalesce.SSA_Coalesce.coalesce
+let ast_coalesce = Coalesce.coalesce_ast
+let ssa_coalesce = Coalesce.coalesce_ssa
 (* let memory2scalardef p = *)
 (*   Memory2scalar.convert_g p Memory2scalar.Default *)
 (* let memory2scalariroptir p = *)
@@ -367,8 +367,6 @@ let speclist =
   :: ("-prune-cfg",
       uadd(TransformAstCfg Prune_unreachable.prune_unreachable_ast),
       "Prune unreachable nodes from an AST CFG")
-  :: ("-cfg-coalesce", uadd(TransformAstCfg Coalesce.AST_Coalesce.coalesce),
-      "Perform coalescing on an AST-CFG graph")
   :: ("-unroll",
       Arg.Int (fun i -> add (TransformAstCfg(Unroll.unroll_loops ~count:i))),
       "<n> Unroll loops n times")
