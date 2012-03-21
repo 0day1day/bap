@@ -1,3 +1,5 @@
+.NOTPARALLEL:
+
 # XXX Fix this so it actually works
 include C/Makefile.defs
 
