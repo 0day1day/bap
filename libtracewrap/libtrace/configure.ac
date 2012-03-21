@@ -1,7 +1,7 @@
 #                                               -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 
-AC_PREREQ([2.67])
+AC_PREREQ([2.64])
 AC_INIT([libtrace], [1.0], [bap-dev@lists.andrew.cmu.edu])
 AC_CONFIG_SRCDIR([src/cpp/trace.container.hpp])
 AC_CONFIG_HEADERS([src/cpp/config.h])
