@@ -96,8 +96,9 @@ let exp_ite ?t b e1 e2 =
     | None -> ()
     | Some t -> assert (t=t1));
 
-  Ite(b, e1, e2)
-
+  if b = exp_true then e1
+  else if b = exp_false then e2
+  else Ite(b, e1, e2)
 
 let parse_ite = function
   | BinOp(OR,
