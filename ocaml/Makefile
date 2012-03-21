@@ -97,7 +97,7 @@ export SOURCES = \
 	structural_analysis.ml \
 	unroll.ml \
 	hacks.ml \
-	coalesce.ml \
+	coalesce.mli coalesce.ml \
 	traces.ml \
 	traces_surgical.ml \
 	utils_common.ml \
