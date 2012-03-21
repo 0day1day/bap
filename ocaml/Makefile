@@ -103,7 +103,7 @@ export SOURCES = \
 	utils_common.ml \
 	test_common.ml \
 	template.ml \
-	syscall_id.ml \
+	syscall_id.mli syscall_id.ml \
 	graphDataflowW.ml \
 	$(SOLVER_SOURCES) \
 	$(PROJSOURCES) \
