@@ -62,7 +62,7 @@ type operand =
 type opcode =
   | Retn of ((typ * operand) option) * bool (* bytes to release, far/near ret *)
   | Nop
-  | Mov of typ * operand * operand (* dst, src *)
+  | Mov of typ * operand * operand * (Ast.exp option) (* dst, src, condition *)
   | Movs of typ
   | Movzx of typ * operand * typ * operand (* dsttyp, dst, srctyp, src *)
   | Movsx of typ * operand * typ * operand (* dsttyp, dst, srctyp, src *)
@@ -506,8 +506,12 @@ let rec to_ir addr next ss pref =
       load_stmt::
       esp_stmts@
       [Jmp(Var temp, [StrAttr "ret"])]
-  | Mov(t, dst,src) when pref = [] || pref = [pref_addrsize] ->
-    [assn t dst (op2e t src)]
+  | Mov(t, dst, src, condition) when pref = [] || pref = [pref_addrsize] ->
+    let c_src = (match condition with 
+      | None -> op2e t src
+      | Some(c) -> ite t c (op2e t src) (op2e t dst))
+    in
+      [assn t dst c_src]
   | Movs(Reg bits as t) ->
       let stmts =
 	store_s seg_es t edi_e (load_s seg_es t esi_e)
@@ -1152,7 +1156,8 @@ module ToStr = struct
       | Some (_,src) -> Printf.sprintf "ret %s" (opr src)
       | None -> "ret")
     | Nop -> "nop"
-    | Mov(t,d,s) -> Printf.sprintf "mov %s, %s" (opr d) (opr s)
+    | Mov(t,d,s,None) -> Printf.sprintf "mov %s, %s" (opr d) (opr s)
+    | Mov(t,d,s,Some(_)) -> Printf.sprintf "cmov %s, %s" (opr d) (opr s)
     | Movs(t) -> "movs"
     | Movzx(dt,dst,st,src) -> Printf.sprintf "movzx %s, %s" (opr dst) (opr src)
     | Movsx(dt,dst,st,src) -> Printf.sprintf "movsx %s, %s" (opr dst) (opr src)
@@ -1234,9 +1239,10 @@ let cc_to_exp i =
     | 0x4 -> zf_e
     | 0x6 -> cf_e |* zf_e
     | 0x8 -> sf_e
+    | 0xa -> pf_e
     | 0xc -> sf_e ^* of_e
     | 0xe -> zf_e |* (sf_e ^* of_e)
-    | _ -> disfailwith "unsupported condition code"
+    | _ -> disfailwith "impossible condition code"
   in
   if (i & 1) = 0 then cc else exp_not cc
 
@@ -1488,13 +1494,13 @@ let parse_instr g addr =
     | 0x87 -> let (r, rm, na) = parse_modrm prefix.opsize na in
 	      (Xchg(prefix.opsize, r, rm), na)
     | 0x88 -> let (r, rm, na) = parse_modrm r8 na in
-	      (Mov(r8, rm, r), na)
+	      (Mov(r8, rm, r, None), na)
     | 0x89 -> let (r, rm, na) = parse_modrm32 na in
-	      (Mov(prefix.opsize, rm, r), na)
+	      (Mov(prefix.opsize, rm, r, None), na)
     | 0x8a -> let (r, rm, na) = parse_modrm r8 na in
-	      (Mov(r8, r, rm), na)
+	      (Mov(r8, r, rm, None), na)
     | 0x8b -> let (r, rm, na) = parse_modrm32 na in
-	      (Mov(prefix.opsize, r, rm), na)
+	      (Mov(prefix.opsize, r, rm, None), na)
     | 0x8d -> let (r, rm, na) = parse_modrm prefix.opsize na in
 	      (match rm with
 	      | Oaddr a -> (Lea(r, a), na)
@@ -1505,9 +1511,9 @@ let parse_instr g addr =
       let reg = Oreg (byte90 & 7) in
       (Xchg(prefix.opsize, o_eax, reg), na)
     | 0xa1 -> let (addr, na) = parse_disp32 na in
-	      (Mov(prefix.opsize, o_eax, Oaddr(l32 addr)), na)
+	      (Mov(prefix.opsize, o_eax, Oaddr(l32 addr), None), na)
     | 0xa3 -> let (addr, na) = parse_disp32 na in
-	      (Mov(prefix.opsize, Oaddr(l32 addr), o_eax), na)
+	      (Mov(prefix.opsize, Oaddr(l32 addr), o_eax, None), na)
     | 0xa4 -> (Movs r8, na)
     | 0xa5 -> (Movs prefix.opsize, na)
     | 0xa6 -> (Cmps r8, na)
@@ -1522,10 +1528,10 @@ let parse_instr g addr =
     | 0xab -> (Stos prefix.opsize, na)
     | 0xb0 | 0xb1 | 0xb2 | 0xb3 | 0xb4 | 0xb5 | 0xb6
     | 0xb7 -> let (i, na) = parse_imm8 na in
-	      (Mov(r8, Oreg(b1 & 7), i), na)
+	      (Mov(r8, Oreg(b1 & 7), i, None), na)
     | 0xb8 | 0xb9 | 0xba | 0xbb | 0xbc | 0xbd | 0xbe
     | 0xbf -> let (i, na) = parse_immv prefix.opsize na in
-	      (Mov(prefix.opsize, Oreg(b1 & 7), i), na)
+	      (Mov(prefix.opsize, Oreg(b1 & 7), i, None), na)
     | 0xc2 | 0xc3 (* Near ret *)
     | 0xca | 0xcb (* Far ret *)-> 
       let far_ret = if (b1 = 0xc2 or b1 = 0xc3) then false else true in
@@ -1539,7 +1545,7 @@ let parse_instr g addr =
 		if b1 = 0xc6 then parse_immb na else parse_immz t na 
 	      in
 	      (match e with (* Grp 11 *)
-	      | 0 -> (Mov(t, rm, i), na)
+	      | 0 -> (Mov(t, rm, i, None), na)
 	      | _ -> disfailwith (Printf.sprintf "Invalid opcode: %02x/%d" b1 e)
 	      )
     | 0xc9 -> (Leave prefix.opsize, na)
@@ -1734,15 +1740,17 @@ let parse_instr g addr =
                     type.
                  *)
                  | Oimm 0xcL -> (Pcmpistri(prefix.mopsize, r, rm, i), na)
-                 | Oimm op  -> disfailwith (Printf.sprintf "unsopported pcmpistri op %02Lx" op)
-                 | _ -> disfailwith "unsopported non-imm op for pcmpisgtri")
-             | b4 -> disfailwith 
+                 | Oimm op  ->  unimplemented 
+		   (Printf.sprintf "unsupported pcmpistri op %02Lx" op)
+                 | _ ->  unimplemented "unsupported non-imm op for pcmpisgtri")
+             | b4 ->  unimplemented  
 	       (Printf.sprintf "unsupported opcode %02x %02x %02x" b1 b2 b3)
           )
-      (*| 0x40 | 0x41 | 0x42 | 0x43 | 0x44 | 0x45 | 0x46 | 0x47 | 0x48 | 0x49 
-	| 0x4a | 0x4b | 0x4c | 0x4d | 0x4e | 0x4f ->*)
-	(* conditional move: cmov *)
-      (* Conditional moves of 8-bit register operands are not supported *)
+      (* conditional moves *)
+      | 0x40 | 0x41 | 0x42 | 0x43 | 0x44 | 0x45 | 0x46 | 0x47 | 0x48 | 0x49 
+      | 0x4a | 0x4b | 0x4c | 0x4d | 0x4e | 0x4f ->
+	let (r, rm, na) = parse_modrm32 na in
+	(Mov(prefix.opsize, r, rm, Some(cc_to_exp b2)), na)
       | 0x70 when prefix.opsize = r16 ->
           let r, rm, na = parse_modrm prefix.opsize na in
           let i, na = parse_imm8 na in
