@@ -257,7 +257,8 @@ let do_aggressive_dce ?(globals = []) graph =
       )
       graph
   in
-  let deps = Hashtbl.find site_to_deps in
+  let deps s = try Hashtbl.find site_to_deps s
+    with Not_found -> [] in
 
   let rec do_live worklist = match worklist with
     | [] -> ()
@@ -273,6 +274,7 @@ let do_aggressive_dce ?(globals = []) graph =
 
   let has_changed = ref false in
 
+  (* Remove dead assignments *)
   let graph = C.G.fold_vertex
     (fun bb graph ->
       let stmts = C.get_stmts graph bb in
@@ -284,7 +286,46 @@ let do_aggressive_dce ?(globals = []) graph =
           alive
         | _ -> true (* Don't remove non-assignments for now *)
       ) stmts in
-      C.set_stmts graph bb newstmts;
+    (* Remove dead conditional jumps
+
+       Consider the following dead CJmp:
+
+                    [CJmp]
+                   *      *
+                  *        *
+             [Dead BB] [Dead BB]
+                  *        *
+                   *      *
+                   [Live BB]
+
+       If CJmp is dead, then there are no live statements that are
+       control-dependent on it.  So, we can change the CJmp to
+       arbitrarily point to one of the Dead BBs.  Since any live
+       statement after the CJmp is not control-dependent on the CJmp, it
+       will execute regardless of which branch is taken.
+    *)
+      let graph = match List.rev newstmts with
+        | CJmp (_, t1, _, attrs) as s::others when not (site_is_live (bb, s)) ->
+          has_changed := true;
+          dprintf "Dead: %s" (Pp.ssa_stmt_to_string s);
+          (* Replace CJmp with Jmp to t1 *)
+          let newstmts = List.rev
+            (Jmp (t1, attrs)::others) in
+          let graph = C.set_stmts graph bb newstmts in
+          (* Now fix the edges *)
+          let truee = List.find (fun e -> C.G.E.label e = Some true) (C.G.succ_e graph bb) in
+          let truedst = C.G.E.dst truee in
+          let new_edge = C.G.E.create bb None truedst in
+          (* Remove all existing edges *)
+          let graph = C.G.fold_succ_e
+            (fun e graph -> C.remove_edge_e graph e) graph bb graph in
+          (* Add the new, unlabeled edge *)
+          let graph = C.add_edge_e graph new_edge in
+          graph
+        | _ -> C.set_stmts graph bb newstmts
+      in
+      graph
+
     )
     graph graph in
 

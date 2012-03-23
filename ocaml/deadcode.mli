@@ -26,6 +26,6 @@ val do_aggressive_dce : ?globals:Var.t list -> Cfg.SSA.G.t -> Cfg.SSA.G.t * bool
     - OR [s] is a comment statement
     - OR [s] is a special statement
 
-    Although non-move statements can be dead, only dead move
+    Although non-move statements can be dead, only dead move and cjmp
     statements are currently removed.
 *)
