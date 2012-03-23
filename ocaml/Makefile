@@ -56,6 +56,7 @@ export SOURCES = \
 	cfg_pp.ml \
 	cfg_ast.mli cfg_ast.ml \
 	ssa_visitor.mli ssa_visitor.ml \
+	depgraphs.ml \
 	cfg_ssa.mli cfg_ssa.ml \
 	debug_snippets.ml \
 	sccvn.mli sccvn.ml \
@@ -87,7 +88,6 @@ export SOURCES = \
 	grammar.mly lexer.mll \
 	parser.ml \
 	input.mli input.ml \
-	depgraphs.ml \
 	to_c.ml \
 	vsa.ml \
 	eval.ml \

@@ -3,7 +3,8 @@
 (* Based off Vine_dataflow.DeadCode *)
 open Ssa
 
-module Debug = Debug.Make(struct let name = "Deadcode" and default=`NoDebug end)
+module D = Debug.Make(struct let name = "Deadcode" and default=`NoDebug end)
+open D
 module VH = Var.VarHash
 module C = Cfg.SSA
 module BH = Hashtbl.Make(C.G.V)
@@ -43,9 +44,6 @@ let def_uses s =
 (** Performs dead code elimination, returning the new CFG and a bool
     indicating whether anything changed. Any move with the [Liveout]
     attribute will be assumed to be live.
-
-    @param globals a list of additional variables to be considered
-    live out. The safe default is to declare all variables live-out. 
 *)
 let do_dce ?(globals=[]) graph =
   let (var_to_deps: Ssa.var list VH.t) = VH.create 57 in
@@ -123,11 +121,11 @@ let do_dce ?(globals=[]) graph =
         )
         (deps var_to_kill)
     ) else
-      Debug.dprintf "Dead var %s is undefined" (Pp.var_to_string var_to_kill)
+      dprintf "Dead var %s is undefined" (Pp.var_to_string var_to_kill)
   done;
   
   (* go over graph to remove dead sites *)
-  Debug.dprintf "Deleting %d dead stmts" (Hashtbl.length dead_sites);
+  dprintf "Deleting %d dead stmts" (Hashtbl.length dead_sites);
   let graph =
     BH.fold
       (fun bb () graph->
@@ -142,4 +140,152 @@ let do_dce ?(globals=[]) graph =
   in
   (graph, has_changed)
 
+(** Performs aggressive dead code elimination, returning the new CFG
+    and a bool indicating whether anything changed. Any move with the
+    [Liveout] attribute will be assumed to be live.
 
+    XXX: Is it possible to avoid traversing the whole graph at the end
+    to remove dead sites?
+
+    XXX: We do not remove Labels, CJmps, or Jmps, as this requires
+    some more thought.
+
+    XXX: Our definition of site might be wrong, since
+    non-assignments can be live/dead too, and there is no guarantee
+    they are unique in a BB.  On the other hand, if one is dead, and
+    the other is identical, they should both be dead (in SSA).
+*)
+let do_aggressive_dce ?(globals = []) graph =
+  let cdg = Depgraphs.CDG_SSA.compute_cdg graph in
+  (* Appel book Section 19.5, Aggressive Dead-code Elimination
+
+     "Mark live any statements that
+     1. Performs input/output, stores into memory, returns from the
+     function, or calls another function that might have side effects
+     2. Defines some variable v that is used by another live statement
+     3. Is a conditional branch, upon which some other live statement
+     is control-dependent.
+
+     Then delete all unmarked statements."
+
+     See deadcode.mli for how we handle #1.
+  *)
+
+  let (site_to_deps: (site, site list) Hashtbl.t) = Hashtbl.create 57 in
+  let (var_to_defsite: site VH.t) = VH.create 57 in
+  let site_is_live, mark_site_as_live =
+    let liveh = Hashtbl.create 57 in
+    (fun site -> Hashtbl.mem liveh site),
+    (fun site -> Hashtbl.replace liveh site ())
+  in
+  let mark_site_as_initially_live, all_initially_live =
+    let initial_live = ref [] in
+    (fun site -> initial_live := site :: !initial_live),
+    (fun () -> !initial_live)
+  in
+  (* get initial mappings for var_to_defsite, and mark initial
+     statements as live (see deadcode.mli). *)
+  C.G.iter_vertex
+    (fun bb ->
+      let stmts = C.get_stmts graph bb in
+      List.iter
+	(fun s ->
+	  let site = (bb, s) in
+          match s with
+          | Move(lv, _, a) ->
+            assert(not (VH.mem var_to_defsite lv));
+            VH.add var_to_defsite lv site;
+
+            (* Mark as liveout if liveout attr is present *)
+            if List.mem Type.Liveout a then
+              mark_site_as_initially_live site
+          | Assert _
+          | Comment _
+          | Halt _ ->
+            mark_site_as_initially_live site
+          | _ -> ()
+	)
+        stmts
+    )
+    graph;
+  (* now get initial mappings for var_to_deps *)
+  let control_deps =
+    let cdh = Cfg.BH.create 57 in
+    (fun bb ->
+      try Cfg.BH.find cdh (C.G.V.label bb)
+      with Not_found ->
+        let d =
+          C.G.fold_pred_e
+            (fun e l ->
+              let src = C.G.E.src e in
+              let stmts = C.get_stmts graph src in
+              match List.rev stmts with
+              | (CJmp _ as stmt)::_ -> (bb,stmt) :: l
+              | _ when C.G.V.label src = Cfg.BB_Entry -> l (* Everything is dependent on BB_Entry *)
+              | _ -> failwith (Printf.sprintf "Expected control-dependency to be a CJmp in %s (%s)!" (Cfg_ssa.v2s bb) (Cfg_ssa.v2s src))
+            ) cdg bb []
+        in Cfg.BH.add cdh (C.G.V.label bb) d;
+        d)
+  in
+  (* build mapping for var_to_deps *)
+  let () = 
+    let gen_deps (bb,s) =
+      let uses = ref [] in
+      let vis = object(self)
+        inherit Ssa_visitor.nop
+        method visit_rvar v =
+          (try uses := VH.find var_to_defsite v :: !uses;
+           with Not_found -> ());
+          `DoChildren
+      end in
+      ignore(Ssa_visitor.stmt_accept vis s);
+      let deps = !uses @ (control_deps bb) in
+      (* dprintf "deps for %s" (Pp.ssa_stmt_to_string s); *)
+      (* List.iter (fun (_,s) -> dprintf "%s" (Pp.ssa_stmt_to_string s)) deps; *)
+      deps
+    in
+    C.G.iter_vertex
+      (fun bb ->
+        let stmts = C.get_stmts graph bb in
+        List.iter
+	  (fun s ->
+	    let site = (bb, s) in
+            assert (not (Hashtbl.mem site_to_deps site));
+            Hashtbl.add site_to_deps site (gen_deps site)
+	  )
+          stmts
+      )
+      graph
+  in
+  let deps = Hashtbl.find site_to_deps in
+
+  let rec do_live worklist = match worklist with
+    | [] -> ()
+    | site::others when site_is_live site ->
+      (* site is already live; ignore it *)
+      do_live others
+    | (bb,s) as site::others ->
+      dprintf "Marking %s as live" (Pp.ssa_stmt_to_string s);
+      mark_site_as_live site;
+      do_live (worklist@(deps site))
+  in
+  do_live (all_initially_live ());
+
+  let has_changed = ref false in
+
+  let graph = C.G.fold_vertex
+    (fun bb graph ->
+      let stmts = C.get_stmts graph bb in
+      let newstmts = List.filter (function
+        | Move _ as s ->
+          let alive = site_is_live (bb, s) in
+          if not alive then has_changed := true;
+          if not alive then dprintf "Dead: %s" (Pp.ssa_stmt_to_string s);
+          alive
+        | _ -> true (* Don't remove non-assignments for now *)
+      ) stmts in
+      C.set_stmts graph bb newstmts;
+    )
+    graph graph in
+
+  graph, !has_changed

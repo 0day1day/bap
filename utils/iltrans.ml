@@ -107,6 +107,8 @@ let sccvn p =
   fst(Sccvn.replacer p)
 let deadcode p =
   fst(Deadcode.do_dce p)
+let adeadcode p =
+  fst(Deadcode.do_aggressive_dce p)
 let jumpelim p =
   fst(Ssa_simp_misc.cfg_jumpelim p)
 let ast_coalesce = Coalesce.coalesce_ast
@@ -180,6 +182,8 @@ let speclist =
      "Apply Strongly Connected Component based Value Numbering")
   ::("-deadcode", uadd(TransformSsa deadcode),
      "Perform dead code ellimination.")
+  ::("-adeadcode", uadd(TransformSsa adeadcode),
+     "Perform aggressive dead code ellimination.")
   ::("-ast-coalesce", uadd(TransformAstCfg ast_coalesce),
      "Perform coalescing on the AST.")
   ::("-ssa-coalesce", uadd(TransformSsa ssa_coalesce),
