@@ -71,11 +71,17 @@ AC_CHECK_FILE([$PIN_HOME],
 AM_CONDITIONAL([HAVE_PIN], [test x$HAVE_PIN = xtrue])
 
 # Checks for ocaml libraries
-ocamlfind query ocamlgraph
+ocamlfind query camomile
 if test $? != 0; then
-   echo "bap requires libbitstring-ocaml-dev"
+   echo "bap requires camomile-dev"
    exit -1
 fi
+
+#ocamlfind query ocamlgraph
+#if test $? != 0; then
+#   echo "bap requires libbitstring-ocaml-dev"
+#   exit -1
+#fi
 
 dnl ocamlfind query ocamlgraph
 dnl if test $? != 0; then
