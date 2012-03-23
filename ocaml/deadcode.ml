@@ -220,7 +220,7 @@ let do_aggressive_dce ?(globals = []) graph =
               let src = C.G.E.src e in
               let stmts = C.get_stmts graph src in
               match List.rev stmts with
-              | (CJmp _ as stmt)::_ -> (bb,stmt) :: l
+              | (CJmp _ as stmt)::_ -> (src,stmt) :: l
               | _ when C.G.V.label src = Cfg.BB_Entry -> l (* Everything is dependent on BB_Entry *)
               | _ -> failwith (Printf.sprintf "Expected control-dependency to be a CJmp in %s (%s)!" (Cfg_ssa.v2s bb) (Cfg_ssa.v2s src))
             ) cdg bb []
