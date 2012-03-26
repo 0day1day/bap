@@ -74,7 +74,7 @@ export SOURCES = \
 	syscall_models.ml \
 	gcl.mli gcl.ml \
 	ugcl.ml \
-	wp.ml \
+	wp.mli wp.ml \
 	stp_grammar.mly stp_lexer.mll \
 	cvc3_grammar.mly cvc3_lexer.mll \
 	yices_grammar.mly yices_lexer.mll \
