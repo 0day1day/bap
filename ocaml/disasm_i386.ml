@@ -1674,7 +1674,7 @@ let parse_instr g addr =
       | 0x1f -> (Nop, na)
       | 0x28 | 0x29 | 0x6e | 0x7e | 0x6f | 0x7f ->
         let t, name, align, tsrc, tdest = match b2 with
-          | 0x28 | 0x29 when prefix.opsize_override -> 
+          | 0x28 | 0x29 when prefix.opsize_override ->
 	    r128, "movapd", true, r128, r128
           | 0x28 | 0x29 when not prefix.opsize_override -> 
 	    r128, "movaps", true, r128, r128
@@ -1684,14 +1684,17 @@ let parse_instr g addr =
           | 0x6e -> r32, "movd", false, r32, prefix.mopsize
           | 0x7e -> r32, "movd", false, prefix.mopsize, r32
           | 0x6f | 0x7f -> r64, "movq", false, r64, r64
-          | _ -> disfailwith "mov opcode case missing, please fill it in"
+          | _ -> unimplemented 
+	    (Printf.sprintf "mov opcode case missing: %02x" b2)
         in
 	let r, rm, na = parse_modrm32 na in
 	let s, d = match b2 with
-          | 0x6f | 0x6e | 0x28 -> rm, r
-          | _ -> r, rm
+          | 0x6f | 0x6e | 0x28 -> r, rm
+          | 0x7f | 0x7e | 0x29 -> rm, r
+	  | _ -> disfailwith 
+	    (Printf.sprintf "impossible mov(a/d) condition: %02x" b2)
         in
-	(Movdq(t, tdest,d,tsrc,s,align,name), na)
+	(Movdq(t, tdest, d, tsrc, s, align, name), na)
       | 0x31 -> (Rdtsc, na)
       | 0x34 -> (Sysenter, na)
       | 0x3a ->
