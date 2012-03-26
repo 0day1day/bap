@@ -15,7 +15,7 @@ val do_dce : ?globals:Var.t list -> Cfg.SSA.G.t -> Cfg.SSA.G.t * bool
 *)
 
 val do_aggressive_dce : ?globals:Var.t list -> Cfg.SSA.G.t -> Cfg.SSA.G.t * bool
-(** Just like [do_dce], except dead code is detected more
+(** Just like {!do_dce}, except dead code is detected more
     aggressively. Specifically, a statement [s] is considered live if
     - [s] has the [Liveout] attribute
     - OR [s] appears in [globals]
@@ -28,4 +28,6 @@ val do_aggressive_dce : ?globals:Var.t list -> Cfg.SSA.G.t -> Cfg.SSA.G.t * bool
 
     Although non-move statements can be dead, only dead move and cjmp
     statements are currently removed.
+
+    [do_aggressive_dce] is considered experimental.
 *)
