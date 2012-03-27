@@ -452,6 +452,8 @@ static uint32_t GetBitsOfReg(REG r) {
     if (REG_is_gr32(r)) return 32;
     if (REG_is_gr64(r)) return 64;
 
+    if (REG_is_fr_or_x87(r)) return 80;
+
     string s = REG_StringShort(r);
 
     switch (r) {
