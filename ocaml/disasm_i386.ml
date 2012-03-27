@@ -1689,8 +1689,8 @@ let parse_instr g addr =
         in
 	let r, rm, na = parse_modrm32 na in
 	let s, d = match b2 with
-          | 0x6f | 0x6e | 0x28 -> r, rm
-          | 0x7f | 0x7e | 0x29 -> rm, r
+          | 0x6f | 0x6e | 0x28 -> rm, r
+          | 0x7f | 0x7e | 0x29 -> r, rm
 	  | _ -> disfailwith 
 	    (Printf.sprintf "impossible mov(a/d) condition: %02x" b2)
         in
