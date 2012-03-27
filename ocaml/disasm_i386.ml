@@ -1048,8 +1048,8 @@ let rec to_ir addr next ss pref =
   | Xor(t, o1, o2) when o1 = o2->
     assn t o1 (Int(bi0,t))
     :: move af (Unknown("AF is undefined after xor", r1))
-    :: List.map (fun v -> move v exp_true) [zf; pf]
-    @  List.map (fun v -> move v exp_false) [oF; cf; sf]
+    :: List.map (fun v -> move v exp_true) [zf; pf; sf]
+    @  List.map (fun v -> move v exp_false) [oF; cf]
   | Xor(t, o1, o2) ->
     assn t o1 (op2e t o1 ^* op2e t o2)
     :: move oF exp_false

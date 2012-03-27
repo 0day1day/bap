@@ -1436,11 +1436,17 @@ VOID InstrBlock(BBL bbl)
                 REG r = INS_OperandReg(ins, i);
                 opndvals[valcount].reg = r;
                 opndvals[valcount].type.type = REGISTER;
-                opndvals[valcount].type.size = INS_OperandWidth(ins, i);
+
+                // This was causing problems with movd %eax, %xmm0,
+                // because %xmm0's operand width is 32, but BAP needs
+                // to know the full operand size, which is 128.
+                // opndvals[valcount].type.size = INS_OperandWidth(ins, i);
+
+                opndvals[valcount].type.size = GetBitsOfReg(r);
 
                 REG fullr = REG_FullRegName(r);
                 if (fullr != REG_INVALID() && fullr != r) {
-                    /* We know the name and type of the fuller register, so just use that! */
+                  /* We know the fuller register, so just use that! */
                     //	      cerr << "partial " << REG_StringShort(r) << " full " << REG_StringShort(fullr) << endl;
                     opndvals[valcount].reg = fullr;
                     opndvals[valcount].type.type = REGISTER;
