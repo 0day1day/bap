@@ -683,9 +683,9 @@ let rec to_ir addr next ss pref =
          | None ->
              disfailwith "failed to read dwords for pshufd"
       )
-  | Pxor args ->
-    (* Pxor is just a larger xor *)
-    to_ir addr next ss pref (Xor(args))
+  | Pxor(t, o1, o2) ->
+    [assn t o1 (op2e t o1 ^* op2e t o2)]
+    (* Pxor does not set any flags! *)
   | Lea(r, a) when pref = [] ->
     [assn r32 r a]
   | Call(o1, ra) when pref = [] ->
@@ -696,7 +696,7 @@ let rec to_ir addr next ss pref =
      store_s None r32 esp_e (l32 ra);
      Jmp(Var t, calla)]
   | Jump(o) ->
-    [ Jmp(op2e r32 o, [])]
+    [Jmp(op2e r32 o, [])]
   | Jcc(o, c) ->
     cjmp c (op2e r32 o)
   | Setcc(t, o1, c) ->
