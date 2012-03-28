@@ -79,7 +79,7 @@ export SOURCES = \
 	cvc3_grammar.mly cvc3_lexer.mll \
 	yices_grammar.mly yices_lexer.mll \
 	smtexec.mli smtexec.ml \
-	solver.ml \
+	solver.mli solver.ml \
 	asmir_vars.ml \
 	asmir_consts.ml \
 	asmir.mli asmir.ml \
