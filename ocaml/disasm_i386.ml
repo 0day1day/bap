@@ -841,7 +841,7 @@ let rec to_ir addr next ss pref =
     let first_one = fold check_bit (it (bits-1) t) ((bits-2) --- 0) in
     [
       move source_is_zero (src_e ==* it 0 t);
-      move zf (ite t source_is_zero_v (it 1 t) (it 0 t));
+      move zf (ite r1 source_is_zero_v (it 1 r1) (it 0 r1));
       assn t dst (ite t source_is_zero_v (Unknown ("bsf: destination undefined when source is zero", t)) first_one);
     ]
   | Hlt ->
