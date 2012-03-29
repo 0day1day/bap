@@ -719,7 +719,7 @@ let trace_length trace =
 
 let print_formula file formula =
   let oc = open_out file in
-  let mem_hash = Var.VarHash.create 1000 in
+  let mem_hash = Memory2array.create_state () in
   let formula = Memory2array.coerce_exp_state mem_hash formula in
   let foralls = List.map (Memory2array.coerce_rvar_state mem_hash) [] in
   let p = match !printer with

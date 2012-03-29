@@ -49,7 +49,7 @@ export SOURCES = \
 	ast_visitor.mli ast_visitor.ml \
 	ast_convenience.ml \
 	grammar_scope.ml \
-	memory2array.ml \
+	memory2array.mli memory2array.ml \
 	reachable.mli \
 	reachable.ml \
 	prune_unreachable.mli prune_unreachable.ml \
