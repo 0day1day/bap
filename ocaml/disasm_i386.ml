@@ -842,8 +842,11 @@ let rec to_ir addr next ss pref =
     [
       move source_is_zero (src_e ==* it 0 t);
       move zf (ite r1 source_is_zero_v (it 1 r1) (it 0 r1));
-      assn t dst (ite t source_is_zero_v (Unknown ("bsf: destination undefined when source is zero", t)) first_one);
+      assn t dst (ite t source_is_zero_v (Unknown ("bsf: destination undefined when source is zero", t)) first_one)
     ]
+    @
+      let undef (Var.V(_, n, t) as r) = move r (Unknown ((n^" undefined after bsf"), t)) in
+      List.map undef [cf; oF; sf; af; pf]
   | Hlt ->
     [Jmp(Lab "General_protection fault", [])]
   | Rdtsc ->
