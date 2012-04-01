@@ -978,17 +978,21 @@ let rec to_ir addr next ss pref =
     :: assn t o1 (op2e t o1 -* op2e t o2)
     :: set_flags_sub t (Var oldo1) (op2e t o2) (op2e t o1)
   | Sbb(t, o1, o2) ->
-    let tmp = nt "t" t in
-    let s1 = Var tmp 
-    and s2 = (op2e t o2) +* cast_unsigned t cf_e 
-    and r = op2e t o1 in
-    move tmp r
-    :: assn t o1 (r -* s2)
-    (* FIXME: sanity check this *)
-    ::move oF (cast_high r1 ((s1 ^* s2) &* (s1 ^* r)))
-    ::move cf ((r >* s1) |* (r ==* s1 &* cf_e))
+    let tmp_s = nt "ts" t in
+    let tmp_d = nt "td" t in
+    let orig_s = Var tmp_s in
+    let orig_d = Var tmp_d in
+    let sube = orig_s +* cast_unsigned t cf_e in
+    let d = op2e t o1 in
+    let s1 = op2e t o2 in
+    let s2 = op2e t o1 in
+    move tmp_s s1
+    :: move tmp_d s2
+    :: assn t o2 (orig_d -* sube)
+    ::move oF (cast_high r1 ((orig_s ^* orig_d) &* (orig_d ^* d)))
+    ::move cf (sube >* orig_d)
     ::move af (Unknown("AF for sbb unimplemented", r1))
-    ::set_pszf t r
+    ::set_pszf t d
   | Cmp(t, o1, o2) ->
     let tmp = nt "t" t in
     move tmp (op2e t o1 -* op2e t o2)
