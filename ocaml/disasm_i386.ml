@@ -988,7 +988,7 @@ let rec to_ir addr next ss pref =
     let s2 = op2e t o1 in
     move tmp_s s1
     :: move tmp_d s2
-    :: assn t o2 (orig_d -* sube)
+    :: assn t o1 (orig_d -* sube)
     ::move oF (cast_high r1 ((orig_s ^* orig_d) &* (orig_d ^* d)))
     ::move cf (sube >* orig_d)
     ::move af (Unknown("AF for sbb unimplemented", r1))
