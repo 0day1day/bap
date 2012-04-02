@@ -689,12 +689,27 @@ let rec to_ir addr next ss pref =
   | Lea(r, a) when pref = [] ->
     [assn r32 r a]
   | Call(o1, ra) when pref = [] ->
+    (* If o1 is an immediate, we should syntactically have Jump(imm)
+       so that the CFG algorithm knows where the jump goes.  Otherwise
+       it will point to BB_Indirect.
+
+       Otherwise, we should evaluate the operand before decrementing esp.
+       (This really only matters when esp is the base register of a memory
+       lookup. *)
     let target = op2e r32 o1 in
-    let t = nt "target" r32 in
-    [move t target;
-     move esp (esp_e -* i32 4);
-     store_s None r32 esp_e (l32 ra);
-     Jmp(Var t, calla)]
+    (match o1 with
+    | Oimm _ ->
+      let t = nt "target" r32 in
+      [move t target;
+       move esp (esp_e -* i32 4);
+       store_s None r32 esp_e (l32 ra);
+       Jmp(target, calla)]
+    | _ ->
+      let t = nt "target" r32 in
+      [move t target;
+       move esp (esp_e -* i32 4);
+       store_s None r32 esp_e (l32 ra);
+       Jmp(Var t, calla)])
   | Jump(o) ->
     [Jmp(op2e r32 o, [])]
   | Jcc(o, c) ->
