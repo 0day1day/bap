@@ -288,6 +288,7 @@ let efse ?(cf=true) p pi =
       | _ ->
         let pi_t = efse delta value_t s1 in
         let pi_f = efse delta (Ast.exp_not value_t) s2 in
+        (* XXX: This is wrong. We need to merge deltas here! *)
         Ast.exp_and (Ast.exp_and pi (Ast.exp_or pi_t pi_f)) (efse delta Ast.exp_true tl))
   in
   efse (D.create ()) pi p
@@ -370,9 +371,11 @@ let efse_feas ?(cf=true) p pi =
         efse delta pi solver (s2@tl)
       | (Valid|Sat), (Valid|Sat) ->
         solver#push;
+        (* XXX: I think we need to add the constraint value_t to solver here *)
         let pi_t = efse delta value_t solver s1 in
         solver#pop;
         solver#push;
+        (* XXX: I think we need to add the constraint not value_t to solver here *)
         let pi_f = efse delta (Ast.exp_not value_t) solver s2 in
         solver#pop;
         let new_constraint = Ast.exp_or pi_t pi_f in
