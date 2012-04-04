@@ -7,7 +7,6 @@ open Big_int_Z
 open Big_int_convenience
 open Symbeval
 open Type
-open BatListFull
 
 module D = Debug.Make(struct let name = "Traces" and default=`NoDebug end)
 module DV = Debug.Make(struct let name = "TracesVerbose" and default=`NoDebug end)

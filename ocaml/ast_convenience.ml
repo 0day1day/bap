@@ -238,11 +238,3 @@ let rm_concat = function
       let nt = Reg(bitsl + bitsr) in
       exp_or ((cast_unsigned nt le) <<* Int(big_int_of_int bitsr, nt)) (cast_unsigned nt re)
   | _ -> assert false
-
-let last_meaningful_stmt p =
-  let rec f = function
-    | Comment _::tl -> f tl
-    | x::_ -> x
-    | [] -> failwith "No meaningful statements"
-  in
-  f (List.rev p)

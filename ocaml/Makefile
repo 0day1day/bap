@@ -20,12 +20,6 @@ export SOLVER=$(BAP_DIR)/solvers
 include $(SOLVER)/makefile.inc
 -include ../../ocaml-proj/Makefile
 
-include $(CURDIR)/makefile.inc
-ifdef HAVE_LLVM
-export LLVM_SRC = llvm_codegen.ml
-export LLVM_PACKS = llvm llvm.analysis llvm.executionengine llvm.target llvm.scalar_opts
-endif
-
 # Stop annoying warnings about big_int duplication!
 #export OCAMLFIND_IGNORE_DUPS_IN=$(BAP_DIR)/bigint-3.12/otherlibs/num
 
@@ -51,13 +45,11 @@ export SOURCES = \
 	disasm_temp.ml \
 	pp.ml \
 	typecheck.ml \
-	ast_convenience.ml \
 	cfg.mli cfg.ml \
 	ast_visitor.mli ast_visitor.ml \
+	ast_convenience.ml \
 	grammar_scope.ml \
 	memory2array.mli memory2array.ml \
-	flatten_mem.mli \
-	flatten_mem.ml \
 	reachable.mli \
 	reachable.ml \
 	prune_unreachable.mli prune_unreachable.ml \
@@ -79,7 +71,6 @@ export SOURCES = \
 	libasmir.idl \
 	disasm_i386.ml \
 	disasm.ml \
-	$(LLVM_SRC) \
 	syscall_models.ml \
 	gcl.mli gcl.ml \
 	ugcl.ml \
@@ -129,7 +120,7 @@ DOC_FILES := $(filter %.mli, $(SOURCES)) $(filter %.ml, $(SOURCES))
 
 
 # ocamlfind packages required
-export PACKS = bigarray str num unix camomile threads piqi.lib $(LLVM_PACKS)
+export PACKS = bigarray str num unix camomile threads piqi.lib
 # ocamlfind packages for ocamldoc
 # don't include packages in /usr/lib/ocaml, this will cause ocamldoc
 # to complain about conflicts with our local big_int
