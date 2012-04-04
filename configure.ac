@@ -31,7 +31,6 @@ AC_PROG_CAMLIDL
 #AC_PROG_LIBTOOL
 
 # Check for Z3
-
 AC_ARG_WITH([z3-bindings],
             [AS_HELP_STRING([--with-z3-bindings],
               [enable support for Z3 bindings])],
@@ -69,6 +68,13 @@ AC_CHECK_FILE([$PIN_HOME],
               [HAVE_PIN=false; AC_MSG_WARN([Pin not found. BAP pintraces will be unavailable.])])
 
 AM_CONDITIONAL([HAVE_PIN], [test x$HAVE_PIN = xtrue])
+
+# Conditionally build llvm
+AS_IF([ocamlfind query llvm],
+		 [HAVE_LLVM=true],
+		 [HAVE_LLVM=false; AC_MSG_WARN([LLVM not found. BAP to llvm will be unavailable.])])
+
+AM_CONDITIONAL([HAVE_LLVM], [test x$HAVE_LLVM = xtrue])
 
 # Checks for ocaml libraries
 ocamlfind query ocamlgraph
