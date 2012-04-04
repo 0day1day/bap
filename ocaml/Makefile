@@ -20,7 +20,8 @@ export SOLVER=$(BAP_DIR)/solvers
 include $(SOLVER)/makefile.inc
 -include ../../ocaml-proj/Makefile
 
-if HAVE_LLVM
+include $(CURDIR)/makefile.inc
+ifdef HAVE_LLVM
 export LLVM_SRC = llvm_codegen.ml
 export LLVM_PACKS = llvm llvm.analysis llvm.executionengine llvm.target llvm.scalar_opts
 endif

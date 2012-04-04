@@ -71,10 +71,18 @@ AM_CONDITIONAL([HAVE_PIN], [test x$HAVE_PIN = xtrue])
 
 # Conditionally build llvm
 AS_IF([ocamlfind query llvm],
-		 [HAVE_LLVM=true],
-		 [HAVE_LLVM=false; AC_MSG_WARN([LLVM not found. BAP to llvm will be unavailable.])])
+      [HAVE_LLVM=true],
+      [HAVE_LLVM=false; AC_MSG_WARN([LLVM not found. BAP to llvm will be unavailable.])])
 
-AM_CONDITIONAL([HAVE_LLVM], [test x$HAVE_LLVM = xtrue])
+rm -f ocaml/makefile.inc
+if `test "x$HAVE_LLVM" = "xtrue"` ; then
+   cat >>ocaml/makefile.inc <<"EOF"
+HAVE_LLVM=true
+
+EOF
+else          
+   touch ocaml/makefile.inc
+fi
 
 # Checks for ocaml libraries
 ocamlfind query ocamlgraph
