@@ -31,7 +31,6 @@ AC_PROG_CAMLIDL
 #AC_PROG_LIBTOOL
 
 # Check for Z3
-
 AC_ARG_WITH([z3-bindings],
             [AS_HELP_STRING([--with-z3-bindings],
               [enable support for Z3 bindings])],
@@ -70,12 +69,33 @@ AC_CHECK_FILE([$PIN_HOME],
 
 AM_CONDITIONAL([HAVE_PIN], [test x$HAVE_PIN = xtrue])
 
+# Conditionally build llvm
+AS_IF([ocamlfind query llvm],
+      [HAVE_LLVM=true],
+      [HAVE_LLVM=false; AC_MSG_WARN([LLVM not found. BAP to llvm will be unavailable.])])
+
+rm -f ocaml/makefile.inc
+if `test "x$HAVE_LLVM" = "xtrue"` ; then
+   cat >>ocaml/makefile.inc <<"EOF"
+HAVE_LLVM=true
+
+EOF
+else          
+   touch ocaml/makefile.inc
+fi
+
 # Checks for ocaml libraries
-ocamlfind query ocamlgraph
+ocamlfind query camomile
 if test $? != 0; then
-   echo "bap requires libbitstring-ocaml-dev"
+   echo "bap requires camomile-dev"
    exit -1
 fi
+
+#ocamlfind query ocamlgraph
+#if test $? != 0; then
+#   echo "bap requires libbitstring-ocaml-dev"
+#   exit -1
+#fi
 
 dnl ocamlfind query ocamlgraph
 dnl if test $? != 0; then

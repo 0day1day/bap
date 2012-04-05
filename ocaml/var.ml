@@ -29,7 +29,14 @@ end
 
 include V
 
-module VarHash = Hashtbl.Make(V)
+module VHMake = Hashtbl.Make(V)
+
+module VarHash = struct
+  include VHMake
+  (* Overwrite broken replace:
+     http://caml.inria.fr/mantis/view.php?id=5349 *)
+  include Util.HashUtil(VHMake)
+end
 module VarMap = Map.Make(V)
 module VarSet = Set.Make(V)
 

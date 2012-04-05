@@ -197,29 +197,29 @@ let _ =
   print_out ("Total run time : " ^ !total_run_time ^ " seconds");
   print_out ("Number of traces : " ^ string_of_int !total_traces);
   print_out ("Total number of instructions : " ^ !block_count);
-  print_out ("Total number of unknown instructions : " 
+  print_out ("Total number of BAP unknown instructions : " 
 	     ^ string_of_int !total_unknown);		 
   let unknown_percent = 
     (string_of_float 
        (one_decimal_percent !total_unknown (int_of_string !block_count))) in
-  print_out ("Percentage of unknown blocks : "^unknown_percent^"%");
+  print_out ("Percentage of BAP unknown instructions : "^unknown_percent^"%");
   print_out ("Total number of wrong instructions : " 
 	     ^ string_of_int !total_wrong);
   let wrong_percent = 
     (string_of_float 
        (one_decimal_percent !total_wrong (int_of_string !block_count))) in
-  print_out ("Percentage of incorrect blocks : "^wrong_percent^"%");
+  print_out ("Percentage of wrong instructions : "^wrong_percent^"%");
   flush !out;
 
-  print_out "Unknown Instruction Summary:";
+  print_out "Errors and Unknowns in disasm_i386:";
   print_hashtbl ~total:(Some(!total_unknown)) bap_unknown_hashtbl;
   flush !out;
   
-  print_out "Incorrect Implementation Summary:";
+  print_out "Instructions BAP Evaluation Got Incorrect:";
   print_hashtbl ~total:(Some(!total_wrong)) small_hashtbl;
   flush !out;
 
-  print_out "Incorrect but Likely due to special Summary:";
+  print_out "Instructions which are Incorrect but Likely due to Specials:";
   print_hashtbl probably_right_hashtbl;
   flush !out;
 

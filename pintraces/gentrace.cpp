@@ -452,6 +452,10 @@ static uint32_t GetBitsOfReg(REG r) {
     if (REG_is_gr32(r)) return 32;
     if (REG_is_gr64(r)) return 64;
 
+    /* REG_is_fr_or_x87 returns true on XMM registers and other
+       non-x87 regs, so we can't use that. */
+    if (REG_ST_BASE <= r && r <= REG_ST_LAST) return 80;
+
     string s = REG_StringShort(r);
 
     switch (r) {
@@ -1436,11 +1440,17 @@ VOID InstrBlock(BBL bbl)
                 REG r = INS_OperandReg(ins, i);
                 opndvals[valcount].reg = r;
                 opndvals[valcount].type.type = REGISTER;
-                opndvals[valcount].type.size = INS_OperandWidth(ins, i);
+
+                // This was causing problems with movd %eax, %xmm0,
+                // because %xmm0's operand width is 32, but BAP needs
+                // to know the full operand size, which is 128.
+                // opndvals[valcount].type.size = INS_OperandWidth(ins, i);
+
+                opndvals[valcount].type.size = GetBitsOfReg(r);
 
                 REG fullr = REG_FullRegName(r);
                 if (fullr != REG_INVALID() && fullr != r) {
-                    /* We know the name and type of the fuller register, so just use that! */
+                  /* We know the fuller register, so just use that! */
                     //	      cerr << "partial " << REG_StringShort(r) << " full " << REG_StringShort(fullr) << endl;
                     opndvals[valcount].reg = fullr;
                     opndvals[valcount].type.type = REGISTER;

@@ -1,13 +1,4 @@
-(** Dijkstra's Guarded Command Language
-
-    Type declarations for the Guarded Command Language, and a function
-    to traslate a VinE trace into GCL.
-
-    Other generally useful functions that deal with the GCL should be
-    added here.
-
-    @author: Ivan Jager
-*)
+(* Dijkstra's Guarded Command Language *)
 
 open BatListFull
 open Type

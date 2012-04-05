@@ -52,7 +52,7 @@ struct
   (** [sdom x y] returns true iff [x] strictly dominates [y]. *)
   type sdom = G.V.t -> G.V.t -> bool
 
-    
+
   (** function from [x] to a list of nodes not dominated by [x], but with
       predecessors which are dominated by [x] *)
   type dom_frontier = G.V.t -> G.V.t list

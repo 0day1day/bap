@@ -7,7 +7,6 @@ open Big_int_Z
 open Big_int_convenience
 open Symbeval
 open Type
-open BatListFull
 
 module D = Debug.Make(struct let name = "Traces" and default=`NoDebug end)
 module DV = Debug.Make(struct let name = "TracesVerbose" and default=`NoDebug end)
@@ -719,7 +718,7 @@ let trace_length trace =
 
 let print_formula file formula =
   let oc = open_out file in
-  let mem_hash = Var.VarHash.create 1000 in
+  let mem_hash = Memory2array.create_state () in
   let formula = Memory2array.coerce_exp_state mem_hash formula in
   let foralls = List.map (Memory2array.coerce_rvar_state mem_hash) [] in
   let p = match !printer with
@@ -1113,9 +1112,7 @@ let run_block ?(next_label = None) ?(log=fun _ -> ()) ?(transformf = (fun s _ ->
         | Move(v, _, _) ->
           (* An explicit assignment *)
 	  if not (is_temp v) then 
-	    let module HU = Util.HashUtil(VH) in
-            HU.hashtbl_replace 
-	      reg_to_stmt v {assignstmt=addr; assigned_time=get_counter ()}
+            VH.replace reg_to_stmt v {assignstmt=addr; assigned_time=get_counter ()}
         | Special _ as s when Syscall_models.x86_is_system_call s ->
           (* A special could potentially overwrite all registers *)
           last_time := get_counter();

@@ -6,6 +6,7 @@
     @author Ivan Jager
 *)
 
+val v2s : Cfg.SSA.G.V.t -> string
 
 val of_astcfg : Cfg.AST.G.t -> Cfg.SSA.G.t
 

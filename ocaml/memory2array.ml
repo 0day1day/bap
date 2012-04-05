@@ -165,6 +165,8 @@ object (self)
     broken down to byte-level reads and writes using array variables
     with the same name as the old memory variables.  *)
 
+type state = Ast.var VarHash.t
+
 let create_state () = VarHash.create 1000
 
 let coerce_prog prog =

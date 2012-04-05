@@ -20,6 +20,12 @@ export SOLVER=$(BAP_DIR)/solvers
 include $(SOLVER)/makefile.inc
 -include ../../ocaml-proj/Makefile
 
+include $(CURDIR)/makefile.inc
+ifdef HAVE_LLVM
+export LLVM_SRC = llvm_codegen.ml
+export LLVM_PACKS = llvm llvm.analysis llvm.executionengine llvm.target llvm.scalar_opts
+endif
+
 # Stop annoying warnings about big_int duplication!
 #export OCAMLFIND_IGNORE_DUPS_IN=$(BAP_DIR)/bigint-3.12/otherlibs/num
 
@@ -45,17 +51,20 @@ export SOURCES = \
 	disasm_temp.ml \
 	pp.ml \
 	typecheck.ml \
+	ast_convenience.ml \
 	cfg.mli cfg.ml \
 	ast_visitor.mli ast_visitor.ml \
-	ast_convenience.ml \
 	grammar_scope.ml \
-	memory2array.ml \
+	memory2array.mli memory2array.ml \
+	flatten_mem.mli \
+	flatten_mem.ml \
 	reachable.mli \
 	reachable.ml \
 	prune_unreachable.mli prune_unreachable.ml \
 	cfg_pp.ml \
 	cfg_ast.mli cfg_ast.ml \
 	ssa_visitor.mli ssa_visitor.ml \
+	depgraphs.ml \
 	cfg_ssa.mli cfg_ssa.ml \
 	debug_snippets.ml \
 	sccvn.mli sccvn.ml \
@@ -70,15 +79,16 @@ export SOURCES = \
 	libasmir.idl \
 	disasm_i386.ml \
 	disasm.ml \
+	$(LLVM_SRC) \
 	syscall_models.ml \
 	gcl.mli gcl.ml \
 	ugcl.ml \
-	wp.ml \
+	wp.mli wp.ml \
 	stp_grammar.mly stp_lexer.mll \
 	cvc3_grammar.mly cvc3_lexer.mll \
 	yices_grammar.mly yices_lexer.mll \
 	smtexec.mli smtexec.ml \
-	solver.ml \
+	solver.mli solver.ml \
 	asmir_vars.ml \
 	asmir_consts.ml \
 	asmir.mli asmir.ml \
@@ -87,13 +97,12 @@ export SOURCES = \
 	grammar.mly lexer.mll \
 	parser.ml \
 	input.mli input.ml \
-	depgraphs.ml \
 	to_c.ml \
 	vsa.ml \
 	eval.ml \
 	symbeval.ml symbeval_search.ml \
 	hacks.ml \
-	coalesce.ml \
+	coalesce.mli coalesce.ml \
 	structural_analysis.ml \
 	unroll.ml \
 	efse.ml \
@@ -104,7 +113,7 @@ export SOURCES = \
 	utils_common.ml \
 	test_common.ml \
 	template.ml \
-	syscall_id.ml \
+	syscall_id.mli syscall_id.ml \
 	graphDataflowW.ml \
 	$(SOLVER_SOURCES) \
 	$(PROJSOURCES) \
@@ -121,11 +130,8 @@ DOC_FILES := $(filter %.mli, $(SOURCES)) $(filter %.ml, $(SOURCES))
 
 
 # ocamlfind packages required
-export PACKS = bigarray str num unix camomile threads piqi.lib
-# ocamlfind packages for ocamldoc
-# don't include packages in /usr/lib/ocaml, this will cause ocamldoc
-# to complain about conflicts with our local big_int
-export DOCPACKS = bigarray str num unix camomile threads piqi.lib
+export PACKS = bigarray str num unix camomile threads piqi.lib $(LLVM_PACKS)
+export DOCPACKS = $(PACKS)
 export YFLAGS = -v
 
 export USE_CAMLP4 = yes
