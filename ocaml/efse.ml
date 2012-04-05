@@ -109,6 +109,10 @@ module type Delta =
 sig
   type t
   val create : unit -> t
+  val merge : t -> t -> t
+  (** Take the intersection of two deltas. When there are conflicting
+      bindings for a variable, there will be no binding in the final
+      delta for that variable. *)
   val set : t -> var -> Symbeval.varval -> t
   (** Setter method *)
   val get : t -> var -> Symbeval.varval
@@ -125,9 +129,36 @@ struct
   type t = Symbeval.varval VM.t
   let create () =
     VM.empty
-  let set h v e =
-    dprintf "Setting %s to %s" (Pp.var_to_string v) (Symbeval.symb_to_string e);
-    VM.add v e h
+  let merge d1 d2 =
+    let f =
+      VM.fold (fun var value newdelta ->
+        try
+          let newvalue = VM.find var newdelta in
+          if value = newvalue then
+          (* Newdelta already has the same value! We can just return newdelta as
+             is. *)
+            newdelta
+          else
+          (* Newdelta has a CONFLICTING assignment.  We need to remove it. *)
+            VM.remove var newdelta
+        with Not_found ->
+          (* Conflict: Var only assigned in one branch. Don't add it. *)
+          newdelta
+      ) d1 d2
+    in
+    (* f has all the correct bindings in d1.  Now we need to remove
+       bindings that are only in d2. *)
+    VM.fold (fun var value newdelta ->
+      if VM.mem var d1 then
+        (* This is in d1 and d2, we're okay *)
+        newdelta
+      else
+        (* In d2 but not d1, remove *)
+        VM.remove var newdelta
+    ) f f
+    let set h v e =
+      dprintf "Setting %s to %s" (Pp.var_to_string v) (Symbeval.symb_to_string e);
+      VM.add v e h
   let get h v =
     VM.find v h
   let get_exp h v =
@@ -257,12 +288,17 @@ let efse ?(cf=true) p pi =
   (* in *)
   let eval_exp delta e = unwrap_symb (eval delta e) in
   let rec efse delta pi = function
-    | [] -> pi
+    | [] -> delta,pi
     | Assign(v, e) as s::tl ->
       let value = eval delta e in
       dprintf "stmt: %s\nevaluated %s to %s, concrete = %b" (stmt_to_string s) (Pp.ast_exp_to_string e) (Pp.ast_exp_to_string (unwrap_symb value)) (Symbeval.is_concrete_mem_or_scalar value);
       let delta',pi' = if Symbeval.is_concrete_mem_or_scalar value
-        then D.set delta v value, pi
+        (* Note: Even concrete assignments need to be added to the
+           formula.  This is because when Ite merged two contexts,
+           conflicting concrete assignments will be expunged from the
+           concrete context.  In this case, the assignment in the
+           formula must be used. *)
+        then D.set delta v value, Ast.exp_and pi (Ast.exp_eq (Ast.Var v) (unwrap_symb value))
         else delta, Ast.exp_and pi (Ast.exp_eq (Ast.Var v) (unwrap_symb value)) in
       efse delta' pi' tl
     | Assert e::tl ->
@@ -271,7 +307,7 @@ let efse ?(cf=true) p pi =
       (match value with
       | Ast.Int(bi, Reg 1) when bi_is_zero bi ->
         (* Assert false = false, pi \land false = false *)
-        Ast.exp_false
+        delta,Ast.exp_false
       | Ast.Int(bi, Reg 1) when bi_is_one bi ->
         (* Assert true = true, pi \land true = pi *)
         efse delta pi tl
@@ -286,12 +322,14 @@ let efse ?(cf=true) p pi =
       | Ast.Int(bi, Reg 1) when bi_is_one bi ->
         efse delta pi (s1@tl)
       | _ ->
-        let pi_t = efse delta value_t s1 in
-        let pi_f = efse delta (Ast.exp_not value_t) s2 in
-        (* XXX: This is wrong. We need to merge deltas here! *)
-        Ast.exp_and (Ast.exp_and pi (Ast.exp_or pi_t pi_f)) (efse delta Ast.exp_true tl))
+        let delta1,pi_t = efse delta value_t s1 in
+        let delta2,pi_f = efse delta (Ast.exp_not value_t) s2 in
+        let mergedelta = D.merge delta1 delta2 in
+        let deltatl,pitl = efse mergedelta Ast.exp_true tl in
+        deltatl, Ast.exp_and (Ast.exp_and pi (Ast.exp_or pi_t pi_f)) pitl)
   in
-  efse (D.create ()) pi p
+  let _,pi = efse (D.create ()) pi p in
+  pi
 
 (** Efficient fse algorithm for passified programs with feasibility testing. *)
 let efse_feas ?(cf=true) p pi =
@@ -306,24 +344,32 @@ let efse_feas ?(cf=true) p pi =
       dprintf "Executing %s" (stmt_to_string stmt)
     | _ -> ());
     match stmts with
-    | [] -> pi
+    | [] -> delta, pi
     | Assign(v, e) as s::tl ->
       let value = eval delta e in
       dprintf "stmt: %s\nevaluated %s to %s, concrete = %b" (stmt_to_string s) (Pp.ast_exp_to_string e) (Pp.ast_exp_to_string (unwrap_symb value)) (Symbeval.is_concrete_mem_or_scalar value);
-      let delta',pi' = if Symbeval.is_concrete_mem_or_scalar value
-        then D.set delta v value, pi
+      let delta', pi' =
+        let new_constraint = Ast.exp_eq (Ast.Var v) (unwrap_symb value) in
+        dprintf "new constraint %s" (Pp.ast_exp_to_string new_constraint);
+        let () = solver#add_constraint new_constraint in
+        let new_pi = Ast.exp_and pi new_constraint in
+        if Symbeval.is_concrete_mem_or_scalar value then
+          (* Note: Even concrete assignments need to be added to the
+             formula.  This is because when Ite merged two contexts,
+             conflicting concrete assignments will be expunged from the
+             concrete context.  In this case, the assignment in the
+             formula must be used. *)
+          D.set delta v value, new_pi
         else
-          let new_constraint = Ast.exp_eq (Ast.Var v) (unwrap_symb value) in
-          dprintf "new constraint %s" (Pp.ast_exp_to_string new_constraint);
-          let () = solver#add_constraint new_constraint in
-          delta, Ast.exp_and pi new_constraint in
+          delta, new_pi
+      in
       efse delta' pi' solver tl
     | Assert e::tl ->
       let value = eval_exp delta e in
       (match value with
       | Ast.Int(bi, Reg 1) when bi_is_zero bi ->
         (* Assert false = false, pi \land false = false *)
-        Ast.exp_false
+        delta, Ast.exp_false
       | Ast.Int(bi, Reg 1) when bi_is_one bi ->
         (* Assert true = true, pi \land true = pi *)
         efse delta pi solver tl
@@ -333,7 +379,7 @@ let efse_feas ?(cf=true) p pi =
         solver#add_constraint value;
         if (not solver#is_sat) then (
           dprintf "Unsatisfiable assertion, returning false";
-          Ast.exp_false
+          delta, Ast.exp_false
         ) else
           efse delta pi' solver tl)
     | Ite(e, s1, s2)::tl ->
@@ -371,24 +417,27 @@ let efse_feas ?(cf=true) p pi =
         efse delta pi solver (s2@tl)
       | (Valid|Sat), (Valid|Sat) ->
         solver#push;
-        (* XXX: I think we need to add the constraint value_t to solver here *)
-        let pi_t = efse delta value_t solver s1 in
+        solver#add_constraint value_t;
+        let delta_t, pi_t = efse delta value_t solver s1 in
         solver#pop;
         solver#push;
-        (* XXX: I think we need to add the constraint not value_t to solver here *)
-        let pi_f = efse delta (Ast.exp_not value_t) solver s2 in
+        solver#add_constraint (Ast.exp_not value_t);
+        let delta_f, pi_f = efse delta (Ast.exp_not value_t) solver s2 in
         solver#pop;
         let new_constraint = Ast.exp_or pi_t pi_f in
         dprintf "Adding constraint %s" (Pp.ast_exp_to_string new_constraint);
         solver#add_constraint new_constraint;
-        Ast.exp_and (Ast.exp_and pi new_constraint) (efse delta Ast.exp_true solver tl)
+        let delta_merged = D.merge delta_t delta_f in
+        let delta_tl, pi_tl = efse delta_merged Ast.exp_true solver tl in
+        delta_tl, Ast.exp_and (Ast.exp_and pi new_constraint) pi_tl
       | Unsat, Unsat ->
         failwith "Efse: We should never reach here because this is an infeasible path"
   in
   let s = new Solver.Z3.solver in
   s#add_constraint pi;
   dprintf "initial sat %b" s#is_sat;
-  efse (D.create ()) pi s p
+  let _,pi = efse (D.create ()) pi s p in
+  pi
 
 end
 
