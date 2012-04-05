@@ -17,8 +17,7 @@ satisfy most dependencies on Ubuntu 11.04/11.10 by running:
   $ sudo apt-get install ocaml ocaml-native-compilers ocaml-findlib camlidl \
     libocamlgraph-ocaml-dev libextlib-ocaml-dev binutils-dev automake \
     libcamomile-ocaml-dev otags libpcre3-dev camlp4-extra bison flex \
-    zlib1g-dev libgmp3-dev g++ libbitstring-ocaml-dev libtool \
-    libllvm-ocaml-2.8-dev
+    zlib1g-dev libgmp3-dev g++ libbitstring-ocaml-dev libtool
 
 XXX: Does this work for Debian too?
 

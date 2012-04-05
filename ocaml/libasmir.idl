@@ -225,8 +225,3 @@ byte_insn_to_asmp(enum bfd_architecture arch, address_t addr,
 
 // free vex buffers
 void asmir_free_vex_buffers(void);
-
-// LLVM needs functions from llvm.cpp to be linked to the ocaml
-// binaries.  This is a dummy entry to force these symbols to be
-// linked.
-void fake_assert();
