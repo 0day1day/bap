@@ -311,6 +311,9 @@ and reg2bits r = Util.list_firstindex [eax; ecx; edx; ebx; esp; ebp; esi; edi] (
 
 let bits2xmme b = Var(bits2xmm b)
 
+let bits2reg64e b =
+  cast_low r64 (bits2xmme b)
+
 let bits2reg32e b = Var(bits2reg32 b)
 
 let bits2reg16e b =
@@ -381,6 +384,7 @@ let op2e_s ss t = function
   | Oreg r when t = r32 -> bits2reg32e r
   | Oreg r when t = r16 -> bits2reg16e r
   | Oreg r when t = r8 -> bits2reg8e r
+  | Oreg r when t = r64 -> bits2reg64e r
   | Oreg r -> unimplemented "unknown register"
   | Oaddr e -> load_s ss t e
   | Oimm i -> Int(Arithmetic.to_big_int (big_int_of_int64 i,t), t)
@@ -1694,7 +1698,7 @@ let parse_instr g addr =
       let b2 = Char.code (g na) and na = s na in
       match b2 with (* Table A-3 *)
       | 0x1f -> (Nop, na)
-      | 0x28 | 0x29 | 0x6e | 0x7e | 0x6f | 0x7f ->
+      | 0x28 | 0x29 | 0x6e | 0x7e | 0x6f | 0x7f | 0xd6 ->
         let t, name, align, tsrc, tdest = match b2 with
           | 0x28 | 0x29 when prefix.opsize_override ->
 	    r128, "movapd", true, r128, r128
@@ -1705,7 +1709,7 @@ let parse_instr g addr =
 	    r128, "movdqa", true, r128, r128
           | 0x6e -> r32, "movd", false, r32, prefix.mopsize
           | 0x7e -> r32, "movd", false, prefix.mopsize, r32
-          | 0x6f | 0x7f -> r64, "movq", false, r64, r64
+          | 0x6f | 0x7f | 0xd6 -> r64, "movq", false, r64, r64
           | _ -> unimplemented 
 	    (Printf.sprintf "mov opcode case missing: %02x" b2)
         in
