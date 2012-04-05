@@ -16,14 +16,23 @@ export PIQIBUILDDIR=$(BAP_DIR)/libtracewrap/libtrace/piqi/piqi/build/lib/ocaml
 
 export OCAMLMAKEFILE=$(BAP_OCAMLDIR)/OCamlMakefile
 
+include $(BAP_OCAMLDIR)/makefile.inc
+ifdef HAVE_LLVM
+export CODEGEN = codegen
+export LLVM_PACKS = llvm llvm.analysis llvm.executionengine llvm.target llvm.scalar_opts
+endif
+
 # Stop annoying warnings about big_int duplication!
 #export OCAMLFIND_IGNORE_DUPS_IN=$(BAP_DIR)/bigint-3.12/otherlibs/num
 
 # ocamlfind packages required
-export PACKS = bigarray str num unix camomile piqi.lib
+export PACKS = bigarray str num unix camomile piqi.lib $(LLVM_PACKS)
 export LIBS = zarith batteries objsize oUnit graph pcre libtrace bap
 export INCDIRS = $(BAP_OCAMLDIR) $(BIGINT) $(BATT) $(OUNIT) $(PCRE) $(OCAMLGRAPH) $(OBJSIZE) $(LIBTRACE)
 export OCAMLPATH = $(PIQIBUILDDIR)
+
+# -rdynamic lets LLVM JIT see dynamic symbols
+export LDFLAGS = -rdynamic
 
 # Include sources from ../ocaml in the automatically generated dependencies.
 export SOURCE_DIRS_IN = $(BAP_OCAMLDIR) $(BAP_PROJ_OCAMLDIR)
@@ -33,7 +42,7 @@ export RESULTDEPS = $(BAP_OCAMLDIR)/bap.a
 
 # default subprojects to build
 ifndef SUBPROJS
-	export SUBPROJS = $(PROJUTILS) toil iltrans ileval topredicate formula get_functions split streamtrans
+	export SUBPROJS = $(PROJUTILS) $(CODEGEN) toil iltrans ileval topredicate formula get_functions split streamtrans
 endif
 
 define PROJ_toil
@@ -91,6 +100,13 @@ define PROJ_streamtrans
 	DOC_FILES=$(SOURCES)
 endef
 export PROJ_streamtrans
+
+define PROJ_codegen
+	RESULT=codegen
+	SOURCES = codegen.ml
+	DOC_FILES=$(SOURCES)
+endef
+export PROJ_codegen
 
 # suffix for bytecode (which when we make all is debug code)
 export BCSUFFIX = .dbg
