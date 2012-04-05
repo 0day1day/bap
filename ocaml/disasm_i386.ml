@@ -1709,6 +1709,9 @@ let parse_instr g addr =
 	    r128, "movdqa", true, r128, r128
           | 0x6e -> r32, "movd", false, r32, prefix.mopsize
           | 0x7e -> r32, "movd", false, prefix.mopsize, r32
+          (* I am a little worried, since 6f and 7f do not take the
+             opsize prefix, but 0xd6 does.  I will look into this more
+             later. *)
           | 0x6f | 0x7f | 0xd6 -> r64, "movq", false, r64, r64
           | _ -> unimplemented 
 	    (Printf.sprintf "mov opcode case missing: %02x" b2)
@@ -1724,41 +1727,41 @@ let parse_instr g addr =
       | 0x31 -> (Rdtsc, na)
       | 0x34 -> (Sysenter, na)
       | 0x3a ->
-          let b3 = Char.code (g na) and na = s na in
-          (match b3 with
-             | 0x0f ->
-                 let (r, rm, na) = parse_modrm prefix.opsize na in
-	         let (i, na) = parse_imm8 na in
-                 (Palignr(prefix.mopsize, r, rm, i), na)
-             | 0x63 ->
-                 let (r, rm, na) = parse_modrm prefix.opsize na in
-                 let (i, na) = parse_imm8 na in
-                 (match i with
-                   (* See Section 4.1 of Intel manual for more
-                      information on the immediate control byte.
+        let b3 = Char.code (g na) and na = s na in
+        (match b3 with
+        | 0x0f ->
+          let (r, rm, na) = parse_modrm prefix.opsize na in
+	  let (i, na) = parse_imm8 na in
+          (Palignr(prefix.mopsize, r, rm, i), na)
+        | 0x63 ->
+          let (r, rm, na) = parse_modrm prefix.opsize na in
+          let (i, na) = parse_imm8 na in
+          (match i with
+                 (* See Section 4.1 of Intel manual for more
+                    information on the immediate control byte.
 
-                      i[0]:
-                      0 = 16 packed bytes
-                      1 =  8 packed words
-                      i[1]:
-                      0 = packed elements are unsigned
-                      1 = packed elements are signed
-                      i[3:2]:
-                      00 = "equal any"
-                      01 = "ranges"
-                      10 = "each each"
-                      11 = "equal ordered"
-                      i[4]:
-                      0 = IntRes1 unmodified
-                      1 = IntRes1 is negated (1's complement)
-                      i[5]:
-                      0 = Negation of IntRes1 is for all 16 (8) bits
-                      1 = Negation of IntRes1 is masked by reg/mem validity
-                      i[6]:
-                      0 = Use least significant bit for IntRes2
-                      1 = Use most significant bit for IntRes2
-                      i[7]: Undefined, set to 0.
-                   *)
+                    i[0]:
+                    0 = 16 packed bytes
+                    1 =  8 packed words
+                    i[1]:
+                    0 = packed elements are unsigned
+                    1 = packed elements are signed
+                    i[3:2]:
+                    00 = "equal any"
+                    01 = "ranges"
+                    10 = "each each"
+                    11 = "equal ordered"
+                    i[4]:
+                    0 = IntRes1 unmodified
+                    1 = IntRes1 is negated (1's complement)
+                    i[5]:
+                    0 = Negation of IntRes1 is for all 16 (8) bits
+                    1 = Negation of IntRes1 is masked by reg/mem validity
+                    i[6]:
+                    0 = Use least significant bit for IntRes2
+                    1 = Use most significant bit for IntRes2
+                    i[7]: Undefined, set to 0.
+                 *)
 
                  (* Note: We only implement the case for unsigned
                     bytes equal ordered comparison for pcmpistri right
