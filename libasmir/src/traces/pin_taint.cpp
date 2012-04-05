@@ -147,20 +147,20 @@ void TaintTracker::setTaintNetwork()
 /**************** Helper Functions ****************/
 
 //
-bool TaintTracker::isValid(uint32_t type)
+bool TaintTracker::isValid(RegMem_t type)
 {
-  return (type != VT_NONE);
+  return (type.type != NONE);
 }
 
 // 
-bool TaintTracker::isReg(uint32_t type)
+bool TaintTracker::isReg(RegMem_t type)
 {
-  return isValid(type) && (type >= REG_BASE) && (type <= REGTYPE_LAST);
+    return (type.type == REGISTER);
 }
 
-bool TaintTracker::isMem(uint32_t type)
+bool TaintTracker::isMem(RegMem_t type)
 {
-  return isValid(type) && (type >= MEM_BASE) && (type <= MEMTYPE_LAST);
+    return (type.type == MEM);
 }
 
 // 
@@ -169,20 +169,11 @@ uint32_t TaintTracker::exists(context &ctx, uint32_t elem)
   return (ctx.find(elem) != ctx.end());
 }
 
-//
-uint32_t TaintTracker::getSize(uint32_t type)
-{
-  uint32_t size;
-  switch (type) {
-      case VT_MEM128: case VT_REG128: size = 16; break;
-      case VT_MEM64: case VT_REG64: size = 8; break;
-      case VT_MEM32: case VT_REG32: size = 4; break;
-      case VT_MEM16: case VT_REG16: size = 2; break;
-      case VT_MEM8:  case VT_REG8:  size = 1; break;
-      default:                      assert(false);
-  }
-  return size;
+
+uint32_t TaintTracker::getSize(RegMem_t type) {
+    return type.size / 8;
 }
+
 
 // Combining two taint tags
 uint32_t TaintTracker::combineTaint(uint32_t oldtag, uint32_t newtag)
@@ -245,6 +236,9 @@ FrameOption_t TaintTracker::introMemTaint(uint32_t addr, uint32_t length, const 
       taint_intro* tfi = fb.f.mutable_taint_intro_frame()->mutable_taint_intro_list()->add_elem();
       tfi->set_taint_id(t);
       tfi->set_addr(addr+i);
+      uint8_t value;
+      assert (PIN_SafeCopy((void*) &value, (void*) (addr+i), 1) == 1);
+      tfi->set_value((void*) &value, 1);
     }
     fb.b = true;
     return fb;
@@ -281,7 +275,7 @@ uint32_t TaintTracker::getTaint(context &ctx, uint32_t elem)
 }
 
 // 
-uint32_t TaintTracker::getMemTaint(uint32_t addr, uint32_t type)
+uint32_t TaintTracker::getMemTaint(uint32_t addr, RegMem_t type)
 {
   uint32_t tag = NOTAINT;
   //cerr << "Getting memory " << addr << endl;
@@ -313,12 +307,12 @@ uint32_t TaintTracker::getReadTaint(context &delta)
   for (uint32_t i = 0 ; i < count ; i++) {
     if ((values[i].usage & RD) == RD) {
       // this is a read
-      if (isReg(values[i].type) 
-	  && (values[i].loc != REG_EFLAGS)) // FIXME: no control-flow taint
-	tmp_tag = getRegTaint(delta, values[i].loc);
-      else if (isMem(values[i].type))
-	tmp_tag = getMemTaint(values[i].loc, values[i].type);
-      tag = combineTaint(tag, tmp_tag);
+        if (isReg(values[i].type) 
+            && (values[i].loc != REG_EFLAGS)) // FIXME: no control-flow taint
+            tmp_tag = getRegTaint(delta, values[i].loc);
+        else if (isMem(values[i].type))
+            tmp_tag = getMemTaint(values[i].loc, values[i].type);
+        tag = combineTaint(tag, tmp_tag);
     }
   }
   return tag;
@@ -830,17 +824,17 @@ void TaintTracker::setTaintContext(context &delta)
 {
   uint32_t tag;
   for (uint32_t i = 0 ; i < count ; i++) {
-    if (isReg(values[i].type)) {
-      if ((tag = getRegTaint(delta, values[i].loc)) != NOTAINT) {
+      if (isReg(values[i].type)) {
+          if ((tag = getRegTaint(delta, values[i].loc)) != NOTAINT) {
 	// cerr << "register: " << REG_StringShort((REG)values[i].loc) << " is tainted" << endl;
-	values[i].taint = tag;
+              values[i].taint = tag;
+          }
+      } else if (isValid(values[i].type)) {
+          if ((tag = getTaint(memory,values[i].loc)) != NOTAINT) {
+              //cerr << "memory: " << values[i].loc << " is tainted" << endl;
+              values[i].taint = tag;
+          }
       }
-    } else if (isValid(values[i].type)) {
-      if ((tag = getTaint(memory,values[i].loc)) != NOTAINT) {
-	//cerr << "memory: " << values[i].loc << " is tainted" << endl;
-	values[i].taint = tag;
-      }
-    }
   }
   
 }

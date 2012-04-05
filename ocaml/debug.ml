@@ -1,7 +1,6 @@
 (** Debugging module.
 
-    This module contains a bunch of functions for printing debugging output
-    an'at.
+    This module contains a bunch of functions for printing debugging output.
 
     Environment Variables:
     - [BAP_LOGFILE]

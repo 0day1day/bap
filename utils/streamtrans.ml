@@ -14,7 +14,7 @@ type cmd =
   | TransformAst of (ast -> ast)
 
 let concrete_state = Traces.TraceConcrete.create_state ();;
-let mem_hash = Var.VarHash.create 1000;;
+let mem_hash = Memory2array.create_state ();;
 (* HACK to make sure default memory has a map to normalized memory *)
 ignore(Memory2array.coerce_rvar_state mem_hash Asmir.x86_mem);;
 

@@ -1408,20 +1408,34 @@ class taint_intro : public ::google::protobuf::Message {
   inline ::google::protobuf::uint64 taint_id() const;
   inline void set_taint_id(::google::protobuf::uint64 value);
   
+  // optional bytes value = 3;
+  inline bool has_value() const;
+  inline void clear_value();
+  static const int kValueFieldNumber = 3;
+  inline const ::std::string& value() const;
+  inline void set_value(const ::std::string& value);
+  inline void set_value(const char* value);
+  inline void set_value(const void* value, size_t size);
+  inline ::std::string* mutable_value();
+  inline ::std::string* release_value();
+  
   // @@protoc_insertion_point(class_scope:taint_intro)
  private:
   inline void set_has_addr();
   inline void clear_has_addr();
   inline void set_has_taint_id();
   inline void clear_has_taint_id();
+  inline void set_has_value();
+  inline void clear_has_value();
   
   ::google::protobuf::UnknownFieldSet _unknown_fields_;
   
   ::google::protobuf::uint64 addr_;
   ::google::protobuf::uint64 taint_id_;
+  ::std::string* value_;
   
   mutable int _cached_size_;
-  ::google::protobuf::uint32 _has_bits_[(2 + 31) / 32];
+  ::google::protobuf::uint32 _has_bits_[(3 + 31) / 32];
   
   friend void  protobuf_AddDesc_frame_2epiqi_2eproto();
   friend void protobuf_AssignDesc_frame_2epiqi_2eproto();
@@ -3209,6 +3223,64 @@ inline ::google::protobuf::uint64 taint_intro::taint_id() const {
 inline void taint_intro::set_taint_id(::google::protobuf::uint64 value) {
   set_has_taint_id();
   taint_id_ = value;
+}
+
+// optional bytes value = 3;
+inline bool taint_intro::has_value() const {
+  return (_has_bits_[0] & 0x00000004u) != 0;
+}
+inline void taint_intro::set_has_value() {
+  _has_bits_[0] |= 0x00000004u;
+}
+inline void taint_intro::clear_has_value() {
+  _has_bits_[0] &= ~0x00000004u;
+}
+inline void taint_intro::clear_value() {
+  if (value_ != &::google::protobuf::internal::kEmptyString) {
+    value_->clear();
+  }
+  clear_has_value();
+}
+inline const ::std::string& taint_intro::value() const {
+  return *value_;
+}
+inline void taint_intro::set_value(const ::std::string& value) {
+  set_has_value();
+  if (value_ == &::google::protobuf::internal::kEmptyString) {
+    value_ = new ::std::string;
+  }
+  value_->assign(value);
+}
+inline void taint_intro::set_value(const char* value) {
+  set_has_value();
+  if (value_ == &::google::protobuf::internal::kEmptyString) {
+    value_ = new ::std::string;
+  }
+  value_->assign(value);
+}
+inline void taint_intro::set_value(const void* value, size_t size) {
+  set_has_value();
+  if (value_ == &::google::protobuf::internal::kEmptyString) {
+    value_ = new ::std::string;
+  }
+  value_->assign(reinterpret_cast<const char*>(value), size);
+}
+inline ::std::string* taint_intro::mutable_value() {
+  set_has_value();
+  if (value_ == &::google::protobuf::internal::kEmptyString) {
+    value_ = new ::std::string;
+  }
+  return value_;
+}
+inline ::std::string* taint_intro::release_value() {
+  clear_has_value();
+  if (value_ == &::google::protobuf::internal::kEmptyString) {
+    return NULL;
+  } else {
+    ::std::string* temp = value_;
+    value_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
+    return temp;
+  }
 }
 
 // -------------------------------------------------------------------

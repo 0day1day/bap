@@ -9,7 +9,7 @@ export LIBASMIR=../libasmir
 export BIGINT=$(BAP_DIR)/zarith-1.0
 export BATT=$(BAP_DIR)/batteries/_build/src
 export OUNIT=$(BAP_DIR)/ounit-1.1.0/_build/src/
-export PCRE=$(BAP_DIR)/pcre-ocaml-release-6.2.2/lib
+export PCRE=$(BAP_DIR)/pcre-ocaml/lib
 export OCAMLGRAPH=$(BAP_DIR)/ocamlgraph-1.8
 export OBJSIZE=$(BAP_DIR)/objsize-0.16
 export LIBTRACE=$(BAP_DIR)/libtracewrap/libtrace/src/ocaml
@@ -55,7 +55,7 @@ export SOURCES = \
 	cfg.mli cfg.ml \
 	ast_visitor.mli ast_visitor.ml \
 	grammar_scope.ml \
-	memory2array.ml \
+	memory2array.mli memory2array.ml \
 	flatten_mem.mli \
 	flatten_mem.ml \
 	reachable.mli \
@@ -64,6 +64,7 @@ export SOURCES = \
 	cfg_pp.ml \
 	cfg_ast.mli cfg_ast.ml \
 	ssa_visitor.mli ssa_visitor.ml \
+	depgraphs.ml \
 	cfg_ssa.mli cfg_ssa.ml \
 	debug_snippets.ml \
 	sccvn.mli sccvn.ml \
@@ -82,12 +83,12 @@ export SOURCES = \
 	syscall_models.ml \
 	gcl.mli gcl.ml \
 	ugcl.ml \
-	wp.ml \
+	wp.mli wp.ml \
 	stp_grammar.mly stp_lexer.mll \
 	cvc3_grammar.mly cvc3_lexer.mll \
 	yices_grammar.mly yices_lexer.mll \
 	smtexec.mli smtexec.ml \
-	solver.ml \
+	solver.mli solver.ml \
 	asmir_vars.ml \
 	asmir_consts.ml \
 	asmir.mli asmir.ml \
@@ -96,7 +97,6 @@ export SOURCES = \
 	grammar.mly lexer.mll \
 	parser.ml \
 	input.mli input.ml \
-	depgraphs.ml \
 	to_c.ml \
 	vsa.ml \
 	eval.ml \
@@ -106,13 +106,13 @@ export SOURCES = \
 	structural_analysis.ml \
 	unroll.ml \
 	hacks.ml \
-	coalesce.ml \
+	coalesce.mli coalesce.ml \
 	traces.ml \
 	traces_surgical.ml \
 	utils_common.ml \
 	test_common.ml \
 	template.ml \
-	syscall_id.ml \
+	syscall_id.mli syscall_id.ml \
 	graphDataflowW.ml \
 	$(SOLVER_SOURCES) \
 	$(PROJSOURCES) \
@@ -133,7 +133,7 @@ export PACKS = bigarray str num unix camomile threads piqi.lib $(LLVM_PACKS)
 # ocamlfind packages for ocamldoc
 # don't include packages in /usr/lib/ocaml, this will cause ocamldoc
 # to complain about conflicts with our local big_int
-export DOCPACKS = ocamlgraph
+export DOCPACKS = bigarray str num unix camomile threads piqi.lib
 export YFLAGS = -v
 
 export USE_CAMLP4 = yes

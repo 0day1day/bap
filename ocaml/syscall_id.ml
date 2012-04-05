@@ -1,6 +1,4 @@
-(** Use dataflow analysis to statically identify system call types
-
-    @author ejs
+(** Statically identify obvious use of system call numbers.
 *)
 
 open Ast

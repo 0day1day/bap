@@ -15,16 +15,6 @@ open D
 module BH = Cfg.BH
 module VH = Var.VarHash
 
-(** wp(p,q), applying simp to simplify each intermediate expression
-    during the calculation.  See "A Discipline of Programming" by
-    Dijkstra, or CMU-CS-08-159 (Brumley's thesis), chapter 3.2.
-
-    @param simp is an optional expression simplifier.
-
-    @param p is the program
-
-    @param q is the post-condition.
-*)
 let wp ?(simp=Util.id) (p:Gcl.t) (q:exp) : exp =
   (*  We use CPS to avoid stack overflows *)
   let rec wp q s k =
@@ -101,7 +91,7 @@ let uwp ?(simp=Util.id) ((cfg,ugclmap):Ugcl.t) (q:exp) : exp =
   RToposort.iter compute_at cfg;
   lookupwpvar Cfg.BB_Entry
 
-(** Same as [wp] but for unstructured programs. *)
+(** Same as [efficient_wp] but for unstructured programs. *)
 let efficient_uwp ?(simp=Util.id) ((cfg,ugclmap):Ugcl.t) (q:exp) : exp =
   (* dprintf "Starting uwp"; *)
   (* Block -> var *)
@@ -163,18 +153,6 @@ let efficient_uwp ?(simp=Util.id) ((cfg,ugclmap):Ugcl.t) (q:exp) : exp =
   (* FIXME: We shouldn't use entry here *)
   List.fold_left build_exp (Var(lookupwpvar Cfg.BB_Entry)) assigns
 
-(** the efficient weakest precondition wp(p,q):Q where Q is guaranteed
-    to be linear in the size of p.  This version expects p to be
-    assignment-free, e.g., to be an SSA acyclic program. See
-    CMU-CS-08-159.pdf (Brumley's thesis), chapter 3.3.
-
-    @param simp is an expression simplifier. You can pass in fun x->x
-    if you want no simplification.
-
-    @param p is the program
-
-    @param q is the post-condition.
-*)
 let efficient_wp ?(simp=Util.id) (p:Gcl.t) =
   let wlp_f_ctx = Hashtbl.create 113 in
   let rec wlp_f s k =

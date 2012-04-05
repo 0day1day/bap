@@ -662,6 +662,15 @@ let rm_phis ?(dsa=false) ?(attrs=[]) cfg =
 
 type tm = Ssa.exp VH.t
 
+(* This function creates a mapping of temporary variables to their
+   expression, so later copy propagation can be applied when converting
+   from SSA three-address form to AST expressions of arbitrary size.
+
+   The refd map keeps track of how many times a variable was
+   referenced.  Non-existant bindings indicate zero references, true
+   bindings indicate a single reference, and false bindings indicate
+   more than one reference.  Temporaries are only added to the final
+   map when there is one (or zero) reference.  *)
 let create_tm c =
   let tm = VH.create 5700 
   and refd = VH.create 5700 in
@@ -669,9 +678,9 @@ let create_tm c =
     inherit Ssa_visitor.nop
     method visit_rvar v =
       (try
-	 if VH.find refd v then
-	   VH.remove tm v
-	 else VH.replace refd v false
+	 if VH.find refd v then (
+	   VH.remove tm v;
+	   VH.replace refd v false)
        with Not_found -> VH.add refd v true);
       `DoChildren
 

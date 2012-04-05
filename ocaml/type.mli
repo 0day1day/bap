@@ -3,8 +3,10 @@
     @author Ivan Jager
 *)
 
+(** Addresses are 64-bit integers *)
 type addr = int64
 
+(** Labels are program locations that can be jumped to. *)
 type label = 
   | Name of string (** For named labels*)
   | Addr of addr (** For addresses. Cast REG_type as unsigned when comparing. *)
@@ -12,10 +14,16 @@ type label =
 
 (** The IR type of a BAP expression *)
 type typ =
-  | Reg of int (** an N-bit bitvector (use 1 for booleans). Currently supported values: 1,8,16,32,64 *)
-  | TMem of typ (** Memory of given index type and endianness*)
-  | Array  of typ * typ (** Array of index type, element type. *)
+  | Reg of int (** an N-bit bitvector (use 1 for booleans). *)
+  | TMem of typ (** Memory of given index type *)
+  | Array of typ * typ (** Array of index type, element type. *)
 
+(** {!Array} memories can only be updated or accessed in terms of
+    their element type, which is usually [Reg 8].  {!TMem} memories
+    can be updated or accessed by any type, for instance both [Reg 8]
+    and [Reg 32].  Native code is generally lifted with {!TMem}
+    memories for simplicity, and converted to {!Array} type when
+    needed.  SMT solvers require {!Array} type memories. *)
 
 (** Different forms of casting *)
 type cast_type =
@@ -56,15 +64,12 @@ type unop_type =
 (** The position of a statement in a source file *)
 type pos = (string * int)
 
-(** Extra attributes we can add to things.
-    There may be a nicer way to implement this. Basically any extra information
-    about a statement can be saved by wrapping the statement inside an Attr
-    statement.
- *)
+(** {5 Extra attributes} *)
 
 type taint_type = Taint of int
 type usage = RD | WR | RW
 
+(** Information about a concrete operand from a trace *)
 type context = 
  {
    name  : string;
@@ -78,16 +83,14 @@ type context =
  
 type attribute = 
   | Pos of pos  (** The position of a statement in the source file *)
-  | Asm of string
+  | Asm of string (** Assembly representation of the following IL code *)
   | Address of addr
-  | Liveout (** the variable assigned in this move should be considered live *)
+  | Liveout (** Statement should be considered live by deadcode elimination *)
   | StrAttr of string (** Generic printable and parseable attribute *)
-  | Context of context         (** An attribute containing the concrete values
-                                * and taint status of the instruction operands.
-                                * It can be merged with `StrAttr' but it seems 
-                                * more flexible to create a separate attribute. 
-                                * - ethan *)
-  | ThreadId of int
+  | Context of context         (** Information about the 
+                                   instruction operands from a
+                                   trace. *)
+  | ThreadId of int (** Executed by a specific thread *)
   | ExnAttr of exn (** Generic extensible attribute, but no parsing *)
   | InitRO (** The memory in this assignment is stored in the binary *)
   | Synthetic (** Operation was added by an analysis *)
