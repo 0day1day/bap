@@ -381,10 +381,10 @@ let storem m t a e =
 
 let op2e_s ss t = function
   | Oreg r when t = r128 -> bits2xmme r
+  | Oreg r when t = r64 -> bits2reg64e r
   | Oreg r when t = r32 -> bits2reg32e r
   | Oreg r when t = r16 -> bits2reg16e r
   | Oreg r when t = r8 -> bits2reg8e r
-  | Oreg r when t = r64 -> bits2reg64e r
   | Oreg r -> unimplemented "unknown register"
   | Oaddr e -> load_s ss t e
   | Oimm i -> Int(Arithmetic.to_big_int (big_int_of_int64 i,t), t)
@@ -1716,7 +1716,7 @@ let parse_instr g addr =
 	let r, rm, na = parse_modrm32 na in
 	let s, d = match b2 with
           | 0x6f | 0x6e | 0x28 -> rm, r
-          | 0x7f | 0x7e | 0x29 -> r, rm
+          | 0x7f | 0x7e | 0x29 | 0xd6 -> r, rm
 	  | _ -> disfailwith 
 	    (Printf.sprintf "impossible mov(a/d) condition: %02x" b2)
         in
