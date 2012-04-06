@@ -1700,19 +1700,18 @@ let parse_instr g addr =
       | 0x1f -> (Nop, na)
       | 0x28 | 0x29 | 0x6e | 0x7e | 0x6f | 0x7f | 0xd6 ->
         let t, name, align, tsrc, tdest = match b2 with
-          | 0x28 | 0x29 when prefix.opsize_override ->
+          | 0x28 | 0x29 when pref=[pref_opsize] ->
 	    r128, "movapd", true, r128, r128
-          | 0x28 | 0x29 when not prefix.opsize_override -> 
+          | 0x28 | 0x29 when pref=[] ->
 	    r128, "movaps", true, r128, r128
-          | 0x6f | 0x7f when prefix.repeat -> r128, "movdqu", false, r128, r128
-          | 0x6f | 0x7f when prefix.opsize_override -> 
+          | 0x6f | 0x7f when pref=[repz] ->
+            r128, "movdqu", false, r128, r128
+          | 0x6f | 0x7f when pref=[pref_opsize] ->
 	    r128, "movdqa", true, r128, r128
-          | 0x6e -> r32, "movd", false, r32, prefix.mopsize
-          | 0x7e -> r32, "movd", false, prefix.mopsize, r32
-          (* I am a little worried, since 6f and 7f do not take the
-             opsize prefix, but 0xd6 does.  I will look into this more
-             later. *)
-          | 0x6f | 0x7f | 0xd6 -> r64, "movq", false, r64, r64
+          | 0x6e when pref=[] -> r32, "movd", false, r32, prefix.mopsize
+          | 0x7e when pref=[] -> r32, "movd", false, prefix.mopsize, r32
+          | 0x6f | 0x7f when pref=[] -> r64, "movq", false, r64, r64
+          | 0xd6 when pref=[pref_opsize] -> r64, "movq", false, r64, r64
           | _ -> unimplemented 
 	    (Printf.sprintf "mov opcode case missing: %02x" b2)
         in
@@ -1885,7 +1884,7 @@ let parse_instr g addr =
       repeat = List.mem repz pref;
       nrepeat = List.mem repnz pref;
       addrsize_override = List.mem pref_addrsize pref;
-      opsize_override = List.mem pref_opsize pref
+      opsize_override = List.mem pref_opsize pref;
     }
   in
   let op, a = get_opcode pref prefix a in
