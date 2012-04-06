@@ -1490,7 +1490,7 @@ let parse_instr g addr =
       in
       (Imul(prefix.opsize, (r,None), rm, (sign_ext ot o prefix.opsize)), na)
     | 0x70 | 0x71 | 0x72 | 0x73 | 0x74 | 0x75 | 0x76 | 0x77 | 0x78 | 0x79
-    | 0x7c | 0x7d | 0x7e | 0x7f -> 
+    | 0x7a | 0x7c | 0x7d | 0x7e | 0x7f -> 
       let (i,na) = parse_disp8 na in
       (Jcc(Oimm(Int64.add i na), cc_to_exp b1), na)
     | 0x80 | 0x81 | 0x82 | 0x83 -> 
@@ -1792,7 +1792,7 @@ let parse_instr g addr =
 	  disfailwith "impossible" in
         (Pcmpeq(prefix.mopsize, elet, r, rm), na)
       | 0x80 | 0x81 | 0x82 | 0x83 | 0x84 | 0x85 | 0x86 | 0x87 | 0x88 | 0x89
-      | 0x8c | 0x8d | 0x8e
+      | 0x8a | 0x8c | 0x8d | 0x8e
       | 0x8f ->	let (i,na) = parse_disp32 na in
 		(Jcc(Oimm(Int64.add i na), cc_to_exp b2), na)
     (* add other opcodes for setcc here *)
