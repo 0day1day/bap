@@ -99,6 +99,7 @@ type opcode =
   | Xor of (typ * operand * operand)
   | Pxor of (typ * operand * operand)
   | Test of typ * operand * operand
+  | Ptest of typ * operand * operand
   | Not of typ * operand
   | Neg of typ * operand
   | Imul of typ * (operand * operand option) * operand * operand (* typ, (dst1,dst2), src1, src2 *)
@@ -1089,6 +1090,17 @@ let rec to_ir addr next ss pref =
     :: move cf exp_false
     :: move af (Unknown("AF is undefined after and", r1))
     :: set_pszf t (Var tmp)
+  | Ptest(t, o1, o2) ->
+    let tmp1 = nt "t1" t in
+    let tmp2 = nt "t2" t in
+    move tmp1 (op2e t o2 &* op2e t o1)
+    :: move tmp2 (op2e t o2 &* (exp_not (op2e t o1)))
+    :: move af exp_false
+    :: move oF exp_false
+    :: move pf exp_false
+    :: move sf exp_false
+    :: move zf ((Var tmp1) ==* (Int(bi0, t)))
+    :: [move cf ((Var tmp2) ==* (Int(bi0, t)))]
   | Not(t, o) ->
     [assn t o (exp_not (op2e t o))]
   | Neg(t, o) ->
@@ -1237,6 +1249,7 @@ module ToStr = struct
     | Xor(t,d,s) -> Printf.sprintf "xor %s, %s" (opr d) (opr s)
     | Pxor(t,d,s)  -> Printf.sprintf "pxor %s, %s" (opr d) (opr s)
     | Test(t,d,s) -> Printf.sprintf "test %s, %s" (opr d) (opr s)
+    | Ptest(t,d,s) -> Printf.sprintf "ptest %s, %s" (opr d) (opr s)
     | Not(t,o) -> Printf.sprintf "not %s" (opr o)
     | Neg(t,o) -> Printf.sprintf "neg %s" (opr o)
     | Imul (t, (dst1,dstop), src1, src2) -> 
@@ -1727,6 +1740,13 @@ let parse_instr g addr =
 	(Movdq(t, tdest, d, tsrc, s, align, name), na)
       | 0x31 -> (Rdtsc, na)
       | 0x34 -> (Sysenter, na)
+      | 0x38 when prefix.opsize_override ->
+          let b2 = Char.code (g na) and na = s na in
+          (match b2 with
+            | 0x17 ->
+              let d, s, na = parse_modrm32 na in
+              (Ptest(r128, d, s), na)
+            | _ -> disfailwith (Printf.sprintf "opcode missing: %02x" b2))
       | 0x3a ->
         let b3 = Char.code (g na) and na = s na in
         (match b3 with
