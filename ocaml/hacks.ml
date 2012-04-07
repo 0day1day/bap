@@ -176,7 +176,7 @@ let uniqueify_labels p =
     method visit_stmt = function
       | Label(l, attrs) ->
         `ChangeTo (Label(find_new_label l, attrs))
-      | _ -> `SkipChildren
+      | _ -> `DoChildren
 
     method visit_exp e = match lab_of_exp e with
     | Some l -> `ChangeToAndDoChildren (exp_of_lab (find_new_label l))

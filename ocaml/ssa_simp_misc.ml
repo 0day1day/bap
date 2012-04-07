@@ -17,16 +17,18 @@ let cfg_jumpelim graph =
 	match laststmt with
 	| CJmp(cond, l1, l2, attr)
 	    when full_value_eq cond val_true or full_value_eq cond val_false ->
-          changed := true;
-	      let (l1, l2) = if full_value_eq cond val_true
-		then (l1, l2) else (l2, l1) in
-	      let toremove = match val_of_exp l2 with
-		| Some(l) -> C.find_label graph l
-		| None -> failwith "Unable to convert expression to label" in
-	      let graph = C.remove_edge graph bb toremove in
-	      let revnewstmts = Jmp(l1, attr)::(List.tl revstmts) in
-	      let newstmts = List.rev revnewstmts in
-	      C.set_stmts graph bb newstmts
+          (try
+	    let (l1, l2) = if full_value_eq cond val_true
+	      then (l1, l2) else (l2, l1) in
+	    let toremove = match val_of_exp l2 with
+	      | Some(l) -> C.find_label graph l
+	      | None -> raise Not_found in
+	    let graph = C.remove_edge graph bb toremove in
+	    let revnewstmts = Jmp(l1, attr)::(List.tl revstmts) in
+	    let newstmts = List.rev revnewstmts in
+            changed := true;
+	    C.set_stmts graph bb newstmts
+           with Not_found -> graph)
 	| _ -> graph)
       else graph
     )
