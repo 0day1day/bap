@@ -99,6 +99,7 @@ type opcode =
   | Xor of (typ * operand * operand)
   | Pxor of (typ * operand * operand)
   | Test of typ * operand * operand
+  | Ptest of typ * operand * operand
   | Not of typ * operand
   | Neg of typ * operand
   | Imul of typ * (operand * operand option) * operand * operand (* typ, (dst1,dst2), src1, src2 *)
@@ -311,6 +312,9 @@ and reg2bits r = Util.list_firstindex [eax; ecx; edx; ebx; esp; ebp; esi; edi] (
 
 let bits2xmme b = Var(bits2xmm b)
 
+let bits2reg64e b =
+  cast_low r64 (bits2xmme b)
+
 let bits2reg32e b = Var(bits2reg32 b)
 
 let bits2reg16e b =
@@ -378,6 +382,7 @@ let storem m t a e =
 
 let op2e_s ss t = function
   | Oreg r when t = r128 -> bits2xmme r
+  | Oreg r when t = r64 -> bits2reg64e r
   | Oreg r when t = r32 -> bits2reg32e r
   | Oreg r when t = r16 -> bits2reg16e r
   | Oreg r when t = r8 -> bits2reg8e r
@@ -1085,6 +1090,17 @@ let rec to_ir addr next ss pref =
     :: move cf exp_false
     :: move af (Unknown("AF is undefined after and", r1))
     :: set_pszf t (Var tmp)
+  | Ptest(t, o1, o2) ->
+    let tmp1 = nt "t1" t in
+    let tmp2 = nt "t2" t in
+    move tmp1 (op2e t o2 &* op2e t o1)
+    :: move tmp2 (op2e t o2 &* (exp_not (op2e t o1)))
+    :: move af exp_false
+    :: move oF exp_false
+    :: move pf exp_false
+    :: move sf exp_false
+    :: move zf ((Var tmp1) ==* (Int(bi0, t)))
+    :: [move cf ((Var tmp2) ==* (Int(bi0, t)))]
   | Not(t, o) ->
     [assn t o (exp_not (op2e t o))]
   | Neg(t, o) ->
@@ -1233,6 +1249,7 @@ module ToStr = struct
     | Xor(t,d,s) -> Printf.sprintf "xor %s, %s" (opr d) (opr s)
     | Pxor(t,d,s)  -> Printf.sprintf "pxor %s, %s" (opr d) (opr s)
     | Test(t,d,s) -> Printf.sprintf "test %s, %s" (opr d) (opr s)
+    | Ptest(t,d,s) -> Printf.sprintf "ptest %s, %s" (opr d) (opr s)
     | Not(t,o) -> Printf.sprintf "not %s" (opr o)
     | Neg(t,o) -> Printf.sprintf "neg %s" (opr o)
     | Imul (t, (dst1,dstop), src1, src2) -> 
@@ -1486,7 +1503,7 @@ let parse_instr g addr =
       in
       (Imul(prefix.opsize, (r,None), rm, (sign_ext ot o prefix.opsize)), na)
     | 0x70 | 0x71 | 0x72 | 0x73 | 0x74 | 0x75 | 0x76 | 0x77 | 0x78 | 0x79
-    | 0x7c | 0x7d | 0x7e | 0x7f -> 
+    | 0x7a | 0x7b | 0x7c | 0x7d | 0x7e | 0x7f -> 
       let (i,na) = parse_disp8 na in
       (Jcc(Oimm(Int64.add i na), cc_to_exp b1), na)
     | 0x80 | 0x81 | 0x82 | 0x83 -> 
@@ -1694,7 +1711,10 @@ let parse_instr g addr =
       let b2 = Char.code (g na) and na = s na in
       match b2 with (* Table A-3 *)
       | 0x1f -> (Nop, na)
-      | 0x28 | 0x29 | 0x6e | 0x7e | 0x6f | 0x7f ->
+      | 0x28 | 0x29 | 0x6e | 0x7e | 0x6f | 0x7f | 0xd6 ->
+        (* XXX: Clean up prefixes.  This will probably require some
+           effort understaind the manual. We probably don't do the
+           right thing on weird cases (too many prefixes set). *)
         let t, name, align, tsrc, tdest = match b2 with
           | 0x28 | 0x29 when prefix.opsize_override ->
 	    r128, "movapd", true, r128, r128
@@ -1705,56 +1725,64 @@ let parse_instr g addr =
 	    r128, "movdqa", true, r128, r128
           | 0x6e -> r32, "movd", false, r32, prefix.mopsize
           | 0x7e -> r32, "movd", false, prefix.mopsize, r32
-          | 0x6f | 0x7f -> r64, "movq", false, r64, r64
-          | _ -> unimplemented 
+          | 0x6f | 0x7f when pref=[] -> r64, "movq", false, r64, r64
+          | 0xd6 when prefix.opsize_override -> r64, "movq", false, r64, r64
+          | _ -> unimplemented
 	    (Printf.sprintf "mov opcode case missing: %02x" b2)
         in
 	let r, rm, na = parse_modrm32 na in
 	let s, d = match b2 with
           | 0x6f | 0x6e | 0x28 -> rm, r
-          | 0x7f | 0x7e | 0x29 -> r, rm
+          | 0x7f | 0x7e | 0x29 | 0xd6 -> r, rm
 	  | _ -> disfailwith 
 	    (Printf.sprintf "impossible mov(a/d) condition: %02x" b2)
         in
 	(Movdq(t, tdest, d, tsrc, s, align, name), na)
       | 0x31 -> (Rdtsc, na)
       | 0x34 -> (Sysenter, na)
+      | 0x38 when prefix.opsize_override ->
+          let b2 = Char.code (g na) and na = s na in
+          (match b2 with
+            | 0x17 ->
+              let d, s, na = parse_modrm32 na in
+              (Ptest(r128, d, s), na)
+            | _ -> disfailwith (Printf.sprintf "opcode missing: %02x" b2))
       | 0x3a ->
-          let b3 = Char.code (g na) and na = s na in
-          (match b3 with
-             | 0x0f ->
-                 let (r, rm, na) = parse_modrm prefix.opsize na in
-	         let (i, na) = parse_imm8 na in
-                 (Palignr(prefix.mopsize, r, rm, i), na)
-             | 0x63 ->
-                 let (r, rm, na) = parse_modrm prefix.opsize na in
-                 let (i, na) = parse_imm8 na in
-                 (match i with
-                   (* See Section 4.1 of Intel manual for more
-                      information on the immediate control byte.
+        let b3 = Char.code (g na) and na = s na in
+        (match b3 with
+        | 0x0f ->
+          let (r, rm, na) = parse_modrm prefix.opsize na in
+	  let (i, na) = parse_imm8 na in
+          (Palignr(prefix.mopsize, r, rm, i), na)
+        | 0x63 ->
+          let (r, rm, na) = parse_modrm prefix.opsize na in
+          let (i, na) = parse_imm8 na in
+          (match i with
+                 (* See Section 4.1 of Intel manual for more
+                    information on the immediate control byte.
 
-                      i[0]:
-                      0 = 16 packed bytes
-                      1 =  8 packed words
-                      i[1]:
-                      0 = packed elements are unsigned
-                      1 = packed elements are signed
-                      i[3:2]:
-                      00 = "equal any"
-                      01 = "ranges"
-                      10 = "each each"
-                      11 = "equal ordered"
-                      i[4]:
-                      0 = IntRes1 unmodified
-                      1 = IntRes1 is negated (1's complement)
-                      i[5]:
-                      0 = Negation of IntRes1 is for all 16 (8) bits
-                      1 = Negation of IntRes1 is masked by reg/mem validity
-                      i[6]:
-                      0 = Use least significant bit for IntRes2
-                      1 = Use most significant bit for IntRes2
-                      i[7]: Undefined, set to 0.
-                   *)
+                    i[0]:
+                    0 = 16 packed bytes
+                    1 =  8 packed words
+                    i[1]:
+                    0 = packed elements are unsigned
+                    1 = packed elements are signed
+                    i[3:2]:
+                    00 = "equal any"
+                    01 = "ranges"
+                    10 = "each each"
+                    11 = "equal ordered"
+                    i[4]:
+                    0 = IntRes1 unmodified
+                    1 = IntRes1 is negated (1's complement)
+                    i[5]:
+                    0 = Negation of IntRes1 is for all 16 (8) bits
+                    1 = Negation of IntRes1 is masked by reg/mem validity
+                    i[6]:
+                    0 = Use least significant bit for IntRes2
+                    1 = Use most significant bit for IntRes2
+                    i[7]: Undefined, set to 0.
+                 *)
 
                  (* Note: We only implement the case for unsigned
                     bytes equal ordered comparison for pcmpistri right
@@ -1786,15 +1814,16 @@ let parse_instr g addr =
 	  disfailwith "impossible" in
         (Pcmpeq(prefix.mopsize, elet, r, rm), na)
       | 0x80 | 0x81 | 0x82 | 0x83 | 0x84 | 0x85 | 0x86 | 0x87 | 0x88 | 0x89
-      | 0x8c | 0x8d | 0x8e
-      | 0x8f ->	let (i,na) = parse_disp32 na in
-		(Jcc(Oimm(Int64.add i na), cc_to_exp b2), na)
+      | 0x8a | 0x8b | 0x8c | 0x8d | 0x8e | 0x8f ->
+        let (i,na) = parse_disp32 na in
+	(Jcc(Oimm(Int64.add i na), cc_to_exp b2), na)
     (* add other opcodes for setcc here *)
-      | 0x94
-      | 0x95 -> let r, rm, na = parse_modrm r8 na in
-		(* unclear what happens otherwise *)
-		assert (prefix.opsize = r32);
-		(Setcc(r8, rm, cc_to_exp b2), na)
+      | 0x90 | 0x91 | 0x92 | 0x93 | 0x94 | 0x95 | 0x96 | 0x97 | 0x98 | 0x99
+      | 0x9a | 0x9b | 0x9c | 0x9d | 0x9e | 0x9f ->
+        let r, rm, na = parse_modrm r8 na in
+	(* unclear what happens otherwise *)
+	assert (prefix.opsize = r32);
+	(Setcc(r8, rm, cc_to_exp b2), na)
       | 0xa2 -> (Cpuid, na)
       | 0xa3 | 0xba ->
           let (r, rm, na) = parse_modrm prefix.opsize na in
