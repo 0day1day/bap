@@ -292,14 +292,20 @@ let efse ?(cf=true) p pi =
     | Assign(v, e) as s::tl ->
       let value = eval delta e in
       dprintf "stmt: %s\nevaluated %s to %s, concrete = %b" (stmt_to_string s) (Pp.ast_exp_to_string e) (Pp.ast_exp_to_string (unwrap_symb value)) (Symbeval.is_concrete_mem_or_scalar value);
-      let delta',pi' = if Symbeval.is_concrete_mem_or_scalar value
+      let delta',pi' = match value with
         (* Note: Even concrete assignments need to be added to the
            formula.  This is because when Ite merged two contexts,
            conflicting concrete assignments will be expunged from the
            concrete context.  In this case, the assignment in the
-           formula must be used. *)
-        then D.set delta v value, Ast.exp_and pi (Ast.exp_eq (Ast.Var v) (unwrap_symb value))
-        else delta, Ast.exp_and pi (Ast.exp_eq (Ast.Var v) (unwrap_symb value)) in
+           formula must be used.
+
+           However, we need to be careful about concrete memories,
+           because they aren't really constant size. So, we won't add
+           the evaluated memory to the formula.  *)
+        | Symbeval.Symbolic(Ast.Int _) -> D.set delta v value, Ast.exp_and pi (Ast.exp_eq (Ast.Var v) (unwrap_symb value))
+        | Symbeval.ConcreteMem _ -> D.set delta v value, Ast.exp_and pi (Ast.exp_eq (Ast.Var v) e)
+        | _ -> delta, Ast.exp_and pi (Ast.exp_eq (Ast.Var v) e)
+      in
       efse delta' pi' tl
     | Assert e::tl ->
       let value = eval_exp delta e in
