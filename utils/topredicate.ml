@@ -18,6 +18,7 @@ let usedc = ref true
 let usesccvn = ref true
 let solve = ref false
 let dwpcf = ref true
+let sat = ref true
 
 (* Select which solver to use *)
 let solver = ref (Smtexec.STP.si);;
@@ -81,6 +82,8 @@ let compute_fse cfg post =
   (Eval.fse post ast, [])
 
 (* DWP paper *)
+let sat_or_valid () = if !sat then Efse.Assign.Sat else Efse.Assign.Validity
+
 let compute_fse_unpass cfg post =
   let cfg, post = optimize_cfg ~usedc:!usedc ~usesccvn:!usesccvn cfg post in
   let efse = Efse.of_astcfg cfg in
@@ -90,25 +93,31 @@ let compute_fse_pass cfg post =
   let cfg, post = optimize_cfg ~usedc:!usedc ~usesccvn:!usesccvn cfg post in
   let (efse, tossa) = Efse.passified_of_astcfg cfg in
   let post = rename_astexp tossa post in
-  (Efse.fse_pass ~cf:!dwpcf efse post, [])
+  (Efse.fse_pass ~cf:!dwpcf efse post (sat_or_valid ()), [])
 
 let compute_efse_pass cfg post =
   let cfg, post = optimize_cfg ~usedc:!usedc ~usesccvn:!usesccvn cfg post in
   let (efse, tossa) = Efse.passified_of_astcfg cfg in
   let post = rename_astexp tossa post in
-  (Efse.efse ~cf:!dwpcf efse post, [])
+  (Efse.efse ~cf:!dwpcf efse post (sat_or_valid ()), [])
 
 let compute_efse_mergepass cfg post =
   let cfg, post = optimize_cfg ~usedc:!usedc ~usesccvn:!usesccvn cfg post in
   let (efse, tossa) = Efse.passified_of_astcfg cfg in
   let post = rename_astexp tossa post in
-  (Efse.efse_merge1 ~cf:!dwpcf efse post, [])
+  (Efse.efse_merge1 ~cf:!dwpcf efse post (sat_or_valid ()), [])
 
-let compute_efse_feaspass cfg post =
+let compute_efse_lazypass cfg post =
   let cfg, post = optimize_cfg ~usedc:!usedc ~usesccvn:!usesccvn cfg post in
   let (efse, tossa) = Efse.passified_of_astcfg cfg in
   let post = rename_astexp tossa post in
-  (Efse.efse_feas ~cf:!dwpcf efse post, [])
+  (Efse.efse_lazy ~cf:!dwpcf efse post (sat_or_valid ()), [])
+
+(* let compute_efse_feaspass cfg post = *)
+(*   let cfg, post = optimize_cfg ~usedc:!usedc ~usesccvn:!usesccvn cfg post in *)
+(*   let (efse, tossa) = Efse.passified_of_astcfg cfg in *)
+(*   let post = rename_astexp tossa post in *)
+(*   (Efse.efse_feas ~cf:!dwpcf efse post, []) *)
 
 (* end DWP paper *)
 
@@ -215,10 +224,12 @@ let speclist =
      "Use inefficient FSE algorithm for passified programs in DWP paper.")
   ::("-efse-pass-dwp-paper", Arg.Unit(fun () -> compute_wp := compute_efse_pass),
      "Use efficient FSE algorithm for passified programs in DWP paper.")
-  ::("-efse-pass-dwp-mergepaper", Arg.Unit(fun () -> compute_wp := compute_efse_mergepass),
+  ::("-efse-pass-merge-dwp-paper", Arg.Unit(fun () -> compute_wp := compute_efse_mergepass),
      "Use efficient FSE algorithm for passified programs in DWP paper that adds concrete assignments to the formula only during merging.")
-  ::("-efse-pass-feas-dwp-paper", Arg.Unit(fun () -> compute_wp := compute_efse_feaspass),
-     "Use efficient FSE algorithm for passified programs in DWP paper with feasibility checking.")
+  ::("-efse-pass-lazy-dwp-paper", Arg.Unit(fun () -> compute_wp := compute_efse_lazypass),
+     "Use efficient FSE algorithm for passified programs in DWP paper that lazily adds concrete assignments to the formula when merging.")
+  (* ::("-efse-pass-feas-dwp-paper", Arg.Unit(fun () -> compute_wp := compute_efse_feaspass), *)
+  (*    "Use efficient FSE algorithm for passified programs in DWP paper with feasibility checking.") *)
   ::("-nocf-dwp-paper", Arg.Clear dwpcf,
      "Do not use constant folding in DWP paper algorithms")
   ::("-noopt", Arg.Unit (fun () -> usedc := false; usesccvn := false),
@@ -231,6 +242,8 @@ let speclist =
      "Perform sccvn on the SSA CFG.")
   ::("-solve", Arg.Unit (fun () -> solve := true),
      "Solve the generated formula.")
+  ::("-validity", Arg.Clear sat,
+     "Check validity rather than satisfiability.")
   :: Input.speclist
 
 let anon x = raise(Arg.Bad("Unexpected argument: '"^x^"'"))
@@ -271,10 +284,16 @@ match !stpout with
     if !assert_vars then (
       let (vars,wp') = extract_vars wp in
       List.iter (fun (v,e) -> p#assert_ast_exp (BinOp(EQ, Var v, e))) vars;
-      p#assert_ast_exp_with_foralls foralls wp'
+      if !sat then
+        p#assert_ast_exp_with_foralls foralls wp'
+      else
+        p#valid_ast_exp ~foralls wp'
     )
     else (
-      p#assert_ast_exp_with_foralls foralls wp;
+      if !sat then
+        p#assert_ast_exp_with_foralls foralls wp
+      else
+        p#valid_ast_exp ~foralls wp
     );
     p#counterexample;
     p#close;
