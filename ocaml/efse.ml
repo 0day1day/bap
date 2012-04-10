@@ -1,5 +1,6 @@
 (** Implementation of [efse] algorithm from DWP paper. *)
 
+open Ast
 open Big_int_convenience
 module CA = Cfg.AST
 module D = Debug.Make(struct let name = "Efse" and default = `NoDebug end)
@@ -120,6 +121,12 @@ sig
   (** Take the intersection of two deltas. When there are conflicting
       bindings for a variable, there will be no binding in the final
       delta for that variable. *)
+  val merge_super : t -> t -> exp -> exp -> t * exp * exp
+  (** [merge_super d1 d2 pi1 pi2] returns a merged [d], and modified
+      [pi1] and [pi2]. When there are conflicting bindings for a
+      variable, there will be no binding in the final delta for that
+      variable, and the binding will be added to that branch's
+      formula. *)
   val set : t -> var -> Symbeval.varval -> t
   (** Setter method *)
   val get : t -> var -> Symbeval.varval
@@ -165,6 +172,41 @@ struct
         (* In d2 but not d1, remove *)
         VM.remove var newdelta
     ) f f
+  let merge_super d1 d2 pi1 pi2 =
+    let f, pi1, pi2 =
+      VM.fold (fun var value (newdelta, pi1, pi2) ->
+        try
+          let newvalue = VM.find var newdelta in
+          if value = newvalue then
+          (* Newdelta already has the same value! We can just return newdelta as
+             is. *)
+            newdelta, pi1, pi2
+          else (
+            (* Newdelta has a CONFLICTING assignment.  We need to remove
+               it, and add the assignments to pi1 and pi2. *)
+            dprintf "CONFLICT: Removing %s" (Pp.var_to_string var);
+            let pi1 = exp_and pi1 (exp_eq (Var var) (unwrap_symb value)) in
+            let pi2 = exp_and pi2 (exp_eq (Var var) (unwrap_symb newvalue)) in
+            VM.remove var newdelta, pi1, pi2)
+        with Not_found ->
+          (* Conflict: Var only assigned in d1. Add it to pi1. *)
+          dprintf "MISSING: Removing %s" (Pp.var_to_string var);
+          let pi1 = exp_and pi1 (exp_eq (Var var) (unwrap_symb value)) in
+          newdelta, pi1, pi2
+      ) d1 (d2, pi1, pi2)
+    in
+    (* f has all the correct bindings in d1.  Now we need to remove
+       bindings that are only in d2. *)
+    VM.fold (fun var value (newdelta, pi1, pi2) ->
+      if VM.mem var d1 then
+        (* This is in d1 and d2, we're okay *)
+        newdelta, pi1, pi2
+      else
+        (* In d2 but not d1, add to pi2. *)
+        let newvalue = VM.find var d2 in
+        let pi2 = exp_and pi2 (exp_eq (Var var) (unwrap_symb newvalue)) in
+        VM.remove var newdelta, pi1, pi2
+    ) f (f, pi1, pi2)
     let set h v e =
       dprintf "Setting %s to %s" (Pp.var_to_string v) (Symbeval.symb_to_string e);
       VM.add v e h
@@ -347,6 +389,74 @@ let efse ?(cf=true) p pi =
         let delta1,pi_t = efse delta value_t s1 in
         let delta2,pi_f = efse delta (Ast.exp_not value_t) s2 in
         let mergedelta = D.merge delta1 delta2 in
+        let deltatl,pitl = efse mergedelta Ast.exp_true tl in
+        deltatl, Ast.exp_and (Ast.exp_and pi (Ast.exp_or pi_t pi_f)) pitl)
+  in
+  let _,pi = efse (D.create ()) pi p in
+  pi
+
+(** Efficient fse algorithm for passified programs. 
+
+    This implementation only adds concrete assignments to the formula when
+    merging conflicts happen.
+*)
+let efse_merge1 ?(cf=true) p pi =
+  let eval delta e = if cf
+    then D.simplify delta e
+    else Symbeval.Symbolic e
+  in
+  (* let eval delta e = if cf then ( *)
+  (*   let x = D.simplify delta e in *)
+  (*   if Symbeval.is_concrete_mem_or_scalar x then x *)
+  (*   else Symbeval.Symbolic e *)
+  (* ) else Symbeval.Symbolic e *)
+  (* in *)
+  let eval_exp delta e = unwrap_symb (eval delta e) in
+  let rec efse delta pi = function
+    | [] -> dprintf "empty"; delta,pi
+    | Assign(v, e) as s::tl ->
+      dprintf "assign";
+      let value = eval delta e in
+      dprintf "stmt: %s\nevaluated %s to %s, concrete = %b" (stmt_to_string s) (Pp.ast_exp_to_string e) (Pp.ast_exp_to_string (unwrap_symb value)) (Symbeval.is_concrete_mem_or_scalar value);
+      let delta',pi' = match value with
+        (* Note: Concrete assignments are not added to the formula
+           here, but may be by merge_super.  Imagine if x=1 and x=0 occur
+           on different branches of an Ite. *)
+        | Symbeval.Symbolic(Ast.Int _) when cf -> D.set delta v value, (*Ast.exp_and pi (Ast.exp_eq (Ast.Var v) (unwrap_symb value))*) pi
+        | Symbeval.ConcreteMem _ when cf -> D.set delta v value, (*Ast.exp_and pi (Ast.exp_eq (Ast.Var v) e)*) pi
+        | _ -> delta, Ast.exp_and pi (Ast.exp_eq (Ast.Var v) e)
+      in
+      dprintf "done.";
+      efse delta' pi' tl
+    | Assert e::tl ->
+      dprintf "assert";
+      let value = eval_exp delta e in
+      dprintf "Evaluated %s to %s" (Pp.ast_exp_to_string e) (Pp.ast_exp_to_string value);
+      (match value with
+      | Ast.Int(bi, Reg 1) when bi_is_zero bi && cf ->
+        (* Assert false = false, pi \land false = false *)
+        delta,Ast.exp_false
+      | Ast.Int(bi, Reg 1) when bi_is_one bi && cf ->
+        (* Assert true = true, pi \land true = pi *)
+        efse delta pi tl
+      | _ ->
+        let pi' = Ast.exp_and pi value in
+        efse delta pi' tl)
+    | Ite(e, s1, s2)::tl ->
+      dprintf "ite condition %s" (Pp.ast_exp_to_string e);
+      let value_t = eval_exp delta e in
+      (match value_t with
+      | Ast.Int(bi, Reg 1) when bi_is_zero bi && cf ->
+        dprintf "true branch";
+        efse delta pi (s2@tl)
+      | Ast.Int(bi, Reg 1) when bi_is_one bi && cf ->
+        dprintf "false branch";
+        efse delta pi (s1@tl)
+      | _ ->
+        dprintf "symbolic branch";
+        let delta1,pi_t = efse delta value_t s1 in
+        let delta2,pi_f = efse delta (Ast.exp_not value_t) s2 in
+        let mergedelta,pi_t,pi_f = D.merge_super delta1 delta2 pi_t pi_f in
         let deltatl,pitl = efse mergedelta Ast.exp_true tl in
         deltatl, Ast.exp_and (Ast.exp_and pi (Ast.exp_or pi_t pi_f)) pitl)
   in

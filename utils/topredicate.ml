@@ -98,6 +98,12 @@ let compute_efse_pass cfg post =
   let post = rename_astexp tossa post in
   (Efse.efse ~cf:!dwpcf efse post, [])
 
+let compute_efse_mergepass cfg post =
+  let cfg, post = optimize_cfg ~usedc:!usedc ~usesccvn:!usesccvn cfg post in
+  let (efse, tossa) = Efse.passified_of_astcfg cfg in
+  let post = rename_astexp tossa post in
+  (Efse.efse_merge1 ~cf:!dwpcf efse post, [])
+
 let compute_efse_feaspass cfg post =
   let cfg, post = optimize_cfg ~usedc:!usedc ~usesccvn:!usesccvn cfg post in
   let (efse, tossa) = Efse.passified_of_astcfg cfg in
@@ -166,11 +172,11 @@ let speclist =
   ("-o", Arg.String (fun f -> irout := Some(open_out f)),
    "<file> Print output to <file> rather than stdout.")
   ::("-stp-out", Arg.String (fun f -> stpoutname := f; stpout := Some(open_out f)),
-   "<file> Print output to <file> rather than stdout.")
+     "<file> Print output to <file> rather than stdout.")
   ::("-pstp-out", Arg.String (fun f -> pstpout := Some(open_out f)),
-   "<file> Print WP expression without assertion to <file>.")
+     "<file> Print WP expression without assertion to <file>.")
   ::("-q", Arg.Unit (fun () -> irout := None),
-   "Quiet: Supress outputting the WP in the BAP IL.")
+     "Quiet: Supress outputting the WP in the BAP IL.")
   ::("-post", Arg.Set_string post,
      "<exp> Use <exp> as the postcondition (defaults to \"true\")")
   ::("-suffix", Arg.String (fun str -> suffix := str),
@@ -209,6 +215,8 @@ let speclist =
      "Use inefficient FSE algorithm for passified programs in DWP paper.")
   ::("-efse-pass-dwp-paper", Arg.Unit(fun () -> compute_wp := compute_efse_pass),
      "Use efficient FSE algorithm for passified programs in DWP paper.")
+  ::("-efse-pass-dwp-mergepaper", Arg.Unit(fun () -> compute_wp := compute_efse_mergepass),
+     "Use efficient FSE algorithm for passified programs in DWP paper that adds concrete assignments to the formula only during merging.")
   ::("-efse-pass-feas-dwp-paper", Arg.Unit(fun () -> compute_wp := compute_efse_feaspass),
      "Use efficient FSE algorithm for passified programs in DWP paper with feasibility checking.")
   ::("-nocf-dwp-paper", Arg.Clear dwpcf,
