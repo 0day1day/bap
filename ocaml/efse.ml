@@ -501,7 +501,7 @@ let efse_lazy ?(cf=true) p pi mode =
   let eval_exp delta e = unwrap_symb (eval delta e) in
   let module VH = Var.VarHash in
   let h = VH.create 1000 in
-  let mark v =
+  let merged v =
     VH.replace h v false
   and needed v =
     try VH.find h v
@@ -513,7 +513,7 @@ let efse_lazy ?(cf=true) p pi mode =
       VH.replace h v true
     )
   in
-  let mark_vars_in e =
+  let used_vars_in e =
     let v = object
       inherit Ast_visitor.nop
       method visit_rvar v =
@@ -551,7 +551,7 @@ let efse_lazy ?(cf=true) p pi mode =
              Assign.add_passive_value (Lazy.force pi) v value mode
            else Lazy.force pi)
         | _ -> 
-          mark_vars_in e;
+          used_vars_in e;
           delta, lazy (Assign.add_passive_assignment (Lazy.force pi) v e mode)
       in
       dprintf "done.";
@@ -569,7 +569,7 @@ let efse_lazy ?(cf=true) p pi mode =
         efse delta pi tl
       | _ ->
         let pi' = lazy (Ast.exp_and (Lazy.force pi) value) in
-        mark_vars_in e;
+        used_vars_in e;
         efse delta pi' tl)
     | Ite(e, s1, s2)::tl ->
       dprintf "ite condition %s" (Pp.ast_exp_to_string e);
@@ -583,12 +583,12 @@ let efse_lazy ?(cf=true) p pi mode =
         efse delta pi (s1@tl)
       | _ ->
         dprintf "symbolic branch";
-        mark_vars_in e;
+        used_vars_in e;
         let delta1,pi_t = efse delta (lazy value_t) s1 in
         let delta2,pi_f = efse delta (lazy (Ast.exp_not value_t)) s2 in
         let mergedelta,badlist = D.merge delta1 delta2 in
         (* Mark each variable in badlist as needing to go in the formula *)
-        List.iter mark badlist;
+        List.iter merged badlist;
         let deltatl,pitl = efse mergedelta (lazy Ast.exp_true) tl in
         deltatl, lazy (Ast.exp_and (Ast.exp_and (Lazy.force pi) (Ast.exp_or (Lazy.force pi_t) (Lazy.force pi_f))) (Lazy.force pitl)))
   in
