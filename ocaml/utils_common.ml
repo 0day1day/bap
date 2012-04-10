@@ -17,7 +17,7 @@ let rename_astexp f =
   Ast_visitor.exp_accept vis;;
 
 
-let to_ssagcl ?(usedc=true) ?(usesccvn=true) cfg post =
+let optimize_cfg ?(usedc=true) ?(usesccvn=true) cfg post =
   let cfg = Hacks.remove_cycles cfg in
   let cfg = Coalesce.coalesce_ast cfg in
   let {Cfg_ssa.cfg=cfg; to_ssavar=tossa} = Cfg_ssa.trans_cfg cfg in
@@ -27,6 +27,10 @@ let to_ssagcl ?(usedc=true) ?(usesccvn=true) cfg post =
     Ssa_simp.simp_cfg ~liveout:vars ~usedc ~usesccvn cfg
   in
   let cfg = Cfg_ssa.to_astcfg cfg in
+  (cfg, p);;
+
+let to_ssagcl ?(usedc=true) ?(usesccvn=true) cfg post =
+  let cfg, p = optimize_cfg ~usedc ~usesccvn cfg post in
   let gcl = Gcl.of_astcfg cfg in
   (gcl, p);;
 

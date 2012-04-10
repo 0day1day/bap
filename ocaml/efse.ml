@@ -27,6 +27,9 @@ and prog_to_string = function
   | x::[] -> stmt_to_string x
   | x::tl -> (stmt_to_string x)^"; "^(prog_to_string tl)
 
+(* let stmt_to_string x = if not debug then "" else stmt_to_string x *)
+(* let prog_to_string x = "" *)
+
 module ToEfse = struct
   let of_rev_straightline stmts =
     let rec f acc = function
@@ -71,10 +74,14 @@ module ToEfse = struct
       c s Util.id
     in
     if debug then Pp.output_varnums := true;
+    dprintf "Converting to gclhelp";
     let gcl = Gcl.gclhelp_of_astcfg ?entry ?exit cfg in
-    dprintf "gcl: %s" (Gcl.gclhelp_to_string gcl);
+    (* If debug is off, dprintf will still evaluate it's arguments,
+       which is why we insert a conditional. *)
+    if debug then dprintf "gcl: %s" (Gcl.gclhelp_to_string gcl);
+    dprintf "Converting to fse";
     let fse = cgcl_to_fse (Gcl.gclhelp_of_astcfg ?entry ?exit cfg) in
-    dprintf "fse: %s" (prog_to_string fse);
+    if debug then dprintf "fse: %s" (prog_to_string fse);
     fse
 
   let passified_of_ssa ?entry ?exit cfg =
@@ -138,11 +145,13 @@ struct
           (* Newdelta already has the same value! We can just return newdelta as
              is. *)
             newdelta
-          else
+          else (
           (* Newdelta has a CONFLICTING assignment.  We need to remove it. *)
-            VM.remove var newdelta
+            dprintf "CONFLICT: Removing %s" (Pp.var_to_string var);
+            VM.remove var newdelta)
         with Not_found ->
           (* Conflict: Var only assigned in one branch. Don't add it. *)
+          dprintf "MISSING: Removing %s" (Pp.var_to_string var);
           newdelta
       ) d1 d2
     in
@@ -288,8 +297,9 @@ let efse ?(cf=true) p pi =
   (* in *)
   let eval_exp delta e = unwrap_symb (eval delta e) in
   let rec efse delta pi = function
-    | [] -> delta,pi
+    | [] -> dprintf "empty"; delta,pi
     | Assign(v, e) as s::tl ->
+      dprintf "assign";
       let value = eval delta e in
       dprintf "stmt: %s\nevaluated %s to %s, concrete = %b" (stmt_to_string s) (Pp.ast_exp_to_string e) (Pp.ast_exp_to_string (unwrap_symb value)) (Symbeval.is_concrete_mem_or_scalar value);
       let delta',pi' = match value with
@@ -302,32 +312,38 @@ let efse ?(cf=true) p pi =
            However, we need to be careful about concrete memories,
            because they aren't really constant size. So, we won't add
            the evaluated memory to the formula.  *)
-        | Symbeval.Symbolic(Ast.Int _) -> D.set delta v value, Ast.exp_and pi (Ast.exp_eq (Ast.Var v) (unwrap_symb value))
-        | Symbeval.ConcreteMem _ -> D.set delta v value, Ast.exp_and pi (Ast.exp_eq (Ast.Var v) e)
+        | Symbeval.Symbolic(Ast.Int _) when cf -> D.set delta v value, Ast.exp_and pi (Ast.exp_eq (Ast.Var v) (unwrap_symb value))
+        | Symbeval.ConcreteMem _ when cf -> D.set delta v value, Ast.exp_and pi (Ast.exp_eq (Ast.Var v) e)
         | _ -> delta, Ast.exp_and pi (Ast.exp_eq (Ast.Var v) e)
       in
+      dprintf "done.";
       efse delta' pi' tl
     | Assert e::tl ->
+      dprintf "assert";
       let value = eval_exp delta e in
       dprintf "Evaluated %s to %s" (Pp.ast_exp_to_string e) (Pp.ast_exp_to_string value);
       (match value with
-      | Ast.Int(bi, Reg 1) when bi_is_zero bi ->
+      | Ast.Int(bi, Reg 1) when bi_is_zero bi && cf ->
         (* Assert false = false, pi \land false = false *)
         delta,Ast.exp_false
-      | Ast.Int(bi, Reg 1) when bi_is_one bi ->
+      | Ast.Int(bi, Reg 1) when bi_is_one bi && cf ->
         (* Assert true = true, pi \land true = pi *)
         efse delta pi tl
       | _ ->
         let pi' = Ast.exp_and pi value in
         efse delta pi' tl)
     | Ite(e, s1, s2)::tl ->
+      dprintf "ite condition %s" (Pp.ast_exp_to_string e);
       let value_t = eval_exp delta e in
       (match value_t with
-      | Ast.Int(bi, Reg 1) when bi_is_zero bi ->
+      | Ast.Int(bi, Reg 1) when bi_is_zero bi && cf ->
+        dprintf "true branch";
         efse delta pi (s2@tl)
-      | Ast.Int(bi, Reg 1) when bi_is_one bi ->
+      | Ast.Int(bi, Reg 1) when bi_is_one bi && cf ->
+        dprintf "false branch";
         efse delta pi (s1@tl)
       | _ ->
+        dprintf "symbolic branch";
         let delta1,pi_t = efse delta value_t s1 in
         let delta2,pi_f = efse delta (Ast.exp_not value_t) s2 in
         let mergedelta = D.merge delta1 delta2 in

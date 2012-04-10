@@ -82,20 +82,24 @@ let compute_fse cfg post =
 
 (* DWP paper *)
 let compute_fse_unpass cfg post =
+  let cfg, post = optimize_cfg ~usedc:!usedc ~usesccvn:!usesccvn cfg post in
   let efse = Efse.of_astcfg cfg in
   (Efse.fse_unpass ~cf:!dwpcf efse post, [])
 
 let compute_fse_pass cfg post =
+  let cfg, post = optimize_cfg ~usedc:!usedc ~usesccvn:!usesccvn cfg post in
   let (efse, tossa) = Efse.passified_of_astcfg cfg in
   let post = rename_astexp tossa post in
   (Efse.fse_pass ~cf:!dwpcf efse post, [])
 
 let compute_efse_pass cfg post =
+  let cfg, post = optimize_cfg ~usedc:!usedc ~usesccvn:!usesccvn cfg post in
   let (efse, tossa) = Efse.passified_of_astcfg cfg in
   let post = rename_astexp tossa post in
   (Efse.efse ~cf:!dwpcf efse post, [])
 
 let compute_efse_feaspass cfg post =
+  let cfg, post = optimize_cfg ~usedc:!usedc ~usesccvn:!usesccvn cfg post in
   let (efse, tossa) = Efse.passified_of_astcfg cfg in
   let post = rename_astexp tossa post in
   (Efse.efse_feas ~cf:!dwpcf efse post, [])
@@ -267,6 +271,7 @@ match !stpout with
     p#counterexample;
     p#close;
     if !solve then
+      Printf.fprintf stderr "Solving\n"; flush stderr;
       let r = (!solver)#solve_formula_file ~printmodel:true !stpoutname in
       Printf.fprintf stderr "Solve result: %s\n" (Smtexec.result_to_string r)
 
