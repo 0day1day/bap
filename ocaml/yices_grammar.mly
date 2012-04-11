@@ -9,6 +9,7 @@
 %token ASSERT
 %token SDASHES
 %token DASHES
+%token QUESTIONMARKS
 %token INVALID
 %token VALID
 %token DEFAULT
@@ -42,8 +43,13 @@ assertion:
   /* Ignore "default: val" */
   | DEFAULT VAL { None }
   /* Ignore memory information for now */
-  | LBRACKET EQUAL LBRACKET VAR VAL RBRACKET VAL RBRACKET { None }
+  | LBRACKET EQUAL LBRACKET VAR val_opt RBRACKET val_opt RBRACKET { None }
   ;
+
+val_opt:
+  VAL { }
+  | QUESTIONMARKS { }
+;
 
 goodresult:
   INVALID { }

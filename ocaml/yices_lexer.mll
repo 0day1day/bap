@@ -16,6 +16,7 @@ rule token = parse
   | ')'              { RBRACKET }
   | "---"            { SDASHES }
   | "----"           { DASHES }
+  | "???"            { QUESTIONMARKS }
   | "MODEL"          { MODEL }
   | "ASSERT"         { ASSERT }
   | "sat"            { INVALID }
