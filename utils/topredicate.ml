@@ -72,7 +72,7 @@ let compute_dwp ?(k=1) cfg post =
 
 let compute_flanagansaxe ?(k=1) cfg post =
   let (gcl,p) = to_ssapassgcl cfg post in
-  (Wp.flanagansaxe ~k gcl p, [])
+  (Wp.flanagansaxe ~k gcl !sat p, [])
 
 (* FIXME: Why did I think we needed SSA here? *)
 let compute_fse cfg post =
