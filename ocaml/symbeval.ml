@@ -484,7 +484,9 @@ struct
 		   (*pdebug("Adding assertion: " ^ (Pp.ast_exp_to_string pred')) ;*)
 		   [{ctx with pred=pred'; pc=next_pc}]
              | v when is_false_val v ->
-		 raise (AssertFailed ctx)
+               let pred = Form.true_formula in
+               let pred = add_constraint pred exp_false Equal in
+	       raise (Halted(None, {ctx with pred = pred}))
              | _ -> [{ctx with pc=next_pc}]
           )
       | Comment _ | Label _ ->
@@ -745,7 +747,8 @@ struct
       | ConcreteMem(m,v), Int(i,t) ->
 	  (try AddrMap.find (normalize i t) m
 	   with Not_found ->
-	     Int(bi0, reg_8)
+             failwith (Printf.sprintf "Uninitialized memory found at %s" (Pp.ast_exp_to_string index))
+	     (*Int(bi0, reg_8)*)
 	  )
       | _ -> failwith "Symbolic memory or address in concrete evaluation"
 
