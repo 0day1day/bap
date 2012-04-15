@@ -169,7 +169,7 @@ let speclist =
          [Arg.Set_int srcbb ; Arg.Set_int srcn ;
           Arg.Set_int trgbb ; Arg.Set_int trgn ;
                uadd(TransformAstCfg(ast_chop srcbb srcn trgbb trgn)) ]),
-     "<src-bb> <src-num> <trg-bb> <trg-num> Calculate the chop of an AST")
+     "<src-bbnum> <src-linenum> <trg-bbnum> <trg-linenum> Calculate the chop of an AST")
   ::("-ssa-chop",
       Arg.Tuple
         (let srcbb = ref 0 and srcn = ref 0
@@ -177,7 +177,7 @@ let speclist =
          [Arg.Set_int srcbb ; Arg.Set_int srcn ;
           Arg.Set_int trgbb ; Arg.Set_int trgn ;
                uadd(TransformSsa(ssa_chop srcbb srcn trgbb trgn)) ]),
-     "<src-bb> <src-num> <trg-bb> <trg-num> Calculate the chop of an AST")
+     "<src-bbnum> <src-linenum> <trg-bbnum> <trg-linenum> Calculate the chop of an AST")
   ::("-sccvn", uadd(TransformSsa sccvn),
      "Apply Strongly Connected Component based Value Numbering")
   ::("-deadcode", uadd(TransformSsa deadcode),
