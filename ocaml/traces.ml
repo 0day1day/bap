@@ -713,8 +713,7 @@ let print_block =
   List.iter (fun s -> pdebug (Pp.ast_stmt_to_string s))
 
 let trace_length trace =
-  print "Trace length: %d\n" (List.length trace) ;
-  trace
+  print "Trace length: %d\n" (List.length trace)
 
 let print_formula file formula =
   let oc = open_out file in
@@ -1921,8 +1920,7 @@ let output_formula file trace =
     (*dprintf "formula size: %Ld\n" (formula_size formula) ;*)
   Status.init "Printing out formula" 0;
   print_formula file formula ;
-  Status.stop () ;
-  trace
+  Status.stop ()
 
 
 (*************************************************************)
@@ -1998,9 +1996,7 @@ let output_exploit file trace =
     List.iter (output_byte cout) input ;
     close_out cout;
     print "Exploit string was written out to file \"%s\"\n" file ;
-    flush stdout ;
-    trace
-
+    flush stdout
 
 
 (*************************************************************)
@@ -2075,8 +2071,7 @@ let trace_valid_to_invalid trace =
   in
   let (l,u) = bsearch 1 length in
   ignore (output_formula "form_val" (Util.take l trace)) ;
-  ignore (output_formula "form_inv" (Util.take u trace)) ;
-  trace
+  ignore (output_formula "form_inv" (Util.take u trace)) 
 
 (* Binary search over the concretized IL to check where things go
    wrong. *)
@@ -2120,8 +2115,7 @@ let formula_valid_to_invalid ?(min=1) trace =
   in
   let (l,u) = bsearch min length in
   ignore (sym_and_output (Util.take l trace) "form_val") ;
-  ignore (sym_and_output (Util.take u trace) "form_inv") ;
-  trace
+  ignore (sym_and_output (Util.take u trace) "form_inv")
 
 let clean =
   let rec clean_aux acc = function
