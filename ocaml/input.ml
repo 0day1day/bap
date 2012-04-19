@@ -108,7 +108,10 @@ let get_program () =
       List.append (Asmir.serialized_bap_from_trace_file f) oldp, oldscope
   in
   try
-    List.fold_left get_one ([], Grammar_private_scope.default_scope ()) (List.rev !inputs)
+    let p,scope = List.fold_left get_one ([], Grammar_private_scope.default_scope ()) (List.rev !inputs) in
+    (* Should we always typecheck? *)
+    Printexc.print Typecheck.typecheck_prog p;
+    p,scope
   with _ -> failwith "An exception occured while lifting"
 
 let get_stream_program () = match !streaminputs with

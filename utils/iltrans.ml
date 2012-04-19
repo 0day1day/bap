@@ -1,9 +1,6 @@
 let usage = "Usage: "^Sys.argv.(0)^" <input options> [transformations and outputs]\n\
              Transform BAP IL programs. "
 
-
-open Utils_common
-
 type ast = Ast.program
 type astcfg = Cfg.AST.G.t
 type ssa = Cfg.SSA.G.t
@@ -14,6 +11,9 @@ type prog =
   | Ssa of ssa
 
 type cmd =
+  | AnalysisAst of (ast -> unit)
+  | AnalysisAstCfg of (astcfg -> unit)
+  | AnalysisSsa of (ssa -> unit)
   | TransformAst of (ast -> ast)
   | TransformAstCfg of (astcfg -> astcfg)
   | TransformSsa of (ssa -> ssa)
@@ -24,7 +24,6 @@ type cmd =
 
 let pipeline = ref []
 let startdebug = ref 1
-
 
 let output_ast f p =
   let oc = open_out f in
@@ -376,7 +375,7 @@ let speclist =
       "<n> Unroll loops n times")
   :: ("-rm-cycles", uadd(TransformAstCfg Hacks.remove_cycles),
       "Remove cycles")
-  :: ("-typecheck", uadd(TransformAst typecheck),
+  :: ("-typecheck", uadd(AnalysisAst Typecheck.typecheck_prog),
       "Typecheck program")
   :: ("-uniqueify-labels", uadd(TransformAst Hacks.uniqueify_labels),
       "Ensure all labels are unique")
@@ -394,37 +393,52 @@ let prog =
     exit 1
 
 let rec apply_cmd prog = function
+  | AnalysisAst f -> (
+    match prog with
+    | Ast p as p' -> f p; p'
+    | _ -> failwith "need explicit translation to AST"
+  )
+  | AnalysisAstCfg f -> (
+    match prog with
+    | AstCfg p as p' -> f p; p'
+    | _ -> failwith "need explicit translation to AST CFG"
+  )
+  | AnalysisSsa f -> (
+    match prog with
+    | Ssa p as p' -> f p; p'
+    | _ -> failwith "need explicit translation to SSA"
+  )
   | TransformAst f -> (
-      match prog with
-      | Ast p -> Ast(f p)
-      | _ -> failwith "need explicit translation to AST"
-    )
+    match prog with
+    | Ast p -> Ast(f p)
+    | _ -> failwith "need explicit translation to AST"
+  )
   | TransformAstCfg f -> (
-      match prog with
-      | AstCfg p -> AstCfg(f p)
-      | _ -> failwith "need explicit translation to AST CFG"
-    )
+    match prog with
+    | AstCfg p -> AstCfg(f p)
+    | _ -> failwith "need explicit translation to AST CFG"
+  )
   | TransformSsa f -> (
-      match prog with
-      | Ssa p -> Ssa(f p)
-      | _ -> failwith "need explicit translation to SSA"
-    )
+    match prog with
+    | Ssa p -> Ssa(f p)
+    | _ -> failwith "need explicit translation to SSA"
+  )
   | ToCfg -> (
-      match prog with
-      | Ast p -> AstCfg(Cfg_ast.of_prog p)
-      | Ssa p -> AstCfg(Cfg_ssa.to_astcfg p)
-      | AstCfg _ as p -> prerr_endline "Warning: null transformation"; p
-    )
+    match prog with
+    | Ast p -> AstCfg(Cfg_ast.of_prog p)
+    | Ssa p -> AstCfg(Cfg_ssa.to_astcfg p)
+    | AstCfg _ as p -> prerr_endline "Warning: null transformation"; p
+  )
   | ToAst -> (
-      match prog with
-      | AstCfg p -> Ast(Cfg_ast.to_prog p)
-      | p -> apply_cmd (apply_cmd p ToCfg) ToAst
-    )
+    match prog with
+    | AstCfg p -> Ast(Cfg_ast.to_prog p)
+    | p -> apply_cmd (apply_cmd p ToCfg) ToAst
+  )
   | ToSsa -> (
-      match prog with
-      | AstCfg p -> Ssa(Cfg_ssa.of_astcfg p)
-      | p -> apply_cmd (apply_cmd p ToCfg) ToSsa
-    )
+    match prog with
+    | AstCfg p -> Ssa(Cfg_ssa.of_astcfg p)
+    | p -> apply_cmd (apply_cmd p ToCfg) ToSsa
+  )
 ;;
 
 List.fold_left apply_cmd (Ast prog) pipeline

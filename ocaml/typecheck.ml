@@ -115,7 +115,11 @@ and check_same ?e t1 t2 =
 
 and check_reg t =
   if not (is_integer_type t) then
-    terror "Expected integer type"
+    terror (Printf.sprintf "Expected integer type, but got %s" (Pp.typ_to_string t))
+
+and check_bool t =
+  if t <> Reg 1 then
+    terror (Printf.sprintf "Expected bool type, but got %s" (Pp.typ_to_string t))
 
 and check_idx arr idx endian t =
   let ta = infer_ast arr
@@ -129,3 +133,39 @@ and check_idx arr idx endian t =
       check_subt t e "Can't get a %s from array of %s";
   | TMem _ -> ();
   | _ -> terror "Indexing only allowed from array or mem."
+
+(* Quick, informal, AST statement type checking.
+
+   XXX: Formal type checking rules!
+*)
+let typecheck_stmt =
+  let infer_te = infer_ast ~check:true in
+  function
+    | Move(v, e, _) ->
+      let vt = Var.typ v in
+      let et = infer_te e in
+      check_same ~e vt et
+    | Jmp(e, _) ->
+      let et = infer_te e in
+      check_reg et
+    | CJmp(ce, t1, t2, _) ->
+      let et = infer_te ce in
+      let t1t = infer_te t1 in
+      let t2t = infer_te t2 in
+      check_bool et;
+      check_reg t1t;
+      check_reg t2t
+    | Halt(e, _) ->
+      let et = infer_te e in
+      (* Can we return a memory? Does this make sense? *)
+      check_reg et
+    | Assert(e, _) ->
+      let et = infer_te e in
+      check_bool et
+    | Label _
+    | Comment _
+    | Special _ ->
+      ()
+
+let typecheck_prog =
+  List.iter typecheck_stmt
