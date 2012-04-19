@@ -109,8 +109,8 @@ let get_program () =
   in
   try
     let p,scope = List.fold_left get_one ([], Grammar_private_scope.default_scope ()) (List.rev !inputs) in
-    (* Should we always typecheck? *)
-    Printexc.print Typecheck.typecheck_prog p;
+    (* Should we always typecheck? We won't be fatal yet. *)
+    (try Printexc.print Typecheck.typecheck_prog p with _ -> ());
     p,scope
   with _ -> failwith "An exception occured while lifting"
 
