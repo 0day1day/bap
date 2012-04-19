@@ -98,10 +98,11 @@ type opcode =
   | Or of (typ * operand * operand)
   | Xor of (typ * operand * operand)
   | Pxor of (typ * operand * operand)
-  | Test of typ * operand * operand
-  | Ptest of typ * operand * operand
-  | Not of typ * operand
-  | Neg of typ * operand
+  | Test of (typ * operand * operand)
+  | Ptest of (typ * operand * operand)
+  | Not of (typ * operand)
+  | Neg of (typ * operand)
+  | Mul of (typ * operand) (* typ, src *)
   | Imul of typ * (operand * operand option) * operand * operand (* typ, (dst1,dst2), src1, src2 *)
   | Cld
   | Rdtsc
@@ -407,6 +408,23 @@ let assn_s s t v e =
   | Oaddr a -> store_s s t a e
   | Oimm _ -> disfailwith "disasm_i386: Can't assign to an immediate value"
 
+
+let assn_dbl_s s t e =
+  match t with
+  | Reg 8 -> [assn_s s r16 o_eax e]
+  | Reg 16 ->
+    let tmp = nt "t" r32 in
+    [move tmp e;
+     assn_s s reg_16 o_eax (extract (big_int_of_int 15) (big_int_of_int 0) (Var(tmp)));
+     assn_s s reg_16 o_edx (extract (big_int_of_int 31) (big_int_of_int 16) (Var(tmp)));]
+  | Reg 32 -> 
+    let tmp = nt "t" r64 in
+    [move tmp e;
+     assn_s s reg_32 o_eax (extract (big_int_of_int 31) (big_int_of_int 0) (Var(tmp)));
+     assn_s s reg_32 o_edx (extract (big_int_of_int 63) (big_int_of_int 32) (Var(tmp)))]
+  | _ -> failwith "Unknown assn_dbl_s register size"
+
+
 let bytes_of_width = function
   | Reg x when x land 7 = 0 -> x/8
   | _ -> failwith "bytes_of_width"
@@ -491,7 +509,8 @@ let rec to_ir addr next ss pref =
   let load = load_s ss (* Need to change this if we want seg_ds <> None *)
   and op2e = op2e_s ss
   and store = store_s ss
-  and assn = assn_s ss in
+  and assn = assn_s ss 
+  and assn_dbl = assn_dbl_s ss in
   function
   | Nop -> []
   | Retn (op, far_ret) when pref = [] ->
@@ -1113,28 +1132,72 @@ let rec to_ir addr next ss pref =
     ::move cf (ite r1 (Var tmp ==* it 0 t) (it 0 r1) (it 1 r1))
     ::move oF (ite r1 (Var tmp ==* min_int) (it 1 r1) (it 0 r1))
     ::set_apszf_sub t (Var tmp) (it 0 t) (op2e t o)
+  | Mul (t, src) ->
+    (* Mul always multiplies EAX by src and stores the result in EDX:EAX 
+       starting from the "right hand side" based on the type t of src *)
+
+    (* The OF and CF flags are set to 0 if the upper half of the result is 0;
+       otherwise, they are set to 1 *)
+    let new_t = match t with 
+      | Reg n -> Reg (n*2) 
+      | _ -> failwith "Mul: Impossible type"
+    in
+    let flag = 
+      match t with
+      | Reg 8 ->
+	(Extract((big_int_of_int 15), (big_int_of_int 8), (op2e t o_eax)) <>* it 0 t)
+      | Reg 16 -> 
+	(Extract((big_int_of_int 31), (big_int_of_int 16), (op2e t o_eax)) <>* it 0 t)
+      | Reg 32 -> 
+	(Extract((big_int_of_int 31), (big_int_of_int 0), (op2e t o_edx)) <>* it 0 t)
+      | _ -> failwith "Mul: Unknown register size or impossible type"
+    in
+    (assn_dbl t ((cast_unsigned new_t (op2e t o_eax)) ** (cast_unsigned new_t (op2e t src))))@
+      [
+	move oF flag;
+	move cf flag;
+	move sf (Unknown("SF is undefined after Mul", r1));
+	move zf (Unknown("ZF is undefined after Mul", r1));
+	move af (Unknown("AF is undefined after Mul", r1));
+	move pf (Unknown("PF is undefined after Mul", r1))
+      ]
   | Imul (t, (dst1,dstop), src1, src2) -> 
-    [
+    let new_t = match t with 
+      | Reg n -> Reg (n*2) 
+      | _ -> failwith "Imul: Impossible type"
+    in
+    let mul_stmts = 
       (match dstop with
       | Some(dst2) -> 
-	(* For the one operand form of the instruction, the CF and OF flags are 
-	   set when significant bits are carried into the upper half of the 
-	   result and cleared when the result fitsexactly in the lower half of 
-	   the result. *)
-	unimplemented "Imul"
-      | None ->  assn t dst1 (op2e t src1 ** op2e t src2) 
-      (* SWXXX Do this!
-	 For the two- and three-operand forms of the instruction, the CF and OF 
-	 flags are set when the result must be truncated to fit in the 
-	 destination operand size and cleared when the result fits exactly in 
-	 the destination operand size. *)
-      );
-      move oF exp_false;
-      move cf exp_false;
+	(* Imul always uses EDX:EAX if there are two destinations *)
+	let flag = 
+	  (* Intel checks if EAX == EDX:EAX.  Instead of doing this, we are just
+	     going to check if the upper bits are != 0 *)
+	  match t with
+	  | Reg 8 ->
+	    (Extract((big_int_of_int 15), (big_int_of_int 8), (op2e t o_eax)) <>* it 0 t)
+	  | Reg 16 -> 
+	    (Extract((big_int_of_int 31), (big_int_of_int 16), (op2e t o_eax)) <>* it 0 t)
+	  | Reg 32 -> 
+	    (Extract((big_int_of_int 31), (big_int_of_int 0), (op2e t o_edx)) <>* it 0 t)
+	  | _ -> failwith "Imul: Unknown register size or impossible type"
+	in
+	(assn_dbl t ((cast_unsigned new_t (op2e t src1)) ** (cast_unsigned new_t (op2e t src2))))@
+	  [move oF flag;
+	   move cf flag]
+      | None ->  
+	let tmp = nt "t" new_t in
+	let flag = ((Var(tmp)) <>* (cast_unsigned new_t (op2e t dst1))) in
+	[(move tmp ((cast_unsigned new_t (op2e t src1)) ** (cast_unsigned new_t (op2e t src2))));
+	 (assn t dst1 ((op2e t src1) ** (op2e t src2)));
+	 move oF flag;
+	 move cf flag]
+      )
+    in
+    mul_stmts@[
       move sf (Unknown("SF is undefined after imul", r1));
       move zf (Unknown("ZF is undefined after imul", r1));
       move af (Unknown("AF is undefined after imul", r1));
-      move pf (Unknown("PF is undefined after imul", r1))
     ]
   | Cld ->
     [Move(dflag, i32 1, [])]
@@ -1252,11 +1315,13 @@ module ToStr = struct
     | Ptest(t,d,s) -> Printf.sprintf "ptest %s, %s" (opr d) (opr s)
     | Not(t,o) -> Printf.sprintf "not %s" (opr o)
     | Neg(t,o) -> Printf.sprintf "neg %s" (opr o)
+    | Mul (t, src) -> 
+      Printf.sprintf "mul %s" (opr src)
     | Imul (t, (dst1,dstop), src1, src2) -> 
       (match dstop with
       | Some(dst2) ->
 	Printf.sprintf 
-	  "imul %s:%s, %s, %s" (opr dst1) (opr dst2) (opr src1) (opr src2)
+          "imul %s:%s, %s, %s" (opr dst1) (opr dst2) (opr src1) (opr src2)
       | None ->
 	Printf.sprintf "imul %s, %s, %s" (opr dst1) (opr src1) (opr src2))
     | Cld -> "cld"
@@ -1641,11 +1706,15 @@ let parse_instr g addr =
 		      (Test(t, rm, imm), na)
 	       | 2 -> (Not(t, rm), na)
 	       | 3 -> (Neg(t, rm), na)
-	       | 4 -> unimplemented (* mul *)
-		 (Printf.sprintf "unsupported opcode: %02x/%d" b1 r) 
+	       | 4 -> (match b1 with 
+		 | 0xf6 -> (Mul(t, rm), na)
+		 | 0xf7 -> (Mul(t, rm), na)
+		 | _ -> disfailwith
+		   (Printf.sprintf "impossible opcode: %02x/%d" b1 r)
+	       ) 
 	       | 5 -> (match b1 with 
-		 | 0xf6 -> (Imul(t, (o_eax,None), o_eax, rm), na)
-		 | 0xf7 -> (Imul(t, (o_edx,Some(o_eax)), o_eax, rm), na)
+                 | 0xf6 -> (Imul(t, (o_eax,None), o_eax, rm), na)
+                 | 0xf7 -> (Imul(t, (o_edx,Some(o_eax)), o_eax, rm), na)
 		 | _ -> disfailwith
 		   (Printf.sprintf "impossible opcode: %02x/%d" b1 r)
 	       )
