@@ -378,7 +378,7 @@ let do_aggressive_dce ?(globals = []) graph =
       C.G.fold_vertex
         (fun bb graph ->
           let stmts = C.get_stmts graph bb in
-          let stmts = List.filter (fun s -> s == deadstmt) stmts in
+          let stmts = List.filter (fun s -> s != deadstmt) stmts in
           C.set_stmts graph bb stmts
         ) graph graph
     else graph
