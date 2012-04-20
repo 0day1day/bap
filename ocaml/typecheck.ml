@@ -34,7 +34,7 @@ let bits_of_width = function
 
 let bytes_of_width t =
   let b = bits_of_width t in
-  assert ((b mod 8) = 0);
+  if not ((b mod 8) = 0) then invalid_arg "bytes_of_width";
   b / 8
 
 let rec infer_ast ?(check=true) = function
@@ -136,6 +136,8 @@ and check_idx arr idx endian t =
       check_subt t e "Can't get a %s from array of %s";
   | TMem _ -> ();
   | _ -> terror "Indexing only allowed from array or mem."
+
+let typecheck_expression e = ignore(infer_ast ~check:true e)
 
 (* Quick, informal, AST statement type checking.
 

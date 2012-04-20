@@ -50,7 +50,7 @@ export SOURCES = \
 	ssa.ml \
 	disasm_temp.ml \
 	pp.ml \
-	typecheck.ml \
+	typecheck.mli typecheck.ml \
 	ast_convenience.ml \
 	cfg.mli cfg.ml \
 	ast_visitor.mli ast_visitor.ml \

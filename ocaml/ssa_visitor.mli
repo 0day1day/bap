@@ -26,8 +26,7 @@ object
     (** Called when visiting an assigned variable. (IE: On the LHS of a Move *)
 end
 
-(** A nop visitor similar to [nop_bap_visitor].
-    See {!Vine.nop_bap_visitor} for more information.   *)
+(** A nop visitor. *)
 class nop : t
 
 
