@@ -673,10 +673,10 @@ let rec to_ir addr next ss pref =
       in
       let bits = map get_bit (0--15) in
       let res_e = reduce (fun acc f -> Concat(f, acc)) bits in
-      let int_res_2 = nt "IntRes2" reg_32 in
+      let int_res_2 = nt "IntRes2" reg_16 in
       move int_res_2 res_e
       :: move ecx (lsb (Var int_res_2))
-      :: move cf (BinOp(NEQ, (Var int_res_2), Int(bi0, reg_32)))
+      :: move cf (BinOp(NEQ, (Var int_res_2), Int(bi0, reg_16)))
       :: move zf (contains_null dst_e)
       :: move sf (contains_null src_e)
       :: move oF (Extract(bi0, bi0, (Var int_res_2)))

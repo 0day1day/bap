@@ -108,10 +108,13 @@ let rec infer_ast ?(check=true) = function
       );
       infer_ast ~check:false arr
 
-and check_same ?e t1 t2 =
+and check_same ?e ?s t1 t2 =
   if t1 <> t2 then
-    let es = match e with | Some(e) -> ("\nProblem expression: "^(Pp.ast_exp_to_string e)) | None -> "" in
-    terror ("Similar types expected: "^(Pp.typ_to_string t1)^" <> "^(Pp.typ_to_string t2)^es)
+    let probs = match e, s with
+      | Some e, _ -> ("\nProblem expression: "^(Pp.ast_exp_to_string e))
+      | _, Some s -> ("\nProblem statement: "^(Pp.ast_stmt_to_string s))
+      | None, None -> "" in
+    terror ("Similar types expected: "^(Pp.typ_to_string t1)^" <> "^(Pp.typ_to_string t2)^probs)
 
 and check_reg t =
   if not (is_integer_type t) then
@@ -141,10 +144,10 @@ and check_idx arr idx endian t =
 let typecheck_stmt =
   let infer_te = infer_ast ~check:true in
   function
-    | Move(v, e, _) ->
+    | Move(v, e, _) as s ->
       let vt = Var.typ v in
       let et = infer_te e in
-      check_same ~e vt et
+      check_same ~s vt et
     | Jmp(e, _) ->
       let et = infer_te e in
       check_reg et
