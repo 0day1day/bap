@@ -103,7 +103,7 @@ type opcode =
   | Not of (typ * operand)
   | Neg of (typ * operand)
   | Mul of (typ * operand) (* typ, src *)
-  | Imul of typ * (bool * operand * operand option) * operand * operand (* typ, (true if one operand form, dst operand, and optional dst operand for concatenated output (edx:eax)), src1, src2 *)
+  | Imul of typ * (bool * operand) * operand * operand (* typ, (true if one operand form, dst operand), src1, src2 *)
   | Cld
   | Rdtsc
   | Cpuid
@@ -1156,7 +1156,7 @@ let rec to_ir addr next ss pref =
 	move af (Unknown("AF is undefined after Mul", r1));
 	move pf (Unknown("PF is undefined after Mul", r1))
       ]
-  | Imul (t, (oneopform, dst, _dstop), src1, src2) -> 
+  | Imul (t, (oneopform, dst), src1, src2) -> 
     let new_t = Reg ((Typecheck.bits_of_width t)*2) in
     let mul_stmts = 
       (match oneopform with
@@ -1308,12 +1308,12 @@ module ToStr = struct
     | Neg(t,o) -> Printf.sprintf "neg %s" (opr o)
     | Mul (t, src) -> 
       Printf.sprintf "mul %s" (opr src)
-    | Imul (t, (_,dst,dstop), src1, src2) -> 
-      (match dstop with
-      | Some dst2 ->
+    | Imul (t, (b,dst), src1, src2) -> 
+      (match b with
+      | true ->
 	Printf.sprintf 
-          "imul %s:%s, %s, %s" (opr dst) (opr dst2) (opr src1) (opr src2)
-      | None ->
+          "imul %s"  (opr src2)
+      | false ->
 	Printf.sprintf "imul %s, %s, %s" (opr dst) (opr src1) (opr src2))
     | Cld -> "cld"
     | Leave _ -> "leave"
@@ -1557,7 +1557,7 @@ let parse_instr g addr =
 	  if (prefix.opsize = r16) then (parse_simmw na, r16) 
 	  else (parse_simmd na, r32)
       in
-      (Imul(prefix.opsize, (false,r,None), rm, (sign_ext ot o prefix.opsize)), na)
+      (Imul(prefix.opsize, (false,r), rm, (sign_ext ot o prefix.opsize)), na)
     | 0x70 | 0x71 | 0x72 | 0x73 | 0x74 | 0x75 | 0x76 | 0x77 | 0x78 | 0x79
     | 0x7a | 0x7b | 0x7c | 0x7d | 0x7e | 0x7f -> 
       let (i,na) = parse_disp8 na in
@@ -1704,8 +1704,8 @@ let parse_instr g addr =
 		   (Printf.sprintf "impossible opcode: %02x/%d" b1 r)
 	       ) 
 	       | 5 -> (match b1 with 
-                 | 0xf6 -> (Imul(t, (true,o_eax,None), o_eax, rm), na)
-                 | 0xf7 -> (Imul(t, (true,o_edx,Some(o_eax)), o_eax, rm), na)
+                 | 0xf6 -> (Imul(t, (true,o_eax), o_eax, rm), na)
+                 | 0xf7 -> (Imul(t, (true,o_edx), o_eax, rm), na)
 		 | _ -> disfailwith
 		   (Printf.sprintf "impossible opcode: %02x/%d" b1 r)
 	       )
@@ -1917,7 +1917,7 @@ let parse_instr g addr =
           )
       | 0xaf ->
 	let (r, rm, na) = parse_modrm prefix.opsize na in
-	(Imul(prefix.opsize, (false,r,None), r, rm), na)
+	(Imul(prefix.opsize, (false,r), r, rm), na)
       | 0xb1 ->
         let r, rm, na = parse_modrm prefix.opsize na in
         (Cmpxchg (prefix.opsize, r, rm), na)
