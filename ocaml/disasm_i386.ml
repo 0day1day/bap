@@ -103,7 +103,7 @@ type opcode =
   | Not of (typ * operand)
   | Neg of (typ * operand)
   | Mul of (typ * operand) (* typ, src *)
-  | Imul of typ * (operand * operand option) * operand * operand (* typ, (dst1,dst2), src1, src2 *)
+  | Imul of typ * (bool * operand * operand option) * operand * operand (* typ, (true if one operand form, dst operand, and optional dst operand for concatenated output (edx:eax)), src1, src2 *)
   | Cld
   | Rdtsc
   | Cpuid
@@ -408,20 +408,20 @@ let assn_s s t v e =
   | Oaddr a -> store_s s t a e
   | Oimm _ -> disfailwith "disasm_i386: Can't assign to an immediate value"
 
-
+(* Double width assignments, as used by multiplication *)
 let assn_dbl_s s t e =
   match t with
-  | Reg 8 -> [assn_s s r16 o_eax e]
+  | Reg 8 -> [assn_s s r16 o_eax e], cast_low r16 (Var eax)
   | Reg 16 ->
     let tmp = nt "t" r32 in
     [move tmp e;
-     assn_s s reg_16 o_eax (extract (big_int_of_int 15) (big_int_of_int 0) (Var(tmp)));
-     assn_s s reg_16 o_edx (extract (big_int_of_int 31) (big_int_of_int 16) (Var(tmp)));]
+     assn_s s reg_16 o_eax (extract (biconst 15) (biconst 0) (Var(tmp)));
+     assn_s s reg_16 o_edx (extract (biconst 31) (biconst 16) (Var(tmp)))], Var tmp
   | Reg 32 -> 
     let tmp = nt "t" r64 in
     [move tmp e;
-     assn_s s reg_32 o_eax (extract (big_int_of_int 31) (big_int_of_int 0) (Var(tmp)));
-     assn_s s reg_32 o_edx (extract (big_int_of_int 63) (big_int_of_int 32) (Var(tmp)))]
+     assn_s s reg_32 o_eax (extract (biconst 31) (biconst 0) (Var(tmp)));
+     assn_s s reg_32 o_edx (extract (biconst 63) (biconst 32) (Var(tmp)))], Var tmp
   | _ -> failwith "Unknown assn_dbl_s register size"
 
 
@@ -594,8 +594,8 @@ let rec to_ir addr next ss pref =
         | Oimm _ -> disfailwith "invalid"
       in
       let compare_region i =
-        let byte1 = Extract(big_int_of_int (i*elebits-1), big_int_of_int ((i-1)*elebits), src) in
-        let byte2 = Extract(big_int_of_int (i*elebits-1), big_int_of_int ((i-1)*elebits), op2e t dst) in
+        let byte1 = Extract(biconst (i*elebits-1), biconst ((i-1)*elebits), src) in
+        let byte2 = Extract(biconst (i*elebits-1), biconst ((i-1)*elebits), op2e t dst) in
         let tmp = nt ("t" ^ string_of_int i) elet in
         Var tmp, move tmp (Ite(byte1 ==* byte2, lt (-1L) elet, lt 0L elet))
       in
@@ -612,7 +612,7 @@ let rec to_ir addr next ss pref =
         | Oreg i -> op2e t src
         | _ -> disfailwith "invalid operand"
       in
-      let get_bit i = Extract(big_int_of_int (i*8-1), big_int_of_int (i*8-1), src) in
+      let get_bit i = Extract(biconst (i*8-1), biconst (i*8-1), src) in
       let byte_indices = BatList.init nbytes (fun i -> i + 1) in (* list 1-nbytes *)
       let all_bits = List.map get_bit byte_indices in
       let all_bits = List.rev all_bits in
@@ -688,8 +688,8 @@ let rec to_ir addr next ss pref =
       let src_e = op2e t src in
       let imm_e = op2e t imm in
       let get_dword prev_dwords ndword =
-        let high = 2 * ndword + 1 |> big_int_of_int in
-        let low = 2 * ndword |> big_int_of_int in
+        let high = 2 * ndword + 1 |> biconst in
+        let low = 2 * ndword |> biconst in
         let encoding = cast_unsigned t (Extract (high, low, imm_e)) in
         let shift = encoding ** (it 32 t) in
         let dword = src_e >>* shift in
@@ -1138,21 +1138,16 @@ let rec to_ir addr next ss pref =
 
     (* The OF and CF flags are set to 0 if the upper half of the result is 0;
        otherwise, they are set to 1 *)
-    let new_t = match t with 
-      | Reg n -> Reg (n*2) 
-      | _ -> failwith "Mul: Impossible type"
+    let new_t = Reg ((Typecheck.bits_of_width t)*2) in
+    let assnstmts, assne = assn_dbl t ((cast_unsigned new_t (op2e t o_eax)) ** (cast_unsigned new_t (op2e t src)))
     in
-    let flag = 
-      match t with
-      | Reg 8 ->
-	(Extract((big_int_of_int 15), (big_int_of_int 8), (op2e t o_eax)) <>* it 0 t)
-      | Reg 16 -> 
-	(Extract((big_int_of_int 31), (big_int_of_int 16), (op2e t o_eax)) <>* it 0 t)
-      | Reg 32 -> 
-	(Extract((big_int_of_int 31), (big_int_of_int 0), (op2e t o_edx)) <>* it 0 t)
-      | _ -> failwith "Mul: Unknown register size or impossible type"
+    let flag =
+      let highbit = Typecheck.bits_of_width new_t - 1 in
+      let lowbit = Typecheck.bits_of_width new_t / 2 in
+      extract (biconst highbit) (biconst lowbit) assne <>* it 0 t
     in
-    (assn_dbl t ((cast_unsigned new_t (op2e t o_eax)) ** (cast_unsigned new_t (op2e t src))))@
+    assnstmts
+      @
       [
 	move oF flag;
 	move cf flag;
@@ -1161,40 +1156,36 @@ let rec to_ir addr next ss pref =
 	move af (Unknown("AF is undefined after Mul", r1));
 	move pf (Unknown("PF is undefined after Mul", r1))
       ]
-  | Imul (t, (dst1,dstop), src1, src2) -> 
-    let new_t = match t with 
-      | Reg n -> Reg (n*2) 
-      | _ -> failwith "Imul: Impossible type"
-    in
+  | Imul (t, (oneopform, dst, _dstop), src1, src2) -> 
+    let new_t = Reg ((Typecheck.bits_of_width t)*2) in
     let mul_stmts = 
-      (match dstop with
-      | Some(dst2) -> 
-	(* Imul always uses EDX:EAX if there are two destinations *)
-	let flag = 
+      (match oneopform with
+      | true -> 
+        (* For one operand form, use assn_double *)
+        let assnstmts, assne = assn_dbl t ((cast_signed new_t (op2e t src1)) ** (cast_signed new_t (op2e t src2))) in
+        let flag =
 	  (* Intel checks if EAX == EDX:EAX.  Instead of doing this, we are just
 	     going to check if the upper bits are != 0 *)
-	  match t with
-	  | Reg 8 ->
-	    (Extract((big_int_of_int 15), (big_int_of_int 8), (op2e t o_eax)) <>* it 0 t)
-	  | Reg 16 -> 
-	    (Extract((big_int_of_int 31), (big_int_of_int 16), (op2e t o_eax)) <>* it 0 t)
-	  | Reg 32 -> 
-	    (Extract((big_int_of_int 31), (big_int_of_int 0), (op2e t o_edx)) <>* it 0 t)
-	  | _ -> failwith "Imul: Unknown register size or impossible type"
-	in
-	(assn_dbl t ((cast_unsigned new_t (op2e t src1)) ** (cast_unsigned new_t (op2e t src2))))@
+          let highbit = Typecheck.bits_of_width new_t - 1 in
+          let lowbit = Typecheck.bits_of_width new_t / 2 in
+          extract (biconst highbit) (biconst lowbit) assne <>* it 0 t
+        in
+        assnstmts @
 	  [move oF flag;
 	   move cf flag]
-      | None ->  
-	let tmp = nt "t" new_t in
-	let flag = ((Var(tmp)) <>* (cast_unsigned new_t (op2e t dst1))) in
-	[(move tmp ((cast_unsigned new_t (op2e t src1)) ** (cast_unsigned new_t (op2e t src2))));
-	 (assn t dst1 ((op2e t src1) ** (op2e t src2)));
-	 move oF flag;
-	 move cf flag]
+      | false ->
+        (* Two and three operand forms *)
+        let tmp = nt "t" new_t in
+        (* Flag is set when the result is truncated *)
+        let flag = (Var tmp <>* cast_signed new_t (op2e t dst)) in
+        [(move tmp ((cast_signed new_t (op2e t src1)) ** (cast_signed new_t (op2e t src2))));
+         (assn t dst (cast_low t (Var tmp)));
+         move oF flag;
+         move cf flag]
       )
     in
     mul_stmts@[
+      move pf (Unknown("PF is undefined after imul", r1));
       move sf (Unknown("SF is undefined after imul", r1));
       move zf (Unknown("ZF is undefined after imul", r1));
       move af (Unknown("AF is undefined after imul", r1));
@@ -1317,13 +1308,13 @@ module ToStr = struct
     | Neg(t,o) -> Printf.sprintf "neg %s" (opr o)
     | Mul (t, src) -> 
       Printf.sprintf "mul %s" (opr src)
-    | Imul (t, (dst1,dstop), src1, src2) -> 
+    | Imul (t, (_,dst,dstop), src1, src2) -> 
       (match dstop with
-      | Some(dst2) ->
+      | Some dst2 ->
 	Printf.sprintf 
-          "imul %s:%s, %s, %s" (opr dst1) (opr dst2) (opr src1) (opr src2)
+          "imul %s:%s, %s, %s" (opr dst) (opr dst2) (opr src1) (opr src2)
       | None ->
-	Printf.sprintf "imul %s, %s, %s" (opr dst1) (opr src1) (opr src2))
+	Printf.sprintf "imul %s, %s, %s" (opr dst) (opr src1) (opr src2))
     | Cld -> "cld"
     | Leave _ -> "leave"
     | Interrupt(o) -> Printf.sprintf "int %s" (opr o)
@@ -1401,7 +1392,7 @@ let parse_instr g addr =
     (d, (Int64.add a 4L))
   in
   let to_signed i t = 
-    int64_of_big_int (Arithmetic.to_sbig_int (big_int_of_int64 i, t)) in
+    int64_of_big_int (Arithmetic.to_sbig_int (biconst64 i, t)) in
   let parse_sint8 a =
     let (i, na) = parse_int8 a in
     (to_signed i reg_8, na)
@@ -1529,7 +1520,7 @@ let parse_instr g addr =
   let sign_ext ot op size = (match op with
     | Oimm d ->
       let (v,_) = 
-	Arithmetic.cast CAST_SIGNED ((big_int_of_int64 d), ot) size
+	Arithmetic.cast CAST_SIGNED ((biconst64 d), ot) size
       in
       (Oimm (int64_of_big_int v)) 
     | _ -> disfailwith "sign_ext only handles Oimm"
@@ -1566,7 +1557,7 @@ let parse_instr g addr =
 	  if (prefix.opsize = r16) then (parse_simmw na, r16) 
 	  else (parse_simmd na, r32)
       in
-      (Imul(prefix.opsize, (r,None), rm, (sign_ext ot o prefix.opsize)), na)
+      (Imul(prefix.opsize, (false,r,None), rm, (sign_ext ot o prefix.opsize)), na)
     | 0x70 | 0x71 | 0x72 | 0x73 | 0x74 | 0x75 | 0x76 | 0x77 | 0x78 | 0x79
     | 0x7a | 0x7b | 0x7c | 0x7d | 0x7e | 0x7f -> 
       let (i,na) = parse_disp8 na in
@@ -1713,8 +1704,8 @@ let parse_instr g addr =
 		   (Printf.sprintf "impossible opcode: %02x/%d" b1 r)
 	       ) 
 	       | 5 -> (match b1 with 
-                 | 0xf6 -> (Imul(t, (o_eax,None), o_eax, rm), na)
-                 | 0xf7 -> (Imul(t, (o_edx,Some(o_eax)), o_eax, rm), na)
+                 | 0xf6 -> (Imul(t, (true,o_eax,None), o_eax, rm), na)
+                 | 0xf7 -> (Imul(t, (true,o_edx,Some(o_eax)), o_eax, rm), na)
 		 | _ -> disfailwith
 		   (Printf.sprintf "impossible opcode: %02x/%d" b1 r)
 	       )
@@ -1926,7 +1917,7 @@ let parse_instr g addr =
           )
       | 0xaf ->
 	let (r, rm, na) = parse_modrm prefix.opsize na in
-	(Imul(prefix.opsize, (r,None), r, rm), na)
+	(Imul(prefix.opsize, (false,r,None), r, rm), na)
       | 0xb1 ->
         let r, rm, na = parse_modrm prefix.opsize na in
         (Cmpxchg (prefix.opsize, r, rm), na)
