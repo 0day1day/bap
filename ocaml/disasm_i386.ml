@@ -1199,7 +1199,19 @@ let rec to_ir addr next ss pref =
     [Special(Printf.sprintf "int %Lx" i, [])]
   | Sysenter ->
     [Special("syscall", [])]
-  | _ -> unimplemented "to_ir"
+  (* Match everything exhaustively *)
+  | Leave _ ->  unimplemented "to_ir: Leave"
+  | Call _ ->  unimplemented "to_ir: Call"
+  | Lea _ ->  unimplemented "to_ir: Lea"
+  | Movsx _ ->  unimplemented "to_ir: Movsx"
+  | Movzx _ ->  unimplemented "to_ir: Movzx"
+  | Mov _ ->  unimplemented "to_ir: Mov"
+  | Movs _ ->  unimplemented "to_ir: Movs"
+  | Cmps _ ->  unimplemented "to_ir: Cmps"
+  | Scas _ ->  unimplemented "to_ir: Scas"
+  | Stos _ ->  unimplemented "to_ir: Stos"
+  | Retn _ ->  unimplemented "to_ir: Retn"
+  | Interrupt _ ->  unimplemented "to_ir: Interrupt"
 
 let add_labels ?(asm) a ir =
   let attr = match asm with None -> [] | Some s -> [Asm(s)] in
