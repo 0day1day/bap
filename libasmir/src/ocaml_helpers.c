@@ -1,4 +1,5 @@
 #include "asm_program.h"
+#include <assert.h>
 #include <stdint.h>
 
 asection* bfd_sections( bfd *abfd) {

@@ -1,0 +1,30 @@
+.include [
+         .module types
+]
+
+% Frame representing the execution of a single assembly instruction
+.record [
+        .name std-frame
+
+        % Address of the instruction
+        .field [
+               .type address
+        ]
+
+        % Thread id that executed the instruction
+        .field [
+               .type thread-id
+        ]
+
+        % Raw bytes of the instruction
+        .field [
+               .name rawbytes
+               .type binary
+        ]
+
+        % Operands read/written by the instruction
+        .field [
+               .type operand-list
+        ]
+
+]

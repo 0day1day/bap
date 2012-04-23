@@ -59,7 +59,7 @@ let remove_cycles cfg =
   let module C = Cfg.AST in
   let a = StrAttr "added by remove_cycles" in
   (* let assert_false = Assert(exp_false, a) in *)
-  let assert_false = Jmp(Lab("Bb_error"), a::[]) in
+  let assert_false = Jmp(Lab("BB_Error"), a::[]) in
   let cfg, error = Cfg_ast.find_error cfg in
   let handle_backedge cfg e =
     let s = C.G.E.src e in
@@ -176,7 +176,7 @@ let uniqueify_labels p =
     method visit_stmt = function
       | Label(l, attrs) ->
         `ChangeTo (Label(find_new_label l, attrs))
-      | _ -> `SkipChildren
+      | _ -> `DoChildren
 
     method visit_exp e = match lab_of_exp e with
     | Some l -> `ChangeToAndDoChildren (exp_of_lab (find_new_label l))
@@ -184,4 +184,3 @@ let uniqueify_labels p =
   end
   in
   Ast_visitor.prog_accept renamelabels p
-

@@ -1,3 +1,5 @@
+
+
 val id : 'a -> 'a
 val curry : ('a * 'b -> 'c) -> 'a -> 'b -> 'c
 val uncurry : ('a -> 'b -> 'c) -> ('a * 'b -> 'c)
@@ -67,6 +69,7 @@ module HashUtil :
   functor (H : Hashtbl.S) ->
     sig
       val hashtbl_eq : ?eq:('a -> 'a -> bool) -> 'a H.t -> 'a H.t -> bool
+      val hashtbl_replace : 'a H.t -> H.key -> 'a -> unit
     end
 val hashtbl_eq :
   ?eq:('a -> 'a -> bool) -> ('b, 'a) Hashtbl.t -> ('b, 'a) Hashtbl.t -> bool
@@ -97,6 +100,9 @@ val binary_of_int64 : ?pad:int -> int64 -> string
 val binary_of_big_int : ?pad:int -> Big_int_Z.big_int -> string
 val hex_of_big_int : ?pad:int -> Big_int_Z.big_int -> string
 val big_int_of_string : string -> Big_int_Z.big_int
+
+type endian = Little | Big
+val big_int_of_binstring : ?e:endian -> string -> Big_int_Z.big_int
 
 val print_obj_info : string -> 'a -> unit
 val print_mem_usage : unit -> unit

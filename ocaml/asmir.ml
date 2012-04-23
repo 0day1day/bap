@@ -1,5 +1,5 @@
 (** High level interface to libasmir.
-    
+
     The functions in this file should be used instead of calling Libasmir functions
     directly. These functions should be easier to use, and, unlike the Libasmir
     ones, will handle garbage collection.
@@ -11,6 +11,7 @@ open Asmir_consts
 open Ast
 open Big_int_Z
 open BatListFull
+open Frame_piqi
 open Libasmir
 open Libbfd
 open Type
@@ -34,6 +35,7 @@ let arch_i386 = Bfd_arch_i386
 let arch_arm  = Bfd_arch_arm
 (*more to come later when we support them*)
 
+(** How many blocks to obtain when reading a FULL trace (not streaming) *)
 let trace_blocksize = ref 100000L
 
 module D = Debug.Make(struct let name = "ASMIR" and default=`Debug end)
@@ -603,204 +605,332 @@ let byte_sequence_to_bap bytes arch addr =
   Libasmir.asmir_close prog;
   il
 
-(* Get stmts for a frame *)
-let trans_frame f =
-  let arch = Libbfd.Bfd_arch_i386 in
-  let t = Libasmir.asmir_frame_type f in
-  match t with
-  | Libasmir.FRM_STD2 -> 
-    let bytes, addr, _ = Libasmir.asmir_frame_get_insn_bytes f in
-    (* Array.iter (fun x -> dprintf "Byte: %x" (int_of_char x)) bytes; *)
-    let stmts, _ = byte_insn_to_bap arch addr bytes in
-    stmts
-  | Libasmir.FRM_TAINT -> 
-    [Comment("ReadSyscall", []); Comment("All blocks must have two statements", [])]
-  | Libasmir.FRM_LOADMOD ->
-    let name, lowaddr, highaddr = Libasmir.asmir_frame_get_loadmod_info f in
-    (* The traceremove attr means that our Traces implementation can safely ignore this Special. *)
-    [Special(Printf.sprintf "Loaded module '%s' at %#Lx to %#Lx" name lowaddr highaddr, []); Comment("All blocks must have two statements", [])]
-  | Libasmir.FRM_SYSCALL ->
-    let callno, addr, tid = Libasmir.asmir_frame_get_syscall_info f in
-    [Special(Printf.sprintf "Syscall number %d at %#Lx by thread %d" callno addr tid, [StrAttr "TraceKeep"]);
-     Comment("All blocks must have two statements", [])]
-  | Libasmir.FRM_EXCEPT ->
-    let exceptno, tid, from_addr, to_addr =
-      Libasmir.asmir_frame_get_except_info f in
-    [Special(Printf.sprintf "Exception number %d by thread %d at %#Lx to %#Lx" exceptno tid from_addr to_addr, []);
-     Comment("All blocks must have two statements", [])]
-  | Libasmir.FRM_KEY_GENERAL ->
-    [Comment("Key frame state", []);
-     Comment("All blocks must have two statements", [])]
-  | Libasmir.FRM_STD | Libasmir.FRM_KEY | Libasmir.FRM_NONE -> []
+(** Create a function suitable for [Stream.of_func] that gets one
+    block at a time from getter function [f].
 
+    The trace is over when [getf] returns [].
+*)
+let rec bap_get_block_from_f f =
+(* SWXXX UGLY! copy and pasted from traces....better place to put/do this? *)
+  let trace_to_blocks trace = 
+    let endtrace = "This is the final trace block" in
+    let is_seed_label = (=) "ReadSyscall" in
+    let rec to_blocks blocks current = function
+      | [] -> 
+        List.rev ((List.rev current)::blocks)
+      | (Ast.Label (Addr _, _) as l)::rest ->
+        let block = List.rev current in
+        to_blocks (block::blocks) [l] rest
+      | (Ast.Comment (c, _) as s)::rest when c = endtrace || (is_seed_label c) ->
+        let block = List.rev current in
+        to_blocks (block::blocks) [s] rest
+      | x::rest ->
+        to_blocks blocks (x::current) rest
+    in
+    let blocks = to_blocks [] [] trace in
+    List.filter (fun b -> List.length b > 1) blocks
+  in
+  let block_q = Queue.create () in
+  (fun off ->
+    let refill () =
+      match f () with
+      | [] -> false
+      | trace ->
+        let blocks = trace_to_blocks trace in
+        List.iter (fun x -> Queue.push x block_q) blocks;
+        true
+    in
+    try
+      Some(Queue.take block_q)
+    with Queue.Empty ->
+      (match refill() with
+      | true -> Some(Queue.take block_q)
+      | false -> None))
 
-let alt_bap_from_trace_file_range filename off reqframes =
-  let add_operands stmts f =
-    let ops = tr_frame_attrs f in
+  let add_operands stmts ops =
     match stmts with
     | Label (l,a)::others ->
-	  Label (l,a@ops)::others
+      Label (l,a@ops)::others
     | Comment (s,a)::others ->
-	  Comment (s,a@ops)::others
+      Comment (s,a@ops)::others
     | others when ops <> [] -> Comment("Attrs without label.", ops)::others
     | others -> others
-  in
-  let raise_frame f =
-    let stmts = trans_frame f in
-    add_operands stmts f
-  in
-  let c = ref true in
-  let revstmts = ref [] in
+
+(** The original PIN trace format (pin_trace.cpp). *)
+module PinTrace = struct
+
+(* Get stmts for a frame *)
+  let trans_frame f =
+    let arch = Libbfd.Bfd_arch_i386 in
+    let t = Libasmir.asmir_frame_type f in
+    match t with
+    | Libasmir.FRM_STD2 -> 
+      let bytes, addr, _ = Libasmir.asmir_frame_get_insn_bytes f in
+    (* Array.iter (fun x -> dprintf "Byte: %x" (int_of_char x)) bytes; *)
+      let stmts, _ = byte_insn_to_bap arch addr bytes in
+      stmts
+    | Libasmir.FRM_TAINT -> 
+      [Comment("ReadSyscall", []); Comment("All blocks must have two statements", [])]
+    | Libasmir.FRM_LOADMOD ->
+      let name, lowaddr, highaddr = Libasmir.asmir_frame_get_loadmod_info f in
+    (* The traceremove attr means that our Traces implementation can safely ignore this Special. *)
+      [Special(Printf.sprintf "Loaded module '%s' at %#Lx to %#Lx" name lowaddr highaddr, []); Comment("All blocks must have two statements", [])]
+    | Libasmir.FRM_SYSCALL ->
+      let callno, addr, tid = Libasmir.asmir_frame_get_syscall_info f in
+      [Special(Printf.sprintf "Syscall number %d at %#Lx by thread %d" callno addr tid, [StrAttr "TraceKeep"]);
+       Comment("All blocks must have two statements", [])]
+    | Libasmir.FRM_EXCEPT ->
+      let exceptno, tid, from_addr, to_addr =
+        Libasmir.asmir_frame_get_except_info f in
+      [Special(Printf.sprintf "Exception number %d by thread %d at %#Lx to %#Lx" exceptno tid from_addr to_addr, []);
+       Comment("All blocks must have two statements", [])]
+    | Libasmir.FRM_KEY_GENERAL ->
+      [Comment("Key frame state", []);
+       Comment("All blocks must have two statements", [])]
+    | Libasmir.FRM_STD | Libasmir.FRM_KEY | Libasmir.FRM_NONE -> []
+
+  let alt_bap_from_trace_file_range_rev filename off reqframes =
+    let raise_frame f =
+      let stmts = trans_frame f in
+      add_operands stmts (tr_frame_attrs f)
+    in
+    let c = ref true in
+    let revstmts = ref [] in
   let trace_frames = 
 	Libasmir.asmir_frames_from_trace_file filename !off reqframes in
   let numframes = Libasmir.asmir_frames_length trace_frames in
   (*dprintf "Got %d frames" numframes;*)
-  if numframes = 0 || numframes = -1 then (
-    c := false
-  ) else (
-    if ((Int64.of_int numframes) <> reqframes) then 
-      dprintf "Got %d frames which <> requested frames %s" 
-		numframes (Int64.to_string reqframes);
-    revstmts := 
-	  Util.foldn
-      (fun acc n ->
-		let frameno = numframes-1-n in
-		(* dprintf "frame %d" frameno; *)
-		let stmts = 
-		  raise_frame (Libasmir.asmir_frames_get trace_frames frameno)
-		in
-		List.rev_append stmts acc) 
-	  [] (numframes-1);
-    off := Int64.add !off (Int64.of_int numframes);
+    if numframes = 0 || numframes = -1 then (
+      c := false
+    ) else (
+      if ((Int64.of_int numframes) <> reqframes) then
+        dprintf "Got %d frames which <> requested frames %s"
+	  numframes (Int64.to_string reqframes);
+      revstmts :=
+        Util.foldn
+        (fun acc n ->
+	  let frameno = numframes-1-n in
+	(* dprintf "frame %d" frameno; *)
+	  let stmts =
+	    raise_frame (Libasmir.asmir_frames_get trace_frames frameno)
+	  in
+	  List.rev_append stmts acc)
+        [] (numframes-1);
+      off := Int64.add !off (Int64.of_int numframes);
   (* let moreir = tr_bap_blocks_t_no_asm g bap_blocks in *)
   (* Build ir backwards *)
   (* ir := List.rev_append moreir !ir; *)
-  );
-  asmir_frames_destroy trace_frames;
-  (!c, !revstmts)
+    );
+    asmir_frames_destroy trace_frames;
+    (!c, !revstmts)
 
+  let alt_bap_from_trace_file_range filename off reqframes =
+    let (c, revstmts) = alt_bap_from_trace_file_range_rev filename off reqframes in
+    (c, List.rev revstmts)
 
-let alt_bap_from_trace_file filename =
-  let off = ref 0L in
-  let ir = ref [] in
-  let c = ref true in
-  Status.init "Lifting trace" 0 ;
-  while !c do
-    let (tmp_c,revstmts) = 
-      alt_bap_from_trace_file_range filename off !trace_blocksize in
-    ir := Util.fast_append revstmts !ir;
-    c := tmp_c;
-  done;
-  let r = List.rev !ir in
-  Status.stop () ;
-  r
+  let alt_bap_from_trace_file filename =
+    let off = ref 0L in
+    let ir = ref [] in
+    let c = ref true in
+    Status.init "Lifting trace" 0 ;
+    while !c do
+      let (tmp_c,revstmts) =
+        alt_bap_from_trace_file_range_rev filename off !trace_blocksize in
+      ir := Util.fast_append revstmts !ir;
+      c := tmp_c;
+    done;
+    let r = List.rev !ir in
+    Status.stop () ;
+    r
 
+let alt_bap_get_block_from_trace_file ?(atts = true) ?(rate=1L) ?(pin=false) filename =
+  let offset = ref 0L in
+  let f () = snd (alt_bap_from_trace_file_range filename offset rate) in
+  bap_get_block_from_f f
+
+(** Return stream of trace instructions raised to the IL *)
+let alt_bap_stream_from_trace_file ?(atts = true) ?(rate=1L) ?(pin = false) filename =
+  Stream.from (
+   alt_bap_get_block_from_trace_file ~atts ~rate ~pin filename)
+
+end
+
+(** The new protobuffers/piqi serialized trace format. *)
+module SerializedTrace = struct
+
+  let new_bap_from_trace_frames ?n r =
+    print_mem_usage();
+    let get_attrs =
+      let convert_taint = function
+        | `no_taint -> Taint 0
+        | `taint_id(id) -> Taint (Int64.to_int id)
+        | `taint_multiple -> Taint (-1)
+      in
+      let convert_usage = function
+        | {Operand_usage.read=true; Operand_usage.written=true} -> Type.RW
+        | {Operand_usage.read=true} -> Type.RD
+        | {Operand_usage.written=true} -> Type.WR
+        | _ -> (* Trace usage undefined; assuming read *) Type.RD
+      in
+      let convert_operand_info = function
+        | {Operand_info.operand_info_specific=`mem_operand({Mem_operand.address=a});
+           Operand_info.bit_length=b;
+           Operand_info.operand_usage=use;
+           Operand_info.taint_info=t;
+           Operand_info.value=v} ->
+          Context({name="mem";
+                   mem=true;
+                   t=Reg b;
+                   index=a;
+                   value=Util.big_int_of_binstring ~e:Util.Little v;
+                   usage=convert_usage use;
+                   taint=convert_taint t})
+        | {Operand_info.operand_info_specific=`reg_operand({Reg_operand.name=n});
+           Operand_info.bit_length=b;
+           Operand_info.operand_usage=use;
+           Operand_info.taint_info=t;
+           Operand_info.value=v} ->
+          Context({name=n;
+                   mem=false;
+                   t=Reg b;
+                   index=0L;
+                   value=Util.big_int_of_binstring ~e:Util.Little v;
+                   usage=convert_usage use;
+                   taint=convert_taint t})
+      in
+      let convert_taint_info = function
+        | {Taint_intro.addr=a;
+           Taint_intro.taint_id=tid;
+           Taint_intro.value=value} ->
+          let v = match value with
+            | Some x -> Util.big_int_of_binstring ~e:Util.Little x
+            | None -> Big_int_convenience.bi0
+          in
+          Context({name="mem";
+                   mem=true;
+                   t=Reg 8;
+                   index=a;
+                   value=v;
+                   usage=WR;
+                   taint=Taint (Int64.to_int tid)})
+      in
+      function
+        | `std_frame({Std_frame.operand_list=ol}) -> List.map convert_operand_info ol
+        | `syscall_frame _ -> []
+        | `exception_frame _ -> []
+        | `taint_intro_frame({Taint_intro_frame.taint_intro_list=til}) -> List.map convert_taint_info til
+        | `modload_frame _ -> []
+        | `key_frame _ -> []
+    in
+    let raise_frame arch f =
+      let get_stmts =
+        function
+          | `std_frame(f) ->
+      (* Convert string to byte array *)
+            let a = Array.of_list (BatString.to_list f.Std_frame.rawbytes) in
+            let stmts, _ = byte_insn_to_bap arch f.Std_frame.address a in
+            stmts
+          | `syscall_frame({Syscall_frame.number=callno;
+                            Syscall_frame.address=addr;
+                            Syscall_frame.thread_id=tid}) ->
+            [Special(Printf.sprintf "Syscall number %Ld at %#Lx by thread %Ld" callno addr tid, [StrAttr "TraceKeep"]); Comment("All blocks must have two statements", [])]
+          | `exception_frame({Exception_frame.exception_number=exceptno;
+                              Exception_frame.thread_id=Some tid;
+                              Exception_frame.from_addr=Some from_addr;
+                              Exception_frame.to_addr=Some to_addr}) ->
+            [Special(Printf.sprintf "Exception number %Ld by thread %Ld at %#Lx to %#Lx" exceptno tid from_addr to_addr, []);
+             Comment("All blocks must have two statements", [])]
+          | `exception_frame({Exception_frame.exception_number=exceptno}) ->
+            [Special(Printf.sprintf "Exception number %Ld" exceptno, []);
+             Comment("All blocks must have two statements", [])]
+          | `taint_intro_frame(f) ->
+            [Comment("ReadSyscall", []); Comment("All blocks must have two statements", [])]
+          | `modload_frame({Modload_frame.module_name=name;
+                            Modload_frame.low_address=lowaddr;
+                            Modload_frame.high_address=highaddr}) ->
+            [Special(Printf.sprintf "Loaded module '%s' at %#Lx to %#Lx" name lowaddr highaddr, []); Comment("All blocks must have two statements", [])]
+          | `key_frame _ ->
+      (* Implement key frame later *)
+            []
+      in
+      add_operands (get_stmts f) (get_attrs f)
+    in
+    let out = ref [] in
+    let counter = ref 0L in
+    let checkctr () =
+      match n with
+      | Some(n) -> !counter < n
+      | None -> true
+    in
+    let blocksize = match n with | Some x -> x | None -> !trace_blocksize in
+    while not r#end_of_trace && checkctr () do
+      let frames = r#get_frames blocksize in
+    (* XXX: Remove use of Obj.magic in an elegant way... *)
+      out := List.rev_append (List.flatten (List.map (raise_frame (Obj.magic r#get_arch)) frames)) !out;
+      counter := Int64.add !counter (Int64.of_int (List.length frames));
+    done;
+
+    List.rev !out
+
+(** New trace file format: Read entire trace at once *)
+  let new_bap_from_trace_file filename =
+    let r = new Trace_container.reader filename in
+    new_bap_from_trace_frames r
+
+(** New trace format: Create a streamer *)
+  let new_bap_stream_from_trace_file rate filename =
+    let r = new Trace_container.reader filename in
+    let f () = new_bap_from_trace_frames ~n:rate r in
+    Stream.from (bap_get_block_from_f f)
+
+end
+
+(** Old pre-PIN trace format (trace_*.cpp) *)
+module OldTrace = struct
 
 (* deprecated *)  
-let old_bap_from_trace_file ?(atts = true) ?(pin = false) filename =
-  let g = gamma_create x86_mem x86_regs in
-  let ir = ref [] in
-  let off = ref 0L in
-  let c = ref true in
+  let old_bap_from_trace_file ?(atts = true) ?(pin = false) filename =
+    let g = gamma_create x86_mem x86_regs in
+    let ir = ref [] in
+    let off = ref 0L in
+    let c = ref true in
   (* might be better to just grab the length of the trace in advance :*( *)
-  Status.init "Lifting trace" 0 ;
-  while !c do
+    Status.init "Lifting trace" 0 ;
+    while !c do
     (*dprintf "Calling the trace again.... ";*)
-    let bap_blocks = 
-      Libasmir.asmir_bap_from_trace_file filename !off !trace_blocksize atts pin
-    in
-    let numblocks = Libasmir.asmir_bap_blocks_size bap_blocks in
-    if numblocks = -1 then (
-      c := false
-    ) else (
-      let moreir = tr_bap_blocks_t_trace_asm g bap_blocks in
-      let () = destroy_bap_blocks bap_blocks in
+      let bap_blocks = 
+        Libasmir.asmir_bap_from_trace_file filename !off !trace_blocksize atts pin
+      in
+      let numblocks = Libasmir.asmir_bap_blocks_size bap_blocks in
+      if numblocks = -1 then (
+        c := false
+      ) else (
+        let moreir = tr_bap_blocks_t_trace_asm g bap_blocks in
+        let () = destroy_bap_blocks bap_blocks in
 	(* Build ir backwards *)
 	ir := List.rev_append moreir !ir;
 	off := Int64.add !off !trace_blocksize
-    )
-  done;
-  let r = List.rev !ir in
-  Status.stop () ;
-  r
+      )
+    done;
+    let r = List.rev !ir in
+    Status.stop () ;
+    r
+end
 
+(** Read entire trace at once.  If [pin] is true, uses PinTrace
+    code.  If [pin] is false, uses old lifting code. *)
 let bap_from_trace_file ?(atts = true) ?(pin = false) filename =
   if pin then
-    alt_bap_from_trace_file filename
+    PinTrace.alt_bap_from_trace_file filename
   else
-    old_bap_from_trace_file ~atts ~pin filename
+    OldTrace.old_bap_from_trace_file ~atts ~pin filename
 
-(* SWXXX UGLY! copy and pasted from traces....better place to put/do this? *)
-let endtrace = "This is the final trace block"
-let is_seed_label = (=) "ReadSyscall"
-(** A trace is a sequence of instructions. This function
-    takes a list of ast statements and returns a list of
-    lists of ast stmts. Each one of those sublists will 
-    represent the IL of the executed assembly instruction *)
-let trace_to_blocks trace = 
-  let rec to_blocks blocks current = function
-    | [] -> 
-	  List.rev ((List.rev current)::blocks)
-    | (Ast.Label (Addr _, _) as l)::rest ->
-	  let block = List.rev current in
-	  to_blocks (block::blocks) [l] rest
-    | (Ast.Comment (c, _) as s)::rest when c = endtrace || (is_seed_label c) ->
-	  let block = List.rev current in
-	  to_blocks (block::blocks) [s] rest
-    | x::rest ->
-	  to_blocks blocks (x::current) rest
-  in
-  let blocks = to_blocks [] [] trace in
-    List.filter (fun b -> List.length b > 1) blocks
+let serialized_bap_stream_from_trace_file = SerializedTrace.new_bap_stream_from_trace_file
+let bap_stream_from_trace_file = PinTrace.alt_bap_stream_from_trace_file
 
-(** SWXXX Rename; this is a block *)
-(** Get one statement at a time. *)
-let rec bap_get_stmt_from_trace_file ?(atts = true) ?(rate=1L) ?(pin = false) filename block_q offset off = 
-  (* There is a difference between the file offset and the stream off(set) *)
-  let enqueue blocks = 
-    Util.print_obj_info "block_q" block_q; 
-    Util.print_mem_usage();
-    block_q := blocks
-  in
-  let rec dequeue _ =
-    match !block_q with
-    | [] -> None
-    | b::bs -> block_q := bs; 
-      match b with 
-      | [] -> dequeue() 
-      | _ -> Some(b)
-  in
-  let tmp_c = ref false in
-  let next_block = 
-    (match !block_q with
-    | [] ->
-      let (c,ir) = alt_bap_from_trace_file_range filename offset rate in
-      tmp_c := c;
-      let ir = List.rev ir in
-      let blocks = if (rate <> 1L) then trace_to_blocks ir else [ir] in
-      enqueue blocks;
-      dequeue()
-    | _ -> dequeue()) in
-  (* Handle the case where the last block on the queue is an empty block but 
-     frames are still left in the trace (c is true) *)
-  match next_block with
-  | None -> 
-    if !tmp_c then 
-      bap_get_stmt_from_trace_file ~atts ~rate ~pin filename block_q offset off 
-    else None
-  | _ -> next_block
+let serialized_bap_from_trace_file = SerializedTrace.new_bap_from_trace_file
 
-
-let f filename = fun x -> (DTest.pdebug("Finalized block_q for "^filename));;
-
-(** Return stream of trace instructions raised to the IL *)
-let bap_stream_from_trace_file ?(atts = true) ?(rate=1L) ?(pin = false) filename =
-  let block_q = ref [] in
-  let offset = ref 0L in
-  Gc.finalise (f filename) block_q;
-  Stream.from (
-    bap_get_stmt_from_trace_file ~atts ~rate ~pin filename block_q offset)
-
+(* End traces functions *)
 
 let get_symbols ?(all=false) {asmp=p} =
   let f = if all then asmir_get_all_symbols else asmir_get_symbols in

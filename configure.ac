@@ -7,7 +7,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.59)
-AC_INIT(Bap, 0.1, dbrumley@cmu.edu)
+AC_INIT(Bap, 0.1, bap-dev@lists.andrew.cmu.edu)
 AC_CONFIG_SRCDIR([libasmir/src/asm_program.c])
 AC_CONFIG_HEADER([libasmir/config.h])
 
@@ -31,7 +31,6 @@ AC_PROG_CAMLIDL
 #AC_PROG_LIBTOOL
 
 # Check for Z3
-
 AC_ARG_WITH([z3-bindings],
             [AS_HELP_STRING([--with-z3-bindings],
               [enable support for Z3 bindings])],
@@ -70,7 +69,34 @@ AC_CHECK_FILE([$PIN_HOME],
 
 AM_CONDITIONAL([HAVE_PIN], [test x$HAVE_PIN = xtrue])
 
+# Conditionally build llvm
+AS_IF([ocamlfind query llvm],
+      [HAVE_LLVM=true],
+      [HAVE_LLVM=false; AC_MSG_WARN([LLVM not found. BAP to llvm will be unavailable.])])
+
+rm -f ocaml/makefile.inc
+if `test "x$HAVE_LLVM" = "xtrue"` ; then
+   cat >>ocaml/makefile.inc <<"EOF"
+HAVE_LLVM=true
+
+EOF
+else          
+   touch ocaml/makefile.inc
+fi
+
 # Checks for ocaml libraries
+ocamlfind query camomile
+if test $? != 0; then
+   echo "bap requires camomile-dev"
+   exit -1
+fi
+
+#ocamlfind query ocamlgraph
+#if test $? != 0; then
+#   echo "bap requires libbitstring-ocaml-dev"
+#   exit -1
+#fi
+
 dnl ocamlfind query ocamlgraph
 dnl if test $? != 0; then
 dnl     echo "bap needs libocamlgraph-ocaml-dev"
@@ -178,6 +204,8 @@ echo "LIBASMIR_LIBS=-lasmir -lvex -lbfd -ldl -liberty" >> libasmir/makefile.inc
 AC_SUBST(ASMIR_DIR)
 ASMIR_DIR="`pwd`/libasmir"
 
+AC_SUBST(BAP_DIR)
+BAP_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 # Checks for header files.
 AC_HEADER_STDC
@@ -211,7 +239,8 @@ AM_CONDITIONAL([TESTS_OPT], [ test ! -f NOTESTS ])
 AC_CONFIG_FILES([Makefile
                  libasmir/Makefile
                  libasmir/apps/Makefile
-                 libasmir/src/Makefile])
+                 libasmir/src/Makefile
+                 libtracewrap/Makefile])
 AC_OUTPUT
 
 # Configure ocamlgraph

@@ -166,7 +166,7 @@ struct
       let p = Prune_unreachable.prune_unreachable_ast p in
       let post = Ast.exp_true in
       let (wp, _foralls) = compute_wp_boring p post in
-	  let mem_hash = Var.VarHash.create 1000 in
+      let mem_hash = Memory2array.create_state () in
       let wp = Memory2array.coerce_exp_state mem_hash wp in
       let foralls = List.map (Memory2array.coerce_rvar_state mem_hash) foralls in
       (* FIXME: same for exists? *)

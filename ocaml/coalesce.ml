@@ -87,3 +87,5 @@ end
 module AST_Coalesce = MakeCoalesce(AST)
 module SSA_Coalesce = MakeCoalesce(SSA)
 
+let coalesce_ast = AST_Coalesce.coalesce
+let coalesce_ssa = SSA_Coalesce.coalesce

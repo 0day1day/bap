@@ -17,12 +17,15 @@ satisfy most dependencies on Ubuntu 11.04/11.10 by running:
   $ sudo apt-get install ocaml ocaml-native-compilers ocaml-findlib camlidl \
     libocamlgraph-ocaml-dev libextlib-ocaml-dev binutils-dev automake \
     libcamomile-ocaml-dev otags libpcre3-dev camlp4-extra bison flex \
-    zlib1g-dev libgmp3-dev g++
+    zlib1g-dev libgmp3-dev g++ libbitstring-ocaml-dev libtool
 
 XXX: Does this work for Debian too?
 
+To build LLVM code generation, include:
+   libllvm-ocaml-2.8-dev
+
 On x86_64 add the following packages:
-    gcc-multilib g++-multilib
+    gcc-multilib g++-multilib lib32z1-dev
 
 To compile the documentation, you also need
   $ sudo aptitude install texlive-base texlive-latex-base \

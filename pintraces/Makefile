@@ -24,7 +24,7 @@
 #    Pin was installed. This can also be set on the command line,
 #    or as an environment variable.
 #
-PIN_HOME = ../pin/
+PIN_HOME ?= ../pin/
 
 
 # We only support ia32
@@ -39,7 +39,7 @@ TARGET=ia32
 PIN_KIT=$(PIN_HOME)
 KIT=1
 TESTAPP=$(OBJDIR)cp-pin.exe
-DEBUG=0
+DEBUG=1
 
 TARGET_COMPILER?=gnu
 ifdef OS
@@ -57,7 +57,7 @@ endif
 
 ifeq ($(TARGET_COMPILER),ms)
     include $(PIN_HOME)/source/tools/makefile.ms.config
-    CXXFLAGS +=  -Iddk-inc 
+    CXXFLAGS +=  -Iddk-inc
     PIN=$(PIN_HOME)/pin.bat
 	RM = del /Q
 endif
@@ -73,12 +73,29 @@ TOOL_ROOTS = gentrace #ctxtest
 
 TOOLS = $(TOOL_ROOTS:%=$(OBJDIR)%$(PINTOOL_SUFFIX))
 
-#OBJS = $(OBJDIR)pin_taint.o $(OBJDIR)pin_frame.o $(OBJDIR)winsyscalls.o $(OBJDIR)pivot.o
-OBJS = $(OBJDIR)pivot.o $(OBJDIR)pin_trace.o $(OBJDIR)pin_taint.o $(OBJDIR)pin_frame.o $(OBJDIR)winsyscalls.o $(OBJDIR)pin_misc.o
+# FORMATOBJS = $(OBJDIR)frame.piqi.pb.o $(OBJDIR)types.piqi.pb.o $(OBJDIR)trace.container.o
 
-CXXFLAGS += -I../libasmir/include -I../libasmir/src/traces
+#FORMATOBJS = $(OBJDIR)frame.piqi.pb.o $(OBJDIR)exceptionframe.piqi.pb.o $(OBJDIR)stdframe.piqi.pb.o $(OBJDIR)taintintroframe.piqi.pb.o $(OBJDIR)types.piqi.pb.o $(OBJDIR)trace.container.o
 
-TRACEDIR = ../libasmir/src/traces
+OBJS = $(OBJDIR)pivot.o $(OBJDIR)pin_trace.o $(OBJDIR)pin_taint.o $(OBJDIR)pin_frame.o $(OBJDIR)winsyscalls.o $(OBJDIR)pin_misc.o $(OBJDIR)reg_mapping_pin.o $(FORMATOBJS)
+
+ROOT = $(realpath ..)
+
+TRACEDIR = $(ROOT)/libasmir/src/traces
+
+TRACEFORMATDIR = $(ROOT)/libtracewrap/libtrace/src/cpp
+TRACEFORMATCOMMON = $(ROOT)/libtracewrap/libtrace/src/common
+TRACEFORMATPBDIR = $(TRACEFORMATDIR)/pb
+LIBTRACE = $(TRACEFORMATDIR)/libtrace.a
+
+PROTOBUFDIR = $(ROOT)/libtracewrap/libtrace/protobuf/src
+
+CXXFLAGS += -I$(TRACEFORMATCOMMON) -I../libasmir/include -I../libasmir/src/traces -I$(TRACEFORMATDIR) -I$(TRACEFORMATPBDIR) -I$(PROTOBUFDIR) -DUSING_PIN
+
+# XXX We should probably use libtool
+PROTOBUFLIBDIR = $(PROTOBUFDIR)/.libs
+LIB_PATHS = -L$(PROTOBUFLIBDIR)
+LIBS = $(LIBTRACE) -Wl,-rpath=$(PROTOBUFLIBDIR) -pthread  -pthread -lprotobuf -lz -lpthread
 
 ##############################################################
 #
@@ -117,8 +134,17 @@ $(OBJDIR)%.o : $(TRACEDIR)/%.cpp
 $(OBJDIR)%.o : %.cpp
 	$(CXX) -c $(CXXFLAGS) $(PIN_CXXFLAGS) ${OUTOPT}$@ $<
 
+$(OBJDIR)%.o : $(TRACEFORMATPBDIR)/%.cc
+	$(CXX) -c $(CXXFLAGS) $(PIN_CXXFLAGS) ${OUTOPT}$@ $<
+
+$(OBJDIR)%.o : $(TRACEFORMATDIR)/%.cpp
+	$(CXX) -c $(CXXFLAGS) $(PIN_CXXFLAGS) ${OUTOPT}$@ $<
+
 reader: readtrace.cpp $(OBJDIR)pin_frame.o $(OBJDIR)pin_trace.o
 	$(CXX) -o $@ $^ $(CXXFLAGS)
+
+newreadtrace : newreadtrace.cpp $(LIBTRACE)
+	$(CXX) -o $@ $^ $(CXXFLAGS) $(LIB_PATHS) $(LIBS)
 
 pivottest: $(OBJDIR)pivot.o pivottest.cpp
 	$(CXX) -o $@ $^ $(CXXFLAGS) $(PIN_CXXFLAGS)
@@ -133,8 +159,8 @@ pinregs.h : listregs $(OBJDIR)ctxtest$(PINTOOL_SUFFIX)
 
 $(TOOLS): $(PIN_LIBNAMES)
 
-$(TOOLS): %$(PINTOOL_SUFFIX) : %.o $(OBJS)
-	${PIN_LD} $(PIN_LDFLAGS) $(LINK_DEBUG) ${LINK_OUT}$@ $(OBJS) $< ${PIN_LPATHS} $(PIN_LIBS) $(DBG)
+$(TOOLS): %$(PINTOOL_SUFFIX) : %.o $(OBJS) $(LIBTRACE)
+	${PIN_LD} $(PIN_LDFLAGS) $(LINK_DEBUG) ${LINK_OUT}$@ $(OBJS) $< ${PIN_LPATHS} $(PIN_LIBS) $(DBG) $(LIB_PATHS) $(LIBS)
 
 ## cleaning
 clean:

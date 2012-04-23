@@ -3,6 +3,7 @@
 #include "pin_frame.h"
 #include "pin_syscalls.h"
 #include "winsyscalls.h"
+#include "trace.container.hpp"
 #ifndef _WIN32
 #include <unistd.h>
 #endif
@@ -146,20 +147,20 @@ void TaintTracker::setTaintNetwork()
 /**************** Helper Functions ****************/
 
 //
-bool TaintTracker::isValid(uint32_t type)
+bool TaintTracker::isValid(RegMem_t type)
 {
-  return (type != VT_NONE);
+  return (type.type != NONE);
 }
 
 // 
-bool TaintTracker::isReg(uint32_t type)
+bool TaintTracker::isReg(RegMem_t type)
 {
-  return isValid(type) && (type >= REG_BASE) && (type <= REGTYPE_LAST);
+    return (type.type == REGISTER);
 }
 
-bool TaintTracker::isMem(uint32_t type)
+bool TaintTracker::isMem(RegMem_t type)
 {
-  return isValid(type) && (type >= MEM_BASE) && (type <= MEMTYPE_LAST);
+    return (type.type == MEM);
 }
 
 // 
@@ -168,20 +169,11 @@ uint32_t TaintTracker::exists(context &ctx, uint32_t elem)
   return (ctx.find(elem) != ctx.end());
 }
 
-//
-uint32_t TaintTracker::getSize(uint32_t type)
-{
-  uint32_t size;
-  switch (type) {
-      case VT_MEM128: case VT_REG128: size = 16; break;
-      case VT_MEM64: case VT_REG64: size = 8; break;
-      case VT_MEM32: case VT_REG32: size = 4; break;
-      case VT_MEM16: case VT_REG16: size = 2; break;
-      case VT_MEM8:  case VT_REG8:  size = 1; break;
-      default:                      assert(false);
-  }
-  return size;
+
+uint32_t TaintTracker::getSize(RegMem_t type) {
+    return type.size / 8;
 }
+
 
 // Combining two taint tags
 uint32_t TaintTracker::combineTaint(uint32_t oldtag, uint32_t newtag)
@@ -217,10 +209,10 @@ void TaintTracker::printMem()
 // addr. If offset is -1, new tainted bytes are assigned. Otherwise,
 // the (source,offset) tuple are compared for each byte to see if that
 // resource has been used before, and if so, the same taint number is given.
-std::vector<TaintFrame> TaintTracker::introMemTaint(uint32_t addr, uint32_t length, const char *source, int64_t offset) {
+FrameOption_t TaintTracker::introMemTaint(uint32_t addr, uint32_t length, const char *source, int64_t offset) {
 
-  std::vector<TaintFrame> tfs;
-  
+  FrameOption_t fb;
+
   if ((*pf)(addr, length, source)) {
 
     for (unsigned int i = 0; i < length; i++) {
@@ -241,23 +233,26 @@ std::vector<TaintFrame> TaintTracker::introMemTaint(uint32_t addr, uint32_t leng
       }
       /* Mark memory as tainted */
       setTaint(memory, addr+i, t);
-      TaintFrame tf;
-      tf.id = t;
-      tf.length = 1;
-      tf.addr = addr+i;
-      tfs.push_back(tf);
+      taint_intro* tfi = fb.f.mutable_taint_intro_frame()->mutable_taint_intro_list()->add_elem();
+      tfi->set_taint_id(t);
+      tfi->set_addr(addr+i);
+      uint8_t value;
+      assert (PIN_SafeCopy((void*) &value, (void*) (addr+i), 1) == 1);
+      tfi->set_value((void*) &value, 1);
     }
-    return tfs;
+    fb.b = true;
+    return fb;
   } else {
-    return tfs;
+    fb.b = false;
+    return fb;
   }
 }
 
 // Reads length bytes from source at offset, putting the bytes at
 // addr. Also adds length to the offset of the resource.
-std::vector<TaintFrame> TaintTracker::introMemTaintFromFd(uint32_t fd, uint32_t addr, uint32_t length) {
+FrameOption_t TaintTracker::introMemTaintFromFd(uint32_t fd, uint32_t addr, uint32_t length) {
   assert(fds.find(fd) != fds.end());
-  std::vector<TaintFrame> tfs = introMemTaint(addr, length, fds[fd].name.c_str(), fds[fd].offset);
+  FrameOption_t tfs = introMemTaint(addr, length, fds[fd].name.c_str(), fds[fd].offset);
   fds[fd].offset += length;
   return tfs;
 }
@@ -280,7 +275,7 @@ uint32_t TaintTracker::getTaint(context &ctx, uint32_t elem)
 }
 
 // 
-uint32_t TaintTracker::getMemTaint(uint32_t addr, uint32_t type)
+uint32_t TaintTracker::getMemTaint(uint32_t addr, RegMem_t type)
 {
   uint32_t tag = NOTAINT;
   //cerr << "Getting memory " << addr << endl;
@@ -312,12 +307,12 @@ uint32_t TaintTracker::getReadTaint(context &delta)
   for (uint32_t i = 0 ; i < count ; i++) {
     if ((values[i].usage & RD) == RD) {
       // this is a read
-      if (isReg(values[i].type) 
-	  && (values[i].loc != REG_EFLAGS)) // FIXME: no control-flow taint
-	tmp_tag = getRegTaint(delta, values[i].loc);
-      else if (isMem(values[i].type))
-	tmp_tag = getMemTaint(values[i].loc, values[i].type);
-      tag = combineTaint(tag, tmp_tag);
+        if (isReg(values[i].type) 
+            && (values[i].loc != REG_EFLAGS)) // FIXME: no control-flow taint
+            tmp_tag = getRegTaint(delta, values[i].loc);
+        else if (isMem(values[i].type))
+            tmp_tag = getMemTaint(values[i].loc, values[i].type);
+        tag = combineTaint(tag, tmp_tag);
     }
   }
   return tag;
@@ -345,16 +340,14 @@ void TaintTracker::acceptHelper(uint32_t fd) {
   }
 }
 
-std::vector<TaintFrame> TaintTracker::recvHelper(uint32_t fd, void *ptr, size_t len) {
+FrameOption_t TaintTracker::recvHelper(uint32_t fd, void *ptr, size_t len) {
   uint32_t addr = reinterpret_cast<uint32_t> (ptr);
 
   if (fds.find(fd) != fds.end()) {
-
     cerr << "Tainting " << len << " bytes of recv @" << addr << endl;
     return introMemTaintFromFd(fd, addr, len);
   } else {
-    std::vector<TaintFrame> tfs;
-    return tfs;
+    return FrameOption_t(false);
   }
 }
 
@@ -364,10 +357,11 @@ std::vector<TaintFrame> TaintTracker::recvHelper(uint32_t fd, void *ptr, size_t 
 
 //
 #ifdef _WIN32
-std::vector<TaintFrame> TaintTracker::taintArgs(char *cmdA, wchar_t *cmdW)
+std::vector<frame> TaintTracker::taintArgs(char *cmdA, wchar_t *cmdW)
 {
-  std::vector<TaintFrame> frms;
-  std::vector<TaintFrame> tfrms;
+  std::vector<frame> frms;
+  FrameOption_t fo;
+  std::vector<frame> tfrms;
   if (taint_args) {
     size_t lenA = strlen(cmdA);
     size_t lenW = wcslen(cmdW);
@@ -376,34 +370,37 @@ std::vector<TaintFrame> TaintTracker::taintArgs(char *cmdA, wchar_t *cmdW)
     cerr << "Tainting multibyte command-line arguments: " << bytesA << " bytes @ " << (unsigned int)(cmdA) << endl;
     
     /* Taint multibyte command line */
-    frms = introMemTaint((uint32_t)cmdA, bytesA, "Tainted Arguments", -1);
-
+    fo = introMemTaint((uint32_t)cmdA, bytesA, "Tainted Arguments", -1);
+    if (fo.b) { frms.push_back(fo.f); }
     cerr << "Tainting wide command-line arguments: " << bytesW << " bytes @ " << (unsigned int)(cmdW) << endl;
-    tfrms = introMemTaint((uint32_t)cmdW, bytesW, "Tainted Arguments", -1);
-    frms.insert(frms.end(), tfrms.begin(), tfrms.end());
+    fo = introMemTaint((uint32_t)cmdW, bytesW, "Tainted Arguments", -1);
+    if (fo.b) { frms.push_back(fo.f); }
   }
   return frms;
 }
 #else
-std::vector<TaintFrame> TaintTracker::taintArgs(int argc, char **argv)
+std::vector<frame> TaintTracker::taintArgs(int argc, char **argv)
 {
+
+  std::vector<frame> fv;
+
   if (taint_args) {
     cerr << "Tainting command-line arguments" << endl;
     for ( int i = 1 ; i < argc ; i++ ) {
-		cerr << "Tainting " << argv[i] << endl;
+      cerr << "Tainting " << argv[i] << endl;
       size_t len = strlen(argv[i]);
-      return introMemTaint((uint32_t)argv[i], len, "Arguments", -1);      
+      FrameOption_t fo = introMemTaint((uint32_t)argv[i], len, "Arguments", -1);
+      if (fo.b) { fv.push_back(fo.f); }
     }
   }
-  
-  // XXX: Is this even safe?
-  return std::vector<TaintFrame> ();
+
+  return fv;
 }
 #endif
 
 //
 #ifdef _WIN32
-std::vector<TaintFrame> TaintTracker::taintEnv(char *env, wchar_t *wenv)
+std::vector<frame> TaintTracker::taintEnv(char *env, wchar_t *wenv)
 {
   /* See MSDN docs here: http://msdn.microsoft.com/en-us/library/ms683187(VS.85).aspx 
    * Basically, env is a pointer to
@@ -412,7 +409,8 @@ std::vector<TaintFrame> TaintTracker::taintEnv(char *env, wchar_t *wenv)
    * ...
    * \x00\x00
    */
-  //  std::vector<TaintFrame> frms;
+  std::vector<frame> fv;
+  //  std::vector<frame> frms;
 
   // /* Multibyte strings */
   // for ( ; *env != '\x00'; env += (strlen(env) + 1 /* null */)) {
@@ -448,19 +446,20 @@ std::vector<TaintFrame> TaintTracker::taintEnv(char *env, wchar_t *wenv)
 	uint32_t numBytes = numChars * sizeof(wchar_t);
         uint32_t addr = (uint32_t) (wenv+equal+1);
         cerr << "Tainting environment variable: " << var << " @" << (int)addr << " " << numChars << " bytes" << endl;
-	return introMemTaint(addr, numBytes, "Environment Variable", -1);
-
+	FrameOption_t fo = introMemTaint(addr, numBytes, "Environment Variable", -1);
+	if (fo.b) { fv.push_back(fo.f); }
       }
     }
   }
 
-
-  return std::vector<TaintFrame> ();
+  return fv;
 }
 #else /* unix */
-std::vector<TaintFrame> TaintTracker::taintEnv(char **env)
+std::vector<frame> TaintTracker::taintEnv(char **env)
 {
-  std::vector<TaintFrame> frms;
+
+  std::vector<frame> fv;
+
   for ( int i = 1 ; env[i] ; i++ ) {
     string var(env[i]);
     int equal = var.find('=');
@@ -469,15 +468,16 @@ std::vector<TaintFrame> TaintTracker::taintEnv(char **env)
       uint32_t len = strlen(env[i]) - var.size();
       uint32_t addr = (uint32_t)env[i]+equal+1;
       cerr << "Tainting environment variable: " << var << " @" << (int)addr << endl;
-      return introMemTaint(addr, len, "environment variable", -1);
+      FrameOption_t fo = introMemTaint(addr, len, "environment variable", -1);
+      if (fo.b) { fv.push_back(fo.f); }
     }
   }
-  return std::vector<TaintFrame> ();
+  return std::vector<frame> ();
 }
 #endif
 
 /** This function is called right before a system call. */
-bool TaintTracker::taintPreSC(uint32_t callno, uint32_t *args, /* out */ uint32_t &state)
+bool TaintTracker::taintPreSC(uint32_t callno, const uint64_t *args, /* out */ uint32_t &state)
 {
   //cout << "Syscall no: " << callno << endl << "Args:" ;
   //for ( int i = 0 ; i < MAX_SYSCALL_ARGS ; i ++ )
@@ -626,8 +626,8 @@ bool TaintTracker::taintPreSC(uint32_t callno, uint32_t *args, /* out */ uint32_
 }
 
  /** This function is called immediately following a system call. */
-std::vector<TaintFrame> TaintTracker::taintPostSC(const uint32_t bytes, 
-                                     uint32_t *args,
+FrameOption_t TaintTracker::taintPostSC(const uint32_t bytes, 
+                                     const uint64_t *args,
                                      uint32_t &addr,
                                      uint32_t &length,
 				     const uint32_t state)
@@ -814,8 +814,7 @@ std::vector<TaintFrame> TaintTracker::taintPostSC(const uint32_t bytes,
       default:
         break;
   }
-  std::vector<TaintFrame> tfs;
-  return tfs;
+  return FrameOption_t(false);
 }
 
 /******** Taint Propagation **********/
@@ -825,17 +824,17 @@ void TaintTracker::setTaintContext(context &delta)
 {
   uint32_t tag;
   for (uint32_t i = 0 ; i < count ; i++) {
-    if (isReg(values[i].type)) {
-      if ((tag = getRegTaint(delta, values[i].loc)) != NOTAINT) {
+      if (isReg(values[i].type)) {
+          if ((tag = getRegTaint(delta, values[i].loc)) != NOTAINT) {
 	// cerr << "register: " << REG_StringShort((REG)values[i].loc) << " is tainted" << endl;
-	values[i].taint = tag;
+              values[i].taint = tag;
+          }
+      } else if (isValid(values[i].type)) {
+          if ((tag = getTaint(memory,values[i].loc)) != NOTAINT) {
+              //cerr << "memory: " << values[i].loc << " is tainted" << endl;
+              values[i].taint = tag;
+          }
       }
-    } else if (isValid(values[i].type)) {
-      if ((tag = getTaint(memory,values[i].loc)) != NOTAINT) {
-	//cerr << "memory: " << values[i].loc << " is tainted" << endl;
-	values[i].taint = tag;
-      }
-    }
   }
   
 }

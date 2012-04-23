@@ -10,8 +10,8 @@ bin_PROGRAMS = \
 print_ir_SOURCES = print-ir.cpp ir_printer.cpp
 lifttrace_SOURCES = lifttrace.cpp
 LDADD =  @ASMIR_DIR@/src/libasmir.a -lbfd -ldl -liberty -lopcodes
-# AM_LDFLAGS = -L../src -L@VEX_DIR@ -L@BINUTILS_DIR@
-AM_LDFLAGS = -L@BINUTILS_DIR@
+#AM_LDFLAGS = -L../src -L@VEX_DIR@ -L@BINUTILS_DIR@
+#AM_LDFLAGS = -L@BINUTILS_DIR@
 AM_CXXFLAGS = \
               -I../include \
               -I../src/traces \

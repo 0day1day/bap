@@ -180,13 +180,11 @@ let run_and_subst_block state memv block =
   );
 
   (* Assign concrete values to regs/memory *)
-  let block, extra = match !use_alt_assignment with
-    | true ->
-	let assigns = assign_vars memv false in
-	(* List.iter *)
-	(*   (fun stmt -> dprintf "assign stmt: %s" (Pp.ast_stmt_to_string stmt)) assigns;	 *)
-	assigns @ block, List.length assigns
-    | false -> block, 0
+  let block, extra =
+    let assigns = assign_vars memv false in
+    (* List.iter *)
+    (*   (fun stmt -> dprintf "assign stmt: %s" (Pp.ast_stmt_to_string stmt)) assigns;	 *)
+    assigns @ block, List.length assigns
   in
 
   let place = ref 0 in

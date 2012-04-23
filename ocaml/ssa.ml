@@ -201,3 +201,12 @@ let full_stmt_eq s1 s2 = s1 = s2
   (*     && List.for_all2 full_value_eq l1 r1 *)
   (*   else *)
   (*     false *)
+
+let get_attrs = function
+  | Move(_,_,a)
+  | Jmp(_,a)
+  | CJmp(_,_,_,a)
+  | Label(_,a)
+  | Halt(_,a)
+  | Assert(_,a)
+  | Comment(_,a) -> a

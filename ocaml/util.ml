@@ -1,8 +1,4 @@
-
-(** Generally useful things.
-
-    This module contains functions that are used in BAP, but which are
-    not at all BAP specific.
+(** Utility functions that are not BAP specific.
 
     @author Ivan Jager
 *)
@@ -264,6 +260,12 @@ struct
 	h1 true
     in
       subtbl h1 h2 && subtbl h2 h1
+
+  (* Work around buggy replace in older versions of ocaml *)
+  let hashtbl_replace table x y =
+    H.remove table x;
+    H.add table x y
+
 end
 
 (* GRR, Hashtbl doesn't ascribe to the Hashtbl.S signature *)
@@ -284,8 +286,6 @@ let trim_newline s =
   if String.length s > 0 && String.get s ((String.length s) -1) = '\n'
   then	String.sub s 0 ((String.length s)-2)
   else	s
-
-
 		    
   
 let apply_option f k = 
@@ -588,7 +588,7 @@ let binary_of_big_int ?pad n =
   in
   zeroextend (f n)
 
-(** Convert big integer to binary represented as a string
+(** Convert big integer to hex represented as a string
 
     XXX: We could make this more efficient by operating one int64 at a
     time, instead of just a nibble.
@@ -659,6 +659,12 @@ let big_int_of_string s =
     (* big_int_of_string handles decimals *)
     Big_int_Z.big_int_of_string s
 
+type endian = Little | Big
+let big_int_of_binstring ?(e = Little) s =
+  let s = BatString.explode s in
+  let s = if e = Little then List.rev s else s in
+  let s = "0x" ^ (BatString.implode (List.flatten (List.map (fun c -> BatString.explode (Printf.sprintf "%02x" (Char.code c))) s))) in
+  big_int_of_string s
 
 (* Print the size of an object *)
 let print_obj_info title value = 
@@ -672,7 +678,6 @@ bytes_without_headers=%i bytes_with_headers=%i"
     (Objsize.size_without_headers i)
     (Objsize.size_with_headers i);
   D.dprintf "%S : total size in MB = %i" title ((Objsize.size_with_headers i) / 1048576)
-
 
 (* Deal with system calls (stolen from 
    http://rosettacode.org/wiki/Execute_a_system_command#OCaml ) *)

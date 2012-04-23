@@ -1,6 +1,6 @@
 (*pp camlp4o pa_macro.cmo *)
 
-(** A module to convert AST formulas to expressions for SMT Solvers.
+(* A module to convert AST formulas to expressions for SMT Solvers.
 
     @author Thanassis Avgerinos, Sang Kil Cha, ejs
 *)
@@ -31,39 +31,48 @@ let get_bits = Typecheck.bits_of_width
 
 let timeout = ref 0
 
-(* A Generic Interface for all solvers *)
-module type Solver =
-sig
+(** The interface for defining a new solver *)
+module type Solver_In =
+  sig
+    type set (** Solver context *)
+    type exp (** Solver expression *)
+    type model (** Solver model *)
+    val name : string (** Name of solver *)
+    val mk_set : unit -> set (** Function to create solver context *)
+    val del_set : set -> unit (** Function to free solver context *)
+    val convert : set -> Ast.exp -> exp (** Function to convert BAP expression to solver expression *)
+    val add_binding : set -> Ast.var -> exp -> unit (** Function to add a [Ast.Let] binding *)
+    val del_binding : set -> Ast.var -> unit (** Function to delete [Ast.Let] binding *)
+    val add_constraint : set -> exp -> unit (** Function to add boolean constraint *)
+    val is_sat : set -> bool (** [is_sat ctx] returns true iff [ctx] is satisfiable *)
+    val get_model : set -> model (** Get a model that satisfies the current context *)
+    val model_exp : set -> model -> Ast.exp -> Ast.exp (** [model_exp ctx model e] evaluates the BAP expression [e] in the satisfying model [model] *)
+    val push : set -> unit (** [push ctx] saves the current context in [ctx] to the context stack *)
+    val pop : set -> unit (** [pop ctx] pops the context stack and stores the result in [ctx] *)
+    val pp_sol : set -> string (* What is this? *)
+    val pp_exp : set -> exp -> string (** Convert a solver expresion to a string *)
+  end
 
-  type set (* solver specific data structure *)
-  type exp (* expression type of solver language *)
-  type model (* type of model *)
-
-  val name    : string (* name of the solver *)
-
-  val mk_set  : unit -> set            (* initialize solver data set *)
-  val del_set : set -> unit            (* delete solver data set *)
-
-  val convert : set -> Ast.exp -> exp  (* covert Ast.exp to solver's exp *)
-
-  val add_binding : set -> Ast.var -> exp -> unit
-  val del_binding : set -> Ast.var -> unit
-
-  val add_constraint : set -> exp -> unit (* Add a constraint *)
-
-  val is_sat  : set -> bool
-  val get_model : set -> model
-  val model_exp : set -> model -> Ast.exp -> Ast.exp
-
-  val push : set -> unit
-  val pop : set -> unit
-
-  (* XXX: What does pp_sol do? *)
-  val pp_sol  : set -> string            (* print solution *)
-  val pp_exp  : set -> exp -> string     (* expression printer *)
-
-
+module type Solver_Out = sig
+  type set
+  val is_satisfiable : Ast.exp -> bool
+  val is_valid : Ast.exp -> bool
+  class solver :
+  object
+    val s : set
+    method add_binding : Ast.var -> Ast.exp -> unit
+    method add_constraint : Ast.exp -> unit
+    method del_binding : Ast.var -> unit
+    method is_sat : bool
+    method is_valid : Ast.exp -> bool
+    method model_exp : Ast.exp -> Ast.exp
+    method pop : unit
+    method pp_sol : string
+    method push : unit
+  end
+  val newsolver : unit -> solver
 end
+
 
 module NullSolver = struct
   type set = unit
@@ -156,8 +165,10 @@ struct
 end
 *)
 
-module Make(S: Solver) =
+module Make(S: Solver_In) =
 struct
+
+  type set = S.set
 
   (* let create_solver = S.mk_set *)
   (* let conv_formula = S.convert *)

@@ -11,6 +11,7 @@
 #include <vector>
 #include <string.h>
 #include "pin_frame.h"
+#include "trace.container.hpp"
 
 // Size of temporary buffers
 #define BUFSIZE 128
@@ -55,11 +56,33 @@ typedef std::map<var,t> context;
 /********************************************/
 
 struct ValSpecRec {
-  uint32_t type;               // Type of value specifier.
+  pintrace::RegMem_t type;               // Type of value specifier.
   uint32_t loc;                // Location of this value.
   pintrace::PIN_REGISTER value;// Actual value.
   uint32_t usage;              // Operand usage (R, RW, W, etc)
   uint32_t taint;              // Taint status of the value
+};
+
+/** Like [frame option] type in ML.  If b is true, then f is a valid,
+ * meaningful frame.  If b is false, some failure returned and no
+ * frame is present. */
+struct FrameOption_t {
+  frame f;
+  bool b;
+
+  FrameOption_t(bool b) {
+    assert (b == false);
+    this->b = b;
+  }
+
+  FrameOption_t(bool b, frame &tf) {
+    this->f = f;
+  }
+
+  FrameOption_t() {
+
+  }
+
 };
 
 /* globals */
@@ -97,24 +120,24 @@ namespace pintrace { // We will use namespace to avoid collision
      /** A function to introduce taint in the contexts. Writes
 	 information to state; this state must be passed to
 	 taintIntro */
-     bool taintPreSC(uint32_t callno, uint32_t * args, uint32_t &state);
+     bool taintPreSC(uint32_t callno, const uint64_t * args, uint32_t &state);
 
-     std::vector<TaintFrame> taintPostSC(const uint32_t bytes, 
-                            uint32_t * args, 
-                            uint32_t &addr,
-                            uint32_t &length,
-			    const uint32_t state);
+     FrameOption_t taintPostSC(const uint32_t bytes,
+                               const uint64_t * args,
+                               uint32_t &addr,
+                               uint32_t &length,
+                               const uint32_t state);
 
 #ifdef _WIN32
-     std::vector<TaintFrame> taintArgs(char *cmdA, wchar_t *cmdW);
+     std::vector<frame> taintArgs(char *cmdA, wchar_t *cmdW);
 #else
-     std::vector<TaintFrame> taintArgs(int args, char **argv);
+     std::vector<frame> taintArgs(int args, char **argv);
 #endif
 
 #ifdef _WIN32
-     std::vector<TaintFrame> taintEnv(char *env, wchar_t *wenv);
+     std::vector<frame> taintEnv(char *env, wchar_t *wenv);
 #else
-     std::vector<TaintFrame> taintEnv(char **env);
+     std::vector<frame> taintEnv(char **env);
 #endif
 
      // A function to propagate taint
@@ -155,21 +178,21 @@ namespace pintrace { // We will use namespace to avoid collision
 
      void acceptHelper(uint32_t fd);
 
-     std::vector<TaintFrame> recvHelper(uint32_t fd, void *ptr, size_t len);
+     FrameOption_t recvHelper(uint32_t fd, void *ptr, size_t len);
 
      uint32_t getRegTaint(context &delta, uint32_t reg_int);
 
-     uint32_t getMemTaint(uint32_t addr, uint32_t type);
+     uint32_t getMemTaint(uint32_t addr, RegMem_t type);
 
      void untaintMem(uint32_t addr);
+       
+     static uint32_t getSize(RegMem_t type);
 
-     static uint32_t getSize(uint32_t type);
+     static bool isValid(RegMem_t type);
 
-     static bool isValid(uint32_t type);
+     static bool isReg(RegMem_t type);
 
-     static bool isReg(uint32_t type);
-
-     static bool isMem(uint32_t type);
+     static bool isMem(RegMem_t type);
     
      
    private:
@@ -217,9 +240,9 @@ namespace pintrace { // We will use namespace to avoid collision
 
      uint32_t getTaint(context &ctx, uint32_t elem);
 
-     std::vector<TaintFrame> introMemTaint(uint32_t addr, uint32_t length, const char *source, int64_t offset);
+     FrameOption_t introMemTaint(uint32_t addr, uint32_t length, const char *source, int64_t offset);
 
-     std::vector<TaintFrame> introMemTaintFromFd(uint32_t fd, uint32_t addr, uint32_t length);
+     FrameOption_t introMemTaintFromFd(uint32_t fd, uint32_t addr, uint32_t length);
      
      void setTaint(context &ctx, uint32_t key, uint32_t tag);
 

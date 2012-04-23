@@ -222,3 +222,8 @@ byte_insn_to_ir_c(address_t addr, [size_is(len)] char *bb_bytes, int len);
 asm_program_t
 byte_insn_to_asmp(enum bfd_architecture arch, address_t addr,
 		  [size_is(len)] char *bb_bytes, int len);
+
+// LLVM needs functions from llvm.cpp to be linked to the ocaml
+// binaries.  This is a dummy entry to force these symbols to be
+// linked.
+void fake_assert();
