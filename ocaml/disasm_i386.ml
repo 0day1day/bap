@@ -104,6 +104,7 @@ type opcode =
   | Neg of (typ * operand)
   | Mul of (typ * operand) (* typ, src *)
   | Imul of typ * (bool * operand) * operand * operand (* typ, (true if one operand form, dst operand), src1, src2 *)
+  | Div of typ * bool * operand (* typ, true if one operand form, src *)
   | Cld
   | Rdtsc
   | Cpuid
@@ -1190,6 +1191,38 @@ let rec to_ir addr next ss pref =
       move zf (Unknown("ZF is undefined after imul", r1));
       move af (Unknown("AF is undefined after imul", r1));
     ]
+  | Div(t, one_operand, src) ->
+      let t = if one_operand then r8 else t in
+      let dividend =
+        if one_operand then op2e t o_eax
+        else op2e t o_edx ++* op2e t o_eax
+      in
+      let t_bits = Typecheck.bits_of_width t in
+      let tmp_t = if one_operand then Reg t_bits else Reg (t_bits * 2) in
+      let tmp = nt "temp" tmp_t in
+      let res = nt "res" t in
+      let src = cast_unsigned tmp_t (op2e t src) in
+      let rem = dividend %* src in
+      let rem = if one_operand then rem else cast_low t rem in
+      let rem_assn =
+        if one_operand then assn r16 o_eax (rem ++* (cast_low r8 (Var eax)))
+        else assn t o_edx rem
+      in
+      let max = Int((bi1 <<% t_bits) -% bi1, tmp_t) in
+      [
+        Assert(src <>* it 0 tmp_t, []);
+        move tmp (dividend /* src);
+        Assert(Var(tmp) <=* max, []);
+        move res (cast_low t (Var tmp));
+        rem_assn;
+        assn t o_eax (Var res);
+        move cf (Unknown("CF is undefined after div", r1));
+        move oF (Unknown("OF is undefined after div", r1));
+        move sf (Unknown("SF is undefined after div", r1));
+        move zf (Unknown("ZF is undefined after div", r1));
+        move af (Unknown("AF is undefined after div", r1));
+        move pf (Unknown("PF is undefined after div", r1));
+      ]
   | Cld ->
     [Move(dflag, i32 1, [])]
   | Leave t when pref = [] -> (* #UD if Lock prefix is used *)
@@ -1327,6 +1360,8 @@ module ToStr = struct
           "imul %s"  (opr src2)
       | false ->
 	Printf.sprintf "imul %s, %s, %s" (opr dst) (opr src1) (opr src2))
+    | Div(t, one_operand, src) ->
+        Printf.sprintf "div %s" (opr src)
     | Cld -> "cld"
     | Leave _ -> "leave"
     | Interrupt(o) -> Printf.sprintf "int %s" (opr o)
@@ -1721,8 +1756,14 @@ let parse_instr g addr =
 		 | _ -> disfailwith
 		   (Printf.sprintf "impossible opcode: %02x/%d" b1 r)
 	       )
-	       | 6 -> unimplemented (* div *)
-		 (Printf.sprintf "unsupported opcode: %02x/%d" b1 r) 
+	       | 6 -> (* div *)
+              (match b1 with
+                | 0xf6 -> (Div(t, true, rm) , na)
+                | 0xf7 -> (Div(t, false, rm), na)
+		        | _ -> disfailwith
+		            (Printf.sprintf "impossible opcode: %02x/%d" b1 r)
+              )
+
 	       | 7 -> unimplemented (* idiv *)
 		 (Printf.sprintf "unsupported opcode: %02x/%d" b1 r) 
 	       | _ -> 

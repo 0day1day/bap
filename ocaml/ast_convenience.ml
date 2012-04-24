@@ -66,6 +66,8 @@ let (>=* ) a b   = binop LE b a
 let ( =* ) a b   = binop XOR a (unop NOT b)
 
 let ( ++* ) a b   = concat a b
+let ( %* ) a b = binop MOD a b
+let ( /* ) a b = binop DIVIDE a b
 
 let cast ct tnew = function
   | Int(i,t) -> let (i',t') = Arithmetic.cast ct (i,t) tnew in
