@@ -428,7 +428,7 @@ VOID ModLoad(IMG i, void*);
 ThreadInfo_t* GetThreadInfo(void) {
     ThreadInfo_t* ti;
 
-    ti = static_cast<ThreadInfo_t*> (PIN_GetThreadData(tl_key));
+    ti = static_cast<ThreadInfo_t*> (PIN_GetThreadData(tl_key, PIN_ThreadId()));
     assert(ti);
     return ti;
 }
