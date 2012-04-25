@@ -1009,11 +1009,18 @@ let rec to_ir addr next ss pref =
        set_flags_add t s1 s2 r
   | Adc(t, o1, o2) ->
     let tmp = nt "t1" t and tmp2 = nt "t2" t in
+    let bits = Typecheck.bits_of_width t in
+    let t' = Reg (bits + 1) in
+    let c = cast_unsigned t' in
+    (* Literally compute the addition with an extra bit and see
+       what the value is for CF *)
+    let bige = c (op2e t o1) +* c (Var tmp2) +* c (cast_unsigned t cf_e) in
+    let s1 = Var tmp and s2 = Var tmp2 and r = op2e t o1 in
     move tmp (op2e t o1)
     :: move tmp2 (op2e t o2)
     :: assn t o1 (op2e t o1 +* Var tmp2 +* cast_unsigned t cf_e)
-    :: let s1 = Var tmp and s2 = Var tmp2 and r = op2e t o1 in
-       set_flags_add t s1 s2 r
+    :: move cf (extract (biconst bits) (biconst bits) bige)
+    :: set_aopszf_add t s1 s2 r
   | Inc(t, o) (* o = o + 1 *) ->
     let tmp = nt "t" t in
     move tmp (op2e t o)
@@ -1047,7 +1054,11 @@ let rec to_ir addr next ss pref =
        subtraction does not overflow.
 
        So, I am guessing that CF is set if the subtraction overflows
-       or the addition overflows. *)
+       or the addition overflows.
+
+       Maybe we should implement this by doing the actual computation,
+       like we do for adc.
+    *)
                (* sub overflow | add overflow *)
     :: move cf ((sube >* orig_d) |* (sube <* orig_s))
     :: move af (Unknown("AF for sbb unimplemented", r1))

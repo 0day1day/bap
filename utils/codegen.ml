@@ -32,6 +32,7 @@ let prog,scope =
     exit 1
 
 let cfg = Cfg_ast.of_prog prog;;
+let cfg = Prune_unreachable.prune_unreachable_ast cfg;;
 
 (* let prog = Memory2array.coerce_prog prog *)
 
