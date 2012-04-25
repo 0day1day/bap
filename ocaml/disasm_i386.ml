@@ -1037,14 +1037,21 @@ let rec to_ir addr next ss pref =
     let sube = orig_s +* cast_unsigned t cf_e in
     let d = op2e t o1 in
     let s1 = op2e t o2 in
-    let s2 = op2e t o1 in
     move tmp_s s1
-    :: move tmp_d s2
+    :: move tmp_d d
     :: assn t o1 (orig_d -* sube)
-    ::move oF (cast_high r1 ((orig_s ^* orig_d) &* (orig_d ^* d)))
-    ::move cf (sube >* orig_d)
-    ::move af (Unknown("AF for sbb unimplemented", r1))
-    ::set_pszf t d
+    :: move oF (cast_high r1 ((orig_s ^* orig_d) &* (orig_d ^* d)))
+    (* When src = 0xffffffff and cf=1, the processor sets CF=1.
+
+       Note that we compute dest = dest - (0xffffffff + 1) = 0, so the
+       subtraction does not overflow.
+
+       So, I am guessing that CF is set if the subtraction overflows
+       or the addition overflows. *)
+               (* sub overflow | add overflow *)
+    :: move cf (sube >* orig_d |* sube <* orig_s)
+    :: move af (Unknown("AF for sbb unimplemented", r1))
+    :: set_pszf t d
   | Cmp(t, o1, o2) ->
     let tmp = nt "t" t in
     move tmp (op2e t o1 -* op2e t o2)
