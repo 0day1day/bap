@@ -1049,7 +1049,7 @@ let rec to_ir addr next ss pref =
        So, I am guessing that CF is set if the subtraction overflows
        or the addition overflows. *)
                (* sub overflow | add overflow *)
-    :: move cf (sube >* orig_d |* sube <* orig_s)
+    :: move cf ((sube >* orig_d) |* (sube <* orig_s))
     :: move af (Unknown("AF for sbb unimplemented", r1))
     :: set_pszf t d
   | Cmp(t, o1, o2) ->
