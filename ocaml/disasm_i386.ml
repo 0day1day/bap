@@ -104,7 +104,7 @@ type opcode =
   | Neg of (typ * operand)
   | Mul of (typ * operand) (* typ, src *)
   | Imul of typ * (bool * operand) * operand * operand (* typ, (true if one operand form, dst operand), src1, src2 *)
-  | Div of typ * bool * operand (* typ, true if one operand form, src *)
+  | Div of typ * operand (* typ, src *)
   | Cld
   | Rdtsc
   | Cpuid
@@ -409,22 +409,33 @@ let assn_s s t v e =
   | Oaddr a -> store_s s t a e
   | Oimm _ -> disfailwith "disasm_i386: Can't assign to an immediate value"
 
-(* Double width assignments, as used by multiplication *)
-let assn_dbl_s s t e =
-  match t with
-  | Reg 8 -> [assn_s s r16 o_eax e], cast_low r16 (Var eax)
-  | Reg 16 ->
-    let tmp = nt "t" r32 in
-    [move tmp e;
-     assn_s s reg_16 o_eax (extract (biconst 15) (biconst 0) (Var(tmp)));
-     assn_s s reg_16 o_edx (extract (biconst 31) (biconst 16) (Var(tmp)))], Var tmp
-  | Reg 32 -> 
-    let tmp = nt "t" r64 in
-    [move tmp e;
-     assn_s s reg_32 o_eax (extract (biconst 31) (biconst 0) (Var(tmp)));
-     assn_s s reg_32 o_edx (extract (biconst 63) (biconst 32) (Var(tmp)))], Var tmp
-  | _ -> failwith "Unknown assn_dbl_s register size"
+(* Double width operands, as used by multiplication and division *)
+let op_dbl = function
+  | Reg 8 -> [reg_16, o_eax]
+  | Reg 16 -> [reg_16, o_edx; reg_16, o_eax]
+  | Reg 32 -> [reg_32, o_edx; reg_32, o_eax]
+  | _ -> disfailwith "op_dbl only defined for Reg 8, 16, and 32"
 
+(* Return an expression for a double-width operand, as used by the div
+   instruction. *)
+let op2e_dbl_s ss t =
+  let cf (ct, o) = op2e_s ss ct o in
+  let ol = List.map cf (op_dbl t) in
+  List.fold_left
+    (fun bige little -> bige ++* little)
+    (List.hd ol)
+    (List.tl ol)
+
+(* Double width assignments, as used by multiplication *)
+let assn_dbl_s s t e = match op_dbl t with
+  | (t,o) :: [] -> [assn_s s t o e], op2e_s s t o
+  | l ->
+    let tmp = nt "t" (Reg (Typecheck.bits_of_width t * 2)) in
+    let f (stmts, off) (ct, o) = 
+      let newoff = off + Typecheck.bits_of_width ct in
+      assn_s s ct o (extract (biconst (newoff-1)) (biconst off) (Var tmp))::stmts, newoff
+    in
+    List.rev (fst (List.fold_left f ([move tmp e], 0) (List.rev l))), Var tmp
 
 let bytes_of_width = function
   | Reg x when x land 7 = 0 -> x/8
@@ -509,6 +520,7 @@ let set_flags_sub t s1 s2 r =
 let rec to_ir addr next ss pref =
   let load = load_s ss (* Need to change this if we want seg_ds <> None *)
   and op2e = op2e_s ss
+  and op2e_dbl = op2e_dbl_s ss
   and store = store_s ss
   and assn = assn_s ss 
   and assn_dbl = assn_dbl_s ss in
@@ -1191,38 +1203,22 @@ let rec to_ir addr next ss pref =
       move zf (Unknown("ZF is undefined after imul", r1));
       move af (Unknown("AF is undefined after imul", r1));
     ]
-  | Div(t, one_operand, src) ->
-      let t = if one_operand then r8 else t in
-      let dividend =
-        if one_operand then op2e t o_eax
-        else op2e t o_edx ++* op2e t o_eax
-      in
-      let t_bits = Typecheck.bits_of_width t in
-      let tmp_t = if one_operand then Reg t_bits else Reg (t_bits * 2) in
-      let tmp = nt "temp" tmp_t in
-      let res = nt "res" t in
-      let src = cast_unsigned tmp_t (op2e t src) in
-      let rem = dividend %* src in
-      let rem = if one_operand then rem else cast_low t rem in
-      let rem_assn =
-        if one_operand then assn r16 o_eax (rem ++* (cast_low r8 (Var eax)))
-        else assn t o_edx rem
-      in
-      let max = Int((bi1 <<% t_bits) -% bi1, tmp_t) in
-      [
-        Assert(src <>* it 0 tmp_t, []);
-        move tmp (dividend /* src);
-        Assert(Var(tmp) <=* max, []);
-        move res (cast_low t (Var tmp));
-        rem_assn;
-        assn t o_eax (Var res);
-        move cf (Unknown("CF is undefined after div", r1));
-        move oF (Unknown("OF is undefined after div", r1));
-        move sf (Unknown("SF is undefined after div", r1));
-        move zf (Unknown("ZF is undefined after div", r1));
-        move af (Unknown("AF is undefined after div", r1));
-        move pf (Unknown("PF is undefined after div", r1));
-      ]
+  | Div(t, src) ->
+    let dt = Reg (Typecheck.bits_of_width t * 2) in
+    let dividend = op2e_dbl t in
+    let divisor = cast_unsigned dt (op2e t src) in
+    let tdiv = nt "div" dt in
+    let trem = nt "rem" dt in
+    let assne = cast_low t (Var trem) ++* cast_low t (Var tdiv) in
+      Assert(divisor <>* it 0 dt, [StrAttr "#DE"])
+      :: move tdiv (dividend /* divisor)
+      :: move trem (dividend %* divisor)
+      (* Overflow is indicated with the #DE (divide error) exception
+         rather than with the CF flag. *)
+      :: [Assert(cast_high t (Var tdiv) ==* it 0 t, [StrAttr "#DE"])]
+      @ fst (assn_dbl t assne)
+      @ let undef (Var.V(_, n, t) as r) = move r (Unknown ((n^" undefined after div"), t)) in
+        List.map undef [cf; oF; sf; zf; af; pf]
   | Cld ->
     [Move(dflag, i32 1, [])]
   | Leave t when pref = [] -> (* #UD if Lock prefix is used *)
@@ -1360,8 +1356,8 @@ module ToStr = struct
           "imul %s"  (opr src2)
       | false ->
 	Printf.sprintf "imul %s, %s, %s" (opr dst) (opr src1) (opr src2))
-    | Div(t, one_operand, src) ->
-        Printf.sprintf "div %s" (opr src)
+    | Div(t, src) ->
+      Printf.sprintf "div %s" (opr src)
     | Cld -> "cld"
     | Leave _ -> "leave"
     | Interrupt(o) -> Printf.sprintf "int %s" (opr o)
@@ -1758,10 +1754,10 @@ let parse_instr g addr =
 	       )
 	       | 6 -> (* div *)
               (match b1 with
-                | 0xf6 -> (Div(t, true, rm) , na)
-                | 0xf7 -> (Div(t, false, rm), na)
-		        | _ -> disfailwith
-		            (Printf.sprintf "impossible opcode: %02x/%d" b1 r)
+                | 0xf6 -> (Div(reg_8, rm) , na)
+                | 0xf7 -> (Div(t, rm), na)
+		| _ -> disfailwith
+		  (Printf.sprintf "impossible opcode: %02x/%d" b1 r)
               )
 
 	       | 7 -> unimplemented (* idiv *)
