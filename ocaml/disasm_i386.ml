@@ -1008,17 +1008,17 @@ let rec to_ir addr next ss pref =
     :: let s1 = Var tmp and s2 = Var tmp2 and r = op2e t o1 in
        set_flags_add t s1 s2 r
   | Adc(t, o1, o2) ->
-    let tmp = nt "t1" t and tmp2 = nt "t2" t in
+    let orig1 = nt "orig1" t and orig2 = nt "orig2" t in
     let bits = Typecheck.bits_of_width t in
     let t' = Reg (bits + 1) in
     let c = cast_unsigned t' in
     (* Literally compute the addition with an extra bit and see
        what the value is for CF *)
-    let bige = c (op2e t o1) +* c (Var tmp2) +* c (cast_unsigned t cf_e) in
-    let s1 = Var tmp and s2 = Var tmp2 and r = op2e t o1 in
-    move tmp (op2e t o1)
-    :: move tmp2 (op2e t o2)
-    :: assn t o1 (op2e t o1 +* Var tmp2 +* cast_unsigned t cf_e)
+    let s1 = Var orig1 and s2 = Var orig2 and r = op2e t o1 in
+    let bige = c s1 +* c s2 +* c (cast_unsigned t cf_e) in
+    move orig1 (op2e t o1)
+    :: move orig2 (op2e t o2)
+    :: assn t o1 (s1 +* s2 +* cast_unsigned t cf_e)
     :: move cf (extract (biconst bits) (biconst bits) bige)
     :: set_aopszf_add t s1 s2 r
   | Inc(t, o) (* o = o + 1 *) ->
