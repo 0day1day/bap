@@ -1110,7 +1110,8 @@ let run_block ?(next_label = None) ?(log=fun _ -> ()) ?(transformf = (fun s _ ->
           (* An explicit assignment *)
 	  if not (is_temp v) then 
             VH.replace reg_to_stmt v {assignstmt=addr; assigned_time=get_counter ()}
-        | Special _ as s when Syscall_models.x86_is_system_call s ->
+        | Special _ as s when Syscall_models.x86_is_system_call s ||
+            Disasm.is_decode_error s ->
           (* A special could potentially overwrite all registers *)
           last_time := get_counter();
           last_special := addr;
