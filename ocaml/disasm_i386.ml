@@ -54,6 +54,8 @@ open D
 
 exception Disasm_i386_exception of string
 
+type direction = Forward | Backward
+
 type operand =
   | Oreg of int
   | Oaddr of Ast.exp
@@ -73,7 +75,7 @@ type opcode =
   | Shiftd of binop_type * typ * operand * operand * operand
   | Rotate of binop_type * typ * operand * operand * bool (* left or right, type, src/dest op, shift op, use carry flag *)
   | Bt of typ * operand * operand
-  | Bsf of typ * operand * operand
+  | Bs of typ * operand * operand * direction
   | Jump of operand
   | Jcc of operand * Ast.exp
   | Setcc of typ * operand * Ast.exp
@@ -882,19 +884,25 @@ let rec to_ir addr next ss pref =
 	move af (Unknown ("AF undefined after bt", r1));
 	move pf (Unknown ("PF undefined after bt", r1))
       ]
-  | Bsf(t, dst, src) ->
+  | Bs(t, dst, src, dir) ->
     let source_is_zero = nt "t" r1 in
     let source_is_zero_v = Var source_is_zero in
     let src_e = op2e t src in
     let bits = Typecheck.bits_of_width t in
-    let check_bit next_value bitindex =
+    let check_bit bitindex next_value =
       ite t (Extract(biconst bitindex,biconst bitindex,src_e) ==* it 1 r1) (it bitindex t) next_value
     in
-    let first_one = fold check_bit (it (bits-1) t) ((bits-2) --- 0) in
+    let bitlist = List.of_enum (0 --- (bits-1)) in
+    (* We are folding from right to left *)
+    let bitlist = match dir with
+      | Forward -> (* least significant first *) bitlist
+      | Backward -> (* most significant *) List.rev bitlist
+    in
+    let first_one = List.fold_right check_bit bitlist (Unknown("bs: destination undefined when source is zero", t)) in
     [
       move source_is_zero (src_e ==* it 0 t);
+      assn t dst first_one;
       move zf (ite r1 source_is_zero_v (it 1 r1) (it 0 r1));
-      assn t dst (ite t source_is_zero_v (Unknown ("bsf: destination undefined when source is zero", t)) first_one)
     ]
     @
       let undef (Var.V(_, n, t) as r) = move r (Unknown ((n^" undefined after bsf"), t)) in
@@ -1340,7 +1348,7 @@ module ToStr = struct
     | Dec (t, o) -> Printf.sprintf "dec %s" (opr o)
     | Jump a -> Printf.sprintf "jmp %s" (opr a)
     | Bt(t,d,s) -> Printf.sprintf "bt %s, %s" (opr d) (opr s)
-    | Bsf(t,d,s) -> Printf.sprintf "bsf %s, %s" (opr d) (opr s)
+    | Bs(t,d,s,dir) -> Printf.sprintf "bs%s %s, %s" (opr d) (opr s) (match dir with Forward -> "f" | Backward -> "r")
     | Jcc _ -> "jcc"
     | Setcc _ -> "setcc"
     | Cmps _ -> "cmps"
@@ -1992,9 +2000,10 @@ let parse_instr g addr =
       | 0xb7 -> let st = if b2 = 0xb6 then r8 else r16 in
 		let r, rm, na = parse_modrm32 na in
 		(Movzx(prefix.opsize, r, st, rm), na)
-      | 0xbc ->
-          let r, rm, na = parse_modrm prefix.opsize na in
-          (Bsf (prefix.opsize, r, rm), na)
+      | 0xbc | 0xbd ->
+        let dir = match b2 with | 0xbc -> Forward | 0xbd -> Backward | _ -> failwith "impossible" in
+        let r, rm, na = parse_modrm prefix.opsize na in
+        (Bs (prefix.opsize, r, rm, dir), na)
       | 0xbe
       | 0xbf -> let st = if b2 = 0xbe then r8 else r16 in
           let r, rm, na = parse_modrm32 na in
