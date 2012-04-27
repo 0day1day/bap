@@ -1257,7 +1257,7 @@ let rec to_ir addr next ss pref =
     let assne = cast_low t (Var trem) ++* cast_low t (Var tdiv) in
     Assert(divisor <>* it 0 dt, [StrAttr "#DE"])
     :: move tdiv (dividend $/* divisor)
-    :: move trem (dividend $%* divisor)
+    :: [move trem (dividend $%* divisor)]
     (* Overflow is indicated with the #DE (divide error) exception
        rather than with the CF flag. *)
     (* SWXXX For signed division make sure  qutient is between smallest and 
