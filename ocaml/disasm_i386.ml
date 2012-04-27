@@ -107,6 +107,7 @@ type opcode =
   | Mul of (typ * operand) (* typ, src *)
   | Imul of typ * (bool * operand) * operand * operand (* typ, (true if one operand form, dst operand), src1, src2 *)
   | Div of typ * operand (* typ, src *)
+  | Idiv of typ * operand (* typ, src *)
   | Cld
   | Rdtsc
   | Cpuid
@@ -1236,15 +1237,36 @@ let rec to_ir addr next ss pref =
     let tdiv = nt "div" dt in
     let trem = nt "rem" dt in
     let assne = cast_low t (Var trem) ++* cast_low t (Var tdiv) in
-      Assert(divisor <>* it 0 dt, [StrAttr "#DE"])
-      :: move tdiv (dividend /* divisor)
-      :: move trem (dividend %* divisor)
-      (* Overflow is indicated with the #DE (divide error) exception
-         rather than with the CF flag. *)
-      :: [Assert(cast_high t (Var tdiv) ==* it 0 t, [StrAttr "#DE"])]
-      @ fst (assn_dbl t assne)
-      @ let undef (Var.V(_, n, t) as r) = move r (Unknown ((n^" undefined after div"), t)) in
-        List.map undef [cf; oF; sf; zf; af; pf]
+    Assert(divisor <>* it 0 dt, [StrAttr "#DE"])
+    :: move tdiv (dividend /* divisor)
+    :: move trem (dividend %* divisor)
+    (* Overflow is indicated with the #DE (divide error) exception
+       rather than with the CF flag. *)
+    :: [Assert(cast_high t (Var tdiv) ==* it 0 t, [StrAttr "#DE"])]
+    @ fst (assn_dbl t assne)
+    @ (let undef (Var.V(_, n, t) as r) = 
+	 move r (Unknown ((n^" undefined after div"), t)) 
+       in
+       List.map undef [cf; oF; sf; zf; af; pf])
+  | Idiv(t, src) ->
+    let dt = Reg (Typecheck.bits_of_width t * 2) in
+    let dividend = op2e_dbl t in
+    let divisor = cast_signed dt (op2e t src) in
+    let tdiv = nt "div" dt in
+    let trem = nt "rem" dt in
+    let assne = cast_low t (Var trem) ++* cast_low t (Var tdiv) in
+    Assert(divisor <>* it 0 dt, [StrAttr "#DE"])
+    :: move tdiv (dividend $/* divisor)
+    :: move trem (dividend $%* divisor)
+    (* Overflow is indicated with the #DE (divide error) exception
+       rather than with the CF flag. *)
+    (* SWXXX For signed division make sure  qutient is between smallest and 
+       largest values.  For type t, this would be -2^(t/2) to (2^(t/2) - 1). *)
+    (* :: [Assert(cast_high t (Var tdiv) ==* it 0 t, [StrAttr "#DE"])] *)
+    @ fst (assn_dbl t assne)
+    @ (let undef (Var.V(_, n, t) as r) = 
+	 move r (Unknown ((n^" undefined after div"), t)) in
+       List.map undef [cf; oF; sf; zf; af; pf])
   | Cld ->
     [Move(dflag, i32 1, [])]
   | Leave t when pref = [] -> (* #UD if Lock prefix is used *)
@@ -1384,6 +1406,8 @@ module ToStr = struct
 	Printf.sprintf "imul %s, %s, %s" (opr dst) (opr src1) (opr src2))
     | Div(t, src) ->
       Printf.sprintf "div %s" (opr src)
+    | Idiv(t, src) ->
+      Printf.sprintf "idiv %s" (opr src)
     | Cld -> "cld"
     | Leave _ -> "leave"
     | Interrupt(o) -> Printf.sprintf "int %s" (opr o)
@@ -1760,37 +1784,43 @@ let parse_instr g addr =
     | 0xf7 -> let t = if b1 = 0xf6 then r8 else prefix.opsize in
 	      let (r, rm, na) = parse_modrm32ext na in
 	      (match r with (* Grp 3 *)
-	       | 0 -> let (imm, na) = 
-			if (b1 = 0xf7) then parse_immz t na else parse_immb na
-		      in 
-		      (Test(t, rm, imm), na)
+	       | 0 ->
+		 let (imm, na) = 
+		   if (b1 = 0xf7) then parse_immz t na else parse_immb na
+		 in 
+		 (Test(t, rm, imm), na)
 	       | 2 -> (Not(t, rm), na)
 	       | 3 -> (Neg(t, rm), na)
-	       | 4 -> (match b1 with 
+	       | 4 -> 
+		 (match b1 with 
 		 | 0xf6 -> (Mul(t, rm), na)
 		 | 0xf7 -> (Mul(t, rm), na)
 		 | _ -> disfailwith
 		   (Printf.sprintf "impossible opcode: %02x/%d" b1 r)
-	       ) 
-	       | 5 -> (match b1 with 
+		 ) 
+	       | 5 -> 
+		 (match b1 with 
                  | 0xf6 -> (Imul(t, (true,o_eax), o_eax, rm), na)
                  | 0xf7 -> (Imul(t, (true,o_edx), o_eax, rm), na)
 		 | _ -> disfailwith
 		   (Printf.sprintf "impossible opcode: %02x/%d" b1 r)
-	       )
-	       | 6 -> (* div *)
-              (match b1 with
-                | 0xf6 -> (Div(reg_8, rm) , na)
-                | 0xf7 -> (Div(t, rm), na)
-		| _ -> disfailwith
-		  (Printf.sprintf "impossible opcode: %02x/%d" b1 r)
-              )
-
-	       | 7 -> unimplemented (* idiv *)
-		 (Printf.sprintf "unsupported opcode: %02x/%d" b1 r) 
+		 )
+	       | 6 -> 
+		 (match b1 with
+                 | 0xf6 -> (Div(reg_8, rm) , na)
+                 | 0xf7 -> (Div(t, rm), na)
+		 | _ -> disfailwith
+		   (Printf.sprintf "impossible opcode: %02x/%d" b1 r)
+		 )
+	       | 7 -> 
+		 (match b1 with
+                 | 0xf6 -> (Idiv(reg_8, rm) , na)
+                 | 0xf7 -> (Idiv(t, rm), na)
+		 | _ -> disfailwith
+		   (Printf.sprintf "impossible opcode: %02x/%d" b1 r)
+		 )
 	       | _ -> 
 		 disfailwith (Printf.sprintf "impossible opcode: %02x/%d" b1 r)
-
 	      )
     | 0xfc -> (Cld, na)
     | 0xfe -> let (r, rm, na) = parse_modrm32ext na in
