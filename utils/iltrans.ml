@@ -365,6 +365,10 @@ let speclist =
       "<n> Unroll loops n times")
   :: ("-rm-cycles", uadd(TransformAstCfg Hacks.remove_cycles),
       "Remove cycles")
+  :: ("-ast-rm-indirect", uadd(TransformAstCfg Hacks.ast_remove_indirect),
+      "Remove BB_Indirect")
+  :: ("-ssa-rm-indirect", uadd(TransformSsa Hacks.ssa_remove_indirect),
+      "Remove BB_Indirect")
   :: ("-typecheck", uadd(AnalysisAst Typecheck.typecheck_prog),
       "Typecheck program")
   :: ("-uniqueify-labels", uadd(TransformAst Hacks.uniqueify_labels),
