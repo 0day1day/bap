@@ -22,7 +22,7 @@ satisfy most dependencies on Ubuntu 11.04/11.10 by running:
 XXX: Does this work for Debian too?
 
 To build LLVM code generation, include:
-   libllvm-ocaml-2.8-dev
+   libllvm-ocaml-dev
 
 On x86_64 add the following packages:
     gcc-multilib g++-multilib lib32z1-dev
