@@ -31,7 +31,7 @@ export OCAMLPATH = $(PIQIBUILDDIR)
 # Include sources from ../ocaml in the automatically generated dependencies.
 export SOURCE_DIRS_IN = $(BAP_OCAMLDIR) $(BAP_PROJ_OCAMLDIR)
 
-export SUBPROJS += $(PROJTESTS) analyze_test_log baptest
+export SUBPROJS += $(PROJTESTS) baptest
 
 CSRC=$(wildcard C/*.c)
 CEXECS = $(CSRC:C/%.c=%)
@@ -57,13 +57,6 @@ define PROJ_baptest
 	DOC_FILES=$(SOURCES)
 endef
 export PROJ_baptest
-
-define PROJ_analyze_test_log
-	RESULT=analyze_test_log
-	SOURCES = analyze_test_log.ml
-	DOC_FILES=$(SOURCES)
-endef
-export PROJ_analyze_test_log
 
 export BCSUFFIX = .dbg
 
