@@ -1260,7 +1260,7 @@ let rec to_ir addr next ss pref =
     :: [move trem (dividend $%* divisor)]
     (* Overflow is indicated with the #DE (divide error) exception
        rather than with the CF flag. *)
-    (* SWXXX For signed division make sure  qutient is between smallest and 
+    (* SWXXX For signed division make sure quotient is between smallest and
        largest values.  For type t, this would be -2^(t/2) to (2^(t/2) - 1). *)
     (* :: [Assert(cast_high t (Var tdiv) ==* it 0 t, [StrAttr "#DE"])] *)
     @ fst (assn_dbl t assne)

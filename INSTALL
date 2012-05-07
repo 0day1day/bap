@@ -1,8 +1,7 @@
-
 *** Basic installation ****
 
-Note: we primarily build bap on 64-bit Debian Lenny. It will
-likely also work on ubuntu and 32-bit systems.
+We primarily build bap on Ubuntu Linux. It will likely also work on
+Debian systems.
 
 To build BAP on x86, do the following:
   $ ./autogen.sh
@@ -50,16 +49,15 @@ Doing make clean first, will ensure that the whole platform gets
 compiled with the same flag
 
 
-*** Valgrind's VEX library ****
+*** SMT Solvers ***
 
-BAP requires Valgrind's VEX library. We have included a patched
-version of the VEX library in this distribution.   We have included
-information on our patch under VEX/BAP.README.  We recommend you use
-the version of VEX that is included.
-
-It is possible to use a different version of VEX.  To do so, build
-VEX, then use the --with-vex=<vex dir> configure option.
-
+BAP interfaces with several SMT solvers which must be downloaded and
+installed separately.  The solver utility must be in the executable
+path to be available to BAP. The supported solvers are:
+ * STP https://sites.google.com/site/stpfastprover/
+ * cvc3 http://www.cs.nyu.edu/acsys/cvc3/
+ * yices2 http://yices.csl.sri.com/
+ * XXX: need to describe Z3 setup
 
 
 *** Installing pin ***
@@ -82,29 +80,18 @@ $PATH/traces/pintraces/obj-ia32/gentrace.so (or gentrace.dll on Windows).
 
 *** Optional: Making the documentation ***
 
-Optionally you can also make the documentation by running: 'make doc'
-in the ocaml directory.  The documentation will be generated under
-ocaml/doc/bap/.  Note that ocaml documentation requires that the ocaml
-source files be built properly first.
-
-We have also provided a command line to view the ocaml file
-dependencies. Run:
-  $ make bap.dot
-in the ocaml directory. The resulting file is a graphviz dot file
-which can help you visualize how modules are related, e.g., run:
-  $ dot -Tpdf bap.dot > bap.pdf
-  $ xpdf bap.pdf
-
+Optionally you can also build the developer documentation by running:
+'make doc' in the ocaml directory.  The documentation will be
+generated under ocaml/doc/bap/.  Note that ocaml documentation
+requires that the ocaml source files be built properly first.
 
 
 *** Optional: Making unit tests ***
 
-Make tests:
-$ make tests
--- or --
-$ cd tests && make
+Build and run the unit tests tests:
+$ make test
+OR
 
-Run tests:
-$ cd tests && ./bap_test_suite
--- or for verbose test output --
-$ cd tests && ./bap_test_suite -verbose
+$ cd tests && make && ./bap_test_suite
+
+For verbose output, pass -verbose to bap_test_suite.
