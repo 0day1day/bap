@@ -904,11 +904,11 @@ let check_delta state =
                 let s = "{"^(Pp.ast_stmt_to_string assignstmt)^"}\n" in
                 if assigned_time <= !last_time then
                   (* The special happened after our assignment *)
-                  s^"{"^(Pp.ast_stmt_to_string !last_special)^"}\n"
+                  s^"special{"^(Pp.ast_stmt_to_string !last_special)^"}\n"
                 else s
 	      with Not_found ->
                 (* This is a little weird if this happens... *)
-                "{"^(Pp.ast_stmt_to_string !last_special)^"}"
+                "special{"^(Pp.ast_stmt_to_string !last_special)^"}"
 	    in
 	    let traceval_str = Pp.ast_exp_to_string traceval in
 	    let evalval_str = Pp.ast_exp_to_string evalval in
