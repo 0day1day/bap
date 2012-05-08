@@ -51,7 +51,7 @@ AS_IF([test "x$with_z3" != "xno"],
         ],
 
        [AC_MSG_FAILURE([z3 library not found])],
-       [-lgmp]
+       [-lgmp -lgomp]
        )])
 
 # Restore

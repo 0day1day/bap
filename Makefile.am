@@ -7,7 +7,7 @@ if HAVE_PIN
 PINTRACES=pintraces
 endif
 
-BAPDIRS=libasmir solvers ocaml utils $(BAPTESTDIRS) $(PINTRACES)
+BAPDIRS=libasmir ocaml utils $(BAPTESTDIRS) $(PINTRACES)
 SUBDIRS=batteries zarith-1.0 ounit-1.1.0 pcre-ocaml ocamlgraph-1.8 objsize-0.16 libtracewrap VEX $(BAPDIRS) $(TESTPOSTDIRS)
 
 test: all

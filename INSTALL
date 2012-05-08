@@ -57,7 +57,16 @@ path to be available to BAP. The supported solvers are:
  * STP https://sites.google.com/site/stpfastprover/
  * cvc3 http://www.cs.nyu.edu/acsys/cvc3/
  * yices2 http://yices.csl.sri.com/
- * XXX: need to describe Z3 setup
+
+BAP also supports z3 through its native ocaml library, avavilable here:
+http://research.microsoft.com/en-us/um/redmond/projects/z3/download.html
+Once downloaded and extracted, use the BAP configure --with-z3=z3-dir
+option, where z3-dir is the extracted z3 directory.  Note that you must
+run the z3-dir/ocaml/build-lib.sh script before configuring.  The getz3.sh
+script in the solvers directory of the BAP distribution will download,
+extract z3 to solvers/z3, and run the build-lib script for you.  If
+you use this script, you must then pass --with-z3=bap-dir/solvers/z3
+to configure, replacing bap-dir with the path of your BAP directory.
 
 
 *** Installing pin ***
