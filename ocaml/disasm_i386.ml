@@ -1202,17 +1202,15 @@ let rec to_ir addr next ss pref =
     move tmp (op2e t o1 -* op2e t o2)
     :: set_flags_sub t (op2e t o1) (op2e t o2) (Var tmp)
   | Cmpxchg(t, src, dst) ->
-    let accumulator = op2e t o_eax in
+    let eax_e = op2e t o_eax in
     let dst_e = op2e t dst in
     let src_e = op2e t src in
-    let equal = nt "t" r1 in
-    let equal_v = Var equal in
-    [
-      move equal (accumulator ==* dst_e);
-      move zf equal_v;
-      assn t dst (ite t equal_v src_e dst_e);
-      assn t o_eax (ite t equal_v accumulator dst_e);
-    ]
+    let tmp = nt "t" t in
+    move tmp (eax_e -* dst_e)
+    :: set_flags_sub t eax_e dst_e (Var tmp)
+    @ assn t dst (ite t zf_e src_e dst_e)
+    :: assn t o_eax (ite t zf_e eax_e dst_e)
+    :: []
   | Cmpxchg8b o -> (* only 32bit case *)
     let accumulator = Concat((op2e r32 o_edx),(op2e r32 o_eax)) in
     let dst_e = op2e r64 o in
