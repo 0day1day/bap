@@ -685,7 +685,7 @@ let rec to_ir addr next ss pref =
             Int(biconst i, reg_32),
             acc
           )
-        ) (Int(biconst 16, reg_32)) (0--15)
+        ) (Int(biconst 16, reg_32)) (15---0)
       in
       let bits = map get_bit (0--15) in
       let res_e = reduce (fun acc f -> Concat(f, acc)) bits in
@@ -693,8 +693,8 @@ let rec to_ir addr next ss pref =
       move int_res_2 res_e
       :: move ecx (lsb (Var int_res_2))
       :: move cf (BinOp(NEQ, (Var int_res_2), Int(bi0, reg_16)))
-      :: move zf (contains_null dst_e)
-      :: move sf (contains_null src_e)
+      :: move zf (contains_null src_e)
+      :: move sf (contains_null dst_e)
       :: move oF (Extract(bi0, bi0, (Var int_res_2)))
       :: move af (Int(bi0, reg_1))
       :: move pf (Int(bi0, reg_1))
