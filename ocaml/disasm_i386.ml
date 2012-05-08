@@ -85,6 +85,8 @@ type opcode =
   | Stos of typ
   | Push of typ * operand
   | Pop of typ * operand
+  | Pushf of typ
+  | Popf of typ
   | Add of (typ * operand * operand)
   | Adc of (typ * operand * operand)
   | Inc of typ * operand
@@ -157,7 +159,8 @@ let unimplemented s  = disfailwith ("disasm_i386: unimplemented feature: "^s)
 let (&) = (land)
 and (>>) = (lsr)
 and (<<) = (lsl)
-
+let ite t b e1 e2 =
+  exp_ite ~t b e1 e2
 
 (* register widths *)
 let r1 = Ast.reg_1
@@ -186,7 +189,7 @@ and eax = nv "R_EAX" r32
 and ebx = nv "R_EBX" r32
 and ecx = nv "R_ECX" r32
 and edx = nv "R_EDX" r32
-and eflags = nv "EFLAGS" r32
+and eflags = nv "EFLAGS" r32 (* why is eflags in here? *)
   (* condition flag bits *)
 and cf = nv "R_CF" r1
 and pf = nv "R_PF" r1
@@ -270,6 +273,12 @@ and of_e = Var oF
 
 and dflag_e = Var dflag
 
+(* BAP's dflag is 1 or -1, indicating forward or backwards.
+
+   x86 uses values 0 and 1 for forward and backwards. *)
+let x86_dflag_e =
+  ite reg_1 (dflag_e ==* Int(bi1, reg_32)) exp_false exp_true
+
 let esiaddr = Oaddr esi_e
 and ediaddr = Oaddr edi_e
 
@@ -280,6 +289,88 @@ and seg_es = None
 and seg_fs = Some fs_base
 and seg_gs = Some gs_base
 
+(* eflags *)
+let dflag_to_bap e =
+  ite reg_32 (e ==* exp_false) (Int(bi1, reg_32)) (Int(bim1, reg_32))
+
+let bap_to_eflags =
+  let undefined d = Unknown(Printf.sprintf "Undefined EFLAGS bit %d" d, reg_1) in
+  let unmodeled s = Unknown("Unmodeled EFLAGS bit " ^ s, reg_1) in
+  undefined 31                  (* 31 *)
+  :: undefined 30               (* 30 *)
+  :: undefined 29               (* 29 *)
+  :: undefined 28               (* 28 *)
+  :: undefined 27               (* 27 *)
+  :: undefined 26               (* 26 *)
+  :: undefined 25               (* 25 *)
+  :: undefined 24               (* 24 *)
+  :: undefined 23               (* 23 *)
+  :: undefined 22               (* 22 *)
+  :: unmodeled "ID"             (* 21 *)
+  :: unmodeled "VIP"            (* 20 *)
+  :: unmodeled "VIF"            (* 19 *)
+  :: unmodeled "AC"             (* 18 *)
+  :: unmodeled "VM"             (* 17 *)
+  :: unmodeled "RF"             (* 16 *)
+  :: undefined 15               (* 15 *)
+  :: unmodeled "NT"             (* 14 *)
+  :: unmodeled "IOPL1"          (* 13 *)
+  :: unmodeled "IOPL2"          (* 12 *)
+  :: of_e                       (* 11 *)
+  :: x86_dflag_e                (* 10 *)
+  :: unmodeled "IF"             (*  9 *)
+  :: unmodeled "TF"             (*  8 *)
+  :: sf_e                       (*  7 *)
+  :: zf_e                       (*  6 *)
+  :: undefined 5                (*  5 *)
+  :: af_e                       (*  4 *)
+  :: undefined 3                (*  3 *)
+  :: pf_e                       (*  2 *)
+  :: undefined 1                (*  1 *)
+  :: cf_e                       (*  0 *)
+  :: []
+let bap_to_flags = BatList.drop 16 bap_to_eflags
+
+let eflags_e = BatList.reduce (++*) bap_to_eflags
+and flags_e = BatList.reduce (++*) bap_to_flags
+
+let eflags_to_bap =
+  let assn v = Some(v, Util.id) in
+  None                          (* 31 *)
+  :: None                       (* 30 *)
+  :: None                       (* 29 *)
+  :: None                       (* 28 *)
+  :: None                       (* 27 *)
+  :: None                       (* 26 *)
+  :: None                       (* 25 *)
+  :: None                       (* 24 *)
+  :: None                       (* 23 *)
+  :: None                       (* 22 *)
+  :: None                       (* 21 *)
+  :: None                       (* 20 *)
+  :: None                       (* 19 *)
+  :: None                       (* 18 *)
+  :: None                       (* 17 *)
+  :: None                       (* 16 *)
+  :: None                       (* 15 *)
+  :: None                       (* 14 *)
+  :: None                       (* 13 *)
+  :: None                       (* 12 *)
+  :: assn oF                    (* 11 *)
+  :: Some(dflag, dflag_to_bap)  (* 10 *)
+  :: None                       (* 09 *)
+  :: None                       (* 08 *)
+  :: assn sf                    (* 07 *)
+  :: assn zf                    (* 06 *)
+  :: None                       (* 05 *)
+  :: assn af                    (* 04 *)
+  :: None                       (* 03 *)
+  :: assn pf                    (* 02 *)
+  :: None                       (* 01 *)
+  :: assn cf                    (* 00 *)
+  :: []
+let flags_to_bap = BatList.drop 16 eflags_to_bap
+
 (* exp helpers *)
 
 let loadm m t a =
@@ -288,9 +379,6 @@ let loadm m t a =
 let load_s s t a = match s with
   | None -> Load(mem_e, a, little_endian, t)
   | Some v -> Load(mem_e, Var v +* a, little_endian, t)
-
-let ite t b e1 e2 =
-  exp_ite ~t b e1 e2
 
 let l32 i = Int(Arithmetic.to_big_int (big_int_of_int64 i,r32), r32)
 let l16 i = Int(Arithmetic.to_big_int (big_int_of_int64 i,r16), r16)
@@ -440,9 +528,8 @@ let assn_dbl_s s t e = match op_dbl t with
     in
     List.rev (fst (List.fold_left f ([move tmp e], 0) (List.rev l))), Var tmp
 
-let bytes_of_width = function
-  | Reg x when x land 7 = 0 -> x/8
-  | _ -> failwith "bytes_of_width"
+let bytes_of_width = Typecheck.bytes_of_width
+let bits_of_width = Typecheck.bits_of_width
 
 let string_incr t v =
   if t = r8 then
@@ -576,7 +663,7 @@ let rec to_ir addr next ss pref =
       | Oaddr a -> op2e ts s, [a]
       | Oimm _ -> disfailwith "invalid"
     in
-    let b = Typecheck.bits_of_width in
+    let b = bits_of_width in
     let s =
       if b ts < b t then cast_unsigned t s
       else if b ts > b t then cast_low t s
@@ -602,8 +689,8 @@ let rec to_ir addr next ss pref =
     in
     d::al
   | Pcmpeq (t,elet,dst,src) ->
-      let ncmps = (Typecheck.bits_of_width t) / (Typecheck.bits_of_width elet) in
-      let elebits = Typecheck.bits_of_width elet in
+      let ncmps = (bits_of_width t) / (bits_of_width elet) in
+      let elebits = bits_of_width elet in
       let src = match src with
         | Oreg i -> op2e t src
         | Oaddr a -> load t a
@@ -759,7 +846,7 @@ let rec to_ir addr next ss pref =
   | Shift(st, s, dst, shift) -> 
     assert (List.mem s [r8; r16; r32]);
     let origCOUNT, origDEST = nt "origCOUNT" s, nt "origDEST" s
-    and size = it (Typecheck.bits_of_width s) s
+    and size = it (bits_of_width s) s
     and s_f = match st with LSHIFT -> (<<*) | RSHIFT -> (>>*) 
       | ARSHIFT -> (>>>*) | _ -> disfailwith "invalid shift type"
     and count = (op2e s shift) &* (it 31 s)
@@ -797,7 +884,7 @@ let rec to_ir addr next ss pref =
       let e_fill = op2e s fill in
       (* count mod 32 *)
       let e_count = (op2e s count) &* (it 31 s) in
-      let size = it (Typecheck.bits_of_width s) s in
+      let size = it (bits_of_width s) s in
       let new_cf =  match st with
 	| LSHIFT -> cast_low r1 (Var origDEST >>* (size -* Var origCOUNT))
 	| RSHIFT -> cast_high r1 (Var origDEST <<* (size -* Var origCOUNT))
@@ -837,7 +924,7 @@ let rec to_ir addr next ss pref =
     let origCOUNT = nt "origCOUNT" s in
     let e_dst = op2e s dst in
     let e_shift = op2e s shift &* it 31 s in
-    let size = it (Typecheck.bits_of_width s) s in
+    let size = it (bits_of_width s) s in
     let new_cf = match rt with
       | LSHIFT -> cast_low r1 e_dst
       | RSHIFT -> cast_high r1 e_dst 
@@ -870,7 +957,7 @@ let rec to_ir addr next ss pref =
       let value, shift = match bitbase with
         | Oreg i ->
             let reg = op2e t bitbase in
-            let shift = offset &* it (Typecheck.bits_of_width t - 1) t in
+            let shift = offset &* it (bits_of_width t - 1) t in
             reg, shift
         | Oaddr a ->
             let byte = load r8 (a +* (offset >>* (it 3 t))) in
@@ -889,7 +976,7 @@ let rec to_ir addr next ss pref =
     let source_is_zero = nt "t" r1 in
     let source_is_zero_v = Var source_is_zero in
     let src_e = op2e t src in
-    let bits = Typecheck.bits_of_width t in
+    let bits = bits_of_width t in
     let check_bit bitindex next_value =
       ite t (Extract(biconst bitindex,biconst bitindex,src_e) ==* it 1 r1) (it bitindex t) next_value
     in
@@ -1009,6 +1096,44 @@ let rec to_ir addr next ss pref =
     assn t o (load_s seg_ss t esp_e)
     :: if o = o_esp then []
       else [move esp (esp_e +* i32 (bytes_of_width t))]
+  | Pushf(t) ->
+    (* Note that we currently treat these fields as unknowns, but the
+       manual says: When copying the entire EFLAGS register to the
+       stack, the VM and RF flags (bits 16 and 17) are not copied;
+       instead, the values for these flags are cleared in the EFLAGS
+       image stored on the stack. *)
+    let flags_e = match t with
+      | Reg 16 -> flags_e
+      | Reg 32 -> eflags_e
+      | _ -> failwith "impossible"
+    in
+    move esp (esp_e -* i32 (bytes_of_width t))
+    :: store_s seg_ss t esp_e flags_e
+    :: []
+  | Popf t ->
+    let assns = match t with
+      | Reg 16 -> flags_to_bap
+      | Reg 32 -> eflags_to_bap
+      | _ -> failwith "impossible"
+    in
+    let tmp = nt "t" t in
+    let extractlist =
+      List.map
+        (fun i -> 
+          let i = Big_int_Z.big_int_of_int i in
+          extract i i (Var tmp))
+        (BatList.of_enum (((bits_of_width t)-1)---0))
+    in
+    let assnsf =
+      List.map
+        (function
+          | None -> (fun e -> [])
+          | Some (v,f) -> (fun e -> [Move(v,f e,[])]))
+        assns
+    in
+    move tmp (load_s seg_ss t esp_e)
+    :: move esp (esp_e +* i32 (bytes_of_width t))
+    :: List.flatten (List.map2 (fun f e -> f e) assnsf extractlist)
   | Add(t, o1, o2) ->
     let tmp = nt "t1" t and tmp2 = nt "t2" t in
     move tmp (op2e t o1)
@@ -1018,7 +1143,7 @@ let rec to_ir addr next ss pref =
        set_flags_add t s1 s2 r
   | Adc(t, o1, o2) ->
     let orig1 = nt "orig1" t and orig2 = nt "orig2" t in
-    let bits = Typecheck.bits_of_width t in
+    let bits = bits_of_width t in
     let t' = Reg (bits + 1) in
     let c = cast_unsigned t' in
     (* Literally compute the addition with an extra bit and see
@@ -1165,7 +1290,7 @@ let rec to_ir addr next ss pref =
   | Neg(t, o) ->
     let tmp = nt "t" t in
     let min_int = 
-      Ast_convenience.binop LSHIFT (it 1 t) (it ((Typecheck.bits_of_width t)-1) t)
+      Ast_convenience.binop LSHIFT (it 1 t) (it ((bits_of_width t)-1) t)
     in
     move tmp (op2e t o)
     ::assn t o (it 0 t -* op2e t o)
@@ -1178,12 +1303,12 @@ let rec to_ir addr next ss pref =
 
     (* The OF and CF flags are set to 0 if the upper half of the result is 0;
        otherwise, they are set to 1 *)
-    let new_t = Reg ((Typecheck.bits_of_width t)*2) in
+    let new_t = Reg ((bits_of_width t)*2) in
     let assnstmts, assne = assn_dbl t ((cast_unsigned new_t (op2e t o_eax)) ** (cast_unsigned new_t (op2e t src)))
     in
     let flag =
-      let highbit = Typecheck.bits_of_width new_t - 1 in
-      let lowbit = Typecheck.bits_of_width new_t / 2 in
+      let highbit = bits_of_width new_t - 1 in
+      let lowbit = bits_of_width new_t / 2 in
       extract (biconst highbit) (biconst lowbit) assne <>* it 0 t
     in
     assnstmts
@@ -1197,7 +1322,7 @@ let rec to_ir addr next ss pref =
 	move pf (Unknown("PF is undefined after Mul", r1))
       ]
   | Imul (t, (oneopform, dst), src1, src2) -> 
-    let new_t = Reg ((Typecheck.bits_of_width t)*2) in
+    let new_t = Reg ((bits_of_width t)*2) in
     let mul_stmts = 
       (match oneopform with
       | true -> 
@@ -1206,8 +1331,8 @@ let rec to_ir addr next ss pref =
         let flag =
 	  (* Intel checks if EAX == EDX:EAX.  Instead of doing this, we are just
 	     going to check if the upper bits are != 0 *)
-          let highbit = Typecheck.bits_of_width new_t - 1 in
-          let lowbit = Typecheck.bits_of_width new_t / 2 in
+          let highbit = bits_of_width new_t - 1 in
+          let lowbit = bits_of_width new_t / 2 in
           extract (biconst highbit) (biconst lowbit) assne <>* it 0 t
         in
         assnstmts @
@@ -1231,7 +1356,7 @@ let rec to_ir addr next ss pref =
       move af (Unknown("AF is undefined after imul", r1));
     ]
   | Div(t, src) ->
-    let dt = Reg (Typecheck.bits_of_width t * 2) in
+    let dt = Reg (bits_of_width t * 2) in
     let dividend = op2e_dbl t in
     let divisor = cast_unsigned dt (op2e t src) in
     let tdiv = nt "div" dt in
@@ -1249,7 +1374,7 @@ let rec to_ir addr next ss pref =
        in
        List.map undef [cf; oF; sf; zf; af; pf])
   | Idiv(t, src) ->
-    let dt = Reg (Typecheck.bits_of_width t * 2) in
+    let dt = Reg (bits_of_width t * 2) in
     let dividend = op2e_dbl t in
     let divisor = cast_signed dt (op2e t src) in
     let tdiv = nt "div" dt in
@@ -1378,6 +1503,8 @@ module ToStr = struct
     | Stos _ -> "stos"
     | Push(t,o) -> Printf.sprintf "push %s" (opr o)
     | Pop(t,o) -> Printf.sprintf "pop %s" (opr o)
+    | Pushf _ -> "pushf"
+    | Popf _ -> "popf"
     | Add(t,d,s) -> Printf.sprintf "add %s, %s" (opr d) (opr s)
     | Adc(t,d,s) -> Printf.sprintf "adc %s, %s" (opr d) (opr s)
     | Sub(t,d,s) -> Printf.sprintf "sub %s, %s" (opr d) (opr s)
@@ -1695,9 +1822,11 @@ let parse_instr g addr =
 	      | _ -> disfailwith "invalid lea (must be address)"
 	      )
     | 0x90 -> (Nop, na)
-    | byte90 when byte90 > 0x90 && byte90 <= 0x97 ->
-      let reg = Oreg (byte90 & 7) in
+    | 0x91 | 0x92 | 0x93 | 0x94 | 0x95 | 0x96 | 0x97 ->
+      let reg = Oreg (b1 & 7) in
       (Xchg(prefix.opsize, o_eax, reg), na)
+    | 0x9c -> (Pushf(prefix.opsize), na)
+    | 0x9d -> (Popf(prefix.opsize), na)
     | 0xa1 -> let (addr, na) = parse_disp32 na in
 	      (Mov(prefix.opsize, o_eax, Oaddr(l32 addr), None), na)
     | 0xa3 -> let (addr, na) = parse_disp32 na in
