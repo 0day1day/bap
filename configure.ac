@@ -31,27 +31,41 @@ AC_PROG_CAMLIDL
 #AC_PROG_LIBTOOL
 
 # Check for Z3
-AC_ARG_WITH([z3-bindings],
-            [AS_HELP_STRING([--with-z3-bindings],
-              [enable support for Z3 bindings])],
-            [with_z3_bindings=yes],
-            [])
+AC_ARG_WITH([z3],
+            [AS_HELP_STRING([--with-z3],
+              [location of Z3 library])],
+            [with_z3=$withval],
+            [with_z3=no])
 
-AS_IF([test "x$with_z3_bindings" = "xyes"],
-     [AC_CHECK_FILE([solvers/z3-x86],
-        [AC_DEFINE([HAVE_Z3_BINDINGS], [1], [Define if you want to use Z3 bindings])],
-        [AC_MSG_FAILURE([z3 library not found])])])
+# Save pre-z3 ldflags
+OLDLDFLAGS=$LDFLAGS
+
+AS_IF([test "x$with_z3" != "xno"],
+     [
+     LDFLAGS="$OLDLDFLAGS -L$with_z3/lib"
+     AC_CHECK_LIB([z3], [Z3_mk_bvadd],
+       [
+        z3_dir=$with_z3
+        with_z3=yes
+        AC_DEFINE([HAVE_Z3_BINDINGS], [1], [Define to use Z3 bindings])
+        ],
+
+       [AC_MSG_FAILURE([z3 library not found])],
+       [-lgmp]
+       )])
+
+# Restore
+LDFLAGS=$OLDLDFLAGS
 
 rm -f solvers/makefile.inc
-if `test "x$with_z3_bindings" = "xyes"`; then
+if `test "x$with_z3" = "xyes"`; then
    cat >>solvers/makefile.inc <<"EOF"
-SOLVER_SOURCES=$(SOLVER)/z3/ocaml/z3.ml
 SOLVER_PPFLAGS=-D WITH_Z3_BINDINGS
-SOLVER_LIBDIRS = $(SOLVER)/z3/lib
-SOLVER_LDFLAGS = -Wl,-rpath=$(SOLVER)/z3/lib -fopenmp
 SOLVER_CLIBS = z3stubs z3
-
 EOF
+echo "SOLVER_SOURCES = $z3_dir/ocaml/z3.ml" >>solvers/makefile.inc
+echo "SOLVER_LIBDIRS = $z3_dir/lib" >>solvers/makefile.inc
+echo "SOLVER_LDFLAGS = -fopenmp -Wl,-rpath=$z3_dir/lib" >> solvers/makefile.inc
 else
    touch solvers/makefile.inc
 fi
