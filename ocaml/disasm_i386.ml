@@ -772,7 +772,7 @@ let rec to_ir addr next ss pref =
             Int(biconst i, reg_32),
             acc
           )
-        ) (Int(biconst 16, reg_32)) (15---0)
+        ) (Int(biconst 16, reg_32)) (0--15)
       in
       let bits = map get_bit (0--15) in
       let res_e = reduce (fun acc f -> Concat(f, acc)) bits in
