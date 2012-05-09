@@ -739,18 +739,18 @@ let rec to_ir addr next ss pref =
       let addresses = List.fold_left (fun acc -> function Oaddr a -> a::acc | _ -> acc) [] [src;dst] in
       List.map (fun addr -> Assert( (addr &* i32 15) ==* i32 0, [])) addresses
       @ [assn t dst result]
-  | Pcmpistri(t,dst,src,imm) ->
-      let dst_e = op2e t dst in
-      let src_e = op2e t src in
+  | Pcmpistri(t,xmm1,xmm2m128,imm) ->
+      let xmm1_e = op2e t xmm1 in
+      let xmm2m128_e = op2e t xmm2m128 in
       (* only handles imm == 0xc *)
       assert (imm = Oimm 0xcL);
       let get_bit i =
         let fold_cmp acc j =
-          let dst_e_byte = Extract(biconst (j*8+7), biconst (j*8), dst_e) in
-          let src_e_byte = Extract(biconst ((i+j)*8+7), biconst ((i+j)*8), src_e) in
-          Ite(BinOp(EQ, Int(bi0, reg_8), dst_e_byte),
+          let xmm1_e_byte = Extract(biconst (j*8+7), biconst (j*8), xmm1_e) in
+          let xmm2m128_e_byte = Extract(biconst ((i+j)*8+7), biconst ((i+j)*8), xmm2m128_e) in
+          Ite(BinOp(EQ, Int(bi0, reg_8), xmm1_e_byte),
             exp_true,
-            Ite(BinOp(NEQ, src_e_byte, dst_e_byte),
+            Ite(BinOp(NEQ, xmm2m128_e_byte, xmm1_e_byte),
               exp_false,
               acc
             )
@@ -780,8 +780,8 @@ let rec to_ir addr next ss pref =
       move int_res_2 res_e
       :: move ecx (lsb (Var int_res_2))
       :: move cf (BinOp(NEQ, (Var int_res_2), Int(bi0, reg_16)))
-      :: move zf (contains_null src_e)
-      :: move sf (contains_null dst_e)
+      :: move zf (contains_null xmm2m128_e)
+      :: move sf (contains_null xmm1_e)
       :: move oF (Extract(bi0, bi0, (Var int_res_2)))
       :: move af (Int(bi0, reg_1))
       :: move pf (Int(bi0, reg_1))
