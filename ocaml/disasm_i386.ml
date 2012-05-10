@@ -785,19 +785,21 @@ let rec to_ir addr next ss pref =
           )
         ) exp_false (0--15)
       in
-      let lsb e =
+      let msb e =
         fold (fun acc i ->
           Ite(BinOp(EQ, exp_true, Extract(biconst i, biconst i, e)),
               Int(biconst i, reg_32),
               acc
           )
-        ) (Int(biconst 16, reg_32)) (0--15)
+        ) (Int(biconst 16, reg_32)) (15---0)
       in
       let bits = map get_bit (15---0) in
       let res_e = concat_explist bits in
       let int_res_2 = nt "IntRes2" reg_16 in
       move int_res_2 res_e
-      :: move ecx (lsb (Var int_res_2))
+      (* This is supposed to be lsb, but lsb works in practice.
+         It's like we are generating IntRes in reverse. *)
+      :: move ecx (msb (Var int_res_2))
       :: move cf (BinOp(NEQ, (Var int_res_2), Int(bi0, reg_16)))
       :: move zf (contains_null xmm2m128_e)
       :: move sf (contains_null xmm1_e)
