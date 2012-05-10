@@ -2,6 +2,7 @@
     separate file so it can use functions from Typecheck and elsewhere. *)
 
 open Ast
+open BatPervasives
 open Big_int_Z
 open Big_int_convenience
 open Type
@@ -250,3 +251,19 @@ let last_meaningful_stmt p =
     | [] -> failwith "No meaningful statements"
   in
   f (List.rev p)
+
+let reverse_bytes e =
+  let bytes = Typecheck.bytes_of_width (Typecheck.infer_ast ~check:false e) in
+  let get_byte n = extract (biconst (n*8+7)) (biconst (n*8)) e in
+  reduce
+    (fun bige e -> bige ++* e)
+    (map get_byte (0 -- (bytes-1)))
+
+(* Extract the nth least significant byte from e, starting with zero *)
+let extract_byte n e =
+  extract (biconst (n*8+7)) (biconst (n*8)) e
+
+(* Concatenate a list of expressions *)
+let concat_explist elist =
+  reduce
+    (fun l r -> l ++* r) elist

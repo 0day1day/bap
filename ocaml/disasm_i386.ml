@@ -464,13 +464,6 @@ module ToIR = struct
 
 (* stmt helpers *)
 
-let reverse_bytes e =
-  let bytes = Typecheck.bytes_of_width (Typecheck.infer_ast ~check:false e) in
-  let get_byte n = extract (biconst (n*8+7)) (biconst (n*8)) e in
-  reduce
-    (fun bige e -> e ++* bige)
-    (map get_byte (0 -- (bytes-1)))
-
 let move v e =
   Move(v, e, [])
 
@@ -748,24 +741,32 @@ let rec to_ir addr next ss pref =
       List.map (fun addr -> Assert( (addr &* i32 15) ==* i32 0, [])) addresses
       @ [assn t dst result]
   | Pcmpistri(t,xmm1,xmm2m128,imm) ->
-    let op2e t = function
-      | Oreg r as o ->
-        (* Strings in registers are reversed (little endian).  Weird and
-           undocumented but true.
-
-           XXX: This is not the most efficient implementation, since
-           it generates very large IL. *)
-        reverse_bytes (op2e t o)
-      | o -> op2e t o
-    in
+    (* All bytes and bits are numbered with zero being the least
+       significant. This includes strings! *)
+    (* NOTE: Strings are backwards, at least when they are in
+       registers.  This doesn't seem to be documented in the Intel
+       manual.  This means that the NULL byte comes before the
+       string. *)
     let xmm1_e = op2e t xmm1 in
     let xmm2m128_e = op2e t xmm2m128 in
       (* only handles imm == 0xc *)
       assert (imm = Oimm 0xcL);
+      (* Is there a substring starting at i? *)
       let get_bit i =
+        let get_indices base index =
+          let t = (base+index)*8 in
+          biconst (t+7), biconst t
+        in
         let fold_cmp acc j =
-          let xmm1_e_byte = Extract(biconst (j*8+7), biconst (j*8), xmm1_e) in
-          let xmm2m128_e_byte = Extract(biconst ((i+j)*8+7), biconst ((i+j)*8), xmm2m128_e) in
+          (* Compare the jth bit of the substring *)
+          let xmm1_e_byte = 
+            let u, l = get_indices 0 j in
+            Extract(u, l, xmm1_e)
+          in
+          let xmm2m128_e_byte =
+            let u, l = get_indices i j in
+            Extract(u, l, xmm2m128_e)
+          in
           Ite(BinOp(EQ, Int(bi0, reg_8), xmm1_e_byte),
             exp_true,
             Ite(BinOp(NEQ, xmm2m128_e_byte, xmm1_e_byte),
@@ -779,21 +780,21 @@ let rec to_ir addr next ss pref =
       let contains_null e =
         fold (fun acc i ->
           Ite(BinOp(EQ, Extract(biconst (i*8+7), biconst (i*8), e), Int(bi0, reg_8)),
-            exp_true,
-            acc
+              exp_true,
+              acc
           )
         ) exp_false (0--15)
       in
       let lsb e =
         fold (fun acc i ->
           Ite(BinOp(EQ, exp_true, Extract(biconst i, biconst i, e)),
-            Int(biconst i, reg_32),
-            acc
+              Int(biconst i, reg_32),
+              acc
           )
         ) (Int(biconst 16, reg_32)) (0--15)
       in
-      let bits = map get_bit (0--15) in
-      let res_e = reduce (fun acc f -> Concat(f, acc)) bits in
+      let bits = map get_bit (15---0) in
+      let res_e = concat_explist bits in
       let int_res_2 = nt "IntRes2" reg_16 in
       move int_res_2 res_e
       :: move ecx (lsb (Var int_res_2))
@@ -805,7 +806,7 @@ let rec to_ir addr next ss pref =
       :: move pf (Int(bi0, reg_1))
       :: []
   | Pshufd (dst, src, imm) ->
-      let t = r128 in (* pshufd is only defined for 128-bits *)
+    let t = r128 in (* pshufd is only defined for 128-bits *)
       let src_e = op2e t src in
       let imm_e = op2e t imm in
       let get_dword prev_dwords ndword =
