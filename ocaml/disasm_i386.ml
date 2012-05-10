@@ -463,6 +463,14 @@ let eaddr16e b = cast_low r16 (eaddr16 b)
 module ToIR = struct
 
 (* stmt helpers *)
+
+let reverse_bytes e =
+  let bytes = Typecheck.bytes_of_width (Typecheck.infer_ast ~check:false e) in
+  let get_byte n = extract (biconst (n*8+7)) (biconst (n*8)) e in
+  reduce
+    (fun bige e -> e ++* bige)
+    (map get_byte (0 -- (bytes-1)))
+
 let move v e =
   Move(v, e, [])
 
@@ -740,8 +748,18 @@ let rec to_ir addr next ss pref =
       List.map (fun addr -> Assert( (addr &* i32 15) ==* i32 0, [])) addresses
       @ [assn t dst result]
   | Pcmpistri(t,xmm1,xmm2m128,imm) ->
-      let xmm1_e = op2e t xmm1 in
-      let xmm2m128_e = op2e t xmm2m128 in
+    let op2e t = function
+      | Oreg r as o ->
+        (* Strings in registers are reversed (little endian).  Weird and
+           undocumented but true.
+
+           XXX: This is not the most efficient implementation, since
+           it generates very large IL. *)
+        reverse_bytes (op2e t o)
+      | o -> op2e t o
+    in
+    let xmm1_e = op2e t xmm1 in
+    let xmm2m128_e = op2e t xmm2m128 in
       (* only handles imm == 0xc *)
       assert (imm = Oimm 0xcL);
       let get_bit i =
