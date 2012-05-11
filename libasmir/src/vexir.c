@@ -176,6 +176,12 @@ IRSB *translate_insn( VexArch guest,
 		      unsigned int insn_addr )
 {
     vta.arch_guest = guest;
+
+    if (guest == VexArchARM) {
+      /* We must set the ARM version of VEX aborts */
+      vta.archinfo_guest.hwcaps |= 5 /* ARMv5 */;
+    }
+
     vta.guest_bytes         = (UChar *)(insn_start);  // Ptr to actual bytes of start of instruction
     vta.guest_bytes_addr    = (Addr64)(insn_addr);
 

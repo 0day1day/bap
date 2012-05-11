@@ -20,6 +20,7 @@ enum bfd_architecture
   bfd_arch_mips,      /* MIPS Rxxxx */
   bfd_arch_i386,      /* Intel 386 */
   bfd_arch_l1om,   /* Intel L1OM */
+  bfd_arch_k1om,
   bfd_arch_we32k,     /* AT&T WE32xxx */
   bfd_arch_tahoe,     /* CCI/Harris Tahoe */
   bfd_arch_i860,      /* Intel 860 */
