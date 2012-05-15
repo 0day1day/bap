@@ -19,7 +19,7 @@ export OCAMLMAKEFILE=$(BAP_OCAMLDIR)/OCamlMakefile
 include $(BAP_OCAMLDIR)/makefile.inc
 ifdef HAVE_LLVM
 export CODEGEN = codegen
-export LLVM_PACKS = llvm llvm.analysis llvm.executionengine llvm.target llvm.scalar_opts
+export LLVM_PACKS = llvm llvm.analysis llvm.executionengine llvm.target llvm.scalar_opts llvm.bitwriter
 endif
 
 # Stop annoying warnings about big_int duplication!

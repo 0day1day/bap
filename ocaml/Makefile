@@ -22,8 +22,8 @@ include $(SOLVER)/makefile.inc
 
 include $(CURDIR)/makefile.inc
 ifdef HAVE_LLVM
-export LLVM_SRC = llvm_codegen.ml
-export LLVM_PACKS = llvm llvm.analysis llvm.executionengine llvm.target llvm.scalar_opts
+export LLVM_SRC = llvm_codegen.mli llvm_codegen.ml
+export LLVM_PACKS = llvm llvm.analysis llvm.executionengine llvm.target llvm.scalar_opts llvm.bitwriter
 endif
 
 # Stop annoying warnings about big_int duplication!

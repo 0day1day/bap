@@ -373,6 +373,8 @@ let speclist =
       "Typecheck program")
   :: ("-uniqueify-labels", uadd(TransformAst Hacks.uniqueify_labels),
       "Ensure all labels are unique")
+  :: ("-replace-unknowns", uadd(TransformAst Hacks.replace_unknowns),
+      "Replace all unknowns with zeros")
   :: Input.speclist
 
 let anon x = raise(Arg.Bad("Unexpected argument: '"^x^"'"))

@@ -9,9 +9,10 @@
 open Ast
 open Big_int_convenience
 module CA = Cfg.AST
-module D = Debug.Make(struct let name = "Llvm_codegen" and default=`Debug end)
+module D = Debug.Make(struct let name = "Llvm_codegen" and default=`NoDebug end)
 open D
 open Llvm
+open Llvm_bitwriter
 open Llvm_executionengine
 open Llvm_scalar_opts
 open Type
@@ -31,7 +32,6 @@ let new_ctx () = { globalvars = VH.create 100;
                    letvars=VH.create 100;
                    allocbb=None
                  }
-let opts = ref true
 
 type varuse = Store | Load
 
@@ -39,10 +39,16 @@ type memimpl = Real (** Use "real" memory; unsafe *)
                | Func (** Use memory functions, one byte at a time *)
                | FuncMulti (** Use memory functions, multiple bytes at a time *)
 
+let string_to_memimpl s = match s with
+  | "Real" -> Some Real
+  | "Func" -> Some Func
+  | "FuncMulti" -> Some FuncMulti
+  | _ -> None
+
 (** Topological sort for CFG conversion *)
 module Toposort = Graph.Topological.Make(CA.G)
 
-class codegen memimpl =
+class codegen ?(opts=true) memimpl =
 
   let () = ignore (initialize_native_target ()) in
   let context = global_context () in
@@ -56,7 +62,7 @@ class codegen memimpl =
    * how the target lays out data structures. *)
   let () = Llvm_target.TargetData.add (ExecutionEngine.target_data execengine) the_fpm in
 
-  let () = if !opts then (
+  let () = if opts then (
 
     (* Aggregate to scalar opts *)
     let () = add_scalar_repl_aggregation the_fpm in
@@ -119,7 +125,7 @@ object(self)
     | _ -> failwith "No idea how to handle memories yet"
 
   (** Convert a var to its global LLVM pointer *)
-  method convert_global_var (Var.V(_, s, t) as v) =
+  method private convert_global_var (Var.V(_, s, t) as v) =
     try VH.find ctx.globalvars v
     with Not_found ->
       let init = self#convert_exp (Int(bi0, t)) in
@@ -127,7 +133,7 @@ object(self)
       VH.add ctx.globalvars v a;
       a
 
-  method convert_temp_var (Var.V(_, s, t) as v) =
+  method private convert_temp_var (Var.V(_, s, t) as v) =
     try VH.find ctx.vars v
     with Not_found ->
       let a = self#in_alloc
@@ -136,7 +142,7 @@ object(self)
       VH.add ctx.vars v a;
       a
 
-  method convert_let_var (Var.V(_, s, t) as v) =
+  method private convert_let_var (Var.V(_, s, t) as v) =
     VH.find ctx.letvars v
 
   (** Convert a Var to its LLVM pointer *)
@@ -244,7 +250,7 @@ object(self)
       ignore(build_call getmmulti [| idx'; alloc'; nbytes |] "" builder);
       build_load alloc "load_multiload" builder
     | Ast.Store _ -> failwith "Stores are not proper expressions"
-    | _ -> failwith "Unsupported exp"
+    | e -> failwith (Printf.sprintf "Unsupported expression %s" (Pp.ast_exp_to_string e))
 
   (* (\** Create an anonymous function to compute e *\) *)
   (* method convert_exp_helper e = *)
@@ -333,8 +339,8 @@ object(self)
   (* If there are no successors, return now. *)
   | _, Some (Halt(e, _)) ->
     build_ret (self#convert_exp e) builder
-  | [], _ ->
-    wprintf "Program exit without returning a value";
+  | [], o ->
+    (* wprintf "Program exit without returning a value"; *)
     if rt = void_type context then build_ret_void builder
     (* If no halt, we'll say undefined *)
     else build_ret (undef rt) builder
@@ -376,7 +382,7 @@ object(self)
       | Some x -> self#convert_type x
       | None -> void_type context
     in
-    dprintf "type: %s" (string_of_lltype halt_type);
+    dprintf "return type: %s" (string_of_lltype halt_type);
     (* Map bb to llvm bb *)
     let f = self#anon_fun ~t:halt_type () in
     let module H = Hashtbl.Make(CA.G.V) in
@@ -433,7 +439,7 @@ object(self)
       ignore(self#convert_jump_statement halt_type cfstmt succllvmbbs);
 
     ) cfg;
-    self#dump;
+    if debug then self#dump;
     Llvm_analysis.assert_valid_function f;
     (* Optimize until fixed point.  Ehh that didn't work so well. *)
     let countdown = ref 5 in
@@ -470,6 +476,7 @@ object(self)
 
   val set_value_h = VH.create 1000
   method private set_value v c =
+    if Disasm.is_temp v then failwith "Temporary variables cannot be set";
     let build_setter () =
       let f = declare_function "" (function_type (void_type context) [| self#convert_type (Var.typ v) |]) the_module in
       let bb = append_block context "setbb" f in
@@ -478,40 +485,79 @@ object(self)
       ignore(build_store p (self#convert_var v) builder);
       ignore(build_ret_void builder);
       Llvm_analysis.assert_valid_function f;
-      self#dump;
+      if debug then self#dump;
       f
     in
     let setf = try VH.find set_value_h v
-      with Not_found -> let newf = build_setter () in
-                        let newf = function
-                          | Int(va, _) ->
-                            ignore(ExecutionEngine.run_function newf
+      with Not_found ->
+        let newf = build_setter () in
+        let newf = function
+          | Int(va, _) ->
+            ignore(ExecutionEngine.run_function newf
                                      (* XXX: Fix me for > int64 *)
-                                     [|GenericValue.of_int64 (self#convert_type (Var.typ v))
-                                         (Big_int_Z.int64_of_big_int va)|] execengine)
-                          | _ -> failwith "Expected a constant"
-                        in
-                        VH.add set_value_h v newf;
-                        newf
+                     [|GenericValue.of_int64 (self#convert_type (Var.typ v))
+                         (Big_int_Z.int64_of_big_int va)|] execengine)
+          | _ -> failwith "Expected a constant"
+        in
+        VH.add set_value_h v newf;
+        newf
     in
     setf c
 
+  val get_value_h = VH.create 1000
+  method private get_value v =
+    if Disasm.is_temp v then failwith "Temporary variables cannot be get";
+    let build_getter () =
+      let f = declare_function "" (function_type (self#convert_type (Var.typ v)) [| |]) the_module in
+      let bb = append_block context "getbb" f in
+      position_at_end bb builder;
+      (* let p = param f 0 in *)
+      let l = build_load (self#convert_var v) "get" builder in
+      ignore(build_ret l builder);
+      (* ignore(build_store p (self#convert_var v) builder); *)
+      (* ignore(build_ret_void builder); *)
+      Llvm_analysis.assert_valid_function f;
+      (* self#dump; *)
+      f
+    in
+    let getf = try VH.find get_value_h v
+      with Not_found ->
+        let newf = build_getter () in
+        let newf () =
+          let r = ExecutionEngine.run_function newf [||] execengine in
+          self#bap_of_generic (Var.typ v) r
+        in
+        VH.add get_value_h v newf;
+        newf
+    in
+    getf ()
+
   method private initialize_contexts ctx =
-    (* let stmts = List.fold_left *)
-    (*   (fun acc (k,v) -> *)
-    (*     (match v with | Int _ -> () | _ -> failwith "Only constant initialization allowed!"); *)
-    (*     Move(k,v,[]) :: acc) *)
-    (*   [Halt (exp_true, [])] ctx in *)
-    (* let f = self#convert_straightline_f stmts in *)
-    (* Llvm_analysis.assert_valid_function f; *)
-    (* ignore(self#run_fun f); *)
-    (* delete_function f *)
     List.iter (fun (k,v) -> self#set_value k v) ctx
 
-  method run_fun ?ctx f =
+  method eval_fun ?ctx f =
     (match ctx with
     | None -> ()
     | Some x -> self#initialize_contexts x);
-    ExecutionEngine.run_function f [||] execengine
+    let r = ExecutionEngine.run_function f [||] execengine in
+    assert ((classify_type (type_of f)) = TypeKind.Pointer);
+    let et = element_type (type_of f) in
+    assert ((classify_type et) = TypeKind.Function);
+    let rt = return_type et in
+    match classify_type rt with
+    | TypeKind.Integer ->
+      self#bap_of_generic (Reg (integer_bitwidth rt)) r
+    | o ->
+      exp_true
+
+  method private bap_of_generic t g =
+    (match t with
+    | Reg n when n > 64 -> failwith "bap_of_generic: Only supports Reg smaller than 64 bits"
+    | _ -> ());
+    let i64 = GenericValue.as_int64 g in
+    Int(Big_int_Z.big_int_of_int64 i64, t)
+
+  method output_bitcode oc =
+    output_bitcode oc the_module
 
 end

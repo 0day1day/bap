@@ -213,7 +213,7 @@ let parse_concat = function
 *)
 let rm_ite = function
   | Ite(b, e1, e2) ->
-      let t = Typecheck.infer_ast b in
+      let t = Typecheck.infer_ast e1 in
       (match t with
       | Reg(1) ->
 	(b &* e1) |*  (exp_not b &* e2)

@@ -261,6 +261,7 @@ and ebp_e = Var ebp
 and esi_e = Var esi
 and edi_e = Var edi
 and ecx_e = Var ecx
+and eax_e = Var eax
 
 let mem = nv "mem" (TMem(r32))
 let mem_e = Var mem
@@ -1017,7 +1018,7 @@ let rec to_ir addr next ss pref =
       let undef (Var.V(_, n, t) as r) = move r (Unknown ((n^" undefined after bsf"), t)) in
       List.map undef [cf; oF; sf; af; pf]
   | Hlt ->
-    [Jmp(Lab "General_protection fault", [])]
+    [Halt(eax_e, [])]
   | Rdtsc ->
       [
         move eax (Unknown ("rdtsc", r32));
