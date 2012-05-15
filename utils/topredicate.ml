@@ -72,13 +72,6 @@ let compute_flanagansaxe ?(k=1) cfg post =
   let (gcl,p) = to_ssapassgcl cfg post in
   (Wp.flanagansaxe ~k gcl p, [])
 
-(* FIXME: Why did I think we needed SSA here? *)
-let compute_fse cfg post =
-  let {Cfg_ssa.cfg=ssa; to_ssavar=tossa} = Cfg_ssa.trans_cfg cfg in
-  let ast = Cfg_ssa.to_ast ssa in
-  let p = rename_astexp tossa post in
-  (Eval.fse p ast, [])
-
 let extract_vars e =
   let rec h v = function
     | BinOp(AND, BinOp(EQ,Var v1, e1), BinOp(EQ,Var v2, e2)) ->
@@ -166,8 +159,6 @@ let speclist =
      ("Use the specified solver. Choices: " ^ solvers))
   ::("-extract-vars", Arg.Set assert_vars,
      "Put vars in separate asserts")
-  ::("-fse", Arg.Unit(fun()-> compute_wp := compute_fse),
-     "Use naive forward symbolic execution (no loops)")
   ::("-fse-bfs", Arg.Unit(fun()-> compute_wp := compute_fse_bfs),
      "Use naive forward symbolic execution with breath first search")
   ::("-fse-bfs-maxdepth", Arg.Int(fun i-> compute_wp := compute_fse_bfs_maxdepth i),

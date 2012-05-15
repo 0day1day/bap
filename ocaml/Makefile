@@ -99,7 +99,6 @@ export SOURCES = \
 	input.mli input.ml \
 	to_c.ml \
 	vsa.ml \
-	eval.ml \
 	symbeval.ml symbeval_search.ml \
 	ast_slice.ml \
 	ssa_slice.ml \
