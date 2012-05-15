@@ -26,13 +26,6 @@ export LLVM_SRC = llvm_codegen.mli llvm_codegen.ml
 export LLVM_PACKS = llvm llvm.analysis llvm.executionengine llvm.target llvm.scalar_opts llvm.bitwriter
 endif
 
-# Stop annoying warnings about big_int duplication!
-#export OCAMLFIND_IGNORE_DUPS_IN=$(BAP_DIR)/bigint-3.12/otherlibs/num
-
-#export INCDIRS += ../stp ../stp/ocaml
-#export EXTLIBDIRS += ../stp ../stp/ocaml
-#export LIBS += stpvc
-
 #export LIB_PACK_NAME = bap
 
 # common sources
@@ -116,12 +109,6 @@ export SOURCES = \
 	$(SOLVER_SOURCES) \
 	$(PROJSOURCES) \
 
-# XXX: Only compile info_flow and formule_simplify_mem if Z3 is enabled
-
-# Fix the interpreter to work with big ints
-#	interpreter.ml \
-
-
 RESULT = bap
 DOC_FILES := $(filter %.mli, $(SOURCES)) $(filter %.ml, $(SOURCES))
 
@@ -139,7 +126,7 @@ export CLIBS += $(SOLVER_CLIBS)
 export OCAMLPATH = $(PIQIBUILDDIR)
 export CFLAGS = -g
 export LDFLAGS = $(LIBASMIR_LDFLAGS) $(SOLVER_LDFLAGS)
-export PPFLAGS = $(SOLVER_PPFLAGS)
+export PPFLAGS = $(SOLVER_PPFLAGS) $(LLVM_PPFLAGS)
 export INCDIRS = $(BIGINT) $(BATT) $(OUNIT) $(PCRE) $(OCAMLGRAPH) $(OBJSIZE) $(LIBTRACE) $(LIBTRACE)/piqi
 export LIBS = zarith batteries oUnit pcre graph objsize libtrace
 export RESULTDEPS = $(LIBASMIR)/src/libasmir.a $(VEX_DIR)/libvex.a $(LIBTRACE)/libtrace.cmxa

@@ -91,6 +91,7 @@ AS_IF([ocamlfind query llvm],
 rm -f ocaml/makefile.inc
 if `test "x$HAVE_LLVM" = "xtrue"` ; then
    cat >>ocaml/makefile.inc <<"EOF"
+LLVM_PPFLAGS=-D WITH_LLVM
 HAVE_LLVM=true
 
 EOF

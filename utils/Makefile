@@ -4,6 +4,8 @@ export BAP_DIR=$(CURDIR)/..
 .PHONY: ../../utils-proj/Makefile
 -include ../../utils-proj/Makefile
 
+export USE_CAMLP4 = yes
+
 export BAP_OCAMLDIR=$(BAP_DIR)/ocaml
 export BIGINT=$(BAP_DIR)/zarith-1.0
 export BATT=$(BAP_DIR)/batteries/_build/src

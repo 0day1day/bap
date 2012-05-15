@@ -1,7 +1,7 @@
+(*pp camlp4o pa_macro.cmo *)
+
 let usage = "Usage: "^Sys.argv.(0)^" <input options> [transformations and outputs]\n\
              Transform BAP IL programs. "
-
-(* open Bap*)
 
 open Ast
 
@@ -42,6 +42,7 @@ let cexecute p =
   p
 
 let jitexecute p =
+IFDEF WITH_LLVM THEN
   let cfg = Cfg_ast.of_prog p in
   let cfg = Prune_unreachable.prune_unreachable_ast cfg in
   let codegen = new Llvm_codegen.codegen Llvm_codegen.FuncMulti in
@@ -49,6 +50,9 @@ let jitexecute p =
   let r = codegen#eval_fun ~ctx:(List.rev !inits) jit in
   Printf.printf "Result: %s\n" (Pp.ast_exp_to_string r);
   p
+ELSE
+  failwith "LLVM not enabled"
+END;;
 
 let add c =
   pipeline := c :: !pipeline
