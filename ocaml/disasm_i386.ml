@@ -61,6 +61,10 @@ type operand =
   | Oaddr of Ast.exp
   | Oimm of int64 (* XXX: Should this be big_int? *)
 
+type jumptarget =
+  | Jabs of operand
+  | Jrel of int64 * int64 (* next ins address, offset *)
+
 type opcode =
   | Bswap of (typ * operand)
   | Retn of ((typ * operand) option) * bool (* bytes to release, far/near ret *)
@@ -77,8 +81,8 @@ type opcode =
   | Rotate of binop_type * typ * operand * operand * bool (* left or right, type, src/dest op, shift op, use carry flag *)
   | Bt of typ * operand * operand
   | Bs of typ * operand * operand * direction
-  | Jump of operand
-  | Jcc of operand * Ast.exp
+  | Jump of jumptarget
+  | Jcc of jumptarget * Ast.exp
   | Setcc of typ * operand * Ast.exp
   | Hlt
   | Cmps of typ
@@ -531,6 +535,16 @@ let assn_dbl_s s t e = match op_dbl t with
     in
     List.rev (fst (List.fold_left f ([move tmp e], 0) (List.rev l))), Var tmp
 
+(* A function for computing the target of jumps. *)
+let compute_jump_target s = function
+  | Jabs o -> op2e_s s r32 o
+  | Jrel (na,offset) ->
+    let na = biconst64 na in
+    let offset = biconst64 offset in
+    let i,t = Arithmetic.binop PLUS (na,reg_32) (offset,reg_32) in
+    Int(i,t)
+let jump_target = compute_jump_target
+
 let bytes_of_width = Typecheck.bytes_of_width
 let bits_of_width = Typecheck.bits_of_width
 
@@ -549,11 +563,11 @@ let rep_wrap ?check_zf ~addr ~next stmts =
       CJmp(zf_e, l32 next, l32 addr, [])
     | _ -> failwith "invalid value for ?check_zf"
   in
-    cjmp (ecx_e ==* l32 0L) (l32 next)
-    @ stmts
-    @ move ecx (ecx_e -* i32 1)
-    :: cjmp (ecx_e ==* l32 0L) (l32 next)
-    @ [endstmt]
+  cjmp (ecx_e ==* l32 0L) (l32 next)
+  @ stmts
+  @ move ecx (ecx_e -* i32 1)
+  :: cjmp (ecx_e ==* l32 0L) (l32 next)
+  @ [endstmt]
 
 let reta = [StrAttr "ret"]
 and calla = [StrAttr "call"]
@@ -870,9 +884,9 @@ let rec to_ir addr next ss pref =
        store_s None r32 esp_e (l32 ra);
        Jmp(Var t, calla)])
   | Jump(o) ->
-    [Jmp(op2e r32 o, [])]
+    [Jmp(jump_target ss o, [])]
   | Jcc(o, c) ->
-    cjmp c (op2e r32 o)
+    cjmp c (jump_target ss o)
   | Setcc(t, o1, c) ->
     [assn t o1 (cast_unsigned t c)]
   | Shift(st, s, dst, shift) -> 
@@ -1486,6 +1500,10 @@ module ToStr = struct
     | Oimm i -> Printf.sprintf "$0x%Lx" i
     | Oaddr a -> Pp.ast_exp_to_string a
 
+  let j2str = function
+    | Jabs o -> opr o
+    | Jrel (_, offset) -> Printf.sprintf "+=%Ld" offset
+
   let op2str = function
     | Bswap(_, op) -> Printf.sprintf "bswap %s" (opr op)
     | Retn (op, _) -> 
@@ -1524,7 +1542,7 @@ module ToStr = struct
     | Fldcw (o) -> Printf.sprintf "fldcw %s" (opr o)
     | Inc (t, o) -> Printf.sprintf "inc %s" (opr o)
     | Dec (t, o) -> Printf.sprintf "dec %s" (opr o)
-    | Jump a -> Printf.sprintf "jmp %s" (opr a)
+    | Jump a -> Printf.sprintf "jmp %s" (j2str a)
     | Bt(t,d,s) -> Printf.sprintf "bt %s, %s" (opr d) (opr s)
     | Bs(t,d,s,dir) -> Printf.sprintf "bs%s %s, %s" (opr d) (opr s) (match dir with Forward -> "f" | Backward -> "r")
     | Jcc _ -> "jcc"
@@ -1812,7 +1830,7 @@ let parse_instr g addr =
     | 0x70 | 0x71 | 0x72 | 0x73 | 0x74 | 0x75 | 0x76 | 0x77 | 0x78 | 0x79
     | 0x7a | 0x7b | 0x7c | 0x7d | 0x7e | 0x7f -> 
       let (i,na) = parse_disp8 na in
-      (Jcc(Oimm(Int64.add i na), cc_to_exp b1), na)
+      (Jcc(Jabs(Oimm(Int64.add i na)), cc_to_exp b1), na)
     | 0x80 | 0x81 | 0x82 | 0x83 -> 
       let (r, rm, na) = parse_modrm32ext na in
       let (o2, na) =
@@ -1902,16 +1920,21 @@ let parse_instr g addr =
     | 0xd9 ->
         let (r, rm, na) = parse_modrm32ext na in
         (match r with
-           | 5 -> (Fldcw rm, na)
-           | 7 -> (Fnstcw rm, na)
-           | _ -> unimplemented (Printf.sprintf "unsupported opcode: d9/%d" r)
+        | 5 -> (Fldcw rm, na)
+        | 7 -> (Fnstcw rm, na)
+        | _ -> unimplemented (Printf.sprintf "unsupported opcode: d9/%d" r)
         )
+    | 0xdb ->
+      let (r, rm, na) = parse_modrm32ext na in
+      (match r with
+      | _ -> unimplemented (Printf.sprintf "unsupported opcode: db/%d" r)
+      )
     | 0xe8 -> let (i,na) = parse_disp32 na in
 	      (Call(Oimm(Int64.add i na), na), na)
     | 0xe9 -> let (i,na) = parse_disp prefix.opsize na in
-	      (Jump(Oimm(Int64.add i na)), na)
+	      (Jump(Jabs(Oimm(Int64.add i na))), na)
     | 0xeb -> let (i,na) = parse_disp8 na in
-	      (Jump(Oimm(Int64.add i na)), na)
+	      (Jump(Jabs(Oimm(Int64.add i na))), na)
     | 0xc0 | 0xc1
     | 0xd0 | 0xd1 | 0xd2
     | 0xd3 -> let (r, rm, na) = parse_modrm32ext na in
@@ -1939,6 +1962,9 @@ let parse_instr g addr =
 	      | _ -> disfailwith 
 		(Printf.sprintf "impossible opcode: %02x/%d" b1 r)
 	      )
+    | 0xe3 ->
+      let (i,na) = parse_disp8 na in
+      (Jcc(Jrel(na, i), ecx_e ==* l32 0L), na)
     | 0xf4 -> (Hlt, na)
     | 0xf6
     | 0xf7 -> let t = if b1 = 0xf6 then r8 else prefix.opsize in
@@ -1997,7 +2023,7 @@ let parse_instr g addr =
 	        | 2 -> (Call(rm, na), na)
 		| 3 -> unimplemented (* callf *)
 		  (Printf.sprintf "unsupported opcode: %02x/%d" b1 r) 
-	        | 4 -> (Jump rm, na)
+	        | 4 -> (Jump (Jabs rm), na)
 		| 5 -> unimplemented (* jmpf *)
 		  (Printf.sprintf "unsupported opcode: %02x/%d" b1 r)
 	        | 6 -> (Push(prefix.opsize, rm), na)
@@ -2142,7 +2168,7 @@ let parse_instr g addr =
       | 0x80 | 0x81 | 0x82 | 0x83 | 0x84 | 0x85 | 0x86 | 0x87 | 0x88 | 0x89
       | 0x8a | 0x8b | 0x8c | 0x8d | 0x8e | 0x8f ->
         let (i,na) = parse_disp32 na in
-	(Jcc(Oimm(Int64.add i na), cc_to_exp b2), na)
+	(Jcc(Jabs(Oimm(Int64.add i na)), cc_to_exp b2), na)
     (* add other opcodes for setcc here *)
       | 0x90 | 0x91 | 0x92 | 0x93 | 0x94 | 0x95 | 0x96 | 0x97 | 0x98 | 0x99
       | 0x9a | 0x9b | 0x9c | 0x9d | 0x9e | 0x9f ->
