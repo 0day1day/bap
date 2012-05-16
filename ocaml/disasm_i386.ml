@@ -92,6 +92,8 @@ type opcode =
   | Pop of typ * operand
   | Pushf of typ
   | Popf of typ
+  | Sahf
+  | Lahf
   | Add of (typ * operand * operand)
   | Adc of (typ * operand * operand)
   | Inc of typ * operand
@@ -336,9 +338,11 @@ let bap_to_eflags =
   :: cf_e                       (*  0 *)
   :: []
 let bap_to_flags = BatList.drop 16 bap_to_eflags
+let bap_to_lflags = BatList.drop 8 bap_to_flags
 
 let eflags_e = BatList.reduce (++*) bap_to_eflags
 and flags_e = BatList.reduce (++*) bap_to_flags
+and lflags_e = BatList.reduce (++*) bap_to_lflags
 
 let eflags_to_bap =
   let assn v = Some(v, Util.id) in
@@ -376,6 +380,17 @@ let eflags_to_bap =
   :: assn cf                    (* 00 *)
   :: []
 let flags_to_bap = BatList.drop 16 eflags_to_bap
+let lflags_to_bap = BatList.drop 8 flags_to_bap
+(* A list of functions for assigning each bit in eflags *)
+let assns_eflags_to_bap =
+  List.map
+    (function
+      | None -> (fun e -> [])
+      | Some (v,f) -> (fun e -> [Move(v,f e,[])]))
+    eflags_to_bap
+let assns_flags_to_bap = BatList.drop 16 assns_eflags_to_bap
+let assns_lflags_to_bap = BatList.drop 8 assns_flags_to_bap
+
 
 (* exp helpers *)
 
@@ -465,6 +480,11 @@ let eaddr16 = function
   | _ -> disfailwith "eaddr16 takes only 0-7"
 
 let eaddr16e b = cast_low r16 (eaddr16 b)
+
+let ah_e = bits2reg8e 4
+let ch_e = bits2reg8e 5
+let dh_e = bits2reg8e 6
+let bh_e = bits2reg8e 7
 
 module ToIR = struct
 
@@ -1157,29 +1177,37 @@ let rec to_ir addr next ss pref =
     :: store_s seg_ss t esp_e flags_e
     :: []
   | Popf t ->
-    let assns = match t with
-      | Reg 16 -> flags_to_bap
-      | Reg 32 -> eflags_to_bap
+    let assnsf = match t with
+      | Reg 16 -> assns_flags_to_bap
+      | Reg 32 -> assns_eflags_to_bap
       | _ -> failwith "impossible"
     in
     let tmp = nt "t" t in
     let extractlist =
       List.map
         (fun i -> 
-          let i = Big_int_Z.big_int_of_int i in
+          let i = biconst i in
           extract i i (Var tmp))
         (BatList.of_enum (((bits_of_width t)-1)---0))
-    in
-    let assnsf =
-      List.map
-        (function
-          | None -> (fun e -> [])
-          | Some (v,f) -> (fun e -> [Move(v,f e,[])]))
-        assns
     in
     move tmp (load_s seg_ss t esp_e)
     :: move esp (esp_e +* i32 (bytes_of_width t))
     :: List.flatten (List.map2 (fun f e -> f e) assnsf extractlist)
+  | Sahf ->
+    let assnsf = assns_lflags_to_bap in
+    let tah = nt "AH" reg_8 in
+    let extractlist =
+      List.map
+        (fun i ->
+          let i = biconst i in
+          extract i i (Var tah))
+        (BatList.of_enum (7---0))
+    in
+    move tah ah_e
+    :: List.flatten (List.map2 (fun f e -> f e) assnsf extractlist)
+  | Lahf ->
+    let o_ah = Oreg 4 in
+    [assn reg_8 o_ah lflags_e]
   | Add(t, o1, o2) ->
     let tmp = nt "t1" t and tmp2 = nt "t2" t in
     move tmp (op2e t o1)
@@ -1554,6 +1582,8 @@ module ToStr = struct
     | Pop(t,o) -> Printf.sprintf "pop %s" (opr o)
     | Pushf _ -> "pushf"
     | Popf _ -> "popf"
+    | Sahf -> "sahf"
+    | Lahf -> "lahf"
     | Add(t,d,s) -> Printf.sprintf "add %s, %s" (opr d) (opr s)
     | Adc(t,d,s) -> Printf.sprintf "adc %s, %s" (opr d) (opr s)
     | Sub(t,d,s) -> Printf.sprintf "sub %s, %s" (opr d) (opr s)
@@ -1876,6 +1906,8 @@ let parse_instr g addr =
       (Xchg(prefix.opsize, o_eax, reg), na)
     | 0x9c -> (Pushf(prefix.opsize), na)
     | 0x9d -> (Popf(prefix.opsize), na)
+    | 0x9e -> (Sahf, na)
+    | 0x9f -> (Lahf, na)
     | 0xa1 -> let (addr, na) = parse_disp32 na in
 	      (Mov(prefix.opsize, o_eax, Oaddr(l32 addr), None), na)
     | 0xa3 -> let (addr, na) = parse_disp32 na in
