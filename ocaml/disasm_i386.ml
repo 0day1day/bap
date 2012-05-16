@@ -1918,12 +1918,19 @@ let parse_instr g addr =
     | 0xcd -> let (i,na) = parse_imm8 na in
 	      (Interrupt(i), na)
     | 0xd9 ->
-        let (r, rm, na) = parse_modrm32ext na in
-        (match r with
-        | 5 -> (Fldcw rm, na)
-        | 7 -> (Fnstcw rm, na)
-        | _ -> unimplemented (Printf.sprintf "unsupported opcode: d9/%d" r)
-        )
+
+      (* 0xd9 can be followed by a secondary opcode, OR a modrm
+         byte. But the secondary opcode is only used when the modrm
+         byte does not specify a memory address. *)
+
+      let b2, _ = parse_int8 na in
+      let (r, rm, na) = parse_modrm32ext na in
+      (match r, rm with
+      | 5, Oaddr _ -> (Fldcw rm, na)
+      | 7, Oaddr _ -> (Fnstcw rm, na)
+      | _, Oaddr _ -> unimplemented (Printf.sprintf "unsupported opcode: d9/%d" r)
+      | _, _ -> unimplemented (Printf.sprintf "unsupported opcode: d9 %02Lx" b2)
+      )
     | 0xdb ->
       let (r, rm, na) = parse_modrm32ext na in
       (match r with
