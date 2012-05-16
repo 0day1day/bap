@@ -23,6 +23,9 @@ let ncjmp c t =
   :: []
 
 (* exp helpers *)
+let unknown t s =
+  Unknown(s, t)
+
 let binop op a b = match (a,b) with
   | (Int(a, at), Int(b, bt)) ->
     assert (at = bt);

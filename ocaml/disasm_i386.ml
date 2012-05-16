@@ -62,6 +62,7 @@ type operand =
   | Oimm of int64 (* XXX: Should this be big_int? *)
 
 type opcode =
+  | Bswap of (typ * operand)
   | Retn of ((typ * operand) option) * bool (* bytes to release, far/near ret *)
   | Nop
   | Mov of typ * operand * operand * (Ast.exp option) (* dst, src, condition *)
@@ -618,6 +619,15 @@ let rec to_ir addr next ss pref =
   and assn_dbl = assn_dbl_s ss in
   function
   | Nop -> []
+  | Bswap(t, op) ->
+    let e = match t with
+      | Reg 32 ->
+        reverse_bytes (op2e t op)
+      | Reg 16 ->
+        unknown t "result of bswap is undefined for 16 bit operand"
+      | _ -> disfailwith "bswap: Expected 16 or 32 bit type"
+    in
+    [assn t op e]
   | Retn (op, far_ret) when pref = [] ->
     let temp = nt "ra" r32 in
     let load_stmt = if far_ret 
@@ -1477,6 +1487,7 @@ module ToStr = struct
     | Oaddr a -> Pp.ast_exp_to_string a
 
   let op2str = function
+    | Bswap(_, op) -> Printf.sprintf "bswap %s" (opr op)
     | Retn (op, _) -> 
       (match op with 
       | Some (_,src) -> Printf.sprintf "ret %s" (opr src)
@@ -2021,6 +2032,7 @@ let parse_instr g addr =
 	in
 	(ins(t, o1, o2), na)
       )
+    (* Two byte opcodes *)
     | 0x0f -> (
       let b2 = Char.code (g na) and na = s na in
       match b2 with (* Table A-3 *)
@@ -2197,6 +2209,8 @@ let parse_instr g addr =
             | _ -> unimplemented 
 	      (Printf.sprintf "unsupported opcode: %02x %02x/%d" b1 b2 r)
           )
+      | 0xc8 | 0xc9 | 0xca | 0xcb | 0xcc | 0xcd | 0xce | 0xcf ->
+        (Bswap(prefix.opsize, Oreg(b2 & 7)), na)
       | 0xd7 ->
           let r, rm, na = parse_modrm32 na in
           (Pmovmskb(prefix.mopsize, r, rm), na)
