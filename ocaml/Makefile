@@ -152,6 +152,13 @@ TAGS: $(SOURCES)
 runtop:	top
 	./bap.top -I $(BIGINT) -I $(BATT)
 
+libbfd.idl : bfdarch.idl
+
+bfdarch.idl : /usr/include/bfd.h
+	 $(CPP) $< | awk 'BEGIN { go=0; } /^enum bfd_architecture$$/ { go=1; } \
+		go && $$0 != "" { print; } \
+		/};$$/ { go=0; }' > $@
+
 # You may also tell "make" at the command-line what kind of target to
 # produce (e.g. "make nc").  Here all the possibilities with shortcuts
 # between parenthesis:
