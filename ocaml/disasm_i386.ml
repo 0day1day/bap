@@ -124,6 +124,8 @@ type opcode =
   | Ldmxcsr of operand
   | Fnstcw of operand
   | Fldcw of operand
+  | Fld of operand
+  | Fst of (operand * bool)
   | Pmovmskb of (typ * operand * operand)
   | Pcmpeq of (typ * typ * operand * operand)
   | Palignr of (typ * operand * operand * operand)
@@ -1103,6 +1105,10 @@ let rec to_ir addr next ss pref =
       [
         move fpu_ctrl (load r16 src);
       ]
+  | Fld (src) ->
+    unimplemented "unsupported FPU register stack"
+  | Fst (dst,pop) ->
+    unimplemented "unsupported FPU flags"
   | Cmps(Reg bits as t) ->
     let src1 = nt "src1" t and src2 = nt "src2" t and tmpres = nt "tmp" t in
     let stmts =
@@ -1568,6 +1574,10 @@ module ToStr = struct
     | Ldmxcsr (o) -> Printf.sprintf "ldmxcr %s" (opr o)
     | Fnstcw (o) -> Printf.sprintf "fnstcw %s" (opr o)
     | Fldcw (o) -> Printf.sprintf "fldcw %s" (opr o)
+    | Fld (o) -> Printf.sprintf "fld %s" (opr o)
+    | Fst (o,b) -> (match b with 
+      | true -> Printf.sprintf "fstp %s" (opr o)
+      | false -> Printf.sprintf "fst %s" (opr o))
     | Inc (t, o) -> Printf.sprintf "inc %s" (opr o)
     | Dec (t, o) -> Printf.sprintf "dec %s" (opr o)
     | Jump a -> Printf.sprintf "jmp %s" (j2str a)
@@ -1949,25 +1959,46 @@ let parse_instr g addr =
     | 0xc9 -> (Leave prefix.opsize, na)
     | 0xcd -> let (i,na) = parse_imm8 na in
 	      (Interrupt(i), na)
-    | 0xd9 ->
-
-      (* 0xd9 can be followed by a secondary opcode, OR a modrm
-         byte. But the secondary opcode is only used when the modrm
-         byte does not specify a memory address. *)
-
+                
+    (* 0xd8-0xdf can be followed by a secondary opcode, OR a modrm
+       byte. But the secondary opcode is only used when the modrm
+       byte does not specify a memory address. *)
+    | 0xd8 | 0xd9 | 0xda | 0xdb | 0xdc | 0xdd | 0xde | 0xdf ->
       let b2, _ = parse_int8 na in
       let (r, rm, na) = parse_modrm32ext na in
       (match r, rm with
-      | 5, Oaddr _ -> (Fldcw rm, na)
-      | 7, Oaddr _ -> (Fnstcw rm, na)
-      | _, Oaddr _ -> unimplemented (Printf.sprintf "unsupported opcode: d9/%d" r)
-      | _, _ -> unimplemented (Printf.sprintf "unsupported opcode: d9 %02Lx" b2)
+      | 2, Oaddr _ -> 
+        (match b1 with 
+        | 0xd9 | 0xdd -> (Fst(rm, false), na)
+        | _ -> 
+          unimplemented (Printf.sprintf "unsupported opcode: %02x/%d" b1 r)
+        )
+      | 3, Oaddr _ -> 
+        (match b1 with 
+        | 0xd9 | 0xdd -> (Fst(rm, true), na)
+        | _ -> 
+          unimplemented (Printf.sprintf "unsupported opcode: %02x/%d" b1 r)
+        )
+      | 5, Oaddr _ -> 
+        (match b1 with 
+        | 0xd9 -> (Fldcw rm, na)
+        | 0xdb -> (Fld rm, na)
+        | _ -> 
+          unimplemented (Printf.sprintf "unsupported opcode: %02x/%d" b1 r)
+        )
+      | 7, Oaddr _ -> 
+        (match b1 with 
+        | 0xd9 -> (Fnstcw rm, na)
+        | 0xdb -> (Fst(rm, true), na)
+        | _ -> 
+          unimplemented (Printf.sprintf "unsupported opcode: %02x/%d" b1 r)
+        )
+      | _, Oaddr _ -> 
+        unimplemented (Printf.sprintf "unsupported opcode: %02x/%d" b1 r)
+      | _, _ -> 
+        unimplemented (Printf.sprintf "unsupported opcode: %02x %02Lx" b1 b2)
       )
-    | 0xdb ->
-      let (r, rm, na) = parse_modrm32ext na in
-      (match r with
-      | _ -> unimplemented (Printf.sprintf "unsupported opcode: db/%d" r)
-      )
+
     | 0xe8 -> let (i,na) = parse_disp32 na in
 	      (Call(Oimm(Int64.add i na), na), na)
     | 0xe9 -> let (i,na) = parse_disp prefix.opsize na in
@@ -2293,7 +2324,8 @@ let parse_instr g addr =
 
      The opsize override makes regular operands smaller, but MMX
      operands larger.  *)
-  let opsize, mopsize = if List.mem pref_opsize pref then r16,r128 else r32,r64 in
+  let opsize, mopsize = 
+    if List.mem pref_opsize pref then r16,r128 else r32,r64 in
   let prefix =
     {
       opsize = opsize;
@@ -2327,5 +2359,7 @@ let disasm_instr g addr =
   let (pref, op, na) = parse_instr g addr in
   let (_, ss, pref) =  parse_prefixes pref op in
   let ir = ToIR.to_ir addr na ss pref op in
-  let asm = try Some(ToStr.to_string pref op) with Disasm_i386_exception _ -> None in
+  let asm = 
+    try Some(ToStr.to_string pref op) with Disasm_i386_exception _ -> None 
+  in
   (ToIR.add_labels ?asm addr ir, na)
