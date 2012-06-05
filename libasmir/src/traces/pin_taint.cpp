@@ -213,7 +213,7 @@ FrameOption_t TaintTracker::introMemTaint(uint32_t addr, uint32_t length, const 
 
   FrameOption_t fb;
 
-  if ((*pf)(addr, length, source)) {
+  if ((*pf)(addr, length, source) && length > 0) {
 
     for (unsigned int i = 0; i < length; i++) {
       uint32_t t = 0;
@@ -240,7 +240,7 @@ FrameOption_t TaintTracker::introMemTaint(uint32_t addr, uint32_t length, const 
       assert (PIN_SafeCopy((void*) &value, (void*) (addr+i), 1) == 1);
       tfi->set_value((void*) &value, 1);
     }
-    fb.b = length > 0;
+    fb.b = true;
     return fb;
   } else {
     fb.b = false;
