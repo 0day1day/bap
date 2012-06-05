@@ -61,6 +61,9 @@ namespace SerializedTrace {
 
     /* Write the length before the frame. */
     uint64_t len = s.length();
+    if (len == 0) {
+      throw (TraceException("Attempt to add zero-length frame to trace"));
+    }
     WRITE(len);
 
     /* Write the frame. */
@@ -238,6 +241,9 @@ namespace SerializedTrace {
 
     uint64_t frame_len;
     READ(frame_len);
+    if (frame_len == 0) {
+      throw (TraceException("Read zero-length frame at offset " + ifs.tellg()));
+    }
 
     /* We really just want a variable sized array, but MS VC++ doesn't support C99 yet.
      *
