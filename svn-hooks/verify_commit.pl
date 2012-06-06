@@ -132,7 +132,7 @@ if(defined $getpin) {
 
 # make test
 print "Making test\n";
-check_system("make -j test");
+check_system("nice make -j test");
 
 
 # leave $local_path before removing it
