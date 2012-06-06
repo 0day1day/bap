@@ -1,5 +1,6 @@
 New in BAP 0.5:
 
+* Aggressive dead code elimination
 * New trace format using google protobuf
 * LLVM-based JIT and regular compiler of BAP IL
 * BAP has zero wrong instructions on its x86 nightly tests (but still some unimplemented)
