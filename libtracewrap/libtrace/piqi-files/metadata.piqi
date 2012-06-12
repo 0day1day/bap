@@ -1,0 +1,81 @@
+.include [
+         .module types
+]
+
+% Frame representing the state of the system which collected this trace
+.record [
+        .name metadata-frame
+
+        % BAP svn revision number
+        .field [
+               .name svn-id
+               .type int
+        ]
+
+        % pin version
+        .field [
+               .name pin-id
+               .type float32
+        ]
+
+        % commandline invoked to create trace
+        .field [
+               .name commandline
+               .type string
+        ]
+
+        % md5 of binary traced
+        .field [
+               .name binary-hash
+               .type string
+        ]
+
+        % input to binary
+        .field [
+               .name binary-args
+               .type string
+        ]
+
+        % datestamp of creation 
+        .field [
+               .name epoch-seconds
+               .type uint64
+        ]
+
+        % OS version (kernel)
+        .field [
+               .name os-version
+               .type string
+        ]
+
+        % Ocaml version
+        .field [
+               .name ocaml-version
+               .type string
+        ]
+
+        % md5 of environment variables
+        .field [
+               .name environment-hash
+               .type string
+        ]
+
+        % VM/machine identifier (hostname)
+        .field [
+               .name machine-id
+               .type string
+        ]
+
+        % Time to generate trace in seconds
+        .field [
+               .name generation-time
+               .type int
+        ]
+
+        % Size of generated trace in bytes
+        .field [
+               .name trace-size
+               .type int
+        ]
+
+]
