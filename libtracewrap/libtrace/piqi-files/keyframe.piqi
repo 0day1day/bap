@@ -12,6 +12,7 @@
         % value register values are from.
         .field [
                .type tagged-value-lists
+               .code 1
         ]
 ]
 
@@ -29,11 +30,13 @@
         .field [
                .name value-source-tag
                .type value-source-tag
+               .code 1
         ]
 
         % The value list
         .field [
                .type value-list
+               .code 2
         ]
 ]
 
@@ -43,10 +46,12 @@
 
          .option [
                  .name no-thread-id
+                 .code 1
          ]
 
          .option [
                  .type thread-id
+                 .code 2
          ]
 ]
 
@@ -63,22 +68,26 @@
         % Mem/register specific stuff
         .field [
                .type operand-info-specific
+               .code 1
         ]
 
         % Size in bits
         .field [
                .type bit-length
+               .code 2
         ]
 
         % Taint information (optional)
         .field [
                .type taint-info
                .optional
+               .code 3
         ]
 
         % Value
         .field [
                .name value
                .type binary
+               .code 4
         ]
 ]

@@ -9,12 +9,14 @@
         % Number representing the exception type
         .field [
                .type exception-number
+               .code 1
         ]
 
         % Thread the exception occured in
         .field [
                .type thread-id
                .optional
+               .code 2
         ]
 
         % Address the exception occured at
@@ -22,6 +24,7 @@
                .name from-addr
                .type address
                .optional
+               .code 3
         ]
 
         % Address the exception transferred control to
@@ -29,5 +32,6 @@
                .name to-addr
                .type address
                .optional
+               .code 4
         ]
 ]
