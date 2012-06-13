@@ -6,6 +6,7 @@
     @author Ivan Jager
 *)
 
+let (|>) = BatPervasives.(|>)
 open Util
 
 exception Unreachable
@@ -46,6 +47,9 @@ struct
       list is sorted by depth in the dominator tree. *)
   type dominators = G.V.t -> G.V.t list
 
+  (** function from [x] to a list of nodes that are dominated by [x]. *)
+  type dominees = G.V.t -> G.V.t list
+
   (** [dom x y] returns true iff [x] dominates [y] *)
   type dom = G.V.t -> G.V.t -> bool
 
@@ -62,6 +66,7 @@ struct
     idoms: idoms;
     dom_tree: dom_tree;
     dominators: dominators;
+    dominees: dominees;
     dom: dom;
     sdom: sdom;
     dom_frontier: dom_frontier;
@@ -256,6 +261,29 @@ struct
       (* FIXME: maybe faster to convert eagerly *)
       fun x -> set_of_list(H.find_all tree x)
 
+  (** Computes the transitive closure of a dominator tree. *)
+  let dom_tree_to_dominees dom_tree =
+    let cache = H.create 9999 in
+    let rec trans_closure f s =
+      let expand f s =
+        S.fold (fun e s ->
+          List.fold_left (fun s e -> S.add e s) s (f e)
+        ) s s
+      in
+      let expands = expand f s in
+      if expands = s then s else
+        trans_closure f expands
+    in
+    let rec get x =
+      try
+        H.find cache x
+      with Not_found ->
+        let r = trans_closure dom_tree (S.singleton x) |> S.elements in
+        H.add cache x r;
+        r
+    in
+    get
+
   (** Computes a dominator tree (function from x to a list of nodes immediately
       dominated by x) for the given CFG and idom function. *)
   let idom_to_dom_tree cfg idom =
@@ -342,6 +370,7 @@ struct
     let idoms = idom_to_idoms idom in
     let dom_tree = lazy(idom_to_dom_tree cfg idom) in
     let dominators = idom_to_dominators idom in
+    let dominees = lazy(dom_tree_to_dominees (fun x -> Lazy.force dom_tree x)) in
     let dom = idom_to_dom idom in
     let sdom = dom_to_sdom dom in
     let dom_frontier =
@@ -352,6 +381,7 @@ struct
 	idoms=idoms;
 	dom_tree=(fun x -> Lazy.force dom_tree x);
 	dominators=dominators;
+        dominees=(fun x -> Lazy.force dominees x);
 	dom=dom;
 	sdom=sdom;
 	dom_frontier=(fun x -> Lazy.force dom_frontier x);
