@@ -6,76 +6,90 @@
 .record [
         .name metadata-frame
 
-        % BAP svn revision number
+        % Trace creator version string.  Be as verbose as possible, including SVN revisions, etc.
         .field [
-               .name svn-id
-               .type int
-        ]
-
-        % pin version
-        .field [
-               .name pin-id
-               .type float32
-        ]
-
-        % commandline invoked to create trace
-        .field [
-               .name commandline
+               .name trace-writer-version
                .type string
+               .optional
         ]
 
-        % md5 of binary traced
+        % Options given to trace creator.  For the BAP PIN trace tool, this will just be the command line arguments.
+        .field [
+               .name trace-options
+               .type string
+               .optional
+        ]
+
+        % Name of binary being traced.
+        .field [
+               .name binary-name
+               .type string
+               .optional
+        ]
+
+        % MD5 hash of traced binary.
         .field [
                .name binary-hash
                .type string
+               .optional
         ]
 
-        % input to binary
+        % Input to binary.
+        % XXX: This should probably be a list, since there are different types of inputs.
         .field [
                .name binary-args
                .type string
+               .optional
         ]
 
-        % datestamp of creation 
+        % Time of tracing, in unixtime.
         .field [
                .name epoch-seconds
                .type uint64
+               .optional
         ]
 
-        % OS version (kernel)
+        % OS version (kernel).
         .field [
                .name os-version
                .type string
+               .optional
         ]
 
-        % Ocaml version
+        % OCaml version.
         .field [
                .name ocaml-version
                .type string
+               .optional
         ]
 
-        % md5 of environment variables
+        % MD5 of environment variables.
+        % Should we just include all the environment variables?
         .field [
                .name environment-hash
                .type string
+               .optional
         ]
 
-        % VM/machine identifier (hostname)
+        % Machine identifier (hostname).
         .field [
                .name machine-id
                .type string
+               .optional
         ]
 
-        % Time to generate trace in seconds
+        % Time to generate trace in seconds.
         .field [
                .name generation-time
                .type int
+               .optional
         ]
 
-        % Size of generated trace in bytes
+        % Size of generated trace in bytes.
         .field [
                .name trace-size
                .type int
+               .optional
         ]
 
 ]
