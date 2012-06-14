@@ -90,7 +90,7 @@ struct
               List.fold_left (fun graph e ->
                 let src = G.E.src e in
                 (* Don't re-add nodes being coalesced. *)
-                if List.mem src successors then graph
+                if List.mem src successors || src = init then graph
                 else let label = G.E.label e in
                      let newe = G.E.create src label init in
                      dprintf "Adding edge originally from %s pred from %s to %s" (C.v2s succ) (C.v2s src) (C.v2s init);
