@@ -3,6 +3,9 @@
     A sequence [seq] of basic blocks [bb1, ..., bbn] is sequential if
     - [seq] is the only path from [bb1] to [bbn] in the control flow graph.
     - [bb1] dominates all other basic blocks in [seq].
+
+    XXX: Update this definition to reflect noop BBs.
+
 *)
 
 val coalesce_ast : Cfg.AST.G.t -> Cfg.AST.G.t
