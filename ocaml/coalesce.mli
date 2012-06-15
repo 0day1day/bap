@@ -1,11 +1,15 @@
 (** Coalesce sequential basic blocks into a single basic block.
 
+    A statement [s] is reorderable if [s] can be swapped with an
+    adjacent reorderable statement [s2] without changing the semantics
+    of the program.  For example, labels and comments are reorderable
+    statements.
+
     A sequence [seq] of basic blocks [bb1, ..., bbn] is sequential if
     - [seq] is the only path from [bb1] to [bbn] in the control flow graph.
-    - [bb1] dominates all other basic blocks in [seq].
-
-    XXX: Update this definition to reflect noop BBs.
-
+    - The first (closest to bb1) non-reorderable statement in [seq]
+      dominates all other non-reorderable statements in [seq].
+    - [bbn] postdominates all other basic blocks in [seq].
 *)
 
 val coalesce_ast : Cfg.AST.G.t -> Cfg.AST.G.t
