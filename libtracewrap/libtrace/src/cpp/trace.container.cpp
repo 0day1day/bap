@@ -44,14 +44,14 @@ namespace SerializedTrace {
   }
 
   void TraceContainerWriter::add(frame &f) throw (std::ofstream::failure, TraceException) {
-    num_frames++;
-
     /* Is is time for a toc entry? */
     if ((num_frames % frames_per_toc_entry) == 0) {
       /* Yes.  Add the file offset where we will insert this frame to
          toc. */
       toc.push_back(ofs.tellp());
     }
+
+    num_frames++;
 
     /* Serialize to string so we can get the length. */
     std::string s;

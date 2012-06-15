@@ -71,10 +71,11 @@ object(self)
   initializer Gc.finalise (fun self -> if not self#has_finished then self#finish) self
 
   method add (frame:frame) =
-    let () = num_frames <- Int64.succ num_frames in
     if Int64.rem num_frames frames_per_toc_entry = 0L then
       (* Put a toc entry *)
       toc <- (LargeFile.pos_out oc) :: toc;
+
+    let () = num_frames <- Int64.succ num_frames in
 
     (* Convert to string so we know length *)
     let s = Frame_piqi_ext.gen_frame frame `pb in
