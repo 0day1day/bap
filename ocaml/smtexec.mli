@@ -1,25 +1,22 @@
 (**
-   Module for executing SMTs inside of BAP
+   Interface for executing command line driven SMT solvers.
 
-   XXX: This is not portable in any shape or way. It will only work on
-   Unix-like systems.
+   XXX: This module is designed for Unix systems and is not
+   portable.
 
    @author ejs
 *)
 
-type result = Valid | Invalid | SmtError | Timeout
+(** The result of solving a formula. *)
+type result = Valid (** The formula was valid or unsatisfiable. *)
+              | Invalid (** The formula was invalid or satisfiable. *)
+              | SmtError of string (** The solver failed.  Possible reasons for this include the formula having invalid syntax and the solver running out of memory. *)
+              | Timeout (** The solver took too long to solve the formula. *)
 val result_to_string : result -> string
+  (** Convert a result to a string *)
 
-module type SOLVER_INFO =
-sig
-  val timeout : int (** Default timeout in seconds *)
-  val solvername : string (** Solver name *)
-  val cmdstr : string -> string (** Given a filename, produce a command string to invoke solver *)
-  val parse_result : ?printmodel:bool -> string -> string -> Unix.process_status -> result (** Given output, decide the result *)
-  val printer : Formulap.fppf
-end
-
-(** This is a hack so we can use subtyping of the solver instances *)
+(** A hack so that we can subtype solver instances. If ocaml <3.11 had
+    first order modules, we wouldn't need this. *)
 class type smtexec =
 object
   method printer : Formulap.fppf
@@ -29,23 +26,38 @@ end
 
 module type SOLVER =
 sig
-  val solvername : string
-  val solve_formula_file : ?timeout:int -> ?remove:bool -> ?printmodel:bool -> string -> result (** Solve a formula in a file *)
-  val check_exp_validity : ?timeout:int -> ?remove:bool -> ?exists:(Ast.var list) -> ?foralls:(Ast.var list) -> Ast.exp -> result (** Check validity of an exp *)
-  (* XXX: check_exp_sat *)
-  (** Write a formula for weakest precondition.
-
-      XXX: Select weakest precondition method
-      XXX: Give this a better name
+  val solvername : string (** Solver name *)
+  val solve_formula_file : ?timeout:int -> ?remove:bool -> ?printmodel:bool -> string -> result 
+  (** [solve_formula_file f] solves the formula in [f]. 
+      @param timeout Sets the timeout duration in seconds.
+      @param remove If set, remove the formula after solving it.
+      @param printmodel If set, prints a satisfiable model if one is found. 
   *)
+  val check_exp_validity : ?timeout:int -> ?remove:bool -> ?exists:(Ast.var list) -> ?foralls:(Ast.var list) -> Ast.exp -> result 
+  (** [check_exp_validity e] tests the validity of [e]. The [timeout] and
+      [remove] options are the same as in {!solve_formula_file}.
+      @param exists A list of variables to be existentially quantified at the front of the expression.
+      @param foralls A list of variables to be quantified with foralls at the front of the expression.
+  *)
+  (* XXX: check_exp_sat *)
   val create_cfg_formula :
     ?remove:bool -> ?exists:Ast.var list ->  ?foralls:Ast.var list -> Cfg.AST.G.t -> string
-  (* XXX: solve_wp *)
-    
-  val si : smtexec
-end
+  (** [create_cfg_formula cfg] computes the weakest precondition for
+      the CFG program [cfg], using postcondition [true]. The weakest
+      precondition is then written to a file, and the name of this file is
+      returned.
 
-module Make : functor (Module : SOLVER_INFO) -> SOLVER
+      [remove], [exists], and [foralls] behave the same as above.
+
+      XXX: Select weakest precondition method
+
+      XXX: Give this a better name
+  *)
+
+  val si : smtexec
+    (** An object to enable subtyping *)
+end
+(** Interface for a solver. *)
 
 module STP : SOLVER
 module STPSMTLIB : SOLVER
@@ -53,16 +65,5 @@ module CVC3 : SOLVER
 module CVC3SMTLIB : SOLVER
 module YICES : SOLVER
 
-(** A Hashtbl of solver names to solver interfaces *)
+(** A Hashtbl that maps solver names to the corresponding {!SOLVER} module. *)
 val solvers : (string,smtexec) Hashtbl.t
-
-
-(* The following are deprecated, use modules *)
-
-(* val runstp : ?timeout:int -> string -> result *)
-
-(* possibly expose write_formula too if that is useful *)
-
-(* val query_formula : *)
-(*   ?timeout:int -> ?exists:Ast.var list ->  ?foralls:Ast.var list *)
-(*   -> Ast.exp -> result *)

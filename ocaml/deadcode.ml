@@ -1,6 +1,7 @@
 (** Dead code elimination for SSA graphs. *)
 
 (* Based off Vine_dataflow.DeadCode *)
+open BatPervasives
 open Ssa
 
 module D = Debug.Make(struct let name = "Deadcode" and default=`NoDebug end)
@@ -10,9 +11,14 @@ module C = Cfg.SSA
 module BH = Hashtbl.Make(C.G.V)
 
 type site = C.G.V.t * Ssa.stmt
-	
+(* XXX: This definition is not unique! *)
 
-    
+type newsite = C.G.V.t * int
+(** BB, statement number *)
+
+let deadstmt = Comment("Dead code", [])
+(** Dead code is replaced with this comment *)
+
 (* return list of lvals defined and used by this stmt *)
 (* XXX doesn't match behavior of previous implementation
    w.r.t. Set. Not sure which behavior is correct. *)
@@ -156,6 +162,10 @@ let do_dce ?(globals=[]) graph =
     the other is identical, they should both be dead (in SSA).
 *)
 let do_aggressive_dce ?(globals = []) graph =
+  let gets (bb,snum) =
+    let stmts = C.get_stmts graph bb in
+    List.nth stmts snum
+  in
   let cdg = Depgraphs.CDG_SSA.compute_cdg graph in
   (* Appel book Section 19.5, Aggressive Dead-code Elimination
 
@@ -171,10 +181,10 @@ let do_aggressive_dce ?(globals = []) graph =
      See deadcode.mli for how we handle #1.
   *)
 
-  let (site_to_deps: (site, site list) Hashtbl.t) = Hashtbl.create 57 in
-  let (var_to_defsite: site VH.t) = VH.create 57 in
+  let (site_to_deps: (newsite, newsite list) Hashtbl.t) = Hashtbl.create 57 in
+  let (var_to_defsite: newsite VH.t) = VH.create 57 in
   let site_is_live, mark_site_as_live =
-    let liveh = Hashtbl.create 57 in
+    let liveh : (newsite, unit) Hashtbl.t = Hashtbl.create 57 in
     (fun site -> Hashtbl.mem liveh site),
     (fun site -> Hashtbl.replace liveh site ())
   in
@@ -188,13 +198,14 @@ let do_aggressive_dce ?(globals = []) graph =
   C.G.iter_vertex
     (fun bb ->
       let stmts = C.get_stmts graph bb in
-      List.iter
-	(fun s ->
-	  let site = (bb, s) in
+      let _ = List.fold_left
+	(fun snum s ->
+	  let site = (bb, snum) in
           (match s with
           | Move(lv, _, a) ->
             assert(not (VH.mem var_to_defsite lv));
-            VH.add var_to_defsite lv site
+            VH.add var_to_defsite lv site;
+            if List.mem lv globals then mark_site_as_initially_live site
           | Assert _
           (* Comments don't execute *)
           (* | Comment _ *)
@@ -204,10 +215,12 @@ let do_aggressive_dce ?(globals = []) graph =
 
           (* Mark as liveout if liveout attr is present *)
           if List.mem Type.Liveout (get_attrs s) then
-            mark_site_as_initially_live site
+            mark_site_as_initially_live site;
+
+          snum+1
 
 	)
-        stmts
+        0 stmts in ()
     )
     graph;
   (* now get initial mappings for var_to_deps *)
@@ -222,7 +235,7 @@ let do_aggressive_dce ?(globals = []) graph =
               let src = C.G.E.src e in
               let stmts = C.get_stmts graph src in
               match List.rev stmts with
-              | (CJmp _ as stmt)::_ -> (src,stmt) :: l
+              | (CJmp _)::_ -> (src, (List.length stmts)-1) :: l
               | _ when C.G.V.label src = Cfg.BB_Entry -> l (* Everything is dependent on BB_Entry *)
               | [] -> failwith (Printf.sprintf "Expected control-dependency to be a CJmp in %s (%s)!" (Cfg_ssa.v2s bb) (Cfg_ssa.v2s src))
               | s::_ -> failwith (Printf.sprintf "Expected control-dependency to be a CJmp in %s (%s) %s!" (Cfg_ssa.v2s bb) (Cfg_ssa.v2s src) (Pp.ssa_stmt_to_string s))
@@ -232,7 +245,7 @@ let do_aggressive_dce ?(globals = []) graph =
   in
   (* build mapping for var_to_deps *)
   let () = 
-    let gen_deps (bb,s) =
+    let gen_deps ((bb,snum) as site) =
       let uses = ref [] in
       let vis = object(self)
         inherit Ssa_visitor.nop
@@ -241,7 +254,7 @@ let do_aggressive_dce ?(globals = []) graph =
            with Not_found -> ());
           `DoChildren
       end in
-      ignore(Ssa_visitor.stmt_accept vis s);
+      ignore(Ssa_visitor.stmt_accept vis (gets site));
       let deps = !uses @ (control_deps bb) in
       (* dprintf "deps for %s" (Pp.ssa_stmt_to_string s); *)
       (* List.iter (fun (_,s) -> dprintf "%s" (Pp.ssa_stmt_to_string s)) deps; *)
@@ -250,13 +263,14 @@ let do_aggressive_dce ?(globals = []) graph =
     C.G.iter_vertex
       (fun bb ->
         let stmts = C.get_stmts graph bb in
-        List.iter
-	  (fun s ->
-	    let site = (bb, s) in
+        let _ = List.fold_left
+	  (fun snum s ->
+	    let site = (bb, snum) in
             assert (not (Hashtbl.mem site_to_deps site));
-            Hashtbl.add site_to_deps site (gen_deps site)
+            Hashtbl.add site_to_deps site (gen_deps site);
+            snum+1
 	  )
-          stmts
+          0 stmts in ()
       )
       graph
   in
@@ -269,7 +283,7 @@ let do_aggressive_dce ?(globals = []) graph =
       (* site is already live; ignore it *)
       do_live others
     | (bb,s) as site::others ->
-      dprintf "Marking %s,%s as live" (Cfg_ssa.v2s bb) (Pp.ssa_stmt_to_string s);
+      dprintf "Marking %s,%s as live" (Cfg_ssa.v2s bb) (Pp.ssa_stmt_to_string (gets site));
       (* List.iter (fun (_,s) -> dprintf "Adding dep %s" (Pp.ssa_stmt_to_string s)) (deps site); *)
       mark_site_as_live site;
       do_live (worklist@(deps site))
@@ -278,7 +292,9 @@ let do_aggressive_dce ?(globals = []) graph =
 
   let has_changed = ref false in
 
-  (* Remove dead assignments *)
+  (* Replace dead assignments with a comment.  Don't remove them,
+     since this would change sites (e.g., removing statement number three
+     would change the site of all statements after three *)
   let check_path graph =
     (* It would be nice if we could re-use the same path checker, but
        we must modify the graph. *)
@@ -289,14 +305,17 @@ let do_aggressive_dce ?(globals = []) graph =
   let graph = C.G.fold_vertex
     (fun bb graph ->
       let stmts = C.get_stmts graph bb in
-      let newstmts = List.filter (function
-        | Move _ as s ->
-          let alive = site_is_live (bb, s) in
-          if not alive then has_changed := true;
-          if not alive then dprintf "Dead: %s" (Pp.ssa_stmt_to_string s);
-          alive
-        | _ -> true (* Don't remove non-assignments for now *)
-      ) stmts in
+      let revnewstmts,_ = List.fold_left (fun (l,snum) s -> match s with
+        | Move _ ->
+          let alive = site_is_live (bb, snum) in
+          if not alive then (has_changed := true;
+                        dprintf "Dead: %s" (Pp.ssa_stmt_to_string s);
+                        deadstmt::l, snum+1
+          ) else (
+            s::l, snum+1
+          )
+        | _ -> s::l, snum+1 (* Don't remove non-assignments for now *)
+      ) ([],0) stmts in
     (* Remove dead conditional jumps
 
        Consider the following dead CJmp:
@@ -315,8 +334,8 @@ let do_aggressive_dce ?(globals = []) graph =
        statement after the CJmp is not control-dependent on the CJmp,
        it will execute regardless of which branch is taken.
     *)
-      let graph = match List.rev newstmts with
-        | CJmp (_, t1, t2, attrs) as s::others when not (site_is_live (bb, s)) ->
+      let graph = match revnewstmts with
+        | CJmp (_, t1, t2, attrs) as s::others when not (site_is_live (bb, (List.length revnewstmts)-1)) ->
           has_changed := true;
           dprintf "Dead cjmp: %s" (Pp.ssa_stmt_to_string s);
           (* Which edge do we remove? Try removing one and see if we
@@ -348,11 +367,22 @@ let do_aggressive_dce ?(globals = []) graph =
           (* Add the new, unlabeled edge *)
           let graph = C.add_edge_e graph new_edge in
           graph
-        | _ -> C.set_stmts graph bb newstmts
+        | _ -> C.set_stmts graph bb (List.rev revnewstmts)
       in
       graph
 
     )
     graph graph in
+
+  (* It's now safe to remove deadstmts *)
+  let graph = if !has_changed then
+      C.G.fold_vertex
+        (fun bb graph ->
+          let stmts = C.get_stmts graph bb in
+          let stmts = List.filter (fun s -> s != deadstmt) stmts in
+          C.set_stmts graph bb stmts
+        ) graph graph
+    else graph
+  in
 
   graph, !has_changed

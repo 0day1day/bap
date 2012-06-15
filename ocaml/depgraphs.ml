@@ -504,7 +504,10 @@ struct
     (* Getting the vertices *)
     let pdg = 
        AST.G.fold_vertex 
-         (fun v g -> AST.add_vertex g v) 
+         (fun v g ->
+           let g = AST.add_vertex g v in
+           AST.set_stmts g v (AST.get_stmts cfg v)
+         )
          cfg (AST.empty()) 
     in
     (* Adding true/data dependence edges *)

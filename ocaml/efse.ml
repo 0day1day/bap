@@ -39,6 +39,18 @@ module Assign =
 struct
   type mode = Sat | Validity
 
+  let get_passive_assignment pi v e = function
+    | Sat ->
+      (exp_eq (Var v) e)
+    | Validity ->
+      (* \forall v. v = e -> pi
+         \equiv
+         \lnot (\exists v. v = e \land \lnot pi)
+
+         So, we still want to add v=e to the solver context.  But what
+         if we are really trying to make a formula for Validity?  *)
+      failwith "efse_feas unimplemented for validity"
+
   let add_passive_assignment pi v e = function
     | Sat ->
       exp_and pi (exp_eq (Var v) e)
@@ -65,7 +77,7 @@ module ToEfse = struct
 
   let of_astcfg ?entry ?exit cfg =
     let cgcl_to_fse s =
-    (* k is a continuation *)
+      (* k is a continuation *)
       let rec c s (k : prog -> prog) = match s with
         | Gcl.CChoice(cond, e1, e2) ->
           c e1 (fun ce1 ->
@@ -415,293 +427,125 @@ let efse ?(cf=true) p pi mode =
   let _,pi = efse (D.create ()) pi p in
   pi
 
-(** Efficient fse algorithm for passified programs. 
-
-    This implementation only adds concrete assignments to the formula when
-    merging conflicts happen.
-*)
-let efse_merge1 ?(cf=true) p pi mode =
+(** Efficient fse algorithm for passified programs with feasibility testing. *)
+let efse_feas ?(cf=true) p pi =
   let eval delta e = if cf
     then D.simplify delta e
     else Symbeval.Symbolic e
   in
-  (* let eval delta e = if cf then ( *)
-  (*   let x = D.simplify delta e in *)
-  (*   if Symbeval.is_concrete_mem_or_scalar x then x *)
-  (*   else Symbeval.Symbolic e *)
-  (* ) else Symbeval.Symbolic e *)
-  (* in *)
   let eval_exp delta e = unwrap_symb (eval delta e) in
-  let rec efse delta pi = function
-    | [] -> dprintf "empty"; delta,pi
+  let rec efse delta pi solver stmts =
+    (match stmts with
+    | stmt::_ ->
+      dprintf "Executing %s" (stmt_to_string stmt)
+    | [] -> ());
+    match stmts with
+    | [] -> delta, pi
     | Assign(v, e) as s::tl ->
-      dprintf "assign";
       let value = eval delta e in
       dprintf "stmt: %s\nevaluated %s to %s, concrete = %b" (stmt_to_string s) (Pp.ast_exp_to_string e) (Pp.ast_exp_to_string (unwrap_symb value)) (Symbeval.is_concrete_mem_or_scalar value);
-      let delta',pi' = match value with
-        (* Note: Concrete assignments are not added to the formula
-           here, but may be by merge_super.  Imagine if x=1 and x=0 occur
-           on different branches of an Ite. *)
-        | Symbeval.Symbolic(Ast.Int _) when cf -> D.set delta v value, (*Ast.exp_and pi (Ast.exp_eq (Ast.Var v) (unwrap_symb value))*) pi
-        | Symbeval.ConcreteMem _ when cf -> D.set delta v value, (*Ast.exp_and pi (Ast.exp_eq (Ast.Var v) e)*) pi
-        | _ -> delta, Assign.add_passive_assignment pi v e mode
+      let delta', v, e = match value with
+        (* Note: Even concrete assignments need to be added to the
+           formula.  This is because when Ite merged two contexts,
+           conflicting concrete assignments will be expunged from the
+           concrete context.  In this case, the assignment in the
+           formula must be used.
+
+           However, we need to be careful about concrete memories,
+           because they aren't really constant size. So, we won't add
+           the evaluated memory to the formula.  *)
+        | Symbeval.Symbolic(Ast.Int _) when cf -> D.set delta v value, v (unwrap_symb value)
+        | Symbeval.ConcreteMem _ when cf -> D.set delta v value, v, e
+        | _ -> delta, v, e
       in
-      dprintf "done.";
-      efse delta' pi' tl
-    | Assert e::tl ->
-      dprintf "assert";
-      let value = eval_exp delta e in
-      dprintf "Evaluated %s to %s" (Pp.ast_exp_to_string e) (Pp.ast_exp_to_string value);
-      (match value with
-      | Ast.Int(bi, Reg 1) when bi_is_zero bi && cf ->
-        (* Assert false = false, pi \land false = false *)
-        delta,Ast.exp_false
-      | Ast.Int(bi, Reg 1) when bi_is_one bi && cf ->
-        (* Assert true = true, pi \land true = pi *)
-        efse delta pi tl
-      | _ ->
-        let pi' = Ast.exp_and pi value in
-        efse delta pi' tl)
-    | Ite(e, s1, s2)::tl ->
-      dprintf "ite condition %s" (Pp.ast_exp_to_string e);
-      let value_t = eval_exp delta e in
-      (match value_t with
-      | Ast.Int(bi, Reg 1) when bi_is_zero bi && cf ->
-        dprintf "true branch";
-        efse delta pi (s2@tl)
-      | Ast.Int(bi, Reg 1) when bi_is_one bi && cf ->
-        dprintf "false branch";
-        efse delta pi (s1@tl)
-      | _ ->
-        dprintf "symbolic branch";
-        let delta1,pi_t = efse delta value_t s1 in
-        let delta2,pi_f = efse delta (Ast.exp_not value_t) s2 in
-        let mergedelta,pi_t,pi_f = D.merge_super delta1 delta2 pi_t pi_f mode in
-        let deltatl,pitl = efse mergedelta Ast.exp_true tl in
-        deltatl, Ast.exp_and (Ast.exp_and pi (Ast.exp_or pi_t pi_f)) pitl)
-  in
-  let _,pi = efse (D.create ()) pi p in
-  pi
-
-(** Efficient fse algorithm for passified programs.
-
-    Avoid putting concrete assignments in formulas version 2.
-*)
-let efse_lazy ?(cf=true) p pi mode =
-  let eval delta e = if cf
-    then D.simplify delta e
-    else Symbeval.Symbolic e
-  in
-  (* let eval delta e = if cf then ( *)
-  (*   let x = D.simplify delta e in *)
-  (*   if Symbeval.is_concrete_mem_or_scalar x then x *)
-  (*   else Symbeval.Symbolic e *)
-  (* ) else Symbeval.Symbolic e *)
-  (* in *)
-  let eval_exp delta e = unwrap_symb (eval delta e) in
-  let module VH = Var.VarHash in
-  let h = VH.create 1000 in
-  let merged v =
-    VH.replace h v false
-  and needed v =
-    try VH.find h v
-    with Not_found -> false
-  and used v =
-    dprintf "%s is used!" (Pp.var_to_string v);
-    if VH.mem h v then (
-      dprintf "But is not merged";
-      VH.replace h v true
-    )
-  in
-  let used_vars_in e =
-    let v = object
-      inherit Ast_visitor.nop
-      method visit_rvar v =
-        used v;
-        `DoChildren
-    end
-    in
-    ignore(Ast_visitor.exp_accept v e)
-  in
-  let rec efse delta pi = function
-    | [] -> dprintf "empty"; delta, pi
-    | Assign(v, e) as s::tl ->
-      dprintf "assign";
-      let value = eval delta e in
-      dprintf "stmt: %s\nevaluated %s to %s, concrete = %b" (stmt_to_string s) (Pp.ast_exp_to_string e) (Pp.ast_exp_to_string (unwrap_symb value)) (Symbeval.is_concrete_mem_or_scalar value);
-      let delta',pi' = match value with
+      dprintf "new constraint %s" (Pp.ast_exp_to_string new_constraint);
+      let () = solver#add_constraint new_constraint in
+      let new_pi = Ast.exp_and pi new_constraint in
+        if Symbeval.is_concrete_mem_or_scalar value then
           (* Note: Even concrete assignments need to be added to the
              formula.  This is because when Ite merged two contexts,
              conflicting concrete assignments will be expunged from the
              concrete context.  In this case, the assignment in the
-             formula must be used.
-
-             However, we need to be careful about concrete memories,
-             because they aren't really constant size. So, we won't add
-             the evaluated memory to the formula.  *)
-        | Symbeval.Symbolic(Ast.Int _) when cf -> D.set delta v value, lazy (
-          if needed v then
-            Assign.add_passive_value (Lazy.force pi) v value mode
-          else Lazy.force pi)
-         (* | Symbeval.ConcreteMem _ when cf -> D.set delta v value, lazy ( *)
-         (*   if needed v then *)
-         (*     Assign.add_passive_assignment (Lazy.force pi) v e mode *)
-         | Symbeval.ConcreteMem _ when cf -> D.set delta v value, lazy (
-           if needed v then
-             Assign.add_passive_value (Lazy.force pi) v value mode
-           else Lazy.force pi)
-        | _ -> 
-          used_vars_in e;
-          delta, lazy (Assign.add_passive_assignment (Lazy.force pi) v e mode)
+             formula must be used. *)
+          D.set delta v value, new_pi
+        else
+          delta, new_pi
       in
-      dprintf "done.";
-      efse delta' pi' tl
+      efse delta' pi' solver tl
     | Assert e::tl ->
-      dprintf "assert";
       let value = eval_exp delta e in
-      dprintf "Evaluated %s to %s" (Pp.ast_exp_to_string e) (Pp.ast_exp_to_string value);
       (match value with
-      | Ast.Int(bi, Reg 1) when bi_is_zero bi && cf ->
+      | Ast.Int(bi, Reg 1) when bi_is_zero bi ->
         (* Assert false = false, pi \land false = false *)
-        delta, lazy Ast.exp_false
-      | Ast.Int(bi, Reg 1) when bi_is_one bi && cf ->
+        delta, Ast.exp_false
+      | Ast.Int(bi, Reg 1) when bi_is_one bi ->
         (* Assert true = true, pi \land true = pi *)
-        efse delta pi tl
+        efse delta pi solver tl
       | _ ->
-        let pi' = lazy (Ast.exp_and (Lazy.force pi) value) in
-        used_vars_in e;
-        efse delta pi' tl)
+        let pi' = Ast.exp_and pi value in
+        dprintf "adding constraint %s" (Pp.ast_exp_to_string value);
+        solver#add_constraint value;
+        if (not solver#is_sat) then (
+          dprintf "Unsatisfiable assertion, returning false";
+          delta, Ast.exp_false
+        ) else
+          efse delta pi' solver tl)
     | Ite(e, s1, s2)::tl ->
-      dprintf "ite condition %s" (Pp.ast_exp_to_string e);
       let value_t = eval_exp delta e in
-      (match value_t with
-      | Ast.Int(bi, Reg 1) when bi_is_zero bi && cf ->
-        dprintf "true branch";
-        efse delta pi (s2@tl)
-      | Ast.Int(bi, Reg 1) when bi_is_one bi && cf ->
-        dprintf "false branch";
-        efse delta pi (s1@tl)
+      let true_sat, false_sat = match value_t with
+      | Ast.Int(bi, Reg 1) when bi_is_one bi ->
+        Valid, Unsat
+      | Ast.Int(bi, Reg 1) when bi_is_zero bi ->
+        Unsat, Valid
       | _ ->
-        dprintf "symbolic branch";
-        used_vars_in e;
-        let delta1,pi_t = efse delta (lazy value_t) s1 in
-        let delta2,pi_f = efse delta (lazy (Ast.exp_not value_t)) s2 in
-        let mergedelta,badlist = D.merge delta1 delta2 in
-        (* Mark each variable in badlist as needing to go in the formula *)
-        List.iter merged badlist;
-        let deltatl,pitl = efse mergedelta (lazy Ast.exp_true) tl in
-        deltatl, lazy (Ast.exp_and (Ast.exp_and (Lazy.force pi) (Ast.exp_or (Lazy.force pi_t) (Lazy.force pi_f))) (Lazy.force pitl)))
+        solver#push;
+        solver#add_constraint e;
+        let t = solver#is_sat in
+        dprintf "true branch sat %b" t;
+        solver#pop;
+        solver#push;
+        solver#add_constraint (Ast.exp_not e);
+        let f = solver#is_sat in
+        dprintf "false branch sat %b" f;
+        solver#pop;
+        let convert = function | true -> Sat | false -> Unsat in
+        convert t, convert f
+      in
+      match true_sat, false_sat with
+      (* If one branch condition is Unsat, then this means pi => e
+         or pi => \lnot e, and we do not need to put e (or \lnot e) in
+         the new pi. *)
+      | (Valid|Sat), Unsat ->
+        dprintf "Only looking at true branch";
+        (* if true then x else y == x *)
+        efse delta pi solver (s1@tl)
+      | Unsat, (Valid|Sat) ->
+        dprintf "Only looking at false branch";
+        (* if false then x else y == y *)
+        efse delta pi solver (s2@tl)
+      | (Valid|Sat), (Valid|Sat) ->
+        solver#push;
+        solver#add_constraint value_t;
+        let delta_t, pi_t = efse delta value_t solver s1 in
+        solver#pop;
+        solver#push;
+        solver#add_constraint (Ast.exp_not value_t);
+        let delta_f, pi_f = efse delta (Ast.exp_not value_t) solver s2 in
+        solver#pop;
+        let new_constraint = Ast.exp_or pi_t pi_f in
+        dprintf "Adding constraint %s" (Pp.ast_exp_to_string new_constraint);
+        solver#add_constraint new_constraint;
+        let delta_merged,_ = D.merge delta_t delta_f in
+        let delta_tl, pi_tl = efse delta_merged Ast.exp_true solver tl in
+        delta_tl, Ast.exp_and (Ast.exp_and pi new_constraint) pi_tl
+      | Unsat, Unsat ->
+        failwith "Efse: We should never reach here because this is an infeasible path"
   in
-  let _,pi = efse (D.create ()) (lazy pi) p in
-  Lazy.force pi
-
-(* (\** Efficient fse algorithm for passified programs with feasibility testing. *\) *)
-(* let efse_feas ?(cf=true) p pi = *)
-(*   let eval delta e = if cf *)
-(*     then D.simplify delta e *)
-(*     else Symbeval.Symbolic e *)
-(*   in *)
-(*   let eval_exp delta e = unwrap_symb (eval delta e) in *)
-(*   let rec efse delta pi solver stmts = *)
-(*     (match stmts with *)
-(*     | stmt::_ -> *)
-(*       dprintf "Executing %s" (stmt_to_string stmt) *)
-(*     | _ -> ()); *)
-(*     match stmts with *)
-(*     | [] -> delta, pi *)
-(*     | Assign(v, e) as s::tl -> *)
-(*       let value = eval delta e in *)
-(*       dprintf "stmt: %s\nevaluated %s to %s, concrete = %b" (stmt_to_string s) (Pp.ast_exp_to_string e) (Pp.ast_exp_to_string (unwrap_symb value)) (Symbeval.is_concrete_mem_or_scalar value); *)
-(*       let delta', pi' = *)
-(*         let new_constraint = Ast.exp_eq (Ast.Var v) (unwrap_symb value) in *)
-(*         dprintf "new constraint %s" (Pp.ast_exp_to_string new_constraint); *)
-(*         let () = solver#add_constraint new_constraint in *)
-(*         let new_pi = Ast.exp_and pi new_constraint in *)
-(*         if Symbeval.is_concrete_mem_or_scalar value then *)
-(*           (\* Note: Even concrete assignments need to be added to the *)
-(*              formula.  This is because when Ite merged two contexts, *)
-(*              conflicting concrete assignments will be expunged from the *)
-(*              concrete context.  In this case, the assignment in the *)
-(*              formula must be used. *\) *)
-(*           D.set delta v value, new_pi *)
-(*         else *)
-(*           delta, new_pi *)
-(*       in *)
-(*       efse delta' pi' solver tl *)
-(*     | Assert e::tl -> *)
-(*       let value = eval_exp delta e in *)
-(*       (match value with *)
-(*       | Ast.Int(bi, Reg 1) when bi_is_zero bi -> *)
-(*         (\* Assert false = false, pi \land false = false *\) *)
-(*         delta, Ast.exp_false *)
-(*       | Ast.Int(bi, Reg 1) when bi_is_one bi -> *)
-(*         (\* Assert true = true, pi \land true = pi *\) *)
-(*         efse delta pi solver tl *)
-(*       | _ -> *)
-(*         let pi' = Ast.exp_and pi value in *)
-(*         dprintf "adding constraint %s" (Pp.ast_exp_to_string value); *)
-(*         solver#add_constraint value; *)
-(*         if (not solver#is_sat) then ( *)
-(*           dprintf "Unsatisfiable assertion, returning false"; *)
-(*           delta, Ast.exp_false *)
-(*         ) else *)
-(*           efse delta pi' solver tl) *)
-(*     | Ite(e, s1, s2)::tl -> *)
-(*       let value_t = eval_exp delta e in *)
-(*       let true_sat, false_sat = match value_t with *)
-(*       | Ast.Int(bi, Reg 1) when bi_is_one bi -> *)
-(*         Valid, Unsat *)
-(*       | Ast.Int(bi, Reg 1) when bi_is_zero bi -> *)
-(*         Unsat, Valid *)
-(*       | _ -> *)
-(*         solver#push; *)
-(*         solver#add_constraint e; *)
-(*         let t = solver#is_sat in *)
-(*         dprintf "true branch sat %b" t; *)
-(*         solver#pop; *)
-(*         solver#push; *)
-(*         solver#add_constraint (Ast.exp_not e); *)
-(*         let f = solver#is_sat in *)
-(*         dprintf "false branch sat %b" f; *)
-(*         solver#pop; *)
-(*         let convert = function | true -> Sat | false -> Unsat in *)
-(*         convert t, convert f *)
-(*       in *)
-(*       match true_sat, false_sat with *)
-(*       (\* If one branch condition is Unsat, then this means pi => e *)
-(*          or pi => \lnot e, and we do not need to put e (or \lnot e) in *)
-(*          the new pi. *\) *)
-(*       | (Valid|Sat), Unsat -> *)
-(*         dprintf "Only looking at true branch"; *)
-(*         (\* if true then x else y == x *\) *)
-(*         efse delta pi solver (s1@tl) *)
-(*       | Unsat, (Valid|Sat) -> *)
-(*         dprintf "Only looking at false branch"; *)
-(*         (\* if false then x else y == y *\) *)
-(*         efse delta pi solver (s2@tl) *)
-(*       | (Valid|Sat), (Valid|Sat) -> *)
-(*         solver#push; *)
-(*         solver#add_constraint value_t; *)
-(*         let delta_t, pi_t = efse delta value_t solver s1 in *)
-(*         solver#pop; *)
-(*         solver#push; *)
-(*         solver#add_constraint (Ast.exp_not value_t); *)
-(*         let delta_f, pi_f = efse delta (Ast.exp_not value_t) solver s2 in *)
-(*         solver#pop; *)
-(*         let new_constraint = Ast.exp_or pi_t pi_f in *)
-(*         dprintf "Adding constraint %s" (Pp.ast_exp_to_string new_constraint); *)
-(*         solver#add_constraint new_constraint; *)
-(*         let delta_merged,_ = D.merge delta_t delta_f in *)
-(*         let delta_tl, pi_tl = efse delta_merged Ast.exp_true solver tl in *)
-(*         delta_tl, Ast.exp_and (Ast.exp_and pi new_constraint) pi_tl *)
-(*       | Unsat, Unsat -> *)
-(*         failwith "Efse: We should never reach here because this is an infeasible path" *)
-(*   in *)
-(*   let s = new Solver.Z3.solver in *)
-(*   s#add_constraint pi; *)
-(*   dprintf "initial sat %b" s#is_sat; *)
-(*   let _,pi = efse (D.create ()) pi s p in *)
-(*   pi *)
+  let s = new Solver.Z3.solver in
+  s#add_constraint pi;
+  dprintf "initial sat %b" s#is_sat;
+  let _,pi = efse (D.create ()) pi s p in
+  pi
 
 end
 

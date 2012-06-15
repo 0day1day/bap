@@ -1,15 +1,15 @@
-(** Convert {!Type.TMem} memories to {!Type.Array} memories.
+(** Convert [Type.TMem] memories to [Type.Array] memories.
 
-    {!Type.Array} memories ensure that all memory reads and writes are
+    [Type.Array] memories ensure that all memory reads and writes are
     of the element type, which is almost always [Reg 8] (one byte).
-    This module converts {!Type.TMem} memories, which do not have
-    these restrictions, to {!Type.Array} memories.
+    This module converts [Type.TMem] memories, which do not have
+    these restrictions, to [Type.Array] memories.
 *)
 
 
 (** [coerce_prog p] returns a new AST program in which all variables
-    of type {!Type.TMem} are replaced with variables of type
-    {!Type.Array}.  All memory reads and writes are of type [Reg 8]. *)
+    of type [Type.TMem] are replaced with variables of type
+    [Type.Array].  All memory reads and writes are of type [Reg 8]. *)
 val coerce_prog : Ast.program -> Ast.program
 
 (** Like {!coerce_prog} but for expressions *)
@@ -19,19 +19,19 @@ val coerce_exp : Ast.exp -> Ast.exp
 
 (** The stateful variants of the coerce functions are like their
     non-stateful versions, but also read and update an external state
-    that maps {!Type.TMem} variables to {!Type.Array} variables.
+    that maps [Type.TMem] variables to [Type.Array] variables.
     These functions are useful when coercing multiple parts of a
-    program so that a {!Type.TMem} variable is mapped to the
-    same {!Type.Array} variable in each part of the
+    program so that a [Type.TMem] variable is mapped to the
+    same [Type.Array] variable in each part of the
     program.
 
     An optional scope argument can also be passed to each stateful
     variant so that the parser scope can be kept consistent with
     converted variables. This allows the parser to understand
-    references to a converted {!Type.Array} variable. *)
+    references to a converted [Type.Array] variable. *)
 
 
-(** Map of {!Type.TMem} variables to their {!Type.Array} type equivalent. *)
+(** Map of [Type.TMem] variables to their [Type.Array] type equivalent. *)
 type state
 
 (** Create an empty state usable by {!coerce_prog_state},

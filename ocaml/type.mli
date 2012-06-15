@@ -18,12 +18,12 @@ type typ =
   | TMem of typ (** Memory of given index type *)
   | Array of typ * typ (** Array of index type, element type. *)
 
-(** {!Array} memories can only be updated or accessed in terms of
-    their element type, which is usually [Reg 8].  {!TMem} memories
+(** [Array] memories can only be updated or accessed in terms of
+    their element type, which is usually [Reg 8].  [TMem] memories
     can be updated or accessed by any type, for instance both [Reg 8]
-    and [Reg 32].  Native code is generally lifted with {!TMem}
-    memories for simplicity, and converted to {!Array} type when
-    needed.  SMT solvers require {!Array} type memories. *)
+    and [Reg 32].  Native code is generally lifted with [TMem]
+    memories for simplicity, and converted to [Array] type when
+    needed.  SMT solvers require [Array] type memories. *)
 
 (** Different forms of casting *)
 type cast_type =

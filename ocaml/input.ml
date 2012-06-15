@@ -108,8 +108,14 @@ let get_program () =
       List.append (Asmir.serialized_bap_from_trace_file f) oldp, oldscope
   in
   try
-    List.fold_left get_one ([], Grammar_private_scope.default_scope ()) (List.rev !inputs)
-  with _ -> failwith "An exception occured while lifting"
+    let p,scope = List.fold_left get_one ([], Grammar_private_scope.default_scope ()) (List.rev !inputs) in
+      (* (try Printexc.print Typecheck.typecheck_prog p with _ -> ()); *)
+      (* Always typecheck input programs. *)
+    Printexc.print Typecheck.typecheck_prog p;
+    p,scope
+  with e ->
+    Printf.eprintf "Exception %s occurred while lifting\n" (Printexc.to_string e);
+    raise e
 
 let get_stream_program () = match !streaminputs with
   | None -> raise(Arg.Bad "No input specified")
