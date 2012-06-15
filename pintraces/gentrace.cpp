@@ -1440,6 +1440,7 @@ VOID InstrBlock(BBL bbl)
 
         for(uint32_t i = 0; i < INS_OperandCount(ins); i++) {
 
+            opndvals[valcount].taint = 0;
             if (INS_OperandRead(ins, i) && (!is_xor))
                 opndvals[valcount].taint = RD;
             if (INS_OperandWritten(ins, i))

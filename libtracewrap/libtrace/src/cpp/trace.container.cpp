@@ -45,7 +45,7 @@ namespace SerializedTrace {
 
   void TraceContainerWriter::add(frame &f) throw (std::ofstream::failure, TraceException) {
     /* Is is time for a toc entry? */
-    if ((num_frames % frames_per_toc_entry) == 0) {
+    if (num_frames > 0 && (num_frames % frames_per_toc_entry) == 0) {
       /* Yes.  Add the file offset where we will insert this frame to
          toc. */
       toc.push_back(ofs.tellp());
@@ -84,7 +84,7 @@ namespace SerializedTrace {
     uint64_t toc_offset = ofs.tellp();
 
     /* Make sure the toc is the right size. */
-    assert ((num_frames / frames_per_toc_entry) == toc.size());
+    assert (((num_frames - 1) / frames_per_toc_entry) == toc.size());
 
     /* Write frames per toc entry. */
     WRITE(frames_per_toc_entry);
@@ -169,7 +169,7 @@ namespace SerializedTrace {
     READ(frames_per_toc_entry);
 
     /* Read each toc entry. */
-    for (int i = 0; i < (num_frames / frames_per_toc_entry); i++) {
+    for (int i = 0; i < ((num_frames - 1)/ frames_per_toc_entry); i++) {
       uint64_t offset;
       READ(offset);
       toc.push_back(offset);

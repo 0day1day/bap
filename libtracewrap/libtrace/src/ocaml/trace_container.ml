@@ -71,7 +71,7 @@ object(self)
   initializer Gc.finalise (fun self -> if not self#has_finished then self#finish) self
 
   method add (frame:frame) =
-    if Int64.rem num_frames frames_per_toc_entry = 0L then
+    if num_frames <> 0L && Int64.rem num_frames frames_per_toc_entry = 0L then
       (* Put a toc entry *)
       toc <- (LargeFile.pos_out oc) :: toc;
 
@@ -99,7 +99,7 @@ object(self)
 
     let toc_offset = LargeFile.pos_out oc in
     (* Make sure the toc is the right size. *)
-    let () = assert ((Int64.div num_frames frames_per_toc_entry) = Int64.of_int (List.length toc)) in
+    let () = assert ((Int64.div (Int64.pred num_frames) frames_per_toc_entry) = Int64.of_int (List.length toc)) in
     (* Write frames per toc entry. *)
     let () = write_i64 oc frames_per_toc_entry in
     (* Write toc to file. *)
@@ -158,7 +158,7 @@ class reader filename =
   (* Read number of frames per toc entry. *)
   let frames_per_toc_entry = read_i64 ic in
   (* Read each toc entry. *)
-  let toc_size = Int64.div num_frames frames_per_toc_entry in
+  let toc_size = Int64.div (Int64.pred num_frames) frames_per_toc_entry in
   let toc =
     let toc_rev = foldn64
       (fun acc n ->
