@@ -40,7 +40,8 @@ struct
            let node_safe = C.is_safe_to_coalesce stmts in
            let safe = safe && node_safe in
            match G.succ graph node with
-           | [successor] when not (List.mem successor acc) ->
+           | [successor] when not (List.mem successor acc)
+               && not (isspecial successor) ->
              (match G.pred graph successor with
              | [] -> failwith "node's successor has no predecessor"
              | [_] when not (isspecial successor) ->
