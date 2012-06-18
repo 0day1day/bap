@@ -1,14 +1,10 @@
-if TESTS_OPT
-TESTPOSTDIRS=stpwrap
-BAPTESTDIRS=tests
-endif
-
 if HAVE_PIN
 PINTRACES=pintraces
 endif
 
-BAPDIRS=libasmir solvers ocaml utils $(BAPTESTDIRS) $(PINTRACES)
-SUBDIRS=batteries zarith-1.0 ounit-1.1.0 pcre-ocaml ocamlgraph-1.8 objsize-0.16 libtracewrap $(BAPDIRS) $(TESTPOSTDIRS)
+
+BAPDIRS=libasmir ocaml utils tests $(PINTRACES)
+SUBDIRS=batteries zarith-1.0 ounit-1.1.0 pcre-ocaml ocamlgraph-1.8 objsize-0.16 libtracewrap $(BAPDIRS) stpwrap
 
 test: all
 	$(MAKE) -C tests test

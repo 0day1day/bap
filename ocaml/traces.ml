@@ -904,11 +904,11 @@ let check_delta state =
                 let s = "{"^(Pp.ast_stmt_to_string assignstmt)^"}\n" in
                 if assigned_time <= !last_time then
                   (* The special happened after our assignment *)
-                  s^"{"^(Pp.ast_stmt_to_string !last_special)^"}\n"
+                  s^"special{"^(Pp.ast_stmt_to_string !last_special)^"}\n"
                 else s
 	      with Not_found ->
                 (* This is a little weird if this happens... *)
-                "{"^(Pp.ast_stmt_to_string !last_special)^"}"
+                "special{"^(Pp.ast_stmt_to_string !last_special)^"}"
 	    in
 	    let traceval_str = Pp.ast_exp_to_string traceval in
 	    let evalval_str = Pp.ast_exp_to_string evalval in
@@ -1110,7 +1110,8 @@ let run_block ?(next_label = None) ?(log=fun _ -> ()) ?(transformf = (fun s _ ->
           (* An explicit assignment *)
 	  if not (is_temp v) then 
             VH.replace reg_to_stmt v {assignstmt=addr; assigned_time=get_counter ()}
-        | Special _ as s when Syscall_models.x86_is_system_call s ->
+        | Special _ as s when Syscall_models.x86_is_system_call s ||
+            Disasm.is_decode_error s ->
           (* A special could potentially overwrite all registers *)
           last_time := get_counter();
           last_special := addr;

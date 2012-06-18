@@ -8,3 +8,7 @@ let disasm_instr arch =
   | _ -> raise Unimplemented
 
 let is_temp = Disasm_temp.is_temp
+
+let is_decode_error = function
+  | Ast.Special("VEX decode error", []) -> true
+  | _ -> false

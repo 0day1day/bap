@@ -204,7 +204,8 @@ let do_aggressive_dce ?(globals = []) graph =
           (match s with
           | Move(lv, _, a) ->
             assert(not (VH.mem var_to_defsite lv));
-            VH.add var_to_defsite lv site
+            VH.add var_to_defsite lv site;
+            if List.mem lv globals then mark_site_as_initially_live site
           | Assert _
           (* Comments don't execute *)
           (* | Comment _ *)

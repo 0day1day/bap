@@ -27,6 +27,7 @@ let arm_regs =
       "CC_OP";
       "CC_DEP1";
       "CC_DEP2";
+      "CC_NDEP";
     ]
 
 let all_regs = x86_mem :: x86_regs @ arm_regs

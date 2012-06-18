@@ -9,8 +9,7 @@ export OCAMLPATH = $(PIQIBUILDDIR)
 
 PACKS = piqi.lib
 
-SOURCES = piqi/frame_piqi.mli \
-	  piqi/frame_piqi.ml \
+SOURCES = piqi/frame_piqi.ml \
 	  piqi/frame_piqi_ext.ml \
 	  arch.idl \
 	  trace_container.mli \

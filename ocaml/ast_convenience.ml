@@ -2,6 +2,7 @@
     separate file so it can use functions from Typecheck and elsewhere. *)
 
 open Ast
+open BatPervasives
 open Big_int_Z
 open Big_int_convenience
 open Type
@@ -22,6 +23,9 @@ let ncjmp c t =
   :: []
 
 (* exp helpers *)
+let unknown t s =
+  Unknown(s, t)
+
 let binop op a b = match (a,b) with
   | (Int(a, at), Int(b, bt)) ->
     assert (at = bt);
@@ -66,6 +70,10 @@ let (>=* ) a b   = binop LE b a
 let ( =* ) a b   = binop XOR a (unop NOT b)
 
 let ( ++* ) a b   = concat a b
+let ( %* ) a b = binop MOD a b
+let ( $%* ) a b = binop SMOD a b
+let ( /* ) a b = binop DIVIDE a b
+let ( $/* ) a b = binop SDIVIDE a b
 
 let cast ct tnew = function
   | Int(i,t) -> let (i',t') = Arithmetic.cast ct (i,t) tnew in
@@ -208,7 +216,7 @@ let parse_concat = function
 *)
 let rm_ite = function
   | Ite(b, e1, e2) ->
-      let t = Typecheck.infer_ast b in
+      let t = Typecheck.infer_ast e1 in
       (match t with
       | Reg(1) ->
 	(b &* e1) |*  (exp_not b &* e2)
@@ -246,3 +254,19 @@ let last_meaningful_stmt p =
     | [] -> failwith "No meaningful statements"
   in
   f (List.rev p)
+
+let reverse_bytes e =
+  let bytes = Typecheck.bytes_of_width (Typecheck.infer_ast ~check:false e) in
+  let get_byte n = extract (biconst (n*8+7)) (biconst (n*8)) e in
+  reduce
+    (fun bige e -> bige ++* e)
+    (map get_byte (0 -- (bytes-1)))
+
+(* Extract the nth least significant byte from e, starting with zero *)
+let extract_byte n e =
+  extract (biconst (n*8+7)) (biconst (n*8)) e
+
+(* Concatenate a list of expressions *)
+let concat_explist elist =
+  reduce
+    (fun l r -> l ++* r) elist

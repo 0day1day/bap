@@ -2,7 +2,8 @@ PAPERNAME=main
 TEXFILES =  *.tex
 
 TEXFILES = $(wildcard *.tex) $(wildcard *.sty)\
-	 $(wildcard chap-intro/*.tex) $(wildcard chap-intro/*.sty)\
+        $(wildcard chap-intro/*.tex) $(wildcard chap-intro/*.sty)\
+	$(wildcard chap-developer/*.tex) $(wildcard chap-developer/*.sty)\
 	$(wildcard chap-formalism/*.tex) $(wildcard chap-formalism/*.sty)\
 	$(wildcard chap-tools/*.tex) $(wildcard chap-tools/*.sty)\
 	$(wildcard chap-examples/*.tex) $(wildcard chap-examples/*.sty)\

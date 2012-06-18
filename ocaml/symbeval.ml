@@ -790,7 +790,10 @@ module Concrete = Make(ConcreteMemL)(AlwaysEvalLet)(StdAssign)(StdForm)
 (** Execute a program concretely *)
 let concretely_execute ?s ?(i=[]) p =
   let rec step ctx =
-    let s = Concrete.inst_fetch ctx.sigma ctx.pc in
+    let s = try Concrete.inst_fetch ctx.sigma ctx.pc
+      with Not_found ->
+        failwith (Printf.sprintf "Fetching instruction %#Lx failed; you probably need to add a halt to the end of your program" ctx.pc)
+    in
     dprintf "Executing: %s" (Pp.ast_stmt_to_string s);
     let nextctxs = try Concrete.eval ctx, None with
         Concrete.Halted (v, ctx) -> [ctx], v

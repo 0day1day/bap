@@ -1,7 +1,7 @@
+(*pp camlp4o pa_macro.cmo *)
+
 let usage = "Usage: "^Sys.argv.(0)^" <input options> [transformations and outputs]\n\
              Transform BAP IL programs. "
-
-(* open Bap*)
 
 open Ast
 
@@ -30,13 +30,29 @@ let inits = ref []
 
 let scope = ref (Grammar_private_scope.default_scope ())
 
+let init_stmts () =
+  List.fold_left (fun l (v,e) -> Move(v,e,[])::l) [] !inits
+
 let cexecute_at s p =
-  let () = ignore(Symbeval.concretely_execute p ~i:(List.rev !inits) ~s) in
+  let () = ignore(Symbeval.concretely_execute p ~i:(init_stmts ()) ~s) in
   p
 
 let cexecute p =
-  let () = ignore(Symbeval.concretely_execute p ~i:(List.rev !inits)) in
+  let () = ignore(Symbeval.concretely_execute p ~i:(init_stmts ())) in
   p
+
+let jitexecute p =
+IFDEF WITH_LLVM THEN
+  let cfg = Cfg_ast.of_prog p in
+  let cfg = Prune_unreachable.prune_unreachable_ast cfg in
+  let codegen = new Llvm_codegen.codegen Llvm_codegen.FuncMulti in
+  let jit = codegen#convert_cfg cfg in
+  let r = codegen#eval_fun ~ctx:(List.rev !inits) jit in
+  Printf.printf "Result: %s\n" (Pp.ast_exp_to_string r);
+  p
+ELSE
+  failwith "LLVM not enabled"
+END;;
 
 let add c =
   pipeline := c :: !pipeline
@@ -53,8 +69,9 @@ let mapv v e =
     | _ -> assert false
   in
   scope := ns;
-  let s = Move(v, e, []) in
-  inits := s :: !inits
+  inits := (v, e) :: !inits
+  (* let s = Move(v, e, []) in *)
+  (* inits := s :: !inits *)
 
 let mapmem a e =
   let a,ns = Parser.exp_from_string ~scope:!scope a in
@@ -66,9 +83,9 @@ let mapmem a e =
     | _ -> assert false
   in
   scope := ns;
-  let s = Move(m, Store(Var(m), a, e, exp_false, t), []) in
-  inits := s :: !inits
-  
+  (* let s = Move(m, Store(Var(m), a, e, exp_false, t), []) in *)
+  inits := (m, Store(Var(m), a, e, exp_false, t)) :: !inits
+  (* inits := s :: !inits *)
 
 let speclist =
   ("-eval", 
@@ -77,6 +94,9 @@ let speclist =
   ::("-eval-at", 
      Arg.String (fun s -> add(TransformAst (cexecute_at (Int64.of_string s)))),
      "<pc> Concretely execute the IL from pc")
+  ::("-jiteval",
+     Arg.Unit (fun () -> add(TransformAst jitexecute)),
+     "Concretely execute the IL using the LLVM JIT compiler")
   ::("-init-var",
      Arg.Tuple 
        (let vname = ref "" and vval = ref "" in

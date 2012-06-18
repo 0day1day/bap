@@ -184,3 +184,29 @@ let uniqueify_labels p =
   end
   in
   Ast_visitor.prog_accept renamelabels p
+
+module Rm(C: Cfg.CFG) = struct
+  let remove_indirect g =
+    C.remove_vertex g (C.G.V.create Cfg.BB_Indirect)
+end
+
+let ast_remove_indirect =
+  let module Rm = Rm(Cfg.AST) in
+  Rm.remove_indirect
+
+let ssa_remove_indirect =
+  let module Rm = Rm(Cfg.SSA) in
+  Rm.remove_indirect
+
+(** Replace unknown expressions with constant zero *)
+let replace_unknowns p =
+  let i t = Int(Big_int_convenience.bi0, t) in
+  let v = object(self)
+    inherit Ast_visitor.nop
+    method visit_exp = function
+      | Unknown(_, t) ->
+        `ChangeTo (i t)
+      | _ -> `DoChildren
+  end
+  in
+  Ast_visitor.prog_accept v p

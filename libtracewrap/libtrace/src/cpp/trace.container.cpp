@@ -44,14 +44,14 @@ namespace SerializedTrace {
   }
 
   void TraceContainerWriter::add(frame &f) throw (std::ofstream::failure, TraceException) {
-    num_frames++;
-
     /* Is is time for a toc entry? */
-    if ((num_frames % frames_per_toc_entry) == 0) {
+    if (num_frames > 0 && (num_frames % frames_per_toc_entry) == 0) {
       /* Yes.  Add the file offset where we will insert this frame to
          toc. */
       toc.push_back(ofs.tellp());
     }
+
+    num_frames++;
 
     /* Serialize to string so we can get the length. */
     std::string s;
@@ -61,6 +61,9 @@ namespace SerializedTrace {
 
     /* Write the length before the frame. */
     uint64_t len = s.length();
+    if (len == 0) {
+      throw (TraceException("Attempt to add zero-length frame to trace"));
+    }
     WRITE(len);
 
     /* Write the frame. */
@@ -81,7 +84,7 @@ namespace SerializedTrace {
     uint64_t toc_offset = ofs.tellp();
 
     /* Make sure the toc is the right size. */
-    assert ((num_frames / frames_per_toc_entry) == toc.size());
+    assert (((num_frames - 1) / frames_per_toc_entry) == toc.size());
 
     /* Write frames per toc entry. */
     WRITE(frames_per_toc_entry);
@@ -166,7 +169,7 @@ namespace SerializedTrace {
     READ(frames_per_toc_entry);
 
     /* Read each toc entry. */
-    for (int i = 0; i < (num_frames / frames_per_toc_entry); i++) {
+    for (int i = 0; i < ((num_frames - 1)/ frames_per_toc_entry); i++) {
       uint64_t offset;
       READ(offset);
       toc.push_back(offset);
@@ -238,6 +241,9 @@ namespace SerializedTrace {
 
     uint64_t frame_len;
     READ(frame_len);
+    if (frame_len == 0) {
+      throw (TraceException("Read zero-length frame at offset " + ifs.tellg()));
+    }
 
     /* We really just want a variable sized array, but MS VC++ doesn't support C99 yet.
      *
