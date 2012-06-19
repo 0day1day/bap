@@ -1,3 +1,5 @@
+(*pp camlp4o pa_macro.cmo *)
+
 (** Functions that are used by utilities and tests *)
 
 open Ast
@@ -35,3 +37,16 @@ let stream_concrete ?(tag = "") mem_hash concrete_state block =
   let memv = Memory2array.coerce_rvar_state mem_hash Asmir.x86_mem in
   ignore(Traces.run_block concrete_state memv block);
   []
+
+
+let jitexecute inits p =
+IFDEF WITH_LLVM THEN
+  let cfg = Cfg_ast.of_prog p in
+  let cfg = Prune_unreachable.prune_unreachable_ast cfg in
+  let codegen = new Llvm_codegen.codegen Llvm_codegen.FuncMulti in
+  let jit = codegen#convert_cfg cfg in
+  let r = codegen#eval_fun ~ctx:inits jit in
+  Printf.printf "Result: %s\n" (Pp.ast_exp_to_string r)
+ELSE
+  failwith "LLVM not enabled"
+END;;

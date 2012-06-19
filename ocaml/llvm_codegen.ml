@@ -39,6 +39,8 @@ type memimpl = Real (** Use "real" memory; unsafe *)
                | Func (** Use memory functions, one byte at a time *)
                | FuncMulti (** Use memory functions, multiple bytes at a time *)
 
+let addr_type = Reg 64
+
 let string_to_memimpl s = match s with
   | "Real" -> Some Real
   | "Func" -> Some Func
@@ -268,7 +270,7 @@ object(self)
   method private convert_straightline_stmt s = 
     (* dprintf "Converting stmt %s" (Pp.ast_stmt_to_string s); *)
     match s with
-    | Label _ -> (* Labels can be safely ignored, they are already handled by the CFG *) ()
+    | Label _ -> ()
     | (Jmp _ | CJmp _ | Special _) as s ->
       failwith (Printf.sprintf "convert_straightline_stmt: Non-straightline statement type %s" (Pp.ast_stmt_to_string s))
     | Assert(e, _) ->
@@ -335,28 +337,60 @@ object(self)
     while PassManager.run_function f the_fpm do () done;
     f
 
-  method private convert_jump_statement rt s succs = match succs, s with
+  method private convert_jump_statement ijf rt s bb succs = match succs, s with
   (* If there are no successors, return now. *)
   | _, Some (Halt(e, _)) ->
-    build_ret (self#convert_exp e) builder
+    ignore(build_ret (self#convert_exp e) builder)
   | [], o ->
     (* wprintf "Program exit without returning a value"; *)
-    if rt = void_type context then build_ret_void builder
+    if rt = void_type context then ignore(build_ret_void builder)
     (* If no halt, we'll say undefined *)
-    else build_ret (undef rt) builder
-(* Unconditional branch *)
-  | [x], _ -> build_br x builder
-(* Conditional branch. The first element is the true branch. *)
+    else ignore(build_ret (undef rt) builder)
+  (* Indirect jump *)
+  | _, Some (Jmp(e, _)) when Ast.lab_of_exp e = None ->
+    ijf e
+  (* Unconditional branch *)
+  | [x], _ -> ignore(build_br x builder)
+  (* Conditional branch. The first element is the true branch. *)
   | [x;y], Some(CJmp(e, _, _, _)) ->
     let e' = self#convert_exp e in
-    build_cond_br e' x y builder
-  | _ -> failwith "convert_jump_statement: Invalid CFG"
+    ignore(build_cond_br e' x y builder)
+  (* BB_Indirect is allowed to have multiple successors *)
+  | _ when (CA.G.V.label bb) = Cfg.BB_Indirect -> ignore(build_unreachable builder)
+  | _ -> failwith (Printf.sprintf "convert_jump_statement: Invalid CFG @%s" (Cfg_ast.v2s bb))
 
-(** Convert a cfg to llvm IR.
+  (** Create a BB for handling indirect jumps *)
+  method private create_indirect_handler =
+    let addr = build_alloca (self#convert_type addr_type) "jump_addr" builder in
+    (* Append a new BB to the function *)
+    let start_bb = insertion_block builder in
+    let the_function = block_parent start_bb in
+    (* Abort BB *)
+    let abort_bb = append_block context "invalid_address" the_function in
+    ignore(position_at_end abort_bb builder);
+    ignore(build_call assertf [| const_null (i32_type context) |] "" builder);
+    ignore(build_unreachable builder);
 
-    XXX: Handle return values? Maybe by scanning all Halts in the
-    program and using that type?
-*)
+    (* Switch BB *)
+    let switch_bb = append_block context "switch" the_function in
+    ignore(position_at_end switch_bb builder);
+    let addr_load = build_load addr "read_addr" builder in
+    let switch = build_switch addr_load abort_bb 100 builder in
+    (* Move builder to original point *)
+    ignore(position_at_end start_bb builder);
+
+    (* Jump handler *)
+    (fun e ->
+      (* move llvalue to addr *)
+      let llvalue = self#convert_exp (Cast(CAST_UNSIGNED, addr_type, e)) in
+      ignore(build_store llvalue addr builder);
+      ignore(build_br switch_bb builder)),
+
+    (* Add new case *)
+    (fun llvalue llbb ->
+      add_case switch llvalue llbb)
+
+(** Convert a cfg to llvm IR. *)
   method convert_cfg cfg =
 
     let halt_type =
@@ -383,8 +417,14 @@ object(self)
       | None -> void_type context
     in
     dprintf "return type: %s" (string_of_lltype halt_type);
-    (* Map bb to llvm bb *)
+
+    (* Create a function for this cfg *)
     let f = self#anon_fun ~t:halt_type () in
+
+    (* Create an indirect jump handler *)
+    let build_ind_jump, add_label = self#create_indirect_handler in
+
+    (* Map bb to llvm bb *)
     let module H = Hashtbl.Make(CA.G.V) in
     let h = H.create 1000 in
     let get_llvmbb bb =
@@ -394,8 +434,21 @@ object(self)
         H.add h bb llvmbb;
         llvmbb
     in
+
+    (* Add labels to indirect jump *)
+    let add_labels bb stmts =
+      List.iter (function
+        | Label (l, _) ->
+          (match exp_of_lab l with
+          | Int _ as e ->
+            add_label (self#convert_exp e) (get_llvmbb bb)
+          | _ -> ())
+        | _ -> ()) stmts
+    in
+
     let firstbb = ref true in
     Toposort.iter (fun bb ->
+
       (* Create a new LLVM bb for this bb *)
       let llvmbb = get_llvmbb bb in
 
@@ -417,6 +470,7 @@ object(self)
       let succbbs =
         List.map CA.G.E.dst
           (match CA.G.succ_e cfg bb with
+          | l when (CA.G.V.label bb) = Cfg.BB_Indirect -> l
           | [] -> []
           | [x] -> [x]
           | [x;y] when CA.G.E.label x = Some true
@@ -428,6 +482,7 @@ object(self)
       let succllvmbbs = List.map get_llvmbb succbbs in
 
       let stmts = CA.get_stmts cfg bb in
+      add_labels bb stmts;
       let cfstmt, straightline_stmts = match List.rev stmts with
         | (Halt _ as j::tl) | (Jmp _ as j::tl) | (CJmp _ as j::tl) -> Some(j), tl
         | _ -> None, stmts
@@ -436,7 +491,7 @@ object(self)
       (* Convert the straightline statements *)
       self#convert_straightline straightline_stmts;
       (* Convert the jump *)
-      ignore(self#convert_jump_statement halt_type cfstmt succllvmbbs);
+      ignore(self#convert_jump_statement build_ind_jump halt_type cfstmt bb succllvmbbs);
 
     ) cfg;
     if debug then self#dump;

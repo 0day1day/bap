@@ -1,5 +1,3 @@
-(*pp camlp4o pa_macro.cmo *)
-
 let usage = "Usage: "^Sys.argv.(0)^" <input options> [transformations and outputs]\n\
              Transform BAP IL programs. "
 
@@ -15,6 +13,9 @@ type prog =
   | Ssa of ssa
 
 type cmd = 
+  | AnalysisAst of (ast -> unit)
+  | AnalysisAstCfg of (astcfg -> unit)
+  | AnalysisSsa of (ssa -> unit)
   | TransformAst of (ast -> ast)
   | TransformAstCfg of (astcfg -> astcfg)
   | TransformSsa of (ssa -> ssa)
@@ -34,25 +35,10 @@ let init_stmts () =
   List.fold_left (fun l (v,e) -> Move(v,e,[])::l) [] !inits
 
 let cexecute_at s p =
-  let () = ignore(Symbeval.concretely_execute p ~i:(init_stmts ()) ~s) in
-  p
+  ignore(Symbeval.concretely_execute p ~i:(init_stmts ()) ~s)
 
 let cexecute p =
-  let () = ignore(Symbeval.concretely_execute p ~i:(init_stmts ())) in
-  p
-
-let jitexecute p =
-IFDEF WITH_LLVM THEN
-  let cfg = Cfg_ast.of_prog p in
-  let cfg = Prune_unreachable.prune_unreachable_ast cfg in
-  let codegen = new Llvm_codegen.codegen Llvm_codegen.FuncMulti in
-  let jit = codegen#convert_cfg cfg in
-  let r = codegen#eval_fun ~ctx:(List.rev !inits) jit in
-  Printf.printf "Result: %s\n" (Pp.ast_exp_to_string r);
-  p
-ELSE
-  failwith "LLVM not enabled"
-END;;
+  ignore(Symbeval.concretely_execute p ~i:(init_stmts ()))
 
 let add c =
   pipeline := c :: !pipeline
@@ -87,15 +73,17 @@ let mapmem a e =
   inits := (m, Store(Var(m), a, e, exp_false, t)) :: !inits
   (* inits := s :: !inits *)
 
+let jitexecute p = Utils_common.jitexecute (List.rev !inits) p
+
 let speclist =
   ("-eval", 
-     Arg.Unit (fun () -> add(TransformAst cexecute)),
+     Arg.Unit (fun () -> add(AnalysisAst cexecute)),
      "Concretely execute the IL from the beginning of the program")
   ::("-eval-at", 
-     Arg.String (fun s -> add(TransformAst (cexecute_at (Int64.of_string s)))),
+     Arg.String (fun s -> add(AnalysisAst (cexecute_at (Int64.of_string s)))),
      "<pc> Concretely execute the IL from pc")
   ::("-jiteval",
-     Arg.Unit (fun () -> add(TransformAst jitexecute)),
+     Arg.Unit (fun () -> add(AnalysisAst jitexecute)),
      "Concretely execute the IL using the LLVM JIT compiler")
   ::("-init-var",
      Arg.Tuple 
@@ -130,6 +118,21 @@ let prog =
     exit 1
 
 let rec apply_cmd prog = function
+  | AnalysisAst f -> (
+    match prog with
+    | Ast p as p' -> f p; p'
+    | _ -> failwith "need explicit translation to AST"
+  )
+  | AnalysisAstCfg f -> (
+    match prog with
+    | AstCfg p as p' -> f p; p'
+    | _ -> failwith "need explicit translation to AST CFG"
+  )
+  | AnalysisSsa f -> (
+    match prog with
+    | Ssa p as p' -> f p; p'
+    | _ -> failwith "need explicit translation to SSA"
+  )
   | TransformAst f -> (
       match prog with
       | Ast p -> Ast(f p)
