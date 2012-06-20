@@ -99,6 +99,13 @@ else
    touch ocaml/makefile.inc
 fi
 
+# Check for etags
+AS_IF([which etags],
+      [HAVE_ETAGS=true],
+      [HAVE_ETAGS=false; AC_MSG_WARN([ETAGS not found. BAP will not build tags.])])
+
+AM_CONDITIONAL([HAVE_ETAGS], [test x$HAVE_ETAGS = xtrue])
+
 # Checks for ocaml libraries
 ocamlfind query camomile
 if test $? != 0; then

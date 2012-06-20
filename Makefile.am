@@ -17,4 +17,6 @@ cscope:
 bap-clean:
 	for d in $(BAPDIRS); do $(MAKE) -C $$d clean; done
 
+if HAVE_ETAGS
 all-local: tags
+endif
