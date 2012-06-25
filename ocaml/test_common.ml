@@ -37,7 +37,6 @@ let rec rm_and_ignore_list paths =
 
 
 (** STP helpers **)
-let stp_path = "../stpwrap/stp/bin/";;
 let stp = "stp";;
 
 let does_stp_work () =
@@ -45,14 +44,12 @@ let does_stp_work () =
     true
   else false
 
-let check_stp_path file =
+let check_stp_path () =
   print_endline("Checking for stp...");
   match Unix.system("echo 'QUERY(TRUE);' | stp 2> /dev/null") with
   | Unix.WEXITED(0) -> ()
-  | _ -> (if (Sys.file_exists file) 
-    then let path = Sys.getenv("PATH") in Unix.putenv "PATH" (path^":"^stp_path)
-    else skip_if true 
-      ("Skipping test.  Stp is not in PATH and can not find file "^file));;
+  | _ -> skip_if true 
+    "Skipping test.  Stp is not in PATH";;
 
 
 (** pin helpers **)

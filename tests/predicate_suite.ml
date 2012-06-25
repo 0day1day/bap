@@ -10,7 +10,7 @@ let stp_out = "stp_out.stp";;
 let solver = ref (Smtexec.STP.si);;
 
 let predicate_stp_setup _ =
-  let _ = check_stp_path (stp_path^stp) in 
+  let _ = check_stp_path() in 
   (* Silence floating point warnings for tests *)
   let _ = if (Asmir.get_print_warning()) then Asmir.set_print_warning(false) in
   let prog = Asmir.open_program test_file in

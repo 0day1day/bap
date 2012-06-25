@@ -22,7 +22,7 @@ let pin_trace_setup _ =
   check_pin_setup();
   (* check_file (pin_path^pin); *)
   (* check_file (gentrace_path^gentrace); *)
-  check_stp_path(stp_path^stp);
+  check_stp_path();
   create_input_file();
   assert_command ~exit_code (!pin_path^pin) args;
   find_pin_out (Array.to_list (Sys.readdir "./")) tag;;
