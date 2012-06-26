@@ -31,3 +31,13 @@ val backwards_taint : Ast.stmt list -> LocSet.t -> LocSet.t
 
 (** Prints the contents of a location set to [stdout]. *)
 val print_locset : LocSet.t -> unit
+
+(** [exp_to_locset] returns a location set that contains the locations of all variables and loaded memory addresses referenced in the expression [e]. *)
+val exp_to_locset : Ast.exp -> LocSet.t
+
+(** Given a trace of a crash, try to identify the faulting location.
+    The algorithm for this is simple: Look for the last indirect jump or
+    memory operation.  If this operation is an indirect jump, the target
+    is the faulting location.  For a memory reference, the addresses are
+    the faulting location. *)
+val identify_fault_location : Ast.program -> LocSet.t

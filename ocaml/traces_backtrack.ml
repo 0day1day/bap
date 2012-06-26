@@ -4,7 +4,7 @@ open Ast
 open Big_int_convenience
 open Type
 
-module D = Debug.Make(struct let name = "Exploitable" and default=`Debug end)
+module D = Debug.Make(struct let name = "Exploitable" and default=`NoDebug end)
 open D
 
 (* Represent a location, which is either a variable (register) or a
@@ -17,10 +17,14 @@ module Loc = struct
     | ((M x),(M y)) -> Big_int_Z.compare_big_int x y
     | ((V _),(M _)) -> -1
     | ((M _),(V _)) -> 1
+  let to_string = function
+    | V(v) -> Printf.sprintf "V(%s)" (Pp.var_to_string v)
+    | M(i) -> Printf.sprintf "M[%s]" (~% i)
 end
 
 module LocSet = Set.Make(Loc)
 module VH = Var.VarHash
+
 
 let print_locset vars =
   dprintf "  [+] Cardinality of Set: %d" (LocSet.cardinal vars);
@@ -112,3 +116,54 @@ let backwards_taint stmts locset =
     );
   ) rev_stmts;
   !vars
+
+(* Convert expression to a locset *)
+let exp_to_locset e =
+  let s = ref LocSet.empty in
+  let add l = s := LocSet.add l !s in
+
+  let v = object(self)
+    inherit Ast_visitor.nop
+    method visit_rvar v = add (Loc.V v); `SkipChildren
+    method visit_exp = function
+      | Load(_,Int(addr,_),_,t) when t = reg_8 ->
+        add (Loc.M addr);
+        `DoChildren
+      | Load _ ->
+        failwith "Memory loads must be 8-bit and have an integer address.  Maybe you need to concretize the trace."
+      | _ -> `DoChildren
+  end in
+  ignore(Ast_visitor.exp_accept v e);
+  !s
+
+(* Guess faulting locations from trace using heuristics *)
+let identify_fault_location t =
+  let revt = List.rev t in
+  let get_memory s =
+    let addrs = ref [] in
+    let v = object(self)
+      inherit Ast_visitor.nop
+      method visit_exp = function
+        | Load (_, Int(i,_), _, t)
+        | Store (_, Int(i,_), _, _, t) when t = reg_8 ->
+          addrs := (Loc.M i) :: !addrs;
+          `DoChildren
+        | Load _ | Store _ ->
+          failwith "Memory loads must be 8-bit and have an integer address.  Maybe you need to concretize the trace."
+        | _ -> `DoChildren
+    end
+    in
+    ignore(Ast_visitor.stmt_accept v s);
+    !addrs
+  in
+  let rec find_fault = function
+  (* XXX: We remove Jmps when we concretize... *)
+    | Jmp(e, _)::_ when lab_of_exp e = None -> exp_to_locset e
+    | s::_ when get_memory s <> [] ->
+      List.fold_left (fun s l -> LocSet.add l s) LocSet.empty (get_memory s)
+    | _::tl -> find_fault tl
+    | [] -> failwith "No faulting location found.  This is probably a bug."
+  in
+  let loc = find_fault revt in
+  if debug then print_locset loc;
+  loc

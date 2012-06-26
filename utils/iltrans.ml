@@ -102,16 +102,16 @@ let jumpelim p =
   fst(Ssa_simp_misc.cfg_jumpelim p)
 let ast_coalesce = Coalesce.coalesce_ast
 let ssa_coalesce = Coalesce.coalesce_ssa
-(* let memory2scalardef p = *)
-(*   Memory2scalar.convert_g p Memory2scalar.Default *)
-(* let memory2scalariroptir p = *)
-(*   Memory2scalar.convert_g p Memory2scalar.IndirectROPTIR *)
 
 (* Chop code added *)
 let ast_chop srcbb srcn trgbb trgn p =
   Ast_slice.CHOP_AST.chop p !srcbb !srcn !trgbb !trgn
 let ssa_chop srcbb srcn trgbb trgn p =
   Ssa_slice.CHOP_SSA.chop p !srcbb !srcn !trgbb !trgn
+
+let backwards_taint p =
+  let input_set = Traces_backtrack.backwards_taint p (Traces_backtrack.identify_fault_location p) in
+  Traces_backtrack.print_locset input_set
 
 let add c =
   pipeline := c :: !pipeline
@@ -334,7 +334,10 @@ let speclist =
      Arg.Unit(fun () -> Traces.padding := false),
      "Apply padding for symbolic unused bytes."
     )
-  ::("-no-let-bindings",
+  :: ("-trace-backwards-taint",
+      uadd (AnalysisAst backwards_taint),
+      "Run backwards taint analysis on a faulting/crashing trace to determine the causing bytes")
+  ::("-trace-no-let-bindings",
      Arg.Clear Traces.full_symbolic,
      "Disable the usage of let bindings during formula generation"
     )
@@ -382,8 +385,8 @@ let () = Arg.parse speclist anon usage
 
 let pipeline = List.rev !pipeline
 
-let prog =
-  try fst (Input.get_program())
+let prog, scope =
+  try (Input.get_program())
   with Arg.Bad s ->
     Arg.usage speclist (s^"\n"^usage);
     exit 1
