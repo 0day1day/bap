@@ -134,7 +134,7 @@ export LIBDIRS = $(LIBASMIR)/src $(VEX_DIR)
 export LIBDIRS += $(SOLVER_LIBDIRS) $(LIBTRACE)
 
 OCAMLLDFLAGS = -thread # just for make top
-OCAMLFLAGS = -thread -warn-error Aelz # -for-pack Bap #-w A
+OCAMLFLAGS = -thread -warn-error Aelz -annot # -for-pack Bap #-w A
 # merge everything but descriptions.
 OCAMLDOCFLAGS = -m avlsoper
 
