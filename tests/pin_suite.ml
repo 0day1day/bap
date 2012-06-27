@@ -1,6 +1,7 @@
 open OUnit
 open Pcre
 open Test_common
+open Traces_backtaint
 
 let bof = "C/bof1";;
 let taint_file = "tainted_file";;
@@ -10,7 +11,7 @@ let tag = "pin_suite";;
 
 let create_input_file _ =
   let out = open_out taint_file in
-  output_string out "helloooooooooooooooooo\n";
+  output_string out "helloooooooooooooooooooooo\n";
   close_out out;;
 
 
@@ -36,6 +37,30 @@ let pin_trace_test pin_out =
   Traces.consistency_check := false;
   ignore(Traces.output_exploit exploit_file prog);;
 
+let backwards_taint_test pin_out =
+  let prog = Asmir.serialized_bap_from_trace_file pin_out in
+  typecheck prog;
+  let input_locations = Test_common.backwards_taint prog in
+(* The buffer is eight bytes large, so make sure all bytes are
+   coming from after that.  This isn't exact, since copying eight bytes
+   at a time (XMM register) could make us off by seven bytes, but that
+   seems unlikely... *)
+  assert_bool "Early symbolic bytes affect crash"
+    (LocSet.for_all
+       (function
+         | Loc.V v ->
+           (try
+             let n = Traces.get_symb_num v in
+             n > 8 && n < 30
+            with _ -> assert_failure "Unable to find symbolic byte number")
+         | Loc.M _ -> assert_failure "Expected only symbolic bytes to influence crash")
+       input_locations);
+
+  let n = LocSet.cardinal input_locations in
+  Printf.printf "n = %d\n" n;
+  assert_bool "There must be at least one and less than sixteen bytes causing the crash" (n >= 1 && n <= 16)
+
+
 
 (* Note: This will leave the files pin.log and pintool.log by intention *)
 let pin_trace_cleanup pin_out =
@@ -45,6 +70,9 @@ let pin_trace_cleanup pin_out =
 
 let suite = "Pin" >:::
   [
-	"pin_taint_test" >:: (
-	  bracket pin_trace_setup pin_trace_test pin_trace_cleanup;)
+    "pin_trace_test" >::
+      bracket pin_trace_setup pin_trace_test pin_trace_cleanup;
+    (* We record the same trace twice, which is kind of dumb *)
+    "backwards_taint_test" >::
+      bracket pin_trace_setup backwards_taint_test pin_trace_cleanup;
   ]

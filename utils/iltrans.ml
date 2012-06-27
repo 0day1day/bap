@@ -102,10 +102,6 @@ let jumpelim p =
   fst(Ssa_simp_misc.cfg_jumpelim p)
 let ast_coalesce = Coalesce.coalesce_ast
 let ssa_coalesce = Coalesce.coalesce_ssa
-(* let memory2scalardef p = *)
-(*   Memory2scalar.convert_g p Memory2scalar.Default *)
-(* let memory2scalariroptir p = *)
-(*   Memory2scalar.convert_g p Memory2scalar.IndirectROPTIR *)
 
 (* Chop code added *)
 let ast_chop srcbb srcn trgbb trgn p =
@@ -334,7 +330,7 @@ let speclist =
      Arg.Unit(fun () -> Traces.padding := false),
      "Apply padding for symbolic unused bytes."
     )
-  ::("-no-let-bindings",
+  ::("-trace-no-let-bindings",
      Arg.Clear Traces.full_symbolic,
      "Disable the usage of let bindings during formula generation"
     )
@@ -375,6 +371,8 @@ let speclist =
       "Ensure all labels are unique")
   :: ("-replace-unknowns", uadd(TransformAst Hacks.replace_unknowns),
       "Replace all unknowns with zeros")
+  :: ("-flatten-mem", uadd(TransformAst Flatten_mem.flatten_mem_program),
+      "Flatten memory accesses")
   :: Input.speclist
 
 let anon x = raise(Arg.Bad("Unexpected argument: '"^x^"'"))
@@ -382,8 +380,8 @@ let () = Arg.parse speclist anon usage
 
 let pipeline = List.rev !pipeline
 
-let prog =
-  try fst (Input.get_program())
+let prog, scope =
+  try (Input.get_program())
   with Arg.Bad s ->
     Arg.usage speclist (s^"\n"^usage);
     exit 1

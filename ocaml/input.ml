@@ -39,8 +39,26 @@ let stream_speclist =
      "Enable pin trace.");
   ]
 
+let addinput i = inputs := i :: !inputs
+
+let trace_speclist =
+[
+    ("-trace",
+     Arg.String(fun s ->
+		  set_gc () ;
+		  addinput (`Trace s)),
+     "<file> Read in a trace and lift it to the IL");
+    ("-serializedtrace",
+     Arg.String(fun s ->
+		  set_gc () ;
+		  addinput (`Serializedtrace s)),
+     "<file> Read in a SerializedTrace and lift it to the IL");
+    ("-pin",
+     Arg.Set pintrace,
+     "Enable pin trace");
+]
+
 let speclist =
-  let addinput i = inputs := i :: !inputs in
   [
     ("-init-ro", Arg.Set (init_ro), "Access rodata.");
     ("-bin",
@@ -60,27 +78,14 @@ let speclist =
                [Arg.Set_string f;
                 Arg.String (fun s -> addinput (`Binrecurseat (!f, toint64 s)))]),
      "<file> <start> Lift binary to the IL using a recursive descent algorithm starting at <start>.");
-    ("-trace",
-     Arg.String(fun s ->
-		  set_gc () ;
-		  addinput (`Trace s)),
-     "<file> Read in a trace and lift it to the IL");
-    ("-serializedtrace",
-     Arg.String(fun s ->
-		  set_gc () ;
-		  addinput (`Serializedtrace s)),
-     "<file> Read in a SerializedTrace and lift it to the IL");
     ("-il",
      Arg.String(fun s -> addinput (`Il s)),
      "<file> Read input from an IL file.");
     ("-ir", (* to be removed in next versions *)
      Arg.String(fun s -> addinput (`Il s)),
      "<file> Read input from an IL file. (deprecated)");
-    ("-pin", (* enable pin trace *)
-     Arg.Set pintrace,
-     "Enable pin trace");
-	("-always-vex", Arg.Set Asmir.always_vex, "Only use vex to lift to IL" );
-  ]
+    ("-always-vex", Arg.Set Asmir.always_vex, "Only use vex to lift to IL" );
+  ] @ trace_speclist
 
 
 
