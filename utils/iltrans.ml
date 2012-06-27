@@ -109,10 +109,6 @@ let ast_chop srcbb srcn trgbb trgn p =
 let ssa_chop srcbb srcn trgbb trgn p =
   Ssa_slice.CHOP_SSA.chop p !srcbb !srcn !trgbb !trgn
 
-let backwards_taint p =
-  let input_set = Traces_backtrack.backwards_taint p (Traces_backtrack.identify_fault_location p) in
-  Traces_backtrack.print_locset input_set
-
 let add c =
   pipeline := c :: !pipeline
 
@@ -334,9 +330,6 @@ let speclist =
      Arg.Unit(fun () -> Traces.padding := false),
      "Apply padding for symbolic unused bytes."
     )
-  :: ("-trace-backwards-taint",
-      uadd (AnalysisAst backwards_taint),
-      "Run backwards taint analysis on a faulting/crashing trace to determine the causing bytes")
   ::("-trace-no-let-bindings",
      Arg.Clear Traces.full_symbolic,
      "Disable the usage of let bindings during formula generation"
@@ -378,6 +371,8 @@ let speclist =
       "Ensure all labels are unique")
   :: ("-replace-unknowns", uadd(TransformAst Hacks.replace_unknowns),
       "Replace all unknowns with zeros")
+  :: ("-flatten-mem", uadd(TransformAst Flatten_mem.flatten_mem_program),
+      "Flatten memory accesses")
   :: Input.speclist
 
 let anon x = raise(Arg.Bad("Unexpected argument: '"^x^"'"))

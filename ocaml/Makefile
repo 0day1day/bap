@@ -101,7 +101,7 @@ export SOURCES = \
 	coalesce.mli coalesce.ml \
 	traces.ml \
 	traces_surgical.ml \
-	traces_backtrack.mli traces_backtrack.ml \
+	traces_backtaint.mli traces_backtaint.ml \
 	utils_common.ml \
 	test_common.ml \
 	template.ml \

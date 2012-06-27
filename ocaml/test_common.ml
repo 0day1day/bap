@@ -214,3 +214,13 @@ let rec summarize_results res =
   match res with
   | [] -> None
   | r::rs -> summarize r; summarize_results rs;;
+
+let backwards_taint prog =
+  let prog = Traces.concrete prog in
+
+  (* Flatten memory *)
+  let prog = Flatten_mem.flatten_mem_program prog in
+
+  (* Try to identify fault *)
+  let fault_location = Traces_backtaint.identify_fault_location prog in
+  Traces_backtaint.backwards_taint prog fault_location

@@ -27,10 +27,10 @@ module VH = Var.VarHash
 
 
 let print_locset vars =
-  dprintf "  [+] Cardinality of Set: %d" (LocSet.cardinal vars);
+  Printf.printf "  [+] Cardinality of Set: %d\n" (LocSet.cardinal vars);
   LocSet.iter (fun k -> match k with
-  | Loc.V(x) -> dprintf "   [-] Var name: %s" (Pp.var_to_string x)
-  | Loc.M(x) -> dprintf "   [-] Addr: %s" (Util.hex_of_big_int x)) vars
+  | Loc.V(x) -> Printf.printf "   [-] Var name: %s\n" (Pp.var_to_string x)
+  | Loc.M(x) -> Printf.printf "   [-] Addr: %s\n" (Util.hex_of_big_int x)) vars
 
 (* Given an expression e, recursively adds referenced locations to the
  * given set.
