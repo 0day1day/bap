@@ -1,3 +1,5 @@
+export OCAML_COMPAT='c'
+
 if HAVE_PIN
 PINTRACES=pintraces
 endif
