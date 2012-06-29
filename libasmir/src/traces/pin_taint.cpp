@@ -500,7 +500,9 @@ bool TaintTracker::taintPreSC(uint32_t callno, const uint64_t *args, /* out */ u
         if (taint_files.find(string(filename)) != taint_files.end()) {
           cerr << "Opening tainted file: " << string(filename) << endl;
           state = __NR_open;
-        }
+        } else {
+	  cerr << "Open non-tainted file: " << string(filename) << endl;
+	}
         break;
       case __NR_close:
         state = __NR_close;
