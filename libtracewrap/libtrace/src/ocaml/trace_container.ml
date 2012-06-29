@@ -99,7 +99,7 @@ object(self)
 
     let toc_offset = LargeFile.pos_out oc in
     (* Make sure the toc is the right size. *)
-    let () = assert ((Int64.div (Int64.pred num_frames) frames_per_toc_entry) = Int64.of_int (List.length toc)) in
+    let () = assert ((num_frames = 0L) || (Int64.div (Int64.pred num_frames) frames_per_toc_entry) = Int64.of_int (List.length toc)) in
     (* Write frames per toc entry. *)
     let () = write_i64 oc frames_per_toc_entry in
     (* Write toc to file. *)

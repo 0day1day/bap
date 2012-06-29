@@ -84,7 +84,7 @@ namespace SerializedTrace {
     uint64_t toc_offset = ofs.tellp();
 
     /* Make sure the toc is the right size. */
-    assert (((num_frames - 1) / frames_per_toc_entry) == toc.size());
+    assert ((num_frames == 0) || ((num_frames - 1) / frames_per_toc_entry) == toc.size());
 
     /* Write frames per toc entry. */
     WRITE(frames_per_toc_entry);
