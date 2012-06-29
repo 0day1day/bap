@@ -15,4 +15,12 @@ let test_list_append _ =
 let suite = "OUnit Example" >::: ["test_list_length" >:: test_list_length;
 				  "test_list_append" >:: test_list_append]
 let _ =
-  run_test_tt_main suite
+  let verbose = ref false in
+  let set_verbose _ = verbose := true in
+  Arg.parse
+    [("-verbose", Arg.Unit set_verbose, "Run the test in verbose mode.");]
+    (fun x -> raise (Arg.Bad ("Bad argument : " ^ x)))
+    ("usage: " ^ Sys.argv.(0) ^ " [-verbose]");
+  if not (was_successful (run_test_tt ~verbose:!verbose suite)) then
+    exit 1
+
