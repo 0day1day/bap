@@ -594,6 +594,8 @@ let binary_of_big_int ?pad n =
     time, instead of just a nibble.
 *)
 let hex_of_big_int ?pad n = 
+  if n < Big_int_Z.zero_big_int then
+    failwith "hex_of_big_int: Cannot convert infinite-width negative number to hex";
   let getn n = Big_int_Z.and_big_int n (big_int_of_int 0xf) in (* Get lsnibble *)
   let getrest n = Big_int_Z.shift_right_big_int n 4 in (* Get all but lsnibble *)
   let zeroextend s = match pad with
