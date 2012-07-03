@@ -185,7 +185,7 @@ let speclist =
      uadd(TransformSsa Depgraphs.DDG_SSA.stmtlist_to_single_stmt),
      "Create new graph where every node has at most 1 SSA statement"
     )
-  ::("-trace-cut", Arg.Int(fun i -> add(TransformAst(Util.take i))),
+  ::("-trace-cut", Arg.Int(fun i -> add(TransformAst(BatList.take i))),
      "<n>  Get the first <n> instructions of the trace")
   ::("-trace-concrete",
      uadd(TransformAst Traces.concrete),

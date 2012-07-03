@@ -89,9 +89,9 @@ object (self)
 	 let maskedval = Arithmetic.to_big_int (i,t) in
 	 (match t with
 	   | Reg n when (n mod 4) = 0 ->
-	       printf "0hex%s" (Util.hex_of_big_int ~pad:(n/4) maskedval)
+	       printf "0hex%s" (Util.big_int_to_hex ~pad:(n/4) maskedval)
 	   | Reg n ->
-	       printf "0bin%s" (Util.binary_of_big_int ~pad:n maskedval)
+	       printf "0bin%s" (Util.big_int_to_binary ~pad:n maskedval)
 	   | _ -> invalid_arg "Only constant integers supported")
      | Ite(b, v1, v2) ->
 	 (* XXX: Needs testing *)

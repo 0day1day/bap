@@ -201,9 +201,9 @@ let run_and_subst_block state memv block =
       | Symbolic(e) -> e
       | _ -> failwith "Expected symbolic" 
     in
-    executed := Util.fast_append input_seeds !executed ;
+    executed := BatList.append input_seeds !executed ;
       if !place >= extra then (
-    executed := Util.fast_append (trace_transform_stmt2 stmt evalf) !executed ; 
+    executed := BatList.append (trace_transform_stmt2 stmt evalf) !executed ; 
       );
         place := !place + 1;
     (*print_endline (Pp.ast_stmt_to_string stmt) ;*)

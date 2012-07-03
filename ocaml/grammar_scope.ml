@@ -53,7 +53,7 @@ module Scope = struct
     let v = Hashtbl.find (fst scope) n in
     if t = None || t = Some(Var.typ v)
     then v
-    else err ("Variable '"^n^"' used with inconsistent type: "^(Pp.typ_to_string (Var.typ v))^" "^(Pp.typ_to_string (Util.option_unwrap t)))
+    else err ("Variable '"^n^"' used with inconsistent type: "^(Pp.typ_to_string (Var.typ v))^" "^(Pp.typ_to_string (BatOption.get t)))
 
   let get_lval scope n t =
     let n = stripnum n in

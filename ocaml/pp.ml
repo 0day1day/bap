@@ -123,7 +123,7 @@ object (self)
       let ts = string_of_int t in
 	(*if t = Taint then "tainted" else "untainted" in*)
 	let ind = if mem then "[0x"^(Int64.format "%Lx" i)^"]" else "" in
-	pp "@context "; pp (s^ ind ^" = 0x"^(Util.hex_of_big_int v)^ ", " ^ ts
+	pp "@context "; pp (s^ ind ^" = 0x"^(Util.big_int_to_hex v)^ ", " ^ ts
 			      ^", u"
 			      ^ (string_of_int bits))
     | Context _ ->
@@ -146,7 +146,7 @@ object (self)
     | (bi,t) ->
         if (abs_big_int bi) <% bia
         then pp (string_of_big_int bi)
-        else pp ("0x"^(Util.hex_of_big_int (Arithmetic.to_big_int (i,t))));
+        else pp ("0x"^(Util.big_int_to_hex (Arithmetic.to_big_int (i,t))));
         pp ":"; self#typ t
 
 

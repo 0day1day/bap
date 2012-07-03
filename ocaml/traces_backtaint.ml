@@ -30,7 +30,7 @@ let print_locset vars =
   Printf.printf "  [+] Cardinality of Set: %d\n" (LocSet.cardinal vars);
   LocSet.iter (fun k -> match k with
   | Loc.V(x) -> Printf.printf "   [-] Var name: %s\n" (Pp.var_to_string x)
-  | Loc.M(x) -> Printf.printf "   [-] Addr: %s\n" (Util.hex_of_big_int x)) vars
+  | Loc.M(x) -> Printf.printf "   [-] Addr: %s\n" (Util.big_int_to_hex x)) vars
 
 (* Given an expression e, recursively adds referenced locations to the
  * given set.

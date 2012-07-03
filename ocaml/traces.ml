@@ -675,7 +675,7 @@ let remove_specials =
 (* Appends a Halt instruction to the end of the trace *)
 let append_halt trace =
   let halt = Ast.Halt (exp_true, []) in
-    Util.fast_append trace [halt]
+    BatList.append trace [halt]
 
 (** A trace is a sequence of instructions. This function
     takes a list of ast statements and returns a list of
@@ -1134,7 +1134,7 @@ let run_block ?(next_label = None) ?(log=fun _ -> ()) ?(transformf = (fun s _ ->
   TraceConcrete.initialize_prog state block ;
   clean_delta state.delta;
   let executed = ref [] in
-  executed := Util.fast_append input_seeds !executed;
+  executed := BatList.append input_seeds !executed;
   let rec eval_block state =
     let stmt = TraceConcrete.inst_fetch state.sigma state.pc in
     (* pdebug ("Executing: " ^ (Pp.ast_stmt_to_string stmt)); *)
@@ -1143,7 +1143,7 @@ let run_block ?(next_label = None) ?(log=fun _ -> ()) ?(transformf = (fun s _ ->
       | Symbolic(e) -> e
       | _ -> failwith "Expected symbolic"
     in
-    executed := Util.fast_append (transformf stmt evalf) !executed ; 
+    executed := BatList.append (transformf stmt evalf) !executed ; 
     (*print_endline (Pp.ast_stmt_to_string stmt) ;*)
 
     (* If we have a system call, run the model instead.
@@ -1587,7 +1587,7 @@ struct
   let assign v ev ({delta=delta; pred=pred; pc=pc} as ctx) =
     let expr = symb_to_exp ev in
     let is_worth_storing = (*is_concrete expr &&*)
-      Disasm.is_temp (Util.option_unwrap (dsa_var v))
+      Disasm.is_temp (BatOption.get (dsa_var v))
     in
     let delta', pred' =
       if is_worth_storing then (dprintf "Storing %s in delta" (Var.name v);
@@ -1746,14 +1746,14 @@ let control_flow addr trace =
   let target = big_int_of_string addr in
   let target = Int(target,reg_32) in
   let trace, assertion = hijack_control target trace in
-    Util.fast_append trace [assertion]
+    BatList.append trace [assertion]
 
 (* Making the final jump target a symbolic variable. This
    should be useful for enumerating all possible jump targets *)
 let limited_control trace =
   let target = Var (Var.newvar "s_jump_target" reg_32) in
   let trace, assertion = hijack_control target trace in
-    Util.fast_append trace [assertion]
+    BatList.append trace [assertion]
 
 (** Return the last load expression *)
 let get_last_load_exp stmts =
@@ -1818,24 +1818,24 @@ let add_payload ?(offset=0L) payload trace =
   let _, index, trace = get_last_load_exp trace in
   let start = BinOp(PLUS, index, Int(big_int_of_int64 offset, reg_32)) in
   let assertions = inject_payload_gen start payload trace in
-    Util.fast_append trace assertions
+    BatList.append trace assertions
 
 let add_payload_after ?(offset=4L) payload trace =
   let payload = string_to_bytes payload in
   let trace, assertions = inject_payload offset payload trace in
-    Util.fast_append trace assertions
+    BatList.append trace assertions
 
 let add_payload_from_file ?(offset=0L) file trace =
   let payload = bytes_from_file file in
   let _, index, trace = get_last_load_exp trace in
   let start = BinOp(PLUS, index, Int(big_int_of_int64 offset, reg_32)) in
   let assertions = inject_payload_gen start payload trace in
-    Util.fast_append trace assertions
+    BatList.append trace assertions
 
 let add_payload_from_file_after ?(offset=4L) file trace =
   let payload = bytes_from_file file in
   let trace, assertions = inject_payload offset payload trace in
-    Util.fast_append trace assertions
+    BatList.append trace assertions
 
 exception Found_load of Ast.exp
 
@@ -1851,25 +1851,25 @@ let inject_shellcode nops trace =
   let payload = string_to_bytes payload in
   let _, trace = get_last_jmp_exp trace in
   let trace, shell = inject_payload 4L payload trace in
-    Util.fast_append trace (shell @ [assertion])
+    BatList.append trace (shell @ [assertion])
 
 (** Use pivot to create exploit *)
 let add_pivot gaddr maddr payload trace =
   let gaddrexp = Int(big_int_of_int64 gaddr, reg_32) in
   let trace, assertion = hijack_control gaddrexp trace in
   (* Concatenate the assertion and the gadget IL *)
-  let trace = Util.fast_append trace [assertion] in
+  let trace = BatList.append trace [assertion] in
   let passerts = inject_payload_gen (Int(big_int_of_int64 maddr, reg_32)) (string_to_bytes payload) trace in
-  Util.fast_append trace passerts
+  BatList.append trace passerts
 
 (** Use pivot to create exploit *)
 let add_pivot_file gaddr maddr payloadfile trace =
   let gaddrexp = Int(big_int_of_int64 gaddr, reg_32) in
   let trace, assertion = hijack_control gaddrexp trace in
   (* Concatenate the assertion and the gadget IL *)
-  let trace = Util.fast_append trace [assertion] in
+  let trace = BatList.append trace [assertion] in
   let passerts = inject_payload_gen (Int(big_int_of_int64 maddr, reg_32)) (bytes_from_file payloadfile) trace in
-  Util.fast_append trace passerts
+  BatList.append trace passerts
 
 (** Transfer control by overwriting sehaddr with gaddr. *)
 let add_seh_pivot gaddr sehaddr paddr payload trace =
@@ -1879,9 +1879,9 @@ let add_seh_pivot gaddr sehaddr paddr payload trace =
   let endtrace = Ast.Comment (endtrace, []) in
   let assertion = Ast.Assert(BinOp(EQ, gaddrexp, sehexp), []) in
   (* Concatenate the assertion and the gadget IL *)
-  let trace = Util.fast_append trace [endtrace; assertion] in
+  let trace = BatList.append trace [endtrace; assertion] in
   let passerts = inject_payload_gen (Int(big_int_of_int64 paddr, reg_32)) (string_to_bytes payload) trace in
-  Util.fast_append trace passerts
+  BatList.append trace passerts
 
 (** Transfer control by overwriting sehaddr with gaddr. *)
 let add_seh_pivot_file gaddr sehaddr paddr payloadfile trace =
@@ -1891,9 +1891,9 @@ let add_seh_pivot_file gaddr sehaddr paddr payloadfile trace =
   let endtrace = Ast.Comment (endtrace, []) in
   let assertion = Ast.Assert(BinOp(EQ, gaddrexp, sehexp), []) in
   (* Concatenate the assertion and the gadget IL *)
-  let trace = Util.fast_append trace [endtrace; assertion] in
+  let trace = BatList.append trace [endtrace; assertion] in
   let passerts = inject_payload_gen (Int(big_int_of_int64 paddr, reg_32)) (bytes_from_file payloadfile) trace in
-  Util.fast_append trace passerts
+  BatList.append trace passerts
 
 (*************************************************************)
 (********************  Formula Generation  *******************)
@@ -2029,7 +2029,7 @@ let add_assignments trace =
          (Ast.Move (var, value, []))::acc
       ) varset []
     in
-      Util.fast_append assignments trace
+      BatList.append assignments trace
 
 (*************************************************************)
 (******************* Formula Debugging  **********************)
@@ -2044,7 +2044,7 @@ let trace_valid_to_invalid trace =
     if l >= u - 1 then (l,u)
     else
       let middle = (l + u) / 2 in
-      let trace = Util.take middle trace in
+      let trace = BatList.take middle trace in
       try
         ignore (output_formula "temp" trace) ;
         ignore (solve_formula "temp" "tempout") ;
@@ -2064,8 +2064,8 @@ let trace_valid_to_invalid trace =
            bsearch l (u-1))
   in
   let (l,u) = bsearch 1 length in
-  ignore (output_formula "form_val" (Util.take l trace)) ;
-  ignore (output_formula "form_inv" (Util.take u trace)) 
+  ignore (output_formula "form_val" (BatList.take l trace)) ;
+  ignore (output_formula "form_inv" (BatList.take u trace)) 
 
 (* Binary search over the concretized IL to check where things go
    wrong. *)
@@ -2088,7 +2088,7 @@ let formula_valid_to_invalid ?(min=1) trace =
     if l >= u - 1 then (l,u)
     else
       let middle = (l + u) / 2 in
-      let trace = Util.take middle trace in
+      let trace = BatList.take middle trace in
       try
         sym_and_output trace "temp";
         ignore (solve_formula "temp" "tempout") ;
@@ -2108,8 +2108,8 @@ let formula_valid_to_invalid ?(min=1) trace =
            bsearch l (u-1))
   in
   let (l,u) = bsearch min length in
-  ignore (sym_and_output (Util.take l trace) "form_val") ;
-  ignore (sym_and_output (Util.take u trace) "form_inv")
+  ignore (sym_and_output (BatList.take l trace) "form_val") ;
+  ignore (sym_and_output (BatList.take u trace) "form_inv")
 
 let clean =
   let rec clean_aux acc = function

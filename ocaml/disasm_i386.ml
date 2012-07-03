@@ -424,7 +424,9 @@ let bits2reg32= function
 
 let bits2xmm b = xmms.(b)
 
-and reg2bits r = Util.list_firstindex [eax; ecx; edx; ebx; esp; ebp; esi; edi] ((==)r)
+and reg2bits r =
+  let (i,_) = BatList.findi (fun _ x -> x == r) [eax; ecx; edx; ebx; esp; ebp; esi; edi] in
+  i
 
 let bits2xmme b = Var(bits2xmm b)
 

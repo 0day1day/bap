@@ -67,7 +67,7 @@ class pp ?suffix:(s="") ft =
 	    oh bop e'1 e'2
 	| _ -> [e2]
       in
-      Util.fast_append l1 l2
+      BatList.append l1 l2
     in
     match e with
     | BinOp(bop, e1, e2) ->
