@@ -1646,13 +1646,6 @@ let symbolic_run trace =
              stmts := !stmts @ [assert_vars h]
            );
            stmts := List.map to_dsa (!stmts @ [stmt]);
-           (*(if !status >= 3770 && !status <= 3771 then
-              (count := !count + 1;
-               (*print_endline (Pp.ast_stmt_to_string stmt) ;*)
-               (*TraceSymbolic.print_var state.delta "R_EAX" ;*)
-              let formula = TraceSymbolic.output_formula () in
-                print_formula ("form_" ^ (string_of_int !count)) formula))
-             ;*)
            dprintf "Evaluating stmt %s" (Pp.ast_stmt_to_string stmt);
            (match stmt with
               | Ast.Label (_,atts) when filter_taint atts != [] ->

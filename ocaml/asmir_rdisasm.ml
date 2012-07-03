@@ -1,7 +1,4 @@
-(** Recursive disassembly module
-
-    @author Ricky
-*)
+(* Recursive disassembly module *)
 
 open Ast
 open BatListFull
@@ -76,16 +73,22 @@ module Int64Set = Set.Make(
 type callback = addr -> addr -> stmt list -> bool
 let default _ _ _ = true
 
-(** Recursively disassemble [p] beginning at [startaddr]. If [f] is
-    defined and [f addr stmts] returns false, raises
-    {!Asmir.Disassembly_error}. *)
-let rdisasm_at ?(f=default) p startaddr =
+let rdisasm_at ?(f=default) p startaddrs =
   let seen = ref Int64Set.empty in
   let out = ref [] in
   let outasm = ref "" in
   let stack = Queue.create () in
   let numstmts = ref 0 in
-  Queue.push startaddr stack;
+
+  (* Remove duplicates or we'll get duplicate labels *)
+  let startaddrs = Util.list_unique startaddrs in
+
+  (* Initialize with the startaddrs *)
+  List.iter (fun startaddr ->
+    Queue.push startaddr stack;
+    seen := Int64Set.add startaddr !seen
+  ) startaddrs;
+
   while not (Queue.is_empty stack) do
     let addr = Queue.pop stack in
     try
@@ -108,10 +111,10 @@ let rdisasm_at ?(f=default) p startaddr =
   done;
   List.concat (List.rev !out), !outasm
 
-(** Recursively disassemble [p] beginning at the program's defined start
-    address.  [f] behaves the same as in {!rdisasm_at}. *)
 let rdisasm ?(f=default) p =
-  rdisasm_at ~f p (Asmir.get_start_addr p)
+  let func_starts = List.map (function (_, s, _) -> s) (Asmir.get_function_ranges p) in
+  let startaddrs = Asmir.get_start_addr p :: func_starts in
+  rdisasm_at ~f p startaddrs
 
 let max_callback n =
   let ctr = ref 0 in
