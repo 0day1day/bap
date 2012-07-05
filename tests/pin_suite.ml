@@ -38,6 +38,7 @@ let pin_trace_test pin_out =
   ignore(Traces.output_exploit exploit_file prog);;
 
 let backwards_taint_test pin_out =
+  Traces.cleanup();
   let prog = Asmir.serialized_bap_from_trace_file pin_out in
   typecheck prog;
   let input_locations = Test_common.backwards_taint prog in
