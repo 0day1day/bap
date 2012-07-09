@@ -26,13 +26,17 @@ let setint64 r s =  r := toint64 s
 let stream_speclist =
   (* let addinput i = streaminputs := i :: !streaminputs in *)
   [
-	("-rate",
-	 Arg.String(setint64 streamrate), "<rate> Stream at rate frames");
+    ("-rate",
+     Arg.String(setint64 streamrate), "<rate> Stream at rate frames");
     ("-tracestream",
-     Arg.String(fun s -> streaminputs := Some(`Tracestream s)),
+     Arg.String(fun s ->
+       set_gc ();
+       streaminputs := Some(`Tracestream s)),
      "<file> Read a PinTrace to be processed as a stream.");
     ("-serializedtracestream",
-     Arg.String(fun s -> streaminputs := Some(`Serializedtracestream s)),
+     Arg.String(fun s ->
+       set_gc ();
+       streaminputs := Some(`Serializedtracestream s)),
      "<file> Read a SerializedTrace to be processed as a stream.");
     ("-pin",
      Arg.Set pintrace,
@@ -45,13 +49,13 @@ let trace_speclist =
 [
     ("-trace",
      Arg.String(fun s ->
-		  set_gc () ;
-		  addinput (`Trace s)),
+       set_gc () ;
+       addinput (`Trace s)),
      "<file> Read in a trace and lift it to the IL");
     ("-serializedtrace",
      Arg.String(fun s ->
-		  set_gc () ;
-		  addinput (`Serializedtrace s)),
+       set_gc () ;
+       addinput (`Serializedtrace s)),
      "<file> Read in a SerializedTrace and lift it to the IL");
     ("-pin",
      Arg.Set pintrace,
