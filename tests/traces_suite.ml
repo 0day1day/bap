@@ -1,70 +1,79 @@
 open OUnit
 open Pcre
-open Ast
 open Test_common
-open Big_int
-open Big_int_convenience
+open Traces_backtaint
 
-let test_file = "C/test";;
-let il_file = "C/test.il";;
-
-
-(* i represents the change on the stack to the "wrong" value for function g *)
-let i = 
-  let a,_ = Parser.exp_from_string "R_ESP_1:u32" in
-  let e,_ = Parser.exp_from_string "43:u32" in
-  let t = Typecheck.infer_ast e in
-  let m = match Parser.exp_from_string "mem_45:?u32" with
-    | Var(v), _ -> v
-    | _ -> assert false
-  in
-  let s = Move(m, Store(Var(m), a, e, exp_false, t), []) in
-  [s];;
+let bof = "C/bof1";;
+let taint_file = "tainted_file";;
+let exploit_file = "exploit";;
+let tag = "pin_suite";;
 
 
-(** Lift C/test and convert it to bap.  Then inject "halt true" after the return
-    in the main function. Print this out to the file test.il. *)
-let concrete_eval_setup _ =
-  let out = open_out il_file in
-  let pp = new Pp.pp_oc out in
-  let prog = Asmir.open_program test_file in
-  let ranges = Asmir.get_function_ranges prog in
-  let (start_addr,_) = find_fun ranges "main" in
-  (* Silence floating point warnings for tests *)
-  let _ = if (Asmir.get_print_warning()) then Asmir.set_print_warning(false) in
-  let ir = Asmir.asmprogram_to_bap prog in
-  let outir = inject_stmt ir start_addr "ret" halt_stmt in 
-  pp#ast_program outir;
-  pp#close;
-  (ranges, start_addr);;
+let create_input_file _ =
+  let out = open_out taint_file in
+  output_string out "helloooooooooooooooooooooo\n";
+  close_out out;;
 
 
-(** Open the file test.il and run two concrete executions.  The first verifies
-    running from main results in the desired value (42 = 0x2aL).  The second
-    concrete execution changes the value on the stack to 43 (i), starts
-    the execution at the "call <g>" assembly instruction in main, and verifies
-	that the result is -1. *)
-let concrete_eval_test (ranges, s) = 
-  let prog,_ = Parser.program_from_file il_file in
-  let ctx1 = Symbeval.concretely_execute ~s prog in
-  let eax1 = biconst 0x2a in
-  let (start_addr,end_addr) = find_fun ranges "main" in
-  let main_prog = Test_common.find_prog_chunk prog start_addr end_addr in
-  let s = find_call main_prog in 
-  let ctx2 = Symbeval.concretely_execute ~s ~i prog in
-  let eax2 = Arithmetic.to_big_int(bim1,Type.Reg(32)) in
-  let msg = " from check_functions" in
+let pin_trace_setup _ =
+  let args =
+	["-t"; (gentrace_path^gentrace); "-taint-files"; taint_file;
+	 "-o"; tag^pin_out_suffix; "--"; bof; taint_file ] in
+  let exit_code = Unix.WEXITED(0) in
+  check_pin_setup();
+  (* check_file (pin_path^pin); *)
+  (* check_file (gentrace_path^gentrace); *)
+  check_stp_path();
+  create_input_file();
+  assert_command ~exit_code (!pin_path^pin) args;
+  find_pin_out (Array.to_list (Sys.readdir "./")) tag;;
+
+
+let pin_trace_test pin_out =
+  let prog = Asmir.serialized_bap_from_trace_file pin_out in
   typecheck prog;
-  check_functions msg ranges ["main"; "g"];
-  check_eax ctx1 eax1;
-  check_eax ctx2 eax2;;
+  Traces.consistency_check := true;
+  ignore(Traces.concrete prog);
+  Traces.consistency_check := false;
+  ignore(Traces.output_exploit exploit_file prog);;
+
+let backwards_taint_test pin_out =
+  Traces.cleanup();
+  let prog = Asmir.serialized_bap_from_trace_file pin_out in
+  typecheck prog;
+  let input_locations = Test_common.backwards_taint prog in
+(* The buffer is eight bytes large, so make sure all bytes are
+   coming from after that.  This isn't exact, since copying eight bytes
+   at a time (XMM register) could make us off by seven bytes, but that
+   seems unlikely... *)
+  assert_bool "Early symbolic bytes affect crash"
+    (LocSet.for_all
+       (function
+         | Loc.V v ->
+           (try
+             let n = Traces.get_symb_num v in
+             n > 8 && n < 30
+            with _ -> assert_failure "Unable to find symbolic byte number")
+         | Loc.M _ -> assert_failure "Expected only symbolic bytes to influence crash")
+       input_locations);
+
+  let n = LocSet.cardinal input_locations in
+  Printf.printf "n = %d\n" n;
+  assert_bool "There must be at least one and less than sixteen bytes causing the crash" (n >= 1 && n <= 16)
 
 
-let concrete_eval_tear_down _ = rm_and_ignore il_file;;
+
+(* Note: This will leave the files pin.log and pintool.log by intention *)
+let pin_trace_cleanup pin_out =
+  rm_and_ignore_list [pin_out ; exploit_file ; taint_file];;
+(*  Sys.remove pin_out; Sys.remove exploit_file; Sys.remove taint_file;; *)
 
 
 let suite = "Traces" >:::
   [
-	"concrete_eval_test" >::
-	  (bracket concrete_eval_setup concrete_eval_test concrete_eval_tear_down);
+    "pin_trace_test" >::
+      bracket pin_trace_setup pin_trace_test pin_trace_cleanup;
+    (* We record the same trace twice, which is kind of dumb *)
+    "backwards_taint_test" >::
+      bracket pin_trace_setup backwards_taint_test pin_trace_cleanup;
   ]

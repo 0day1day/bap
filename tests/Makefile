@@ -57,8 +57,8 @@ define PROJ_baptest
 	ast_suite.ml \
 	disasm_i386_suite.ml \
 	asmir_suite.ml \
+	eval_suite.ml \
 	traces_suite.ml \
-	pin_suite.ml \
 	predicate_suite.ml \
 	arithmetic_suite.ml \
 	dominator_suite.ml \
