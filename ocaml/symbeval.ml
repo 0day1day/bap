@@ -102,7 +102,7 @@ let context_copy = VH.copy
 (* Unwrapping functions *)
 let symb_to_exp = function
   | Symbolic e -> e
-  | ConcreteMem _ -> failwith "this is not a symbolic expression"
+  | ConcreteMem _ -> failwith "symb_to_exp called on concrete memory"
 let concmem_to_mem = function
   | ConcreteMem m -> m
   | _ -> failwith "not a concrete memory"

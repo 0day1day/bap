@@ -60,8 +60,6 @@ let dce = ref true;;
 (* Concretizing as much as possible *)
 let allow_symbolic_indices = ref false
 
-let full_symbolic = ref true
-
 let padding = ref true
 
 let printer = ref "stp"
@@ -1531,128 +1529,6 @@ let formula_size formula =
   in
     size formula
 
-module IntSet = Set.Make(Int64)
-let memory_read = ref IntSet.empty
-let memory_write = ref IntSet.empty
-let empty_mem_ind () =
-  memory_read  := IntSet.empty;
-  memory_write := IntSet.empty
-
-let get_indices () =
-  empty_mem_ind () ;
-  conc_mem_iter
-    (fun index value -> match value.usg with
-       | RD -> memory_read := IntSet.add index !memory_read
-       | WR -> memory_write := IntSet.add index !memory_write
-       | RW -> (* Read-Write -> let's store both *)
-           memory_read := IntSet.add index !memory_read ;
-           memory_write := IntSet.add index !memory_write
-    )
-
-let get_concrete_read_index () =
-  let el = IntSet.max_elt !memory_read in
-    memory_read := IntSet.remove el !memory_read ;
-    Int(big_int_of_int64 el, reg_32)
-
-let get_concrete_write_index () =
-  let el = IntSet.max_elt !memory_write in
-    memory_write := IntSet.remove el !memory_write ;
-    Int(big_int_of_int64 el, reg_32)
-
-
-
-module TaintSymbolic =
-struct
-
-  include MemVHBackEnd
-
-  let lookup_var delta var =
-
-    let name = Var.name var in
-    DV.dprintf "looking up var %s" name;
-
-    (* We need to use DSA because we combine the delta context with
-       let-based renaming.  If we did not use DSA, then assignments to
-       new registers could shadow previous computations.  *)
-    (* TraceConcrete.print_values delta; *)
-
-    let unknown = !full_symbolic && not (VH.mem delta var) in
-      (match dsa_taint_val var, dsa_concrete_val var with
-       | Some(true), _ when unknown ->
-  	   (* If the variable is tainted and we don't have a formula for it, it
-	      is symbolic *)
-	   (* DV.dprintf "symbolic"; *)
-  	   Symbolic (Var var)
-       | Some(true), _ ->
-  	   (* If the variable is tainted, but we do have a formula for it *)
-	   (* DV.dprintf "getting formula from delta: %s" (Var.name var); *)
-  	   VH.find delta var
-
-       | _, _ when is_symbolic var ->
-           (* If the variable is untainted, but is a symbolic byte that we 
-	      introduced *)
-           Symbolic(Var(var))
-
-       | _, Some(cval) ->
-  	 (* Finally, if untainted try to use the concrete value.
-  	    Otherwise, see if we can find the value in delta; it's
-  	    probably a temporary. *)
-
-	 (* In the alternate scheme, all concretes are added right to the 
-	    formula *)
-	 VH.remove delta var;
-	 Symbolic(Var(var))
-       | _, _ ->
-	   DV.dprintf "looking %s up in delta" (Var.name var);
-  	   try VH.find delta var
-  	   with Not_found ->
-  	     match Var.typ var with
-  	     | TMem _ 
-	     | Array _ -> (* DV.dprintf "new memory %s" (Var.name var); *) 
-	       empty_smem var
-  	     | _ ->
-		 (match dsa_var var with
-		 | Some(x) -> if not (isbad x) then
-  		   wprintf "Variable not found during evaluation: %s" name
-		 | _ -> ());
-  		 Symbolic(Var(var))
-      )
-
-
-  let update_mem mu pos value endian =
-    match is_concrete pos with
-    | true ->
-	(match pos with
-	 | Int (n, _) -> del_symbolic (int64_of_big_int n)
-	 | _ -> ());
-	Symbolic.update_mem mu pos value endian
-    | _  ->
-        Symbolic.update_mem mu pos value endian
-
-  (* TODO: add a memory initializer *)
-
-  let rec lookup_mem mu index endian =
-    match index with
-    | Int(n,_) ->
-	(try
-	   (* Check if this is a symbolic seed *)
-	   let var = symbolic_mem (int64_of_big_int n) in
-	   (* pdebug ("introducing symbolic: "^(Pp.ast_exp_to_string var)) ; *)
-	   (*update_mem mu index var endian;
-	     Hashtbl.remove n;*)
-	   var
-	 with Not_found ->
-	   (* Check if we know something about this memory location *)
-	   (*pdebug ("not found in symb_mem "^(Printf.sprintf "%Lx" n)) ;*)
-	     Symbolic.lookup_mem mu index endian
-	)
-    | _ ->
-          (pdebug ("Symbolic memory index at "
-                   ^ (Pp.ast_exp_to_string index)) ;
-           Symbolic.lookup_mem mu index endian)
-
-end
-
 
 (** SWXXX These should go somewhere else, maybe util.ml? *)
 let solve_formula input output =
@@ -1690,7 +1566,7 @@ let solution_from_stp_formula file =
 module PredAssignTraces(MemL: MemLookup)(Form: Formula) =
 struct
   let assign v ev ({delta=delta; pred=pred; pc=pc} as ctx) =
-    let expr = symb_to_exp ev in
+    dprintf "ev: %s" (Symbeval.symb_to_string ev);
     let is_worth_storing = (*is_concrete expr &&*)
       Disasm.is_temp (BatOption.get (dsa_var v))
     in
@@ -1698,6 +1574,10 @@ struct
       if is_worth_storing then (dprintf "Storing %s in delta" (Var.name v);
                                 (MemL.update_var delta v ev, pred))
       else
+        let expr = match ev with
+          | ConcreteMem (m,v) -> symb_to_exp (Symbeval.SymbolicMemL.conc2symb m v)
+          | Symbolic e -> e
+        in
         let constr = BinOp (EQ, Var v, expr) in
         pdebug ((Var.name v) ^ " = " ^ (Pp.ast_exp_to_string expr)) ;
         let delta' = MemL.remove_var delta v in (* shouldn't matter because of dsa, but remove any old version anyway *)
@@ -1707,23 +1587,17 @@ struct
 end
 
 
-module TraceSymbolicAssign(MemL: MemLookup)(Form: Formula) =
-struct
-  let assign v ev ctx =
-    if !full_symbolic then
-      let module PredAssign = PredAssignTraces(MemL)(Form) in
-      PredAssign.assign v ev ctx
-    else
-      let module StdAssign = StdAssign(MemL)(Form) in
-      StdAssign.assign v ev ctx
-end
-
-(* module LetBindSimplify=Formula_simplify_mem.Test *)
+(* module TraceSymbolicAssign(MemL: MemLookup)(Form: Formula) = *)
+(* struct *)
+(*   let assign v ev ctx = *)
+(*     let module PredAssign = PredAssignTraces(MemL)(Form) in *)
+(*     PredAssign.assign v ev ctx *)
+(* end *)
 
 module TraceSymbolicFunc (Tune: EvalTune) (Form: Formula) =
 struct 
   (* Set this to LetBindSimplify to use formula simplificiation *)
-  module TraceSymbolic = Symbeval.Make(TaintSymbolic)(Tune)(TraceSymbolicAssign)(Form)
+  module TraceSymbolic = Symbeval.Make(SymbolicMemL)(Tune)(PredAssignTraces)(Form)
 
   let status = ref 0
   let count = ref 0
@@ -1740,13 +1614,6 @@ struct
       stmts := !stmts @ [assert_vars h]
     );
     stmts := List.map to_dsa (BatList.append !stmts [stmt]);
-    (*(if !status >= 3770 && !status <= 3771 then
-      (count := !count + 1;
-    (*print_endlin e(Pp.ast_stmt_to_string stmt) ;*)
-    (*TraceSymbolic.print_var state.delta "R_EAX" ;*)
-      let formula = TraceSymbolic.output_formula () in
-      print_formula ("form_" ^ (string_of_int !count)) formula))
-      ;*)
     dprintf "Evaluating stmt %s" (Pp.ast_stmt_to_string stmt);
     (match stmt with
       | Ast.Label (_,atts) when filter_taint atts != [] ->
@@ -1754,11 +1621,7 @@ struct
           (* Printf.printf "%s\n" (Pp.ast_stmt_to_string stmt); *)
           (* We have a new block *)
           clean_delta state.delta;
-          get_indices();
           status := !status + 1 ;
-      (*if !status > 3770 && !status < 3780 then
-        let formula = TraceSymbolic.output_formula () in
-        print_formula ("form_" ^ (string_of_int !status)) formula*)
       | _ -> ());
 
     (* Double fold since we may have to add an assertion *)

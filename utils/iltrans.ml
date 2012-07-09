@@ -338,10 +338,6 @@ let speclist =
      Arg.Unit(fun () -> Traces.padding := false),
      "Apply padding for symbolic unused bytes."
     )
-  ::("-trace-no-let-bindings",
-     Arg.Clear Traces.full_symbolic,
-     "Disable the usage of let bindings during formula generation"
-    )
   ::("-trace-symbolic-indices",
      Arg.Set Traces.allow_symbolic_indices,
      "Allow the existence of symbolic indices during formula generation"
