@@ -1594,10 +1594,10 @@ end
 (*     PredAssign.assign v ev ctx *)
 (* end *)
 
-module TraceSymbolicFunc (Tune: EvalTune) (Form: Formula) =
+module TraceSymbolicFunc (Tune: EvalTune) (Assign: Assign) (Form: Formula) =
 struct 
   (* Set this to LetBindSimplify to use formula simplificiation *)
-  module TraceSymbolic = Symbeval.Make(SymbolicMemL)(Tune)(PredAssignTraces)(Form)
+  module TraceSymbolic = Symbeval.Make(SymbolicMemL)(Tune)(Assign)(Form)
 
   let status = ref 0
   let count = ref 0
@@ -1825,9 +1825,11 @@ type traceSymbolicType =
   | NoSub
   | Substitution
 
-module TraceSymbolicNoSubNoLet = TraceSymbolicFunc(FastEval)(StdForm);;
-module TraceSymbolicNoSub = TraceSymbolicFunc(FastEval)(LetBind);;
-module TraceSymbolicSub = TraceSymbolicFunc(SlowEval)(LetBind);;
+module TraceSymbolicNoSubNoLet = 
+  TraceSymbolicFunc(FastEval)(PredAssignTraces)(StdForm);;
+module TraceSymbolicNoSub = 
+  TraceSymbolicFunc(FastEval)(PredAssignTraces)(LetBind);;
+module TraceSymbolicSub = TraceSymbolicFunc(SlowEval)(StdAssign)(LetBind);;
 
 
 (** SWXXX Should this go somewhere else too? *)

@@ -55,6 +55,7 @@ let prints f =
 (** Concretely executes a block *)
 let concrete block = 
   Utils_common.stream_concrete mem_hash concrete_state thread_map block false
+  
 
 
 (*** Symbolicly executes a block and builds formulas ***)
