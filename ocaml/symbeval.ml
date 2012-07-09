@@ -30,6 +30,8 @@ type varval = Symbolic of Ast.exp | ConcreteMem of mem
 type label_kind = label
 type form_type = Equal | Rename
 
+type form_style = NoSubLet | NoSubNoLet | Substitution
+
 type ('a,'b) ctx = {
   pred: 'b;
   delta: 'a;
@@ -395,7 +397,8 @@ struct
 		 (* Splitting introduces blowup.  Can we avoid it? *)
 		 eval_expr delta (Memory2array.split_loads mem ind t endian)
 	     | Array _ ->
-		 failwith ("loading array currently unsupported" ^ (Pp.typ_to_string t))
+		 failwith ("loading array currently unsupported" 
+                           ^ (Pp.typ_to_string t))
 	     | _ -> failwith "not a loadable type"
 	  )
       | Store (mem,ind,value,endian,t) ->
@@ -429,7 +432,8 @@ struct
     let get_label e =
       let v = eval_expr delta e in
 	match lab_of_exp (symb_to_exp v) with
-	  | None -> failwith ("not a valid label "^(Pp.ast_exp_to_string (symb_to_exp v)))
+	  | None -> failwith ("not a valid label "
+                              ^(Pp.ast_exp_to_string (symb_to_exp v)))
 	  | Some lab -> label_decode lambda lab
     in
     let next_pc = Int64.succ pc in
@@ -457,14 +461,16 @@ struct
 		 [{ctx with pc=get_label e1}]
              | v when is_false_val v ->
 		 [{ctx with pc=get_label e2}]
-             | v -> failwith ("not a boolean condition: " ^ (Pp.ast_exp_to_string (symb_to_exp v)))
+             | v -> failwith ("not a boolean condition: " 
+                              ^ (Pp.ast_exp_to_string (symb_to_exp v)))
           )
       | Assert (e,_) ->
           (match eval_expr delta e with
              | v when is_symbolic v ->
 		 let constr = symb_to_exp v in
 		 let pred' = add_constraint pred constr Equal in
-		   (*pdebug("Adding assertion: " ^ (Pp.ast_exp_to_string pred')) ;*)
+		   (*pdebug("Adding assertion: " 
+                     ^ (Pp.ast_exp_to_string pred')) ;*)
 		   [{ctx with pred=pred'; pc=next_pc}]
              | v when is_false_val v ->
 		 raise (AssertFailed ctx)
@@ -490,10 +496,12 @@ struct
                       ^"\nreason: "^str);
        print_values state.delta;
        print_mem state.delta;
-       print_endline ("Path predicate: "^(Pp.ast_exp_to_string (output_formula state.pred)));
+       print_endline ("Path predicate: "
+                      ^(Pp.ast_exp_to_string (output_formula state.pred)));
        [])
       | Not_found ->
-	  (* The only way inst_fetch would fail is if pc falls off the end, right? *)
+	  (* The only way inst_fetch would fail is if pc falls off the end, 
+             right? *)
 	  wprintf "PC not found: %#Lx" state.pc;
 	  raise (Halted(None, state))
 
@@ -527,7 +535,8 @@ struct
       (fun k v ->
   	 match k,v with
   	   | var,Symbolic e ->
-               pdebug ((Pp.var_to_string var) ^ " = " ^ (Pp.ast_exp_to_string e))
+               pdebug ((Pp.var_to_string var) ^ " = " 
+                       ^ (Pp.ast_exp_to_string e))
   	   | _ -> ()
       ) delta
 
@@ -609,7 +618,8 @@ struct
     let init = Var v in
       pdebug "The point of no return" ;
       Symbolic (AddrMap.fold
-		  (fun k v m -> Store (m,Int(big_int_of_int64 k,reg_32),v,exp_false,reg_8))
+		  (fun k v m -> Store (m, Int(big_int_of_int64 k,reg_32), v,
+                                       exp_false, reg_8))
 		  memory init)
 
   (* Normalize a memory address, setting high bits to 0. *)
@@ -692,7 +702,8 @@ struct
       else
         let constr = BinOp (EQ, Var v, expr) in
         pdebug ((Var.name v) ^ " = " ^ (Pp.ast_exp_to_string expr)) ;
-        let delta' = MemL.remove_var delta v in (* shouldn't matter because of dsa, but remove any old version anyway *)
+        (* shouldn't matter because of dsa, but remove any old version anyway *)
+        let delta' = MemL.remove_var delta v in 
         (delta', Form.add_to_formula pred constr Rename)
     in
     {ctx with delta=delta'; pred=pred'; pc=Int64.succ pc}
@@ -747,8 +758,7 @@ struct
      | _ -> failwith "internal error: adding malformed constraint to formula"
     )
 
-  let output_formula bindings =
-    bindings exp_true
+  let output_formula bindings = bindings exp_true
 end
 
 (** Uses Lets for assignments *)

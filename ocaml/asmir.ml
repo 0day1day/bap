@@ -66,15 +66,19 @@ let tr_regtype = function
 (* maps a string variable to the var we are using for it *)
 type varctx = (string,Var.t) Hashtbl.t
 
+
+let gamma_populate h mem decls = 
+  List.iter (fun (Var.V(_,nm,_) as var) -> Hashtbl.add h nm var) decls;
+  Hashtbl.add h "$mem" mem;
+  Hashtbl.add h "mem" mem
+
 (** [gamma_create mem decls] creates a new varctx for use during translation. 
     [mem] is the var that should be used for memory references, and [decls]
     should be a list of variables already in scope.
 *)
 let gamma_create mem decls : varctx =
   let h = Hashtbl.create 57 in
-  List.iter (fun (Var.V(_,nm,_) as var) -> Hashtbl.add h nm var) decls;
-  Hashtbl.add h "$mem" mem;
-  Hashtbl.add h "mem" mem;
+  gamma_populate h mem decls;
   h
 
 let gamma_lookup (g:varctx) s =
@@ -82,8 +86,11 @@ let gamma_lookup (g:varctx) s =
   with Not_found ->
     failwith("Disassembled code had undeclared variable '"^s^"'. Something is broken.")
 
-let gamma_extend = Hashtbl.add
+let gamma_reset gamma mem decls = 
+  Hashtbl.clear gamma;
+  gamma_populate gamma mem decls
 
+let gamma_extend = Hashtbl.add
 
 let gamma_unextend = Hashtbl.remove
 
@@ -404,6 +411,11 @@ let gamma_for_arch = function
   | Bfd_arch_arm  -> gamma_create x86_mem arm_regs
   | _ -> failwith "gamma_for_arch: unsupported arch"
 
+
+let gamma_for_arch_reset gamma = function
+  | Bfd_arch_i386 -> gamma_reset gamma x86_mem x86_regs
+  | Bfd_arch_arm  -> gamma_reset gamma x86_mem arm_regs
+  | _ -> failwith "gamma_for_arch_reset: unsupported arch"
 
 let get_asmprogram_arch {arch=arch}= arch
 
@@ -840,13 +852,16 @@ module SerializedTrace = struct
                    usage=WR;
                    taint=Taint (Int64.to_int tid)})
       in
+      let convert_thread_id x = Type.ThreadId (Int64.to_int x)
+      in
       function
-        | `std_frame({Std_frame.operand_list=ol}) -> List.map convert_operand_info ol
+        | `std_frame({Std_frame.operand_list=ol; Std_frame.thread_id=tid}) -> (convert_thread_id tid) :: List.map convert_operand_info ol
         | `syscall_frame _ -> []
         | `exception_frame _ -> []
         | `taint_intro_frame({Taint_intro_frame.taint_intro_list=til}) -> List.map convert_taint_info til
         | `modload_frame _ -> []
         | `key_frame _ -> []
+        | `metadata_frame _ -> []
     in
     let raise_frame arch f =
       let get_stmts =
@@ -878,6 +893,7 @@ module SerializedTrace = struct
           | `key_frame _ ->
       (* Implement key frame later *)
             []
+          | `metadata_frame _ -> []
       in
       add_operands (get_stmts f) (get_attrs f)
     in

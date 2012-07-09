@@ -35,7 +35,7 @@ let pin_trace_test pin_out =
   Traces.consistency_check := true;
   ignore(Traces.concrete prog);
   Traces.consistency_check := false;
-  ignore(Traces.output_exploit exploit_file prog);;
+  ignore(Traces.TraceSymbolicNoSub.output_exploit exploit_file prog);;
 
 let backwards_taint_test pin_out =
   Traces.cleanup();

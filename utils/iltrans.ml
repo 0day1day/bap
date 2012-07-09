@@ -216,13 +216,13 @@ let speclist =
      "Start debugging at item n."
     )
   ::("-trace-debug",
-     uadd(AnalysisAst Traces.trace_valid_to_invalid),
+     uadd(AnalysisAst Traces.TraceSymbolicNoSub.trace_valid_to_invalid),
      "Formula debugging. Prints to files form_val and form_inv"
     )
   ::("-trace-conc-debug",
      Arg.Unit
        (fun () ->
-	  let f = Traces.formula_valid_to_invalid ~min:!startdebug in
+	  let f = Traces.TraceSymbolicNoSub.formula_valid_to_invalid ~min:!startdebug in
 	  add(AnalysisAst f)
        ),
      "Formula debugging. Prints to files form_val and form_inv. Concretizes BEFORE debugging; useful for finding which assertion doesn't work."
@@ -307,15 +307,23 @@ let speclist =
      "<gaddress> <maddress> <sehaddress> <payload file> Use pivot at gaddress to transfer control (by overwriting SEH handler at sehaddress) to payload at maddress."
     )
   ::("-trace-formula",
-     Arg.String(fun f -> add(AnalysisAst(Traces.output_formula f))),
+     Arg.String(fun f -> add(AnalysisAst(Traces.TraceSymbolicNoSub.output_formula f))),
      "<file> Output the STP trace formula to <file>"
     )
+  ::("-trace-formula-no-sub-no-let",
+     Arg.String(fun f -> add(AnalysisAst(Traces.TraceSymbolicNoSubNoLet.output_formula f))),
+     "Set formula format so it does not use substitution or let bindings (default is no substitution with let bindings)"
+  )
+  ::("-trace-formula-sub",
+     Arg.String(fun f -> add(AnalysisAst(Traces.TraceSymbolicSub.output_formula f))),
+     "Set formula format so it uses substitution (default is no substitution with let bindings)"
+  )
   ::("-trace-formula-format",
      Arg.Set_string Traces.printer,
      "Set formula format (STP (default) or smtlib1)."
   )
   ::("-trace-exploit",
-     Arg.String(fun f -> add(AnalysisAst(Traces.output_exploit f))),
+     Arg.String(fun f -> add(AnalysisAst(Traces.TraceSymbolicNoSub.output_exploit f))),
      "<file> Output the exploit string to <file>"
     )
   ::("-trace-assignments",
