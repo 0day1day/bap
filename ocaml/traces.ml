@@ -1603,8 +1603,6 @@ struct
   let count = ref 0
 
   let symbolic_run_block h rh state stmt = 
-    Util.print_obj_info "h size" h;
-    Util.print_obj_info "rh size" rh;
     let to_dsa stmt = to_dsa_stmt stmt h rh in
     let stmts = ref [] in
     (* dprintf "Dsa'ified stmt: %s" (Pp.ast_stmt_to_string stmt); *)
