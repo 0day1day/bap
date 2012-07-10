@@ -36,12 +36,13 @@ let bytes_of_width t =
   b / 8
 
 let rec infer_ast =
-  let warn () =
+  let warn =
     let has_warned = ref false in
-    if !has_warned = false then (
-      wprintf "infer_ast ~check option is deprecated.  Please use typecheck_expression instead.";
-      has_warned := true
-    )
+    (fun () ->
+      if !has_warned = false then (
+        wprintf "infer_ast ~check option is deprecated.  Please use typecheck_expression instead.";
+        has_warned := true
+    ))
   in
   (fun ?(check=true) e ->
     if check then warn ();
