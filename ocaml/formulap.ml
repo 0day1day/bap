@@ -6,6 +6,7 @@ module D = Debug.Make(struct let name = "formula" and default=`NoDebug end)
 open D
 
 open Ast
+open Type
 
 (** Returns a list of free variables in the given expression *)
 let freevars e =
@@ -29,13 +30,13 @@ let freevars e =
 	    VH.add ctx v ();
 	    ignore(Ast_visitor.exp_accept self e2);
 	    VH.remove ctx v;
-	    `SkipChildren
+	    SkipChildren
 	| _ ->
-	    `DoChildren
+	    DoChildren
 
       method visit_rvar r =
 	self#add_dec r;
-	`DoChildren
+	DoChildren
     end
   in
   ignore(Ast_visitor.exp_accept freevis e);

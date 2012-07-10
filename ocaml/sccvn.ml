@@ -402,7 +402,7 @@ let rpo ~opt cfg =
           VH.add info.vn2eid x eid;
           EH.add info.eid2vn eid h;
         );
-        `DoChildren
+        DoChildren
     end
     in
     C.G.iter_vertex
@@ -521,27 +521,27 @@ let replacer ?(opt=true) cfg =
     method visit_value = function
       | Ssa.Var v ->
           (match hash_replacement pos (vn v) with
-           | Some(Ssa.Var var) when v == var -> `SkipChildren
+           | Some(Ssa.Var var) when v == var -> SkipChildren
            | Some v' ->
                changed := true;
                dprintf "Replacing var %s with %s" (Pp.var_to_string v) (Pp.value_to_string v');
-               `ChangeTo v'
-           | None -> `SkipChildren
+               ChangeTo v'
+           | None -> SkipChildren
           )
-      | _  -> `SkipChildren
+      | _  -> SkipChildren
 
     method visit_stmt = function
       | Ssa.Move(_,Val _, _) -> (* visit value will handle that properly *)
-          `DoChildren
+          DoChildren
       | Ssa.Move(v,e, a) -> (
           match hash_replacement pos (vn v) with
           | Some vl ->
               changed := true;
               dprintf "Replacing exp %s with %s" (Pp.ssa_exp_to_string e) (Pp.value_to_string vl);
-              `ChangeTo(Move(v, Val vl, a))
-          | None -> `DoChildren
+              ChangeTo(Move(v, Val vl, a))
+          | None -> DoChildren
         )
-      | _ -> `DoChildren
+      | _ -> DoChildren
   end
   in
   let somechange = ref false in

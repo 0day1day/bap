@@ -679,10 +679,10 @@ object (self)
 	inherit Ast_visitor.nop
 	method visit_exp = function
 	  | Load _
-	  | Store _ -> found_mem := true; `SkipChildren
-	  | Var v when not (is_integer_type (Var.typ v)) -> found_mem := true; `SkipChildren
-	  | _ when !found_mem -> `SkipChildren
-	  | _ -> `DoChildren	  
+	  | Store _ -> found_mem := true; SkipChildren
+	  | Var v when not (is_integer_type (Var.typ v)) -> found_mem := true; SkipChildren
+	  | _ when !found_mem -> SkipChildren
+	  | _ -> DoChildren	  
       end
       in
       ignore(Ast_visitor.exp_accept v e);

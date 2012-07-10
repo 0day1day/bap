@@ -1,7 +1,7 @@
-
 open Ast
 module D = Debug.Make(struct let name = "Flatten_mem" and default=`Debug end)
 open D
+open Type
 
 (* Explode Let(x,e,e') when [f e] is true 
 
@@ -22,10 +22,10 @@ let explode_mem_let f e =
     method visit_exp = function
       | Var(v) ->
         (* Do we have a value from a Let binding to return? *)
-        (try `ChangeTo(Hashtbl.find h v)
+        (try ChangeTo(Hashtbl.find h v)
          with Not_found ->
            (* Nope, leave it alone *)
-           `DoChildren)
+           DoChildren)
       | Let(v,e,e') as bige when f bige ->
         (* Recurse on e, removing any Lets *)
         let e = Ast_visitor.exp_accept self e in
@@ -33,8 +33,8 @@ let explode_mem_let f e =
         let newe' = Ast_visitor.exp_accept self e' in
         let () = self#pop_assign v in
         (* We don't need to recurse on children because we already did in e' *)
-        `ChangeTo newe'
-      | e -> `DoChildren
+        ChangeTo newe'
+      | e -> DoChildren
   end
   in
   Ast_visitor.exp_accept v e
@@ -77,7 +77,7 @@ let flatten_loads_stmt s =
   let v = object(self)
     inherit Ast_visitor.nop
     method visit_exp e =
-      `ChangeTo (flatten_loads e)
+      ChangeTo (flatten_loads e)
   end in
   Ast_visitor.stmt_accept v s
 

@@ -126,9 +126,9 @@ object (self)
   method visit_avar avar =
     match Var.typ(avar) with
     |	TMem(idxt) ->
-      `ChangeToAndDoChildren (get_array_var avar)
+      ChangeToAndDoChildren (get_array_var avar)
     |	_ ->
-      `DoChildren
+      DoChildren
 
   method visit_rvar = self#visit_avar
 
@@ -139,25 +139,25 @@ object (self)
 	  let width = (getwidth t) in
 	  match width with
 	  | 1 -> (* Printf.printf "Cool\n"; *)
-	      `DoChildren
+	      DoChildren
 	  | _ -> (* Printf.printf "Need to split\n"; *)
 	    let arr = Ast_visitor.exp_accept self arr in
 	    let newexpr = split_loads arr idx t endian
 	    in
 	    (* Printf.printf "New Load %s\n" (Pp.ast_exp_to_string newexpr); *)
 	    (* djb: still need to descend into children *)
-	    `ChangeToAndDoChildren newexpr)
+	    ChangeToAndDoChildren newexpr)
       | Store(arr,idx,data,endian,t) -> ((* Printf.printf "Store %s %s %s Reg%d\n" (Pp.ast_exp_to_string arr) (Pp.ast_exp_to_string idx) (Pp.ast_exp_to_string data) (getwidth t); *)
           let width = (getwidth t) in
           match width with
           | 1 -> (* Printf.printf "Cool!\n"; *)
-	      `DoChildren
+	      DoChildren
           | _ -> (* Printf.printf "Need to split\n"; *)
 	      let arr = Ast_visitor.exp_accept self arr in
               let newexpr = split_writes arr idx t endian data in
-	      `ChangeToAndDoChildren newexpr
+	      ChangeToAndDoChildren newexpr
         )
-      | _ -> `DoChildren
+      | _ -> DoChildren
   end
 
 

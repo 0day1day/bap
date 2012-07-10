@@ -92,7 +92,7 @@ val list_last_option : 'a list -> 'a option
 (** [list_insert l li i] Insert all elements in [li] into [l] just before index [i] *)
 val list_insert : 'a list -> 'a list -> int -> 'a list
 
-(* [list_remove l i n] removes [n] elements in [l] starting at position [i]. *)
+(** [list_remove l i n] removes [n] elements in [l] starting at position [i]. *)
 val list_remove: 'a list -> int -> int -> 'a list
 
 (** Deletes the first occurrence of e (if it exists) in the list
@@ -204,14 +204,19 @@ val hashtbl_eq :
 
 (** Unsigned compare *)
 val int64_ucompare : int64 -> int64 -> int
+
 (** Unsigned division *)
 val int64_udiv : int64 -> int64 -> int64
+
 (** Unsigned remainder *)
 val int64_urem : int64 -> int64 -> int64
+
 (** Unsigned max *)
 val int64_umax : int64 -> int64 -> int64
+
 (** Unsigned min *)
 val int64_umin : int64 -> int64 -> int64
+
 (** Convert [int64] to binary string for printing *)
 val int64_to_binary : ?pad:int -> int64 -> string
 
@@ -219,10 +224,13 @@ val int64_to_binary : ?pad:int -> int64 -> string
 
 (** Convert [big_int] to binary string for printing *)
 val big_int_to_binary : ?pad:int -> Big_int_Z.big_int -> string
+
 (** Convert [big_int] to hex string for printing *)
 val big_int_to_hex : ?pad:int -> Big_int_Z.big_int -> string
+
 (** Convert string to [big_int] *)
 val big_int_of_string : string -> Big_int_Z.big_int
+
 (** Convert binary string to [big_int] *)
 val big_int_of_binstring : ?e:[`Little | `Big] -> string -> Big_int_Z.big_int
 

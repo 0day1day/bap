@@ -3,7 +3,7 @@
 module D = Debug.Make(struct let name = "Reachable" and default=`NoDebug end)
 
 (** Along the lines of Builder.S, but with remove instead of add *)
-module type B =
+module type G =
 sig
   include Graph.Builder.S
 
@@ -33,7 +33,7 @@ end
 
 (** Make functions for folding/iterating over reachable or unreachable vertices,
     and for removing them. *)
-module Make (BI:B) =
+module Make (BI:G) =
 struct
 
   type gt = BI.G.t
