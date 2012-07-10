@@ -320,7 +320,7 @@ let speclist =
   )
   ::("-trace-formula-format",
      Arg.Set_string Traces.printer,
-     "Set formula format (STP (default) or smtlib1)."
+     "Set formula format (smtlib1 (default), smtlib2, or STP)."
   )
   ::("-trace-exploit",
      Arg.String(fun f -> add(AnalysisAst(Traces.TraceSymbolicNoSub.output_exploit f))),

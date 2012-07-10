@@ -62,7 +62,7 @@ let allow_symbolic_indices = ref false
 
 let padding = ref true
 
-let printer = ref "stp"
+let printer = ref "smtlib1"
 
 let memtype = reg_32
 
@@ -791,9 +791,9 @@ let print_formula file formula =
   let formula = Memory2array.coerce_exp_state mem_hash formula in
   let foralls = List.map (Memory2array.coerce_rvar_state mem_hash) [] in
   let p = match !printer with
-    | "stp" -> ((new Stp.pp_oc oc) :> Formulap.fpp_oc)
     | "smtlib1" -> ((new Smtlib1.pp_oc oc) :> Formulap.fpp_oc)
     | "smtlib2" -> ((new Smtlib2.pp_oc oc) :> Formulap.fpp_oc)
+    | "stp" -> ((new Stp.pp_oc oc) :> Formulap.fpp_oc)
     | _ -> failwith "Unknown printer"
   in
   (* let p = new Smtlib1.pp_oc oc in *)
@@ -1533,10 +1533,17 @@ let formula_size formula =
 
 
 (** SWXXX These should go somewhere else, maybe util.ml? *)
-let solve_formula input output =
+let solve_formula ?format input output =
   (* print "Querying STP for a satisfying answer\n" ;  *)
-  flush stdout ;
-  let cmd = "stp < " ^ input ^ " > " ^ output in
+  flush stdout;
+  let opt = 
+    match !printer with
+      | "smtlib1" -> " --SMTLIB1 -m"
+      | "smtlib2" -> " --SMTLIB2"
+      | "stp" -> ""
+      | _ -> failwith "Unknown printer" 
+  in
+  let cmd ="stp" ^ opt ^ " < " ^ input ^ " > " ^ output in
   Status.init "Solving formula" 0 ;
   (match Unix.system cmd with
       | Unix.WEXITED 0 -> ()

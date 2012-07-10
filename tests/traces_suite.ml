@@ -24,6 +24,7 @@ let pin_trace_setup _ =
   (* check_file (pin_path^pin); *)
   (* check_file (gentrace_path^gentrace); *)
   check_stp_path();
+  Traces.printer := "stp";
   create_input_file();
   assert_command ~exit_code (!pin_path^pin) args;
   find_pin_out (Array.to_list (Sys.readdir "./")) tag;;
