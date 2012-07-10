@@ -3,6 +3,7 @@
 (* Based off Vine_dataflow.DeadCode *)
 open BatPervasives
 open Ssa
+open Type
 
 module D = Debug.Make(struct let name = "Deadcode" and default=`NoDebug end)
 open D
@@ -36,7 +37,7 @@ let def_uses s =
   let vis =  object(self)
     inherit Ssa_visitor.nop
     method visit_rvar v = uses := v :: !uses;
-      `DoChildren
+      DoChildren
   end
   in
   ignore (Ssa_visitor.stmt_accept vis s);
@@ -252,7 +253,7 @@ let do_aggressive_dce ?(globals = []) graph =
         method visit_rvar v =
           (try uses := VH.find var_to_defsite v :: !uses;
            with Not_found -> ());
-          `DoChildren
+          DoChildren
       end in
       ignore(Ssa_visitor.stmt_accept vis (gets site));
       let deps = !uses @ (control_deps bb) in

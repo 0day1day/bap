@@ -482,7 +482,7 @@ let allvars p =
 
     method visit_avar v =
       VH.replace h v ();
-      `DoChildren
+      DoChildren
 
     method visit_rvar = self#visit_avar
   end
@@ -592,7 +592,7 @@ let explicit_thread_stmts stmts thread_map =
   in
   let svis = object(self)
     inherit Ast_visitor.nop
-    method visit_avar v = `ChangeTo(lookup_thread_map thread_map !tid v)
+    method visit_avar v = ChangeTo(lookup_thread_map thread_map !tid v)
     method visit_rvar = self#visit_avar
   end
   in
@@ -730,17 +730,18 @@ let remove_specials =
   in
     List.filter no_specials
 
-(** Removing all unknowns from the trace *)
-let remove_unknowns =
-  let v = object(self)
-    inherit Ast_visitor.nop
-    method visit_exp = function
-      | Unknown(s,t) ->
-	  dprintf "Removed unknown: %s" s;
-	  `ChangeTo (Int(bi0,t))
-      | _ -> `DoChildren
-  end
-  in Ast_visitor.prog_accept v
+
+(* (\** Removing all unknowns from the trace *\) *)
+(* let remove_unknowns = *)
+(*   let v = object(self) *)
+(*     inherit Ast_visitor.nop *)
+(*     method visit_exp = function *)
+(*       | Unknown(s,t) -> *)
+(* 	  dprintf "Removed unknown: %s" s; *)
+(* 	  ChangeTo (Int(bi0,t)) *)
+(*       | _ -> DoChildren *)
+(*   end *)
+(*   in Ast_visitor.prog_accept v *)
 
 (* Appends a Halt instruction to the end of the trace *)
 let append_halt trace =
@@ -816,21 +817,21 @@ let trace_dce trace =
   let rv = object(self)
     inherit Ast_visitor.nop
     method visit_stmt = function
-        Assert _ -> `DoChildren
+        Assert _ -> DoChildren
       | Move (tv, _, _) when VH.mem rvh tv ->
           (* Include this statement, and add referenced vars. *)
           VH.remove rvh tv;
-          `DoChildren
+          DoChildren
       | Move (tv, _, _) as olds when not (VH.mem rvh tv) ->
           (* Remove this statement *)
           let str = 
 	    Printf.sprintf "Removed by dce: %s" (Pp.ast_stmt_to_string olds) in
           let news = Comment (str, []) in
-            `ChangeTo news
-      | _ -> `SkipChildren
+            ChangeTo news
+      | _ -> SkipChildren
     method visit_rvar v =
       VH.replace rvh v ();
-      `DoChildren
+      DoChildren
   end in
   let rev = Ast_visitor.prog_accept rv (List.rev trace) in
   let final = List.rev rev in
@@ -921,7 +922,7 @@ let check_delta state =
       inherit Ast_visitor.nop
       method visit_exp = function
         | Unknown _ -> foundone := true; raise Exit
-        | _ -> `DoChildren
+        | _ -> DoChildren
     end
     in
     (try
@@ -1055,12 +1056,12 @@ let trace_transform_stmt stmt evalf =
       | Load(mem, idx, endian, t) ->
           let cidx = evalf idx in
           exp := BinOp(AND, !exp, BinOp(EQ, cidx, idx));
-          `ChangeToAndDoChildren(Load(mem, cidx, endian, t))
+          ChangeToAndDoChildren(Load(mem, cidx, endian, t))
       | Store(mem, idx, value, endian, t) ->
           let cidx = evalf idx in
           exp := BinOp(AND, !exp, BinOp(EQ, cidx, idx));
-          `ChangeToAndDoChildren(Store(mem, cidx, value, endian, t))
-      | _ -> `DoChildren
+          ChangeToAndDoChildren(Store(mem, cidx, value, endian, t))
+      | _ -> DoChildren
   end
   in
   (* Concretize memory addresses *)
@@ -1373,19 +1374,19 @@ let to_dsa_stmt s h rh =
   let av = object(self)
     inherit Ast_visitor.nop
     method visit_avar v =
-      `ChangeTo (replace_var v)
+      ChangeTo (replace_var v)
 
     method visit_rvar v =
       try
-        `ChangeTo (VH.find h v)
+        ChangeTo (VH.find h v)
       with Not_found ->
         dprintf "Unable to find %s during DSA: probably an input" (Var.name v);
         let nv = replace_var v in
-        `ChangeTo nv
+        ChangeTo nv
 
     method visit_uvar v =
       VH.remove h v;
-      `DoChildren
+      DoChildren
 
   end
   in
@@ -2081,7 +2082,7 @@ let add_assignments trace =
              if not (Hashtbl.mem varset name) then
                Hashtbl.add varset name (v,value)
            with Not_found -> ());
-          `DoChildren
+          DoChildren
     end
     in
       Ast_visitor.stmt_accept var_visitor

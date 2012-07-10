@@ -49,18 +49,18 @@ let add_referenced vars e =
         (* XXX: This doesn't handle shadowing Lets properly, e.g., let v
 	   = 5 in let v = 4 in v *)
         vars := LocSet.remove (Loc.V v) !vars;
-        `SkipChildren
+        SkipChildren
       | Load (_,Int(addr,_),_,_) ->
         vars := LocSet.add (Loc.M addr) !vars;
-        `DoChildren
+        DoChildren
       | Load _ as e ->
         failwith (Printf.sprintf "Found a non-concretized memory read %s, but expected all memory addresses to be concretized" (Pp.ast_exp_to_string e))
-      | _ -> `DoChildren
+      | _ -> DoChildren
     method visit_rvar r =
       if not (LocSet.mem (Loc.V r) !vars) then
 	if Typecheck.is_integer_type (Var.typ r) then
 	  vars := LocSet.add (Loc.V r) !vars;
-      `DoChildren
+      DoChildren
   end
   in
   ignore(Ast_visitor.exp_accept varvis e);
@@ -80,10 +80,10 @@ let interesting_mem_write vars e =
       if (LocSet.mem (Loc.M addr) !vars) then (
         mems := LocSet.add (Loc.M addr) !mems;
         interesting_flag := true;
-        `SkipChildren)
+        SkipChildren)
       else
-        `DoChildren
-    | _ -> `DoChildren
+        DoChildren
+    | _ -> DoChildren
   end
   in
   ignore(Ast_visitor.exp_accept memvis_one e);
@@ -124,14 +124,14 @@ let exp_to_locset e =
 
   let v = object(self)
     inherit Ast_visitor.nop
-    method visit_rvar v = add (Loc.V v); `SkipChildren
+    method visit_rvar v = add (Loc.V v); SkipChildren
     method visit_exp = function
       | Load(_,Int(addr,_),_,t) when t = reg_8 ->
         add (Loc.M addr);
-        `DoChildren
+        DoChildren
       | Load _ ->
         failwith "Memory loads must be 8-bit and have an integer address.  Maybe you need to concretize the trace."
-      | _ -> `DoChildren
+      | _ -> DoChildren
   end in
   ignore(Ast_visitor.exp_accept v e);
   !s
@@ -147,10 +147,10 @@ let identify_fault_location t =
         | Load (_, Int(i,_), _, t)
         | Store (_, Int(i,_), _, _, t) when t = reg_8 ->
           addrs := (Loc.M i) :: !addrs;
-          `DoChildren
+          DoChildren
         | Load _ | Store _ ->
           failwith "Memory loads must be 8-bit and have an integer address.  Maybe you need to concretize the trace."
-        | _ -> `DoChildren
+        | _ -> DoChildren
     end
     in
     ignore(Ast_visitor.stmt_accept v s);

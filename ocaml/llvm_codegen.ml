@@ -401,13 +401,13 @@ object(self)
           match s, !t with
           | Halt(e, _), None ->
             t := Some(Typecheck.infer_ast ~check:false e);
-            `SkipChildren
+            SkipChildren
           | Halt(e, _), Some t when (Typecheck.infer_ast ~check:false e) = t ->
-            `SkipChildren
+            SkipChildren
           | Halt(e, _), Some t when (Typecheck.infer_ast ~check:false e) <> t ->
             failwith "Program is not well typed: multiple return value types"
           | _ ->
-            `SkipChildren
+            SkipChildren
       end
       in
       ignore(Ast_visitor.cfg_accept v cfg);

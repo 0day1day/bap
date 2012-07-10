@@ -13,8 +13,8 @@ let rename_astexp f =
   let vis = object
     inherit Ast_visitor.nop
     method visit_rvar v =
-      try `ChangeTo(f v)
-      with Not_found -> `DoChildren
+      try ChangeTo(f v)
+      with Not_found -> DoChildren
   end in
   Ast_visitor.exp_accept vis;;
 

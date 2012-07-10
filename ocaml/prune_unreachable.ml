@@ -1,5 +1,3 @@
-(** Code for removing unreachable nodes in a CFG. *)
-
 module D = Debug.Make(struct let name = "Prune_unreachable" and default=`Debug end)
 module R = Reachable
 

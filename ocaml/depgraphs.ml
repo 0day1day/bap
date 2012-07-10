@@ -6,8 +6,7 @@
 module VS = Var.VarSet
 module VH = Var.VarHash
 open Cfg
-
-
+open Type
 
 module MakeCDG (C: CFG) = 
 struct
@@ -131,11 +130,11 @@ struct
       let stmt_uses = ref VS.empty in 
       let vis =  object(self)
 	inherit Ssa_visitor.nop
-	method visit_rvar v = stmt_uses := VS.add v !stmt_uses; `DoChildren
+	method visit_rvar v = stmt_uses := VS.add v !stmt_uses; DoChildren
 	method visit_value v = 
 	  match v with
-	      Ssa.Var(v') -> vars := VS.add v' !vars; `DoChildren
-	    | _ -> `DoChildren
+	      Ssa.Var(v') -> vars := VS.add v' !vars; DoChildren
+	    | _ -> DoChildren
       end
       in
 	ignore (Ssa_visitor.stmt_accept vis s);
@@ -189,15 +188,15 @@ struct
   	  inherit Ssa_visitor.nop
           method visit_avar v = 
             if v = var
-            then (stop := true ; `SkipChildren)
-            else `DoChildren
+            then (stop := true ; SkipChildren)
+            else DoChildren
 	  method visit_rvar v = 
             if v = var
             then (Hashtbl.add ud (Var var,node,!id) (Var var,init,line) ;
                   edges := GE.add (node,init) !edges ; 
-                  `DoChildren
+                  DoChildren
                   )
-            else `DoChildren
+            else DoChildren
         end
         in
         List.iter
@@ -358,12 +357,12 @@ struct
       let stmt_uses = ref VS.empty in 
       let vis = object(self)
 	inherit Ast_visitor.nop
-        method visit_avar v = VH.add defs v loc ; `DoChildren
-	method visit_rvar v = stmt_uses := VS.add v !stmt_uses; `DoChildren
+        method visit_avar v = VH.add defs v loc ; DoChildren
+	method visit_rvar v = stmt_uses := VS.add v !stmt_uses; DoChildren
 	method visit_exp v = 
 	  match v with
-	      Ast.Var(v') -> vars := VS.add v' !vars; `DoChildren
-	    | _ -> `DoChildren
+	      Ast.Var(v') -> vars := VS.add v' !vars; DoChildren
+	    | _ -> DoChildren
       end
       in
 	ignore (Ast_visitor.stmt_accept vis s);
@@ -417,15 +416,15 @@ struct
   	  inherit Ast_visitor.nop
           method visit_avar v = 
             if v = var
-            then (stop := true ; `SkipChildren)
-            else `DoChildren
+            then (stop := true ; SkipChildren)
+            else DoChildren
 	  method visit_rvar v = 
             if v = var
             then (Hashtbl.add ud (Var var,node,!id) (Var var,init,line) ;
                   edges := GE.add (node,init) !edges ; 
-                  `DoChildren
+                  DoChildren
                   )
-            else `DoChildren
+            else DoChildren
         end
         in
         List.iter
@@ -627,7 +626,7 @@ struct
 	  let s = LS.empty in
 	  let s = LS.add (LocationType.Loc (bb,!line)) s in
 	  lref := VM.add v s !lref;
-	  `DoChildren
+	  DoChildren
       end
       in
       let stmts = Cfg.AST.get_stmts g bb in
@@ -650,11 +649,11 @@ struct
 	  method visit_avar v =
 	    vars := VS.add v !vars;
 	    (* 	Printf.printf "Def: We are adding %s_%d\n" (Var.name v) (Var.id v); *)
-	    `DoChildren
+	    DoChildren
 	  method visit_rvar v =
 	    vars := VS.add v !vars;
 	    (* 	Printf.printf "Def: We are adding %s_%d\n" (Var.name v) (Var.id v); *)
-	    `DoChildren
+	    DoChildren
 	end 
 	in
 	ignore(Ast_visitor.cfg_accept visitor p);
@@ -695,7 +694,7 @@ struct
 	     let s = LS.empty in
 	     let s = LS.add (LocationType.Loc (bb,!line)) s in
 	     lref := VM.add v s !lref;
-	     `DoChildren
+	     DoChildren
 	 end
 	 in
 	 List.iter
@@ -761,7 +760,7 @@ struct
 	    
 	  end;
 	
-	`DoChildren
+	DoChildren
     end
     in
     Cfg.AST.G.iter_vertex
@@ -800,12 +799,12 @@ struct
       method visit_avar v =
 	definedvars := VS.add v !definedvars;
 	(* 	Printf.printf "Def: We are adding %s_%d\n" (Var.name v) (Var.id v); *)
-	`DoChildren
+	DoChildren
 	  
       method visit_rvar v =
 	refvars := VS.add v !refvars;
 	(* 	Printf.printf "Ref: We are adding %s_%d\n" (Var.name v) (Var.id v); *)
-	`DoChildren
+	DoChildren
     end 
     in
     ignore(Ast_visitor.cfg_accept visitor p);
@@ -820,12 +819,12 @@ struct
       method visit_avar v =
 	vars := VS.add v !vars;
 	(* 	Printf.printf "Def: We are adding %s_%d\n" (Var.name v) (Var.id v); *)
-	`DoChildren
+	DoChildren
 	  
       method visit_rvar v =
 	vars := VS.add v !vars;
 	(* 	Printf.printf "Ref: We are adding %s_%d\n" (Var.name v) (Var.id v); *)
-	`DoChildren
+	DoChildren
     end 
     in
     ignore(Ast_visitor.cfg_accept visitor p);
@@ -849,12 +848,12 @@ struct
       method visit_avar v =
 	definedvars := VS.add v !definedvars;
 	(* 	Printf.printf "Def: We are adding %s_%d\n" (Var.name v) (Var.id v); *)
-	`DoChildren
+	DoChildren
 	  
       method visit_rvar v =
 	refvars := VS.add v !refvars;
 	(* 	Printf.printf "Ref: We are adding %s_%d\n" (Var.name v) (Var.id v); *)
-	`DoChildren
+	DoChildren
     end 
     in
     ignore(Ssa_visitor.prog_accept visitor p);

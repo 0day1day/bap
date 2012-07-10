@@ -80,14 +80,15 @@ type context =
    usage : usage;
    taint : taint_type
  }
- 
+
+(** Attributes are extra information contained in a [stmt]. *)
 type attribute = 
   | Pos of pos  (** The position of a statement in the source file *)
   | Asm of string (** Assembly representation of the following IL code *)
-  | Address of addr
+  | Address of addr (** The address corresponding to lifted IL. *)
   | Liveout (** Statement should be considered live by deadcode elimination *)
   | StrAttr of string (** Generic printable and parseable attribute *)
-  | Context of context         (** Information about the 
+  | Context of context         (** Information about the
                                    instruction operands from a
                                    trace. *)
   | ThreadId of int (** Executed by a specific thread *)
@@ -96,33 +97,15 @@ type attribute =
   | Synthetic (** Operation was added by an analysis *)
 type attributes = attribute list
 
-
-
-(* stolen from Cil *)
-(** Different visiting actions to be used by visitors. 'a will be
-    instantiated with [exp], [stmt], etc. *)
-type 'a visit_action = 
-    [
-    | `SkipChildren    (** Do not visit the children. Return the node
-                           as it is. *)
-    | `DoChildren      (** Continue with the children of this
-                           node. Rebuild the node on return if any of
-                           the children changes (use == test) *)
-    | `ChangeTo of 'a  (** Replace the expression with the given
-                           one *)
-    | `ChangeToAndDoChildren of 'a (** Replace the expression with the
-				   given one and do children  *)
-(* FIXME: ChangeDoChildrenPost is fugly... find a better solution.
-    | `DoChildrenPost of 'a -> 'a
-	(** Continue on to the children, rebuild the node if changed, and apply
-	the given function on the result. *)
-    | `ChangeDoChildrenPost of 'a * ('a -> 'a)
-        (** First consider that the entire 
-			   exp is replaced by the first 
-			   parameter. Then continue with 
-			   the children. On return rebuild 
-			   the node if any of the children 
-			   has changed and then apply the 
-			   function on the node *)
-*)
-    ]
+(** Visitors are a systematic method for exploring and changing
+    objects of type ['a].  In BAP, ['a] can be [stmt], [exp], etc. The
+    children of statements are expressions; the children of
+    expressions are subexpressions and variables. *)
+type 'a visit_action =
+  | SkipChildren (** Do not visit the children. Return the node
+                     as is. *)
+  | DoChildren      (** Continue exploring children of the current node. Changes to children will propagate up. *)
+  | ChangeTo of 'a  (** Replace the current object with the specified one. *)
+  | ChangeToAndDoChildren of 'a (** Replace the current object with
+				    the given one, and visit children
+				    of the {b replacement} object. *)

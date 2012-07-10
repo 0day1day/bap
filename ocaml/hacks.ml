@@ -175,12 +175,12 @@ let uniqueify_labels p =
     inherit Ast_visitor.nop
     method visit_stmt = function
       | Label(l, attrs) ->
-        `ChangeTo (Label(find_new_label l, attrs))
-      | _ -> `DoChildren
+        ChangeTo (Label(find_new_label l, attrs))
+      | _ -> DoChildren
 
     method visit_exp e = match lab_of_exp e with
-    | Some l -> `ChangeToAndDoChildren (exp_of_lab (find_new_label l))
-    | None -> `DoChildren
+    | Some l -> ChangeToAndDoChildren (exp_of_lab (find_new_label l))
+    | None -> DoChildren
   end
   in
   Ast_visitor.prog_accept renamelabels p
@@ -205,8 +205,8 @@ let replace_unknowns p =
     inherit Ast_visitor.nop
     method visit_exp = function
       | Unknown(_, t) ->
-        `ChangeTo (i t)
-      | _ -> `DoChildren
+        ChangeTo (i t)
+      | _ -> DoChildren
   end
   in
   Ast_visitor.prog_accept v p

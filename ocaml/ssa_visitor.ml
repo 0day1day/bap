@@ -26,29 +26,20 @@ class type t = object
 end
 
 class nop : t = object
-  method visit_exp _   = `DoChildren
-  method visit_value _ = `DoChildren
-  method visit_stmt _  = `DoChildren
-  method visit_avar _  = `DoChildren
-  method visit_rvar _  = `DoChildren
+  method visit_exp _   = DoChildren
+  method visit_value _ = DoChildren
+  method visit_stmt _  = DoChildren
+  method visit_avar _  = DoChildren
+  method visit_rvar _  = DoChildren
 end
 
 
 let rec action vischil startvisit node=
   match startvisit node with
-  | `SkipChildren -> node
-  | `ChangeTo x -> x (* FIXME: warn if x = node *)
-  | `DoChildren -> vischil node
-  | `ChangeToAndDoChildren x -> vischil x
-  | _ -> failwith "Action not implemented"
-(*  | `DoChildrenPost f -> f (vischil node)
-  | `ChangeDoChildrenPost(x,f) -> f (vischil x)*)
-(*  | `Combine(a,b) ->
-      let r1 =  action vischil (fun _ -> a) node in
-      action vischil (fun _ -> b) r1
-  | `AfterChildren f ->
-      action vischil f (vischil node)
-*)
+  | SkipChildren -> node
+  | ChangeTo x -> x (* FIXME: warn if x = node *)
+  | DoChildren -> vischil node
+  | ChangeToAndDoChildren x -> vischil x
 
 let wrapstmt f v = let v' = f v in if quick_stmt_eq v v' then v else v'
 let wrapexp f v = let v' = f v in if quick_exp_eq v v' then v else v'
@@ -143,3 +134,5 @@ let prog_accept vis p =
        let oldstmts = Cfg.SSA.get_stmts g abb in
        let newstmts = stmts_accept vis oldstmts in
        Cfg.SSA.set_stmts g abb newstmts) p p
+
+let cfg_accept = prog_accept

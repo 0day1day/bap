@@ -64,7 +64,7 @@ let generate_formulas_setup block =
     Utils_common.stream_concrete mem_hash concrete_state thread_map block true 
   in
   let block = Traces.remove_specials block in
-  let block = Traces.remove_unknowns block in
+  (*let block = Traces.remove_unknowns block in*)
   block
 
 (** Do NOT use Substitution, DO use lets *)

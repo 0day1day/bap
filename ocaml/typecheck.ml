@@ -1,14 +1,12 @@
-(** Type checking for BAP.
-
-
-    This is incomplete, as it is somewhat of a quick hack to get type
-    inference working (which is needed for STP translation).
+(* Type checking for BAP.
 *)
 
 open Type
 open Ast
 open Big_int_Z
 open Big_int_convenience
+module D = Debug.Make(struct let name="Typecheck" and default=`NoDebug end)
+open D
 
 exception TypeError of string
 
@@ -37,16 +35,27 @@ let bytes_of_width t =
   if not ((b mod 8) = 0) then invalid_arg "bytes_of_width";
   b / 8
 
-let rec infer_ast ?(check=true) = function
-  | Var v ->
-      (* FIXME: Check context *)
+let has_warned = ref false
+
+let rec infer_ast =
+  let warn () =
+    if !has_warned = false then (
+      wprintf "infer_ast ~check option is deprecated.  Please use typecheck_expression instead.";
+      has_warned := true
+    )
+  in
+  (fun ?(check=true) e ->
+    if check then warn ();
+    match e with
+    | Var v ->
+    (* FIXME: Check context *)
       Var.typ v
-  | UnOp(_, e) ->
+    | UnOp(_, e) ->
       if check then 
 	(let t = infer_ast ~check e in
-	check_reg t);
+	 check_reg t);
       infer_ast ~check:false e;
-  | BinOp(o,e1,e2) as e ->
+    | BinOp(o,e1,e2) as e ->
       if check then (
 	let t1 = infer_ast ~check e1
 	and t2 = infer_ast ~check e2 in
@@ -55,58 +64,57 @@ let rec infer_ast ?(check=true) = function
 	| EQ | NEQ -> ()
 	| _ -> check_reg t1);
       (match o with
-       | EQ | NEQ | LT | LE | SLT | SLE -> reg_1
-       | _ -> infer_ast ~check:false e1
+      | EQ | NEQ | LT | LE | SLT | SLE -> reg_1
+      | _ -> infer_ast ~check:false e1
       )
-  | Ite(b,e1,e2) ->
+    | Ite(b,e1,e2) ->
       if check then 
 	(let t1 = infer_ast ~check e1
-	 and t2 = infer_ast ~check e2 in
+	and t2 = infer_ast ~check e2 in
 	 check_same t1 t2);
       infer_ast ~check:false e1 
-  | Extract(h,l,e) ->
+    | Extract(h,l,e) ->
       let ns = int_of_big_int(h -% l +% bi1) in
       let nt = Reg ns in
       if check then (
 	match infer_ast ~check:true e with
 	| Reg(oldn) ->
-	    if (ns <= 0) then terror("Extract must extract at least one bit");
-	    if l <% bi0 then terror("Lower bit index must be at least 0");
-	    if h >% (big_int_of_int oldn) -% bi1 then terror("Upper bit index must be at most one less than the size of the original register")
-	      
-	| _ -> terror ("Extract expects Reg type")	
+	  if (ns <= 0) then terror("Extract must extract at least one bit");
+	  if l <% bi0 then terror("Lower bit index must be at least 0");
+	  if h >% (big_int_of_int oldn) -% bi1 then terror("Upper bit index must be at most one less than the size of the original register")
+	| _ -> terror ("Extract expects Reg type")
       );
       nt
-  | Concat(le, re) ->
+    | Concat(le, re) ->
       let lt, rt = infer_ast ~check le, infer_ast ~check re in
       let nt = match lt, rt with
 	| Reg(lb), Reg(rb) ->
-	    Reg(lb+rb)
+	  Reg(lb+rb)
 	| _ -> terror "Concat expects Reg type"
       in
       nt
-  | Lab s ->
-      (* FIXME: no type for labels yet *)
+    | Lab s ->
+        (* FIXME: no type for labels yet *)
       reg_64
-  | Int(_,t)
-  | Unknown(_,t) ->
+    | Int(_,t)
+    | Unknown(_,t) ->
       t
-  | Cast(ct,t,e) ->
-      (* FIXME: check *)
+    | Cast(ct,t,e) ->
+        (* FIXME: check *)
       t
-  | Let(v,e1,e2) ->
-      (* FIXME: check *)
+    | Let(v,e1,e2) ->
+        (* FIXME: check *)
       infer_ast e2
-  | Load(arr,idx,endian, t) ->
+    | Load(arr,idx,endian, t) ->
       if check then check_idx arr idx endian t;
       t
-  | Store(arr,idx,vl, endian, t) ->
+    | Store(arr,idx,vl, endian, t) ->
       if check then (
 	check_idx arr idx endian t;
 	let tv = infer_ast vl in
 	check_subt tv t "Can't store value with type %s as a %s";
       );
-      infer_ast ~check:false arr
+      infer_ast ~check:false arr)
 
 and check_same ?e ?s t1 t2 =
   if t1 <> t2 then
