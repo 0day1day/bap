@@ -134,3 +134,5 @@ let prog_accept vis p =
        let oldstmts = Cfg.SSA.get_stmts g abb in
        let newstmts = stmts_accept vis oldstmts in
        Cfg.SSA.set_stmts g abb newstmts) p p
+
+let cfg_accept = prog_accept
