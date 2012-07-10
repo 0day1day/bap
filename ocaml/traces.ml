@@ -364,7 +364,7 @@ let symbtoexp = function
 let typ_to_bytes = function
   | Reg 1 | Reg 8 -> 1
   | Reg 16 -> 2
-   | Reg 32 -> 4
+  | Reg 32 -> 4
   | Reg 64 -> 8
   | _ -> failwith "not a register"
 
@@ -375,71 +375,6 @@ let get_byte i v =
 
 let num_to_bit num =
   if bi_is_zero num then bi0 else bi1
-
-let rec get_tid stmts =
-  let rec get_tid_from_atts atts = 
-    match atts with
-      | [] -> None
-      | a::ats -> (match a with
-          | ThreadId i -> Some(i)
-          | _ -> get_tid_from_atts ats)
-  in
-  get_tid_from_atts (get_attrs (List.hd stmts))
-
-
-(** Support muti-threaded traces by seperating variables per threadId *)
-module ThreadVar = struct
-  type t = int * Var.t
-  let hash (i,v) = Hashtbl.hash (i, Var.hash v)
-  let equal = (=)
-  let compare (i1,v1) (i2,v2) = 
-    let c1 = compare i1 i2 in 
-    if c1 <> 0 then c1 else Var.compare v1 v2
-end
-
-module TVMake = Hashtbl.Make(ThreadVar)
-
-module TVHash = struct
-  include TVMake
-  include Util.HashUtil(TVMake)
-end
-
-let create_thread_map_state () = TVHash.create 1000
-
-(** look up - if tid and var have been used, lookup that.  Otherwise make a new
-one and store that 
-Pass in a state object 
-*)
-let lookup_thread_map map threadIDopt (Var.V(_,_,t) as avar) =
-  match threadIDopt, t with
-    | Some(threadID), Reg _ ->
-        let nvar = 
-          try TVHash.find map (threadID, avar)
-          with Not_found ->
-            let new_name = (Var.name avar) in
-            let newervar = Var.newvar new_name t in
-            TVHash.add map (threadID, avar) newervar;
-            newervar
-        in
-        nvar
-    | Some(threadID), _ -> avar (* Ignore non register variables *)
-    | None, _ -> failwith "Can not lookup vars if no thread id exists!"
-
-(** Rename variables so they are unique to the thread they are found in *)
-let explicit_thread_stmts stmts thread_map =
-  (* check if tid is in first or second statment.  If it isn't, use None and
-     don't change any variables *)
-  let tid = ref (get_tid stmts)
-  in
-  let svis = object(self)
-    inherit Ast_visitor.nop
-    method visit_avar v = `ChangeTo(lookup_thread_map thread_map !tid v)
-    method visit_rvar = self#visit_avar
-  end
-  in
-  Ast_visitor.prog_accept svis stmts
-
-
 (* Wrappers & Useful shorthands to manipulate taint
    attributes and process taint info *)
 let keep_taint = function
@@ -595,6 +530,73 @@ let () =
 (********************************************************)
 
 let is_seed_label = (=) "ReadSyscall"
+
+(* Extract the tid from a list of stmts *)
+let rec get_tid stmts =
+  let rec get_tid_from_atts atts = 
+    match atts with
+      | [] -> None
+      | a::ats -> (match a with
+          | ThreadId i -> Some(i)
+          | _ -> get_tid_from_atts ats)
+  in
+  (* If symbolic bytes are introduced, this should be a memory only operation
+     and doesn't really have a thread ID, so set the thread ID to 0 *)
+  match stmts with
+    | (Ast.Comment (c, _))::rest when (is_seed_label c) -> Some 0
+    | _ ->  get_tid_from_atts (get_attrs (List.hd stmts))
+        
+(** Support muti-threaded traces by seperating variables per threadId *)
+module ThreadVar = struct
+  type t = int * Var.t
+  let hash (i,v) = Hashtbl.hash (i, Var.hash v)
+  let equal = (=)
+  let compare (i1,v1) (i2,v2) = 
+    let c1 = compare i1 i2 in 
+    if c1 <> 0 then c1 else Var.compare v1 v2
+end
+
+module TVMake = Hashtbl.Make(ThreadVar)
+
+module TVHash = struct
+  include TVMake
+  include Util.HashUtil(TVMake)
+end
+
+let create_thread_map_state () = TVHash.create 1000
+
+(** look up - if tid and var have been used, lookup that.  Otherwise make a new
+one and store that 
+Pass in a state object 
+*)
+let lookup_thread_map map threadIDopt (Var.V(_,_,t) as avar) =
+  match threadIDopt, t with
+    | Some(threadID), Reg _ ->
+        let nvar = 
+          try TVHash.find map (threadID, avar)
+          with Not_found ->
+            let new_name = (Var.name avar) in
+            let newervar = Var.newvar new_name t in
+            TVHash.add map (threadID, avar) newervar;
+            newervar
+        in
+        nvar
+    | Some(threadID), _ -> avar (* Ignore non register variables *)
+    | None, _ -> failwith "Can not lookup vars if no thread id exists!"
+
+(** Rename variables so they are unique to the thread they are found in *)
+let explicit_thread_stmts stmts thread_map =
+  (* check if tid is in first or second statment.  If it isn't, use None and
+     don't change any variables *)
+  let tid = ref (get_tid stmts)
+  in
+  let svis = object(self)
+    inherit Ast_visitor.nop
+    method visit_avar v = `ChangeTo(lookup_thread_map thread_map !tid v)
+    method visit_rvar = self#visit_avar
+  end
+  in
+  Ast_visitor.prog_accept svis stmts
 
 (* Store the concrete taint info in the global environment *)
 let add_to_conc {name=name; mem=mem; index=index; value=value;
@@ -1202,7 +1204,7 @@ let run_block ?(next_label = None) ?(transformf = (fun s _ -> [s])) state memv t
   in
 
   let block = append_halt block in
-  TraceConcrete.initialize_prog state block ;
+  TraceConcrete.initialize_prog state block;
   clean_delta state.delta;
   let executed = ref [] in
   executed := BatList.append input_seeds !executed;
