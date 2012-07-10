@@ -275,8 +275,7 @@ object (self)
 	   | DIVIDE -> "bvudiv"
 	   | SDIVIDE -> "bvsdiv"
 	   | MOD -> "bvurem"
-	   (* | SMOD -> "bvsrem" *)
-	   | SMOD -> failwith "SMOD goes to bvsrem or bvsmod?"
+	   | SMOD -> "bvsrem"
 	   | AND -> "bvand"
 	   | OR -> "bvor"
 	   | XOR -> "bvxor"
