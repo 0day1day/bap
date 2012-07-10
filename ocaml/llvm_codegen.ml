@@ -252,6 +252,7 @@ object(self)
       ignore(build_call getmmulti [| idx'; alloc'; nbytes |] "" builder);
       build_load alloc "load_multiload" builder
     | Ast.Store _ -> failwith "Stores are not proper expressions"
+    | Ast.Unknown (_, t) -> undef (self#convert_type t)
     | e -> failwith (Printf.sprintf "Unsupported expression %s" (Pp.ast_exp_to_string e))
 
   (* (\** Create an anonymous function to compute e *\) *)
