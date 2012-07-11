@@ -211,7 +211,7 @@ struct
     let lm = fold_labels
       (fun l lm ->
         (* dprintf "Adding label %s to bbid %s" (Pp.label_to_string l) (bbid_to_string (V.label v)); *)
-        if debug && LM.mem l lm then (
+        if debug() && LM.mem l lm then (
             (* wprintf "stmt: %s" (Lang.to_string s); *)
             let oldstmts = get_stmts c (LM.find l lm) in
             let newstmts = s in

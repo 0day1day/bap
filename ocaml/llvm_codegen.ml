@@ -495,7 +495,7 @@ object(self)
       ignore(self#convert_jump_statement build_ind_jump halt_type cfstmt bb succllvmbbs);
 
     ) cfg;
-    if debug then self#dump;
+    if debug() then self#dump;
     Llvm_analysis.assert_valid_function f;
     (* Optimize until fixed point.  Ehh that didn't work so well. *)
     let countdown = ref 5 in
@@ -541,7 +541,7 @@ object(self)
       ignore(build_store p (self#convert_var v) builder);
       ignore(build_ret_void builder);
       Llvm_analysis.assert_valid_function f;
-      if debug then self#dump;
+      if debug() then self#dump;
       f
     in
     let setf = try VH.find set_value_h v

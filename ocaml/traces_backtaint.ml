@@ -165,5 +165,5 @@ let identify_fault_location t =
     | [] -> failwith "No faulting location found.  This is probably a bug."
   in
   let loc = find_fault revt in
-  if debug then print_locset loc;
+  if debug() then print_locset loc;
   loc

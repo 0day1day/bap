@@ -747,8 +747,7 @@ struct
      | _ -> failwith "internal error: adding malformed constraint to formula"
     )
 
-  let output_formula bindings =
-    bindings exp_true
+  let output_formula bindings = bindings exp_true
 end
 
 (** Uses Lets for assignments *)

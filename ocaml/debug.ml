@@ -31,6 +31,10 @@ let debug_string = prerr_string
 (** like [debug_string] but prints a newline and flushes the buffer *)
 let debug_endline = prerr_endline
 
+(** flag and helper function to dynamically turn debug on and off *)
+let global_debug = ref true
+let set_global_debug v = global_debug := v
+
 let output_endline oc s =
   output_string oc s;
   output_char oc '\n';
@@ -72,11 +76,14 @@ let get_env_options varname defvalue =
       default
 
 
-(** [has_debug s] returns true when debugging is enabled for s.
+(** [has_debug d s] returns true when debugging is enabled for s.  d is the 
+    default behavior.
     See documentation on [BAP_DEBUG_MODULES] at the top.
 *)
-let has_debug =
-  get_env_options "BAP_DEBUG_MODULES"
+let has_debug d s =
+  (*get_env_options "BAP_DEBUG_MODULES"*)
+  if !global_debug then get_env_options "BAP_DEBUG_MODULES" d s
+  else get_env_options "BAP_DEBUG_MODULES" false s
 
 (** [has_warn s] returns true when warnings are enabled for s.
     See documention on [BAP_WARN_MODULES] at the top *)
@@ -129,7 +136,7 @@ let ptime =
 (** The type of module that contains the debugging functions *)
 module type DEBUG =
 sig
-  val debug : bool
+  val debug : unit -> bool
     (** Whether debugging is on *)
 
   val warn : bool
@@ -169,7 +176,7 @@ end
 (** No-op debugging module. Throws everything away. *)
 module NoDebug : DEBUG  =
 struct
-  let debug = false
+  let debug _ = false
   let pdebug = (fun _ -> ())
   let dprintf fmt = Printf.ksprintf ignore fmt
   let dtrace = (fun ~before ~f ~after -> f)
@@ -182,16 +189,16 @@ end
 module Make(Module:DEBUG_MOD_INFO)  : DEBUG =
 struct
 
-  let debug = has_debug (Module.default = `Debug) Module.name 
+  let debug _ = has_debug (Module.default = `Debug) Module.name 
 
   let pdebug s =
     pindent(); ptime();
     debug_string Module.name; debug_string ": ";
     debug_endline s
-  let pdebug = if debug then pdebug else NoDebug.pdebug
+  let pdebug a = if debug() then pdebug a else NoDebug.pdebug a
 
   let dprintf fmt = Printf.ksprintf pdebug fmt
-  let dprintf = if debug then dprintf else NoDebug.dprintf
+  let dprintf a = if debug() then dprintf a else NoDebug.dprintf a
 
   let dtrace ~before ~f ~after x =
     before x;
@@ -201,7 +208,7 @@ struct
     after r;
     r
  
-  let dtrace = if debug then dtrace else NoDebug.dtrace
+  let dtrace = if debug() then dtrace else NoDebug.dtrace
 
   let warn = has_warn Module.name
 

@@ -6,7 +6,7 @@
 
 module type DEBUG =
   sig
-    val debug : bool
+    val debug : unit -> bool
     val warn : bool
     val pdebug : string -> unit
     val dprintf : ('a, unit, string, unit) format4 -> 'a

@@ -78,7 +78,7 @@ struct
   let eval_ast_program initdata prog post =
     let ctx = Symbolic.init prog in
     let predicates = search post [] (S.start_at ctx initdata) in
-    if debug then dprintf "Explored %d paths." (List.length predicates);
+    if debug() then dprintf "Explored %d paths." (List.length predicates);
     BatList.reduce Ast.exp_or (List.map Symbolic.Form.output_formula predicates)
 
 end
