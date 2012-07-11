@@ -31,7 +31,7 @@ let debug_string = prerr_string
 (** like [debug_string] but prints a newline and flushes the buffer *)
 let debug_endline = prerr_endline
 
-(** flag and helper function to dynamically turn debug on and off *)
+(* Disabling global debugging turns off all debug functionality for all modules *)
 let global_debug = ref true
 let set_global_debug v = global_debug := v
 
@@ -76,14 +76,14 @@ let get_env_options varname defvalue =
       default
 
 
-(** [has_debug d s] returns true when debugging is enabled for s.  d is the 
+(** [has_debug d s] returns true when debugging is enabled for s.  d is the
     default behavior.
     See documentation on [BAP_DEBUG_MODULES] at the top.
 *)
 let has_debug d s =
   (*get_env_options "BAP_DEBUG_MODULES"*)
   if !global_debug then get_env_options "BAP_DEBUG_MODULES" d s
-  else get_env_options "BAP_DEBUG_MODULES" false s
+  else false
 
 (** [has_warn s] returns true when warnings are enabled for s.
     See documention on [BAP_WARN_MODULES] at the top *)
