@@ -23,14 +23,11 @@ let thread_map = Traces.create_thread_map_state();;
 (* HACK to make sure default memory has a map to normalized memory *)
 ignore(Memory2array.coerce_rvar_state mem_hash Asmir.x86_mem);;
 
+let outfile = ref "";;
+
 (** Values for formula generation *)
 let h = VH.create 1000;; (* vars to dsa vars *)
 let rh = VH.create 10000;;  (* dsa vars to vars *)
-let last_state = ref (Traces.TraceSymbolicNoSub.TraceSymbolic.create_state ());;
-let last_state_no_sub_no_let = ref (Traces.TraceSymbolicNoSubNoLet.TraceSymbolic.create_state ());;
-let last_state_sub = ref (Traces.TraceSymbolicSub.TraceSymbolic.create_state ());;
-
-let outfile = ref "";;
 
 let traceSymbType = ref Traces.NoSub;;
 
@@ -57,30 +54,45 @@ let concrete block =
   Utils_common.stream_concrete mem_hash concrete_state thread_map block false
   
 
-
 (*** Symbolicly executes a block and builds formulas ***)
 let generate_formulas_setup block = 
   let block = 
     Utils_common.stream_concrete mem_hash concrete_state thread_map block true 
   in
   let block = Traces.remove_specials block in
-  (*let block = Traces.remove_unknowns block in*)
+  let block = Hacks.replace_unknowns block in
   block
 
 (** Do NOT use Substitution, DO use lets *)
-let generate_formulas block = 
-  let block = generate_formulas_setup block in
-  last_state := Traces.TraceSymbolicNoSub.construct_symbolic_run_formula h rh !last_state block
+let generate_formulas filename =
+  let last_state = ref (Traces.TraceSymbolicNoSub.TraceSymbolic.create_state (Traces.TraceSymbolicNoSub.init_formula_file filename))
+  in
+  (fun block ->
+    let block = generate_formulas_setup block in
+    last_state := Traces.TraceSymbolicNoSub.construct_symbolic_run_formula h rh !last_state block)
+
+let generate_formulas_opt filename = 
+  let last_state = ref (Traces.TraceSymbolicNoSub.TraceSymbolic.create_state (Traces.TraceSymbolicNoSub.init_formula_file filename))
+  in
+  (fun block ->
+    let block = generate_formulas_setup block in
+    last_state := Traces.TraceSymbolicNoSubOpt.construct_symbolic_run_formula h rh !last_state block)
 
 (** Do NOT use Substitution, do NOT use lets *)
-let generate_formulas_no_sub_no_let block = 
+let generate_formulas_no_sub_no_let filename = 
+  let last_state_no_sub_no_let = ref (Traces.TraceSymbolicNoSubNoLet.TraceSymbolic.create_state (Traces.TraceSymbolicNoSubNoLet.init_formula_file filename))
+  in
+  (fun block ->
   let block = generate_formulas_setup block in
-  last_state_no_sub_no_let := Traces.TraceSymbolicNoSubNoLet.construct_symbolic_run_formula h rh !last_state_no_sub_no_let block
+  last_state_no_sub_no_let := Traces.TraceSymbolicNoSubNoLet.construct_symbolic_run_formula h rh !last_state_no_sub_no_let block)
 
 (** DO use Substitution *)
-let generate_formulas_sub block = 
-  let block = generate_formulas_setup block in
-  last_state_sub := Traces.TraceSymbolicSub.construct_symbolic_run_formula h rh !last_state_sub block
+let generate_formulas_sub filename = 
+  let last_state_sub = ref (Traces.TraceSymbolicSub.TraceSymbolic.create_state (Traces.TraceSymbolicSub.init_formula_file filename))
+  in
+  (fun block ->
+    let block = generate_formulas_setup block in
+    last_state_sub := Traces.TraceSymbolicSub.construct_symbolic_run_formula h rh !last_state_sub block)
 
 let speclist =
   ("-print", Arg.String(fun f -> add(TransformAst(prints f))),
@@ -88,18 +100,23 @@ let speclist =
   ::("-concrete", uadd(TransformAst(concrete)),
      "Concretely execute each block.")
   ::("-trace-formula",
-     Arg.String(fun f -> (outfile := f; add(AnalysisAst(generate_formulas)))),
-     "<file> Generate and output the STP trace formula to <file>.  "^
+     Arg.String(fun f -> (outfile := f; add(AnalysisAst(generate_formulas f)))),
+     "<file> Generate and output a trace formula to <file>.  "^
+       "Don't use substitution but do use lets.")
+  ::("-trace-formula-opt",
+     Arg.String(fun f -> (outfile := f; 
+                          add(AnalysisAst(generate_formulas_opt f)))),
+     "<file> Generate and output a trace formula to <file>.  "^
        "Don't use substitution but do use lets.")
   ::("-trace-formula-no-sub-no-let",
      Arg.String(fun f -> (outfile := f; traceSymbType := Traces.NoSubNoLet;
-                          add(AnalysisAst(generate_formulas_no_sub_no_let)))),
-     "<file> Generate and output the STP trace formula to <file>.  "^
+                          add(AnalysisAst(generate_formulas_no_sub_no_let f)))),
+     "<file> Generate and output a trace formula to <file>.  "^
        "Don't use substitution and do not use lets.")
   ::("-trace-formula-sub",
      Arg.String(fun f -> (outfile := f; traceSymbType := Traces.Substitution;
-                          add(AnalysisAst(generate_formulas_sub)))),
-     "<file> Generate and output the STP trace formula to <file>.  "^
+                          add(AnalysisAst(generate_formulas_sub f)))),
+     "<file> Generate and output a trace formula to <file>.  "^
        "Do use substitution.")
   :: Input.stream_speclist
 
@@ -141,18 +158,18 @@ Stream.iter
   ) prog;
 
 (** SWXXX Is there a better way to do this? *)
-if (!outfile <> "") then (
-  Traces.dsa_rev_map := None;
-  print_endline("Outputting formula, please wait...");
-  let form = (match !traceSymbType with
-    | Traces.NoSub -> 
-        Traces.TraceSymbolicNoSub.TraceSymbolic.output_formula !last_state.Symbeval.pred
-    | Traces.NoSubNoLet -> 
-        Traces.TraceSymbolicNoSubNoLet.TraceSymbolic.output_formula !last_state_no_sub_no_let.Symbeval.pred
-    | Traces.Substitution -> 
-        Traces.TraceSymbolicSub.TraceSymbolic.output_formula !last_state_sub.Symbeval.pred
-  )
-  in
-  Traces.print_formula !outfile form
-)
+(* if (!outfile <> "") then ( *)
+(*   Traces.dsa_rev_map := None; *)
+(*   print_endline("Outputting formula, please wait..."); *)
+(*   let form = (match !traceSymbType with *)
+(*     | Traces.NoSub ->  *)
+(*         Traces.TraceSymbolicNoSub.TraceSymbolic.output_formula !last_state.Symbeval.pred *)
+(*     | Traces.NoSubNoLet ->  *)
+(*         Traces.TraceSymbolicNoSubNoLet.TraceSymbolic.output_formula !last_state_no_sub_no_let.Symbeval.pred *)
+(*     | Traces.Substitution ->  *)
+(*         Traces.TraceSymbolicSub.TraceSymbolic.output_formula !last_state_sub.Symbeval.pred *)
+(*   ) *)
+(*   in *)
+(*   Traces.print_formula !outfile form *)
+(* ) *)
 

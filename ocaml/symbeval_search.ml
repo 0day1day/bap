@@ -13,7 +13,12 @@ sig
   end
 
   module Form : sig
-    include Formula
+      type t
+      type init = unit
+      type output = Ast.exp
+      val init : init -> t 
+      val add_to_formula : t -> Ast.exp -> form_type -> t
+      val output_formula : t -> output
   end
 
   type myctx = (MemL.t,Form.t) ctx
@@ -22,7 +27,7 @@ sig
   exception Halted of varval option * myctx
   exception UnknownLabel of label_kind
   exception AssertFailed of myctx
-  val init : Ast.stmt list -> myctx
+  val init : Ast.stmt list -> Form.init -> myctx
   val eval : myctx -> myctx list
   val eval_expr : MemL.t -> Ast.exp -> varval
 
@@ -76,9 +81,9 @@ struct
 	search post predicates q
 
   let eval_ast_program initdata prog post =
-    let ctx = Symbolic.init prog in
+    let ctx = Symbolic.init prog () in
     let predicates = search post [] (S.start_at ctx initdata) in
-    if debug then dprintf "Explored %d paths." (List.length predicates);
+    if debug() then dprintf "Explored %d paths." (List.length predicates);
     BatList.reduce Ast.exp_or (List.map Symbolic.Form.output_formula predicates)
 
 end

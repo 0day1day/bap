@@ -154,16 +154,26 @@ sig
   val output_formula : t -> Ast.exp
 end
 
+module type StreamFormula =
+sig
+  type t
+  type init
+  type output
+  val init : init -> t 
+  val add_to_formula : t -> Ast.exp -> form_type -> t
+  val output_formula : t -> output
+end
+
 (** Module that handles how Assignments are handled. *)
 module type Assign =
   functor (MemL:MemLookup) ->
-    functor (Form:Formula) ->
+    functor (Form:StreamFormula) ->
 sig
   (** Assign a variable. Does not modify the entire context in place. *)
   val assign : Var.t -> varval -> (MemL.t,Form.t) ctx -> (MemL.t,Form.t) ctx
 end
 
-module Make(MemL: MemLookup)(Tune: EvalTune)(Assign: Assign)(Form: Formula) =
+module Make(MemL:MemLookup)(Tune:EvalTune)(Assign:Assign)(Form:StreamFormula) =
 struct
 
   module MemL=MemL
@@ -225,12 +235,12 @@ struct
   let output_formula    = Form.output_formula
 
   (* Initializers *)
-  let create_state () =
+  let create_state form_init =
     let sigma : (addr, instr) Hashtbl.t = Hashtbl.create 5700
     and pc = Int64.zero
     and delta : MemL.t = MemL.create ()
     and lambda : (label_kind, addr) Hashtbl.t = Hashtbl.create 5700 in
-      {pred=Form.true_formula; delta=delta; sigma=sigma; lambda=lambda; pc=pc}
+    {pred=(Form.init form_init); delta=delta; sigma=sigma; lambda=lambda; pc=pc}
 
   let initialize_prog state prog_stmts =
     Hashtbl.clear state.sigma ;
@@ -250,8 +260,8 @@ struct
   let cleanup_delta state =
     MemL.clear state
 
-  let build_default_context prog_stmts =
-    let state = create_state() in
+  let build_default_context prog_stmts form_init =
+    let state = create_state form_init in
       initialize_prog state prog_stmts ;
       state
 
@@ -496,8 +506,6 @@ struct
                       ^"\nreason: "^str);
        print_values state.delta;
        print_mem state.delta;
-       print_endline ("Path predicate: "
-                      ^(Pp.ast_exp_to_string (output_formula state.pred)));
        [])
       | Not_found ->
 	  (* The only way inst_fetch would fail is if pc falls off the end, 
@@ -689,7 +697,7 @@ end
 (** Symbolic assigns are represented as Lets in the formula, except
     for temporaries.  If you use this, you should clear out temporaries
     after executing each instruction. *)
-module PredAssign(MemL: MemLookup)(Form: Formula) =
+module PredAssign(MemL: MemLookup)(Form: StreamFormula) =
 struct
   let assign v ev ({delta=delta; pred=pred; pc=pc} as ctx) =
     let expr = symb_to_exp ev in
@@ -710,7 +718,7 @@ struct
 end
 
 (** Symbolic assigns are represented in delta *)
-module StdAssign(MemL:MemLookup)(Form:Formula) =
+module StdAssign(MemL:MemLookup)(Form:StreamFormula) =
 struct
   open MemL
   let assign v ev ({delta=delta; pc=pc} as ctx) =
@@ -791,11 +799,74 @@ struct
       create_formula exp_true bindings
 end
 
+(* module StreamForm =  *)
+(* struct  *)
+(*   type t = Ast.exp *)
 
-module Symbolic = Make(SymbolicMemL)(FastEval)(StdAssign)(StdForm)
-module SymbolicSlow = Make(SymbolicMemL)(SlowEval)(StdAssign)(StdForm)
+(*   let true_formula = exp_true *)
+(*   (\* How do you add a new assertion that two things are equal? *)
+(*      How do you add a new let binding? *)
+(*   *\) *)
+(*   let add_to_formula formula expression typ = *)
+(*     (match expression, typ with *)
+(*       | _, Equal -> *)
+(* 	  #letmebegin () *)
+(*      | BinOp(EQ, Var v, value), Rename -> *)
+(* 	 (fun newe -> fbuild (Let(v, value, newe))) *)
+(*      | _ -> failwith "internal error: adding malformed constraint to formula" *)
+(*     ) *)
 
-module Concrete = Make(ConcreteMemL)(AlwaysEvalLet)(StdAssign)(StdForm)
+(*   let output_formula e = e *)
+(* end *)
+
+(** Older Formulas build up formula before printing out but this functor makes 
+    it looks like streaming to evaluator *) 
+module StreamFormulaConverter(Form:Formula) =
+struct
+  type t = Form.t
+  type init = unit
+  type output = Ast.exp
+
+  let init () = Form.true_formula
+
+  let add_to_formula = Form.add_to_formula
+
+  let output_formula = Form.output_formula
+end
+
+module StreamFormulaConverterToStream(Form:Formula) = 
+struct
+  type t = {printer : Formulap.fpp_oc; form_t : Form.t}
+  type init = Formulap.fpp_oc
+  type output = unit
+
+  let init printer = {printer=printer; form_t=Form.true_formula}
+
+  let add_to_formula {printer=printer; form_t=form_t} exp typ = 
+    {printer=printer; form_t = Form.add_to_formula form_t exp typ}
+
+  let output_formula {printer=printer; form_t=form_t} = 
+    let formula = Form.output_formula form_t in
+    let mem_hash = Memory2array.create_state () in
+    let formula = Memory2array.coerce_exp_state mem_hash formula in
+    let foralls = [] in
+    let () = printer#assert_ast_exp_with_foralls foralls formula in
+    let () = printer#counterexample in
+    printer#close
+end
+
+module StdFormStreamOld = StreamFormulaConverter(StdForm)
+module LetBindStreamOld = StreamFormulaConverter(LetBind)
+module LetBindOldStreamOld = StreamFormulaConverter(LetBindOld)
+
+module StdFormStream = StreamFormulaConverterToStream(StdForm)
+module LetBindStream = StreamFormulaConverterToStream(LetBind)
+module LetBindOldStream = StreamFormulaConverterToStream(LetBindOld)
+
+module Symbolic = Make(SymbolicMemL)(FastEval)(StdAssign)(StdFormStreamOld)
+module SymbolicSlow = Make(SymbolicMemL)(SlowEval)(StdAssign)(StdFormStreamOld)
+
+module Concrete = Make(ConcreteMemL)(AlwaysEvalLet)(StdAssign)(StdFormStreamOld)
 
 (** Execute a program concretely *)
 let concretely_execute ?s ?(i=[]) p =
@@ -815,7 +886,7 @@ let concretely_execute ?s ?(i=[]) p =
     | [ctx], v -> ctx, v
     | _, Some _ -> failwith "step"
   in
-  let ctx = Concrete.build_default_context p in
+  let ctx = Concrete.build_default_context p () in
   (* Evaluate initialization statements *)
   let ctx = List.fold_left (fun ctx s ->
 			      dprintf "Init %s" (Pp.ast_stmt_to_string s);

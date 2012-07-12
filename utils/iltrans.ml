@@ -307,15 +307,19 @@ let speclist =
      "<gaddress> <maddress> <sehaddress> <payload file> Use pivot at gaddress to transfer control (by overwriting SEH handler at sehaddress) to payload at maddress."
     )
   ::("-trace-formula",
-     Arg.String(fun f -> add(AnalysisAst(Traces.TraceSymbolicNoSub.output_formula f))),
-     "<file> Output the STP trace formula to <file>"
+     Arg.String(fun f -> add(AnalysisAst(Traces.TraceSymbolicNoSub.generate_formula f))),
+     "<file> Output a trace formula to <file>"
+    )
+  ::("-trace-formula-opt",
+     Arg.String(fun f -> add(AnalysisAst(Traces.TraceSymbolicNoSubOpt.generate_formula f))),
+     "<file> Output a trace formula to <file>"
     )
   ::("-trace-formula-no-sub-no-let",
-     Arg.String(fun f -> add(AnalysisAst(Traces.TraceSymbolicNoSubNoLet.output_formula f))),
+     Arg.String(fun f -> add(AnalysisAst(Traces.TraceSymbolicNoSubNoLet.generate_formula f))),
      "Set formula format so it does not use substitution or let bindings (default is no substitution with let bindings)"
   )
   ::("-trace-formula-sub",
-     Arg.String(fun f -> add(AnalysisAst(Traces.TraceSymbolicSub.output_formula f))),
+     Arg.String(fun f -> add(AnalysisAst(Traces.TraceSymbolicSub.generate_formula f))),
      "Set formula format so it uses substitution (default is no substitution with let bindings)"
   )
   ::("-trace-formula-format",

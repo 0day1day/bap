@@ -785,22 +785,7 @@ let print_block =
 
 let trace_length trace =
   print "Trace length: %d\n" (List.length trace)
-
-let print_formula file formula =
-  let oc = open_out file in
-  let mem_hash = Memory2array.create_state () in
-  let formula = Memory2array.coerce_exp_state mem_hash formula in
-  let foralls = List.map (Memory2array.coerce_rvar_state mem_hash) [] in
-  let p = match !printer with
-    | "smtlib1" -> ((new Smtlib1.pp_oc oc) :> Formulap.fpp_oc)
-    | "smtlib2" -> ((new Smtlib2.pp_oc oc) :> Formulap.fpp_oc)
-    | "stp" -> ((new Stp.pp_oc oc) :> Formulap.fpp_oc)
-    | _ -> failwith "Unknown printer"
-  in
-  (* let p = new Smtlib1.pp_oc oc in *)
-  let () = p#assert_ast_exp_with_foralls foralls formula in
-  let () = p#counterexample in
-    p#close
+  
 
 module Status = Util.StatusPrinter
 
@@ -899,7 +884,7 @@ struct
 
 end
 
-module TraceConcreteAssign(MemL: MemLookup)(Form: Formula) =
+module TraceConcreteAssign(MemL: MemLookup)(Form: StreamFormula) =
 struct
   let assign v ev ctx =
     let module StdAssign = Symbeval.StdAssign(MemL)(Form) in
@@ -908,7 +893,7 @@ struct
 end
 
 module TraceConcrete = 
-  Symbeval.Make(TraceConcreteDef)(AlwaysEvalLet)(TraceConcreteAssign)(StdForm)
+  Symbeval.Make(TraceConcreteDef)(AlwaysEvalLet)(TraceConcreteAssign)(StdFormStreamOld)
 
 (** Check all variables in delta to make sure they agree with operands
     loaded from a trace. We should be able to find bugs in BAP and the
@@ -1355,8 +1340,8 @@ let run_blocks blocks memv length =
 let to_dsa_stmt s h rh =
   let dsa_ctr = ref 0 in
   let new_name (Var.V(_,s,t) as v) =
-    if is_mem v then v
-    else if is_symbolic v then v
+    (* if is_mem v then v *)
+    (* else *) if is_symbolic v then v
     else (
       dsa_ctr := !dsa_ctr + 1;
       assert (!dsa_ctr <> 0);
@@ -1471,14 +1456,14 @@ struct
 
 end
 
-module TaintConcrete = Symbeval.Make(TaintConcreteDef)(FastEval)(StdAssign)(StdForm)
+module TaintConcrete = Symbeval.Make(TaintConcreteDef)(FastEval)(StdAssign)(StdFormStreamOld)
 
 (** Concretely execute a trace without using any operand information *)
 let concrete_rerun file stmts =
   TaintConcreteDef.bytes := Array.of_list (bytes_from_file file);
   let length = List.length stmts in
   Status.init "Concretely Re-executing" length;
-  let initctx = TaintConcrete.build_default_context stmts in
+  let initctx = TaintConcrete.build_default_context stmts () in
   (try
      let step state =
        let () = Status.inc () in
@@ -1573,7 +1558,7 @@ let solution_from_stp_formula file =
     that when we call is_temp we need to use the non-dsa variable
     name.
 *)
-module PredAssignTraces(MemL: MemLookup)(Form: Formula) =
+module PredAssignTraces(MemL: MemLookup)(Form: StreamFormula) =
 struct
   let assign v ev ({delta=delta; pred=pred; pc=pc} as ctx) =
     dprintf "ev: %s" (Symbeval.symb_to_string ev);
@@ -1596,6 +1581,10 @@ struct
     {ctx with delta=delta'; pred=pred'; pc=Int64.succ pc}
 end
 
+(* module StreamingLetBind : StreamFormula =  *)
+(* struct *)
+(*   type t =  *)
+(* end *)
 
 (* module TraceSymbolicAssign(MemL: MemLookup)(Form: Formula) = *)
 (* struct *)
@@ -1604,7 +1593,7 @@ end
 (*     PredAssign.assign v ev ctx *)
 (* end *)
 
-module TraceSymbolicFunc (Tune: EvalTune) (Assign: Assign) (Form: Formula) =
+module TraceSymbolicFunc (Tune: EvalTune) (Assign: Assign) (Form: StreamFormula with type init=Formulap.fpp_oc with type output = unit) =
 struct 
   (* Set this to LetBindSimplify to use formula simplificiation *)
   module TraceSymbolic = Symbeval.Make(SymbolicMemL)(Tune)(Assign)(Form)
@@ -1658,7 +1647,18 @@ struct
           raise e
 
 
-  let symbolic_run trace =
+  let init_formula_file file =
+    let oc = open_out file in
+    let p = match !printer with
+      | "smtlib1" -> ((new Smtlib1.pp_oc oc) :> Formulap.fpp_oc)
+      | "smtlib2" -> ((new Smtlib2.pp_oc oc) :> Formulap.fpp_oc)
+      | "stp" -> ((new Stp.pp_oc oc) :> Formulap.fpp_oc)
+      | _ -> failwith "Unknown printer"
+    in
+    p
+
+
+  let symbolic_run trace filename =
     Status.init "Symbolic Run" (List.length trace) ;
     let h = VH.create 1000 in (* vars to dsa vars *)
     let rh = VH.create 10000 in (* dsa vars to vars *)
@@ -1666,7 +1666,9 @@ struct
     let trace = append_halt trace in
     (*  VH.clear TaintSymbolic.dsa_map; *)
     cleanup ();
-    let state = TraceSymbolic.build_default_context trace in
+    let state = 
+      TraceSymbolic.build_default_context trace (init_formula_file filename) 
+    in
     (* Find the memory variable *)
     let memv = find_memv trace in
     dprintf "Memory variable: %s" (Var.name memv);
@@ -1678,22 +1680,22 @@ struct
   (*************************************************************)
   (********************  Formula Generation  *******************)
   (*************************************************************)      
-  let generate_formula trace =
+  let generate_formula file trace =
     let trace = concrete trace in
     (* If we leave DCE on, it will screw up the consistency check. *)
     let trace = match !consistency_check || (not !dce) with
       | true -> trace
       | false -> trace_dce trace
     in
-    let finalstate = symbolic_run trace in
-    TraceSymbolic.output_formula finalstate.pred
+    let finalstate = symbolic_run trace file in
+    Form.output_formula finalstate.pred
 
-  let output_formula file trace =
-    let formula = generate_formula trace in
-    (*dprintf "formula size: %Ld\n" (formula_size formula) ;*)
-    Status.init "Printing out formula" 0;
-    print_formula file formula ;
-    Status.stop ()
+  (* let output_formula file trace = *)
+  (*   let formula = generate_formula trace in *)
+  (*   (\*dprintf "formula size: %Ld\n" (formula_size formula) ;*\) *)
+  (*   Status.init "Printing out formula" 0; *)
+  (*   print_formula file formula ; *)
+  (*   Status.stop () *)
 
 
   (*************************************************************)
@@ -1703,9 +1705,8 @@ struct
      wrong. *)
   let formula_valid_to_invalid ?(min=1) trace =
     let sym_and_output trace fname =
-      let finalstate = symbolic_run trace in
-      let formula = TraceSymbolic.output_formula finalstate.pred in
-      print_formula fname formula ;
+      let finalstate = symbolic_run trace fname in
+      Form.output_formula finalstate.pred;
     in
     let trace = concrete trace in
     (* If we leave DCE on, it will screw up the consistency check. *)
@@ -1754,7 +1755,7 @@ struct
         let middle = (l + u) / 2 in
         let trace = BatList.take middle trace in
         try
-          ignore (output_formula "temp" trace) ;
+          ignore (generate_formula "temp" trace) ;
           ignore (solve_formula "temp" "tempout") ;
           ignore(Unix.system("cat tempout"));
           match solution_from_stp_formula "tempout" with
@@ -1772,8 +1773,8 @@ struct
                bsearch l (u-1))
     in
     let (l,u) = bsearch 1 length in
-    ignore (output_formula "form_val" (BatList.take l trace)) ;
-    ignore (output_formula "form_inv" (BatList.take u trace)) 
+    ignore (generate_formula "form_val" (BatList.take l trace)) ;
+    ignore (generate_formula "form_inv" (BatList.take u trace)) 
 
 
 (*************************************************************)
@@ -1784,7 +1785,7 @@ struct
   let answer_storage = ".answer"
 
   let output_exploit file trace =
-    ignore (output_formula formula_storage trace) ;
+    ignore (generate_formula formula_storage trace) ;
     solve_formula formula_storage answer_storage ;
     let var_vals = match solution_from_stp_formula answer_storage with
       | Some(x) -> x
@@ -1836,10 +1837,12 @@ type traceSymbolicType =
   | Substitution
 
 module TraceSymbolicNoSubNoLet = 
-  TraceSymbolicFunc(FastEval)(PredAssignTraces)(StdForm);;
+  TraceSymbolicFunc(FastEval)(PredAssignTraces)(StdFormStream);;
 module TraceSymbolicNoSub = 
-  TraceSymbolicFunc(FastEval)(PredAssignTraces)(LetBind);;
-module TraceSymbolicSub = TraceSymbolicFunc(SlowEval)(StdAssign)(LetBind);;
+  TraceSymbolicFunc(FastEval)(PredAssignTraces)(LetBindStream);;
+module TraceSymbolicNoSubOpt = 
+  TraceSymbolicFunc(SlowEval)(PredAssignTraces)(LetBindStream);;
+module TraceSymbolicSub = TraceSymbolicFunc(SlowEval)(StdAssign)(LetBindStream);;
 
 
 (** SWXXX Should this go somewhere else too? *)

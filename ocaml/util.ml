@@ -390,7 +390,7 @@ let big_int_to_binary ?pad n =
 *)
 let big_int_to_hex ?pad n = 
   if n < Big_int_Z.zero_big_int then
-    failwith "hex_of_big_int: Cannot convert infinite-width negative number to hex";
+    failwith "big_int_to_hex: Cannot convert infinite-width negative number to hex";
   let getn n = Big_int_Z.and_big_int n (big_int_of_int 0xf) in (* Get lsnibble *)
   let getrest n = Big_int_Z.shift_right_big_int n 4 in (* Get all but lsnibble *)
   let zeroextend s = match pad with
@@ -532,9 +532,9 @@ struct
   let update () =
     let p = cpercent () in
     if p = -1 then (
-      if (debug) then Printf.printf "%s...\r" !message)
+      if (debug()) then Printf.printf "%s...\r" !message)
     else (
-      if (debug) then Printf.printf "%s: %d%% (%f eps)\r" !message p (rate ()) ;
+      if (debug()) then Printf.printf "%s: %d%% (%f eps)\r" !message p (rate ()) ;
 
       percentage := p;
       last := !current;
@@ -560,7 +560,7 @@ struct
 	  (update ()))
 	  
   let stop () =
-    if (debug) then 
+    if (debug()) then 
 	  Printf.printf "%s: Done! (%f seconds)\n" !message 
 		(Unix.gettimeofday () -. !starttime) ;
     flush stdout
@@ -577,13 +577,14 @@ let rec print_separated_list ps sep lst =
 
 let print_obj_info title value =
   let module D = Debug.Make(struct let name = "UtilSize" and default=`NoDebug end) in
-  let i = Objsize.objsize value in
-  D.dprintf "%S : data_words=%i headers=%i depth=%i\n    \
-bytes_without_headers=%i bytes_with_headers=%i"
-    title i.Objsize.data i.Objsize.headers i.Objsize.depth
-    (Objsize.size_without_headers i)
-    (Objsize.size_with_headers i);
-  D.dprintf "%S : total size in MB = %i" title ((Objsize.size_with_headers i) / 1048576)
+  if D.debug() then
+    let i = Objsize.objsize value in
+    D.dprintf "%S : data_words=%i headers=%i depth=%i\n    \ 
+      bytes_without_headers=%i bytes_with_headers=%i"
+      title i.Objsize.data i.Objsize.headers i.Objsize.depth
+      (Objsize.size_without_headers i)
+      (Objsize.size_with_headers i);
+    D.dprintf "%S : total size in MB = %i" title ((Objsize.size_with_headers i) / 1048576)
 
 let syscall ?(env=[| |]) cmd =
   let check_exit_status =
@@ -615,11 +616,12 @@ let print_mem_usage _ =
   let module D = 
 	Debug.Make(struct let name = "UtilMemUse" and default=`NoDebug end) 
   in
-  let pid = Unix.getpid() in
-  let cmd = 
-    "ps auxw | grep \'^[a-zA-Z]\\{1,\\}[[:space:]]\\{1,\\}"^
-      (string_of_int pid)^"\'"
-  in
-  let (out1,out2) = syscall cmd in
-  D.pdebug (out1^out2)
+  if D.debug() then
+    let pid = Unix.getpid() in
+    let cmd = 
+      "ps auxw | grep \'^[a-zA-Z]\\{1,\\}[[:space:]]\\{1,\\}"^
+        (string_of_int pid)^"\'"
+    in
+    let (out1,out2) = syscall cmd in
+    D.pdebug (out1^out2)
 

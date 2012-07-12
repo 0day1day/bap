@@ -128,17 +128,65 @@ object (self)
     match (VH.find ctx v) with
     | n,_ -> pp n
 
-  (** Returns a lazy expression that prints let v = e1 in e2. Never raises No_rule. *)
+(** Seperate lemebegin and letmeend to allow for streaming generation of
+    formulas in utils/streamtrans.ml *)
+  (* method letmebegin v e1 e2 st = *)
+  (*   let t1 = Typecheck.infer_ast ~check:false e1 in *)
+  (*   let cmd,c,pf,vst =  *)
+  (*     match t1,!use_booleans with  *)
+  (*       | Reg 1,true -> "flet","$",self#ast_exp_bool,Bool  *)
+  (*       | _ -> "let","?",self#ast_exp,BitVec  *)
+  (*   in *)
+  (*   let pf2 =  *)
+  (*     match st with  *)
+  (*       | Bool -> self#ast_exp_bool  *)
+  (*       | BitVec -> self#ast_exp  *)
+  (*   in *)
+  (*   (\* The print functions called, ast_exp and ast_exp_bool never *)
+  (*      raise No_rule. So, we don't need to evaluate them before the lazy *)
+  (*      block. *\) *)
+  (*   lazy( *)
+  (*     pp "("; pp cmd; pp " ("; *)
+  (*     (\* v isn't allowed to shadow anything. also, smtlib requires it be  *)
+  (*        prefixed with ? or $ *\) *)
+  (*     let s = c ^ var2s v ^"_"^ string_of_int let_counter in *)
+  (*     let_counter <- succ let_counter; *)
+  (*     pp s; *)
+  (*     pc ' '; *)
+  (*     pf e1; *)
+  (*     pc ')'; *)
+  (*     space () *)
+  (*   ) *)
+
+  (* method letemend v e1 e2 st = *)
+  (*   self#unextend v; *)
+  (*   cut (); *)
+  (*   pc ')' *)
+
+  (* method lettype t  SWXXX fixme *)
+
+  (** Returns a lazy expression that prints let v = e1 in e2. Never raises 
+      No_rule. *)
   method letme v e1 e2 st =
+    (* self#letmebegin v e1 e2 st; *)
     let t1 = Typecheck.infer_ast ~check:false e1 in
-    let cmd,c,pf,vst = match t1,!use_booleans with Reg 1,true -> "flet","$",self#ast_exp_bool,Bool | _ -> "let","?",self#ast_exp,BitVec in
-    let pf2 = match st with Bool -> self#ast_exp_bool | BitVec -> self#ast_exp in
+    let cmd,c,pf,vst = 
+      match t1,!use_booleans with 
+        | Reg 1,true -> "flet","$",self#ast_exp_bool,Bool 
+        | _ -> "let","?",self#ast_exp,BitVec 
+    in
+    let pf2 = 
+      match st with 
+        | Bool -> self#ast_exp_bool 
+        | BitVec -> self#ast_exp 
+    in
     (* The print functions called, ast_exp and ast_exp_bool never
        raise No_rule. So, we don't need to evaluate them before the lazy
        block. *)
     lazy(
       pp "("; pp cmd; pp " (";
-      (* v isn't allowed to shadow anything. also, smtlib requires it be prefixed with ? or $ *)
+      (* v isn't allowed to shadow anything. also, smtlib requires it be 
+         prefixed with ? or $ *)
       let s = c ^ var2s v ^"_"^ string_of_int let_counter in
       let_counter <- succ let_counter;
       pp s;
@@ -146,12 +194,12 @@ object (self)
       pf e1;
       pc ')';
       space ();
-      self#extend v s vst;
-      pf2 e2;
-      self#unextend v;
-      cut ();
-      pc ')'
-    )
+    (* SWXXX Fixme *)
+    self#extend v s vst;
+    pf2 e2;
+    self#unextend v;
+    cut ();
+    pc ')'   )
 
   method varname v =
     match VH.find ctx v with

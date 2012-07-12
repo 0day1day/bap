@@ -70,7 +70,7 @@ let var_to_string ?ctx (Var.V(id,name,t) as v) =
   | None ->
 	name ^ "_" ^ string_of_int id ^ ":" ^ typ_to_string t
   | Some(vars,names) ->
-    if debug then (
+    if debug() then (
       if (not !printed_varctx_warning) &&
         (Hashtbl.length names > reasonable_size_varctx ||
         VH.length vars > reasonable_size_varctx) then (
