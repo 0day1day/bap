@@ -26,5 +26,6 @@ val find_exit : Cfg.AST.G.t -> Cfg.AST.G.t * Cfg.AST.G.V.t
 val find_indirect : Cfg.AST.G.t -> Cfg.AST.G.t * Cfg.AST.G.V.t
 
 (** {3 Convenience Functions} *)
-(** [v2s v] returns the BBId associated with [v]. *)
+(** [v2s v] returns the basic blocker identifier string associated
+    with [v]. *)
 val v2s : Cfg.AST.G.V.t -> string

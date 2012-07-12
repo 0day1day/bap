@@ -1,4 +1,4 @@
-(** Dependence Graphs. We currently support the program dependence
+(* Dependence Graphs. We currently support the program dependence
     graph (PDG), a data dependence graph (DDG), and the control
     dependence graph (CDG). 
 *)
@@ -7,6 +7,20 @@ module VS = Var.VarSet
 module VH = Var.VarHash
 open Cfg
 open Type
+
+module type CDG =
+sig
+  module G :
+    sig
+      type t
+      module V :
+        sig
+          type t
+        end
+    end
+  val compute_cd : G.t -> G.V.t -> G.V.t list
+  val compute_cdg : G.t -> G.t
+end
 
 module MakeCDG (C: CFG) = 
 struct
@@ -40,18 +54,6 @@ struct
     
 
     
-  (** This function computes control dependencies.
-      This implements the algorithm in the Tiger Book p.454 (ML
-      version) with the exception we do not add a new node before
-      entry. Therefore all nodes are control dependent on BB_Entry.
-      
-      Note that BB_Exit will not be control dependent on anything,
-      thus a lone node in the graph (you can prune it away if you want
-      using other utilities in BAP)
-
-      @return a map from a node to its parents in the CDG tree.
-
-  *)
   let compute_cd cfg =
     (* Note that we don't add an extra entry node, so everything is control
        dependent on the entry node of the CFG *)
@@ -63,8 +65,6 @@ struct
     let () = dprintf "compute_cdg: computing dom frontier" in
       D.compute_dom_frontier cfg dom_tree idom 
 
-(** computes the control dependence graph (cdg), which turns the
-    result of [compute_cd] below into a graph*)
   let compute_cdg cfg  = 
     let df = compute_cd cfg in 
     let vertices =  C.G.fold_vertex (fun v g -> C.add_vertex g v) cfg (C.empty ()) in
@@ -78,21 +78,18 @@ struct
 
 end
 
-(** control dependence graphs for SSA graphs *)
 module CDG_SSA = MakeCDG(Cfg.SSA)
 
-(** control dependence graphs for AST graphs *)
 module CDG_AST = MakeCDG(Cfg.AST)
 
 (* A DDG implementation for ASTs *)
 
 type var = Var of Var.t | Novar | Gamma
 
-
 module DDG_SSA = 
 struct
 
-  (** a location in the CFG program.  *)
+  (* a location in the CFG program.  *)
   type location = Cfg.SSA.G.V.t * int
 
   module Dbg = Debug.Make(struct let name = "DDG" and default=`NoDebug end)
@@ -112,7 +109,7 @@ struct
 			  let compare = Pervasives.compare
 			end)
 
-  (** [compute_dd cfg] the tuple vars,fd,fu. vars is the set of
+  (* [compute_dd cfg] the tuple vars,fd,fu. vars is the set of
       variables used by the graph.  fd is a hashtbl from vars to the
       definition location.  fu is a hashtbl from vars to their use
       locations.  Unlike graphs such as DDG and PDG (below), we do not
@@ -285,7 +282,7 @@ struct
 	) uses ddg 
 
 
-  (** convert a cfg whose nodes contain any number of SSA stmts, to a
+  (* convert a cfg whose nodes contain any number of SSA stmts, to a
       cfg whose nodes contain a single SSA stmt in the node stmt
       list. This will make subsequent graphs more precise as an edge
       corresponds to a def/use statement, instead of a def/use block.
@@ -321,13 +318,10 @@ struct
       SSA.G.fold_vertex translate_block cfg g
 end
 
-type instance = var * Cfg.AST.G.V.t * int
-
-
 module DDG_AST = 
 struct
 
-  (** a location in the CFG program.  *)
+  (* a location in the CFG program.  *)
   type location = Cfg.AST.G.V.t * int
 
   module Dbg = Debug.Make(struct let name = "DDG" and default=`NoDebug end)
@@ -530,7 +524,7 @@ struct
     
 end
 
-(** Module for computing usedef chains/reaching definitions *)
+(* Module for computing usedef chains/reaching definitions *)
 module UseDef_AST =
 struct
   
@@ -538,15 +532,17 @@ struct
   open D
   module C = Cfg.AST
   module VM = Var.VarMap
+
+  type location = Cfg.AST.G.V.t * int
     
-  (** Define the location type *)
+  (* Define the location type *)
   module LocationType =
   struct
     
     type t = 
 	(* Missing definitions are implicitly assumed to be top *)
       | Undefined (* There is proof that of an undefined definition *)
-      | Loc of Cfg.AST.G.V.t * int (* Location of a definition *)
+      | Loc of location (* Location of a definition *)
     
     let compare = compare
     
@@ -674,7 +670,7 @@ struct
 
   let worklist = DF.worklist_iterate
 
-  (** 
+  (* 
       Given a program, returns 1) a hash function mapping locations to
       the definitions available at that location 2) a function that
       returns the definitions for a (variable, location) pair 
@@ -719,14 +715,16 @@ struct
     h, find
 end
 
-(** Returns defined vars and referenced variables that are never
+(* Returns defined vars and referenced variables that are never
     defined. *)
 module DEFS_AST =
 struct
 
+  type location = Cfg.AST.G.V.t * int
+
   module LS = UseDef_AST.LS
 
-  (** Return variables that might be referenced before they are
+  (* Return variables that might be referenced before they are
       defined. The output of this function is a good starting point
       when trying to find inputs of a program. Returns a hash of
       values that are always undefined, and sometimes undefined
@@ -777,7 +775,7 @@ struct
 
     alwaysud, maybeud
 
-  (** Returns a set of always undefined variables, and sometimes
+  (* Returns a set of always undefined variables, and sometimes
       undefined variables. *)
   let undefinedvars p =
     let htos h =
@@ -789,7 +787,7 @@ struct
     let alwaysh,maybeh = undefined p in
     htos alwaysh, htos maybeh
 
-  (** Returns (defined variables, "free" variables) *)
+  (* Returns (defined variables, "free" variables) *)
   let defs p =
     let definedvars = ref VS.empty in
     let refvars = ref VS.empty in
@@ -810,7 +808,7 @@ struct
     ignore(Ast_visitor.cfg_accept visitor p);
     (!definedvars, VS.diff !refvars !definedvars)
 
-  (** Returns all variables *)
+  (* Returns all variables *)
   let vars p =
     let vars = ref VS.empty in
     let visitor = object(self)
@@ -833,12 +831,12 @@ struct
 
 end
 
-(** Returns defined vars and referenced variables that are never
+(* Returns defined vars and referenced variables that are never
     defined *)
 module DEFS_SSA =
 struct
 
-  (** Returns (defined variables, "free" variables) *)
+  (* Returns (defined variables, "free" variables) *)
   let defs p =
     let definedvars = ref VS.empty in
     let refvars = ref VS.empty in
