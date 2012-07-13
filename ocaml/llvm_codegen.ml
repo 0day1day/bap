@@ -550,7 +550,7 @@ object(self)
         let newf = function
           | Int(va, _) ->
             ignore(ExecutionEngine.run_function newf
-                                     (* XXX: Fix me for > int64 *)
+                     (* XXX: Fix me for > int64 *)
                      [|GenericValue.of_int64 (self#convert_type (Var.typ v))
                          (Big_int_Z.int64_of_big_int va)|] execengine)
           | _ -> failwith "Expected a constant"
