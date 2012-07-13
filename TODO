@@ -5,7 +5,7 @@ Missing features:
 Disassembly stuff:
 * Include symbols in disassembly
 * Include section names in disassembly
-* Support floating point
+* Include data?
 
 Design issues:
 * Change attributes from attribute list to a set of attribute.
