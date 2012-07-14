@@ -283,7 +283,7 @@ end
 module LangSSA =
 struct
   type t = Ssa.stmt list
-  type exp = unit
+  type exp = Ssa.exp
   let default = []
   let join sl1 sl2 = match List.rev sl1 with
     | Ssa.Jmp (e, _) :: sl1' when Ssa.val_of_exp e <> None -> List.append (List.rev sl1') sl2

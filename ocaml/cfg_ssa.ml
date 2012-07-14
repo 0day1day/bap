@@ -246,7 +246,7 @@ let rec trans_cfg cfg =
 
   let cfg = Prune_unreachable.prune_unreachable_ast (CA.copy cfg) in
   pdebug "Creating new cfg";
-  let ssa = Cfg.map_ast2ssa (fun _ -> []) (fun _ -> ()) cfg in
+  let ssa = Cfg.map_ast2ssa (fun _ -> []) (fun _ -> failwith "unimplemented") cfg in
   pdebug "Computing defsites";
   let (defsites, globals) = defsites cfg in
     (* keep track of where we need to insert phis *)
@@ -319,7 +319,22 @@ let rec trans_cfg cfg =
       let stmts = CA.get_stmts cfg cfgb in
       dprintf "translating stmts";
       let stmts' = stmts2ssa ctx stmts in
-      C.set_stmts ssa b stmts'
+      let g = C.set_stmts ssa b stmts' in
+      (* Update the edge labels of any conditional jumps *)
+      match List.rev stmts' with
+      | Ssa.CJmp (v, _, _, _)::_ ->
+        C.G.fold_succ_e
+          (fun e g ->
+            let g = C.remove_edge_e g e in
+            let new_lab = match C.G.E.label e with
+              | Some(true, _) -> Some(true, Val v)
+              | Some(false, _) -> Some(false, UnOp(NOT, v))
+              | None -> failwith "Successor of a CJmp should have a label"
+            in
+            let newe = C.G.E.create (C.G.E.src e) new_lab (C.G.E.dst e) in
+            C.add_edge_e g newe
+          ) g b g
+      | _ -> g
     in
     dprintf "going on to children";
     (* rename children *)

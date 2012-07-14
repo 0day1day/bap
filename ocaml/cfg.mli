@@ -94,7 +94,7 @@ module AST : CFG with type lang = Ast.stmt list and type exp = Ast.exp
 (** Control flow graph in which statements are in {!Ssa.stmt} form.
     All variables are assigned at most one time in the program, and
     expressions do not contain subexpressions. *)
-module SSA : CFG with type lang = Ssa.stmt list and type exp = unit
+module SSA : CFG with type lang = Ssa.stmt list and type exp = Ssa.exp
 
 (** {3 Helper functions for CFG conversions} *)
 (* These are for cfg_ast.ml and cfg_ssa.ml to be able to translate without
