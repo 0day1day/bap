@@ -246,7 +246,7 @@ let rec trans_cfg cfg =
 
   let cfg = Prune_unreachable.prune_unreachable_ast (CA.copy cfg) in
   pdebug "Creating new cfg";
-  let ssa = Cfg.map_ast2ssa (fun _ -> []) cfg in
+  let ssa = Cfg.map_ast2ssa (fun _ -> []) (fun _ -> ()) cfg in
   pdebug "Computing defsites";
   let (defsites, globals) = defsites cfg in
     (* keep track of where we need to insert phis *)
@@ -747,7 +747,7 @@ let stmts2ast tm stmts =
 
 (** Convert an ssa cfg (with phis already removed) back to a ast cfg *)
 let cfg2ast tm cfg =
-  Cfg.map_ssa2ast (stmts2ast tm) cfg
+  Cfg.map_ssa2ast (stmts2ast tm) (fun _ -> failwith "unimplemented") cfg
 
 (** Convert an SSA CFG to an AST CFG. *)
 let to_astcfg ?(remove_temps=true) ?(dsa=false) c =

@@ -100,5 +100,5 @@ module SSA : CFG with type lang = Ssa.stmt list and type exp = unit
 (* These are for cfg_ast.ml and cfg_ssa.ml to be able to translate without
    breaking nextid. Poke Ivan if you think you need them for something else. *)
 
-val map_ast2ssa : (Ast.stmt list -> Ssa.stmt list) -> AST.G.t -> SSA.G.t
-val map_ssa2ast : (Ssa.stmt list -> Ast.stmt list) -> SSA.G.t -> AST.G.t
+val map_ast2ssa : (Ast.stmt list -> Ssa.stmt list) -> (AST.exp -> SSA.exp) -> AST.G.t -> SSA.G.t
+val map_ssa2ast : (Ssa.stmt list -> Ast.stmt list) -> (SSA.exp -> AST.exp) -> SSA.G.t -> AST.G.t

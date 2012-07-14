@@ -319,48 +319,29 @@ sig
   val set_stmts  : G.t -> G.V.t -> lang -> G.t
 end
 
-module type CONV_LABEL =
-sig
-  type expsource
-  type expdest
-  val convert_exp : expsource -> expdest
-end
-
-module MkMap(A:CFG_PRIV)(B:CFG_PRIV)(Conv:CONV_LABEL with type expsource = A.exp and type expdest = B.exp) =
+module MkMap(A:CFG_PRIV)(B:CFG_PRIV) =
 struct
-  let map f ({nextid=n} as cfg) =
+  let map conv_stmts conv_exp ({nextid=n} as cfg) =
     let s = B.empty() in
     let t vertex = B.G.V.create (A.G.V.label vertex) in
     let te e =
       let new_lab = match A.G.E.label e with
-        | Some(b, e) -> Some(b, Conv.convert_exp e)
+        | Some(b, e) -> Some(b, conv_exp e)
         | None -> None
       in
       B.G.E.create (t (A.G.E.src e)) new_lab (t (A.G.E.dst e)) in
     let per_vertex v g =
       let v' = t v in
       let g = B.add_vertex g v' in
-      B.set_stmts g v' (f (A.get_stmts cfg v))
+      B.set_stmts g v' (conv_stmts (A.get_stmts cfg v))
     in
     let s = A.G.fold_vertex per_vertex cfg s in
     let s = A.G.fold_edges_e (fun e s -> B.add_edge_e s (te e)) cfg s in
     { s with nextid = n}
 end
 
-module CONV_AST2SSA = struct
-  type expsource = Ast.exp
-  type expdest = unit
-  let convert_exp e = ()
-end
-
-module CONV_SSA2AST = struct
-  type expsource = unit
-  type expdest = Ast.exp
-  let convert_exp e = failwith "unimplemented"
-end
-
-module M2ssa = MkMap(AST)(SSA)(CONV_AST2SSA)
-module M2ast = MkMap(SSA)(AST)(CONV_SSA2AST)
+module M2ssa = MkMap(AST)(SSA)
+module M2ast = MkMap(SSA)(AST)
 
 let map_ast2ssa = M2ssa.map
 let map_ssa2ast = M2ast.map
