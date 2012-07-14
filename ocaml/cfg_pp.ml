@@ -1,5 +1,6 @@
 (** Pretty printing for CFGs. *)
 
+open Cfg
 
 module CS = Cfg.SSA
 module CA = Cfg.AST
@@ -73,11 +74,16 @@ let edge_labels f e =
 let edge_labels_ssa = edge_labels CS.G.E.label
 let edge_labels_ast = edge_labels CA.G.E.label
 
+module type Cfg =
+sig
+  type exp
+  include Graph.Sig.G with type V.label = Cfg.bbid and type E.label = (bool * exp) option
+end
 
 (** Makes a module suitable for use with Graph.Graphviz.Dot  for writting out
     a CFG. *)
 module MakeCfgPrinter
-  (G:Graph.Sig.G with type V.label = Cfg.bbid and type E.label = (bool * unit) option)
+  (G:Cfg)
   (Printer:sig val print: G.t -> G.V.t -> string end)
   (Attributor:sig val vertex_attributes: G.t -> G.V.t -> Graph.Graphviz.DotAttributes.vertex list ;;
                   val edge_attributes: G.t -> G.E.t -> Graph.Graphviz.DotAttributes.edge list end)
@@ -169,10 +175,18 @@ struct
   let edge_attributes = edge_labels_ast
 end
 
-module SsaStmtsPrinter = MakeCfgPrinter (CS.G) (PrintSsaStmts) (DefAttributor)
+module CSG = struct
+  include CS.G
+  type exp = CS.exp
+end
+module SsaStmtsPrinter = MakeCfgPrinter (CSG) (PrintSsaStmts) (DefAttributor)
 module SsaStmtsDot = Graph.Graphviz.Dot(SsaStmtsPrinter)
 
-module AstStmtsPrinter = MakeCfgPrinter (CA.G) (PrintAstStmts) (DefAttributor)
+module CAG = struct
+  include CA.G
+  type exp = CA.exp
+end
+module AstStmtsPrinter = MakeCfgPrinter (CAG) (PrintAstStmts) (DefAttributor)
 module AstStmtsDot = Graph.Graphviz.Dot (AstStmtsPrinter)
 
 module SsaBBidPrinter =
@@ -193,8 +207,8 @@ struct
 end
 module AstBBidDot = Graph.Graphviz.Dot(AstBBidPrinter)
 
-module SsaStmtsAttPrinter = MakeCfgPrinter (CS.G) (PrintSsaStmts) (DefAttributor)
+module SsaStmtsAttPrinter = MakeCfgPrinter (CSG) (PrintSsaStmts) (DefAttributor)
 module SsaStmtsAttDot = Graph.Graphviz.Dot(SsaStmtsAttPrinter)
 
-module AstStmtsAttPrinter = MakeCfgPrinter (CA.G) (PrintAstStmts) (DefAttributor)
+module AstStmtsAttPrinter = MakeCfgPrinter (CAG) (PrintAstStmts) (DefAttributor)
 module AstStmtsAttDot = Graph.Graphviz.Dot(AstStmtsAttPrinter)

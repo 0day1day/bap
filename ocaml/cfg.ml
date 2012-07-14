@@ -44,13 +44,6 @@ module BM = Map.Make(BBid)
 
 
 
-module E =
-struct
-  type t = (bool * unit) option
-  let compare = compare
-  let default = None
-end
-
 module type CFG =
 sig
 
@@ -92,20 +85,28 @@ type ('a,'b,'c) pcfg =
 module type Language =
 sig
   type t
+  type exp
   val default : t
   val join : t -> t -> t
   val iter_labels : (label->unit) -> t -> unit
   val to_string : t -> string
 end
 
+module E(Lang: Language) =
+struct
+  type t = (bool * Lang.exp) option
+  let compare = compare
+  let default = None
+end
+
 (* Begin persistent implementation *)
 module MakeP (Lang: Language) =
 struct
   (* A simple implementation for now... We can worry about optimizing later. *)
-  module G' = Graph.Persistent.Digraph.ConcreteBidirectionalLabeled(BBid)(E)
+  module G' = Graph.Persistent.Digraph.ConcreteBidirectionalLabeled(BBid)(E(Lang))
 
   type lang = Lang.t
-  type exp = unit
+  type exp = Lang.exp
 
 
   module G = struct
@@ -268,6 +269,7 @@ module Make = MakeP
 module LangAST =
 struct
   type t = Ast.stmt list
+  type exp = Ast.exp
   let default = []
   let join sl1 sl2 = match List.rev sl1 with
     | Ast.Jmp (e, _) :: sl1' when Ast.lab_of_exp e <> None -> List.append (List.rev sl1') sl2
@@ -281,6 +283,7 @@ end
 module LangSSA =
 struct
   type t = Ssa.stmt list
+  type exp = unit
   let default = []
   let join sl1 sl2 = match List.rev sl1 with
     | Ssa.Jmp (e, _) :: sl1' when Ssa.val_of_exp e <> None -> List.append (List.rev sl1') sl2
@@ -303,11 +306,12 @@ module SSA = Make(LangSSA)
 module type CFG_PRIV =
 sig
   type lang
+  type exp
   module G' : Graph.Sig.G
 
   include Graph.Builder.S
     with type G.V.label = bbid
-    and type G.E.label = (bool * unit) option
+    and type G.E.label = (bool * exp) option
     and type G.t = (G'.t, lang BM.t, G'.V.t LM.t) pcfg
 
   val get_stmts  : G.t -> G.V.t -> lang
@@ -315,12 +319,24 @@ sig
   val set_stmts  : G.t -> G.V.t -> lang -> G.t
 end
 
-module MkMap(A:CFG_PRIV)(B:CFG_PRIV) =
+module type CONV_LABEL =
+sig
+  type expsource
+  type expdest
+  val convert_exp : expsource -> expdest
+end
+
+module MkMap(A:CFG_PRIV)(B:CFG_PRIV)(Conv:CONV_LABEL with type expsource = A.exp and type expdest = B.exp) =
 struct
   let map f ({nextid=n} as cfg) =
     let s = B.empty() in
     let t vertex = B.G.V.create (A.G.V.label vertex) in
-    let te e = B.G.E.create (t (A.G.E.src e)) (A.G.E.label e) (t (A.G.E.dst e)) in
+    let te e =
+      let new_lab = match A.G.E.label e with
+        | Some(b, e) -> Some(b, Conv.convert_exp e)
+        | None -> None
+      in
+      B.G.E.create (t (A.G.E.src e)) new_lab (t (A.G.E.dst e)) in
     let per_vertex v g =
       let v' = t v in
       let g = B.add_vertex g v' in
@@ -331,8 +347,20 @@ struct
     { s with nextid = n}
 end
 
-module M2ssa = MkMap(AST)(SSA)
-module M2ast = MkMap(SSA)(AST)
+module CONV_AST2SSA = struct
+  type expsource = Ast.exp
+  type expdest = unit
+  let convert_exp e = ()
+end
+
+module CONV_SSA2AST = struct
+  type expsource = unit
+  type expdest = Ast.exp
+  let convert_exp e = failwith "unimplemented"
+end
+
+module M2ssa = MkMap(AST)(SSA)(CONV_AST2SSA)
+module M2ast = MkMap(SSA)(AST)(CONV_SSA2AST)
 
 let map_ast2ssa = M2ssa.map
 let map_ssa2ast = M2ast.map

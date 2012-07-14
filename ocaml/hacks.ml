@@ -133,8 +133,8 @@ let repair_node g n =
   let stmts = C.get_stmts g n in
   match List.rev stmts with
   | Jmp(t, _)::_ -> make_edge g n t
-  | CJmp(_,t,f,_)::_ -> let g = make_edge g n ~lab:(true, ()) t in
-                     make_edge g n ~lab:(false, ()) f
+  | CJmp(e,t,f,_)::_ -> let g = make_edge g n ~lab:(true, e) t in
+                     make_edge g n ~lab:(false, Ast_convenience.unop NOT e) f
   | Special _::_ -> C.add_edge g n error
   | Halt _::_ -> C.add_edge g n exit
   | _ -> (* It's probably fine.  That's why this is in hacks.ml. *) g

@@ -42,6 +42,8 @@ sig
   type lang
   type exp
 
+  (* XXX: Should we force exp more structured? For instance, exp =
+     exp? *)
   include Graph.Builder.S with type G.V.label = bbid and type G.E.label = (bool * exp) option
 
 
@@ -87,7 +89,7 @@ sig
 end
 
 (** Control flow graph in which statements are in {!Ast.stmt} form. *)
-module AST : CFG with type lang = Ast.stmt list and type exp = unit
+module AST : CFG with type lang = Ast.stmt list and type exp = Ast.exp
 
 (** Control flow graph in which statements are in {!Ssa.stmt} form.
     All variables are assigned at most one time in the program, and
