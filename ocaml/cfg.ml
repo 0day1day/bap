@@ -21,6 +21,10 @@ let bbid_to_string = function
   | BB_Error	 -> "BB_Error"
   | BB n         -> "BB_"^string_of_int n
 
+let edge_direction = function
+  | Some(b, _) -> Some b
+  | None -> None
+
 module BBid =
 struct
   type t = bbid
@@ -42,18 +46,19 @@ module BM = Map.Make(BBid)
 
 module E =
 struct
-  type t = bool option
+  type t = (bool * unit) option
   let compare = compare
   let default = None
 end
 
-
-
 module type CFG =
 sig
-  include Graph.Builder.S with type G.V.label = bbid and type G.E.label = bool option
 
   type lang
+  type exp
+
+  include Graph.Builder.S with type G.V.label = bbid and type G.E.label = (bool * exp) option
+
 
   val find_vertex : G.t -> G.V.label -> G.V.t
   val find_label : G.t -> Type.label -> G.V.t
@@ -100,7 +105,7 @@ struct
   module G' = Graph.Persistent.Digraph.ConcreteBidirectionalLabeled(BBid)(E)
 
   type lang = Lang.t
-
+  type exp = unit
 
 
   module G = struct
@@ -302,7 +307,7 @@ sig
 
   include Graph.Builder.S
     with type G.V.label = bbid
-    and type G.E.label = bool option
+    and type G.E.label = (bool * unit) option
     and type G.t = (G'.t, lang BM.t, G'.V.t LM.t) pcfg
 
   val get_stmts  : G.t -> G.V.t -> lang

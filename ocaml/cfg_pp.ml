@@ -66,8 +66,8 @@ end
 
 let edge_labels f e =
   match f e with
-  | Some true -> [`Label "t"]
-  | Some false -> [`Label "f"]
+  | Some (true, _) -> [`Label "t"]
+  | Some (false, _) -> [`Label "f"]
   | None -> []
 
 let edge_labels_ssa = edge_labels CS.G.E.label
@@ -77,7 +77,7 @@ let edge_labels_ast = edge_labels CA.G.E.label
 (** Makes a module suitable for use with Graph.Graphviz.Dot  for writting out
     a CFG. *)
 module MakeCfgPrinter
-  (G:Graph.Sig.G with type V.label = Cfg.bbid and type E.label = bool option)
+  (G:Graph.Sig.G with type V.label = Cfg.bbid and type E.label = (bool * unit) option)
   (Printer:sig val print: G.t -> G.V.t -> string end)
   (Attributor:sig val vertex_attributes: G.t -> G.V.t -> Graph.Graphviz.DotAttributes.vertex list ;;
                   val edge_attributes: G.t -> G.E.t -> Graph.Graphviz.DotAttributes.edge list end)

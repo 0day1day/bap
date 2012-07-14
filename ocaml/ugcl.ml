@@ -96,9 +96,11 @@ let of_ssacfg ?(passify=false) ?entry ?exit cfg =
   in
   let prepend_assume e bb =
     let t,f = match CA.G.succ_e cfg bb with
-    | [f;t] when (CA.G.E.label t) = Some(true) && (CA.G.E.label f) = Some(false) ->
+    | [f;t] when Cfg.edge_direction (CA.G.E.label t) = Some true &&
+              Cfg.edge_direction (CA.G.E.label f) = Some false ->
       t, f
-    | [t;f] when (CA.G.E.label t) = Some(true) && (CA.G.E.label f) = Some(false) ->
+    | [t;f] when Cfg.edge_direction (CA.G.E.label t) = Some true &&
+              Cfg.edge_direction (CA.G.E.label f) = Some false ->
       t, f
     | _ -> failwith "Unable to find successors of cjmp"
     in

@@ -463,8 +463,8 @@ let split_edges c =
     let newl = mklabel c in
     let el = E.label e in
     let (t1,t2,_) = match el with
-      | Some true -> (Lab newl, t2, t1)
-      | Some false -> (t1, Lab newl, t2)
+      | Some (true, _) -> (Lab newl, t2, t1)
+      | Some (false, _) -> (t1, Lab newl, t2)
       | None -> failwith "Unlabeled edges from cjmp"
     in
     let revs = CJmp(cond, t1, t2, attrs) :: List.tl revs in

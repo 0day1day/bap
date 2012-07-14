@@ -18,6 +18,9 @@ type bbid =
 (** Convert a bbid to a string. *)
 val bbid_to_string : bbid -> string
 
+(** Extract the direction taken from an edge *)
+val edge_direction : (bool * 'a) option -> bool option
+
 module BBid :
 sig
   type t = bbid
@@ -35,9 +38,12 @@ module BM : Map.S with type key = BBid.t
 (** The type of a control flow graph *)
 module type CFG =
 sig
-  include Graph.Builder.S with type G.V.label = bbid and type G.E.label = bool option
 
   type lang
+  type exp
+
+  include Graph.Builder.S with type G.V.label = bbid and type G.E.label = (bool * exp) option
+
 
   (** Finds a vertex by a bbid *)
   val find_vertex : G.t -> G.V.label -> G.V.t
@@ -81,12 +87,12 @@ sig
 end
 
 (** Control flow graph in which statements are in {!Ast.stmt} form. *)
-module AST : CFG with type lang = Ast.stmt list
+module AST : CFG with type lang = Ast.stmt list and type exp = unit
 
 (** Control flow graph in which statements are in {!Ssa.stmt} form.
     All variables are assigned at most one time in the program, and
     expressions do not contain subexpressions. *)
-module SSA : CFG with type lang = Ssa.stmt list
+module SSA : CFG with type lang = Ssa.stmt list and type exp = unit
 
 (** {3 Helper functions for CFG conversions} *)
 (* These are for cfg_ast.ml and cfg_ssa.ml to be able to translate without

@@ -113,7 +113,7 @@ let of_prog ?(special_error = true) p =
       let for_later ?lab t = Hashtbl.add postponed_edges v (lab,t) in
       let c = match s with
 	| Jmp(t, _) -> for_later t; c
-	| CJmp(_,t,f,_) -> for_later ~lab:true t; for_later ~lab:false f; c
+	| CJmp(_,t,f,_) -> for_later ~lab:(true, ()) t; for_later ~lab:(false, ()) f; c
 	| Special _ -> C.add_edge c v error
 	| Halt _ -> C.add_edge c v exit
         | Assert(e,_) when e === exp_false -> if v <> error then C.add_edge c v error else c

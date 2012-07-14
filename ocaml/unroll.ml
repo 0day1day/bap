@@ -122,9 +122,11 @@ let unroll_loop ?(count=8) cfg head body =
     let revstmts' = match revstmts with
       | (CJmp(c,t1,t2,attrs) as stmt)::rest ->
 	  let e1,e2 = match C.G.succ_e cfg vertex with
-	    | [e1;e2] when C.G.E.label e1 = Some true && C.G.E.label e2 = Some false ->
+	    | [e1;e2] when Cfg.edge_direction (C.G.E.label e1) = Some true &&
+                        Cfg.edge_direction (C.G.E.label e2) = Some false ->
 		(e1,e2)
-	    | [e1;e2] when C.G.E.label e2 = Some true && C.G.E.label e1 = Some false ->
+	    | [e1;e2] when Cfg.edge_direction (C.G.E.label e2) = Some true &&
+                        Cfg.edge_direction (C.G.E.label e1) = Some false ->
 		(e2,e1)
 	    | _ ->
                 failwith ("Something is wrong with the edges or edge labels:"^(Pp.ast_stmt_to_string stmt))

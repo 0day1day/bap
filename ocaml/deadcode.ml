@@ -341,8 +341,18 @@ let do_aggressive_dce ?(globals = []) graph =
           dprintf "Dead cjmp: %s" (Pp.ssa_stmt_to_string s);
           (* Which edge do we remove? Try removing one and see if we
              can still reach BB_Exit. *)
-          let truee = List.find (fun e -> match C.G.E.label e with | Some(true) -> true | _ -> false) (C.G.succ_e graph bb) in
-          let falsee = List.find (fun e -> match C.G.E.label e with | Some(false) -> true | _ -> false) (C.G.succ_e graph bb) in
+          let truee = List.find (fun e ->
+            match C.G.E.label e with
+            | Some(true, _) -> true 
+            | _ -> false)
+            (C.G.succ_e graph bb)
+          in
+          let falsee = List.find (fun e ->
+            match C.G.E.label e with
+            | Some(false, _) -> true
+            | _ -> false)
+            (C.G.succ_e graph bb)
+          in
           (* Remove true edge, check for reachability *)
           let use_true, graph =
             let graph = C.remove_edge_e graph truee in

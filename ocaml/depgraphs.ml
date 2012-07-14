@@ -507,7 +507,7 @@ struct
     let pdg =
       AST.G.fold_edges
         (fun v1 v2 g ->
-          let edge = AST.G.E.create v1 (Some true) v2 in
+          let edge = AST.G.E.create v1 (Some (true, ())) v2 in
           AST.add_edge_e g edge
         ) ddg pdg
     in
@@ -517,7 +517,7 @@ struct
         (fun v1 v2 g ->
           if AST.G.mem_edge g v1 v2
           then g 
-          else let edge = AST.G.E.create v1 (Some false) v2 in
+          else let edge = AST.G.E.create v1 (Some (false, ())) v2 in
                AST.add_edge_e g edge
         ) cdg pdg
     in pdg
