@@ -210,3 +210,6 @@ let get_attrs = function
   | Halt(_,a)
   | Assert(_,a)
   | Comment(_,a) -> a
+
+let exp_true = Val(Int(bi1, Reg 1))
+let exp_false = Val(Int(bi0, Reg 1))

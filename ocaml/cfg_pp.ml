@@ -65,18 +65,18 @@ end
 (*   let vertex_attributes (g:'a) (v:'b) = try !f g v with Not_found -> [] *)
 (* end *)
 
-let edge_labels f e =
+let edge_labels f pexp e =
   match f e with
-  | Some (true, _) -> [`Label "t"]
-  | Some (false, _) -> [`Label "f"]
+  | Some (_, e) -> [`Label (pexp e)]
   | None -> []
 
-let edge_labels_ssa = edge_labels CS.G.E.label
-let edge_labels_ast = edge_labels CA.G.E.label
+let edge_labels_ssa = edge_labels CS.G.E.label Pp.ssa_exp_to_string
+let edge_labels_ast = edge_labels CA.G.E.label Pp.ast_exp_to_string
 
 module type Cfg =
 sig
   type exp
+  val exp_to_string : exp -> string
   include Graph.Sig.G with type V.label = Cfg.bbid and type E.label = (bool * exp) option
 end
 
@@ -129,7 +129,7 @@ struct
     (* FIXME: The Dot module really should be the one doing the escaping here *)
     `Label (String.escaped(!printer v)) :: Attributor.vertex_attributes g v
 
-  let edge_attributes ((e,g) as e') = (edge_labels E.label e') @ Attributor.edge_attributes g e
+  let edge_attributes ((e,g) as e') = (edge_labels E.label G.exp_to_string e') @ Attributor.edge_attributes g e
 
 end
 
@@ -178,6 +178,7 @@ end
 module CSG = struct
   include CS.G
   type exp = CS.exp
+  let exp_to_string = Pp.ssa_exp_to_string
 end
 module SsaStmtsPrinter = MakeCfgPrinter (CSG) (PrintSsaStmts) (DefAttributor)
 module SsaStmtsDot = Graph.Graphviz.Dot(SsaStmtsPrinter)
@@ -185,6 +186,7 @@ module SsaStmtsDot = Graph.Graphviz.Dot(SsaStmtsPrinter)
 module CAG = struct
   include CA.G
   type exp = CA.exp
+  let exp_to_string = Pp.ast_exp_to_string
 end
 module AstStmtsPrinter = MakeCfgPrinter (CAG) (PrintAstStmts) (DefAttributor)
 module AstStmtsDot = Graph.Graphviz.Dot (AstStmtsPrinter)
