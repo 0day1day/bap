@@ -39,7 +39,7 @@ export SOURCES = \
 	big_int_convenience.ml \
 	dominator.ml \
 	graphDataflow.mli graphDataflow.ml \
-	type.ml type.mli \
+	type.mli type.ml \
 	var.mli var.ml \
 	arithmetic.ml \
 	ast.ml \
@@ -50,17 +50,15 @@ export SOURCES = \
 	ast_convenience.ml \
 	cfg.mli cfg.ml \
 	ast_visitor.mli ast_visitor.ml \
+	ssa_visitor.mli ssa_visitor.ml \
 	grammar_scope.ml \
 	memory2array.mli memory2array.ml \
-	flatten_mem.mli \
-	flatten_mem.ml \
-	reachable.mli \
-	reachable.ml \
+	flatten_mem.mli flatten_mem.ml \
+	reachable.mli reachable.ml \
 	prune_unreachable.mli prune_unreachable.ml \
 	cfg_pp.ml \
 	cfg_ast.mli cfg_ast.ml \
-	ssa_visitor.mli ssa_visitor.ml \
-	depgraphs.ml \
+	depgraphs.mli depgraphs.ml \
 	cfg_ssa.mli cfg_ssa.ml \
 	debug_snippets.ml \
 	sccvn.mli sccvn.ml \

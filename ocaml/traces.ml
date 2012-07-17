@@ -1593,10 +1593,31 @@ end
 (*     PredAssign.assign v ev ctx *)
 (* end *)
 
+module type TraceSymbolicRun =
+sig
+  type init
+  type output
+  type state
+
+  val symbolic_run_block : VH.t -> VH.t -> state -> stmt -> stmt
+  val construct_symbolic_run_formula : VH.t -> VH.t -> state -> trace -> state
+  val init_formula_file : string -> init
+  val symbolic_run : trace -> string -> formula
+  val generate_formula : string -> trace -> output
+
+  (******************* Formula Debugging  **********************)
+  val formula_valid_to_invalid : ?int -> trace -> unit
+  val sym_and_output : trace -> string -> unit
+  val trace_valid_to_invalid : trace -> unit
+
+  (****************  Exploit String Generation  ****************)
+  val output_exploit : string -> trace -> unit
+end
+
 module TraceSymbolicFunc (Tune: EvalTune) (Assign: Assign) (Form: StreamFormula with type init=Formulap.fpp_oc with type output = unit) =
 struct 
   (* Set this to LetBindSimplify to use formula simplificiation *)
-  module TraceSymbolic = Symbeval.Make(SymbolicMemL)(Tune)(Assign)(Form)
+  module SymbolicEval = Symbeval.Make(SymbolicMemL)(Tune)(Assign)(Form)
 
   let status = ref 0
   let count = ref 0
@@ -1624,7 +1645,7 @@ struct
     (* Double fold since we may have to add an assertion *)
     List.fold_left
       (fun state stmt ->
-        match TraceSymbolic.eval_stmt state stmt with
+        match SymbolicEval.eval_stmt state stmt with
           | [next] -> next
           | _ -> failwith "Jump in a straightline program"
       ) state !stmts
@@ -1638,10 +1659,10 @@ struct
           pdebug ("Symbolic Run Fail: "^fail);
           (*state.pred*)
           raise e
-      | TraceSymbolic.Halted (_,state) ->
+      | SymbolicEval.Halted (_,state) ->
           pdebug "Symbolic Run ... Successful!";
           state
-      | TraceSymbolic.AssertFailed _ as e ->
+      | SymbolicEval.AssertFailed _ as e ->
           pdebug "Failed assertion ..." ;
           (*state.pred*)
           raise e
@@ -1667,7 +1688,7 @@ struct
     (*  VH.clear TaintSymbolic.dsa_map; *)
     cleanup ();
     let state = 
-      TraceSymbolic.build_default_context trace (init_formula_file filename) 
+      SymbolicEval.build_default_context trace (init_formula_file filename) 
     in
     (* Find the memory variable *)
     let memv = find_memv trace in
@@ -1736,7 +1757,7 @@ struct
               (Printf.printf "going lower\n";
                bsearch l middle)
           | TraceConcrete.UnknownLabel _
-          | TraceSymbolic.UnknownLabel _ ->
+          | SymbolicEval.UnknownLabel _ ->
               (Printf.printf "going a little higher\n";
                bsearch l (u-1))
     in
@@ -1768,7 +1789,7 @@ struct
               (Printf.printf "going lower\n";
                bsearch l middle)
           | TraceConcrete.UnknownLabel _
-          | TraceSymbolic.UnknownLabel _ ->
+          | SymbolicEval.UnknownLabel _ ->
               (Printf.printf "going a little higher\n";
                bsearch l (u-1))
     in
@@ -1834,6 +1855,7 @@ end
 type traceSymbolicType =
   | NoSubNoLet
   | NoSub
+  | NoSubOpt
   | Substitution
 
 module TraceSymbolicNoSubNoLet = 
