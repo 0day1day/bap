@@ -115,7 +115,7 @@ let of_prog ?(special_error = true) p =
 	| Jmp(t, _) -> for_later t; c
         (* XXX: This does not structure expressions such that it is
            easy to tell if two expressions are inverted *)
-	| CJmp(e,t,f,_) -> for_later ~lab:(true, e) t; for_later ~lab:(false, Ast_convenience.unop NOT e) f; c
+	| CJmp(e,t,f,_) -> for_later ~lab:(true, Ast_convenience.binop EQ e exp_true) t; for_later ~lab:(false, Ast_convenience.binop EQ e exp_false) f; c
 	| Special _ -> C.add_edge c v error
 	| Halt _ -> C.add_edge c v exit
         | Assert(e,_) when e === exp_false -> if v <> error then C.add_edge c v error else c

@@ -25,5 +25,3 @@ Branch specific:
 * Depgraphs.ml: Make a separate graph type for depgraphs.ml with
    Lang.exp = unit
 * Cfg.mli: How can we make expressions more structured?
-* Cfg_pp: Print out edge expressions?
-* AST/SSA conversion

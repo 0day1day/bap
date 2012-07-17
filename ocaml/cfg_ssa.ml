@@ -327,8 +327,8 @@ let rec trans_cfg cfg =
           (fun e g ->
             let g = C.remove_edge_e g e in
             let new_lab = match C.G.E.label e with
-              | Some(true, _) -> Some(true, Val v)
-              | Some(false, _) -> Some(false, UnOp(NOT, v))
+              | Some(true, _) -> Some(true, BinOp(EQ, v, val_true))
+              | Some(false, _) -> Some(false, BinOp(EQ, v, val_false))
               | None -> failwith "Successor of a CJmp should have a label"
             in
             let newe = C.G.E.create (C.G.E.src e) new_lab (C.G.E.dst e) in
