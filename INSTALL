@@ -22,6 +22,7 @@ XXX: Does this work for Debian too?
 
 To build LLVM code generation, include:
    libllvm-ocaml-dev
+We have only tested with version 2.9, but other versions may work too.
 
 On x86_64 add the following packages:
     gcc-multilib g++-multilib lib32z1-dev

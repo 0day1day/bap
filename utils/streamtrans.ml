@@ -82,14 +82,10 @@ struct
       | None -> failwith "Can not output formula for empty state!"
 end
 
-module StreamSymbolicNoSubNoLet = 
-  StreamSymbolic(Traces.TraceSymbolicNoSubNoLet)
-module StreamSymbolicNoSub = 
-  StreamSymbolic(Traces.TraceSymbolicNoSub)
-module StreamSymbolicNoSubOpt = 
-  StreamSymbolic(Traces.TraceSymbolicNoSubOpt)
-module StreamSymbolicSub = 
-  StreamSymbolic(Traces.TraceSymbolicSub)
+module StreamSymbolicNoSubNoLet = StreamSymbolic(Traces.TraceSymbolicNoSubNoLet)
+module StreamSymbolicNoSub = StreamSymbolic(Traces.TraceSymbolicNoSub)
+module StreamSymbolicNoSubOpt = StreamSymbolic(Traces.TraceSymbolicNoSubOpt)
+module StreamSymbolicSub = StreamSymbolic(Traces.TraceSymbolicSub)
 
 let speclist =
   ("-print", Arg.String(fun f -> add(TransformAst(prints f))),
@@ -146,7 +142,6 @@ let rec apply_cmd prog = function
   )
 ;;
 
-(** SWXXX Is there a better way to do this? *)
 if (!outfile <> "") then
   (** Set for formula generation *)
   Traces.dsa_rev_map := Some(rh)
@@ -160,7 +155,6 @@ Stream.iter
     ignore(List.fold_left apply_cmd (Ast block) pipeline)
   ) prog;
 
-(** SWXXX Is there a better way to do this? *)
 if (!outfile <> "") then (
   Traces.dsa_rev_map := None;
   print_endline("Outputting formula.");
