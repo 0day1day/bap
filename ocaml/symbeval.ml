@@ -30,8 +30,6 @@ type varval = Symbolic of Ast.exp | ConcreteMem of mem
 type label_kind = label
 type form_type = Equal | Rename
 
-type form_style = NoSubLet | NoSubNoLet | Substitution
-
 type ('a,'b) ctx = {
   pred: 'b;
   delta: 'a;

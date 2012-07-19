@@ -68,20 +68,17 @@ struct
     block
 
   let generate_formulas filename block =
-    let create_state = TraceSymbolic.SymbolicEval.create_state in
-    let init_formula_file = TraceSymbolic.init_formula_file in
-    let construct_symbolic = TraceSymbolic.construct_symbolic_run_formula in
+    let block = generate_formulas_setup block in
     let state = match !last_state with 
-      | Some s -> s         
+      | Some s -> s
       | None ->
-          let block = generate_formulas_setup block in
-          create_state (init_formula_file filename)
+          TraceSymbolic.create_state (TraceSymbolic.init_formula_file filename)
     in
-    last_state := Some (construct_symbolic h rh state block)
+    last_state := Some (TraceSymbolic.construct_symbolic_run_formula h rh state block)
       
   let output_formula () = 
     match !last_state with
-      | Some s -> TraceSymbolic.Form.ouput_formula s.SymbolicEval.pred
+      | Some s -> TraceSymbolic.output_formula s
       | None -> failwith "Can not output formula for empty state!"
 end
 
@@ -171,6 +168,6 @@ if (!outfile <> "") then (
     | Traces.NoSub -> StreamSymbolicNoSub.output_formula ()
     | Traces.NoSubOpt -> StreamSymbolicNoSubOpt.output_formula ()
     | Traces.NoSubNoLet -> StreamSymbolicNoSubNoLet.output_formula ()
-    | Traces.Substitution -> StreamSymbolicSub.ouput_formula ()
+    | Traces.Substitution -> StreamSymbolicSub.output_formula ()
 )
 

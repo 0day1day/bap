@@ -1594,24 +1594,27 @@ end
 (* end *)
 
 module type TraceSymbolicRun =
+  (* functor (Tune: EvalTune) -> *)
+  (*   functor (Assign: Assign) -> *)
+  (*     functor (Form: StreamFormula) -> *)
 sig
   type init
   type output
   type state
-
-  val symbolic_run_block : VH.t -> VH.t -> state -> stmt -> stmt
-  val construct_symbolic_run_formula : VH.t -> VH.t -> state -> trace -> state
+    
+  val create_state : init -> state
+  val construct_symbolic_run_formula : Var.t VH.t -> Var.t VH.t -> state -> stmt list -> state
   val init_formula_file : string -> init
-  val symbolic_run : trace -> string -> formula
-  val generate_formula : string -> trace -> output
+  val symbolic_run : stmt list -> string -> state
+  val generate_formula : string -> stmt list -> output
+  val output_formula : state -> output
 
   (******************* Formula Debugging  **********************)
-  val formula_valid_to_invalid : ?int -> trace -> unit
-  val sym_and_output : trace -> string -> unit
-  val trace_valid_to_invalid : trace -> unit
+  val formula_valid_to_invalid : ?min:int -> stmt list -> unit
+  val trace_valid_to_invalid : stmt list -> unit
 
   (****************  Exploit String Generation  ****************)
-  val output_exploit : string -> trace -> unit
+  val output_exploit : string -> stmt list -> unit
 end
 
 module TraceSymbolicFunc (Tune: EvalTune) (Assign: Assign) (Form: StreamFormula with type init=Formulap.fpp_oc with type output = unit) =
@@ -1619,8 +1622,14 @@ struct
   (* Set this to LetBindSimplify to use formula simplificiation *)
   module SymbolicEval = Symbeval.Make(SymbolicMemL)(Tune)(Assign)(Form)
 
+  type init = Form.init
+  type output = Form.output
+  type state = SymbolicEval.myctx
+
   let status = ref 0
   let count = ref 0
+
+  let create_state = SymbolicEval.create_state
 
   let symbolic_run_block h rh state stmt = 
     let to_dsa stmt = to_dsa_stmt stmt h rh in
@@ -1710,6 +1719,8 @@ struct
     in
     let finalstate = symbolic_run trace file in
     Form.output_formula finalstate.pred
+
+  let output_formula state = Form.output_formula state.pred
 
   (* let output_formula file trace = *)
   (*   let formula = generate_formula trace in *)
