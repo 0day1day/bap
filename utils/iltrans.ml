@@ -103,6 +103,14 @@ let jumpelim p =
 let ast_coalesce = Coalesce.coalesce_ast
 let ssa_coalesce = Coalesce.coalesce_ssa
 
+let vsa_print g =
+  let _df_in, df_out = Vsa.AlmostVSA.DF.worklist_iterate g in
+  Cfg.SSA.G.iter_vertex (fun v ->
+    Printf.printf "VSA @%s" (Cfg_ssa.v2s v);
+    Vsa.AbsEnv.pp print_string (df_out v);
+    print_string "\n\n"
+  ) g
+
 (* Chop code added *)
 let ast_chop srcbb srcn trgbb trgn p =
   Ast_slice.CHOP_AST.chop p !srcbb !srcn !trgbb !trgn
@@ -369,6 +377,8 @@ let speclist =
       "Replace all unknowns with zeros")
   :: ("-flatten-mem", uadd(TransformAst Flatten_mem.flatten_mem_program),
       "Flatten memory accesses")
+  :: ("-vsa", uadd(AnalysisSsa vsa_print),
+      "Run value set analysis and print the results.")
   :: Input.speclist
 
 let anon x = raise(Arg.Bad("Unexpected argument: '"^x^"'"))

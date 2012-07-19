@@ -501,7 +501,7 @@ struct
 	pp_address p x;
 	List.iter (fun x -> p ", "; pp_address p x) xs;
 	p ")"
-	
+
 
   let kind = function
     | [] -> `Top
@@ -699,10 +699,11 @@ module AllocEnv = struct
 
   let top = M1.empty
 
+  let pp p a = p "unimplemented\n"
+
   (** Fold over all addresses in the AllocEnv *)
   let fold f ae i =
     M1.fold (fun r m2 a -> M2.fold (fun i vs a -> f (r,i) vs a) m2 a) ae i
-
 
   let read_concrete ae (r,i) =
     try M2.find i (M1.find r ae)
@@ -766,6 +767,16 @@ module AbsEnv = struct
 
   let empty = VM.empty
 
+  let pp p m =
+    let pp_value = function
+      | `Scalar s -> VS.pp p s
+      | `Array a -> AllocEnv.pp p a
+    in
+    VM.iter (fun k v ->
+      p ("\n " ^ (Pp.var_to_string k) ^ " -> ");
+      pp_value v;
+    ) m
+
   let value_equal x y = match x,y with
     | (`Scalar x, `Scalar y) -> x = y
     | (`Array x, `Array y) -> AllocEnv.equal x y
@@ -773,8 +784,6 @@ module AbsEnv = struct
 
   let equal x y =
     VM.equal (value_equal) x y
-
-
 
   let do_find_vs ae v =
     try match VM.find v ae with
@@ -792,8 +801,6 @@ module AbsEnv = struct
       | `Array ae -> ae
       | _ -> AllocEnv.top
     with  Not_found -> AllocEnv.top
-      
-	
 end  (* module AE *)
 
 
