@@ -308,6 +308,16 @@ struct
     let (a,b,c) as res = union x y in
       if b = c then (0L,b,b) else (check_reduced 64 res; res)
 
+  let widen k (s1,a,b) (s2,c,d) =
+    let s' = uint64_gcd s1 s2 in
+    let l = if c < a then mini k else min a c
+    and u = if d > b then maxi k else max b d in
+    if s' = 0L then
+      if a = b && c = d then
+        (u -% l, l, u)
+      else failwith "widen: strided interval not in reduced form"
+    else
+      (1L, l, u)
 
   let rec fold f (s,a,b) init =
     if a = b then f a init
@@ -337,6 +347,17 @@ struct
 	       VM.add k v res
 	  )
 	  x y
+      (* let widen x y = *)
+      (*   VM.fold *)
+      (*     (fun k v res -> *)
+      (*        try *)
+      (*          let v' = VM.find k y in *)
+      (*          let si = SI.widen v v' in *)
+      (*   	 VM.add k si res *)
+      (*        with Not_found -> *)
+      (*          VM.add k v res *)
+      (*     ) *)
+      (*     x y *)
     end
     let s0 _ = G.V.create Cfg.BB_Entry
     let init g = L.top

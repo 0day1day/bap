@@ -30,7 +30,7 @@ sig
   (** The type of a latice element *)
   type t
 
-  (** Top of the latice *)
+  (** Top of the latice (the bound)*)
   val top : t
 
   (** The meet operator.
@@ -45,37 +45,102 @@ sig
   val equal : t -> t -> bool
 end
 
+(** The lattice the dataflow is defined on, with a widening operator. *)
+module type BOUNDED_MEET_SEMILATTICE_WITH_WIDENING =
+sig
+
+  include BOUNDED_MEET_SEMILATTICE
+
+  (** The widening operator W.
+
+      I'm not going to repeat the formal definition here, since it is
+      intended for infinite chains, and we often have finite (but long
+      chains), which are just as bad.
+
+      Suffice to say if you have some long finite chain over the
+      lattice values, applying the widening operator to the chain
+      should cause it to stablize quickly.
+
+      If [A < B], then [widen B A] should probably equal the bottom
+      element of the lattice. If [A <= B], then [widen A B = A]. *)
+  val widen : t -> t -> t
+end
+
 (** A dataflow problem is defined by a lattice over a graph. *)
 module type DATAFLOW =
-  sig
+sig
 
-    module L : BOUNDED_MEET_SEMILATTICE
-    module G : G
+  module L : BOUNDED_MEET_SEMILATTICE
+  module G : G
 
-    (** The transfer function over node elements, e.g., basic
-        blocks. *)
-    val transfer_function : G.t -> G.V.t -> L.t -> L.t
+  (** The transfer function over node elements, e.g., basic
+      blocks. *)
+  val transfer_function : G.t -> G.V.t -> L.t -> L.t
 
-    (** The starting node for the analysis. *)
-    val s0 : G.t -> G.V.t
+  (** The starting node for the analysis. *)
+  val s0 : G.t -> G.V.t
 
-    (** The initial lattice value given to node [s0]. All other nodes
-        start out with [Top]. *)
-    val init : G.t -> L.t
+  (** The initial lattice value given to node [s0]. All other nodes
+      start out with [Top]. *)
+  val init : G.t -> L.t
 
-    (** The dataflow direction. *)
-    val dir : direction
-  end
+  (** The dataflow direction. *)
+  val dir : direction
+end
+
+(** A dataflow problem with widening. *)
+module type DATAFLOW_WITH_WIDENING =
+sig
+
+  module L : BOUNDED_MEET_SEMILATTICE_WITH_WIDENING
+  module G : G
+
+  (** The transfer function over node elements, e.g., basic
+      blocks. *)
+  val transfer_function : G.t -> G.V.t -> L.t -> L.t
+
+  (** The starting node for the analysis. *)
+  val s0 : G.t -> G.V.t
+
+  (** The initial lattice value given to node [s0]. All other nodes
+      start out with [Top]. *)
+  val init : G.t -> L.t
+
+  (** The dataflow direction. *)
+  val dir : direction
+end
 
 (** Build a custom dataflow algorithm for the given dataflow problem [D]. *)
 module Make :
   functor (D : DATAFLOW) ->
 sig
-  (** [worklist_iterage g] returns a worklist algorithm for graph [g]
+  (** [worklist_iterate g] returns a worklist algorithm for graph [g]
       as a pair of functions [in,out]. [in], when given a node [v],
       computes the lattice value going in to that node, [v]. [out],
       when given a node [v], computes the lattice value exiting
       [v]. *)
   val worklist_iterate : ?init:(D.G.t -> D.L.t) ->
+    D.G.t -> (D.G.V.t -> D.L.t) * (D.G.V.t -> D.L.t)
+end
+
+(** Build a custom dataflow algorithm for the given dataflow problem
+    with widening operator [D]. *)
+module MakeWide :
+  functor (D : DATAFLOW_WITH_WIDENING) ->
+sig
+  (** [worklist_iterate g] returns a worklist algorithm for graph [g]
+      as a pair of functions [in,out]. [in], when given a node [v],
+      computes the lattice value going in to that node, [v]. [out],
+      when given a node [v], computes the lattice value exiting
+      [v]. This function does not use the widening operator
+      [D.L.widen]. *)
+  val worklist_iterate : ?init:(D.G.t -> D.L.t) ->
+    D.G.t -> (D.G.V.t -> D.L.t) * (D.G.V.t -> D.L.t)
+
+  (** Same as [worklist_iterate], but additionally employs the
+      widening operator as lattice values propagate over backedges in
+      the CFG.  Backedges are identified by observing when lattices
+      values flow in cycles. *)
+  val worklist_iterate_widen : ?init:(D.G.t -> D.L.t) ->
     D.G.t -> (D.G.V.t -> D.L.t) * (D.G.V.t -> D.L.t)
 end
