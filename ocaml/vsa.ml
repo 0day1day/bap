@@ -38,7 +38,7 @@ let fwd_transfer_stmt_to_block f g node latice =
   List.fold_left (fun l n -> f n l) latice (Cfg.SSA.get_stmts g node)
 
 (* FIXME: find a better way to get the stack pointer *)
-let sp = List.find (fun (Var.V(_,n,_)) -> n = "R_ESP") (Asmir.decls_for_arch Asmir.arch_i386)
+let sp = Disasm_i386.esp
 
 
 (** Strided Intervals *)
@@ -46,10 +46,10 @@ module SI =
 struct
 (* FIXME: some of these functions can return a stride of 1 for a singleton *)
 
-  (** unsigned stride * signed lower bound * signed upper bound *)
-  type t = int64 * int64 * int64
+  (** number of bits * unsigned stride * signed lower bound * signed upper bound *)
+  type t = int * int64 * int64 * int64
 
-  let to_string (s,lb,ub) = Printf.sprintf "%Lu[%Ld,%Ld]" s lb ub
+  let to_string (_,s,lb,ub) = Printf.sprintf "%Lu[%Ld,%Ld]" s lb ub
 
   let highbit k =
     if k = 1 then 1L else I.shift_left 1L (k-1)
@@ -66,17 +66,18 @@ struct
 
   let maxi k = highbit k -% 1L
   let mini k = extend k (highbit k)
-  let top k = (1L, mini k, maxi k)
+  let top k = (k, 1L, mini k, maxi k)
 
-  let single x = (0L,x,x)
-  let of_bap_int i t = single (extend (bits_of_width t) i)
+  let single k x = (k,0L,x,x)
+  let of_bap_int i t = single (bits_of_width t) (extend (bits_of_width t) i)
 
-  let zero = single 0L
-  let one = single 1L
-  let minus_one = single (-1L)
+  let zero k = single k 0L
+  let one k = single k 1L
+  let minus_one k = single k (-1L)
 
-
-  let is_reduced k (s,lb,ub) =
+  (* XXX: Remove k argument *)
+  let is_reduced k (k',s,lb,ub) =
+    assert(k=k');
     assert(k>0 && k<=64);
     (lb >= mini k && ub <= maxi k) &&
       if s = 0L then lb = ub
@@ -89,18 +90,20 @@ struct
   let check_reduced2 k si1 si2 =
     check_reduced k si1; check_reduced k si2
 
-
-  let renorm k ((a,b,c) as si) =
-    let si' = if b = c then (0L,b,b) else si in
+  (* XXX: Remove k argument *)
+  let renorm k ((k',a,b,c) as si) =
+    assert(k=k');
+    let si' = if b = c then (k,0L,b,b) else si in
       check_reduced k si';
       si'
 
   let renormbin f k x y = renorm k (f k x y)
   let renormun f k x = renorm k (f k x)
 
-
+  (* XXX: Remove k *)
   (** Addition of strided intervals *)
-  let add k ((s1,lb1,ub1) as a) ((s2,lb2,ub2) as b) =
+  let add k ((k',s1,lb1,ub1) as a) ((k'',s2,lb2,ub2) as b) =
+    assert (k=k' && k=k'');
     check_reduced2 k a b;
     let lb' = lb1 +% lb2 
     and ub' = ub1 +% ub2 in
@@ -111,17 +114,19 @@ struct
     in
       if (u |% v) &% highbit = highbit then
 	top k
-      else (uint64_gcd s1 s2, extend k lb', extend k ub')
+      else (k, uint64_gcd s1 s2, extend k lb', extend k ub')
 
   let add = renormbin add
 
+  (* XXX: Remove k *)
   (** Negation of a strided interval *)
-  let neg k ((s,lb,ub) as si) =
+  let neg k ((k',s,lb,ub) as si) =
+    assert(k=k');
     check_reduced k si;
     if lb <> extend k (highbit k) then
-      (s, I.neg ub, I.neg lb)
+      (k, s, I.neg ub, I.neg lb)
     else if lb = ub then 
-      single (mini k)
+      single k (mini k)
     else
       top k
 
@@ -177,7 +182,8 @@ struct
 
 
   (** Bitwise OR *)
-  let logor k ((s1,lb1,ub1) as a) ((s2,lb2,ub2) as b) =
+  let logor k ((k',s1,lb1,ub1) as a) ((k'',s2,lb2,ub2) as b) =
+    assert (k=k' && k=k'');
     check_reduced2 k a b;
     let t = min (ntz s1) (ntz s2) in
     let s' = I.shift_left 1L t in
@@ -201,14 +207,16 @@ struct
       | _ -> failwith "Impossible: check_reduced prevents this"
     in
     let highmask = bnot(s' -% 1L) in
-      (s', (lb' &% highmask) |% lowbits, (ub' &% highmask) |% lowbits)
+      (k, s', (lb' &% highmask) |% lowbits, (ub' &% highmask) |% lowbits)
       
 
   let logor = renormbin logor
 
+  (* XXX: Get rid of _k *)
   (** Bitwise NOT *)
-  let lognot (_k:int) (s,l,u) =
-    (s, bnot u, bnot l)
+  let lognot (_k:int) (k,s,l,u) =
+    assert (_k = k);
+    (k, s, bnot u, bnot l)
 
   let lognot = if debug() then renormun lognot else lognot
 
@@ -224,22 +232,26 @@ struct
     o (n(o (n x) y)) (n(o x (n y)))
 
   (** FIXME: Signed or unsigned modulus? *)
-  let modulus k (s1,a,b) (s2,c,d) =
-    if b = 0L then single 0L
+  let modulus k (k',s1,a,b) (k'',s2,c,d) =
+    assert(k=k' && k=k'');
+    if b = 0L then single k 0L
     else
-      (1L,0L, int64_umin b d)
+      (k, 1L, 0L, int64_umin b d)
 
   let modulus = renormbin modulus
-	
+
+(* XXX: Get rid of k *)
 (* shifting by more than k or by negative values
  * will be the same as shifting by k. *)
   let toshifts k =
     let f x = if x > Int64.of_int k || x < 0L then k else Int64.to_int x in
       function
-	| (0L,x,y) ->
-	    assert(x=y);
+	| (k',0L,x,y) ->
+	  assert(x=y);
+          assert (k=k');
 	    let s = f x in  (s,s)
-	| (_s,x,y) ->
+	| (k',_s,x,y) ->
+          assert(k=k');
 	    if x < 0L then
 	      if y >= 0L then
 		(* FIXME: using stride information could be useful here *)
@@ -248,7 +260,9 @@ struct
 	    else (* x >= 0L *)
 	      (f x, f y)
 
-  let mk_rshift shifter k ((s1,a,b) as x) y =
+  (* Get rid of k *)
+  let mk_rshift shifter k ((k',s1,a,b) as x) ((k'',_,_,_) as y) =
+    assert(k=k' && k=k'');
     check_reduced2 k x y;
     let (z1,z2) = toshifts k y
     and aa = trunc k a
@@ -261,7 +275,7 @@ struct
     and s' = int64_umax (Int64.shift_right_logical s1 z2) 1L in
     let l = min (min a1 a2) (min b1 b2)
     and u = max (max a1 a2) (max b1 b2) in
-      renorm k (s',l,u)
+    renorm k (k,s',l,u)
 
   (** Logical right-shift *)
   let rshift = mk_rshift Int64.shift_right_logical
@@ -270,11 +284,13 @@ struct
   let arshift = mk_rshift Int64.shift_right
 
   (* construct these only once *)
-  let yes = single (-1L)
-  and no = single 0L
-  and maybe = (1L, -1L, 0L)
+  let yes = single 1 (-1L)
+  and no = single 1 0L
+  and maybe = (1, 1L, -1L, 0L)
 
-  let eq k ((s1,a,b) as x) ((s2,c,d) as y) =
+  (* XXX: Remove k *)
+  let eq k ((k',s1,a,b) as x) ((k'',s2,c,d) as y) =
+    assert(k=k' && k=k'');
     check_reduced2 k x y;
     if a = b && a = c && a = d then
       yes
@@ -289,24 +305,25 @@ struct
 	else
 	  no
 
-  let union (s1,a,b) (s2,c,d) =
+  let union (k,s1,a,b) (k',s2,c,d) =
+    if k <> k' then failwith "union: expected same bitwidth intervals";
     let s' = uint64_gcd s1 s2 in
       if s' = 0L then
 	if a = b && c = d then
 	  let u = max a c
 	  and l = min a c in
-	    (u -% l, l, u)
+	    (k, u -% l, l, u)
 	else failwith "union: strided interval not in reduced form"
       else 
 	let r1 = I.rem a s' (* not right when s' is negative. *)
 	and r2 = I.rem c s' in
 	  if s' > 0L && r1 = r2 then
-	    (s', min a c, max b d)
-	  else (1L, min a c, max b d)
+	    (k, s', min a c, max b d)
+	  else (k, 1L, min a c, max b d)
 
   let union x y =
-    let (a,b,c) as res = union x y in
-      if b = c then (0L,b,b) else (check_reduced 64 res; res)
+    let (k,a,b,c) as res = union x y in
+      if b = c then (k,0L,b,b) else (check_reduced 64 res; res)
 
   let widen k (s1,a,b) (s2,c,d) =
     let s' = uint64_gcd s1 s2 in
@@ -319,9 +336,9 @@ struct
     else
       (1L, l, u)
 
-  let rec fold f (s,a,b) init =
+  let rec fold f (k,s,a,b) init =
     if a = b then f a init
-    else fold f (s, a+%s ,b) (f a init)
+    else fold f (k, s, a+%s ,b) (f a init)
 
 end (* module SI *)
 
@@ -466,10 +483,11 @@ struct
 		    | Cast(CAST_HIGH, t, vl) ->
 			let k = bits_of_val vl
 			and k' = bits_of_width t
-			and (s,a,b) as si = val2si vl in
+			and (k'',s,a,b) as si = val2si vl in
+                        assert (k=k'');
 			let f x = I.shift_right x (k' - k) in
 			  if k' <> k then
-			    (s, f a, f b)
+			    (k', s, f a, f b)
 			  else si
 		    | Cast(CAST_LOW, t, vl) ->
 			raise(Unimplemented "FIXME")
@@ -533,9 +551,9 @@ struct
   let single x = [(global, SI.single x)]
   let of_bap_int i t = [(global, SI.of_bap_int i t)]
 
-  let zero = [(global, SI.zero)]
-  let one = [(global, SI.one)]
-  let minus_one = [(global, SI.minus_one)]
+  let zero k = [(global, SI.zero k)]
+  let one k = [(global, SI.one k)]
+  let minus_one k = [(global, SI.minus_one k)]
 
 
   let add k x y = match (x,y) with
@@ -564,11 +582,11 @@ struct
 	BatOption.get annihilator
     | _ -> top
 
-  let logand = makeother SI.logand minus_one (Some zero)
+  let logand k = makeother SI.logand (minus_one k) (Some (zero k)) k
 
-  let logor = makeother SI.logor zero (Some minus_one)
+  let logor k = makeother SI.logor (zero k) (Some (minus_one k)) k
 
-  let logxor = makeother SI.logxor zero None
+  let logxor k = makeother SI.logxor (zero k) None k
 
   let yes = [(global, SI.yes)]
   let no = [(global, SI.no)]
@@ -628,7 +646,7 @@ struct
     end
     let s0 _ = G.V.create Cfg.BB_Entry
     let init g =
-	VM.add sp [(sp, SI.zero)] L.top (* stack region *)
+	VM.add sp [(sp, SI.zero (bits_of_width (Var.typ sp)))] L.top (* stack region *)
 
     let dir = GraphDataflow.Forward
 
@@ -765,10 +783,11 @@ module AllocEnv = struct
 	fold (fun k v a -> write_concrete_strong a k (VS.union vl v)) ae ae
     else
       match addr with
-	| [(r, (0L,x,y))] when x = y ->
+        (* XXX: does k matter here? *)
+	| [(r, (_,0L,x,y))] when x = y ->
 	   write_concrete_strong ae (r,x) vl
 	| _ ->
-	    VS.fold (fun v a -> write_concrete_weak a v vl) addr ae
+          VS.fold (fun v a -> write_concrete_weak a v vl) addr ae
 
 
   let union (x:t) (y:t) =
@@ -860,7 +879,7 @@ struct
 	it's own region. (For use as an inital value in the dataflow problem.)
     *)
     let init_vars vars =
-      List.fold_left (fun vm x -> VM.add x (`Scalar [(x, SI.zero)]) vm) L.top vars
+      List.fold_left (fun vm x -> VM.add x (`Scalar [(x, SI.zero (bits_of_width (Var.typ x)))]) vm) L.top vars
 
     let init g =
       init_vars [sp]
