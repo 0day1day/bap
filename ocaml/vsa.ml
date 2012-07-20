@@ -3,6 +3,9 @@
     See Gogul Balakrishnan's thesis at
     http://pages.cs.wisc.edu/~bgogul/Research/Thesis/thesis.html
 
+    TODO:
+    * Consolidate widen/meet/union functions
+    * Remove extra "k" arguments
 *)
 
 module VM = Var.VarMap
@@ -323,18 +326,18 @@ struct
 
   let union x y =
     let (k,a,b,c) as res = union x y in
-      if b = c then (k,0L,b,b) else (check_reduced 64 res; res)
+      if b = c then (k,0L,b,b) else (check_reduced k res; res)
 
-  let widen k (s1,a,b) (s2,c,d) =
+  let widen (k,s1,a,b) (k',s2,c,d) =
+    if k <> k' then failwith "widen: expected same bitwidth intervals";
     let s' = uint64_gcd s1 s2 in
     let l = if c < a then mini k else min a c
     and u = if d > b then maxi k else max b d in
     if s' = 0L then
       if a = b && c = d then
-        (u -% l, l, u)
+        (k, u -% l, l, u)
       else failwith "widen: strided interval not in reduced form"
-    else
-      (1L, l, u)
+    else (k, 1L, l, u)
 
   let rec fold f (k,s,a,b) init =
     if a = b then f a init
@@ -364,17 +367,17 @@ struct
 	       VM.add k v res
 	  )
 	  x y
-      (* let widen x y = *)
-      (*   VM.fold *)
-      (*     (fun k v res -> *)
-      (*        try *)
-      (*          let v' = VM.find k y in *)
-      (*          let si = SI.widen v v' in *)
-      (*   	 VM.add k si res *)
-      (*        with Not_found -> *)
-      (*          VM.add k v res *)
-      (*     ) *)
-      (*     x y *)
+      let widen x y =
+        VM.fold
+          (fun k v res ->
+             try
+               let v' = VM.find k y in
+               let si = SI.widen v v' in
+        	 VM.add k si res
+             with Not_found ->
+               VM.add k v res
+          )
+          x y
     end
     let s0 _ = G.V.create Cfg.BB_Entry
     let init g = L.top
@@ -507,7 +510,7 @@ struct
 
   end
   
-  module DF = GraphDataflow.Make(DFP)
+  module DF = GraphDataflow.MakeWide(DFP)
 
 end (* module SimpleVSA *)
 
@@ -605,13 +608,25 @@ struct
   let union x y =
     let h = Hashtbl.create (List.length x + List.length y) in
     let add (r,si) =
-      try Hashtbl.replace h r (SI.union si (Hashtbl.find h r))
+      try Hashtbl.replace h r (SI.union (Hashtbl.find h r) si)
       with Not_found ->
 	Hashtbl.add h r si
     in
       List.iter add x;
       List.iter add y;
       Hashtbl.fold (fun k v r -> (k,v)::r) h []
+
+  let widen x y =
+    let h = Hashtbl.create (List.length x + List.length y) in
+    let add (r,si) =
+      try Hashtbl.replace h r (SI.widen (Hashtbl.find h r) si)
+      with Not_found ->
+	Hashtbl.add h r si
+    in
+      List.iter add x;
+      List.iter add y;
+      Hashtbl.fold (fun k v r -> (k,v)::r) h []
+
 
   let fold f vs init =
     if vs = top then failwith "VS.fold doesn't work on Top"
@@ -638,6 +653,17 @@ struct
 	     try
 	       let v' = VM.find k y in
 	       let vs = VS.union v v' in
+		 VM.add k vs res
+	     with Not_found ->
+	       VM.add k v res
+	  )
+	  x y
+      let widen x y =
+	VM.fold
+	  (fun k v res ->
+	     try
+	       let v' = VM.find k y in
+	       let vs = VS.widen v v' in
 		 VM.add k vs res
 	     with Not_found ->
 	       VM.add k v res
@@ -723,7 +749,7 @@ struct
 
   end
   
-  module DF = GraphDataflow.Make(DFP)
+  module DF = GraphDataflow.MakeWide(DFP)
 
 end (* module RegionVSA *)
 
@@ -776,6 +802,9 @@ module AllocEnv = struct
   let write_concrete_weak ae addr vl =
     write_concrete_strong ae addr (VS.union vl (read_concrete ae addr))
 
+  let write_concrete_weak_widen ae addr vl =
+    write_concrete_strong ae addr (VS.widen vl (read_concrete ae addr))
+
   let write ae addr vl =
     if addr = VS.top then
       if vl = VS.top then top
@@ -792,6 +821,9 @@ module AllocEnv = struct
 
   let union (x:t) (y:t) =
     fold (fun k v res -> write_concrete_weak res k v) x y
+
+  let widen (x:t) (y:t) =
+    fold (fun k v res -> write_concrete_weak_widen res k v) x y
 
   let equal = M1.equal (M2.equal (=))
 
@@ -872,7 +904,33 @@ struct
 		 VM.add k v res
 	    )
 	    x y
-    end
+      let widen (x:t) (y:t) =
+	  VM.fold
+	    (fun k v res ->
+	       try
+		 let v' = VM.find k y in
+		 let vs = match v, v' with
+		   | (`Scalar a, `Scalar b) -> `Scalar(VS.widen a b)
+		   | (`Array a, `Array b) -> `Array(AllocEnv.widen a b)
+		   | _ -> failwith "Tried to meet scalar and array"
+		 in
+		   VM.add k vs res
+	       with Not_found ->
+		 VM.add k v res
+	    )
+	    x y
+
+(*      let widen x y =
+        let v = widen x y in
+        print_string "x\n";
+        AbsEnv.pp print_string x;
+        print_string "\ny\n";
+        AbsEnv.pp print_string y;
+        print_string "\nwiden\n";
+        AbsEnv.pp print_string v;
+        print_string "\n";
+        v *) 
+   end
     let s0 _ = G.V.create Cfg.BB_Entry
       
     (** Creates a lattice element that maps each of the given variables to
@@ -978,6 +1036,6 @@ struct
 
   end
   
-  module DF = GraphDataflow.Make(DFP)
+  module DF = GraphDataflow.MakeWide(DFP)
 
 end

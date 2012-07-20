@@ -4,6 +4,8 @@
 
 open Util
 open BatListFull
+module D = Debug.Make(struct let name = "GraphDataflow" and default = `NoDebug end)
+open D
 
 module type G =
 sig
@@ -140,7 +142,8 @@ struct
     let is_backedge s d =
       try Hashtbl.find backedge (s,d)
       with Not_found ->
-        let v = H.mem visited s = false && H.mem visited d = true in
+        (* self loop, or we visited the destination edge already *)
+        let v = D.G.V.equal s d || (H.mem visited s = false && H.mem visited d = true) in
         Hashtbl.add backedge (s,d) v;
         v
     in
@@ -152,7 +155,6 @@ struct
 	  let inset = (dfin b) in 
 	  let outset = (f_t b inset) in 
 	  H.replace htout b outset;
-          H.replace visited b ();
 	  let affected_elems =
 	    List.filter 
 	      (fun s ->
@@ -163,13 +165,17 @@ struct
 		 else
                    let newin =
                      if is_backedge b s
-                     then D.L.widen oldin outset
+                     then (dprintf "widening"; D.L.widen oldin outset)
                      else newin
                    in
                    let () = H.replace htin s newin in
                    true)
 	      (succ b)
 	  in
+          (* Note we must mark b as visited after we look at the
+             affected elements, because we look for back edges there. *)
+          H.replace visited b ();
+          dprintf "visited";
 	  let newwklist = worklist@list_difference affected_elems worklist
 	  in
 	  do_work newwklist
