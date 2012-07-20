@@ -9,8 +9,9 @@ module type G =
 sig
   type t
   module V : Graph.Sig.COMPARABLE
-  val pred : t -> V.t -> V.t list
-  val succ : t -> V.t -> V.t list
+  module E : Graph.Sig.EDGE with type vertex = V.t
+  val pred_e : t -> V.t -> E.t list
+  val succ_e : t -> V.t -> E.t list
   val fold_vertex : (V.t -> 'a -> 'a) -> t -> 'a -> 'a
 end
 
@@ -75,7 +76,10 @@ sig
 
   (** The transfer function over node elements, e.g., basic
       blocks. *)
-  val transfer_function : G.t -> G.V.t -> L.t -> L.t
+  val node_transfer_function : G.t -> G.V.t -> L.t -> L.t
+
+  (** The transfer function over edge elements, e.g., conditions. *)
+  val edge_transfer_function : G.t -> G.E.t -> L.t -> L.t
 
   (** The starting node for the analysis. *)
   val s0 : G.t -> G.V.t
@@ -97,7 +101,10 @@ sig
 
   (** The transfer function over node elements, e.g., basic
       blocks. *)
-  val transfer_function : G.t -> G.V.t -> L.t -> L.t
+  val node_transfer_function : G.t -> G.V.t -> L.t -> L.t
+
+  (** The transfer function over edge elements, e.g., conditions. *)
+  val edge_transfer_function : G.t -> G.E.t -> L.t -> L.t
 
   (** The starting node for the analysis. *)
   val s0 : G.t -> G.V.t
@@ -140,7 +147,12 @@ sig
   (** Same as [worklist_iterate], but additionally employs the
       widening operator as lattice values propagate over backedges in
       the CFG.  Backedges are identified by observing when lattices
-      values flow in cycles. *)
+      values flow in cycles.
+
+      @param nmeets The number of times a widening edge should be
+      computed using meet.  After this threshold is reached, the widening
+      operator will be applied.
+  *)
   val worklist_iterate_widen : ?init:(D.G.t -> D.L.t) ->
-    D.G.t -> (D.G.V.t -> D.L.t) * (D.G.V.t -> D.L.t)
+    ?nmeets:int -> D.G.t -> (D.G.V.t -> D.L.t) * (D.G.V.t -> D.L.t)
 end

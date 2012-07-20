@@ -615,7 +615,7 @@ struct
     module G = Cfg.AST.G
     module L = UseDefL
 
-    let transfer_function (g:G.t) (bb:G.V.t) (l:L.t) =
+    let node_transfer_function (g:G.t) (bb:G.V.t) (l:L.t) =
       let lref = ref l in
       let line = ref 0 in
       let v = object(self)
@@ -634,7 +634,9 @@ struct
 	   line := !line + 1
 	) stmts;
       !lref
-    
+
+    let edge_transfer_function g e = Util.id
+
     let s0 _ = Cfg.AST.G.V.create Cfg.BB_Entry
 
     (* Set each variable to undefined at the starting point *)

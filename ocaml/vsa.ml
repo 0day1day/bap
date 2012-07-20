@@ -6,6 +6,7 @@
     TODO:
     * Consolidate widen/meet/union functions
     * Remove extra "k" arguments
+    * Path sensitivity: Does this require changing SSA expressions?
 *)
 
 module VM = Var.VarMap
@@ -506,7 +507,9 @@ struct
 	    with Invalid_argument _ | Not_found ->
 	      l
 
-    let transfer_function = fwd_transfer_stmt_to_block transfer_stmt
+    let node_transfer_function = fwd_transfer_stmt_to_block transfer_stmt
+
+    let edge_transfer_function g e = Util.id
 
   end
   
@@ -745,7 +748,9 @@ struct
 	    with Invalid_argument _ | Not_found ->
 	      l
 
-    let transfer_function = fwd_transfer_stmt_to_block transfer_stmt
+    let node_transfer_function = fwd_transfer_stmt_to_block transfer_stmt
+
+    let edge_transfer_function g e = Util.id
 
   end
   
@@ -1032,7 +1037,9 @@ struct
 	    with Invalid_argument _ | Not_found ->
 	      l
 
-    let transfer_function = fwd_transfer_stmt_to_block transfer_stmt
+    let node_transfer_function = fwd_transfer_stmt_to_block transfer_stmt
+
+    let edge_transfer_function g e = Util.id
 
   end
   

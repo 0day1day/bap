@@ -27,7 +27,7 @@ module DFSPEC = struct
       | Set s1, Set s2 -> Set (S.union s1 s2)
   end
 
-  let transfer_function g n init =
+  let node_transfer_function g n init =
     let stmts = Cfg.AST.get_stmts g n in
     let process_stmt a s = match s with
       | Move(v, Int(i, t), _) when v=syscall_reg ->
@@ -45,6 +45,7 @@ module DFSPEC = struct
     (*                   m) *)
     (* in *)
     List.fold_left process_stmt init stmts
+  let edge_transfer_function g e = Util.id
   let s0 g =
     (* let check_v v a = *)
     (*   let stmts = Cfg.AST.get_stmts g v in *)

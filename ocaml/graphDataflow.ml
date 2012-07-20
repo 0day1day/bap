@@ -11,8 +11,9 @@ module type G =
 sig
   type t
   module V : Graph.Sig.COMPARABLE
-  val pred : t -> V.t -> V.t list
-  val succ : t -> V.t -> V.t list
+  module E : Graph.Sig.EDGE with type vertex = V.t
+  val pred_e : t -> V.t -> E.t list
+  val succ_e : t -> V.t -> E.t list
   val fold_vertex : (V.t -> 'a -> 'a) -> t -> 'a -> 'a
 end
 
@@ -42,7 +43,8 @@ sig
   module L : BOUNDED_MEET_SEMILATTICE
   module G : G
 
-  val transfer_function : G.t -> G.V.t -> L.t -> L.t
+  val node_transfer_function : G.t -> G.V.t -> L.t -> L.t
+  val edge_transfer_function : G.t -> G.E.t -> L.t -> L.t
   val s0 : G.t -> G.V.t
   val init : G.t -> L.t
   val dir : direction
@@ -54,7 +56,8 @@ sig
   module L : BOUNDED_MEET_SEMILATTICE_WITH_WIDENING
   module G : G
 
-  val transfer_function : G.t -> G.V.t -> L.t -> L.t
+  val node_transfer_function : G.t -> G.V.t -> L.t -> L.t
+  val edge_transfer_function : G.t -> G.E.t -> L.t -> L.t
   val s0 : G.t -> G.V.t
   val init : G.t -> L.t
   val dir : direction
@@ -67,12 +70,14 @@ struct
 
  let worklist_iterate ?(init = D.init) g = 
     let nodes = D.G.fold_vertex (fun x acc -> x::acc) g [] in
-    let f_t = D.transfer_function g in 
-    let succ,pred = match D.dir with
+    let f_t = D.node_transfer_function g in 
+    let succ_e,pred_e,dst,src = match D.dir with
       | Forward ->
-	  (D.G.succ g, D.G.pred g) 
+	  (D.G.succ_e g, D.G.pred_e g,
+           D.G.E.dst, D.G.E.src)
       | Backward ->
-	  (D.G.pred g, D.G.succ g)
+	  (D.G.pred_e g, D.G.succ_e g,
+           D.G.E.src, D.G.E.dst)
     in
     let htin = H.create (List.length nodes) in
     let dfin = H.find htin in (* function to be returned *)
@@ -93,17 +98,21 @@ struct
 	  let inset = (dfin b) in 
 	  let outset = (f_t b inset) in 
 	  H.replace htout b outset;
-	  let affected_elems =
+	  let affected_edges =
 	    List.filter 
-	      (fun s ->
-		 let oldin = dfin s in
-		 let newin = D.L.meet oldin (outset) in
-		 if D.L.equal oldin newin
-		 then false
-		 else let () = H.replace htin s newin in true
+	      (fun se ->
+                let s = dst se in
+                (* Apply edge transfer function *)
+                let outset' = D.edge_transfer_function g se outset in
+		let oldin = dfin s in
+		let newin = D.L.meet oldin outset' in
+		if D.L.equal oldin newin
+		then false
+		else let () = H.replace htin s newin in true
 	      )
-	      (succ b)
+	      (succ_e b)
 	  in
+          let affected_elems = List.map dst affected_edges in
 	  let newwklist = worklist@list_difference affected_elems worklist
 	  in
 	  do_work newwklist
@@ -117,14 +126,16 @@ module MakeWide (D:DATAFLOW_WITH_WIDENING) =
 struct
   include Make(D)
 
- let worklist_iterate_widen ?(init = D.init) g = 
+ let worklist_iterate_widen ?(init = D.init) ?(nmeets=0) g = 
     let nodes = D.G.fold_vertex (fun x acc -> x::acc) g [] in
-    let f_t = D.transfer_function g in 
-    let succ,pred = match D.dir with
+    let f_t = D.node_transfer_function g in 
+    let succ_e,pred_e,dst,src = match D.dir with
       | Forward ->
-	  (D.G.succ g, D.G.pred g) 
+	  (D.G.succ_e g, D.G.pred_e g,
+           D.G.E.dst, D.G.E.src)
       | Backward ->
-	  (D.G.pred g, D.G.succ g)
+	  (D.G.pred_e g, D.G.succ_e g,
+           D.G.E.src, D.G.E.dst)
     in
     let htin = H.create (List.length nodes) in
     let dfin = H.find htin in (* function to be returned *)
@@ -147,6 +158,12 @@ struct
         Hashtbl.add backedge (s,d) v;
         v
     in
+    let counth = Hashtbl.create (List.length nodes) in
+    let count s d =
+      let n = (try Hashtbl.find counth (s,d) with Not_found -> 0)+1 in
+      let () = Hashtbl.replace counth (s,d) n in
+      n
+    in
     List.iter (fun n -> H.add htin n D.L.top) nodes;
     H.replace htin (D.s0 g) (init g);
     let rec do_work = function
@@ -155,23 +172,27 @@ struct
 	  let inset = (dfin b) in 
 	  let outset = (f_t b inset) in 
 	  H.replace htout b outset;
-	  let affected_elems =
+	  let affected_edges =
 	    List.filter 
-	      (fun s ->
-		 let oldin = dfin s in
-		 let newin = D.L.meet oldin outset in
-		 if D.L.equal oldin newin
-		 then false
-		 else
-                   let newin =
-                     if is_backedge b s
-                     then (dprintf "widening"; D.L.widen oldin outset)
-                     else newin
-                   in
-                   let () = H.replace htin s newin in
-                   true)
-	      (succ b)
+	      (fun se ->
+                let s = dst se in
+                (* Apply edge transfer function *)
+                let outset' = D.edge_transfer_function g se outset in
+		let oldin = dfin s in
+		let newin = D.L.meet oldin outset' in
+		if D.L.equal oldin newin
+		then false
+		else
+                  let newin =
+                    if is_backedge b s && count b s > nmeets
+                    then (dprintf "widening"; D.L.widen oldin outset')
+                    else newin
+                  in
+                  let () = H.replace htin s newin in
+                  true)
+	      (succ_e b)
 	  in
+          let affected_elems = List.map dst affected_edges in
           (* Note we must mark b as visited after we look at the
              affected elements, because we look for back edges there. *)
           H.replace visited b ();
