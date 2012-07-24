@@ -27,9 +27,6 @@ object
 
 	FIXME: would be nice to be able to add stmts... We may change this. *)
 
-  method visit_value : value -> value visit_action
-  (** Called when visiting a SSA value *)
-
   method visit_rvar : var -> var visit_action
   (** Called when visiting a refenenced variable. (IE: inside an expression) *)
 
@@ -48,9 +45,6 @@ val rvar_accept : #t -> var -> var
 
 (** Visit an assigned variable *)
 val avar_accept : #t -> var -> var
-
-(** Visit a value *)
-val value_accept : #t -> value -> value
 
 (** Visit an expression *)
 val exp_accept : #t -> exp -> exp

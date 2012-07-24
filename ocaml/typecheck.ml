@@ -94,7 +94,7 @@ let rec infer_ast =
       in
       nt
     | Lab s ->
-        (* FIXME: no type for labels yet *)
+      (* FIXME: no type for labels yet *)
       reg_64
     | Int(_,t)
     | Unknown(_,t) ->
@@ -144,6 +144,36 @@ and check_idx arr idx endian t =
       check_subt t e "Can't get a %s from array of %s";
   | TMem _ -> ();
   | _ -> terror "Indexing only allowed from array or mem."
+
+let rec infer_ssa = function
+  | Ssa.Int(_,t) -> t
+  | Ssa.Var v -> Var.typ v
+  | Ssa.Lab _ ->
+    (* FIXME: no type for labels yet *)
+    reg_64
+  | Ssa.Load(_,_,_,t)
+  | Ssa.Cast(_,t,_)
+  | Ssa.Unknown(_,t)
+    -> t
+  | Ssa.BinOp((EQ|NEQ|LT|LE|SLT|SLE),_,_)
+    -> Ast.reg_1
+  | Ssa.Ite(_,v,_)
+  | Ssa.BinOp(_,v,_)
+  | Ssa.Store(v,_,_,_,_)
+  | Ssa.UnOp(_,v) ->
+      infer_ssa v
+  | Ssa.Extract(h, l, v) ->
+      let n = ((h -% l) +% bi1) in
+      assert(n >=% bi1);
+      Reg(int_of_big_int n)
+  | Ssa.Concat(lv, rv) ->
+      (match infer_ssa lv, infer_ssa rv with
+      | Reg(lt), Reg(rt) -> Reg(lt + rt)
+      | _ -> failwith "infer_ssa")
+  | Ssa.Phi(x::_)
+    -> Var.typ x
+  | Ssa.Phi []
+    -> failwith "Empty phi has no type"
 
 let typecheck_expression e = ignore(infer_ast ~check:true e)
 

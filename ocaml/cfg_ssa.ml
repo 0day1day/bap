@@ -55,39 +55,7 @@ struct
     Stack.iter (fun (v,_) -> VH.remove vh v) myvars
 end
 
-(* This should probably be somewhere else... *)
-let type_of_value = function
-  | Int(_,t) -> t
-  | Var v -> Var.typ v
-  | Lab _ -> failwith "arg blarg, need types for labels"
-let type_of_exp = function
-  | Load(_,_,_,t)
-  | Cast(_,t,_)
-  | Unknown(_,t)
-    -> t
-  | BinOp((EQ|NEQ|LT|LE|SLT|SLE),_,_)
-    -> Ast.reg_1
-  | Ite(_,v,_)
-  | BinOp(_,v,_)
-  | Store(v,_,_,_,_)
-  | UnOp(_,v)
-  | Val v
-    -> type_of_value v
-  | Extract(h, l, v) ->
-      let n = ((h -% l) +% bi1) in
-      assert(n >=% bi1);
-      Reg(int_of_big_int n)
-  | Concat(lv, rv) ->
-      (match type_of_value lv, type_of_value rv with
-      | Reg(lt), Reg(rt) -> Reg(lt + rt)
-      | _ -> failwith "type_of_exp")
-  | Phi(x::_)
-    -> Var.typ x
-  | Phi []
-    -> failwith "Empty phi has no type"
-
-
-
+let type_of_exp = Typecheck.infer_ssa
 
 (* share the strings in the variable names we create, to save memory *)
 let ssa_temp_name = "temp"
@@ -116,11 +84,11 @@ let rec exp2ssaexp (ctx:Ctx.t) ~(revstmts:stmt list) ?(attrs=[]) e : stmt list *
       let (revstmts, v1) = exp2ssa ctx revstmts e1 in
       (revstmts, UnOp(op,v1))
   | Ast.Int(i, t) ->
-      (revstmts, Val(Int(i,t)))
+      (revstmts, Int(i,t))
   | Ast.Lab s ->
-      (revstmts, Val(Lab s))
+      (revstmts, Lab s)
   | Ast.Var name -> 
-      (revstmts, Val(Var(Ctx.lookup ctx name)))
+      (revstmts, Var(Ctx.lookup ctx name))
   | Ast.Load(arr,idx,endian, t) ->
       let (revstmts,arr) = exp2ssa ctx revstmts arr in
       let (revstmts,idx) = exp2ssa ctx revstmts idx in
@@ -147,14 +115,14 @@ let rec exp2ssaexp (ctx:Ctx.t) ~(revstmts:stmt list) ?(attrs=[]) e : stmt list *
       (revstmts, e2)
 
 
-(* @return a reversed lits of SSA stmts and a value that is equivalent to
+(* @return a reversed lits of SSA stmts and an expression that is equivalent to
    the Ast expression *)
-and exp2ssa ctx ~(revstmts:stmt list) ?(attrs=[]) ?(name=ssa_temp_name) e : stmt list * value =
+and exp2ssa ctx ~(revstmts:stmt list) ?(attrs=[]) ?(name=ssa_temp_name) e : stmt list * exp =
   (* Make an SSA value for an SSA expression by adding an assignment to
      revstmts if needed *)
   let exp2val (revstmts, exp) =
     match exp with
-    | Val v -> (revstmts, v)
+    | (Var _ | Int _ | Lab _) as v -> (revstmts, v)
     | _ ->
 	let t = type_of_exp exp in
 	let l = Var.newvar name t in
@@ -423,22 +391,24 @@ let uninitialized cfg =
   let process stmts =
     let rec f_s = function
       | Move(v, e, _) -> add assnd v; f_e e
-      | _ -> ()
+      | Assert(e, _)
+      | Halt(e, _)
+      | Jmp(e, _) -> f_e e
+      | CJmp(e1, e2, e3, _) -> f_e e1; f_e e2; f_e e3
+      | Label _ | Comment _ -> ()
     and f_e = function
-      | Load(v1,v2,v3,_) -> f_v v1; f_v v2; f_v v3
-      | Store(v1,v2,v3,v4,_) -> f_v v1; f_v v2; f_v v3; f_v v4
-      | Ite(cond,v1,v2) -> f_v cond; f_v v1; f_v v2
-      | Extract(_,_,v) -> f_v v
-      | Concat(lv,rv) -> f_v lv; f_v rv
-      | BinOp(_,v1,v2) -> f_v v1; f_v v2
-      | UnOp(_,v)
-      | Cast(_,_,v)
-      | Val v -> f_v v
-      | Phi vs -> List.iter (add refd) vs
-      | Unknown _ -> ()
-    and f_v = function
+      | Load(v1,v2,v3,_) -> f_e v1; f_e v2; f_e v3
+      | Store(v1,v2,v3,v4,_) -> f_e v1; f_e v2; f_e v3; f_e v4
       | Var v -> add refd v
       | Int _ | Lab _ -> ()
+      | Ite(cond,v1,v2) -> f_e cond; f_e v1; f_e v2
+      | Extract(_,_,v) -> f_e v
+      | Concat(lv,rv) -> f_e lv; f_e rv
+      | BinOp(_,v1,v2) -> f_e v1; f_e v2
+      | UnOp(_,v)
+      | Cast(_,_,v) -> f_e v
+      | Phi vs -> List.iter (add refd) vs
+      | Unknown _ -> ()
     in
     List.iter f_s stmts;
   in
@@ -559,7 +529,7 @@ let rm_phis ?(dsa=false) ?(attrs=[]) cfg =
     (* note that since stmts are reversed, we can prepend
        instead of appending. We must still be careful to not put
        assignments after a jump. *)
-    let move = Move(l,Val(Var p), attrs) in
+    let move = Move(l, Var p, attrs) in
     C.set_stmts cfg b
       (match C.get_stmts cfg b with
        | (Jmp _ as j)::stmts
@@ -686,7 +656,7 @@ type tm = Ssa.exp VH.t
    bindings indicate a single reference, and false bindings indicate
    more than one reference.  Temporaries are only added to the final
    map when there is one (or zero) reference.  *)
-let create_tm c =
+let rec create_tm c =
   let tm = VH.create 5700 
   and refd = VH.create 5700 in
   let vis = object
@@ -718,36 +688,33 @@ let create_tm c =
   tm
 
 
-let rec value2ast tm = function
-  | Int(i,t) -> Ast.Int(i,t)
-  | Lab s -> Ast.Lab s
-  | Var l -> try exp2ast tm (VH.find tm l) with Not_found -> Ast.Var l
-
 and exp2ast tm =
-  let v2a = value2ast tm in
+  let e2a = exp2ast tm in
   function
-    | Ite(c,v1,v2) -> Ast.Ite(v2a c, v2a v1, v2a v2)
-    | Extract(h,l,v) -> Ast.Extract(h, l, v2a v)
-    | Concat(lv,rv) -> Ast.Concat(v2a lv, v2a rv)
-    | BinOp(bo,v1,v2) -> Ast.BinOp(bo, v2a v1, v2a v2)
-    | UnOp(uo, v) -> Ast.UnOp(uo, v2a v)
-    | Val v -> v2a v
-    | Cast(ct,t,v) -> Ast.Cast(ct, t, v2a v)
+    | Int(i,t) -> Ast.Int(i,t)
+    | Lab s -> Ast.Lab s
+    | Var l -> (try e2a (VH.find tm l) with Not_found -> Ast.Var l)
+    | Ite(c,v1,v2) -> Ast.Ite(e2a c, e2a v1, e2a v2)
+    | Extract(h,l,v) -> Ast.Extract(h, l, e2a v)
+    | Concat(lv,rv) -> Ast.Concat(e2a lv, e2a rv)
+    | BinOp(bo,v1,v2) -> Ast.BinOp(bo, e2a v1, e2a v2)
+    | UnOp(uo, v) -> Ast.UnOp(uo, e2a v)
+    | Cast(ct,t,v) -> Ast.Cast(ct, t, e2a v)
     | Unknown(s,t) -> Ast.Unknown(s,t)
-    | Load(arr,idx,e, t) -> Ast.Load(v2a arr, v2a idx, v2a e, t)
-    | Store(a,i,v, e, t) -> Ast.Store(v2a a, v2a i, v2a v, v2a e, t)
+    | Load(arr,idx,e, t) -> Ast.Load(e2a arr, e2a idx, e2a e, t)
+    | Store(a,i,v, e, t) -> Ast.Store(e2a a, e2a i, e2a v, e2a e, t)
     | Phi _ -> failwith "exp2ast cannot translate Phi expressions"
 
 (* Translates an SSA stmt back to Ast *)
 let stmt2ast tm =
-  let v2a = value2ast tm in
+  let e2a = exp2ast tm in
   function
-    | Jmp(t,a) -> Ast.Jmp(v2a t, a)
-    | CJmp(c,tt,tf,a) -> Ast.CJmp(v2a c, v2a tt, v2a tf, a)
+    | Jmp(t,a) -> Ast.Jmp(e2a t, a)
+    | CJmp(c,tt,tf,a) -> Ast.CJmp(e2a c, e2a tt, e2a tf, a)
     | Label(l,a) -> Ast.Label(l,a)
     | Comment(s,a) -> Ast.Comment(s,a)
-    | Assert(t,a) -> Ast.Assert(v2a t, a)
-    | Halt(t,a) -> Ast.Halt(v2a t, a)
+    | Assert(t,a) -> Ast.Assert(e2a t, a)
+    | Halt(t,a) -> Ast.Halt(e2a t, a)
     | Move(l,e,a) -> Ast.Move(l, exp2ast tm e, a)
 
 let stmts2ast tm stmts =

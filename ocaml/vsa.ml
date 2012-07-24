@@ -410,10 +410,7 @@ struct
       | NEG -> SI.neg
       | NOT -> SI.lognot
 
-    let bits_of_val = function
-      | Int(_,t) -> bits_of_width t
-      | Var v -> bits_of_width (Var.typ v)
-      | Lab _ -> 64 (* FIXME *)
+    let bits_of_exp e = bits_of_width (Typecheck.infer_ssa e)
 
     let rec transfer_stmt s l =
       match s with
@@ -425,85 +422,82 @@ struct
 	    try
 	      let top v = SI.top (bits_of_width(Var.typ v)) in
 	      let find v = VM.find v l in
-	      let do_find v =  try find v with Not_found -> top v  in
-	      let val2si = function
+	      let do_find v =  try find v with Not_found -> top v in
+              let rec exp2si e =
+		try (match e with
 		| Int(i,t) -> SI.of_bap_int (int64_of_big_int i) t
 		| Lab _ -> raise(Unimplemented "No SI for labels (should be a constant)")
 		| Var v -> do_find v
-	      in
-		try
-		  let new_si = match e with
-		    | Val x ->
-			val2si x
-		    | BinOp(op, x, y) ->
-			let f = binop_to_si_function op in
-			let k = bits_of_val x in
-			let r = f k (val2si x) (val2si y) in
-			  SI.check_reduced k r;
-			  r
-		    | UnOp(op, x) ->
-			let f = unop_to_si_function op in
-			let k = bits_of_val x in
-			let r = f k (val2si x) in
-			  SI.check_reduced k r;
-			  r
-		    | Phi(x::xs) ->
-			List.fold_left
-			  (fun i y -> SI.union i (do_find y))
-			  (do_find x) xs
-		    | Phi [] ->
-			failwith "Encountered empty Phi expression"
+		| BinOp(op, x, y) ->
+		  let f = binop_to_si_function op in
+		  let k = bits_of_exp x in
+		  let r = f k (exp2si x) (exp2si y) in
+		  SI.check_reduced k r;
+		  r
+		| UnOp(op, x) ->
+		  let f = unop_to_si_function op in
+		  let k = bits_of_exp x in
+		  let r = f k (exp2si x) in
+		  SI.check_reduced k r;
+		  r
+		| Phi(x::xs) ->
+		  List.fold_left
+		    (fun i y -> SI.union i (do_find y))
+		    (do_find x) xs
+		| Phi [] ->
+		  failwith "Encountered empty Phi expression"
 
-(* This tries to preserve strides for loop variables, but takes too long, and
-   wasn't working.
-		    | Phi xs ->
-			let res = List.fold_left
-			  (fun res y ->
-			     try let l = find y in
-			       match res with None -> Some l
-				 | Some l' -> Some(SI.union l l')
-			     with Not_found -> res
-			  )
-			  None xs
-			in
-			  (match res with
-			     | Some l -> l
-			     | None -> raise Not_found
-			  )
-*)
-		    | Cast(CAST_SIGNED, _, vl) ->
-			val2si vl
-(* This can result in non-reduced SIs currently 
-		    | Cast(CAST_UNSIGNED, t, vl) ->
-			let k = bits_of_val vl
-			and k' = bits_of_width t
-			and (s,a,b) as si = val2si vl in
-			let d = 64-k in
-			let f x = I.shift_right_logical(I.shift_left x d) d in
-			  if k <> 64 && k <> k' then
-			    (s, f a, f b)
-			  else si
-*)
-		    | Cast(CAST_HIGH, t, vl) ->
-			let k = bits_of_val vl
-			and k' = bits_of_width t
-			and (k'',s,a,b) as si = val2si vl in
-                        assert (k=k'');
-			let f x = I.shift_right x (k' - k) in
-			  if k' <> k then
-			    (k', s, f a, f b)
-			  else si
-		    | Cast(CAST_LOW, t, vl) ->
-			raise(Unimplemented "FIXME")
-		    | _ ->
-			raise(Unimplemented "unimplemented expression type")
-		  in
-		    if try VM.find v l <> new_si with Not_found -> true then (
-		      dprintf "adding %s = %s" (Pp.var_to_string v) (SI.to_string new_si);
-		      VM.add v new_si l )
-		    else l
-		with Unimplemented _ | Invalid_argument _ ->
-		  VM.add v (top v) l
+                    (* This tries to preserve strides for loop variables, but takes too long, and
+                       wasn't working.
+		       | Phi xs ->
+		       let res = List.fold_left
+		       (fun res y ->
+		       try let l = find y in
+		       match res with None -> Some l
+		       | Some l' -> Some(SI.union l l')
+		       with Not_found -> res
+		       )
+		       None xs
+		       in
+		       (match res with
+		       | Some l -> l
+		       | None -> raise Not_found
+		       )
+                    *)
+		| Cast(CAST_SIGNED, _, vl) ->
+		  exp2si vl
+                    (* This can result in non-reduced SIs currently 
+		       | Cast(CAST_UNSIGNED, t, vl) ->
+		       let k = bits_of_val vl
+		       and k' = bits_of_width t
+		       and (s,a,b) as si = val2si vl in
+		       let d = 64-k in
+		       let f x = I.shift_right_logical(I.shift_left x d) d in
+		       if k <> 64 && k <> k' then
+		       (s, f a, f b)
+		       else si
+                    *)
+		| Cast(CAST_HIGH, t, vl) ->
+		  let k = bits_of_exp vl
+		  and k' = bits_of_width t
+		  and (k'',s,a,b) as si = exp2si vl in
+                  assert (k=k'');
+		  let f x = I.shift_right x (k' - k) in
+		  if k' <> k then
+		    (k', s, f a, f b)
+		  else si
+		| Cast(CAST_LOW, t, vl) ->
+		  raise(Unimplemented "FIXME")
+		| _ ->
+		  raise(Unimplemented "unimplemented expression type"))
+                with Unimplemented _ | Invalid_argument _ ->
+                  top v
+	      in
+              let new_si = exp2si e in
+	      if try VM.find v l <> new_si with Not_found -> true then (
+		dprintf "adding %s = %s" (Pp.var_to_string v) (SI.to_string new_si);
+		VM.add v new_si l )
+		else l
 	    with Invalid_argument _ | Not_found ->
 	      l
 
@@ -716,37 +710,33 @@ struct
 	    try
 	      let find v = VM.find v l in
 	      let do_find v =  try find v with Not_found -> VS.top in
-	      let val2vs = function
+              let rec exp2vs e =
+		try (match e with
 		| Int(i,t) -> VS.of_bap_int (int64_of_big_int i) t
 		| Lab _ -> raise(Unimplemented "No VS for labels (should be a constant)")
 		| Var v -> do_find v
+		| BinOp(op, x, y) ->
+		  let f = binop_to_vs_function op in
+		  let k = SimpleVSA.DFP.bits_of_exp x in
+		  f k (exp2vs x) (exp2vs y)
+		| UnOp(op, x) ->
+		  let f = unop_to_vs_function op in
+		  let k = SimpleVSA.DFP.bits_of_exp x in
+		  f k (exp2vs x)
+		| Phi(x::xs) ->
+		  List.fold_left
+		    (fun i y -> VS.union i (do_find y))
+		    (do_find x) xs
+		| Phi [] ->
+		  failwith "Encountered empty Phi expression"
+		| Cast _ ->
+		  raise(Unimplemented "FIXME")
+		| _ ->
+		  raise(Unimplemented "unimplemented expression type"))
+                with Unimplemented _ | Invalid_argument _ -> VS.top
 	      in
-		try
-		  let new_vs = match e with
-		    | Val x ->
-			val2vs x
-		    | BinOp(op, x, y) ->
-			let f = binop_to_vs_function op in
-			let k = SimpleVSA.DFP.bits_of_val x in
-			  f k (val2vs x) (val2vs y)
-		    | UnOp(op, x) ->
-			let f = unop_to_vs_function op in
-			let k = SimpleVSA.DFP.bits_of_val x in
-			  f k (val2vs x)
-		    | Phi(x::xs) ->
-			List.fold_left
-			  (fun i y -> VS.union i (do_find y))
-			  (do_find x) xs
-		    | Phi [] ->
-			failwith "Encountered empty Phi expression"
-		    | Cast _ ->
-			raise(Unimplemented "FIXME")
-		    | _ ->
-			raise(Unimplemented "unimplemented expression type")
-		  in
-		    VM.add v new_vs l
-		with Unimplemented _ | Invalid_argument _ ->
-		  VM.add v VS.top l
+              let new_vs = exp2vs e in
+	      VM.add v new_vs l
 	    with Invalid_argument _ | Not_found ->
 	      l
 
@@ -870,10 +860,10 @@ module AbsEnv = struct
       | _ -> VS.top
     with Not_found -> VS.top
 
-  let ssaval2vs ae = function
-    | Int(i,t) -> VS.of_bap_int (int64_of_big_int i) t
-    | Lab _ -> raise(Unimplemented "No VS for labels (should be a constant)")
-    | Var v -> do_find_vs ae v
+  (* let ssaval2vs ae = function *)
+  (*   | Int(i,t) -> VS.of_bap_int (int64_of_big_int i) t *)
+  (*   | Lab _ -> raise(Unimplemented "No VS for labels (should be a constant)") *)
+  (*   | Var v -> do_find_vs ae v *)
 
   let do_find_ae ae v =
     try match VM.find v ae with
@@ -967,75 +957,69 @@ struct
 		  | _ -> VS.top
 		with Not_found -> VS.top
 	      in
-	      let val2vs = function
-		| Int(i,t)->
-		      VS.of_bap_int (int64_of_big_int i) t
-		| Lab _ -> raise(Unimplemented "No VS for labels (should be a constant)")
-		| Var v -> do_find v
-	      in
 	      let do_find_ae v =
 		try match VM.find v l with
 		  | `Array ae -> ae
 		  | _ -> AllocEnv.top
 		with  Not_found -> AllocEnv.top
 	      in
-	      match Var.typ v with
-	      | Reg _ -> (
-		  try
-		    let new_vs = match e with
-		      | Val x ->
-			  val2vs x
-		      | BinOp(op, x, y) ->
-			  let f = RegionVSA.DFP.binop_to_vs_function op in
-			  let k = SimpleVSA.DFP.bits_of_val x in
-			    f k (val2vs x) (val2vs y)
-		      | UnOp(op, x) ->
-			  let f = RegionVSA.DFP.unop_to_vs_function op in
-			  let k = SimpleVSA.DFP.bits_of_val x in
-			    f k (val2vs x)
-		      | Phi(x::xs) ->
-			  List.fold_left
-			    (fun i y -> VS.union i (do_find y))
-			    (do_find x) xs
-		      | Phi [] ->
-			  failwith "Encountered empty Phi expression"
-		      | Load(Var m, i, _e, _t) ->
+              let rec exp2vs e =
+	        match Var.typ v with
+	        | Reg _ -> (
+		  let new_vs = try match e with
+		  | Int(i,t)->
+		    VS.of_bap_int (int64_of_big_int i) t
+		  | Lab _ -> raise(Unimplemented "No VS for labels (should be a constant)")
+		  | Var v -> do_find v
+		  | BinOp(op, x, y) ->
+		    let f = RegionVSA.DFP.binop_to_vs_function op in
+		    let k = SimpleVSA.DFP.bits_of_exp x in
+		    f k (exp2vs x) (exp2vs y)
+		  | UnOp(op, x) ->
+		    let f = RegionVSA.DFP.unop_to_vs_function op in
+		    let k = SimpleVSA.DFP.bits_of_exp x in
+		    f k (exp2vs x)
+		  | Phi(x::xs) ->
+		    List.fold_left
+		      (fun i y -> VS.union i (do_find y))
+		      (do_find x) xs
+		  | Phi [] ->
+		    failwith "Encountered empty Phi expression"
+		  | Load(Var m, i, _e, _t) ->
 			  (* FIXME: assumes deendianized.
 			     ie: _e and _t should be the same for all loads and
 			     stores of m. *)
-			  AllocEnv.read (do_find_ae m) (val2vs i)
-		      | Cast _ ->
-			  raise(Unimplemented "FIXME")
-		      | _ ->
-			  raise(Unimplemented "unimplemented expression type")
-		    in
-		      VM.add v (`Scalar new_vs) l
-		  with Unimplemented _ | Invalid_argument _ ->
-		    VM.add v (`Scalar VS.top) l
+		    AllocEnv.read (do_find_ae m) (exp2vs i)
+		  | Cast _ ->
+		    raise(Unimplemented "FIXME")
+		  | _ ->
+		    raise(Unimplemented "unimplemented expression type")
+                  with Unimplemented _ | Invalid_argument _ -> VS.top
+                  in `Scalar new_vs
 		)
-	      | TMem _ | Array _ -> (
-		  try
-		    let new_ae = match e with
-		      | Val(Var x) ->
-			  do_find_ae x
-		      | Store(Var m,i,v,_e,_t) ->
+	        | TMem _ | Array _ -> (
+		  let new_vs = try match e with
+		  | Var v ->
+		    do_find_ae v
+		  | Store(Var m,i,v,_e,_t) ->
 			  (* FIXME: assumes deendianized.
 			     ie: _e and _t should be the same for all loads and
 			     stores of m. *)
-			  AllocEnv.write (do_find_ae m) (val2vs i) (val2vs v)
-		      | Phi(x::xs) ->
-			  List.fold_left
-			    (fun i y -> AllocEnv.union i (do_find_ae y))
-			    (do_find_ae x) xs
-		      | Phi [] ->
-			  failwith "Encountered empty Phi expression"
-		      | _ ->
-			  raise(Unimplemented "unimplemented memory expression type")
-		    in
-		      VM.add v (`Array new_ae) l
-		  with Unimplemented _ | Invalid_argument _ ->
-		    VM.add v (`Array AllocEnv.top) l
+		    AllocEnv.write (do_find_ae m) (exp2vs i) (exp2vs v)
+		  | Phi(x::xs) ->
+		    List.fold_left
+		      (fun i y -> AllocEnv.union i (do_find_ae y))
+		      (do_find_ae x) xs
+		  | Phi [] ->
+		    failwith "Encountered empty Phi expression"
+		  | _ ->
+		    raise(Unimplemented "unimplemented memory expression type")
+                  with Unimplemented _ | Invalid_argument _ -> AllocEnv.top
+                  in `Array new_vs
 		)
+              in
+              let new_vs = exp2vs e in
+              VM.add v new_vs l
 	    with Invalid_argument _ | Not_found ->
 	      l
 

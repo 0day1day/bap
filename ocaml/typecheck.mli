@@ -9,7 +9,7 @@ exception TypeError of string
 (** {3 Type inference of expressions} *)
 
 val infer_ast : ?check:bool -> Ast.exp -> Type.typ
-(** [infer_ast e] returns the type of the expression [e].
+(** [infer_ast e] returns the type of the AST {!Ast.exp} expression [e].
 
     @param check If check is set, performs type checking on [e]. This
     parameter is deprecated.
@@ -17,6 +17,9 @@ val infer_ast : ?check:bool -> Ast.exp -> Type.typ
     @raise TypeError if [check] is set and the expression does not
     type check.
 *)
+
+val infer_ssa : Ssa.exp -> Type.typ
+(** [infer_ssa e] returns the type of the {!Ssa.exp} expression [e]. *)
 
 (** {3 Type checking} *)
 

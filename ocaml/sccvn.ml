@@ -51,16 +51,18 @@ module Dom = Dominator.Make(G)
 type vn = Top | Hash of Ssa.var | HInt of (big_int * typ)
 let top = Top
 type expid =
-  | Const of Ssa.value (* Except Var *)
+  | Ld of vn * vn * vn * typ
+  | St of vn * vn * vn * vn * typ
+  | Bin of binop_type * vn * vn
+  | Un of unop_type * vn
+  (* No vars *)
+  | Const of Ssa.exp (* Integers and labels *)
+  | Cst of cast_type * typ * vn
+  (* Unknowns are in Unique *)
   | It of vn * vn * vn
   | Ex of big_int * big_int * vn
   | Con of vn * vn
-  | Bin of binop_type * vn * vn
-  | Un of unop_type * vn
-  | Cst of cast_type * typ * vn
   | Unique of var (* for free variables and unknowns *)
-  | Ld of vn * vn * vn * typ
-  | St of vn * vn * vn * vn * typ
   | Ph of vn list
 
 let vn_compare vn1 vn2 = match vn1,vn2 with
@@ -82,57 +84,57 @@ let (==!) = vn_eq
 let (<=!) vn1 vn2 = vn_compare vn1 vn2 <= 0
 let (<>!) v1 v2 = not (vn_eq v1 v2)
 
-let expid_eq e1 e2 =
-  (* values, vns, bops, uops, types, cts, vars, big ints *)
-  let getnum = function
-    | Const _ -> 1
-    | It _ -> 2
-    | Ex _ -> 3
-    | Con _ -> 4
-    | Bin _ -> 5
-    | Un _ -> 6
-    | Cst _ -> 7
-    | Unique _ -> 8
-    | Ld _ -> 9
-    | St _ -> 10
-    | Ph _ -> 11
-  in
-  let getargs = function
-    | Const(v) -> [v], [], [], [], [], [], [], []
-    | It(vn1,vn2,vn3) -> [], [vn1;vn2;vn3], [], [], [], [], [], []
-    | Ex(bi1,bi2,vn1) -> [], [vn1], [], [], [], [], [], [bi1;bi2]
-    | Con(vn1,vn2) -> [], [vn1;vn2], [], [], [], [], [], []
-    | Bin(bop, vn1, vn2) -> [], [vn1; vn2], [bop], [], [], [], [], []
-    | Un(uop, vn) -> [], [vn], [], [uop], [], [], [], []
-    | Cst(ct, t, vn) -> [], [vn], [], [], [t], [ct], [], []
-    | Unique(var) -> [], [], [], [], [], [], [var], []
-    | Ld(vn1, vn2, vn3, t) -> [], [vn1; vn2; vn3], [], [], [t], [], [], []
-    | St(vn1, vn2, vn3, vn4, t) -> [], [vn1; vn2; vn3; vn4], [], [], [t], [], [], []
-    | Ph(vnlist) -> [], vnlist, [], [], [], [], [], []
-  in
-  if (getnum e1) <> (getnum e2) then false
-  else (
-    let l1,l2,l3,l4,l5,l6,l7,l8 = getargs e1 in
-    let r1,r2,r3,r4,r5,r6,r7,r8 = getargs e2 in
-    let phil = (List.length l2) == (List.length r2) in
-    let b1 = List.for_all2 (==) l1 r1 in
-    let b2 = if phil then List.for_all2 (==) l2 r2 else false in
-    let b3 = List.for_all2 (=) l3 r3 in
-    let b4 = List.for_all2 (=) l4 r4 in
-    let b5 = List.for_all2 (=) l5 r5 in
-    let b6 = List.for_all2 (=) l6 r6 in
-    let b7 = List.for_all2 (=) l7 r7 in
-    let b8 = List.for_all2 (==%) l8 r8 in
-    if b1 & b2 & b3 & b4 & b5 & b6 & b7 & b8 then
-      true
-    else if b3 & b4 & b5 & b6 & b7 & b8 then
-      (* e1 and e2 are not physically equal.  But maybe the
-         subexpressions are structurally, but not physically,
-         equal. *)
-      List.for_all2 Ssa.full_value_eq l1 r1
-      && if phil then List.for_all2 vn_eq l2 r2 else false
-    else
-      false)
+let expid_eq e1 e2 = e1 = e2
+  (* (\* values, vns, bops, uops, types, cts, vars, big ints *\) *)
+  (* let getnum = function *)
+  (*   | Const _ -> 1 *)
+  (*   | It _ -> 2 *)
+  (*   | Ex _ -> 3 *)
+  (*   | Con _ -> 4 *)
+  (*   | Bin _ -> 5 *)
+  (*   | Un _ -> 6 *)
+  (*   | Cst _ -> 7 *)
+  (*   | Unique _ -> 8 *)
+  (*   | Ld _ -> 9 *)
+  (*   | St _ -> 10 *)
+  (*   | Ph _ -> 11 *)
+  (* in *)
+  (* let getargs = function *)
+  (*   | Const(v) -> [v], [], [], [], [], [], [], [] *)
+  (*   | It(vn1,vn2,vn3) -> [], [vn1;vn2;vn3], [], [], [], [], [], [] *)
+  (*   | Ex(bi1,bi2,vn1) -> [], [vn1], [], [], [], [], [], [bi1;bi2] *)
+  (*   | Con(vn1,vn2) -> [], [vn1;vn2], [], [], [], [], [], [] *)
+  (*   | Bin(bop, vn1, vn2) -> [], [vn1; vn2], [bop], [], [], [], [], [] *)
+  (*   | Un(uop, vn) -> [], [vn], [], [uop], [], [], [], [] *)
+  (*   | Cst(ct, t, vn) -> [], [vn], [], [], [t], [ct], [], [] *)
+  (*   | Unique(var) -> [], [], [], [], [], [], [var], [] *)
+  (*   | Ld(vn1, vn2, vn3, t) -> [], [vn1; vn2; vn3], [], [], [t], [], [], [] *)
+  (*   | St(vn1, vn2, vn3, vn4, t) -> [], [vn1; vn2; vn3; vn4], [], [], [t], [], [], [] *)
+  (*   | Ph(vnlist) -> [], vnlist, [], [], [], [], [], [] *)
+  (* in *)
+  (* if (getnum e1) <> (getnum e2) then false *)
+  (* else ( *)
+  (*   let l1,l2,l3,l4,l5,l6,l7,l8 = getargs e1 in *)
+  (*   let r1,r2,r3,r4,r5,r6,r7,r8 = getargs e2 in *)
+  (*   let phil = (List.length l2) == (List.length r2) in *)
+  (*   let b1 = List.for_all2 (==) l1 r1 in *)
+  (*   let b2 = if phil then List.for_all2 (==) l2 r2 else false in *)
+  (*   let b3 = List.for_all2 (=) l3 r3 in *)
+  (*   let b4 = List.for_all2 (=) l4 r4 in *)
+  (*   let b5 = List.for_all2 (=) l5 r5 in *)
+  (*   let b6 = List.for_all2 (=) l6 r6 in *)
+  (*   let b7 = List.for_all2 (=) l7 r7 in *)
+  (*   let b8 = List.for_all2 (==%) l8 r8 in *)
+  (*   if b1 & b2 & b3 & b4 & b5 & b6 & b7 & b8 then *)
+  (*     true *)
+  (*   else if b3 & b4 & b5 & b6 & b7 & b8 then *)
+  (*     (\* e1 and e2 are not physically equal.  But maybe the *)
+  (*        subexpressions are structurally, but not physically, *)
+  (*        equal. *\) *)
+  (*     List.for_all2 Ssa.full_value_eq l1 r1 *)
+  (*     && if phil then List.for_all2 vn_eq l2 r2 else false *)
+  (*   else *)
+  (*     false) *)
 
 module EH =
   Hashtbl.Make(struct
@@ -233,11 +235,12 @@ let get_expid info =
         with Not_found ->
           failwith("get_expid: unknown var: "^Pp.var_to_string x)
       )
+    | _ -> failwith "SCCVN run with-out three address code"
   in
   fun var -> function
-    | Val(Var _ as v) ->
-        vn2eid info (vn v) 
-    | Val v -> Const v
+    | Var _ as e ->
+        vn2eid info (vn e)
+    | (Int _ | Lab _) as c -> Const c
     | Ite(c,v1,v2) -> It(vn c, vn v1, vn v2)
     | Extract(h,l,e) -> Ex(h,l, vn e)
     | Concat(le,re) -> Con(vn le, vn re)
@@ -518,27 +521,25 @@ let replacer ?(opt=true) cfg =
     inherit Ssa_visitor.nop
     val mutable pos = (C.G.V.create Cfg.BB_Entry, 0)
     method set_pos p = pos <- p
-    method visit_value = function
+    method visit_exp = function
       | Ssa.Var v ->
           (match hash_replacement pos (vn v) with
            | Some(Ssa.Var var) when v == var -> SkipChildren
            | Some v' ->
                changed := true;
-               dprintf "Replacing var %s with %s" (Pp.var_to_string v) (Pp.value_to_string v');
+               dprintf "Replacing var %s with %s" (Pp.var_to_string v) (Pp.ssa_exp_to_string v');
                ChangeTo v'
            | None -> SkipChildren
           )
       | _  -> SkipChildren
 
     method visit_stmt = function
-      | Ssa.Move(_,Val _, _) -> (* visit value will handle that properly *)
-          DoChildren
-      | Ssa.Move(v,e, a) -> (
+      | Ssa.Move(v,e,a) -> (
           match hash_replacement pos (vn v) with
           | Some vl ->
               changed := true;
-              dprintf "Replacing exp %s with %s" (Pp.ssa_exp_to_string e) (Pp.value_to_string vl);
-              ChangeTo(Move(v, Val vl, a))
+              dprintf "Replacing exp %s with %s" (Pp.ssa_exp_to_string e) (Pp.ssa_exp_to_string vl);
+              ChangeTo(Move(v, vl, a))
           | None -> DoChildren
         )
       | _ -> DoChildren

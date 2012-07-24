@@ -324,78 +324,72 @@ object (self)
     Format.pp_force_newline ft ();
     cls();
 
-
-  method ssa_value = function
-    | Ssa.Int(i,t) ->
-        self#int i t
-    | Ssa.Var v ->
-	self#var v
-    | Ssa.Lab lab ->
-	pc '"'; pp lab; pc '"'
-
   method ssa_endian = function
     | Ssa.Int(bi, Reg 1) when bi_is_zero bi -> pp "e_little";
     | Ssa.Int(bi, Reg 1) when bi_is_one bi -> pp "e_big"
-    | x -> self#ssa_value x
+    | x -> self#ssa_exp x
 
   method ssa_exp e =
     opn 0;
     (match e with
      | Ssa.Load(arr,idx,edn, t) ->
-	 self#ssa_value arr;
-	 pp "["; self#ssa_value idx; comma(); self#ssa_endian edn; pp "]";
-	 (* FIXME: check type of arr *)
+	 self#ssa_exp arr;
+	 pp "["; self#ssa_exp idx; comma(); self#ssa_endian edn; pp "]";
 	 pp ":"; self#typ t;
      | Ssa.Store(arr,idx,vl, edn, t) ->
-	 self#ssa_value arr;
+	 self#ssa_exp arr;
 	 pp " with"; space();
-	 pp "["; self#ssa_value idx;
+	 pp "["; self#ssa_exp idx;
 	 comma(); self#ssa_endian edn;
 	 pp "]:"; self#typ t;
 	 pp " ="; space();
-	 self#ssa_value vl
+	 self#ssa_exp vl
+     | Ssa.BinOp(b, x, y) ->
+	 self#ssa_exp x;
+	 pp " "; pp (binop_to_string b); space();
+	 self#ssa_exp y;
+     | Ssa.UnOp(u, x) ->
+	 pp (unop_to_string u); self#ssa_exp x;
+     | Ssa.Var v ->
+         self#var v
+     | Ssa.Lab lab ->
+         pc '"'; pp lab; pc '"'
+     | Ssa.Int(i,t) ->
+         self#int i t
+     | Ssa.Cast(ct,t,v) ->
+         pp (ct_to_string ct);
+	 pp ":"; self#typ t;
+	 pp "("; self#ssa_exp v; pp ")"
+     | Ssa.Unknown(s,t) ->
+	 pp "unknown \""; pp s; pp "\":"; self#typ t
      | Ssa.Ite(c, x, y) ->
 	 pp "if";
 	 space ();
-	 self#ssa_value c;
+	 self#ssa_exp c;
 	 space ();
 	 pp "then";
 	 space ();
-	 self#ssa_value x;
+	 self#ssa_exp x;
 	 space ();
 	 pp "else";
 	 space ();
-	 self#ssa_value y	 
+	 self#ssa_exp y	 
      | Ssa.Extract(h, l, e) ->
 	 pp "extract:";
 	 pp (string_of_big_int h);
 	 pc ':';
 	 pp (string_of_big_int l);
 	 pp ":[";
-	 self#ssa_value e;
+	 self#ssa_exp e;
 	 pc ']';
      | Ssa.Concat(lv, rv) ->
 	 pp "concat:[";
-	 self#ssa_value lv;
+	 self#ssa_exp lv;
 	 pp "][";
-	 self#ssa_value rv;
+	 self#ssa_exp rv;
 	 pc ']'
-     | Ssa.BinOp(b, x, y) ->
-	 self#ssa_value x;
-	 pp " "; pp (binop_to_string b); space();
-	 self#ssa_value y;
-     | Ssa.UnOp(u, x) ->
-	 pp (unop_to_string u); self#ssa_value x;
-     | Ssa.Val v ->
-	 self#ssa_value v
-     | Ssa.Cast(ct,t,v) ->
-	 pp (ct_to_string ct);
-	 pp ":"; self#typ t;
-	 pp "("; self#ssa_value v; pp ")"
-     | Ssa.Unknown(s,t) ->
-	 pp "unknown \""; pp s; pp "\":"; self#typ t
      | Ssa.Phi [] ->
-	 pp "(ERROR: Empty phi)"
+         failwith "Cannot print empty phi expression"
      | Ssa.Phi(x::xs) ->
 	 pp "phi(";
 	 self#var x;
@@ -414,13 +408,13 @@ object (self)
 	self#attrs a
     | Ssa.Jmp(v,a) ->
 	pp "jmp ";
-	self#ssa_value v;
+	self#ssa_exp v;
 	self#attrs a
     | Ssa.CJmp(c,t,f,a) ->
 	pp "cjmp"; space();
-	self#ssa_value c; comma();
-	self#ssa_value t; comma();
-	self#ssa_value f;
+	self#ssa_exp c; comma();
+	self#ssa_exp t; comma();
+	self#ssa_exp f;
 	self#attrs a
     | Ssa.Label(l,a) ->
 	(match l with
@@ -430,11 +424,11 @@ object (self)
 	self#attrs a
     | Ssa.Halt(v,a) ->
 	pp "halt ";
-	self#ssa_value v;
+	self#ssa_exp v;
 	self#attrs a
     | Ssa.Assert(v,a) ->
 	pp "assert ";
-	self#ssa_value v;
+	self#ssa_exp v;
 	self#attrs a
     | Ssa.Comment(s,a) ->
 	pp "/*";
@@ -494,7 +488,6 @@ let make_varctx () =
 
 (* These functions will not remember variable names across separate
    invocations *)
-let value_to_string = pp2string (fun p -> p#ssa_value)
 let label_to_string = pp2string (fun p -> p#label)
 let ssa_exp_to_string = pp2string (fun p -> p#ssa_exp)
 let ssa_stmt_to_string = pp2string (fun p -> p#ssa_stmt)
@@ -506,7 +499,6 @@ let ast_stmt_to_string = pp2string (fun p -> p#ast_stmt)
 
    XXX: Create pp.mli so that callers do not know type of ctx
 *)
-let value_to_string_in_varctx ctx = pp2string_with_pp ctx (fun p -> p#ssa_value)
 let label_to_string_in_varctx ctx = pp2string_with_pp ctx (fun p -> p#label)
 let ssa_exp_to_string_in_varctx ctx = pp2string_with_pp ctx (fun p -> p#ssa_exp)
 let ssa_stmt_to_string_in_varctx ctx = pp2string_with_pp ctx (fun p -> p#ssa_stmt)
