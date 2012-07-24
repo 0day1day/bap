@@ -76,7 +76,10 @@ let of_prog ?(special_error = true) p =
             just silently use the old block.  If not, raise an
             exception because we are defining a label twice. *)
          if full_stmts_eq stmts ostmts then
-           Some(v) else failwith (Printf.sprintf "Duplicate label usage: label %s" (Pp.label_to_string l))
+           Some(v) 
+         else 
+           failwith (Printf.sprintf "Duplicate label usage: label %s" 
+                       (Pp.label_to_string l))
        with Not_found -> None) (* The label does not exist *)
     | _ -> None
   in

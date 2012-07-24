@@ -1594,9 +1594,6 @@ end
 (* end *)
 
 module type TraceSymbolicRun =
-  (* functor (Tune: EvalTune) -> *)
-  (*   functor (Assign: Assign) -> *)
-  (*     functor (Form: StreamFormula) -> *)
 sig
   type init
   type output
