@@ -609,17 +609,19 @@ struct
 	 else no
 
   let union x y =
-    let h = Hashtbl.create (List.length x + List.length y) in
-    let add (r,si) =
-      try Hashtbl.replace h r (SI.union (Hashtbl.find h r) si)
-      with Not_found ->
-	Hashtbl.add h r si
-    in
+    if x = top || y = top then top else
+      let h = Hashtbl.create (List.length x + List.length y) in
+      let add (r,si) =
+        try Hashtbl.replace h r (SI.union (Hashtbl.find h r) si)
+        with Not_found ->
+	  Hashtbl.add h r si
+      in
       List.iter add x;
       List.iter add y;
       Hashtbl.fold (fun k v r -> (k,v)::r) h []
 
   let widen x y =
+    if x = top || y = top then top else
     let h = Hashtbl.create (List.length x + List.length y) in
     let add (r,si) =
       try Hashtbl.replace h r (SI.widen (Hashtbl.find h r) si)
