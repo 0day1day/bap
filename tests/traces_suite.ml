@@ -11,7 +11,7 @@ let tag = "pin_suite";;
 
 let create_input_file _ =
   let out = open_out taint_file in
-  output_string out "helloooooooooooooooooooooo\n";
+  output_string out "helloooooooooooooooooooooooo\n";
   close_out out;;
 
 
