@@ -50,9 +50,9 @@ end
     anything. This visitor can be inherited from to build a new one. *)
 class nop : t
 
-(** {9 Accept functions} *)
+(** {3 Accept functions} *)
 
-(** Visit a label *)
+(** Visit a label definition *)
 val label_accept : #t -> label -> label
 
 (** Visit a referenced variable *)
