@@ -26,6 +26,10 @@ let rec uint64_gcd x y =
   if y = 0L then x
   else uint64_gcd y (int64_urem x y)
 
+let uint64_lcm x y =
+  let m = Int64.mul x y in
+  Int64.div m (uint64_gcd x y)
+
 module I = Int64
 (* some operators to make this more readable *)
 let (&%) = I.logand
@@ -75,8 +79,8 @@ struct
   let single k x = (k,0L,x,x)
   let of_bap_int i t = single (bits_of_width t) (extend (bits_of_width t) i)
 
-  let above k i = (k, 1L, x, maxi k)
-  let below k i = (k, 1L, mini k, x)
+  let above k x = (k, 1L, x, maxi k)
+  let below k x = (k, 1L, mini k, x)
 
   let zero k = single k 0L
   let one k = single k 1L
@@ -331,6 +335,17 @@ struct
   let union x y =
     let (k,a,b,c) as res = union x y in
       if b = c then (k,0L,b,b) else (check_reduced k res; res)
+
+  let intersection (k,s1,a,b) (k',s2,c,d) =
+    if k <> k' then failwith "intersection: expected same bitwidth intervals";
+    let s' = uint64_lcm s1 s2 in
+    let l = min a c
+    and u = max b d in
+  (* If l mod s1 = 0 and l mod s2 = 0, then we have a stride from l
+     to u - u rem s' with stride s'.
+
+     Else, set stride to 1 and use l to u. *)
+    ()
 
   let widen (k,s1,a,b) (k',s2,c,d) =
     if k <> k' then failwith "widen: expected same bitwidth intervals";
