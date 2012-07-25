@@ -797,14 +797,17 @@ struct
       create_formula exp_true bindings
 end
 
-(* module StreamForm =  *)
-(* struct  *)
-(*   type t = Ast.exp *)
+(* module LetBindStreamForm = *)
+(* struct *)
+(*   type t = {printer : Formulap.fpp_oc; form_t : Ast.exp} *)
+(*   type init = Formulap.fpp_oc *)
+(*   type output = unit *)
 
-(*   let true_formula = exp_true *)
+(*   let init printer = {printer=printer; form_t=exp_true} *)
 (*   (\* How do you add a new assertion that two things are equal? *)
 (*      How do you add a new let binding? *)
 (*   *\) *)
+
 (*   let add_to_formula formula expression typ = *)
 (*     (match expression, typ with *)
 (*       | _, Equal -> *)
@@ -814,7 +817,8 @@ end
 (*      | _ -> failwith "internal error: adding malformed constraint to formula" *)
 (*     ) *)
 
-(*   let output_formula e = e *)
+(*   let output_formula e =  *)
+(*     #letmeend *)
 (* end *)
 
 (** Older Formulas build up formula before printing out but this functor makes 

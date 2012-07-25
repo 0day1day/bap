@@ -1872,7 +1872,8 @@ module TraceSymbolicNoSub =
   TraceSymbolicFunc(FastEval)(PredAssignTraces)(LetBindStream);;
 module TraceSymbolicNoSubOpt = 
   TraceSymbolicFunc(SlowEval)(PredAssignTraces)(LetBindStream);;
-module TraceSymbolicSub = TraceSymbolicFunc(SlowEval)(StdAssign)(LetBindStream);;
+module TraceSymbolicSub = 
+  TraceSymbolicFunc(SlowEval)(StdAssign)(LetBindStream);;
 
 
 (** SWXXX Should this go somewhere else too? *)
