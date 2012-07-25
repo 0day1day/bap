@@ -75,6 +75,9 @@ struct
   let single k x = (k,0L,x,x)
   let of_bap_int i t = single (bits_of_width t) (extend (bits_of_width t) i)
 
+  let above k i = (k, 1L, x, maxi k)
+  let below k i = (k, 1L, mini k, x)
+
   let zero k = single k 0L
   let one k = single k 1L
   let minus_one k = single k (-1L)
@@ -555,6 +558,8 @@ struct
   let one k = [(global, SI.one k)]
   let minus_one k = [(global, SI.minus_one k)]
 
+  let above k i = [(global, SI.above k i)]
+  let below k i = [(global, SI.below k i)]
 
   let add k x y = match (x,y) with
     | ([r2,si2],[r1,si1]) when r1 == global ->
