@@ -84,8 +84,6 @@ object (self)
 
   val mutable let_counter = 0;
 
-  val mutable let_type = BitVec;
-
   method bool_to_bv e =
     let pe = self#ast_exp_bool_base e in
     let ptrue = self#ast_exp_base exp_true in
@@ -134,10 +132,10 @@ object (self)
     formulas in utils/streamtrans.ml *)
   method letmebegin v e1 e2 st =
     let t1 = Typecheck.infer_ast ~check:false e1 in
-    let cmd,c,pf=
+    let cmd,c,pf,vst=
       match t1,!use_booleans with
-        | Reg 1,true -> (self#setlettype Bool; "flet","$",self#ast_exp_bool)
-        | _ -> (self#setlettype BitVec; "let","?",self#ast_exp)
+        | Reg 1,true -> "flet","$",self#ast_exp_bool,Bool
+        | _ -> "let","?",self#ast_exp,BitVec
     in
     (* The print functions called, ast_exp and ast_exp_bool never
        raise No_rule. So, we don't need to evaluate them before the lazy
@@ -151,8 +149,8 @@ object (self)
       pc ' ';
       pf e1;
       pc ')';
-      space ()
-    
+      space ();
+      self#extend v s vst
 
   method letmeend v e1 e2 st =
     let pf2 =
@@ -160,15 +158,10 @@ object (self)
         | Bool -> self#ast_exp_bool
         | BitVec -> self#ast_exp
     in
-      self#extend v s let_type;
       pf2 e2;
       self#unextend v;
       cut ();
-      pc ')'
-    
-
-  method setlettype t = 
-    let_type <- t
+      pc ')'    
 
   (** Returns a lazy expression that prints let v = e1 in e2. Never raises 
       No_rule. *)
@@ -177,37 +170,6 @@ object (self)
       self#letmebegin v e1 e2 st;
       self#letmeend v e1 e2 st
     )
-    (* let t1 = Typecheck.infer_ast ~check:false e1 in *)
-    (* let cmd,c,pf,vst =  *)
-    (*   match t1,!use_booleans with  *)
-    (*     | Reg 1,true -> "flet","$",self#ast_exp_bool,Bool  *)
-    (*     | _ -> "let","?",self#ast_exp,BitVec  *)
-    (* in *)
-    (* let pf2 =  *)
-    (*   match st with  *)
-    (*     | Bool -> self#ast_exp_bool  *)
-    (*     | BitVec -> self#ast_exp  *)
-    (* in *)
-    (* (\* The print functions called, ast_exp and ast_exp_bool never *)
-    (*    raise No_rule. So, we don't need to evaluate them before the lazy *)
-    (*    block. *\) *)
-    (* lazy( *)
-    (*   pp "("; pp cmd; pp " ("; *)
-    (*   (\* v isn't allowed to shadow anything. also, smtlib requires it be  *)
-    (*      prefixed with ? or $ *\) *)
-    (*   let s = c ^ var2s v ^"_"^ string_of_int let_counter in *)
-    (*   let_counter <- succ let_counter; *)
-    (*   pp s; *)
-    (*   pc ' '; *)
-    (*   pf e1; *)
-    (*   pc ')'; *)
-    (*   space (); *)
-    (* (\* SWXXX Fixme *\) *)
-    (* self#extend v s vst; *)
-    (* pf2 e2; *)
-    (* self#unextend v; *)
-    (* cut (); *)
-    (* pc ')'   ) *)
 
   method varname v =
     match VH.find ctx v with
