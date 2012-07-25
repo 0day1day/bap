@@ -25,6 +25,8 @@ type cmd =
 let pipeline = ref []
 let startdebug = ref 1
 
+let tac = ref true
+
 let output_ast f p =
   let oc = open_out f in
   let pp = new Pp.pp_oc oc in
@@ -379,6 +381,8 @@ let speclist =
       "Flatten memory accesses")
   :: ("-vsa", uadd(AnalysisSsa vsa_print),
       "Run value set analysis and print the results.")
+  ::("-no-ssa-tac", Arg.Unit (fun () -> tac := false),
+     "Disable three address code in SSA representation.")
   :: Input.speclist
 
 let anon x = raise(Arg.Bad("Unexpected argument: '"^x^"'"))
@@ -436,7 +440,7 @@ let rec apply_cmd prog = function
   )
   | ToSsa -> (
     match prog with
-    | AstCfg p -> Ssa(Cfg_ssa.of_astcfg p)
+    | AstCfg p -> Ssa(Cfg_ssa.of_astcfg ~tac:!tac p)
     | p -> apply_cmd (apply_cmd p ToCfg) ToSsa
   )
 ;;

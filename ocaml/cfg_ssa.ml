@@ -60,28 +60,30 @@ let type_of_exp = Typecheck.infer_ssa
 (* share the strings in the variable names we create, to save memory *)
 let ssa_temp_name = "temp"
 
-(* @return a reversed lits of SSA stmts and an exp that is equivalent to
+(* @return a reversed list of SSA stmts and an exp that is equivalent to
    the Ast expression *)
-let rec exp2ssaexp (ctx:Ctx.t) ~(revstmts:stmt list) ?(attrs=[]) e : stmt list * exp =
+let rec exp2ssaexp (ctx:Ctx.t) ~(revstmts:stmt list) ?tac ?(attrs=[]) e : stmt list * exp =
+  let exp2ssa = exp2ssa ctx ?tac ~attrs in
+  let exp2ssaexp = exp2ssaexp ctx ?tac ~attrs in
   match e with 
   | Ast.Ite(b, e1, e2) ->
-      let (revstmts, vb) = exp2ssa ctx revstmts b in
-      let (revstmts, v1) = exp2ssa ctx revstmts e1 in
-      let (revstmts, v2) = exp2ssa ctx revstmts e2 in
+      let (revstmts, vb) = exp2ssa ~revstmts b in
+      let (revstmts, v1) = exp2ssa ~revstmts e1 in
+      let (revstmts, v2) = exp2ssa ~revstmts e2 in
       (revstmts, Ite(vb, v1, v2))
   | Ast.Extract(h, l, e) ->
-      let (revstmts, ve) = exp2ssa ctx revstmts e in
+      let (revstmts, ve) = exp2ssa ~revstmts e in
       (revstmts, Extract(h, l, ve))
   | Ast.Concat(le, re) ->
-      let (revstmts, lv) = exp2ssa ctx revstmts le in
-      let (revstmts, rv) = exp2ssa ctx revstmts re in
+      let (revstmts, lv) = exp2ssa ~revstmts le in
+      let (revstmts, rv) = exp2ssa ~revstmts re in
       (revstmts, Concat(lv, rv))
   | Ast.BinOp(op, e1, e2) -> 
-      let (revstmts, v1) = exp2ssa ctx revstmts e1 in
-      let (revstmts, v2) = exp2ssa ctx revstmts e2 in
+      let (revstmts, v1) = exp2ssa ~revstmts e1 in
+      let (revstmts, v2) = exp2ssa ~revstmts e2 in
       (revstmts, BinOp(op,v1,v2))
   | Ast.UnOp(op, e1) ->
-      let (revstmts, v1) = exp2ssa ctx revstmts e1 in
+      let (revstmts, v1) = exp2ssa ~revstmts e1 in
       (revstmts, UnOp(op,v1))
   | Ast.Int(i, t) ->
       (revstmts, Int(i,t))
@@ -90,60 +92,63 @@ let rec exp2ssaexp (ctx:Ctx.t) ~(revstmts:stmt list) ?(attrs=[]) e : stmt list *
   | Ast.Var name -> 
       (revstmts, Var(Ctx.lookup ctx name))
   | Ast.Load(arr,idx,endian, t) ->
-      let (revstmts,arr) = exp2ssa ctx revstmts arr in
-      let (revstmts,idx) = exp2ssa ctx revstmts idx in
-      let (revstmts,endian) = exp2ssa ctx revstmts endian in
+      let (revstmts,arr) = exp2ssa ~revstmts arr in
+      let (revstmts,idx) = exp2ssa ~revstmts idx in
+      let (revstmts,endian) = exp2ssa ~revstmts endian in
       (revstmts, Load(arr,idx,endian,t))
   | Ast.Store(arr,idx,vl, endian, t) ->
-      let (revstmts,arr) = exp2ssa ctx revstmts arr in
-      let (revstmts,idx) = exp2ssa ctx revstmts idx in
-      let (revstmts,vl) = exp2ssa ctx revstmts vl in
-      let (revstmts,endian) = exp2ssa ctx revstmts endian in
+      let (revstmts,arr) = exp2ssa ~revstmts arr in
+      let (revstmts,idx) = exp2ssa ~revstmts idx in
+      let (revstmts,vl) = exp2ssa ~revstmts vl in
+      let (revstmts,endian) = exp2ssa ~revstmts endian in
       (revstmts, Store(arr,idx,vl, endian,t))
   | Ast.Cast(ct,t,e1) ->
-      let (revstmts, v1) = exp2ssa ctx revstmts e1 in
+      let (revstmts, v1) = exp2ssa ~revstmts e1 in
       (revstmts, Cast(ct,t,v1))
   | Ast.Unknown(s,t) ->
       (revstmts, Unknown(s,t))
   | Ast.Let(v, e1, e2) ->
       let v' = Var.renewvar v in
-      let (revstmts,e1) = exp2ssaexp ctx revstmts e1 in
+      let (revstmts,e1) = exp2ssaexp ~revstmts e1 in
       let revstmts = Move(v',e1, attrs)::revstmts in
       Ctx.letextend ctx v v';
-      let (revstmts,e2) = exp2ssaexp ctx revstmts e2 in
+      let (revstmts,e2) = exp2ssaexp ~revstmts e2 in
       Ctx.letunextend ctx v;
       (revstmts, e2)
 
 
 (* @return a reversed lits of SSA stmts and an expression that is equivalent to
    the Ast expression *)
-and exp2ssa ctx ~(revstmts:stmt list) ?(attrs=[]) ?(name=ssa_temp_name) e : stmt list * exp =
+and exp2ssa ctx ~(revstmts:stmt list) ?(tac=true) ?(attrs=[]) ?(name=ssa_temp_name) e : stmt list * exp =
   (* Make an SSA value for an SSA expression by adding an assignment to
      revstmts if needed *)
   let exp2val (revstmts, exp) =
     match exp with
-    | (Var _ | Int _ | Lab _) as v -> (revstmts, v)
-    | _ ->
+    | (Var _ | Int _ | Lab _) as e -> (revstmts, e)
+    | e when tac ->
 	let t = type_of_exp exp in
 	let l = Var.newvar name t in
 	(Move(l, exp, attrs)::revstmts, Var l)
+    | e (* when not tac *) -> (revstmts, e)
   in
-  exp2val(exp2ssaexp ctx revstmts e)
+  exp2val(exp2ssaexp ctx ~tac ~revstmts ~attrs e)
 
 
 (* @return a reversed list of SSA stmts *)
-let rec stmt2ssa ctx ~(revstmts: stmt list) s =
+let rec stmt2ssa ctx ?tac ~(revstmts: stmt list) s =
+  let exp2ssa = exp2ssa ctx ?tac in
+  let exp2ssaexp = exp2ssaexp ctx ?tac in
   match s with
       Ast.Jmp(e1, a) ->
-	let (revstmts,v1) = exp2ssa ctx revstmts e1 in
+	let (revstmts,v1) = exp2ssa ~revstmts e1 in
 	  Jmp(v1, a) :: revstmts
     | Ast.CJmp(e1,e2,e3,a) ->
-	let (revstmts,v1) = exp2ssa ctx revstmts e1 in
-	let (revstmts,v2) = exp2ssa ctx revstmts e2 in
-	let (revstmts,v3) = exp2ssa ctx revstmts e3 in
+	let (revstmts,v1) = exp2ssa ~revstmts e1 in
+	let (revstmts,v2) = exp2ssa ~revstmts e2 in
+	let (revstmts,v3) = exp2ssa ~revstmts e3 in
 	  CJmp(v1,v2,v3,a) :: revstmts
     | Ast.Move(v, e2, a) ->
-	let (revstmts, e) = exp2ssaexp ctx revstmts e2 in
+	let (revstmts, e) = exp2ssaexp ~revstmts e2 in
 	let nv = Var.renewvar v in
 	Ctx.extend ctx v nv;
 	Move(nv, e, a)::revstmts
@@ -154,16 +159,16 @@ let rec stmt2ssa ctx ~(revstmts: stmt list) s =
     | Ast.Special(s,_) -> 
 	raise (Invalid_argument("SSA: Impossible to handle specials. They should be replaced with their semantics. Special: "^s))
     | Ast.Assert(e,a) ->
-	let (revstmts,v) = exp2ssa ctx revstmts e in
+	let (revstmts,v) = exp2ssa ~revstmts e in
 	  Assert(v,a)::revstmts
     | Ast.Halt(e,a) ->
-	let (revstmts, v) = exp2ssa ctx revstmts e in 
+	let (revstmts, v) = exp2ssa ~revstmts e in 
 	  Halt(v,a)::revstmts
 	
 
 (* Translates a list of Ast statements that get executed sequentially to SSA. *)
-let stmts2ssa ctx ss =
-  let revstmts = List.fold_left (fun rs s -> stmt2ssa ctx rs s) [] ss in
+let stmts2ssa ctx ?tac ss =
+  let revstmts = List.fold_left (fun rs s -> stmt2ssa ctx ?tac ~revstmts:rs s) [] ss in
     List.rev revstmts
 
 
@@ -207,7 +212,7 @@ type translation_results = {
     Not_found for variables that don't map to anything. (Eg, for temporary
     variables introduced by SSA, or variables that weren't assigned.)
  *)
-let rec trans_cfg cfg =
+let rec trans_cfg ?tac cfg =
   pdebug "Translating to SSA";
   (* if debug && not(Ast_cfg.well_defined cfg) then
     raise(TypeError "Ssa.trans_cfg: given cfg not well defined");*)
@@ -286,7 +291,7 @@ let rec trans_cfg cfg =
       (* rename variables *)
       let stmts = CA.get_stmts cfg cfgb in
       dprintf "translating stmts";
-      let stmts' = stmts2ssa ctx stmts in
+      let stmts' = stmts2ssa ctx ?tac stmts in
       let g = C.set_stmts ssa b stmts' in
       (* Update the edge labels of any conditional jumps *)
       match List.rev stmts' with
@@ -374,13 +379,13 @@ let rec trans_cfg cfg =
   {cfg=ssa; to_astvar=VH.find to_oldvar; to_ssavar=VH.find exitctx}
 
 (** Translates a CFG into SSA form. *)
-let of_astcfg cfg =
-  let {cfg=ssa} = trans_cfg cfg in
+let of_astcfg ?tac cfg =
+  let {cfg=ssa} = trans_cfg ?tac cfg in
   ssa
 
 (** Translates an AST program into an SSA CFG. *)
-let of_ast p = 
-  of_astcfg (Cfg_ast.of_prog p)
+let of_ast ?tac p = 
+  of_astcfg ?tac (Cfg_ast.of_prog p)
 
 
 let uninitialized cfg =
@@ -688,9 +693,9 @@ let rec create_tm c =
   tm
 
 
-and exp2ast tm =
+and exp2ast tm e =
   let e2a = exp2ast tm in
-  function
+  match e with
     | Int(i,t) -> Ast.Int(i,t)
     | Lab s -> Ast.Lab s
     | Var l -> (try e2a (VH.find tm l) with Not_found -> Ast.Var l)
@@ -706,9 +711,9 @@ and exp2ast tm =
     | Phi _ -> failwith "exp2ast cannot translate Phi expressions"
 
 (* Translates an SSA stmt back to Ast *)
-let stmt2ast tm =
+let stmt2ast tm e =
   let e2a = exp2ast tm in
-  function
+  match e with
     | Jmp(t,a) -> Ast.Jmp(e2a t, a)
     | CJmp(c,tt,tf,a) -> Ast.CJmp(e2a c, e2a tt, e2a tf, a)
     | Label(l,a) -> Ast.Label(l,a)

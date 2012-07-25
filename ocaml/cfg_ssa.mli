@@ -8,9 +8,9 @@
 
 val v2s : Cfg.SSA.G.V.t -> string
 
-val of_astcfg : Cfg.AST.G.t -> Cfg.SSA.G.t
+val of_astcfg : ?tac:bool -> Cfg.AST.G.t -> Cfg.SSA.G.t
 
-val of_ast : Ast.program -> Cfg.SSA.G.t
+val of_ast : ?tac:bool -> Ast.program -> Cfg.SSA.G.t
 
 val to_astcfg : ?remove_temps:bool -> ?dsa:bool -> Cfg.SSA.G.t -> Cfg.AST.G.t
 
@@ -23,5 +23,5 @@ type translation_results = {
   to_ssavar: Var.t -> Var.t; (* Maps AST vars to SSA at end of exit node. *)
 }  
 
-val trans_cfg : Cfg.AST.G.t -> translation_results
+val trans_cfg : ?tac:bool -> Cfg.AST.G.t -> translation_results
 

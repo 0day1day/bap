@@ -1,5 +1,5 @@
 (** Strongly connected component based value numbering.
-    
+
     Currently we only implement the RPO algorithm, described in
     "SCC-Based Value Numbering" by Keith Cooper and Taylor Simpson.
     http://citeseer.ist.psu.edu/41805.html
@@ -534,6 +534,8 @@ let replacer ?(opt=true) cfg =
       | _  -> SkipChildren
 
     method visit_stmt = function
+      | Ssa.Move(_, (Var _ | Lab _ | Int _), _) -> (* visit_exp will handle this *)
+        DoChildren
       | Ssa.Move(v,e,a) -> (
           match hash_replacement pos (vn v) with
           | Some vl ->
