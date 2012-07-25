@@ -74,7 +74,8 @@ struct
       | None ->
           TraceSymbolic.create_state (TraceSymbolic.init_formula_file filename)
     in
-    last_state := Some (TraceSymbolic.construct_symbolic_run_formula h rh state block)
+    last_state := 
+      Some (TraceSymbolic.construct_symbolic_run_formula h rh state block)
       
   let output_formula () = 
     match !last_state with
@@ -101,7 +102,7 @@ let speclist =
        "Don't use substitution but do use lets.")
   ::("-trace-formula-opt",
      Arg.String(fun f -> 
-       (outfile := f; 
+       (outfile := f; traceSymbType := Traces.NoSubOpt;
         add(AnalysisAst(StreamSymbolicNoSubOpt.generate_formulas f)))),
      "<file> Generate and output a trace formula to <file>.  "^
        "Don't use substitution but do use lets.")
