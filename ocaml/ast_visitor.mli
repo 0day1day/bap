@@ -27,6 +27,9 @@ object
 
       FIXME: would be nice to be able to add stmts... We may change this. *)
 
+  method visit_label : label -> label visit_action
+  (** Called when visiting a label. (IE: inside a statment like Cjmp) *)
+
   method visit_rvar : var -> var visit_action
   (** Called when visiting a referenced variable. (IE: inside an expression) *)
 
@@ -47,7 +50,10 @@ end
     anything. This visitor can be inherited from to build a new one. *)
 class nop : t
 
-(** {3 Accept functions} *)
+(** {9 Accept functions} *)
+
+(** Visit a label *)
+val label_accept : #t -> label -> label
 
 (** Visit a referenced variable *)
 val rvar_accept : #t -> var -> var
