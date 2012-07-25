@@ -137,6 +137,11 @@ object (self)
         | Reg 1,true -> "flet","$",self#ast_exp_bool,Bool
         | _ -> "let","?",self#ast_exp,BitVec
     in
+    let pf2 =
+      match st with
+        | Bool -> self#ast_exp_bool
+        | BitVec -> self#ast_exp
+    in
     (* The print functions called, ast_exp and ast_exp_bool never
        raise No_rule. So, we don't need to evaluate them before the lazy
        block. *)
@@ -150,15 +155,10 @@ object (self)
       pf e1;
       pc ')';
       space ();
-      self#extend v s vst
+      self#extend v s vst;
+      pf2 e2
 
-  method letmeend v e1 e2 st =
-    let pf2 =
-      match st with
-        | Bool -> self#ast_exp_bool
-        | BitVec -> self#ast_exp
-    in
-      pf2 e2;
+  method letmeend v =
       self#unextend v;
       cut ();
       pc ')'    
@@ -168,7 +168,7 @@ object (self)
   method letme v e1 e2 st =
     lazy(
       self#letmebegin v e1 e2 st;
-      self#letmeend v e1 e2 st
+      self#letmeend v 
     )
 
   method varname v =
