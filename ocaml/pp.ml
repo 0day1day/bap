@@ -123,9 +123,9 @@ object (self)
       let ts = string_of_int t in
 	(*if t = Taint then "tainted" else "untainted" in*)
 	let ind = if mem then "[0x"^(Int64.format "%Lx" i)^"]" else "" in
-	pp "@context "; pp (s^ ind ^" = 0x"^(Util.big_int_to_hex v)^ ", " ^ ts
-			      ^", u"
-			      ^ (string_of_int bits))
+	pp "@context "; pc '"'; pp (s^ind); pc '"'; pp (" = 0x"^(Util.big_int_to_hex v)^ ", " ^ ts
+			                              ^", u"
+			                              ^ (string_of_int bits))
     | Context _ ->
       failwith "Contexts only specify register types"
     | ThreadId i -> pp "@tid \""; pp (string_of_int i); pp "\""

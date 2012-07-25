@@ -1,4 +1,4 @@
-(** Visitor for BAP AST
+(* Visitor for BAP AST
 
     The design of this visitor was highly influenced by the one from CIL.
  *)
@@ -13,6 +13,8 @@ class type t = object
 
   method visit_stmt : stmt -> stmt visit_action
 
+  method visit_label : label -> label visit_action
+
   method visit_rvar : var -> var visit_action
 
   method visit_avar : var -> var visit_action
@@ -26,6 +28,7 @@ end
 class nop : t = object
   method visit_exp _   = DoChildren
   method visit_stmt _  = DoChildren
+  method visit_label _ = DoChildren
   method visit_avar _  = DoChildren
   method visit_rvar _  = DoChildren
   method visit_lbinding _ = DoChildren
@@ -91,6 +94,8 @@ let rec exp_accept visitor =
   in
   action (wrapexp vischil) visitor#visit_exp
 
+and label_accept visitor =
+  action Util.id visitor#visit_label
 
 and avar_accept visitor =
   action Util.id visitor#visit_avar
@@ -116,18 +121,19 @@ and ulbinding_accept visitor =
 and stmt_accept visitor =
   let vischil = function
       (* TODO: attributes? *)
-    | Jmp(l, a) -> Jmp(exp_accept visitor l, a)
+    | Jmp(l, a) ->
+      Jmp(exp_accept visitor l, a)
     | CJmp(c, l1, l2, a) ->
-	let c' = exp_accept visitor c in
-	let l1' = exp_accept visitor l1 in
-	let l2' = exp_accept visitor l2 in
-	CJmp(c', l1', l2', a)
+      let c' = exp_accept visitor c in
+      let l1' = exp_accept visitor l1 in
+      let l2' = exp_accept visitor l2 in
+      CJmp(c', l1', l2', a)
     | Move(lv, e, a) ->
-	let e = exp_accept visitor e in
-	let lv = avar_accept visitor lv in
-	Move(lv, e, a)
-    | Label _ as s -> s
-    | Comment _ as s-> s
+      let e = exp_accept visitor e in
+      let lv = avar_accept visitor lv in
+      Move(lv, e, a)
+    | Label (l,a) -> Label (label_accept visitor l, a)
+    | Comment _ as s -> s
     | Assert(e,a) -> Assert(exp_accept visitor e, a)
     | Halt(e,a) -> Halt(exp_accept visitor e, a)
     | Special _ as s -> s
