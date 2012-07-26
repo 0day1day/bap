@@ -130,17 +130,12 @@ object (self)
 
 (** Seperate lemebegin and letmeend to allow for streaming generation of
     formulas in utils/streamtrans.ml *)
-  method letmebegin v e1 e2 st =
+  method letmebegin v e1 st =
     let t1 = Typecheck.infer_ast ~check:false e1 in
     let cmd,c,pf,vst=
       match t1,!use_booleans with
         | Reg 1,true -> "flet","$",self#ast_exp_bool,Bool
         | _ -> "let","?",self#ast_exp,BitVec
-    in
-    let pf2 =
-      match st with
-        | Bool -> self#ast_exp_bool
-        | BitVec -> self#ast_exp
     in
     (* The print functions called, ast_exp and ast_exp_bool never
        raise No_rule. So, we don't need to evaluate them before the lazy
@@ -156,18 +151,23 @@ object (self)
       pc ')';
       space ();
       self#extend v s vst;
-      pf2 e2
 
   method letmeend v =
       self#unextend v;
       cut ();
       pc ')'    
 
+  method letmemiddle st = 
+      match st with
+        | Bool -> self#ast_exp_bool
+        | BitVec -> self#ast_exp
+
   (** Returns a lazy expression that prints let v = e1 in e2. Never raises 
       No_rule. *)
   method letme v e1 e2 st =
     lazy(
-      self#letmebegin v e1 e2 st;
+      self#letmebegin v e1 st;
+      self#letmemiddle st e2;
       self#letmeend v 
     )
 
