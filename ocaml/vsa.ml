@@ -11,24 +11,17 @@
 
 module VM = Var.VarMap
 
+open Big_int_convenience
 open Big_int_Z
 open Util
 open Type
 open Ssa
 
-module D = Debug.Make(struct let name = "VSA" and default=`Debug end)
+module D = Debug.Make(struct let name = "VSA" and default=`NoDebug end)
 open D
 
 
 exception Unimplemented of string
-    
-let rec uint64_gcd x y =
-  if y = 0L then x
-  else uint64_gcd y (int64_urem x y)
-
-let uint64_lcm x y =
-  let m = Int64.mul x y in
-  Int64.div m (uint64_gcd x y)
 
 module I = Int64
 (* some operators to make this more readable *)
@@ -37,8 +30,17 @@ let (|%) = I.logor
 let (^%) = I.logxor
 let (+%) = I.add
 let (-%) = I.sub
+let ( *%) = I.mul
+let (/%) = I.div
 let bnot = I.lognot
 
+let rec uint64_gcd x y =
+  if y = 0L then x
+  else uint64_gcd y (int64_urem x y)
+
+let uint64_lcm x y =
+  let m = x *% y in
+  m /% (uint64_gcd x y)
 
 let bits_of_width = Typecheck.bits_of_width
 
@@ -79,8 +81,11 @@ struct
   let single k x = (k,0L,x,x)
   let of_bap_int i t = single (bits_of_width t) (extend (bits_of_width t) i)
 
-  let above k x = (k, 1L, x, maxi k)
-  let below k x = (k, 1L, mini k, x)
+  let above k x = (k, 1L, x +% 1L, maxi k)
+  let below k x = (k, 1L, mini k, x -% 1L)
+
+  let aboveeq k x = (k, 1L, x, maxi k)
+  let beloweq k x = (k, 1L, mini k, x)
 
   let zero k = single k 0L
   let one k = single k 1L
@@ -328,9 +333,11 @@ struct
       else 
         let r1 = I.rem a s' (* not right when s' is negative. *)
         and r2 = I.rem c s' in
-          if s' > 0L && r1 = r2 then
-            (k, s', min a c, max b d)
-          else (k, 1L, min a c, max b d)
+        let u = max b d
+        and l = min a c in
+        if s' > 0L && r1 = r2 then
+          (k, s', l, u)
+        else (k, 1L, l, u)
 
   let union x y =
     let (k,a,b,c) as res = union x y in
@@ -339,13 +346,12 @@ struct
   let intersection (k,s1,a,b) (k',s2,c,d) =
     if k <> k' then failwith "intersection: expected same bitwidth intervals";
     let s' = uint64_lcm s1 s2 in
-    let l = min a c
-    and u = max b d in
-  (* If l mod s1 = 0 and l mod s2 = 0, then we have a stride from l
-     to u - u rem s' with stride s'.
-
-     Else, set stride to 1 and use l to u. *)
-    ()
+    let l = max a c
+    and u = min b d in
+    if int64_urem a s' = 0L && int64_urem c s' = 0L then
+      (k, s', l, u -% int64_urem u s')
+    else
+      (k, 1L, l, u)
 
   let widen (k,s1,a,b) (k',s2,c,d) =
     if k <> k' then failwith "widen: expected same bitwidth intervals";
@@ -559,6 +565,11 @@ struct
         List.iter (fun x -> p ", "; pp_address p x) xs;
         p ")"
 
+  let to_string vs =
+    let b = Buffer.create 57 in
+    let p = Buffer.add_string b in
+    pp p vs;
+    Buffer.contents b
 
   let kind = function
     | [] -> `Top
@@ -575,6 +586,9 @@ struct
 
   let above k i = [(global, SI.above k i)]
   let below k i = [(global, SI.below k i)]
+
+  let aboveeq k i = [(global, SI.aboveeq k i)]
+  let beloweq k i = [(global, SI.beloweq k i)]
 
   let add k x y = match (x,y) with
     | ([r2,si2],[r1,si1]) when r1 == global ->
@@ -633,6 +647,20 @@ struct
       List.iter add x;
       List.iter add y;
       Hashtbl.fold (fun k v r -> (k,v)::r) h []
+
+  let intersection x y =
+    if x = top then y
+    else if y = top then x
+    else let hx = Hashtbl.create (List.length x) in
+         let add (r,si) =
+           Hashtbl.add hx r si
+         in
+         List.iter add x;
+         List.fold_left
+           (fun l (r,si) ->
+             try (r, SI.intersection si (Hashtbl.find hx r))::l
+             with Not_found -> l)
+           [] y
 
   let widen x y =
     if x = top || y = top then top else
@@ -961,6 +989,9 @@ struct
 
     let dir = GraphDataflow.Forward
 
+    let find v l = VM.find v l
+    let do_find = AbsEnv.do_find_vs
+    let do_find_ae = AbsEnv.do_find_ae
 
     let rec transfer_stmt s l =
       match s with
@@ -970,19 +1001,6 @@ struct
             l
         | Move(v, e, _) ->
             try
-              let find v = VM.find v l in
-              let do_find v =
-                try match find v with
-                  | `Scalar vs -> vs
-                  | _ -> VS.top
-                with Not_found -> VS.top
-              in
-              let do_find_ae v =
-                try match VM.find v l with
-                  | `Array ae -> ae
-                  | _ -> AllocEnv.top
-                with  Not_found -> AllocEnv.top
-              in
               (* aev = abstract environment value *)
               let rec exp2aev e : AbsEnv.value =
                 let exp2vs e = match exp2aev e with
@@ -995,7 +1013,7 @@ struct
                   | Int(i,t)->
                     VS.of_bap_int (int64_of_big_int i) t
                   | Lab _ -> raise(Unimplemented "No VS for labels (should be a constant)")
-                  | Var v -> do_find v
+                  | Var v -> do_find l v
                   | BinOp(op, x, y) ->
                     let f = RegionVSA.DFP.binop_to_vs_function op in
                     let k = SimpleVSA.DFP.bits_of_exp x in
@@ -1006,15 +1024,15 @@ struct
                     f k (exp2vs x)
                   | Phi(x::xs) ->
                     List.fold_left
-                      (fun i y -> VS.union i (do_find y))
-                      (do_find x) xs
+                      (fun i y -> VS.union i (do_find l y))
+                      (do_find l x) xs
                   | Phi [] ->
                     failwith "Encountered empty Phi expression"
                   | Load(Var m, i, _e, _t) ->
                           (* FIXME: assumes deendianized.
                              ie: _e and _t should be the same for all loads and
                              stores of m. *)
-                    AllocEnv.read (do_find_ae m) (exp2vs i)
+                    AllocEnv.read (do_find_ae l m) (exp2vs i)
                   | Cast _ ->
                     raise(Unimplemented "FIXME")
                   | _ ->
@@ -1025,16 +1043,16 @@ struct
                 | TMem _ | Array _ -> (
                   let new_vs = try (match e with
                   | Var v ->
-                    do_find_ae v
+                    do_find_ae l v
                   | Store(Var m,i,v,_e,_t) ->
                     (* FIXME: assumes deendianized.
                        ie: _e and _t should be the same for all loads and
                        stores of m. *)
-                    AllocEnv.write (do_find_ae m) (exp2vs i) (exp2vs v)
+                    AllocEnv.write (do_find_ae l m) (exp2vs i) (exp2vs v)
                   | Phi(x::xs) ->
                     List.fold_left
-                      (fun i y -> AllocEnv.union i (do_find_ae y))
-                      (do_find_ae x) xs
+                      (fun i y -> AllocEnv.union i (do_find_ae l y))
+                      (do_find_ae l x) xs
                   | Phi [] ->
                     failwith "Encountered empty Phi expression"
                   | _ ->
@@ -1050,7 +1068,39 @@ struct
 
     let node_transfer_function = fwd_transfer_stmt_to_block transfer_stmt
 
-    let edge_transfer_function g e = Util.id
+    let edge_transfer_function g edge l =
+      match G.E.label edge with
+      | Some(_, BinOp(EQ, (BinOp((LE|LT) as bop, Var v, Int(i, t)) as be), Int(i', t')))
+      | Some(_, BinOp(EQ, (BinOp((LE|LT) as bop, Int(i, t), Var v) as be), Int(i', t'))) ->
+
+        let dir = match be with
+          | BinOp(_, Var _, Int _) -> `Below
+          | BinOp(_, Int _, Var _) -> `Above
+          | _ -> failwith "impossible"
+        in
+
+        (* Reverse if needed *)
+        let e, dir, bop =
+          if bi_is_one i' then be, dir, bop
+          else
+            let newbop = if bop = LE then LT else LE in
+            match dir with
+            | `Below -> BinOp(newbop, Int(i, t), Var v), `Above, newbop
+            | `Above -> BinOp(newbop, Var v, Int(i, t)), `Below, newbop
+        in
+        let vsf = match dir, bop with
+          | `Below, LE -> VS.beloweq
+          | `Below, LT -> VS.below
+          | `Above, LE -> VS.aboveeq
+          | `Above, LT -> VS.above
+          | _ -> failwith "impossible"
+        in
+        let vs_v = do_find l v in
+        let vs_c = vsf (bits_of_width t) (int64_of_big_int i) in
+        dprintf "%s %s vs_v %s vs_c %s" (Pp.var_to_string v) (Cfg_ssa.v2s (G.E.dst edge)) (VS.to_string vs_v) (VS.to_string vs_c);
+        let vs_int = VS.intersection vs_v vs_c in
+        VM.add v (`Scalar vs_int) l
+      | _ -> l
 
   end
 

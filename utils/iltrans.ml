@@ -106,7 +106,7 @@ let ast_coalesce = Coalesce.coalesce_ast
 let ssa_coalesce = Coalesce.coalesce_ssa
 
 let vsa_print g =
-  let _df_in, df_out = Vsa.AlmostVSA.DF.worklist_iterate_widen g in
+  let _df_in, df_out = Vsa.AlmostVSA.DF.worklist_iterate_widen ~nmeets:20 g in
   Cfg.SSA.G.iter_vertex (fun v ->
     Printf.printf "VSA @%s" (Cfg_ssa.v2s v);
     Vsa.AbsEnv.pp print_string (df_out v);
