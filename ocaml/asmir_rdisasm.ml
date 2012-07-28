@@ -41,7 +41,7 @@ let get_code_addrs stmts next =
          false!
 
          As a result of this, next should be at the front of the list,
-         and we can use a Queue. *)
+         and we can use a Stack. *)
       | [] -> next :: l
       | (Ast.Jmp (e, attrs)) :: _ ->
         let addrs = collect_some get_addr l e in
@@ -62,7 +62,9 @@ let get_code_addrs stmts next =
             else get_code_addrs' rest (addrs @ l)
       | _ :: rest -> get_code_addrs' rest l
   in
-  get_code_addrs' stmts []
+  (* Reverse so that 'next' is last in the list, last added to the
+     stack, and thus first in the stack. *)
+  List.rev (get_code_addrs' stmts [])
 
 module Int64Set = Set.Make( 
   struct
@@ -77,7 +79,7 @@ let rdisasm_at ?(f=default) p startaddrs =
   let seen = ref Int64Set.empty in
   let out = ref [] in
   let outasm = ref "" in
-  let stack = Queue.create () in
+  let stack = Stack.create () in
   let numstmts = ref 0 in
 
   (* Remove duplicates or we'll get duplicate labels *)
@@ -85,12 +87,12 @@ let rdisasm_at ?(f=default) p startaddrs =
 
   (* Initialize with the startaddrs *)
   List.iter (fun startaddr ->
-    Queue.push startaddr stack;
+    Stack.push startaddr stack;
     seen := Int64Set.add startaddr !seen
   ) startaddrs;
 
-  while not (Queue.is_empty stack) do
-    let addr = Queue.pop stack in
+  while not (Stack.is_empty stack) do
+    let addr = Stack.pop stack in
     try
       let (statements, next) = Asmir.asm_addr_to_bap p addr in
       let asm = Asmir.get_asm_instr_string p addr in
@@ -100,8 +102,10 @@ let rdisasm_at ?(f=default) p startaddrs =
       if not (f addr next statements) then raise Asmir.Disassembly_error;
       List.iter
         (fun x -> if not (Int64Set.mem x !seen)
-          then (Queue.push x stack; seen := Int64Set.add x !seen)
-          else ())
+          then (Stack.push x stack;
+                dprintf "Adding address %#Lx to the stack" x;
+                seen := Int64Set.add x !seen)
+          else (dprintf "Not adding address %#Lx to the stack again" x))
         (get_code_addrs statements next)
     (*
      * Ignore invalid addresses.
