@@ -6,7 +6,8 @@
     TODO:
     * Consolidate widen/meet/union functions
     * Remove extra "k" arguments
-    * Path sensitivity: Does this require changing SSA expressions?
+    * Handle specials: map everything to Top
+    * Represent bottom?
 *)
 
 module VM = Var.VarMap
@@ -15,7 +16,7 @@ open Big_int_convenience
 open Big_int_Z
 open Util
 open Type
-open Ssa
+open Ast
 
 module D = Debug.Make(struct let name = "VSA" and default=`NoDebug end)
 open D
@@ -45,7 +46,7 @@ let uint64_lcm x y =
 let bits_of_width = Typecheck.bits_of_width
 
 let fwd_transfer_stmt_to_block f g node latice =
-  List.fold_left (fun l n -> f n l) latice (Cfg.SSA.get_stmts g node)
+  List.fold_left (fun l n -> f n l) latice (Cfg.AST.get_stmts g node)
 
 (* FIXME: find a better way to get the stack pointer *)
 let sp = Disasm_i386.esp
@@ -348,7 +349,12 @@ struct
     let s' = uint64_lcm s1 s2 in
     let l = max a c
     and u = min b d in
-    if int64_urem a s' = 0L && int64_urem c s' = 0L then
+    (* XXX: How should we represented bottom, e.g. no intersection? *)
+    if s1 = 0L then
+      if int64_urem (c -% a) s2 == 0L && a >= c && a <= d then (k,s1,a,b) else (k,s1,a,b)
+    else if s2 = 0L then
+      if int64_urem (c -% a) s1 == 0L && c >= a && c <= b then (k',s2,c,d) else (k',s2,c,d)
+    else if int64_urem a s' = 0L && int64_urem c s' = 0L then
       (k, s', l, u -% int64_urem u s')
     else
       (k, 1L, l, u)
@@ -375,7 +381,7 @@ module SimpleVSA =
 struct
   module DFP =
   struct
-    module G = Cfg.SSA.G
+    module G = Cfg.AST.G
     module L =
     struct
       type t = SI.t VM.t
@@ -434,7 +440,7 @@ struct
       | NEG -> SI.neg
       | NOT -> SI.lognot
 
-    let bits_of_exp e = bits_of_width (Typecheck.infer_ssa e)
+    let bits_of_exp e = bits_of_width (Typecheck.infer_ast ~check:false e)
 
     let rec transfer_stmt s l =
       match s with
@@ -442,6 +448,7 @@ struct
         | Assert _ | Jmp _ | CJmp _ | Label _ | Comment _
         | Halt _ ->
             l
+        | Special _ -> failwith "Specials are unimplemented"
         | Move(v, e, _) ->
             try
               let top v = SI.top (bits_of_width(Var.typ v)) in
@@ -464,12 +471,12 @@ struct
                   let r = f k (exp2si x) in
                   SI.check_reduced k r;
                   r
-                | Phi(x::xs) ->
-                  List.fold_left
-                    (fun i y -> SI.union i (do_find y))
-                    (do_find x) xs
-                | Phi [] ->
-                  failwith "Encountered empty Phi expression"
+                (* | Phi(x::xs) -> *)
+                (*   List.fold_left *)
+                (*     (fun i y -> SI.union i (do_find y)) *)
+                (*     (do_find x) xs *)
+                (* | Phi [] -> *)
+                (*   failwith "Encountered empty Phi expression" *)
 
                     (* This tries to preserve strides for loop variables, but takes too long, and
                        wasn't working.
@@ -688,7 +695,7 @@ module RegionVSA =
 struct
   module DFP =
   struct
-    module G = Cfg.SSA.G
+    module G = Cfg.AST.G
     module L =
     struct
       type t = VS.t VM.t
@@ -754,6 +761,7 @@ struct
         | Assert _ | Jmp _ | CJmp _ | Label _ | Comment _
         | Halt _ ->
             l
+        | Special _ -> failwith "Special is unimplemented"
         | Move(v, e, _) ->
             try
               let find v = VM.find v l in
@@ -771,12 +779,12 @@ struct
                   let f = unop_to_vs_function op in
                   let k = SimpleVSA.DFP.bits_of_exp x in
                   f k (exp2vs x)
-                | Phi(x::xs) ->
-                  List.fold_left
-                    (fun i y -> VS.union i (do_find y))
-                    (do_find x) xs
-                | Phi [] ->
-                  failwith "Encountered empty Phi expression"
+                (* | Phi(x::xs) -> *)
+                (*   List.fold_left *)
+                (*     (fun i y -> VS.union i (do_find y)) *)
+                (*     (do_find x) xs *)
+                (* | Phi [] -> *)
+                (*   failwith "Encountered empty Phi expression" *)
                 | Cast _ ->
                   raise(Unimplemented "FIXME")
                 | _ ->
@@ -908,7 +916,7 @@ module AbsEnv = struct
       | _ -> VS.top
     with Not_found -> VS.top
 
-  (* let ssaval2vs ae = function *)
+  (* let astval2vs ae = function *)
   (*   | Int(i,t) -> VS.of_bap_int (int64_of_big_int i) t *)
   (*   | Lab _ -> raise(Unimplemented "No VS for labels (should be a constant)") *)
   (*   | Var v -> do_find_vs ae v *)
@@ -928,7 +936,7 @@ module AlmostVSA =
 struct
   module DFP =
   struct
-    module G = Cfg.SSA.G
+    module G = Cfg.AST.G
     module L =
     struct
       type t = AbsEnv.t
@@ -999,6 +1007,7 @@ struct
         | Assert _ | Jmp _ | CJmp _ | Label _ | Comment _
         | Halt _ ->
             l
+        | Special _ -> failwith "Special is unimplemented"
         | Move(v, e, _) ->
             try
               (* aev = abstract environment value *)
@@ -1022,12 +1031,12 @@ struct
                     let f = RegionVSA.DFP.unop_to_vs_function op in
                     let k = SimpleVSA.DFP.bits_of_exp x in
                     f k (exp2vs x)
-                  | Phi(x::xs) ->
-                    List.fold_left
-                      (fun i y -> VS.union i (do_find l y))
-                      (do_find l x) xs
-                  | Phi [] ->
-                    failwith "Encountered empty Phi expression"
+                  (* | Phi(x::xs) -> *)
+                  (*   List.fold_left *)
+                  (*     (fun i y -> VS.union i (do_find l y)) *)
+                  (*     (do_find l x) xs *)
+                  (* | Phi [] -> *)
+                  (*   failwith "Encountered empty Phi expression" *)
                   | Load(Var m, i, _e, _t) ->
                           (* FIXME: assumes deendianized.
                              ie: _e and _t should be the same for all loads and
@@ -1049,12 +1058,12 @@ struct
                        ie: _e and _t should be the same for all loads and
                        stores of m. *)
                     AllocEnv.write (do_find_ae l m) (exp2vs i) (exp2vs v)
-                  | Phi(x::xs) ->
-                    List.fold_left
-                      (fun i y -> AllocEnv.union i (do_find_ae l y))
-                      (do_find_ae l x) xs
-                  | Phi [] ->
-                    failwith "Encountered empty Phi expression"
+                  (* | Phi(x::xs) -> *)
+                  (*   List.fold_left *)
+                  (*     (fun i y -> AllocEnv.union i (do_find_ae l y)) *)
+                  (*     (do_find_ae l x) xs *)
+                  (* | Phi [] -> *)
+                  (*   failwith "Encountered empty Phi expression" *)
                   | _ ->
                     raise(Unimplemented "unimplemented memory expression type"))
                   with Unimplemented _ | Invalid_argument _ -> AllocEnv.top
@@ -1097,7 +1106,7 @@ struct
         in
         let vs_v = do_find l v in
         let vs_c = vsf (bits_of_width t) (int64_of_big_int i) in
-        dprintf "%s %s vs_v %s vs_c %s" (Pp.var_to_string v) (Cfg_ssa.v2s (G.E.dst edge)) (VS.to_string vs_v) (VS.to_string vs_c);
+        dprintf "%s %s vs_v %s vs_c %s" (Pp.var_to_string v) (Cfg_ast.v2s (G.E.dst edge)) (VS.to_string vs_v) (VS.to_string vs_c);
         let vs_int = VS.intersection vs_v vs_c in
         VM.add v (`Scalar vs_int) l
       | _ -> l

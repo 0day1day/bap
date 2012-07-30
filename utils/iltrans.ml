@@ -107,8 +107,8 @@ let ssa_coalesce = Coalesce.coalesce_ssa
 
 let vsa_print g =
   let _df_in, df_out = Vsa.AlmostVSA.DF.worklist_iterate_widen ~nmeets:20 g in
-  Cfg.SSA.G.iter_vertex (fun v ->
-    Printf.printf "VSA @%s" (Cfg_ssa.v2s v);
+  Cfg.AST.G.iter_vertex (fun v ->
+    Printf.printf "VSA @%s" (Cfg_ast.v2s v);
     Vsa.AbsEnv.pp print_string (df_out v);
     print_string "\n\n"
   ) g
@@ -379,7 +379,7 @@ let speclist =
       "Replace all unknowns with zeros")
   :: ("-flatten-mem", uadd(TransformAst Flatten_mem.flatten_mem_program),
       "Flatten memory accesses")
-  :: ("-vsa", uadd(AnalysisSsa vsa_print),
+  :: ("-vsa", uadd(AnalysisAstCfg vsa_print),
       "Run value set analysis and print the results.")
   ::("-no-ssa-tac", Arg.Unit (fun () -> tac := false),
      "Disable three address code in SSA representation.")
