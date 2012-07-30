@@ -88,6 +88,9 @@ module StreamSymbolicNoSub = StreamSymbolic(Traces.TraceSymbolicNoSub)
 module StreamSymbolicNoSubOpt = StreamSymbolic(Traces.TraceSymbolicNoSubOpt)
 module StreamSymbolicSub = StreamSymbolic(Traces.TraceSymbolicSub)
 
+module StreamSymbolicNoSubStreamLet = 
+  StreamSymbolic(Traces.TraceSymbolicNoSubStreamLet)
+
 let speclist =
   ("-print", Arg.String(fun f -> add(TransformAst(prints f))),
    "<file> Print each statement in the trace to file.")
@@ -104,6 +107,12 @@ let speclist =
      Arg.String(fun f -> 
        (outfile := f; traceSymbType := Traces.NoSubOpt;
         add(AnalysisAst(StreamSymbolicNoSubOpt.generate_formulas f)))),
+     "<file> Generate and output a trace formula to <file>.  "^
+       "Don't use substitution but do use lets.")
+  ::("-trace-formula-stream-let",
+     Arg.String(fun f -> 
+       (outfile := f; traceSymbType := Traces.NoSubStreamLet;
+        add(AnalysisAst(StreamSymbolicNoSubStreamLet.generate_formulas f)))),
      "<file> Generate and output a trace formula to <file>.  "^
        "Don't use substitution but do use lets.")
   ::("-trace-formula-no-sub-no-let",
@@ -162,6 +171,7 @@ if (!outfile <> "") then (
   match !traceSymbType with
     | Traces.NoSub -> StreamSymbolicNoSub.output_formula ()
     | Traces.NoSubOpt -> StreamSymbolicNoSubOpt.output_formula ()
+    | Traces.NoSubStreamLet -> StreamSymbolicNoSubStreamLet.output_formula ()
     | Traces.NoSubNoLet -> StreamSymbolicNoSubNoLet.output_formula ()
     | Traces.Substitution -> StreamSymbolicSub.output_formula ()
 )

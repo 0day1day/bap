@@ -1593,6 +1593,12 @@ end
 (*     PredAssign.assign v ev ctx *)
 (* end *)
 
+module type TracePrinter =
+sig
+  type fp
+  val init_printer : string -> string -> fp
+end
+
 module type TraceSymbolicRun =
 sig
   type init
@@ -1614,7 +1620,7 @@ sig
   val output_exploit : string -> stmt list -> unit
 end
 
-module TraceSymbolicFunc (Tune: EvalTune) (Assign: Assign) (Form: StreamFormula with type init=Formulap.fpp_oc with type output = unit) =
+module TraceSymbolicFunc (Tune: EvalTune) (Assign: Assign) (PrinterType: TracePrinter) (Form: StreamFormula with type init=PrinterType.fp with type output = unit) =
 struct 
   (* Set this to LetBindSimplify to use formula simplificiation *)
   module SymbolicEval = Symbeval.Make(SymbolicMemL)(Tune)(Assign)(Form)
@@ -1674,16 +1680,8 @@ struct
           raise e
 
 
-  let init_formula_file file =
-    let oc = open_out file in
-    let p = match !printer with
-      | "smtlib1" -> ((new Smtlib1.pp_oc oc) :> Formulap.fpp_oc)
-      | "smtlib2" -> ((new Smtlib2.pp_oc oc) :> Formulap.fpp_oc)
-      | "stp" -> ((new Stp.pp_oc oc) :> Formulap.fpp_oc)
-      | _ -> failwith "Unknown printer"
-    in
-    p
-
+  let init_formula_file filename = PrinterType.init_printer filename !printer
+    
 
   let symbolic_run trace filename =
     Status.init "Symbolic Run" (List.length trace) ;
@@ -1863,17 +1861,50 @@ end
 type traceSymbolicType =
   | NoSubNoLet
   | NoSub
+  | NoSubStreamLet
   | NoSubOpt
   | Substitution
 
-module TraceSymbolicNoSubNoLet = 
-  TraceSymbolicFunc(FastEval)(PredAssignTraces)(StdFormStream);;
-module TraceSymbolicNoSub = 
-  TraceSymbolicFunc(FastEval)(PredAssignTraces)(LetBindStream);;
-module TraceSymbolicNoSubOpt = 
-  TraceSymbolicFunc(SlowEval)(PredAssignTraces)(LetBindStream);;
-module TraceSymbolicSub = 
-  TraceSymbolicFunc(SlowEval)(StdAssign)(LetBindStream);;
+module StreamPrinter =
+struct 
+  type fp = Formulap.stream_fpp_oc 
+  let init_printer file s = 
+    let oc = open_out file in
+    let p =
+      match s with
+        | "smtlib1" -> ((new Smtlib1.pp_oc oc) :> fp)
+        | _ -> failwith ("Unknown printer "^s)
+    in 
+    p
+end
+
+module OldPrinter =
+struct 
+  type fp = Formulap.fpp_oc 
+  let init_printer file s = 
+    let oc = open_out file in
+    let p =
+      match s with
+        | "smtlib1" -> ((new Smtlib1.pp_oc oc) :> fp)
+        | "smtlib2" -> ((new Smtlib2.pp_oc oc) :> fp)
+        | "stp" -> ((new Stp.pp_oc oc) :> fp) 
+        | _ -> failwith ("Unknown printer "^s)
+    in 
+    p
+end
+
+
+module TraceSymbolicNoSubNoLet =
+  TraceSymbolicFunc(FastEval)(PredAssignTraces)(OldPrinter)(StdFormStream);;
+module TraceSymbolicNoSub =
+  TraceSymbolicFunc(FastEval)(PredAssignTraces)(OldPrinter)(LetBindStream);;
+module TraceSymbolicNoSubOpt =
+  TraceSymbolicFunc(SlowEval)(PredAssignTraces)(OldPrinter)(LetBindStream);;
+module TraceSymbolicSub =
+  TraceSymbolicFunc(SlowEval)(StdAssign)(OldPrinter)(LetBindStream);;
+
+module TraceSymbolicNoSubStreamLet = 
+  TraceSymbolicFunc(FastEval)(PredAssignTraces)(StreamPrinter)(LetBindStreamLet);;
 
 
 (** SWXXX Should this go somewhere else too? *)

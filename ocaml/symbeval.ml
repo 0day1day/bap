@@ -797,30 +797,6 @@ struct
       create_formula exp_true bindings
 end
 
-(* module LetBindStreamForm = *)
-(* struct *)
-(*   type t = {printer : Formulap.fpp_oc; form_t : Ast.exp} *)
-(*   type init = Formulap.fpp_oc *)
-(*   type output = unit *)
-
-(*   let init printer = {printer=printer; form_t=exp_true} *)
-(*   (\* How do you add a new assertion that two things are equal? *)
-(*      How do you add a new let binding? *)
-(*   *\) *)
-
-(*   let add_to_formula formula expression typ = *)
-(*     (match expression, typ with *)
-(*       | _, Equal -> *)
-(* 	  #letmebegin () *)
-(*      | BinOp(EQ, Var v, value), Rename -> *)
-(* 	 (fun newe -> fbuild (Let(v, value, newe))) *)
-(*      | _ -> failwith "internal error: adding malformed constraint to formula" *)
-(*     ) *)
-
-(*   let output_formula e =  *)
-(*     #letmeend *)
-(* end *)
-
 (** Older Formulas build up formula before printing out but this functor makes 
     it looks like streaming to evaluator *) 
 module StreamFormulaConverter(Form:Formula) =
@@ -838,16 +814,17 @@ end
 
 module StreamFormulaConverterToStream(Form:Formula) = 
 struct
+  type fp = Formulap.fpp_oc
   type t = {printer : Formulap.fpp_oc; form_t : Form.t}
   type init = Formulap.fpp_oc
   type output = unit
 
   let init printer = {printer=printer; form_t=Form.true_formula}
 
-  let add_to_formula {printer=printer; form_t=form_t} exp typ = 
-    {printer=printer; form_t = Form.add_to_formula form_t exp typ}
+  let add_to_formula ({printer; form_t} as record) exp typ = 
+    {record with form_t = Form.add_to_formula form_t exp typ}
 
-  let output_formula {printer=printer; form_t=form_t} = 
+  let output_formula {printer; form_t} = 
     let formula = Form.output_formula form_t in
     let mem_hash = Memory2array.create_state () in
     let formula = Memory2array.coerce_exp_state mem_hash formula in
@@ -864,6 +841,50 @@ module LetBindOldStreamOld = StreamFormulaConverter(LetBindOld)
 module StdFormStream = StreamFormulaConverterToStream(StdForm)
 module LetBindStream = StreamFormulaConverterToStream(LetBind)
 module LetBindOldStream = StreamFormulaConverterToStream(LetBindOld)
+
+(** Print let formulas in a streaming fashion.  For example, given a trace:
+    1. x = 5
+    2. assert (x = 5)
+    3. y = 10
+
+    The formula (for smtlib) would look like:
+    (and
+        (let x = 5 in
+            (x = 5)
+            (let y = 10 in
+                (true))))
+*)
+module LetBindStreamLet =
+struct
+  (* type fp = Formulap.stream_fpp_oc *)
+  type t = {printer : Formulap.stream_fpp_oc; form_t : Ast.exp; 
+            close_funs : (unit -> unit) Stack.t}
+  type init = Formulap.stream_fpp_oc
+  type output = unit
+
+  let init printer = 
+    (* SWXXX printer#open_and (); *)
+    {printer=printer; form_t=exp_true; close_funs=Stack.create()}
+
+  let add_to_formula ({printer; form_t; close_funs} as record) expression typ =
+    (match expression, typ with
+      | _, Equal ->
+          printer#print_assertion expression;
+          (* print space? *)
+          record 
+      | BinOp(EQ, Var v, value), Rename ->
+	  printer#letmebegin v value;
+          Stack.push (fun () -> printer#letmeend v) close_funs;
+          {record with close_funs=close_funs}
+      | _ -> failwith "internal error: adding malformed constraint to formula"
+    )
+
+  let output_formula {printer; form_t; close_funs} =
+    printer#print_assertion exp_true;
+    (* SWXXX printer#letmeend v for each v in var_stack *)
+    (* SWXXX Print freevars at the end of the formula *)
+end
+
 
 module Symbolic = Make(SymbolicMemL)(FastEval)(StdAssign)(StdFormStreamOld)
 module SymbolicSlow = Make(SymbolicMemL)(SlowEval)(StdAssign)(StdFormStreamOld)

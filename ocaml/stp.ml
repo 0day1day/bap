@@ -41,6 +41,11 @@ object (self)
 
   val mutable let_counter = 0;
 
+  (* method  letmebegin v e = () *)
+  (* method  letmeend v = () *)
+  (* method print_assertion e = () *)
+  (* method declare_new_free_vars (v : var list) = () *)
+
   method flush =
     flush();
 

@@ -86,6 +86,11 @@ object (self)
   val mutable unknown_counter = 0;
 
   val mutable let_counter = 0;
+  
+  (* method  letmebegin v e = () *)
+  (* method  letmeend v = () *)
+  (* method print_assertion e = () *)
+  (* method declare_new_free_vars (v : var list) = () *)
 
   method bool_to_bv e =
     let pe = self#ast_exp_bool_base e in

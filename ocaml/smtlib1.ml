@@ -77,6 +77,7 @@ class pp ?suffix:(s="") ft =
 
 object (self)
   inherit Formulap.fpp
+  inherit Formulap.stream_fpp
   val used_vars : (string,Var.t) Hashtbl.t = Hashtbl.create 57
   val ctx : (string*sort) VH.t = VH.create 57
     
@@ -126,11 +127,11 @@ object (self)
 
   method var v =
     match (VH.find ctx v) with
-    | n,_ -> pp n
+        | n,_ -> pp n
 
 (** Seperate lemebegin and letmeend to allow for streaming generation of
     formulas in utils/streamtrans.ml *)
-  method letmebegin v e1 st =
+  method letmebegin v e1 =
     let t1 = Typecheck.infer_ast ~check:false e1 in
     let cmd,c,pf,vst=
       match t1,!use_booleans with
@@ -166,7 +167,7 @@ object (self)
       No_rule. *)
   method letme v e1 e2 st =
     lazy(
-      self#letmebegin v e1 st;
+      self#letmebegin v e1;
       self#letmemiddle st e2;
       self#letmeend v 
     )
@@ -179,27 +180,36 @@ object (self)
     match VH.find ctx v with
     | _,st -> st
 
-  method declare_new_freevars e =
+  method declare_given_freevars es =
     force_newline();
     pp "; free variables:"; force_newline();
-    let fvs = Formulap.freevars e in 
-    List.iter (fun v -> if not(VH.mem ctx v) then self#decl v) fvs;
+    List.iter (fun v -> if not(VH.mem ctx v) then self#decl v) es;
     pp "; end free variables."; 
     force_newline()
-       
+
+  method declare_new_freevars e =
+    let fvs = Formulap.freevars e in 
+    self#declare_given_freevars fvs
+
   method typ = function
     | Reg n ->	printf "BitVec[%u]" n
     | Array(Reg idx, Reg elmt) -> printf "Array[%u:%u] " idx elmt;
     | Array _ -> failwith "SMTLIB1 only supports Arrays with register indices and elements"
     | TMem _ ->	failwith "TMem unsupported by SMTLIB1"
 
-  method decl (Var.V(_,_,t) as v) =
+  method decl_no_print (Var.V(_,_,t) as v) =
     let sort = match t with
       (* | Reg 1 -> Bool (\* Let's try making all 1-bit bvs bools for now *\) *)
       | _ -> BitVec
     in
-    self#extend v (var2s v) sort;
+    self#extend v (var2s v) sort
+
+  method declare_new_free_var = self#decl_no_print
+
+  method decl (Var.V(_,_,t) as v) =
+    self#decl_no_print v;
     pp ":extrafuns (("; self#var v; space (); self#typ t; pp "))"; force_newline();
+
 
   (** Prints the BAP expression e in SMTLIB format.  If e is a
       1-bit bitvector in BAP, then e is printed as a SMTLIB 1-bit
@@ -219,10 +229,18 @@ object (self)
          )
      | Int _ -> failwith "Ints may only have register types"
      | Var v ->
-	 let name,st = VH.find ctx v in
+	 let name,st = 
+           try (match VH.find ctx v with
+               name,st -> name,st)
+           with Not_found ->
+             (* If streaming and v isn't found we don't know  the free vars 
+              * ahead of time, so add it then look up again *)
+             self#decl_no_print v; 
+             VH.find ctx v 
+         in
 	 (match st with 
-	 | BitVec -> lazy (pp name)
-	 | Bool -> raise No_rule)
+	   | BitVec -> lazy (pp name)
+	   | Bool -> raise No_rule)
      | Ite(cond, e1, e2) ->
 	 let pe1 = lazy (self#ast_exp e1) in
 	 let pe2 = lazy (self#ast_exp e2) in
@@ -461,6 +479,8 @@ object (self)
     with No_rule ->
       Lazy.force (self#bool_to_bv e)
       
+
+  method print_assertion = self#ast_exp_bool
 
   (** Try to evaluate an expression to a boolean. If no good rule
       exists, then raises the No_rule exception. *)
@@ -804,8 +824,14 @@ class pp_oc ?suffix:(s="") fd =
 object
   inherit pp ~suffix:s ft as super
   inherit Formulap.fpp_oc
+  inherit Formulap.stream_fpp_oc
   method close =
     super#close;
     close_out fd
+
+  (* method seek = () *)
+    
+    
+    
 end
 

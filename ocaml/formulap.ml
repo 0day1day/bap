@@ -64,3 +64,20 @@ end
    I guess we should/could change the type of fpp_oc too to avoid
 this. *)
 type fppf = ?suffix:string -> out_channel -> fpp_oc
+
+
+class virtual stream_fpp =
+object(self)
+  method virtual letmebegin : var -> Ast.exp -> unit
+  method virtual letmeend : var -> unit
+  method virtual print_assertion : Ast.exp -> unit
+  method virtual declare_new_free_var : var -> unit
+end
+
+class virtual stream_fpp_oc =
+object(self)
+  inherit stream_fpp
+  method virtual close : unit
+  method virtual flush : unit
+  (* method virtual seek : int -> unit *)
+end
