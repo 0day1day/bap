@@ -724,6 +724,15 @@ object (self)
 	pp "):";
 	cls();space();
 
+  method open_benchmark_has_mem () =
+    pp ("(set-logic QF_ABV)"); 
+    force_newline();
+    pp "(set-info :smt-lib-version 2.0)";
+    force_newline();
+    pp "(set-option :produce-assignments true)";
+    force_newline()
+
+
   method open_benchmark e =
     let has_mem e =
       let found_mem = ref false in

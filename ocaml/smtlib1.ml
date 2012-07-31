@@ -723,6 +723,22 @@ object (self)
 	pp "):";
 	cls();space();
 
+  method open_benchmark_has_mem () =
+    pc '(';
+    opn 0;
+    pp "benchmark file.smt";
+    force_newline();
+    pp ":status unknown";
+    force_newline();
+    pp ":source { Source Unknown }";
+    force_newline();
+    pp ":difficulty { Unknown }";
+    force_newline();
+    pp ":category { Unknown }";
+    force_newline();
+    pp (":logic QF_AUFBV");
+    force_newline()
+
   method open_benchmark e =
     let has_mem e =
       let found_mem = ref false in
@@ -731,7 +747,8 @@ object (self)
 	method visit_exp = function
 	  | Load _
 	  | Store _ -> found_mem := true; SkipChildren
-	  | Var v when not (is_integer_type (Var.typ v)) -> found_mem := true; SkipChildren
+	  | Var v when not (is_integer_type (Var.typ v)) -> 
+              found_mem := true; SkipChildren
 	  | _ when !found_mem -> SkipChildren
 	  | _ -> DoChildren	  
       end

@@ -72,10 +72,13 @@ object(self)
   method virtual andend : unit -> unit
   method virtual letmebegin : var -> Ast.exp -> unit
   method virtual letmeend : var -> unit
+  method virtual open_benchmark_has_mem : unit -> unit
+  method virtual close_benchmark : unit -> unit
   method virtual print_assertion : Ast.exp -> unit
   method virtual declare_given_freevars : var list -> unit
   method virtual declare_new_free_var : var -> unit
   method virtual print_free_var : var -> unit
+  method virtual formula : unit -> unit
 end
 
 class virtual stream_fpp_oc =
@@ -85,3 +88,7 @@ object(self)
   method virtual flush : unit
   method virtual seek : int -> unit 
 end
+
+type double_printer_type = {formula_p : stream_fpp_oc;
+                            free_var_p : stream_fpp_oc}
+
