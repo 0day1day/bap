@@ -68,10 +68,14 @@ type fppf = ?suffix:string -> out_channel -> fpp_oc
 
 class virtual stream_fpp =
 object(self)
+  method virtual andstart : unit -> unit
+  method virtual andend : unit -> unit
   method virtual letmebegin : var -> Ast.exp -> unit
   method virtual letmeend : var -> unit
   method virtual print_assertion : Ast.exp -> unit
+  method virtual declare_given_freevars : var list -> unit
   method virtual declare_new_free_var : var -> unit
+  method virtual print_free_var : var -> unit
 end
 
 class virtual stream_fpp_oc =
@@ -79,5 +83,5 @@ object(self)
   inherit stream_fpp
   method virtual close : unit
   method virtual flush : unit
-  (* method virtual seek : int -> unit *)
+  method virtual seek : int -> unit 
 end

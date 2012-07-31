@@ -129,6 +129,13 @@ object (self)
     match (VH.find ctx v) with
         | n,_ -> pp n
 
+  method andstart () = 
+    pp "(and ";
+
+  method andend () =
+    cut ();
+    pc ')'    
+
 (** Seperate lemebegin and letmeend to allow for streaming generation of
     formulas in utils/streamtrans.ml *)
   method letmebegin v e1 =
@@ -206,10 +213,17 @@ object (self)
 
   method declare_new_free_var = self#decl_no_print
 
-  method decl (Var.V(_,_,t) as v) =
-    self#decl_no_print v;
-    pp ":extrafuns (("; self#var v; space (); self#typ t; pp "))"; force_newline();
+  method print_free_var (Var.V(_,_,t) as v) =
+    pp ":extrafuns (("; 
+    self#var v; 
+    space (); 
+    self#typ t; 
+    pp "))"; 
+    force_newline()
 
+  method decl v =
+    self#decl_no_print v;
+    self#print_free_var v
 
   (** Prints the BAP expression e in SMTLIB format.  If e is a
       1-bit bitvector in BAP, then e is printed as a SMTLIB 1-bit
@@ -825,13 +839,12 @@ object
   inherit pp ~suffix:s ft as super
   inherit Formulap.fpp_oc
   inherit Formulap.stream_fpp_oc
+
   method close =
     super#close;
     close_out fd
 
-  (* method seek = () *)
-    
-    
-    
+  method seek = 
+    seek_out fd
 end
 

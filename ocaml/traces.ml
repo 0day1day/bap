@@ -1867,12 +1867,13 @@ type traceSymbolicType =
 
 module StreamPrinter =
 struct 
-  type fp = Formulap.stream_fpp_oc 
+  type fp = Formulap.stream_fpp_oc
   let init_printer file s = 
     let oc = open_out file in
     let p =
       match s with
         | "smtlib1" -> ((new Smtlib1.pp_oc oc) :> fp)
+        | "smtlib2" -> ((new Smtlib2.pp_oc oc) :> fp)
         | _ -> failwith ("Unknown printer "^s)
     in 
     p

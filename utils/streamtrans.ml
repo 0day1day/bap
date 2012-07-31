@@ -168,11 +168,13 @@ Stream.iter
 if (!outfile <> "") then (
   Traces.dsa_rev_map := None;
   print_endline("Outputting formula.");
-  match !traceSymbType with
+  (match !traceSymbType with
     | Traces.NoSub -> StreamSymbolicNoSub.output_formula ()
     | Traces.NoSubOpt -> StreamSymbolicNoSubOpt.output_formula ()
     | Traces.NoSubStreamLet -> StreamSymbolicNoSubStreamLet.output_formula ()
     | Traces.NoSubNoLet -> StreamSymbolicNoSubNoLet.output_formula ()
-    | Traces.Substitution -> StreamSymbolicSub.output_formula ()
+    | Traces.Substitution -> StreamSymbolicSub.output_formula ());
+(* SWXXX Super ugly hack.  Prepend the free variables to the formula file *)
+        
 )
 

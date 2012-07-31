@@ -87,8 +87,6 @@ object (self)
 
   val mutable let_counter = 0;
   
-  (* method  letmebegin v e = () *)
-  (* method  letmeend v = () *)
   (* method print_assertion e = () *)
   (* method declare_new_free_vars (v : var list) = () *)
 
@@ -136,29 +134,54 @@ object (self)
     match (VH.find ctx v) with
     | n,_ -> pp n
 
-  (** Returns a lazy expression that prints let v = e1 in e2. Never raises No_rule. *)
-  method letme v e1 e2 st =
+  method andstart () = 
+    pp "(and ";
+
+  method andend () =
+    cut ();
+    pc ')'    
+
+(** Seperate lemebegin and letmeend to allow for streaming generation of
+    formulas in utils/streamtrans.ml *)
+  method letmebegin v e1 =
     let t1 = Typecheck.infer_ast ~check:false e1 in
-    let cmd,c,pf,vst = match t1,!use_booleans with Reg 1,true -> "flet","$",self#ast_exp_bool,Bool | _ -> "let","?",self#ast_exp,BitVec in
-    let pf2 = match st with Bool -> self#ast_exp_bool | BitVec -> self#ast_exp in
+    let cmd,c,pf,vst=
+      match t1,!use_booleans with
+        | Reg 1,true -> "flet","$",self#ast_exp_bool,Bool
+        | _ -> "let","?",self#ast_exp,BitVec
+    in
     (* The print functions called, ast_exp and ast_exp_bool never
        raise No_rule. So, we don't need to evaluate them before the lazy
        block. *)
-    lazy(
-      pp "("; pp cmd; pp " ((";
-      (* v isn't allowed to shadow anything. also, smtlib requires it be prefixed with ? or $ *)
+      pp "("; pp cmd; pp " (";
+      (* v isn't allowed to shadow anything. also, smtlib requires it be
+         prefixed with ? or $ *)
       let s = c ^ var2s v ^"_"^ string_of_int let_counter in
       let_counter <- succ let_counter;
       pp s;
       pc ' ';
       pf e1;
-      pp "))";
+      pc ')';
       space ();
       self#extend v s vst;
-      pf2 e2;
+
+  method letmeend v =
       self#unextend v;
       cut ();
-      pc ')'
+      pc ')'    
+
+  method letmemiddle st = 
+      match st with
+        | Bool -> self#ast_exp_bool
+        | BitVec -> self#ast_exp
+
+  (** Returns a lazy expression that prints let v = e1 in e2. Never raises 
+      No_rule. *)
+  method letme v e1 e2 st =
+    lazy(
+      self#letmebegin v e1;
+      self#letmemiddle st e2;
+      self#letmeend v 
     )
 
   method varname v =
@@ -169,13 +192,16 @@ object (self)
     match VH.find ctx v with
     | _,st -> st
 
-  method declare_new_freevars e =
+  method declare_given_freevars es =
     force_newline();
     pp "; free variables:"; force_newline();
-    let fvs = Formulap.freevars e in 
-    List.iter (fun v -> if not(VH.mem ctx v) then self#decl v) fvs;
+    List.iter (fun v -> if not(VH.mem ctx v) then self#decl v) es;
     pp "; end free variables."; 
     force_newline()
+ 
+  method declare_new_freevars e =
+    let fvs = Formulap.freevars e in 
+    self#declare_given_freevars fvs
        
   method typ = function
     | Reg n ->	printf "(_ BitVec %d)" n
@@ -183,13 +209,26 @@ object (self)
     | Array _ -> failwith "SMTLIB2 only supports Arrays with register indices and elements"
     | TMem _ ->	failwith "TMem unsupported by SMTLIB2"
 
-  method decl (Var.V(_,_,t) as v) =
+ method decl_no_print (Var.V(_,_,t) as v) =
     let sort = match t with
       (* | Reg 1 -> Bool (\* Let's try making all 1-bit bvs bools for now *\) *)
       | _ -> BitVec
     in
-    self#extend v (var2s v) sort;
-    pp "(declare-fun "; self#var v; space (); pp "()"; space (); self#typ t; pp ")"; force_newline();
+    self#extend v (var2s v) sort
+
+  method declare_new_free_var = self#decl_no_print
+
+  method print_free_var (Var.V(_,_,t) as v) =     
+    pp ":extrafuns (("; 
+    self#var v; 
+    space (); 
+    self#typ t; 
+    pp "))"; 
+    force_newline()
+
+  method decl v =
+    self#decl_no_print v;
+    self#print_free_var v
 
   (** Prints the BAP expression e in SMTLIB format.  If e is a
       1-bit bitvector in BAP, then e is printed as a SMTLIB 1-bit
@@ -456,6 +495,7 @@ object (self)
     with No_rule ->
       Lazy.force (self#bool_to_bv e)
       
+  method print_assertion = self#ast_exp_bool
 
   (** Try to evaluate an expression to a boolean. If no good rule
       exists, then raises the No_rule exception. *)
@@ -794,8 +834,13 @@ class pp_oc ?suffix:(s="") fd =
 object
   inherit pp ~suffix:s ft as super
   inherit Formulap.fpp_oc
+  inherit Formulap.stream_fpp_oc
+
   method close =
     super#close;
     close_out fd
+
+  method seek =
+    seek_out fd
 end
 

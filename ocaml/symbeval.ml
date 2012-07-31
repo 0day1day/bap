@@ -856,33 +856,49 @@ module LetBindOldStream = StreamFormulaConverterToStream(LetBindOld)
 *)
 module LetBindStreamLet =
 struct
-  (* type fp = Formulap.stream_fpp_oc *)
-  type t = {printer : Formulap.stream_fpp_oc; form_t : Ast.exp; 
+  type t = {printer : Formulap.stream_fpp_oc; 
+            (* free_var_oc : Formulap.stream_fpp_oc;  *)
+            form_t : Ast.exp; 
             close_funs : (unit -> unit) Stack.t}
-  type init = Formulap.stream_fpp_oc
+  type init = Formulap.stream_fpp_oc (* * Formulap.stream_fpp_oc*)
   type output = unit
 
-  let init printer = 
-    (* SWXXX printer#open_and (); *)
-    {printer=printer; form_t=exp_true; close_funs=Stack.create()}
+  let free_vars = ref Var.VarSet.empty;;
+  let defined_vars = ref Var.VarSet.empty;;
 
-  let add_to_formula ({printer; form_t; close_funs} as record) expression typ =
+  let init printer = 
+    let close_funs = Stack.create() in
+    printer#andstart();
+    Stack.push (printer#andend) close_funs;
+    {printer=printer; (* free_var_oc=free_var_oc; *) form_t=exp_true; 
+     close_funs=close_funs}
+
+  let add_to_formula ({printer; (* free_var_oc; *) form_t; close_funs} as record) expression typ =
     (match expression, typ with
       | _, Equal ->
           printer#print_assertion expression;
-          (* print space? *)
+          (* SWXXX print space? *)
           record 
       | BinOp(EQ, Var v, value), Rename ->
+          let fp_list = Formulap.freevars value in
+          let fp = 
+            List.fold_left (fun s e -> Var.VarSet.add e s) Var.VarSet.empty fp_list
+          in
+          defined_vars := Var.VarSet.add v !defined_vars;
+          let fp = Var.VarSet.diff fp !defined_vars in
+          Var.VarSet.iter printer#declare_new_free_var fp;
+          free_vars := Var.VarSet.union !free_vars fp;
 	  printer#letmebegin v value;
           Stack.push (fun () -> printer#letmeend v) close_funs;
           {record with close_funs=close_funs}
       | _ -> failwith "internal error: adding malformed constraint to formula"
     )
 
-  let output_formula {printer; form_t; close_funs} =
+  let output_formula {printer; (* free_var_oc; *) form_t; close_funs} =
     printer#print_assertion exp_true;
-    (* SWXXX printer#letmeend v for each v in var_stack *)
-    (* SWXXX Print freevars at the end of the formula *)
+    Stack.iter (fun f -> f()) close_funs;
+    (* printer#seek 0; *) (* Free vars go at the begining of the file *)
+    (* free_var_oc#declare_given_freevars (Var.VarSet.elements !free_vars) *)
 end
 
 
