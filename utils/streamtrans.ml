@@ -177,7 +177,7 @@ if (!outfile <> "") then (
            expression file.  The formula expression file is named 
            outfile.tmp_exp and created in traces.ml *)
         Hacks.append_file !outfile ((!outfile)^".tmp_exp");
-        ignore(Unix.system ("rm "^(!outfile)^".tmp_exp"))
+        Sys.remove((!outfile)^".tmp_exp")
     | Traces.NoSubNoLet -> StreamSymbolicNoSubNoLet.output_formula ()
     | Traces.Substitution -> StreamSymbolicSub.output_formula ());
 )
