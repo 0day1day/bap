@@ -176,8 +176,8 @@ if (!outfile <> "") then (
         (* SWXXX Super ugly hack.  Prepend the free variables to the formula 
            expression file.  The formula expression file is named 
            outfile.tmp_exp and created in traces.ml *)
-        ignore(Unix.system ("cat "^(!outfile)^".tmp_exp >> "^(!outfile)^
-                               " && rm "^(!outfile)^".tmp_exp"))
+        Hacks.append_file !outfile ((!outfile)^".tmp_exp");
+        ignore(Unix.system ("rm "^(!outfile)^".tmp_exp"))
     | Traces.NoSubNoLet -> StreamSymbolicNoSubNoLet.output_formula ()
     | Traces.Substitution -> StreamSymbolicSub.output_formula ());
 )

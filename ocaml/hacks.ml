@@ -204,3 +204,15 @@ let replace_unknowns p =
   end
   in
   Ast_visitor.prog_accept v p
+
+(** Append file2 to file1 *)
+let append_file file1 file2 =
+  let oc1 = open_out_gen [Open_text; Open_append] 0o640 file1 in
+  let oc2 = open_in file2 in
+  let rec do_append oc_out oc_in =
+    try 
+      output_string oc_out ((input_line oc_in)^"\n");
+      do_append oc_out oc_in
+    with End_of_file -> ()
+  in
+  do_append oc1 oc2

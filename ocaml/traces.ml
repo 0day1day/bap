@@ -331,6 +331,11 @@ let assign_vars memv thread_map_lookup symbolic =
     match name_to_var k with
     | Some(realv) ->
         let realv = thread_map_lookup realv in
+        (* SWXXX Add another option for type of trace, if it is concrete, only
+           add move if instruction was unknown *)
+        (* SWXXX Add state of "do we have a valid symbolic formula" for the
+           variable.  Starts as false (and thus a move is inserted) Reset
+           to false when we see an unknown instruction *)
 	(match symbolic, v.tnt with
 	 | true, false (* Symbolic execution, non-tainted *)
 	 | false, _ (* Concrete execution *) ->
