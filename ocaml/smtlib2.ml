@@ -848,8 +848,5 @@ object
   method close =
     super#close;
     close_out fd
-
-  method seek =
-    seek_out fd
 end
 

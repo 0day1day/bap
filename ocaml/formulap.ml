@@ -86,7 +86,6 @@ object(self)
   inherit stream_fpp
   method virtual close : unit
   method virtual flush : unit
-  method virtual seek : int -> unit 
 end
 
 type double_printer_type = {formula_p : stream_fpp_oc;
