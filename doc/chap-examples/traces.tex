@@ -16,9 +16,11 @@ from the \cmdline{\$PATH/bap/pintraces} directory will
 automatically download and extract PIN for Linux; the user is
 responsible for accepting the PIN license agreements.
 
-On Windows, the process is more complicated.  First, install GNU Make
-for Windows (\url{http://gnuwin32.sourceforge.net/packages/make.htm})
-and Visual C++ 2010 Express
+On Windows, the process is more complicated.  We usually test with
+Windows 7, but some people have reported success with Windows XP SP3
+as well.  First, install GNU Make for Windows
+(\url{http://gnuwin32.sourceforge.net/packages/make.htm}) and Visual
+C++ 2010 Express
 (\url{http://www.microsoft.com/visualstudio/en-us/products/2010-editions/visual-cpp-express}).
 Also download PIN and extract it to the \cmdline{\$PATH/bap/pin}
 directory.  Next, we need to upgrade the Visual Studio project for
@@ -37,10 +39,9 @@ Generation settings.  Change the Runtime Library to Multi-threaded
 (/MT)\footnote{If you skip this step, you will get unresolved symbol
   errors while linking the PIN tool}.  Finally, close Visual Studio
 and save the changes to the project.  Open a Visual Studio command
-prompt, navigate to
-\cmdline{\$PATH/bap/libtracewrap/libtrace/src/cpp} and run
-\cmdline{make -f Makefile.windows} to build protobuffers and the
-libtrace library.
+prompt, navigate to \cmdline{\$PATH/bap/libtracewrap/libtrace/src/cpp}
+and run \cmdline{make -f Makefile.windows} to build protobuffers and
+the libtrace library.
 
 The PIN tool itself can be built by executing \cmdline{make} in the
 \cmdline{\$PATH/bap/pintraces} directory on both Windows and Linux.
@@ -94,14 +95,14 @@ following commands, we assume this file is named trace.bpt.
 To lift the trace data and print it, run 
 
 \begin{verbatim}
-iltrans -pin -trace trace.bpt -pp-ast /dev/stdout
+iltrans -serializedtrace trace.bpt -pp-ast /dev/stdout
 \end{verbatim}
 
 It is also possible to concretize the trace, which removes jumps and performs
 memory concretization, by executing 
 
 \begin{verbatim}
-iltrans -pin -trace trace.bpt -trace-concrete -pp-ast /dev/stdout
+iltrans -serializedtrace trace.bpt -trace-concrete -pp-ast /dev/stdout
 \end{verbatim}
 
 Adding the -trace-check option before -trace-concrete causes BAP to compare its
@@ -109,7 +110,7 @@ internal evaluator's notion of state with the actual values recorded in the
 trace.  It can be used to check for bugs in the IL.  Finally, running 
 
 \begin{verbatim}
-iltrans -pin -trace trace.bpt -trace-formula f
+iltrans -serializedtrace trace.bpt -trace-formula f
 \end{verbatim}
 
 will symbolically execute the trace and output the generated verification
