@@ -64,6 +64,7 @@ export SOURCES = \
 	debug_snippets.ml \
 	sccvn.mli sccvn.ml \
 	deadcode.mli deadcode.ml \
+	copy_prop.mli copy_prop.ml \
 	ssa_simp_misc.ml \
 	ssa_simp.ml \
 	formulap.ml \
