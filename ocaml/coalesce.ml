@@ -26,6 +26,8 @@ struct
   *       OR all nodes before n1 have safe stmts (comments, labels, etc.)
   *)
   let coalesce cfg =
+   let module CC = Checks.MakeConnectedCheck(C) in
+   let () = CC.connected_check cfg "coalesce" in
    let entry_node = C.find_vertex cfg BB_Entry in
    let visited = ref GS.empty in
    let isspecial v = match G.V.label v with BB _ -> false | _ -> true in

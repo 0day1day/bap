@@ -84,7 +84,7 @@ let check_pin_setup _ =
   if (Sys.file_exists cat_arg) 
   then assert_command ~foutput ~verbose:true "cat" [cat_arg] else ();
   (* Check environment variable for path to pin *)
-  let env_pin_path = try Sys.getenv "PIN_PATH" with _ -> "" in
+  let env_pin_path = try Sys.getenv "PIN_HOME" with _ -> "" in
   if (env_pin_path <> "") then pin_path := env_pin_path;
   check_file(!pin_path^pin);
   check_file(gentrace_path^gentrace);

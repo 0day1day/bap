@@ -81,6 +81,7 @@ let find_backedges g entry =
   found
 
 let structural_analysis c =
+  let () = Checks.connected_astcfg c "structural_analysis" in
   let g = graph_of_cfg c
   and entry = ref (BBlock Cfg.BB_Entry)
   and exit = ref (BBlock Cfg.BB_Exit) in
@@ -240,6 +241,7 @@ let structural_analysis c =
 
   let rec doit () =
     let progress = ref false in
+    post_ctr := 0;
     DFS.postfix_component (fun v-> post.(!post_ctr) <- v; incr post_ctr) g !entry;
     post_ctr := 0;
     while G.nb_vertex g > 1 && !post_ctr < G.nb_vertex g

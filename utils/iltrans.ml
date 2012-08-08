@@ -362,6 +362,9 @@ let speclist =
   :: ("-prune-cfg",
       uadd(TransformAstCfg Prune_unreachable.prune_unreachable_ast),
       "Prune unreachable nodes from an AST CFG")
+  :: ("-prune-ssa",
+      uadd(TransformSsa Prune_unreachable.prune_unreachable_ssa),
+      "Prune unreachable nodes from a SSA CFG")
   :: ("-unroll",
       Arg.Int (fun i -> add (TransformAstCfg(Unroll.unroll_loops ~count:i))),
       "<n> Unroll loops n times")

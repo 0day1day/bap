@@ -60,6 +60,7 @@ export SOURCES = \
 	cfg_ast.mli cfg_ast.ml \
 	depgraphs.mli depgraphs.ml \
 	cfg_ssa.mli cfg_ssa.ml \
+	checks.mli checks.ml \
 	debug_snippets.ml \
 	sccvn.mli sccvn.ml \
 	deadcode.mli deadcode.ml \
