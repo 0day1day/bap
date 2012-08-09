@@ -135,15 +135,6 @@ end
 module MakeWide :
   functor (D : DATAFLOW_WITH_WIDENING) ->
 sig
-  (** [worklist_iterate g] returns a worklist algorithm for graph [g]
-      as a pair of functions [in,out]. [in], when given a node [v],
-      computes the lattice value going in to that node, [v]. [out],
-      when given a node [v], computes the lattice value exiting
-      [v]. This function does not use the widening operator
-      [D.L.widen]. *)
-  val worklist_iterate : ?init:(D.G.t -> D.L.t) ->
-    D.G.t -> (D.G.V.t -> D.L.t) * (D.G.V.t -> D.L.t)
-
   (** Same as [worklist_iterate], but additionally employs the
       widening operator as lattice values propagate over backedges in
       the CFG.  Backedges are identified by observing when lattices

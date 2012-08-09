@@ -1,9 +1,6 @@
 (* Dataflow module for use with the ocamlgraph library
    @author Ivan Jager
 
-   XXX: MakeWide should be the 'main' functor, since Make can be
-   implemented by adding a default widening operator.
-
 *)
 
 open Util
@@ -68,69 +65,11 @@ sig
 end
 
 
-module Make (D:DATAFLOW) = 
+module MakeWide (D:DATAFLOW_WITH_WIDENING) = 
 struct
   module H = Hashtbl.Make(D.G.V)
 
- let worklist_iterate ?(init = D.init) g = 
-    let nodes = D.G.fold_vertex (fun x acc -> x::acc) g [] in
-    let f_t = D.node_transfer_function g in 
-    let succ_e,pred_e,dst,src = match D.dir with
-      | Forward ->
-	  (D.G.succ_e g, D.G.pred_e g,
-           D.G.E.dst, D.G.E.src)
-      | Backward ->
-	  (D.G.pred_e g, D.G.succ_e g,
-           D.G.E.src, D.G.E.dst)
-    in
-    let htin = H.create (List.length nodes) in
-    let dfin = H.find htin in (* function to be returned *)
-    let htout = H.create (List.length nodes) in
-    let dfout n =
-      try
-	H.find htout n
-      with Not_found ->
-	let out = (f_t n (dfin n)) in
-	H.add htout n out;
-	out
-    in
-    List.iter (fun n -> H.add htin n D.L.top) nodes;
-    H.replace htin (D.s0 g) (init g);
-    let rec do_work = function
-      | [] -> ()
-      | b::worklist ->  
-	  let inset = (dfin b) in 
-	  let outset = (f_t b inset) in 
-	  H.replace htout b outset;
-	  let affected_edges =
-	    List.filter 
-	      (fun se ->
-                let s = dst se in
-                (* Apply edge transfer function *)
-                let outset' = D.edge_transfer_function g se outset in
-		let oldin = dfin s in
-		let newin = D.L.meet oldin outset' in
-		if D.L.equal oldin newin
-		then false
-		else let () = H.replace htin s newin in true
-	      )
-	      (succ_e b)
-	  in
-          let affected_elems = List.map dst affected_edges in
-	  let newwklist = worklist@list_difference affected_elems worklist
-	  in
-	  do_work newwklist
-    in
-    do_work [D.s0 g];
-    (dfin, dfout)
-
-end
-
-module MakeWide (D:DATAFLOW_WITH_WIDENING) = 
-struct
-  include Make(D)
-
- let worklist_iterate_widen ?(init = D.init) ?(nmeets=0) g = 
+  let worklist_iterate_widen ?(init = D.init) ?(nmeets=0) g = 
     let nodes = D.G.fold_vertex (fun x acc -> x::acc) g [] in
     let f_t = D.node_transfer_function g in 
     let succ_e,pred_e,dst,src = match D.dir with
@@ -207,5 +146,25 @@ struct
     in
     do_work [D.s0 g];
     (dfin, dfout)
+end
 
+module Make (D:DATAFLOW) = 
+struct
+  module H = Hashtbl.Make(D.G.V)
+
+  let worklist_iterate =
+    let module DFSPEC = struct
+      module L = struct
+        include D.L
+        let widen = D.L.meet
+      end
+      module G = D.G
+      let node_transfer_function = D.node_transfer_function
+      let edge_transfer_function = D.edge_transfer_function
+      let s0 = D.s0
+      let init = D.init
+      let dir = D.dir
+    end in
+    let module DF = MakeWide(DFSPEC) in
+    DF.worklist_iterate_widen ~nmeets:0
 end
