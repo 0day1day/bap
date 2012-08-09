@@ -4,31 +4,33 @@ open GraphDataflow
 
 module type CFG =
 sig
-  type t
   type exp
   type stmt
   type lang = stmt list
-  module V : Graph.Sig.COMPARABLE
-  module E : Graph.Sig.EDGE with type vertex = V.t and type label = (bool * exp) option
-  val pred_e : t -> V.t -> E.t list
-  val succ_e : t -> V.t -> E.t list
-  val fold_vertex : (V.t -> 'a -> 'a) -> t -> 'a -> 'a
-  val get_stmts : t -> V.t -> lang
+  module G : sig
+    type t
+    module V : Graph.Sig.COMPARABLE
+    module E : Graph.Sig.EDGE with type vertex = V.t and type label = (bool * exp) option
+    val pred_e : t -> V.t -> E.t list
+    val succ_e : t -> V.t -> E.t list
+    val fold_vertex : (V.t -> 'a -> 'a) -> t -> 'a -> 'a
+  end
+  val get_stmts : G.t -> G.V.t -> lang
 end
 
 module type DATAFLOW =
 sig
 
   module L : BOUNDED_MEET_SEMILATTICE
-  module G : CFG
+  module CFG : CFG
 
-  val stmt_transfer_function : G.t -> G.stmt -> L.t -> L.t
+  val stmt_transfer_function : CFG.G.t -> CFG.stmt -> L.t -> L.t
 
-  val edge_transfer_function : G.t -> G.exp option -> L.t -> L.t
+  val edge_transfer_function : CFG.G.t -> CFG.exp option -> L.t -> L.t
 
-  val s0 : G.t -> G.V.t
+  val s0 : CFG.G.t -> CFG.G.V.t
 
-  val init : G.t -> L.t
+  val init : CFG.G.t -> L.t
 
   val dir : direction
 end
@@ -37,15 +39,15 @@ module type DATAFLOW_WITH_WIDENING =
 sig
 
   module L : BOUNDED_MEET_SEMILATTICE_WITH_WIDENING
-  module G : CFG
+  module CFG : CFG
 
-  val stmt_transfer_function : G.t -> G.stmt -> L.t -> L.t
+  val stmt_transfer_function : CFG.G.t -> CFG.stmt -> L.t -> L.t
 
-  val edge_transfer_function : G.t -> G.exp option -> L.t -> L.t
+  val edge_transfer_function : CFG.G.t -> CFG.exp option -> L.t -> L.t
 
-  val s0 : G.t -> G.V.t
+  val s0 : CFG.G.t -> CFG.G.V.t
 
-  val init : G.t -> L.t
+  val init : CFG.G.t -> L.t
 
   val dir : direction
 end
@@ -57,9 +59,9 @@ struct
     | Backward -> BatList.fold_right f stmts l
   module DFSPECW = struct
     module L=D.L
-    module G=D.G
+    module G=D.CFG.G
     let node_transfer_function g v l =
-      fold (D.stmt_transfer_function g) l (G.get_stmts g v)
+      fold (D.stmt_transfer_function g) l (D.CFG.get_stmts g v)
     let edge_transfer_function g e l =
       let arg = match G.E.label e with
         | Some(_,e) -> Some e
@@ -77,10 +79,10 @@ struct
     let win,wout = worklist_iterate_widen ?init ?nmeets g in
     let winstmt (v,n) =
       let l = win v in
-      fold (D.stmt_transfer_function g) l (BatList.take n (D.G.get_stmts g v))
+      fold (D.stmt_transfer_function g) l (BatList.take n (D.CFG.get_stmts g v))
     and woutstmt (v,n) =
       let l = win v in
-      fold (D.stmt_transfer_function g) l (BatList.take (n+1) (D.G.get_stmts g v))
+      fold (D.stmt_transfer_function g) l (BatList.take (n+1) (D.CFG.get_stmts g v))
     in
     winstmt, woutstmt
 end
@@ -93,7 +95,7 @@ struct
         include D.L
         let widen = D.L.meet
       end
-      module G = D.G
+      module CFG = D.CFG
       let stmt_transfer_function = D.stmt_transfer_function
       let edge_transfer_function = D.edge_transfer_function
       let s0 = D.s0

@@ -43,20 +43,17 @@ module CPSpecSSA = struct
       | Map x, Map y -> VM.equal (=) x y
       | _, _ -> false
   end
-  module G = Cfg.SSA.G
+  module CFG = Cfg.SSA
 
-  let node_transfer_function g bb l =
+  let stmt_transfer_function g stmt l =
     let l = match l with | L.Map m -> m | L.Top -> failwith "Expected Map, not Top" in
-    let stmts = Cfg.SSA.get_stmts g bb in
-    L.Map (List.fold_left
-      (fun l stmt -> match stmt with
-      | Move(v, Phi _, _) ->
-        VM.add v L.Bottom l
-      | Move(v,e,_) ->
+    L.Map (match stmt with
+    | Move(v, Phi _, _) ->
+      VM.add v L.Bottom l
+    | Move(v,e,_) ->
         (* dprintf "ignoring %s" (Pp.ssa_stmt_to_string s); *)
-        VM.add v (L.Middle e) l
-      | _ -> l
-      ) l stmts)
+      VM.add v (L.Middle e) l
+    | _ -> l)
 
   let edge_transfer_function g e l = l
 
@@ -95,18 +92,15 @@ module CPSpecAST = struct
       | Map x, Map y -> VM.equal (=) x y
       | _, _ -> false
   end
-  module G = Cfg.AST.G
+  module CFG = Cfg.AST
 
-  let node_transfer_function g bb l =
+  let stmt_transfer_function g stmt l =
     let l = match l with | L.Map m -> m | L.Top -> failwith "Expected Map, not Top" in
-    let stmts = Cfg.AST.get_stmts g bb in
-    L.Map (List.fold_left
-      (fun l stmt -> match stmt with
-      | Ast.Move(v,e,_) ->
+    L.Map (match stmt with
+    | Ast.Move(v,e,_) ->
         (* dprintf "ignoring %s" (Pp.ast_stmt_to_string s); *)
-        VM.add v (L.Middle e) l
-      | _ -> l
-      ) l stmts)
+      VM.add v (L.Middle e) l
+    | _ -> l)
 
   let edge_transfer_function g e l = l
 
@@ -115,8 +109,8 @@ module CPSpecAST = struct
   let dir = GraphDataflow.Forward
 end
 
-module CPSSA = GraphDataflow.Make(CPSpecSSA)
-module CPAST = GraphDataflow.Make(CPSpecAST)
+module CPSSA = CfgDataflow.Make(CPSpecSSA)
+module CPAST = CfgDataflow.Make(CPSpecAST)
 
 let copyprop_ssa g =
 
