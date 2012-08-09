@@ -47,7 +47,8 @@ module BM = Map.Make(BBid)
 module type CFG =
 sig
 
-  type lang
+  type stmt
+  type lang = stmt list
   type exp
 
   include Graph.Builder.S with type G.V.label = bbid and type G.E.label = (bool * exp) option
@@ -84,12 +85,13 @@ type ('a,'b,'c) pcfg =
 
 module type Language =
 sig
-  type t
+  type stmt
+  type lang = stmt list
   type exp
-  val default : t
-  val join : t -> t -> t
-  val iter_labels : (label->unit) -> t -> unit
-  val to_string : t -> string
+  val default : lang
+  val join : lang -> lang -> lang
+  val iter_labels : (label->unit) -> lang -> unit
+  val to_string : lang -> string
 end
 
 module E(Lang: Language) =
@@ -105,7 +107,8 @@ struct
   (* A simple implementation for now... We can worry about optimizing later. *)
   module G' = Graph.Persistent.Digraph.ConcreteBidirectionalLabeled(BBid)(E(Lang))
 
-  type lang = Lang.t
+  type lang = Lang.lang
+  type stmt = Lang.stmt
   type exp = Lang.exp
 
 
@@ -124,7 +127,7 @@ struct
       nextid : int
     }
 *)
-    type t = (G'.t, Lang.t BM.t, V.t LM.t) pcfg
+    type t = (G'.t, Lang.lang BM.t, V.t LM.t) pcfg
 
     let is_directed = true
 
@@ -268,7 +271,8 @@ module Make = MakeP
 
 module LangAST =
 struct
-  type t = Ast.stmt list
+  type lang = Ast.stmt list
+  type stmt = Ast.stmt
   type exp = Ast.exp
   let default = []
   let join sl1 sl2 = match List.rev sl1 with
@@ -282,7 +286,8 @@ end
 
 module LangSSA =
 struct
-  type t = Ssa.stmt list
+  type lang = Ssa.stmt list
+  type stmt = Ssa.stmt
   type exp = Ssa.exp
   let default = []
   let join sl1 sl2 = match List.rev sl1 with

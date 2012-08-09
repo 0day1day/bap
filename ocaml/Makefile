@@ -49,6 +49,7 @@ export SOURCES = \
 	typecheck.mli typecheck.ml \
 	ast_convenience.ml \
 	cfg.mli cfg.ml \
+	cfgDataFlow.mli cfgDataFlow.ml \
 	ast_visitor.mli ast_visitor.ml \
 	ssa_visitor.mli ssa_visitor.ml \
 	grammar_scope.ml \

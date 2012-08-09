@@ -1,5 +1,9 @@
 (* Dataflow module for use with the ocamlgraph library
    @author Ivan Jager
+
+   XXX: MakeWide should be the 'main' functor, since Make can be
+   implemented by adding a default widening operator.
+
 *)
 
 open Util

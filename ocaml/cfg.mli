@@ -39,7 +39,8 @@ module BM : Map.S with type key = BBid.t
 module type CFG =
 sig
 
-  type lang
+  type stmt
+  type lang = stmt list
   type exp
 
   (* XXX: Should we force exp more structured? For instance, exp =
@@ -89,12 +90,12 @@ sig
 end
 
 (** Control flow graph in which statements are in {!Ast.stmt} form. *)
-module AST : CFG with type lang = Ast.stmt list and type exp = Ast.exp
+module AST : CFG with type stmt = Ast.stmt and type exp = Ast.exp
 
 (** Control flow graph in which statements are in {!Ssa.stmt} form.
     All variables are assigned at most one time in the program, and
     expressions do not contain subexpressions. *)
-module SSA : CFG with type lang = Ssa.stmt list and type exp = Ssa.exp
+module SSA : CFG with type stmt = Ssa.stmt and type exp = Ssa.exp
 
 (** {3 Helper functions for CFG conversions} *)
 (* These are for cfg_ast.ml and cfg_ssa.ml to be able to translate without
@@ -102,3 +103,6 @@ module SSA : CFG with type lang = Ssa.stmt list and type exp = Ssa.exp
 
 val map_ast2ssa : (Ast.stmt list -> Ssa.stmt list) -> (AST.exp -> SSA.exp) -> AST.G.t -> SSA.G.t
 val map_ssa2ast : (Ssa.stmt list -> Ast.stmt list) -> (SSA.exp -> AST.exp) -> SSA.G.t -> AST.G.t
+
+
+

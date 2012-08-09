@@ -1,85 +1,35 @@
-(** Dataflow module for use with the ocamlgraph library
+(** Dataflow module for use with Control Flow Graphs.  This should
+    probably always be used in BAP instead of [graphDataFlow]. *)
 
-    @author Ivan Jager
-*)
+open GraphDataflow
 
-
-(** Types of graph that data flow is defined on *)
-module type G =
+(** Types of control flow graph that data flow is defined on *)
+module type CFG =
 sig
   type t
+  type exp
+  type stmt
+  type lang = stmt list
   module V : Graph.Sig.COMPARABLE
-  module E : Graph.Sig.EDGE with type vertex = V.t
+  module E : Graph.Sig.EDGE with type vertex = V.t and type label = (bool * exp) option
   val pred_e : t -> V.t -> E.t list
   val succ_e : t -> V.t -> E.t list
   val fold_vertex : (V.t -> 'a -> 'a) -> t -> 'a -> 'a
+  val get_stmts : t -> V.t -> lang
 end
 
-(** Data flow direction.  [Forward] dataflow propagates values in the
-    same direction as edges in the control flow graph, while
-    [Backward] dataflow propagates values in the reverse direction. *)
-type direction = Forward | Backward
-
-
-(** The lattice the dataflow is defined on.  See
-    {{:http://en.wikipedia.org/wiki/Meet-semilattice}here} for more
-    information.
-*)
-module type BOUNDED_MEET_SEMILATTICE =
-sig
-
-  (** The type of a latice element *)
-  type t
-
-  (** Top of the latice (the bound)*)
-  val top : t
-
-  (** The meet operator.
-      [meet v1 v2] should form a lattice. In particular,
-      [meet v1 Top = meet Top v1 = v1],
-      and [meet Bottom _ = meet _ Bottom = Bottom].
-  *)
-  val meet : t -> t -> t
-
-  (** Equality checking for latice values.  Returns true when the two
-      latice elements are the same.  *)
-  val equal : t -> t -> bool
-end
-
-(** The lattice the dataflow is defined on, with a widening operator. *)
-module type BOUNDED_MEET_SEMILATTICE_WITH_WIDENING =
-sig
-
-  include BOUNDED_MEET_SEMILATTICE
-
-  (** The widening operator W.
-
-      I'm not going to repeat the formal definition here, since it is
-      intended for infinite chains, and we often have finite (but long
-      chains), which are just as bad.
-
-      Suffice to say if you have some long finite chain over the
-      lattice values, applying the widening operator to the chain
-      should cause it to stablize quickly.
-
-      If [A < B], then [widen B A] should probably equal the bottom
-      element of the lattice. If [A <= B], then [widen A B = A]. *)
-  val widen : t -> t -> t
-end
-
-(** A dataflow problem is defined by a lattice over a graph. *)
+(** A dataflow problem is defined by a lattice over a CFG. *)
 module type DATAFLOW =
 sig
 
   module L : BOUNDED_MEET_SEMILATTICE
-  module G : G
+  module G : CFG
 
-  (** The transfer function over node elements, e.g., basic
-      blocks. *)
-  val node_transfer_function : G.t -> G.V.t -> L.t -> L.t
+  (** The transfer function over statements. *)
+  val stmt_transfer_function : G.t -> G.stmt -> L.t -> L.t
 
   (** The transfer function over edge elements, e.g., conditions. *)
-  val edge_transfer_function : G.t -> G.E.t -> L.t -> L.t
+  val edge_transfer_function : G.t -> G.exp option -> L.t -> L.t
 
   (** The starting node for the analysis. *)
   val s0 : G.t -> G.V.t
@@ -97,14 +47,13 @@ module type DATAFLOW_WITH_WIDENING =
 sig
 
   module L : BOUNDED_MEET_SEMILATTICE_WITH_WIDENING
-  module G : G
+  module G : CFG
 
-  (** The transfer function over node elements, e.g., basic
-      blocks. *)
-  val node_transfer_function : G.t -> G.V.t -> L.t -> L.t
+  (** The transfer function over statements. *)
+  val stmt_transfer_function : G.t -> G.stmt -> L.t -> L.t
 
   (** The transfer function over edge elements, e.g., conditions. *)
-  val edge_transfer_function : G.t -> G.E.t -> L.t -> L.t
+  val edge_transfer_function : G.t -> G.exp option -> L.t -> L.t
 
   (** The starting node for the analysis. *)
   val s0 : G.t -> G.V.t
@@ -128,6 +77,12 @@ sig
       [v]. *)
   val worklist_iterate : ?init:(D.G.t -> D.L.t) ->
     D.G.t -> (D.G.V.t -> D.L.t) * (D.G.V.t -> D.L.t)
+
+  (** Like [worklist_iterate], except the dataflow is done on the
+      statement level. A statement [bb,n] is the [n]th stmt
+      (zero-indexed) in [bb]. *)
+  val worklist_iterate_stmt : ?init:(D.G.t -> D.L.t) ->
+    D.G.t -> (D.G.V.t * int -> D.L.t) * (D.G.V.t * int -> D.L.t)
 end
 
 (** Build a custom dataflow algorithm for the given dataflow problem
