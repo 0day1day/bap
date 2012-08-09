@@ -17,6 +17,7 @@
 #define __NR_mmap2		192
 
 // Windows system calls @ http://code.google.com/p/miscellaneouz/source/browse/trunk/winsyscalls?spec=svn26&r=26
+// These numbers are for Windows 7
 enum {
   __NR_closewin = 0x32,
   __NR_createfilewin = 0x42,
