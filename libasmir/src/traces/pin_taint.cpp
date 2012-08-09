@@ -525,6 +525,7 @@ bool TaintTracker::taintPreSC(uint32_t callno, const uint64_t *args, /* out */ u
   switch (callno) {
 #ifndef _WIN32 /* unix */
       case __NR_open:
+      {
         // FIXME: use PIN_SafeCopy
         strncpy(filename, (char *)args[0],128); 
 
@@ -542,6 +543,7 @@ bool TaintTracker::taintPreSC(uint32_t callno, const uint64_t *args, /* out */ u
 	} else {
 	  cerr << "Not opening " << cppfilename << endl;
 	}
+      }
         break;
       case __NR_close:
         state = __NR_close;
