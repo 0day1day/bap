@@ -18,23 +18,14 @@
 
 // Windows system calls @ http://code.google.com/p/miscellaneouz/source/browse/trunk/winsyscalls?spec=svn26&r=26
 enum {
-  __NR_closewin = 1,
-  __NR_createfilewin,
-  __NR_createsectionwin,
-  __NR_mapviewofsectionwin,
-  __NR_readfilewin,
-  __NR_setinfofilewin,
-  total_syscall_num
+  __NR_closewin = 0x32,
+  __NR_createfilewin = 0x42,
+  __NR_createsectionwin = 0x54,
+  __NR_mapviewofsectionwin = 0xa8,
+  __NR_readfilewin = 0x111,
+  __NR_setinfofilewin = 0x149,
 };
 
-const char *syscall_array[] = {
-  "NtClose",
-  "NtCreateFile",
-  "NtCreateSection",
-  "NtMapViewOfSection",
-  "NtReadFile",
-  "NtSetInformationFile",
-};
 
 
 /********************************************/

@@ -88,17 +88,47 @@ TaintTracker::TaintTracker(ValSpecRec * env)
 {
 #ifdef _WIN32
 
-// Windows versions from 
-// http://msdn.microsoft.com/en-us/library/aa383745(v=vs.85).aspx
+// Windows versions from
+// http://msdn.microsoft.com/en-us/library/aa383745(v=vs.85).aspx 
+
+// It would be better if this determined the OS at run-time rather
+// than build time.
 #if NTDDI_VERSION == 0x06010000
   #define WIN_VER OS_SEVEN_SP0
+#elif NTDDI_VERSION == 0x06000000
+  #define WIN_VER OS_VISTA_SP0
+#elif NTDDI_VERSION == 0x05020100
+  #define WIN_VER OS_2003_SP1
+#elif NTDDI_VERSION == 0x05020000
+  #define WIN_VER OS_2003_SP0
 #elif NTDDI_VERSION == 0x05010300
   #define WIN_VER OS_XP_SP3
+#elif NTDDI_VERSION == 0x05010200
+  #define WIN_VER OS_XP_SP2
+#elif NTDDI_VERSION == 0x05010100
+  #define WIN_VER OS_XP_SP1
+#elif NTDDI_VERSION == 0x05010000
+  #define WIN_VER OS_XP_SP0
+#elif NTDDI_VERSION == 0x05000400
+  #define WIN_VER OS_2K_SP4
+#elif NTDDI_VERSION == 0x05000300
+  #define WIN_VER OS_2K_SP3
+#elif NTDDI_VERSION == 0x05000200
+  #define WIN_VER OS_2K_SP2
+#elif NTDDI_VERSION == 0x05000100
+  #define WIN_VER OS_2K_SP1
+#elif NTDDI_VERSION == 0x05000000
+  #define WIN_VER OS_2K_SP0
+#else
+  #error "Unsupported version of windows"
 #endif
 
-  for ( unsigned i = 0; i < total_syscall_num; i++ ) {
-    const char * name = syscall_array[i];
-    syscall_map.insert( std::pair<unsigned int, unsigned int>( get_syscall(name, WIN_VER), i ) );
+  for ( unsigned i = 0; i < num_syscalls; i++ ) {
+    const char *name = syscalls[i].name;
+    int from = get_syscall(name, WIN_VER);
+    int to = get_syscall(name, OS_SEVEN_SP0);
+    //cerr << "mapping " << from << " to " << to << endl; 
+    syscall_map.insert( std::pair<unsigned int, unsigned int>( from, to ));
   }
 #endif
 }
@@ -497,11 +527,20 @@ bool TaintTracker::taintPreSC(uint32_t callno, const uint64_t *args, /* out */ u
       case __NR_open:
         // FIXME: use PIN_SafeCopy
         strncpy(filename, (char *)args[0],128); 
-        if (taint_files.find(string(filename)) != taint_files.end()) {
-          cerr << "Opening tainted file: " << string(filename) << endl;
-          state = __NR_open;
-        } else {
-	  cerr << "Open non-tainted file: " << string(filename) << endl;
+
+	// Search for each tainted filename in filename
+	string cppfilename(filename);
+	for (std::set<string>::iterator i = taint_files.begin();
+	     i != taint_files.end();
+	     i++) {
+	  if (cppfilename.find(*i) != string::npos) {
+	    state = __NR_open;
+	  }
+	}
+	if (state == __NR_open) {
+	  cerr << "Opening tainted file: " << cppfilename << endl;
+	} else {
+	  cerr << "Not opening " << cppfilename << endl;
 	}
         break;
       case __NR_close:
@@ -559,11 +598,19 @@ bool TaintTracker::taintPreSC(uint32_t callno, const uint64_t *args, /* out */ u
 	cerr << "Warning: Could not convert all characters" << endl;
       }
       
-      if (taint_files.find(string(tempstr)) != taint_files.end()) {
-	cerr << "Opening tainted file: " << string(tempstr) << endl;
-	state = __NR_createfilewin;
+      // Search for each tainted filename in tempstr
+      string tempcppstr(tempstr);
+      for (std::set<string>::iterator i = taint_files.begin();
+	   i != taint_files.end();
+	   i++) {
+	if (tempcppstr.find(*i) != string::npos) {
+	  state = __NR_createfilewin;
+	}
+      }
+      if (state == __NR_createfilewin) {
+	cerr << "Opening tainted file: " << tempcppstr << endl;
       } else {
-	cerr << "Not opening " << string(tempstr) << endl;
+	cerr << "Not opening " << tempcppstr << endl;
       }
       
       break;
@@ -587,6 +634,7 @@ bool TaintTracker::taintPreSC(uint32_t callno, const uint64_t *args, /* out */ u
     break;
 
   case __NR_createsectionwin:
+    cerr << "create section win" << endl;
     if (args[6]) {
       state = __NR_createsectionwin;
     }
@@ -611,6 +659,7 @@ bool TaintTracker::taintPreSC(uint32_t callno, const uint64_t *args, /* out */ u
     // }
     break;
   case __NR_mapviewofsectionwin:
+    cerr << "map view of section" << endl;
     if (sections.find(args[0]) != sections.end()) {
       reading_tainted = true;
       cerr << "found a t-mmap " << endl;
@@ -621,7 +670,7 @@ bool TaintTracker::taintPreSC(uint32_t callno, const uint64_t *args, /* out */ u
     
   default:
     //    LOG(string("Unknown system call") + *(get_name(callno)) + string("\n"));
-    // cerr << "Unknown system call " << *(get_name(callno)) << endl;
+    //    cerr << "Unknown system call " << callno << " " << *(get_name(callno)) << endl;
     break;
   }
   return reading_tainted;
@@ -802,7 +851,7 @@ FrameOption_t TaintTracker::taintPostSC(const uint32_t bytes,
       case __NR_mapviewofsectionwin:
         if (bytes == STATUS_SUCCESS) {
 	  /* XXX: Determine offset into file. */
-          length = 0; // disabled args[6];  /// XXX: possibly wrong
+          length = *(reinterpret_cast<uint32_t *> (args[6]));  /// XXX: possibly wrong
           addr = *(reinterpret_cast<uint32_t *> (args[2])); /// XXX: possibly wrong
           assert(addr);
           cerr << "Tainting " 
