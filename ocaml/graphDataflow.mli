@@ -1,4 +1,6 @@
-(** Dataflow module for use with the ocamlgraph library
+(** Dataflow module for use with the ocamlgraph library.  You should
+    not need to use this module directly in BAP.  Instead, use
+    {!CfgDataflow}.
 
     @author Ivan Jager
 *)

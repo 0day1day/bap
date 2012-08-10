@@ -384,6 +384,8 @@ let speclist =
       "Flatten memory accesses")
   :: ("-vsa", uadd(AnalysisAstCfg vsa_print),
       "Run value set analysis and print the results.")
+  :: ("-simplify-conds", uadd(TransformAstCfg Ast_cond_simplify.simplify_cond),
+      "Simplify conditions")
   ::("-no-ssa-tac", Arg.Unit (fun () -> tac := false),
      "Disable three address code in SSA representation.")
   :: Input.speclist

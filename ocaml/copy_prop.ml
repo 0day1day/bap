@@ -160,4 +160,35 @@ let copyprop_ssa g =
       VM.add k ssae newmap
     | _ ->
       newmap)
-  ) unionmap VM.empty
+  ) unionmap VM.empty, propagate unionmap
+
+let copyprop_ast g =
+  let rec propagate l v =
+    let vis = object(self)
+      inherit Ast_visitor.nop
+      method visit_exp = function
+        | Ast.Var v ->
+          (try
+             match VM.find v l with
+             | CPSpecAST.L.Middle e ->
+               ChangeToAndDoChildren e
+             | _ -> SkipChildren
+           with Not_found -> SkipChildren)
+        | _ -> DoChildren
+    end in
+    Ast_visitor.exp_accept vis v
+  in
+  let dfin, _ = CPAST.worklist_iterate_stmt g in
+  (fun (v,n) ->
+    match dfin (v,n) with
+    | CPSpecAST.L.Map m ->
+      VM.fold (fun k v newmap ->
+        (match v with
+        | CPSpecAST.L.Middle x ->
+          let aste = propagate m x in
+          (* dprintf "%s maps to %s" (Pp.var_to_string k) (Pp.ast_exp_to_string aste); *)
+          VM.add k aste newmap
+        | _ ->
+          newmap)
+      ) m VM.empty, propagate m
+    | _ -> failwith "Expected map")

@@ -307,6 +307,8 @@ end
 module AST = Make(LangAST)
 module SSA = Make(LangSSA)
 
+type aststmtloc = AST.G.V.t * int
+type ssastmtloc = SSA.G.V.t * int
 
 module type CFG_PRIV =
 sig

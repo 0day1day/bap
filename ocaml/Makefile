@@ -66,6 +66,7 @@ export SOURCES = \
 	sccvn.mli sccvn.ml \
 	deadcode.mli deadcode.ml \
 	copy_prop.mli copy_prop.ml \
+	ast_cond_simplify.mli ast_cond_simplify.ml \
 	ssa_simp_misc.ml \
 	ssa_simp.ml \
 	formulap.ml \

@@ -1,5 +1,5 @@
-(** Dataflow module for use with Control Flow Graphs.  This should
-    probably always be used in BAP instead of [graphDataFlow]. *)
+(** Dataflow module for use with Control Flow Graphs.  Use this module
+    to write dataflow analyses in BAP instead of {!GraphDataflow}. *)
 
 open GraphDataflow
 

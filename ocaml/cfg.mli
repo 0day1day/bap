@@ -97,6 +97,16 @@ module AST : CFG with type stmt = Ast.stmt and type exp = Ast.exp
     expressions do not contain subexpressions. *)
 module SSA : CFG with type stmt = Ssa.stmt and type exp = Ssa.exp
 
+(** {3 Location of statements in CFGs} *)
+
+(** Unique identifier for an AST CFG statement. [(v,n)] means the [n]th
+    (zero-indexed) statement in basic block [v]. *)
+type aststmtloc = AST.G.V.t * int
+
+(** Unique identifier for an SSA CFG statement. [(v,n)] means the [n]th
+    (zero-indexed) statement in basic block [v]. *)
+type ssastmtloc = SSA.G.V.t * int
+
 (** {3 Helper functions for CFG conversions} *)
 (* These are for cfg_ast.ml and cfg_ssa.ml to be able to translate without
    breaking nextid. Poke Ivan if you think you need them for something else. *)
