@@ -52,7 +52,8 @@ module CPSpecSSA = struct
       VM.add v L.Bottom l
     | Move(v,e,_) ->
         (* dprintf "ignoring %s" (Pp.ssa_stmt_to_string s); *)
-      VM.add v (L.Middle e) l
+      let newv = try L.elementmeet (VM.find v l) (L.Middle e) with Not_found -> L.Middle e in
+      VM.add v newv l
     | _ -> l)
 
   let edge_transfer_function g e l = l
@@ -99,7 +100,8 @@ module CPSpecAST = struct
     L.Map (match stmt with
     | Ast.Move(v,e,_) ->
         (* dprintf "ignoring %s" (Pp.ast_stmt_to_string s); *)
-      VM.add v (L.Middle e) l
+      let newv = try L.elementmeet (VM.find v l) (L.Middle e) with Not_found -> L.Middle e in
+      VM.add v newv l
     | _ -> l)
 
   let edge_transfer_function g e l = l
@@ -115,54 +117,40 @@ module CPAST = CfgDataflow.Make(CPSpecAST)
 let copyprop_ssa g =
 
   let _, dfout = CPSSA.worklist_iterate g in
-  (* copy propagation is used during iterative indirect jump
-     resolving.  Unfortunately, this means there may not be a path to
-     exit from the indirect jump.  Thus, we should take results from all
-     nodes, not just BB_Exit *)
-
-  let map_union m oldmap =
-    VM.fold
-      (fun k v newmap ->
-        let old = try VM.find k newmap with Not_found -> v in
-        let meet = CPSpecSSA.L.elementmeet v old in
-        VM.add k meet newmap
-      ) m oldmap
-  in
-  let unionmap = Cfg.SSA.G.fold_vertex
-    (fun v m ->
-      (* let newm = dfout v in *)
-      let newm = match dfout v with
-        | CPSpecSSA.L.Map m -> m
-        | _ -> failwith "Expected a map"
-      in
-      map_union newm m) g VM.empty
-  in
-
   let rec propagate l v =
     let vis = object(self)
       inherit Ssa_visitor.nop
       method visit_exp = function
-        | Var v ->
+        | Ssa.Var v ->
           (try
-            match VM.find v l with
-            | CPSpecSSA.L.Middle e -> ChangeToAndDoChildren e
-            | _ -> SkipChildren
-          with Not_found -> SkipChildren)
+             match VM.find v l with
+             | CPSpecSSA.L.Middle e ->
+               ChangeToAndDoChildren e
+             | _ -> SkipChildren
+           with Not_found -> SkipChildren)
         | _ -> DoChildren
     end in
     Ssa_visitor.exp_accept vis v
   in
+
+  let l = dfout (Cfg.SSA.G.V.create Cfg.BB_Error) in
+  let l = match l with
+    | CPSpecSSA.L.Map m -> m
+    | _ -> failwith "Expected to find a map: BB_Exit probably unreachable"
+  in
   VM.fold (fun k v newmap ->
     (match v with
     | CPSpecSSA.L.Middle x ->
-      let ssae = propagate unionmap x in
-      (* dprintf "%s maps to %s" (Pp.var_to_string k) (Pp.ssa_exp_to_string aste); *)
+      let ssae = propagate l x in
+      (* dprintf "%s maps to %s" (Pp.var_to_string k) (Pp.ssa_exp_to_string ssae); *)
       VM.add k ssae newmap
     | _ ->
       newmap)
-  ) unionmap VM.empty, propagate unionmap
+  ) l VM.empty, propagate l
 
 let copyprop_ast g =
+
+  let dfin, _ = CPAST.worklist_iterate_stmt g in
   let rec propagate l v =
     let vis = object(self)
       inherit Ast_visitor.nop
@@ -178,17 +166,19 @@ let copyprop_ast g =
     end in
     Ast_visitor.exp_accept vis v
   in
-  let dfin, _ = CPAST.worklist_iterate_stmt g in
-  (fun (v,n) ->
-    match dfin (v,n) with
-    | CPSpecAST.L.Map m ->
-      VM.fold (fun k v newmap ->
-        (match v with
-        | CPSpecAST.L.Middle x ->
-          let aste = propagate m x in
-          (* dprintf "%s maps to %s" (Pp.var_to_string k) (Pp.ast_exp_to_string aste); *)
-          VM.add k aste newmap
-        | _ ->
-          newmap)
-      ) m VM.empty, propagate m
-    | _ -> failwith "Expected map")
+
+  (fun (bb,n) ->
+  let l = dfin (bb,n) in
+  let l = match l with
+    | CPSpecAST.L.Map m -> m
+    | _ -> failwith "Expected to find a map: BB_Exit probably unreachable"
+  in
+  VM.fold (fun k v newmap ->
+    (match v with
+    | CPSpecAST.L.Middle x ->
+      let aste = propagate l x in
+      (* dprintf "%s maps to %s" (Pp.var_to_string k) (Pp.ast_exp_to_string aste); *)
+      VM.add k aste newmap
+    | _ ->
+      newmap)
+  ) l VM.empty, propagate l)
