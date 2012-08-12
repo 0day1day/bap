@@ -490,7 +490,8 @@ os_t get_win_version() {
   if (osvi.dwMajorVersion == 6 &&
       osvi.dwMinorVersion == 1 &&
       osvi.wProductType == VER_NT_WORKSTATION &&
-      osvi.wServicePackMajor == 0) {
+      // Table hasn't been updated for Windows 7 SP1 yet...
+      osvi.wServicePackMajor <= 1) {
     WIN_VER = OS_SEVEN_SP0;
   } 
   else if (osvi.dwMajorVersion == 6 &&
@@ -566,6 +567,10 @@ os_t get_win_version() {
     WIN_VER = OS_2K_SP0;
   } 
   else {
+    cerr << "Unable to determine OS version: Major/minor/service "
+	 << osvi.dwMajorVersion << "/"
+	 << osvi.dwMinorVersion << "/"
+	 << osvi.wServicePackMajor << endl;
     assert (0 && "Unable to determine OS version.");
   }
 

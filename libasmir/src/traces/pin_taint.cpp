@@ -97,7 +97,7 @@ TaintTracker::TaintTracker(ValSpecRec * env)
     int from = get_syscall(name, WIN_VER);
     int to = get_syscall(name, OS_SEVEN_SP0);
     if (from != -1 && to != -1) {
-      cerr << "mapping " << name << ": " << from << " to " << to << endl; 
+      //cerr << "mapping " << name << ": " << from << " to " << to << endl; 
       syscall_map.insert( std::pair<unsigned int, unsigned int>( from, to ));
     }
   }
