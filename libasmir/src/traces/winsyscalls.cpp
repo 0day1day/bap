@@ -473,6 +473,7 @@ int num_syscalls = sizeof(syscalls) / sizeof(SCENTRY);
 
 //using namespace std;
 
+#ifdef _WIN32
 /** Get version */
 os_t get_win_version() {
   OSVERSIONINFOEX osvi;
@@ -576,6 +577,7 @@ os_t get_win_version() {
 
   return WIN_VER;
 }
+#endif
 
 /** Find name of system call num on os */
 auto_ptr<string> get_name(uint32_t num, os_t os) {
