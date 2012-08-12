@@ -41,4 +41,6 @@ std::auto_ptr<std::string> get_name(uint32_t, os_t = OS_SEVEN_SP0);
 
 uint32_t get_syscall(const char *, os_t);
 
+os_t get_win_version();
+
 #endif

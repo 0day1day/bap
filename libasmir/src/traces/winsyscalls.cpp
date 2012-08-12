@@ -1,7 +1,11 @@
+#include <cassert>
 #include <iostream>
 #include <memory>
 #include <string>
 #include <stdint.h>
+#ifdef _WIN32
+#include <Windows.h>
+#endif
 
 using namespace std;
 //#include "winsyscalls.h"
@@ -469,6 +473,105 @@ int num_syscalls = sizeof(syscalls) / sizeof(SCENTRY);
 
 //using namespace std;
 
+/** Get version */
+os_t get_win_version() {
+  OSVERSIONINFOEX osvi;
+  BOOL bIsWindowsXPorLater;
+
+  ZeroMemory(&osvi, sizeof(OSVERSIONINFOEX));
+  osvi.dwOSVersionInfoSize = sizeof(OSVERSIONINFOEX);
+
+  assert (GetVersionEx((LPOSVERSIONINFO) &osvi));
+
+  os_t WIN_VER;
+
+  // See http://msdn.microsoft.com/en-us/library/windows/desktop/ms724833(v=vs.85).aspx
+
+  if (osvi.dwMajorVersion == 6 &&
+      osvi.dwMinorVersion == 1 &&
+      osvi.wProductType == VER_NT_WORKSTATION &&
+      osvi.wServicePackMajor == 0) {
+    WIN_VER = OS_SEVEN_SP0;
+  } 
+  else if (osvi.dwMajorVersion == 6 &&
+      osvi.dwMinorVersion == 0 &&
+      osvi.wProductType == VER_NT_WORKSTATION &&
+      osvi.wServicePackMajor == 0) {
+    WIN_VER = OS_VISTA_SP0;
+  } 
+  else if (osvi.dwMajorVersion == 5 &&
+      osvi.dwMinorVersion == 2 &&
+      osvi.wProductType == VER_NT_SERVER &&
+      osvi.wServicePackMajor == 1) {
+    WIN_VER = OS_2003_SP1;
+  } 
+  else if (osvi.dwMajorVersion == 5 &&
+      osvi.dwMinorVersion == 2 &&
+      osvi.wProductType == VER_NT_SERVER &&
+      osvi.wServicePackMajor == 0) {
+    WIN_VER = OS_2003_SP0;
+  } 
+  else if (osvi.dwMajorVersion == 5 &&
+      osvi.dwMinorVersion == 1 &&
+      osvi.wProductType == VER_NT_WORKSTATION &&
+      osvi.wServicePackMajor == 3) {
+    WIN_VER = OS_XP_SP3;
+  } 
+  else if (osvi.dwMajorVersion == 5 &&
+      osvi.dwMinorVersion == 1 &&
+      osvi.wProductType == VER_NT_WORKSTATION &&
+      osvi.wServicePackMajor == 2) {
+    WIN_VER = OS_XP_SP2;
+  } 
+  else if (osvi.dwMajorVersion == 5 &&
+      osvi.dwMinorVersion == 1 &&
+      osvi.wProductType == VER_NT_WORKSTATION &&
+      osvi.wServicePackMajor == 1) {
+    WIN_VER = OS_XP_SP1;
+  } 
+  else if (osvi.dwMajorVersion == 5 &&
+      osvi.dwMinorVersion == 1 &&
+      osvi.wProductType == VER_NT_WORKSTATION &&
+      osvi.wServicePackMajor == 0) {
+    WIN_VER = OS_XP_SP0;
+  } 
+  else if (osvi.dwMajorVersion == 5 &&
+      osvi.dwMinorVersion == 0 &&
+      osvi.wProductType == VER_NT_WORKSTATION &&
+      osvi.wServicePackMajor == 4) {
+    WIN_VER = OS_2K_SP4;
+  } 
+  else if (osvi.dwMajorVersion == 5 &&
+      osvi.dwMinorVersion == 0 &&
+      osvi.wProductType == VER_NT_WORKSTATION &&
+      osvi.wServicePackMajor == 3) {
+    WIN_VER = OS_2K_SP3;
+  } 
+  else if (osvi.dwMajorVersion == 5 &&
+      osvi.dwMinorVersion == 0 &&
+      osvi.wProductType == VER_NT_WORKSTATION &&
+      osvi.wServicePackMajor == 2) {
+    WIN_VER = OS_2K_SP2;
+  } 
+  else if (osvi.dwMajorVersion == 5 &&
+      osvi.dwMinorVersion == 0 &&
+      osvi.wProductType == VER_NT_WORKSTATION &&
+      osvi.wServicePackMajor == 1) {
+    WIN_VER = OS_2K_SP1;
+  } 
+  else if (osvi.dwMajorVersion == 5 &&
+      osvi.dwMinorVersion == 0 &&
+      osvi.wProductType == VER_NT_WORKSTATION &&
+      osvi.wServicePackMajor == 0) {
+    WIN_VER = OS_2K_SP0;
+  } 
+  else {
+    assert (0 && "Unable to determine OS version.");
+  }
+
+  return WIN_VER;
+}
+
 /** Find name of system call num on os */
 auto_ptr<string> get_name(uint32_t num, os_t os) {
   auto_ptr<string> s(new string);
@@ -491,5 +594,5 @@ uint32_t get_syscall (const char* name, os_t os) {
       return syscalls[i].x[os];
     }
   }
-  return 0;
+  return -1;
 }

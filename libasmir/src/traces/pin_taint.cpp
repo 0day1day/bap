@@ -88,47 +88,18 @@ TaintTracker::TaintTracker(ValSpecRec * env)
 {
 #ifdef _WIN32
 
-// Windows versions from
-// http://msdn.microsoft.com/en-us/library/aa383745(v=vs.85).aspx 
+  os_t WIN_VER = get_win_version();
 
-// It would be better if this determined the OS at run-time rather
-// than build time.
-#if NTDDI_VERSION == 0x06010000
-  #define WIN_VER OS_SEVEN_SP0
-#elif NTDDI_VERSION == 0x06000000
-  #define WIN_VER OS_VISTA_SP0
-#elif NTDDI_VERSION == 0x05020100
-  #define WIN_VER OS_2003_SP1
-#elif NTDDI_VERSION == 0x05020000
-  #define WIN_VER OS_2003_SP0
-#elif NTDDI_VERSION == 0x05010300
-  #define WIN_VER OS_XP_SP3
-#elif NTDDI_VERSION == 0x05010200
-  #define WIN_VER OS_XP_SP2
-#elif NTDDI_VERSION == 0x05010100
-  #define WIN_VER OS_XP_SP1
-#elif NTDDI_VERSION == 0x05010000
-  #define WIN_VER OS_XP_SP0
-#elif NTDDI_VERSION == 0x05000400
-  #define WIN_VER OS_2K_SP4
-#elif NTDDI_VERSION == 0x05000300
-  #define WIN_VER OS_2K_SP3
-#elif NTDDI_VERSION == 0x05000200
-  #define WIN_VER OS_2K_SP2
-#elif NTDDI_VERSION == 0x05000100
-  #define WIN_VER OS_2K_SP1
-#elif NTDDI_VERSION == 0x05000000
-  #define WIN_VER OS_2K_SP0
-#else
-  #error "Unsupported version of windows"
-#endif
+  // cerr << "WIN_VER=" << WIN_VER << ", SEVEN=" << OS_SEVEN_SP0 << endl;
 
   for ( unsigned i = 0; i < num_syscalls; i++ ) {
     const char *name = syscalls[i].name;
     int from = get_syscall(name, WIN_VER);
     int to = get_syscall(name, OS_SEVEN_SP0);
-    //cerr << "mapping " << from << " to " << to << endl; 
-    syscall_map.insert( std::pair<unsigned int, unsigned int>( from, to ));
+    if (from != -1 && to != -1) {
+      cerr << "mapping " << name << ": " << from << " to " << to << endl; 
+      syscall_map.insert( std::pair<unsigned int, unsigned int>( from, to ));
+    }
   }
 #endif
 }
