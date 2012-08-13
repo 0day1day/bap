@@ -45,18 +45,17 @@ module CPSpecSSA = struct
   end
   module CFG = Cfg.SSA
 
-  let stmt_transfer_function g stmt l =
+  let stmt_transfer_function g _ stmt l =
     let l = match l with | L.Map m -> m | L.Top -> failwith "Expected Map, not Top" in
     L.Map (match stmt with
     | Move(v, Phi _, _) ->
       VM.add v L.Bottom l
     | Move(v,e,_) ->
         (* dprintf "ignoring %s" (Pp.ssa_stmt_to_string s); *)
-      (* let newv = try L.elementmeet (VM.find v l) (L.Middle e) with Not_found -> L.Middle e in *)
       VM.add v (L.Middle e) l
     | _ -> l)
 
-  let edge_transfer_function g e l = l
+  let edge_transfer_function g _ _ l = l
 
   let s0 _ = Cfg.SSA.G.V.create Cfg.BB_Entry
   let init _ = L.Map VM.empty
@@ -66,9 +65,9 @@ end
 module CPSpecAST = struct
 
   module L = struct
-    type et = Middle of Ast.exp (** One assigned exp *) | Bottom (** Multiple assigned exps *)
+    type et = Middle of (Cfg.AST.G.V.t * int) * Ast.exp (** One assigned exp *) | Bottom (** Multiple assigned exps *)
     let et_to_string = function
-      | Middle e -> Printf.sprintf "Middle %s" (Pp.ast_exp_to_string e)
+      | Middle (v,e) -> Printf.sprintf "Middle %s" (Pp.ast_exp_to_string e)
       | Bottom -> "Bottom"
     type t = Top | Map of et VM.t
     let top = Top
@@ -95,16 +94,15 @@ module CPSpecAST = struct
   end
   module CFG = Cfg.AST
 
-  let stmt_transfer_function g stmt l =
+  let stmt_transfer_function g loc stmt l =
     let l = match l with | L.Map m -> m | L.Top -> failwith "Expected Map, not Top" in
     L.Map (match stmt with
     | Ast.Move(v,e,_) as _s ->
       (* dprintf "seeing %s" (Pp.ast_stmt_to_string s); *)
-      (* let newv = try L.elementmeet (VM.find v l) (L.Middle e) with Not_found -> L.Middle e in *)
-      VM.add v (L.Middle e) l
+      VM.add v (L.Middle (loc, e)) l
     | _ -> l)
 
-  let edge_transfer_function g e l = l
+  let edge_transfer_function g _ _ l = l
 
   let s0 _ = Cfg.AST.G.V.create Cfg.BB_Entry
   let init _ = L.Map VM.empty
@@ -148,37 +146,40 @@ let copyprop_ssa g =
       newmap)
   ) l VM.empty, propagate l
 
+let get_map = function
+  | CPSpecAST.L.Map m -> m
+  | _ -> failwith "Expected to find a map: BB_Exit probably unreachable"
+
 let copyprop_ast g =
 
   let dfin, _ = CPAST.worklist_iterate_stmt g in
-  let rec propagate l v =
+  let rec propagate dfin loc e =
+    let l = get_map (dfin loc) in
     let vis = object(self)
       inherit Ast_visitor.nop
       method visit_exp = function
         | Ast.Var v ->
           (try
              match VM.find v l with
-             | CPSpecAST.L.Middle e ->
-               ChangeToAndDoChildren e
+             | CPSpecAST.L.Middle (loc, e) ->
+               (* Use copy propagation results AT the location of the
+                  earlier definition *)
+               ChangeTo (propagate dfin loc e)
              | _ -> SkipChildren
            with Not_found -> SkipChildren)
         | _ -> DoChildren
     end in
-    Ast_visitor.exp_accept vis v
+    Ast_visitor.exp_accept vis e
   in
 
-  (fun (bb,n) ->
-  let l = dfin (bb,n) in
-  let l = match l with
-    | CPSpecAST.L.Map m -> m
-    | _ -> failwith "Expected to find a map: BB_Exit probably unreachable"
-  in
-  VM.fold (fun k v newmap ->
-    (match v with
-    | CPSpecAST.L.Middle x ->
-      let aste = propagate l x in
+  (fun loc ->
+    let l = get_map (dfin loc) in
+    VM.fold (fun k v newmap ->
+      (match v with
+      | CPSpecAST.L.Middle (loc, x) ->
+        let aste = propagate dfin loc x in
       (* dprintf "%s maps to %s" (Pp.var_to_string k) (Pp.ast_exp_to_string aste); *)
       VM.add k aste newmap
     | _ ->
       newmap)
-  ) l VM.empty, propagate l)
+  ) l VM.empty, propagate dfin loc)

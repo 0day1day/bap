@@ -24,9 +24,9 @@ sig
   module L : BOUNDED_MEET_SEMILATTICE
   module CFG : CFG
 
-  val stmt_transfer_function : CFG.G.t -> CFG.stmt -> L.t -> L.t
+  val stmt_transfer_function : CFG.G.t -> CFG.G.V.t * int -> CFG.stmt -> L.t -> L.t
 
-  val edge_transfer_function : CFG.G.t -> CFG.exp option -> L.t -> L.t
+  val edge_transfer_function : CFG.G.t -> CFG.G.E.t -> CFG.exp option -> L.t -> L.t
 
   val s0 : CFG.G.t -> CFG.G.V.t
 
@@ -41,9 +41,9 @@ sig
   module L : BOUNDED_MEET_SEMILATTICE_WITH_WIDENING
   module CFG : CFG
 
-  val stmt_transfer_function : CFG.G.t -> CFG.stmt -> L.t -> L.t
+  val stmt_transfer_function : CFG.G.t -> CFG.G.V.t * int -> CFG.stmt -> L.t -> L.t
 
-  val edge_transfer_function : CFG.G.t -> CFG.exp option -> L.t -> L.t
+  val edge_transfer_function : CFG.G.t -> CFG.G.E.t -> CFG.exp option -> L.t -> L.t
 
   val s0 : CFG.G.t -> CFG.G.V.t
 
@@ -61,13 +61,14 @@ struct
     module L=D.L
     module G=D.CFG.G
     let node_transfer_function g v l =
-      fold (D.stmt_transfer_function g) l (D.CFG.get_stmts g v)
+      let l, _ = fold (fun s (l,i) -> D.stmt_transfer_function g (v,i) s l, i+1) (l,0) (D.CFG.get_stmts g v) in
+      l
     let edge_transfer_function g e l =
       let arg = match G.E.label e with
         | Some(_,e) -> Some e
         | None -> None
       in
-      D.edge_transfer_function g arg l
+      D.edge_transfer_function g e arg l
     let s0 = D.s0
     let init = D.init
     let dir = D.dir
@@ -79,10 +80,12 @@ struct
     let win,wout = worklist_iterate_widen ?init ?nmeets g in
     let winstmt (v,n) =
       let l = win v in
-      fold (D.stmt_transfer_function g) l (BatList.take n (D.CFG.get_stmts g v))
+      let l,_ = fold (fun s (l,i) -> D.stmt_transfer_function g (v,i) s l, i+1) (l,0) (BatList.take n (D.CFG.get_stmts g v)) in
+      l
     and woutstmt (v,n) =
       let l = win v in
-      fold (D.stmt_transfer_function g) l (BatList.take (n+1) (D.CFG.get_stmts g v))
+      let l, _ = fold (fun s (l,i) -> D.stmt_transfer_function g (v,i) s l, i+1) (l,0) (BatList.take (n+1) (D.CFG.get_stmts g v)) in
+      l
     in
     winstmt, woutstmt
 end

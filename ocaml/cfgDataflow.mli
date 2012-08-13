@@ -27,11 +27,14 @@ sig
   module L : BOUNDED_MEET_SEMILATTICE
   module CFG : CFG
 
-  (** The transfer function over statements. *)
-  val stmt_transfer_function : CFG.G.t -> CFG.stmt -> L.t -> L.t
+  (** The transfer function over statements. The second argument
+      contains the location of the statement being processed,and is
+      generally unused. *)
+  val stmt_transfer_function : CFG.G.t -> CFG.G.V.t * int -> CFG.stmt -> L.t -> L.t
 
-  (** The transfer function over edge elements, e.g., conditions. *)
-  val edge_transfer_function : CFG.G.t -> CFG.exp option -> L.t -> L.t
+  (** The transfer function over edge elements, e.g., conditions. The
+      second argument is generally unused. *)
+  val edge_transfer_function : CFG.G.t -> CFG.G.E.t -> CFG.exp option -> L.t -> L.t
 
   (** The starting node for the analysis. *)
   val s0 : CFG.G.t -> CFG.G.V.t
@@ -51,11 +54,14 @@ sig
   module L : BOUNDED_MEET_SEMILATTICE_WITH_WIDENING
   module CFG : CFG
 
-  (** The transfer function over statements. *)
-  val stmt_transfer_function : CFG.G.t -> CFG.stmt -> L.t -> L.t
+  (** The transfer function over statements. The second argument
+      contains the location of the statement being processed,and is
+      generally unused. *)
+  val stmt_transfer_function : CFG.G.t -> CFG.G.V.t * int -> CFG.stmt -> L.t -> L.t
 
-  (** The transfer function over edge elements, e.g., conditions. *)
-  val edge_transfer_function : CFG.G.t -> CFG.exp option -> L.t -> L.t
+  (** The transfer function over edge elements, e.g., conditions. The
+      second argument is generally unused. *)
+  val edge_transfer_function : CFG.G.t -> CFG.G.E.t -> CFG.exp option -> L.t -> L.t
 
   (** The starting node for the analysis. *)
   val s0 : CFG.G.t -> CFG.G.V.t

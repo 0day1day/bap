@@ -34,7 +34,13 @@ let simplify_flat = function
   | BinOp(EQ,
           Int(i0, _),
           BinOp(MINUS, e1, e2)) when i0 = bi0 ->
+    (* e - e2 = 0 -> e = e2 *)
     BinOp(EQ, e1, e2)
+  | BinOp(OR,
+          BinOp(LT, e1, e2),
+          BinOp(EQ, e1', e2')) when e1 = e1' && e2 = e2' ->
+    (* a < b || a == b -> a <= b *)
+    BinOp(LE, e1, e2)
   | e -> e
 
 let simplify_exp = reverse_visit simplify_flat
