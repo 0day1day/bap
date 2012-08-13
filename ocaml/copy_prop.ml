@@ -52,8 +52,8 @@ module CPSpecSSA = struct
       VM.add v L.Bottom l
     | Move(v,e,_) ->
         (* dprintf "ignoring %s" (Pp.ssa_stmt_to_string s); *)
-      let newv = try L.elementmeet (VM.find v l) (L.Middle e) with Not_found -> L.Middle e in
-      VM.add v newv l
+      (* let newv = try L.elementmeet (VM.find v l) (L.Middle e) with Not_found -> L.Middle e in *)
+      VM.add v (L.Middle e) l
     | _ -> l)
 
   let edge_transfer_function g e l = l
@@ -98,10 +98,10 @@ module CPSpecAST = struct
   let stmt_transfer_function g stmt l =
     let l = match l with | L.Map m -> m | L.Top -> failwith "Expected Map, not Top" in
     L.Map (match stmt with
-    | Ast.Move(v,e,_) ->
-        (* dprintf "ignoring %s" (Pp.ast_stmt_to_string s); *)
-      let newv = try L.elementmeet (VM.find v l) (L.Middle e) with Not_found -> L.Middle e in
-      VM.add v newv l
+    | Ast.Move(v,e,_) as _s ->
+      (* dprintf "seeing %s" (Pp.ast_stmt_to_string s); *)
+      (* let newv = try L.elementmeet (VM.find v l) (L.Middle e) with Not_found -> L.Middle e in *)
+      VM.add v (L.Middle e) l
     | _ -> l)
 
   let edge_transfer_function g e l = l

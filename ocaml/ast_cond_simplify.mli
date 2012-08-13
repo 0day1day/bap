@@ -1,2 +1,2 @@
 (** Simplify conditions used in edge labels *)
-val simplify_cond : Cfg.AST.G.t -> Cfg.AST.G.t
+val simplifycond_cfg : Cfg.AST.G.t -> Cfg.AST.G.t
