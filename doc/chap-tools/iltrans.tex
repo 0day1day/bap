@@ -86,8 +86,7 @@ program. %% We describe our implementation of chopping in more detail
 \paragraph{Data-flow and Optimizations.} {\tt iltrans} interfaces with
 the generic data-flow engine in \bap.  The data-flow engine works on
 user-defined lattices, such as those for constant propagation, dead
-code elimination, etc.  {\tt iltrans} interfaces with several
-implements several data-flow analyses. \bap currently implements
+code elimination, etc.  \bap currently implements
 Simpson's global value numbering~\cite{simpson:1996}, (aggressive)
 dead-code elimination~\cite{muchnick:1997}, and live-variable
 analysis~\cite{muchnick:1997}.
