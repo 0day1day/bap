@@ -1040,11 +1040,12 @@ struct
             try
               (* aev = abstract environment value *)
               let rec exp2aev e : AbsEnv.value =
-                let exp2vs e = match exp2aev e with
+                let exp2vs e =
+                  match exp2aev e with
                   | `Scalar vs -> vs
                   | _ -> failwith "exp2vs: Expected scalar"
                 in
-                match Var.typ v with
+                match Typecheck.infer_ast ~check:false e with
                 | Reg _ -> (
                   let new_vs = try (match e with
                   | Int(i,t)->
