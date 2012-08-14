@@ -60,7 +60,9 @@ struct
   (** number of bits * unsigned stride * signed lower bound * signed upper bound *)
   type t = int * int64 * int64 * int64
 
-  let to_string (_,s,lb,ub) = Printf.sprintf "%Lu[%Ld,%Ld]" s lb ub
+  let to_string (_,s,lb,ub) =
+    if s = (-1L) then "[]"
+    else Printf.sprintf "%Lu[%Ld,%Ld]" s lb ub
 
   let highbit k =
     if k = 1 then 1L else I.shift_left 1L (k-1)
@@ -78,6 +80,7 @@ struct
   let maxi k = highbit k -% 1L
   let mini k = extend k (highbit k)
   let top k = (k, 1L, mini k, maxi k)
+  let empty k = (k, (-1L), 1L, 0L)
 
   let single k x = (k,0L,x,x)
   let of_bap_int i t = single (bits_of_width t) (extend (bits_of_width t) i)
@@ -92,13 +95,17 @@ struct
   let one k = single k 1L
   let minus_one k = single k (-1L)
 
+  let is_empty (k,s,lb,ub) =
+    s = (-1L) && lb = 1L && ub = 0L
+
   (* XXX: Remove k argument *)
-  let is_reduced k (k',s,lb,ub) =
+  let is_reduced k ((k',s,lb,ub) as si) =
     assert(k=k');
     assert(k>0 && k<=64);
     (lb >= mini k && ub <= maxi k) &&
-      if s = 0L then lb = ub
-      else lb < ub && let r1 = I.rem lb s and r2 = I.rem ub s in r1 = r2 || r2 -% r1 = s
+      is_empty si ||
+      (if s = 0L then lb = ub
+       else lb < ub && let r1 = I.rem lb s and r2 = I.rem ub s in r1 = r2 || r2 -% r1 = s)
 
   let check_reduced k si =
     if not(is_reduced k si)
@@ -322,8 +329,12 @@ struct
         else
           no
 
-  let union (k,s1,a,b) (k',s2,c,d) =
+  let union ((k,s1,a,b) as si1) ((k',s2,c,d) as si2) =
     if k <> k' then failwith "union: expected same bitwidth intervals";
+    (* Empty sets *)
+    if is_empty si1 then si2
+    else if is_empty si2 then si1
+    else
     let s' = uint64_gcd s1 s2 in
       if s' = 0L then
         if a = b && c = d then
@@ -349,13 +360,13 @@ struct
     let s' = uint64_lcm s1 s2 in
     let l = max a c
     and u = min b d in
-    (* XXX: How should we represented bottom, e.g. no intersection? *)
     if s1 = 0L then
-      if int64_urem (c -% a) s2 == 0L && a >= c && a <= d then (k,s1,a,b) else (k,s1,a,b)
+      if int64_urem (c -% a) s2 = 0L && a >= c && a <= d then (k,s1,a,b) else (empty k)
     else if s2 = 0L then
-      if int64_urem (c -% a) s1 == 0L && c >= a && c <= b then (k',s2,c,d) else (k',s2,c,d)
+      if int64_urem (c -% a) s1 = 0L && c >= a && c <= b then (k',s2,c,d) else (empty k)
     else if int64_urem a s' = 0L && int64_urem c s' = 0L then
-      (k, s', l, u -% int64_urem u s')
+      let l = l and u = u -% int64_urem u s' in
+      if u >= l then (k, s', l, u -% int64_urem u s') else empty k
     else
       (k, 1L, l, u)
 
@@ -1106,9 +1117,10 @@ struct
         in
         let vs_v = do_find l v in
         let vs_c = vsf (bits_of_width t) (int64_of_big_int i) in
-        dprintf "%s %s vs_v %s vs_c %s" (Pp.var_to_string v) (Cfg_ast.v2s (G.E.dst edge)) (VS.to_string vs_v) (VS.to_string vs_c);
         let vs_int = VS.intersection vs_v vs_c in
+        dprintf "%s dst %s vs_v %s vs_c %s vs_int %s" (Pp.var_to_string v) (Cfg_ast.v2s (G.E.dst edge)) (VS.to_string vs_v) (VS.to_string vs_c) (VS.to_string vs_int);
         VM.add v (`Scalar vs_int) l
+      | Some(_, e) -> dprintf "no edge match %s" (Pp.ast_exp_to_string e); l
       | _ -> l
 
   end

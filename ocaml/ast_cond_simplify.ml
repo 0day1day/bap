@@ -8,7 +8,7 @@
 open Ast
 open Big_int_convenience
 module C=Cfg.AST
-module D=Debug.Make(struct let name="Ast_cond_simplify" and default=`Debug end)
+module D=Debug.Make(struct let name="Ast_cond_simplify" and default=`NoDebug end)
 open D
 open Type
 
@@ -41,18 +41,44 @@ let simplify_flat = function
           BinOp(EQ, e1', e2')) when e1 = e1' && e2 = e2' ->
     (* a < b || a == b -> a <= b *)
     BinOp(LE, e1, e2)
+  | BinOp(LT|LE|EQ as op,
+          BinOp(PLUS|MINUS as op2,
+                e,
+                Int(i1, t1)),
+          Int(i2, _t2)) ->
+    (* a + i (>|>=|eq) i' -> a (>|>=|eq) i' - i *)
+    let newop = match op2 with PLUS -> MINUS | MINUS -> PLUS | _ -> failwith "impossible" in
+    let newi, _ = Arithmetic.binop newop (i2,t1) (i1,t1) in
+    BinOp(op,
+          e,
+          Int(newi, t1))
   | e -> e
 
 let simplify_exp = reverse_visit simplify_flat
 
 let simplifycond_cfg g =
   let cp = Copy_prop.copyprop_ast g in
-  C.G.iter_vertex (fun v ->
+  C.G.fold_vertex (fun v g ->
     let stmts = C.get_stmts g v in
     match List.rev stmts with
-    | CJmp(e, _, _, _)::tl ->
+    | CJmp(e, tt, tf, a)::tl ->
       let _, copyprop = cp (v, List.length tl) in
-      dprintf "e: %s e': %s" (Pp.ast_exp_to_string e) (Pp.ast_exp_to_string (simplify_exp (copyprop e)))
-    | _ -> ()
-  ) g;
-  g
+      let e' = simplify_exp (copyprop e) in
+      dprintf "e: %s e': %s" (Pp.ast_exp_to_string e) (Pp.ast_exp_to_string e');
+      (* Update statement *)
+      let s = CJmp(e', tt, tf, a)::tl in
+      let g = C.set_stmts g v s in
+
+      (* Update edge conditions *)
+      C.G.fold_succ_e (fun e g ->
+        let g = C.remove_edge_e g e in
+        let dst = C.G.E.dst e in
+        let newlabel = match C.G.E.label e with
+        | Some (true, _) -> Some(true, BinOp(EQ, e', exp_true))
+        | Some (false, _) -> Some(false, BinOp(EQ, e', exp_false))
+        | None -> failwith "Unexpected unlabeled edge found from CJmp" in
+        let newe = C.G.E.create v newlabel dst in
+        C.add_edge_e g newe
+      ) g v g
+    | _ -> g
+  ) g g
