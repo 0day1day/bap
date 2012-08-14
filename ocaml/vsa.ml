@@ -8,6 +8,8 @@
     * Remove extra "k" arguments
     * Handle specials: map everything to Top
     * Add a real interface; automatically call simplify_cond
+    * Big int support
+    * Handle signedness
 *)
 
 module VM = Var.VarMap
@@ -357,18 +359,21 @@ struct
 
   let intersection (k,s1,a,b) (k',s2,c,d) =
     if k <> k' then failwith "intersection: expected same bitwidth intervals";
-    let s' = uint64_lcm s1 s2 in
     let l = max a c
     and u = min b d in
-    if s1 = 0L then
+    if s1 = 0L && s2 = 0L then
+      if a = c then (k,s1,a,b) else (empty k)
+    else if s1 = 0L then
       if int64_urem (c -% a) s2 = 0L && a >= c && a <= d then (k,s1,a,b) else (empty k)
     else if s2 = 0L then
       if int64_urem (c -% a) s1 = 0L && c >= a && c <= b then (k',s2,c,d) else (empty k)
-    else if int64_urem a s' = 0L && int64_urem c s' = 0L then
-      let l = l and u = u -% int64_urem u s' in
-      if u >= l then (k, s', l, u -% int64_urem u s') else empty k
-    else
-      (k, 1L, l, u)
+    else (
+      let s' = uint64_lcm s1 s2 in
+      if int64_urem a s' = 0L && int64_urem c s' = 0L then
+        let l = l and u = u -% int64_urem u s' in
+        if u >= l then (k, s', l, u -% int64_urem u s') else empty k
+      else
+        (k, 1L, l, u))
 
   let widen (k,s1,a,b) (k',s2,c,d) =
     if k <> k' then failwith "widen: expected same bitwidth intervals";
@@ -595,7 +600,7 @@ struct
     | [_] -> `VSsingle
     | _ -> `VSarb
 
-  let single x = [(global, SI.single x)]
+  let single k x = [(global, SI.single k x)]
   let of_bap_int i t = [(global, SI.of_bap_int i t)]
 
   let zero k = [(global, SI.zero k)]
@@ -1102,8 +1107,8 @@ struct
 
     let edge_transfer_function g edge l =
       match G.E.label edge with
-      | Some(_, BinOp(EQ, (BinOp((LE|LT) as bop, Var v, Int(i, t)) as be), Int(i', t')))
-      | Some(_, BinOp(EQ, (BinOp((LE|LT) as bop, Int(i, t), Var v) as be), Int(i', t'))) ->
+      | Some(_, BinOp(EQ, (BinOp((LE|LT|SLE|SLT) as bop, Var v, Int(i, t)) as be), Int(i', t')))
+      | Some(_, BinOp(EQ, (BinOp((LE|LT|SLE|SLT) as bop, Int(i, t), Var v) as be), Int(i', t'))) ->
 
         let dir = match be with
           | BinOp(_, Var _, Int _) -> `Below
@@ -1115,20 +1120,43 @@ struct
         let e, dir, bop =
           if bi_is_one i' then be, dir, bop
           else
-            let newbop = if bop = LE then LT else LE in
+            let newbop = match bop with
+              | LE -> LT
+              | LT -> LE
+              | SLE -> SLT
+              | SLT -> SLE
+              | _ -> failwith "impossible"
+            in
             match dir with
             | `Below -> BinOp(newbop, Int(i, t), Var v), `Above, newbop
             | `Above -> BinOp(newbop, Var v, Int(i, t)), `Below, newbop
         in
         let vsf = match dir, bop with
-          | `Below, LE -> VS.beloweq
-          | `Below, LT -> VS.below
-          | `Above, LE -> VS.aboveeq
-          | `Above, LT -> VS.above
+          | `Below, (LE|SLE) -> VS.beloweq
+          | `Below, (LT|SLT) -> VS.below
+          | `Above, (LE|SLE) -> VS.aboveeq
+          | `Above, (LT|SLT) -> VS.above
           | _ -> failwith "impossible"
         in
         let vs_v = do_find l v in
         let vs_c = vsf (bits_of_width t) (int64_of_big_int i) in
+        let vs_int = VS.intersection vs_v vs_c in
+        dprintf "%s dst %s vs_v %s vs_c %s vs_int %s" (Pp.var_to_string v) (Cfg_ast.v2s (G.E.dst edge)) (VS.to_string vs_v) (VS.to_string vs_c) (VS.to_string vs_int);
+        VM.add v (`Scalar vs_int) l
+      | Some(_, BinOp(EQ, (BinOp(EQ|NEQ as bop, Var v, Int(i, t))), Int(i', t')))
+      | Some(_, BinOp(EQ, (BinOp(EQ|NEQ as bop, Int(i, t), Var v)), Int(i', t'))) ->
+
+        (* We can make a SI for equality, but not for not for
+           inequality *)
+        let vs_c =
+          let s = VS.of_bap_int (int64_of_big_int i) t in
+          match bop with
+          | EQ when i' = bi1 -> s
+          | NEQ when i' = bi0 -> s
+          | _ -> VS.top
+        in
+
+        let vs_v = do_find l v in
         let vs_int = VS.intersection vs_v vs_c in
         dprintf "%s dst %s vs_v %s vs_c %s vs_int %s" (Pp.var_to_string v) (Cfg_ast.v2s (G.E.dst edge)) (VS.to_string vs_v) (VS.to_string vs_c) (VS.to_string vs_int);
         VM.add v (`Scalar vs_int) l

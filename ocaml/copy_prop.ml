@@ -12,6 +12,7 @@ module D = Debug.Make(struct let name = "Copy_prop" and default=`NoDebug end)
 open D
 module VH = Var.VarHash
 module VM = Var.VarMap
+module VS = Var.VarSet
 
 module CPSpecSSA = struct
 
@@ -153,7 +154,19 @@ let get_map = function
 let copyprop_ast g =
 
   let dfin, _ = CPAST.worklist_iterate_stmt g in
-  let rec propagate dfin loc e =
+  let _, defs = Depgraphs.UseDef_AST.usedef g in
+  let vars_in e =
+    let s = ref VS.empty in
+    let v = object(self)
+      inherit Ast_visitor.nop
+      method visit_rvar v =
+        s := VS.add v !s;
+        SkipChildren
+    end in
+    ignore(Ast_visitor.exp_accept v e);
+    !s
+  in
+  let rec propagate dfin origloc loc e =
     let l = get_map (dfin loc) in
     let vis = object(self)
       inherit Ast_visitor.nop
@@ -163,8 +176,21 @@ let copyprop_ast g =
              match VM.find v l with
              | CPSpecAST.L.Middle (loc, e) ->
                (* Use copy propagation results AT the location of the
-                  earlier definition *)
-               ChangeTo (propagate dfin loc e)
+                  earlier definition, but only if all definitions of
+                  variables in e are the ones in scope at the current
+                  location *)
+               let module UD = Depgraphs.UseDef_AST in
+               let module LS = UD.LS in
+               (* Make sure all variables referenced in e are the same
+                  definitions at the original location *)
+               if VS.for_all
+                 (fun use ->
+                   let vdefs = defs origloc use in
+                   let vdefs' = defs loc use in
+                   vdefs = vdefs') (vars_in e)
+               then
+                 ChangeTo (propagate dfin origloc loc e)
+               else SkipChildren
              | _ -> SkipChildren
            with Not_found -> SkipChildren)
         | _ -> DoChildren
@@ -177,9 +203,9 @@ let copyprop_ast g =
     VM.fold (fun k v newmap ->
       (match v with
       | CPSpecAST.L.Middle (loc, x) ->
-        let aste = propagate dfin loc x in
+        let aste = propagate dfin loc loc x in
       (* dprintf "%s maps to %s" (Pp.var_to_string k) (Pp.ast_exp_to_string aste); *)
       VM.add k aste newmap
     | _ ->
       newmap)
-  ) l VM.empty, propagate dfin loc)
+  ) l VM.empty, propagate dfin loc loc)

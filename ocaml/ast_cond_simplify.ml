@@ -3,6 +3,9 @@
    WHAT YOU EXECUTE.
 
    Available at http://pages.cs.wisc.edu/~bgogul/Research/Thesis/bgogul-thesis.pdf
+
+   XXX: Verify these using SMT
+
 *)
 
 open Ast
@@ -37,11 +40,19 @@ let simplify_flat = function
     (* e - e2 = 0 -> e = e2 *)
     BinOp(EQ, e1, e2)
   | BinOp(OR,
-          BinOp(LT, e1, e2),
+          BinOp(EQ, e1', e2'),
+          BinOp(LT|SLT as bop, e1, e2))
+  | BinOp(OR,
+          BinOp(LT|SLT as bop, e1, e2),
           BinOp(EQ, e1', e2')) when e1 = e1' && e2 = e2' ->
     (* a < b || a == b -> a <= b *)
-    BinOp(LE, e1, e2)
-  | BinOp(LT|LE|EQ as op,
+    let newbop = match bop with
+      | LT -> LE
+      | SLT -> SLE
+      | _ -> failwith "impossible"
+    in
+    BinOp(newbop, e1, e2)
+  | BinOp(LT|LE|SLT|SLE|EQ as op,
           BinOp(PLUS|MINUS as op2,
                 e,
                 Int(i1, t1)),
@@ -52,7 +63,39 @@ let simplify_flat = function
     BinOp(op,
           e,
           Int(newi, t1))
+  | UnOp(NOT,
+         BinOp(LE|LT|SLE|SLT|EQ|NEQ as bop, e1, e2)) ->
+    (* not (e1 < e2) -> e2 <= e1 *)
+    let newbop = match bop with
+      | LE -> LT
+      | LT -> LE
+      | SLE -> SLT
+      | SLT -> SLE
+      | EQ -> NEQ
+      | NEQ -> EQ
+      | _ -> failwith "impossible" in
+    BinOp(newbop, e2, e1)
+  | BinOp(XOR,
+          Cast(CAST_HIGH, Reg 1,
+               BinOp(MINUS, e1, Int(i1, t1))),
+          Cast(CAST_HIGH, Reg 1,
+               BinOp(AND,
+                     BinOp(XOR, e2, Int(i2, _t2)),
+                     BinOp(XOR, e3,
+                           BinOp(MINUS,
+                                 e4,
+                                 Int(i3, _t3)))))) when e1 = e2 && e2 = e3 && e3 = e4 && i1 = i2 && i2 = i3 ->
+    (* Not as intuitive: signed less than comparison *)
+    BinOp(SLT, e1, Int(i1, t1))
   | e -> e
+
+let simplify_flat e =
+  if debug () then
+    let e' = simplify_flat e in
+    if e <> e' then
+      dprintf "Simplified %s to %s" (Pp.ast_exp_to_string e) (Pp.ast_exp_to_string e');
+    e'
+  else simplify_flat e
 
 let simplify_exp = reverse_visit simplify_flat
 
@@ -74,8 +117,8 @@ let simplifycond_cfg g =
         let g = C.remove_edge_e g e in
         let dst = C.G.E.dst e in
         let newlabel = match C.G.E.label e with
-        | Some (true, _) -> Some(true, BinOp(EQ, e', exp_true))
-        | Some (false, _) -> Some(false, BinOp(EQ, e', exp_false))
+        | Some (true, _) -> Some(true, simplify_exp (BinOp(EQ, e', exp_true)))
+        | Some (false, _) -> Some(false, simplify_exp (BinOp(EQ, e', exp_false)))
         | None -> failwith "Unexpected unlabeled edge found from CJmp" in
         let newe = C.G.E.create v newlabel dst in
         C.add_edge_e g newe
