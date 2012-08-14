@@ -7,7 +7,7 @@
     * Consolidate widen/meet/union functions
     * Remove extra "k" arguments
     * Handle specials: map everything to Top
-    * Represent bottom?
+    * Add a real interface; automatically call simplify_cond
 *)
 
 module VM = Var.VarMap
@@ -903,15 +903,27 @@ module AbsEnv = struct
 
   let empty = VM.empty
 
+  let pp_value p = function
+    | `Scalar s -> VS.pp p s
+    | `Array a -> AllocEnv.pp p a
+
+  let value_to_string v =
+    let b = Buffer.create 57 in
+    let p = Buffer.add_string b in
+    pp_value p v;
+    Buffer.contents b
+
   let pp p m =
-    let pp_value = function
-      | `Scalar s -> VS.pp p s
-      | `Array a -> AllocEnv.pp p a
-    in
     VM.iter (fun k v ->
       p ("\n " ^ (Pp.var_to_string k) ^ " -> ");
-      pp_value v;
+      pp_value p v;
     ) m
+
+  let to_string m =
+    let b = Buffer.create 57 in
+    let p = Buffer.add_string b in
+    pp p m;
+    Buffer.contents b
 
   let value_equal x y = match x,y with
     | (`Scalar x, `Scalar y) -> x = y

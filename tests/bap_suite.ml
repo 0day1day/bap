@@ -13,6 +13,7 @@ let short_tests = [
   Predicate_suite.suite;
   Arithmetic_suite.suite;
   Dominator_suite.suite;
+  Vsa_suite.suite;
 ];;
 
 let bap_tests = ("BAP" >::: short_tests);;
