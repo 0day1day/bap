@@ -1107,8 +1107,11 @@ struct
 
     let edge_transfer_function g edge l =
       match G.E.label edge with
-      | Some(_, BinOp(EQ, (BinOp((LE|LT|SLE|SLT) as bop, Var v, Int(i, t)) as be), Int(i', t')))
-      | Some(_, BinOp(EQ, (BinOp((LE|LT|SLE|SLT) as bop, Int(i, t), Var v) as be), Int(i', t'))) ->
+      (* Because strided intervals represent signed numbers, we
+         cannot convert unsigned inequalities to strided intervals (try
+         it). *)
+      | Some(_, BinOp(EQ, (BinOp((SLE|SLT) as bop, Var v, Int(i, t)) as be), Int(i', t')))
+      | Some(_, BinOp(EQ, (BinOp((SLE|SLT) as bop, Int(i, t), Var v) as be), Int(i', t'))) ->
 
         let dir = match be with
           | BinOp(_, Var _, Int _) -> `Below
@@ -1121,8 +1124,6 @@ struct
           if bi_is_one i' then be, dir, bop
           else
             let newbop = match bop with
-              | LE -> LT
-              | LT -> LE
               | SLE -> SLT
               | SLT -> SLE
               | _ -> failwith "impossible"
@@ -1132,10 +1133,10 @@ struct
             | `Above -> BinOp(newbop, Var v, Int(i, t)), `Below, newbop
         in
         let vsf = match dir, bop with
-          | `Below, (LE|SLE) -> VS.beloweq
-          | `Below, (LT|SLT) -> VS.below
-          | `Above, (LE|SLE) -> VS.aboveeq
-          | `Above, (LT|SLT) -> VS.above
+          | `Below, SLE -> VS.beloweq
+          | `Below, SLT -> VS.below
+          | `Above, SLE -> VS.aboveeq
+          | `Above, SLT -> VS.above
           | _ -> failwith "impossible"
         in
         let vs_v = do_find l v in
