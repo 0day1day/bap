@@ -40,10 +40,8 @@ let rtype2s = function
 
 let rec node2s = function
   | BBlock b -> Cfg.bbid_to_string b
-  | Region(rt, b::_) -> node2s b ^ "'"
-  | Region _ -> failwith "eep, empty region?"
-
-let nodes2s nodes = String.concat ", " (List.map node2s nodes)
+  | Region(rt, l) -> rtype2s rt ^ "(" ^ nodes2s l ^ ")"
+and nodes2s nodes = String.concat ", " (List.map node2s nodes)
 
 module G = Graph.Imperative.Digraph.ConcreteBidirectional(Node)
 module PC = Graph.Path.Check(G)

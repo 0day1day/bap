@@ -146,13 +146,16 @@ let unroll_loop ?(count=8) cfg head body =
   in
 
   let cfg = C.G.fold_vertex rename_targets cfg cfg in
+  let nodelist = Hashtbl.fold (fun k v l ->
+    v::l
+  ) unrollednodes nodes in
 
   (* let oc = Pervasives.open_out "unroll.dot" in *)
   (* (\*let ssa_func_cfg = Cfg_ssa.of_astcfg cfg in *)
   (* Cfg_pp.SsaStmtsDot.output_graph oc ssa_func_cfg;*\) *)
   (* Cfg_pp.AstBBidDot.output_graph oc cfg; *)
   (* Pervasives.close_out oc; *)
-  cfg
+  cfg, nodelist
 (*
   let rename_targets cfg v =
     let getlabel le n =
@@ -224,18 +227,35 @@ let unroll_loops ?count cfg =
     in
     get_nodes []
   in
-  let rec unroll_in cfg = function
-    | SA.BBlock _ -> cfg
-    | SA.Region(rt, ns) as n ->
-        dprintf "Found region: %s" (SA.rtype2s rt);
-	(* Don't worry about nested loops for now... *)
-	let cfg = match rt with
-	  | SA.SelfLoop | SA.WhileLoop | SA.NaturalLoop ->
-	      let bbs = bbs_of_node n in
-	      dprintf "Found a loop with %d nodes" (List.length bbs);
-	      unroll_bbs ?count idom cfg bbs
-	  | _ -> cfg
-	in
-	List.fold_left unroll_in cfg ns
+  (* unroll_in cfg needs to return a CFG and a modified structure,
+     since unrolling changes the structure of the CFG. *)
+  let rec unroll_in cfg : SA.node -> C.G.t * SA.node = function
+    | SA.BBlock _ as r -> cfg, r
+    | SA.Region(rt, ns) as r ->
+      dprintf "Found region: %s" (SA.node2s r);
+      (* First unroll any nested loops *)
+      let f (cfg,rl) n =
+        let cfg,r = unroll_in cfg n in
+        cfg, r::rl
+      in
+      let cfg, r =
+        let cfg, rl = List.fold_left f (cfg,[]) ns in
+        cfg, SA.Region(rt, List.rev rl)
+      in
+
+      (* If the top level region is a loop, unroll that *)
+      match rt with
+      | SA.SelfLoop | SA.WhileLoop | SA.NaturalLoop ->
+	let bbs = bbs_of_node r in
+	dprintf "Found a loop with %d nodes" (List.length bbs);
+        (* We need to return an updated region for the unrolled loop.
+           However, the region does not need to be correct, it only
+           need contain the correct bbs, since it is only used by
+           bbs_of_node. *)
+	let cfg, nl = unroll_bbs ?count idom cfg bbs in
+        let make_region bb = SA.BBlock (C.G.V.label bb) in
+        cfg, SA.Region(SA.Proper, List.map make_region nl)
+      | _ -> cfg, r
   in
-  unroll_in cfg (SA.structural_analysis cfg)
+  let cfg, _ = unroll_in cfg (SA.structural_analysis cfg) in
+  cfg
