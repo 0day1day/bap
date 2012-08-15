@@ -216,7 +216,7 @@ let ast_size e =
     inherit Ast_visitor.nop
     method visit_exp _ =
       incr s;
-      `DoChildren
+      DoChildren
   end in
   ignore(Ast_visitor.exp_accept vis e);
   !s
@@ -244,7 +244,7 @@ let rm_useless_vars vs n w =
 	(* FIXME: worry about Let? *)
       method visit_rvar r =
 	inc r;
-	`DoChildren
+	DoChildren
     end
   in
   ignore(Ast_visitor.exp_accept counter n);
@@ -257,8 +257,8 @@ let rm_useless_vars vs n w =
       inherit Ast_visitor.nop
       method visit_exp = function
 	| Var v when to_remove v ->
-	    `ChangeToAndDoChildren(VH.find h v)
-	| _ -> `DoChildren
+	    ChangeToAndDoChildren(VH.find h v)
+	| _ -> DoChildren
     end
   in
   let n = Ast_visitor.exp_accept subst n

@@ -449,14 +449,14 @@ let is_code s =
   let flags = bfd_section_get_flags s in
   Int64.logand flags Libbfd.sEC_CODE <> 0L
 
-let section_contents prog secs =
+let section_contents ?(codeonly=true) prog secs =
   let bfd = Libasmir.asmir_get_bfd prog in
   let sc l s =
     let size = bfd_section_size s and vma = bfd_section_vma s
     and flags = bfd_section_get_flags s
     and name = bfd_section_name s in
     dprintf "Found section %s at %Lx with size %Ld. flags=%Lx" name vma size flags;
-    if is_load s then
+    if is_load s && ((not codeonly) || is_code s) then
     (* if Int64.logand Libbfd.sEC_LOAD flags <> 0L then *)
       let (ok, a) = Libbfd.bfd_get_section_contents bfd s 0L size in
       if ok <> 0 then (vma, a)::l else (dprintf "failed."; l)
@@ -762,7 +762,7 @@ module PinTrace = struct
     while !c do
       let (tmp_c,revstmts) =
         alt_bap_from_trace_file_range_rev filename off !trace_blocksize in
-      ir := Util.fast_append revstmts !ir;
+      ir := BatList.append revstmts !ir;
       c := tmp_c;
     done;
     let r = List.rev !ir in
@@ -808,7 +808,7 @@ module SerializedTrace = struct
                    mem=true;
                    t=Reg b;
                    index=a;
-                   value=Util.big_int_of_binstring ~e:Util.Little v;
+                   value=Util.big_int_of_binstring ~e:`Little v;
                    usage=convert_usage use;
                    taint=convert_taint t})
         | {Operand_info.operand_info_specific=`reg_operand({Reg_operand.name=n});
@@ -820,7 +820,7 @@ module SerializedTrace = struct
                    mem=false;
                    t=Reg b;
                    index=0L;
-                   value=Util.big_int_of_binstring ~e:Util.Little v;
+                   value=Util.big_int_of_binstring ~e:`Little v;
                    usage=convert_usage use;
                    taint=convert_taint t})
       in
@@ -829,7 +829,7 @@ module SerializedTrace = struct
            Taint_intro.taint_id=tid;
            Taint_intro.value=value} ->
           let v = match value with
-            | Some x -> Util.big_int_of_binstring ~e:Util.Little x
+            | Some x -> Util.big_int_of_binstring ~e:`Little x
             | None -> Big_int_convenience.bi0
           in
           Context({name="mem";

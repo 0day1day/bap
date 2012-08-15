@@ -121,8 +121,8 @@ program:
         | MINUS INT { minus_big_int $2 }
 
             context:
-        | ID LSQUARE INT RSQUARE EQUAL INT COMMA plusminusint COMMA styp { {name=$1; mem=true; t=$10; index=int64_of_big_int $3; value=$6; usage=RD; (* XXX fix me *) taint=Taint(int_of_big_int $8)} } /* memory */
-| ID EQUAL INT COMMA plusminusint COMMA typ { {name=$1; mem=false; t=$7; index=0L; value=$3; usage=RD; (* XXX fix me *) taint=Taint(int_of_big_int $5)} } /* non memory */
+        | STRING LSQUARE INT RSQUARE EQUAL INT COMMA plusminusint COMMA styp { {name=$1; mem=true; t=$10; index=int64_of_big_int $3; value=$6; usage=RD; (* XXX fix me *) taint=Taint(int_of_big_int $8)} } /* memory */
+| STRING EQUAL INT COMMA plusminusint COMMA typ { {name=$1; mem=false; t=$7; index=0L; value=$3; usage=RD; (* XXX fix me *) taint=Taint(int_of_big_int $5)} } /* non memory */
 
 attrs:
 |    { [] }

@@ -7,7 +7,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.59)
-AC_INIT(Bap, 0.1, bap-dev@lists.andrew.cmu.edu)
+AC_INIT(Bap, 0.6, bap-dev@lists.andrew.cmu.edu)
 AC_CONFIG_SRCDIR([libasmir/src/asm_program.c])
 AC_CONFIG_HEADER([libasmir/config.h])
 
@@ -31,27 +31,41 @@ AC_PROG_CAMLIDL
 #AC_PROG_LIBTOOL
 
 # Check for Z3
-AC_ARG_WITH([z3-bindings],
-            [AS_HELP_STRING([--with-z3-bindings],
-              [enable support for Z3 bindings])],
-            [with_z3_bindings=yes],
-            [])
+AC_ARG_WITH([z3],
+            [AS_HELP_STRING([--with-z3],
+              [location of Z3 library])],
+            [with_z3=$withval],
+            [with_z3=no])
 
-AS_IF([test "x$with_z3_bindings" = "xyes"],
-     [AC_CHECK_FILE([solvers/z3-x86],
-        [AC_DEFINE([HAVE_Z3_BINDINGS], [1], [Define if you want to use Z3 bindings])],
-        [AC_MSG_FAILURE([z3 library not found])])])
+# Save pre-z3 ldflags
+OLDLDFLAGS=$LDFLAGS
+
+AS_IF([test "x$with_z3" != "xno"],
+     [
+     LDFLAGS="$OLDLDFLAGS -L$with_z3/lib"
+     AC_CHECK_LIB([z3], [Z3_mk_bvadd],
+       [
+        z3_dir=$with_z3
+        with_z3=yes
+        AC_DEFINE([HAVE_Z3_BINDINGS], [1], [Define to use Z3 bindings])
+        ],
+
+       [AC_MSG_FAILURE([z3 library not found])],
+       [-lgmp -lgomp]
+       )])
+
+# Restore
+LDFLAGS=$OLDLDFLAGS
 
 rm -f solvers/makefile.inc
-if `test "x$with_z3_bindings" = "xyes"`; then
+if `test "x$with_z3" = "xyes"`; then
    cat >>solvers/makefile.inc <<"EOF"
-SOLVER_SOURCES=$(SOLVER)/z3/ocaml/z3.ml
 SOLVER_PPFLAGS=-D WITH_Z3_BINDINGS
-SOLVER_LIBDIRS = $(SOLVER)/z3/lib
-SOLVER_LDFLAGS = -Wl,-rpath=$(SOLVER)/z3/lib -fopenmp
 SOLVER_CLIBS = z3stubs z3
-
 EOF
+echo "SOLVER_SOURCES = $z3_dir/ocaml/z3.ml" >>solvers/makefile.inc
+echo "SOLVER_LIBDIRS = $z3_dir/lib" >>solvers/makefile.inc
+echo "SOLVER_LDFLAGS = -fopenmp -Wl,-rpath=$z3_dir/lib" >> solvers/makefile.inc
 else
    touch solvers/makefile.inc
 fi
@@ -77,12 +91,20 @@ AS_IF([ocamlfind query llvm],
 rm -f ocaml/makefile.inc
 if `test "x$HAVE_LLVM" = "xtrue"` ; then
    cat >>ocaml/makefile.inc <<"EOF"
+LLVM_PPFLAGS=-D WITH_LLVM
 HAVE_LLVM=true
 
 EOF
 else          
    touch ocaml/makefile.inc
 fi
+
+# Check for etags
+AS_IF([which etags],
+      [HAVE_ETAGS=true],
+      [HAVE_ETAGS=false; AC_MSG_WARN([ETAGS not found. BAP will not build tags.])])
+
+AM_CONDITIONAL([HAVE_ETAGS], [test x$HAVE_ETAGS = xtrue])
 
 # Checks for ocaml libraries
 ocamlfind query camomile
@@ -234,7 +256,7 @@ AC_CHECK_FUNCS([bzero memset strstr strtoul])
 
 # Check for library function versions
 
-AM_CONDITIONAL([TESTS_OPT], [ test ! -f NOTESTS ])
+#AM_CONDITIONAL([TESTS_OPT], [ test ! -f NOTESTS ])
 
 AC_CONFIG_FILES([Makefile
                  libasmir/Makefile

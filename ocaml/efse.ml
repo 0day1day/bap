@@ -92,15 +92,15 @@ module ToEfse = struct
       in
       c s Util.id
     in
-    if debug then Pp.output_varnums := true;
+    if debug () then Pp.output_varnums := true;
     dprintf "Converting to gclhelp";
     let gcl = Gcl.gclhelp_of_astcfg ?entry ?exit cfg in
     (* If debug is off, dprintf will still evaluate it's arguments,
        which is why we insert a conditional. *)
-    if debug then dprintf "gcl: %s" (Gcl.gclhelp_to_string gcl);
+    if debug () then dprintf "gcl: %s" (Gcl.gclhelp_to_string gcl);
     dprintf "Converting to fse";
     let fse = cgcl_to_fse (Gcl.gclhelp_of_astcfg ?entry ?exit cfg) in
-    if debug then dprintf "fse: %s" (prog_to_string fse);
+    if debug () then dprintf "fse: %s" (prog_to_string fse);
     fse
 
   let passified_of_ssa ?entry ?exit cfg =
@@ -258,10 +258,10 @@ struct
           (try
           (* do NOT do children, because expressions are already
              evaluated. *)
-            `ChangeTo (D.get_exp delta v)
+            ChangeTo (D.get_exp delta v)
           with Not_found ->
-            `DoChildren)
-        | _ -> `DoChildren
+            DoChildren)
+        | _ -> DoChildren
     end in
     Ast_visitor.exp_accept v e
 
@@ -518,7 +518,7 @@ let efse_lazy ?(cf=true) p pi mode =
       inherit Ast_visitor.nop
       method visit_rvar v =
         used v;
-        `DoChildren
+        DoChildren
     end
     in
     ignore(Ast_visitor.exp_accept v e)

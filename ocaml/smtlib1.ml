@@ -67,7 +67,7 @@ class pp ?suffix:(s="") ft =
 	    oh bop e'1 e'2
 	| _ -> [e2]
       in
-      Util.fast_append l1 l2
+      BatList.append l1 l2
     in
     match e with
     | BinOp(bop, e1, e2) ->
@@ -275,8 +275,7 @@ object (self)
 	   | DIVIDE -> "bvudiv"
 	   | SDIVIDE -> "bvsdiv"
 	   | MOD -> "bvurem"
-	   (* | SMOD -> "bvsrem" *)
-	   | SMOD -> failwith "SMOD goes to bvsrem or bvsmod?"
+	   | SMOD -> "bvsrem"
 	   | AND -> "bvand"
 	   | OR -> "bvor"
 	   | XOR -> "bvxor"
@@ -679,10 +678,10 @@ object (self)
 	inherit Ast_visitor.nop
 	method visit_exp = function
 	  | Load _
-	  | Store _ -> found_mem := true; `SkipChildren
-	  | Var v when not (is_integer_type (Var.typ v)) -> found_mem := true; `SkipChildren
-	  | _ when !found_mem -> `SkipChildren
-	  | _ -> `DoChildren	  
+	  | Store _ -> found_mem := true; SkipChildren
+	  | Var v when not (is_integer_type (Var.typ v)) -> found_mem := true; SkipChildren
+	  | _ when !found_mem -> SkipChildren
+	  | _ -> DoChildren	  
       end
       in
       ignore(Ast_visitor.exp_accept v e);

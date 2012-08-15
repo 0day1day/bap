@@ -110,11 +110,18 @@ struct
 
   include DefAttrs
 
+  let printer = ref (fun _ -> failwith "Uninitialized printer")
+
+  let graph_attributes g =
+    (* Use this as an initialization routine *)
+    printer := Printer.print g;
+    []
+
   let vertex_name (v,g) = Cfg.bbid_to_string (G.V.label v)
 
   let vertex_attributes (v,g) =
     (* FIXME: The Dot module really should be the one doing the escaping here *)
-    `Label (String.escaped(Printer.print g v)) :: Attributor.vertex_attributes g v
+    `Label (String.escaped(!printer v)) :: Attributor.vertex_attributes g v
 
   let edge_attributes ((e,g) as e') = (edge_labels E.label e') @ Attributor.edge_attributes g e
 
@@ -124,34 +131,40 @@ end
 
 module PrintSsaStmts =
 struct
-  let print g b =
-    let stmts = CS.get_stmts g b in
-    let buf = Buffer.create (20*(List.length stmts+1)) in
+  let print g =
+    let buf = Buffer.create 1000 in
     let ft = Format.formatter_of_buffer buf in
     let pp = new Pp.pp ft in
     let pr = Buffer.add_string buf in
+    (fun b ->
+    let stmts = CS.get_stmts g b in
     pr(Cfg.bbid_to_string (CS.G.V.label b));
     pr "\n";
     pp#ssa_stmts stmts;
     Format.pp_print_flush ft ();
-    Buffer.contents buf
+    let o = Buffer.contents buf in
+    Buffer.clear buf;
+    o)
 
   let edge_attributes = edge_labels_ssa
 end
 
 module PrintAstStmts =
 struct
-  let print g b =
-    let stmts = CA.get_stmts g b in
-    let buf = Buffer.create (20*(List.length stmts+1)) in
+  let print g =
+    let buf = Buffer.create 1000 in
     let ft = Format.formatter_of_buffer buf in
     let pp = new Pp.pp ft in
     let pr = Buffer.add_string buf in
+    (fun b ->
+    let stmts = CA.get_stmts g b in
     pr(Cfg.bbid_to_string (CA.G.V.label b));
     pr "\n";
     pp#ast_program stmts;
     Format.pp_print_flush ft ();
-    Buffer.contents buf
+    let o = Buffer.contents buf in
+    Buffer.clear buf;
+    o)
 
   let edge_attributes = edge_labels_ast
 end

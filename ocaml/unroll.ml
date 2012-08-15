@@ -215,6 +215,7 @@ let unroll_bbs ?count idom cfg bbs =
 let unroll_loops ?count cfg =
   let module SA = Structural_analysis in
   let module Dom = Dominator.Make(C.G) in
+  let () = Checks.connected_astcfg cfg "unroll_loops" in
   let idom = Dom.compute_idom cfg (C.find_vertex cfg Cfg.BB_Entry) in
   let bbs_of_node =
     let rec get_nodes acc = function

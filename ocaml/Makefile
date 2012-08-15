@@ -1,6 +1,9 @@
 # $Id$
 
 .NOTPARALLEL:
+# Work around buggy Debian ocaml patch
+# See http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=678577
+export OCAML_COMPAT='c'
 
 export BAP_DIR=$(CURDIR)/..
 
@@ -22,16 +25,9 @@ include $(SOLVER)/makefile.inc
 
 include $(CURDIR)/makefile.inc
 ifdef HAVE_LLVM
-export LLVM_SRC = llvm_codegen.ml
-export LLVM_PACKS = llvm llvm.analysis llvm.executionengine llvm.target llvm.scalar_opts
+export LLVM_SRC = llvm_codegen.mli llvm_codegen.ml
+export LLVM_PACKS = llvm llvm.analysis llvm.executionengine llvm.target llvm.scalar_opts llvm.bitwriter
 endif
-
-# Stop annoying warnings about big_int duplication!
-#export OCAMLFIND_IGNORE_DUPS_IN=$(BAP_DIR)/bigint-3.12/otherlibs/num
-
-#export INCDIRS += ../stp ../stp/ocaml
-#export EXTLIBDIRS += ../stp ../stp/ocaml
-#export LIBS += stpvc
 
 #export LIB_PACK_NAME = bap
 
@@ -43,29 +39,28 @@ export SOURCES = \
 	big_int_convenience.ml \
 	dominator.ml \
 	graphDataflow.mli graphDataflow.ml \
-	type.ml type.mli \
+	type.mli type.ml \
 	var.mli var.ml \
 	arithmetic.ml \
 	ast.ml \
 	ssa.ml \
 	disasm_temp.ml \
 	pp.ml \
-	typecheck.ml \
+	typecheck.mli typecheck.ml \
 	ast_convenience.ml \
 	cfg.mli cfg.ml \
 	ast_visitor.mli ast_visitor.ml \
+	ssa_visitor.mli ssa_visitor.ml \
 	grammar_scope.ml \
 	memory2array.mli memory2array.ml \
-	flatten_mem.mli \
-	flatten_mem.ml \
-	reachable.mli \
-	reachable.ml \
+	flatten_mem.mli flatten_mem.ml \
+	reachable.mli reachable.ml \
 	prune_unreachable.mli prune_unreachable.ml \
 	cfg_pp.ml \
 	cfg_ast.mli cfg_ast.ml \
-	ssa_visitor.mli ssa_visitor.ml \
-	depgraphs.ml \
+	depgraphs.mli depgraphs.ml \
 	cfg_ssa.mli cfg_ssa.ml \
+	checks.mli checks.ml \
 	debug_snippets.ml \
 	sccvn.mli sccvn.ml \
 	deadcode.mli deadcode.ml \
@@ -99,7 +94,6 @@ export SOURCES = \
 	input.mli input.ml \
 	to_c.ml \
 	vsa.ml \
-	eval.ml \
 	symbeval.ml symbeval_search.ml \
 	hacks.ml \
 	coalesce.mli coalesce.ml \
@@ -110,6 +104,7 @@ export SOURCES = \
 	ssa_slice.ml \
 	traces.ml \
 	traces_surgical.ml \
+	traces_backtaint.mli traces_backtaint.ml \
 	utils_common.ml \
 	test_common.ml \
 	template.ml \
@@ -117,12 +112,6 @@ export SOURCES = \
 	graphDataflowW.ml \
 	$(SOLVER_SOURCES) \
 	$(PROJSOURCES) \
-
-# XXX: Only compile info_flow and formule_simplify_mem if Z3 is enabled
-
-# Fix the interpreter to work with big ints
-#	interpreter.ml \
-
 
 RESULT = bap
 DOC_FILES := $(filter %.mli, $(SOURCES)) $(filter %.ml, $(SOURCES))
@@ -141,7 +130,7 @@ export CLIBS += $(SOLVER_CLIBS)
 export OCAMLPATH = $(PIQIBUILDDIR)
 export CFLAGS = -g
 export LDFLAGS = $(LIBASMIR_LDFLAGS) $(SOLVER_LDFLAGS)
-export PPFLAGS = $(SOLVER_PPFLAGS)
+export PPFLAGS = $(SOLVER_PPFLAGS) $(LLVM_PPFLAGS)
 export INCDIRS = $(BIGINT) $(BATT) $(OUNIT) $(PCRE) $(OCAMLGRAPH) $(OBJSIZE) $(LIBTRACE) $(LIBTRACE)/piqi
 export LIBS = zarith batteries oUnit pcre graph objsize libtrace
 export RESULTDEPS = $(LIBASMIR)/src/libasmir.a $(VEX_DIR)/libvex.a $(LIBTRACE)/libtrace.cmxa
@@ -149,7 +138,7 @@ export LIBDIRS = $(LIBASMIR)/src $(VEX_DIR)
 export LIBDIRS += $(SOLVER_LIBDIRS) $(LIBTRACE)
 
 OCAMLLDFLAGS = -thread # just for make top
-OCAMLFLAGS = -thread -warn-error Aelz # -for-pack Bap #-w A
+OCAMLFLAGS = -thread -warn-error Aelz -annot # -for-pack Bap #-w A
 # merge everything but descriptions.
 OCAMLDOCFLAGS = -m avlsoper
 
@@ -166,6 +155,13 @@ TAGS: $(SOURCES)
 
 runtop:	top
 	./bap.top -I $(BIGINT) -I $(BATT)
+
+libbfd.idl : bfdarch.idl
+
+bfdarch.idl : /usr/include/bfd.h
+	 $(CPP) $< | awk 'BEGIN { go=0; } /^enum bfd_architecture$$/ { go=1; } \
+		go && $$0 != "" { print; } \
+		/};$$/ { go=0; }' > $@
 
 # You may also tell "make" at the command-line what kind of target to
 # produce (e.g. "make nc").  Here all the possibilities with shortcuts

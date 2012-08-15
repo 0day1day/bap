@@ -93,10 +93,10 @@ let trace_transform_stmt2 stmt evalf =
           let num = concretize idx in
           let bytes = get_bytes t in
           let exp = load (int64_of_big_int num) t bytes in
-            `ChangeTo exp
-      | _ -> `DoChildren
+            ChangeTo exp
+      | _ -> DoChildren
     method visit_stmt = function
-      | _ -> `DoChildren
+      | _ -> DoChildren
   end
   in
   let break_move num value t bytes =
@@ -201,9 +201,9 @@ let run_and_subst_block state memv block =
       | Symbolic(e) -> e
       | _ -> failwith "Expected symbolic" 
     in
-    executed := Util.fast_append input_seeds !executed ;
+    executed := BatList.append input_seeds !executed ;
       if !place >= extra then (
-    executed := Util.fast_append (trace_transform_stmt2 stmt evalf) !executed ; 
+    executed := BatList.append (trace_transform_stmt2 stmt evalf) !executed ; 
       );
         place := !place + 1;
     (*print_endline (Pp.ast_stmt_to_string stmt) ;*)
@@ -262,8 +262,8 @@ let dicer =
     let vis = object(self)
       inherit Ast_visitor.nop
       method visit_exp = function
-        | Ast.Var v -> inset := NameSet.add (Var.name v) !inset ; `DoChildren 
-        | _ -> `DoChildren
+        | Ast.Var v -> inset := NameSet.add (Var.name v) !inset ; DoChildren 
+        | _ -> DoChildren
     end
     in
     let make_sets = function
@@ -329,8 +329,8 @@ let slice varname trace =
   let vis = object(self)
     inherit Ast_visitor.nop
     method visit_exp = function
-      | Ast.Var v -> maps := NameSet.add (Var.name v) !maps ; `DoChildren 
-      | _ -> `DoChildren
+      | Ast.Var v -> maps := NameSet.add (Var.name v) !maps ; DoChildren 
+      | _ -> DoChildren
   end
   in
   let run_all acc = function 

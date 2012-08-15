@@ -71,36 +71,39 @@ object(self)
   initializer Gc.finalise (fun self -> if not self#has_finished then self#finish) self
 
   method add (frame:frame) =
-    let () = num_frames <- Int64.succ num_frames in
-    if Int64.rem num_frames frames_per_toc_entry = 0L then
+    if num_frames <> 0L && Int64.rem num_frames frames_per_toc_entry = 0L then
       (* Put a toc entry *)
-      toc <- (pos_out oc) :: toc;
+      toc <- (LargeFile.pos_out oc) :: toc;
+
+    let () = num_frames <- Int64.succ num_frames in
 
     (* Convert to string so we know length *)
     let s = Frame_piqi_ext.gen_frame frame `pb in
     let len = Int64.of_int (String.length s) in
+    if len <= 0L then
+      raise (TraceException "Attempt to add zero-length frame to trace");
 
     (* Write the length in binary *)
     let () = write_i64 oc len in
 
-    let old_offset = Int64.of_int (pos_out oc) in
+    let old_offset = LargeFile.pos_out oc in
     (* Finally write the serialized string out. *)
     let () = output_string oc s in
 
     (* Double-check our size. *)
     assert ((Int64.add old_offset len)
-        = (Int64.of_int (pos_out oc)));
+        = (LargeFile.pos_out oc));
 
   method finish =
     if is_finished then raise (TraceException "finish called twice");
 
-    let toc_offset = Int64.of_int (pos_out oc) in
+    let toc_offset = LargeFile.pos_out oc in
     (* Make sure the toc is the right size. *)
-    let () = assert ((Int64.div num_frames frames_per_toc_entry) = Int64.of_int (List.length toc)) in
+    let () = assert ((num_frames = 0L) || (Int64.div (Int64.pred num_frames) frames_per_toc_entry) = Int64.of_int (List.length toc)) in
     (* Write frames per toc entry. *)
     let () = write_i64 oc frames_per_toc_entry in
     (* Write toc to file. *)
-    let () = List.iter (fun offset -> write_i64 oc (Int64.of_int offset)) (List.rev toc) in
+    let () = List.iter (fun offset -> write_i64 oc offset) (List.rev toc) in
     (* Now we need to write the magic number, number of trace frames,
        and the offset of field m at the start of the trace. *)
     (* Magic number. *)
@@ -155,7 +158,7 @@ class reader filename =
   (* Read number of frames per toc entry. *)
   let frames_per_toc_entry = read_i64 ic in
   (* Read each toc entry. *)
-  let toc_size = Int64.div num_frames frames_per_toc_entry in
+  let toc_size = Int64.div (Int64.pred num_frames) frames_per_toc_entry in
   let toc =
     let toc_rev = foldn64
       (fun acc n ->
@@ -195,30 +198,29 @@ class reader filename =
       while current_frame <> frame_number do
         (* Read frame length and skip that far ahead. *)
         let frame_len = read_i64 ic in
-        let () = LargeFile.seek_in ic (Int64.add (Int64.of_int (pos_in ic)) frame_len) in
+        let () = LargeFile.seek_in ic (Int64.add (LargeFile.pos_in ic) frame_len) in
         current_frame <- Int64.succ current_frame
       done
 
     method get_frame : frame =
       let () = self#check_end_of_trace "get_frame on non-existant frame" in
-
       let frame_len = read_i64 ic in
-
+      if (frame_len <= 0L) then
+        raise (TraceException (Printf.sprintf "Read zero-length frame at offset %#Lx" (LargeFile.pos_in ic)));
       let buf = String.create (Int64.to_int frame_len) in
       (* Read the frame info buf. *)
       let () = really_input ic buf 0 (Int64.to_int frame_len) in
       let f = Frame_piqi.parse_frame (Piqirun.init_from_string buf) in
       let () = current_frame <- Int64.succ current_frame in
-
       f
 
     method get_frames requested_frames =
       let () = self#check_end_of_trace "get_frame on non-existant frame" in
-
       (* The number of frames we copy is bounded by the number of
          frames left in the trace. *)
-      let num_frames = min requested_frames (Int64.sub num_frames current_frame) in
-
+      let 
+          num_frames = min requested_frames (Int64.sub num_frames current_frame)
+      in
       List.rev (foldn64 ~t:1L (fun l n -> self#get_frame :: l) [] num_frames)
 
     method end_of_trace =

@@ -1,4 +1,4 @@
-\section{Transformations on \bil Code}
+\section{\texttt{iltrans}: Programs Transformations on \bil Code}
 The {\tt iltrans} tool translates our IL in various ways.  The options
 to {\tt iltrans} specify a sequence of transformations, optionally
 printing out the result of the transformation.   For example,
@@ -60,8 +60,8 @@ know the subsequent state. For example, a data-flow analysis could
 widen all facts to the lattice bottom.  Most normal analyses will
 first run an indirect jump resolution analysis in order to build a
 more precise CFG that resolves indirect jumps to a list of possible
-jump targets.  {\tt iltrans} provides one such analysis, called Value Set
-Analysis~\cite{balakrishnan:2007}.
+jump targets.  %% {\tt iltrans} provides one such analysis, called Value Set
+%% Analysis~\cite{balakrishnan:2007}.
 
 \paragraph{Single Static Assignment.} {\tt iltrans} supports
 conversion to and from single static assignment (SSA)
@@ -86,20 +86,18 @@ program. %% We describe our implementation of chopping in more detail
 \paragraph{Data-flow and Optimizations.} {\tt iltrans} interfaces with
 the generic data-flow engine in \bap.  The data-flow engine works on
 user-defined lattices, such as those for constant propagation, dead
-code elimination, etc.  {\tt iltrans} interfaces with several
-implements several data-flow analyses. \bap currently implements
-Simpson's global value numbering~\cite{simpson:1996}, constant
-propagation and folding~\cite{muchnick:1997}, dead-code
-elimination~\cite{muchnick:1997}, live-variable
-analysis~\cite{muchnick:1997}, integer range analysis, and
-VSA~\cite{balakrishnan:2007}.
+code elimination, etc.  \bap currently implements
+Simpson's global value numbering~\cite{simpson:1996}, (aggressive)
+dead-code elimination~\cite{muchnick:1997}, and live-variable
+analysis~\cite{muchnick:1997}.
 
-We have implemented value set analysis~\cite{balakrishnan:2007}. Value
-set analysis is a data-flow analysis that over-approximates the values
-for each variable at each program point. Value-set analysis can be
-used to help resolve indirect jumps. It can also be used as an alias
-analysis.  Two memory accesses are potentially aliased if the
-intersection of their value sets is non-empty.
+We have also implemented value set
+analysis~\cite{balakrishnan:2007}. Value set analysis is a data-flow
+analysis that over-approximates the values for each variable at each
+program point. Value-set analysis can be used to help resolve indirect
+jumps. It can also be used as an alias analysis.  Two memory accesses
+are potentially aliased if the intersection of their value sets is
+non-empty.
 
 
 Optimizations are useful for simplifying or speeding up subsequent

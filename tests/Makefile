@@ -1,4 +1,7 @@
 .NOTPARALLEL:
+# Work around buggy Debian ocaml patch
+# See http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=678577
+export OCAML_COMPAT='c'
 
 # XXX Fix this so it actually works
 include C/Makefile.defs
@@ -22,8 +25,13 @@ export PIQIBUILDDIR=$(BAP_DIR)/libtracewrap/libtrace/piqi/piqi/build/lib/ocaml
 # Stop annoying warnings about big_int duplication!
 #export OCAMLFIND_IGNORE_DUPS_IN=$(BAP_DIR)/bigint-3.12/otherlibs/num
 
-#export PACKS = oUnit bigarray str ocamlgraph extlib unix
-export PACKS = bigarray str num unix camomile piqi.lib
+include $(BAP_OCAMLDIR)/makefile.inc
+ifdef HAVE_LLVM
+export LLVM_PACKS = llvm llvm.analysis llvm.executionengine llvm.target llvm.scalar_opts llvm.bitwriter
+endif
+
+
+export PACKS = bigarray str num unix camomile piqi.lib $(LLVM_PACKS)
 export LIBS = zarith batteries oUnit pcre objsize graph libtrace bap
 export INCDIRS = $(BAP_OCAMLDIR) $(BIGINT) $(BATT) $(OUNIT) $(PCRE) $(OCAMLGRAPH) $(OBJSIZE) $(LIBTRACE)
 export OCAMLPATH = $(PIQIBUILDDIR)
@@ -31,7 +39,7 @@ export OCAMLPATH = $(PIQIBUILDDIR)
 # Include sources from ../ocaml in the automatically generated dependencies.
 export SOURCE_DIRS_IN = $(BAP_OCAMLDIR) $(BAP_PROJ_OCAMLDIR)
 
-export SUBPROJS += $(PROJTESTS) analyze_test_log baptest
+export SUBPROJS += $(PROJTESTS) baptest
 
 CSRC=$(wildcard C/*.c)
 CEXECS = $(CSRC:C/%.c=%)
@@ -49,21 +57,15 @@ define PROJ_baptest
 	ast_suite.ml \
 	disasm_i386_suite.ml \
 	asmir_suite.ml \
+	eval_suite.ml \
 	traces_suite.ml \
-	pin_suite.ml \
 	predicate_suite.ml \
 	arithmetic_suite.ml \
+	dominator_suite.ml \
 	bap_suite.ml
 	DOC_FILES=$(SOURCES)
 endef
 export PROJ_baptest
-
-define PROJ_analyze_test_log
-	RESULT=analyze_test_log
-	SOURCES = analyze_test_log.ml
-	DOC_FILES=$(SOURCES)
-endef
-export PROJ_analyze_test_log
 
 export BCSUFFIX = .dbg
 

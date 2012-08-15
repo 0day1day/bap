@@ -105,7 +105,7 @@ let context_copy = VH.copy
 (* Unwrapping functions *)
 let symb_to_exp = function
   | Symbolic e -> e
-  | ConcreteMem _ -> failwith "this is not a symbolic expression"
+  | ConcreteMem _ -> failwith "symb_to_exp called on concrete memory"
 let concmem_to_mem = function
   | ConcreteMem m -> m
   | _ -> failwith "not a concrete memory"
@@ -828,8 +828,7 @@ struct
      | _ -> failwith "internal error: adding malformed constraint to formula"
     )
 
-  let output_formula bindings =
-    bindings exp_true
+  let output_formula bindings = bindings exp_true
 end
 
 (** Uses Lets for assignments *)
@@ -875,7 +874,10 @@ module ConcreteMap = Make(BuildConcreteMemL(MemVMBackEnd))(AlwaysEvalLet)(StdAss
 (** Execute a program concretely *)
 let concretely_execute ?s ?(i=[]) p =
   let rec step ctx =
-    let s = Concrete.inst_fetch ctx.sigma ctx.pc in
+    let s = try Concrete.inst_fetch ctx.sigma ctx.pc
+      with Not_found ->
+        failwith (Printf.sprintf "Fetching instruction %#Lx failed; you probably need to add a halt to the end of your program" ctx.pc)
+    in
     dprintf "Executing: %s" (Pp.ast_stmt_to_string s);
     let nextctxs = try Concrete.eval ctx, None with
         Concrete.Halted (v, ctx) -> [ctx], v

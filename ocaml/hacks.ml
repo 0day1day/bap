@@ -161,7 +161,8 @@ let uniqueify_labels p =
     in
     let n =
       try (Hashtbl.find lh strl)+1
-      with Not_found -> 0 in
+      with Not_found -> 0 
+    in
     Hashtbl.replace lh strl n;
         (* Keep the first name unique to make sure cjmptrace labels
            don't get broken *)
@@ -173,14 +174,33 @@ let uniqueify_labels p =
   in
   let renamelabels = object(self)
     inherit Ast_visitor.nop
-    method visit_stmt = function
-      | Label(l, attrs) ->
-        `ChangeTo (Label(find_new_label l, attrs))
-      | _ -> `DoChildren
-
-    method visit_exp e = match lab_of_exp e with
-    | Some l -> `ChangeToAndDoChildren (exp_of_lab (find_new_label l))
-    | None -> `DoChildren
+    method visit_label l = ChangeTo (find_new_label l)
   end
   in
   Ast_visitor.prog_accept renamelabels p
+
+module Rm(C: Cfg.CFG) = struct
+  let remove_indirect g =
+    C.remove_vertex g (C.G.V.create Cfg.BB_Indirect)
+end
+
+let ast_remove_indirect =
+  let module Rm = Rm(Cfg.AST) in
+  Rm.remove_indirect
+
+let ssa_remove_indirect =
+  let module Rm = Rm(Cfg.SSA) in
+  Rm.remove_indirect
+
+(** Replace unknown expressions with constant zero *)
+let replace_unknowns p =
+  let i t = Int(Big_int_convenience.bi0, t) in
+  let v = object(self)
+    inherit Ast_visitor.nop
+    method visit_exp = function
+      | Unknown(_, t) ->
+        ChangeTo (i t)
+      | _ -> DoChildren
+  end
+  in
+  Ast_visitor.prog_accept v p

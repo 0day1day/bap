@@ -1,8 +1,6 @@
 let usage = "Usage: "^Sys.argv.(0)^" <input options> [transformations and outputs]\n\
              Transform BAP IL programs. "
 
-(* open Bap*)
-
 open Ast
 
 type ast = Ast.program
@@ -15,6 +13,9 @@ type prog =
   | Ssa of ssa
 
 type cmd = 
+  | AnalysisAst of (ast -> unit)
+  | AnalysisAstCfg of (astcfg -> unit)
+  | AnalysisSsa of (ssa -> unit)
   | TransformAst of (ast -> ast)
   | TransformAstCfg of (astcfg -> astcfg)
   | TransformSsa of (ssa -> ssa)
@@ -30,13 +31,14 @@ let inits = ref []
 
 let scope = ref (Grammar_private_scope.default_scope ())
 
+let init_stmts () =
+  List.fold_left (fun l (v,e) -> Move(v,e,[])::l) [] !inits
+
 let cexecute_at s p =
-  let () = ignore(Symbeval.concretely_execute p ~i:(List.rev !inits) ~s) in
-  p
+  ignore(Symbeval.concretely_execute p ~i:(init_stmts ()) ~s)
 
 let cexecute p =
-  let () = ignore(Symbeval.concretely_execute p ~i:(List.rev !inits)) in
-  p
+  ignore(Symbeval.concretely_execute p ~i:(init_stmts ()))
 
 let add c =
   pipeline := c :: !pipeline
@@ -53,8 +55,9 @@ let mapv v e =
     | _ -> assert false
   in
   scope := ns;
-  let s = Move(v, e, []) in
-  inits := s :: !inits
+  inits := (v, e) :: !inits
+  (* let s = Move(v, e, []) in *)
+  (* inits := s :: !inits *)
 
 let mapmem a e =
   let a,ns = Parser.exp_from_string ~scope:!scope a in
@@ -66,17 +69,22 @@ let mapmem a e =
     | _ -> assert false
   in
   scope := ns;
-  let s = Move(m, Store(Var(m), a, e, exp_false, t), []) in
-  inits := s :: !inits
-  
+  (* let s = Move(m, Store(Var(m), a, e, exp_false, t), []) in *)
+  inits := (m, Store(Var(m), a, e, exp_false, t)) :: !inits
+  (* inits := s :: !inits *)
+
+let jitexecute p = Utils_common.jitexecute (List.rev !inits) p
 
 let speclist =
   ("-eval", 
-     Arg.Unit (fun () -> add(TransformAst cexecute)),
+     Arg.Unit (fun () -> add(AnalysisAst cexecute)),
      "Concretely execute the IL from the beginning of the program")
   ::("-eval-at", 
-     Arg.String (fun s -> add(TransformAst (cexecute_at (Int64.of_string s)))),
+     Arg.String (fun s -> add(AnalysisAst (cexecute_at (Int64.of_string s)))),
      "<pc> Concretely execute the IL from pc")
+  ::("-jiteval",
+     Arg.Unit (fun () -> add(AnalysisAst jitexecute)),
+     "Concretely execute the IL using the LLVM JIT compiler")
   ::("-init-var",
      Arg.Tuple 
        (let vname = ref "" and vval = ref "" in
@@ -110,6 +118,21 @@ let prog =
     exit 1
 
 let rec apply_cmd prog = function
+  | AnalysisAst f -> (
+    match prog with
+    | Ast p as p' -> f p; p'
+    | _ -> failwith "need explicit translation to AST"
+  )
+  | AnalysisAstCfg f -> (
+    match prog with
+    | AstCfg p as p' -> f p; p'
+    | _ -> failwith "need explicit translation to AST CFG"
+  )
+  | AnalysisSsa f -> (
+    match prog with
+    | Ssa p as p' -> f p; p'
+    | _ -> failwith "need explicit translation to SSA"
+  )
   | TransformAst f -> (
       match prog with
       | Ast p -> Ast(f p)

@@ -86,6 +86,10 @@ namespace WINDOWS {
 // necessary.
 #define BUFFER_SIZE 10240
 
+// Leave this much extra room in the frame buffer, for some unexpected
+// frames.
+#define FUDGE 5
+
 // Add a keyframe every KEYFRAME_FREQ instructions.
 #define KEYFRAME_FREQ 10240
 
@@ -428,7 +432,7 @@ VOID ModLoad(IMG i, void*);
 ThreadInfo_t* GetThreadInfo(void) {
     ThreadInfo_t* ti;
 
-    ti = static_cast<ThreadInfo_t*> (PIN_GetThreadData(tl_key));
+    ti = static_cast<ThreadInfo_t*> (PIN_GetThreadData(tl_key, PIN_ThreadId()));
     assert(ti);
     return ti;
 }
@@ -483,6 +487,17 @@ static uint32_t GetBitsOfReg(REG r) {
     case REG_XMM6:
     case REG_XMM7:
         return 128;
+        break;
+
+    case REG_YMM0:
+    case REG_YMM1:
+    case REG_YMM2:
+    case REG_YMM3:
+    case REG_YMM4:
+    case REG_YMM5:
+    case REG_YMM6:
+    case REG_YMM7:
+        return 256;
         break;
 
     default:
@@ -556,13 +571,12 @@ VOID TActivate()
 //
 ADDRINT CheckBuffer(UINT32 count)
 {
-    return (g_bufidx + count) >= BUFFER_SIZE;
-
+  return (g_bufidx + count) >= BUFFER_SIZE - FUDGE;
 }
 
 ADDRINT CheckBufferEx(BOOL cond, UINT32 count, UINT32 count2)
 {
-    return cond && ((g_bufidx + count + count2) >= BUFFER_SIZE);
+  return cond && ((g_bufidx + count + count2) >= BUFFER_SIZE - FUDGE);
 }
 
 // Callers must ensure mutual exclusion
@@ -1103,6 +1117,8 @@ VOID AppendBuffer(ADDRINT addr,
         //cerr << "Logging instruction " << rawbytes0 << " " << rawbytes1 << endl;
 
         // Now, fill in the buffer with information
+
+	assert (g_bufidx < BUFFER_SIZE);
       
         g_buffer[g_bufidx].addr = addr;
         g_buffer[g_bufidx].tid = tid;
@@ -1429,6 +1445,7 @@ VOID InstrBlock(BBL bbl)
 
         for(uint32_t i = 0; i < INS_OperandCount(ins); i++) {
 
+            opndvals[valcount].taint = 0;
             if (INS_OperandRead(ins, i) && (!is_xor))
                 opndvals[valcount].taint = RD;
             if (INS_OperandWritten(ins, i))
@@ -1438,6 +1455,11 @@ VOID InstrBlock(BBL bbl)
             if (INS_OperandIsReg(ins, i)) {
          
                 REG r = INS_OperandReg(ins, i);
+                if(r == REG_INVALID()) {
+                  cerr << "Warning: invalid register operand in " << INS_Disassemble(ins) << endl;
+                  continue;
+                }
+                assert(r != REG_INVALID());
                 opndvals[valcount].reg = r;
                 opndvals[valcount].type.type = REGISTER;
 

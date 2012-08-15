@@ -11,7 +11,11 @@ open Grammar_scope
     Add this to the speclist for your program. *)
 val speclist : (key * spec * doc) list
 
+(** A speclist with only streaming inputs *)
 val stream_speclist : (key * spec * doc) list
+
+(** A speclist with only trace inputs *)
+val trace_speclist : (key * spec * doc) list
 
 (** Get the program as specified by the commandline. *)
 val get_program : unit -> Ast.program * Scope.t

@@ -8,10 +8,11 @@ let short_tests = [
   Ast_suite.suite;
   Disasm_i386_suite.suite;
   Asmir_suite.suite;
+  Eval_suite.suite;
   Traces_suite.suite;
-  Pin_suite.suite;
   Predicate_suite.suite;
   Arithmetic_suite.suite;
+  Dominator_suite.suite;
 ];;
 
 let bap_tests = ("BAP" >::: short_tests);;

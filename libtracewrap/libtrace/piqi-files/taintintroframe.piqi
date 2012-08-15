@@ -8,6 +8,7 @@
 
         .field [
                .type taint-intro-list
+               .code 1
         ]
 ]
 
@@ -24,11 +25,13 @@
         .field [
                .name addr
                .type address
+               .code 1
         ]
 
         % The taint identifier
         .field [
                .type taint-id
+               .code 2
         ]
 
         % Initial concrete value when introduced.
@@ -40,5 +43,6 @@
                .name value
                .type binary
                .optional
+               .code 3
         ]
 ]

@@ -16,7 +16,7 @@ module type Solver_Out = sig
   class solver :
   object
     val s : set
-    method add_binding : Ast.var -> Ast.exp -> unit (** Add a {!Ast.Let} binding to context *)
+    method add_binding : Ast.var -> Ast.exp -> unit (** Add a [Ast.Let] binding to context *)
     method add_constraint : Ast.exp -> unit (** Add boolean constraint to context *)
     method del_binding : Ast.var -> unit (** Delete boolean constraint from context *)
     method is_sat : bool (** true iff context is satisfiable *)
