@@ -7,7 +7,7 @@ module D = Debug.Make(struct let name = "Unroll" and default=`Debug end)
 open D
 
 
-let unroll_loop ?(count=8) cfg head body =
+let unroll_loop ?(count=8) ?(id=0) cfg head body =
   dprintf "Unrolling loop for %s with %d nodes" (Cfg.bbid_to_string (C.G.V.label head)) (List.length body);
   let nodes = head::body in
   let nnodes = List.length nodes in
@@ -26,7 +26,7 @@ let unroll_loop ?(count=8) cfg head body =
   in
   let unrollednodes = Hashtbl.create (nnodes * count) in
   let backedges = Hashtbl.create (nnodes * count) in
-  let renewlabel l i = l ^ "_unroll_" ^ string_of_int i in
+  let renewlabel l i = l ^ "_unroll_" ^ string_of_int i ^ "_" ^ string_of_int id in
   let duplicate cfg i =
     List.fold_left 
       (fun cfg node ->
@@ -200,7 +200,7 @@ let unroll_loop ?(count=8) cfg head body =
   cfg
 
 *)
-let unroll_bbs ?count idom cfg bbs =
+let unroll_bbs ?count ?id idom cfg bbs =
   dprintf "unroll_bbs invoked";
   let nodes = List.map (C.find_vertex cfg) bbs in
   let h = Hashtbl.create (List.length nodes) in
@@ -212,13 +212,14 @@ let unroll_bbs ?count idom cfg bbs =
   in
   let head = findhead (List.hd nodes) in
   let body = List.filter ((<>)head) nodes in
-  unroll_loop ?count cfg head body
+  unroll_loop ?count ?id cfg head body
 
 
 let unroll_loops ?count cfg =
   let module SA = Structural_analysis in
   let module Dom = Dominator.Make(C.G) in
   let () = Checks.connected_astcfg cfg "unroll_loops" in
+  let nunrolled = ref 0 in
   let idom = Dom.compute_idom cfg (C.find_vertex cfg Cfg.BB_Entry) in
   let bbs_of_node =
     let rec get_nodes acc = function
@@ -252,7 +253,8 @@ let unroll_loops ?count cfg =
            However, the region does not need to be correct, it only
            need contain the correct bbs, since it is only used by
            bbs_of_node. *)
-	let cfg, nl = unroll_bbs ?count idom cfg bbs in
+	let cfg, nl = unroll_bbs ?count ~id:!nunrolled idom cfg bbs in
+        incr nunrolled;
         let make_region bb = SA.BBlock (C.G.V.label bb) in
         cfg, SA.Region(SA.Proper, List.map make_region nl)
       | _ -> cfg, r
