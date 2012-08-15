@@ -155,14 +155,11 @@ let check_bigint_answer e correct =
 
 
 let check_eax ctx eax =
-  let pat = "R_EAX_" in
   Var.VarHash.iter 
     (fun k v ->
-      match k,v with
-      | var,Symbeval.Symbolic e ->
-	if (pmatch ~pat (Pp.var_to_string var)) 
-	then check_bigint_answer e eax
-	else ()
+      match v with
+      | Symbeval.Symbolic e when k = Disasm_i386.eax ->
+	check_bigint_answer e eax
       | _ -> ()
     ) ctx.Symbeval.delta;;
 

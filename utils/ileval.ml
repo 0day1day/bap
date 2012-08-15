@@ -63,8 +63,7 @@ let mapmem a e =
   let a,ns = Parser.exp_from_string ~scope:!scope a in
   let e,ns = Parser.exp_from_string ~scope:ns e in
   let t = Typecheck.infer_ast e in
-  (* XXX: Fix parser/asmir so that we don't have to do this! *)
-  let m,ns = match Parser.exp_from_string ~scope:ns "mem_45:?u32" with
+  let m,ns = match Parser.exp_from_string ~scope:ns "mem:?u32" with
     | Var(v), ns -> v, ns
     | _ -> assert false
   in
