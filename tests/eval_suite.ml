@@ -33,10 +33,10 @@ let concrete_eval_setup _ =
 let concrete_eval_test (ranges, s) = 
   (* i represents the change on the stack to the "wrong" value for function g *)
   let i =
-    let a,_ = Parser.exp_from_string "R_ESP_1:u32" in
+    let a,_ = Parser.exp_from_string "R_ESP:u32" in
     let e,_ = Parser.exp_from_string "43:u32" in
     let t = Typecheck.infer_ast e in
-    let m = match Parser.exp_from_string "mem_45:?u32" with
+    let m = match Parser.exp_from_string "mem:?u32" with
       | Var(v), _ -> v
       | _ -> assert false
     in
