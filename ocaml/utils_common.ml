@@ -34,6 +34,25 @@ let to_ssagcl ?(usedc=true) ?(usesccvn=true) cfg post =
   let gcl = Gcl.of_astcfg cfg in
   (gcl, p);;
 
+
+(* For type checking.  Temporary home. *)
+let typecheck p =
+  let v = object(self)
+    inherit Ast_visitor.nop
+    method visit_exp e = ignore(Typecheck.infer_ast ~check:true e); `DoChildren
+  end 
+  in
+  List.iter
+    (fun s ->
+      try ignore(Ast_visitor.stmt_accept v s)
+      with Typecheck.TypeError _ as e ->
+        (* Having the statement usually helps *)
+        wprintf "Problem statement: %s" (Pp.ast_stmt_to_string s);
+        raise e
+    )
+    p;
+  p
+
 let stream_concrete ?(tag = "") mem_hash concrete_state block =
   let block = Memory2array.coerce_prog_state mem_hash block in
   let memv = Memory2array.coerce_rvar_state mem_hash Asmir.x86_mem in

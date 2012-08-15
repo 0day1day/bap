@@ -4,8 +4,6 @@ export BAP_DIR=$(CURDIR)/..
 .PHONY: ../../utils-proj/Makefile
 -include ../../utils-proj/Makefile
 
-export USE_CAMLP4 = yes
-
 export BAP_OCAMLDIR=$(BAP_DIR)/ocaml
 export BIGINT=$(BAP_DIR)/zarith-1.0
 export BATT=$(BAP_DIR)/batteries/_build/src
@@ -21,7 +19,7 @@ export OCAMLMAKEFILE=$(BAP_OCAMLDIR)/OCamlMakefile
 include $(BAP_OCAMLDIR)/makefile.inc
 ifdef HAVE_LLVM
 export CODEGEN = codegen
-export LLVM_PACKS = llvm llvm.analysis llvm.executionengine llvm.target llvm.scalar_opts llvm.bitwriter
+export LLVM_PACKS = llvm llvm.analysis llvm.executionengine llvm.target llvm.scalar_opts
 endif
 
 # Stop annoying warnings about big_int duplication!

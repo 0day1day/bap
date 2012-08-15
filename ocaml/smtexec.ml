@@ -1,5 +1,10 @@
 (**
    Module for executing SMTs inside of BAP
+
+   XXX: This is not portable in any shape or way. It will only work on
+   Unix-like systems.
+
+   @author ejs
 *)
 
 exception Alarm_signal_internal;;
@@ -12,7 +17,7 @@ open Unix
 
 type model = (string*int64) list option
 
-type result = Valid | Invalid (*of model*) | SmtError of string | Timeout
+type result = Valid | Invalid (*of model*) | SmtError | Timeout
 
 (** Class type to embed SMT execution functions.  If OCaml < 3.12 had
     first-class modules, we wouldn't need this. *)
@@ -28,7 +33,6 @@ module type SOLVER_INFO =
 sig
   val timeout : int (** Default timeout in seconds *)
   val solvername : string (** Solver name *)
-  val progname : string (** Name of program, to ensure it is in the path *)
   val cmdstr : string -> string (** Given a filename, produce a command string to invoke solver *)
   val parse_result : ?printmodel:bool -> string -> string -> Unix.process_status -> result (** Given output, decide the result *)
   val printer : Formulap.fppf
@@ -133,7 +137,7 @@ let result_to_string result =
   match result with
   | Valid -> "Valid"
   | Invalid -> "Invalid"
-  | SmtError s -> "SmtError: " ^ s
+  | SmtError -> "SmtError"
   | Timeout -> "Timeout"
 
 module Make = functor (S: SOLVER_INFO) ->
@@ -170,22 +174,19 @@ struct
 
     let solve_formula_file ?(timeout=S.timeout) ?(remove=false) ?(printmodel=false) file =
       ignore(alarm timeout);
-      let cmdline = S.progname ^ " " ^ S.cmdstr file in
+      let cmdline = S.cmdstr file in
 
       try
         dprintf "Executing: %s" cmdline;
-        if Sys.command (Printf.sprintf "which %s > /dev/null" S.progname) != 0 then
-          SmtError (Printf.sprintf "Solver program %s not in path" S.progname)
-        else (
-	  let sout,serr,pstatus = syscall cmdline in
+	let sout,serr,pstatus = syscall cmdline in
 
-	  (* Turn the alarm off *)
-	  ignore(alarm 0);
+	(* Turn the alarm off *)
+	ignore(alarm 0);
 
-          dprintf "Parsing result...";
-          let r = S.parse_result ~printmodel sout serr pstatus in
-          if remove then (try Unix.unlink file with _ -> ());
-          r)
+        dprintf "Parsing result...";
+        let r = S.parse_result ~printmodel sout serr pstatus in
+        if remove then (try Unix.unlink file with _ -> ());
+        r
 
       with Alarm_signal(pid) ->
 	kill pid 9;
@@ -228,8 +229,7 @@ module STP_INFO =
 struct
   let timeout = 60
   let solvername = "stp"
-  let progname = "stp"
-  let cmdstr f = "-p " ^ f
+  let cmdstr f = "stp -p " ^ f
   let parse_result_builder solvername ?(printmodel=false) stdout stderr pstatus =
     let failstat = match pstatus with
       | WEXITED(c) -> c > 0
@@ -250,7 +250,7 @@ struct
       Invalid
     ) else if fail then (
       dprintf "output: %s\nerror: %s" stdout stderr;
-      SmtError ("SMT solver failed: " ^ stderr)
+      SmtError
     )
     else
       failwith "Something weird happened."
@@ -264,8 +264,7 @@ module STPSMTLIB_INFO =
 struct
   let timeout = 60
   let solvername = "stp"
-  let progname = "stp"
-  let cmdstr f = "--SMTLIB1 -t " ^ f
+  let cmdstr f = "stp --SMTLIB1 -t " ^ f
   let parse_result_builder solvername ?(printmodel=false) stdout stderr pstatus =
     let failstat = match pstatus with
       | WEXITED(c) -> c > 0
@@ -286,7 +285,7 @@ struct
       Invalid
     ) else if fail then (
       dprintf "output: %s\nerror: %s" stdout stderr;
-      SmtError ("SMT solver failed: " ^ stderr)
+      SmtError
     )
     else
       failwith "Something weird happened."
@@ -300,8 +299,7 @@ module CVC3_INFO =
 struct
   let timeout = 60
   let solvername = "cvc3"
-  let progname = "cvc3"
-  let cmdstr f = "+model " ^ f
+  let cmdstr f = "cvc3 +model " ^ f
   (* let parse_result stdout stderr pstatus = *)
   (*   let failstat = match pstatus with *)
   (*     | WEXITED(c) -> c > 0 *)
@@ -356,8 +354,7 @@ module CVC3SMTLIB_INFO =
 struct
   let timeout = 60
   let solvername = "cvc3"
-  let progname = "cvc3"
-  let cmdstr f = "-lang smtlib " ^ f
+  let cmdstr f = "cvc3 -lang smtlib " ^ f
   let parse_result = STPSMTLIB_INFO.parse_result_builder solvername
   let printer = ((new Smtlib1.pp_oc) :> Formulap.fppf)
 end
@@ -368,8 +365,7 @@ module YICES_INFO =
 struct
   let timeout = 60
   let solvername = "yices"
-  let progname = "yices"
-  let cmdstr f = "-m " ^ f
+  let cmdstr f = "yices -m " ^ f
   let parse_result = STPSMTLIB_INFO.parse_result_builder solvername
   let printer = ((new Smtlib1.pp_oc) :> Formulap.fppf)
 end

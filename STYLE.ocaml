@@ -98,7 +98,6 @@ Install tuareg-mode, and use
 (custom-set-variables
 	'(tuareg-in-indent 0)
 	'(tuareg-with-indent 0))
-(setq-default indent-tabs-mode nil)
 
 Note: Comments in ocaml start with a (* and end with a *) and can
 contain nested comments. Apparently this is too complicated for emacs'

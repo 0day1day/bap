@@ -1,4 +1,6 @@
-\section{{\tt topredicate}: Predicate-based Program Verification}
+\section{Tools from \bil}
+
+\subsection{{\tt topredicate}}
 
 {\tt topredicate} supports program verification in two ways. First,
 {\tt topredicate} can convert the IL into Dijkstra's Guarded Command
@@ -16,7 +18,9 @@ decision procedures. In addition, {\tt topredicate} interfaces
 directly with the STP~\cite{ganesh:2007} decision procedure through
 calls from \bap to the STP library.
 
-\section{{\tt ileval}: Concrete evaluation} 
+
+
+\subsection{{\tt ileval}} 
 
 {\tt ileval} evaluates a given \bil
 program using the operational semantics in in~\ref{vine:operational}.
@@ -26,28 +30,19 @@ is correct by executing the IL on an input $i$, observing the value $v$,
 executing the original binary program on $i$, observing the value
 $v'$, and verifying $v = v'$.
 
-\section{\texttt{codegen}: LLVM-based code generation}
+\subsection{{\tt toc}} 
 
-\texttt{codegen} converts a \bil program to LLVM~\cite{llvm} IL, and
-then converted to native code using LLVM's code generators.  This may
-be useful for translating binary code to other architectures, or for
-static instrumentation.
+{\tt toc} generates valid C code from the IL.  For example, one could
+use this as a rudimentary decompiler by first raising assembly to
+\bil, then writing it out as valid C.  The ability to export to C also
+provides a way to compile \bil programs: the IL is written as C, then
+compiled with a C compiler.
 
-%% We don't have a separate toc command anymore
-
-%% \section{{\tt toc}} 
-
-%% {\tt toc} generates valid C code from the IL.  For example, one could
-%% use this as a rudimentary decompiler by first raising assembly to
-%% \bil, then writing it out as valid C.  The ability to export to C also
-%% provides a way to compile \bil programs: the IL is written as C, then
-%% compiled with a C compiler.
-
-%% The C code generator implements memories in the IL as arrays.  A {\tt
-%%   store} operation is a store on the array, and a {\tt load} is a load
-%% from the array.  Thus, C-generated code simulates real memory.  For
-%% example, consider a program that is vulnerable to a buffer overflow
-%% attack. It is raised to \bil, then written as C and recompiled. An
-%% out-of-bound write on the original program will be simulated in the
-%% corresponding C array, but will not lead to a real buffer overflow.
+The C code generator implements memories in the IL as arrays.  A {\tt
+  store} operation is a store on the array, and a {\tt load} is a load
+from the array.  Thus, C-generated code simulates real memory.  For
+example, consider a program that is vulnerable to a buffer overflow
+attack. It is raised to \bil, then written as C and recompiled. An
+out-of-bound write on the original program will be simulated in the
+corresponding C array, but will not lead to a real buffer overflow.
 

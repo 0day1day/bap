@@ -213,7 +213,7 @@ FrameOption_t TaintTracker::introMemTaint(uint32_t addr, uint32_t length, const 
 
   FrameOption_t fb;
 
-  if ((*pf)(addr, length, source) && length > 0) {
+  if ((*pf)(addr, length, source)) {
 
     for (unsigned int i = 0; i < length; i++) {
       uint32_t t = 0;

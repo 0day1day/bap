@@ -428,7 +428,7 @@ VOID ModLoad(IMG i, void*);
 ThreadInfo_t* GetThreadInfo(void) {
     ThreadInfo_t* ti;
 
-    ti = static_cast<ThreadInfo_t*> (PIN_GetThreadData(tl_key, PIN_ThreadId()));
+    ti = static_cast<ThreadInfo_t*> (PIN_GetThreadData(tl_key));
     assert(ti);
     return ti;
 }
@@ -483,17 +483,6 @@ static uint32_t GetBitsOfReg(REG r) {
     case REG_XMM6:
     case REG_XMM7:
         return 128;
-        break;
-
-    case REG_YMM0:
-    case REG_YMM1:
-    case REG_YMM2:
-    case REG_YMM3:
-    case REG_YMM4:
-    case REG_YMM5:
-    case REG_YMM6:
-    case REG_YMM7:
-        return 256;
         break;
 
     default:
@@ -1449,11 +1438,6 @@ VOID InstrBlock(BBL bbl)
             if (INS_OperandIsReg(ins, i)) {
          
                 REG r = INS_OperandReg(ins, i);
-                if(r == REG_INVALID()) {
-                  cerr << "Warning: invalid register operand in " << INS_Disassemble(ins) << endl;
-                  continue;
-                }
-                assert(r != REG_INVALID());
                 opndvals[valcount].reg = r;
                 opndvals[valcount].type.type = REGISTER;
 

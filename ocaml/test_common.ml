@@ -173,7 +173,7 @@ let check_eax ctx eax =
 let check_functions msg ranges names =
   ignore(List.map (find_fun ~msg ranges) names);;
 
-let typecheck p = Typecheck.typecheck_prog p;;
+let typecheck p = ignore(Utils_common.typecheck p);;
 
 (* Return list of statments between start_addr and end_addr *)
 let find_prog_chunk prog start_addr end_addr = 

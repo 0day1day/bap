@@ -40,33 +40,28 @@
         % Mem/register specific stuff.
         .field [
                .type operand-info-specific
-               .code 1
         ]
 
 
         % Size in bits
         .field [
                .type bit-length
-               .code 2
         ]
 
         % Usage (read, written, both)
         .field [
                .type operand-usage
-               .code 3
         ]
 
         % Taint information
         .field [
                .type taint-info
-               .code 4
         ]
 
         % Value
         .field [
                .name value
                .type binary
-               .code 5
         ]
 ]
 
@@ -76,12 +71,10 @@
 
          .option [
                  .type mem-operand
-                 .code 1
          ]
 
          .option [
                  .type reg-operand
-                 .code 2
          ]
 ]
 
@@ -92,7 +85,6 @@
         .field [
                .name name
                .type string
-               .code 1
         ]
 ]
 
@@ -103,7 +95,6 @@
         % Address
         .field [
                .type address
-               .code 1
         ]
 ]
 
@@ -115,28 +106,24 @@
       .field [
              .name read
              .type bool
-             .code 1
       ]
 
       % Is this operand written to?
       .field [
              .name written
              .type bool
-             .code 2
       ]
 
       % Is this operand used as the index of a memory lookup?
       .field [
              .name index
              .type bool
-             .code 3
       ]
 
       % Is this operand used as the base of a memory lookup?
       .field [
              .name base
              .type bool
-             .code 4
       ]
 ]
 
@@ -147,18 +134,15 @@
          % Operand not tainted
          .option [
                  .name no-taint
-                 .code 1
          ]
 
          % Taint from a single source
          .option [
                  .type taint-id
-                 .code 2
          ]
 
          % Taint from more than one source
          .option [
                  .name taint-multiple
-                 .code 3
          ]
 ]

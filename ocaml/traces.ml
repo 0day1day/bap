@@ -713,7 +713,8 @@ let print_block =
   List.iter (fun s -> pdebug (Pp.ast_stmt_to_string s))
 
 let trace_length trace =
-  print "Trace length: %d\n" (List.length trace)
+  print "Trace length: %d\n" (List.length trace) ;
+  trace
 
 let print_formula file formula =
   let oc = open_out file in
@@ -906,11 +907,11 @@ let check_delta state =
                 let s = "{"^(Pp.ast_stmt_to_string assignstmt)^"}\n" in
                 if assigned_time <= !last_time then
                   (* The special happened after our assignment *)
-                  s^"special{"^(Pp.ast_stmt_to_string !last_special)^"}\n"
+                  s^"{"^(Pp.ast_stmt_to_string !last_special)^"}\n"
                 else s
 	      with Not_found ->
                 (* This is a little weird if this happens... *)
-                "special{"^(Pp.ast_stmt_to_string !last_special)^"}"
+                "{"^(Pp.ast_stmt_to_string !last_special)^"}"
 	    in
 	    let traceval_str = Pp.ast_exp_to_string traceval in
 	    let evalval_str = Pp.ast_exp_to_string evalval in
@@ -1112,8 +1113,7 @@ let run_block ?(next_label = None) ?(log=fun _ -> ()) ?(transformf = (fun s _ ->
           (* An explicit assignment *)
 	  if not (is_temp v) then 
             VH.replace reg_to_stmt v {assignstmt=addr; assigned_time=get_counter ()}
-        | Special _ as s when Syscall_models.x86_is_system_call s ||
-            Disasm.is_decode_error s ->
+        | Special _ as s when Syscall_models.x86_is_system_call s ->
           (* A special could potentially overwrite all registers *)
           last_time := get_counter();
           last_special := addr;
@@ -1925,7 +1925,8 @@ let output_formula file trace =
     (*dprintf "formula size: %Ld\n" (formula_size formula) ;*)
   Status.init "Printing out formula" 0;
   print_formula file formula ;
-  Status.stop ()
+  Status.stop () ;
+  trace
 
 
 (*************************************************************)
@@ -2001,7 +2002,9 @@ let output_exploit file trace =
     List.iter (output_byte cout) input ;
     close_out cout;
     print "Exploit string was written out to file \"%s\"\n" file ;
-    flush stdout
+    flush stdout ;
+    trace
+
 
 
 (*************************************************************)
@@ -2076,7 +2079,8 @@ let trace_valid_to_invalid trace =
   in
   let (l,u) = bsearch 1 length in
   ignore (output_formula "form_val" (Util.take l trace)) ;
-  ignore (output_formula "form_inv" (Util.take u trace)) 
+  ignore (output_formula "form_inv" (Util.take u trace)) ;
+  trace
 
 (* Binary search over the concretized IL to check where things go
    wrong. *)
@@ -2120,7 +2124,8 @@ let formula_valid_to_invalid ?(min=1) trace =
   in
   let (l,u) = bsearch min length in
   ignore (sym_and_output (Util.take l trace) "form_val") ;
-  ignore (sym_and_output (Util.take u trace) "form_inv")
+  ignore (sym_and_output (Util.take u trace) "form_inv") ;
+  trace
 
 let clean =
   let rec clean_aux acc = function

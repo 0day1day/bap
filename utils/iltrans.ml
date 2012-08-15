@@ -1,6 +1,9 @@
 let usage = "Usage: "^Sys.argv.(0)^" <input options> [transformations and outputs]\n\
              Transform BAP IL programs. "
 
+
+open Utils_common
+
 type ast = Ast.program
 type astcfg = Cfg.AST.G.t
 type ssa = Cfg.SSA.G.t
@@ -11,9 +14,6 @@ type prog =
   | Ssa of ssa
 
 type cmd =
-  | AnalysisAst of (ast -> unit)
-  | AnalysisAstCfg of (astcfg -> unit)
-  | AnalysisSsa of (ssa -> unit)
   | TransformAst of (ast -> ast)
   | TransformAstCfg of (astcfg -> astcfg)
   | TransformSsa of (ssa -> ssa)
@@ -25,62 +25,72 @@ type cmd =
 let pipeline = ref []
 let startdebug = ref 1
 
+
 let output_ast f p =
   let oc = open_out f in
   let pp = new Pp.pp_oc oc in
   pp#ast_program p;
-  pp#close
+  pp#close;
+  p
 
 let output_ast_cfg f p =
   let oc = open_out f in
   Cfg_pp.AstStmtsDot.output_graph oc p;
-  close_out oc
+  close_out oc;
+  p
 
 let output_ast_bbids f p =
   let oc = open_out f in
   Cfg_pp.AstBBidDot.output_graph oc p;
-  close_out oc
+  close_out oc;
+  p
 
 let output_ast_cdg f p =
   let oc = open_out f in
   let cdg = Depgraphs.CDG_AST.compute_cdg p in
     Cfg_pp.AstBBidDot.output_graph oc cdg;
-    close_out oc
+    close_out oc;
+    p
 
 let output_ast_pdg f p =
   let oc = open_out f in
   let pdg = Depgraphs.PDG_AST.compute_pdg p in
     Cfg_pp.AstStmtsDot.output_graph oc pdg;
-    close_out oc
+    close_out oc;
+    p
 
 let output_ssa f p =
   let oc = open_out f in
   Cfg_pp.SsaStmtsDot.output_graph oc p;
-  close_out oc
-
+  close_out oc;
+  p
 let output_ssa_bbids f p =
   let oc = open_out f in
   Cfg_pp.SsaBBidDot.output_graph oc p;
-  close_out oc
+  close_out oc;
+  p
 
 let output_ssa_cdg f p =
   let oc = open_out f in
   let cdg = Depgraphs.CDG_SSA.compute_cdg p in
     Cfg_pp.SsaBBidDot.output_graph oc cdg;
-    close_out oc
+    close_out oc;
+    p
 
 let output_ssa_ddg f p =
   let oc = open_out f in
   let ddg = Depgraphs.DDG_SSA.compute_ddg p in
     Cfg_pp.SsaStmtsDot.output_graph oc ddg;
-    close_out oc
+    close_out oc;
+    p
 
 let output_c f p =
   let oc = open_out f in
   let ft = Format.formatter_of_out_channel oc in
   let pp = new To_c.pp ft in
   pp#ast_program p;
-  close_out oc
+  close_out oc;
+  p
 
 let to_dsa p =
   let p,_ = Traces.to_dsa p in
@@ -88,9 +98,10 @@ let to_dsa p =
 
 let output_structanal p =
   let cfg = Prune_unreachable.prune_unreachable_ast p in
-  ignore(Structural_analysis.structural_analysis cfg)
+  let _ = Structural_analysis.structural_analysis cfg in
   (* FIXME: print a pretty graph or something. For now the debugging
      output is useful enough... *)
+  p
 
 let sccvn p =
   fst(Sccvn.replacer p)
@@ -120,27 +131,27 @@ let uadd c =
   Arg.Unit(fun()-> add c)
 
 let speclist =
-  ("-pp-ast", Arg.String(fun f -> add(AnalysisAst(output_ast f))),
+  ("-pp-ast", Arg.String(fun f -> add(TransformAst(output_ast f))),
    "<file> Pretty print AST to <file>.")
-  ::("-pp-ast-cfg", Arg.String (fun f -> add(AnalysisAstCfg(output_ast_cfg f))),
+  ::("-pp-ast-cfg", Arg.String (fun f -> add(TransformAstCfg(output_ast_cfg f))),
      "<file> Pretty print AST graph to <file> (in Graphviz format)")
-  ::("-pp-ast-bbids", Arg.String(fun f -> add(AnalysisAstCfg(output_ast_bbids f))),
+  ::("-pp-ast-bbids", Arg.String(fun f -> add(TransformAstCfg(output_ast_bbids f))),
      "<file> Pretty print AST graph to <file> (in Graphviz format) (no stmts)")
-  ::("-pp-ast-cdg", Arg.String (fun f -> add(AnalysisAstCfg(output_ast_cdg f))),
+  ::("-pp-ast-cdg", Arg.String (fun f -> add(TransformAstCfg(output_ast_cdg f))),
      "Output the AST CDG (bbid's)")
-  ::("-pp-ast-pdg", Arg.String (fun f -> add(AnalysisAstCfg(output_ast_pdg f))),
+  ::("-pp-ast-pdg", Arg.String (fun f -> add(TransformAstCfg(output_ast_pdg f))),
      "Output the AST DDG (bbid's)")
-  ::("-pp-ssa", Arg.String(fun f -> add(AnalysisSsa(output_ssa f))),
+  ::("-pp-ssa", Arg.String(fun f -> add(TransformSsa(output_ssa f))),
      "<file> Pretty print SSA graph to <file> (in Graphviz format)")
-  ::("-pp-ssa-bbids", Arg.String(fun f -> add(AnalysisSsa(output_ssa_bbids f))),
+  ::("-pp-ssa-bbids", Arg.String(fun f -> add(TransformSsa(output_ssa_bbids f))),
      "<file> Pretty print SSA graph to <file> (in Graphviz format) (no stmts)")
-  ::("-pp-ssa-cdg", Arg.String (fun f -> add(AnalysisSsa(output_ssa_cdg f))),
+  ::("-pp-ssa-cdg", Arg.String (fun f -> add(TransformSsa(output_ssa_cdg f))),
      "Output the SSA CDG (bbid's)")
-  ::("-pp-ssa-ddg", Arg.String (fun f -> add(AnalysisSsa(output_ssa_ddg f))),
+  ::("-pp-ssa-ddg", Arg.String (fun f -> add(TransformSsa(output_ssa_ddg f))),
      "Output the SSA DDG (bbid's)")
   ::("-pp-novarnums", Arg.Unit (fun () -> Pp.output_varnums := false),
      "Print variables without variable ID numbers")
-  ::("-struct", Arg.Unit (fun () -> add(AnalysisAstCfg(output_structanal))),
+  ::("-struct", Arg.Unit (fun () -> add(TransformAstCfg(output_structanal))),
      "Structural analysis.")
   ::("-to-cfg", uadd(ToCfg),
      "Convert to an AST CFG.")
@@ -148,7 +159,7 @@ let speclist =
      "Convert to the AST.")
   ::("-to-ssa", uadd(ToSsa),
      "Convert to SSA.")
-  :: ("-to-c", Arg.String(fun f -> add(AnalysisAst(output_c f))),
+  :: ("-to-c", Arg.String(fun f -> add(TransformAst(output_c f))),
       "<file> Output C to file."
      )
   ::("-ast-chop",
@@ -158,7 +169,7 @@ let speclist =
          [Arg.Set_int srcbb ; Arg.Set_int srcn ;
           Arg.Set_int trgbb ; Arg.Set_int trgn ;
                uadd(TransformAstCfg(ast_chop srcbb srcn trgbb trgn)) ]),
-     "<src-bbnum> <src-linenum> <trg-bbnum> <trg-linenum> Calculate the chop of an AST")
+     "<src-bb> <src-num> <trg-bb> <trg-num> Calculate the chop of an AST")
   ::("-ssa-chop",
       Arg.Tuple
         (let srcbb = ref 0 and srcn = ref 0
@@ -166,7 +177,7 @@ let speclist =
          [Arg.Set_int srcbb ; Arg.Set_int srcn ;
           Arg.Set_int trgbb ; Arg.Set_int trgn ;
                uadd(TransformSsa(ssa_chop srcbb srcn trgbb trgn)) ]),
-     "<src-bbnum> <src-linenum> <trg-bbnum> <trg-linenum> Calculate the chop of an AST")
+     "<src-bb> <src-num> <trg-bb> <trg-num> Calculate the chop of an AST")
   ::("-sccvn", uadd(TransformSsa sccvn),
      "Apply Strongly Connected Component based Value Numbering")
   ::("-deadcode", uadd(TransformSsa deadcode),
@@ -179,9 +190,9 @@ let speclist =
      "Perform coalescing on the SSA.")
   ::("-jumpelim", uadd(TransformSsa jumpelim),
      "Control flow optimization.")
-  (* ::("-memtoscalar", uadd(AnalysisSsa memory2scalardef), *)
+  (* ::("-memtoscalar", uadd(TransformSsa memory2scalardef), *)
   (*    "Convert memory accesses to scalars (default mode).") *)
-  (* ::("-memtoscalar-initro", uadd(AnalysisSsa memory2scalariroptir), *)
+  (* ::("-memtoscalar-initro", uadd(TransformSsa memory2scalariroptir), *)
   (*    "Convert memory accesses to scalars (IndirectROPTIR mode).") *)
   ::("-ssa-simp", uadd(TransformSsa Ssa_simp.simp_cfg),
      "Perform all supported optimizations on SSA")
@@ -220,14 +231,14 @@ let speclist =
      "Start debugging at item n."
     )
   ::("-trace-debug",
-     uadd(AnalysisAst Traces.trace_valid_to_invalid),
+     uadd(TransformAst Traces.trace_valid_to_invalid),
      "Formula debugging. Prints to files form_val and form_inv"
     )
   ::("-trace-conc-debug",
      Arg.Unit
        (fun () ->
 	  let f = Traces.formula_valid_to_invalid ~min:!startdebug in
-	  add(AnalysisAst f)
+	  add(TransformAst f)
        ),
      "Formula debugging. Prints to files form_val and form_inv. Concretizes BEFORE debugging; useful for finding which assertion doesn't work."
     )
@@ -311,7 +322,7 @@ let speclist =
      "<gaddress> <maddress> <sehaddress> <payload file> Use pivot at gaddress to transfer control (by overwriting SEH handler at sehaddress) to payload at maddress."
     )
   ::("-trace-formula",
-     Arg.String(fun f -> add(AnalysisAst(Traces.output_formula f))),
+     Arg.String(fun f -> add(TransformAst(Traces.output_formula f))),
      "<file> Output the STP trace formula to <file>"
     )
   ::("-trace-formula-format",
@@ -319,7 +330,7 @@ let speclist =
      "Set formula format (STP (default) or smtlib1)."
   )
   ::("-trace-exploit",
-     Arg.String(fun f -> add(AnalysisAst(Traces.output_exploit f))),
+     Arg.String(fun f -> add(TransformAst(Traces.output_exploit f))),
      "<file> Output the exploit string to <file>"
     )
   ::("-trace-assignments",
@@ -327,7 +338,7 @@ let speclist =
      "Explicitly assign the concrete values to the trace variables"
     )
   ::("-trace-length",
-     uadd(AnalysisAst(Traces.trace_length)),
+     uadd(TransformAst(Traces.trace_length)),
      "Output the length of the trace"
     )
   ::("-trace-no-padding",
@@ -365,16 +376,10 @@ let speclist =
       "<n> Unroll loops n times")
   :: ("-rm-cycles", uadd(TransformAstCfg Hacks.remove_cycles),
       "Remove cycles")
-  :: ("-ast-rm-indirect", uadd(TransformAstCfg Hacks.ast_remove_indirect),
-      "Remove BB_Indirect")
-  :: ("-ssa-rm-indirect", uadd(TransformSsa Hacks.ssa_remove_indirect),
-      "Remove BB_Indirect")
-  :: ("-typecheck", uadd(AnalysisAst Typecheck.typecheck_prog),
+  :: ("-typecheck", uadd(TransformAst typecheck),
       "Typecheck program")
   :: ("-uniqueify-labels", uadd(TransformAst Hacks.uniqueify_labels),
       "Ensure all labels are unique")
-  :: ("-replace-unknowns", uadd(TransformAst Hacks.replace_unknowns),
-      "Replace all unknowns with zeros")
   :: Input.speclist
 
 let anon x = raise(Arg.Bad("Unexpected argument: '"^x^"'"))
@@ -389,52 +394,37 @@ let prog =
     exit 1
 
 let rec apply_cmd prog = function
-  | AnalysisAst f -> (
-    match prog with
-    | Ast p as p' -> f p; p'
-    | _ -> failwith "need explicit translation to AST"
-  )
-  | AnalysisAstCfg f -> (
-    match prog with
-    | AstCfg p as p' -> f p; p'
-    | _ -> failwith "need explicit translation to AST CFG"
-  )
-  | AnalysisSsa f -> (
-    match prog with
-    | Ssa p as p' -> f p; p'
-    | _ -> failwith "need explicit translation to SSA"
-  )
   | TransformAst f -> (
-    match prog with
-    | Ast p -> Ast(f p)
-    | _ -> failwith "need explicit translation to AST"
-  )
+      match prog with
+      | Ast p -> Ast(f p)
+      | _ -> failwith "need explicit translation to AST"
+    )
   | TransformAstCfg f -> (
-    match prog with
-    | AstCfg p -> AstCfg(f p)
-    | _ -> failwith "need explicit translation to AST CFG"
-  )
+      match prog with
+      | AstCfg p -> AstCfg(f p)
+      | _ -> failwith "need explicit translation to AST CFG"
+    )
   | TransformSsa f -> (
-    match prog with
-    | Ssa p -> Ssa(f p)
-    | _ -> failwith "need explicit translation to SSA"
-  )
+      match prog with
+      | Ssa p -> Ssa(f p)
+      | _ -> failwith "need explicit translation to SSA"
+    )
   | ToCfg -> (
-    match prog with
-    | Ast p -> AstCfg(Cfg_ast.of_prog p)
-    | Ssa p -> AstCfg(Cfg_ssa.to_astcfg p)
-    | AstCfg _ as p -> prerr_endline "Warning: null transformation"; p
-  )
+      match prog with
+      | Ast p -> AstCfg(Cfg_ast.of_prog p)
+      | Ssa p -> AstCfg(Cfg_ssa.to_astcfg p)
+      | AstCfg _ as p -> prerr_endline "Warning: null transformation"; p
+    )
   | ToAst -> (
-    match prog with
-    | AstCfg p -> Ast(Cfg_ast.to_prog p)
-    | p -> apply_cmd (apply_cmd p ToCfg) ToAst
-  )
+      match prog with
+      | AstCfg p -> Ast(Cfg_ast.to_prog p)
+      | p -> apply_cmd (apply_cmd p ToCfg) ToAst
+    )
   | ToSsa -> (
-    match prog with
-    | AstCfg p -> Ssa(Cfg_ssa.of_astcfg p)
-    | p -> apply_cmd (apply_cmd p ToCfg) ToSsa
-  )
+      match prog with
+      | AstCfg p -> Ssa(Cfg_ssa.of_astcfg p)
+      | p -> apply_cmd (apply_cmd p ToCfg) ToSsa
+    )
 ;;
 
 List.fold_left apply_cmd (Ast prog) pipeline

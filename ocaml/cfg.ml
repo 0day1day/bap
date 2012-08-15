@@ -61,7 +61,6 @@ sig
   val default : lang
   val set_stmts : G.t -> G.V.t -> lang -> G.t
   val join_stmts : lang -> lang -> lang
-  val lang_to_string : lang -> string
   (*val newid : G.t -> bbid*)
   val create_vertex : G.t -> lang -> G.t * G.V.t
   val copy_map : G.t -> G.t
@@ -71,8 +70,7 @@ sig
   val remove_edge : G.t -> G.V.t -> G.V.t -> G.t
   val remove_edge_e : G.t -> G.E.t -> G.t
 
-  (* val vlabel_to_string : G.V.label -> string *)
-  val v2s : G.V.t -> string
+  val vlabel_to_string : G.V.label -> string
 
 end
 
@@ -162,6 +160,63 @@ struct
     let remove_edge_e c e   = { c with g = G'.remove_edge_e c.g e }
     let add_vertex c v      = { c with g = G'.add_vertex c.g v }
 
+    let join_stmts = Lang.join
+
+
+
+
+
+    (* Extra stuff to make this a CFG *)
+
+    let find_vertex c id =
+      let v = V.create id in
+	if mem_vertex c v then v else raise Not_found
+
+    let find_label c l = LM.find l c.l
+
+    let get_stmts c v =
+      try BM.find v c.s
+      with Not_found -> Lang.default
+
+    let default = Lang.default
+
+    (* helper *)
+    let fold_labels f l a =
+      let r = ref a in
+      Lang.iter_labels (fun l -> r := f l !r) l;
+      !r
+    let remove_labels c v =
+      { c with
+	  l = fold_labels (fun l lm -> LM.remove l lm) (get_stmts c v) c.l
+      }
+
+    let set_stmts c v s =
+      let c = remove_labels c v in
+      let sm = BM.add v s c.s in
+      let lm = fold_labels
+        (fun l lm ->
+          (* dprintf "Adding label %s to bbid %s" (Pp.label_to_string l) (bbid_to_string (V.label v)); *)
+          if debug && LM.mem l lm then (
+            (* wprintf "stmt: %s" (Lang.to_string s); *)
+            let oldstmts = get_stmts c (LM.find l lm) in
+            let newstmts = s in
+            wprintf "Duplicate of %s:\n\noldstmts: %s\n\n newstmts: %s" (Pp.label_to_string l) (Lang.to_string oldstmts) (Lang.to_string newstmts);
+            failwith (Printf.sprintf "Duplicate of %s" (Pp.label_to_string l)));
+          LM.add l v lm
+        ) s c.l in
+      { c with l=lm; s=sm }
+
+    let newid c =
+      let id = c.nextid in
+      if id = -1 then failwith "newid: wrapped around";
+      (BB id, {c with nextid = id + 1 })
+
+    let create_vertex c stmts =
+      let (i,c) = newid c in
+      let v = V.create i in
+      let c = add_vertex c v in
+      (set_stmts c v stmts, v)
+
     (* Less boring wrappers *)
     let empty =
       {
@@ -171,74 +226,18 @@ struct
 	nextid = 0;
       }
 
+    let remove_vertex c v =
+      let c = remove_labels c v in
+      let sm = BM.remove v c.s in
+      let g = G'.remove_vertex c.g v in
+      { c with g=g; s=sm }
+
     let map_vertex f c =
       failwith "map_vertex: unimplemented"
 
     let copy_map {s=s; l=l; nextid = nextid} = {g = G'.empty; s=s; l=l; nextid=nextid}
 
   end (* module G *)
-
-    (* Extra stuff to make this a CFG *)
-  let find_vertex c id =
-    let v = G.V.create id in
-    if G.mem_vertex c v then v else raise Not_found
-
-  let find_label c l = LM.find l c.l
-
-  let get_stmts c v =
-    try BM.find v c.s
-    with Not_found -> Lang.default
-
-  let default = Lang.default
-
-  let join_stmts = Lang.join
-
-  let lang_to_string = Lang.to_string
-
-    (* helper *)
-  let fold_labels f l a =
-    let r = ref a in
-    Lang.iter_labels (fun l -> r := f l !r) l;
-    !r
-  let remove_labels c v =
-    { c with
-      l = fold_labels (fun l lm -> LM.remove l lm) (get_stmts c v) c.l
-    }
-
-  let set_stmts c v s =
-    let c = remove_labels c v in
-    let sm = BM.add v s c.s in
-    let lm = fold_labels
-      (fun l lm ->
-        (* dprintf "Adding label %s to bbid %s" (Pp.label_to_string l) (bbid_to_string (V.label v)); *)
-        if debug && LM.mem l lm then (
-            (* wprintf "stmt: %s" (Lang.to_string s); *)
-            let oldstmts = get_stmts c (LM.find l lm) in
-            let newstmts = s in
-            wprintf "Duplicate of %s:\n\noldstmts: %s\n\n newstmts: %s" (Pp.label_to_string l) (Lang.to_string oldstmts) (Lang.to_string newstmts);
-            failwith (Printf.sprintf "Duplicate of %s" (Pp.label_to_string l)));
-        LM.add l v lm
-      ) s c.l in
-    { c with l=lm; s=sm }
-
-  let newid c =
-    let id = c.nextid in
-    if id = -1 then failwith "newid: wrapped around";
-    (BB id, {c with nextid = id + 1 })
-
-  let create_vertex c stmts =
-    let (i,c) = newid c in
-    let v = G.V.create i in
-    let c = G.add_vertex c v in
-    (set_stmts c v stmts, v)
-
-  let remove_vertex c v =
-    let c = remove_labels c v in
-    let sm = BM.remove v c.s in
-    let g = G'.remove_vertex c.g v in
-    { c with g=g; s=sm }
-
-
 
   (* Copied from ocamlgraph's Builder.P so that G doesn't eat our extensions *)
   let empty () = G.empty
@@ -248,12 +247,21 @@ struct
   let add_edge_e = G.add_edge_e
 
   (* extra, builder-like stuff *)
+  let remove_vertex = G.remove_vertex
   let remove_edge = G.remove_edge
   let remove_edge_e = G.remove_edge_e
 
+  let find_vertex = G.find_vertex
+  let find_label = G.find_label
+  let get_stmts = G.get_stmts
+  let default = G.default
+  let set_stmts = G.set_stmts
+  let join_stmts = G.join_stmts
+  let newid = G.newid
+  let create_vertex = G.create_vertex
   let copy_map = G.copy_map
 
-  let v2s v = bbid_to_string (G.V.label v)
+  let vlabel_to_string = bbid_to_string
 
 end
 (* end persistent implementation *)
@@ -265,8 +273,7 @@ struct
   type t = Ast.stmt list
   let default = []
   let join sl1 sl2 = match List.rev sl1 with
-    | Ast.Jmp (e, _) :: sl1' when Ast.lab_of_exp e <> None -> List.append (List.rev sl1') sl2
-    | Ast.Jmp _ :: _ -> failwith "join: Joining BB with indirect jump not possible"
+    | Ast.Jmp _ :: sl1' -> List.append (List.rev sl1') sl2
     | _ -> BatList.append sl1 sl2
   let iter_labels f =
     List.iter (function Ast.Label(l, _) -> f l  | _ -> () )
@@ -278,8 +285,7 @@ struct
   type t = Ssa.stmt list
   let default = []
   let join sl1 sl2 = match List.rev sl1 with
-    | Ssa.Jmp (e, _) :: sl1' when Ssa.val_of_exp e <> None -> List.append (List.rev sl1') sl2
-    | Ssa.Jmp _ :: _ -> failwith "join: Joining BB with indirect not possible"
+    | Ssa.Jmp _ :: sl1' -> List.append (List.rev sl1') sl2
     | _ -> BatList.append sl1 sl2
   let iter_labels f =
     (* optimization: assume labels are at the beginning *)

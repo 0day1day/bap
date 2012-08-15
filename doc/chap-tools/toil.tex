@@ -1,15 +1,37 @@
-\section{\texttt{toil}: Lifting Binary Code to \bil}
+\section{Lifting Binary Code to \bil}
 
-The {\tt toil} tool lifts binary code to \bil.  Lifting up binary code
-to the IL consists of two steps:
+The {\tt toil} tool lifts binary code to \bil.  The syntax for {\tt
+  toil} is yet to be determined.
+
+
+\section{The internals of {\tt toil}}
+Lifting up binary code to the IL consists of three steps:
 \begin{itemize}\squish
-\item First, the binary file is opened using libbfd. BAP can read binaries from any bfd-supported binary, including ELF and PE binaries.  
+\item {\bf Step 1.} First, the binary file is disassembled. {\tt toil}
+  currently interfaces with %% two disassemblers: IDA Pro~\cite{idapro},
+  %% a commercial disassembler, and 
+  a linear sweep disassembler built on top of GNU libopcodes.
+  Interfacing with other disassemblers like IDA Pro is straight-forward.
 
-\item Second, the executable code in the binary is disassembled.  {\tt
-  toil} currently uses a linear sweep disassembler.
+\item {\bf Step 2.} The disassembly is passed to VEX, a third-party
+  library which turns assembly instructions into the VEX intermediate
+  language. The VEX IL is part of the Valgrind dynamic instrumentation
+  tool~\cite{nethercote:2004:phd}.  The VEX IL is also similar to a
+  RISC-based language. As a result, the lifted IL has only a few
+  instruction types, similar to \bap. However, the VEX IL  is
+  insufficient for performing program analysis because it lacks
+  information about the implicit side effects of instructions, e.g., what
+  {\tt eflags} are set by x86 instructions.  This step is mainly
+  performed in order to simplify the development of \bap: we let the
+  existing tool take care of reducing assembly instructions to a
+  basic IL, then step 3 exposes all implicit side-effects so that
+  the analysis is faithful.
 
-\item Each assembly instruction discovered by the linear sweep disassembler
-  is then lifted directly to \bil.
+  
+
+\item {\bf Step 3.} We lift the VEX IL to \bil.  The resulting \bil
+  IL is intended to be faithful to the semantics of the disassembled
+  assembly instructions. 
 \end{itemize}
 
 Lifted assembly instructions have all of the side-effects explicitly
@@ -23,7 +45,7 @@ lifted as a sequence of \bil instructions.  For example, the {\tt add
 tmp1 = EAX;
 EAX = EAX + 2;
 //eflags calculation
-CF = (EAX<tmp1);
+CF:reg1\_t = (EAX<tmp1);
 tmp2 = cast(low, EAX, reg8\_t);
 PF = (!cast(low,
               ((((tmp2>>7)^(tmp2>>6))^((tmp2>>5)^(tmp2>>4)))^

@@ -1,7 +1,8 @@
+
 *** Basic installation ****
 
-We primarily build bap on Ubuntu Linux. It will likely also work on
-Debian systems.
+Note: we primarily build bap on 64-bit Debian Lenny. It will
+likely also work on ubuntu and 32-bit systems.
 
 To build BAP on x86, do the following:
   $ ./autogen.sh
@@ -21,7 +22,7 @@ satisfy most dependencies on Ubuntu 11.04/11.10 by running:
 XXX: Does this work for Debian too?
 
 To build LLVM code generation, include:
-   libllvm-ocaml-dev
+   libllvm-ocaml-2.8-dev
 
 On x86_64 add the following packages:
     gcc-multilib g++-multilib lib32z1-dev
@@ -49,24 +50,16 @@ Doing make clean first, will ensure that the whole platform gets
 compiled with the same flag
 
 
-*** SMT Solvers ***
+*** Valgrind's VEX library ****
 
-BAP interfaces with several SMT solvers which must be downloaded and
-installed separately.  The solver utility must be in the executable
-path to be available to BAP. The supported solvers are:
- * STP https://sites.google.com/site/stpfastprover/
- * cvc3 http://www.cs.nyu.edu/acsys/cvc3/
- * yices2 http://yices.csl.sri.com/
+BAP requires Valgrind's VEX library. We have included a patched
+version of the VEX library in this distribution.   We have included
+information on our patch under VEX/BAP.README.  We recommend you use
+the version of VEX that is included.
 
-BAP also supports z3 through its native ocaml library, avavilable here:
-http://research.microsoft.com/en-us/um/redmond/projects/z3/download.html
-Once downloaded and extracted, use the BAP configure --with-z3=z3-dir
-option, where z3-dir is the extracted z3 directory.  Note that you must
-run the z3-dir/ocaml/build-lib.sh script before configuring.  The getz3.sh
-script in the solvers directory of the BAP distribution will download,
-extract z3 to solvers/z3, and run the build-lib script for you.  If
-you use this script, you must then pass --with-z3=bap-dir/solvers/z3
-to configure, replacing bap-dir with the path of your BAP directory.
+It is possible to use a different version of VEX.  To do so, build
+VEX, then use the --with-vex=<vex dir> configure option.
+
 
 
 *** Installing pin ***
@@ -89,35 +82,29 @@ $PATH/traces/pintraces/obj-ia32/gentrace.so (or gentrace.dll on Windows).
 
 *** Optional: Making the documentation ***
 
-Optionally you can also build the developer documentation by running:
-'make doc' in the ocaml directory.  The documentation will be
-generated under ocaml/doc/bap/.  Note that ocaml documentation
-requires that the ocaml source files be built properly first.
+Optionally you can also make the documentation by running: 'make doc'
+in the ocaml directory.  The documentation will be generated under
+ocaml/doc/bap/.  Note that ocaml documentation requires that the ocaml
+source files be built properly first.
+
+We have also provided a command line to view the ocaml file
+dependencies. Run:
+  $ make bap.dot
+in the ocaml directory. The resulting file is a graphviz dot file
+which can help you visualize how modules are related, e.g., run:
+  $ dot -Tpdf bap.dot > bap.pdf
+  $ xpdf bap.pdf
+
 
 
 *** Optional: Making unit tests ***
 
-Build and run the unit tests tests:
-$ make test
-OR
+Make tests:
+$ make tests
+-- or --
+$ cd tests && make
 
-$ cd tests && make && ./bap_test_suite
-
-For verbose output, pass -verbose to bap_test_suite.
-
-
-*** Optional: Lift arm binaries ***
-
-BAP can lift little endian arm binaries.  For this to work, BAP needs
-to be linked to a version of the BFD library that supports arm.  On
-ubuntu, these are provided by the binutils-multiarch package.
-However, this package does not replace the default BFD libraries
-(which probably do not support arm).  You must also manually run:
-
-  $ cd /usr/lib && sudo rm libbfd.so libopcodes.so \
-  && sudo ln -s libbfd-2.21.0-multiarch.20110327.so libbfd.so \
-  && sudo ln -s libopcodes-2.21.0-multiarch.20110327.so libopcodes.so
-
-to point the default BFD libraries to the multiarch implementations.
-You will probably need to adjust the lib*-multiarch*so filenames to
-match those on your system.
+Run tests:
+$ cd tests && ./bap_test_suite
+-- or for verbose test output --
+$ cd tests && ./bap_test_suite -verbose

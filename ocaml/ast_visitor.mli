@@ -27,7 +27,8 @@ object
 
 end
 
-(** A nop visitor. *)
+(** A nop visitor similar to [nop_bap_visitor].
+    See {!Vine.nop_bap_visitor} for more information.   *)
 class nop : t
 
 

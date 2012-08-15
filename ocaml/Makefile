@@ -22,9 +22,16 @@ include $(SOLVER)/makefile.inc
 
 include $(CURDIR)/makefile.inc
 ifdef HAVE_LLVM
-export LLVM_SRC = llvm_codegen.mli llvm_codegen.ml
-export LLVM_PACKS = llvm llvm.analysis llvm.executionengine llvm.target llvm.scalar_opts llvm.bitwriter
+export LLVM_SRC = llvm_codegen.ml
+export LLVM_PACKS = llvm llvm.analysis llvm.executionengine llvm.target llvm.scalar_opts
 endif
+
+# Stop annoying warnings about big_int duplication!
+#export OCAMLFIND_IGNORE_DUPS_IN=$(BAP_DIR)/bigint-3.12/otherlibs/num
+
+#export INCDIRS += ../stp ../stp/ocaml
+#export EXTLIBDIRS += ../stp ../stp/ocaml
+#export LIBS += stpvc
 
 #export LIB_PACK_NAME = bap
 
@@ -43,7 +50,7 @@ export SOURCES = \
 	ssa.ml \
 	disasm_temp.ml \
 	pp.ml \
-	typecheck.mli typecheck.ml \
+	typecheck.ml \
 	ast_convenience.ml \
 	cfg.mli cfg.ml \
 	ast_visitor.mli ast_visitor.ml \
@@ -92,6 +99,7 @@ export SOURCES = \
 	input.mli input.ml \
 	to_c.ml \
 	vsa.ml \
+	eval.ml \
 	symbeval.ml symbeval_search.ml \
 	hacks.ml \
 	coalesce.mli coalesce.ml \
@@ -110,6 +118,12 @@ export SOURCES = \
 	$(SOLVER_SOURCES) \
 	$(PROJSOURCES) \
 
+# XXX: Only compile info_flow and formule_simplify_mem if Z3 is enabled
+
+# Fix the interpreter to work with big ints
+#	interpreter.ml \
+
+
 RESULT = bap
 DOC_FILES := $(filter %.mli, $(SOURCES)) $(filter %.ml, $(SOURCES))
 
@@ -127,7 +141,7 @@ export CLIBS += $(SOLVER_CLIBS)
 export OCAMLPATH = $(PIQIBUILDDIR)
 export CFLAGS = -g
 export LDFLAGS = $(LIBASMIR_LDFLAGS) $(SOLVER_LDFLAGS)
-export PPFLAGS = $(SOLVER_PPFLAGS) $(LLVM_PPFLAGS)
+export PPFLAGS = $(SOLVER_PPFLAGS)
 export INCDIRS = $(BIGINT) $(BATT) $(OUNIT) $(PCRE) $(OCAMLGRAPH) $(OBJSIZE) $(LIBTRACE) $(LIBTRACE)/piqi
 export LIBS = zarith batteries oUnit pcre graph objsize libtrace
 export RESULTDEPS = $(LIBASMIR)/src/libasmir.a $(VEX_DIR)/libvex.a $(LIBTRACE)/libtrace.cmxa
@@ -152,13 +166,6 @@ TAGS: $(SOURCES)
 
 runtop:	top
 	./bap.top -I $(BIGINT) -I $(BATT)
-
-libbfd.idl : bfdarch.idl
-
-bfdarch.idl : /usr/include/bfd.h
-	 $(CPP) $< | awk 'BEGIN { go=0; } /^enum bfd_architecture$$/ { go=1; } \
-		go && $$0 != "" { print; } \
-		/};$$/ { go=0; }' > $@
 
 # You may also tell "make" at the command-line what kind of target to
 # produce (e.g. "make nc").  Here all the possibilities with shortcuts

@@ -52,9 +52,6 @@ sig
   (** Joins two statement lists *)
   val join_stmts : lang -> lang -> lang
 
-  (** Convert lang to string *)
-  val lang_to_string : lang -> string
-
   (** Generate a new ID that wasn't previously generated for the given graph *)
   (* val newid : G.t -> bbid *)
 
@@ -70,8 +67,11 @@ sig
   val remove_edge : G.t -> G.V.t -> G.V.t -> G.t
   val remove_edge_e : G.t -> G.E.t -> G.t
 
-  (** Convert a vertex's label to a string *)
-  val v2s : G.V.t -> string
+  (** Convert a vertex label to a string
+
+      XXX: Remove this or put in V
+  *)
+  val vlabel_to_string : G.V.label -> string
 
 end
 

@@ -32,31 +32,25 @@
 
          .option [
                  .type std-frame
-                 .code 1
          ]
 
          .option [
                  .type syscall-frame
-                 .code 2
          ]
 
          .option [
                  .type exception-frame
-                 .code 3
          ]
 
          .option [
                  .type taint-intro-frame
-                 .code 4
          ]
 
          .option [
                  .type modload-frame
-                 .code 5
          ]
 
          .option [
                  .type key-frame
-                 .code 6
          ]
 ]
