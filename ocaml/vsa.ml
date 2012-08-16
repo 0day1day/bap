@@ -74,12 +74,14 @@ struct
   let highbit k =
     if k = 1 then 1L else I.shift_left 1L (k-1)
 
-  let extend k i = 
+  (* Cast i as signed number *)
+  let extend k i =
     if k <> 64 then
       let k' = 64-k in I.shift_right(I.shift_left i k') k'
     else i
 
-  let trunc k i = 
+  (* Set the irrelevant upper bits of i to 0 *)
+  let trunc k i =
     if k <> 64 then
       let k' = 64-k in I.shift_right_logical(I.shift_left i k') k'
     else i
@@ -292,40 +294,58 @@ struct
       function
         | (k',0L,x,y) ->
           assert(x=y);
-          assert (k=k');
-            let s = f x in  (s,s)
+          assert(k=k');
+          let s = f x in
+          (s,s)
         | (k',_s,x,y) ->
           assert(k=k');
-            if x < 0L then
-              if y >= 0L then
-                (* FIXME: using stride information could be useful here *)
-                (0, k)
-              else (k,k)
-            else (* x >= 0L *)
-              (f x, f y)
+          if x < 0L then
+            if y >= 0L then
+              (* FIXME: using stride information could be useful here *)
+              (0, k)
+            else (k,k)
+          else (* x >= 0L *)
+            (f x, f y)
 
   (* Get rid of k *)
-  let mk_rshift shifter k ((k',s1,a,b) as x) ((k'',_,_,_) as y) =
+  let mk_shift dir shifter k ((k',s1,a,b) as x) ((k'',_,_,_) as y) =
     assert(k=k' && k=k'');
     check_reduced2 k x y;
+    (* Get the lower and upper bound for y, as shift amounts.  Shifts
+       amounts are always in [0,k]. *)
     let (z1,z2) = toshifts k y
+    (* Set the upper bits of a and b to 0 *)
     and aa = trunc k a
     and bb = trunc k b
-    and shift n z = extend k (shifter n z)in
+    (* Shift and cast as signed number *)
+    and shift n z = extend k (shifter n z) in
+    (* Shift lower bound of x by minimum shift amount *)
     let a1 = shift aa z1
+    (* Shift lower bound of x by maximum shift amount *)
     and a2 = shift aa z2
+    (* Shift upper bound of x by minimum shift amount *)
     and b1 = shift bb z1
+    (* Shift upper bound of x by maximum shift amount *)
     and b2 = shift bb z2
-    and s' = int64_umax (Int64.shift_right_logical s1 z2) 1L in
+    (* Compute new stride info. *)
+    and s' = match dir with
+      | `Rightshift -> int64_umax (Int64.shift_right_logical s1 z2) 1L
+      | `Leftshift -> int64_umax (Int64.shift_left s1 z2) 1L
+    in
+    (* Finally pick the lower and upper bounds.  All the values above
+       are checked because of sign overflow. *)
     let l = min (min a1 a2) (min b1 b2)
     and u = max (max a1 a2) (max b1 b2) in
     renorm k (k,s',l,u)
 
   (** Logical right-shift *)
-  let rshift = mk_rshift Int64.shift_right_logical
+  let rshift = mk_shift `Rightshift Int64.shift_right_logical
 
   (** Arithmetic right-shift *)
-  let arshift = mk_rshift Int64.shift_right
+  let arshift = mk_shift `Rightshift Int64.shift_right
+
+  (** Left shift *)
+  let lshift = mk_shift `Leftshift Int64.shift_left
 
   (* construct these only once *)
   let yes = single 1 (-1L)
@@ -457,18 +477,18 @@ struct
       | MOD -> SI.modulus
       | RSHIFT -> SI.rshift
       | ARSHIFT -> SI.arshift
+      | LSHIFT -> SI.lshift
       | EQ -> SI.eq
       | NEQ -> fun k x y -> SI.lognot k (SI.eq k x y)
       | TIMES
       | DIVIDE
       | SDIVIDE
       | SMOD
-      | LSHIFT
       | LT
       | LE
       | SLT
       | SLE
-          -> failwith "unimplemented binop"
+          -> raise (Unimplemented "unimplemented binop")
 
     let unop_to_si_function = function
       | NEG -> SI.neg
@@ -771,6 +791,12 @@ struct
 
     let dir = GraphDataflow.Forward
 
+    let si_to_vs_binop_function f k =
+      let g vs1 vs2 = match vs1, vs2 with
+        | [(r1,si1)], [(r2,si2)] when r1 == VS.global && r2 == VS.global -> [(r1, f k si1 si2)]
+        | _ -> raise(Unimplemented "unimplemented binop") in
+      g
+
     let binop_to_vs_function = function
       | PLUS -> VS.add
       | MINUS -> VS.sub
@@ -790,8 +816,8 @@ struct
       | LT
       | LE
       | SLT
-      | SLE
-          -> raise(Unimplemented "unimplemented binop")
+      | SLE as bop
+        -> si_to_vs_binop_function (SimpleVSA.DFP.binop_to_si_function bop)
 
     let unop_to_vs_function _ = (raise(Unimplemented "unop") : int -> VS.t -> VS.t)
 
