@@ -85,9 +85,9 @@ struct
   let empty k = (k, (-1L), 1L, 0L)
 
   let remove_lower_bound (k,s,a,b) =
-    (k,s,mini k a,b)
+    (k,s,mini k,b)
   let remove_upper_bound (k,s,a,b) =
-    (k,s,a,maxi b)
+    (k,s,a,maxi k)
 
   let single k x = (k,0L,x,x)
   let of_bap_int i t = single (bits_of_width t) (extend (bits_of_width t) i)
@@ -608,8 +608,8 @@ struct
   let single k x = [(global, SI.single k x)]
   let of_bap_int i t = [(global, SI.of_bap_int i t)]
 
-  let remove_lower_bound = List.map SI.remove_lower_bound
-  let remove_upper_bound = List.map SI.remove_upper_bound
+  let remove_lower_bound = List.map (fun (r,si) -> (r, SI.remove_lower_bound si))
+  let remove_upper_bound = List.map (fun (r,si) -> (r, SI.remove_upper_bound si))
 
   let zero k = [(global, SI.zero k)]
   let one k = [(global, SI.one k)]
@@ -1171,7 +1171,7 @@ struct
         dprintf "%s dst %s vs_v %s vs_c %s vs_int %s" (Pp.var_to_string v) (Cfg_ast.v2s (G.E.dst edge)) (VS.to_string vs_v) (VS.to_string vs_c) (VS.to_string vs_int);
         VM.add v (`Scalar vs_int) l
 
-      | Some(_, BinOp(SLT|SLE as bop, Var v2, Var v1)) ->
+      | Some(_, BinOp((SLT|SLE), Var v2, Var v1)) ->
         (* XXX: Can we do something different for SLT? *)
         let vs_v1 = do_find l v1
         and vs_v2 = do_find l v2 in
