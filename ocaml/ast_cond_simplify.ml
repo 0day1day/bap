@@ -100,7 +100,13 @@ let simplify_flat e =
 let simplify_exp = reverse_visit simplify_flat
 
 let simplifycond_cfg g =
-  let cp = Copy_prop.copyprop_ast g in
+  (* Don't copy propagate over memory, since most programs do
+     comparisons on registers. *)
+  let stop_at = function
+    | Ast.Move(v, Load _, _) -> true
+    | _ -> false
+  in
+  let cp = Copy_prop.copyprop_ast ~stop_at g in
   C.G.fold_vertex (fun v g ->
     let stmts = C.get_stmts g v in
     match List.rev stmts with

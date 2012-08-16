@@ -14,7 +14,15 @@ module VH = Var.VarHash
 module VM = Var.VarMap
 module VS = Var.VarSet
 
-module CPSpecSSA = struct
+module type CPSpecSSAOptions = sig
+  val stop_at : Ssa.stmt -> bool
+end
+
+module type CPSpecASTOptions = sig
+  val stop_at : Ast.stmt -> bool
+end
+
+module MakeCPSpecSSA(O: CPSpecSSAOptions) = struct
 
   module L = struct
     type et = Middle of Ssa.exp (** One assigned exp *) | Bottom (** Multiple assigned exps *)
@@ -51,9 +59,12 @@ module CPSpecSSA = struct
     L.Map (match stmt with
     | Move(v, Phi _, _) ->
       VM.add v L.Bottom l
-    | Move(v,e,_) ->
-        (* dprintf "ignoring %s" (Pp.ssa_stmt_to_string s); *)
-      VM.add v (L.Middle e) l
+    | Move(v,e,_) as s ->
+      (* dprintf "ignoring %s" (Pp.ssa_stmt_to_string s); *)
+      if O.stop_at s then
+        VM.add v L.Bottom l
+      else
+        VM.add v (L.Middle e) l
     | _ -> l)
 
   let edge_transfer_function g _ _ l = l
@@ -63,7 +74,7 @@ module CPSpecSSA = struct
   let dir = GraphDataflow.Forward
 end
 
-module CPSpecAST = struct
+module MakeCPSpecAST(O: CPSpecASTOptions) = struct
 
   module L = struct
     type et = Middle of (Cfg.AST.G.V.t * int) * Ast.exp (** One assigned exp *) | Bottom (** Multiple assigned exps *)
@@ -98,9 +109,12 @@ module CPSpecAST = struct
   let stmt_transfer_function g loc stmt l =
     let l = match l with | L.Map m -> m | L.Top -> failwith "Expected Map, not Top" in
     L.Map (match stmt with
-    | Ast.Move(v,e,_) as _s ->
+    | Ast.Move(v,e,_) as s ->
       (* dprintf "seeing %s" (Pp.ast_stmt_to_string s); *)
-      VM.add v (L.Middle (loc, e)) l
+      if O.stop_at s then
+        VM.add v L.Bottom l
+      else
+        VM.add v (L.Middle (loc, e)) l
     | _ -> l)
 
   let edge_transfer_function g _ _ l = l
@@ -110,12 +124,11 @@ module CPSpecAST = struct
   let dir = GraphDataflow.Forward
 end
 
-module CPSSA = CfgDataflow.Make(CPSpecSSA)
-module CPAST = CfgDataflow.Make(CPSpecAST)
-
-let copyprop_ssa g =
-
-  let _, dfout = CPSSA.worklist_iterate g in
+let copyprop_ssa ?(stop_at=fun _ -> false) g =
+  let module CPSpecSSA = MakeCPSpecSSA(struct let stop_at = stop_at end) in
+  let module CPSSA = CfgDataflow.Make(CPSpecSSA) in
+  let _, dfout =
+    CPSSA.worklist_iterate g in
   let rec propagate l v =
     let vis = object(self)
       inherit Ssa_visitor.nop
@@ -147,13 +160,14 @@ let copyprop_ssa g =
       newmap)
   ) l VM.empty, propagate l
 
-let get_map = function
-  | CPSpecAST.L.Map m -> m
-  | _ -> failwith "Expected to find a map: BB_Exit probably unreachable"
-
-let copyprop_ast g =
-
+let copyprop_ast ?(stop_at=fun _ -> false) g =
+  let module CPSpecAST = MakeCPSpecAST(struct let stop_at = stop_at end) in
+  let module CPAST = CfgDataflow.Make(CPSpecAST) in
   let dfin, _ = CPAST.worklist_iterate_stmt g in
+  let get_map = function
+    | CPSpecAST.L.Map m -> m
+    | _ -> failwith "Expected to find a map: BB_Exit probably unreachable"
+  in
   let _, defs = Depgraphs.UseDef_AST.usedef g in
   let vars_in e =
     let s = ref VS.empty in

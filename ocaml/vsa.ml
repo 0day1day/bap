@@ -10,6 +10,8 @@
     * Add a real interface; automatically call simplify_cond
     * Big int support
     * Handle signedness
+    * Handle full/partial memory correctly
+    * Idea: Use copy propagation information to maintain equivalence classes, and use intersection over equivalence class members at edge transfer
 *)
 
 module VM = Var.VarMap
@@ -23,6 +25,9 @@ open Ast
 module D = Debug.Make(struct let name = "VSA" and default=`NoDebug end)
 open D
 
+(* Treat unsigned comparisons the same as signed: should be okay as
+   long as overflow does not occur *)
+let signedness_hack = ref true
 
 exception Unimplemented of string
 
@@ -95,8 +100,16 @@ struct
   let above k x = (k, 1L, x +% 1L, maxi k)
   let below k x = (k, 1L, mini k, x -% 1L)
 
+  (* These are hacks *)
+  let above_unsigned k x = (k, 1L, x +% 1L, maxi k)
+  let below_unsigned k x = (k, 1L, 0L, x -% 1L)
+
   let aboveeq k x = (k, 1L, x, maxi k)
   let beloweq k x = (k, 1L, mini k, x)
+
+  (* These are hacks *)
+  let aboveeq_unsigned k x = (k, 1L, x, maxi k)
+  let beloweq_unsigned k x = (k, 1L, 0L, x)
 
   let zero k = single k 0L
   let one k = single k 1L
@@ -617,9 +630,13 @@ struct
 
   let above k i = [(global, SI.above k i)]
   let below k i = [(global, SI.below k i)]
+  let above_unsigned k i = [(global, SI.above_unsigned k i)]
+  let below_unsigned k i = [(global, SI.below_unsigned k i)]
 
   let aboveeq k i = [(global, SI.aboveeq k i)]
   let beloweq k i = [(global, SI.beloweq k i)]
+  let aboveeq_unsigned k i = [(global, SI.aboveeq_unsigned k i)]
+  let beloweq_unsigned k i = [(global, SI.beloweq_unsigned k i)]
 
   let add k x y = match (x,y) with
     | ([r2,si2],[r1,si1]) when r1 == global ->
@@ -841,11 +858,15 @@ module AllocEnv = struct
 
   let top = M1.empty
 
-  let pp p a = p "unimplemented\n"
-
   (** Fold over all addresses in the AllocEnv *)
   let fold f ae i =
     M1.fold (fun r m2 a -> M2.fold (fun i vs a -> f (r,i) vs a) m2 a) ae i
+
+  let pp p a =
+    p "Memory contents:\n";
+    fold (fun (r,i) vs () ->
+      p (Printf.sprintf " %s[%#Lx] -> %s\n" (Pp.var_to_string r) i (VS.to_string vs))) a ();
+    p "End contents."
 
   let read_concrete ae (r,i) =
     try M2.find i (M1.find r ae)
@@ -858,7 +879,7 @@ module AllocEnv = struct
           VS.fold
             (fun v a ->  match a with
                | None -> Some (read_concrete ae v)
-               | Some a -> Some(VS.union (read_concrete ae v) a))
+               | Some a -> Some (VS.union (read_concrete ae v) a))
             addrs None
         in
           match res with
@@ -870,7 +891,7 @@ module AllocEnv = struct
       try
         let m2 = M1.find r ae in
         let m2' = M2.remove i m2 in
-          if M2.is_empty m2' then M1.remove r ae else M1.add r m2' ae
+        if M2.is_empty m2' then M1.remove r ae else M1.add r m2' ae
       with Not_found -> ae
     else
       let m2 = try M1.find r ae with Not_found -> M2.empty in
@@ -878,6 +899,9 @@ module AllocEnv = struct
 
   let write_concrete_weak ae addr vl =
     write_concrete_strong ae addr (VS.union vl (read_concrete ae addr))
+
+  let write_concrete_intersection ae addr vl =
+    write_concrete_strong ae addr (VS.intersection vl (read_concrete ae addr))
 
   let write_concrete_weak_widen ae addr vl =
     write_concrete_strong ae addr (VS.widen vl (read_concrete ae addr))
@@ -889,12 +913,22 @@ module AllocEnv = struct
         fold (fun k v a -> write_concrete_strong a k (VS.union vl v)) ae ae
     else
       match addr with
-        (* XXX: does k matter here? *)
         | [(r, (_,0L,x,y))] when x = y ->
            write_concrete_strong ae (r,x) vl
         | _ ->
           VS.fold (fun v a -> write_concrete_weak a v vl) addr ae
 
+  let write_intersection ae addr vl =
+    match addr with
+    | [(r, (_,0L,x,y))] when x = y ->
+      write_concrete_intersection ae (r,x) vl
+    | _ ->
+      (* Since we don't know what location is getting the
+         intersection, we can't do anything. *)
+      ae
+
+  let intersection (x:t) (y:t) =
+    fold (fun k v res -> write_concrete_intersection res k v) x y
 
   let union (x:t) (y:t) =
     fold (fun k v res -> write_concrete_weak res k v) x y
@@ -1037,6 +1071,66 @@ struct
     let do_find = AbsEnv.do_find_vs
     let do_find_ae = AbsEnv.do_find_ae
 
+    (* aev = abstract environment value *)
+    let rec exp2vs l e =
+      match exp2aev l e with
+      | `Scalar vs -> vs
+      | _ -> failwith "exp2vs: Expected scalar"
+    and exp2aev l e : AbsEnv.value =
+      match Typecheck.infer_ast ~check:false e with
+      | Reg _ -> (
+        let new_vs = try (match e with
+          | Int(i,t)->
+            VS.of_bap_int (int64_of_big_int i) t
+          | Lab _ -> raise(Unimplemented "No VS for labels (should be a constant)")
+          | Var v -> do_find l v
+          | BinOp(op, x, y) ->
+            let f = RegionVSA.DFP.binop_to_vs_function op in
+            let k = SimpleVSA.DFP.bits_of_exp x in
+            f k (exp2vs l x) (exp2vs l y)
+          | UnOp(op, x) ->
+            let f = RegionVSA.DFP.unop_to_vs_function op in
+            let k = SimpleVSA.DFP.bits_of_exp x in
+            f k (exp2vs l x)
+                  (* | Phi(x::xs) -> *)
+                  (*   List.fold_left *)
+                  (*     (fun i y -> VS.union i (do_find l y)) *)
+                  (*     (do_find l x) xs *)
+                  (* | Phi [] -> *)
+                  (*   failwith "Encountered empty Phi expression" *)
+          | Load(Var m, i, _e, _t) ->
+                    (* FIXME: assumes deendianized.
+                       ie: _e and _t should be the same for all loads and
+                       stores of m. *)
+            AllocEnv.read (do_find_ae l m) (exp2vs l i)
+          | Cast _ ->
+            raise(Unimplemented "FIXME")
+          | _ ->
+            raise(Unimplemented "unimplemented expression type"))
+          with Unimplemented _ | Invalid_argument _ -> VS.top
+        in `Scalar new_vs
+      )
+      | TMem _ | Array _ -> (
+        let new_vs = try (match e with
+          | Var v ->
+            do_find_ae l v
+          | Store(Var m,i,v,_e,_t) ->
+                    (* FIXME: assumes deendianized.
+                       ie: _e and _t should be the same for all loads and
+                       stores of m. *)
+            AllocEnv.write (do_find_ae l m) (exp2vs l i) (exp2vs l v)
+          (* | Phi(x::xs) -> *)
+          (*   List.fold_left *)
+          (*     (fun i y -> AllocEnv.union i (do_find_ae l y)) *)
+          (*     (do_find_ae l x) xs *)
+          (* | Phi [] -> *)
+          (*   failwith "Encountered empty Phi expression" *)
+          | _ ->
+            raise(Unimplemented "unimplemented memory expression type"))
+          with Unimplemented _ | Invalid_argument _ -> AllocEnv.top
+        in `Array new_vs
+      )
+
     let rec transfer_stmt s l =
       match s with
         | Assert(Var _, _)  (* FIXME: Do we want to say v is true? *)
@@ -1045,82 +1139,28 @@ struct
             l
         | Special _ -> failwith "Special is unimplemented"
         | Move(v, e, _) ->
-            try
-              (* aev = abstract environment value *)
-              let rec exp2aev e : AbsEnv.value =
-                let exp2vs e =
-                  match exp2aev e with
-                  | `Scalar vs -> vs
-                  | _ -> failwith "exp2vs: Expected scalar"
-                in
-                match Typecheck.infer_ast ~check:false e with
-                | Reg _ -> (
-                  let new_vs = try (match e with
-                  | Int(i,t)->
-                    VS.of_bap_int (int64_of_big_int i) t
-                  | Lab _ -> raise(Unimplemented "No VS for labels (should be a constant)")
-                  | Var v -> do_find l v
-                  | BinOp(op, x, y) ->
-                    let f = RegionVSA.DFP.binop_to_vs_function op in
-                    let k = SimpleVSA.DFP.bits_of_exp x in
-                    f k (exp2vs x) (exp2vs y)
-                  | UnOp(op, x) ->
-                    let f = RegionVSA.DFP.unop_to_vs_function op in
-                    let k = SimpleVSA.DFP.bits_of_exp x in
-                    f k (exp2vs x)
-                  (* | Phi(x::xs) -> *)
-                  (*   List.fold_left *)
-                  (*     (fun i y -> VS.union i (do_find l y)) *)
-                  (*     (do_find l x) xs *)
-                  (* | Phi [] -> *)
-                  (*   failwith "Encountered empty Phi expression" *)
-                  | Load(Var m, i, _e, _t) ->
-                          (* FIXME: assumes deendianized.
-                             ie: _e and _t should be the same for all loads and
-                             stores of m. *)
-                    AllocEnv.read (do_find_ae l m) (exp2vs i)
-                  | Cast _ ->
-                    raise(Unimplemented "FIXME")
-                  | _ ->
-                    raise(Unimplemented "unimplemented expression type"))
-                    with Unimplemented _ | Invalid_argument _ -> VS.top
-                  in `Scalar new_vs
-                )
-                | TMem _ | Array _ -> (
-                  let new_vs = try (match e with
-                  | Var v ->
-                    do_find_ae l v
-                  | Store(Var m,i,v,_e,_t) ->
-                    (* FIXME: assumes deendianized.
-                       ie: _e and _t should be the same for all loads and
-                       stores of m. *)
-                    AllocEnv.write (do_find_ae l m) (exp2vs i) (exp2vs v)
-                  (* | Phi(x::xs) -> *)
-                  (*   List.fold_left *)
-                  (*     (fun i y -> AllocEnv.union i (do_find_ae l y)) *)
-                  (*     (do_find_ae l x) xs *)
-                  (* | Phi [] -> *)
-                  (*   failwith "Encountered empty Phi expression" *)
-                  | _ ->
-                    raise(Unimplemented "unimplemented memory expression type"))
-                  with Unimplemented _ | Invalid_argument _ -> AllocEnv.top
-                  in `Array new_vs
-                )
-              in
-              let new_vs = exp2aev e in
-              VM.add v new_vs l
-            with Invalid_argument _ | Not_found ->
-              l
+          try
+            let new_vs = exp2aev l e in
+            VM.add v new_vs l
+          with Invalid_argument _ | Not_found ->
+            l
 
     let node_transfer_function = fwd_transfer_stmt_to_block transfer_stmt
 
     let edge_transfer_function g edge l =
+      let accept_signed_bop bop =
+        match !signedness_hack, bop with
+        | false, (SLE|SLT) -> true
+        | true, (SLE|SLT|LE|LT) -> true
+        | _, _ -> false
+      in
       match G.E.label edge with
       (* Because strided intervals represent signed numbers, we
          cannot convert unsigned inequalities to strided intervals (try
          it). *)
-      | Some(_, BinOp(EQ, (BinOp((SLE|SLT) as bop, Var v, Int(i, t)) as be), Int(i', t')))
-      | Some(_, BinOp(EQ, (BinOp((SLE|SLT) as bop, Int(i, t), Var v) as be), Int(i', t'))) ->
+      | Some(_, BinOp(EQ, (BinOp((SLE|SLT|LE|LT) as bop, Var v, Int(i, t)) as be), Int(i', t')))
+      | Some(_, BinOp(EQ, (BinOp((SLE|SLT|LE|LT) as bop, Int(i, t), Var v) as be), Int(i', t')))
+          when accept_signed_bop bop ->
 
         let dir = match be with
           | BinOp(_, Var _, Int _) -> `Below
@@ -1135,6 +1175,8 @@ struct
             let newbop = match bop with
               | SLE -> SLT
               | SLT -> SLE
+              | LE -> LT
+              | LT -> LE
               | _ -> failwith "impossible"
             in
             match dir with
@@ -1143,9 +1185,13 @@ struct
         in
         let vsf = match dir, bop with
           | `Below, SLE -> VS.beloweq
+          | `Below, LE -> VS.beloweq_unsigned
           | `Below, SLT -> VS.below
+          | `Below, LT -> VS.below_unsigned
           | `Above, SLE -> VS.aboveeq
+          | `Above, LE -> VS.aboveeq_unsigned
           | `Above, SLT -> VS.above
+          | `Above, LT -> VS.above_unsigned
           | _ -> failwith "impossible"
         in
         let vs_v = do_find l v in
@@ -1153,6 +1199,42 @@ struct
         let vs_int = VS.intersection vs_v vs_c in
         dprintf "%s dst %s vs_v %s vs_c %s vs_int %s" (Pp.var_to_string v) (Cfg_ast.v2s (G.E.dst edge)) (VS.to_string vs_v) (VS.to_string vs_c) (VS.to_string vs_int);
         VM.add v (`Scalar vs_int) l
+      (* | Some(_, BinOp(EQ, (BinOp((SLE|SLT) as bop, (Load(Var m, ind, _e, t) as le), Int(i, t')) as be), Int(i', t''))) *)
+      (* | Some(_, BinOp(EQ, (BinOp((SLE|SLT) as bop, Int(i, t'), (Load(Var m, ind, _e, t) as le)) as be), Int(i', t''))) -> *)
+      (*   let dir = match be with *)
+      (*     | BinOp(_, Load _, Int _) -> `Below *)
+      (*     | BinOp(_, Int _, Load _) -> `Above *)
+      (*     | _ -> failwith "impossible" *)
+      (*   in *)
+
+      (*   (\* Reverse if needed *\) *)
+      (*   let e, dir, bop = *)
+      (*     if bi_is_one i' then be, dir, bop *)
+      (*     else *)
+      (*       let newbop = match bop with *)
+      (*         | SLE -> SLT *)
+      (*         | SLT -> SLE *)
+      (*         | LT -> LE *)
+      (*         | _ -> failwith "impossible" *)
+      (*       in *)
+      (*       match dir with *)
+      (*       | `Below -> BinOp(newbop, Int(i, t), Load(Var m, ind, _e, t)), `Above, newbop *)
+      (*       | `Above -> BinOp(newbop, Load(Var m, ind, _e, t), Int(i, t)), `Below, newbop *)
+      (*   in *)
+      (*   let vsf = match dir, bop with *)
+      (*     | `Below, (SLE|LE) -> VS.beloweq *)
+      (*     | `Below, (SLT|LT) -> VS.below *)
+      (*     | `Above, (SLE|LE) -> VS.aboveeq *)
+      (*     | `Above, (SLT|LT) -> VS.above *)
+      (*     | _ -> failwith "impossible" *)
+      (*   in *)
+      (*   let vs_v = exp2vs l le in *)
+      (*   let vs_c = vsf (bits_of_width t) (int64_of_big_int i) in *)
+      (*   let vs_int = VS.intersection vs_v vs_c in *)
+      (*   dprintf "%s dst %s vs_v %s vs_c %s vs_int %s" (Pp.var_to_string m) (Cfg_ast.v2s (G.E.dst edge)) (VS.to_string vs_v) (VS.to_string vs_c) (VS.to_string vs_int); *)
+      (*   let orig_mem = do_find_ae l m in *)
+      (*   let new_mem = AllocEnv.write_intersection orig_mem (exp2vs l ind) vs_int in *)
+      (*   VM.add m (`Array new_mem) l *)
       | Some(_, BinOp(EQ, (BinOp(EQ|NEQ as bop, Var v, Int(i, t))), Int(i', t')))
       | Some(_, BinOp(EQ, (BinOp(EQ|NEQ as bop, Int(i, t), Var v)), Int(i', t'))) ->
 
