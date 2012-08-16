@@ -3,7 +3,7 @@ open Type
 open Ast
 open BatPervasives
 module C = Cfg.AST
-module D = Debug.Make(struct let name = "Unroll" and default=`Debug end)
+module D = Debug.Make(struct let name = "Unroll" and default=`NoDebug end)
 open D
 
 
@@ -34,7 +34,7 @@ let unroll_loop ?(count=8) ?(id=0) cfg head body =
          let stmts =
            List.map (function
 		       | Label(Name l, a) -> Label(Name(renewlabel l i), a)
-		       | Label(Addr addr, a) -> Label(Name(Printf.sprintf "addr_%Lx_%d" addr i), a)
+		       | Label(Addr addr, a) -> Label(Name(Printf.sprintf "addr_%Lx_unroll_%d_%d" addr i id), a)
 		       | s -> s
 	            ) stmts
          in
