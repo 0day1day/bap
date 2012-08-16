@@ -18,17 +18,21 @@ responsible for accepting the PIN license agreements.
 
 On Windows, the process is more complicated.  We usually test with
 Windows 7, but some people have reported success with Windows XP SP3
-as well.  First, install GNU Make for Windows
+as well.  First, make sure that \cmdline{\$PATH} contains no
+spaces. Then, install GNU Make for Windows
 (\url{http://gnuwin32.sourceforge.net/packages/make.htm}) and Visual
 C++ 2010 Express
 (\url{http://www.microsoft.com/visualstudio/en-us/products/2010-editions/visual-cpp-express}).
-Also download PIN and extract it to the \cmdline{\$PATH/bap/pin}
-directory.  Next, we need to upgrade the Visual Studio project for
-Google's protobuffers library, which our PIN tool depends
-on\footnote{This can be done automatically at the command line using
-  devenv.exe, but this tool is only part of Visual Studio proper; it
-  does not come with the Express versions.}.  To do this, navigate to
-the \cmdline{\$PATH/bap/libtracewrap/libtrace/protobuf/vsprojects}
+Make sure to add the directory containing \texttt{make} (the default
+is \verb!C:\Program Files\GnuWin32\bin!) to the Windows \texttt{Path}
+environment variable.  Also download PIN and extract it to the
+\cmdline{\$PATH/bap/pin} directory.  Next, we need to upgrade the
+Visual Studio project for Google's protobuffers library, which our PIN
+tool depends on\footnote{This can be done automatically at the command
+  line using devenv.exe, but this tool is only part of Visual Studio
+  proper; it does not come with the Express versions.}.  To do this,
+navigate to the
+\cmdline{\$PATH/bap/libtracewrap/libtrace/protobuf/vsprojects}
 directory and open \cmdline{protobuf.sln}.  When the Visual Studio
 Conversion Wizard appears, click Finish and close the summary window.
 It is normal for the conversion process to have warnings, but not

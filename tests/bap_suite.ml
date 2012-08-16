@@ -14,6 +14,7 @@ let short_tests = [
   Arithmetic_suite.suite;
   Dominator_suite.suite;
   Vsa_suite.suite;
+  Unroll_suite.suite;
 ];;
 
 let bap_tests = ("BAP" >::: short_tests);;

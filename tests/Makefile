@@ -63,6 +63,7 @@ define PROJ_baptest
 	arithmetic_suite.ml \
 	dominator_suite.ml \
 	vsa_suite.ml \
+	unroll_suite.ml \
 	bap_suite.ml
 	DOC_FILES=$(SOURCES)
 endef

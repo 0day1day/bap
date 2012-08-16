@@ -1,3 +1,7 @@
+New in BAP 0.6:
+* General bug fixes to PIN trace tool and trace reading API
+* Major bug fix for PIN tool on Windows that fixes taint analysis
+
 New in BAP 0.5:
 
 * Aggressive dead code elimination

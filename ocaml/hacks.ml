@@ -6,7 +6,7 @@ open Util
 open BatListFull
 
 module C = Cfg.AST
-module D = Debug.Make(struct let name = "Hacks" and default=`Debug end)
+module D = Debug.Make(struct let name = "Hacks" and default=`NoDebug end)
 open D
 
 let ra_final = Var.newvar "ra_final" reg_32

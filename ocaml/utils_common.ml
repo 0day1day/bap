@@ -39,6 +39,35 @@ let stream_concrete ?(tag = "") mem_hash concrete_state block =
   ignore(Traces.run_block concrete_state memv block);
   []
 
+let get_functions ?unroll ?names p =
+  let ranges = Asmir.get_function_ranges p in
+  let do_function (n,s,e) =
+    let inc = match names with
+      | Some l -> List.mem n l
+      | None -> true
+    in
+    try
+      if inc then (
+        let ir = Asmir.asmprogram_to_bap_range p s e in
+        let ir = Hacks.ret_to_jmp ir in
+        let cfg = Cfg_ast.of_prog ir in
+        let cfg = Prune_unreachable.prune_unreachable_ast cfg in
+        let cfg = match unroll with
+          | Some n ->
+            let cfg = Unroll.unroll_loops ~count:n cfg in
+            Hacks.remove_cycles cfg
+          | None -> cfg
+        in
+        let cfg = Prune_unreachable.prune_unreachable_ast cfg in
+        let ir = Cfg_ast.to_prog cfg in
+        Some (n,ir,cfg))
+      else None
+    with ex ->
+      Printf.eprintf "Warning: problem with %s (0x%Lx-0x%Lx): %s\n" n s e (Printexc.to_string ex);
+      None
+  in
+  BatList.filter_map do_function ranges
+
 let jitexecute inits p =
 IFDEF WITH_LLVM THEN
   let cfg = Cfg_ast.of_prog p in

@@ -7,6 +7,7 @@
 */
 
 #include "pin.H"
+#include "pin_frame.h"
 #include "pin_taint.h"
 #include <set>
 #include <stdint.h>
