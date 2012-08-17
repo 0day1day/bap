@@ -386,7 +386,9 @@ let speclist =
       "Run value set analysis and print the results.")
   :: ("-simplify-conds", uadd(TransformAstCfg Ast_cond_simplify.simplifycond_cfg),
       "Simplify conditions")
-  ::("-no-ssa-tac", Arg.Unit (fun () -> tac := false),
+  :: ("-resolve-indjumps", uadd(TransformAstCfg (Resolve_indirect.resolve_indjumps None)),
+      "Resolve indirect jumps using VSA.")
+  :: ("-no-ssa-tac", Arg.Unit (fun () -> tac := false),
      "Disable three address code in SSA representation.")
   :: Input.speclist
 

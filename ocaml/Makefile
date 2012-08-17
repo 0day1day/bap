@@ -103,6 +103,7 @@ export SOURCES = \
 	structural_analysis.ml \
 	unroll.ml \
 	hacks.ml \
+	resolve_indirect.mli resolve_indirect.ml \
 	coalesce.mli coalesce.ml \
 	traces.ml \
 	traces_surgical.ml \
