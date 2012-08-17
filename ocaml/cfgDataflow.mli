@@ -26,29 +26,26 @@ sig
 
   module L : BOUNDED_MEET_SEMILATTICE
   module CFG : CFG
-
-  (** Type of extra information that can be specified each time the
-      dataflow analysis is applied. *)
-  type options
+  module O : OPTIONS
 
   (** The transfer function over statements. The second argument
       contains the location of the statement being processed,and is
       generally unused. *)
-  val stmt_transfer_function : options -> CFG.G.t -> CFG.G.V.t * int -> CFG.stmt -> L.t -> L.t
+  val stmt_transfer_function : O.t -> CFG.G.t -> CFG.G.V.t * int -> CFG.stmt -> L.t -> L.t
 
   (** The transfer function over edge elements, e.g., conditions. The
       second argument is generally unused. *)
-  val edge_transfer_function : options -> CFG.G.t -> CFG.G.E.t -> CFG.exp option -> L.t -> L.t
+  val edge_transfer_function : O.t -> CFG.G.t -> CFG.G.E.t -> CFG.exp option -> L.t -> L.t
 
   (** The starting node for the analysis. *)
-  val s0 : options -> CFG.G.t -> CFG.G.V.t
+  val s0 : O.t -> CFG.G.t -> CFG.G.V.t
 
   (** The initial lattice value given to node [s0]. All other nodes
       start out with [Top]. *)
-  val init : options -> CFG.G.t -> L.t
+  val init : O.t -> CFG.G.t -> L.t
 
   (** The dataflow direction. *)
-  val dir : options -> direction
+  val dir : O.t -> direction
 end
 
 (** A dataflow problem with widening. *)
@@ -57,29 +54,26 @@ sig
 
   module L : BOUNDED_MEET_SEMILATTICE_WITH_WIDENING
   module CFG : CFG
-
-  (** Type of extra information that can be specified each time the
-      dataflow analysis is applied. *)
-  type options
+  module O : OPTIONS
 
   (** The transfer function over statements. The second argument
       contains the location of the statement being processed,and is
       generally unused. *)
-  val stmt_transfer_function : options -> CFG.G.t -> CFG.G.V.t * int -> CFG.stmt -> L.t -> L.t
+  val stmt_transfer_function : O.t -> CFG.G.t -> CFG.G.V.t * int -> CFG.stmt -> L.t -> L.t
 
   (** The transfer function over edge elements, e.g., conditions. The
       second argument is generally unused. *)
-  val edge_transfer_function : options -> CFG.G.t -> CFG.G.E.t -> CFG.exp option -> L.t -> L.t
+  val edge_transfer_function : O.t -> CFG.G.t -> CFG.G.E.t -> CFG.exp option -> L.t -> L.t
 
   (** The starting node for the analysis. *)
-  val s0 : options -> CFG.G.t -> CFG.G.V.t
+  val s0 : O.t -> CFG.G.t -> CFG.G.V.t
 
   (** The initial lattice value given to node [s0]. All other nodes
       start out with [Top]. *)
-  val init : options -> CFG.G.t -> L.t
+  val init : O.t -> CFG.G.t -> L.t
 
   (** The dataflow direction. *)
-  val dir : options -> direction
+  val dir : O.t -> direction
 end
 
 (** Build a custom dataflow algorithm for the given dataflow problem [D]. *)
@@ -91,14 +85,14 @@ sig
       computes the lattice value going in to that node, [v]. [out],
       when given a node [v], computes the lattice value exiting
       [v]. *)
-  val worklist_iterate : ?init:(D.options -> D.CFG.G.t -> D.L.t) ->
-    D.options -> D.CFG.G.t -> (D.CFG.G.V.t -> D.L.t) * (D.CFG.G.V.t -> D.L.t)
+  val worklist_iterate : ?init:(D.O.t -> D.CFG.G.t -> D.L.t) ->
+    ?opts:D.O.t -> D.CFG.G.t -> (D.CFG.G.V.t -> D.L.t) * (D.CFG.G.V.t -> D.L.t)
 
   (** Like [worklist_iterate], except the dataflow is done on the
       statement level. A statement [bb,n] is the [n]th stmt
       (zero-indexed) in [bb]. *)
-  val worklist_iterate_stmt : ?init:(D.options -> D.CFG.G.t -> D.L.t) ->
-    D.options -> D.CFG.G.t -> (D.CFG.G.V.t * int -> D.L.t) * (D.CFG.G.V.t * int -> D.L.t)
+  val worklist_iterate_stmt : ?init:(D.O.t -> D.CFG.G.t -> D.L.t) ->
+    ?opts:D.O.t -> D.CFG.G.t -> (D.CFG.G.V.t * int -> D.L.t) * (D.CFG.G.V.t * int -> D.L.t)
 end
 
 (** Build a custom dataflow algorithm for the given dataflow problem
@@ -115,6 +109,6 @@ sig
       computed using meet.  After this threshold is reached, the widening
       operator will be applied.
   *)
-  val worklist_iterate_widen : ?init:(D.options -> D.CFG.G.t -> D.L.t) ->
-    ?nmeets:int -> D.options -> D.CFG.G.t -> (D.CFG.G.V.t -> D.L.t) * (D.CFG.G.V.t -> D.L.t)
+  val worklist_iterate_widen : ?init:(D.O.t -> D.CFG.G.t -> D.L.t) ->
+    ?nmeets:int -> ?opts:D.O.t -> D.CFG.G.t -> (D.CFG.G.V.t -> D.L.t) * (D.CFG.G.V.t -> D.L.t)
 end

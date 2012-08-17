@@ -37,20 +37,24 @@ sig
   val widen : t -> t -> t
 end
 
+module type OPTIONS = sig
+  type t
+  val default : t
+end
+
 (* a dataflow is defined by a lattice over a graph. *)
 module type DATAFLOW =
 sig
 
   module L : BOUNDED_MEET_SEMILATTICE
   module G : G
+  module O : OPTIONS
 
-  type options
-
-  val node_transfer_function : options -> G.t -> G.V.t -> L.t -> L.t
-  val edge_transfer_function : options -> G.t -> G.E.t -> L.t -> L.t
-  val s0 : options -> G.t -> G.V.t
-  val init : options -> G.t -> L.t
-  val dir : options -> direction
+  val node_transfer_function : O.t -> G.t -> G.V.t -> L.t -> L.t
+  val edge_transfer_function : O.t -> G.t -> G.E.t -> L.t -> L.t
+  val s0 : O.t -> G.t -> G.V.t
+  val init : O.t -> G.t -> L.t
+  val dir : O.t -> direction
 end
 
 module type DATAFLOW_WITH_WIDENING =
@@ -58,14 +62,13 @@ sig
 
   module L : BOUNDED_MEET_SEMILATTICE_WITH_WIDENING
   module G : G
+  module O : OPTIONS
 
-  type options
-
-  val node_transfer_function : options -> G.t -> G.V.t -> L.t -> L.t
-  val edge_transfer_function : options -> G.t -> G.E.t -> L.t -> L.t
-  val s0 : options -> G.t -> G.V.t
-  val init : options -> G.t -> L.t
-  val dir : options -> direction
+  val node_transfer_function : O.t -> G.t -> G.V.t -> L.t -> L.t
+  val edge_transfer_function : O.t -> G.t -> G.E.t -> L.t -> L.t
+  val s0 : O.t -> G.t -> G.V.t
+  val init : O.t -> G.t -> L.t
+  val dir : O.t -> direction
 end
 
 
@@ -73,10 +76,10 @@ module MakeWide (D:DATAFLOW_WITH_WIDENING) =
 struct
   module H = Hashtbl.Make(D.G.V)
 
-  let worklist_iterate_widen ?(init = D.init) ?(nmeets=0) o g =
+  let worklist_iterate_widen ?(init = D.init) ?(nmeets=0) ?(opts=D.O.default) g =
     let nodes = D.G.fold_vertex (fun x acc -> x::acc) g [] in
-    let f_t = D.node_transfer_function o g in
-    let succ_e,pred_e,dst,src = match D.dir o with
+    let f_t = D.node_transfer_function opts g in
+    let succ_e,pred_e,dst,src = match D.dir opts with
       | Forward ->
 	  (D.G.succ_e g, D.G.pred_e g,
            D.G.E.dst, D.G.E.src)
@@ -112,7 +115,7 @@ struct
       n
     in
     List.iter (fun n -> H.add htin n D.L.top) nodes;
-    H.replace htin (D.s0 o g) (init o g);
+    H.replace htin (D.s0 opts g) (init opts g);
     let rec do_work = function
       | [] -> ()
       | b::worklist ->  
@@ -124,7 +127,7 @@ struct
 	      (fun se ->
                 let s = dst se in
                 (* Apply edge transfer function *)
-                let outset' = D.edge_transfer_function o g se outset in
+                let outset' = D.edge_transfer_function opts g se outset in
 		let oldin = dfin s in
 		let newin = D.L.meet oldin outset' in
 		if D.L.equal oldin newin
@@ -148,7 +151,7 @@ struct
 	  in
 	  do_work newwklist
     in
-    do_work [D.s0 o g];
+    do_work [D.s0 opts g];
     (dfin, dfout)
 end
 
@@ -163,7 +166,7 @@ struct
         let widen = D.L.meet
       end
       module G = D.G
-      type options = D.options
+      module O = D.O
       let node_transfer_function = D.node_transfer_function
       let edge_transfer_function = D.edge_transfer_function
       let s0 = D.s0

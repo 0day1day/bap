@@ -69,33 +69,40 @@ sig
   val widen : t -> t -> t
 end
 
+(** Run-time options for the data-flow analysis *)
+module type OPTIONS = sig
+  (** Type of extra information that can be specified each time the
+      dataflow analysis is applied. *)
+  type t
+
+  (** Default options when none are specified *)
+  val default : t
+end
+
 (** A dataflow problem is defined by a lattice over a graph. *)
 module type DATAFLOW =
 sig
 
   module L : BOUNDED_MEET_SEMILATTICE
   module G : G
-
-  (** Type of extra information that can be specified each time the
-      dataflow analysis is applied. *)
-  type options
+  module O : OPTIONS
 
   (** The transfer function over node elements, e.g., basic
       blocks. *)
-  val node_transfer_function : options -> G.t -> G.V.t -> L.t -> L.t
+  val node_transfer_function : O.t -> G.t -> G.V.t -> L.t -> L.t
 
   (** The transfer function over edge elements, e.g., conditions. *)
-  val edge_transfer_function : options -> G.t -> G.E.t -> L.t -> L.t
+  val edge_transfer_function : O.t -> G.t -> G.E.t -> L.t -> L.t
 
   (** The starting node for the analysis. *)
-  val s0 : options -> G.t -> G.V.t
+  val s0 : O.t -> G.t -> G.V.t
 
   (** The initial lattice value given to node [s0]. All other nodes
       start out with [Top]. *)
-  val init : options -> G.t -> L.t
+  val init : O.t -> G.t -> L.t
 
   (** The dataflow direction. *)
-  val dir : options -> direction
+  val dir : O.t -> direction
 
 end
 
@@ -105,27 +112,24 @@ sig
 
   module L : BOUNDED_MEET_SEMILATTICE_WITH_WIDENING
   module G : G
-
-  (** Type of extra information that can be specified each time the
-      dataflow analysis is applied. *)
-  type options
+  module O : OPTIONS
 
   (** The transfer function over node elements, e.g., basic
       blocks. *)
-  val node_transfer_function : options -> G.t -> G.V.t -> L.t -> L.t
+  val node_transfer_function : O.t -> G.t -> G.V.t -> L.t -> L.t
 
   (** The transfer function over edge elements, e.g., conditions. *)
-  val edge_transfer_function : options -> G.t -> G.E.t -> L.t -> L.t
+  val edge_transfer_function : O.t -> G.t -> G.E.t -> L.t -> L.t
 
   (** The starting node for the analysis. *)
-  val s0 : options -> G.t -> G.V.t
+  val s0 : O.t -> G.t -> G.V.t
 
   (** The initial lattice value given to node [s0]. All other nodes
       start out with [Top]. *)
-  val init : options -> G.t -> L.t
+  val init : O.t -> G.t -> L.t
 
   (** The dataflow direction. *)
-  val dir : options -> direction
+  val dir : O.t -> direction
 end
 
 (** Build a custom dataflow algorithm for the given dataflow problem [D]. *)
@@ -137,8 +141,8 @@ sig
       computes the lattice value going in to that node, [v]. [out],
       when given a node [v], computes the lattice value exiting
       [v]. *)
-  val worklist_iterate : ?init:(D.options -> D.G.t -> D.L.t) ->
-    D.options -> D.G.t -> (D.G.V.t -> D.L.t) * (D.G.V.t -> D.L.t)
+  val worklist_iterate : ?init:(D.O.t -> D.G.t -> D.L.t) ->
+    ?opts:D.O.t -> D.G.t -> (D.G.V.t -> D.L.t) * (D.G.V.t -> D.L.t)
 end
 
 (** Build a custom dataflow algorithm for the given dataflow problem
@@ -155,6 +159,6 @@ sig
       computed using meet.  After this threshold is reached, the widening
       operator will be applied.
   *)
-  val worklist_iterate_widen : ?init:(D.options -> D.G.t -> D.L.t) ->
-    ?nmeets:int -> D.options -> D.G.t -> (D.G.V.t -> D.L.t) * (D.G.V.t -> D.L.t)
+  val worklist_iterate_widen : ?init:(D.O.t -> D.G.t -> D.L.t) ->
+    ?nmeets:int -> ?opts:D.O.t -> D.G.t -> (D.G.V.t -> D.L.t) * (D.G.V.t -> D.L.t)
 end

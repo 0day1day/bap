@@ -23,14 +23,13 @@ sig
 
   module L : BOUNDED_MEET_SEMILATTICE
   module CFG : CFG
+  module O : OPTIONS
 
-  type options
-
-  val stmt_transfer_function : options -> CFG.G.t -> CFG.G.V.t * int -> CFG.stmt -> L.t -> L.t
-  val edge_transfer_function : options -> CFG.G.t -> CFG.G.E.t -> CFG.exp option -> L.t -> L.t
-  val s0 : options -> CFG.G.t -> CFG.G.V.t
-  val init : options -> CFG.G.t -> L.t
-  val dir : options -> direction
+  val stmt_transfer_function : O.t -> CFG.G.t -> CFG.G.V.t * int -> CFG.stmt -> L.t -> L.t
+  val edge_transfer_function : O.t -> CFG.G.t -> CFG.G.E.t -> CFG.exp option -> L.t -> L.t
+  val s0 : O.t -> CFG.G.t -> CFG.G.V.t
+  val init : O.t -> CFG.G.t -> L.t
+  val dir : O.t -> direction
 end
 
 module type DATAFLOW_WITH_WIDENING =
@@ -38,14 +37,13 @@ sig
 
   module L : BOUNDED_MEET_SEMILATTICE_WITH_WIDENING
   module CFG : CFG
+  module O : OPTIONS
 
-  type options
-
-  val stmt_transfer_function : options -> CFG.G.t -> CFG.G.V.t * int -> CFG.stmt -> L.t -> L.t
-  val edge_transfer_function : options -> CFG.G.t -> CFG.G.E.t -> CFG.exp option -> L.t -> L.t
-  val s0 : options -> CFG.G.t -> CFG.G.V.t
-  val init : options -> CFG.G.t -> L.t
-  val dir : options -> direction
+  val stmt_transfer_function : O.t -> CFG.G.t -> CFG.G.V.t * int -> CFG.stmt -> L.t -> L.t
+  val edge_transfer_function : O.t -> CFG.G.t -> CFG.G.E.t -> CFG.exp option -> L.t -> L.t
+  val s0 : O.t -> CFG.G.t -> CFG.G.V.t
+  val init : O.t -> CFG.G.t -> L.t
+  val dir : O.t -> direction
 end
 
 module MakeWide (D:DATAFLOW_WITH_WIDENING) =
@@ -56,7 +54,7 @@ struct
   module DFSPECW = struct
     module L=D.L
     module G=D.CFG.G
-    type options=D.options
+    module O=D.O
     let node_transfer_function o g v l =
       let l, _ = fold o (fun s (l,i) -> D.stmt_transfer_function o g (v,i) s l, i+1) (l,0) (D.CFG.get_stmts g v) in
       l
@@ -73,15 +71,15 @@ struct
   module DFW = GraphDataflow.MakeWide(DFSPECW)
   let worklist_iterate_widen =
     DFW.worklist_iterate_widen
-  let worklist_iterate_widen_stmt ?init ?nmeets o g =
-    let win,wout = worklist_iterate_widen ?init ?nmeets o g in
+  let worklist_iterate_widen_stmt ?init ?nmeets ?(opts=D.O.default) g =
+    let win,wout = worklist_iterate_widen ?init ?nmeets ~opts g in
     let winstmt (v,n) =
       let l = win v in
-      let l,_ = fold o (fun s (l,i) -> D.stmt_transfer_function o g (v,i) s l, i+1) (l,0) (BatList.take n (D.CFG.get_stmts g v)) in
+      let l,_ = fold opts (fun s (l,i) -> D.stmt_transfer_function opts g (v,i) s l, i+1) (l,0) (BatList.take n (D.CFG.get_stmts g v)) in
       l
     and woutstmt (v,n) =
       let l = win v in
-      let l, _ = fold o (fun s (l,i) -> D.stmt_transfer_function o g (v,i) s l, i+1) (l,0) (BatList.take (n+1) (D.CFG.get_stmts g v)) in
+      let l, _ = fold opts (fun s (l,i) -> D.stmt_transfer_function opts g (v,i) s l, i+1) (l,0) (BatList.take (n+1) (D.CFG.get_stmts g v)) in
       l
     in
     winstmt, woutstmt
@@ -96,7 +94,7 @@ struct
         let widen = D.L.meet
       end
       module CFG = D.CFG
-      type options = D.options
+      module O = D.O
       let stmt_transfer_function = D.stmt_transfer_function
       let edge_transfer_function = D.edge_transfer_function
       let s0 = D.s0
