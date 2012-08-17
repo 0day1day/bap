@@ -464,9 +464,10 @@ struct
           )
           x y
     end
-    let s0 _ = G.V.create Cfg.BB_Entry
-    let init g = L.top
-    let dir = GraphDataflow.Forward
+    module O = GraphDataflow.NOOPTIONS
+    let s0 _ _ = G.V.create Cfg.BB_Entry
+    let init _ g = L.top
+    let dir _ = GraphDataflow.Forward
 
     let binop_to_si_function = function
       | PLUS -> SI.add
@@ -586,9 +587,9 @@ struct
             with Invalid_argument _ | Not_found ->
               l
 
-    let node_transfer_function = fwd_transfer_stmt_to_block transfer_stmt
+    let node_transfer_function _ = fwd_transfer_stmt_to_block transfer_stmt
 
-    let edge_transfer_function g e = Util.id
+    let edge_transfer_function _ g e = Util.id
 
   end
   
@@ -785,11 +786,12 @@ struct
           )
           x y
     end
-    let s0 _ = G.V.create Cfg.BB_Entry
-    let init g =
+    module O = GraphDataflow.NOOPTIONS
+    let s0 _ _ = G.V.create Cfg.BB_Entry
+    let init _ g =
         VM.add sp [(sp, SI.zero (bits_of_width (Var.typ sp)))] L.top (* stack region *)
 
-    let dir = GraphDataflow.Forward
+    let dir _ = GraphDataflow.Forward
 
     let si_to_vs_binop_function f k =
       let g vs1 vs2 = match vs1, vs2 with
@@ -863,9 +865,9 @@ struct
             with Invalid_argument _ | Not_found ->
               l
 
-    let node_transfer_function = fwd_transfer_stmt_to_block transfer_stmt
+    let node_transfer_function _ = fwd_transfer_stmt_to_block transfer_stmt
 
-    let edge_transfer_function g e = Util.id
+    let edge_transfer_function _ g e = Util.id
 
   end
   
@@ -1079,8 +1081,10 @@ struct
         AbsEnv.pp print_string v;
         print_string "\n";
         v *) 
-   end
-    let s0 _ = G.V.create Cfg.BB_Entry
+    end
+    module O = GraphDataflow.NOOPTIONS
+
+    let s0 _ _ = G.V.create Cfg.BB_Entry
       
     (** Creates a lattice element that maps each of the given variables to
         it's own region. (For use as an inital value in the dataflow problem.)
@@ -1088,10 +1092,10 @@ struct
     let init_vars vars =
       List.fold_left (fun vm x -> VM.add x (`Scalar [(x, SI.zero (bits_of_width (Var.typ x)))]) vm) L.top vars
 
-    let init g =
+    let init _ g =
       init_vars [sp]
 
-    let dir = GraphDataflow.Forward
+    let dir _ = GraphDataflow.Forward
 
     let find v l = VM.find v l
     let do_find = AbsEnv.do_find_vs
@@ -1171,9 +1175,9 @@ struct
           with Invalid_argument _ | Not_found ->
             l
 
-    let node_transfer_function = fwd_transfer_stmt_to_block transfer_stmt
+    let node_transfer_function _ = fwd_transfer_stmt_to_block transfer_stmt
 
-    let edge_transfer_function g edge l =
+    let edge_transfer_function _ g edge l =
       let accept_signed_bop bop =
         match !signedness_hack, bop with
         | false, (SLE|SLT) -> true

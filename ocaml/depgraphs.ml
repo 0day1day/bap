@@ -614,8 +614,9 @@ struct
 
     module G = Cfg.AST.G
     module L = UseDefL
+    module O = GraphDataflow.NOOPTIONS
 
-    let node_transfer_function (g:G.t) (bb:G.V.t) (l:L.t) =
+    let node_transfer_function _ (g:G.t) (bb:G.V.t) (l:L.t) =
       let lref = ref l in
       let line = ref 0 in
       let v = object(self)
@@ -635,12 +636,12 @@ struct
 	) stmts;
       !lref
 
-    let edge_transfer_function g e = Util.id
+    let edge_transfer_function _ g e = Util.id
 
-    let s0 _ = Cfg.AST.G.V.create Cfg.BB_Entry
+    let s0 _ _ = Cfg.AST.G.V.create Cfg.BB_Entry
 
     (* Set each variable to undefined at the starting point *)
-    let init (g:G.t) = 
+    let init _ (g:G.t) = 
       let defs p =
 	let vars = ref VS.empty in
 	let visitor = object(self)
@@ -667,7 +668,7 @@ struct
 	   VM.add v s m'
 	) (defs g) m
 
-    let dir = GraphDataflow.Forward
+    let dir _ = GraphDataflow.Forward
   end
 
   module DF = GraphDataflow.Make(UseDefSpec)

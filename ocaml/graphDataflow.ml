@@ -42,6 +42,12 @@ module type OPTIONS = sig
   val default : t
 end
 
+module NOOPTIONS =
+struct
+  type t = unit
+  let default = ()
+end
+
 (* a dataflow is defined by a lattice over a graph. *)
 module type DATAFLOW =
 sig

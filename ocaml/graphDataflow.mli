@@ -79,6 +79,9 @@ module type OPTIONS = sig
   val default : t
 end
 
+(** A No-op options module *)
+module NOOPTIONS : OPTIONS
+
 (** A dataflow problem is defined by a lattice over a graph. *)
 module type DATAFLOW =
 sig
