@@ -103,7 +103,7 @@ let simplifycond_cfg g =
   (* Don't copy propagate over memory, since most programs do
      comparisons on registers. *)
   let stop_at = function
-    | Ast.Move(v, Load _, _) -> true
+    | Ast.Move(v, Load _, _) -> false (*true*)
     | _ -> false
   in
   let cp = Copy_prop.copyprop_ast ~stop_at g in

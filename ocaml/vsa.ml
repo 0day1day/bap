@@ -908,16 +908,15 @@ module MemStore = struct
       let prog_mem = BatList.filter_map get_mem [i;i+%1L;i+%2L;i+%3L] in
       if List.length prog_mem = 4 then
         (* Ugh, fix this *)
-        VS.of_bap_int (Arithmetic.bytes_to_int64 `Little prog_mem) reg_32
+        let i64 = Arithmetic.bytes_to_int64 `Little prog_mem in
+        VS.of_bap_int i64 reg_32
       else VS.top
-    | Some _ -> dprintf "not global %s %#Lx" (Pp.var_to_string r) i; VS.top
-    | _ -> dprintf "NOOO"; VS.top
+    | _ -> VS.top
 
   let read_concrete ?o ae (r,i) =
     try M2.find i (M1.find r ae)
     with Not_found ->
-      VS.top
-      (* read_concrete_real ?o (r,i) *)
+      read_concrete_real ?o (r,i)
 
   let read ?o ae = function
     | [] -> VS.top
@@ -1249,42 +1248,48 @@ struct
         let vs_int = VS.intersection vs_v vs_c in
         dprintf "%s dst %s vs_v %s vs_c %s vs_int %s" (Pp.var_to_string v) (Cfg_ast.v2s (G.E.dst edge)) (VS.to_string vs_v) (VS.to_string vs_c) (VS.to_string vs_int);
         VM.add v (`Scalar vs_int) l
-      (* | Some(_, BinOp(EQ, (BinOp((SLE|SLT) as bop, (Load(Var m, ind, _e, t) as le), Int(i, t')) as be), Int(i', t''))) *)
-      (* | Some(_, BinOp(EQ, (BinOp((SLE|SLT) as bop, Int(i, t'), (Load(Var m, ind, _e, t) as le)) as be), Int(i', t''))) -> *)
-      (*   let dir = match be with *)
-      (*     | BinOp(_, Load _, Int _) -> `Below *)
-      (*     | BinOp(_, Int _, Load _) -> `Above *)
-      (*     | _ -> failwith "impossible" *)
-      (*   in *)
+      | Some(_, BinOp(EQ, (BinOp((SLE|SLT|LE|LT) as bop, (Load(Var m, ind, _e, t) as le), Int(i, t')) as be), Int(i', t'')))
+      | Some(_, BinOp(EQ, (BinOp((SLE|SLT|LE|LT) as bop, Int(i, t'), (Load(Var m, ind, _e, t) as le)) as be), Int(i', t'')))
+          when accept_signed_bop bop ->
+        let dir = match be with
+          | BinOp(_, Load _, Int _) -> `Below
+          | BinOp(_, Int _, Load _) -> `Above
+          | _ -> failwith "impossible"
+        in
 
-      (*   (\* Reverse if needed *\) *)
-      (*   let e, dir, bop = *)
-      (*     if bi_is_one i' then be, dir, bop *)
-      (*     else *)
-      (*       let newbop = match bop with *)
-      (*         | SLE -> SLT *)
-      (*         | SLT -> SLE *)
-      (*         | LT -> LE *)
-      (*         | _ -> failwith "impossible" *)
-      (*       in *)
-      (*       match dir with *)
-      (*       | `Below -> BinOp(newbop, Int(i, t), Load(Var m, ind, _e, t)), `Above, newbop *)
-      (*       | `Above -> BinOp(newbop, Load(Var m, ind, _e, t), Int(i, t)), `Below, newbop *)
-      (*   in *)
-      (*   let vsf = match dir, bop with *)
-      (*     | `Below, (SLE|LE) -> VS.beloweq *)
-      (*     | `Below, (SLT|LT) -> VS.below *)
-      (*     | `Above, (SLE|LE) -> VS.aboveeq *)
-      (*     | `Above, (SLT|LT) -> VS.above *)
-      (*     | _ -> failwith "impossible" *)
-      (*   in *)
-      (*   let vs_v = exp2vs l le in *)
-      (*   let vs_c = vsf (bits_of_width t) (int64_of_big_int i) in *)
-      (*   let vs_int = VS.intersection vs_v vs_c in *)
-      (*   dprintf "%s dst %s vs_v %s vs_c %s vs_int %s" (Pp.var_to_string m) (Cfg_ast.v2s (G.E.dst edge)) (VS.to_string vs_v) (VS.to_string vs_c) (VS.to_string vs_int); *)
-      (*   let orig_mem = do_find_ae l m in *)
-      (*   let new_mem = MemStore.write_intersection orig_mem (exp2vs l ind) vs_int in *)
-      (*   VM.add m (`Array new_mem) l *)
+        (* Reverse if needed *)
+        let e, dir, bop =
+          if bi_is_one i' then be, dir, bop
+          else
+            let newbop = match bop with
+              | SLE -> SLT
+              | SLT -> SLE
+              | LT -> LE
+              | LE -> LT
+              | _ -> failwith "impossible"
+            in
+            match dir with
+            | `Below -> BinOp(newbop, Int(i, t), Load(Var m, ind, _e, t)), `Above, newbop
+            | `Above -> BinOp(newbop, Load(Var m, ind, _e, t), Int(i, t)), `Below, newbop
+        in
+        let vsf = match dir, bop with
+          | `Below, SLE -> VS.beloweq
+          | `Below, LE -> VS.beloweq_unsigned
+          | `Below, SLT -> VS.below
+          | `Below, LT -> VS.below_unsigned
+          | `Above, SLE -> VS.aboveeq
+          | `Above, LE -> VS.aboveeq_unsigned
+          | `Above, SLT -> VS.above
+          | `Above, LT -> VS.above_unsigned
+          | _ -> failwith "impossible"
+        in
+        let vs_v = exp2vs ~o l le in
+        let vs_c = vsf (bits_of_width t) (int64_of_big_int i) in
+        let vs_int = VS.intersection vs_v vs_c in
+        dprintf "%s dst %s vs_v %s vs_c %s vs_int %s" (Pp.var_to_string m) (Cfg_ast.v2s (G.E.dst edge)) (VS.to_string vs_v) (VS.to_string vs_c) (VS.to_string vs_int);
+        let orig_mem = do_find_ae l m in
+        let new_mem = MemStore.write_intersection orig_mem (exp2vs l ind) vs_int in
+        VM.add m (`Array new_mem) l
       | Some(_, BinOp(EQ, (BinOp(EQ|NEQ as bop, Var v, Int(i, t))), Int(i', t')))
       | Some(_, BinOp(EQ, (BinOp(EQ|NEQ as bop, Int(i, t), Var v)), Int(i', t'))) ->
 

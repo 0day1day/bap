@@ -168,8 +168,8 @@ let is_zero ((i,t) as v) =
 let bytes_to_int64 e bs =
   match e with
   | `Little -> BatList.fold_right (fun b i ->
-    let old = Int64.shift_left b 8 in
+    let old = Int64.shift_left i 8 in
     Int64.add old b) bs 0L
   | `Big -> List.fold_left (fun i b ->
-    let old = Int64.shift_left b 8 in
+    let old = Int64.shift_left i 8 in
     Int64.add old b) 0L bs
