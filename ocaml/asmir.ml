@@ -28,7 +28,11 @@ type arch = Libbfd.bfd_architecture
 type asmprogram = {asmp : Libasmir.asm_program_t;
 		   arch : arch;
 		   secs : section_ptr list;
-		   get : int64 -> char }
+                   (** Get executable code bytes *)
+		   get_exec : int64 -> char;
+                   (** Get any readable bytes *)
+                   get_readable : int64 -> char;
+ }
 
 
 let arch_i386 = Bfd_arch_i386
@@ -449,14 +453,17 @@ let is_code s =
   let flags = bfd_section_get_flags s in
   Int64.logand flags Libbfd.sEC_CODE <> 0L
 
-let section_contents ?(codeonly=true) prog secs =
+let codeonly s = is_load s && is_code s
+let loaded s = is_load s
+
+let section_contents ?(which=codeonly) prog secs =
   let bfd = Libasmir.asmir_get_bfd prog in
   let sc l s =
     let size = bfd_section_size s and vma = bfd_section_vma s
     and flags = bfd_section_get_flags s
     and name = bfd_section_name s in
     dprintf "Found section %s at %Lx with size %Ld. flags=%Lx" name vma size flags;
-    if is_load s && ((not codeonly) || is_code s) then
+    if which s then
     (* if Int64.logand Libbfd.sEC_LOAD flags <> 0L then *)
       let (ok, a) = Libbfd.bfd_get_section_contents bfd s 0L size in
       if ok <> 0 then (vma, a)::l else (dprintf "failed."; l)
@@ -486,8 +493,9 @@ let open_program ?base filename =
     (* tell the GC how to free resources associated with prog *)
   Gc.finalise Libasmir.asmir_close prog;
   let secs = Array.to_list (get_all_sections prog)  in
-  let get = section_contents prog secs in
-  {asmp=prog; arch=Libasmir.asmir_get_asmp_arch prog; secs=secs; get=get}
+  let get_exec = section_contents prog secs in
+  let get_readable = section_contents ~which:loaded prog secs in 
+ {asmp=prog; arch=Libasmir.asmir_get_asmp_arch prog; secs=secs; get_exec=get_exec; get_readable=get_readable}
 
 
 let get_asm = function
@@ -521,7 +529,7 @@ let get_asm = function
 
 
 (** Translate only one address of a  Libasmir.asm_program_t to Vine *)
-let asm_addr_to_bap {asmp=prog; arch=arch; get=get} addr =
+let asm_addr_to_bap {asmp=prog; arch=arch; get_exec=get_exec} addr =
   let fallback() =
     let g = gamma_for_arch arch in
     let (block, next) = Libasmir.asmir_addr_to_bap prog addr in
@@ -544,7 +552,7 @@ let asm_addr_to_bap {asmp=prog; arch=arch; get=get} addr =
   else (
     try 
       let (ir,na) as v = 
-	(try (Disasm.disasm_instr arch get addr)
+	(try (Disasm.disasm_instr arch get_exec addr)
 	 with Disasm_i386.Disasm_i386_exception s -> 
 	   DTest.dprintf "BAP unknown disasm_instr %Lx: %s" addr s;
 	   DV.dprintf "disasm_instr %Lx: %s" addr s; raise Disasm.Unimplemented
@@ -607,8 +615,8 @@ let asmprogram_to_bap ?(init_ro=false) p =
    sequence of bytes. *)
 let byte_insn_to_bap arch addr bytes =
   let prog = Libasmir.byte_insn_to_asmp arch addr bytes in
-  let get a = bytes.(Int64.to_int (Int64.sub a addr)) in
-  let (pr, n) = asm_addr_to_bap {asmp=prog; arch=arch; secs=[]; get=get} addr in
+  let get_exec a = bytes.(Int64.to_int (Int64.sub a addr)) in
+  let (pr, n) = asm_addr_to_bap {asmp=prog; arch=arch; secs=[]; get_exec=get_exec; get_readable=get_exec} addr in
   Libasmir.asmir_close prog;
   pr, Int64.sub n addr
 
@@ -618,11 +626,11 @@ let byte_sequence_to_bap bytes arch addr =
   let prog = Libasmir.byte_insn_to_asmp arch addr bytes in
   let len = Array.length bytes in
   let end_addr = Int64.add addr (Int64.of_int len) in
-  let get a = bytes.(Int64.to_int (Int64.sub a addr)) in
+  let get_exec a = bytes.(Int64.to_int (Int64.sub a addr)) in
   let rec read_all acc cur_addr =
     if cur_addr >= end_addr then List.rev acc
     else
-      let prog, next = asm_addr_to_bap {asmp=prog; arch=arch; secs=[]; get=get} cur_addr in
+      let prog, next = asm_addr_to_bap {asmp=prog; arch=arch; secs=[]; get_exec=get_exec; get_readable=get_exec} cur_addr in
       read_all (prog::acc) next
   in
   let il = read_all [] addr in
@@ -1055,5 +1063,7 @@ let get_print_warning = Libasmir.asmir_get_print_warning
 
 let set_use_simple_segments = Libasmir.asmir_set_use_simple_segments
 
-let get_prog_contents {get=get} addr =
-  get addr
+let get_exec_mem_contents {get_exec=get_exec} =
+  get_exec
+
+let get_readable_mem_contents {get_readable=get_readable} = get_readable

@@ -48,7 +48,7 @@ export RESULTDEPS = $(BAP_OCAMLDIR)/bap.a
 
 # default subprojects to build
 ifndef SUBPROJS
-	export SUBPROJS = $(PROJUTILS) $(CODEGEN) toil iltrans ileval topredicate formula get_functions split streamtrans backtaint
+	export SUBPROJS = $(PROJUTILS) $(CODEGEN) toil iltrans ileval topredicate formula get_functions split streamtrans backtaint resolvetest
 endif
 
 define PROJ_toil
@@ -120,6 +120,13 @@ define PROJ_backtaint
 	DOC_FILES=$(SOURCES)
 endef
 export PROJ_backtaint
+
+define PROJ_resolvetest
+	RESULT=resolvetest
+	SOURCES = resolvetest.ml
+	DOC_FILES=$(SOURCES)
+endef
+export PROJ_resolvetest
 
 # suffix for bytecode (which when we make all is debug code)
 export BCSUFFIX = .dbg

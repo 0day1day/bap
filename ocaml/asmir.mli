@@ -112,4 +112,5 @@ val get_print_warning : unit -> bool
 
 val set_use_simple_segments : bool -> unit
 
-val get_prog_contents : asmprogram -> int64 -> char
+val get_exec_mem_contents : asmprogram -> int64 -> char
+val get_readable_mem_contents : asmprogram -> int64 -> char

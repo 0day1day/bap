@@ -164,3 +164,12 @@ let concat ((_,lt) as lv) ((_,rt) as rv) =
 let is_zero ((i,t) as v) =
   let v = to_big_int v in
   sign_big_int v = 0
+
+let bytes_to_int64 e bs =
+  match e with
+  | `Little -> BatList.fold_right (fun b i ->
+    let old = Int64.shift_left b 8 in
+    Int64.add old b) bs 0L
+  | `Big -> List.fold_left (fun i b ->
+    let old = Int64.shift_left b 8 in
+    Int64.add old b) 0L bs

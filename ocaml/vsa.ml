@@ -12,6 +12,7 @@
     * Handle signedness
     * Handle full/partial memory correctly
     * Idea: Use copy propagation information to maintain equivalence classes, and use intersection over equivalence class members at edge transfer
+    * Memory read/store lengths ignored!
 *)
 
 module VM = Var.VarMap
@@ -876,17 +877,23 @@ struct
 end (* module RegionVSA *)
 
 (** Abstract Store *)
-module AllocEnv = struct
+module MemStore = struct
   type aloc = VS.region * int64
   module M1 = Map.Make(struct type t = VS.region let compare = Var.compare end)
   module M2 = Map.Make(struct type t = int64 let compare = Int64.compare end)
+
+  (* VSA optional interface: specify a "real" memory read funtion *)
+  module O = struct
+    type t = { get_mem : int64 -> int64 option }
+    let default = { get_mem = (fun _ -> None) } 
+  end
 
   (** This implementation may change... *)
   type t = VS.t M2.t M1.t
 
   let top = M1.empty
 
-  (** Fold over all addresses in the AllocEnv *)
+  (** Fold over all addresses in the MemStore *)
   let fold f ae i =
     M1.fold (fun r m2 a -> M2.fold (fun i vs a -> f (r,i) vs a) m2 a) ae i
 
@@ -896,23 +903,35 @@ module AllocEnv = struct
       p (Printf.sprintf " %s[%#Lx] -> %s\n" (Pp.var_to_string r) i (VS.to_string vs))) a ();
     p "End contents."
 
-  let read_concrete ae (r,i) =
-    try M2.find i (M1.find r ae)
-    with Not_found -> VS.top
+  let read_concrete_real ?o (r,i) = match o with
+    | Some {O.get_mem=get_mem} when r = VS.global ->
+      let prog_mem = BatList.filter_map get_mem [i;i+%1L;i+%2L;i+%3L] in
+      if List.length prog_mem = 4 then
+        (* Ugh, fix this *)
+        VS.of_bap_int (Arithmetic.bytes_to_int64 `Little prog_mem) reg_32
+      else VS.top
+    | Some _ -> dprintf "not global %s %#Lx" (Pp.var_to_string r) i; VS.top
+    | _ -> dprintf "NOOO"; VS.top
 
-  let read ae = function
+  let read_concrete ?o ae (r,i) =
+    try M2.find i (M1.find r ae)
+    with Not_found ->
+      VS.top
+      (* read_concrete_real ?o (r,i) *)
+
+  let read ?o ae = function
     | [] -> VS.top
     | addrs -> (* FIXME: maybe shortcut this *)
         let res =
           VS.fold
             (fun v a ->  match a with
-               | None -> Some (read_concrete ae v)
-               | Some a -> Some (VS.union (read_concrete ae v) a))
+               | None -> Some (read_concrete ?o ae v)
+               | Some a -> Some (VS.union (read_concrete ?o ae v) a))
             addrs None
         in
           match res with
             | Some x -> x
-            | None -> failwith "AllocEnv.read impossible address"
+            | None -> failwith "MemStore.read impossible address"
 
   let write_concrete_strong ae (r,i) vl =
     if vl = VS.top then
@@ -971,7 +990,7 @@ end
 (** Abstract Environment *)
 module AbsEnv = struct
 
-  type value = [ `Scalar of VS.t | `Array of AllocEnv.t ]
+  type value = [ `Scalar of VS.t | `Array of MemStore.t ]
 
   (** This implementation may change *)
   type t = value VM.t
@@ -980,7 +999,7 @@ module AbsEnv = struct
 
   let pp_value p = function
     | `Scalar s -> VS.pp p s
-    | `Array a -> AllocEnv.pp p a
+    | `Array a -> MemStore.pp p a
 
   let value_to_string v =
     let b = Buffer.create 57 in
@@ -1002,7 +1021,7 @@ module AbsEnv = struct
 
   let value_equal x y = match x,y with
     | (`Scalar x, `Scalar y) -> x = y
-    | (`Array x, `Array y) -> AllocEnv.equal x y
+    | (`Array x, `Array y) -> MemStore.equal x y
     | _ -> false
 
   let equal x y =
@@ -1022,8 +1041,8 @@ module AbsEnv = struct
   let do_find_ae ae v =
     try match VM.find v ae with
       | `Array ae -> ae
-      | _ -> AllocEnv.top
-    with  Not_found -> AllocEnv.top
+      | _ -> MemStore.top
+    with  Not_found -> MemStore.top
 end  (* module AE *)
 
 
@@ -1047,7 +1066,7 @@ struct
                  let v' = VM.find k y in
                  let vs = match v, v' with
                    | (`Scalar a, `Scalar b) -> `Scalar(VS.union a b)
-                   | (`Array a, `Array b) -> `Array(AllocEnv.union a b)
+                   | (`Array a, `Array b) -> `Array(MemStore.union a b)
                    | _ -> failwith "Tried to meet scalar and array"
                  in
                    VM.add k vs res
@@ -1062,7 +1081,7 @@ struct
                  let v' = VM.find k y in
                  let vs = match v, v' with
                    | (`Scalar a, `Scalar b) -> `Scalar(VS.widen a b)
-                   | (`Array a, `Array b) -> `Array(AllocEnv.widen a b)
+                   | (`Array a, `Array b) -> `Array(MemStore.widen a b)
                    | _ -> failwith "Tried to meet scalar and array"
                  in
                    VM.add k vs res
@@ -1082,10 +1101,10 @@ struct
         print_string "\n";
         v *) 
     end
-    module O = GraphDataflow.NOOPTIONS
+    module O = MemStore.O
 
     let s0 _ _ = G.V.create Cfg.BB_Entry
-      
+
     (** Creates a lattice element that maps each of the given variables to
         it's own region. (For use as an inital value in the dataflow problem.)
     *)
@@ -1102,11 +1121,11 @@ struct
     let do_find_ae = AbsEnv.do_find_ae
 
     (* aev = abstract environment value *)
-    let rec exp2vs l e =
-      match exp2aev l e with
+    let rec exp2vs ?o l e =
+      match exp2aev ?o l e with
       | `Scalar vs -> vs
       | _ -> failwith "exp2vs: Expected scalar"
-    and exp2aev l e : AbsEnv.value =
+    and exp2aev ?o l e : AbsEnv.value =
       match Typecheck.infer_ast ~check:false e with
       | Reg _ -> (
         let new_vs = try (match e with
@@ -1117,11 +1136,11 @@ struct
           | BinOp(op, x, y) ->
             let f = RegionVSA.DFP.binop_to_vs_function op in
             let k = SimpleVSA.DFP.bits_of_exp x in
-            f k (exp2vs l x) (exp2vs l y)
+            f k (exp2vs ?o l x) (exp2vs ?o l y)
           | UnOp(op, x) ->
             let f = RegionVSA.DFP.unop_to_vs_function op in
             let k = SimpleVSA.DFP.bits_of_exp x in
-            f k (exp2vs l x)
+            f k (exp2vs ?o l x)
                   (* | Phi(x::xs) -> *)
                   (*   List.fold_left *)
                   (*     (fun i y -> VS.union i (do_find l y)) *)
@@ -1132,7 +1151,7 @@ struct
                     (* FIXME: assumes deendianized.
                        ie: _e and _t should be the same for all loads and
                        stores of m. *)
-            AllocEnv.read (do_find_ae l m) (exp2vs l i)
+            MemStore.read ?o (do_find_ae l m) (exp2vs ?o l i)
           | Cast _ ->
             raise(Unimplemented "FIXME")
           | _ ->
@@ -1148,20 +1167,20 @@ struct
                     (* FIXME: assumes deendianized.
                        ie: _e and _t should be the same for all loads and
                        stores of m. *)
-            AllocEnv.write (do_find_ae l m) (exp2vs l i) (exp2vs l v)
+            MemStore.write (do_find_ae l m) (exp2vs ?o l i) (exp2vs ?o l v)
           (* | Phi(x::xs) -> *)
           (*   List.fold_left *)
-          (*     (fun i y -> AllocEnv.union i (do_find_ae l y)) *)
+          (*     (fun i y -> MemStore.union i (do_find_ae l y)) *)
           (*     (do_find_ae l x) xs *)
           (* | Phi [] -> *)
           (*   failwith "Encountered empty Phi expression" *)
           | _ ->
             raise(Unimplemented "unimplemented memory expression type"))
-          with Unimplemented _ | Invalid_argument _ -> AllocEnv.top
+          with Unimplemented _ | Invalid_argument _ -> MemStore.top
         in `Array new_vs
       )
 
-    let rec transfer_stmt s l =
+    let rec transfer_stmt o s l =
       match s with
         | Assert(Var _, _)  (* FIXME: Do we want to say v is true? *)
         | Assert _ | Jmp _ | CJmp _ | Label _ | Comment _
@@ -1170,14 +1189,15 @@ struct
         | Special _ -> failwith "Special is unimplemented"
         | Move(v, e, _) ->
           try
-            let new_vs = exp2aev l e in
+            let new_vs = exp2aev ~o l e in
             VM.add v new_vs l
           with Invalid_argument _ | Not_found ->
             l
 
-    let node_transfer_function _ = fwd_transfer_stmt_to_block transfer_stmt
+    let node_transfer_function o =
+      fwd_transfer_stmt_to_block (transfer_stmt o)
 
-    let edge_transfer_function _ g edge l =
+    let edge_transfer_function o g edge l =
       let accept_signed_bop bop =
         match !signedness_hack, bop with
         | false, (SLE|SLT) -> true
@@ -1263,7 +1283,7 @@ struct
       (*   let vs_int = VS.intersection vs_v vs_c in *)
       (*   dprintf "%s dst %s vs_v %s vs_c %s vs_int %s" (Pp.var_to_string m) (Cfg_ast.v2s (G.E.dst edge)) (VS.to_string vs_v) (VS.to_string vs_c) (VS.to_string vs_int); *)
       (*   let orig_mem = do_find_ae l m in *)
-      (*   let new_mem = AllocEnv.write_intersection orig_mem (exp2vs l ind) vs_int in *)
+      (*   let new_mem = MemStore.write_intersection orig_mem (exp2vs l ind) vs_int in *)
       (*   VM.add m (`Array new_mem) l *)
       | Some(_, BinOp(EQ, (BinOp(EQ|NEQ as bop, Var v, Int(i, t))), Int(i', t')))
       | Some(_, BinOp(EQ, (BinOp(EQ|NEQ as bop, Int(i, t), Var v)), Int(i', t'))) ->
