@@ -12,10 +12,12 @@
 #define WRITE(x) { if (fwrite(&(x), sizeof(x), 1, ofs) != 1) { throw (TraceException("Unable to write to trace")); } }
 #define READ(x) { if (fread(&(x), sizeof(x), 1, ifs) != 1) { throw (TraceException("Unable to read from trace")); } }
 #ifdef _WIN32
+typedef uint64_t traceoff_t;
 #define SEEKNAME _fseeki64
 #define SEEK(f,x) { if (SEEKNAME(f, x, SEEK_SET) != 0) { throw (TraceException("Unable to seek in trace to offset " + x)); } }
 #define TELL(f) _ftelli64(f)
 #else
+typedef off_t traceoff_t;
 #define SEEKNAME fseeko
 #define SEEK(f,x) { if (SEEKNAME(f, x, SEEK_SET) != 0) { throw (TraceException("Unable to seek in trace to offset " + x)); } }
 #define TELL(f) ftello(f)
