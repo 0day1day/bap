@@ -80,7 +80,7 @@ namespace SerializedTrace {
     WRITE(len);
 
     /* Write the frame. */
-    off_t old_offset = TELL(ofs);
+    traceoff_t old_offset = TELL(ofs);
     if (old_offset == -1) {
       throw (TraceException("Unable to determine the current offset in the trace"));
     }
@@ -199,8 +199,8 @@ namespace SerializedTrace {
     }
 
     /* We should be at the end of the file now. */
-    off_t us = TELL(ifs);
-    off_t end = SEEKNAME(ifs, 0, SEEK_END);
+    traceoff_t us = TELL(ifs);
+    traceoff_t end = SEEKNAME(ifs, 0, SEEK_END);
     if (us != TELL(ifs) || end != 0) {
       throw(TraceException("The table of contents is malformed."));
     }
