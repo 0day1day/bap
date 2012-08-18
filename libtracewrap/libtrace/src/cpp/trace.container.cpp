@@ -11,8 +11,15 @@
 
 #define WRITE(x) { if (fwrite(&(x), sizeof(x), 1, ofs) != 1) { throw (TraceException("Unable to write to trace")); } }
 #define READ(x) { if (fread(&(x), sizeof(x), 1, ifs) != 1) { throw (TraceException("Unable to read from trace")); } }
-#define SEEK(f,x) { if (fseeko(f, x, SEEK_SET) != 0) { throw (TraceException("Unable to seek in trace to offset " + x)); } }
+#ifdef _WIN32
+#define SEEKNAME _fseeki64
+#define SEEK(f,x) { if (SEEKNAME(f, x, SEEK_SET) != 0) { throw (TraceException("Unable to seek in trace to offset " + x)); } }
+#define TELL(f) _ftelli64(f)
+#else
+#define SEEKNAME fseeko
+#define SEEK(f,x) { if (SEEKNAME(f, x, SEEK_SET) != 0) { throw (TraceException("Unable to seek in trace to offset " + x)); } }
 #define TELL(f) ftello(f)
+#endif
 
 namespace SerializedTrace {
 
@@ -191,7 +198,7 @@ namespace SerializedTrace {
 
     /* We should be at the end of the file now. */
     off_t us = TELL(ifs);
-    off_t end = fseeko(ifs, 0, SEEK_END);
+    off_t end = SEEKNAME(ifs, 0, SEEK_END);
     if (us != TELL(ifs) || end != 0) {
       throw(TraceException("The table of contents is malformed."));
     }
