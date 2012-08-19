@@ -53,14 +53,13 @@ module CPSpecSSA = struct
   let stmt_transfer_function stop_at g _ stmt l =
     let l = match l with | L.Map m -> m | L.Top -> failwith "Expected Map, not Top" in
     L.Map (match stmt with
+    | s when stop_at s ->
+      VM.empty
     | Move(v, Phi _, _) ->
       VM.add v L.Bottom l
-    | Move(v,e,_) as s ->
+    | Move(v,e,_) ->
       (* dprintf "ignoring %s" (Pp.ssa_stmt_to_string s); *)
-      if stop_at s then
-        VM.add v L.Bottom l
-      else
-        VM.add v (L.Middle e) l
+      VM.add v (L.Middle e) l
     | _ -> l)
 
   let edge_transfer_function _ g _ _ l = l
@@ -109,12 +108,11 @@ module CPSpecAST = struct
   let stmt_transfer_function stop_at g loc stmt l =
     let l = match l with | L.Map m -> m | L.Top -> failwith "Expected Map, not Top" in
     L.Map (match stmt with
-    | Ast.Move(v,e,_) as s ->
+    | s when stop_at s ->
+      VM.empty
+    | Ast.Move(v,e,_) ->
       (* dprintf "seeing %s" (Pp.ast_stmt_to_string s); *)
-      if stop_at s then
-        VM.add v L.Bottom l
-      else
-        VM.add v (L.Middle (loc, e)) l
+      VM.add v (L.Middle (loc, e)) l
     | _ -> l)
 
   let edge_transfer_function _ g _ _ l = l
