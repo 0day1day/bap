@@ -1,6 +1,7 @@
 #ifndef TRACE_CONTAINER_HPP
 #define TRACE_CONTAINER_HPP
 
+#include "config.h"
 #include "arch.hpp"
 
 /**
