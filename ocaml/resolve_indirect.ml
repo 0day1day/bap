@@ -17,6 +17,11 @@ let resolve_indjumps ?is_exit asmp cfg =
     let _df_in, df_out = Vsa.AlmostVSA.DF.worklist_iterate_widen ~nmeets:50 ~opts:{Vsa.AlmostVSA.DFP.O.get_mem=get_mem} cfg_vsa in
     C.G.fold_vertex
       (fun v cfg ->
+        (try
+          Printf.printf "VSA %s" (Cfg_ast.v2s v);
+          Vsa.AbsEnv.pp print_string (df_out v);
+          print_string "\n\n"
+        with Not_found -> ());
         if List.mem (C.G.V.create BB_Indirect) (C.G.succ cfg v) then (
           let stmts = C.get_stmts cfg v in
           match List.rev stmts with
