@@ -6,7 +6,6 @@ module C = Cfg.AST
 module D = Debug.Make(struct let name = "Unroll" and default=`NoDebug end)
 open D
 
-
 let unroll_loop ?(count=8) ?(id=0) cfg head body =
   dprintf "Unrolling loop for %s with %d nodes" (Cfg.bbid_to_string (C.G.V.label head)) (List.length body);
   let nodes = head::body in

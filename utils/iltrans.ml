@@ -169,9 +169,9 @@ let speclist =
      "Perform dead code ellimination.")
   ::("-adeadcode", uadd(TransformSsa adeadcode),
      "Perform aggressive dead code ellimination.")
-  ::("-ast-coalesce", uadd(TransformAstCfg ast_coalesce),
+  ::("-coalesce-ast", uadd(TransformAstCfg ast_coalesce),
      "Perform coalescing on the AST.")
-  ::("-ssa-coalesce", uadd(TransformSsa ssa_coalesce),
+  ::("-coalesce-ssa", uadd(TransformSsa ssa_coalesce),
      "Perform coalescing on the SSA.")
   ::("-jumpelim", uadd(TransformSsa jumpelim),
      "Control flow optimization.")
@@ -179,9 +179,9 @@ let speclist =
   (*    "Convert memory accesses to scalars (default mode).") *)
   (* ::("-memtoscalar-initro", uadd(AnalysisSsa memory2scalariroptir), *)
   (*    "Convert memory accesses to scalars (IndirectROPTIR mode).") *)
-  ::("-ssa-simp", uadd(TransformSsa Ssa_simp.simp_cfg),
+  ::("-simp-ssa", uadd(TransformSsa Ssa_simp.simp_cfg),
      "Perform all supported optimizations on SSA")
-  ::("-ssa-to-single-stmt",
+  ::("-single-stmt-ssa",
      uadd(TransformSsa Depgraphs.DDG_SSA.stmtlist_to_single_stmt),
      "Create new graph where every node has at most 1 SSA statement"
     )
@@ -360,9 +360,9 @@ let speclist =
       "<n> Unroll loops n times")
   :: ("-rm-cycles", uadd(TransformAstCfg Hacks.remove_cycles),
       "Remove cycles")
-  :: ("-ast-rm-indirect", uadd(TransformAstCfg Hacks.ast_remove_indirect),
+  :: ("-rm-indirect-ast", uadd(TransformAstCfg Hacks.ast_remove_indirect),
       "Remove BB_Indirect")
-  :: ("-ssa-rm-indirect", uadd(TransformSsa Hacks.ssa_remove_indirect),
+  :: ("-rm-indirect-ssa", uadd(TransformSsa Hacks.ssa_remove_indirect),
       "Remove BB_Indirect")
   :: ("-typecheck", uadd(AnalysisAst Typecheck.typecheck_prog),
       "Typecheck program")
