@@ -266,7 +266,7 @@ let reverse_bytes e =
 let extract_byte n e =
   extract (biconst (n*8+7)) (biconst (n*8)) e
 
-(* Concatenate a list of expressions *)
+(* Concatenate an enumeration of expressions *)
 let concat_explist elist =
   reduce
     (fun l r -> l ++* r) elist
