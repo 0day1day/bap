@@ -88,9 +88,9 @@ let to_dsa p =
 
 let output_structanal p =
   let cfg = Prune_unreachable.prune_unreachable_ast p in
-  ignore(Structural_analysis.structural_analysis cfg)
-  (* FIXME: print a pretty graph or something. For now the debugging
-     output is useful enough... *)
+  let sa = Structural_analysis.structural_analysis cfg in
+  print_endline "Structural analysis results:";
+  print_endline (Structural_analysis.node2s sa)
 
 let sccvn p =
   fst(Sccvn.replacer p)
