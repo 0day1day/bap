@@ -1,6 +1,9 @@
 # $Id$
 
 .NOTPARALLEL:
+# Work around buggy Debian ocaml patch
+# See http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=678577
+export OCAML_COMPAT='c'
 
 export BAP_DIR=$(CURDIR)/..
 
@@ -36,7 +39,7 @@ export SOURCES = \
 	big_int_convenience.ml \
 	dominator.ml \
 	graphDataflow.mli graphDataflow.ml \
-	type.ml type.mli \
+	type.mli type.ml \
 	var.mli var.ml \
 	arithmetic.ml \
 	ast.ml \
@@ -47,18 +50,17 @@ export SOURCES = \
 	ast_convenience.ml \
 	cfg.mli cfg.ml \
 	ast_visitor.mli ast_visitor.ml \
+	ssa_visitor.mli ssa_visitor.ml \
 	grammar_scope.ml \
 	memory2array.mli memory2array.ml \
-	flatten_mem.mli \
-	flatten_mem.ml \
-	reachable.mli \
-	reachable.ml \
+	flatten_mem.mli flatten_mem.ml \
+	reachable.mli reachable.ml \
 	prune_unreachable.mli prune_unreachable.ml \
 	cfg_pp.ml \
 	cfg_ast.mli cfg_ast.ml \
-	ssa_visitor.mli ssa_visitor.ml \
-	depgraphs.ml \
+	depgraphs.mli depgraphs.ml \
 	cfg_ssa.mli cfg_ssa.ml \
+	checks.mli checks.ml \
 	debug_snippets.ml \
 	sccvn.mli sccvn.ml \
 	deadcode.mli deadcode.ml \
@@ -101,6 +103,7 @@ export SOURCES = \
 	coalesce.mli coalesce.ml \
 	traces.ml \
 	traces_surgical.ml \
+	traces_backtaint.mli traces_backtaint.ml \
 	utils_common.ml \
 	test_common.ml \
 	template.ml \
@@ -134,7 +137,7 @@ export LIBDIRS = $(LIBASMIR)/src $(VEX_DIR)
 export LIBDIRS += $(SOLVER_LIBDIRS) $(LIBTRACE)
 
 OCAMLLDFLAGS = -thread # just for make top
-OCAMLFLAGS = -thread -warn-error Aelz # -for-pack Bap #-w A
+OCAMLFLAGS = -thread -warn-error Aelz -annot # -for-pack Bap #-w A
 # merge everything but descriptions.
 OCAMLDOCFLAGS = -m avlsoper
 

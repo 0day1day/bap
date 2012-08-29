@@ -762,7 +762,7 @@ module PinTrace = struct
     while !c do
       let (tmp_c,revstmts) =
         alt_bap_from_trace_file_range_rev filename off !trace_blocksize in
-      ir := Util.fast_append revstmts !ir;
+      ir := BatList.append revstmts !ir;
       c := tmp_c;
     done;
     let r = List.rev !ir in
@@ -808,7 +808,7 @@ module SerializedTrace = struct
                    mem=true;
                    t=Reg b;
                    index=a;
-                   value=Util.big_int_of_binstring ~e:Util.Little v;
+                   value=Util.big_int_of_binstring ~e:`Little v;
                    usage=convert_usage use;
                    taint=convert_taint t})
         | {Operand_info.operand_info_specific=`reg_operand({Reg_operand.name=n});
@@ -820,7 +820,7 @@ module SerializedTrace = struct
                    mem=false;
                    t=Reg b;
                    index=0L;
-                   value=Util.big_int_of_binstring ~e:Util.Little v;
+                   value=Util.big_int_of_binstring ~e:`Little v;
                    usage=convert_usage use;
                    taint=convert_taint t})
       in
@@ -829,7 +829,7 @@ module SerializedTrace = struct
            Taint_intro.taint_id=tid;
            Taint_intro.value=value} ->
           let v = match value with
-            | Some x -> Util.big_int_of_binstring ~e:Util.Little x
+            | Some x -> Util.big_int_of_binstring ~e:`Little x
             | None -> Big_int_convenience.bi0
           in
           Context({name="mem";

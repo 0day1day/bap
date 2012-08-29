@@ -7,7 +7,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.59)
-AC_INIT(Bap, 0.5, bap-dev@lists.andrew.cmu.edu)
+AC_INIT(Bap, 0.6, bap-dev@lists.andrew.cmu.edu)
 AC_CONFIG_SRCDIR([libasmir/src/asm_program.c])
 AC_CONFIG_HEADER([libasmir/config.h])
 
@@ -98,6 +98,13 @@ EOF
 else          
    touch ocaml/makefile.inc
 fi
+
+# Check for etags
+AS_IF([which etags],
+      [HAVE_ETAGS=true],
+      [HAVE_ETAGS=false; AC_MSG_WARN([ETAGS not found. BAP will not build tags.])])
+
+AM_CONDITIONAL([HAVE_ETAGS], [test x$HAVE_ETAGS = xtrue])
 
 # Checks for ocaml libraries
 ocamlfind query camomile

@@ -66,6 +66,7 @@ let split_cmdstr cmdstr =
   let args = Array.of_list slist in
   cmd, args
 
+(* XXX: Move me to Util.ml *)
 let syscall cmd =
   let () = Sys.set_signal Sys.sigalrm (Sys.Signal_handle alarm_handler) in
   let (stdoutread,stdoutwrite) = pipe () in
@@ -123,7 +124,7 @@ let syscall cmd =
      done;
      close stdoutread;
      close stderrread;
-     (Buffer.contents obuf), (Buffer.contents ebuf), Util.option_unwrap !estatus
+     (Buffer.contents obuf), (Buffer.contents ebuf), BatOption.get !estatus
    with Alarm_signal_internal ->
      close stdoutread;
      close stderrread;

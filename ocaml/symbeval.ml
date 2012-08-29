@@ -100,7 +100,7 @@ let context_copy = VH.copy
 (* Unwrapping functions *)
 let symb_to_exp = function
   | Symbolic e -> e
-  | ConcreteMem _ -> failwith "this is not a symbolic expression"
+  | ConcreteMem _ -> failwith "symb_to_exp called on concrete memory"
 let concmem_to_mem = function
   | ConcreteMem m -> m
   | _ -> failwith "not a concrete memory"
@@ -522,25 +522,25 @@ struct
   let create () = VH.create 5000
 
   let print_values delta =
-    pdebug "contents of variables" ;
+    print_endline "contents of variables" ;
     VH.iter
       (fun k v ->
   	 match k,v with
   	   | var,Symbolic e ->
-               pdebug ((Pp.var_to_string var) ^ " = " ^ (Pp.ast_exp_to_string e))
+               print_endline ((Pp.var_to_string var) ^ " = " ^ (Pp.ast_exp_to_string e))
   	   | _ -> ()
       ) delta
 
   let print_mem delta =
-    pdebug "contents of memories" ;
+    print_endline "contents of memories" ;
     VH.iter
       (fun k v ->
   	 match k,v with
   	   | var, ConcreteMem(mem,_) ->
-               pdebug ("memory " ^ (Var.name var)) ;
+               print_endline ("memory " ^ (Var.name var)) ;
                AddrMap.iter
   		 (fun i v ->
-  		    pdebug((Printf.sprintf "%Lx" i)
+  		    print_endline((Printf.sprintf "%Lx" i)
   			   ^ " -> " ^ (Pp.ast_exp_to_string v))
   		 )
   		 mem
@@ -554,7 +554,7 @@ struct
   	   | Symbolic e ->
   	       let varname = Var.name var in
   		 if varname = name then
-  		   pdebug (varname ^ " = "
+  		   print_endline (varname ^ " = "
   			   ^ (Pp.ast_exp_to_string e))
   	   | _ -> ()
       ) delta
@@ -747,8 +747,7 @@ struct
      | _ -> failwith "internal error: adding malformed constraint to formula"
     )
 
-  let output_formula bindings =
-    bindings exp_true
+  let output_formula bindings = bindings exp_true
 end
 
 (** Uses Lets for assignments *)

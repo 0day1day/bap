@@ -26,6 +26,8 @@ struct
   *       OR all nodes before n1 have safe stmts (comments, labels, etc.)
   *)
   let coalesce cfg =
+   let module CC = Checks.MakeConnectedCheck(C) in
+   let () = CC.connected_check cfg "coalesce" in
    let entry_node = C.find_vertex cfg BB_Entry in
    let visited = ref GS.empty in
    let isspecial v = match G.V.label v with BB _ -> false | _ -> true in
@@ -40,7 +42,8 @@ struct
            let node_safe = C.is_safe_to_coalesce stmts in
            let safe = safe && node_safe in
            match G.succ graph node with
-           | [successor] when not (List.mem successor acc) ->
+           | [successor] when not (List.mem successor acc)
+               && not (isspecial successor) ->
              (match G.pred graph successor with
              | [] -> failwith "node's successor has no predecessor"
              | [_] when not (isspecial successor) ->

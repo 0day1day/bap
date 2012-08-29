@@ -1,35 +1,10 @@
-(** Debugging module.
-
-    This module contains a bunch of functions for printing debugging output.
-
-    Environment Variables:
-    - [BAP_LOGFILE]
-    If set, debug messages will be written to the file 
-    $BAP_LOGFILE. The default is to write to standard error.
-    - [BAP_DEBUG_MODULES]
-    Specifies which modules should have debugging enabled or disabled. The list
-    is separated by colons ([:]). {i modulename} or [!]{i modulename} turn
-    debugging on or off respectively for {i modulename}. If {i modulename} is
-    the empty string, it matches all modules. The leftmost match wins. Default
-    behavior is undefined and subject to change. Note that {i modulename}
-    refers to the name used for debug printing, which is not necesarily
-    identical to the module name in OCaml.
-
-    - [BAP_WARN_MODULES]
-    Specifies which modules should have warning enabled or
-    disabled. The format is like that of [BAP_DEBUG_MODULES].
-    Default behavior is on (unlike debugging).
-
-    - [BAP_DEBUG_TIMESTAMPS]
-    Specified how (and whether) timestapms will be printed with each
-    debug message. Supported values are [unix], [iso], [elapsed], and [none].
-*)
-
-(** prints given string exactly to the debug channel *)
 let debug_string = prerr_string
 
-(** like [debug_string] but prints a newline and flushes the buffer *)
 let debug_endline = prerr_endline
+
+(* Disabling global debugging turns off all debug functionality for all modules *)
+let global_debug = ref true
+let set_global_debug v = global_debug := v
 
 let output_endline oc s =
   output_string oc s;
@@ -72,13 +47,16 @@ let get_env_options varname defvalue =
       default
 
 
-(** [has_debug s] returns true when debugging is enabled for s.
+(* [has_debug d s] returns true when debugging is enabled for s.  d is the
+    default behavior.
     See documentation on [BAP_DEBUG_MODULES] at the top.
 *)
-let has_debug =
-  get_env_options "BAP_DEBUG_MODULES"
+let has_debug d s =
+  (*get_env_options "BAP_DEBUG_MODULES"*)
+  if !global_debug then get_env_options "BAP_DEBUG_MODULES" d s
+  else false
 
-(** [has_warn s] returns true when warnings are enabled for s.
+(* [has_warn s] returns true when warnings are enabled for s.
     See documention on [BAP_WARN_MODULES] at the top *)
 let has_warn = 
   get_env_options "BAP_WARN_MODULES" true
@@ -125,51 +103,37 @@ let ptime =
 	ptime_unix
   with Not_found ->
     ptime_none
-      
-(** The type of module that contains the debugging functions *)
+
 module type DEBUG =
 sig
-  val debug : bool
-    (** Whether debugging is on *)
+  val debug : unit -> bool
 
   val warn : bool
-    (** Whether warnings are on *)
 
   val pdebug : string -> unit
-    (** Prints given string as a debug message. *)
 
   val dprintf : ('a, unit, string, unit) format4 -> 'a
-    (** printf a debug message *)
 
   val dtrace : before:('a->unit) -> f:('a->'b) -> after:('b->unit) -> 'a -> 'b
-    (** [dtrace before f after] will return [f()], but will call
-	[before] first and after calling [f] it will pass the result
-	to [after]. Also, while [f] is running, indentation for all
-	debugging functions will be increased.  *)
-    (* more should get added here *)
+
+  (* more should get added here *)
 
   val pwarn : string -> unit
-    (** Prints given string as a warning message. *)
 
   val wprintf : ('a, unit, string, unit) format4 -> 'a
-    (** printf a warning message *)
 
 end
 
-(** The type of module we need to make a [DEBUG] module *)
 module type DEBUG_MOD_INFO =
 sig
   val name : string
-    (** The name to prefix all debug messages with *)
 
   val default : [ `Debug | `NoDebug ]
-    (** Specifies whether debugging is enabled or disabled by default. *)
 end
-  
-(** No-op debugging module. Throws everything away. *)
+
 module NoDebug : DEBUG  =
 struct
-  let debug = false
+  let debug _ = false
   let pdebug = (fun _ -> ())
   let dprintf fmt = Printf.ksprintf ignore fmt
   let dtrace = (fun ~before ~f ~after -> f)
@@ -178,20 +142,19 @@ struct
   let wprintf fmt = Printf.ksprintf ignore fmt
 end
 
-(** Creates a debugging module for the given component. *)
 module Make(Module:DEBUG_MOD_INFO)  : DEBUG =
 struct
 
-  let debug = has_debug (Module.default = `Debug) Module.name 
+  let debug _ = has_debug (Module.default = `Debug) Module.name 
 
   let pdebug s =
     pindent(); ptime();
     debug_string Module.name; debug_string ": ";
     debug_endline s
-  let pdebug = if debug then pdebug else NoDebug.pdebug
+  let pdebug a = if debug() then pdebug a else NoDebug.pdebug a
 
   let dprintf fmt = Printf.ksprintf pdebug fmt
-  let dprintf = if debug then dprintf else NoDebug.dprintf
+  let dprintf a = if debug() then dprintf a else NoDebug.dprintf a
 
   let dtrace ~before ~f ~after x =
     before x;
@@ -201,7 +164,7 @@ struct
     after r;
     r
  
-  let dtrace = if debug then dtrace else NoDebug.dtrace
+  let dtrace = if debug() then dtrace else NoDebug.dtrace
 
   let warn = has_warn Module.name
 

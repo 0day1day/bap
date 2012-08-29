@@ -109,7 +109,7 @@ let (/%) bi1 bi2 = div_big_int bi1 bi2
 let (%%) bi1 bi2 = mod_big_int bi1 bi2
 
 (** Operator for printing as hex *)
-let (~%) = Util.hex_of_big_int
+let (~%) = Util.big_int_to_hex
 
 (** bi_is_zero bi returns true iff bi = 0 *)
 let bi_is_zero bi = bi0 ==% bi

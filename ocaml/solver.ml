@@ -578,8 +578,8 @@ struct
           let newv = (try VarHash.find vars v
             with Not_found ->
               (Var v)) in
-          `ChangeToAndDoChildren newv
-        | e -> `DoChildren
+          ChangeToAndDoChildren newv
+        | e -> DoChildren
     end in
     (fun {vars=vars} e ->
       Ast_visitor.exp_accept (v vars) e)

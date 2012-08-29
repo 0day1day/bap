@@ -682,20 +682,20 @@ let create_tm c =
 	   VH.remove tm v;
 	   VH.replace refd v false)
        with Not_found -> VH.add refd v true);
-      `DoChildren
+      DoChildren
 
     method visit_stmt = function
       | Move(_, Phi _, _) ->
-	  `DoChildren
+	  DoChildren
       | Move(v,e,_) ->
 	  (* FIXME: should we check whether we introduced this var? *)
           (* FIX: we introduced it if it is named "temp" *)
 	  if (try VH.find refd v with Not_found -> true) 
               && (Var.name v == ssa_temp_name)
 	  then VH.add tm v e;
-	  `DoChildren
+	  DoChildren
       | _ ->
-	  `DoChildren
+	  DoChildren
   end in
   C.G.iter_vertex
     (fun b -> ignore(Ssa_visitor.stmts_accept vis (C.get_stmts c b)))

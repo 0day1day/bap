@@ -125,7 +125,7 @@ struct
     else
       top k
 
-  let neg = if debug then renormun neg else neg
+  let neg = if debug() then renormun neg else neg
 	
   (** Subtractionf of strided intervals *)
   let sub k a b =
@@ -210,7 +210,7 @@ struct
   let lognot (_k:int) (s,l,u) =
     (s, bnot u, bnot l)
 
-  let lognot = if debug then renormun lognot else lognot
+  let lognot = if debug() then renormun lognot else lognot
 
 
   (** Bitwise AND *)

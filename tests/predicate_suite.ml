@@ -10,7 +10,7 @@ let stp_out = "stp_out.stp";;
 let solver = ref (Smtexec.STP.si);;
 
 let predicate_stp_setup _ =
-  let _ = check_stp_path (stp_path^stp) in 
+  let _ = check_stp_path() in 
   (* Silence floating point warnings for tests *)
   let _ = if (Asmir.get_print_warning()) then Asmir.set_print_warning(false) in
   let prog = Asmir.open_program test_file in
@@ -22,7 +22,6 @@ let predicate_stp_setup _ =
   let g_cfg = Prune_unreachable.prune_unreachable_ast g_cfg in
   let g_cfg = Unroll.unroll_loops g_cfg in
   let g_cfg = Hacks.remove_cycles g_cfg in
-  let g_cfg = Prune_unreachable.prune_unreachable_ast g_cfg in
   ignore(typecheck g_ir);
   g_cfg;;
 

@@ -37,7 +37,6 @@ let rec rm_and_ignore_list paths =
 
 
 (** STP helpers **)
-let stp_path = "../stpwrap/stp/bin/";;
 let stp = "stp";;
 
 let does_stp_work () =
@@ -45,14 +44,12 @@ let does_stp_work () =
     true
   else false
 
-let check_stp_path file =
+let check_stp_path () =
   print_endline("Checking for stp...");
   match Unix.system("echo 'QUERY(TRUE);' | stp 2> /dev/null") with
   | Unix.WEXITED(0) -> ()
-  | _ -> (if (Sys.file_exists file) 
-    then let path = Sys.getenv("PATH") in Unix.putenv "PATH" (path^":"^stp_path)
-    else skip_if true 
-      ("Skipping test.  Stp is not in PATH and can not find file "^file));;
+  | _ -> skip_if true 
+    "Skipping test.  Stp is not in PATH";;
 
 
 (** pin helpers **)
@@ -87,7 +84,7 @@ let check_pin_setup _ =
   if (Sys.file_exists cat_arg) 
   then assert_command ~foutput ~verbose:true "cat" [cat_arg] else ();
   (* Check environment variable for path to pin *)
-  let env_pin_path = try Sys.getenv "PIN_PATH" with _ -> "" in
+  let env_pin_path = try Sys.getenv "PIN_HOME" with _ -> "" in
   if (env_pin_path <> "") then pin_path := env_pin_path;
   check_file(!pin_path^pin);
   check_file(gentrace_path^gentrace);
@@ -158,14 +155,11 @@ let check_bigint_answer e correct =
 
 
 let check_eax ctx eax =
-  let pat = "R_EAX_" in
   Var.VarHash.iter 
     (fun k v ->
-      match k,v with
-      | var,Symbeval.Symbolic e ->
-	if (pmatch ~pat (Pp.var_to_string var)) 
-	then check_bigint_answer e eax
-	else ()
+      match v with
+      | Symbeval.Symbolic e when k = Disasm_i386.eax ->
+	check_bigint_answer e eax
       | _ -> ()
     ) ctx.Symbeval.delta;;
 
@@ -217,3 +211,13 @@ let rec summarize_results res =
   match res with
   | [] -> None
   | r::rs -> summarize r; summarize_results rs;;
+
+let backwards_taint prog =
+  let prog = Traces.concrete prog in
+
+  (* Flatten memory *)
+  let prog = Flatten_mem.flatten_mem_program prog in
+
+  (* Try to identify fault *)
+  let fault_location = Traces_backtaint.identify_fault_location prog in
+  Traces_backtaint.backwards_taint prog fault_location

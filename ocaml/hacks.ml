@@ -6,7 +6,7 @@ open Util
 open BatListFull
 
 module C = Cfg.AST
-module D = Debug.Make(struct let name = "Hacks" and default=`Debug end)
+module D = Debug.Make(struct let name = "Hacks" and default=`NoDebug end)
 open D
 
 let ra_final = Var.newvar "ra_final" reg_32
@@ -161,7 +161,8 @@ let uniqueify_labels p =
     in
     let n =
       try (Hashtbl.find lh strl)+1
-      with Not_found -> 0 in
+      with Not_found -> 0 
+    in
     Hashtbl.replace lh strl n;
         (* Keep the first name unique to make sure cjmptrace labels
            don't get broken *)
@@ -173,14 +174,7 @@ let uniqueify_labels p =
   in
   let renamelabels = object(self)
     inherit Ast_visitor.nop
-    method visit_stmt = function
-      | Label(l, attrs) ->
-        `ChangeTo (Label(find_new_label l, attrs))
-      | _ -> `DoChildren
-
-    method visit_exp e = match lab_of_exp e with
-    | Some l -> `ChangeToAndDoChildren (exp_of_lab (find_new_label l))
-    | None -> `DoChildren
+    method visit_label l = ChangeTo (find_new_label l)
   end
   in
   Ast_visitor.prog_accept renamelabels p
@@ -205,8 +199,8 @@ let replace_unknowns p =
     inherit Ast_visitor.nop
     method visit_exp = function
       | Unknown(_, t) ->
-        `ChangeTo (i t)
-      | _ -> `DoChildren
+        ChangeTo (i t)
+      | _ -> DoChildren
   end
   in
   Ast_visitor.prog_accept v p

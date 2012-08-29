@@ -14,7 +14,9 @@ module VH=Var.VarHash
 module D = Debug.Make(struct let name = "Disasm_i386" and default=`NoDebug end)
 open D
 
-(* 
+let compute_segment_bases = ref true
+
+(*
    Note: In general, the function g is the get memory function.  The variable
    na refers to the next address or next instruction.
 
@@ -233,7 +235,7 @@ let xmms = Array.init 8 (fun i -> nv (Printf.sprintf "R_XMM%d" i) xmm_t)
 let st = Array.init 8 (fun i -> nv (Printf.sprintf "R_ST%d" i) st_t)
 
 let regs : var list =
-  ebp::esp::esi::edi::eip::eax::ebx::ecx::edx::eflags::cf::pf::af::zf::sf::oF::dflag::fs_base::gs_base::fpu_ctrl::mxcsr::
+  ebp::esp::esi::edi::eip::eax::ebx::ecx::edx::eflags::cf::pf::af::zf::sf::oF::dflag::fs_base::gs_base::cs::ds::es::fs::gs::ss::fpu_ctrl::mxcsr::
   List.map (fun (n,t) -> Var.newvar n t)
     [
 
@@ -436,7 +438,9 @@ let bits2reg32 = function
 
 let bits2xmm b = xmms.(b)
 
-and reg2bits r = Util.list_firstindex [eax; ecx; edx; ebx; esp; ebp; esi; edi] ((==)r)
+and reg2bits r =
+  let (i,_) = BatList.findi (fun _ x -> x == r) [eax; ecx; edx; ebx; esp; ebp; esi; edi] in
+  i
 
 let bits2segreg = function
   | 0 -> es
@@ -539,18 +543,43 @@ let op2e_s ss t = function
   | Oimm i -> Int(Arithmetic.to_big_int (big_int_of_int64 i,t), t)
 
 let assn_s s t v e =
+  (* Assign to some bits of v, starting at bit off, while preserving the other bits *)
+  let sub_assn ?(off=0) t v e =
+    let concat_exps = ref [] in
+    let bits = Typecheck.bits_of_width (Var.typ v) in
+    let assnbits = Typecheck.bits_of_width t in
+
+    (* Add the upper preserved bits, if any *)
+    let ubh = bi (bits-1) and ubl = bi (assnbits+off) in
+    if ubh > ubl then
+      concat_exps := extract ubh ubl (Var v)::!concat_exps;
+
+    (* Add e *)
+    concat_exps := e::!concat_exps;
+
+    (* Add the lower preserved bits, if any *)
+    let lbh = bi (off-1) and lbl = bi0 in
+    if lbh > lbl then
+      concat_exps := extract lbh lbl (Var v)::!concat_exps;
+
+    let final_e = BatList.reduce (fun big_e e -> Ast_convenience.concat e big_e) !concat_exps in
+    move v final_e
+  in
   match v with
   | Oreg r when t = r128 -> move (bits2xmm r) e
+  | Oreg r when t = r64 ->
+    let v = bits2xmm r in
+    sub_assn t v e
   | Oreg r when t = r32 -> move (bits2reg32 r) e
   | Oreg r when t = r16 ->
     let v = bits2reg32 r in
-    move v ((Var v &* l32 0xffff0000L) |* cast_unsigned r32 e)
+    sub_assn t v e
   | Oreg r when t = r8 && r < 4 ->
     let v = bits2reg32 r in
-    move v ((Var v &* l32 0xffffff00L) |* cast_unsigned r32 e)
+    sub_assn t v e
   | Oreg r when t = r8 ->
     let v = bits2reg32 (r land 3) in
-    move v ((Var v &* l32 0xffff00ffL) |* (cast_unsigned r32 e <<* i32 8))
+    sub_assn ~off:8 t v e
   | Oreg _ -> unimplemented "assignment to sub registers"
   | Oseg r when t = r16 ->
     let v = bits2segreg r in
@@ -725,7 +754,6 @@ let rec to_ir addr next ss pref =
       let index = cast_unsigned r32 (extract (biconst 15) bi4 e) <<* i32 6 in
       (* Load the table entry *)
       let table_entry = loadm mem reg_64 (base +* index) in
-      let tev = nt reg_64 "table_entry" in
       (* Extract the base *)
       concat_explist
         (BatList.enum
@@ -736,8 +764,8 @@ let rec to_ir addr next ss pref =
     in
     let bs =
       let dst_e = op2e t dst in
-      if dst = o_fs then [move fs_base (base_e dst_e)]
-      else if dst = o_gs then [move gs_base (base_e dst_e)]
+      if dst = o_fs && !compute_segment_bases then [move fs_base (base_e dst_e)]
+      else if dst = o_gs && !compute_segment_bases then [move gs_base (base_e dst_e)]
       else []
     in
     assn t dst c_src
@@ -2211,11 +2239,15 @@ let parse_instr g addr =
       let b2 = Char.code (g na) and na = s na in
       match b2 with (* Table A-3 *)
       | 0x1f -> (Nop, na)
-      | 0x28 | 0x29 | 0x6e | 0x7e | 0x6f | 0x7f | 0xd6 ->
+      | 0x12 | 0x13 | 0x28 | 0x29 | 0x6e | 0x7e | 0x6f | 0x7f | 0xd6 ->
         (* XXX: Clean up prefixes.  This will probably require some
-           effort understaind the manual. We probably don't do the
-           right thing on weird cases (too many prefixes set). *)
+           effort studying the manual. We probably don't do the right
+           thing on weird cases (too many prefixes set). *)
         let t, name, align, tsrc, tdest = match b2 with
+          | 0x12 | 0x13 when prefix.opsize_override ->
+            r128, "movlpd", false, r64, r64
+          | 0x12 | 0x13 when not prefix.opsize_override ->
+            r128, "movlps", false, r64, r64
           | 0x28 | 0x29 when prefix.opsize_override ->
 	    r128, "movapd", true, r128, r128
           | 0x28 | 0x29 when not prefix.opsize_override -> 
@@ -2232,8 +2264,8 @@ let parse_instr g addr =
         in
 	let r, rm, na = parse_modrm32 na in
 	let s, d = match b2 with
-          | 0x6f | 0x6e | 0x28 -> rm, r
-          | 0x7f | 0x7e | 0x29 | 0xd6 -> r, rm
+          | 0x12 | 0x6f | 0x6e | 0x28 -> rm, r
+          | 0x13 | 0x7f | 0x7e | 0x29 | 0xd6 -> r, rm
 	  | _ -> disfailwith 
 	    (Printf.sprintf "impossible mov(a/d) condition: %02x" b2)
         in
@@ -2241,12 +2273,12 @@ let parse_instr g addr =
       | 0x31 -> (Rdtsc, na)
       | 0x34 -> (Sysenter, na)
       | 0x38 when prefix.opsize_override ->
-          let b2 = Char.code (g na) and na = s na in
-          (match b2 with
-            | 0x17 ->
-              let d, s, na = parse_modrm32 na in
-              (Ptest(r128, d, s), na)
-            | _ -> disfailwith (Printf.sprintf "opcode missing: %02x" b2))
+        let b2 = Char.code (g na) and na = s na in
+        (match b2 with
+        | 0x17 ->
+          let d, s, na = parse_modrm32 na in
+          (Ptest(r128, d, s), na)
+        | _ -> disfailwith (Printf.sprintf "opcode missing: %02x" b2))
       | 0x3a ->
         let b3 = Char.code (g na) and na = s na in
         (match b3 with

@@ -206,11 +206,11 @@ let gclhelp_of_astcfg ?entry ?exit cfg =
       (* dprintf "done skip town"; *)
       match s with
       | CAssign b -> Some b
-      | CSeq l -> Util.list_existssome find_first_h l
+      | CSeq l -> Util.list_find_option find_first_h l
       | CChoice _ -> failwith "shouldn't ever get here tnh9rh203"
       | Cunchoice _ -> failwith "shouldn't ever get here tnh982h9o"
     in
-    Util.option_unwrap (find_first_h s)
+    BatOption.get (find_first_h s)
   in
     (* find cjmp in a block. assumes it is the last statement in the
        block *)
