@@ -40,10 +40,8 @@ let rtype2s = function
 
 let rec node2s = function
   | BBlock b -> Cfg.bbid_to_string b
-  | Region(rt, b::_) -> node2s b ^ "'"
-  | Region _ -> failwith "eep, empty region?"
-
-let nodes2s nodes = String.concat ", " (List.map node2s nodes)
+  | Region(rt, l) -> rtype2s rt ^ "(" ^ nodes2s l ^ ")"
+and nodes2s nodes = String.concat ", " (List.map node2s nodes)
 
 module G = Graph.Imperative.Digraph.ConcreteBidirectional(Node)
 module PC = Graph.Path.Check(G)
@@ -78,7 +76,7 @@ let find_backedges g entry =
     )
   in
   dfs entry entry;
-  found
+  Hashtbl.fold (fun k _ l -> k::l) found []
 
 let structural_analysis c =
   let () = Checks.connected_astcfg c "structural_analysis" in
@@ -209,34 +207,16 @@ let structural_analysis c =
     | [] -> failwith "structural_analysis: cyclic_region_type: nset cannot be empty"
   in
   let get_reachunder g n =
-(* HERP DERP
     (* This is terribly unoptimized *)
     let module PC = Graph.Path.Check(G) in
-    let module Op = Graph.Oper.I(G) in
-    (*let gm = Op.mirror (G.copy g) in*)
-    (* let backedges = find_backedges g !entry in *)
-    let path = PC.check_path (PC.create g) in
-    (*let is_backedge a b =
-      (* FIXME: There's a better way to check for backedgeness, isn't there?. *)
-      (* Hashtbl.mem backedges (a,b) *)
-      path b a
-    in*)
-    let _ = dprintf "get_reachunder: %s original backpreds: %s" (node2s n) (nodes2s (G.succ g n)) in
-    let backpreds = List.filter (fun p -> path p n) (G.succ g n) in
-    dprintf "preds: %s" (nodes2s (G.pred g n));
-    Hashtbl.iter (fun (a,b) _ -> dprintf "node: %s -> %s" (node2s a) (node2s b)) backedges;
-    dprintf "get_reachunder: %s backpreds: %s" (node2s n) (nodes2s backpreds);
+    let backedges = find_backedges g !entry in
+    let backedges = List.filter (fun (_,d) -> d = n) backedges in
+    let backpreds = List.map (fun (p,_) -> p) backedges in
+    dprintf "backpreds: %s" (nodes2s backpreds);
     let g' = G.copy g in
+    let () = G.remove_vertex g' n in
     let path = PC.check_path (PC.create g') in
-    G.remove_vertex g' n;
     n :: G.fold_vertex (fun m l -> if List.exists (fun k -> path m k) backpreds then m::l else l) g' []
-*)
-    let path = PC.check_path (PC.create g) in
-    let seesMe = n :: G.fold_vertex (fun m l -> if (path m n) then m::l else l) g [] in
-    let iSee   = G.fold_vertex (fun m l -> if (path n m) then m::l else l) g [] in
-    let sect   = List.filter (fun x -> List.mem x seesMe) iSee in
-    dprintf "get_reachunder HERP DERP: %s\n" (nodes2s sect);
-    sect
   in
 
   let rec doit () =
@@ -247,6 +227,7 @@ let structural_analysis c =
     while G.nb_vertex g > 1 && !post_ctr < G.nb_vertex g
     do
       let n = post.(!post_ctr) in
+      dprintf "Checking %s" (node2s n);
       match acyclic_region_type g n with
       | Some(rtype, nodeset) ->
 	  let p = reduce g rtype nodeset in

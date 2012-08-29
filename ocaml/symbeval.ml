@@ -634,27 +634,27 @@ end
 module BuildMemLPrinters(F:Foldable) =
 struct
   let print_values delta =
-    pdebug "contents of variables" ;
+    print_endline "contents of variables" ;
     F.fold
       delta
       (fun k v () ->
   	 match k,v with
   	   | var,Symbolic e ->
-               pdebug ((Pp.var_to_string var) ^ " = " ^ (Pp.ast_exp_to_string e))
+               print_endline ((Pp.var_to_string var) ^ " = " ^ (Pp.ast_exp_to_string e))
   	   | _ -> ()
       ) ()
 
   let print_mem delta =
-    pdebug "contents of memories" ;
+    print_endline "contents of memories" ;
     F.fold
       delta
       (fun k v () ->
   	 match k,v with
   	   | var, ConcreteMem(mem,_) ->
-               pdebug ("memory " ^ (Var.name var)) ;
+               print_endline ("memory " ^ (Var.name var)) ;
                AddrMap.iter
   		 (fun i v ->
-  		    pdebug((Printf.sprintf "%Lx" i)
+  		    print_endline((Printf.sprintf "%Lx" i)
   			   ^ " -> " ^ (Pp.ast_exp_to_string v))
   		 )
   		 mem
@@ -669,7 +669,7 @@ struct
   	   | Symbolic e ->
   	       let varname = Var.name var in
   		 if varname = name then
-  		   pdebug (varname ^ " = "
+  		   print_endline (varname ^ " = "
   			   ^ (Pp.ast_exp_to_string e))
   	   | _ -> ()
       ) ()
