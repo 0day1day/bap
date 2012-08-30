@@ -399,7 +399,7 @@ struct
                 v2
 	      else
 		(* var is still free; we can't use the evaluated version *)
-		Symbolic(l)
+		Symbolic(Let(var, v1, v2'))
             | Symbolic _ ->
               (* The above situation cannot occur if we are doing full
                  substitution, so we do not need to do the freevars
