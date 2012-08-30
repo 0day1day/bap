@@ -256,52 +256,56 @@ let post = Memory2array.coerce_exp_state ~scope m2a_state post
 let cfg = Cfg_ast.of_prog prog
 let cfg = Prune_unreachable.prune_unreachable_ast cfg
 
+let () = print_endline "Computing predicate..."
 let (wp, foralls) = !compute_wp cfg post
 
 ;;
 match !irout with
 | None -> ()
 | Some oc ->
-    let p = new Pp.pp_oc oc in
-    let () = p#ast_exp wp in
-    p#close
+  let () = print_endline "Printing predicate as BAP expression" in
+  let p = new Pp.pp_oc oc in
+  let () = p#ast_exp wp in
+  p#close
 ;;
 match !stpout with
 | None -> ()
 | Some oc ->
-    let foralls = List.map (Memory2array.coerce_rvar_state ~scope m2a_state) foralls in 
-    let pp = (((!solver)#printer) :> Formulap.fppf) in
-    let p = pp ~suffix:!suffix oc in
-    if !assert_vars then (
-      let (vars,wp') = extract_vars wp in
-      List.iter (fun (v,e) -> p#assert_ast_exp (BinOp(EQ, Var v, e))) vars;
-      if !sat then
-        p#assert_ast_exp_with_foralls foralls wp'
-      else
-        p#valid_ast_exp ~foralls wp'
-    )
-    else (
-      if !sat then
-        p#assert_ast_exp_with_foralls foralls wp
-      else
-        p#valid_ast_exp ~foralls wp
-    );
-    p#counterexample;
-    p#close;
-    if !solve then (
-      Printf.fprintf stderr "Solving\n"; flush stderr;
-      let r = (!solver)#solve_formula_file ~printmodel:true !stpoutname in
-      Printf.fprintf stderr "Solve result: %s\n" (Smtexec.result_to_string r))
+  let () = print_endline "Printing predicate as SMT formula" in
+  let foralls = List.map (Memory2array.coerce_rvar_state ~scope m2a_state) foralls in 
+  let pp = (((!solver)#printer) :> Formulap.fppf) in
+  let p = pp ~suffix:!suffix oc in
+  if !assert_vars then (
+    let (vars,wp') = extract_vars wp in
+    List.iter (fun (v,e) -> p#assert_ast_exp (BinOp(EQ, Var v, e))) vars;
+    if !sat then
+      p#assert_ast_exp_with_foralls foralls wp'
+    else
+      p#valid_ast_exp ~foralls wp'
+  )
+  else (
+    if !sat then
+      p#assert_ast_exp_with_foralls foralls wp
+    else
+      p#valid_ast_exp ~foralls wp
+  );
+  p#counterexample;
+  p#close;
+  if !solve then (
+    Printf.fprintf stderr "Solving\n"; flush stderr;
+    let r = (!solver)#solve_formula_file ~printmodel:true !stpoutname in
+    Printf.fprintf stderr "Solve result: %s\n" (Smtexec.result_to_string r))
 
 ;;
 match !pstpout with
 | None -> ()
 | Some oc ->
-    let foralls = List.map (Memory2array.coerce_rvar_state m2a_state) foralls in 
-    let pp = (((!solver)#printer) :> Formulap.fppf) in
-    let p = pp ~suffix:!suffix oc in
-	p#forall foralls;
-	p#ast_exp wp;
-	p#close
+  let () = print_endline "Printing predicate as SMT formula" in
+  let foralls = List.map (Memory2array.coerce_rvar_state m2a_state) foralls in 
+  let pp = (((!solver)#printer) :> Formulap.fppf) in
+  let p = pp ~suffix:!suffix oc in
+  p#forall foralls;
+  p#ast_exp wp;
+  p#close
 ;;
 

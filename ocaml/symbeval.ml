@@ -503,8 +503,9 @@ struct
   let eval state =
     try
       let stmt = inst_fetch state.sigma state.pc in
-	(*pdebug (Pp.ast_stmt_to_string stmt) ; *)
-	eval_stmt state stmt
+      dprintf "Executing %s" (Pp.ast_stmt_to_string stmt);
+      (*pdebug (Pp.ast_stmt_to_string stmt) ; *)
+      eval_stmt state stmt
     with Failure str ->
       (prerr_endline ("Evaluation aborted at stmt No-"
                       ^(Int64.to_string state.pc)
