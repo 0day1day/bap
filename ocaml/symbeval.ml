@@ -251,7 +251,7 @@ struct
     Hashtbl.clear state.sigma ;
     Hashtbl.clear state.lambda ;
     (* Initializing Sigma and Lambda *)
-    ignore
+    let pc =
       (List.fold_left
          (fun pc s ->
           Hashtbl.add state.sigma pc s ;
@@ -260,7 +260,9 @@ struct
                | _ -> ()
             ) ;
             Int64.succ pc
-         ) state.pc prog_stmts )
+         ) state.pc prog_stmts) in
+    (* Add a halt to the end of the program *)
+    Hashtbl.add state.sigma pc (Halt(exp_true, []))
 
   let cleanup_delta state =
     state.delta <- MemL.clear state.delta
@@ -507,14 +509,18 @@ struct
       (prerr_endline ("Evaluation aborted at stmt No-"
                       ^(Int64.to_string state.pc)
                       ^"\nreason: "^str);
-       print_values state.delta;
-       print_mem state.delta;
-       print_endline ("Path predicate: "^(Pp.ast_exp_to_string (output_formula state.pred)));
+       if debug () then (print_values state.delta;
+                      print_mem state.delta);
+       (* print_endline ("Path predicate: "^(Pp.ast_exp_to_string (output_formula state.pred))); *)
        [])
       | Not_found ->
-	  (* The only way inst_fetch would fail is if pc falls off the end, right? *)
-	  wprintf "PC not found: %#Lx" state.pc;
-	  raise (Halted(None, state))
+        (prerr_endline ("Evaluation aborted at stmt No-"
+                        ^(Int64.to_string state.pc)
+                        ^"\nreason: "^(Printf.sprintf "PC not found: %#Lx" state.pc));
+         if debug () then (print_values state.delta;
+                        print_mem state.delta);
+         (* print_endline ("Path predicate: "^(Pp.ast_exp_to_string (output_formula state.pred))); *)
+         [])
 
   (** Evaluate as long as there is exactly one choice of state.
 
@@ -748,7 +754,7 @@ struct
 	  (try AddrMap.find (normalize i t) m
 	   with Not_found ->
              failwith (Printf.sprintf "Uninitialized memory found at %s" (Pp.ast_exp_to_string index))
-	     (*Int(bi0, reg_8)*)
+	     (* Int(bi0, reg_8) *)
 	  )
       | _ -> failwith "Symbolic memory or address in concrete evaluation"
 

@@ -288,10 +288,10 @@ match !stpout with
     );
     p#counterexample;
     p#close;
-    if !solve then
+    if !solve then (
       Printf.fprintf stderr "Solving\n"; flush stderr;
       let r = (!solver)#solve_formula_file ~printmodel:true !stpoutname in
-      Printf.fprintf stderr "Solve result: %s\n" (Smtexec.result_to_string r)
+      Printf.fprintf stderr "Solve result: %s\n" (Smtexec.result_to_string r))
 
 ;;
 match !pstpout with
