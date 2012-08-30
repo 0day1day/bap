@@ -373,8 +373,8 @@ struct
 	    let delta' = copy delta in (* FIXME: avoid copying *)
 	    let delta' = update_var delta' var v1 in
 	    let v2 = eval_expr delta' e2 in
-	    (match v2 with
-	    | Symbolic v2' when not eval_symb_let ->
+	    (match v1, v2 with
+	    | Symbolic v1', Symbolic v2' when not eval_symb_let ->
 	      (* So, this is a little subtle.  Consider what happens if
 	         we have let x = 1 in let foo = freevar in x. We would
 	         evaluate let foo = freevar in x in the context where x
@@ -399,14 +399,14 @@ struct
                 v2
 	      else
 		(* var is still free; we can't use the evaluated version *)
-		Symbolic(Let(var, v1, v2'))
-            | Symbolic _ ->
+		Symbolic(Let(var, v1', v2'))
+            | Symbolic _, Symbolic _ ->
               (* The above situation cannot occur if we are doing full
                  substitution, so we do not need to do the freevars
                  check.  This is good, since expressions are very large
                  when performing full substitution! *)
               v2
-	    | ConcreteMem _ -> v2)
+	    | _, _ -> v2)
       | Load (mem,ind,endian,t) ->
 	(match t with
 	| Reg 8 ->
