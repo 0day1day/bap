@@ -99,7 +99,7 @@ let speclist =
 	  Arg.Set_string maddr; Arg.Set_string mval;
 	  Arg.Unit (fun () -> mapmem !maddr !mval)
 	]),
-     "<var> <expression> Set variable to expression before evaluation.")
+     "<addr expression> <value expression> Set variable to expression before evaluation.")
   :: Input.speclist
 
 let anon x = raise(Arg.Bad("Unexpected argument: '"^x^"'"))
