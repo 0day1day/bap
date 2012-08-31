@@ -65,7 +65,9 @@ object (self)
   method declare_new_freevars e =
     opn 0;
     pp "% free variables:"; force_newline();
+    dprintf "Computing freevars...";
     let fvs = Formulap.freevars e in 
+    dprintf "... done";
     List.iter (fun v -> if not(VH.mem ctx v) then self#decl v) fvs;
     pp "% end free variables."; force_newline();
     cls()

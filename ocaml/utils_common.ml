@@ -32,10 +32,17 @@ let optimize_cfg ?(usedc=true) ?(usesccvn=true) cfg post =
   let cfg = Cfg_ssa.to_astcfg cfg in
   (cfg, p);;
 
-let to_ssagcl ?(usedc=true) ?(usesccvn=true) cfg post =
-  let cfg, p = optimize_cfg ~usedc ~usesccvn cfg post in
+let to_ssagcl cfg post =
   let gcl = Gcl.of_astcfg cfg in
-  (gcl, p);;
+  (gcl, post);;
+
+let to_ssapassgcl cfg post =
+  let (gcl, _) = Gcl.passified_of_ssa cfg in
+  (gcl, post)
+
+let to_ugcl passify cfg post =
+  let gcl = Ugcl.of_ssacfg ~passify:passify cfg in
+  (gcl, post)
 
 let stream_concrete ?(tag = "") mem_hash concrete_state block =
   let block = Memory2array.coerce_prog_state mem_hash block in

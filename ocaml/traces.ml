@@ -1432,7 +1432,6 @@ let concrete_rerun file stmts =
 
 (* A quick and dirty way to estimate the formula size *)
 let formula_size formula =
-  let _max n1 n2 = if n1 > n2 then n1 else n2 in
   let (+) = Int64.add in
   let rec size = function
     | Ast.Ite(_,e1,e2) -> Int64.one + (size e1) + (size e2)

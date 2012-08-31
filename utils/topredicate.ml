@@ -1,12 +1,14 @@
 open Ast
 open Grammar_scope
 open Type
+open Vc
 open Utils_common
 
 let usage = "Usage: "^Sys.argv.(0)^" <input options> [-o output]\n\
              Translate programs to the IL. "
 
 let fast_fse = ref false
+let options = ref Vc.default_options
 let irout = ref(Some stdout)
 let post = ref "true"
 let stpout = ref None
@@ -17,103 +19,13 @@ let assert_vars = ref false
 let usedc = ref true
 let usesccvn = ref true
 let solve = ref false
-let dwpcf = ref true
-let sat = ref true
+(* let dwpcf = ref true *)
+(* let sat = ref true *)
 
 (* Select which solver to use *)
 let solver = ref (Smtexec.STP.si);;
 
-let compute_dwp1 cfg post =
-  let (gcl, foralls, tossa) = Gcl.passified_of_astcfg cfg in
-  let p = rename_astexp tossa post in
-  let (moreforalls, wp) = Wp.dwp_1st gcl p in
-  (wp, moreforalls@foralls)
-
-
-let to_ssapassgcl cfg post =
-  let cfg = Hacks.remove_cycles cfg in
-  let cfg = Coalesce.coalesce_ast cfg in
-  let {Cfg_ssa.cfg=cfg; to_ssavar=tossa} = Cfg_ssa.trans_cfg cfg in
-  let p = rename_astexp tossa post in
-  let cfg =
-    let vars = Formulap.freevars p in
-    Ssa_simp.simp_cfg ~liveout:vars ~usedc:!usedc ~usesccvn:!usesccvn cfg
-  in
-  let (gcl, _) = Gcl.passified_of_ssa cfg in
-  (gcl, p)
-
-let to_ugcl passify cfg post =
-  let cfg = Hacks.remove_cycles cfg in
-  let cfg = Coalesce.coalesce_ast cfg in
-  let {Cfg_ssa.cfg=cfg; to_ssavar=tossa} = Cfg_ssa.trans_cfg cfg in
-  let p = rename_astexp tossa post in
-  let cfg =
-    let vars = Formulap.freevars p in
-    Ssa_simp.simp_cfg ~liveout:vars ~usedc:!usedc ~usesccvn:!usesccvn cfg
-  in
-  let gcl = Ugcl.of_ssacfg ~passify:passify cfg in
-  (gcl, p)
-
-let compute_wp_boring cfg post =
-  let (gcl, post) = to_ssagcl ~usedc:!usedc ~usesccvn:!usesccvn cfg post in
-  (Wp.wp gcl post, [])
-
-let compute_uwp_boring cfg post =
-  let (ugcl, p) = to_ugcl false cfg post in
-  (Wp.uwp ugcl p, [])
-
-let compute_uwp_passify cfg post =
-  let (ugcl, p) = to_ugcl true cfg post in
-  (Wp.efficient_uwp ugcl p, [])
-
-let compute_dwp ?(k=1) cfg post =
-  let (gcl,p) = to_ssapassgcl cfg post in
-  (Wp.dwp ~k gcl p, [])
-
-let compute_flanagansaxe ?(k=1) cfg post =
-  let (gcl,p) = to_ssapassgcl cfg post in
-  (Wp.flanagansaxe ~k gcl !sat p, [])
-
 (* DWP paper *)
-let sat_or_valid () = if !sat then Efse.Assign.Sat else Efse.Assign.Validity
-
-let compute_fse_unpass cfg post =
-  let cfg, post = optimize_cfg ~usedc:!usedc ~usesccvn:!usesccvn cfg post in
-  let efse = Efse.of_astcfg cfg in
-  (Efse.fse_unpass ~cf:!dwpcf efse post, [])
-
-let compute_fse_pass cfg post =
-  let cfg, post = optimize_cfg ~usedc:!usedc ~usesccvn:!usesccvn cfg post in
-  let (efse, tossa) = Efse.passified_of_astcfg cfg in
-  let post = rename_astexp tossa post in
-  (Efse.fse_pass ~cf:!dwpcf efse post (sat_or_valid ()), [])
-
-let compute_efse_pass cfg post =
-  let cfg, post = optimize_cfg ~usedc:!usedc ~usesccvn:!usesccvn cfg post in
-  let (efse, tossa) = Efse.passified_of_astcfg cfg in
-  let post = rename_astexp tossa post in
-  (Efse.efse ~cf:!dwpcf efse post (sat_or_valid ()), [])
-
-let compute_efse_mergepass cfg post =
-  let cfg, post = optimize_cfg ~usedc:!usedc ~usesccvn:!usesccvn cfg post in
-  let (efse, tossa) = Efse.passified_of_astcfg cfg in
-  let post = rename_astexp tossa post in
-  (Efse.efse_merge1 ~cf:!dwpcf efse post (sat_or_valid ()), [])
-
-let compute_efse_lazypass cfg post =
-  let cfg, post = optimize_cfg ~usedc:!usedc ~usesccvn:!usesccvn cfg post in
-  let (efse, tossa) = Efse.passified_of_astcfg cfg in
-  let post = rename_astexp tossa post in
-  (Efse.efse_lazy ~cf:!dwpcf efse post (sat_or_valid ()), [])
-
-(* let compute_efse_feaspass cfg post = *)
-(*   let cfg, post = optimize_cfg ~usedc:!usedc ~usesccvn:!usesccvn cfg post in *)
-(*   let (efse, tossa) = Efse.passified_of_astcfg cfg in *)
-(*   let post = rename_astexp tossa post in *)
-(*   (Efse.efse_feas ~cf:!dwpcf efse post, []) *)
-
-(* end DWP paper *)
-
 let extract_vars e =
   let rec h v = function
     | BinOp(AND, BinOp(EQ,Var v1, e1), BinOp(EQ,Var v2, e2)) ->
@@ -135,31 +47,6 @@ let extract_vars e =
   match h [] e with
   | (v, Some e) -> (v,e)
   | (v, None) -> (v, exp_true)
-
-
-let compute_fse_bfs cfg post =
-  (* FIXME: avoid converting to cfg *)
-  let ast = Cfg_ast.to_prog cfg in
-  let bfs = if !fast_fse then Symbeval_search.bfs_ast_program_fast
-            else Symbeval_search.bfs_ast_program
-  in
-  (bfs ast post, [])
-
-let compute_fse_bfs_maxdepth i cfg post =
-  (* FIXME: avoid converting to cfg *)
-  let ast = Cfg_ast.to_prog cfg in
-  let bfs = if !fast_fse then Symbeval_search.bfs_maxdepth_ast_program_fast
-            else Symbeval_search.bfs_maxdepth_ast_program
-  in
-  (bfs i ast post, [])
-
-let compute_fse_maxrepeat i cfg post =
-  (* FIXME: avoid converting to cfg *)
-  let ast = Cfg_ast.to_prog cfg in
-  let maxrepeat = if !fast_fse then Symbeval_search.maxrepeat_ast_program_fast
-            else Symbeval_search.maxrepeat_ast_program
-  in
-  (maxrepeat i ast post, [])
 
 let set_solver s =
   solver := try Hashtbl.find Smtexec.solvers s
@@ -257,7 +144,7 @@ let cfg = Cfg_ast.of_prog prog
 let cfg = Prune_unreachable.prune_unreachable_ast cfg
 
 let () = print_endline "Computing predicate..."
-let (wp, foralls) = !compute_wp cfg post
+let (wp, foralls) = !compute_wp !options cfg post
 
 ;;
 match !irout with
