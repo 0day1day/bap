@@ -123,6 +123,10 @@ let conc2symb memory v =
 	      (fun k v m -> Store (m,Int(big_int_of_int64 k,reg_32),v,exp_false,reg_8))
 	      memory init)
 
+let varval_to_exp = function
+  | Symbolic e -> e
+  | ConcreteMem (m,v) -> symb_to_exp (conc2symb m v)
+
 (* Normalize a memory address, setting high bits to 0. *)
 let normalize i t = int64_of_big_int (Arithmetic.to_big_int (i,t))
 
@@ -230,6 +234,7 @@ struct
   let lookup_var        = MemL.lookup_var
   let update_var	= MemL.update_var
   let update_mem        = MemL.update_mem
+  let remove_var	= MemL.remove_var
   let lookup_mem        = MemL.lookup_mem
   let assign            = Assign.assign
   let copy              = MemL.copy
@@ -359,7 +364,7 @@ struct
 	      let e' = concrete_val_tuple v in
 	      let (n',t') = Arithmetic.cast ct e' t in
 		Symbolic (Int (n',t'))
-      | Let (var,e1,e2) as l ->
+      | Let (var,e1,e2) ->
 	(* Consider let v=e in e+e+e+e+e+e+e+e+e+e+e+e+e+e+e. If e
 	   is not concrete, this could lead to a huge blowup.
 
@@ -367,46 +372,55 @@ struct
            stops us from doing substitution in this case.  *)
 
 	  let v1 = eval_expr delta e1 in
-	  if is_symbolic v1 && not eval_symb_let then
-            Symbolic(l)
-	  else
+          if eval_symb_let then
 	    let delta' = copy delta in (* FIXME: avoid copying *)
 	    let delta' = update_var delta' var v1 in
 	    let v2 = eval_expr delta' e2 in
-	    (match v1, v2 with
-	    | Symbolic v1', Symbolic v2' when not eval_symb_let ->
-	      (* So, this is a little subtle.  Consider what happens if
-	         we have let x = 1 in let foo = freevar in x. We would
-	         evaluate let foo = freevar in x in the context where x
-	         is mapped to 1.  However, since freevar is a symbolic
-	         expression, we would not evaluate it further if
-	         eval_symb_let = false, and would return the evaluation
-	         expression let foo = freevar in x.  However, this is
-	         incorrect, because we are removing the Let binding for
-	         x!  We should really wrap any free variable with a Let
-	         binding to its current value in the context.
+            v2
+          else (
+          (* Partial evaluation is difficult.  If v1 is symbolic, we
+             will make no attempt to get rid of the Let binding.
+             Instead, we will evaluate e and e', keeping the Let
+             binding in place.
 
-	         Unfortunately, the way that lookup_var is implemented
-	         does not make it easy to know whether a variable is
-	         really defined or not.  (In traces, we return 0
-	         whenever we see an unknown variable, for instance.) So,
-	         as a stopgap measure, if var is free in v2, we return
-	         the original expression. *)
-	      let fvars = Formulap.freevars v2' in
-	      let isvar = (fun v -> not (Var.equal v var)) in
-	      if List.for_all isvar fvars then
-		(* var is not free! We are good to go *)
-                v2
-	      else
-		(* var is still free; we can't use the evaluated version *)
-		Symbolic(Let(var, v1', v2'))
-            | Symbolic _, Symbolic _ ->
-              (* The above situation cannot occur if we are doing full
-                 substitution, so we do not need to do the freevars
-                 check.  This is good, since expressions are very large
-                 when performing full substitution! *)
-              v2
-	    | _, _ -> v2)
+             If v1 is concrete, however, we can get rid of the Let
+             binding altogether, but only if var is not free in the
+             evaluated e'. This can happen if we have let x = 1 in let
+             foo = freevar in x.  We would evaluate let foo = freevar
+             in x in the context where x is mapped to 1.  However,
+             since freevar is a symbolic expression, we would not
+             evaluate it further if eval_symb_let = false, and would
+             return the evaluation expression let foo = freevar in x.
+             However, this is incorrect, because we are removing the
+             Let binding for x!  We should really wrap any free
+             variable with a Let binding to its current value in the
+             context.
+          *)
+
+            if is_symbolic v1 then
+	      let delta' = copy delta in (* FIXME: avoid copying *)
+              (* Remove so we don't expand references to var in delta *)
+	      let delta' = remove_var delta' var in
+	      let v2 = eval_expr delta' e2 in
+              let v1' = varval_to_exp v1 in
+              let v2' = varval_to_exp v2 in
+              Symbolic(Let(var, v1', v2'))
+            else (* v1 is concrete, do substitution *)
+	      let delta' = copy delta in (* FIXME: avoid copying *)
+	      let delta' = update_var delta' var v1 in
+	      let v2 = eval_expr delta' e2 in
+              match v2 with
+              | Symbolic v2' ->
+	        let fvars = Formulap.freevars v2' in
+	        let isvar = (fun v -> not (Var.equal v var)) in
+	        if List.for_all isvar fvars then
+		  (* var is not free! We can get rid of the Let. *)
+                  v2
+	        else
+		(* var is free in e2; we need to add the binding back *)
+                  let v1' = varval_to_exp v1 in
+		  Symbolic(Let(var, v1', v2'))
+              | ConcreteMem _ -> v2)
       | Load (mem,ind,endian,t) ->
 	(match t with
 	| Reg 8 ->
@@ -511,7 +525,7 @@ struct
     try
       let stmt = inst_fetch state.sigma state.pc in
       dprintf "Executing %s" (Pp.ast_stmt_to_string stmt);
-      (*pdebug (Pp.ast_stmt_to_string stmt) ; *)
+      if debug () then print_values state.delta;
       eval_stmt state stmt
     with Failure str ->
       (prerr_endline ("Evaluation aborted at stmt No-"
