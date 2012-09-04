@@ -55,7 +55,7 @@ let set_solver s =
 
 let solvers = Hashtbl.fold (fun k _ s -> k ^ " " ^ s) Smtexec.solvers ""
 
-let vc = ref compute_wp_boring_gen
+let vc = ref compute_wp_gen
 
 let speclist =
   ("-o", Arg.String (fun f -> irout := Some(open_out f)),
@@ -80,11 +80,11 @@ let speclist =
      "Use 1st order efficient directionless weakest precondition")
   ::("-flanagansaxe", Arg.Unit(fun()-> vc := compute_flanagansaxe_gen),
      "Use Flanagan & Saxe's algorithm instead of the default WP.")
-  ::("-wp", Arg.Unit(fun()-> vc := compute_wp_boring_gen),
+  ::("-wp", Arg.Unit(fun()-> vc := compute_wp_gen),
      "Use Dijkstra's WP, except with let instead of substitution.")
-  ::("-uwp", Arg.Unit(fun()-> vc := compute_uwp_boring_gen),
+  ::("-uwp", Arg.Unit(fun()-> vc := compute_uwp_gen),
      "Use WP for Unstructured Programs")
-  ::("-uwpe", Arg.Unit(fun()-> vc := compute_uwp_passify_gen),
+  ::("-uwpe", Arg.Unit(fun()-> vc := compute_uwp_efficient_gen),
      "Use efficient WP for Unstructured Programs")
   ::("-fse-unpass-dwp-paper", Arg.Unit(fun () -> vc := compute_fse_unpass_gen),
      "Use inefficient FSE algorithm for unpassified programs in DWP paper.")

@@ -6,6 +6,8 @@
     @author Ed Schwartz
 *)
 
+(** {2 VC-specific Types} *)
+
 (** Various options that can modify the behavior of VC generation
     algorithms. *)
 type options = {
@@ -42,8 +44,6 @@ val vc_astcfg : t -> options -> Cfg.AST.G.t -> Ast.exp -> Ast.exp * Ast.var list
 (** [vc_ssacfg] is like [vc_astprog], but for SSA CFG programs. *)
 val vc_ssacfg : t -> options -> Cfg.SSA.G.t -> Ast.exp -> Ast.exp * Ast.var list
 
-(** {3 VC Algorithms} *)
-
 (** {2 DWP algorithms} *)
 
 (** DWP implementation that does not emit quantifiers. *)
@@ -63,18 +63,18 @@ val compute_flanagansaxe_gen : t
 
 (** Weakest precondition based on Dijkstra's GCL. Produces
     exponentially sized formulas. *)
-val compute_wp_boring : cfg_vc
-val compute_wp_boring_gen : t
+val compute_wp : cfg_vc
+val compute_wp_gen : t
 
 (** Unstructured Weakest Precondition that operates on a CFG-like
     representation. Produces exponentially sized formulas. *)
-val compute_uwp_boring : ssa_vc
-val compute_uwp_boring_gen : t
+val compute_uwp : ssa_vc
+val compute_uwp_gen : t
 
 (** Unstructured Weakest Precondition algorithm that uses
     passification. Output sub-exponentially sized formulas. *)
-val compute_uwp_passify : ssa_vc
-val compute_uwp_passify_gen : t
+val compute_uwp_efficient : ssa_vc
+val compute_uwp_efficient_gen : t
 
 (** {2 Experimental Efficient VC Generation Algorithms from DWP paper} *)
 
@@ -109,3 +109,9 @@ val compute_fse_bfs_maxdepth_gen : int -> t
     than [k] times. Produces exponentially sized formulas. *)
 val compute_fse_maxrepeat : int -> ast_vc
 val compute_fse_maxrepeat_gen : int -> t
+
+(** {2 All Supported VCs} *)
+
+(** A list of supported VCs.  VCs with parameters (like maxdepth) are
+    not included. *)
+val vclist : (string * t) list

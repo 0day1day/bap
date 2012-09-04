@@ -362,17 +362,15 @@ let passified_of_ssa ?entry ?exit cfg =
   let vars = ref [] in
   let rec convert_gcl g = 
     match g with
-      (* XXX: dwpimpl branch only change *)
-    | Assign(v,e) as s ->
+    | Assign(v,e) ->
       vars := v :: !vars;
-      (* Assume(exp_eq (Var v) e) *)
-      s
+      Assume(exp_eq (Var v) e)
     | Choice(a,b) ->
-	Choice(convert_gcl a, convert_gcl b)
+      Choice(convert_gcl a, convert_gcl b)
     | Seq(a,b) ->
-	Seq(convert_gcl a, convert_gcl b)
+      Seq(convert_gcl a, convert_gcl b)
     | Assume _ | Assert _ | Skip ->
-	g
+      g
   in
   let pgcl = convert_gcl gcl in
   (pgcl, list_unique !vars)

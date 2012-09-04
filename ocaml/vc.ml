@@ -57,20 +57,20 @@ let compute_dwp1 _ cfg post =
   (wp, moreforalls@foralls)
 let compute_dwp1_gen = SsaVc compute_dwp1
 
-let compute_wp_boring _ cfg post =
+let compute_wp _ cfg post =
   let gcl = Gcl.of_astcfg cfg in
   (Wp.wp gcl post, [])
-let compute_wp_boring_gen = CfgVc compute_wp_boring
+let compute_wp_gen = CfgVc compute_wp
 
-let compute_uwp_boring _ cfg post =
+let compute_uwp _ cfg post =
   let ugcl = Ugcl.of_ssacfg ~passify:false cfg in
   (Wp.uwp ugcl post, [])
-let compute_uwp_boring_gen = SsaVc compute_uwp_boring
+let compute_uwp_gen = SsaVc compute_uwp
 
-let compute_uwp_passify _ cfg post =
+let compute_uwp_efficient _ cfg post =
   let ugcl = Ugcl.of_ssacfg ~passify:true cfg in
   (Wp.efficient_uwp ugcl post, [])
-let compute_uwp_passify_gen = SsaVc compute_uwp_passify
+let compute_uwp_efficient_gen = SsaVc compute_uwp_efficient
 
 let compute_dwp {k=k} cfg post =
   let gcl, foralls = Gcl.passified_of_ssa cfg in
@@ -139,3 +139,18 @@ let compute_fse_maxrepeat i {full_subst=full_subst} ast post =
   in
   (maxrepeat i ast post, [])
 let compute_fse_maxrepeat_gen i = AstVc (compute_fse_maxrepeat i)
+
+let vclist =
+  ("dwp", compute_dwp_gen)
+  :: ("dwp1", compute_dwp1_gen)
+  :: ("flanagansaxe", compute_flanagansaxe_gen)
+  :: ("wp", compute_wp_gen)
+  :: ("uwp", compute_uwp_gen)
+  :: ("uwpe", compute_uwp_efficient_gen)
+  :: ("fse-unpass", compute_fse_unpass_gen)
+  :: ("fse-pass", compute_fse_pass_gen)
+  :: ("efse-pass", compute_efse_pass_gen)
+  :: ("efse-mergepass", compute_efse_mergepass_gen)
+  :: ("efse-lazypass", compute_efse_lazypass_gen)
+  :: ("fse-bfs", compute_fse_bfs_gen)
+  :: []
