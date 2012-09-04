@@ -45,7 +45,7 @@ val efficient_uwp :
 
 val flanagansaxe :
   ?simp:('a -> 'a) ->
-  ?less_duplication:bool -> ?k:int -> Gcl.t -> bool -> Ast.exp -> Ast.exp
+  ?less_duplication:bool -> ?k:int -> Gcl.t -> Ast.exp -> Ast.exp
 (** [flanagansaxe p q] computes [wp(p,q)] using Flanagan and Saxe's algorithm. *)
 
 (** {5 Directionless Weakest Precondition Algorithms} *)

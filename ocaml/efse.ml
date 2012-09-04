@@ -37,12 +37,13 @@ let unwrap_symb = function
 
 module Assign =
 struct
-  type mode = Sat | Validity
 
   let add_passive_assignment pi v e = function
-    | Sat ->
+    | Type.Foralls ->
+      failwith "Foralls formula mode unsupported"
+    | Type.Sat ->
       exp_and pi (exp_eq (Var v) e)
-    | Validity ->
+    | Type.Validity ->
       exp_implies (exp_eq (Var v) e) pi
 
   let add_passive_value pi v value =
@@ -135,7 +136,7 @@ sig
   (** Take the intersection of two deltas. When there are conflicting
       bindings for a variable, there will be no binding in the final
       delta for that variable. *)
-  val merge_super : t -> t -> exp -> exp -> Assign.mode -> t * exp * exp
+  val merge_super : t -> t -> exp -> exp -> Type.formula_mode -> t * exp * exp
   (** [merge_super d1 d2 pi1 pi2] returns a merged [d], and modified
       [pi1] and [pi2]. When there are conflicting bindings for a
       variable, there will be no binding in the final delta for that
@@ -297,7 +298,10 @@ struct
         let fse_f = fse_unpass delta pi_f (s2@tl) in
         Ast.exp_or fse_t fse_f
     in
-    fse_unpass (D.create ()) post p
+    (* For passified programs, pre=post, so we can set pi to post.
+       But not here, since the program is not passified. *)
+    let p = BatList.append p [Assert post] in
+    fse_unpass (D.create ()) exp_true p
 
 (** Inefficient fse algorithm for passified programs. *)
 let fse_pass ?(cf=true) p post mode =
@@ -343,7 +347,8 @@ let fse_pass ?(cf=true) p post mode =
         let fse_f = fse_pass delta pi_f (s2@tl) in
         Ast.exp_or fse_t fse_f)
   in
-  fse_pass (D.create ()) post p
+  let p = BatList.append p [Assert post] in
+  fse_pass (D.create ()) exp_true p
 
 (** Efficient fse algorithm for passified programs. *)
 let efse ?(cf=true) p pi mode =
@@ -502,16 +507,15 @@ let efse_lazy ?(cf=true) p pi mode =
   let module VH = Var.VarHash in
   let h = VH.create 1000 in
   let merged v =
-    VH.replace h v false
+    (* Be careful when v is in the post/pre-condition *)
+    if not (VH.mem h v) then
+      VH.replace h v false
+  (* Is v needed in formula *)
   and needed v =
     try VH.find h v
     with Not_found -> false
   and used v =
-    dprintf "%s is used!" (Pp.var_to_string v);
-    if VH.mem h v then (
-      dprintf "But is not merged";
-      VH.replace h v true
-    )
+    VH.replace h v true
   in
   let used_vars_in e =
     let v = object
@@ -586,12 +590,14 @@ let efse_lazy ?(cf=true) p pi mode =
         used_vars_in e;
         let delta1,pi_t = efse delta (lazy value_t) s1 in
         let delta2,pi_f = efse delta (lazy (Ast.exp_not value_t)) s2 in
+        dprintf "merge time";
         let mergedelta,badlist = D.merge delta1 delta2 in
         (* Mark each variable in badlist as needing to go in the formula *)
         List.iter merged badlist;
         let deltatl,pitl = efse mergedelta (lazy Ast.exp_true) tl in
         deltatl, lazy (Ast.exp_and (Ast.exp_and (Lazy.force pi) (Ast.exp_or (Lazy.force pi_t) (Lazy.force pi_f))) (Lazy.force pitl)))
   in
+  used_vars_in pi;
   let _,pi = efse (D.create ()) (lazy pi) p in
   Lazy.force pi
 

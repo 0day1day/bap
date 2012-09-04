@@ -390,7 +390,7 @@ let dwp_let ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (p:Gcl.t) =
   )
 *)
 
-let flanagansaxe ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (p:Gcl.t) sat =
+let flanagansaxe ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (p:Gcl.t) =
   let rec nw v = function
     | Assume e -> (e, exp_false, v)
     | Assert e ->
@@ -405,11 +405,7 @@ let flanagansaxe ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (p:Gcl.t) sat =
 	let (v,na) = variableify k v na in
 	let (nb,wb,v) = nw v b in
 	(exp_and na nb, exp_or wa (exp_and na wb), v)
-    (* | Assign _ -> failwith "gcl should be passified" *)
-    | Assign (v',e) -> if sat then
-        nw v (Assert (exp_eq (Var v') e))
-      else
-        nw v (Assume (exp_eq (Var v') e))
+    | Assign _ -> failwith "gcl should be passified"
     | Skip -> (exp_true, exp_false, v)
   in
   let (ns,ws,v) = nw [] p in

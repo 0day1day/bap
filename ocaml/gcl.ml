@@ -351,7 +351,7 @@ let rec remove_skips = function
 
 module C = Cfg.SSA
 
-let passified_of_ssa ?entry ?exit cfg =
+let passified_of_ssa ?entry ?exit mode cfg =
   let ast = Cfg_ssa.to_astcfg ~dsa:true cfg in
   let convert = function
     | Some v -> Some(CA.find_vertex ast (C.G.V.label v))
@@ -363,8 +363,11 @@ let passified_of_ssa ?entry ?exit cfg =
   let rec convert_gcl g = 
     match g with
     | Assign(v,e) ->
-      vars := v :: !vars;
-      Assume(exp_eq (Var v) e)
+      (match mode with
+      | Foralls -> vars := v :: !vars;
+        Assume(exp_eq (Var v) e)
+      | Validity -> Assume(exp_eq (Var v) e)
+      | Sat -> Assert(exp_eq (Var v) e))
     | Choice(a,b) ->
       Choice(convert_gcl a, convert_gcl b)
     | Seq(a,b) ->
@@ -376,12 +379,12 @@ let passified_of_ssa ?entry ?exit cfg =
   (pgcl, list_unique !vars)
 
 
-let passified_of_astcfg ?entry ?exit cfg =
+let passified_of_astcfg ?entry ?exit mode cfg =
   let {Cfg_ssa.cfg=ssa; to_ssavar=tossa} = Cfg_ssa.trans_cfg cfg in
   let convert = function
     | Some v -> Some(C.find_vertex ssa (CA.G.V.label v))
     | None -> None
   in
   let entry = convert entry and exit = convert exit in
-  let (g,v) = passified_of_ssa ?entry ?exit ssa in
+  let (g,v) = passified_of_ssa ?entry ?exit mode ssa in
   (g,v,tossa)

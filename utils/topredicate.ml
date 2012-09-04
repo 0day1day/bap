@@ -122,7 +122,7 @@ let speclist =
      "Perform sccvn on the SSA CFG.")
   ::("-solve", Arg.Unit (fun () -> solve := true),
      "Solve the generated formula.")
-  ::("-validity", Arg.Unit (fun () -> options := {!options with sat = false}),
+  ::("-validity", Arg.Unit (fun () -> options := {!options with mode = Type.Validity}),
      "Check validity rather than satisfiability.")
   :: Input.speclist
 
@@ -167,16 +167,22 @@ match !stpout with
   if !assert_vars then (
     let (vars,wp') = extract_vars wp in
     List.iter (fun (v,e) -> p#assert_ast_exp (BinOp(EQ, Var v, e))) vars;
-    if !options.sat then
+    (match !options with
+    | {mode=Sat} ->
       p#assert_ast_exp_with_foralls foralls wp'
-    else
+    | {mode=Validity} ->
       p#valid_ast_exp ~foralls wp'
+    | {mode=Foralls} ->
+      failwith "Foralls formula mode unsupported at this level")
   )
   else (
-    if !options.sat then
+    (match !options with
+    | {mode=Sat} ->
       p#assert_ast_exp_with_foralls foralls wp
-    else
+    | {mode=Validity} ->
       p#valid_ast_exp ~foralls wp
+    | {mode=Foralls} ->
+      failwith "Foralls formula mode unsupported at this level")
   );
   p#counterexample;
   p#close;

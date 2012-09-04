@@ -55,11 +55,13 @@ val of_ast : Ast.program -> t
 (* val remove_skips : t -> t *)
 
 val passified_of_ssa :
-  ?entry:Cfg.SSA.G.V.t -> ?exit:Cfg.SSA.G.V.t -> Cfg.SSA.G.t -> t * var list
+  ?entry:Cfg.SSA.G.V.t -> ?exit:Cfg.SSA.G.V.t -> Type.formula_mode -> Cfg.SSA.G.t -> t * var list
 (** [passified_of_ssa cfg] converts a SSA CFG [cfg] to a passified GCL
     program.  Passified GCL programs do not contain [Assign(v,e)]
-    statements.  Instead, all assignments [Assign(v,e)] are replaced with
-    [Assume(v == e)] statements.
+    statements.  Instead, all assignments [Assign(v,e)] are replaced
+    with [Assert(v == e)] or [Assume(v == e)] statements, depending on
+    whether the formula will be evaluated for satisfiability or
+    validity.
 
     Passification is used by the efficient weakest precondition
     algorithms in BAP, inlcuding DWP ({!Wp.dwp}) and Flanagan and
@@ -68,7 +70,7 @@ val passified_of_ssa :
     @raise Not_found if [cfg] contains cycles.
 *)
 val passified_of_astcfg :
-  ?entry:Cfg.AST.G.V.t -> ?exit:Cfg.AST.G.V.t -> Cfg.AST.G.t -> t * var list * (Var.t->Var.t)
+  ?entry:Cfg.AST.G.V.t -> ?exit:Cfg.AST.G.V.t -> Type.formula_mode -> Cfg.AST.G.t -> t * var list * (Var.t->Var.t)
 (** [passified_of_astcfg] is the same as {!passified_of_ssa}, except
     that it takes an ASG CFG as input. *)
 

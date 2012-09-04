@@ -3,19 +3,22 @@
    XXX: Rename functions
 *)
 
+module D=Debug.Make(struct let name = "Vc" and default = `NoDebug end)
+open D
 open Utils_common
+open Type
 
 type options = {
   cf : bool;
   k : int;
-  sat : bool;
+  mode : formula_mode;
   full_subst : bool;
 }
 
 let default_options = {
   cf = true;
   k = 1;
-  sat = true;
+  mode = Sat;
   full_subst = true;
 }
 
@@ -26,8 +29,6 @@ type ssa_vc = options -> Cfg.SSA.G.t -> Ast.exp -> Ast.exp * Ast.var list
 type t = | AstVc of ast_vc
          | CfgVc of cfg_vc
          | SsaVc of ssa_vc
-
-let sat_or_valid sat = if sat then Efse.Assign.Sat else Efse.Assign.Validity
 
 let vc_astprog vc options prog post  = match vc with
   | AstVc vc -> vc options prog post
@@ -52,7 +53,7 @@ let vc_ssacfg vc options prog post  = match vc with
   | SsaVc vc -> vc options prog post
 
 let compute_dwp1 _ cfg post =
-  let (gcl, foralls) = Gcl.passified_of_ssa cfg in
+  let (gcl, foralls) = Gcl.passified_of_ssa Foralls cfg in
   let (moreforalls, wp) = Wp.dwp_1st gcl post in
   (wp, moreforalls@foralls)
 let compute_dwp1_gen = SsaVc compute_dwp1
@@ -63,23 +64,23 @@ let compute_wp _ cfg post =
 let compute_wp_gen = CfgVc compute_wp
 
 let compute_uwp _ cfg post =
-  let ugcl = Ugcl.of_ssacfg ~passify:false cfg in
+  let ugcl = Ugcl.of_ssacfg cfg in
   (Wp.uwp ugcl post, [])
 let compute_uwp_gen = SsaVc compute_uwp
 
-let compute_uwp_efficient _ cfg post =
-  let ugcl = Ugcl.of_ssacfg ~passify:true cfg in
+let compute_uwp_efficient {mode=mode} cfg post =
+  let ugcl = Ugcl.of_ssacfg ~passify:mode cfg in
   (Wp.efficient_uwp ugcl post, [])
 let compute_uwp_efficient_gen = SsaVc compute_uwp_efficient
 
-let compute_dwp {k=k} cfg post =
-  let gcl, foralls = Gcl.passified_of_ssa cfg in
+let compute_dwp {k=k; mode=mode} cfg post =
+  let gcl, foralls = Gcl.passified_of_ssa mode cfg in
   (Wp.dwp ~k gcl post, foralls)
 let compute_dwp_gen = SsaVc compute_dwp
 
-let compute_flanagansaxe {k=k; sat=sat} cfg post =
-  let gcl, foralls = Gcl.passified_of_ssa cfg in
-  (Wp.flanagansaxe ~k gcl sat post, foralls)
+let compute_flanagansaxe {k=k; mode=mode} cfg post =
+  let gcl, foralls = Gcl.passified_of_ssa mode cfg in
+  (Wp.flanagansaxe ~k gcl post, foralls)
 let compute_flanagansaxe_gen = SsaVc compute_flanagansaxe
 
 let compute_fse_unpass {cf=cf} cfg post =
@@ -87,28 +88,28 @@ let compute_fse_unpass {cf=cf} cfg post =
   (Efse.fse_unpass ~cf efse post, [])
 let compute_fse_unpass_gen = CfgVc compute_fse_unpass
 
-let compute_fse_pass {cf=cf; sat=sat} cfg post =
+let compute_fse_pass {cf=cf; mode=mode} cfg post =
   let (efse, tossa) = Efse.passified_of_astcfg cfg in
   let post = rename_astexp tossa post in
-  (Efse.fse_pass ~cf efse post (sat_or_valid sat), [])
+  (Efse.fse_pass ~cf efse post mode, [])
 let compute_fse_pass_gen = CfgVc compute_fse_pass
 
-let compute_efse_pass {cf=cf; sat=sat} cfg post =
+let compute_efse_pass {cf=cf; mode=mode} cfg post =
   let (efse, tossa) = Efse.passified_of_astcfg cfg in
   let post = rename_astexp tossa post in
-  (Efse.efse ~cf efse post (sat_or_valid sat), [])
+  (Efse.efse ~cf efse post mode, [])
 let compute_efse_pass_gen = CfgVc compute_efse_pass
 
-let compute_efse_mergepass {cf=cf; sat=sat} cfg post =
+let compute_efse_mergepass {cf=cf; mode=mode} cfg post =
   let (efse, tossa) = Efse.passified_of_astcfg cfg in
   let post = rename_astexp tossa post in
-  (Efse.efse_merge1 ~cf efse post (sat_or_valid sat), [])
+  (Efse.efse_merge1 ~cf efse post mode, [])
 let compute_efse_mergepass_gen = CfgVc compute_efse_mergepass
 
-let compute_efse_lazypass {cf=cf; sat=sat} cfg post =
+let compute_efse_lazypass {cf=cf; mode=mode} cfg post =
   let (efse, tossa) = Efse.passified_of_astcfg cfg in
   let post = rename_astexp tossa post in
-  (Efse.efse_lazy ~cf efse post (sat_or_valid sat), [])
+  (Efse.efse_lazy ~cf efse post mode, [])
 let compute_efse_lazypass_gen = CfgVc compute_efse_lazypass
 
 (* let compute_efse_feaspass cfg post = *)
@@ -143,6 +144,20 @@ let compute_fse_maxrepeat_gen i = AstVc (compute_fse_maxrepeat i)
 let vclist =
   ("dwp", compute_dwp_gen)
   :: ("dwp1", compute_dwp1_gen)
+  :: ("flanagansaxe", compute_flanagansaxe_gen)
+  :: ("wp", compute_wp_gen)
+  :: ("uwp", compute_uwp_gen)
+  :: ("uwpe", compute_uwp_efficient_gen)
+  :: ("fse-unpass", compute_fse_unpass_gen)
+  :: ("fse-pass", compute_fse_pass_gen)
+  :: ("efse-pass", compute_efse_pass_gen)
+  :: ("efse-mergepass", compute_efse_mergepass_gen)
+  :: ("efse-lazypass", compute_efse_lazypass_gen)
+  :: ("fse-bfs", compute_fse_bfs_gen)
+  :: []
+
+let pred_vclist =
+  ("dwp", compute_dwp_gen)
   :: ("flanagansaxe", compute_flanagansaxe_gen)
   :: ("wp", compute_wp_gen)
   :: ("uwp", compute_uwp_gen)

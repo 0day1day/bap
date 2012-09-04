@@ -13,7 +13,7 @@
 type options = {
   cf : bool; (** Perform constant folding (concrete evaluation) during VC generation. Only used by EFSE algorithms. *)
   k : int; (** Expressions larger than [k] will be given their own temporary variable assignment in the formula. Only used by DWP algorithms. *)
-  sat : bool; (** [true] indicates that a SAT formula is being produced, and [false] indicates a validity formula. This is currently only needed for VC algorithms that use passification, since passification introduces new free variables into the formula. *)
+  mode : Type.formula_mode; (** Indicates whether the formula should be valid for validity or satisfiability. This is currently only needed for VC algorithms that use passification, since passification introduces new free variables into the formula. *)
   full_subst : bool; (** [true] indicates that full substitution should be performed, even for [Let] expressions, in which case exponential blowup may occur. [false] enables partial substitution only. *)
 }
 
@@ -31,8 +31,6 @@ type ssa_vc = options -> Cfg.SSA.G.t -> Ast.exp -> Ast.exp * Ast.var list
 
 (** Any type of VC algorithm *)
 type t = AstVc of ast_vc | CfgVc of cfg_vc | SsaVc of ssa_vc
-
-val sat_or_valid : bool -> Efse.Assign.mode
 
 (** [vc_astprog vc opts prog post] runs [vc] to compute the VC of [prog]
     with post-condition [post], starting from a {!Ast.program} program. *)
@@ -115,3 +113,7 @@ val compute_fse_maxrepeat_gen : int -> t
 (** A list of supported VCs.  VCs with parameters (like maxdepth) are
     not included. *)
 val vclist : (string * t) list
+
+(** A list of supported VCs that only require predicate logic (no
+    quantifiers). *)
+val pred_vclist : (string * t) list
