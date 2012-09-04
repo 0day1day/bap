@@ -48,6 +48,12 @@ val vc_ssacfg : t -> options -> Cfg.SSA.G.t -> Ast.exp -> Ast.exp * Ast.var list
 val compute_dwp : ssa_vc
 val compute_dwp_gen : t
 
+(** DWP implementation that utilizes [Let] expressions in place of
+    some equalities. This has the advantage of not introducing
+    meaningless free variables. *)
+val compute_dwp_let : ssa_vc
+val compute_dwp_let_gen : t
+
 (** DWP implementation that uses forall quantifiers. *)
 val compute_dwp1 : ssa_vc
 (** General form of [compute_dwp1]. *)

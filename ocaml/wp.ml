@@ -351,20 +351,30 @@ let dwp_pred_help ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (p:Gcl.t) =
   dwp_help ~simp ~k f' p
 
 (** Generates a predicate logic VC using the DWP algorithm. *)
-let dwp ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (p:Gcl.t) =
+let dwp ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (mode:Type.formula_mode) (p:Gcl.t) =
   let (vo, _, n, w) = dwp_pred_help ~simp ~less_duplication ~k p in
-  match vo with
-  | Some v ->
-      (fun q -> (exp_and v (exp_and (exp_not w) (exp_implies n q))))
-  | None ->
-      (fun q -> (exp_and (exp_not w) (exp_implies n q)))
+  match vo, mode with
+  | Some v, Sat ->
+    (fun q -> (exp_and v (exp_and (exp_not w) (exp_and n q))))
+  | Some v, Validity ->
+    (fun q -> (exp_implies v (exp_and (exp_not w) (exp_implies n q))))
+  | None, Sat ->
+    (fun q -> (exp_and (exp_not w) (exp_and n q)))
+  | None, Validity ->
+    (fun q -> (exp_and (exp_not w) (exp_implies n q)))
+  | _, Foralls ->
+    failwith "Foralls not supported in predicate DWP"
 
 
-let dwp_let ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (p:Gcl.t) =
+let dwp_let ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (mode:Type.formula_mode) (p:Gcl.t) =
   let (_, vars, n, w) = dwp_pred_help ~simp ~less_duplication ~k p in
   (fun q ->
-     let exp = exp_and (exp_not w) (exp_and n q) in
-     List.fold_left (fun exp (v,e) -> Let(v,e,exp)) exp vars
+    let exp = match mode with
+      | Sat -> exp_and (exp_not w) (exp_and n q)
+      | Validity -> exp_and (exp_not w) (exp_implies n q)
+      | Foralls -> failwith "Foralls not supported in predicate DWP"
+    in
+    List.fold_left (fun exp (v,e) -> Let(v,e,exp)) exp vars
   )
 
 (*let dwp = dwp_let*)
@@ -390,7 +400,7 @@ let dwp_let ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (p:Gcl.t) =
   )
 *)
 
-let flanagansaxe ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (p:Gcl.t) =
+let flanagansaxe ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (mode:Type.formula_mode) (p:Gcl.t) =
   let rec nw v = function
     | Assume e -> (e, exp_false, v)
     | Assert e ->
@@ -409,9 +419,15 @@ let flanagansaxe ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (p:Gcl.t) =
     | Skip -> (exp_true, exp_false, v)
   in
   let (ns,ws,v) = nw [] p in
-  match assignments_to_exp v with
-  | None ->
-      (fun q ->	 exp_and (exp_not ws) (exp_implies ns q) )
-  | Some v ->
-      (fun q ->	 exp_and v (exp_and (exp_not ws) (exp_implies ns q)) )
+  match assignments_to_exp v, mode with
+  | Some v, Sat ->
+      (fun q -> exp_and v (exp_and (exp_not ws) (exp_and ns q)) )
+  | Some v, Validity ->
+      (fun q -> exp_implies v (exp_and (exp_not ws) (exp_implies ns q)) )
+  | None, Sat ->
+      (fun q -> exp_and (exp_not ws) (exp_and ns q) )
+  | None, Validity ->
+      (fun q -> exp_and (exp_not ws) (exp_implies ns q) )
+  | _, Foralls ->
+    failwith "Foralls not supported in predicate FS"
 

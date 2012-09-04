@@ -44,7 +44,8 @@ struct
     | Type.Sat ->
       exp_and pi (exp_eq (Var v) e)
     | Type.Validity ->
-      exp_implies (exp_eq (Var v) e) pi
+      failwith "Validity is broken in efse"
+      (* exp_implies (exp_eq (Var v) e) pi *)
 
   let add_passive_value pi v value =
     add_passive_assignment pi v (unwrap_symb value)
