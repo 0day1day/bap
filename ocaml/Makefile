@@ -110,7 +110,7 @@ export SOURCES = \
 	template.ml \
 	syscall_id.mli syscall_id.ml \
 	graphDataflowW.ml \
-	vc.ml \
+	vc.mli vc.ml \
 	$(SOLVER_SOURCES) \
 	$(PROJSOURCES) \
 

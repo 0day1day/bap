@@ -55,7 +55,7 @@ let set_solver s =
 
 let solvers = Hashtbl.fold (fun k _ s -> k ^ " " ^ s) Smtexec.solvers ""
 
-let compute_wp = ref compute_wp_boring
+let vc = ref compute_wp_boring_gen
 
 let speclist =
   ("-o", Arg.String (fun f -> irout := Some(open_out f)),
@@ -70,46 +70,48 @@ let speclist =
      "<exp> Use <exp> as the postcondition (defaults to \"true\")")
   ::("-suffix", Arg.String (fun str -> suffix := str),
      "<suffix> Add <suffix> to each variable name.")
-  ::("-wp", Arg.Unit(fun()-> compute_wp := compute_wp_boring),
-     "Use Dijkstra's WP, except with let instead of substitution.")
-  ::("-uwp", Arg.Unit(fun()-> compute_wp := compute_uwp_boring),
-     "Use WP for Unstructured Programs")
-  ::("-uwpe", Arg.Unit(fun()-> compute_wp := compute_uwp_passify),
-     "Use efficient WP for Unstructured Programs")
-  ::("-dwp", Arg.Unit(fun()-> compute_wp := compute_dwp),
+  ::("-dwp", Arg.Unit(fun()-> vc := compute_dwp_gen),
      "Use efficient directionless weakest precondition instead of the default")
-  ::("-dwpk", Arg.Int(fun i-> compute_wp := compute_dwp ~k:i),
+  ::("-dwpk", Arg.Int(fun i-> vc := compute_dwp_gen;
+    options := {!options with k=i};
+),
      "Use efficient directionless weakest precondition instead of the default")
-  ::("-dwp1", Arg.Unit(fun()-> compute_wp := compute_dwp1),
+  ::("-dwp1", Arg.Unit(fun()-> vc := compute_dwp1_gen),
      "Use 1st order efficient directionless weakest precondition")
-  ::("-flanagansaxe", Arg.Unit(fun()-> compute_wp := compute_flanagansaxe),
+  ::("-flanagansaxe", Arg.Unit(fun()-> vc := compute_flanagansaxe_gen),
      "Use Flanagan & Saxe's algorithm instead of the default WP.")
+  ::("-wp", Arg.Unit(fun()-> vc := compute_wp_boring_gen),
+     "Use Dijkstra's WP, except with let instead of substitution.")
+  ::("-uwp", Arg.Unit(fun()-> vc := compute_uwp_boring_gen),
+     "Use WP for Unstructured Programs")
+  ::("-uwpe", Arg.Unit(fun()-> vc := compute_uwp_passify_gen),
+     "Use efficient WP for Unstructured Programs")
+  ::("-fse-unpass-dwp-paper", Arg.Unit(fun () -> vc := compute_fse_unpass_gen),
+     "Use inefficient FSE algorithm for unpassified programs in DWP paper.")
+  ::("-fse-pass-dwp-paper", Arg.Unit(fun () -> vc := compute_fse_pass_gen),
+     "Use inefficient FSE algorithm for passified programs in DWP paper.")
+  ::("-efse-pass-dwp-paper", Arg.Unit(fun () -> vc := compute_efse_pass_gen),
+     "Use efficient FSE algorithm for passified programs in DWP paper.")
+  ::("-efse-pass-merge-dwp-paper", Arg.Unit(fun () -> vc := compute_efse_mergepass_gen),
+     "Use efficient FSE algorithm for passified programs in DWP paper that adds concrete assignments to the formula only during merging.")
+  ::("-efse-pass-lazy-dwp-paper", Arg.Unit(fun () -> vc := compute_efse_lazypass_gen),
+     "Use efficient FSE algorithm for passified programs in DWP paper that lazily adds concrete assignments to the formula when merging.")
+  (* ::("-efse-pass-feas-dwp-paper", Arg.Unit(fun () -> vc := compute_efse_feaspass), *)
+  (*    "Use efficient FSE algorithm for passified programs in DWP paper with feasibility checking.") *)
+  ::("-nocf-dwp-paper", Arg.Unit(fun () -> options := {!options with cf = false}),
+     "Do not use constant folding in DWP paper algorithms")
+  ::("-fse-bfs", Arg.Unit(fun()-> vc := compute_fse_bfs_gen),
+     "Use naive forward symbolic execution with breath first search")
+  ::("-fse-bfs-maxdepth", Arg.Int(fun i-> vc := compute_fse_bfs_maxdepth_gen i),
+     "<n> FSE with breath first search, limiting search depth to n.")
+  ::("-fse-maxrepeat", Arg.Int(fun i-> vc := compute_fse_maxrepeat_gen i),
+     "<n> FSE excluding walks that visit a point more than n times.")
+  ::("-fse-fast", Arg.Set fast_fse,
+     "Perform FSE without full substitution.")
   ::("-solver", Arg.String set_solver,
      ("Use the specified solver. Choices: " ^ solvers))
   ::("-extract-vars", Arg.Set assert_vars,
      "Put vars in separate asserts")
-  ::("-fse-bfs", Arg.Unit(fun()-> compute_wp := compute_fse_bfs),
-     "Use naive forward symbolic execution with breath first search")
-  ::("-fse-bfs-maxdepth", Arg.Int(fun i-> compute_wp := compute_fse_bfs_maxdepth i),
-     "<n> FSE with breath first search, limiting search depth to n.")
-  ::("-fse-maxrepeat", Arg.Int(fun i-> compute_wp := compute_fse_maxrepeat i),
-     "<n> FSE excluding walks that visit a point more than n times.")
-  ::("-fse-fast", Arg.Set fast_fse,
-     "Perform FSE without full substitution.")
-  ::("-fse-unpass-dwp-paper", Arg.Unit(fun () -> compute_wp := compute_fse_unpass),
-     "Use inefficient FSE algorithm for unpassified programs in DWP paper.")
-  ::("-fse-pass-dwp-paper", Arg.Unit(fun () -> compute_wp := compute_fse_pass),
-     "Use inefficient FSE algorithm for passified programs in DWP paper.")
-  ::("-efse-pass-dwp-paper", Arg.Unit(fun () -> compute_wp := compute_efse_pass),
-     "Use efficient FSE algorithm for passified programs in DWP paper.")
-  ::("-efse-pass-merge-dwp-paper", Arg.Unit(fun () -> compute_wp := compute_efse_mergepass),
-     "Use efficient FSE algorithm for passified programs in DWP paper that adds concrete assignments to the formula only during merging.")
-  ::("-efse-pass-lazy-dwp-paper", Arg.Unit(fun () -> compute_wp := compute_efse_lazypass),
-     "Use efficient FSE algorithm for passified programs in DWP paper that lazily adds concrete assignments to the formula when merging.")
-  (* ::("-efse-pass-feas-dwp-paper", Arg.Unit(fun () -> compute_wp := compute_efse_feaspass), *)
-  (*    "Use efficient FSE algorithm for passified programs in DWP paper with feasibility checking.") *)
-  ::("-nocf-dwp-paper", Arg.Clear dwpcf,
-     "Do not use constant folding in DWP paper algorithms")
   ::("-noopt", Arg.Unit (fun () -> usedc := false; usesccvn := false),
      "Do not perform any optimizations on the SSA CFG.")
   ::("-opt", Arg.Unit (fun () -> usedc := true; usesccvn := true),
@@ -120,7 +122,7 @@ let speclist =
      "Perform sccvn on the SSA CFG.")
   ::("-solve", Arg.Unit (fun () -> solve := true),
      "Solve the generated formula.")
-  ::("-validity", Arg.Clear sat,
+  ::("-validity", Arg.Unit (fun () -> options := {!options with sat = false}),
      "Check validity rather than satisfiability.")
   :: Input.speclist
 
@@ -144,7 +146,7 @@ let cfg = Cfg_ast.of_prog prog
 let cfg = Prune_unreachable.prune_unreachable_ast cfg
 
 let () = print_endline "Computing predicate..."
-let (wp, foralls) = !compute_wp !options cfg post
+let (wp, foralls) = vc_astcfg !vc !options cfg post
 
 ;;
 match !irout with
@@ -165,13 +167,13 @@ match !stpout with
   if !assert_vars then (
     let (vars,wp') = extract_vars wp in
     List.iter (fun (v,e) -> p#assert_ast_exp (BinOp(EQ, Var v, e))) vars;
-    if !sat then
+    if !options.sat then
       p#assert_ast_exp_with_foralls foralls wp'
     else
       p#valid_ast_exp ~foralls wp'
   )
   else (
-    if !sat then
+    if !options.sat then
       p#assert_ast_exp_with_foralls foralls wp
     else
       p#valid_ast_exp ~foralls wp
