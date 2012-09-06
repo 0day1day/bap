@@ -17,16 +17,33 @@ type 'a sanityf = 'a -> string -> unit
 
 (** {3 CFG checks} *)
 
-(** [connected_astcfg g s] raises an exception iff g is not a connected graph *)
+(** [connected_astcfg g s] raises an exception iff g is not a connected graph. *)
 val connected_astcfg : Cfg.AST.G.t sanityf
 
-(** [connected_ssacfg g s] raises an exception iff g is not a connected graph *)
+(** [connected_ssacfg g s] raises an exception iff g is not a connected graph. *)
 val connected_ssacfg : Cfg.SSA.G.t sanityf
 
 (** Build a connected check for other graphs *)
 module MakeConnectedCheck :
   functor (C : Cfg.CFG) ->
     sig
-      (** [connected_check g s] raises an exception iff g is not a connected graph *)
+      (** [connected_check g s] raises an exception iff g is not a connected graph. *)
       val connected_check : C.G.t sanityf
+    end
+
+(** [acyclic_astcfg g s] raises an exception iff g is not an acyclic
+    graph. *)
+val acyclic_astcfg : Cfg.AST.G.t sanityf
+
+(** [acyclic_ssacfg g s] raises an exception iff g is not an acyclic
+    graph. *)
+val acyclic_ssacfg : Cfg.SSA.G.t sanityf
+
+(** Build an acyclic check for other graphs *)
+module MakeAcyclicCheck :
+  functor (C : Cfg.CFG) ->
+    sig
+      (** [acyclic_check g s] raises an exception iff g is not an
+          acyclic graph. *)
+      val acyclic_check : C.G.t sanityf
     end

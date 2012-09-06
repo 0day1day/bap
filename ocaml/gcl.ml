@@ -166,6 +166,7 @@ let rec string_of_cgcl = function
 (** [gclhelp_of_cfg cfg entry_node exit_node] returns an intermediate form that
     is between CFGs and the GCL. [cfg] must be acyclic. *)
 let gclhelp_of_astcfg ?entry ?exit cfg =
+  Checks.acyclic_astcfg cfg "GCL";
   let exit = match exit with
     | None -> CA.G.V.create Cfg.BB_Exit
     | Some x -> x
