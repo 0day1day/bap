@@ -148,8 +148,11 @@ let cfg = Prune_unreachable.prune_unreachable_ast cfg
 let (wp, foralls) =
   if !usedc || !usesccvn then
     let () = print_endline "Applying optimizations..." in
-    let ssacfg = Cfg_ssa.of_astcfg cfg in
-    let ssacfg = Ssa_simp.simp_cfg ~usedc:!usedc ~usesccvn:!usesccvn ssacfg in
+    let {Cfg_ssa.cfg=ssacfg; to_ssavar=tossa} = Cfg_ssa.trans_cfg cfg in
+    let () = Pp.output_varnums := true in
+    let post = rename_astexp tossa post in
+    let freevars = Formulap.freevars post in
+    let ssacfg = Ssa_simp.simp_cfg ~liveout:freevars ~usedc:!usedc ~usesccvn:!usesccvn ssacfg in
     let () = print_endline "Computing predicate..." in
     vc_ssacfg !vc !options ssacfg post
   else
