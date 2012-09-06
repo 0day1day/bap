@@ -144,11 +144,19 @@ let post = Memory2array.coerce_exp_state ~scope m2a_state post
 
 let cfg = Cfg_ast.of_prog prog
 let cfg = Prune_unreachable.prune_unreachable_ast cfg
-
-let () = print_endline "Computing predicate..."
-let (wp, foralls) = vc_astcfg !vc !options cfg post
-
 ;;
+let (wp, foralls) =
+  if !usedc || !usesccvn then
+    let () = print_endline "Applying optimizations..." in
+    let ssacfg = Cfg_ssa.of_astcfg cfg in
+    let ssacfg = Ssa_simp.simp_cfg ~usedc:!usedc ~usesccvn:!usesccvn ssacfg in
+    let () = print_endline "Computing predicate..." in
+    vc_ssacfg !vc !options ssacfg post
+  else
+    let () = print_endline "Computing predicate..." in
+    vc_astcfg !vc !options cfg post
+;;
+
 match !irout with
 | None -> ()
 | Some oc ->
