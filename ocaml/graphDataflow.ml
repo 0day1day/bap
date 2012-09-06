@@ -141,7 +141,9 @@ struct
 		else
                   let newin =
                     if is_backedge b s && count b s > nmeets
-                    then (dprintf "widening"; D.L.widen oldin outset')
+                    then (dprintf "widening";
+                          Hashtbl.clear counth;
+                          D.L.widen oldin outset')
                     else newin
                   in
                   let () = H.replace htin s newin in

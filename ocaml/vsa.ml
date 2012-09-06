@@ -13,6 +13,7 @@
     * Handle full/partial memory correctly
     * Idea: Use copy propagation information to maintain equivalence classes, and use intersection over equivalence class members at edge transfer
     * Memory read/store lengths ignored!
+    * VS.top should have a bitlength
 *)
 
 module VM = Var.VarMap
@@ -23,12 +24,16 @@ open Util
 open Type
 open Ast
 
-module D = Debug.Make(struct let name = "VSA" and default=`NoDebug end)
+module D = Debug.Make(struct let name = "Vsa" and default=`NoDebug end)
 open D
 
 (* Treat unsigned comparisons the same as signed: should be okay as
    long as overflow does not occur *)
 let signedness_hack = ref true
+
+(* Treat any memory write to a SI whose lower or upper bound is the
+    min/max is the same as Top. *)
+let mem_top_hack = ref false
 
 exception Unimplemented of string
 
@@ -92,10 +97,30 @@ struct
   let top k = (k, 1L, mini k, maxi k)
   let empty k = (k, (-1L), 1L, 0L)
 
+  let rec upper k i s =
+    assert (s >= 1L);
+    let offset = int64_urem i s in
+    let max = maxi k in
+    let maxoffset = int64_urem max s in
+    if maxoffset > offset then
+      max -% (maxoffset -% offset)
+    else
+      max +% (maxoffset -% (offset -% s))
+
+  let rec lower k i s =
+    assert (s >= 1L);
+    let offset = int64_urem i s in
+    let min = mini k in
+    let minoffset = int64_urem min s in
+    if offset > minoffset then
+      min +% (offset -% offset)
+    else
+      min +% (offset -% (minoffset -% s))
+
   let remove_lower_bound (k,s,a,b) =
-    (k,s,mini k,b)
+    (k,s,lower k b s,b)
   let remove_upper_bound (k,s,a,b) =
-    (k,s,a,maxi k)
+    (k,s,a,upper k a s)
 
   let single k x = (k,0L,x,x)
   let of_bap_int i t = single (bits_of_width t) (extend (bits_of_width t) i)
@@ -414,16 +439,17 @@ struct
       else
         (k, 1L, l, u))
 
-  let widen (k,s1,a,b) (k',s2,c,d) =
+  let widen ((k,s1,a,b) as si1) ((k',s2,c,d) as si2) =
     if k <> k' then failwith "widen: expected same bitwidth intervals";
+    dprintf "Widen: %s to %s" (to_string si1) (to_string si2);
     let s' = uint64_gcd s1 s2 in
-    let l = if c < a then mini k else min a c
-    and u = if d > b then maxi k else max b d in
+    let l = if c < a then lower k a s' else a
+    and u = if d > b then upper k b s' else b in
     if s' = 0L then
       if a = b && c = d then
         (k, u -% l, l, u)
       else failwith "widen: strided interval not in reduced form"
-    else (k, 1L, l, u)
+    else (k, s', l, u)
 
   let rec fold f (k,s,a,b) init =
     if a = b then f a init
@@ -613,7 +639,7 @@ struct
 
   let global = Var.newvar "internal only" (Reg 64) (* value doesn't really matter, so long as it's unique *)
 
-  let top = []
+  let top = [(global, SI.top 32)]
 
   let pp_address p (r, si) =
     if r == global then p "$" else p(Pp.var_to_string r);
@@ -621,7 +647,7 @@ struct
     p (SI.to_string si)
 
   let pp p = function
-    | [] -> p "VS.top"
+    | [] -> failwith "this should not happen"
     | x::xs ->
         p "(";
         pp_address p x;
@@ -635,7 +661,8 @@ struct
     Buffer.contents b
 
   let kind = function
-    | [] -> `Top
+    | [] -> failwith "empty value sets not allowed"
+    | [(r,si)] when r == global && si = SI.top 32 -> `Top
     | [(r,_)] when r == global -> `VSglob
     | [_] -> `VSsingle
     | _ -> `VSarb
@@ -662,9 +689,11 @@ struct
 
   let add k x y = match (x,y) with
     | ([r2,si2],[r1,si1]) when r1 == global ->
-        [(r2, SI.add k si1 si2)]
+      [(r2, SI.add k si1 si2)]
+    | ([r1,si1],[r2,si2]) when r1 == global ->
+      [(r2, SI.add k si1 si2)]
     | ([r,si1], xs) | (xs, [r,si1]) when r == global ->
-        List.map (fun (r,si) -> (r, SI.add k si1 si)) xs
+      List.map (fun (r,si) -> (r, SI.add k si1 si)) xs
     | _ -> top
 
   let sub k x = function
@@ -672,7 +701,6 @@ struct
         List.map (fun (r,si') -> (r, SI.sub k si' si)) x
     | _ -> top
 
-        
   let makeother f id annihilator  k x y = match (x,y) with
     | ([r1,si1], [r2,si2]) when r1 == global && r1 == r2 ->
         [(r1, f k si1 si2)]
@@ -744,11 +772,12 @@ struct
       List.iter add y;
       Hashtbl.fold (fun k v r -> (k,v)::r) h []
 
-
   let fold f vs init =
-    if vs = top then failwith "VS.fold doesn't work on Top"
-    else
-      List.fold_left (fun a (r,si) -> SI.fold (fun v -> f (r,v)) si a) init vs
+    if vs = top then wprintf "VS.fold is very slow for Top";
+    List.fold_left (fun a (r,si) -> SI.fold (fun v -> f (r,v)) si a) init vs
+
+  let numconcrete vs =
+    fold (fun _ a -> a +% 1L) vs 0L
 end
 
 
@@ -919,18 +948,23 @@ module MemStore = struct
       read_concrete_real ?o (r,i)
 
   let read ?o ae = function
-    | [] -> VS.top
+    | [] -> failwith "empty value sets not allowed"
     | addrs -> (* FIXME: maybe shortcut this *)
+      try
         let res =
           VS.fold
             (fun v a ->  match a with
-               | None -> Some (read_concrete ?o ae v)
-               | Some a -> Some (VS.union (read_concrete ?o ae v) a))
-            addrs None
+            | None -> Some (read_concrete ?o ae v)
+            | Some a ->
+              if a = VS.top then raise Exit
+              else
+                Some (VS.union (read_concrete ?o ae v) a)
+            ) addrs None
         in
-          match res with
-            | Some x -> x
-            | None -> failwith "MemStore.read impossible address"
+        match res with
+        | Some x -> x
+        | None -> failwith "MemStore.read impossible address"
+      with Exit -> VS.top
 
   let write_concrete_strong ae (r,i) vl =
     if vl = VS.top then
@@ -953,16 +987,23 @@ module MemStore = struct
     write_concrete_strong ae addr (VS.widen vl (read_concrete ae addr))
 
   let write ae addr vl =
-    if addr = VS.top then
+    if addr = VS.top then (
       if vl = VS.top then top
-      else
-        fold (fun k v a -> write_concrete_strong a k (VS.union vl v)) ae ae
-    else
+      else fold (fun k v a -> write_concrete_weak a k vl) ae ae
+    ) else
       match addr with
-        | [(r, (_,0L,x,y))] when x = y ->
-           write_concrete_strong ae (r,x) vl
-        | _ ->
-          VS.fold (fun v a -> write_concrete_weak a v vl) addr ae
+      (* XXX: Handle strides *)
+      | [(r, ((k,1L,l,u)))] when !mem_top_hack && (l = SI.mini k || u = SI.maxi k) ->
+        if r = VS.global then top else
+        (* Set this entire region to Top *)
+        M1.remove r ae
+      | [(r, ((k,_,_,_) as o))] when o = SI.top k ->
+        (* Set this entire region to Top *)
+        M1.remove r ae
+      | [(r, (_,0L,x,y))] when x = y ->
+        write_concrete_strong ae (r,x) vl
+      | _ ->
+        VS.fold (fun v a -> write_concrete_weak a v vl) addr ae
 
   let write_intersection ae addr vl =
     match addr with
@@ -1040,7 +1081,7 @@ module AbsEnv = struct
   let do_find_ae ae v =
     try match VM.find v ae with
       | `Array ae -> ae
-      | _ -> MemStore.top
+      | _ -> failwith "Wanted to find abstract environment but found scalar. Not sure why this would happen"
     with  Not_found -> MemStore.top
 end  (* module AE *)
 
@@ -1074,20 +1115,20 @@ struct
             )
             x y
       let widen (x:t) (y:t) =
-          VM.fold
-            (fun k v res ->
-               try
-                 let v' = VM.find k y in
-                 let vs = match v, v' with
-                   | (`Scalar a, `Scalar b) -> `Scalar(VS.widen a b)
-                   | (`Array a, `Array b) -> `Array(MemStore.widen a b)
-                   | _ -> failwith "Tried to meet scalar and array"
-                 in
-                   VM.add k vs res
-               with Not_found ->
-                 VM.add k v res
-            )
-            x y
+        VM.fold
+          (fun k v res ->
+            try
+              let v' = VM.find k y in
+              let vs = match v, v' with
+                | (`Scalar a, `Scalar b) -> dprintf "widening %s" (Pp.var_to_string k); `Scalar(VS.widen a b)
+                | (`Array a, `Array b) -> `Array(MemStore.widen a b)
+                | _ -> failwith "Tried to widen scalar and array"
+              in
+              VM.add k vs res
+            with Not_found ->
+              VM.add k v res
+          )
+          x y
 
 (*      let widen x y =
         let v = widen x y in
@@ -1166,6 +1207,8 @@ struct
                     (* FIXME: assumes deendianized.
                        ie: _e and _t should be the same for all loads and
                        stores of m. *)
+            dprintf "doing a write... to %s of %s." (VS.to_string (exp2vs ?o l i)) (VS.to_string (exp2vs ?o l v));
+            (* dprintf "size %#Lx" (VS.numconcrete (exp2vs ?o l i)); *)
             MemStore.write (do_find_ae l m) (exp2vs ?o l i) (exp2vs ?o l v)
           (* | Phi(x::xs) -> *)
           (*   List.fold_left *)
@@ -1180,6 +1223,7 @@ struct
       )
 
     let rec transfer_stmt o s l =
+      dprintf "Executing %s" (Pp.ast_stmt_to_string s);
       match s with
         | Assert(Var _, _)  (* FIXME: Do we want to say v is true? *)
         | Assert _ | Jmp _ | CJmp _ | Label _ | Comment _
@@ -1197,6 +1241,7 @@ struct
       fwd_transfer_stmt_to_block (transfer_stmt o)
 
     let edge_transfer_function o g edge l =
+      dprintf "edge from %s to %s" (Cfg_ast.v2s (Cfg.AST.G.E.src edge)) (Cfg_ast.v2s (Cfg.AST.G.E.dst edge));
       let accept_signed_bop bop =
         match !signedness_hack, bop with
         | false, (SLE|SLT) -> true
