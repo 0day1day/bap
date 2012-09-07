@@ -4,16 +4,18 @@
     http://pages.cs.wisc.edu/~bgogul/Research/Thesis/thesis.html
 
     TODO:
-    * Consolidate widen/meet/union functions
-    * Remove extra "k" arguments
     * Handle specials: map everything to Top
     * Add a real interface; automatically call simplify_cond
     * Big int support
-    * Handle signedness
-    * Handle full/partial memory correctly
-    * Idea: Use copy propagation information to maintain equivalence classes, and use intersection over equivalence class members at edge transfer
+    * Handle unsignedness
+    * Idea: Use copy propagation information to maintain equivalence
+      classes, and use intersection over equivalence class members at
+      edge transfer
     * Memory read/store lengths ignored!
+    * Partial/overlapping memory
     * VS.top should have a bitlength
+    * Special case memory writes of Top: since we will be removing
+      entries, we do not have to iterate through all addresses
 *)
 
 module VM = Var.VarMap
@@ -26,6 +28,9 @@ open Ast
 
 module D = Debug.Make(struct let name = "Vsa" and default=`NoDebug end)
 open D
+
+(* Allow integer overflow to occur in addition/subtraction/etc. *)
+let allow_overflow = ref false
 
 (* Treat unsigned comparisons the same as signed: should be okay as
    long as overflow does not occur *)
@@ -177,16 +182,24 @@ struct
   let add k ((k',s1,lb1,ub1) as a) ((k'',s2,lb2,ub2) as b) =
     assert (k=k' && k=k'');
     check_reduced2 k a b;
-    let lb' = lb1 +% lb2 
+    let lb' = lb1 +% lb2
     and ub' = ub1 +% ub2 in
-    let u = lb1 &% lb2 &% bnot lb' &% bnot(ub1 &% ub2 &% bnot ub')
-    and v = ((lb1 ^% lb2) |% bnot(lb1 ^% lb'))
-      &% (bnot ub1 &% bnot ub2 &% ub')
-    and highbit = highbit k
+    (* Overflow cases 2 and 4; see dissertation *)
+    let lbunderflow = lb' < mini k
+    and uboverflow = ub' > maxi k
+    and s = uint64_gcd s1 s2
     in
-      if (u |% v) &% highbit = highbit then
-        top k
-      else (k, uint64_gcd s1 s2, extend k lb', extend k ub')
+    let overflow = lbunderflow || uboverflow in
+    match overflow with
+    | true when !allow_overflow ->
+      top k
+    | _ ->
+      let lb' = extend k lb' in
+      let ub' = extend k ub' in
+      let lb'' = if lbunderflow then lower k lb' s else lb'
+      and ub'' = if uboverflow then upper k ub' s else ub'
+      in
+      (k, s, lb'', ub'')
 
   let add = renormbin add
 
