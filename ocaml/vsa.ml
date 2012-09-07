@@ -29,15 +29,12 @@ open Ast
 module D = Debug.Make(struct let name = "Vsa" and default=`NoDebug end)
 open D
 
-(* Allow integer overflow to occur in addition/subtraction/etc. *)
-let allow_overflow = ref false
-
 (* Treat unsigned comparisons the same as signed: should be okay as
-   long as overflow does not occur *)
-let signedness_hack = ref true
+   long as overflow does not occur. Should be false for soundness. *)
+let signedness_hack = ref false
 
 (* Treat any memory write to a SI whose lower or upper bound is the
-    min/max is the same as Top. *)
+   min/max is the same as Top. *)
 let mem_top_hack = ref false
 
 exception Unimplemented of string
@@ -179,7 +176,7 @@ struct
 
   (* XXX: Remove k *)
   (** Addition of strided intervals *)
-  let add k ((k',s1,lb1,ub1) as a) ((k'',s2,lb2,ub2) as b) =
+  let add ?(allow_overflow=true) k ((k',s1,lb1,ub1) as a) ((k'',s2,lb2,ub2) as b) =
     assert (k=k' && k=k'');
     check_reduced2 k a b;
     let lb' = lb1 +% lb2
@@ -191,7 +188,7 @@ struct
     in
     let overflow = lbunderflow || uboverflow in
     match overflow with
-    | true when !allow_overflow ->
+    | true when allow_overflow ->
       top k
     | _ ->
       let lb' = extend k lb' in
@@ -201,7 +198,7 @@ struct
       in
       (k, s, lb'', ub'')
 
-  let add = renormbin add
+  let add ?allow_overflow k x y = renormbin (add ?allow_overflow) k x y
 
   (* XXX: Remove k *)
   (** Negation of a strided interval *)
@@ -510,7 +507,7 @@ struct
     let dir _ = GraphDataflow.Forward
 
     let binop_to_si_function = function
-      | PLUS -> SI.add
+      | PLUS -> SI.add ~allow_overflow:true
       | MINUS -> SI.sub
       | AND -> SI.logand
       | OR -> SI.logor
@@ -702,11 +699,15 @@ struct
 
   let add k x y = match (x,y) with
     | ([r2,si2],[r1,si1]) when r1 == global ->
-      [(r2, SI.add k si1 si2)]
+      let allow_overflow = r2 == global in
+      [(r2, SI.add ~allow_overflow k si1 si2)]
     | ([r1,si1],[r2,si2]) when r1 == global ->
-      [(r2, SI.add k si1 si2)]
+      let allow_overflow = r2 == global in
+      [(r2, SI.add ~allow_overflow k si1 si2)]
     | ([r,si1], xs) | (xs, [r,si1]) when r == global ->
-      List.map (fun (r,si) -> (r, SI.add k si1 si)) xs
+      List.map (fun (r,si) ->
+        let allow_overflow = r == global in
+        (r, SI.add ~allow_overflow k si1 si)) xs
     | _ -> top
 
   let sub k x = function
