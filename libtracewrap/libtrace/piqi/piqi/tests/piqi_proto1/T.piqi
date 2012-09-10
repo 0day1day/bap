@@ -1,9 +1,0 @@
-.proto-package "T"
-
-.import [ .module Topic ]
-
-.alias [
-     .name vector
-     .type Topic/vector
-]
-
