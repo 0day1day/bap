@@ -88,43 +88,6 @@ let compute_flanagansaxe {k=k; mode=mode} cfg post =
   (Wp.flanagansaxe ~k mode gcl post, foralls)
 let compute_flanagansaxe_gen = SsaVc compute_flanagansaxe
 
-let compute_fse_unpass {cf=cf} cfg post =
-  let efse = Efse.of_astcfg cfg in
-  (Efse.fse_unpass ~cf efse post, [])
-let compute_fse_unpass_gen = CfgVc compute_fse_unpass
-
-let compute_fse_pass {cf=cf; mode=mode} cfg post =
-  let (efse, tossa) = Efse.passified_of_astcfg cfg in
-  let post = rename_astexp tossa post in
-  (Efse.fse_pass ~cf efse post mode, [])
-let compute_fse_pass_gen = CfgVc compute_fse_pass
-
-let compute_efse_pass {cf=cf; mode=mode} cfg post =
-  let (efse, tossa) = Efse.passified_of_astcfg cfg in
-  let post = rename_astexp tossa post in
-  (Efse.efse ~cf efse post mode, [])
-let compute_efse_pass_gen = CfgVc compute_efse_pass
-
-let compute_efse_mergepass {cf=cf; mode=mode} cfg post =
-  let (efse, tossa) = Efse.passified_of_astcfg cfg in
-  let post = rename_astexp tossa post in
-  (Efse.efse_merge1 ~cf efse post mode, [])
-let compute_efse_mergepass_gen = CfgVc compute_efse_mergepass
-
-let compute_efse_lazypass {cf=cf; mode=mode} cfg post =
-  let (efse, tossa) = Efse.passified_of_astcfg cfg in
-  let post = rename_astexp tossa post in
-  (Efse.efse_lazy ~cf efse post mode, [])
-let compute_efse_lazypass_gen = CfgVc compute_efse_lazypass
-
-(* let compute_efse_feaspass cfg post = *)
-(*   let cfg, post = optimize_cfg ~usedc:!usedc ~usesccvn:!usesccvn cfg post in *)
-(*   let (efse, tossa) = Efse.passified_of_astcfg cfg in *)
-(*   let post = rename_astexp tossa post in *)
-(*   (Efse.efse_feas ~cf:!dwpcf efse post, []) *)
-
-(* end DWP paper *)
-
 let compute_fse_bfs {full_subst=full_subst} ast post =
   let bfs = if not full_subst then Symbeval_search.bfs_ast_program_fast
     else Symbeval_search.bfs_ast_program
@@ -154,11 +117,6 @@ let vclist =
   :: ("wp", compute_wp_gen)
   :: ("uwp", compute_uwp_gen)
   :: ("uwpe", compute_uwp_efficient_gen)
-  :: ("fse-unpass", compute_fse_unpass_gen)
-  :: ("fse-pass", compute_fse_pass_gen)
-  :: ("efse-pass", compute_efse_pass_gen)
-  :: ("efse-mergepass", compute_efse_mergepass_gen)
-  :: ("efse-lazypass", compute_efse_lazypass_gen)
   :: ("fse-bfs", compute_fse_bfs_gen)
   :: []
 
@@ -169,10 +127,5 @@ let pred_vclist =
   :: ("wp", compute_wp_gen)
   :: ("uwp", compute_uwp_gen)
   :: ("uwpe", compute_uwp_efficient_gen)
-  :: ("fse-unpass", compute_fse_unpass_gen)
-  :: ("fse-pass", compute_fse_pass_gen)
-  :: ("efse-pass", compute_efse_pass_gen)
-  :: ("efse-mergepass", compute_efse_mergepass_gen)
-  :: ("efse-lazypass", compute_efse_lazypass_gen)
   :: ("fse-bfs", compute_fse_bfs_gen)
   :: []

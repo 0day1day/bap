@@ -80,23 +80,6 @@ val compute_uwp_gen : t
 val compute_uwp_efficient : ssa_vc
 val compute_uwp_efficient_gen : t
 
-(** {2 Experimental Efficient VC Generation Algorithms from DWP paper} *)
-
-val compute_fse_unpass : cfg_vc
-val compute_fse_unpass_gen : t
-
-val compute_fse_pass : cfg_vc
-val compute_fse_pass_gen : t
-
-val compute_efse_pass : cfg_vc
-val compute_efse_pass_gen : t
-
-val compute_efse_mergepass : cfg_vc
-val compute_efse_mergepass_gen : t
-
-val compute_efse_lazypass : cfg_vc
-val compute_efse_lazypass_gen : t
-
 (** {2 Symbolic Execution VC algorithms} *)
 
 (** Use BFS to visit all states. Produces exponentially sized

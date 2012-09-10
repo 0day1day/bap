@@ -99,7 +99,6 @@ export SOURCES = \
 	coalesce.mli coalesce.ml \
 	structural_analysis.ml \
 	unroll.ml \
-	efse.ml \
 	ast_slice.ml \
 	ssa_slice.ml \
 	traces.ml \
