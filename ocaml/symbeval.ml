@@ -14,7 +14,7 @@ open Type
 module VH = Var.VarHash
 module VM = Var.VarMap
 
-module D = Debug.Make(struct let name = "SymbEval" and default=`NoDebug end)
+module D = Debug.Make(struct let name = "Symbeval" and default=`NoDebug end)
 open D
 
 (* For now, we'll map every byte. Later it may be better to map larger
@@ -502,14 +502,14 @@ struct
       | Assert (e,_) ->
           (match eval_expr delta e with
              | v when is_symbolic v ->
-		 let constr = symb_to_exp v in
-		 let pred' = add_constraint pred constr Equal in
-		   (*pdebug("Adding assertion: " ^ (Pp.ast_exp_to_string pred')) ;*)
-		   [{ctx with pred=pred'; pc=next_pc}]
+	       let constr = symb_to_exp v in
+	       let pred' = add_constraint pred constr Equal in
+	       (*pdebug("Adding assertion: " ^ (Pp.ast_exp_to_string pred')) ;*)
+	       [{ctx with pred=pred'; pc=next_pc}]
              | v when is_false_val v ->
                let pred = Form.true_formula in
                let pred = add_constraint pred exp_false Equal in
-	       raise (Halted(None, {ctx with pred = pred}))
+	       raise (AssertFailed({ctx with pred = pred}))
              | _ -> [{ctx with pc=next_pc}]
           )
       | Comment _ | Label _ ->
@@ -776,7 +776,6 @@ struct
 	  (try AddrMap.find (normalize i t) m
 	   with Not_found ->
              failwith (Printf.sprintf "Uninitialized memory found at %s" (Pp.ast_exp_to_string index))
-	     (* Int(bi0, reg_8) *)
 	  )
       | _ -> failwith "Symbolic memory or address in concrete evaluation"
 
@@ -784,6 +783,26 @@ struct
 end
 
 module ConcreteMemL = BuildConcreteMemL(MemVHBackEnd)
+
+(* This concrete module will return zero for unknown memory locations,
+   rather than raising an exception *)
+module BuildConcreteUnknownZeroMemL(BE:MemBackEnd) =
+struct
+  include BuildConcreteMemL(BE)
+
+  let rec lookup_mem mu index endian =
+    (*pdebug "Lookup mem" ;*)
+    match mu, index with
+    | ConcreteMem(m,v), Int(i,t) ->
+      (try AddrMap.find (normalize i t) m
+       with Not_found ->
+         wprintf "Uninitialized memory found at %s" (Pp.ast_exp_to_string index);
+         Int(bi0, reg_32)
+      )
+    | _ -> failwith "Symbolic memory or address in concrete evaluation"
+end
+
+module ConcreteUnknownZeroMemL = BuildConcreteUnknownZeroMemL(MemVHBackEnd)
 
 (** Symbolic assigns are represented as Lets in the formula, except
     for temporaries.  If you use this, you should clear out temporaries
@@ -895,27 +914,27 @@ module SymbolicSlowMap = Make(BuildSymbolicMemL(MemVMBackEnd))(SlowEval)(StdAssi
 module SymbolicSlow = Make(SymbolicMemL)(SlowEval)(StdAssign)(StdForm)
 
 (** Concrete evaluator based on Hashtables *)
-module Concrete = Make(ConcreteMemL)(AlwaysEvalLet)(StdAssign)(StdForm)
+module Concrete = Make(ConcreteUnknownZeroMemL)(AlwaysEvalLet)(StdAssign)(StdForm)
+
 (** Concrete evaluator based on Maps *)
 module ConcreteMap = Make(BuildConcreteMemL(MemVMBackEnd))(AlwaysEvalLet)(StdAssign)(StdForm)
 
 (** Execute a program concretely *)
 let concretely_execute ?s ?(i=[]) p =
   let rec step ctx =
+    dprintf "Step time";
     let s = try Concrete.inst_fetch ctx.sigma ctx.pc
       with Not_found ->
         failwith (Printf.sprintf "Fetching instruction %#Lx failed; you probably need to add a halt to the end of your program" ctx.pc)
     in
     dprintf "Executing: %s" (Pp.ast_stmt_to_string s);
-    let nextctxs = try Concrete.eval ctx, None with
-        Concrete.Halted (v, ctx) -> [ctx], v
+    let nextctxs, haltvalue, finished = try Concrete.eval ctx, None, false with
+        Concrete.Halted (v, ctx) -> [ctx], v, true
     in
-    match nextctxs with
-    | [next], None -> step next
-    |  _, None -> failwith "step"
-    (* Done recursing *)
-    | [ctx], v -> ctx, v
-    | _, Some _ -> failwith "step"
+    match finished, nextctxs with
+    | true, [c] -> c, haltvalue
+    | false, [next] -> step next
+    | _, _ -> failwith "step"
   in
   let ctx = Concrete.build_default_context p in
   (* Evaluate initialization statements *)
