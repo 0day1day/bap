@@ -25,7 +25,6 @@ let solve = ref false
 (* Select which solver to use *)
 let solver = ref (Smtexec.STP.si);;
 
-(* DWP paper *)
 let extract_vars e =
   let rec h v = function
     | BinOp(AND, BinOp(EQ,Var v1, e1), BinOp(EQ,Var v2, e2)) ->
