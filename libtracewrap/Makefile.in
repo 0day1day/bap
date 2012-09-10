@@ -1,0 +1,13 @@
+# $Id$
+# Wrapper to configure and build libtrace
+
+.PHONY: default
+default: all
+
+%:
+	$(MAKE) CONFIGURED
+	$(MAKE) -C libtrace $@
+
+CONFIGURED: libtrace/Makefile.am libtrace/configure.ac
+	(cd libtrace && ./autogen.sh && CFLAGS=-m32 CXXFLAGS=-m32 ./configure --with-batteries=@BAP_DIR@/batteries/_build/src)
+	touch CONFIGURED
