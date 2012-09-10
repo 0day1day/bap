@@ -12,7 +12,7 @@ open Printf
 open Type
 open Var
 
-module D = Debug.Make(struct let name = "Solver" and default=`Debug end)
+module D = Debug.Make(struct let name = "Solver" and default=`NoDebug end)
 open D
 
 exception Solver_error of string;;
@@ -180,10 +180,10 @@ struct
   let is_satisfiable formula =
     let ctx = S.mk_set () in
     let formula = S.convert ctx formula in
-    dprintf "is_sat: %s" (S.pp_exp ctx formula);
+    (* dprintf "is_sat: %s" (S.pp_exp ctx formula); *)
     S.add_constraint ctx formula;
     let answer = S.is_sat ctx in
-    dprintf "result: %s" (S.pp_sol ctx); (* print out the solution *)
+    (* dprintf "result: %s" (S.pp_sol ctx); (\* print out the solution *\) *)
     S.del_set ctx;
     answer
 
@@ -349,18 +349,24 @@ struct
         mk_array_sort ctx (convert_type set it) (convert_type set vt)
     | _ -> failwith "Invalid type"
 
-  (* Converting AST binop expression to Z3 expressions *)
+  (* Converting AST expression to Z3 expressions *)
   let rec convert ({ctx=ctx; vars=vars} as set) =
     function
-    | Var v ->
+    | Var (Var.V(id,s,typ) as v) ->
         (try VarHash.find vars v
-        with Not_found ->
-          let name = mk_string_symbol ctx (Var.name v) in
-          let typ = convert_type set (Var.typ v) in
-          let var = mk_const ctx name typ in
-          (*dprintf "VAR: %s" (ast_to_string ctx var);*)
-          VarHash.replace vars v var;
-          var)
+         with Not_found ->
+           (* The name here must be unique for Z3 to consider two
+              variables to be unique.
+
+              Another option would be to create a printer context, and
+              use that to ensure we generate unique variable names.
+           *)
+           let name = mk_string_symbol ctx (Printf.sprintf "%s_%d" s id) in
+           let typ = convert_type set typ in
+           let var = mk_const ctx name typ in
+           (*dprintf "VAR: %s" (ast_to_string ctx var);*)
+           VarHash.replace vars v var;
+           var)
     | Int (n, t) ->
         let typ = mk_bv_sort ctx (get_bits t) in
           mk_numeral ctx (Big_int_Z.string_of_big_int n) typ
@@ -427,9 +433,8 @@ struct
     let typ = mk_bv_sort ctx 1 in
     let tr = mk_int ctx 1 typ in
     let formula = mk_eq ctx formula tr in
-    (*pp_exp c formula; flush stderr;*)
+    (* dprintf "adding constraint %s" (ast_to_string ctx formula); *)
     assert_cnstr ctx formula
-    (*with Failure s -> dprintf "shitty...%s" s*)
 
   let push {ctx = ctx; vars = vars; vars_stack = vs} =
     Stack.push (VarHash.copy vars) vs;

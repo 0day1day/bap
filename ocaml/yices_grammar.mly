@@ -7,9 +7,12 @@
 %token EQUAL
 %token MODEL
 %token ASSERT
+%token SDASHES
 %token DASHES
+%token QUESTIONMARKS
 %token INVALID
 %token VALID
+%token DEFAULT
 %token COMMA
 %token PERIOD
 %token EOF
@@ -27,12 +30,26 @@ main:
 
 assertions:
   /* empty */ { [] }
-  | assertion assertions { $1 :: $2 }
+  | assertion assertions { match $1 with | None -> $2 | Some(x) -> x::$2 }
   ;
 
 assertion:
-  LBRACKET EQUAL VAR VAL RBRACKET { ($3, $4) }
+  /* Assign a bitvector to a variable */
+  LBRACKET EQUAL VAR VAL RBRACKET { Some($3, $4) }
+  /* Assign a variable to a variable */
+  | LBRACKET EQUAL VAR VAR RBRACKET { None }
+  /* Ignore "--- var ---" */
+  | SDASHES VAR SDASHES { None }
+  /* Ignore "default: val" */
+  | DEFAULT VAL { None }
+  /* Ignore memory information for now */
+  | LBRACKET EQUAL LBRACKET VAR val_opt RBRACKET val_opt RBRACKET { None }
   ;
+
+val_opt:
+  VAL { }
+  | QUESTIONMARKS { }
+;
 
 goodresult:
   INVALID { }

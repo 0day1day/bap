@@ -794,7 +794,7 @@ struct
           wprintf "Unknown variable during eval: %s" (Var.name var);
         Symbolic(Int(bi0, (Var.typ var)))
 
-  let normalize = SymbolicMemL.normalize
+  let normalize = Symbeval.normalize
 
   let update_mem mu pos value endian =
     (match mu, pos with
@@ -822,6 +822,8 @@ struct
       )
 
     | _ -> failwith "Concrete evaluation should never have symbolic memories"
+
+  include Symbeval.BuildMemLPrinters(MemVHBackEnd)
 
 end
 
@@ -1083,7 +1085,7 @@ let run_block ?(next_label = None) ?(log=fun _ -> ()) ?(transformf = (fun s _ ->
   if not !consistency_check then (
     (* If we are not doing a consistency check, there's no reason to
        keep delta around. cleanup_delta completely clears delta *)
-    TraceConcrete.cleanup_delta state.delta
+    TraceConcrete.cleanup_delta state
   ) else (
     (* remove temps *)
     clean_delta state.delta;
@@ -1377,7 +1379,7 @@ struct
       )
 
   let lookup_mem mu index endian =
-    let normalize = SymbolicMemL.normalize in
+    let normalize = Symbeval.normalize in
     match mu, index with
     | ConcreteMem(m,v), Int(i,t) ->
 	(try AddrMap.find (normalize i t) m
@@ -1430,7 +1432,6 @@ let concrete_rerun file stmts =
 
 (* A quick and dirty way to estimate the formula size *)
 let formula_size formula =
-  let _max n1 n2 = if n1 > n2 then n1 else n2 in
   let (+) = Int64.add in
   let rec size = function
     | Ast.Ite(_,e1,e2) -> Int64.one + (size e1) + (size e2)
@@ -1470,7 +1471,7 @@ struct
                                 (MemL.update_var delta v ev, pred))
       else
         let expr = match ev with
-          | ConcreteMem (m,v) -> symb_to_exp (Symbeval.SymbolicMemL.conc2symb m v)
+          | ConcreteMem (m,v) -> symb_to_exp (Symbeval.conc2symb m v)
           | Symbolic e -> e
         in
         let constr = BinOp (EQ, Var v, expr) in

@@ -14,11 +14,14 @@ rule token = parse
   | ';'              { SEMICOLON }
   | '('              { LBRACKET }
   | ')'              { RBRACKET }
+  | "---"            { SDASHES }
   | "----"           { DASHES }
+  | "???"            { QUESTIONMARKS }
   | "MODEL"          { MODEL }
   | "ASSERT"         { ASSERT }
   | "sat"            { INVALID }
   | "unsat"          { VALID }
+  | "default:"       { DEFAULT }
   | "0hex"           { read_num lexbuf }
   | "0x"             { read_num lexbuf }
   | "0b"             { read_num lexbuf }

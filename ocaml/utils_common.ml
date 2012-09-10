@@ -19,7 +19,7 @@ let rename_astexp f =
   Ast_visitor.exp_accept vis;;
 
 
-let to_ssagcl ?(usedc=true) ?(usesccvn=true) cfg post =
+let optimize_cfg ?(usedc=true) ?(usesccvn=true) cfg post =
   let cfg = Hacks.remove_cycles cfg in
   let cfg = Prune_unreachable.prune_unreachable_ast cfg in
   let cfg = Coalesce.coalesce_ast cfg in
@@ -30,8 +30,19 @@ let to_ssagcl ?(usedc=true) ?(usesccvn=true) cfg post =
     Ssa_simp.simp_cfg ~liveout:vars ~usedc ~usesccvn cfg
   in
   let cfg = Cfg_ssa.to_astcfg cfg in
-  let gcl = Gcl.of_astcfg cfg in
-  (gcl, p);;
+  (cfg, p);;
+
+(* let to_ssagcl cfg post = *)
+(*   let gcl = Gcl.of_astcfg cfg in *)
+(*   (gcl, post);; *)
+
+(* let to_ssapassgcl cfg post = *)
+(*   let (gcl, _) = Gcl.passified_of_ssa cfg in *)
+(*   (gcl, post) *)
+
+(* let to_ugcl passify cfg post = *)
+(*   let gcl = Ugcl.of_ssacfg ~passify:passify cfg in *)
+(*   (gcl, post) *)
 
 let stream_concrete ?(tag = "") mem_hash concrete_state block =
   let block = Memory2array.coerce_prog_state mem_hash block in

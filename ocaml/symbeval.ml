@@ -12,8 +12,9 @@ open Big_int_convenience
 open Type
 
 module VH = Var.VarHash
+module VM = Var.VarMap
 
-module D = Debug.Make(struct let name = "SymbEval" and default=`NoDebug end)
+module D = Debug.Make(struct let name = "Symbeval" and default=`NoDebug end)
 open D
 
 (* For now, we'll map every byte. Later it may be better to map larger
@@ -32,7 +33,7 @@ type form_type = Equal | Rename
 
 type ('a,'b) ctx = {
   pred: 'b;
-  delta: 'a;
+  mutable delta: 'a;
   sigma: (addr, instr) Hashtbl.t;
   lambda: (label_kind, addr) Hashtbl.t;
   pc: addr; (* Should be int *)
@@ -80,8 +81,12 @@ let is_symbolic = function
   | Symbolic (Int _) -> false
   | ConcreteMem _ -> false
   | _ -> true
-let is_concrete = function
+let is_concrete_scalar = function
   | Int _ -> true
+  | _ -> false
+let is_concrete_mem_or_scalar = function
+  | Symbolic(Int _) -> true
+  | ConcreteMem _ -> true
   | _ -> false
 let is_concrete_mem = function
   | ConcreteMem _ -> true
@@ -108,6 +113,23 @@ let symb_to_string = function
   | Symbolic e -> "Symbolic "^(Pp.ast_exp_to_string e)
   | ConcreteMem m -> "Memory"
 
+(* Converting concrete memory to symbolic *)
+let conc2symb memory v =
+  pdebug "Concrete to symbolic" ;
+  (* FIXME: a better symbolism for uninitialized memories *)
+  let init = Var v in
+  pdebug "The point of no return" ;
+  Symbolic (AddrMap.fold
+	      (fun k v m -> Store (m,Int(big_int_of_int64 k,reg_32),v,exp_false,reg_8))
+	      memory init)
+
+let varval_to_exp = function
+  | Symbolic e -> e
+  | ConcreteMem (m,v) -> symb_to_exp (conc2symb m v)
+
+(* Normalize a memory address, setting high bits to 0. *)
+let normalize i t = int64_of_big_int (Arithmetic.to_big_int (i,t))
+
 module type MemLookup =
 sig
 
@@ -117,7 +139,7 @@ sig
   (** Initial lookup table *)
   val create : unit -> t
   (** Clear the lookup table *)
-  val clear : t -> unit
+  val clear : t -> t
   (** Deep copy the lookup table *)
   val copy : t -> t
   (** Print vars *)
@@ -135,7 +157,6 @@ sig
   val update_mem : varval -> Ast.exp -> Ast.exp -> Ast.exp -> varval
   (** Lookup memory *)
   val lookup_mem : varval -> Ast.exp -> Ast.exp -> Ast.exp
-
 end
 
 module type EvalTune =
@@ -213,6 +234,7 @@ struct
   let lookup_var        = MemL.lookup_var
   let update_var	= MemL.update_var
   let update_mem        = MemL.update_mem
+  let remove_var	= MemL.remove_var
   let lookup_mem        = MemL.lookup_mem
   let assign            = Assign.assign
   let copy              = MemL.copy
@@ -234,7 +256,7 @@ struct
     Hashtbl.clear state.sigma ;
     Hashtbl.clear state.lambda ;
     (* Initializing Sigma and Lambda *)
-    ignore
+    let pc =
       (List.fold_left
          (fun pc s ->
           Hashtbl.add state.sigma pc s ;
@@ -243,10 +265,12 @@ struct
                | _ -> ()
             ) ;
             Int64.succ pc
-         ) state.pc prog_stmts )
+         ) state.pc prog_stmts) in
+    (* Add a halt to the end of the program *)
+    Hashtbl.add state.sigma pc (Halt(exp_true, []))
 
   let cleanup_delta state =
-    MemL.clear state
+    state.delta <- MemL.clear state.delta
 
   let build_default_context prog_stmts =
     let state = create_state() in
@@ -340,47 +364,63 @@ struct
 	      let e' = concrete_val_tuple v in
 	      let (n',t') = Arithmetic.cast ct e' t in
 		Symbolic (Int (n',t'))
-      | Let (var,e1,e2) as l ->
-	  (* Consider let v=e in e+e+e+e+e+e+e+e+e+e+e+e+e+e+e. If e
-	     is not concrete, this could lead to a huge blowup.
+      | Let (var,e1,e2) ->
+	(* Consider let v=e in e+e+e+e+e+e+e+e+e+e+e+e+e+e+e. If e
+	   is not concrete, this could lead to a huge blowup.
 
-	     So, if e is symbolic, we won't attempt to evaluate the expression
-	     further at all. *)
+           Thus, we have an option, eval_symb_let, that when unset,
+           stops us from doing substitution in this case.  *)
+
 	  let v1 = eval_expr delta e1 in
-	  if is_symbolic v1 && not eval_symb_let then
-            Symbolic(l)
-	  else
+          if eval_symb_let then
 	    let delta' = copy delta in (* FIXME: avoid copying *)
 	    let delta' = update_var delta' var v1 in
 	    let v2 = eval_expr delta' e2 in
-	    (* So, this is a little subtle.  Consider what happens if
-	       we have let x = 1 in let foo = freevar in x. We would
-	       evaluate let foo = freevar in x in the context where x
-	       is mapped to 1.  However, since freevar is a symbolic
-	       expression, we would not evaluate it further, and would
-	       return the evaluation expression let foo = freevar in
-	       x.  However, this is incorrect, because we are removing
-	       the Let binding for x!  We should really wrap any free
-	       variable with a Let binding to its current value in the
-	       context.
+            v2
+          else (
+          (* Partial evaluation is difficult.  If v1 is symbolic, we
+             will make no attempt to get rid of the Let binding.
+             Instead, we will evaluate e and e', keeping the Let
+             binding in place.
 
-	       Unfortunately, the way that lookup_var is implemented
-	       does not make it easy to know whether a variable is
-	       really defined or not.  (In traces, we return 0
-	       whenever we see an unknown variable, for instance.) So,
-	       as a stopgap measure, if var is free in v2, we return
-	       the original expression. *)
-	    (match v2 with
-	    | Symbolic v2' ->
-	      let fvars = Formulap.freevars v2' in
-	      let isvar = (fun v -> not (Var.equal v var)) in
-	      if List.for_all isvar fvars then
-		(* var is not free! We are good to go *)
-                v2
-	      else
-		(* var is still free; we can't use the evaluated version *)
-		Symbolic(l)
-	    | _ -> v2)
+             If v1 is concrete, however, we can get rid of the Let
+             binding altogether, but only if var is not free in the
+             evaluated e'. This can happen if we have let x = 1 in let
+             foo = freevar in x.  We would evaluate let foo = freevar
+             in x in the context where x is mapped to 1.  However,
+             since freevar is a symbolic expression, we would not
+             evaluate it further if eval_symb_let = false, and would
+             return the evaluation expression let foo = freevar in x.
+             However, this is incorrect, because we are removing the
+             Let binding for x!  We should really wrap any free
+             variable with a Let binding to its current value in the
+             context.
+          *)
+
+            if is_symbolic v1 then
+	      let delta' = copy delta in (* FIXME: avoid copying *)
+              (* Remove so we don't expand references to var in delta *)
+	      let delta' = remove_var delta' var in
+	      let v2 = eval_expr delta' e2 in
+              let v1' = varval_to_exp v1 in
+              let v2' = varval_to_exp v2 in
+              Symbolic(Let(var, v1', v2'))
+            else (* v1 is concrete, do substitution *)
+	      let delta' = copy delta in (* FIXME: avoid copying *)
+	      let delta' = update_var delta' var v1 in
+	      let v2 = eval_expr delta' e2 in
+              match v2 with
+              | Symbolic v2' ->
+	        let fvars = Formulap.freevars v2' in
+	        let isvar = (fun v -> not (Var.equal v var)) in
+	        if List.for_all isvar fvars then
+		  (* var is not free! We can get rid of the Let. *)
+                  v2
+	        else
+		(* var is free in e2; we need to add the binding back *)
+                  let v1' = varval_to_exp v1 in
+		  Symbolic(Let(var, v1', v2'))
+              | ConcreteMem _ -> v2)
       | Load (mem,ind,endian,t) ->
 	(match t with
 	| Reg 8 ->
@@ -462,12 +502,14 @@ struct
       | Assert (e,_) ->
           (match eval_expr delta e with
              | v when is_symbolic v ->
-		 let constr = symb_to_exp v in
-		 let pred' = add_constraint pred constr Equal in
-		   (*pdebug("Adding assertion: " ^ (Pp.ast_exp_to_string pred')) ;*)
-		   [{ctx with pred=pred'; pc=next_pc}]
+	       let constr = symb_to_exp v in
+	       let pred' = add_constraint pred constr Equal in
+	       (*pdebug("Adding assertion: " ^ (Pp.ast_exp_to_string pred')) ;*)
+	       [{ctx with pred=pred'; pc=next_pc}]
              | v when is_false_val v ->
-		 raise (AssertFailed ctx)
+               let pred = Form.true_formula in
+               let pred = add_constraint pred exp_false Equal in
+	       raise (AssertFailed({ctx with pred = pred}))
              | _ -> [{ctx with pc=next_pc}]
           )
       | Comment _ | Label _ ->
@@ -482,20 +524,25 @@ struct
   let eval state =
     try
       let stmt = inst_fetch state.sigma state.pc in
-	(*pdebug (Pp.ast_stmt_to_string stmt) ; *)
-	eval_stmt state stmt
+      dprintf "Executing %s" (Pp.ast_stmt_to_string stmt);
+      if debug () then print_values state.delta;
+      eval_stmt state stmt
     with Failure str ->
       (prerr_endline ("Evaluation aborted at stmt No-"
                       ^(Int64.to_string state.pc)
                       ^"\nreason: "^str);
-       print_values state.delta;
-       print_mem state.delta;
-       print_endline ("Path predicate: "^(Pp.ast_exp_to_string (output_formula state.pred)));
+       if debug () then (print_values state.delta;
+                      print_mem state.delta);
+       (* print_endline ("Path predicate: "^(Pp.ast_exp_to_string (output_formula state.pred))); *)
        [])
       | Not_found ->
-	  (* The only way inst_fetch would fail is if pc falls off the end, right? *)
-	  wprintf "PC not found: %#Lx" state.pc;
-	  raise (Halted(None, state))
+        (prerr_endline ("Evaluation aborted at stmt No-"
+                        ^(Int64.to_string state.pc)
+                        ^"\nreason: "^(Printf.sprintf "PC not found: %#Lx" state.pc));
+         if debug () then (print_values state.delta;
+                        print_mem state.delta);
+         (* print_endline ("Path predicate: "^(Pp.ast_exp_to_string (output_formula state.pred))); *)
+         [])
 
   (** Evaluate as long as there is exactly one choice of state.
 
@@ -518,46 +565,9 @@ struct
   type t = varval VH.t
 
   let copy delta = VH.copy delta
-  let clear delta = VH.clear delta
+  let clear delta = VH.clear delta; delta
   let create () = VH.create 5000
-
-  let print_values delta =
-    print_endline "contents of variables" ;
-    VH.iter
-      (fun k v ->
-  	 match k,v with
-  	   | var,Symbolic e ->
-               print_endline ((Pp.var_to_string var) ^ " = " ^ (Pp.ast_exp_to_string e))
-  	   | _ -> ()
-      ) delta
-
-  let print_mem delta =
-    print_endline "contents of memories" ;
-    VH.iter
-      (fun k v ->
-  	 match k,v with
-  	   | var, ConcreteMem(mem,_) ->
-               print_endline ("memory " ^ (Var.name var)) ;
-               AddrMap.iter
-  		 (fun i v ->
-  		    print_endline((Printf.sprintf "%Lx" i)
-  			   ^ " -> " ^ (Pp.ast_exp_to_string v))
-  		 )
-  		 mem
-  	   | _ -> ()
-      ) delta
-
-  let print_var delta name =
-    VH.iter
-      (fun var exp ->
-  	 match exp with
-  	   | Symbolic e ->
-  	       let varname = Var.name var in
-  		 if varname = name then
-  		   print_endline (varname ^ " = "
-  			   ^ (Pp.ast_exp_to_string e))
-  	   | _ -> ()
-      ) delta
+  let fold delta f i = VH.fold f delta i
 
   (** Number of variable locations stored in state *)
   let num_values delta =
@@ -580,6 +590,8 @@ struct
 	   | _ -> count
       ) delta 0
 
+  let find_var = VH.find
+
   let update_var a b c =
     VH.replace a b c; a
 
@@ -587,13 +599,117 @@ struct
     VH.remove delta var; delta
 end
 
-module SymbolicMemL =
+module MemVMBackEnd =
+struct
+  type t = varval VM.t
+
+  let copy delta = delta
+  let create () = VM.empty
+  let clear delta = create ()
+
+  let fold delta f i = VM.fold f delta i
+
+  (** Number of variable locations stored in state *)
+  let num_values delta =
+    VM.fold (fun _ _ n -> n+1) delta 0
+
+  (** Number of concrete memory locations stored in state *)
+  let num_mem_locs delta =
+    (** Number of bindings in map
+
+	XXX: This is inefficient; switch to BatMaps which support cardinality
+    *)
+    let map_length m =
+      AddrMap.fold (fun _ _ c -> c+1) m 0
+    in
+    VM.fold
+      (fun k v count  ->
+	 match k,v with
+	   | var, ConcreteMem(mem,_) ->
+             count + (map_length mem)
+	   | _ -> count
+      ) delta 0
+
+  let find_var a b =
+    VM.find b a
+
+  let update_var a b c =
+    VM.add b c a
+
+  let remove_var delta var =
+    VM.remove var delta
+end
+
+module type MemBackEnd =
+sig
+  type t
+  val copy : t -> t
+  val clear : t -> t
+  val create : unit -> t
+  val fold : t -> (var -> varval -> 'acc -> 'acc) -> 'acc -> 'acc
+  val num_values : t -> int
+  val find_var : t -> var -> varval
+  val update_var : t -> var -> varval -> t
+  val remove_var : t -> var -> t
+end
+
+module type Foldable =
+sig
+  type t
+  val fold : t -> (var -> varval -> 'acc -> 'acc) -> 'acc -> 'acc
+end
+
+module BuildMemLPrinters(F:Foldable) =
+struct
+  let print_values delta =
+    print_endline "contents of variables" ;
+    F.fold
+      delta
+      (fun k v () ->
+  	 match k,v with
+  	   | var,Symbolic e ->
+               print_endline ((Pp.var_to_string var) ^ " = " ^ (Pp.ast_exp_to_string e))
+  	   | _ -> ()
+      ) ()
+
+  let print_mem delta =
+    print_endline "contents of memories" ;
+    F.fold
+      delta
+      (fun k v () ->
+  	 match k,v with
+  	   | var, ConcreteMem(mem,_) ->
+               print_endline ("memory " ^ (Var.name var)) ;
+               AddrMap.iter
+  		 (fun i v ->
+  		    print_endline((Printf.sprintf "%Lx" i)
+  			   ^ " -> " ^ (Pp.ast_exp_to_string v))
+  		 )
+  		 mem
+  	   | _ -> ()
+      ) ()
+
+  let print_var delta name =
+    F.fold
+      delta
+      (fun var exp () ->
+  	 match exp with
+  	   | Symbolic e ->
+  	       let varname = Var.name var in
+  		 if varname = name then
+  		   print_endline (varname ^ " = "
+  			   ^ (Pp.ast_exp_to_string e))
+  	   | _ -> ()
+      ) ()
+end
+
+module BuildSymbolicMemL(BE:MemBackEnd) =
 struct
 
-  include MemVHBackEnd
+  include BE
 
   let lookup_var delta var =
-    try VH.find delta var
+    try find_var delta var
     with Not_found ->
       match Var.typ var with
 	| TMem _
@@ -601,19 +717,6 @@ struct
 	    empty_mem var
 	| Reg _ ->
 	    Symbolic(Var var)
-
-  (* Converting concrete memory to symbolic *)
-  let conc2symb memory v =
-    pdebug "Concrete to symbolic" ;
-    (* FIXME: a better symbolism for uninitialized memories *)
-    let init = Var v in
-      pdebug "The point of no return" ;
-      Symbolic (AddrMap.fold
-		  (fun k v m -> Store (m,Int(big_int_of_int64 k,reg_32),v,exp_false,reg_8))
-		  memory init)
-
-  (* Normalize a memory address, setting high bits to 0. *)
-  let normalize i t = int64_of_big_int (Arithmetic.to_big_int (i,t))
 
   let rec update_mem mu pos value endian =
     (*pdebug "Update mem" ;*)
@@ -638,15 +741,19 @@ struct
       | Symbolic mem, _ -> Load (mem,index,endian,reg_8)
       | ConcreteMem(m,v),_ -> lookup_mem (conc2symb m v) index endian
 
+  include BuildMemLPrinters(BE)
+
 end
 
-module ConcreteMemL =
+module SymbolicMemL = BuildSymbolicMemL(MemVHBackEnd)
+
+module BuildConcreteMemL(BE:MemBackEnd) =
 struct
 
-  include MemVHBackEnd
+  include BE
 
   let lookup_var delta var =
-    try VH.find delta var
+    try find_var delta var
     with Not_found ->
       match Var.typ var with
 	| TMem _
@@ -654,8 +761,6 @@ struct
 	    empty_mem var
 	| Reg n as t ->
 	    Symbolic(Int(bi0, t))
-
-  let normalize = SymbolicMemL.normalize
 
   let rec update_mem mu pos value endian =
     (*pdebug "Update mem" ;*)
@@ -670,11 +775,34 @@ struct
       | ConcreteMem(m,v), Int(i,t) ->
 	  (try AddrMap.find (normalize i t) m
 	   with Not_found ->
-	     Int(bi0, reg_8)
+             failwith (Printf.sprintf "Uninitialized memory found at %s" (Pp.ast_exp_to_string index))
 	  )
       | _ -> failwith "Symbolic memory or address in concrete evaluation"
 
+  include BuildMemLPrinters(BE)
 end
+
+module ConcreteMemL = BuildConcreteMemL(MemVHBackEnd)
+
+(* This concrete module will return zero for unknown memory locations,
+   rather than raising an exception *)
+module BuildConcreteUnknownZeroMemL(BE:MemBackEnd) =
+struct
+  include BuildConcreteMemL(BE)
+
+  let rec lookup_mem mu index endian =
+    (*pdebug "Lookup mem" ;*)
+    match mu, index with
+    | ConcreteMem(m,v), Int(i,t) ->
+      (try AddrMap.find (normalize i t) m
+       with Not_found ->
+         wprintf "Uninitialized memory found at %s" (Pp.ast_exp_to_string index);
+         Int(bi0, reg_32)
+      )
+    | _ -> failwith "Symbolic memory or address in concrete evaluation"
+end
+
+module ConcreteUnknownZeroMemL = BuildConcreteUnknownZeroMemL(MemVHBackEnd)
 
 (** Symbolic assigns are represented as Lets in the formula, except
     for temporaries.  If you use this, you should clear out temporaries
@@ -782,27 +910,31 @@ end
 
 
 module Symbolic = Make(SymbolicMemL)(FastEval)(StdAssign)(StdForm)
+module SymbolicSlowMap = Make(BuildSymbolicMemL(MemVMBackEnd))(SlowEval)(StdAssign)(StdForm)
 module SymbolicSlow = Make(SymbolicMemL)(SlowEval)(StdAssign)(StdForm)
 
-module Concrete = Make(ConcreteMemL)(AlwaysEvalLet)(StdAssign)(StdForm)
+(** Concrete evaluator based on Hashtables *)
+module Concrete = Make(ConcreteUnknownZeroMemL)(AlwaysEvalLet)(StdAssign)(StdForm)
+
+(** Concrete evaluator based on Maps *)
+module ConcreteMap = Make(BuildConcreteMemL(MemVMBackEnd))(AlwaysEvalLet)(StdAssign)(StdForm)
 
 (** Execute a program concretely *)
 let concretely_execute ?s ?(i=[]) p =
   let rec step ctx =
+    dprintf "Step time";
     let s = try Concrete.inst_fetch ctx.sigma ctx.pc
       with Not_found ->
         failwith (Printf.sprintf "Fetching instruction %#Lx failed; you probably need to add a halt to the end of your program" ctx.pc)
     in
     dprintf "Executing: %s" (Pp.ast_stmt_to_string s);
-    let nextctxs = try Concrete.eval ctx, None with
-        Concrete.Halted (v, ctx) -> [ctx], v
+    let nextctxs, haltvalue, finished = try Concrete.eval ctx, None, false with
+        Concrete.Halted (v, ctx) -> [ctx], v, true
     in
-    match nextctxs with
-    | [next], None -> step next
-    |  _, None -> failwith "step"
-    (* Done recursing *)
-    | [ctx], v -> ctx, v
-    | _, Some _ -> failwith "step"
+    match finished, nextctxs with
+    | true, [c] -> c, haltvalue
+    | false, [next] -> step next
+    | _, _ -> failwith "step"
   in
   let ctx = Concrete.build_default_context p in
   (* Evaluate initialization statements *)
