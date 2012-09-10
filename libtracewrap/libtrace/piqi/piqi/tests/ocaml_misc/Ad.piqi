@@ -1,7 +1,0 @@
-.ocaml-module "Ad"
-
-.alias [
-    .name id
-    .type int64
-]
-
