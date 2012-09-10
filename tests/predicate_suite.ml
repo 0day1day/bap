@@ -92,7 +92,6 @@ let sat_test testname post stp_result (g_cfg, m2actx) =
 let valid_test testname post stp_result (g_cfg, m2actx) =
   let post = Memory2array.coerce_exp_state m2actx post in
   let test_vc (name,vc) =
-    try (* XXX: REMOVE ME *)
     print_endline ("Testing "^testname^" with "^name^" VC algorithm");
     let options = {Vc.default_options with Vc.mode = Validity} in
     let vcout, foralls = Vc.vc_astcfg vc options g_cfg post in
@@ -109,8 +108,6 @@ let valid_test testname post stp_result (g_cfg, m2actx) =
                        ^ " was not "
                        ^(Smtexec.result_to_string stp_result)
                        ^" but "^(Smtexec.result_to_string r))))
-    (* XXX: REMOVE ME *)
-    with Failure _ -> ()
   in
   (* Test with each VC algorithm *)
   List.iter test_vc Vc.pred_vclist;
