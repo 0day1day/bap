@@ -112,5 +112,15 @@ val get_print_warning : unit -> bool
 
 val set_use_simple_segments : bool -> unit
 
+(** [get_exec_mem_contents p] returns a function [f] such that [f
+    addr] returns the executable byte in memory at [addr] if one exists.
+    If no such byte exists, @raises {!Memory_error}. *)
 val get_exec_mem_contents : asmprogram -> int64 -> char
+
+(** [get_readable_mem_contents] is like {!get_exec_mem_contents} but
+    for any readable memory. *)
 val get_readable_mem_contents : asmprogram -> int64 -> char
+
+(** [get_readable_mem_contents_list p] returns a list of [(addr,
+    byte)] tuples indicating the memory at [addr] is [byte]. *)
+val get_readable_mem_contents_list : asmprogram -> (address_t * char) list

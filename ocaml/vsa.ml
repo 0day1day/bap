@@ -927,8 +927,8 @@ module MemStore = struct
 
   (* VSA optional interface: specify a "real" memory read funtion *)
   module O = struct
-    type t = { get_mem : int64 -> int64 option }
-    let default = { get_mem = (fun _ -> None) } 
+    type t = { initial_mem : (addr * char) list }
+    let default = { initial_mem = [] }
   end
 
   (** This implementation may change... *)
@@ -943,23 +943,25 @@ module MemStore = struct
   let pp p a =
     p "Memory contents:\n";
     fold (fun (r,i) vs () ->
-      p (Printf.sprintf " %s[%#Lx] -> %s\n" (Pp.var_to_string r) i (VS.to_string vs))) a ();
+      let region = if r == VS.global then "$" else Pp.var_to_string r in
+      p (Printf.sprintf " %s[%#Lx] -> %s\n" region i (VS.to_string vs))) a ();
     p "End contents."
 
-  let read_concrete_real ?o (r,i) = match o with
-    | Some {O.get_mem=get_mem} when r = VS.global ->
-      let prog_mem = BatList.filter_map get_mem [i;i+%1L;i+%2L;i+%3L] in
-      if List.length prog_mem = 4 then
-        (* Ugh, fix this *)
-        let i64 = Arithmetic.bytes_to_int64 `Little prog_mem in
-        VS.of_bap_int i64 reg_32
-      else VS.top
-    | _ -> VS.top
+  (* let read_concrete_real ?o (r,i) =match o with *)
+  (*   | Some {O.get_mem=get_mem} when r = VS.global -> *)
+  (*     let prog_mem = BatList.filter_map get_mem [i;i+%1L;i+%2L;i+%3L] in *)
+  (*     if List.length prog_mem = 4 then *)
+  (*       (\* Ugh, fix this *\) *)
+  (*       let i64 = Arithmetic.bytes_to_int64 `Little prog_mem in *)
+  (*       VS.of_bap_int i64 reg_32 *)
+  (*     else VS.top *)
+  (*   | _ -> VS.top *)
 
   let read_concrete ?o ae (r,i) =
     try M2.find i (M1.find r ae)
     with Not_found ->
-      read_concrete_real ?o (r,i)
+      VS.top
+      (* read_concrete_real ?o (r,i) *)
 
   let read ?o ae = function
     | [] -> failwith "empty value sets not allowed"
@@ -1165,8 +1167,19 @@ struct
     let init_vars vars =
       List.fold_left (fun vm x -> VM.add x (`Scalar [(x, SI.zero (bits_of_width (Var.typ x)))]) vm) L.top vars
 
-    let init _ g =
-      init_vars [sp]
+    let init_mem vm {O.initial_mem=initial_mem} =
+      let write_mem m (a,v) =
+        dprintf "Writing %c to %#Lx" v a;
+        let v = Char.code v in
+        let v = Int64.of_int v in
+        MemStore.write m (VS.single 32 a) (VS.single 8 v)
+      in
+      let m = List.fold_left write_mem (MemStore.top) initial_mem in
+      VM.add Disasm_i386.mem (`Array m) vm
+
+    let init o g : L.t =
+      let vm = init_vars [sp] in
+      init_mem vm o
 
     let dir _ = GraphDataflow.Forward
 

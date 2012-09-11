@@ -30,7 +30,7 @@ type asmprogram = {asmp : Libasmir.asm_program_t;
 		   secs : section_ptr list;
                    (** Get executable code bytes *)
 		   get_exec : int64 -> char;
-                   (** Get any readable bytes *)
+                   (** Get any readable bytes. *)
                    get_readable : int64 -> char;
  }
 
@@ -456,7 +456,10 @@ let is_code s =
 let codeonly s = is_load s && is_code s
 let loaded s = is_load s
 
-let section_contents ?(which=codeonly) prog secs =
+(** Returns a list of [(addr,array)] tuples where [addr] is the
+    starting address of a memory segment, and [array] is an array
+    representing the memory starting at address [addr]. *)
+let section_memory_helper ?(which=codeonly) prog secs =
   let bfd = Libasmir.asmir_get_bfd prog in
   let sc l s =
     let size = bfd_section_size s and vma = bfd_section_vma s
@@ -464,12 +467,16 @@ let section_contents ?(which=codeonly) prog secs =
     and name = bfd_section_name s in
     dprintf "Found section %s at %Lx with size %Ld. flags=%Lx" name vma size flags;
     if which s then
-    (* if Int64.logand Libbfd.sEC_LOAD flags <> 0L then *)
+      (* if Int64.logand Libbfd.sEC_LOAD flags <> 0L then *)
       let (ok, a) = Libbfd.bfd_get_section_contents bfd s 0L size in
       if ok <> 0 then (vma, a)::l else (dprintf "failed."; l)
     else l
   in
   let bits = List.fold_left sc [] secs in
+  bits
+
+let section_contents ?(which=codeonly) prog secs =
+  let bits = section_memory_helper ~which prog secs in
   let get a =
     (* let open Int64 in *)
     let (-) = Int64.sub in
@@ -482,6 +489,14 @@ let section_contents ?(which=codeonly) prog secs =
   in
   get
 
+let section_contents_list ?(which=codeonly) prog secs =
+  let bits = section_memory_helper ~which prog secs in
+  let (+) = Int64.add in
+  let al l (base,arr) =
+    (* [base, ..., base + len(arr)) *)
+    foldn (fun l n -> (base + (Int64.of_int n), arr.{n})::l) l ((BArray.dim arr) - 1)
+  in
+  List.fold_left al [] bits
 
 (** Open a binary file for translation *)
 let open_program ?base filename =
@@ -1067,3 +1082,5 @@ let get_exec_mem_contents {get_exec=get_exec} =
   get_exec
 
 let get_readable_mem_contents {get_readable=get_readable} = get_readable
+
+let get_readable_mem_contents_list {asmp=asmp; secs=secs} = section_contents_list ~which:loaded asmp secs
