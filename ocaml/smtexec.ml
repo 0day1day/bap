@@ -38,6 +38,7 @@ end
 module type SOLVER =
 sig
   val solvername : string
+  val in_path : unit -> bool
   val solve_formula_file : ?timeout:int -> ?remove:bool -> ?printmodel:bool -> string -> result (** Solve a formula in a file *)
   val check_exp_validity : ?timeout:int -> ?remove:bool -> ?exists:(Ast.var list) -> ?foralls:(Ast.var list) -> Ast.exp -> result (** Check validity of an exp *)
   val create_cfg_formula :
@@ -169,13 +170,16 @@ struct
       (* FIXME: same for exists? *)
       write_formula ~exists ~foralls ?remove wp
 
+    let in_path () =
+      Sys.command (Printf.sprintf "which %s > /dev/null" S.progname) == 0
+
     let solve_formula_file ?(timeout=S.timeout) ?(remove=false) ?(printmodel=false) file =
       ignore(alarm timeout);
       let cmdline = S.progname ^ " " ^ S.cmdstr file in
 
       try
         dprintf "Executing: %s" cmdline;
-        if Sys.command (Printf.sprintf "which %s > /dev/null" S.progname) != 0 then
+        if in_path() = false then
           SmtError (Printf.sprintf "Solver program %s not in path" S.progname)
         else (
 	  let sout,serr,pstatus = syscall cmdline in
