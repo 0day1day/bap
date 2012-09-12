@@ -66,6 +66,8 @@ let fwd_transfer_stmt_to_block f g node latice =
 (* FIXME: find a better way to get the stack pointer *)
 let sp = Disasm_i386.esp
 
+(* FIXME *)
+let addr_bits = 32
 
 (** Strided Intervals *)
 module SI =
@@ -171,6 +173,7 @@ struct
       check_reduced k si';
       si'
 
+  let renormtri f k x y z = renorm k (f k x y z)
   let renormbin f k x y = renorm k (f k x y)
   let renormun f k x = renorm k (f k x)
 
@@ -382,6 +385,42 @@ struct
 
   (** Left shift *)
   let lshift = mk_shift `Leftshift Int64.shift_left
+
+  let cast_low k tok ((k',s,a,b) as v) =
+    assert (k <= k');
+    if s <> trunc k s then top k
+    else
+      (if k' <> k then
+          let f x = extend k (trunc k x) in
+          (k, s, f a, f b)
+       else v)
+  let cast_low = renormbin cast_low
+
+  let cast_high k tok ((k',s,a,b) as v) =
+    assert (k <= k');
+    let f x = I.shift_right x (k' - k) in
+    if k' <> k then
+      (k', s, f a, f b)
+    else v
+  let cast_high = renormbin cast_high
+
+  let extract k h l ((k,_,_,_) as x) =
+    let nb = (h-l)+1 in
+    assert (h >= 0);
+    assert (nb >= 0);
+    let x = if l <> 0 then rshift k (single k (Int64.of_int l)) x else x in
+    let x = if nb <> k then cast_low k nb x else x in
+    x
+  let extract = renormtri extract
+
+  (* XXX: Rewrite to work with non-singleton values *)
+  let concat k (((k1,s1,l1,u1) as _x) : t) (((k2,s2,l2,u2) as _y) : t) =
+    assert (k = k1 + k2);
+    if (s1 = s2) && (s2 = 0L) then
+      let i,t = Arithmetic.concat (biconst64 l1, Reg k1) (biconst64 l2, Reg k2) in
+      of_bap_int (Big_int_Z.int64_of_big_int i) t
+    else top k
+  let concat = renormbin concat
 
   (* construct these only once *)
   let yes = single 1 (-1L)
@@ -600,19 +639,30 @@ struct
                        (s, f a, f b)
                        else si
                     *)
+                | Cast(CAST_LOW, t, vl) ->
+                  let k = bits_of_exp vl
+                  and k' = bits_of_width t
+                  and (k'',s,a,b) as si = exp2si vl in
+                  assert (k=k'');
+                  SI.cast_low k k' si
                 | Cast(CAST_HIGH, t, vl) ->
                   let k = bits_of_exp vl
                   and k' = bits_of_width t
                   and (k'',s,a,b) as si = exp2si vl in
                   assert (k=k'');
-                  let f x = I.shift_right x (k' - k) in
-                  if k' <> k then
-                    (k', s, f a, f b)
-                  else si
-                | Cast(CAST_LOW, t, vl) ->
-                  raise(Unimplemented "FIXME")
-                | _ ->
-                  raise(Unimplemented "unimplemented expression type"))
+                  SI.cast_high k k' si
+                | Cast(CAST_UNSIGNED, t, vl) ->
+                  raise(Unimplemented "Casts unimplemented")
+                | Concat _ -> exp2si (Ast_convenience.rm_concat e)
+                | Extract _ -> exp2si (Ast_convenience.rm_extract e)
+                | Ite (c, e1, e2) ->
+                  let csi = exp2si c in
+                  if csi = SI.yes then exp2si e1
+                  else if csi = SI.no then exp2si e2
+                  else SI.union (exp2si e1) (exp2si e2)
+                | Unknown _ -> top v
+                | Let _ -> raise (Unimplemented "Let unimplemented")
+                | Store _ | Load _ -> raise (Unimplemented "Memory unimplemented in this version of VSA"))
                 with Unimplemented _ | Invalid_argument _ ->
                   top v
               in
@@ -644,12 +694,14 @@ struct
   type address = region * SI.t
 
   type t = address list
-      (* [] = (top, top, top,...), otherwise, any region not in the list
-         maps to bottom. *)
 
   let global = Var.newvar "internal only" (Reg 64) (* value doesn't really matter, so long as it's unique *)
 
-  let top = [(global, SI.top 32)]
+  let top k = [(global, SI.top k)]
+
+  let rec width = function
+    | (_, (k,_,_,_))::_ -> k
+    | [] -> failwith "width: empty value set"
 
   let pp_address p (r, si) =
     if r == global then p "$" else p(Pp.var_to_string r);
@@ -708,14 +760,14 @@ struct
       List.map (fun (r,si) ->
         let allow_overflow = r == global in
         (r, SI.add ~allow_overflow k si1 si)) xs
-    | _ -> top
+    | _ -> top k
 
   let sub k x = function
     | [r,si] when r == global ->
         List.map (fun (r,si') -> (r, SI.sub k si' si)) x
-    | _ -> top
+    | _ -> top k
 
-  let makeother f id annihilator  k x y = match (x,y) with
+  let makeother f id annihilator k x y = match (x,y) with
     | ([r1,si1], [r2,si2]) when r1 == global && r1 == r2 ->
         [(r1, f k si1 si2)]
     | ([_] as vsg, vs) when vsg = id ->
@@ -726,13 +778,21 @@ struct
         BatOption.get annihilator
     | (_,([_] as vsg))  when Some vsg = annihilator ->
         BatOption.get annihilator
-    | _ -> top
+    | _ -> top k
 
   let logand k = makeother SI.logand (minus_one k) (Some (zero k)) k
 
   let logor k = makeother SI.logor (zero k) (Some (minus_one k)) k
 
   let logxor k = makeother SI.logxor (zero k) None k
+
+  let si_to_vs_binop_function f k =
+    let g vs1 vs2 = match vs1, vs2 with
+      | [(r1,si1)], [(r2,si2)] when r1 == global && r2 == global -> [(r1, f k si1 si2)]
+      | _ -> raise(Unimplemented "unimplemented binop") in
+    g
+
+  let concat = si_to_vs_binop_function SI.concat
 
   let yes = [(global, SI.yes)]
   let no = [(global, SI.no)]
@@ -749,7 +809,9 @@ struct
          else no
 
   let union x y =
-    if x = top || y = top then top else
+    let k = width x in
+    if debug () then (assert (k = width y));
+    if x = top k || y = top k then top k else
       let h = Hashtbl.create (List.length x + List.length y) in
       let add (r,si) =
         try Hashtbl.replace h r (SI.union (Hashtbl.find h r) si)
@@ -761,8 +823,10 @@ struct
       Hashtbl.fold (fun k v r -> (k,v)::r) h []
 
   let intersection x y =
-    if x = top then y
-    else if y = top then x
+    let k = width x in
+    if debug () then (assert (k = width y));
+    if x = top k then y
+    else if y = top k then x
     else let hx = Hashtbl.create (List.length x) in
          let add (r,si) =
            Hashtbl.add hx r si
@@ -775,7 +839,9 @@ struct
            [] y
 
   let widen x y =
-    if x = top || y = top then top else
+    let k = width x in
+    if debug () then (assert (k = width y));
+    if x = top k || y = top k then top k else
     let h = Hashtbl.create (List.length x + List.length y) in
     let add (r,si) =
       try Hashtbl.replace h r (SI.widen (Hashtbl.find h r) si)
@@ -787,7 +853,7 @@ struct
       Hashtbl.fold (fun k v r -> (k,v)::r) h []
 
   let fold f vs init =
-    if vs = top then wprintf "VS.fold is very slow for Top";
+    if vs = top addr_bits then wprintf "VS.fold is very slow for Top";
     List.fold_left (fun a (r,si) -> SI.fold (fun v -> f (r,v)) si a) init vs
 
   let numconcrete vs =
@@ -837,12 +903,6 @@ struct
 
     let dir _ = GraphDataflow.Forward
 
-    let si_to_vs_binop_function f k =
-      let g vs1 vs2 = match vs1, vs2 with
-        | [(r1,si1)], [(r2,si2)] when r1 == VS.global && r2 == VS.global -> [(r1, f k si1 si2)]
-        | _ -> raise(Unimplemented "unimplemented binop") in
-      g
-
     let binop_to_vs_function = function
       | PLUS -> VS.add
       | MINUS -> VS.sub
@@ -863,7 +923,7 @@ struct
       | LE
       | SLT
       | SLE as bop
-        -> si_to_vs_binop_function (SimpleVSA.DFP.binop_to_si_function bop)
+        -> VS.si_to_vs_binop_function (SimpleVSA.DFP.binop_to_si_function bop)
 
     let unop_to_vs_function _ = (raise(Unimplemented "unop") : int -> VS.t -> VS.t)
 
@@ -878,7 +938,7 @@ struct
         | Move(v, e, _) ->
             try
               let find v = VM.find v l in
-              let do_find v =  try find v with Not_found -> VS.top in
+              let do_find v = try find v with Not_found -> VS.top (bits_of_width (Var.typ v)) in
               let rec exp2vs e =
                 try (match e with
                 | Int(i,t) -> VS.of_bap_int (int64_of_big_int i) t
@@ -902,7 +962,7 @@ struct
                   raise(Unimplemented "FIXME")
                 | _ ->
                   raise(Unimplemented "unimplemented expression type"))
-                with Unimplemented _ | Invalid_argument _ -> VS.top
+                with Unimplemented _ | Invalid_argument _ -> VS.top (bits_of_width (Typecheck.infer_ast ~check:false e))
               in
               let new_vs = exp2vs e in
               VM.add v new_vs l
@@ -957,33 +1017,53 @@ module MemStore = struct
   (*     else VS.top *)
   (*   | _ -> VS.top *)
 
-  let read_concrete ?o ae (r,i) =
-    try M2.find i (M1.find r ae)
+  let rec read_concrete k ?o ae (r,i) =
+    try
+      let v = M2.find i (M1.find r ae) in
+      let w = VS.width v in
+      assert (w mod 8 = 0);
+      if w = k then v
+      else (
+        (* We wanted to read k bits, but read w instead. Let's try to
+           read from i+w/8 and get the rest. *)
+        if w > k then
+          (* We read too many bytes: use extract *)
+          VS.top k
+        else
+          (* We read too few bytes: use concat
+             XXX: Handle address wrap-around properly
+          *)
+          let (+) = Int64.add in
+          let (/) = Int64.div in
+          let rest = read_concrete (k-w) ?o ae (r, i+((Int64.of_int w)/8L)) in
+          (* dprintf "Concatenating %Ld %s and %s" i (VS.to_string v) (VS.to_string rest); *)
+          (* XXX: Endianness *)
+          VS.concat k rest v)
     with Not_found ->
-      VS.top
+      VS.top k
       (* read_concrete_real ?o (r,i) *)
 
-  let read ?o ae = function
+  let read k ?o ae = function
     | [] -> failwith "empty value sets not allowed"
     | addrs -> (* FIXME: maybe shortcut this *)
       try
         let res =
           VS.fold
             (fun v a ->  match a with
-            | None -> Some (read_concrete ?o ae v)
+            | None -> Some (read_concrete k ?o ae v)
             | Some a ->
-              if a = VS.top then raise Exit
+              if a = VS.top k then raise Exit
               else
-                Some (VS.union (read_concrete ?o ae v) a)
+                Some (VS.union (read_concrete k ?o ae v) a)
             ) addrs None
         in
         match res with
         | Some x -> x
         | None -> failwith "MemStore.read impossible address"
-      with Exit -> VS.top
+      with Exit -> VS.top k
 
-  let write_concrete_strong ae (r,i) vl =
-    if vl = VS.top then
+  let write_concrete_strong k ae (r,i) vl =
+    if vl = VS.top k then
       try
         let m2 = M1.find r ae in
         let m2' = M2.remove i m2 in
@@ -993,19 +1073,19 @@ module MemStore = struct
       let m2 = try M1.find r ae with Not_found -> M2.empty in
         M1.add r (M2.add i vl m2) ae
 
-  let write_concrete_weak ae addr vl =
-    write_concrete_strong ae addr (VS.union vl (read_concrete ae addr))
+  let write_concrete_weak k ae addr vl =
+    write_concrete_strong k ae addr (VS.union vl (read_concrete k ae addr))
 
-  let write_concrete_intersection ae addr vl =
-    write_concrete_strong ae addr (VS.intersection vl (read_concrete ae addr))
+  let write_concrete_intersection k ae addr vl =
+    write_concrete_strong k ae addr (VS.intersection vl (read_concrete k ae addr))
 
-  let write_concrete_weak_widen ae addr vl =
-    write_concrete_strong ae addr (VS.widen vl (read_concrete ae addr))
+  let write_concrete_weak_widen k ae addr vl =
+    write_concrete_strong k ae addr (VS.widen vl (read_concrete k ae addr))
 
-  let write ae addr vl =
-    if addr = VS.top then (
-      if vl = VS.top then top
-      else fold (fun k v a -> write_concrete_weak a k vl) ae ae
+  let write k ae addr vl =
+    if addr = VS.top k then (
+      if vl = VS.top k then top
+      else fold (fun addr v a -> write_concrete_weak k a addr vl) ae ae
     ) else
       match addr with
       (* XXX: Handle strides *)
@@ -1017,27 +1097,27 @@ module MemStore = struct
         (* Set this entire region to Top *)
         M1.remove r ae
       | [(r, (_,0L,x,y))] when x = y ->
-        write_concrete_strong ae (r,x) vl
+        write_concrete_strong k ae (r,x) vl
       | _ ->
-        VS.fold (fun v a -> write_concrete_weak a v vl) addr ae
+        VS.fold (fun v a -> write_concrete_weak k a v vl) addr ae
 
-  let write_intersection ae addr vl =
+  let write_intersection k ae addr vl =
     match addr with
     | [(r, (_,0L,x,y))] when x = y ->
-      write_concrete_intersection ae (r,x) vl
+      write_concrete_intersection k ae (r,x) vl
     | _ ->
       (* Since we don't know what location is getting the
          intersection, we can't do anything. *)
       ae
 
   let intersection (x:t) (y:t) =
-    fold (fun k v res -> write_concrete_intersection res k v) x y
+    fold (fun addr v res -> write_concrete_intersection (VS.width v) res addr v) x y
 
   let union (x:t) (y:t) =
-    fold (fun k v res -> write_concrete_weak res k v) x y
+    fold (fun k v res -> write_concrete_weak (VS.width v) res k v) x y
 
   let widen (x:t) (y:t) =
-    fold (fun k v res -> write_concrete_weak_widen res k v) x y
+    fold (fun k v res -> write_concrete_weak_widen (VS.width v) res k v) x y
 
   let equal = M1.equal (M2.equal (=))
 
@@ -1086,8 +1166,8 @@ module AbsEnv = struct
   let do_find_vs ae v =
     try match VM.find v ae with
       | `Scalar vs -> vs
-      | _ -> VS.top
-    with Not_found -> VS.top
+      | _ -> VS.top (bits_of_width (Var.typ v))
+    with Not_found -> VS.top (bits_of_width (Var.typ v))
 
   (* let astval2vs ae = function *)
   (*   | Int(i,t) -> VS.of_bap_int (int64_of_big_int i) t *)
@@ -1172,7 +1252,7 @@ struct
         dprintf "Writing %c to %#Lx" v a;
         let v = Char.code v in
         let v = Int64.of_int v in
-        MemStore.write m (VS.single 32 a) (VS.single 8 v)
+        MemStore.write 8 m (VS.single 32 a) (VS.single 8 v)
       in
       let m = List.fold_left write_mem (MemStore.top) initial_mem in
       VM.add Disasm_i386.mem (`Array m) vm
@@ -1194,7 +1274,7 @@ struct
       | _ -> failwith "exp2vs: Expected scalar"
     and exp2aev ?o l e : AbsEnv.value =
       match Typecheck.infer_ast ~check:false e with
-      | Reg _ -> (
+      | Reg nbits -> (
         let new_vs = try (match e with
           | Int(i,t)->
             VS.of_bap_int (int64_of_big_int i) t
@@ -1214,29 +1294,29 @@ struct
                   (*     (do_find l x) xs *)
                   (* | Phi [] -> *)
                   (*   failwith "Encountered empty Phi expression" *)
-          | Load(Var m, i, _e, _t) ->
-                    (* FIXME: assumes deendianized.
-                       ie: _e and _t should be the same for all loads and
-                       stores of m. *)
-            MemStore.read ?o (do_find_ae l m) (exp2vs ?o l i)
+          | Load(Var m, i, _e, t) ->
+            (* FIXME: assumes deendianized.
+               ie: _e and _t should be the same for all loads and
+               stores of m. *)
+            MemStore.read (bits_of_width t) ?o (do_find_ae l m) (exp2vs ?o l i)
           | Cast _ ->
             raise(Unimplemented "FIXME")
           | _ ->
             raise(Unimplemented "unimplemented expression type"))
-          with Unimplemented _ | Invalid_argument _ -> VS.top
+          with Unimplemented _ | Invalid_argument _ -> VS.top nbits
         in `Scalar new_vs
       )
       | TMem _ | Array _ -> (
         let new_vs = try (match e with
           | Var v ->
             do_find_ae l v
-          | Store(Var m,i,v,_e,_t) ->
+          | Store(Var m,i,v,_e,t) ->
                     (* FIXME: assumes deendianized.
                        ie: _e and _t should be the same for all loads and
                        stores of m. *)
             dprintf "doing a write... to %s of %s." (VS.to_string (exp2vs ?o l i)) (VS.to_string (exp2vs ?o l v));
             (* dprintf "size %#Lx" (VS.numconcrete (exp2vs ?o l i)); *)
-            MemStore.write (do_find_ae l m) (exp2vs ?o l i) (exp2vs ?o l v)
+            MemStore.write (bits_of_width t)  (do_find_ae l m) (exp2vs ?o l i) (exp2vs ?o l v)
           (* | Phi(x::xs) -> *)
           (*   List.fold_left *)
           (*     (fun i y -> MemStore.union i (do_find_ae l y)) *)
@@ -1360,7 +1440,7 @@ struct
         let vs_int = VS.intersection vs_v vs_c in
         dprintf "%s dst %s vs_v %s vs_c %s vs_int %s" (Pp.var_to_string m) (Cfg_ast.v2s (G.E.dst edge)) (VS.to_string vs_v) (VS.to_string vs_c) (VS.to_string vs_int);
         let orig_mem = do_find_ae l m in
-        let new_mem = MemStore.write_intersection orig_mem (exp2vs l ind) vs_int in
+        let new_mem = MemStore.write_intersection (bits_of_width t) orig_mem (exp2vs l ind) vs_int in
         VM.add m (`Array new_mem) l
       | Some(_, BinOp(EQ, (BinOp(EQ|NEQ as bop, Var v, Int(i, t))), Int(i', t')))
       | Some(_, BinOp(EQ, (BinOp(EQ|NEQ as bop, Int(i, t), Var v)), Int(i', t'))) ->
@@ -1372,7 +1452,7 @@ struct
           match bop with
           | EQ when i' = bi1 -> s
           | NEQ when i' = bi0 -> s
-          | _ -> VS.top
+          | _ -> VS.top (bits_of_width t)
         in
 
         let vs_v = do_find l v in
