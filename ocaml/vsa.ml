@@ -4,18 +4,15 @@
     http://pages.cs.wisc.edu/~bgogul/Research/Thesis/thesis.html
 
     TODO:
-    * Handle specials: map everything to Top
     * Add a real interface; automatically call simplify_cond
     * Big int support
-    * Handle unsignedness
     * Idea: Use copy propagation information to maintain equivalence
       classes, and use intersection over equivalence class members at
       edge transfer
-    * Memory read/store lengths ignored!
     * Partial/overlapping memory
-    * VS.top should have a bitlength
     * Special case memory writes of Top: since we will be removing
       entries, we do not have to iterate through all addresses
+    * Unified interface to Arithmetic for singleton values
 *)
 
 module VM = Var.VarMap
@@ -386,40 +383,68 @@ struct
   (** Left shift *)
   let lshift = mk_shift `Leftshift Int64.shift_left
 
-  let cast_low k tok ((k',s,a,b) as v) =
-    assert (k <= k');
-    if s <> trunc k s then top k
-    else
-      (if k' <> k then
-          let f x = extend k (trunc k x) in
-          (k, s, f a, f b)
-       else v)
-  let cast_low = renormbin cast_low
+  let cast_low tok ((k,s,a,b) as v) =
+    assert (tok <= k);
+    if tok = k then v
+    else (
+      let fits x = x = extend tok x in
+      (* If a and b are in the lowest tok bits, just keep those! *)
+      if fits s && fits a && fits b then
+        (tok, s, a, b)
+      else
+        (* XXX: We can probably do better here *)
+        top tok
+    )
+  let cast_low = renormun cast_low
 
-  let cast_high k tok ((k',s,a,b) as v) =
-    assert (k <= k');
-    let f x = I.shift_right x (k' - k) in
-    if k' <> k then
-      (k', s, f a, f b)
-    else v
-  let cast_high = renormbin cast_high
+  let cast_high tok ((k,s,a,b) as v) =
+    assert (tok <= k);
+    if tok = k then v
+    else (
+      (* Shift right, then cast low *)
+      let v = rshift k v (single k (Int64.of_int(k - k))) in
+      cast_low tok v)
+  let cast_high = renormun cast_high
+
+  let cast_signed tok ((k,s,a,b) as _v) =
+    assert (tok >= k);
+    (* Signed extension preserves signed values, so this is super
+       easy! *)
+    (tok,s,a,b)
+  let cast_signed = renormun cast_signed
+
+  let cast_unsigned tok ((k,s,a,b) as _v) =
+    assert (tok >= k);
+    (* Unsigned casting of signed numbers is bizarre.  For positive
+       numbers, there is no problem, since sign-extension is the same as
+       zero-extension for positive numbers.  For negative numbers,
+       however, a negative number is transformed into a (large) positive
+       number.  *)
+    let c x =
+      if x >= 0L then x
+      else trunc k x in
+    let a' = c a
+    and b' = c b in
+    (* Re-order if needed *)
+    let a',b' = if a' <= b' then a',b' else b',a' in
+    (tok,s,a',b')
+  let cast_unsigned = renormun cast_unsigned
 
   let extract k h l ((k,_,_,_) as x) =
     let nb = (h-l)+1 in
     assert (h >= 0);
     assert (nb >= 0);
     let x = if l <> 0 then rshift k (single k (Int64.of_int l)) x else x in
-    let x = if nb <> k then cast_low k nb x else x in
+    let x = if nb <> k then cast_low nb x else x in
     x
   let extract = renormtri extract
 
-  (* XXX: Rewrite to work with non-singleton values *)
-  let concat k (((k1,s1,l1,u1) as _x) : t) (((k2,s2,l2,u2) as _y) : t) =
+  let concat k (((k1,s1,l1,u1) as x) : t) (((k2,s2,l2,u2) as y) : t) =
     assert (k = k1 + k2);
-    if (s1 = s2) && (s2 = 0L) then
-      let i,t = Arithmetic.concat (biconst64 l1, Reg k1) (biconst64 l2, Reg k2) in
-      of_bap_int (Big_int_Z.int64_of_big_int i) t
-    else top k
+    let x = cast_unsigned k x in
+    let y = cast_unsigned k y in
+    let x = lshift k (single k (Int64.of_int k2)) x in
+    logor k x y
   let concat = renormbin concat
 
   (* construct these only once *)
@@ -571,6 +596,12 @@ struct
       | NEG -> SI.neg
       | NOT -> SI.lognot
 
+    let cast_to_si_function = function
+      | CAST_UNSIGNED -> SI.cast_unsigned
+      | CAST_SIGNED -> SI.cast_signed
+      | CAST_LOW -> SI.cast_low
+      | CAST_HIGH -> SI.cast_high
+
     let bits_of_exp e = bits_of_width (Typecheck.infer_ast ~check:false e)
 
     let rec transfer_stmt s l =
@@ -579,7 +610,7 @@ struct
         | Assert _ | Jmp _ | CJmp _ | Label _ | Comment _
         | Halt _ ->
             l
-        | Special _ -> failwith "Specials are unimplemented"
+        | Special _ -> L.top
         | Move(v, e, _) ->
             try
               let top v = SI.top (bits_of_width(Var.typ v)) in
@@ -626,34 +657,10 @@ struct
                        | None -> raise Not_found
                        )
                     *)
-                | Cast(CAST_SIGNED, _, vl) ->
-                  exp2si vl
-                    (* This can result in non-reduced SIs currently 
-                       | Cast(CAST_UNSIGNED, t, vl) ->
-                       let k = bits_of_val vl
-                       and k' = bits_of_width t
-                       and (s,a,b) as si = val2si vl in
-                       let d = 64-k in
-                       let f x = I.shift_right_logical(I.shift_left x d) d in
-                       if k <> 64 && k <> k' then
-                       (s, f a, f b)
-                       else si
-                    *)
-                | Cast(CAST_LOW, t, vl) ->
-                  let k = bits_of_exp vl
-                  and k' = bits_of_width t
-                  and (k'',s,a,b) as si = exp2si vl in
-                  assert (k=k'');
-                  SI.cast_low k k' si
-                | Cast(CAST_HIGH, t, vl) ->
-                  let k = bits_of_exp vl
-                  and k' = bits_of_width t
-                  and (k'',s,a,b) as si = exp2si vl in
-                  assert (k=k'');
-                  SI.cast_high k k' si
-                | Cast(CAST_UNSIGNED, t, vl) ->
-                  raise(Unimplemented "Casts unimplemented")
-                | Concat _ -> exp2si (Ast_convenience.rm_concat e)
+                | Cast(cast, t, vl) ->
+                  let f = cast_to_si_function cast in
+                  f (bits_of_width t) (exp2si vl)
+                | Concat (e1, e2) -> exp2si (Ast_convenience.rm_concat e)
                 | Extract _ -> exp2si (Ast_convenience.rm_extract e)
                 | Ite (c, e1, e2) ->
                   let csi = exp2si c in
@@ -934,7 +941,7 @@ struct
         | Assert _ | Jmp _ | CJmp _ | Label _ | Comment _
         | Halt _ ->
             l
-        | Special _ -> failwith "Special is unimplemented"
+        | Special _ -> L.top
         | Move(v, e, _) ->
             try
               let find v = VM.find v l in
@@ -1033,9 +1040,7 @@ module MemStore = struct
           (* We read too few bytes: use concat
              XXX: Handle address wrap-around properly
           *)
-          let (+) = Int64.add in
-          let (/) = Int64.div in
-          let rest = read_concrete (k-w) ?o ae (r, i+((Int64.of_int w)/8L)) in
+          let rest = read_concrete (k-w) ?o ae (r, i+%((Int64.of_int w)/%8L)) in
           (* dprintf "Concatenating %Ld %s and %s" i (VS.to_string v) (VS.to_string rest); *)
           (* XXX: Endianness *)
           VS.concat k rest v)
@@ -1336,7 +1341,7 @@ struct
         | Assert _ | Jmp _ | CJmp _ | Label _ | Comment _
         | Halt _ ->
             l
-        | Special _ -> failwith "Special is unimplemented"
+        | Special _ -> L.top
         | Move(v, e, _) ->
           try
             let new_vs = exp2aev ~o l e in
