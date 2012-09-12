@@ -1088,11 +1088,10 @@ module MemStore = struct
     write_concrete_strong k ae addr (VS.widen vl (read_concrete k ae addr))
 
   let write k ae addr vl =
-    if addr = VS.top k then (
+    if addr = VS.top addr_bits then (
       if vl = VS.top k then top
       else fold (fun addr v a -> write_concrete_weak k a addr vl) ae ae
-    ) else
-      match addr with
+    ) else match addr with
       (* XXX: Handle strides *)
       | [(r, ((k,1L,l,u)))] when !mem_top_hack && (l = SI.mini k || u = SI.maxi k) ->
         if r = VS.global then top else
