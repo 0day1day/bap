@@ -1845,7 +1845,7 @@ let output_exploit file trace =
           pad (n+1) (first::acc) rest
       | ((var,_)::rest) as more ->
           assert ((var_to_num var) >= n);
-          pad (n+1) (("",1L)::acc) more
+          pad (n+1) (("",bi1)::acc) more
     in
       pad 1 []
   in
@@ -1853,8 +1853,8 @@ let output_exploit file trace =
   let sorted = sort symb_var_vals in
   let padded = if !padding then pad_unused sorted else sorted in
   let _, input = List.split padded in
-  let input = List.map Int64.to_int input in
-    (* Let's output the exploit string *)
+  let input = List.map Big_int_Z.int_of_big_int input in
+  (* Let's output the exploit string *)
   let cout = open_out file in
     List.iter (output_byte cout) input ;
     close_out cout;

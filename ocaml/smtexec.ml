@@ -5,9 +5,9 @@
 exception Alarm_signal_internal;;
 exception Alarm_signal of int;;
 
+open Big_int_convenience
 module D = Debug.Make(struct let name = "Smtexec" and default=`NoDebug end)
 open D
-
 open Unix
 
 type model = (string*int64) list option
@@ -226,7 +226,7 @@ let parse_model solver s =
     None
 
 let print_model = function
-  | Some(l) -> Printf.printf "Model:\n"; List.iter (fun (v,i) -> Printf.printf "%s -> %#Lx\n" v i) l
+  | Some(l) -> Printf.printf "Model:\n"; List.iter (fun (v,i) -> Printf.printf "%s -> %s\n" v (~% i)) l
   | None -> Printf.printf "No model found\n"
 
 module STP_INFO =

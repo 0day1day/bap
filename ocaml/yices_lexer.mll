@@ -1,6 +1,8 @@
 {
   open Yices_grammar
   (* TODO: add support for memories *)
+
+  exception LexError of string
 }
 
 let digit = ['0'-'9''A'-'F''a'-'f']
@@ -30,6 +32,10 @@ rule token = parse
   | _                { token lexbuf }
 
 and read_num = parse
-  | digit+ as n      { VAL(Int64.of_string ("0b"^n)) }
+  | digit+ as n      {
+    try VAL(Util.big_int_of_string ("0b"^n))
+    with Failure "int_of_string" ->
+      raise(LexError "Error converting integer");
+    }
   | _                { token lexbuf }
 
