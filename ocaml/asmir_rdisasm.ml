@@ -12,9 +12,9 @@ let get_addr expr =
   | _ -> None
 
 let collect_some f l x =
-    match f x with
-    | Some i -> i :: l
-    | None -> l
+  match f x with
+  | Some i -> i :: l
+  | None -> l
 
 let addrt = Reg 32
 

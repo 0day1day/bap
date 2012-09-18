@@ -58,11 +58,9 @@ let of_prog ?(special_error = true) p =
   let (c, indirect) = find_indirect tmp in
   let c = C.add_edge c indirect error in (* indirect jumps could fail *)
 
-  let postponed_edges = Hashtbl.create 5700 in
-  let indirect_target = ref false in
-  let add_indirect_edge_to = function
-    | Addr _ -> indirect_target := true
-    | Name _ -> ()
+  let indirect_edge_to indirectt = function
+    | Addr _ -> true
+    | Name _ -> indirectt
   in
   (* Check for a bb already in the graph that has the same statements.
      This can happen for entry, exit, etc. *)
@@ -80,7 +78,7 @@ let of_prog ?(special_error = true) p =
        with Not_found -> None) (* The label does not exist *)
     | _ -> None
   in
-  let add_new_bb c revstmts addpred =
+  let add_new_bb indirectt c revstmts addpred =
     let stmts = List.rev revstmts in
     let c,v = match find_duplicate c revstmts stmts with
       | Some(v) ->
@@ -90,9 +88,8 @@ let of_prog ?(special_error = true) p =
         let c,v = C.create_vertex c stmts in
         dprintf "of_prog: added vertex %s" (v2s v);
         let c =
-          if !indirect_target then (
-            indirect_target := false;
-            C.add_edge c indirect v)
+          if indirectt then
+            C.add_edge c indirect v
           else c
         in
         c,v
@@ -102,26 +99,28 @@ let of_prog ?(special_error = true) p =
     | Some v' -> (C.add_edge c v' v, v)
   in
   (* Decide what to do given the current state and the next stmt.
+     indirectt: Should indirect point to this BB?
+     edges: delayed edges
      c: the cfg so far
      cur: reversed list of statements we will add to the next bb
      onlylabs: true if cur only contains labels (or comments)
-     addpred: Some v when v should fall through to the next bb
+     addpred: Add Some v as predecessor
   *)
-  let f (c, cur,onlylabs, addpred) s =
+  let f (indirectt, edges, c, cur,onlylabs, addpred) s =
     let g () =
-      let (c,v) = add_new_bb c (s::cur) addpred in
-      let for_later ?lab t = Hashtbl.add postponed_edges v (lab,t) in
-      let c = match s with
-	| Jmp(t, _) -> for_later t; c
+      let (c,v) = add_new_bb indirectt c (s::cur) addpred in
+      let for_later ?lab t = (v,lab,t) in
+      let edges, c = match s with
+	| Jmp(t, _) -> for_later t::edges, c
         (* XXX: This does not structure expressions such that it is
            easy to tell if two expressions are inverted *)
-	| CJmp(e,t,f,_) -> for_later ~lab:(true, Ast_convenience.binop EQ e exp_true) t; for_later ~lab:(false, Ast_convenience.binop EQ e exp_false) f; c
-	| Special _ -> C.add_edge c v error
-	| Halt _ -> C.add_edge c v exit
-        | Assert(e,_) when e === exp_false -> if v <> error then C.add_edge c v error else c
+	| CJmp(e,t,f,_) -> for_later ~lab:(true, Ast_convenience.binop EQ e exp_true) t::for_later ~lab:(false, Ast_convenience.binop EQ e exp_false) f::edges, c
+	| Special _ -> edges, C.add_edge c v error
+	| Halt _ -> edges, C.add_edge c v exit
+        | Assert(e,_) when e === exp_false -> edges, if v <> error then C.add_edge c v error else c
 	| _ -> failwith "impossible"
       in
-      (c, [], true, None)
+      (false, edges, c, [], true, None)
     in
     match s with
     | Jmp _ | CJmp _ | Halt _ ->
@@ -129,31 +128,31 @@ let of_prog ?(special_error = true) p =
     | Special _ when special_error ->
       g ()
     | Special _ (* specials are not error *) ->
-	(c, s::cur, onlylabs, addpred)
+      (indirectt, edges, c, s::cur, onlylabs, addpred)
     | Label(l,_) when onlylabs ->
-	add_indirect_edge_to l;
-	(c, s::cur, true, addpred)
+      let indirectt = indirect_edge_to indirectt l in
+      (indirectt, edges, c, s::cur, true, addpred)
     | Label(l,_) ->
-	add_indirect_edge_to l;
-	let c,v = add_new_bb c cur addpred in
-	(c, [s], true, Some v)
+      let c,v = add_new_bb indirectt c cur addpred in
+      let indirectt = indirect_edge_to false l in
+      (indirectt, edges, c, [s], true, Some v)
     | Assert(e,_) when e === exp_false ->
-      g()
+      g ()
     | Move _ | Assert _ ->
-      (c, s::cur, false, addpred)
+      (indirectt, edges, c, s::cur, false, addpred)
     | Comment _ ->
-      (c, s::cur, onlylabs, addpred)
+      (indirectt, edges, c, s::cur, onlylabs, addpred)
   in
-  let (c,last,_,addpred) = List.fold_left f (c,[],true,Some entry) p in
+  let (indirectt,postponed_edges,c,last,_,addpred) = List.fold_left f (false,[],c,[],true,Some entry) p in
   let c = match last with
     | _::_ ->
-	let c,v = add_new_bb c last addpred in
-	C.add_edge c v exit
+      let c,v = add_new_bb indirectt c last addpred in
+      C.add_edge c v exit
     | [] -> match addpred with
       | None -> c
       | Some v -> C.add_edge c v exit (* Should only happen for empty programs *)
   in
-  let make_edge v (lab,t) c =
+  let make_edge c (v,lab,t) =
     let dst = lab_of_exp t in
     let tgt = match dst with
       | None -> indirect
@@ -166,7 +165,7 @@ let of_prog ?(special_error = true) p =
     in
     C.add_edge_e c (C.G.E.create v lab tgt)
   in
-  let c = Hashtbl.fold make_edge postponed_edges c in
+  let c = List.fold_left make_edge c postponed_edges in
   (* FIXME: Colescing *)
   c
 
