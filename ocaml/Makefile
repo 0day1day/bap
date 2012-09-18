@@ -98,13 +98,13 @@ export SOURCES = \
 	to_c.ml \
 	vsa.ml \
 	symbeval.ml symbeval_search.ml \
-	ast_slice.ml \
-	ssa_slice.ml \
+	hacks.ml \
+	coalesce.mli coalesce.ml \
 	structural_analysis.ml \
 	unroll.ml \
-	hacks.ml \
+	ast_slice.ml \
+	ssa_slice.ml \
 	resolve_indirect.mli resolve_indirect.ml \
-	coalesce.mli coalesce.ml \
 	traces.ml \
 	traces_surgical.ml \
 	traces_backtaint.mli traces_backtaint.ml \
@@ -113,6 +113,7 @@ export SOURCES = \
 	template.ml \
 	syscall_id.mli syscall_id.ml \
 	graphDataflowW.ml \
+	vc.mli vc.ml \
 	$(SOLVER_SOURCES) \
 	$(PROJSOURCES) \
 

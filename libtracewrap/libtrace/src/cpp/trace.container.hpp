@@ -1,6 +1,7 @@
 #ifndef TRACE_CONTAINER_HPP
 #define TRACE_CONTAINER_HPP
 
+#include "config.h"
 #include "arch.hpp"
 
 /**
@@ -37,11 +38,11 @@
  */
 
 #include <exception>
-#include <fstream>
 #include <memory>
 #include <stdint.h>
 #include <string>
 #include <vector>
+#include <stdio.h>
 #include "frame.piqi.pb.h"
 
 namespace SerializedTrace {
@@ -53,7 +54,7 @@ namespace SerializedTrace {
   const bfd_architecture default_arch = bfd_arch_i386;
   const uint64_t default_machine = bfd_mach_i386_i386;
 
-  const uint64_t magic_numer_offset = 0LL;
+  const uint64_t magic_number_offset = 0LL;
   const uint64_t trace_version_offset = 8LL;
   const uint64_t bfd_arch_offset = 16LL;
   const uint64_t bfd_machine_offset = 24LL;
@@ -96,17 +97,17 @@ namespace SerializedTrace {
                          bfd_architecture arch = default_arch,
                          uint64_t machine = default_machine,
                          uint64_t frames_per_toc_entry = default_frames_per_toc_entry,
-                         bool auto_finish = default_auto_finish) throw (std::ofstream::failure, TraceException);
+                         bool auto_finish = default_auto_finish) throw (TraceException);
 
     /** Destructor that calls finish if auto_finish is true. */
     ~TraceContainerWriter(void) throw ();
 
     /** Add [frame] to the trace. */
-    void add(frame &f) throw (std::ofstream::failure, TraceException);
+    void add(frame &f) throw (TraceException);
 
     /** Add all frames in container [c] to the trace. */
     template <typename C>
-    void add(C &c) throw (std::ofstream::failure, TraceException) {
+    void add(C &c) throw (TraceException) {
       for (typename C::iterator i = c.begin(); i != c.end(); i++) {
     	add(*i);
       }
@@ -114,15 +115,18 @@ namespace SerializedTrace {
 
     /** Finish the trace.  Builds and writes the table of contents to
      * the file. Closes the file. */
-    void finish(void) throw (std::ofstream::failure,TraceException);
+    void finish(void) throw (TraceException);
 
     /** Returns true iff finish() has not been called on this trace. */
     bool has_finished(void) throw ();
 
     protected:
 
-    /** Output fstream for trace container file. */
-    std::ofstream ofs;
+    /* Output fstream for trace container file.
+     *
+     *  We used to use fstreams, but Windows fstreams do not allow
+     *  32-bit offsets. */
+    FILE *ofs;
 
     /** The toc entries for frames added so far. */
     std::vector<uint64_t> toc;
@@ -151,7 +155,7 @@ namespace SerializedTrace {
   public:
 
     /** Creates a trace container reader that reads from [filename]. */
-    TraceContainerReader(std::string filename) throw (std::ifstream::failure, TraceException);
+    TraceContainerReader(std::string filename) throw (TraceException);
 
     /** Destructor. */
     ~TraceContainerReader(void) throw ();
@@ -177,7 +181,7 @@ namespace SerializedTrace {
 
     /** Return the frame pointed to by the frame pointer. Advances the
         frame pointer by one after. */
-    std::auto_ptr<frame> get_frame(void) throw (std::ifstream::failure, TraceException);
+    std::auto_ptr<frame> get_frame(void) throw (TraceException);
 
     /** Return [num_frames] starting at the frame pointed to by the
         frame pointer. If there are not that many frames until the end
@@ -185,14 +189,14 @@ namespace SerializedTrace {
         frame pointer is set one frame after the last frame returned.
         If the last frame returned is the last frame in the trace, the
         frame pointer will point to an invalid frame. */
-    std::auto_ptr<std::vector<frame> > get_frames(uint64_t num_frames) throw (std::ifstream::failure, TraceException);
+    std::auto_ptr<std::vector<frame> > get_frames(uint64_t num_frames) throw (TraceException);
 
     /** Return true if frame pointer is at the end of the trace. */
     bool end_of_trace(void) throw ();
 
   protected:
-    /** ifstream to read trace from. */
-    std::ifstream ifs;
+    /** File to read trace from. */
+    FILE *ifs;
 
     /** The toc entries from the trace. */
     std::vector<uint64_t> toc;
@@ -225,7 +229,7 @@ namespace SerializedTrace {
     void check_end_of_trace(std::string msg) throw (TraceException);
 
   };
-  
+
   /* A minimal smart pointer class for arrays. */
   template< typename T_ >
   struct auto_vec{
@@ -236,7 +240,7 @@ namespace SerializedTrace {
     T_* operator->() const { return get(); }
     T_& operator*() const { return *get(); }
   };
-  
+
 };
 
 #endif

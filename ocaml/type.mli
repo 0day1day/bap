@@ -109,3 +109,8 @@ type 'a visit_action =
   | ChangeToAndDoChildren of 'a (** Replace the current object with
 				    the given one, and visit children
 				    of the {b replacement} object. *)
+
+(** Specifies whether generated VCs will be evaluated for
+    satisfiability or validity. Alternatively, quantifiers can be
+    used. *)
+type formula_mode = Sat | Validity | Foralls

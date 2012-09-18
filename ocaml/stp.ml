@@ -7,7 +7,7 @@ open Big_int_convenience
 open Type
 open Typecheck
 
-module D = Debug.Make(struct let name = "STP" and default=`Debug end)
+module D = Debug.Make(struct let name = "Stp" and default=`Debug end)
 open D
 
 
@@ -65,7 +65,9 @@ object (self)
   method declare_new_freevars e =
     opn 0;
     pp "% free variables:"; force_newline();
+    dprintf "Computing freevars...";
     let fvs = Formulap.freevars e in 
+    dprintf "... done";
     List.iter (fun v -> if not(VH.mem ctx v) then self#decl v) fvs;
     pp "% end free variables."; force_newline();
     cls()
@@ -79,8 +81,6 @@ object (self)
   method decl (Var.V(_,_,t) as v) =
     self#extend v (var2s v);
     self#var v; pp " : "; self#typ t; pp ";"; force_newline();
-
-
 
   method ast_exp e =
     opn 0;

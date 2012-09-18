@@ -750,7 +750,7 @@ object (self)
     pp "assert (";
     self#exists exists;
     self#forall foralls;
-    self#ast_exp_bool (UnOp(NOT, e));
+    self#ast_exp_bool (exp_not e);
     pp ");";
     self#formula ();
     self#close_benchmark ()

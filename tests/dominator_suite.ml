@@ -39,7 +39,7 @@ let dominees_test () =
   list_eq (dominees n5) [n5] "Node 5"
 ;;
 
-let suite = "Arithmetic" >:::
+let suite = "Dominator" >:::
   [
     "dominees_test" >:: dominees_test
   ]

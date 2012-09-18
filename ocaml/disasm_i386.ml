@@ -14,7 +14,9 @@ module VH=Var.VarHash
 module D = Debug.Make(struct let name = "Disasm_i386" and default=`NoDebug end)
 open D
 
-(* 
+let compute_segment_bases = ref true
+
+(*
    Note: In general, the function g is the get memory function.  The variable
    na refers to the next address or next instruction.
 
@@ -58,6 +60,7 @@ type direction = Forward | Backward
 
 type operand =
   | Oreg of int
+  | Oseg of int
   | Oaddr of Ast.exp
   | Oimm of int64 (* XXX: Should this be big_int? *)
 
@@ -209,8 +212,19 @@ and oF = nv "R_OF" r1
 
 and dflag = nv "R_DFLAG" r32 (* 1 if DF=0 or -1 if DF=1 *)
 
+(* segment registers and bases *)
 and fs_base = nv "R_FS_BASE" r32
 and gs_base = nv "R_GS_BASE" r32
+
+and cs = nv "R_CS" r16
+and ds = nv "R_DS" r16
+and es = nv "R_ES" r16
+and fs = nv "R_FS" r16
+and gs = nv "R_GS" r16
+and ss = nv "R_SS" r16
+
+and gdt = nv "R_GDT" r32
+and ldt = nv "R_LDT" r32
 
 and fpu_ctrl = nv "R_FPU_CONTROL" r16
 and mxcsr = nv "R_MXCSR" r32
@@ -221,7 +235,7 @@ let xmms = Array.init 8 (fun i -> nv (Printf.sprintf "R_XMM%d" i) xmm_t)
 let st = Array.init 8 (fun i -> nv (Printf.sprintf "R_ST%d" i) st_t)
 
 let regs : var list =
-  ebp::esp::esi::edi::eip::eax::ebx::ecx::edx::eflags::cf::pf::af::zf::sf::oF::dflag::fs_base::gs_base::fpu_ctrl::mxcsr::
+  ebp::esp::esi::edi::eip::eax::ebx::ecx::edx::eflags::cf::pf::af::zf::sf::oF::dflag::fs_base::gs_base::cs::ds::es::fs::gs::ss::fpu_ctrl::mxcsr::
   List.map (fun (n,t) -> Var.newvar n t)
     [
 
@@ -235,17 +249,7 @@ let regs : var list =
   ("R_IDFLAG", reg_32);
   ("R_ACFLAG", reg_32);
   ("R_EMWARN", reg_32);
-  ("R_LDT", reg_32);
-  ("R_GDT", reg_32);
   ("R_IP_AT_SYSCALL", reg_32);
-
-  (* segment regs *)
-  ("R_CS", reg_16);
-  ("R_DS", reg_16);
-  ("R_ES", reg_16);
-  ("R_FS", reg_16);
-  ("R_GS", reg_16);
-  ("R_SS", reg_16);
 
   (* floating point *)
   ("R_FTOP", reg_32);
@@ -264,6 +268,13 @@ and o_esp = Oreg 4
 and o_ebp = Oreg 5
 and o_esi = Oreg 6
 and o_edi = Oreg 7
+
+let o_es = Oseg 0
+and o_cs = Oseg 1
+and o_ss = Oseg 2
+and o_ds = Oseg 3
+and o_fs = Oseg 4
+and o_gs = Oseg 5
 
 let esp_e = Var esp
 and ebp_e = Var ebp
@@ -288,6 +299,9 @@ and dflag_e = Var dflag
    x86 uses values 0 and 1 for forward and backwards. *)
 let x86_dflag_e =
   ite reg_1 (dflag_e ==* Int(bi1, reg_32)) exp_false exp_true
+
+let gdt_e = Var gdt
+and ldt_e = Var ldt
 
 let esiaddr = Oaddr esi_e
 and ediaddr = Oaddr edi_e
@@ -411,7 +425,7 @@ let i32 i = Int(biconst i, r32)
 let it i t = Int(biconst i, t)
 
 (* converts a register number to the corresponding 32bit register variable *)
-let bits2reg32= function
+let bits2reg32 = function
   | 0 -> eax
   | 1 -> ecx
   | 2 -> edx
@@ -427,6 +441,18 @@ let bits2xmm b = xmms.(b)
 and reg2bits r =
   let (i,_) = BatList.findi (fun _ x -> x == r) [eax; ecx; edx; ebx; esp; ebp; esi; edi] in
   i
+
+let bits2segreg = function
+  | 0 -> es
+  | 1 -> cs
+  | 2 -> ss
+  | 3 -> ds
+  | 4 -> fs
+  | 5 -> gs
+  | 6 | 7 -> failwith "bits2segreg: reserved"
+  | _ -> failwith "bits2regseg: invalid"
+
+let bits2segrege b = Var(bits2segreg b)
 
 let bits2xmme b = Var(bits2xmm b)
 
@@ -511,6 +537,8 @@ let op2e_s ss t = function
   | Oreg r when t = r16 -> bits2reg16e r
   | Oreg r when t = r8 -> bits2reg8e r
   | Oreg r -> unimplemented "unknown register"
+  | Oseg r when t = r16 -> bits2segrege r
+  | Oseg r -> disfailwith "Segment register when t is not reg_16"
   | Oaddr e -> load_s ss t e
   | Oimm i -> Int(Arithmetic.to_big_int (big_int_of_int64 i,t), t)
 
@@ -553,6 +581,10 @@ let assn_s s t v e =
     let v = bits2reg32 (r land 3) in
     sub_assn ~off:8 t v e
   | Oreg _ -> unimplemented "assignment to sub registers"
+  | Oseg r when t = r16 ->
+    let v = bits2segreg r in
+    move v e
+  | Oseg r -> disfailwith "Can't assign to non 16 bit segment register"
   | Oaddr a -> store_s s t a e
   | Oimm _ -> disfailwith "disasm_i386: Can't assign to an immediate value"
 
@@ -713,7 +745,31 @@ let rec to_ir addr next ss pref =
       | None -> op2e t src
       | Some(c) -> ite t c (op2e t src) (op2e t dst))
     in
-      [assn t dst c_src]
+    (* Find base by looking at LDT or GDT *)
+    let base_e e =
+      (* 0 = GDT, 1 = LDT *)
+      let ti = extract bi3 bi3 e in
+      let base = ite r32 ti ldt_e gdt_e in
+      (* Extract index into table *)
+      let index = cast_unsigned r32 (extract (biconst 15) bi4 e) <<* i32 6 in
+      (* Load the table entry *)
+      let table_entry = loadm mem reg_64 (base +* index) in
+      (* Extract the base *)
+      concat_explist
+        (BatList.enum
+           (extract (biconst 63) (biconst 56) table_entry
+            :: extract (biconst 39) (biconst 32) table_entry
+            :: extract (biconst 31) (biconst 16) table_entry
+            :: []))
+    in
+    let bs =
+      let dst_e = op2e t dst in
+      if dst = o_fs && !compute_segment_bases then [move fs_base (base_e dst_e)]
+      else if dst = o_gs && !compute_segment_bases then [move gs_base (base_e dst_e)]
+      else []
+    in
+    assn t dst c_src
+    :: bs
   | Movs(Reg bits as t) ->
       let stmts =
 	store_s seg_es t edi_e (load_s seg_es t esi_e)
@@ -736,7 +792,7 @@ let rec to_ir addr next ss pref =
     let (s, al) = match s with
       | Oreg i -> op2e ts s, []
       | Oaddr a -> op2e ts s, [a]
-      | Oimm _ -> disfailwith "invalid"
+      | Oimm _ | Oseg _ -> disfailwith "invalid"
     in
     let b = bits_of_width in
     let s =
@@ -755,7 +811,7 @@ let rec to_ir addr next ss pref =
 	(* let r = op2e t d in *)
 	(* move r s, al *)
       | Oaddr a -> assn td d s, a::al
-      | Oimm _ -> disfailwith "invalid"
+      | Oimm _ | Oseg _ -> disfailwith "invalid"
     in
     let al =
       if align then
@@ -769,7 +825,7 @@ let rec to_ir addr next ss pref =
       let src = match src with
         | Oreg i -> op2e t src
         | Oaddr a -> load t a
-        | Oimm _ -> disfailwith "invalid"
+        | Oimm _ | Oseg _ -> disfailwith "invalid"
       in
       let compare_region i =
         let byte1 = Extract(biconst (i*elebits-1), biconst ((i-1)*elebits), src) in
@@ -1059,6 +1115,7 @@ let rec to_ir addr next ss pref =
             let shift = (cast_low r8 offset) &* (it 7 r8) in
             byte, shift
         | Oimm _ -> disfailwith "Immediate bases not allowed"
+        | Oseg _ -> disfailwith "Segment registers not allowed"
       in
       [
         move cf (cast_low r1 (value >>* shift));
@@ -1555,9 +1612,18 @@ module ToStr = struct
 	| 7 -> "edi"
 	| v -> unimplemented (Printf.sprintf "Don't know what oreg %i is." v)
 
+  let sreg2str = function
+    | 0 -> "es"
+    | 1 -> "cs"
+    | 2 -> "ss"
+    | 3 -> "ds"
+    | 4 -> "fs"
+    | 5 -> "gs"
+    | v -> unimplemented (Printf.sprintf "Don't know what segment register %d is." v)
 
   let opr = function
     | Oreg v -> oreg2str v
+    | Oseg v -> sreg2str v
     | Oimm i -> Printf.sprintf "$0x%Lx" i
     | Oaddr a -> Pp.ast_exp_to_string a
 
@@ -1764,17 +1830,21 @@ let parse_instr g addr =
       if ss = 0 then (base +* idx, na)
       else (base +* (idx <<* i32 ss), na)
   in
-  let parse_modrm16ext a =
-    (* ISR 2.1.5 Table 2-1 *)
+  let parse_modrmbits a =
     let b = Char.code (g a)
     and na = s a in
     let r = (b>>3) & 7
     and m = b >> 6
     and rm = b & 7 in
+    (b, r, m, rm, na)
+  in
+  let parse_modrm16ext a =
+    (* ISR 2.1.5 Table 2-1 *)
+    let b, r, m, rm, na = parse_modrmbits a in
     match m with (* MOD *)
     | 0 -> (match rm with
-      | 6 -> let (disp, na) = parse_disp16 (s a) in (r, Oaddr(l16 disp), na)
-      | n when n < 8 -> (r, Oaddr(eaddr16 rm), s a)
+      | 6 -> let (disp, na) = parse_disp16 na in (r, Oaddr(l16 disp), na)
+      | n when n < 8 -> (r, Oaddr(eaddr16 rm), na)
       | _ -> disfailwith "Impossible"
     )
     | 1 | 2 ->
@@ -1782,25 +1852,25 @@ let parse_instr g addr =
       let (disp, na) = 
 	if m = 1 then parse_disp8 na else (*2*) parse_disp16 na in
       (r, Oaddr(base +* l16 disp), na)
-    | 3 -> (r, Oreg rm, s a)
+    | 3 -> (r, Oreg rm, na)
     | _ -> disfailwith "Impossible"
   in
   let parse_modrm16 a =
     let (r, rm, na) = parse_modrm16ext a in
     (Oreg r, rm, na)
   in
+  let parse_modrm16seg a =
+    let (r, rm, na) = parse_modrm16ext a in
+    (Oseg r, rm, na)
+  in
   let parse_modrm32ext a =
     (* ISR 2.1.5 Table 2-2 *)
-    let b = Char.code (g a)
-    and na = s a in
-    let r = (b>>3) & 7
-    and m = b >> 6
-    and rm = b & 7 in
+    let b, r, m, rm, na = parse_modrmbits a in
     match m with (* MOD *)
     | 0 -> (match rm with
-      | 4 -> let (sib, na) = parse_sib m (s a) in (r, Oaddr sib, na)
-      | 5 -> let (disp, na) = parse_disp32 (s a) in (r, Oaddr(l32 disp), na)
-      | n -> (r, Oaddr(bits2reg32e n), s a)
+      | 4 -> let (sib, na) = parse_sib m na in (r, Oaddr sib, na)
+      | 5 -> let (disp, na) = parse_disp32 na in (r, Oaddr(l32 disp), na)
+      | n -> (r, Oaddr(bits2reg32e n), na)
     )
     | 1 | 2 ->
       let (base, na) = 
@@ -1808,7 +1878,7 @@ let parse_instr g addr =
       let (disp, na) = 
 	if m = 1 then parse_disp8 na else (*2*) parse_disp32 na in
       (r, Oaddr(base +* l32 disp), na)
-    | 3 -> (r, Oreg rm, s a)
+    | 3 -> (r, Oreg rm, na)
     | _ -> disfailwith "Impossible"
   in
   let parse_modrm32 a =
@@ -1818,6 +1888,10 @@ let parse_instr g addr =
     let (r, rm, na) = parse_modrm32ext a in
     let rm = match rm with Oreg r -> Oreg (reg2xmm r) | _ -> rm in
     (Oreg(bits2xmm r), rm, na) *)
+  in
+  let parse_modrm32seg a =
+    let (r, rm, na) = parse_modrm32ext a in
+    (Oseg r, rm, na)
   in
   let parse_modrm opsize a = parse_modrm32 a in
   (* Parse 8-bits as unsigned integer *)
@@ -1863,10 +1937,10 @@ let parse_instr g addr =
   ) in
   let get_opcode pref prefix a =
     (* We should rename these, since the 32 at the end is misleading. *)
-    let parse_disp32, parse_modrm32, parse_modrm32ext =
-      if prefix.addrsize_override 
-      then parse_disp16, parse_modrm16, parse_modrm16ext
-      else parse_disp32, parse_modrm32, parse_modrm32ext
+    let parse_disp32, parse_modrm32, parse_modrm32seg, parse_modrm32ext =
+      if prefix.addrsize_override
+      then parse_disp16, parse_modrm16, parse_modrm16seg, parse_modrm16ext
+      else parse_disp32, parse_modrm32, parse_modrm32seg, parse_modrm32ext
     in
     let b1 = Char.code (g a)
     and na = s a in
@@ -1932,11 +2006,14 @@ let parse_instr g addr =
 	      (Mov(r8, r, rm, None), na)
     | 0x8b -> let (r, rm, na) = parse_modrm32 na in
 	      (Mov(prefix.opsize, r, rm, None), na)
+    | 0x8c -> let (r, rm, na) = parse_modrm32seg na in
+              (Mov(r16, rm, r, None), na)
     | 0x8d -> let (r, rm, na) = parse_modrm prefix.opsize na in
 	      (match rm with
 	      | Oaddr a -> (Lea(r, a), na)
-	      | _ -> disfailwith "invalid lea (must be address)"
-	      )
+	      | _ -> disfailwith "invalid lea (must be address)")
+    | 0x8e -> let (r, rm, na) = parse_modrm32seg na in
+              (Mov(r16, r, rm, None), na)
     | 0x90 -> (Nop, na)
     | 0x91 | 0x92 | 0x93 | 0x94 | 0x95 | 0x96 | 0x97 ->
       let reg = Oreg (b1 & 7) in
@@ -1947,8 +2024,10 @@ let parse_instr g addr =
     | 0x9f -> (Lahf, na)
     | 0xa1 -> let (addr, na) = parse_disp32 na in
 	      (Mov(prefix.opsize, o_eax, Oaddr(l32 addr), None), na)
-    | 0xa3 -> let (addr, na) = parse_disp32 na in
-	      (Mov(prefix.opsize, Oaddr(l32 addr), o_eax, None), na)
+    | 0xa2 | 0xa3 ->
+      let t = if b1 = 0xa2 then reg_8 else prefix.opsize in
+      let (addr, na) = parse_disp32 na in
+      (Mov(t, Oaddr(l32 addr), o_eax, None), na)
     | 0xa4 -> (Movs r8, na)
     | 0xa5 -> (Movs prefix.opsize, na)
     | 0xa6 -> (Cmps r8, na)

@@ -71,7 +71,7 @@ export PROJ_baptest
 
 export BCSUFFIX = .dbg
 
-all: | $(TARGETS)
+all: $(TARGETS)
 
 test: all
 	./bap_test_suite

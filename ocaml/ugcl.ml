@@ -38,17 +38,19 @@ let rec string_of_stmt =
 
 (* Begin conversion functions *)
 
-let of_straightline passify stmts =
-  let mapf = function
-    | Ast.Move(v, e, _) when passify -> Assume(binop EQ (Ast.Var v) e)
-    | Ast.Move(v, e, _) -> Assign(v, e)
-    | Ast.Assert(e, _) -> Assert(e)
-    | Ast.Jmp _
-    | Ast.Label _
-    | Ast.Comment _ -> Skip
-    | Ast.Special _ -> failwith "Special found in straightline"
-    | Ast.Halt _ -> failwith "Halt found in straightline"
-    | Ast.CJmp _ -> failwith "CJmp found in straightline"
+let of_straightline ?passify stmts =
+  let mapf stmt = match stmt, passify with
+    | Ast.Move(v, e, _), Some Validity -> Assume(binop EQ (Ast.Var v) e)
+    | Ast.Move(v, e, _), Some Sat -> Assert(binop EQ (Ast.Var v) e)
+    | Ast.Move(v, e, _), Some Foralls -> failwith "Foralls unsupported"
+    | Ast.Move(v, e, _), None -> Assign(v, e)
+    | Ast.Assert(e, _), _ -> Assert(e)
+    | Ast.Jmp _, _
+    | Ast.Label _, _
+    | Ast.Comment _, _ -> Skip
+    | Ast.Special _, _ -> failwith "Special found in straightline"
+    | Ast.Halt _, _ -> failwith "Halt found in straightline"
+    | Ast.CJmp _, _ -> failwith "CJmp found in straightline"
   in
   let gclstmts = List.map mapf stmts in
   let add_stmt s news = concat_stmt s news in
@@ -65,7 +67,7 @@ end
 
 module RToposort = Graph.Topological.Make(RevCFG);;
 
-let of_ssacfg ?(passify=false) ?entry ?exit cfg =
+let of_ssacfg ?passify ?entry ?exit cfg =
   (* We use DSA here because we want edge splitting to happen.  We
      don't necessarily need full DSA. *)
   let cfg = Cfg_ssa.to_astcfg ~dsa:true cfg in
@@ -117,12 +119,12 @@ let of_ssacfg ?(passify=false) ?entry ?exit cfg =
     (* Debug_snippets.print_ast bb_s; *)
     let ugcl = match List.rev bb_s with
       | [] -> Skip
-      | (Ast.Jmp _ | Ast.Halt _)::rest -> of_straightline passify (List.rev rest)
+      | (Ast.Jmp _ | Ast.Halt _)::rest -> of_straightline ?passify (List.rev rest)
       | Ast.CJmp(e, _, _, _)::rest ->
         (* Prepend Assume e and Assume not e to successors *)
         prepend_assume e b;
-        of_straightline passify (List.rev rest)
-      | _ -> of_straightline passify bb_s
+        of_straightline ?passify (List.rev rest)
+      | _ -> of_straightline ?passify bb_s
     in
     save_gcl (CA.G.V.label b) ugcl
   in

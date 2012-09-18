@@ -28,7 +28,7 @@ open D
 
 (* Treat unsigned comparisons the same as signed: should be okay as
    long as overflow does not occur. Should be false for soundness. *)
-let signedness_hack = ref false
+let signedness_hack = ref true
 
 (* Treat any memory write to a SI whose lower or upper bound is the
    min/max is the same as Top. *)
