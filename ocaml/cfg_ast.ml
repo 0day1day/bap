@@ -50,6 +50,98 @@ let find_indirect g =
   with Not_found ->
     create g BB_Indirect []
 
+(* Add a new bb to the cfg *)
+let add_new_bb indirectt c revstmts addpred =
+  (* Check for a bb already in the graph that has the same statements.
+     This can happen for entry, exit, etc. *)
+  let find_duplicate c revstmts stmts = match stmts with
+    | Label(l, _)::_ ->
+      (try
+         let v = C.find_label c l in
+         let ostmts = C.get_stmts c v in
+           (* At this point, we are redefining a label which is bad.  If
+              the existing block and the new block are identical, we'll
+              just silently use the old block.  If not, raise an
+              exception because we are defining a label twice. *)
+         if full_stmts_eq stmts ostmts then
+           Some(v) else failwith (Printf.sprintf "Duplicate label usage: label %s" (Pp.label_to_string l))
+       with Not_found -> None) (* The label does not exist *)
+    | _ -> None
+  in
+  let stmts = List.rev revstmts in
+  let c,v = match find_duplicate c revstmts stmts with
+    | Some(v) ->
+      dprintf "Not adding duplicate bb of %s" (v2s v);
+      c,v
+    | None ->
+      let c,v = C.create_vertex c stmts in
+      dprintf "of_prog: added vertex %s" (v2s v);
+      let c =
+        if indirectt then
+          let (c, indirect) = find_indirect c in
+          C.add_edge c indirect v
+        else c
+      in
+      c,v
+  in
+  match addpred with
+  | None -> (c,v)
+  | Some v' -> (C.add_edge c v' v, v)
+
+  (* Decide what to do given the current state and the next stmt.
+     indirectt: Should indirect point to this BB?
+     nodes: added BBs (in reverse order)
+     edges: delayed edges
+     c: the cfg so far
+     cur: reversed list of statements we will add to the next bb
+     onlylabs: true if cur only contains labels (or comments)
+     addpred: Add Some v as predecessor
+  *)
+let f ~special_error (indirectt, nodes, edges, c, cur,onlylabs, addpred) s =
+  let indirect_edge_to indirectt = function
+    | Addr _ -> true
+    | Name _ -> indirectt
+  in
+  let g () =
+    let (c,v) = add_new_bb indirectt c (s::cur) addpred in
+    let for_later ?lab t = (v,lab,t) in
+    let edges, c = match s with
+      | Jmp(t, _) -> for_later t::edges, c
+      (* XXX: This does not structure expressions such that it is
+         easy to tell if two expressions are inverted *)
+      | CJmp(e,t,f,_) -> for_later ~lab:(true, Ast_convenience.binop EQ e exp_true) t::for_later ~lab:(false, Ast_convenience.binop EQ e exp_false) f::edges, c
+      | Special _ -> let c, error = find_error c in
+                     edges, C.add_edge c v error
+      | Halt _ -> let c, exit = find_exit c in
+                  edges, C.add_edge c v exit
+      | Assert(e,_) when e === exp_false ->
+        let c, error = find_error c in
+        edges, if v <> error then C.add_edge c v error else c
+      | _ -> failwith "impossible"
+    in
+    (false, v::nodes, edges, c, [], true, None)
+  in
+  match s with
+  | Jmp _ | CJmp _ | Halt _ ->
+    g ()
+  | Special _ when special_error ->
+    g ()
+  | Special _ (* specials are not error *) ->
+    (indirectt, nodes, edges, c, s::cur, onlylabs, addpred)
+  | Label(l,_) when onlylabs ->
+    let indirectt = indirect_edge_to indirectt l in
+    (indirectt, nodes, edges, c, s::cur, true, addpred)
+  | Label(l,_) ->
+    let c,v = add_new_bb indirectt c cur addpred in
+    let indirectt = indirect_edge_to false l in
+    (indirectt, v::nodes, edges, c, [s], true, Some v)
+  | Assert(e,_) when e === exp_false ->
+    g ()
+  | Move _ | Assert _ ->
+    (indirectt, nodes, edges, c, s::cur, false, addpred)
+  | Comment _ ->
+    (indirectt, nodes, edges, c, s::cur, onlylabs, addpred)
+
 (** Build a CFG from a program *)
 let of_prog ?(special_error = true) p =
   let (tmp, entry) = create_entry (C.empty()) in
@@ -58,92 +150,7 @@ let of_prog ?(special_error = true) p =
   let (c, indirect) = find_indirect tmp in
   let c = C.add_edge c indirect error in (* indirect jumps could fail *)
 
-  let indirect_edge_to indirectt = function
-    | Addr _ -> true
-    | Name _ -> indirectt
-  in
-  (* Check for a bb already in the graph that has the same statements.
-     This can happen for entry, exit, etc. *)
-  let find_duplicate c revstmts stmts = match stmts with
-    | Label(l, _)::_ ->
-      (try
-         let v = C.find_label c l in
-         let ostmts = C.get_stmts c v in
-         (* At this point, we are redefining a label which is bad.  If
-            the existing block and the new block are identical, we'll
-            just silently use the old block.  If not, raise an
-            exception because we are defining a label twice. *)
-         if full_stmts_eq stmts ostmts then
-           Some(v) else failwith (Printf.sprintf "Duplicate label usage: label %s" (Pp.label_to_string l))
-       with Not_found -> None) (* The label does not exist *)
-    | _ -> None
-  in
-  let add_new_bb indirectt c revstmts addpred =
-    let stmts = List.rev revstmts in
-    let c,v = match find_duplicate c revstmts stmts with
-      | Some(v) ->
-        dprintf "Not adding duplicate bb of %s" (v2s v);
-        c,v
-      | None ->
-        let c,v = C.create_vertex c stmts in
-        dprintf "of_prog: added vertex %s" (v2s v);
-        let c =
-          if indirectt then
-            C.add_edge c indirect v
-          else c
-        in
-        c,v
-    in
-    match addpred with
-    | None -> (c,v)
-    | Some v' -> (C.add_edge c v' v, v)
-  in
-  (* Decide what to do given the current state and the next stmt.
-     indirectt: Should indirect point to this BB?
-     edges: delayed edges
-     c: the cfg so far
-     cur: reversed list of statements we will add to the next bb
-     onlylabs: true if cur only contains labels (or comments)
-     addpred: Add Some v as predecessor
-  *)
-  let f (indirectt, edges, c, cur,onlylabs, addpred) s =
-    let g () =
-      let (c,v) = add_new_bb indirectt c (s::cur) addpred in
-      let for_later ?lab t = (v,lab,t) in
-      let edges, c = match s with
-	| Jmp(t, _) -> for_later t::edges, c
-        (* XXX: This does not structure expressions such that it is
-           easy to tell if two expressions are inverted *)
-	| CJmp(e,t,f,_) -> for_later ~lab:(true, Ast_convenience.binop EQ e exp_true) t::for_later ~lab:(false, Ast_convenience.binop EQ e exp_false) f::edges, c
-	| Special _ -> edges, C.add_edge c v error
-	| Halt _ -> edges, C.add_edge c v exit
-        | Assert(e,_) when e === exp_false -> edges, if v <> error then C.add_edge c v error else c
-	| _ -> failwith "impossible"
-      in
-      (false, edges, c, [], true, None)
-    in
-    match s with
-    | Jmp _ | CJmp _ | Halt _ ->
-      g ()
-    | Special _ when special_error ->
-      g ()
-    | Special _ (* specials are not error *) ->
-      (indirectt, edges, c, s::cur, onlylabs, addpred)
-    | Label(l,_) when onlylabs ->
-      let indirectt = indirect_edge_to indirectt l in
-      (indirectt, edges, c, s::cur, true, addpred)
-    | Label(l,_) ->
-      let c,v = add_new_bb indirectt c cur addpred in
-      let indirectt = indirect_edge_to false l in
-      (indirectt, edges, c, [s], true, Some v)
-    | Assert(e,_) when e === exp_false ->
-      g ()
-    | Move _ | Assert _ ->
-      (indirectt, edges, c, s::cur, false, addpred)
-    | Comment _ ->
-      (indirectt, edges, c, s::cur, onlylabs, addpred)
-  in
-  let (indirectt,postponed_edges,c,last,_,addpred) = List.fold_left f (false,[],c,[],true,Some entry) p in
+  let (indirectt,_nodes,postponed_edges,c,last,_,addpred) = List.fold_left (f ~special_error) (false,[],[],c,[],true,Some entry) p in
   let c = match last with
     | _::_ ->
       let c,v = add_new_bb indirectt c last addpred in
@@ -166,8 +173,23 @@ let of_prog ?(special_error = true) p =
     C.add_edge_e c (C.G.E.create v lab tgt)
   in
   let c = List.fold_left make_edge c postponed_edges in
-  (* FIXME: Colescing *)
+  (* FIXME: Coalescing *)
   c
+
+(** Add an AST program to an existing CFG. The program will not be
+    connected to the rest of the CFG. *)
+let add_prog ?(special_error = true) c p =
+
+  let (indirectt,nodes,postponed_edges,c,last,_,addpred) = List.fold_left (f ~special_error) (false,[],[],c,[],true,None) p in
+  let c, nodes = match last with
+    | _::_ ->
+      let c,v = add_new_bb indirectt c last addpred in
+      c, (v::nodes)
+    | [] -> match addpred with
+      | None -> c, nodes
+      | Some v -> failwith "add_prog: I do not think this is posible"
+  in
+  c, postponed_edges, (List.rev nodes)
 
 (** Convert a CFG back to an AST program.
     This is needed for printing in a way that can be parsed again.

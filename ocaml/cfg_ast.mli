@@ -29,3 +29,13 @@ val find_indirect : Cfg.AST.G.t -> Cfg.AST.G.t * Cfg.AST.G.V.t
 (** [v2s v] returns the basic blocker identifier string associated
     with [v]. *)
 val v2s : Cfg.AST.G.V.t -> string
+
+(** {3 Internal Functions} *)
+(** [add_prog cfg p] adds the AST program [p] into the existing AST
+    CFG [cfg]. It returns a tuple consisting of the updated CFG, new
+    postponed edges, and newly added BBs.
+
+    This function exists to enable incremental lifting, and should not
+    be used for other applications.
+*)
+val add_prog : ?special_error:bool -> Cfg.AST.G.t -> Ast.program -> (Cfg.AST.G.t * (Cfg.AST.G.V.t * Cfg.AST.G.E.label * Ast.exp) list * Cfg.AST.G.V.t list)
