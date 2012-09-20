@@ -12,7 +12,7 @@ module V = struct
 
   let hash (V(i,_,_)) = i
 
-  let equal = ( = )
+  let equal = ( == )
 
   (* is it faster to use the generic compare, or < and = ? *)
   let compare (V(x,_,_)) (V(y,_,_)) = compare x y
