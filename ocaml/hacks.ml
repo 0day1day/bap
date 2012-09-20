@@ -182,15 +182,31 @@ let uniqueify_labels p =
 module Rm(C: Cfg.CFG) = struct
   let remove_indirect g =
     C.remove_vertex g (C.G.V.create Cfg.BB_Indirect)
+  let exit_indirect g =
+    let exit = C.G.V.create Cfg.BB_Exit in
+    if not (C.G.mem_vertex g exit) then failwith "exit_indirect: No BB_Exit";
+    let swap_edge e g =
+      C.add_edge_e (C.remove_edge_e g e)
+        (C.G.E.create (C.G.E.src e) (C.G.E.label e) exit)
+    in
+    C.G.fold_succ_e swap_edge g (C.G.V.create Cfg.BB_Indirect) g
 end
 
 let ast_remove_indirect =
   let module Rm = Rm(Cfg.AST) in
   Rm.remove_indirect
 
+let ast_exit_indirect =
+  let module Rm = Rm(Cfg.AST) in
+  Rm.exit_indirect
+
 let ssa_remove_indirect =
   let module Rm = Rm(Cfg.SSA) in
   Rm.remove_indirect
+
+let ssa_exit_indirect =
+  let module Rm = Rm(Cfg.SSA) in
+  Rm.exit_indirect
 
 (** Replace unknown expressions with constant zero *)
 let replace_unknowns p =

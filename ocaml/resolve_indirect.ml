@@ -5,11 +5,12 @@ module D = Debug.Make(struct let name = "Resolve_indirect" and default=`NoDebug 
 open D
 
 let resolve_indjumps ?is_exit asmp cfg =
+  let cfg = Hacks.ast_exit_indirect (C.copy cfg) in
   let cfg = Ast_cond_simplify.simplifycond_cfg cfg in
 
   let rec resolve cfg =
-    let cfg_vsa = Hacks.ast_remove_indirect (C.copy cfg) in
-    let _df_in, df_out = Vsa.AlmostVSA.DF.worklist_iterate_widen ~nmeets:50 ~opts:{Vsa.AlmostVSA.DFP.O.initial_mem=Asmir.get_readable_mem_contents_list asmp} cfg_vsa in
+
+    let _df_in, df_out = Vsa.AlmostVSA.DF.worklist_iterate_widen ~nmeets:50 ~opts:{Vsa.AlmostVSA.DFP.O.initial_mem=Asmir.get_readable_mem_contents_list asmp} cfg in
     C.G.fold_vertex
       (fun v cfg ->
         (try
