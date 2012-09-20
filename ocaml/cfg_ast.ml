@@ -181,15 +181,15 @@ let of_prog ?(special_error = true) p =
 let add_prog ?(special_error = true) c p =
 
   let (indirectt,nodes,postponed_edges,c,last,_,addpred) = List.fold_left (f ~special_error) (false,[],[],c,[],true,None) p in
-  let c, nodes = match last with
+  let fallthrough, c, nodes = match last with
     | _::_ ->
       let c,v = add_new_bb indirectt c last addpred in
-      c, (v::nodes)
+      Some v, c, (v::nodes)
     | [] -> match addpred with
-      | None -> c, nodes
+      | None -> None, c, nodes
       | Some v -> failwith "add_prog: I do not think this is posible"
   in
-  c, postponed_edges, nodes
+  c, postponed_edges, nodes, fallthrough
 
 (** Convert a CFG back to an AST program.
     This is needed for printing in a way that can be parsed again.

@@ -1253,7 +1253,7 @@ struct
 
     let init_mem vm {O.initial_mem=initial_mem} =
       let write_mem m (a,v) =
-        dprintf "Writing %c to %#Lx" v a;
+        dprintf "Writing %#x to %#Lx" (Char.code v) a;
         let v = Char.code v in
         let v = Int64.of_int v in
         MemStore.write 8 m (VS.single 32 a) (VS.single 8 v)

@@ -6,10 +6,6 @@ open D
 
 let resolve_indjumps ?is_exit asmp cfg =
   let cfg = Ast_cond_simplify.simplifycond_cfg cfg in
-  (* let get_mem = Asmir.get_readable_mem_contents asmp in *)
-  (* let get_mem i = *)
-  (*   try Some (Int64.of_int (Char.code(get_mem i))) *)
-  (*   with Asmir.Memory_error -> None *)
 
   let rec resolve cfg =
     let cfg_vsa = Hacks.ast_remove_indirect (C.copy cfg) in

@@ -9,23 +9,27 @@ let speclist = []
 
 let arg = ref 0;;
 let binname = ref None;;
+let entry = ref None;;
 
 let anon x =
   (match !arg with
+  | 1 -> entry := Some (Int64.of_string x)
   | 0 -> binname := Some x
   | _ -> failwith "Expected two arguments");
   incr arg;;
 
 let () = Arg.parse speclist anon usage;;
 
-(* let m2a_state = Memory2array.create_state () *)
-
-if !arg <> 1 then
+if !arg < 1 then
   (Arg.usage speclist usage;
    exit 1);;
 
 let asmp = Asmir.open_program (BatOption.get !binname);;
 
-let cfg,_ = Asmir_disasm.recursive_descent asmp;;
+let start = match !entry with
+  | Some x -> x
+  | None -> Asmir.get_start_addr asmp;;
+
+let cfg,_ = Asmir_disasm.recursive_descent_at asmp start;;
 
 let () = ignore(Resolve_indirect.resolve_indjumps asmp cfg);;
