@@ -174,6 +174,9 @@ val split_common_suffix : ?eq:('a -> 'a -> bool) -> 'a list -> 'a list -> 'a lis
     equal to the identity function when [fopt = None]. *)
 val apply_option : ('a -> 'a) option -> 'a -> 'a
 
+(** Memoize the results of a function *)
+val memoize : ?size:int -> ('a -> 'b) -> 'a -> 'b
+
 (* Deprecated: BatOption.is_some *)
 (* val has_some: 'a option -> bool *)
 
