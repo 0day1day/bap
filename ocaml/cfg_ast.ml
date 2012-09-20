@@ -189,7 +189,7 @@ let add_prog ?(special_error = true) c p =
       | None -> c, nodes
       | Some v -> failwith "add_prog: I do not think this is posible"
   in
-  c, postponed_edges, (List.rev nodes)
+  c, postponed_edges, nodes
 
 (** Convert a CFG back to an AST program.
     This is needed for printing in a way that can be parsed again.

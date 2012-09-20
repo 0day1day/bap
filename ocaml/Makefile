@@ -90,6 +90,7 @@ export SOURCES = \
 	asmir_vars.ml \
 	asmir_consts.ml \
 	asmir.mli asmir.ml \
+	asmir_disasm.mli asmir_disasm.ml \
 	asmir_rdisasm.mli asmir_rdisasm.ml \
 	grammar_private_scope.ml \
 	grammar.mly lexer.mll \
