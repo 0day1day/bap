@@ -260,10 +260,19 @@ let split_common_suffix ?(eq=(=)) la lb =
   let (s,rla,rlb) = split_common_prefix ~eq (List.rev la) (List.rev lb) in
   (List.rev s, List.rev rla, List.rev rlb)
 
-let apply_option f k = 
+let apply_option f k =
   match f with
   | None -> k
   | Some(f') -> f' k
+
+let memoize ?(size = 128) f =
+  let results = Hashtbl.create size in
+  fun x ->
+    try Hashtbl.find results x
+    with Not_found ->
+      let y = f x in
+      Hashtbl.add results x y;
+      y
 
 (* (\** Given Some(a), returns a. Given None, raises Not_found *\) *)
 (* let option_unwrap o = *)
