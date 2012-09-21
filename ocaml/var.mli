@@ -33,5 +33,5 @@ val compare : t -> t -> int
 (** {3 Data structures for storing variables} *)
 
 module VarHash : Hashtbl.S with type key = t
-module VarMap : Map.S with type key = t
+module VarMap : BatMap.S with type key = t
 module VarSet : Set.S with type elt = t

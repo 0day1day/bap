@@ -124,8 +124,8 @@ struct
     H.replace htin (D.s0 opts g) (init opts g);
     let rec do_work = function
       | [] -> ()
-      | b::worklist ->  
-	  let inset = (dfin b) in 
+      | b::worklist ->
+	  let inset = (dfin b) in
 	  let outset = (f_t b inset) in 
 	  H.replace htout b outset;
 	  let affected_edges =

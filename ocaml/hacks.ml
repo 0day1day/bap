@@ -189,7 +189,8 @@ module Rm(C: Cfg.CFG) = struct
       C.add_edge_e (C.remove_edge_e g e)
         (C.G.E.create (C.G.E.src e) (C.G.E.label e) exit)
     in
-    C.G.fold_succ_e swap_edge g (C.G.V.create Cfg.BB_Indirect) g
+    let g = C.G.fold_pred_e swap_edge g (C.G.V.create Cfg.BB_Indirect) g in
+    remove_indirect g
 end
 
 let ast_remove_indirect =

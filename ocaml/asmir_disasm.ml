@@ -31,7 +31,7 @@ module RECURSIVE_DESCENT_SPEC = struct
         | Some l -> Addrs [l]
         | None -> Indirect)
       | CJmp _::_, _ -> failwith "error"
-    (* Fallthrough/Jmp *)
+      (* Fallthrough/Jmp *)
       | _::_, None ->
         (match lab_of_exp e with
         | Some l -> Addrs [l]
@@ -54,6 +54,7 @@ module VSA_SPEC = struct
       if l <> None then failwith "VSA-enabled lifting currently assumes that conditional jumps are not indirect";
       let cfg = Hacks.ast_exit_indirect (CA.copy g) in
       let cfg = Ast_cond_simplify.simplifycond_cfg cfg in
+      (* Cfg_pp.AstStmtsDot.output_graph (open_out "vsa.dot") cfg; *)
       let _df_in, df_out = Vsa.AlmostVSA.DF.worklist_iterate_widen ~nmeets:50 ~opts:{Vsa.AlmostVSA.DFP.O.initial_mem=Asmir.get_readable_mem_contents_list asmp} cfg in
       let vs = Vsa.AlmostVSA.DFP.exp2vs (df_out v) e in
       (match Vsa.VS.concrete ~max:50 vs with
@@ -80,6 +81,15 @@ module Make(D:DISASM) = struct
       try c, CA.find_label c (Addr a)
       with Not_found ->
         let (prog, next) = Asmir.asm_addr_to_bap p a in
+
+        (* Hack to remove calls for now *)
+        let prog = match List.rev prog with
+          | Jmp(_, [StrAttr "call"])::tl ->
+            List.map (function
+              | Label _ as s -> s
+              | s -> Comment(Printf.sprintf "Call statement removed: %s" (Pp.ast_stmt_to_string s), [])) prog
+          | _ -> prog
+        in
         let (c', edges, bbs, fallthrough) = Cfg_ast.add_prog c prog in
         (* Queue edges *)
         let edges = match fallthrough with

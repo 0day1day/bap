@@ -60,7 +60,6 @@ let bits_of_width = Typecheck.bits_of_width
 let fwd_transfer_stmt_to_block f g node latice =
   List.fold_left (fun l n -> f n l) latice (Cfg.AST.get_stmts g node)
 
-(* FIXME: find a better way to get the stack pointer *)
 let sp = Disasm_i386.esp
 
 (* FIXME *)
@@ -1089,7 +1088,11 @@ module MemStore = struct
       with Not_found -> ae
     else
       let m2 = try M1.find r ae with Not_found -> M2.empty in
-        M1.add r (M2.add i vl m2) ae
+      (* Don't overwrite the old value if it's the same; this wastes
+         memory in the associative data structure. *)
+      if (try M2.find i m2 = vl with Not_found -> false)
+      then ae
+      else M1.add r (M2.add i vl m2) ae
 
   let write_concrete_weak k ae addr vl =
     write_concrete_strong k ae addr (VS.union vl (read_concrete k ae addr))
@@ -1127,16 +1130,21 @@ module MemStore = struct
          intersection, we can't do anything. *)
       ae
 
+  let equal x y =
+    if x == y then true
+    else M1.equal (M2.equal (=)) x y
+
   let intersection (x:t) (y:t) =
-    fold (fun addr v res -> write_concrete_intersection (VS.width v) res addr v) x y
+    if equal x y then x
+    else fold (fun addr v res -> write_concrete_intersection (VS.width v) res addr v) x y
 
   let union (x:t) (y:t) =
-    fold (fun k v res -> write_concrete_weak (VS.width v) res k v) x y
+    if equal x y then x
+    else fold (fun k v res -> write_concrete_weak (VS.width v) res k v) x y
 
   let widen (x:t) (y:t) =
-    fold (fun k v res -> write_concrete_weak_widen (VS.width v) res k v) x y
-
-  let equal = M1.equal (M2.equal (=))
+    if equal x y then x
+    else fold (fun k v res -> write_concrete_weak_widen (VS.width v) res k v) x y
 
 end
 
@@ -1213,20 +1221,20 @@ struct
       let top = AbsEnv.empty
       let equal = AbsEnv.equal
       let meet (x:t) (y:t) =
-          VM.fold
-            (fun k v res ->
-               try
-                 let v' = VM.find k y in
-                 let vs = match v, v' with
-                   | (`Scalar a, `Scalar b) -> `Scalar(VS.union a b)
-                   | (`Array a, `Array b) -> `Array(MemStore.union a b)
-                   | _ -> failwith "Tried to meet scalar and array"
-                 in
-                   VM.add k vs res
-               with Not_found ->
-                 VM.add k v res
-            )
-            x y
+        VM.fold
+          (fun k v res ->
+            try
+              let v' = VM.find k y in
+              let vs = match v, v' with
+                | (`Scalar a, `Scalar b) -> `Scalar(VS.union a b)
+                | (`Array a, `Array b) -> `Array(MemStore.union a b)
+                | _ -> failwith "Tried to meet scalar and array"
+              in
+              VM.add k vs res
+            with Not_found ->
+              VM.add k v res
+          )
+          x y
       let widen (x:t) (y:t) =
         VM.fold
           (fun k v res ->

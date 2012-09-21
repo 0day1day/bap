@@ -26,10 +26,14 @@ if !arg < 1 then
 
 let asmp = Asmir.open_program (BatOption.get !binname);;
 
-let start = match !entry with
-  | Some x -> x
-  | None -> Asmir.get_start_addr asmp;;
+let funcs = Asmir.get_function_ranges asmp;;
 
-let cfg,_ = Asmir_disasm.vsa_at asmp start;;
+let lift_func (n,s,e) =
+  Printf.printf "Lifting %s\n" n;
+  flush stdout;
+  let cfg,_ = Asmir_disasm.vsa_at asmp s in
+  Cfg_pp.AstStmtsDot.output_graph (open_out ("resolve"^n^".dot")) cfg;
+  cfg
 
-Cfg_pp.AstStmtsDot.output_graph (open_out "resolve.dot") cfg;;
+let funcs = List.map lift_func funcs;;
+

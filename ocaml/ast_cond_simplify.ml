@@ -123,7 +123,7 @@ let simplifycond_cfg g =
       dprintf "e: %s e': %s" (Pp.ast_exp_to_string e) (Pp.ast_exp_to_string e');
       (* Update statement *)
       let s = CJmp(e', tt, tf, a)::tl in
-      let g = C.set_stmts g v s in
+      let g = C.set_stmts g v (List.rev s) in
 
       (* Update edge conditions *)
       C.G.fold_succ_e (fun e g ->
