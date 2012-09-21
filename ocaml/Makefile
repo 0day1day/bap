@@ -90,6 +90,8 @@ export SOURCES = \
 	asmir_vars.ml \
 	asmir_consts.ml \
 	asmir.mli asmir.ml \
+	hacks.ml \
+	vsa.ml \
 	asmir_disasm.mli asmir_disasm.ml \
 	asmir_rdisasm.mli asmir_rdisasm.ml \
 	grammar_private_scope.ml \
@@ -97,15 +99,12 @@ export SOURCES = \
 	parser.ml \
 	input.mli input.ml \
 	to_c.ml \
-	vsa.ml \
 	symbeval.ml symbeval_search.ml \
-	hacks.ml \
 	coalesce.mli coalesce.ml \
 	structural_analysis.ml \
 	unroll.ml \
 	ast_slice.ml \
 	ssa_slice.ml \
-	resolve_indirect.mli resolve_indirect.ml \
 	traces.ml \
 	traces_surgical.ml \
 	traces_backtaint.mli traces_backtaint.ml \

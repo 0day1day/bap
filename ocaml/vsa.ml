@@ -863,6 +863,19 @@ struct
     if vs = top addr_bits then wprintf "VS.fold is very slow for Top";
     List.fold_left (fun a (r,si) -> SI.fold (fun v -> f (r,v)) si a) init vs
 
+  let concrete ?max vs =
+    let get_value (r,o) (l,ctr) =
+      (match max with
+      | Some x -> if ctr > x then raise Exit
+      | None -> ());
+      if r == global then
+        o::l, ctr+1
+      else raise Exit in
+    try
+      let l,_ = fold get_value vs ([],1) in
+      Some l
+    with Exit -> None
+
   let numconcrete vs =
     fold (fun _ a -> a +% 1L) vs 0L
 end

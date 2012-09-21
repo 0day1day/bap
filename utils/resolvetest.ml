@@ -30,6 +30,6 @@ let start = match !entry with
   | Some x -> x
   | None -> Asmir.get_start_addr asmp;;
 
-let cfg,_ = Asmir_disasm.recursive_descent_at asmp start;;
+let cfg,_ = Asmir_disasm.vsa_at asmp start;;
 
-let () = ignore(Resolve_indirect.resolve_indjumps asmp cfg);;
+Cfg_pp.AstStmtsDot.output_graph (open_out "resolve.dot") cfg;;
