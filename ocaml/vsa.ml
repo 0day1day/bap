@@ -13,6 +13,9 @@
     * Special case memory writes of Top: since we will be removing
       entries, we do not have to iterate through all addresses
     * Unified interface to Arithmetic for singleton values
+    * Strided-interval aware applicative data type:
+      It would store values as strided intervals, rather than
+      individual points.
 *)
 
 module VM = Var.VarMap
@@ -25,6 +28,7 @@ open Ast
 
 module D = Debug.Make(struct let name = "Vsa" and default=`NoDebug end)
 open D
+module DV = Debug.Make(struct let name = "VsaVerbose" and default=`NoDebug end)
 
 (* Treat unsigned comparisons the same as signed: should be okay as
    long as overflow does not occur. Should be false for soundness. *)
@@ -73,9 +77,10 @@ struct
   (** number of bits * unsigned stride * signed lower bound * signed upper bound *)
   type t = int * int64 * int64 * int64
 
-  let to_string (_,s,lb,ub) =
+  let to_string (k,s,lb,ub) =
     if s = (-1L) then "[]"
-    else Printf.sprintf "%Lu[%Ld,%Ld]" s lb ub
+    else if not (debug ()) then Printf.sprintf "%Lu[%Ld,%Ld]" s lb ub
+    else Printf.sprintf "(%d)%Lu[%Ld,%Ld]" k s lb ub
 
   let highbit k =
     if k = 1 then 1L else I.shift_left 1L (k-1)
@@ -442,7 +447,7 @@ struct
     assert (k = k1 + k2);
     let x = cast_unsigned k x in
     let y = cast_unsigned k y in
-    let x = lshift k (single k (Int64.of_int k2)) x in
+    let x = lshift k x (single k (Int64.of_int k2)) in
     logor k x y
   let concat = renormbin concat
 
@@ -701,7 +706,7 @@ struct
 
   type t = address list
 
-  let global = Var.newvar "internal only" (Reg 64) (* value doesn't really matter, so long as it's unique *)
+  let global = Var.newvar "global region" (Reg 64) (* value doesn't really matter, so long as it's unique *)
 
   let top k = [(global, SI.top k)]
 
@@ -1053,12 +1058,11 @@ module MemStore = struct
              XXX: Handle address wrap-around properly
           *)
           let rest = read_concrete (k-w) ?o ae (r, i+%((Int64.of_int w)/%8L)) in
-          (* dprintf "Concatenating %Ld %s and %s" i (VS.to_string v) (VS.to_string rest); *)
           (* XXX: Endianness *)
+          (* let () = dprintf "Concatenating %Ld %s and %s ->" i (VS.to_string rest) (VS.to_string v) in *)
           VS.concat k rest v)
     with Not_found ->
       VS.top k
-      (* read_concrete_real ?o (r,i) *)
 
   let read k ?o ae = function
     | [] -> failwith "empty value sets not allowed"
@@ -1066,7 +1070,8 @@ module MemStore = struct
       try
         let res =
           VS.fold
-            (fun v a ->  match a with
+            (fun v a ->
+              match a with
             | None -> Some (read_concrete k ?o ae v)
             | Some a ->
               if a = VS.top k then raise Exit
@@ -1089,7 +1094,7 @@ module MemStore = struct
     else
       let m2 = try M1.find r ae with Not_found -> M2.empty in
       (* Don't overwrite the old value if it's the same; this wastes
-         memory in the associative data structure. *)
+         memory in the applicative data structure. *)
       if (try M2.find i m2 = vl with Not_found -> false)
       then ae
       else M1.add r (M2.add i vl m2) ae
@@ -1274,7 +1279,7 @@ struct
 
     let init_mem vm {O.initial_mem=initial_mem} =
       let write_mem m (a,v) =
-        dprintf "Writing %#x to %#Lx" (Char.code v) a;
+        DV.dprintf "Writing %#x to %#Lx" (Char.code v) a;
         let v = Char.code v in
         let v = Int64.of_int v in
         MemStore.write 8 m (VS.single 32 a) (VS.single 8 v)
@@ -1365,6 +1370,11 @@ struct
         | Move(v, e, _) ->
           try
             let new_vs = exp2aev ~o l e in
+            if DV.debug () then
+            (match new_vs with
+            | `Scalar new_vs ->
+              DV.dprintf "Assign %s <- %s" (Pp.var_to_string v) (VS.to_string new_vs)
+            | _ -> ());
             VM.add v new_vs l
           with Invalid_argument _ | Not_found ->
             l
