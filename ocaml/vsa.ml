@@ -486,14 +486,16 @@ struct
           and l = min a c in
             (k, u -% l, l, u)
         else failwith "union: strided interval not in reduced form"
-      else 
+      else
         let r1 = I.rem a s' (* not right when s' is negative. *)
         and r2 = I.rem c s' in
         let u = max b d
         and l = min a c in
         if s' > 0L && r1 = r2 then
           (k, s', l, u)
-        else (k, 1L, l, u)
+        else
+          let s'' = uint64_gcd (Int64.abs (r1 -% r2)) s' in
+          (k, s'', l, u)
 
   let union x y =
     let (k,a,b,c) as res = union x y in
