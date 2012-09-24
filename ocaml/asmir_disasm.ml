@@ -1,8 +1,12 @@
 open Ast
+open Ast_convenience
+open Big_int_convenience
 module CA = Cfg.AST
 module D = Debug.Make(struct let name = "Asmir_disasm" and default=`NoDebug end)
 open D
 open Type
+
+(* XXX: Conditional indirect jumps *)
 
 type succs = | Addrs of label list
              | Error
@@ -60,7 +64,7 @@ module VSA_SPEC = struct
       dprintf "VSA resolved %s to %s" (Pp.ast_exp_to_string e) (Vsa.VS.to_string vs);
       (match Vsa.VS.concrete ~max:50 vs with
       | Some x -> Addrs (List.map (fun a -> Addr a) x), ()
-      | None -> wprintf "VSA disassembly failed"; Indirect, ())
+      | None -> wprintf "VSA disassembly failed to resolve %s to a specific concrete set" (Pp.ast_exp_to_string e); Indirect, ())
       (* Rely on recursive descent for easy stuff *)
     | o, () -> o, ()
 
@@ -100,15 +104,27 @@ module Make(D:DISASM) = struct
         List.iter (fun x -> Queue.add x q) edges;
         c', CA.find_label c' (Addr a)
     in
-    let add_resolved_edge (s,l,e) c lbl  =
+    (* addcond: Add condition to edge?
+       (s,l,e): original edge information
+       c: graph
+       lbl: resolved edge destination
+    *)
+    let add_resolved_edge addcond (s,l,e) c lbl  =
       try
         let c, dst = match lbl with
           | Addr a -> raise_address c a
           | Name s ->
-        (* If we can't find a named label, something bad happened *)
+            (* If we can't find a named label, something bad happened *)
             c, CA.find_label c lbl
         in
-        CA.add_edge_e c (CA.G.E.create s l dst)
+        let l' = match addcond, lbl with
+          | true, Addr a ->
+            if l <> None then failwith "add_resolved_edge: Indirect conditional jumps are unimplemented";
+            Some(true (* XXX: This is meaningless! *), binop EQ e (Int(bi64 a, Typecheck.infer_ast ~check:false e)))
+          | true, Name _ -> failwith "add_resolved_edge: It is not possible to resolve indirect jump to a named label"
+          | false, _ -> l
+        in
+        CA.add_edge_e c (CA.G.E.create s l' dst)
       with Asmir.Memory_error ->
         (* Should this go to error or exit? *)
         wprintf "Raising address %s failed" (Pp.label_to_string lbl);
@@ -123,7 +139,8 @@ module Make(D:DISASM) = struct
       match resolved_addrs with
       | Addrs addrs ->
         dprintf "%d Addrs" (List.length addrs);
-        c := List.fold_left (add_resolved_edge e) !c addrs
+        let addcond = List.length addrs > 1 in
+        c := List.fold_left (add_resolved_edge addcond e) !c addrs
       | Error | Exit | Indirect ->
         dprintf "Special";
         let c', dest = match resolved_addrs with
