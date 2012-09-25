@@ -6,18 +6,50 @@ module D = Debug.Make(struct let name = "Asmir_disasm" and default=`NoDebug end)
 open D
 open Type
 
-(* XXX: Conditional indirect jumps *)
+(* XXX: Handle conditional function calls *)
+(* VSA dataflow reuse *)
+(* Call/ret behavior *)
 
 type succs = | Addrs of label list
              | Error
              | Exit
              | Indirect
 
+module type STATE = sig
+  type t
+  val init : t
+end
+
+module NOOPSTATE = struct
+  type t = unit
+  let init = ()
+end
+
+module type FUNCID = sig
+  module State : STATE
+  val find_calls : Cfg.AST.G.t -> Cfg.AST.G.V.t list -> Cfg_ast.unresolved_edge list -> State.t -> Cfg_ast.unresolved_edge list * State.t
+  val find_rets : Cfg.AST.G.t -> Cfg.AST.G.V.t list -> Cfg_ast.unresolved_edge list -> State.t -> Cfg_ast.unresolved_edge list * State.t
+end
+
+module FUNCFINDER_DUMB = struct
+  module State = NOOPSTATE
+  let is_call_stmt = function
+    | Jmp(_, [StrAttr "call"]) -> true
+    | _ -> false
+  let is_ret_stmt = function
+    | Jmp(_, [StrAttr "ret"]) -> true
+    | _ -> false
+  let check_last f c nodes unresolved_edges () =
+    List.filter (fun (v,_,_) -> let stmts = CA.get_stmts c v in
+                          match List.rev stmts with
+                          | last::_ -> f last
+                          | [] -> false) unresolved_edges, ()
+  let find_calls = check_last is_call_stmt
+  let find_rets = check_last is_ret_stmt
+end
+
 module type DISASM = sig
-  module State : sig
-    type t (** Auxiliary data that is returned after disassembly *)
-    val init : t
-  end
+  module State : STATE
   (* val visit_new_address : addr * string * Cfg.AST.G.V.t list * Cfg.AST.G.E.t list * Cfg.AST.G.V.t option -> State.t -> State.t *)
   (* visit_new_edge? *)
   val get_succs : Asmir.asmprogram -> Cfg.AST.G.t -> Cfg.AST.G.V.t * Cfg.AST.G.E.label * Ast.exp -> State.t -> succs * State.t (** Function that returns the successors of a node *)
@@ -30,6 +62,8 @@ module RECURSIVE_DESCENT_SPEC = struct
   end
   let get_succs _asmp g (v,l,e) () =
     let o = match List.rev (CA.get_stmts g v), l with
+      | last::_, None when FUNCFINDER_DUMB.is_ret_stmt last ->
+        Exit
       | CJmp _::_, Some _ ->
         (match lab_of_exp e with
         | Some l -> Addrs [l]
@@ -70,38 +104,48 @@ module VSA_SPEC = struct
 
 end
 
-module Make(D:DISASM) = struct
+module Make(D:DISASM)(F:FUNCID) = struct
   let disasm_at p addr =
     let (tmp, entry) = Cfg_ast.create_entry (CA.empty()) in
     let (tmp, exit) = Cfg_ast.find_exit tmp in
     let (tmp, error) = Cfg_ast.find_error tmp in
     let (c, indirect) = Cfg_ast.find_indirect tmp in
+    let succh = Hashtbl.create 1000 in
     let c = CA.add_edge c indirect error in (* indirect jumps could fail *)
     let c = ref c in
     let state = ref D.State.init in
     let q = Queue.create () in
-    let () = Queue.add (entry,None,exp_of_lab (Addr addr)) q in
+    (* bbs of lifted insruction, unresolved outgoing edges from lifted instruction, successor address *)
+    let () = Queue.add (entry::[], (entry,None,exp_of_lab (Addr addr))::[], addr) q in
     let raise_address c a =
       dprintf "raise_address %#Lx" a;
       try c, CA.find_label c (Addr a)
       with Not_found ->
         let (prog, next) = Asmir.asm_addr_to_bap p a in
+        Hashtbl.replace succh a next;
 
-        (* Hack to remove calls for now *)
-        let prog = match List.rev prog with
-          | Jmp(_, [StrAttr "call"])::tl ->
-            List.map (function
-              | Label _ as s -> s
-              | s -> Comment(Printf.sprintf "Call statement removed: %s" (Pp.ast_stmt_to_string s), [])) prog
-          | _ -> prog
-        in
         let (c', edges, bbs, fallthrough) = Cfg_ast.add_prog c prog in
+
+        (* Resolve edges internal to this instruction.  All internal
+           edges will be to Name labels (instead of Addr labels).
+
+           We need to add internal edges here so we can actually do
+           analysis on the CFG (for example, concretely executing to
+           see if there is a call).
+        *)
+        let c', edges = List.fold_left
+          (fun (c,unresolved_edges) ((s,l,e) as edge) ->
+            match lab_of_exp e with
+            | Some (Name _ as t) -> CA.add_edge_e c (CA.G.E.create s l (CA.find_label c t)), unresolved_edges
+            | _ -> c, edge::unresolved_edges
+          ) (c',[]) edges in
+
         (* Queue edges *)
         let edges = match fallthrough with
           | Some v -> (v,None,exp_of_lab (Addr next))::edges
           | None -> edges
         in
-        List.iter (fun x -> Queue.add x q) edges;
+        Queue.add (bbs, edges, next) q;
         c', CA.find_label c' (Addr a)
     in
     (* addcond: Add condition to edge?
@@ -113,9 +157,7 @@ module Make(D:DISASM) = struct
       try
         let c, dst = match lbl with
           | Addr a -> raise_address c a
-          | Name s ->
-            (* If we can't find a named label, something bad happened *)
-            c, CA.find_label c lbl
+          | Name s -> failwith "add_resolved_edge: Named labels should be resolved in raise_address"
         in
         let l' = match addcond, lbl with
           | true, Addr a ->
@@ -124,6 +166,7 @@ module Make(D:DISASM) = struct
           | true, Name _ -> failwith "add_resolved_edge: It is not possible to resolve indirect jump to a named label"
           | false, _ -> l
         in
+
         CA.add_edge_e c (CA.G.E.create s l' dst)
       with Asmir.Memory_error ->
         (* Should this go to error or exit? *)
@@ -131,26 +174,48 @@ module Make(D:DISASM) = struct
         let c,error = Cfg_ast.find_error c in
         CA.add_edge_e c (CA.G.E.create s l error)
     in
-    while not (Queue.is_empty q) do
-      let ((s,l,t) as e) = Queue.pop q in
+    (* Side effects: Adds to queue *)
+    let process_edge (c,state) ((s,l,t) as e) =
       dprintf "Looking at edge from %s to %s" (Cfg_ast.v2s s) (Pp.ast_exp_to_string t);
-      let resolved_addrs,state' = D.get_succs p !c e !state in
-      state := state';
+      let resolved_addrs,state' = D.get_succs p c e state in
       match resolved_addrs with
       | Addrs addrs ->
         dprintf "%d Addrs" (List.length addrs);
         let addcond = List.length addrs > 1 in
-        c := List.fold_left (add_resolved_edge addcond e) !c addrs
+        List.fold_left (add_resolved_edge addcond e) c addrs, state'
       | Error | Exit | Indirect ->
         dprintf "Special";
         let c', dest = match resolved_addrs with
-          | Error -> Cfg_ast.find_error !c
-          | Exit -> Cfg_ast.find_exit !c
-          | Indirect -> Cfg_ast.find_indirect !c
+          | Error -> Cfg_ast.find_error c
+          | Exit -> Cfg_ast.find_exit c
+          | Indirect -> Cfg_ast.find_indirect c
           | _ -> failwith "impossible"
         in
-        let c' = CA.add_edge_e c' (CA.G.E.create s l dest) in
-        c := c'
+        CA.add_edge_e c' (CA.G.E.create s l dest), state'
+    in
+    (* Main loop *)
+    while not (Queue.is_empty q) do
+      let (bbs, unresolved_edges, succ) = Queue.pop q in
+      let c', unresolved_edges = match F.find_calls !c bbs unresolved_edges F.State.init with
+        | [], _ -> !c, unresolved_edges
+        | call_edges, _ ->
+          (* We found edges corresponding to calls *)
+          let others = Util.list_difference unresolved_edges call_edges in
+          let fallthrough = List.map (fun (s,l,e) -> (s,l, exp_of_lab (Addr succ))) call_edges in
+          let dumb_translate_call cfg (s,l,e) =
+            let revstmts = match List.rev (CA.get_stmts !c s) with
+              | CJmp _::_ -> failwith "Conditional function calls are not implemented"
+              | Jmp _ as s::tl -> Comment(Printf.sprintf "Function call removed: %s" (Pp.ast_stmt_to_string s), [])::tl
+              | _ -> failwith "Unable to rewrite function call"
+            in
+            CA.set_stmts cfg s (List.rev revstmts)
+          in
+          let c' = List.fold_left dumb_translate_call !c call_edges in
+          c', BatList.append others fallthrough
+      in
+      let c',state' = List.fold_left process_edge (c',!state) unresolved_edges in
+      c := c';
+      state := state'
     done;
 
     !c, !state
@@ -159,17 +224,17 @@ module Make(D:DISASM) = struct
 end
 
 let recursive_descent =
-  let module RECURSIVE_DESCENT = Make(RECURSIVE_DESCENT_SPEC) in
+  let module RECURSIVE_DESCENT = Make(RECURSIVE_DESCENT_SPEC)(FUNCFINDER_DUMB) in
   RECURSIVE_DESCENT.disasm
 
 let recursive_descent_at =
-  let module RECURSIVE_DESCENT = Make(RECURSIVE_DESCENT_SPEC) in
+  let module RECURSIVE_DESCENT = Make(RECURSIVE_DESCENT_SPEC)(FUNCFINDER_DUMB) in
   RECURSIVE_DESCENT.disasm_at
 
 let vsa =
-  let module VSA = Make(VSA_SPEC) in
+  let module VSA = Make(VSA_SPEC)(FUNCFINDER_DUMB) in
   VSA.disasm
 
 let vsa_at =
-  let module VSA = Make(VSA_SPEC) in
+  let module VSA = Make(VSA_SPEC)(FUNCFINDER_DUMB) in
   VSA.disasm_at

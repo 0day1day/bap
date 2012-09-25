@@ -11,10 +11,10 @@ open Cfg
 open BatListFull
 
 module C = Cfg.AST
-
-
 module D = Debug.Make(struct let name = "CFG_AST" and default=`NoDebug end)
 open D
+
+type unresolved_edge = C.G.V.t * C.G.E.label * Ast.exp
 
 let v2s v = bbid_to_string(C.G.V.label v)
 
@@ -189,7 +189,7 @@ let add_prog ?(special_error = true) c p =
       | None -> None, c, nodes
       | Some v -> failwith "add_prog: I do not think this is posible"
   in
-  c, postponed_edges, nodes, fallthrough
+  c, postponed_edges, List.rev nodes, fallthrough
 
 (** Convert a CFG back to an AST program.
     This is needed for printing in a way that can be parsed again.
