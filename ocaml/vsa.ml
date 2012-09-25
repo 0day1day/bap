@@ -4,6 +4,7 @@
     http://pages.cs.wisc.edu/~bgogul/Research/Thesis/thesis.html
 
     TODO:
+    * Alternate memstore implementation
     * Add a real interface; automatically call simplify_cond
     * Big int support
     * Idea: Use copy propagation information to maintain equivalence
@@ -77,8 +78,11 @@ struct
   (** number of bits * unsigned stride * signed lower bound * signed upper bound *)
   type t = int * int64 * int64 * int64
 
-  let to_string (k,s,lb,ub) =
-    if s = (-1L) then "[]"
+  let is_empty (k,s,lb,ub) =
+    s = (-1L) && lb = 1L && ub = 0L
+
+  let to_string ((k,s,lb,ub) as si) =
+    if is_empty si then "[]"
     else if not (debug ()) then Printf.sprintf "%Lu[%Ld,%Ld]" s lb ub
     else Printf.sprintf "(%d)%Lu[%Ld,%Ld]" k s lb ub
 
@@ -148,9 +152,6 @@ struct
   let one k = single k 1L
   let minus_one k = single k (-1L)
 
-  let is_empty (k,s,lb,ub) =
-    s = (-1L) && lb = 1L && ub = 0L
-
   (* XXX: Remove k argument *)
   let is_reduced k ((k',s,lb,ub) as si) =
     assert(k=k');
@@ -171,8 +172,9 @@ struct
   let renorm k ((k',a,b,c) as si) =
     assert(k=k');
     let si' = if b = c then (k,0L,b,b) else si in
-      check_reduced k si';
-      si'
+    let si' = if a < 0L || c < b then empty k else si' in
+    check_reduced k si';
+    si'
 
   let renormtri f k x y z = renorm k (f k x y z)
   let renormbin f k x y = renorm k (f k x y)
@@ -294,8 +296,6 @@ struct
     in
     let highmask = bnot(s' -% 1L) in
       (k, s', (lb' &% highmask) |% lowbits, (ub' &% highmask) |% lowbits)
-      
-
   let logor = renormbin logor
 
   (* XXX: Get rid of _k *)
@@ -303,19 +303,21 @@ struct
   let lognot (_k:int) (k,s,l,u) =
     assert (_k = k);
     (k, s, bnot u, bnot l)
-
-  let lognot = if debug() then renormun lognot else lognot
+  let lognot = renormun lognot
 
 
   (** Bitwise AND *)
   let logand k x y =
     lognot k (logor k (lognot k x) (lognot k y))
+  let logand = renormbin logand
+
 
   (** Bitwise XOR *)
   let logxor k x y =
     let n = lognot k
     and o = logor k in
     o (n(o (n x) y)) (n(o x (n y)))
+  let logxor = renormbin logxor
 
   (** FIXME: Signed or unsigned modulus? *)
   let modulus k (k',s1,a,b) (k'',s2,c,d) =
@@ -323,7 +325,6 @@ struct
     if b = 0L then single k 0L
     else
       (k, 1L, 0L, int64_umin b d)
-
   let modulus = renormbin modulus
 
 (* XXX: Get rid of k *)
@@ -519,9 +520,9 @@ struct
       else
         (k, 1L, l, u))
 
-  let widen ((k,s1,a,b) as si1) ((k',s2,c,d) as si2) =
+  let widen ((k,s1,a,b) as _si1) ((k',s2,c,d) as _si2) =
     if k <> k' then failwith "widen: expected same bitwidth intervals";
-    dprintf "Widen: %s to %s" (to_string si1) (to_string si2);
+    (* dprintf "Widen: %s to %s" (to_string si1) (to_string si2); *)
     let s' = uint64_gcd s1 s2 in
     let l = if c < a then lower k a s' else a
     and u = if d > b then upper k b s' else b in
@@ -780,9 +781,10 @@ struct
         List.map (fun (r,si') -> (r, SI.sub k si' si)) x
     | _ -> top k
 
-  let makeother f id annihilator k x y = match (x,y) with
+  let makeother f id annihilator k x y =
+    match (x,y) with
     | ([r1,si1], [r2,si2]) when r1 == global && r1 == r2 ->
-        [(r1, f k si1 si2)]
+      [(r1, f k si1 si2)]
     | ([_] as vsg, vs) when vsg = id ->
         vs
     | (vs, ([_] as vsg))  when vsg = id ->
@@ -792,6 +794,7 @@ struct
     | (_,([_] as vsg))  when Some vsg = annihilator ->
         BatOption.get annihilator
     | _ -> top k
+      
 
   let logand k = makeother SI.logand (minus_one k) (Some (zero k)) k
 
@@ -820,6 +823,10 @@ struct
          if List.exists (fun(r,s)-> List.exists (fun(r2,s2)-> r == r2 && SI.eq k s s2 <> SI.no) y) x
          then maybe
          else no
+
+  let equal x y =
+    if x == y then true
+    else x = y
 
   let union x y =
     let k = width x in
@@ -1188,12 +1195,13 @@ module AbsEnv = struct
     Buffer.contents b
 
   let value_equal x y = match x,y with
-    | (`Scalar x, `Scalar y) -> x = y
+    | (`Scalar x, `Scalar y) -> VS.equal x y
     | (`Array x, `Array y) -> MemStore.equal x y
     | _ -> false
 
   let equal x y =
-    VM.equal (value_equal) x y
+    if x == y then true
+    else VM.equal (value_equal) x y
 
   let do_find_vs ae v =
     try match VM.find v ae with
@@ -1228,7 +1236,8 @@ struct
       let top = AbsEnv.empty
       let equal = AbsEnv.equal
       let meet (x:t) (y:t) =
-        VM.fold
+        if equal x y then x
+        else VM.fold
           (fun k v res ->
             try
               let v' = VM.find k y in
@@ -1243,7 +1252,8 @@ struct
           )
           x y
       let widen (x:t) (y:t) =
-        VM.fold
+        if equal x y then x
+        else VM.fold
           (fun k v res ->
             try
               let v' = VM.find k y in

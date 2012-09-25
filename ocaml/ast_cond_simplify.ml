@@ -34,6 +34,9 @@ let rec reverse_visit f e =
   if e' <> e then g e' else e'
 
 let simplify_flat = function
+  | BinOp((OR|AND),
+          e,
+          e') when e === e' -> e
   | BinOp(EQ,
           Int(i0, _),
           BinOp(MINUS, e1, e2)) when i0 = bi0 ->

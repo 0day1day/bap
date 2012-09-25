@@ -89,6 +89,7 @@ module VSA_SPEC = struct
     match RECURSIVE_DESCENT_SPEC.get_succs asmp g (v,l,e) () with
     | Indirect, () ->
       (* Do VSA stuff *)
+      dprintf "Resolving %s with VSA" (Pp.ast_exp_to_string e);
       if l <> None then failwith "VSA-enabled lifting currently assumes that conditional jumps are not indirect";
       let cfg = Hacks.ast_exit_indirect (CA.copy g) in
       let cfg = Ast_cond_simplify.simplifycond_cfg cfg in
