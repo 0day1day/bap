@@ -145,6 +145,9 @@ and check_idx arr idx endian t =
   | TMem _ -> ();
   | _ -> terror "Indexing only allowed from array or mem."
 
+and check_cjmp_direct e =
+  if Ast.lab_of_exp e = None then terror "Conditional jump targets must be direct (to a constant address or label)"
+
 let rec infer_ssa = function
   | Ssa.Int(_,t) -> t
   | Ssa.Var v -> Var.typ v
@@ -197,7 +200,9 @@ let typecheck_stmt =
       let t2t = infer_te t2 in
       check_bool et;
       check_reg t1t;
-      check_reg t2t
+      check_reg t2t;
+      check_cjmp_direct t1;
+      check_cjmp_direct t2
     | Halt(e, _) ->
       let et = infer_te e in
       (* Can we return a memory? Does this make sense? *)
