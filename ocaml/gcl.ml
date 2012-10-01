@@ -4,7 +4,7 @@ open BatListFull
 open Type
 open Util
 open Ast
-
+open Ast_convenience
 
 module D = Debug.Make(struct let name = "GCL" and default=`Debug end)
 open D

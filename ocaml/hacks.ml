@@ -2,6 +2,7 @@
 
 open Type
 open Ast
+open Ast_convenience
 open Util
 open BatListFull
 

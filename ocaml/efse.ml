@@ -1,6 +1,7 @@
 (** Implementation of [efse] algorithm from DWP paper. *)
 
 open Ast
+open Ast_convenience
 open Big_int_convenience
 module CA = Cfg.AST
 module D = Debug.Make(struct let name = "Efse" and default = `NoDebug end)
@@ -288,16 +289,16 @@ struct
         fse_unpass delta' pi tl
       | Assert(e)::tl ->
         let value = eval_exp delta e in
-        let pi' = Ast.exp_and pi value in
+        let pi' = exp_and pi value in
         fse_unpass delta pi' tl
       | Ite(e, s1, s2)::tl ->
         let value_t = eval_exp delta e in
-        let pi_t = Ast.exp_and pi value_t in
-        let value_f = Ast.exp_not value_t in
-        let pi_f = Ast.exp_and pi value_f in
+        let pi_t = exp_and pi value_t in
+        let value_f = exp_not value_t in
+        let pi_f = exp_and pi value_f in
         let fse_t = fse_unpass delta pi_t (s1@tl) in
         let fse_f = fse_unpass delta pi_f (s2@tl) in
-        Ast.exp_or fse_t fse_f
+        exp_or fse_t fse_f
     in
     (* For passified programs, pre=post, so we can set pi to post.
        But not here, since the program is not passified. *)
@@ -331,7 +332,7 @@ let fse_pass ?(cf=true) p post mode =
         (* Assert true = true, pi \land true = pi *)
         fse_pass delta pi tl
       | _ ->
-        let pi' = Ast.exp_and pi value in
+        let pi' = exp_and pi value in
         fse_pass delta pi' tl)
     | Ite(e, s1, s2)::tl ->
       let value_t = eval_exp delta e in
@@ -341,12 +342,12 @@ let fse_pass ?(cf=true) p post mode =
       | Ast.Int(bi, Reg 1) when bi_is_one bi ->
         fse_pass delta pi (s1@tl)
       | _ ->
-        let pi_t = Ast.exp_and pi value_t in
-        let value_f = Ast.exp_not value_t in
-        let pi_f = Ast.exp_and pi value_f in
+        let pi_t = exp_and pi value_t in
+        let value_f = exp_not value_t in
+        let pi_f = exp_and pi value_f in
         let fse_t = fse_pass delta pi_t (s1@tl) in
         let fse_f = fse_pass delta pi_f (s2@tl) in
-        Ast.exp_or fse_t fse_f)
+        exp_or fse_t fse_f)
   in
   let p = BatList.append p [Assert post] in
   fse_pass (D.create ()) exp_true p
@@ -398,7 +399,7 @@ let efse ?(cf=true) p pi mode =
         (* Assert true = true, pi \land true = pi *)
         efse delta pi tl
       | _ ->
-        let pi' = Ast.exp_and pi value in
+        let pi' = exp_and pi value in
         efse delta pi' tl)
     | Ite(e, s1, s2)::tl ->
       dprintf "ite condition %s" (Pp.ast_exp_to_string e);
@@ -413,10 +414,10 @@ let efse ?(cf=true) p pi mode =
       | _ ->
         dprintf "symbolic branch";
         let delta1,pi_t = efse delta value_t s1 in
-        let delta2,pi_f = efse delta (Ast.exp_not value_t) s2 in
+        let delta2,pi_f = efse delta (exp_not value_t) s2 in
         let mergedelta,_ = D.merge delta1 delta2 in
         let deltatl,pitl = efse mergedelta Ast.exp_true tl in
-        deltatl, Ast.exp_and (Ast.exp_and pi (Ast.exp_or pi_t pi_f)) pitl)
+        deltatl, exp_and (exp_and pi (exp_or pi_t pi_f)) pitl)
   in
   let _,pi = efse (D.create ()) pi p in
   pi
@@ -448,8 +449,8 @@ let efse_merge1 ?(cf=true) p pi mode =
         (* Note: Concrete assignments are not added to the formula
            here, but may be by merge_super.  Imagine if x=1 and x=0 occur
            on different branches of an Ite. *)
-        | Symbeval.Symbolic(Ast.Int _) when cf -> D.set delta v value, (*Ast.exp_and pi (Ast.exp_eq (Ast.Var v) (unwrap_symb value))*) pi
-        | Symbeval.ConcreteMem _ when cf -> D.set delta v value, (*Ast.exp_and pi (Ast.exp_eq (Ast.Var v) e)*) pi
+        | Symbeval.Symbolic(Ast.Int _) when cf -> D.set delta v value, (*exp_and pi (Ast.exp_eq (Ast.Var v) (unwrap_symb value))*) pi
+        | Symbeval.ConcreteMem _ when cf -> D.set delta v value, (*exp_and pi (Ast.exp_eq (Ast.Var v) e)*) pi
         | _ -> delta, Assign.add_passive_assignment pi v e mode
       in
       dprintf "done.";
@@ -466,7 +467,7 @@ let efse_merge1 ?(cf=true) p pi mode =
         (* Assert true = true, pi \land true = pi *)
         efse delta pi tl
       | _ ->
-        let pi' = Ast.exp_and pi value in
+        let pi' = exp_and pi value in
         efse delta pi' tl)
     | Ite(e, s1, s2)::tl ->
       dprintf "ite condition %s" (Pp.ast_exp_to_string e);
@@ -481,10 +482,10 @@ let efse_merge1 ?(cf=true) p pi mode =
       | _ ->
         dprintf "symbolic branch";
         let delta1,pi_t = efse delta value_t s1 in
-        let delta2,pi_f = efse delta (Ast.exp_not value_t) s2 in
+        let delta2,pi_f = efse delta (exp_not value_t) s2 in
         let mergedelta,pi_t,pi_f = D.merge_super delta1 delta2 pi_t pi_f mode in
         let deltatl,pitl = efse mergedelta Ast.exp_true tl in
-        deltatl, Ast.exp_and (Ast.exp_and pi (Ast.exp_or pi_t pi_f)) pitl)
+        deltatl, exp_and (exp_and pi (exp_or pi_t pi_f)) pitl)
   in
   let _,pi = efse (D.create ()) pi p in
   pi
@@ -573,7 +574,7 @@ let efse_lazy ?(cf=true) p pi mode =
         (* Assert true = true, pi \land true = pi *)
         efse delta pi tl
       | _ ->
-        let pi' = lazy (Ast.exp_and (Lazy.force pi) value) in
+        let pi' = lazy (exp_and (Lazy.force pi) value) in
         used_vars_in e;
         efse delta pi' tl)
     | Ite(e, s1, s2)::tl ->
@@ -590,13 +591,13 @@ let efse_lazy ?(cf=true) p pi mode =
         dprintf "symbolic branch";
         used_vars_in e;
         let delta1,pi_t = efse delta (lazy value_t) s1 in
-        let delta2,pi_f = efse delta (lazy (Ast.exp_not value_t)) s2 in
+        let delta2,pi_f = efse delta (lazy (exp_not value_t)) s2 in
         dprintf "merge time";
         let mergedelta,badlist = D.merge delta1 delta2 in
         (* Mark each variable in badlist as needing to go in the formula *)
         List.iter merged badlist;
         let deltatl,pitl = efse mergedelta (lazy Ast.exp_true) tl in
-        deltatl, lazy (Ast.exp_and (Ast.exp_and (Lazy.force pi) (Ast.exp_or (Lazy.force pi_t) (Lazy.force pi_f))) (Lazy.force pitl)))
+        deltatl, lazy (exp_and (exp_and (Lazy.force pi) (exp_or (Lazy.force pi_t) (Lazy.force pi_f))) (Lazy.force pitl)))
   in
   used_vars_in pi;
   let _,pi = efse (D.create ()) (lazy pi) p in
@@ -623,7 +624,7 @@ let efse_lazy ?(cf=true) p pi mode =
 (*         let new_constraint = Ast.exp_eq (Ast.Var v) (unwrap_symb value) in *)
 (*         dprintf "new constraint %s" (Pp.ast_exp_to_string new_constraint); *)
 (*         let () = solver#add_constraint new_constraint in *)
-(*         let new_pi = Ast.exp_and pi new_constraint in *)
+(*         let new_pi = exp_and pi new_constraint in *)
 (*         if Symbeval.is_concrete_mem_or_scalar value then *)
 (*           (\* Note: Even concrete assignments need to be added to the *)
 (*              formula.  This is because when Ite merged two contexts, *)
@@ -645,7 +646,7 @@ let efse_lazy ?(cf=true) p pi mode =
 (*         (\* Assert true = true, pi \land true = pi *\) *)
 (*         efse delta pi solver tl *)
 (*       | _ -> *)
-(*         let pi' = Ast.exp_and pi value in *)
+(*         let pi' = exp_and pi value in *)
 (*         dprintf "adding constraint %s" (Pp.ast_exp_to_string value); *)
 (*         solver#add_constraint value; *)
 (*         if (not solver#is_sat) then ( *)
@@ -667,7 +668,7 @@ let efse_lazy ?(cf=true) p pi mode =
 (*         dprintf "true branch sat %b" t; *)
 (*         solver#pop; *)
 (*         solver#push; *)
-(*         solver#add_constraint (Ast.exp_not e); *)
+(*         solver#add_constraint (exp_not e); *)
 (*         let f = solver#is_sat in *)
 (*         dprintf "false branch sat %b" f; *)
 (*         solver#pop; *)
@@ -692,15 +693,15 @@ let efse_lazy ?(cf=true) p pi mode =
 (*         let delta_t, pi_t = efse delta value_t solver s1 in *)
 (*         solver#pop; *)
 (*         solver#push; *)
-(*         solver#add_constraint (Ast.exp_not value_t); *)
-(*         let delta_f, pi_f = efse delta (Ast.exp_not value_t) solver s2 in *)
+(*         solver#add_constraint (exp_not value_t); *)
+(*         let delta_f, pi_f = efse delta (exp_not value_t) solver s2 in *)
 (*         solver#pop; *)
-(*         let new_constraint = Ast.exp_or pi_t pi_f in *)
+(*         let new_constraint = exp_or pi_t pi_f in *)
 (*         dprintf "Adding constraint %s" (Pp.ast_exp_to_string new_constraint); *)
 (*         solver#add_constraint new_constraint; *)
 (*         let delta_merged,_ = D.merge delta_t delta_f in *)
 (*         let delta_tl, pi_tl = efse delta_merged Ast.exp_true solver tl in *)
-(*         delta_tl, Ast.exp_and (Ast.exp_and pi new_constraint) pi_tl *)
+(*         delta_tl, exp_and (exp_and pi new_constraint) pi_tl *)
 (*       | Unsat, Unsat -> *)
 (*         failwith "Efse: We should never reach here because this is an infeasible path" *)
 (*   in *)

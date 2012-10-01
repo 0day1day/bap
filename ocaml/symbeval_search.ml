@@ -1,5 +1,6 @@
 (** A module to try out search strategies on symbolic execution *)
 
+open Ast_convenience
 module D = Debug.Make(struct let name = "SearchFSE" and default=`Debug end)
 open D
 
@@ -79,7 +80,7 @@ struct
     let ctx = Symbolic.init prog in
     let predicates = search post [] (S.start_at ctx initdata) in
     if debug() then dprintf "Explored %d paths." (List.length predicates);
-    BatList.reduce Ast.exp_or (List.map Symbolic.Form.output_formula predicates)
+    BatList.reduce exp_or (List.map Symbolic.Form.output_formula predicates)
 
 end
 

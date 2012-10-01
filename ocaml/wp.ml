@@ -223,8 +223,8 @@ let ast_size e =
 
 
 (* helper for dwp *)
-let variableify k v e =
-    if k <= 1 || ast_size e > k then
+let variableify ?(name=dwp_name) k v e =
+    if ast_size e >= k then
       let x = Var.newvar dwp_name (Typecheck.infer_ast e) in
       let xe = Var x in
       ((x, e) :: v, xe)
@@ -269,7 +269,7 @@ let rm_useless_vars vs n w =
 
 
 let assignments_to_exp = function
-  | [] -> None
+  | [] -> exp_true
   | v::vs ->
       let p2e (v,e) = BinOp(EQ, Var v, e) in
       let rec h e = function
@@ -278,16 +278,19 @@ let assignments_to_exp = function
 	    else h (exp_and (p2e a) e) rest
 	| [] -> e
       in
-      Some(h (p2e v) vs)
+      h (p2e v) vs
+let assignments_to_exp_opt = function
+  | [] -> None
+  | e -> Some(assignments_to_exp e)
 
-(** [dwp_help] is an implementation of [G] from the DWP paper.
+(** [dwp_g] is an implementation of [G] from the DWP paper.
 
    @arg f A function that maps a GCL statement to the [V], [N], and [W]
    lists from the DWP algorithm.
    @arg p The GCL statement/program to run DWP on.
 *)
 
-let dwp_help ?(simp=Util.id) ?(k=1) f (p:Gcl.t) =
+let dwp_g ?(simp=Util.id) ?(k=1) f (p:Gcl.t) =
   let g (v, n, w) =
     let rec g' v ns ws fn fw =
       match (ns,ws) with
@@ -307,7 +310,7 @@ let dwp_help ?(simp=Util.id) ?(k=1) f (p:Gcl.t) =
   (* Surprisingly enough, this is a toss up. It makes some formulas
      much easier for CVC and others much harder. *)
   (* let (vs,n,w) = rm_useless_vars vs n w in *)
-  (assignments_to_exp vs, vs, n, w)
+  (assignments_to_exp_opt vs, vs, n, w)
 
 (** [f] from the DWP paper. *)
 let dwp_f ?(less_duplication=true) ?(k=1) g =
@@ -336,7 +339,7 @@ let dwp_f ?(less_duplication=true) ?(k=1) g =
 (** Generates a 1st order logic VC using the DWP algorithm. *)
 let dwp_1st ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (p:Gcl.t) =
   let f' = dwp_f ~less_duplication ~k in
-  let (vo, vs, n, w) = dwp_help ~simp ~k f' p in
+  let (vo, vs, n, w) = dwp_g ~simp ~k f' p in
   match vo with
   | Some v ->
       let vars = List.map fst vs in
@@ -344,29 +347,27 @@ let dwp_1st ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (p:Gcl.t) =
   | None ->
       (fun q -> ([], exp_and (exp_not w) (exp_implies n q)))
 
-
-
 let dwp_pred_help ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (p:Gcl.t) =
   let f' = dwp_f ~less_duplication ~k in
-  dwp_help ~simp ~k f' p
+  dwp_g ~simp ~k f' p
 
 (** Generates a predicate logic VC using the DWP algorithm. *)
-let dwp ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (mode:Type.formula_mode) (p:Gcl.t) =
+let dwp ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (mode:formula_mode) (p:Gcl.t) =
   let (vo, _, n, w) = dwp_pred_help ~simp ~less_duplication ~k p in
   match vo, mode with
   | Some v, Sat ->
-    (fun q -> (exp_and v (exp_and (exp_not w) (exp_and n q))))
+    (fun q -> (exp_and v (exp_and (exp_not w) (exp_implies n q))))
   | Some v, Validity ->
     (fun q -> (exp_implies v (exp_and (exp_not w) (exp_implies n q))))
   | None, Sat ->
-    (fun q -> (exp_and (exp_not w) (exp_and n q)))
+    (fun q -> (exp_and (exp_not w) (exp_implies n q)))
   | None, Validity ->
     (fun q -> (exp_and (exp_not w) (exp_implies n q)))
   | _, Foralls ->
     failwith "Foralls not supported in predicate DWP"
 
 
-let dwp_let ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (mode:Type.formula_mode) (p:Gcl.t) =
+let dwp_let ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (mode:formula_mode) (p:Gcl.t) =
   let (_, vars, n, w) = dwp_pred_help ~simp ~less_duplication ~k p in
   (fun q ->
     let exp = match mode with
@@ -377,8 +378,39 @@ let dwp_let ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (mode:Type.formula_m
     List.fold_left (fun exp (v,e) -> Let(v,e,exp)) exp vars
   )
 
-(*let dwp = dwp_let*)
+(* Ed's DWP formulation.  If there are no Assumes, dwpms will always
+   be true, and dwp degenerates to efficient (merging) fse. *)
+let eddwp ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (mode:formula_mode) (p:Gcl.t) q =
+  (*
+    Returns (v, dwpms P, dwpaf P).
 
+    Note: dwpms P = Not (wp P true) \/ Not (wlp P false)
+      and dwpaf P = Not (wp P true) *)
+  let rec dwp = function
+    | Assign _ -> failwith "dwp requires an assignment-free program"
+    | Assert e -> [], exp_true, exp_not e
+    | Assume e -> [], e, exp_false
+    | Choice (s1, s2) ->
+      let v1, ms1, af1 = dwp s1 in
+      let v2, ms2, af2 = dwp s2 in
+      v1@v2, exp_or ms1 ms2, exp_or af1 af2
+    | Seq (s1, s2) ->
+      let v1, ms1, af1 = dwp s1 in
+      let v2, ms2, af2 = dwp s2 in
+      let (v,ms1) = variableify ~name:"eddwp_seq_ms1" k [] ms1 in
+      let (v,af1) = variableify ~name:"eddwp_seq_af1" k v af1 in
+      v@v1@v2, exp_and ms1 (exp_or af1 ms2), exp_and ms1 (exp_or af1 af2)
+    | Skip -> [], exp_true, exp_false
+  in
+  let (v,ms,af) = dwp p in
+  let vo = assignments_to_exp v in
+  match mode with
+  | Sat ->
+    exp_and vo (exp_implies ms (exp_and (exp_not af) q))
+  | Validity ->
+    exp_implies vo (exp_implies ms (exp_and (exp_not af) q))
+  | Foralls ->
+    failwith "Foralls not supported yet"
 
 
 (*let flanagansaxe_dumb ?(simp=Util.id) (p:Gcl.t) =
@@ -400,7 +432,7 @@ let dwp_let ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (mode:Type.formula_m
   )
 *)
 
-let flanagansaxe ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (mode:Type.formula_mode) (p:Gcl.t) =
+let flanagansaxe ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (mode:formula_mode) (p:Gcl.t) =
   let rec nw v = function
     | Assume e -> (e, exp_false, v)
     | Assert e ->
@@ -420,14 +452,10 @@ let flanagansaxe ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (mode:Type.form
   in
   let (ns,ws,v) = nw [] p in
   match assignments_to_exp v, mode with
-  | Some v, Sat ->
-      (fun q -> exp_and v (exp_and (exp_not ws) (exp_and ns q)) )
-  | Some v, Validity ->
-      (fun q -> exp_implies v (exp_and (exp_not ws) (exp_implies ns q)) )
-  | None, Sat ->
-      (fun q -> exp_and (exp_not ws) (exp_and ns q) )
-  | None, Validity ->
-      (fun q -> exp_and (exp_not ws) (exp_implies ns q) )
+  | v, Sat ->
+    (fun q -> exp_and v (exp_and (exp_not ws) (exp_implies ns q)) )
+  | v, Validity ->
+    (fun q -> exp_implies v (exp_and (exp_not ws) (exp_implies ns q)) )
   | _, Foralls ->
     failwith "Foralls not supported in predicate FS"
 

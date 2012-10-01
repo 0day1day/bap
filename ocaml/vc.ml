@@ -83,6 +83,11 @@ let compute_dwp_let {k=k; mode=mode} cfg post =
   (Wp.dwp_let ~k mode gcl post, foralls)
 let compute_dwp_let_gen = SsaVc compute_dwp_let
 
+let compute_eddwp {k=k; mode=mode} cfg post =
+  let gcl, foralls = Gcl.passified_of_ssa mode cfg in
+  (Wp.eddwp ~k mode gcl post, foralls)
+let compute_eddwp_gen = SsaVc compute_eddwp
+
 let compute_flanagansaxe {k=k; mode=mode} cfg post =
   let gcl, foralls = Gcl.passified_of_ssa mode cfg in
   (Wp.flanagansaxe ~k mode gcl post, foralls)
@@ -148,31 +153,33 @@ let compute_fse_maxrepeat_gen i = AstVc (compute_fse_maxrepeat i)
 
 let vclist =
   ("dwp", compute_dwp_gen)
+  :: ("eddwp", compute_eddwp_gen)
   :: ("dwplet", compute_dwp_let_gen)
   :: ("dwp1", compute_dwp1_gen)
   :: ("flanagansaxe", compute_flanagansaxe_gen)
   :: ("wp", compute_wp_gen)
   :: ("uwp", compute_uwp_gen)
   :: ("uwpe", compute_uwp_efficient_gen)
-  :: ("fse-unpass", compute_fse_unpass_gen)
-  :: ("fse-pass", compute_fse_pass_gen)
-  :: ("efse-pass", compute_efse_pass_gen)
-  :: ("efse-mergepass", compute_efse_mergepass_gen)
-  :: ("efse-lazypass", compute_efse_lazypass_gen)
+  (* :: ("fse-unpass", compute_fse_unpass_gen) *)
+  (* :: ("fse-pass", compute_fse_pass_gen) *)
+  (* :: ("efse-pass", compute_efse_pass_gen) *)
+  (* :: ("efse-mergepass", compute_efse_mergepass_gen) *)
+  (* :: ("efse-lazypass", compute_efse_lazypass_gen) *)
   :: ("fse-bfs", compute_fse_bfs_gen)
   :: []
 
 let pred_vclist =
   ("dwp", compute_dwp_gen)
+  :: ("eddwp", compute_eddwp_gen)
   :: ("dwplet", compute_dwp_let_gen)
   :: ("flanagansaxe", compute_flanagansaxe_gen)
   :: ("wp", compute_wp_gen)
   :: ("uwp", compute_uwp_gen)
   :: ("uwpe", compute_uwp_efficient_gen)
-  :: ("fse-unpass", compute_fse_unpass_gen)
-  :: ("fse-pass", compute_fse_pass_gen)
-  :: ("efse-pass", compute_efse_pass_gen)
-  :: ("efse-mergepass", compute_efse_mergepass_gen)
-  :: ("efse-lazypass", compute_efse_lazypass_gen)
+  (* :: ("fse-unpass", compute_fse_unpass_gen) *)
+  (* :: ("fse-pass", compute_fse_pass_gen) *)
+  (* :: ("efse-pass", compute_efse_pass_gen) *)
+  (* :: ("efse-mergepass", compute_efse_mergepass_gen) *)
+  (* :: ("efse-lazypass", compute_efse_lazypass_gen) *)
   :: ("fse-bfs", compute_fse_bfs_gen)
   :: []

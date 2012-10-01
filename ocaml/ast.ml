@@ -79,20 +79,6 @@ let exp_true = Int(bi1, reg_1)
 let little_endian = exp_false
 let big_endian = exp_true
 
-(** More convenience functions for building common expressions. *)
-let exp_and e1 e2 = BinOp(AND, e1, e2)
-let exp_or e1 e2 = BinOp(OR, e1, e2)
-let exp_eq e1 e2 = BinOp(EQ, e1, e2)
-let exp_not e = UnOp(NOT, e)
-let exp_implies e1 e2 = exp_or (exp_not e1) e2
-
-let (exp_shl, exp_shr) =
-  let s dir e1 = function
-    | Int(i,_) when bi_is_zero i -> e1
-    | e2 -> BinOp(dir, e1, e2)
-  in
-  (s LSHIFT, s RSHIFT)
-
 let newlab =
   let c = ref 0 in
   (fun ?(pref="newlabel_") () ->

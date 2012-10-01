@@ -44,7 +44,7 @@ val efficient_uwp :
 (** Same as {!efficient_wp} but does not convert to GCL. *)
 
 val flanagansaxe :
-  ?simp:('a -> 'a) ->
+  ?simp:(Ast.exp -> Ast.exp) ->
   ?less_duplication:bool -> ?k:int -> Type.formula_mode -> Gcl.t -> Ast.exp -> Ast.exp
 (** [flanagansaxe mode p q] computes [wp(p,q)] using Flanagan and
     Saxe's algorithm. The [mode] argument specifies whether the formula
@@ -53,7 +53,7 @@ val flanagansaxe :
 (** {5 Directionless Weakest Precondition Algorithms} *)
 
 val dwp_1st :
-  ?simp:('a -> 'a) ->
+  ?simp:(Ast.exp -> Ast.exp) ->
   ?less_duplication:bool ->
   ?k:int -> Gcl.t -> Ast.exp -> Ast.var list * Ast.exp
 (** [dwp_1st p q] returns a tuple [(vars, pc)] where [pc] is [wp(p,q)]
@@ -61,15 +61,23 @@ val dwp_1st :
     foralls. *)
 
 val dwp :
-  ?simp:('a -> 'a) ->
+  ?simp:(Ast.exp -> Ast.exp) ->
   ?less_duplication:bool -> ?k:int -> Type.formula_mode -> Gcl.t -> Ast.exp -> Ast.exp
 (** [dwp mode p q] is the same as {!dwp_1st}, except it generates a
     precondition that does not need quantifiers.  However, the [mode]
     argument must be used to specify whether the formula will be used
     for satisfiability or validity. *)
 
+val eddwp :
+  ?simp:(Ast.exp -> Ast.exp) ->
+  ?less_duplication:bool -> ?k:int -> Type.formula_mode -> Gcl.t -> Ast.exp -> Ast.exp
+(** [eddwp mode p q] is the same as {!dwp}, but uses an alternate
+    formulation of dwp.  It is arguably easier to understand, and
+    generates smaller formulas for programs that do not have [Assume]
+    statements. *)
+
 val dwp_let :
-  ?simp:('a -> 'a) ->
+  ?simp:(Ast.exp -> Ast.exp) ->
   ?less_duplication:bool -> ?k:int -> Type.formula_mode -> Gcl.t -> Ast.exp -> Ast.exp
 (** [dwp_let] is just like {!dwp}, except that [dwp_let] wraps helper
     variables in [Let] expressions so they do not appear as free

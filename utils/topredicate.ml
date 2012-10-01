@@ -1,4 +1,5 @@
 open Ast
+open Ast_convenience
 open Grammar_scope
 open Type
 open Vc
