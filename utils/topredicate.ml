@@ -72,11 +72,13 @@ let speclist =
   ::("-suffix", Arg.String (fun str -> suffix := str),
      "<suffix> Add <suffix> to each variable name.")
   ::("-dwp", Arg.Unit(fun()-> vc := compute_dwp_gen),
-     "Use efficient directionless weakest precondition instead of the default")
+     "Use efficient directionless weakest precondition")
+  ::("-eddwp", Arg.Unit(fun()-> vc := compute_eddwp_gen),
+     "Use Ed's efficient directionless weakest precondition algorithm")
   ::("-dwpk", Arg.Int(fun i-> vc := compute_dwp_gen;
     options := {!options with k=i};
 ),
-     "Use efficient directionless weakest precondition instead of the default")
+     "Use efficient directionless weakest precondition")
   ::("-dwp1", Arg.Unit(fun()-> vc := compute_dwp1_gen),
      "Use 1st order efficient directionless weakest precondition")
   ::("-flanagansaxe", Arg.Unit(fun()-> vc := compute_flanagansaxe_gen),

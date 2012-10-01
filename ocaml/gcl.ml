@@ -29,6 +29,14 @@ type t =
   | Seq of t * t
   | Skip 
 
+let rec to_string = function
+  | Assume e -> "Assume("^Pp.ast_exp_to_string e^")"
+  | Assign(v, e) -> "Assign("^Pp.var_to_string v^", "^Pp.ast_exp_to_string e^")"
+  | Assert e -> "Assert("^Pp.ast_exp_to_string e^")"
+  | Choice(g1, g2) -> "CChoice("^to_string g1^", "^to_string g2^")"
+  | Seq(g1, g2) -> "Seq("^to_string g1^", "^to_string g2^")"
+  | Skip -> "Skip"
+
 (* let rec gcl_equal s1 s2 = *)
 (*   let num = function *)
 (*     | Assume _ -> 0 *)

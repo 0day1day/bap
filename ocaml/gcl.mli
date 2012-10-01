@@ -30,6 +30,10 @@ type t =
   | Seq of t * t
   | Skip
 
+val to_string : t -> string
+(** [to_string p] converts the GCL program [p] to a string for
+    debugging purposes. *)
+
 (** {5 Functions to convert BAP programs to GCL} *)
 
 val of_astcfg : ?entry:Cfg.AST.G.V.t -> ?exit:Cfg.AST.G.V.t -> Cfg.AST.G.t -> t

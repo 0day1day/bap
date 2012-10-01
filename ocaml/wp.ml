@@ -9,7 +9,7 @@ open Ast_convenience
 open Type
 open Gcl
 
-module D = Debug.Make(struct let name = "WP" and default=`Debug end)
+module D = Debug.Make(struct let name = "Wp" and default=`Debug end)
 open D
 
 module BH = Cfg.BH
@@ -224,8 +224,8 @@ let ast_size e =
 
 (* helper for dwp *)
 let variableify ?(name=dwp_name) k v e =
-    if ast_size e >= k then
-      let x = Var.newvar dwp_name (Typecheck.infer_ast e) in
+    if ast_size e > k then
+      let x = Var.newvar name (Typecheck.infer_ast e) in
       let xe = Var x in
       ((x, e) :: v, xe)
     else
@@ -378,9 +378,18 @@ let dwp_let ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (mode:formula_mode) 
     List.fold_left (fun exp (v,e) -> Let(v,e,exp)) exp vars
   )
 
+(* This helps keeps ms syntactically equal to true *)
+let or_simp = function
+  | BinOp(OR, e1, e2) when e1 === exp_true || e2 === exp_true -> exp_true
+  | BinOp(OR, e1, e2) when e1 === exp_false -> e2
+  | BinOp(OR, e1, e2) when e2 === exp_false -> e1
+  | BinOp(AND, e1, e2) when e1 === exp_true -> e2
+  | BinOp(AND, e1, e2) when e2 === exp_true -> e1
+  | e -> e
+
 (* Ed's DWP formulation.  If there are no Assumes, dwpms will always
    be true, and dwp degenerates to efficient (merging) fse. *)
-let eddwp ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (mode:formula_mode) (p:Gcl.t) q =
+let eddwp ?(simp=or_simp) ?(less_duplication=true) ?(k=1) (mode:formula_mode) (p:Gcl.t) q =
   (*
     Returns (v, dwpms P, dwpaf P).
 
@@ -393,13 +402,14 @@ let eddwp ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (mode:formula_mode) (p
     | Choice (s1, s2) ->
       let v1, ms1, af1 = dwp s1 in
       let v2, ms2, af2 = dwp s2 in
-      v1@v2, exp_or ms1 ms2, exp_or af1 af2
+      v1@v2, simp (exp_or ms1 ms2), simp (exp_or af1 af2)
     | Seq (s1, s2) ->
       let v1, ms1, af1 = dwp s1 in
       let v2, ms2, af2 = dwp s2 in
-      let (v,ms1) = variableify ~name:"eddwp_seq_ms1" k [] ms1 in
+      let v = [] in
+      let (v,ms1) = variableify ~name:"eddwp_seq_ms1" k v ms1 in
       let (v,af1) = variableify ~name:"eddwp_seq_af1" k v af1 in
-      v@v1@v2, exp_and ms1 (exp_or af1 ms2), exp_and ms1 (exp_or af1 af2)
+      v@v1@v2, simp (exp_and ms1 (simp (exp_or af1 ms2))), simp (exp_and ms1 (simp (exp_or af1 af2)))
     | Skip -> [], exp_true, exp_false
   in
   let (v,ms,af) = dwp p in

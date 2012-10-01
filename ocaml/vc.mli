@@ -54,6 +54,13 @@ val compute_dwp_gen : t
 val compute_dwp_let : ssa_vc
 val compute_dwp_let_gen : t
 
+(** Alternate formulation of DWP that is easier to understand and
+    produces smaller formulas on programs that have no [Assume]
+    statements.  However, it produces slightly larger formulas for
+    programs with [Assume] statements. *)
+val compute_eddwp : ssa_vc
+val compute_eddwp_gen : t
+
 (** DWP implementation that uses forall quantifiers. *)
 val compute_dwp1 : ssa_vc
 (** General form of [compute_dwp1]. *)
