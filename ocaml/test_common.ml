@@ -44,13 +44,13 @@ let does_stp_work () =
     true
   else false
 
-let check_stp_path () =
-  print_endline("Checking for stp...");
-  match Unix.system("echo 'QUERY(TRUE);' | stp 2> /dev/null") with
-  | Unix.WEXITED(0) -> ()
-  | _ -> skip_if true 
-    "Skipping test.  Stp is not in PATH";;
-
+module SolverCheck(S:Smtexec.SOLVER) = struct
+  let check_solver_path () =
+    if S.in_path() = false then
+      skip_if true ("Skipping test. "^S.solvername^" is not in PATH");;
+end
+let check_stp_path =
+  let module SC = SolverCheck(Smtexec.STP) in SC.check_solver_path
 
 (** pin helpers **)
 let pin_path = (*ref "../pin/";;*)

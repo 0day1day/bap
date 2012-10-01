@@ -260,10 +260,19 @@ let split_common_suffix ?(eq=(=)) la lb =
   let (s,rla,rlb) = split_common_prefix ~eq (List.rev la) (List.rev lb) in
   (List.rev s, List.rev rla, List.rev rlb)
 
-let apply_option f k = 
+let apply_option f k =
   match f with
   | None -> k
   | Some(f') -> f' k
+
+let memoize ?(size = 128) f =
+  let results = Hashtbl.create size in
+  fun x ->
+    try Hashtbl.find results x
+    with Not_found ->
+      let y = f x in
+      Hashtbl.add results x y;
+      y
 
 (* (\** Given Some(a), returns a. Given None, raises Not_found *\) *)
 (* let option_unwrap o = *)
@@ -408,52 +417,53 @@ let big_int_to_hex ?pad n =
   zeroextend (f n)
 
 let big_int_of_string s =
-  let hex_prefix = "0x" in
-  let is_hex s =
-    let re = Str.regexp ("^"^hex_prefix) in
-    Str.string_match re s 0
-  in
-  let hex_to_bitlen s =
-    (String.length s) * 4
-  in
-  let bitlen_to_hex n =
-    (* Round up *)
-    (n+3) / 4
-  in
-  (* If the highest bit is 1, Int64.of_string will return a negative
-     value. So, we use 60 bits instead of 64 to avoid messing with
-     int64's sign bit. *)
-  let numbits = 60 in
-  let getmost s = String.sub s 0 (bitlen_to_hex numbits) in
-  let getrest s =
-    let start = bitlen_to_hex numbits in
-    let last = String.length s in
-    String.sub s start (last - start)
-  in
-  (* Get rid of 0x prefix, if any *)
-  let rec f s =
-    let len = hex_to_bitlen s in
-    if len <= numbits then
-      let bi = Big_int_Z.big_int_of_int64 (Int64.of_string ("0x"^s)) in
-      let (>=%) = ge_big_int in
-      assert (bi >=% zero_big_int);
-      bi
-    else (
-      (* Printf.printf "getmost: %s v: %s\n" (getmost s) (Big_int_Z.string_of_big_int (f (getmost s))); *)
-      (* Printf.printf "getrest: %s v: %s\n" (getrest s) (Big_int_Z.string_of_big_int (f (getrest s))); *)
-      let (|%) = or_big_int in
-      let (<<%) = shift_left_big_int in
-      let bi = (f (getmost s) <<% (hex_to_bitlen (getrest s))) |% (f (getrest s)) in
-      let (>=%) = ge_big_int in
-      assert (bi >=% zero_big_int);
-      bi
-    )
-  in
-  if is_hex s then
-    f (BatString.slice ~first:(String.length hex_prefix) s)
-  else
-    (* big_int_of_string handles decimals *)
-    Big_int_Z.big_int_of_string s
+  (* Awesome, apparently Zarith handles 0x and 0b for us! *)
+  (* let hex_prefix = "0x" in *)
+  (* let is_hex s = *)
+  (*   let re = Str.regexp ("^"^hex_prefix) in *)
+  (*   Str.string_match re s 0 *)
+  (* in *)
+  (* let hex_to_bitlen s = *)
+  (*   (String.length s) * 4 *)
+  (* in *)
+  (* let bitlen_to_hex n = *)
+  (*   (\* Round up *\) *)
+  (*   (n+3) / 4 *)
+  (* in *)
+  (* (\* If the highest bit is 1, Int64.of_string will return a negative *)
+  (*    value. So, we use 60 bits instead of 64 to avoid messing with *)
+  (*    int64's sign bit. *\) *)
+  (* let numbits = 60 in *)
+  (* let getmost s = String.sub s 0 (bitlen_to_hex numbits) in *)
+  (* let getrest s = *)
+  (*   let start = bitlen_to_hex numbits in *)
+  (*   let last = String.length s in *)
+  (*   String.sub s start (last - start) *)
+  (* in *)
+  (* (\* Get rid of 0x prefix, if any *\) *)
+  (* let rec f s = *)
+  (*   let len = hex_to_bitlen s in *)
+  (*   if len <= numbits then *)
+  (*     let bi = Big_int_Z.big_int_of_int64 (Int64.of_string ("0x"^s)) in *)
+  (*     let (>=%) = ge_big_int in *)
+  (*     assert (bi >=% zero_big_int); *)
+  (*     bi *)
+  (*   else ( *)
+  (*     (\* Printf.printf "getmost: %s v: %s\n" (getmost s) (Big_int_Z.string_of_big_int (f (getmost s))); *\) *)
+  (*     (\* Printf.printf "getrest: %s v: %s\n" (getrest s) (Big_int_Z.string_of_big_int (f (getrest s))); *\) *)
+  (*     let (|%) = or_big_int in *)
+  (*     let (<<%) = shift_left_big_int in *)
+  (*     let bi = (f (getmost s) <<% (hex_to_bitlen (getrest s))) |% (f (getrest s)) in *)
+  (*     let (>=%) = ge_big_int in *)
+  (*     assert (bi >=% zero_big_int); *)
+  (*     bi *)
+  (*   ) *)
+  (* in *)
+  (* if is_hex s then *)
+  (*   f (BatString.slice ~first:(String.length hex_prefix) s) *)
+  (* else *)
+  (*   (\* big_int_of_string handles decimals *\) *)
+  Big_int_Z.big_int_of_string s
 
 let big_int_of_binstring ?(e = `Little) s =
   let s = BatString.explode s in

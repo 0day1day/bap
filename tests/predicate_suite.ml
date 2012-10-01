@@ -9,10 +9,15 @@ open Utils_common
 let test_file = "C/test";;
 let g_il = "g.il";;
 let stp_out = "stp_out.stp";;
+
+(* Auto select solver based on which one is available *)
+
 let solver = Smtexec.YICES.si;;
+let check = let module SC = SolverCheck(Smtexec.YICES) in
+            SC.check_solver_path
 
 let basic_setup () =
-  let () = check_stp_path () in
+  let () = check () in
   let m2actx = Memory2array.create_state () in
   let prog = [
     CJmp(BinOp(EQ, Var Disasm_i386.eax, Int(bi0, Reg 32)), Lab("L1"), Lab("L2"), []);
@@ -29,7 +34,7 @@ let basic_setup () =
   cfg, m2actx;;
 
 let basic_validity_setup () =
-  let () = check_stp_path () in
+  let () = check () in
   let m2actx = Memory2array.create_state () in
   let prog = [
     CJmp(BinOp(EQ, Var Disasm_i386.eax, Int(bi1, Reg 32)), Lab("L1"), Lab("L2"), []);
@@ -47,9 +52,7 @@ let basic_validity_setup () =
   cfg, m2actx;;
 
 let c_setup () =
-  let _ = check_stp_path () in
-  (* Silence floating point warnings for tests *)
-  let _ = if (Asmir.get_print_warning()) then Asmir.set_print_warning(false) in
+  let () = check () in
   let m2actx = Memory2array.create_state () in
   let prog = Asmir.open_program test_file in
   let ranges = Asmir.get_function_ranges prog in

@@ -1,6 +1,9 @@
 {
+  open Big_int_Z
   open Stp_grammar
   (* TODO: add support for memories *)
+
+  exception LexError of string
 }
 
 let digit = ['0'-'9''A'-'F''a'-'f']
@@ -25,6 +28,10 @@ rule token = parse
   | _                { token lexbuf }
 
 and read_num = parse
-  | digit+ as n      { VAL(Int64.of_string ("0x"^n)) }
+  | digit+ as n      {
+    try VAL(Util.big_int_of_string ("0x"^n))
+    with Failure "int_of_string" ->
+      raise(LexError "Error converting integer");
+    }
   | _                { token lexbuf }
 
