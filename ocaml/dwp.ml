@@ -13,6 +13,13 @@ let unwrap_symb = function
   | Symbeval.Symbolic e -> e
   | Symbeval.ConcreteMem(m,v) -> Symbeval.symb_to_exp (Symbeval.conc2symb m v)
 
+(* Use the simplified duplicate expression if it is a constant,
+   otherwise use the duplicated one. *)
+let choose_best e edup =
+  match edup with
+  | Int _ -> edup
+  | _ -> e
+
 module type Delta =
 sig
   type t
@@ -93,11 +100,13 @@ let or_simp = function
   | BinOp(OR, e1, e2) when e2 === exp_false -> e1
   | BinOp(OR, e1, UnOp(NOT, e2))
   | BinOp(OR, UnOp(NOT, e1), e2) when e1 === e2 -> exp_true
+  | BinOp(OR, e1, e2) when e1 === e2 -> e1
   | BinOp(AND, e1, e2) when e1 === exp_true -> e2
   | BinOp(AND, e1, e2) when e2 === exp_true -> e1
   | BinOp(AND, e1, e2) when e1 === exp_false || e2 === exp_false -> exp_false
   | BinOp(AND, e1, UnOp(NOT, e2))
   | BinOp(AND, UnOp(NOT, e1), e2) when e1 === e2 -> exp_false
+  | BinOp(AND, e1, e2) when e1 === e2 -> e1
   | e -> e
 
 (* Dwp base implementation.  Returns a tuple consisting of variable
@@ -112,13 +121,6 @@ let or_simp = function
    memory sharing.
 *)
 let rec dwp ?(simp=or_simp) ?(k=1) ?assign_mode p =
-  (* Use the simplified duplicate expression if it is a constant,
-     otherwise use the duplicated one. *)
-  let choose_best e edup =
-    match edup with
-    | Int _ -> edup
-    | _ -> e
-  in
   let dwp = dwp ~simp ~k ?assign_mode in match p with
     | Assign (v,e) when assign_mode <> None ->
       (match assign_mode with
@@ -167,28 +169,28 @@ let eddwp_conc ?(simp=or_simp) ?(k=1) ?(cf=true) (mode:formula_mode) (p:Gcl.t) q
     then D.simplify delta e
     else Symbeval.Symbolic e
   in
-  let punt delta s = let v, ms, af, _, _ = dwp ~simp ~k ~assign_mode:mode s
-                     in delta, v, ms, af
+  let punt delta s = let v, ms, af, msdup, afdup = dwp ~simp ~k ~assign_mode:mode s
+                     in delta, v, ms, af, msdup, afdup
   in
   let rec dwpconc delta = function
     | Gcl.Assign (v, e) as s ->
       let value = eval delta e in
       if Symbeval.is_concrete_mem_or_scalar value then
-        D.set delta v value, [], exp_true, exp_false
+        D.set delta v value, [], exp_true, exp_false, exp_true, exp_false
       else punt delta s
     | Gcl.Assume e as s ->
       let value = eval delta e in
       if value = Symbolic exp_true then punt delta Skip
-      else if value = Symbolic exp_false then delta, [], exp_false, exp_false
+      else if value = Symbolic exp_false then delta, [], exp_false, exp_false, exp_false, exp_false
       else punt delta s
     | Gcl.Assert e as s ->
       let value = eval delta e in
       if value = Symbolic exp_true then punt delta Skip
-      else if value = Symbolic exp_false then delta, [], exp_true, exp_true
+      else if value = Symbolic exp_false then delta, [], exp_true, exp_true, exp_true, exp_true
       else punt delta s
-    | Gcl.Choice (s1, s2) ->
-      let delta1, v1, ms1, af1 = dwpconc delta s1 in
-      let delta2, v2, ms2, af2 = dwpconc delta s2 in
+    | Gcl.Choice (s1, s2) as _s ->
+      let delta1, v1, ms1, af1, msdup1, afdup1 = dwpconc delta s1 in
+      let delta2, v2, ms2, af2, msdup2, afdup2 = dwpconc delta s2 in
       let deltamerge, conflicts = D.merge delta1 delta2 in
 
         (* Merging gives us a list of variable conflicts in the two
@@ -204,28 +206,43 @@ let eddwp_conc ?(simp=or_simp) ?(k=1) ?(cf=true) (mode:formula_mode) (p:Gcl.t) q
         match x with Some x -> Some(v,x) | None -> None) conflicts in
       let s2conflicts = BatList.filter_map (fun (v,_,x) ->
         match x with Some x -> Some(v,x) | None -> None) conflicts in
-      let add_assign (ms,af) (v,e) =
-        let _, ms2, af2, _, _ = dwp ~simp ~k ~assign_mode:mode (Assign (v, unwrap_symb e)) in
+      let add_assign (ms,af,msdup,afdup) (v,e) =
+        let _, ms2, af2, msdup2, afdup2 = dwp ~simp ~k ~assign_mode:mode (Assign (v, unwrap_symb e)) in
         let ms = simp (exp_and ms (simp (exp_or af ms2))) in
-        let af = simp (exp_and ms (simp (exp_or af af2))) in (ms, af)
+        let msdup = simp (exp_and msdup (simp (exp_or afdup msdup2))) in
+        let af = simp (exp_and ms (simp (exp_or af af2))) in
+        let afdup = simp (exp_and msdup (simp (exp_or afdup afdup2))) in
+        (choose_best ms msdup, choose_best af afdup, msdup, afdup)
       in
-      let (ms1, af1) = List.fold_left add_assign (ms1, af1) s1conflicts in
-      let (ms2, af2) = List.fold_left add_assign (ms2, af2) s2conflicts in
+      let (ms1, af1, msdup1, afdup1) = List.fold_left add_assign (ms1, af1, msdup1, afdup1) s1conflicts in
+      let (ms2, af2, msdup2, afdup2) = List.fold_left add_assign (ms2, af2, msdup2, afdup2) s2conflicts in
 
-      deltamerge, v1@v2, simp (exp_or ms1 ms2), simp (exp_or af1 af2)
+      let ms = simp (exp_or ms1 ms2) in
+      let msdup = simp (exp_or msdup1 msdup2) in
+      let af = simp (exp_or af1 af2) in
+      let afdup = simp (exp_or afdup1 afdup2) in
+
+      deltamerge, v1@v2, choose_best ms msdup, choose_best af afdup, msdup, afdup
     | Gcl.Seq (s1, s2) as _s ->
-      let delta1, v1, ms1, af1 = dwpconc delta s1 in
-      if ms1 = exp_false then delta1, v1, exp_false, exp_false
-      else if af1 = exp_true then delta1, v1, ms1, ms1
+      let delta1, v1, ms1, af1, msdup1, afdup1 = dwpconc delta s1 in
+      if ms1 = exp_false then delta1, v1, exp_false, exp_false, exp_false, exp_false
+      else if af1 = exp_true then delta1, v1, ms1, ms1, msdup1, msdup1
       else
-        let delta2, v2, ms2, af2 = dwpconc delta1 s2 in
+        let delta2, v2, ms2, af2, msdup2, afdup2 = dwpconc delta1 s2 in
         let v = [] in
         let (v,ms1) = Wp.variableify ~name:"eddwp_seq_ms1" k v ms1 in
         let (v,af1) = Wp.variableify ~name:"eddwp_seq_af1" k v af1 in
-        delta2, v@v1@v2, simp (exp_and ms1 (simp (exp_or af1 ms2))), simp (exp_and ms1 (simp (exp_or af1 af2)))
+
+        let ms = simp (exp_and ms1 (simp (exp_or af1 ms2))) in
+        let msdup = simp (exp_and msdup1 (simp (exp_or afdup1 msdup2))) in
+        let af = simp (exp_and ms1 (simp (exp_or af1 af2))) in
+        let afdup = simp (exp_and msdup1 (simp (exp_or afdup1 afdup2))) in
+
+        delta2, v@v1@v2, choose_best ms msdup, choose_best af afdup, msdup, afdup
     | Gcl.Skip as s -> punt delta s
   in
-  let (delta,v,ms,af) = dwpconc (D.create ()) p in
+  let (delta,v,ms,af,_,_) = dwpconc (D.create ()) p in
+  if mode = Sat then assert (ms === exp_true);
   let q' =
     let value = eval delta q in
     unwrap_symb value
@@ -280,7 +297,7 @@ let eddwp_lazyconc ?(simp=or_simp) ?(k=1) ?(cf=true) (mode:formula_mode) (p:Gcl.
     in
     ignore(Ast_visitor.exp_accept v e)
   in
-  let punt delta s = let v, ms, af, _, _ = dwp ~simp ~k ~assign_mode:mode s
+  let punt delta s = let v, ms, af, msdup, afdup = dwp ~simp ~k ~assign_mode:mode s
                      in
                      let e = match s with
                      | Gcl.Assign (_, e) -> Some e
@@ -290,13 +307,13 @@ let eddwp_lazyconc ?(simp=or_simp) ?(k=1) ?(cf=true) (mode:formula_mode) (p:Gcl.
                      | _ -> failwith "Not allowed to punt for complex statements"
                      in
                      BatOption.may used_vars_in e;
-                     delta, v, ms, af
+                     delta, v, ms, af, msdup, afdup
   in
-  let punt_internal delta s = let _, v, ms, af = punt delta s in
-                              (v, ms, af)
+  let punt_internal delta s = let _, v, ms, af, msdup, afdup = punt delta s in
+                              (v, ms, af, msdup, afdup)
   in
-  let punt_external delta s = let delta, v, ms, af = punt delta s in
-                              delta, lazy (v,  ms, af)
+  let punt_external delta s = let delta, v, ms, af, msdup, afdup = punt delta s in
+                              delta, lazy (v, ms, af, msdup, afdup)
   in
   let rec dwpconc delta = function
     | Gcl.Assign (v, e) as s ->
@@ -314,12 +331,12 @@ let eddwp_lazyconc ?(simp=or_simp) ?(k=1) ?(cf=true) (mode:formula_mode) (p:Gcl.
     | Gcl.Assume e as s ->
       let value = eval delta e in
       if value = Symbolic exp_true then punt_external delta Gcl.Skip
-      else if value = Symbolic exp_false then delta, lazy([], exp_false, exp_false)
+      else if value = Symbolic exp_false then delta, lazy([], exp_false, exp_false, exp_false, exp_false)
       else punt_external delta s
     | Gcl.Assert e as s ->
       let value = eval delta e in
       if value = Symbolic exp_true then punt_external delta Skip
-      else if value = Symbolic exp_false then delta, lazy([], exp_true, exp_true)
+      else if value = Symbolic exp_false then delta, lazy([], exp_true, exp_true, exp_true, exp_true)
       else punt_external delta s
     | Gcl.Choice (s1, s2) ->
       let delta1, lazy1 = dwpconc delta s1 in
@@ -350,26 +367,39 @@ let eddwp_lazyconc ?(simp=or_simp) ?(k=1) ?(cf=true) (mode:formula_mode) (p:Gcl.
       (* let (ms2, af2) = List.fold_left add_assign (ms2, af2) s2conflicts in *)
 
       deltamerge, lazy (
-        let v1, ms1, af1 = Lazy.force lazy1 in
-        let v2, ms2, af2 = Lazy.force lazy2 in
-        v1@v2, simp (exp_or ms1 ms2), simp (exp_or af1 af2))
+        let v1, ms1, af1, msdup1, afdup1 = Lazy.force lazy1 in
+        let v2, ms2, af2, msdup2, afdup2 = Lazy.force lazy2 in
+
+        let ms = simp (exp_or ms1 ms2) in
+        let msdup = simp (exp_or msdup1 msdup2) in
+        let af = simp (exp_or af1 af2) in
+        let afdup = simp (exp_or afdup1 afdup2) in
+
+        v1@v2, choose_best ms msdup, choose_best af afdup, msdup, afdup)
     | Gcl.Seq (s1, s2) as _s ->
       let delta1, lazy1 = dwpconc delta s1 in
       let delta2, lazy2 = dwpconc delta1 s2 in
       delta2, lazy (
-        let v1, ms1, af1 = Lazy.force lazy1 in
-        if ms1 = exp_false then v1, exp_false, exp_false
-        else if af1 = exp_true then v1, ms1, ms1
+        let v1, ms1, af1, msdup1, afdup1 = Lazy.force lazy1 in
+        if ms1 = exp_false then v1, exp_false, exp_false, exp_false, exp_false
+        else if af1 = exp_true then v1, ms1, ms1, msdup1, msdup1
         else
-          let v2, ms2, af2 = Lazy.force lazy2 in
+          let v2, ms2, af2, msdup2, afdup2 = Lazy.force lazy2 in
           let v = [] in
           let (v,ms1) = Wp.variableify ~name:"eddwp_seq_ms1" k v ms1 in
           let (v,af1) = Wp.variableify ~name:"eddwp_seq_af1" k v af1 in
-          v@v1@v2, simp (exp_and ms1 (simp (exp_or af1 ms2))), simp (exp_and ms1 (simp (exp_or af1 af2))))
+
+          let ms = simp (exp_and ms1 (simp (exp_or af1 ms2))) in
+          let msdup = simp (exp_and msdup1 (simp (exp_or afdup1 msdup2))) in
+          let af = simp (exp_and ms1 (simp (exp_or af1 af2))) in
+          let afdup = simp (exp_and msdup1 (simp (exp_or afdup1 afdup2))) in
+
+          v@v1@v2, choose_best ms msdup, choose_best af afdup, msdup, afdup)
     | Gcl.Skip as s -> punt_external delta s
   in
   let (delta, lazyr) = dwpconc (D.create ()) p in
-  let v, ms, af = Lazy.force lazyr in
+  let v, ms, af, _, _ = Lazy.force lazyr in
+  if mode = Sat then assert (ms === exp_true);
   let q' =
     let value = eval delta q in
     unwrap_symb value
@@ -393,6 +423,7 @@ let eddwp ?(simp=or_simp) ?(k=1) (mode:formula_mode) (p:Gcl.t) q =
     Note: dwpms P = Not (wp P true) \/ Not (wlp P false)
       and dwpaf P = Not (wp P true) *)
   let (v,ms,af,_,_) = dwp ~simp ~k p in
+  if mode = Sat then assert (ms === exp_true);
   let vo = Wp.assignments_to_exp v in
   match mode with
   | Sat ->
