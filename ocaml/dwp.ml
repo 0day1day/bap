@@ -91,33 +91,68 @@ let or_simp = function
   | BinOp(OR, e1, e2) when e1 === exp_true || e2 === exp_true -> exp_true
   | BinOp(OR, e1, e2) when e1 === exp_false -> e2
   | BinOp(OR, e1, e2) when e2 === exp_false -> e1
+  | BinOp(OR, e1, UnOp(NOT, e2))
+  | BinOp(OR, UnOp(NOT, e1), e2) when e1 === e2 -> exp_true
   | BinOp(AND, e1, e2) when e1 === exp_true -> e2
   | BinOp(AND, e1, e2) when e2 === exp_true -> e1
+  | BinOp(AND, e1, e2) when e1 === exp_false || e2 === exp_false -> exp_false
+  | BinOp(AND, e1, UnOp(NOT, e2))
+  | BinOp(AND, UnOp(NOT, e1), e2) when e1 === e2 -> exp_false
   | e -> e
 
+(* Dwp base implementation.  Returns a tuple consisting of variable
+   bindings, de-duplicated ms, de-duplicated af, duplicated ms,
+   duplicated af.  We need to keep both duplicated and de-duplicated
+   versions of expressions for simplification.  For instance, we
+   cannot infer e \/ \lnot e = true if if is written as v=e /\ (v \/
+   \lnot e).  Yet, simplifications are very important because for Sat
+   queries MS should simplify to true!
+
+   Memory is not a concern for the duplicated expressions because of
+   memory sharing.
+*)
 let rec dwp ?(simp=or_simp) ?(k=1) ?assign_mode p =
+  (* Use the simplified duplicate expression if it is a constant,
+     otherwise use the duplicated one. *)
+  let choose_best e edup =
+    match edup with
+    | Int _ -> edup
+    | _ -> e
+  in
   let dwp = dwp ~simp ~k ?assign_mode in match p with
-  | Assign (v,e) when assign_mode <> None ->
-    (match assign_mode with
-    | Some Sat -> dwp (Assert (exp_eq (Var v) e))
-    | Some Validity -> dwp (Assume (exp_eq (Var v) e))
-    | Some Foralls -> failwith "dwp: Foralls not implemented"
-    | None -> failwith "dwp: impossible")
-  | Assign _ -> failwith "dwp requires an assignment free program"
-  | Assert e -> [], exp_true, exp_not e
-  | Assume e -> [], e, exp_false
-  | Choice (s1, s2) ->
-    let v1, ms1, af1 = dwp s1 in
-    let v2, ms2, af2 = dwp s2 in
-    v1@v2, simp (exp_or ms1 ms2), simp (exp_or af1 af2)
-  | Seq (s1, s2) ->
-    let v1, ms1, af1 = dwp s1 in
-    let v2, ms2, af2 = dwp s2 in
-    let v = [] in
-    let (v,ms1) = Wp.variableify ~name:"eddwp_seq_ms1" k v ms1 in
-    let (v,af1) = Wp.variableify ~name:"eddwp_seq_af1" k v af1 in
-    v@v1@v2, simp (exp_and ms1 (simp (exp_or af1 ms2))), simp (exp_and ms1 (simp (exp_or af1 af2)))
-  | Skip -> [], exp_true, exp_false
+    | Assign (v,e) when assign_mode <> None ->
+      (match assign_mode with
+      | Some Sat -> dwp (Assert (exp_eq (Var v) e))
+      | Some Validity -> dwp (Assume (exp_eq (Var v) e))
+      | Some Foralls -> failwith "dwp: Foralls not implemented"
+      | None -> failwith "dwp: impossible")
+    | Assign _ -> failwith "dwp requires an assignment free program"
+    | Assert e -> [], exp_true, exp_not e, exp_true, exp_not e
+    | Assume e -> [], e, exp_false, e, exp_false
+    | Choice (s1, s2) ->
+      let v1, ms1, af1, msdup1, afdup1 = dwp s1 in
+      let v2, ms2, af2, msdup2, afdup2 = dwp s2 in
+
+      let ms = simp (exp_or ms1 ms2) in
+      let msdup = simp (exp_or msdup1 msdup2) in
+      let af = simp (exp_or af1 af2) in
+      let afdup = simp (exp_or afdup1 afdup2) in
+
+      v1@v2, choose_best ms msdup, choose_best af afdup, msdup, afdup
+    | Seq (s1, s2) as _s ->
+      let v1, ms1, af1, msdup1, afdup1 = dwp s1 in
+      let v2, ms2, af2, msdup2, afdup2 = dwp s2 in
+      let v = [] in
+      let (v,ms1) = Wp.variableify ~name:"eddwp_seq_ms1" k v ms1 in
+      let (v,af1) = Wp.variableify ~name:"eddwp_seq_af1" k v af1 in
+
+      let ms = simp (exp_and ms1 (simp (exp_or af1 ms2))) in
+      let msdup = simp (exp_and msdup1 (simp (exp_or afdup1 msdup2))) in
+      let af = simp (exp_and ms1 (simp (exp_or af1 af2))) in
+      let afdup = simp (exp_and msdup1 (simp (exp_or afdup1 afdup2))) in
+
+      v@v1@v2, choose_best ms msdup, choose_best af afdup, msdup, afdup
+  | Skip -> [], exp_true, exp_false, exp_true, exp_false
 
 module Make(D:Delta) = struct
 
@@ -132,7 +167,7 @@ let eddwp_conc ?(simp=or_simp) ?(k=1) ?(cf=true) (mode:formula_mode) (p:Gcl.t) q
     then D.simplify delta e
     else Symbeval.Symbolic e
   in
-  let punt delta s = let v, ms, af = dwp ~simp ~k ~assign_mode:mode s
+  let punt delta s = let v, ms, af, _, _ = dwp ~simp ~k ~assign_mode:mode s
                      in delta, v, ms, af
   in
   let rec dwpconc delta = function
@@ -170,7 +205,7 @@ let eddwp_conc ?(simp=or_simp) ?(k=1) ?(cf=true) (mode:formula_mode) (p:Gcl.t) q
       let s2conflicts = BatList.filter_map (fun (v,_,x) ->
         match x with Some x -> Some(v,x) | None -> None) conflicts in
       let add_assign (ms,af) (v,e) =
-        let _, ms2, af2 = dwp ~simp ~k ~assign_mode:mode (Assign (v, unwrap_symb e)) in
+        let _, ms2, af2, _, _ = dwp ~simp ~k ~assign_mode:mode (Assign (v, unwrap_symb e)) in
         let ms = simp (exp_and ms (simp (exp_or af ms2))) in
         let af = simp (exp_and ms (simp (exp_or af af2))) in (ms, af)
       in
@@ -245,7 +280,7 @@ let eddwp_lazyconc ?(simp=or_simp) ?(k=1) ?(cf=true) (mode:formula_mode) (p:Gcl.
     in
     ignore(Ast_visitor.exp_accept v e)
   in
-  let punt delta s = let v, ms, af = dwp ~simp ~k ~assign_mode:mode s
+  let punt delta s = let v, ms, af, _, _ = dwp ~simp ~k ~assign_mode:mode s
                      in
                      let e = match s with
                      | Gcl.Assign (_, e) -> Some e
@@ -357,7 +392,7 @@ let eddwp ?(simp=or_simp) ?(k=1) (mode:formula_mode) (p:Gcl.t) q =
 
     Note: dwpms P = Not (wp P true) \/ Not (wlp P false)
       and dwpaf P = Not (wp P true) *)
-  let (v,ms,af) = dwp ~simp ~k p in
+  let (v,ms,af,_,_) = dwp ~simp ~k p in
   let vo = Wp.assignments_to_exp v in
   match mode with
   | Sat ->
