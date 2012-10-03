@@ -100,6 +100,7 @@ export SOURCES = \
 	structural_analysis.ml \
 	unroll.ml \
 	efse.ml \
+	dwp.mli dwp.ml \
 	ast_slice.ml \
 	ssa_slice.ml \
 	traces.ml \

@@ -85,8 +85,13 @@ let compute_dwp_let_gen = SsaVc compute_dwp_let
 
 let compute_eddwp {k=k; mode=mode} cfg post =
   let gcl, foralls = Gcl.passified_of_ssa mode cfg in
-  (Wp.eddwp ~k mode gcl post, foralls)
+  (Dwp.eddwp ~k mode gcl post, foralls)
 let compute_eddwp_gen = SsaVc compute_eddwp
+
+let compute_eddwp_conc {k=k; mode=mode} cfg post =
+  let gcl, foralls = Gcl.passified_of_ssa mode cfg in
+  (Dwp.eddwp_conc ~k mode gcl post, foralls)
+let compute_eddwp_conc_gen = SsaVc compute_eddwp_conc
 
 let compute_flanagansaxe {k=k; mode=mode} cfg post =
   let gcl, foralls = Gcl.passified_of_ssa mode cfg in
@@ -154,6 +159,7 @@ let compute_fse_maxrepeat_gen i = AstVc (compute_fse_maxrepeat i)
 let vclist =
   ("dwp", compute_dwp_gen)
   :: ("eddwp", compute_eddwp_gen)
+  :: ("eddwp_conc", compute_eddwp_conc_gen)
   :: ("dwplet", compute_dwp_let_gen)
   :: ("dwp1", compute_dwp1_gen)
   :: ("flanagansaxe", compute_flanagansaxe_gen)
@@ -171,6 +177,7 @@ let vclist =
 let pred_vclist =
   ("dwp", compute_dwp_gen)
   :: ("eddwp", compute_eddwp_gen)
+  :: ("eddwp_conc", compute_eddwp_conc_gen)
   :: ("dwplet", compute_dwp_let_gen)
   :: ("flanagansaxe", compute_flanagansaxe_gen)
   :: ("wp", compute_wp_gen)

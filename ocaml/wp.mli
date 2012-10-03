@@ -68,17 +68,23 @@ val dwp :
     argument must be used to specify whether the formula will be used
     for satisfiability or validity. *)
 
-val eddwp :
-  ?simp:(Ast.exp -> Ast.exp) ->
-  ?less_duplication:bool -> ?k:int -> Type.formula_mode -> Gcl.t -> Ast.exp -> Ast.exp
-(** [eddwp mode p q] is the same as {!dwp}, but uses an alternate
-    formulation of dwp.  It is arguably easier to understand, and
-    generates smaller formulas for programs that do not have [Assume]
-    statements. *)
-
 val dwp_let :
   ?simp:(Ast.exp -> Ast.exp) ->
   ?less_duplication:bool -> ?k:int -> Type.formula_mode -> Gcl.t -> Ast.exp -> Ast.exp
 (** [dwp_let] is just like {!dwp}, except that [dwp_let] wraps helper
     variables in [Let] expressions so they do not appear as free
     variables. *)
+
+(** {5 Utility Functions for Building WP Algorithms} *)
+
+val variableify :
+  ?name:string -> int -> (Ast.var * Ast.exp) list -> Ast.exp -> (Ast.var * Ast.exp) list * Ast.exp
+(** When given a list of variable assignments [v], [variableify s v e]
+    returns a tuple [(v',e')] where [v'] is an updated list of
+    variable assignments, and [e'] is guaranteed to be at most [s] in
+    size. Use this function to avoid duplicating large expressions in
+    formulas. *)
+
+val assignments_to_exp : (Ast.var * Ast.exp) list -> Ast.exp
+(** Convert a list of variable assignments, such as those returned by
+    {!variableify}, to a single expression. *)

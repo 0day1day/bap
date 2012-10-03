@@ -603,6 +603,7 @@ let efse_lazy ?(cf=true) p pi mode =
   let _,pi = efse (D.create ()) (lazy pi) p in
   Lazy.force pi
 
+
 (* (\** Efficient fse algorithm for passified programs with feasibility testing. *\) *)
 (* let efse_feas ?(cf=true) p pi = *)
 (*   let eval delta e = if cf *)
