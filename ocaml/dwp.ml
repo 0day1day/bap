@@ -99,14 +99,16 @@ let or_simp = function
   | BinOp(OR, e1, e2) when e1 === exp_false -> e2
   | BinOp(OR, e1, e2) when e2 === exp_false -> e1
   | BinOp(OR, e1, UnOp(NOT, e2))
-  | BinOp(OR, UnOp(NOT, e1), e2) when e1 === e2 -> exp_true
-  | BinOp(OR, e1, e2) when e1 === e2 -> e1
+  (* Note: this is == on purpose to be fast *)
+  | BinOp(OR, UnOp(NOT, e1), e2) when e1 == e2 -> exp_true
+  | BinOp(OR, e1, e2) when e1 == e2 -> e1
   | BinOp(AND, e1, e2) when e1 === exp_true -> e2
   | BinOp(AND, e1, e2) when e2 === exp_true -> e1
   | BinOp(AND, e1, e2) when e1 === exp_false || e2 === exp_false -> exp_false
   | BinOp(AND, e1, UnOp(NOT, e2))
-  | BinOp(AND, UnOp(NOT, e1), e2) when e1 === e2 -> exp_false
-  | BinOp(AND, e1, e2) when e1 === e2 -> e1
+  (* Note: this is == on purpose to be fast *)
+  | BinOp(AND, UnOp(NOT, e1), e2) when e1 == e2 -> exp_false
+  | BinOp(AND, e1, e2) when e1 == e2 -> e1
   | e -> e
 
 (* Dwp base implementation.  Returns a tuple consisting of variable
@@ -129,7 +131,7 @@ let rec dwp ?(simp=or_simp) ?(k=1) ?assign_mode p =
       | Some Foralls -> failwith "dwp: Foralls not implemented"
       | None -> failwith "dwp: impossible")
     | Assign _ -> failwith "dwp requires an assignment free program"
-    | Assert e -> [], exp_true, exp_not e, exp_true, exp_not e
+    | Assert e -> let ne = exp_not e in [], exp_true, ne, exp_true, ne
     | Assume e -> [], e, exp_false, e, exp_false
     | Choice (s1, s2) ->
       let v1, ms1, af1, msdup1, afdup1 = dwp s1 in
@@ -206,23 +208,25 @@ let eddwp_conc ?(simp=or_simp) ?(k=1) ?(cf=true) (mode:formula_mode) (p:Gcl.t) q
         match x with Some x -> Some(v,x) | None -> None) conflicts in
       let s2conflicts = BatList.filter_map (fun (v,_,x) ->
         match x with Some x -> Some(v,x) | None -> None) conflicts in
-      let add_assign (ms,af,msdup,afdup) (v,e) =
-        let _, ms2, af2, msdup2, afdup2 = dwp ~simp ~k ~assign_mode:mode (Assign (v, unwrap_symb e)) in
+      let add_assign (v,ms,af,msdup,afdup) (var,e) =
+        let _, ms2, af2, msdup2, afdup2 = dwp ~simp ~k ~assign_mode:mode (Assign (var, unwrap_symb e)) in
+        let (v,ms) = Wp.variableify ~name:"eddwp_cseq_ms1" k v ms in
+        let (v,af) = Wp.variableify ~name:"eddwp_cseq_af1" k v af in
         let ms = simp (exp_and ms (simp (exp_or af ms2))) in
         let msdup = simp (exp_and msdup (simp (exp_or afdup msdup2))) in
         let af = simp (exp_and ms (simp (exp_or af af2))) in
         let afdup = simp (exp_and msdup (simp (exp_or afdup afdup2))) in
-        (choose_best ms msdup, choose_best af afdup, msdup, afdup)
+        (v, choose_best ms msdup, choose_best af afdup, msdup, afdup)
       in
-      let (ms1, af1, msdup1, afdup1) = List.fold_left add_assign (ms1, af1, msdup1, afdup1) s1conflicts in
-      let (ms2, af2, msdup2, afdup2) = List.fold_left add_assign (ms2, af2, msdup2, afdup2) s2conflicts in
+      let (v1', ms1, af1, msdup1, afdup1) = List.fold_left add_assign ([], ms1, af1, msdup1, afdup1) s1conflicts in
+      let (v2', ms2, af2, msdup2, afdup2) = List.fold_left add_assign ([], ms2, af2, msdup2, afdup2) s2conflicts in
 
       let ms = simp (exp_or ms1 ms2) in
       let msdup = simp (exp_or msdup1 msdup2) in
       let af = simp (exp_or af1 af2) in
       let afdup = simp (exp_or afdup1 afdup2) in
 
-      deltamerge, v1@v2, choose_best ms msdup, choose_best af afdup, msdup, afdup
+      deltamerge, v1'@v2'@v1@v2, choose_best ms msdup, choose_best af afdup, msdup, afdup
     | Gcl.Seq (s1, s2) as _s ->
       let delta1, v1, ms1, af1, msdup1, afdup1 = dwpconc delta s1 in
       if ms1 = exp_false then delta1, v1, exp_false, exp_false, exp_false, exp_false
