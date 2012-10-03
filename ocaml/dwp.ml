@@ -132,7 +132,7 @@ let eddwp_conc ?(simp=or_simp) ?(k=1) ?(cf=true) (mode:formula_mode) (p:Gcl.t) q
     then D.simplify delta e
     else Symbeval.Symbolic e
   in
-  let punt delta s = let v, ms, af = dwp ~simp ~k s
+  let punt delta s = let v, ms, af = dwp ~simp ~k ~assign_mode:mode s
                      in delta, v, ms, af
   in
   let rec dwpconc delta = function
