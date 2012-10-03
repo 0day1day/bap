@@ -93,6 +93,11 @@ let compute_eddwp_conc {k=k; mode=mode} cfg post =
   (Dwp.eddwp_conc ~k mode gcl post, foralls)
 let compute_eddwp_conc_gen = SsaVc compute_eddwp_conc
 
+let compute_eddwp_lazyconc {k=k; mode=mode} cfg post =
+  let gcl, foralls = Gcl.passified_of_ssa mode ~rm_assigns:false cfg in
+  (Dwp.eddwp_lazyconc ~k mode gcl post, foralls)
+let compute_eddwp_lazyconc_gen = SsaVc compute_eddwp_lazyconc
+
 let compute_flanagansaxe {k=k; mode=mode} cfg post =
   let gcl, foralls = Gcl.passified_of_ssa mode cfg in
   (Wp.flanagansaxe ~k mode gcl post, foralls)

@@ -203,6 +203,150 @@ let eddwp_conc ?(simp=or_simp) ?(k=1) ?(cf=true) (mode:formula_mode) (p:Gcl.t) q
     exp_implies vo (exp_implies ms (exp_and (exp_not af) q'))
   | Foralls ->
     failwith "Foralls not supported yet"
+
+(* Ed's DWP formulation + concrete evaluation + lazy merging.
+
+   This function concrete evaluates the entire program eagerly, but
+   produces lazy expressions for the formulas.  We do this so that we
+   know what variables need to be placed in the formula at merge
+   points.  For instance, in the program [Choice(Assign (x, 5), Skip)]
+   we do not need to put x in the formula, because there is no
+   reference to [x] in the formula. However, [Seq(Choice(Assign (x,
+   5), Skip), Assert (x == 5))] would need to put [x] in the formula.
+   The difficulty is that DWP is going forward, but we don't know if a
+   variable is used until later in the program.  Thus the lazy
+   expressions.
+*)
+let eddwp_lazyconc ?(simp=or_simp) ?(k=1) ?(cf=true) (mode:formula_mode) (p:Gcl.t) q =
+  (*
+    Returns (v, dwpms P, dwpaf P).
+
+    Note: dwpms P = Not (wp P true) \/ Not (wlp P false)
+    and dwpaf P = Not (wp P true) *)
+  let eval delta e = if cf
+    then D.simplify delta e
+    else Symbeval.Symbolic e
+  in
+  let h = VH.create 1000 in
+  let needed v =
+    try VH.find h v
+    with Not_found -> false
+  (* Mark v as being needed in the formula *)
+  and used v =
+    VH.replace h v true
+  in
+  let used_vars_in e =
+    let v = object
+      inherit Ast_visitor.nop
+      method visit_rvar v =
+        used v;
+        DoChildren
+    end
+    in
+    ignore(Ast_visitor.exp_accept v e)
+  in
+  let punt delta s = let v, ms, af = dwp ~simp ~k ~assign_mode:mode s
+                     in
+                     let e = match s with
+                     | Gcl.Assign (_, e) -> Some e
+                     | Gcl.Assume e -> Some e
+                     | Gcl.Assert e -> Some e
+                     | Gcl.Skip -> None
+                     | _ -> failwith "Not allowed to punt for complex statements"
+                     in
+                     BatOption.may used_vars_in e;
+                     delta, v, ms, af
+  in
+  let punt_internal delta s = let _, v, ms, af = punt delta s in
+                              (v, ms, af)
+  in
+  let punt_external delta s = let delta, v, ms, af = punt delta s in
+                              delta, lazy (v,  ms, af)
+  in
+  let rec dwpconc delta = function
+    | Gcl.Assign (v, e) as s ->
+      let value = eval delta e in
+      if Symbeval.is_concrete_mem_or_scalar value then
+        let delta = D.set delta v value in
+        delta, lazy (
+          if needed v
+          (* If needed in the formula, insert the concrete value to the formula.
+             XXX: Should we do this for concrete memories? *)
+          then punt_internal delta (Gcl.Assign (v, unwrap_symb value))
+          (* If the value is not needed in the formula, act like a Skip *)
+          else punt_internal delta Gcl.Skip
+        ) else punt_external delta s
+    | Gcl.Assume e as s ->
+      let value = eval delta e in
+      if value = Symbolic exp_true then punt_external delta Gcl.Skip
+      else if value = Symbolic exp_false then delta, lazy([], exp_false, exp_false)
+      else punt_external delta s
+    | Gcl.Assert e as s ->
+      let value = eval delta e in
+      if value = Symbolic exp_true then punt_external delta Skip
+      else if value = Symbolic exp_false then delta, lazy([], exp_true, exp_true)
+      else punt_external delta s
+    | Gcl.Choice (s1, s2) ->
+      let delta1, lazy1 = dwpconc delta s1 in
+      let delta2, lazy2 = dwpconc delta s2 in
+      let deltamerge, conflicts = D.merge delta1 delta2 in
+
+        (* Merging gives us a list of variable conflicts in the two
+           branches.  We can handle these by adding assignment
+           statements to the end of each branch, and then using the
+           Seq rule. (TODO: Prove this in Isabelle.)  However, we
+           already have a lot of formula pieces precomputed, so
+           instead of recursing and wasting all that work, we will
+           include a version of the sequence rule here that reuses
+           ms1, af1, etc.  *)
+
+      let () = List.iter (fun (v,_,_) -> used v) conflicts in
+
+      (* let s1conflicts = BatList.filter_map (fun (v,x,_) -> *)
+      (*   match x with Some x -> Some(v,x) | None -> None) conflicts in *)
+      (* let s2conflicts = BatList.filter_map (fun (v,_,x) -> *)
+      (*   match x with Some x -> Some(v,x) | None -> None) conflicts in *)
+      (* let add_assign (ms,af) (v,e) = *)
+      (*   let _, ms2, af2 = dwp ~simp ~k ~assign_mode:mode (Assign (v, unwrap_symb e)) in *)
+      (*   let ms = simp (exp_and ms (simp (exp_or af ms2))) in *)
+      (*   let af = simp (exp_and ms (simp (exp_or af af2))) in (ms, af) *)
+      (* in *)
+      (* let (ms1, af1) = List.fold_left add_assign (ms1, af1) s1conflicts in *)
+      (* let (ms2, af2) = List.fold_left add_assign (ms2, af2) s2conflicts in *)
+
+      deltamerge, lazy (
+        let v1, ms1, af1 = Lazy.force lazy1 in
+        let v2, ms2, af2 = Lazy.force lazy2 in
+        v1@v2, simp (exp_or ms1 ms2), simp (exp_or af1 af2))
+    | Gcl.Seq (s1, s2) as _s ->
+      let delta1, lazy1 = dwpconc delta s1 in
+      let delta2, lazy2 = dwpconc delta1 s2 in
+      delta2, lazy (
+        let v1, ms1, af1 = Lazy.force lazy1 in
+        if ms1 = exp_false then v1, exp_false, exp_false
+        else if af1 = exp_true then v1, ms1, ms1
+        else
+          let v2, ms2, af2 = Lazy.force lazy2 in
+          let v = [] in
+          let (v,ms1) = Wp.variableify ~name:"eddwp_seq_ms1" k v ms1 in
+          let (v,af1) = Wp.variableify ~name:"eddwp_seq_af1" k v af1 in
+          v@v1@v2, simp (exp_and ms1 (simp (exp_or af1 ms2))), simp (exp_and ms1 (simp (exp_or af1 af2))))
+    | Gcl.Skip as s -> punt_external delta s
+  in
+  let (delta, lazyr) = dwpconc (D.create ()) p in
+  let v, ms, af = Lazy.force lazyr in
+  let q' =
+    let value = eval delta q in
+    unwrap_symb value
+  in
+  let vo = Wp.assignments_to_exp v in
+  match mode with
+  | Sat ->
+    exp_and vo (exp_implies ms (exp_and (exp_not af) q'))
+  | Validity ->
+    exp_implies vo (exp_implies ms (exp_and (exp_not af) q'))
+  | Foralls ->
+    failwith "Foralls not supported yet"
 end
 
 (* Ed's DWP formulation.  If there are no Assumes, dwpms will always
@@ -226,3 +370,7 @@ let eddwp ?(simp=or_simp) ?(k=1) (mode:formula_mode) (p:Gcl.t) q =
 let eddwp_conc ?simp ?k ?cf mode p q =
   let module DWPCONC = Make(VMDelta) in
   DWPCONC.eddwp_conc ?simp ?k ?cf mode p q
+
+let eddwp_lazyconc ?simp ?k ?cf mode p q =
+  let module DWPCONC = Make(VMDelta) in
+  DWPCONC.eddwp_lazyconc ?simp ?k ?cf mode p q

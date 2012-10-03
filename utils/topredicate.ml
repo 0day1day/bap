@@ -77,6 +77,8 @@ let speclist =
      "Use Ed's efficient directionless weakest precondition algorithm")
   ::("-eddwpconc", Arg.Unit(fun()-> vc := compute_eddwp_conc_gen),
      "Use Ed's efficient directionless weakest precondition algorithm with concrete evaluation")
+  ::("-eddwplazyconc", Arg.Unit(fun()-> vc := compute_eddwp_lazyconc_gen),
+     "Use Ed's efficient directionless weakest precondition algorithm with concrete evaluation and lazy merging")
   ::("-dwpk", Arg.Int(fun i-> vc := compute_dwp_gen;
     options := {!options with k=i};
 ),
