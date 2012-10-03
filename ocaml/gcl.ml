@@ -360,7 +360,7 @@ let rec remove_skips = function
 
 module C = Cfg.SSA
 
-let passified_of_ssa ?entry ?exit mode cfg =
+let passified_of_ssa ?entry ?exit ?(rm_assigns=true) mode cfg =
   let ast = Cfg_ssa.to_astcfg ~dsa:true cfg in
   let convert = function
     | Some v -> Some(CA.find_vertex ast (C.G.V.label v))
@@ -371,12 +371,13 @@ let passified_of_ssa ?entry ?exit mode cfg =
   let vars = ref [] in
   let rec convert_gcl g = 
     match g with
-    | Assign(v,e) ->
+    | Assign(v,e) when rm_assigns ->
       (match mode with
       | Foralls -> vars := v :: !vars;
         Assume(exp_eq (Var v) e)
       | Validity -> Assume(exp_eq (Var v) e)
       | Sat -> Assert(exp_eq (Var v) e))
+    | Assign(v,e) -> g
     | Choice(a,b) ->
       Choice(convert_gcl a, convert_gcl b)
     | Seq(a,b) ->

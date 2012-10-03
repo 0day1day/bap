@@ -15,6 +15,6 @@ val eddwp :
 
 val eddwp_conc :
   ?simp:(Ast.exp -> Ast.exp) ->
-  ?k:int -> Type.formula_mode -> Gcl.t -> Ast.exp -> Ast.exp
+  ?k:int -> ?cf:bool -> Type.formula_mode -> Gcl.t -> Ast.exp -> Ast.exp
 (** [eddwp_conc] is like {!eddwp} but with concrete evaluation turned
     on. *)

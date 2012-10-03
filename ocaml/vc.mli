@@ -61,6 +61,10 @@ val compute_dwp_let_gen : t
 val compute_eddwp : ssa_vc
 val compute_eddwp_gen : t
 
+(** Same as [compute_eddwp] but with concrete evaluation. *)
+val compute_eddwp_conc : ssa_vc
+val compute_eddwp_conc_gen : t
+
 (** DWP implementation that uses forall quantifiers. *)
 val compute_dwp1 : ssa_vc
 (** General form of [compute_dwp1]. *)

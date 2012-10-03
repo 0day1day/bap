@@ -525,14 +525,15 @@ struct
     try
       let stmt = inst_fetch state.sigma state.pc in
       dprintf "Executing %s" (Pp.ast_stmt_to_string stmt);
-      if debug () then print_values state.delta;
+      if debug () then (print_values state.delta;
+                        print_mem state.delta);
       eval_stmt state stmt
     with Failure str ->
       (prerr_endline ("Evaluation aborted at stmt No-"
                       ^(Int64.to_string state.pc)
                       ^"\nreason: "^str);
        if debug () then (print_values state.delta;
-                      print_mem state.delta);
+                         print_mem state.delta);
        (* print_endline ("Path predicate: "^(Pp.ast_exp_to_string (output_formula state.pred))); *)
        [])
       | Not_found ->
@@ -540,7 +541,7 @@ struct
                         ^(Int64.to_string state.pc)
                         ^"\nreason: "^(Printf.sprintf "PC not found: %#Lx" state.pc));
          if debug () then (print_values state.delta;
-                        print_mem state.delta);
+                           print_mem state.delta);
          (* print_endline ("Path predicate: "^(Pp.ast_exp_to_string (output_formula state.pred))); *)
          [])
 

@@ -89,7 +89,7 @@ let compute_eddwp {k=k; mode=mode} cfg post =
 let compute_eddwp_gen = SsaVc compute_eddwp
 
 let compute_eddwp_conc {k=k; mode=mode} cfg post =
-  let gcl, foralls = Gcl.passified_of_ssa mode cfg in
+  let gcl, foralls = Gcl.passified_of_ssa mode ~rm_assigns:false cfg in
   (Dwp.eddwp_conc ~k mode gcl post, foralls)
 let compute_eddwp_conc_gen = SsaVc compute_eddwp_conc
 

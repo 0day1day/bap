@@ -59,7 +59,7 @@ val of_ast : Ast.program -> t
 (* val remove_skips : t -> t *)
 
 val passified_of_ssa :
-  ?entry:Cfg.SSA.G.V.t -> ?exit:Cfg.SSA.G.V.t -> Type.formula_mode -> Cfg.SSA.G.t -> t * var list
+  ?entry:Cfg.SSA.G.V.t -> ?exit:Cfg.SSA.G.V.t -> ?rm_assigns:bool -> Type.formula_mode -> Cfg.SSA.G.t -> t * var list
 (** [passified_of_ssa cfg] converts a SSA CFG [cfg] to a passified GCL
     program.  Passified GCL programs do not contain [Assign(v,e)]
     statements.  Instead, all assignments [Assign(v,e)] are replaced

@@ -3,6 +3,7 @@ open Ast_convenience
 module D = Debug.Make(struct let name = "Dwp" and default=`NoDebug end)
 open D
 open Gcl
+open Symbeval
 open Type
 module VM = Var.VarMap
 
@@ -20,12 +21,6 @@ sig
   (** Take the intersection of two deltas. When there are conflicting
       bindings for a variable, there will be no binding in the final
       delta for that variable. *)
-  (* val merge_super : t -> t -> exp -> exp -> Type.formula_mode -> t * exp * exp *)
-  (* (\** [merge_super d1 d2 pi1 pi2] returns a merged [d], and modified *)
-  (*     [pi1] and [pi2]. When there are conflicting bindings for a *)
-  (*     variable, there will be no binding in the final delta for that *)
-  (*     variable, and the binding will be added to that branch's *)
-  (*     formula. *\) *)
   val set : t -> var -> Symbeval.varval -> t
   (** Setter method *)
   val get : t -> var -> Symbeval.varval
@@ -77,41 +72,6 @@ struct
     ) f f
     in
     f, !o
-  (* let merge_super d1 d2 pi1 pi2 mode = *)
-  (*   let f, pi1, pi2 = *)
-  (*     VM.fold (fun var value (newdelta, pi1, pi2) -> *)
-  (*       try *)
-  (*         let newvalue = VM.find var newdelta in *)
-  (*         if value = newvalue then *)
-  (*         (\* Newdelta already has the same value! We can just return newdelta as *)
-  (*            is. *\) *)
-  (*           newdelta, pi1, pi2 *)
-  (*         else ( *)
-  (*           (\* Newdelta has a CONFLICTING assignment.  We need to remove *)
-  (*              it, and add the assignments to pi1 and pi2. *\) *)
-  (*           dprintf "CONFLICT: Removing %s" (Pp.var_to_string var); *)
-  (*           let pi1 = Assign.add_passive_value pi1 var value mode in *)
-  (*           let pi2 = Assign.add_passive_value pi2 var newvalue mode in *)
-  (*           VM.remove var newdelta, pi1, pi2) *)
-  (*       with Not_found -> *)
-  (*         (\* Conflict: Var only assigned in d1. Add it to pi1. *\) *)
-  (*         dprintf "MISSING: Removing %s" (Pp.var_to_string var); *)
-  (*         let pi1 = Assign.add_passive_value pi1 var value mode in *)
-  (*         newdelta, pi1, pi2 *)
-  (*     ) d1 (d2, pi1, pi2) *)
-  (*   in *)
-  (*   (\* f has all the correct bindings in d1.  Now we need to remove *)
-  (*      bindings that are only in d2. *\) *)
-  (*   VM.fold (fun var value (newdelta, pi1, pi2) -> *)
-  (*     if VM.mem var d1 then *)
-  (*       (\* This is in d1 and d2, we're okay *\) *)
-  (*       newdelta, pi1, pi2 *)
-  (*     else *)
-  (*       (\* In d2 but not d1, add to pi2. *\) *)
-  (*       let newvalue = VM.find var d2 in *)
-  (*       let pi2 = Assign.add_passive_value pi2 var newvalue mode in *)
-  (*       VM.remove var newdelta, pi1, pi2 *)
-  (*   ) f (f, pi1, pi2) *)
   let set h v e =
     dprintf "Setting %s to %s" (Pp.var_to_string v) (Symbeval.symb_to_string e);
     VM.add v e h
@@ -159,32 +119,42 @@ let rec dwp ?(simp=or_simp) ?(k=1) ?assign_mode p =
     v@v1@v2, simp (exp_and ms1 (simp (exp_or af1 ms2))), simp (exp_and ms1 (simp (exp_or af1 af2)))
   | Skip -> [], exp_true, exp_false
 
-(* Ed's DWP formulation + concrete evaluation.
-
-   XXX: Fix simplification
- *)
 module Make(D:Delta) = struct
-  let dwp_conc ?(simp=or_simp) ?(k=1) ?(cf=true) (mode:formula_mode) (p:Gcl.t) =
-    let eval delta e = if cf
-      then D.simplify delta e
-      else Symbeval.Symbolic e
-    in
-  (* let eval_exp delta e = unwrap_symb (eval delta e) in *)
-    let punt delta s = let v, ms, af = dwp ~simp ~k s
-                       in delta, v, ms, af
-    in
-    let rec dwpconc delta = function
-      | Gcl.Assign (v, e) as s ->
-        let value = eval delta e in
-        if Symbeval.is_concrete_mem_or_scalar value then
-          D.set delta v value, [], exp_true, exp_false
-        else punt delta s
-      | Gcl.Assume e as s -> punt delta s
-      | Gcl.Assert e as s -> punt delta s
-      | Gcl.Choice (s1, s2) ->
-        let delta1, v1, ms1, af1 = dwpconc delta s1 in
-        let delta2, v2, ms2, af2 = dwpconc delta s2 in
-        let deltamerge, conflicts = D.merge delta1 delta2 in
+
+(* Ed's DWP formulation + concrete evaluation. *)
+let eddwp_conc ?(simp=or_simp) ?(k=1) ?(cf=true) (mode:formula_mode) (p:Gcl.t) q =
+  (*
+    Returns (v, dwpms P, dwpaf P).
+
+    Note: dwpms P = Not (wp P true) \/ Not (wlp P false)
+      and dwpaf P = Not (wp P true) *)
+  let eval delta e = if cf
+    then D.simplify delta e
+    else Symbeval.Symbolic e
+  in
+  let punt delta s = let v, ms, af = dwp ~simp ~k s
+                     in delta, v, ms, af
+  in
+  let rec dwpconc delta = function
+    | Gcl.Assign (v, e) as s ->
+      let value = eval delta e in
+      if Symbeval.is_concrete_mem_or_scalar value then
+        D.set delta v value, [], exp_true, exp_false
+      else punt delta s
+    | Gcl.Assume e as s ->
+      let value = eval delta e in
+      if value = Symbolic exp_true then punt delta Skip
+      else if value = Symbolic exp_false then delta, [], exp_false, exp_false
+      else punt delta s
+    | Gcl.Assert e as s ->
+      let value = eval delta e in
+      if value = Symbolic exp_true then punt delta Skip
+      else if value = Symbolic exp_false then delta, [], exp_true, exp_true
+      else punt delta s
+    | Gcl.Choice (s1, s2) ->
+      let delta1, v1, ms1, af1 = dwpconc delta s1 in
+      let delta2, v2, ms2, af2 = dwpconc delta s2 in
+      let deltamerge, conflicts = D.merge delta1 delta2 in
 
         (* Merging gives us a list of variable conflicts in the two
            branches.  We can handle these by adding assignment
@@ -195,26 +165,44 @@ module Make(D:Delta) = struct
            include a version of the sequence rule here that reuses
            ms1, af1, etc.  *)
 
-        let s1conflicts = BatList.filter_map (fun (v,x,_) ->
-          match x with Some x -> Some(v,x) | None -> None) conflicts in
-        let s2conflicts = BatList.filter_map (fun (v,_,x) ->
-          match x with Some x -> Some(v,x) | None -> None) conflicts in
-        let add_assign (ms,af) (v,e) =
-          let _, ms2, af2 = dwp ~simp ~k ~assign_mode:mode (Assign (v, unwrap_symb e)) in
-          let ms = exp_and ms (exp_or af ms2) in
-          let af = exp_and ms (exp_or af af2) in (ms, af)
-        in
-        let (ms1, af1) = List.fold_left add_assign (ms1, af1) s1conflicts in
-        let (ms2, af2) = List.fold_left add_assign (ms2, af2) s2conflicts in
+      let s1conflicts = BatList.filter_map (fun (v,x,_) ->
+        match x with Some x -> Some(v,x) | None -> None) conflicts in
+      let s2conflicts = BatList.filter_map (fun (v,_,x) ->
+        match x with Some x -> Some(v,x) | None -> None) conflicts in
+      let add_assign (ms,af) (v,e) =
+        let _, ms2, af2 = dwp ~simp ~k ~assign_mode:mode (Assign (v, unwrap_symb e)) in
+        let ms = simp (exp_and ms (simp (exp_or af ms2))) in
+        let af = simp (exp_and ms (simp (exp_or af af2))) in (ms, af)
+      in
+      let (ms1, af1) = List.fold_left add_assign (ms1, af1) s1conflicts in
+      let (ms2, af2) = List.fold_left add_assign (ms2, af2) s2conflicts in
 
-        deltamerge, v1@v2, simp (exp_or ms1 ms2), simp (exp_or af1 af2)
-      | Gcl.Seq (s1, s2) ->
-        let delta1, v1, ms1, af1 = dwpconc delta s1 in
+      deltamerge, v1@v2, simp (exp_or ms1 ms2), simp (exp_or af1 af2)
+    | Gcl.Seq (s1, s2) as _s ->
+      let delta1, v1, ms1, af1 = dwpconc delta s1 in
+      if ms1 = exp_false then delta1, v1, exp_false, exp_false
+      else if af1 = exp_true then delta1, v1, ms1, ms1
+      else
         let delta2, v2, ms2, af2 = dwpconc delta1 s2 in
-        delta2, v1@v2, simp (exp_and ms1 (simp (exp_or af1 ms2))), simp (exp_and ms1 (simp (exp_or af1 af2)))
-      | Gcl.Skip as s -> punt delta s
-    in
-    dwpconc (D.create ()) p
+        let v = [] in
+        let (v,ms1) = Wp.variableify ~name:"eddwp_seq_ms1" k v ms1 in
+        let (v,af1) = Wp.variableify ~name:"eddwp_seq_af1" k v af1 in
+        delta2, v@v1@v2, simp (exp_and ms1 (simp (exp_or af1 ms2))), simp (exp_and ms1 (simp (exp_or af1 af2)))
+    | Gcl.Skip as s -> punt delta s
+  in
+  let (delta,v,ms,af) = dwpconc (D.create ()) p in
+  let q' =
+    let value = eval delta q in
+    unwrap_symb value
+  in
+  let vo = Wp.assignments_to_exp v in
+  match mode with
+  | Sat ->
+    exp_and vo (exp_implies ms (exp_and (exp_not af) q'))
+  | Validity ->
+    exp_implies vo (exp_implies ms (exp_and (exp_not af) q'))
+  | Foralls ->
+    failwith "Foralls not supported yet"
 end
 
 (* Ed's DWP formulation.  If there are no Assumes, dwpms will always
@@ -225,9 +213,7 @@ let eddwp ?(simp=or_simp) ?(k=1) (mode:formula_mode) (p:Gcl.t) q =
 
     Note: dwpms P = Not (wp P true) \/ Not (wlp P false)
       and dwpaf P = Not (wp P true) *)
-  dprintf "go go go";
   let (v,ms,af) = dwp ~simp ~k p in
-  dprintf "yay";
   let vo = Wp.assignments_to_exp v in
   match mode with
   | Sat ->
@@ -237,21 +223,6 @@ let eddwp ?(simp=or_simp) ?(k=1) (mode:formula_mode) (p:Gcl.t) q =
   | Foralls ->
     failwith "Foralls not supported yet"
 
-(* Ed's DWP formulation.  If there are no Assumes, dwpms will always
-   be true, and dwp degenerates to efficient (merging) fse. *)
-let eddwp_conc ?(simp=or_simp) ?(k=1) (mode:formula_mode) (p:Gcl.t) q =
-  (*
-    Returns (v, dwpms P, dwpaf P).
-
-    Note: dwpms P = Not (wp P true) \/ Not (wlp P false)
-      and dwpaf P = Not (wp P true) *)
+let eddwp_conc ?simp ?k ?cf mode p q =
   let module DWPCONC = Make(VMDelta) in
-  let (_,v,ms,af) = DWPCONC.dwp_conc ~simp ~k mode p in
-  let vo = Wp.assignments_to_exp v in
-  match mode with
-  | Sat ->
-    exp_and vo (exp_implies ms (exp_and (exp_not af) q))
-  | Validity ->
-    exp_implies vo (exp_implies ms (exp_and (exp_not af) q))
-  | Foralls ->
-    failwith "Foralls not supported yet"
+  DWPCONC.eddwp_conc ?simp ?k ?cf mode p q
