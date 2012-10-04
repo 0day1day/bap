@@ -86,6 +86,10 @@ val compute_flanagansaxe_gen : t
 val compute_wp : cfg_vc
 val compute_wp_gen : t
 
+(** Efficient weakest precondition on passified GCL programs. *)
+val compute_passified_wp : ssa_vc
+val compute_passified_wp_gen : t
+
 (** Unstructured Weakest Precondition that operates on a CFG-like
     representation. Produces exponentially sized formulas. *)
 val compute_uwp : ssa_vc

@@ -63,6 +63,11 @@ let compute_wp _ cfg post =
   (Wp.wp gcl post, [])
 let compute_wp_gen = CfgVc compute_wp
 
+let compute_passified_wp {mode=mode} cfg post =
+  let gcl, foralls = Gcl.passified_of_ssa mode cfg in
+  (Wp.passified_wp gcl post, foralls)
+let compute_passified_wp_gen = SsaVc compute_passified_wp
+
 let compute_uwp _ cfg post =
   let ugcl = Ugcl.of_ssacfg cfg in
   (Wp.uwp ugcl post, [])

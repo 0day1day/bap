@@ -88,7 +88,9 @@ let speclist =
   ::("-flanagansaxe", Arg.Unit(fun()-> vc := compute_flanagansaxe_gen),
      "Use Flanagan & Saxe's algorithm instead of the default WP.")
   ::("-wp", Arg.Unit(fun()-> vc := compute_wp_gen),
-     "Use Dijkstra's WP, except with let instead of substitution.")
+     "Use Dijkstra's WP on GCL.")
+  ::("-pwp", Arg.Unit(fun()-> vc := compute_passified_wp_gen),
+     "Efficient WP on passified GCL programs.")
   ::("-uwp", Arg.Unit(fun()-> vc := compute_uwp_gen),
      "Use WP for Unstructured Programs")
   ::("-uwpe", Arg.Unit(fun()-> vc := compute_uwp_efficient_gen),

@@ -21,10 +21,16 @@
     @param q is the post-condition.
 *)
 val wp : ?simp:(Ast.exp -> Ast.exp) -> Gcl.t -> Ast.exp -> Ast.exp
+
+(** [passified_wp] is similar to {!wp}, but is intended for passified
+    programs.  Unlike {!wp} it does not duplicate the post-condition. *)
+val passified_wp : ?simp:(Ast.exp -> Ast.exp) -> Gcl.t -> Ast.exp -> Ast.exp
+
 val uwp : ?simp:(Ast.exp -> Ast.exp) -> Ugcl.t -> Ast.exp -> Ast.exp
 (** Same as {!wp}, but avoids converting the program to GCL. See
     "Weakest-Precondition of Unstructured Programs" by Barnett for the
     general technique. *)
+
 val efficient_wp : ?simp:(Ast.exp -> Ast.exp) -> Gcl.t -> Ast.exp -> Ast.exp
 (** [efficient_wp p q] computes [wp(p,q)] using an algorithm that
     guarantees the resulting precondition will be linear in the size
@@ -39,6 +45,7 @@ val efficient_wp : ?simp:(Ast.exp -> Ast.exp) -> Gcl.t -> Ast.exp -> Ast.exp
 
     @param q is the post-condition.
 *)
+
 val efficient_uwp :
   ?simp:(Ast.exp -> Ast.exp) -> Ugcl.t -> Ast.exp -> Ast.exp
 (** Same as {!efficient_wp} but does not convert to GCL. *)

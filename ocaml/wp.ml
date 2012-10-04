@@ -33,6 +33,26 @@ let wp ?(simp=Util.id) (p:Gcl.t) (q:exp) : exp =
   in
   wp q p  (fun x->x)
 
+let passified_wp ?(simp=Util.id) (p:Gcl.t) (q:exp) : exp =
+  (*  We use CPS to avoid stack overflows *)
+  let rec wp q s k =
+    match s with
+    | Skip -> k q
+    | Assume e ->
+      k (simp(exp_implies e q))
+    | Choice(s1, s2) ->
+      let v = Var.newvar "q" (Reg 1) in
+      let qe = Var v in
+      wp qe s1 (fun x -> wp qe s2 (fun y -> k(simp(Let(v,q,exp_and x y)))))
+    | Seq(s1, s2) ->
+      wp q s2 (fun x -> wp x s1 k)
+    | Assign(t, e) ->
+      failwith "Expected a passified program"
+    | Assert e ->
+      k (simp(exp_and e q))
+  in
+  wp q p  (fun x->x)
+
 module CA = Cfg.AST
 
 module RevCFG =
