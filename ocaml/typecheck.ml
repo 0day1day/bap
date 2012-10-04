@@ -94,17 +94,18 @@ let rec infer_ast =
       in
       nt
     | Lab s ->
-        (* FIXME: no type for labels yet *)
+      (* FIXME: no type for labels yet *)
       reg_64
     | Int(_,t)
     | Unknown(_,t) ->
       t
     | Cast(ct,t,e) ->
-        (* FIXME: check *)
+      ignore(infer_ast ~check e);
       t
     | Let(v,e1,e2) ->
-        (* FIXME: check *)
-      infer_ast e2
+      (* XXX: Need a type context to check this correctly *)
+      ignore(infer_ast ~check e1);
+      infer_ast ~check e2
     | Load(arr,idx,endian, t) ->
       if check then check_idx arr idx endian t;
       t

@@ -722,11 +722,14 @@ object (self)
   (*   cls() *)
 
   method assert_ast_exp_with_foralls ?(fvars=true) foralls e =
+    pdebug "Opening benchmark... ";
     self#open_benchmark e;
     if fvars then (
+      pdebug "declaring new free variables... ";
       self#declare_new_freevars e;
       force_newline();
     );
+    pdebug "done\n";
     opn 1;
     pp ":assumption";
     space();

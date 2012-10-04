@@ -37,6 +37,10 @@ let rec to_string = function
   | Seq(g1, g2) -> "Seq("^to_string g1^", "^to_string g2^")"
   | Skip -> "Skip"
 
+let rec size = function
+  | Assume _ | Assign _ | Assert _ | Skip -> 1
+  | Seq(g1, g2) | Choice(g1, g2) -> size g1 + size g2 + 1
+
 (* let rec gcl_equal s1 s2 = *)
 (*   let num = function *)
 (*     | Assume _ -> 0 *)

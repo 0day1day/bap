@@ -421,6 +421,18 @@ let eddwp_lazyconc ?(simp=or_simp) ?(k=1) ?(cf=true) (mode:formula_mode) (p:Gcl.
     failwith "Foralls not supported yet"
 end
 
+let ast_size e =
+  let s = ref 0 in
+  let vis = object
+    inherit Ast_visitor.nop
+    method visit_exp _ =
+      incr s;
+      DoChildren
+  end in
+  ignore(Ast_visitor.exp_accept vis e);
+  !s
+
+
 (* Ed's DWP formulation.  If there are no Assumes, dwpms will always
    be true, and dwp degenerates to efficient (merging) fse. *)
 let eddwp ?(simp=or_simp) ?(k=1) (mode:formula_mode) (p:Gcl.t) q =
@@ -429,16 +441,18 @@ let eddwp ?(simp=or_simp) ?(k=1) (mode:formula_mode) (p:Gcl.t) q =
 
     Note: dwpms P = Not (wp P true) \/ Not (wlp P false)
       and dwpaf P = Not (wp P true) *)
+  dprintf "GCL size: %d" (Gcl.size p);
   let (v,ms,af,_,_) = dwp ~simp ~k p in
   if mode = Sat then assert (ms === exp_true);
   let vo = Wp.assignments_to_exp v in
-  match mode with
+  let o = match mode with
   | Sat ->
     exp_and vo (exp_implies ms (exp_and (exp_not af) q))
   | Validity ->
     exp_implies vo (exp_implies ms (exp_and (exp_not af) q))
   | Foralls ->
-    failwith "Foralls not supported yet"
+    failwith "Foralls not supported yet" in
+  dprintf "WP size: %d" (ast_size o); o
 
 let eddwp_conc ?simp ?k ?cf mode p q =
   let module DWPCONC = Make(VMDelta) in

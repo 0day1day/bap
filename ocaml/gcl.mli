@@ -34,6 +34,9 @@ val to_string : t -> string
 (** [to_string p] converts the GCL program [p] to a string for
     debugging purposes. *)
 
+val size : t -> int
+(** [size p] computes the number of statements in [p]. *)
+
 (** {5 Functions to convert BAP programs to GCL} *)
 
 val of_astcfg : ?entry:Cfg.AST.G.V.t -> ?exit:Cfg.AST.G.V.t -> Cfg.AST.G.t -> t
