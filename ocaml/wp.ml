@@ -70,6 +70,7 @@ let uwp ?(simp=Util.id) ((cfg,ugclmap):Ugcl.t) (q:exp) : exp =
       | [] -> failwith (Printf.sprintf "BB %s has no successors but should" (Cfg_ast.v2s bb))
       | s -> (* Get the conjunction of our successors' preconditions *)
         let get_wp bb = lookupwpvar (CA.G.V.label bb) in
+        (* Note: This duplicates the postcondition *)
         simp (List.fold_left (fun acc bb -> binop AND acc (get_wp bb)) (get_wp (List.hd s)) (List.tl s))
     in
     let rec wp q s k =
@@ -130,7 +131,7 @@ let efficient_uwp ?(simp=Util.id) ((cfg,ugclmap):Ugcl.t) (q:exp) : exp =
       | Ugcl.Seq(s1, s2) ->
         wp q s2 (fun x -> wp x s1 k)
       | Ugcl.Assign(t, e) ->
-        k(simp(Let(t, e, q)))
+        failwith "Assignments not allowed in passified programs"
       | Ugcl.Assert e ->
         k (simp(exp_and e q))
     in
