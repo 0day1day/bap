@@ -331,7 +331,8 @@ let eddwp_lazyconc ?(simp=or_simp) ?(k=1) ?(cf=true) (mode:formula_mode) (p:Gcl.
           if needed v
           (* If needed in the formula, insert the concrete value to the formula.
              XXX: Should we do this for concrete memories? *)
-          then punt_internal delta (Gcl.Assign (v, unwrap_symb value))
+          (* then punt_internal delta (Gcl.Assign (v, unwrap_symb value)) *)
+          then punt_internal delta (Gcl.Assign (v, e))
           (* If the value is not needed in the formula, act like a Skip *)
           else punt_internal delta Gcl.Skip
         ) else punt_external delta s
