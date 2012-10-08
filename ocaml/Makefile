@@ -91,6 +91,7 @@ export SOURCES = \
 	grammar_private_scope.ml \
 	grammar.mly lexer.mll \
 	parser.ml \
+	tunegc.mli tunegc.ml \
 	input.mli input.ml \
 	to_c.ml \
 	vsa.ml \

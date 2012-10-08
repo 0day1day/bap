@@ -374,6 +374,7 @@ let speclist =
       "Flatten memory accesses")
   :: Input.speclist
 
+let () = Tunegc.set_gc ()
 let anon x = raise(Arg.Bad("Unexpected argument: '"^x^"'"))
 let () = Arg.parse speclist anon usage
 

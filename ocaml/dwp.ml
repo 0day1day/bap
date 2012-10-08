@@ -481,7 +481,7 @@ let fwp ?(simp=or_simp) ?(k=1) (mode:formula_mode) (p:Gcl.t) q =
         let (v,q) = Wp.variableify ~name:"qseq" k v q in
         (* XXX: Why does commenting this out slow down the printer so
            much? *)
-        (* let (v,wlp1) = Wp.variableify ~name:"wlp1" k v wlp1 in *)
+        let (v,wlp1) = Wp.variableify ~name:"wlp1" k v wlp1 in
         let v'',wp2,wlp2 = fwpint s2 q in
         v@v'@v'', exp_and wp1 (exp_or wlp1 wp2), exp_or wlp1 wlp2
       | Skip -> [], q, q
