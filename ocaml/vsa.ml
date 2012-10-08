@@ -35,9 +35,8 @@ module DV = Debug.Make(struct let name = "VsaVerbose" and default=`NoDebug end)
    long as overflow does not occur. Should be false for soundness. *)
 let signedness_hack = ref true
 
-(* Treat any memory write to a SI whose lower or upper bound is the
-   min/max is the same as Top. *)
-let mem_top_hack = ref false
+(* Set memory to top once it surpasses this number of entries *)
+let mem_max = ref (Some(1 lsl 16))
 
 exception Unimplemented of string
 
@@ -61,9 +60,6 @@ let uint64_lcm x y =
   m /% (uint64_gcd x y)
 
 let bits_of_width = Typecheck.bits_of_width
-
-let fwd_transfer_stmt_to_block f g node latice =
-  List.fold_left (fun l n -> f n l) latice (Cfg.AST.get_stmts g node)
 
 let sp = Disasm_i386.esp
 
@@ -543,7 +539,7 @@ module SimpleVSA =
 struct
   module DFP =
   struct
-    module G = Cfg.AST.G
+    module CFG = Cfg.AST
     module L =
     struct
       type t = SI.t VM.t
@@ -573,7 +569,7 @@ struct
           x y
     end
     module O = GraphDataflow.NOOPTIONS
-    let s0 _ _ = G.V.create Cfg.BB_Entry
+    let s0 _ _ = CFG.G.V.create Cfg.BB_Entry
     let init _ g = L.top
     let dir _ = GraphDataflow.Forward
 
@@ -611,7 +607,7 @@ struct
 
     let bits_of_exp e = bits_of_width (Typecheck.infer_ast ~check:false e)
 
-    let rec transfer_stmt s l =
+    let rec stmt_transfer_function _ _ _ s l =
       match s with
         | Assert(Var _, _)  (* FIXME: Do we want to say v is true? *)
         | Assert _ | Jmp _ | CJmp _ | Label _ | Comment _
@@ -688,13 +684,11 @@ struct
             with Invalid_argument _ | Not_found ->
               l
 
-    let node_transfer_function _ = fwd_transfer_stmt_to_block transfer_stmt
-
-    let edge_transfer_function _ g e = Util.id
+    let edge_transfer_function _ _ _ _ = Util.id
 
   end
-  
-  module DF = GraphDataflow.MakeWide(DFP)
+
+  module DF = CfgDataflow.MakeWide(DFP)
 
 end (* module SimpleVSA *)
 
@@ -900,7 +894,7 @@ module RegionVSA =
 struct
   module DFP =
   struct
-    module G = Cfg.AST.G
+    module CFG = Cfg.AST
     module L =
     struct
       type t = VS.t VM.t
@@ -930,7 +924,7 @@ struct
           x y
     end
     module O = GraphDataflow.NOOPTIONS
-    let s0 _ _ = G.V.create Cfg.BB_Entry
+    let s0 _ _ = CFG.G.V.create Cfg.BB_Entry
     let init _ g =
         VM.add sp [(sp, SI.zero (bits_of_width (Var.typ sp)))] L.top (* stack region *)
 
@@ -961,7 +955,7 @@ struct
     let unop_to_vs_function _ = (raise(Unimplemented "unop") : int -> VS.t -> VS.t)
 
 
-    let rec transfer_stmt s l =
+    let rec stmt_transfer_function _ _ _ s l =
       match s with
         | Assert(Var _, _)  (* FIXME: Do we want to say v is true? *)
         | Assert _ | Jmp _ | CJmp _ | Label _ | Comment _
@@ -1002,21 +996,19 @@ struct
             with Invalid_argument _ | Not_found ->
               l
 
-    let node_transfer_function _ = fwd_transfer_stmt_to_block transfer_stmt
-
-    let edge_transfer_function _ g e = Util.id
+    let edge_transfer_function _ _ _ _ = Util.id
 
   end
   
-  module DF = GraphDataflow.MakeWide(DFP)
+  module DF = CfgDataflow.MakeWide(DFP)
 
 end (* module RegionVSA *)
 
 (** Abstract Store *)
 module MemStore = struct
   type aloc = VS.region * int64
-  module M1 = Map.Make(struct type t = VS.region let compare = Var.compare end)
-  module M2 = Map.Make(struct type t = int64 let compare = Int64.compare end)
+  module M1 = BatMap.Make(struct type t = VS.region let compare = Var.compare end)
+  module M2 = BatMap.Make(struct type t = int64 let compare = Int64.compare end)
 
   (* VSA optional interface: specify a "real" memory read funtion *)
   module O = struct
@@ -1093,6 +1085,16 @@ module MemStore = struct
         | None -> failwith "MemStore.read impossible address"
       with Exit -> VS.top k
 
+  let widen_region r =
+    match !mem_max with
+    | Some m ->
+      if M2.cardinal r > m then M2.empty
+      else r
+    | None -> r
+
+  let widen_mem m =
+    M1.map (fun r -> widen_region r) m
+
   let write_concrete_strong k ae (r,i) vl =
     if vl = VS.top k then
       try
@@ -1120,20 +1122,17 @@ module MemStore = struct
   let write k ae addr vl =
     if addr = VS.top addr_bits then (
       if vl = VS.top k then top
-      else fold (fun addr v a -> write_concrete_weak k a addr vl) ae ae
+      else match !mem_max with
+      | None -> fold (fun addr v a -> write_concrete_weak k a addr vl) ae ae
+      | Some _ -> top
     ) else match addr with
-      (* XXX: Handle strides *)
-      | [(r, ((k,1L,l,u)))] when !mem_top_hack && (l = SI.mini k || u = SI.maxi k) ->
-        if r = VS.global then top else
-        (* Set this entire region to Top *)
-        M1.remove r ae
       | [(r, ((k,_,_,_) as o))] when o = SI.top k ->
         (* Set this entire region to Top *)
         M1.remove r ae
       | [(r, (_,0L,x,y))] when x = y ->
         write_concrete_strong k ae (r,x) vl
       | _ ->
-        VS.fold (fun v a -> write_concrete_weak k a v vl) addr ae
+        widen_mem (VS.fold (fun v a -> write_concrete_weak k a v vl) addr ae)
 
   let write_intersection k ae addr vl =
     match addr with
@@ -1197,7 +1196,7 @@ module AbsEnv = struct
   let value_equal x y = match x,y with
     | (`Scalar x, `Scalar y) -> VS.equal x y
     | (`Array x, `Array y) -> MemStore.equal x y
-    | _ -> false
+    | _ -> failwith "value_equal"
 
   let equal x y =
     if x == y then true
@@ -1229,7 +1228,7 @@ module AlmostVSA =
 struct
   module DFP =
   struct
-    module G = Cfg.AST.G
+    module CFG = Cfg.AST
     module L =
     struct
       type t = AbsEnv.t
@@ -1281,7 +1280,7 @@ struct
     end
     module O = MemStore.O
 
-    let s0 _ _ = G.V.create Cfg.BB_Entry
+    let s0 _ _ = CFG.G.V.create Cfg.BB_Entry
 
     (** Creates a lattice element that maps each of the given variables to
         it's own region. (For use as an inital value in the dataflow problem.)
@@ -1371,7 +1370,7 @@ struct
         in `Array new_vs
       )
 
-    let rec transfer_stmt o s l =
+    let rec stmt_transfer_function o _ _ s l =
       dprintf "Executing %s" (Pp.ast_stmt_to_string s);
       match s with
         | Assert(Var _, _)  (* FIXME: Do we want to say v is true? *)
@@ -1391,10 +1390,7 @@ struct
           with Invalid_argument _ | Not_found ->
             l
 
-    let node_transfer_function o =
-      fwd_transfer_stmt_to_block (transfer_stmt o)
-
-    let edge_transfer_function o g edge l =
+    let edge_transfer_function o g edge _ l =
       dprintf "edge from %s to %s" (Cfg_ast.v2s (Cfg.AST.G.E.src edge)) (Cfg_ast.v2s (Cfg.AST.G.E.dst edge));
       let accept_signed_bop bop =
         match !signedness_hack, bop with
@@ -1402,7 +1398,7 @@ struct
         | true, (SLE|SLT|LE|LT) -> true
         | _, _ -> false
       in
-      match G.E.label edge with
+      match CFG.G.E.label edge with
       (* Because strided intervals represent signed numbers, we
          cannot convert unsigned inequalities to strided intervals (try
          it). *)
@@ -1445,7 +1441,7 @@ struct
         let vs_v = do_find l v in
         let vs_c = vsf (bits_of_width t) (int64_of_big_int i) in
         let vs_int = VS.intersection vs_v vs_c in
-        dprintf "%s dst %s vs_v %s vs_c %s vs_int %s" (Pp.var_to_string v) (Cfg_ast.v2s (G.E.dst edge)) (VS.to_string vs_v) (VS.to_string vs_c) (VS.to_string vs_int);
+        dprintf "%s dst %s vs_v %s vs_c %s vs_int %s" (Pp.var_to_string v) (Cfg_ast.v2s (CFG.G.E.dst edge)) (VS.to_string vs_v) (VS.to_string vs_c) (VS.to_string vs_int);
         VM.add v (`Scalar vs_int) l
       | Some(_, BinOp(EQ, (BinOp((SLE|SLT|LE|LT) as bop, (Load(Var m, ind, _e, t) as le), Int(i, t')) as be), Int(i', t'')))
       | Some(_, BinOp(EQ, (BinOp((SLE|SLT|LE|LT) as bop, Int(i, t'), (Load(Var m, ind, _e, t) as le)) as be), Int(i', t'')))
@@ -1485,7 +1481,7 @@ struct
         let vs_v = exp2vs ~o l le in
         let vs_c = vsf (bits_of_width t) (int64_of_big_int i) in
         let vs_int = VS.intersection vs_v vs_c in
-        dprintf "%s dst %s vs_v %s vs_c %s vs_int %s" (Pp.var_to_string m) (Cfg_ast.v2s (G.E.dst edge)) (VS.to_string vs_v) (VS.to_string vs_c) (VS.to_string vs_int);
+        dprintf "%s dst %s vs_v %s vs_c %s vs_int %s" (Pp.var_to_string m) (Cfg_ast.v2s (CFG.G.E.dst edge)) (VS.to_string vs_v) (VS.to_string vs_c) (VS.to_string vs_int);
         let orig_mem = do_find_ae l m in
         let new_mem = MemStore.write_intersection (bits_of_width t) orig_mem (exp2vs l ind) vs_int in
         VM.add m (`Array new_mem) l
@@ -1504,7 +1500,7 @@ struct
 
         let vs_v = do_find l v in
         let vs_int = VS.intersection vs_v vs_c in
-        dprintf "%s dst %s vs_v %s vs_c %s vs_int %s" (Pp.var_to_string v) (Cfg_ast.v2s (G.E.dst edge)) (VS.to_string vs_v) (VS.to_string vs_c) (VS.to_string vs_int);
+        dprintf "%s dst %s vs_v %s vs_c %s vs_int %s" (Pp.var_to_string v) (Cfg_ast.v2s (CFG.G.E.dst edge)) (VS.to_string vs_v) (VS.to_string vs_c) (VS.to_string vs_int);
         VM.add v (`Scalar vs_int) l
 
       | Some(_, BinOp((SLT|SLE), Var v2, Var v1)) ->
@@ -1522,6 +1518,6 @@ struct
 
   end
 
-  module DF = GraphDataflow.MakeWide(DFP)
+  module DF = CfgDataflow.MakeWide(DFP)
 
 end
