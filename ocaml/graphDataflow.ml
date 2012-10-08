@@ -114,6 +114,7 @@ struct
         Hashtbl.add backedge (s,d) v;
         v
     in
+    let widenedh = Hashtbl.create (List.length nodes) in
     let counth = Hashtbl.create (List.length nodes) in
     let count s d =
       let n = (try Hashtbl.find counth (s,d) with Not_found -> 0)+1 in
@@ -142,7 +143,14 @@ struct
                   let newin =
                     if is_backedge b s && count b s > nmeets
                     then (dprintf "widening";
-                          Hashtbl.clear counth;
+                          (* The first time we widen a node, reset the
+                             visit count to allow progress to be made.
+                             After the first time we widen, don't do
+                             this though, or we could always widen the
+                             same node. *)
+                          if not (Hashtbl.mem widenedh b)
+                          then (Hashtbl.clear counth; Hashtbl.replace widenedh b ())
+                          else ();
                           D.L.widen oldin outset')
                     else newin
                   in
