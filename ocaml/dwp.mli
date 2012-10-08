@@ -5,6 +5,11 @@
     @author ejs
 *)
 
+val fwp :
+  ?simp:(Ast.exp -> Ast.exp) ->
+  ?k:int -> Type.formula_mode -> Gcl.t -> Ast.exp -> Ast.exp
+(** [fwp mode p q] is yet another reformulation of dwp. *)
+
 val eddwp :
   ?simp:(Ast.exp -> Ast.exp) ->
   ?k:int -> Type.formula_mode -> Gcl.t -> Ast.exp -> Ast.exp

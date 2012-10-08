@@ -406,12 +406,13 @@ let eddwp_lazyconc ?(simp=or_simp) ?(k=1) ?(cf=true) (mode:formula_mode) (p:Gcl.
     | Gcl.Skip as s -> punt_external delta s
   in
   let (delta, lazyr) = dwpconc (D.create ()) p in
-  let v, ms, af, _, _ = Lazy.force lazyr in
-  if mode = Sat then assert (ms === exp_true);
   let q' =
     let value = eval delta q in
     unwrap_symb value
   in
+  used_vars_in q';
+  let v, ms, af, _, _ = Lazy.force lazyr in
+  if mode = Sat then assert (ms === exp_true);
   let vo = Wp.assignments_to_exp v in
   match mode with
   | Sat ->
@@ -451,6 +452,48 @@ let eddwp ?(simp=or_simp) ?(k=1) (mode:formula_mode) (p:Gcl.t) q =
     exp_and vo (exp_implies ms (exp_and (exp_not af) q))
   | Validity ->
     exp_implies vo (exp_implies ms (exp_and (exp_not af) q))
+  | Foralls ->
+    failwith "Foralls not supported yet" in
+  dprintf "WP size: %d" (ast_size o); o
+
+let fwp ?(simp=or_simp) ?(k=1) (mode:formula_mode) (p:Gcl.t) q =
+(* Simple forward wp. Returns a tuple containing variable bindings, wp
+   S Q, and wlp S Q. *)
+  let rec fwpint ?(simp=or_simp) ?(k=1) ?assign_mode p q =
+    let fwpint = fwpint ~simp ~k ?assign_mode in match p with
+      | Assign (v,e) when assign_mode <> None ->
+        (match assign_mode with
+        | Some Sat -> fwpint (Assert (exp_eq (Var v) e)) q
+        | Some Validity -> fwpint (Assume (exp_eq (Var v) e)) q
+        | Some Foralls -> failwith "fwpint: Foralls not implemented"
+        | None -> failwith "fwpint: impossible")
+      | Assign _ -> failwith "fwpint requires an assignment free program"
+      | Assert e -> [], simp (exp_and e q), simp (exp_implies e q)
+      | Assume e -> let e' = simp (exp_implies e q) in [], e', e'
+      | Choice (s1, s2) ->
+        let (v,q) = Wp.variableify ~name:"qc" k [] q in
+        let v',wp1,wlp1 = fwpint s1 q in
+        let v'',wp2,wlp2 = fwpint s2 q in
+        v@v'@v'', simp (exp_and wp1 wp2), simp (exp_and wlp1 wlp2)
+      | Seq (s1, s2) as _s ->
+        let v,wp1,_ = fwpint s1 exp_true in
+        let v',_,wlp1 = fwpint s1 exp_false in
+        let (v,q) = Wp.variableify ~name:"qseq" k v q in
+        (* XXX: Why does commenting this out slow down the printer so
+           much? *)
+        (* let (v,wlp1) = Wp.variableify ~name:"wlp1" k v wlp1 in *)
+        let v'',wp2,wlp2 = fwpint s2 q in
+        v@v'@v'', exp_and wp1 (exp_or wlp1 wp2), exp_or wlp1 wlp2
+      | Skip -> [], q, q
+  in
+  dprintf "GCL size: %d" (Gcl.size p);
+  let (v,wp,_) = fwpint ~simp ~k p q in
+  let vo = Wp.assignments_to_exp v in
+  let o = match mode with
+  | Sat ->
+    exp_and vo wp
+  | Validity ->
+    exp_implies vo wp
   | Foralls ->
     failwith "Foralls not supported yet" in
   dprintf "WP size: %d" (ast_size o); o

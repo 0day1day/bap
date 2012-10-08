@@ -88,6 +88,11 @@ let compute_dwp_let {k=k; mode=mode} cfg post =
   (Wp.dwp_let ~k mode gcl post, foralls)
 let compute_dwp_let_gen = SsaVc compute_dwp_let
 
+let compute_fwp {k=k; mode=mode} cfg post =
+  let gcl, foralls = Gcl.passified_of_ssa mode cfg in
+  (Dwp.fwp ~k mode gcl post, foralls)
+let compute_fwp_gen = SsaVc compute_fwp
+
 let compute_eddwp {k=k; mode=mode} cfg post =
   let gcl, foralls = Gcl.passified_of_ssa mode cfg in
   (Dwp.eddwp ~k mode gcl post, foralls)

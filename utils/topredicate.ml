@@ -73,6 +73,8 @@ let speclist =
      "<suffix> Add <suffix> to each variable name.")
   ::("-dwp", Arg.Unit(fun()-> vc := compute_dwp_gen),
      "Use efficient directionless weakest precondition")
+  ::("-fwp", Arg.Unit(fun()-> vc := compute_fwp_gen),
+     "Use simple forward weakest precondition")
   ::("-eddwp", Arg.Unit(fun()-> vc := compute_eddwp_gen),
      "Use Ed's efficient directionless weakest precondition algorithm")
   ::("-eddwpconc", Arg.Unit(fun()-> vc := compute_eddwp_conc_gen),

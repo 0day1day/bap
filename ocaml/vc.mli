@@ -54,6 +54,11 @@ val compute_dwp_gen : t
 val compute_dwp_let : ssa_vc
 val compute_dwp_let_gen : t
 
+(** Alternate formulation of DWP that looks like WP, except for the
+    sequence statement. *)
+val compute_fwp : ssa_vc
+val compute_fwp_gen : t
+
 (** Alternate formulation of DWP that is easier to understand and
     produces smaller formulas on programs that have no [Assume]
     statements.  However, it produces slightly larger formulas for
