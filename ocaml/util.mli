@@ -263,6 +263,15 @@ sig
   val stop : unit -> unit
 end
 
+(** [timeout n f x] runs [f x] for [n] seconds.  If [f x] returns [v],
+    [timeout n f x] returns [v]. Otherwise [timeout n f x] raises
+    {!Timeout}. *)
+val timeout : int -> ('a -> 'b) -> 'a -> 'b
+
+(** [timeout_option n f x] runs [f x] for [n] seconds. If [f x]
+    returns [v], [timeout_option n f x] returns [Some v].  Otherwise
+    [timeout_option n f x] returns [None]. *)
+val timeout_option : int -> ('a -> 'b) -> 'a -> 'b option
 
 (** [print_separated_list printer sep l] converts [l] to a string by
     computing [printer e] for each element [e], and concatenating the

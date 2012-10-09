@@ -187,6 +187,9 @@ struct
   let renormbin f k x y = renorm k (f k x y)
   let renormun f k x = renorm k (f k x)
 
+  (* For union/intersection which don't use k argument *)
+  let renormbin' f ((k,_,_,_) as x) y = renorm k (f x y)
+
   (* XXX: Remove k *)
   (** Addition of strided intervals *)
   let add ?(allow_overflow=true) k ((k',s1,lb1,ub1) as a) ((k'',s2,lb2,ub2) as b) =
@@ -503,13 +506,12 @@ struct
         else
           let s'' = uint64_gcd (Int64.abs (r1 -% r2)) s' in
           (k, s'', l, u)
+  let union = renormbin' union
 
-  let union x y =
-    let (k,a,b,c) as res = union x y in
-      if b = c then (k,0L,b,b) else (check_reduced k res; res)
-
-  let intersection (k,s1,a,b) (k',s2,c,d) =
-    if k <> k' then failwith "intersection: expected same bitwidth intervals";
+  let intersection ((k,s1,a,b) as si1) ((k',s2,c,d) as si2) =
+    if is_empty si1 || is_empty si2 then empty k
+    else if k <> k' then failwith "intersection: expected same bitwidth intervals"
+    else
     let l = max a c
     and u = min b d in
     if s1 = 0L && s2 = 0L then
@@ -523,11 +525,15 @@ struct
       if int64_urem a s' = 0L && int64_urem c s' = 0L then
         let l = l and u = u -% int64_urem u s' in
         if u >= l then (k, s', l, u -% int64_urem u s') else empty k
-      else
-        (k, 1L, l, u))
+      else (k, 1L, l, u))
+  let intersection = renormbin' intersection
 
-  let widen ((k,s1,a,b) as _si1) ((k',s2,c,d) as _si2) =
-    if k <> k' then failwith "widen: expected same bitwidth intervals";
+  let widen ((k,s1,a,b) as si1) ((k',s2,c,d) as si2) =
+    if is_empty si1 && not (is_empty si2) then top k
+    else if is_empty si1 then si2
+    else if is_empty si2 then si1
+    else if k <> k' then failwith "widen: expected same bitwidth intervals"
+    else
     (* dprintf "Widen: %s to %s" (to_string si1) (to_string si2); *)
     let s' = uint64_gcd s1 s2 in
     let l = if c < a then lower k a s' else a
@@ -537,6 +543,7 @@ struct
         (k, u -% l, l, u)
       else failwith "widen: strided interval not in reduced form"
     else (k, s', l, u)
+  let widen = renormbin' widen
 
   let rec fold f (k,s,a,b) init =
     if a = b then f a init
@@ -716,6 +723,7 @@ struct
   let global = Var.newvar "global region" (Reg 64) (* value doesn't really matter, so long as it's unique *)
 
   let top k = [(global, SI.top k)]
+  let empty k = [(global, SI.empty k)]
 
   let rec width = function
     | (_, (k,_,_,_))::_ -> k

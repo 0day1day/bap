@@ -10,6 +10,7 @@ let speclist = []
 let arg = ref 0;;
 let binname = ref None;;
 let fname = ref None;;
+let timeout = ref 30;;
 
 let anon x =
   (match !arg with
@@ -40,6 +41,8 @@ let lift_func (n,s,e) =
     let cfg,_ = Asmir_disasm.vsa_at asmp s in
     let cfg = Hacks.ast_remove_indirect cfg in
     Cfg_pp.AstStmtsDot.output_graph (open_out ("resolve"^n^".dot")) cfg)
+let lift_func =
+  Util.timeout !timeout lift_func
 let lift_func ((n,_,_) as x) =
   try lift_func x
   with e ->
