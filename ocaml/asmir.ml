@@ -42,7 +42,7 @@ let arch_arm  = Bfd_arch_arm
 (** How many blocks to obtain when reading a FULL trace (not streaming) *)
 let trace_blocksize = ref 100000L
 
-module D = Debug.Make(struct let name = "ASMIR" and default=`Debug end)
+module D = Debug.Make(struct let name = "Asmir" and default=`NoDebug end)
 open D
 
 module Status = Util.StatusPrinter

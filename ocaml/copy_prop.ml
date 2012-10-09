@@ -199,7 +199,11 @@ let copyprop_ast ?stop_at g =
                  (fun use ->
                    let vdefs = defs origloc use in
                    let vdefs' = defs loc use in
-                   vdefs = vdefs') (vars_in e)
+                   (* Same definitions *)
+                   vdefs = vdefs'
+                   (* No cycle *)
+                   && Depgraphs.UseDef_AST.LS.mem (Depgraphs.UseDef_AST.LocationType.Loc origloc) vdefs = false
+                  ) (vars_in e)
                then
                  ChangeTo (propagate dfin origloc loc e)
                else SkipChildren
