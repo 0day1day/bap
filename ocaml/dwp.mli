@@ -18,12 +18,6 @@ val eddwp :
     generates smaller formulas for programs that do not have [Assume]
     statements. *)
 
-val eddwp_conc :
-  ?simp:(Ast.exp -> Ast.exp) ->
-  ?k:int -> ?cf:bool -> Type.formula_mode -> Gcl.t -> Ast.exp -> Ast.exp
-(** [eddwp_conc] is like {!eddwp} but with concrete evaluation turned
-    on. *)
-
 val eddwp_lazyconc :
   ?simp:(Ast.exp -> Ast.exp) ->
   ?k:int -> ?cf:bool -> Type.formula_mode -> Gcl.t -> Ast.exp -> Ast.exp

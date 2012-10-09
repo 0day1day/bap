@@ -66,11 +66,6 @@ val compute_fwp_gen : t
 val compute_eddwp : ssa_vc
 val compute_eddwp_gen : t
 
-(** Same as [compute_eddwp] but with concrete evaluation. XXX: Should
-    be removed. *)
-val compute_eddwp_conc : ssa_vc
-val compute_eddwp_conc_gen : t
-
 (** Same as [compute_eddwp] but with concrete evaluation and lazy merging. *)
 val compute_eddwp_lazyconc : ssa_vc
 val compute_eddwp_lazyconc_gen : t
