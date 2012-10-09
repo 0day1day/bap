@@ -107,20 +107,30 @@ struct
     let offset = int64_urem i s in
     let max = maxi k in
     let maxoffset = int64_urem max s in
-    if maxoffset > offset then
-      max -% (maxoffset -% offset)
-    else
-      max +% (maxoffset -% (offset -% s))
+    let o = if maxoffset >= offset then
+        max -% (maxoffset -% offset)
+      else
+        max -% ((maxoffset +% s) -% offset)
+    in
+    if debug ()
+    then (assert (o <= maxi k && o > maxi k -% s);
+          assert (int64_urem o s = int64_urem i s));
+    o
 
   let rec lower k i s =
     assert (s >= 1L);
     let offset = int64_urem i s in
     let min = mini k in
     let minoffset = int64_urem min s in
-    if offset > minoffset then
-      min +% (offset -% offset)
-    else
-      min +% (offset -% (minoffset -% s))
+    let o = if offset >= minoffset then
+        min +% (offset -% minoffset)
+      else
+        min +% ((offset +% s) -% minoffset)
+    in
+    if debug ()
+    then (assert (o >= mini k && o < mini k +% s);
+          assert (int64_urem o s = int64_urem i s));
+    o
 
   let remove_lower_bound (k,s,a,b) =
     (k,s,lower k b s,b)
@@ -214,13 +224,12 @@ struct
       single k (mini k)
     else
       top k
+  let neg = renormun neg
 
-  let neg = if debug() then renormun neg else neg
-        
   (** Subtractionf of strided intervals *)
   let sub k a b =
     add k a (neg k b)
-
+  let sub = renormbin sub
 
   let minor k a b c d =
     let rec loop m =
@@ -585,7 +594,7 @@ struct
       | ARSHIFT -> SI.arshift
       | LSHIFT -> SI.lshift
       | EQ -> SI.eq
-      | NEQ -> fun k x y -> SI.lognot k (SI.eq k x y)
+      | NEQ -> fun k x y -> SI.lognot 1 (SI.eq k x y)
       | TIMES
       | DIVIDE
       | SDIVIDE
@@ -773,7 +782,7 @@ struct
 
   let sub k x = function
     | [r,si] when r == global ->
-        List.map (fun (r,si') -> (r, SI.sub k si' si)) x
+      List.map (fun (r,si') -> (r, SI.sub k si' si)) x
     | _ -> top k
 
   let makeother f id annihilator k x y =
@@ -1133,6 +1142,7 @@ module MemStore = struct
       | [(r, (_,0L,x,y))] when x = y ->
         write_concrete_strong k ae (r,x) vl
       | _ ->
+        (* XXX: Implement a short circuiting mechanism *)
         widen_mem (VS.fold (fun v a -> write_concrete_weak k a v vl) addr ae)
 
   let write_intersection k ae addr vl =
