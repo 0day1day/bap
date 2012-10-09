@@ -40,6 +40,10 @@ let lift_func (n,s,e) =
     let cfg,_ = Asmir_disasm.vsa_at asmp s in
     let cfg = Hacks.ast_remove_indirect cfg in
     Cfg_pp.AstStmtsDot.output_graph (open_out ("resolve"^n^".dot")) cfg)
+let lift_func ((n,_,_) as x) =
+  try lift_func x
+  with e ->
+    Printf.printf "Lifting %s failed: %s\n" n (Printexc.to_string e)
 
 let funcs = List.iter lift_func funcs;;
 

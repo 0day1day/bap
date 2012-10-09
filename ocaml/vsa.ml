@@ -150,6 +150,7 @@ struct
 
   (* XXX: Remove k argument *)
   let is_reduced k ((k',s,lb,ub) as si) =
+    if k > 64 then raise (Unimplemented (Printf.sprintf "Register type of %d bits is too large (must be <= 64)" k));
     assert(k=k');
     assert(k>0 && k<=64);
     (lb >= mini k && ub <= maxi k) &&
@@ -867,7 +868,7 @@ struct
       Hashtbl.fold (fun k v r -> (k,v)::r) h []
 
   let fold f vs init =
-    if vs = top addr_bits then wprintf "VS.fold is very slow for Top";
+    (* if vs = top addr_bits then wprintf "VS.fold is very slow for Top"; *)
     List.fold_left (fun a (r,si) -> SI.fold (fun v -> f (r,v)) si a) init vs
 
   let concrete ?max vs =
