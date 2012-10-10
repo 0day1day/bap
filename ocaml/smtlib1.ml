@@ -203,6 +203,10 @@ object (self)
   method ast_exp_base ~check e =
     (* open lazily *)
     (* let t = Typecheck.infer_ast e in *)
+    let ast_exp = self#ast_exp in
+    let ast_exp_bool = self#ast_exp_bool in
+    let ast_exp_bv = self#ast_exp_bv in
+    let letme = self#letme in
     let lazye = 
       (match e with
      | Int((i, Reg t) as p) ->
@@ -218,12 +222,12 @@ object (self)
 	 | BitVec -> lazy (pp name)
 	 | Bool -> raise No_rule)
      | Ite(cond, e1, e2) ->
-	 let pe1 = lazy (self#ast_exp e1) in
-	 let pe2 = lazy (self#ast_exp e2) in
+	 let pe1 = lazy (ast_exp e1) in
+	 let pe2 = lazy (ast_exp e2) in
 	 lazy(
 	   pp "(ite";
 	   space ();
-	   self#ast_exp_bool cond;
+	   ast_exp_bool cond;
 	   space ();
 	   Lazy.force pe1;
 	   space ();
@@ -232,7 +236,7 @@ object (self)
 	   pc ')'
 	 )
      | UnOp(uop, e) ->
-	 let pe = lazy (self#ast_exp_bv e) in
+	 let pe = lazy (ast_exp_bv e) in
 	 lazy(
 	   (match uop with
 	    | NEG -> pp "(bvneg"; space ();
@@ -246,7 +250,7 @@ object (self)
      	   | Some(el, er) -> el, er
      	   | None -> assert false
      	 in
-	 let pel,per = lazy (self#ast_exp_bv el), lazy (self#ast_exp_bv er) in
+	 let pel,per = lazy (ast_exp_bv el), lazy (ast_exp_bv er) in
      	 lazy(
 	   pp "(concat";
      	   space ();
@@ -261,7 +265,7 @@ object (self)
      	   | Some(b, e1, e2) -> b, e1, e2
      	   | None -> assert false
      	 in
-	 let pb, pe1, pe2 = lazy (self#ast_exp_bool b), lazy (self#ast_exp e1), lazy (self#ast_exp e2) in
+	 let pb, pe1, pe2 = lazy (ast_exp_bool b), lazy (ast_exp e1), lazy (ast_exp e2) in
 	 lazy(
      	   pp "(ite";
      	   space ();
@@ -296,7 +300,7 @@ object (self)
 	   | RSHIFT -> "bvlshr"
 	   | ARSHIFT -> "bvashr"
 	 in
-	 let pe1, pe2 = lazy (self#ast_exp e1), lazy (self#ast_exp e2) in
+	 let pe1, pe2 = lazy (ast_exp e1), lazy (ast_exp e2) in
 	 lazy(
 	   pc '('; pp fname; space (); Lazy.force pe1; space (); Lazy.force pe2; pc ')';
 	 )
@@ -305,7 +309,7 @@ object (self)
      	   | Some(hbit, lbit) -> hbit, lbit
      	   | None -> assert false
      	 in
-	 let pe' = lazy (self#ast_exp_bv e') in
+	 let pe' = lazy (ast_exp_bv e') in
 	 lazy(
   	   pp ("(extract["^string_of_big_int hbit^":"^string_of_big_int lbit^"]");
      	   space ();
@@ -329,7 +333,7 @@ object (self)
 	   | _ -> assert false
 	 in
 	 assert (delta >= 0);
-	 let pe1,ptext,pfext = lazy (self#ast_exp_bool e1), lazy (self#ast_exp textend), lazy (self#ast_exp fextend) in
+	 let pe1,ptext,pfext = lazy (ast_exp_bool e1), lazy (ast_exp textend), lazy (ast_exp fextend) in
 	 (match delta with
 	 | 0 -> lazy (Lazy.force pe1)
 	 | _ -> 
@@ -360,7 +364,7 @@ object (self)
 	    (* | CAST_UNSIGNED -> ("(concat bv0["^string_of_int(delta)^"] ", ")") *)
 	    | CAST_SIGNED -> ("(sign_extend["^string_of_int(delta)^"]", ")")
 	  in
-	  let pe1 = lazy (self#ast_exp_bv e1) in
+	  let pe1 = lazy (ast_exp_bv e1) in
 	  lazy(
 	    pp pre;
 	    space ();
@@ -369,8 +373,8 @@ object (self)
 	    pp post
 	  )
      | Concat(le,re) ->
-	 let pe1 = lazy (self#ast_exp le) in
-	 let pe2 = lazy (self#ast_exp re) in
+	 let pe1 = lazy (ast_exp le) in
+	 let pe2 = lazy (ast_exp re) in
 	 lazy (
 	   pp "(concat ";
 	   Lazy.force pe1;
@@ -380,7 +384,7 @@ object (self)
 	   pc ')'
 	 )
      | Extract(h,l,e) ->
-	 let pe = lazy (self#ast_exp e) in
+	 let pe = lazy (ast_exp e) in
 	 lazy(
 	   pp ("(extract["^string_of_big_int(h)^":"^string_of_big_int(l)^"]");
 	   space ();
@@ -396,10 +400,10 @@ object (self)
       | Lab lab ->
 	  failwith ("SMTLIB: don't know how to handle label names: "
 		      ^ (Pp.ast_exp_to_string e))
-      | Let(v, e1, e2) -> self#letme v e1 e2 BitVec
+      | Let(v, e1, e2) -> letme v e1 e2 BitVec
       | Load(arr,idx,endian, t) ->
 	  (* FIXME check arr is array and not mem *)
-	  let parr, pidx = lazy (self#ast_exp arr), lazy (self#ast_exp idx) in
+	  let parr, pidx = lazy (ast_exp arr), lazy (ast_exp idx) in
 	  lazy(
 	    pp "(select ";
 	    Lazy.force parr;
@@ -410,7 +414,7 @@ object (self)
 	  )
       | Store(arr,idx,vl, endian, t) ->
 	  (* FIXME check arr is array and not mem *)
-	  let parr, pidx, pvl = lazy (self#ast_exp arr), lazy (self#ast_exp idx), lazy (self#ast_exp vl) in
+	  let parr, pidx, pvl = lazy (ast_exp arr), lazy (ast_exp idx), lazy (ast_exp vl) in
 	  lazy(
 	    pp "(store ";
 	    Lazy.force parr;
@@ -452,6 +456,12 @@ object (self)
   (** Try to evaluate an expression to a boolean. If no good rule
       exists, then raises the No_rule exception. *)
   method ast_exp_bool_base ~check e =
+    let ast_exp_bool = self#ast_exp_bool in
+    let ast_exp_bv = self#ast_exp in
+    let ast_exp = self#ast_exp in
+    let ast_exp_bool_base = self#ast_exp_bool_base in
+    let ast_exp_base = self#ast_exp_base in
+    let letme = self#letme in
     if debug () then (
       let t = Typecheck.infer_ast ~check:false e in
       assert (t = Reg(1)));
@@ -469,11 +479,11 @@ object (self)
 	lazy(
 	  pp "(if_then_else";
 	  space ();
-	  self#ast_exp_bool cond;
+	  ast_exp_bool cond;
 	  space ();
-	  self#ast_exp_bool e1;
+	  ast_exp_bool e1;
 	  space ();
-	  self#ast_exp_bool e2;
+	  ast_exp_bool e2;
 	  cut ();
 	  pc ')'
 	)
@@ -482,7 +492,7 @@ object (self)
 	lazy(
 	  pp "(not";
 	  space ();
-	  self#ast_exp_bool o;
+	  ast_exp_bool o;
 	  cut ();
 	  pc ')'
 	)
@@ -490,7 +500,7 @@ object (self)
        (* Rewrite NEQ in terms of EQ *)
         let newe = UnOp(NOT, BinOp(EQ, e1, e2)) in
         lazy(
-	  self#ast_exp_bool newe
+	  ast_exp_bool newe
         )
       | BinOp((OR|AND), _, _) when parse_ite e <> None ->
      	let b, e1, e2 = match parse_ite e with
@@ -500,23 +510,23 @@ object (self)
 	lazy(
      	  pp "(if_then_else";
      	  space ();
-     	  self#ast_exp_bool b;
+     	  ast_exp_bool b;
      	  space ();
-     	  self#ast_exp_bool e1;
+     	  ast_exp_bool e1;
      	  space ();
-     	  self#ast_exp_bool e2;
+     	  ast_exp_bool e2;
      	  cut ();
      	  pc ')';
 	)
      (* Short cuts for e = exp_true and e = exp_false *)
       | BinOp(EQ, e1, e2) when full_exp_eq e1 (Int(bi1, Reg(1))) ->
-     	lazy(self#ast_exp_bool e2)
+     	lazy(ast_exp_bool e2)
       | BinOp(EQ, e2, e1) when full_exp_eq e1 (Int(bi1, Reg(1))) ->
-     	lazy(self#ast_exp_bool e2)
+     	lazy(ast_exp_bool e2)
       | BinOp(EQ, e1, e2) when full_exp_eq e1 (Int(bi0, Reg(1))) ->
-     	lazy(self#ast_exp_bool (UnOp(NOT, e2)))
+     	lazy(ast_exp_bool (UnOp(NOT, e2)))
       | BinOp(EQ, e2, e1) when full_exp_eq e1 (Int(bi0, Reg(1))) ->
-     	lazy(self#ast_exp_bool (UnOp(NOT, e2)))
+     	lazy(ast_exp_bool (UnOp(NOT, e2)))
       | BinOp(EQ, e1, e2) ->
        (* These are predicates, which return boolean values. *)
         let t1 = Typecheck.infer_ast ~check:false e1 in
@@ -527,18 +537,18 @@ object (self)
 	    can use =. *)
 	  if t1 = Reg(1) then (
             try
-              self#ast_exp_bool_base ~check:true e1;
-              self#ast_exp_bool_base ~check:true e2;
-              "iff", self#ast_exp_bool_base ~check:false
+              ast_exp_bool_base ~check:true e1;
+              ast_exp_bool_base ~check:true e2;
+              "iff", ast_exp_bool_base ~check:false
             with No_rule ->
               (try
-                 self#ast_exp_base ~check:true e1;
-                 self#ast_exp_base ~check:true e2;
-                 "=", self#ast_exp_base ~check:false
+                 ast_exp_base ~check:true e1;
+                 ast_exp_base ~check:true e2;
+                 "=", ast_exp_base ~check:false
                with No_rule ->
-                 "iff", self#ast_exp_bool)
+                 "iff", ast_exp_bool)
           ) else
-	    "=", self#ast_exp_bv
+	    "=", ast_exp_bv
         in
         lazy(
 	  pp "(";
@@ -556,10 +566,10 @@ object (self)
         let t2 = Typecheck.infer_ast ~check:false e2 in
         assert (t1 = t2);
         let f,pf = match op with
-	  | LT -> "bvult", self#ast_exp
-	  | LE -> "bvule", self#ast_exp
-	  | SLT -> "bvslt", self#ast_exp
-	  | SLE -> "bvsle", self#ast_exp
+	  | LT -> "bvult", ast_exp
+	  | LE -> "bvule", ast_exp
+	  | SLT -> "bvslt", ast_exp
+	  | SLE -> "bvsle", ast_exp
 	  | _ -> assert false
         in
         lazy(
@@ -588,9 +598,9 @@ object (self)
 	  pc '(';
 	  pp fname;
 	  space ();
-	  self#ast_exp_bool e1;
+	  ast_exp_bool e1;
 	  space ();
-	  self#ast_exp_bool e2;
+	  ast_exp_bool e2;
 	  cut ();
 	  pc ')'
 	)
@@ -610,7 +620,7 @@ object (self)
 	lazy(
     	  pc '('; pp fname; 
 	  List.iter
-	    (fun e -> space (); self#ast_exp_bool e) oplist;
+	    (fun e -> space (); ast_exp_bool e) oplist;
 	  pc ')';
 	)
       | Cast((CAST_LOW|CAST_HIGH|CAST_UNSIGNED|CAST_SIGNED),t, e1) ->
@@ -619,7 +629,7 @@ object (self)
      	let delta = bitsnew - bitsold in
      	if delta = 0 
 	then 
-	  lazy(self#ast_exp_bool e1) 
+	  lazy(ast_exp_bool e1) 
 	else 
 	  raise No_rule
       | Var v ->
@@ -627,7 +637,7 @@ object (self)
 	(match st with
 	| BitVec -> raise No_rule
 	| Bool -> lazy(pp name))
-      | Let(v, e1, e2) -> self#letme v e1 e2 Bool
+      | Let(v, e1, e2) -> letme v e1 e2 Bool
       | _ -> raise No_rule
       ) in
     if not check then (
