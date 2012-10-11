@@ -5,6 +5,7 @@ open D
 open Gcl
 open Symbeval
 open Type
+module VH = Var.VarHash
 module VM = Var.VarMap
 
 module SymbolicMap = Symbeval.SymbolicSlowMap
@@ -288,23 +289,32 @@ let eddwp_lazyconc ?(simp=or_simp) ?(k=1) ?(cf=true) (mode:formula_mode) (p:Gcl.
     then D.simplify delta e
     else Symbeval.Symbolic e
   in
-  let h = VH.create 1000 in
-  let needed v =
-    try VH.find h v
+  (* var -> is var needed? *)
+  let needh = VH.create 1000 in
+  (* var -> vars referenced by var *)
+  let vmaph = VH.create 1000 in
+  let is_needed v =
+    try VH.find needh v
     with Not_found -> false
   (* Mark v as being needed in the formula *)
-  and used v =
-    VH.replace h v true
+  in let rec mark_used v =
+    VH.replace needh v true;
   in
-  let used_vars_in e =
-    let v = object
-      inherit Ast_visitor.nop
-      method visit_rvar v =
-        used v;
-        DoChildren
-    end
+  let mark_used_vars_in e =
+    List.iter mark_used (Formulap.freevars e)
+  in
+  let trans_close () =
+    let h = VH.create (VH.length needh) in
+    let rec t = function
+      | [] -> ()
+      | x::tl ->
+        if VH.mem h x then t tl
+        else (mark_used x;
+              VH.add h x ();
+              t (tl@VH.find_all vmaph x))
     in
-    ignore(Ast_visitor.exp_accept v e)
+    let module HU = Util.HashUtil(VH) in
+    t (HU.get_hash_keys needh)
   in
   let punt delta s = let v, ms, af, msdup, afdup = dwp ~simp ~k ~assign_mode:mode s
                      in
@@ -315,7 +325,7 @@ let eddwp_lazyconc ?(simp=or_simp) ?(k=1) ?(cf=true) (mode:formula_mode) (p:Gcl.
                      | Gcl.Skip -> None
                      | _ -> failwith "Not allowed to punt for complex statements"
                      in
-                     BatOption.may used_vars_in e;
+                     BatOption.may mark_used_vars_in e;
                      delta, v, ms, af, msdup, afdup
   in
   let punt_internal delta s = let _, v, ms, af, msdup, afdup = punt delta s in
@@ -326,15 +336,19 @@ let eddwp_lazyconc ?(simp=or_simp) ?(k=1) ?(cf=true) (mode:formula_mode) (p:Gcl.
   in
   let rec dwpconc delta = function
     | Gcl.Assign (v, e) as s ->
+      List.iter (fun v' -> VH.add vmaph v v') (Formulap.freevars e);
       let value = eval delta e in
       if Symbeval.is_concrete_mem_or_scalar value then
         let delta = D.set delta v value in
         delta, lazy (
-          if needed v
-          (* If needed in the formula, insert the concrete value to the formula.
-             XXX: Should we do this for concrete memories? *)
-          (* then punt_internal delta (Gcl.Assign (v, unwrap_symb value)) *)
-          then punt_internal delta (Gcl.Assign (v, e))
+          if is_needed v
+             (* If needed, put the assignment in the formula.  For
+                memories, use the expression, since the conrete values can
+                be huge.  For scalars, use the concrete value. *)
+          then (match value with
+          | Symbolic _ -> punt_internal delta (Gcl.Assign (v, unwrap_symb value))
+          | ConcreteMem _ ->
+            punt_internal delta (Gcl.Assign (v, e)))
           (* If the value is not needed in the formula, act like a Skip *)
           else punt_internal delta Gcl.Skip
         ) else punt_external delta s
@@ -353,28 +367,8 @@ let eddwp_lazyconc ?(simp=or_simp) ?(k=1) ?(cf=true) (mode:formula_mode) (p:Gcl.
       let delta2, lazy2 = dwpconc delta s2 in
       let deltamerge, conflicts = D.merge delta1 delta2 in
 
-        (* Merging gives us a list of variable conflicts in the two
-           branches.  We can handle these by adding assignment
-           statements to the end of each branch, and then using the
-           Seq rule. (TODO: Prove this in Isabelle.)  However, we
-           already have a lot of formula pieces precomputed, so
-           instead of recursing and wasting all that work, we will
-           include a version of the sequence rule here that reuses
-           ms1, af1, etc.  *)
-
-      let () = List.iter (fun (v,_,_) -> used v) conflicts in
-
-      (* let s1conflicts = BatList.filter_map (fun (v,x,_) -> *)
-      (*   match x with Some x -> Some(v,x) | None -> None) conflicts in *)
-      (* let s2conflicts = BatList.filter_map (fun (v,_,x) -> *)
-      (*   match x with Some x -> Some(v,x) | None -> None) conflicts in *)
-      (* let add_assign (ms,af) (v,e) = *)
-      (*   let _, ms2, af2 = dwp ~simp ~k ~assign_mode:mode (Assign (v, unwrap_symb e)) in *)
-      (*   let ms = simp (exp_and ms (simp (exp_or af ms2))) in *)
-      (*   let af = simp (exp_and ms (simp (exp_or af af2))) in (ms, af) *)
-      (* in *)
-      (* let (ms1, af1) = List.fold_left add_assign (ms1, af1) s1conflicts in *)
-      (* let (ms2, af2) = List.fold_left add_assign (ms2, af2) s2conflicts in *)
+      (* Just because there is a conflict does not mean we need to mark the variable as used. *)
+      (* let () = List.iter (fun (v,_,_) -> mark_used v) conflicts in *)
 
       deltamerge, lazy (
         let v1, ms1, af1, msdup1, afdup1 = Lazy.force lazy1 in
@@ -412,7 +406,11 @@ let eddwp_lazyconc ?(simp=or_simp) ?(k=1) ?(cf=true) (mode:formula_mode) (p:Gcl.
     let value = eval delta q in
     unwrap_symb value
   in
-  used_vars_in q';
+  mark_used_vars_in q';
+  (* Compute transitive closure over used variables *)
+  dprintf "Computing transitive closure..";
+  trans_close ();
+  dprintf "done.";
   let v, ms, af, _, _ = Lazy.force lazyr in
   if mode = Sat then assert (ms === exp_true);
   let vo = Wp.assignments_to_exp v in
