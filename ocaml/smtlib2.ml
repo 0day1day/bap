@@ -587,6 +587,21 @@ object (self)
 	  cut ();
 	  pc ')'
 	)
+     | BinOp(OR, _, _) when parse_implies e <> None ->
+     	 let e1, e2 = match parse_implies e with
+     	   | Some(e1, e2) -> e1, e2
+     	   | None -> assert false
+     	 in
+         let pe1, pe2 = lazy (self#ast_exp_bool e1), lazy (self#ast_exp_bool e2) in
+         lazy(
+     	   pp "(=>";
+     	   space ();
+           Lazy.force pe1;
+     	   space ();
+           Lazy.force pe2;
+     	   cut ();
+     	   pc ')';
+         )
       | BinOp((AND|OR(*|XOR*)) as bop, e1, e2) ->
     	let t = infer_ast ~check:false e1 in
     	let t' = infer_ast ~check:false e2 in

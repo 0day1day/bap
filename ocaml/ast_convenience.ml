@@ -139,6 +139,12 @@ let parse_ite = function
     Some(b1, e1, Int(zero_big_int, nt))
   | _ -> None
 
+let parse_implies = function
+  | BinOp(OR,
+          UnOp(NOT, e1),
+          e2) -> Some(e1, e2)
+  | _ -> None
+
 (** Duplicate any shared nodes. Useful for using physical location as
     a unique identity.
 
