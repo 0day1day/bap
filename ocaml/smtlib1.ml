@@ -57,7 +57,7 @@ class pp ?suffix:(s="") ft =
     let rec oh bop e acc =
       match e with
       | BinOp(bop', e'1, e'2) when bop' = bop ->
-	oh bop e'2 (oh bop e'1 acc)
+	oh bop e'1 (oh bop e'2 acc)
       | _ -> e::acc
     in
     match e with
