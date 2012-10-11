@@ -132,7 +132,9 @@ let speclist =
   ::("-solve", Arg.Unit (fun () -> solve := true),
      "Solve the generated formula.")
   ::("-validity", Arg.Unit (fun () -> options := {!options with mode = Type.Validity}),
-     "Check validity rather than satisfiability.")
+     "Check for validity.")
+  ::("-sat", Arg.Unit (fun () -> options := {!options with mode = Type.Sat}),
+     "Check for satisfiability.")
   :: Input.speclist
 
 let () = Tunegc.set_gc ()
