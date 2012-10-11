@@ -200,7 +200,7 @@ object (self)
 	 let maskedval = Arithmetic.to_big_int p in
 	 (* pp "bv"; printf "%Lu" maskedval; pp "["; pi t; pp "]"; *)
 	 lazy(
-           pp "bv"; printf "%s" (string_of_big_int maskedval); pp "["; pi t; pp "]"
+           pp "bv"; pp (string_of_big_int maskedval); pp "["; pi t; pp "]"
          )
      | Int _ -> failwith "Ints may only have register types"
      | Var v ->
