@@ -218,7 +218,7 @@ let parse_model solver s =
       | "stp" -> Stp_grammar.main Stp_lexer.token lexbuf
       | "cvc3" -> Cvc3_grammar.main Cvc3_lexer.token lexbuf
       | "yices" -> Yices_grammar.main Yices_lexer.token lexbuf
-      | _ -> failwith "Unknown solver"
+      | other -> wprintf "Model parsing for %s unsupported" other; None
     in
     Lexing.flush_input lexbuf;
     solution
@@ -381,6 +381,18 @@ end
 
 module YICES = Make(YICES_INFO)
 
+module Z3_INFO =
+struct
+  let timeout = 60
+  let solvername = "z3"
+  let progname = "z3"
+  let cmdstr f = "-m -smt " ^ f
+  let parse_result = STPSMTLIB_INFO.parse_result_builder solvername
+  let printer = ((new Smtlib1.pp_oc) :> Formulap.fppf)
+end
+
+module Z3 = Make(Z3_INFO)
+
 let solvers = Hashtbl.create 10;;
 List.iter (fun (n,s) -> Hashtbl.add solvers n s)
   (
@@ -389,6 +401,7 @@ List.iter (fun (n,s) -> Hashtbl.add solvers n s)
     ::("cvc3", CVC3.si)
     ::("cvc3_smtlib", CVC3SMTLIB.si)
     ::("yices", YICES.si)
+    ::("z3", Z3.si)
     ::[]
   )
 
