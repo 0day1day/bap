@@ -128,7 +128,7 @@ object (self)
   (** Returns a lazy expression that prints let v = e1 in e2. Never raises No_rule. *)
   method letme v e1 e2 st =
     let t1 = Typecheck.infer_ast ~check:false e1 in
-    let cmd,c,pf,vst = match t1,!use_booleans with Reg 1,true -> "flet","$",self#ast_exp_bool,Bool | _ -> "let","?",self#ast_exp,BitVec in
+    let cmd,c,pf,vst = match t1,!use_booleans with Reg 1,true -> "let","$",self#ast_exp_bool,Bool | _ -> "let","?",self#ast_exp,BitVec in
     let pf2 = match st with Bool -> self#ast_exp_bool | BitVec -> self#ast_exp in
     (* The print functions called, ast_exp and ast_exp_bool never
        raise No_rule. So, we don't need to evaluate them before the lazy
@@ -168,7 +168,13 @@ object (self)
        
   method typ = function
     | Reg n ->	printf "(_ BitVec %d)" n
-    | Array(Reg idx, Reg elmt) -> printf "(Array %u %u)" idx elmt;
+    | Array((Reg idx as t1), (Reg elmt as t2)) ->
+      pp "(Array";
+      space ();
+      self#typ t1;
+      space ();
+      self#typ t2;
+      pc ')';
     | Array _ -> failwith "SMTLIB2 only supports Arrays with register indices and elements"
     | TMem _ ->	failwith "TMem unsupported by SMTLIB2"
 
@@ -300,7 +306,7 @@ object (self)
      	 in
 	 let pe' = lazy (self#ast_exp_bv e') in
 	 lazy(
-  	   pp ("(extract["^string_of_big_int hbit^":"^string_of_big_int lbit^"]");
+  	   pp ("(( _ extract "^string_of_big_int hbit^" "^string_of_big_int lbit^")");
      	   space ();
 	   Lazy.force pe';
      	   cut ();
@@ -347,11 +353,11 @@ object (self)
 	    | CAST_UNSIGNED | CAST_SIGNED -> assert (delta >= 0));
 	  let (pre,post) = match ct with
 	    | _ when bitsnew = bitsold -> ("","")
-	    | CAST_LOW      -> ("(extract["^string_of_int(bitsnew-1)^":0]", ")")
-	    | CAST_HIGH     -> ("(extract["^string_of_int(bitsold-1)^":"^string_of_int(bitsold-bitsnew)^"]", ")")
-	    | CAST_UNSIGNED -> ("(zero_extend["^string_of_int(delta)^"]", ")")
+	    | CAST_LOW      -> ("((_ extract "^string_of_int(bitsnew-1)^" 0)", ")")
+	    | CAST_HIGH     -> ("((_ extract "^string_of_int(bitsold-1)^" "^string_of_int(bitsold-bitsnew)^")", ")")
+	    | CAST_UNSIGNED -> ("((_ zero_extend "^string_of_int(delta)^")", ")")
 	    (* | CAST_UNSIGNED -> ("(concat bv0["^string_of_int(delta)^"] ", ")") *)
-	    | CAST_SIGNED -> ("(sign_extend["^string_of_int(delta)^"]", ")")
+	    | CAST_SIGNED -> ("((_ sign_extend "^string_of_int(delta)^")", ")")
 	  in
 	  let pe1 = lazy (self#ast_exp_bv e1) in
 	  lazy(
@@ -375,7 +381,7 @@ object (self)
      | Extract(h,l,e) ->
 	 let pe = lazy (self#ast_exp e) in
 	 lazy(
-	   pp ("(extract["^string_of_big_int(h)^":"^string_of_big_int(l)^"]");
+	   pp ("((_ extract "^string_of_big_int(h)^" "^string_of_big_int(l)^")");
 	   space ();
 	   Lazy.force pe;
 	   cut ();
@@ -522,14 +528,14 @@ object (self)
             try
               self#ast_exp_bool_base ~check:true e1;
               self#ast_exp_bool_base ~check:true e2;
-              "iff", self#ast_exp_bool_base ~check:false
+              "=", self#ast_exp_bool_base ~check:false
             with No_rule ->
               (try
                  self#ast_exp_base ~check:true e1;
                  self#ast_exp_base ~check:true e2;
                  "=", self#ast_exp_base ~check:false
                with No_rule ->
-                 "iff", self#ast_exp_bool)
+                 "=", self#ast_exp_bool)
           ) else
 	    "=", self#ast_exp_bv
         in
@@ -712,7 +718,7 @@ object (self)
     force_newline();
     pp "(set-info :smt-lib-version 2.0)";
     force_newline();
-    pp "(set-option :produce-assignments true)";
+    (* pp "(set-option :produce-assignments true)"; *)
     force_newline()
 
   method close_benchmark () =
@@ -784,8 +790,9 @@ object (self)
 
   method formula () =
     pp "(check-sat)";
-    force_newline();
-    pp "(get-assignment)"
+    (* force_newline(); *)
+    (* pp "(get-assignment)" *)
+    pp "(exit)"
 
   method counterexample = ()
 

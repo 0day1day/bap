@@ -282,19 +282,18 @@ struct
 
     (*       dprintf "fail: %b %b %b" fail isinvalid isvalid; *)
 
-    if isunsat then
-      Valid
-    else if issat then (
-      if printmodel then
-        (let m = parse_model solvername stdout in
-         print_model m);
-      Invalid
-    ) else if fail then (
+    if fail then (
       dprintf "output: %s\nerror: %s" stdout stderr;
-      SmtError ("SMT solver failed: " ^ stderr)
-    )
-    else
-      failwith "Something weird happened."
+      SmtError ("SMT solver failed: " ^ (stderr^stdout))
+    ) else if isunsat then
+        Valid
+      else if issat then (
+        if printmodel then
+          (let m = parse_model solvername stdout in
+           print_model m);
+        Invalid
+      ) else
+        failwith "Something weird happened."
   let parse_result = parse_result_builder solvername
   let printer = ((new Smtlib1.pp_oc) :> Formulap.fppf)
 end
@@ -386,12 +385,48 @@ struct
   let timeout = 60
   let solvername = "z3"
   let progname = "z3"
-  let cmdstr f = "-m -smt " ^ f
+  let cmdstr f = "-smt2 " ^ f
   let parse_result = STPSMTLIB_INFO.parse_result_builder solvername
-  let printer = ((new Smtlib1.pp_oc) :> Formulap.fppf)
+  let printer = ((new Smtlib2.pp_oc) :> Formulap.fppf)
 end
 
 module Z3 = Make(Z3_INFO)
+
+module BOOLECTOR_INFO =
+struct
+  let timeout = 60
+  let solvername = "boolector"
+  let progname = "boolector"
+  let cmdstr f = "--smt2 " ^ f
+  let parse_result_builder solvername ?(printmodel=false) stdout stderr pstatus =
+    let failstat = match pstatus with
+      | WEXITED(c) -> c == 1
+      | _ -> true
+    in
+    (* Boolector returns different values for sat/unsat *)
+    let fail = failstat || BatString.exists stderr "Fatal" in
+    let issat = BatString.exists stdout "sat" in
+    let isunsat = BatString.exists stdout "unsat" in
+
+    (*       dprintf "fail: %b %b %b" fail isinvalid isvalid; *)
+
+    if fail then (
+      dprintf "output: %s\nerror: %s" stdout stderr;
+      SmtError ("SMT solver failed: " ^ (stderr^stdout))
+    ) else if isunsat then
+        Valid
+      else if issat then (
+        if printmodel then
+          (let m = parse_model solvername stdout in
+           print_model m);
+        Invalid
+      ) else
+        failwith "Something weird happened."
+  let parse_result = parse_result_builder solvername
+  let printer = ((new Smtlib2.pp_oc) :> Formulap.fppf)
+end
+
+module BOOLECTOR = Make(BOOLECTOR_INFO)
 
 let solvers = Hashtbl.create 10;;
 List.iter (fun (n,s) -> Hashtbl.add solvers n s)
@@ -402,6 +437,7 @@ List.iter (fun (n,s) -> Hashtbl.add solvers n s)
     ::("cvc3_smtlib", CVC3SMTLIB.si)
     ::("yices", YICES.si)
     ::("z3", Z3.si)
+    ::("boolector", BOOLECTOR.si)
     ::[]
   )
 
