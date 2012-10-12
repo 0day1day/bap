@@ -735,18 +735,17 @@ object (self)
   (*   pc ')'; *)
   (*   cls() *)
 
-  method assert_ast_exp_with_foralls ?(fvars=true) foralls e =
+  method assert_ast_exp ?(exists=[]) ?(foralls=[]) e =
     pdebug "Opening benchmark... ";
     self#open_benchmark e;
-    if fvars then (
-      pdebug "declaring new free variables... ";
-      self#declare_new_freevars e;
-      force_newline();
-    );
+    pdebug "declaring new free variables... ";
+    self#declare_new_freevars e;
+    force_newline();
     pdebug "done\n";
     opn 1;
-    pp "(assert ";
+    pp "(assert";
     space();
+    self#exists exists;
     self#forall foralls;
     self#ast_exp_bool e;
     cut();
@@ -756,21 +755,8 @@ object (self)
     self#formula ();
     self#close_benchmark ()
 
-  method assert_ast_exp e =
-    self#assert_ast_exp_with_foralls [] e
-
-  (** Is e a valid expression (always true)? *)
-  method valid_ast_exp ?(exists=[]) ?(foralls=[]) e =
-    self#open_benchmark e;
-    self#declare_new_freevars e;
-    force_newline();
-    pp "assert (";
-    self#exists exists;
-    self#forall foralls;
-    self#ast_exp_bool (exp_not e);
-    pp ");";
-    self#formula ();
-    self#close_benchmark ()
+  method valid_ast_exp ?exists ?foralls e =
+    self#assert_ast_exp ?exists ?foralls (exp_not e)
 
   (* (\** Is e a valid expression (always true)? *\) *)
   (* method valid_ast_exp ?(exists=[]) ?(foralls=[]) e = *)
@@ -790,7 +776,7 @@ object (self)
 
   method formula () =
     pp "(check-sat)";
-    (* force_newline(); *)
+    force_newline();
     (* pp "(get-assignment)" *)
     pp "(exit)"
 

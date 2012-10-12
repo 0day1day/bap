@@ -78,7 +78,7 @@ let sat_test testname post stp_result (g_cfg, m2actx) =
     let pp = ((solver#printer) :> Formulap.fppf) in
     let oc = open_out stp_out in
     let p = pp oc in
-    p#assert_ast_exp_with_foralls foralls vcout;
+    p#assert_ast_exp ~foralls vcout;
     p#counterexample;
     p#close;
     (let r = solver#solve_formula_file stp_out in

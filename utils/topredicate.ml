@@ -16,7 +16,6 @@ let stpout = ref None
 let stpoutname = ref ""
 let pstpout = ref None
 let suffix = ref ""
-let assert_vars = ref false
 let usedc = ref true
 let usesccvn = ref true
 let solve = ref false
@@ -27,27 +26,6 @@ let solve = ref false
 let solver = ref (Smtexec.STP.si);;
 
 (* DWP paper *)
-let extract_vars e =
-  let rec h v = function
-    | BinOp(AND, BinOp(EQ,Var v1, e1), BinOp(EQ,Var v2, e2)) ->
-	((v2,e2)::(v1,e1)::v, None)
-    | BinOp(AND, BinOp(EQ,Var v1, e1), rest)
-    | BinOp(AND, rest, BinOp(EQ,Var v1, e1)) ->
-	h ((v1,e1)::v) rest
-    | BinOp(AND, e1, e2) ->
-	(match h v e1 with
-	 | (v, None) ->
-	     h v e2
-	 | (v, Some e1) ->
-	     match h v e2 with
-	     | (v, None) -> (v, Some e1)
-	     | (v, Some e2) -> (v, Some(exp_and e1 e2))
-	)
-    | e -> (v, Some e)
-  in
-  match h [] e with
-  | (v, Some e) -> (v,e)
-  | (v, None) -> (v, exp_true)
 
 let set_solver s =
   solver := try Hashtbl.find Smtexec.solvers s
@@ -119,8 +97,6 @@ let speclist =
      "Perform FSE without full substitution.")
   ::("-solver", Arg.String set_solver,
      ("Use the specified solver. Choices: " ^ solvers))
-  ::("-extract-vars", Arg.Set assert_vars,
-     "Put vars in separate asserts")
   ::("-noopt", Arg.Unit (fun () -> usedc := false; usesccvn := false),
      "Do not perform any optimizations on the SSA CFG.")
   ::("-opt", Arg.Unit (fun () -> usedc := true; usesccvn := true),
@@ -187,26 +163,13 @@ match !stpout with
   let foralls = List.map (Memory2array.coerce_rvar_state ~scope m2a_state) foralls in 
   let pp = (((!solver)#printer) :> Formulap.fppf) in
   let p = pp ~suffix:!suffix oc in
-  if !assert_vars then (
-    let (vars,wp') = extract_vars wp in
-    List.iter (fun (v,e) -> p#assert_ast_exp (BinOp(EQ, Var v, e))) vars;
-    (match !options with
-    | {mode=Sat} ->
-      p#assert_ast_exp_with_foralls foralls wp'
-    | {mode=Validity} ->
-      p#valid_ast_exp ~foralls wp'
-    | {mode=Foralls} ->
-      failwith "Foralls formula mode unsupported at this level")
-  )
-  else (
-    (match !options with
-    | {mode=Sat} ->
-      p#assert_ast_exp_with_foralls foralls wp
-    | {mode=Validity} ->
-      p#valid_ast_exp ~foralls wp
-    | {mode=Foralls} ->
-      failwith "Foralls formula mode unsupported at this level")
-  );
+  (match !options with
+  | {mode=Sat} ->
+    p#assert_ast_exp ~foralls wp
+  | {mode=Validity} ->
+    p#valid_ast_exp ~foralls wp
+  | {mode=Foralls} ->
+    failwith "Foralls formula mode unsupported at this level");
   p#counterexample;
   p#close;
   if !solve then (
