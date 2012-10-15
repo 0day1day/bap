@@ -437,7 +437,7 @@ let ast_size e =
 
 (* Ed's DWP formulation.  If there are no Assumes, dwpms will always
    be true, and dwp degenerates to efficient (merging) fse. *)
-let eddwp ?(simp=or_simp) ?(k=1) (mode:formula_mode) (p:Gcl.t) q =
+let eddwp ?(normalusage=true) ?(simp=or_simp) ?(k=1) (mode:formula_mode) (p:Gcl.t) q =
   (*
     Returns (v, dwpms P, dwpaf P).
 
@@ -445,20 +445,27 @@ let eddwp ?(simp=or_simp) ?(k=1) (mode:formula_mode) (p:Gcl.t) q =
       and dwpaf P = Not (wp P true) *)
   dprintf "GCL size: %d" (Gcl.size p);
   let (v,ms,af,_,_) = dwp ~simp ~k p in
-  if mode = Sat then assert (ms === exp_true);
+  (* If p is an entire program lifted in Sat mode, ms should be true.
+     However, when we use eddwp from Uwp, this may not be true, since
+     p is a small part of the whole program. *)
+  if normalusage && mode = Sat then assert (ms === exp_true);
   let vo = Wp.assignments_to_exp v in
   let o = match mode with
-  | Sat ->
-    exp_and vo (exp_implies ms (exp_and (exp_not af) q))
-  | Validity ->
-    exp_implies vo (exp_implies ms (exp_and (exp_not af) q))
-  | Foralls ->
-    failwith "Foralls not supported yet" in
+    | Sat ->
+      exp_and vo (exp_implies ms (exp_and (exp_not af) q))
+    | Validity ->
+      exp_implies vo (exp_implies ms (exp_and (exp_not af) q))
+    | Foralls ->
+      failwith "Foralls not supported yet" in
   dprintf "WP size: %d" (ast_size o); o
 
+let eddwp_uwp ?simp ?k mode =
+  let module Toposort = Graph.Topological.Make(Cfg.AST.G) in
+  Wp.build_passified_uwp Toposort.iter (eddwp ~normalusage:false ?simp ?k mode)
+
 let fwp ?(simp=or_simp) ?(k=1) (mode:formula_mode) (p:Gcl.t) q =
-(* Simple forward wp. Returns a tuple containing variable bindings, wp
-   S Q, and wlp S Q. *)
+  (* Simple forward wp. Returns a tuple containing variable bindings, wp
+     S Q, and wlp S Q. *)
   let rec fwpint ?(simp=or_simp) ?(k=1) ?assign_mode p q =
     let fwpint = fwpint ~simp ~k ?assign_mode in match p with
       | Assign (v,e) when assign_mode <> None ->

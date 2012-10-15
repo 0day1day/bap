@@ -64,6 +64,7 @@ struct
   let in_degree = CA.G.out_degree
 end
 
+module Toposort = Graph.Topological.Make(Cfg.AST.G)
 module RToposort = Graph.Topological.Make(RevCFG);;
 
 let build_uwp wp ((cfg,ugclmap):Gcl.Ugcl.t) (q:exp) : exp =
@@ -105,17 +106,25 @@ let build_uwp wp ((cfg,ugclmap):Gcl.Ugcl.t) (q:exp) : exp =
 
 let dijkstra_uwp = build_uwp wp
 
-let build_passified_uwp wp ((cfg,ugclmap):Gcl.Ugcl.t) (q:exp) : exp =
+let build_passified_uwp iter wp ((cfg,ugclmap):Gcl.Ugcl.t) (q:exp) : exp =
   Checks.acyclic_astcfg cfg "UWP";
   (* dprintf "Starting uwp"; *)
   (* Block -> var *)
   let wpvar = BH.create (CA.G.nb_vertex cfg) in
   (* Var -> exp *)
   let varexp = VH.create (CA.G.nb_vertex cfg) in
-  let lookupwpvar = BH.find wpvar in
+  let lookupwpvar bbid =
+    let makevar bbid =
+      assert (not (BH.mem wpvar bbid));
+      let v = Var.newvar (Printf.sprintf "q_pre_%s" (Cfg.bbid_to_string bbid)) reg_1 in
+      BH.add wpvar bbid v;
+      v
+    in
+    try BH.find wpvar bbid
+    with Not_found -> makevar bbid
+  in
   let setwp bbid q =
-    let v = Var.newvar (Printf.sprintf "q_pre_%s" (Cfg.bbid_to_string bbid)) reg_1 in
-    assert (not (BH.mem wpvar bbid));
+    let v = lookupwpvar bbid in
     BH.add wpvar bbid v;
     VH.add varexp v q
   in
@@ -145,7 +154,7 @@ let build_passified_uwp wp ((cfg,ugclmap):Gcl.Ugcl.t) (q:exp) : exp =
     let q_out = wp (ugclmap bbid) q_in in
     setwp bbid q_out
   in
-  RToposort.iter compute_at cfg;
+  iter compute_at cfg;
 (* Now we have a precondition for every block in terms of
    postcondition variables of its successors. We just need to visit in
    topological order and build up the whole expression now. *)
@@ -161,7 +170,7 @@ let build_passified_uwp wp ((cfg,ugclmap):Gcl.Ugcl.t) (q:exp) : exp =
   (* FIXME: We shouldn't use entry here *)
   List.fold_left build_exp (Var(lookupwpvar Cfg.BB_Entry)) assigns
 
-let efficient_uwp = build_passified_uwp wp
+let efficient_uwp = build_passified_uwp RToposort.iter wp
 
 let efficient_wp ?(simp=Util.id) (p:Gcl.t) =
   let wlp_f_ctx = Hashtbl.create 113 in

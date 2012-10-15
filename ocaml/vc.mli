@@ -66,6 +66,11 @@ val compute_fwp_gen : t
 val compute_eddwp : ssa_vc
 val compute_eddwp_gen : t
 
+(** An unstructured implementation of [compute_eddwp] that does not
+    convert the entire program to GCL *)
+val compute_eddwp_uwp : ssa_vc
+val compute_eddwp_uwp_gen : t
+
 (** Same as [compute_eddwp] but with concrete evaluation and lazy merging. *)
 val compute_eddwp_lazyconc : ssa_vc
 val compute_eddwp_lazyconc_gen : t
