@@ -26,10 +26,25 @@ val wp : ?simp:(Ast.exp -> Ast.exp) -> Gcl.t -> Ast.exp -> Ast.exp
     programs.  Unlike {!wp} it does not duplicate the post-condition. *)
 val passified_wp : ?simp:(Ast.exp -> Ast.exp) -> Gcl.t -> Ast.exp -> Ast.exp
 
-val uwp : ?simp:(Ast.exp -> Ast.exp) -> Gcl.Ugcl.t -> Ast.exp -> Ast.exp
-(** Same as {!wp}, but avoids converting the program to GCL. See
-    "Weakest-Precondition of Unstructured Programs" by Barnett for the
-    general technique. *)
+val build_uwp : (Gcl.t -> Ast.exp -> Ast.exp) -> Gcl.Ugcl.t -> Ast.exp -> Ast.exp
+(** [build_uwp wp] uses the GCL-based weakest precondition algorithm
+    for non-passified programs and builds an unstructured weakest
+    precondition algorithm from it. See "Weakest-Precondition of
+    Unstructured Programs" by Barnett for the general technique. *)
+
+val dijkstra_uwp : Gcl.Ugcl.t -> Ast.exp -> Ast.exp
+(** [dijkstra_wp] is [build_uwp Wp.wp] *)
+
+val build_passified_uwp : (Gcl.t -> Ast.exp -> Ast.exp) -> Gcl.Ugcl.t -> Ast.exp -> Ast.exp
+(** [build_passified_uwp wp] uses the GCL-based weakest precondition
+    algorithm for passified programs and builds an unstructured
+    weakest precondition algorithm from it. See "Weakest-Precondition
+    of Unstructured Programs" by Barnett for the general technique. *)
+
+val efficient_uwp : Gcl.Ugcl.t -> Ast.exp -> Ast.exp
+(** [efficient_uwp] is [build_passified_uwp Wp.wp]. Note that the
+    [Choice] rule is not used, which is the only inefficient aspect of
+    [Wp.wp]. *)
 
 val efficient_wp : ?simp:(Ast.exp -> Ast.exp) -> Gcl.t -> Ast.exp -> Ast.exp
 (** [efficient_wp p q] computes [wp(p,q)] using an algorithm that
@@ -45,10 +60,6 @@ val efficient_wp : ?simp:(Ast.exp -> Ast.exp) -> Gcl.t -> Ast.exp -> Ast.exp
 
     @param q is the post-condition.
 *)
-
-val efficient_uwp :
-  ?simp:(Ast.exp -> Ast.exp) -> Gcl.Ugcl.t -> Ast.exp -> Ast.exp
-(** Same as {!efficient_wp} but does not convert to GCL. *)
 
 val flanagansaxe :
   ?simp:(Ast.exp -> Ast.exp) ->

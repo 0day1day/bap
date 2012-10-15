@@ -70,7 +70,7 @@ let compute_passified_wp_gen = SsaVc compute_passified_wp
 
 let compute_uwp _ cfg post =
   let ugcl = Gcl.Ugcl.of_ssacfg cfg in
-  (Wp.uwp ugcl post, [])
+  (Wp.dijkstra_uwp ugcl post, [])
 let compute_uwp_gen = SsaVc compute_uwp
 
 let compute_uwp_efficient {mode=mode} cfg post =

@@ -66,9 +66,8 @@ end
 
 module RToposort = Graph.Topological.Make(RevCFG);;
 
-(** Same as [wp] but for unstructured programs. *)
-let uwp ?(simp=Util.id) ((cfg,ugclmap):Gcl.Ugcl.t) (q:exp) : exp =
-  (* dprintf "Starting uwp"; *)
+let build_uwp wp ((cfg,ugclmap):Gcl.Ugcl.t) (q:exp) : exp =
+  Checks.acyclic_astcfg cfg "UWP";
   (* Block -> exp *)
   let wpvar = BH.create (CA.G.nb_vertex cfg) in
   let lookupwpvar = BH.find wpvar in
@@ -91,31 +90,23 @@ let uwp ?(simp=Util.id) ((cfg,ugclmap):Gcl.Ugcl.t) (q:exp) : exp =
       | s -> (* Get the conjunction of our successors' preconditions *)
         let get_wp bb = lookupwpvar (CA.G.V.label bb) in
         (* Note: This duplicates the postcondition *)
-        simp (List.fold_left (fun acc bb -> binop AND acc (get_wp bb)) (get_wp (List.hd s)) (List.tl s))
+        BatList.reduce (fun acc e -> binop AND acc e) (List.map get_wp s)
     in
-    let rec wp q s k =
-      (*  We use CPS to avoid stack overflows *)
-      match s with
-      | Skip -> k q
-      | Assume e ->
-        k (simp(exp_implies e q))
-      | Seq(s1, s2) ->
-        wp q s2 (fun x -> wp x s1 k)
-      | Assign(t, e) ->
-        k(simp(Let(t, e, q)))
-      | Assert e ->
-        k (simp(exp_and e q))
+    let wp s q = match s with
       | Choice _ ->
         failwith "uwp: Choice should not appear inside a BB"
+      | _ -> wp s q
     in
-    let q_out = wp q_in (ugclmap bbid) Util.id in
+    let q_out = wp (ugclmap bbid) q_in in
     setwp bbid q_out
   in
   RToposort.iter compute_at cfg;
   lookupwpvar Cfg.BB_Entry
 
-(** Same as [efficient_wp] but for unstructured programs. *)
-let efficient_uwp ?(simp=Util.id) ((cfg,ugclmap):Gcl.Ugcl.t) (q:exp) : exp =
+let dijkstra_uwp = build_uwp wp
+
+let build_passified_uwp wp ((cfg,ugclmap):Gcl.Ugcl.t) (q:exp) : exp =
+  Checks.acyclic_astcfg cfg "UWP";
   (* dprintf "Starting uwp"; *)
   (* Block -> var *)
   let wpvar = BH.create (CA.G.nb_vertex cfg) in
@@ -142,24 +133,16 @@ let efficient_uwp ?(simp=Util.id) ((cfg,ugclmap):Gcl.Ugcl.t) (q:exp) : exp =
       | [] -> failwith (Printf.sprintf "BB %s has no successors but should" (Cfg_ast.v2s bb))
       | s -> (* Get the conjunction of our successors' preconditions *)
         let get_wp bb = Var(lookupwpvar (CA.G.V.label bb)) in
-        List.fold_left (fun acc bb -> binop AND acc (get_wp bb)) (get_wp (List.hd s)) (List.tl s)
+        BatList.reduce (fun acc e -> binop AND acc e) (List.map get_wp s)
     in
-    let rec wp q s k =
+    let wp s q =
       (*  We use CPS to avoid stack overflows *)
       match s with
-      | Skip -> k q
-      | Assume e ->
-        k (simp(exp_implies e q))
-      | Seq(s1, s2) ->
-        wp q s2 (fun x -> wp x s1 k)
-      | Assign(t, e) ->
-        failwith "Assignments not allowed in passified programs"
-      | Assert e ->
-        k (simp(exp_and e q))
       | Choice _ ->
         failwith "efficent_uwp: Choice should not appear inside a BB"
+      | _ -> wp s q
     in
-    let q_out = wp q_in (ugclmap bbid) Util.id in
+    let q_out = wp (ugclmap bbid) q_in in
     setwp bbid q_out
   in
   RToposort.iter compute_at cfg;
@@ -177,6 +160,8 @@ let efficient_uwp ?(simp=Util.id) ((cfg,ugclmap):Gcl.Ugcl.t) (q:exp) : exp =
   in
   (* FIXME: We shouldn't use entry here *)
   List.fold_left build_exp (Var(lookupwpvar Cfg.BB_Entry)) assigns
+
+let efficient_uwp = build_passified_uwp wp
 
 let efficient_wp ?(simp=Util.id) (p:Gcl.t) =
   let wlp_f_ctx = Hashtbl.create 113 in
