@@ -6,9 +6,8 @@ open Vc
 open Utils_common
 
 let usage = "Usage: "^Sys.argv.(0)^" <input options> [-o output]\n\
-             Translate programs to the IL. "
+             Compute Verification Conditions (VCs)"
 
-let fast_fse = ref false
 let options = ref Vc.default_options
 let irout = ref(Some stdout)
 let post = ref "true"
@@ -93,8 +92,6 @@ let speclist =
      "<n> FSE with breath first search, limiting search depth to n.")
   ::("-fse-maxrepeat", Arg.Int(fun i-> vc := compute_fse_maxrepeat_gen i),
      "<n> FSE excluding walks that visit a point more than n times.")
-  ::("-fse-fast", Arg.Set fast_fse,
-     "Perform FSE without full substitution.")
   ::("-solver", Arg.String set_solver,
      ("Use the specified solver. Choices: " ^ solvers))
   ::("-noopt", Arg.Unit (fun () -> usedc := false; usesccvn := false),
@@ -175,7 +172,9 @@ match !stpout with
   if !solve then (
     Printf.fprintf stderr "Solving\n"; flush stderr;
     let r = (!solver)#solve_formula_file ~printmodel:true !stpoutname in
-    Printf.fprintf stderr "Solve result: %s\n" (Smtexec.result_to_string r))
+    Printf.fprintf stderr "Solve result: %s\n" (Smtexec.result_to_string r);
+    match r with | Smtexec.SmtError _ -> failwith "Solver error" | _ -> ()
+  )
 
 ;;
 match !pstpout with
