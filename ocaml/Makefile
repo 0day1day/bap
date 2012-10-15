@@ -77,7 +77,6 @@ export SOURCES = \
 	$(LLVM_SRC) \
 	syscall_models.ml \
 	gcl.mli gcl.ml \
-	ugcl.ml \
 	wp.mli wp.ml \
 	stp_grammar.mly stp_lexer.mll \
 	cvc3_grammar.mly cvc3_lexer.mll \

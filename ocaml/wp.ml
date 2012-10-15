@@ -67,7 +67,7 @@ end
 module RToposort = Graph.Topological.Make(RevCFG);;
 
 (** Same as [wp] but for unstructured programs. *)
-let uwp ?(simp=Util.id) ((cfg,ugclmap):Ugcl.t) (q:exp) : exp =
+let uwp ?(simp=Util.id) ((cfg,ugclmap):Gcl.Ugcl.t) (q:exp) : exp =
   (* dprintf "Starting uwp"; *)
   (* Block -> exp *)
   let wpvar = BH.create (CA.G.nb_vertex cfg) in
@@ -96,15 +96,17 @@ let uwp ?(simp=Util.id) ((cfg,ugclmap):Ugcl.t) (q:exp) : exp =
     let rec wp q s k =
       (*  We use CPS to avoid stack overflows *)
       match s with
-      | Ugcl.Skip -> k q
-      | Ugcl.Assume e ->
+      | Skip -> k q
+      | Assume e ->
         k (simp(exp_implies e q))
-      | Ugcl.Seq(s1, s2) ->
+      | Seq(s1, s2) ->
         wp q s2 (fun x -> wp x s1 k)
-      | Ugcl.Assign(t, e) ->
+      | Assign(t, e) ->
         k(simp(Let(t, e, q)))
-      | Ugcl.Assert e ->
+      | Assert e ->
         k (simp(exp_and e q))
+      | Choice _ ->
+        failwith "uwp: Choice should not appear inside a BB"
     in
     let q_out = wp q_in (ugclmap bbid) Util.id in
     setwp bbid q_out
@@ -113,7 +115,7 @@ let uwp ?(simp=Util.id) ((cfg,ugclmap):Ugcl.t) (q:exp) : exp =
   lookupwpvar Cfg.BB_Entry
 
 (** Same as [efficient_wp] but for unstructured programs. *)
-let efficient_uwp ?(simp=Util.id) ((cfg,ugclmap):Ugcl.t) (q:exp) : exp =
+let efficient_uwp ?(simp=Util.id) ((cfg,ugclmap):Gcl.Ugcl.t) (q:exp) : exp =
   (* dprintf "Starting uwp"; *)
   (* Block -> var *)
   let wpvar = BH.create (CA.G.nb_vertex cfg) in
@@ -145,15 +147,17 @@ let efficient_uwp ?(simp=Util.id) ((cfg,ugclmap):Ugcl.t) (q:exp) : exp =
     let rec wp q s k =
       (*  We use CPS to avoid stack overflows *)
       match s with
-      | Ugcl.Skip -> k q
-      | Ugcl.Assume e ->
+      | Skip -> k q
+      | Assume e ->
         k (simp(exp_implies e q))
-      | Ugcl.Seq(s1, s2) ->
+      | Seq(s1, s2) ->
         wp q s2 (fun x -> wp x s1 k)
-      | Ugcl.Assign(t, e) ->
+      | Assign(t, e) ->
         failwith "Assignments not allowed in passified programs"
-      | Ugcl.Assert e ->
+      | Assert e ->
         k (simp(exp_and e q))
+      | Choice _ ->
+        failwith "efficent_uwp: Choice should not appear inside a BB"
     in
     let q_out = wp q_in (ugclmap bbid) Util.id in
     setwp bbid q_out

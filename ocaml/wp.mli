@@ -26,7 +26,7 @@ val wp : ?simp:(Ast.exp -> Ast.exp) -> Gcl.t -> Ast.exp -> Ast.exp
     programs.  Unlike {!wp} it does not duplicate the post-condition. *)
 val passified_wp : ?simp:(Ast.exp -> Ast.exp) -> Gcl.t -> Ast.exp -> Ast.exp
 
-val uwp : ?simp:(Ast.exp -> Ast.exp) -> Ugcl.t -> Ast.exp -> Ast.exp
+val uwp : ?simp:(Ast.exp -> Ast.exp) -> Gcl.Ugcl.t -> Ast.exp -> Ast.exp
 (** Same as {!wp}, but avoids converting the program to GCL. See
     "Weakest-Precondition of Unstructured Programs" by Barnett for the
     general technique. *)
@@ -47,7 +47,7 @@ val efficient_wp : ?simp:(Ast.exp -> Ast.exp) -> Gcl.t -> Ast.exp -> Ast.exp
 *)
 
 val efficient_uwp :
-  ?simp:(Ast.exp -> Ast.exp) -> Ugcl.t -> Ast.exp -> Ast.exp
+  ?simp:(Ast.exp -> Ast.exp) -> Gcl.Ugcl.t -> Ast.exp -> Ast.exp
 (** Same as {!efficient_wp} but does not convert to GCL. *)
 
 val flanagansaxe :

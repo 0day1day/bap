@@ -53,7 +53,7 @@ let vc_ssacfg vc options prog post  = match vc with
   | SsaVc vc -> vc options prog post
 
 let compute_dwp1 _ cfg post =
-  let (gcl, foralls) = Gcl.passified_of_ssa Foralls cfg in
+  let (gcl, foralls) = Gcl.passified_of_ssa ~mode:Foralls cfg in
   let (moreforalls, wp) = Wp.dwp_1st gcl post in
   (wp, moreforalls@foralls)
 let compute_dwp1_gen = SsaVc compute_dwp1
@@ -64,47 +64,49 @@ let compute_wp _ cfg post =
 let compute_wp_gen = CfgVc compute_wp
 
 let compute_passified_wp {mode=mode} cfg post =
-  let gcl, foralls = Gcl.passified_of_ssa mode cfg in
+  let gcl, foralls = Gcl.passified_of_ssa ~mode cfg in
   (Wp.passified_wp gcl post, foralls)
 let compute_passified_wp_gen = SsaVc compute_passified_wp
 
 let compute_uwp _ cfg post =
-  let ugcl = Ugcl.of_ssacfg cfg in
+  let ugcl = Gcl.Ugcl.of_ssacfg cfg in
   (Wp.uwp ugcl post, [])
 let compute_uwp_gen = SsaVc compute_uwp
 
 let compute_uwp_efficient {mode=mode} cfg post =
-  let ugcl = Ugcl.of_ssacfg ~passify:mode cfg in
+  let ugcl = Gcl.Ugcl.of_ssacfg ~mode cfg in
   (Wp.efficient_uwp ugcl post, [])
 let compute_uwp_efficient_gen = SsaVc compute_uwp_efficient
 
 let compute_dwp {k=k; mode=mode} cfg post =
-  let gcl, foralls = Gcl.passified_of_ssa mode cfg in
+  let gcl, foralls = Gcl.passified_of_ssa ~mode cfg in
   (Wp.dwp ~k mode gcl post, foralls)
 let compute_dwp_gen = SsaVc compute_dwp
 
 let compute_dwp_let {k=k; mode=mode} cfg post =
-  let gcl, foralls = Gcl.passified_of_ssa mode cfg in
+  let gcl, foralls = Gcl.passified_of_ssa ~mode cfg in
   (Wp.dwp_let ~k mode gcl post, foralls)
 let compute_dwp_let_gen = SsaVc compute_dwp_let
 
 let compute_fwp {k=k; mode=mode} cfg post =
-  let gcl, foralls = Gcl.passified_of_ssa mode cfg in
+  let gcl, foralls = Gcl.passified_of_ssa ~mode cfg in
   (Dwp.fwp ~k mode gcl post, foralls)
 let compute_fwp_gen = SsaVc compute_fwp
 
 let compute_eddwp {k=k; mode=mode} cfg post =
-  let gcl, foralls = Gcl.passified_of_ssa mode cfg in
+  let gcl, foralls = Gcl.passified_of_ssa ~mode cfg in
   (Dwp.eddwp ~k mode gcl post, foralls)
 let compute_eddwp_gen = SsaVc compute_eddwp
 
 let compute_eddwp_lazyconc {k=k; mode=mode} cfg post =
-  let gcl, foralls = Gcl.passified_of_ssa mode ~rm_assigns:false cfg in
+  (* Do not allow Gcl to rewrite Assigns.  We need to see the
+     Assignments to do concrete evaluation. *)
+  let gcl, foralls = Gcl.passified_of_ssa ?mode:None cfg in
   (Dwp.eddwp_lazyconc ~k mode gcl post, foralls)
 let compute_eddwp_lazyconc_gen = SsaVc compute_eddwp_lazyconc
 
 let compute_flanagansaxe {k=k; mode=mode} cfg post =
-  let gcl, foralls = Gcl.passified_of_ssa mode cfg in
+  let gcl, foralls = Gcl.passified_of_ssa ~mode cfg in
   (Wp.flanagansaxe ~k mode gcl post, foralls)
 let compute_flanagansaxe_gen = SsaVc compute_flanagansaxe
 
