@@ -237,6 +237,100 @@ module Make(D:Delta) = struct
 (*   | Foralls -> *)
 (*     failwith "Foralls not supported yet" *)
 
+(* Internal function for eddwp lazy concrete eval *)
+  let mark_used needh v =
+    VH.replace needh v true
+  let mark_used_vars_in needh e =
+    List.iter (mark_used needh) (Formulap.freevars e)
+  let rec dwpconcint simp eval k needh vmaph mode delta =
+    let is_needed v =
+      try VH.find needh v
+      with Not_found -> false
+    (* Mark v as being needed in the formula *)
+    in
+    let punt delta s = let v, ms, af, msdup, afdup = dwp ~simp ~k ~assign_mode:mode s
+                       in
+                       let e = match s with
+                         | Gcl.Assign (_, e) -> Some e
+                         | Gcl.Assume e -> Some e
+                         | Gcl.Assert e -> Some e
+                         | Gcl.Skip -> None
+                         | _ -> failwith "Not allowed to punt for complex statements"
+                       in
+                       BatOption.may (mark_used_vars_in needh) e;
+                       delta, v, ms, af, msdup, afdup
+    in
+    let punt_internal delta s = let _, v, ms, af, msdup, afdup = punt delta s in
+                                (v, ms, af, msdup, afdup)
+    in
+    let punt_external delta s = let delta, v, ms, af, msdup, afdup = punt delta s in
+                                delta, lazy (v, ms, af, msdup, afdup)
+    in
+    let dwpconc = dwpconcint simp eval k needh vmaph mode in
+    function
+      | Gcl.Assign (v, e) as s ->
+        List.iter (fun v' -> VH.add vmaph v v') (Formulap.freevars e);
+        let value = eval delta e in
+        if Symbeval.is_concrete_mem_or_scalar value then
+          let delta = D.set delta v value in
+          delta, lazy (
+            if is_needed v
+            (* If needed, put the assignment in the formula.  For
+               memories, use the expression, since the conrete values can
+               be huge.  For scalars, use the concrete value. *)
+            then (match value with
+            | Symbolic _ -> punt_internal delta (Gcl.Assign (v, unwrap_symb value))
+            | ConcreteMem _ ->
+              punt_internal delta (Gcl.Assign (v, e)))
+            (* If the value is not needed in the formula, act like a Skip *)
+            else punt_internal delta Gcl.Skip
+          ) else punt_external delta s
+      | Gcl.Assume e as s ->
+        let value = eval delta e in
+        if value = Symbolic exp_true then punt_external delta Gcl.Skip
+        else if value = Symbolic exp_false then delta, lazy([], exp_false, exp_false, exp_false, exp_false)
+        else punt_external delta s
+      | Gcl.Assert e as s ->
+        let value = eval delta e in
+        if value = Symbolic exp_true then punt_external delta Skip
+        else if value = Symbolic exp_false then delta, lazy([], exp_true, exp_true, exp_true, exp_true)
+        else punt_external delta s
+      | Gcl.Choice (s1, s2) ->
+        let delta1, lazy1 = dwpconc delta s1 in
+        let delta2, lazy2 = dwpconc delta s2 in
+        let deltamerge = D.merge delta1 delta2 in
+
+        deltamerge, lazy (
+          let v1, ms1, af1, msdup1, afdup1 = Lazy.force lazy1 in
+          let v2, ms2, af2, msdup2, afdup2 = Lazy.force lazy2 in
+
+          let ms = simp (exp_or ms1 ms2) in
+          let msdup = simp (exp_or msdup1 msdup2) in
+          let af = simp (exp_or af1 af2) in
+          let afdup = simp (exp_or afdup1 afdup2) in
+
+          v1@v2, choose_best ms msdup, choose_best af afdup, msdup, afdup)
+      | Gcl.Seq (s1, s2) as _s ->
+        let delta1, lazy1 = dwpconc delta s1 in
+        let delta2, lazy2 = dwpconc delta1 s2 in
+        delta2, lazy (
+          let v1, ms1, af1, msdup1, afdup1 = Lazy.force lazy1 in
+          if msdup1 = exp_false then v1, exp_false, exp_false, exp_false, exp_false
+          else if afdup1 = exp_true then v1, ms1, ms1, msdup1, msdup1
+          else
+            let v2, ms2, af2, msdup2, afdup2 = Lazy.force lazy2 in
+            let v = [] in
+            let (v,ms1) = Wp.variableify ~name:"eddwp_seq_ms1" k v ms1 in
+            let (v,af1) = Wp.variableify ~name:"eddwp_seq_af1" k v af1 in
+
+            let ms = simp (exp_and ms1 (simp (exp_or af1 ms2))) in
+            let msdup = simp (exp_and msdup1 (simp (exp_or afdup1 msdup2))) in
+            let af = simp (exp_and ms1 (simp (exp_or af1 af2))) in
+            let afdup = simp (exp_and msdup1 (simp (exp_or afdup1 afdup2))) in
+
+            v@v1@v2, choose_best ms msdup, choose_best af afdup, msdup, afdup)
+      | Gcl.Skip as s -> punt_external delta s
+
 (* Ed's DWP formulation + concrete evaluation + lazy merging.
 
    This function concrete evaluates the entire program eagerly, but
@@ -264,117 +358,25 @@ let eddwp_lazyconc ?(simp=or_simp) ?(k=1) ?(cf=true) (mode:formula_mode) (p:Gcl.
   let needh = VH.create 1000 in
   (* var -> vars referenced by var *)
   let vmaph = VH.create 1000 in
-  let is_needed v =
-    try VH.find needh v
-    with Not_found -> false
-  (* Mark v as being needed in the formula *)
-  in let rec mark_used v =
-    VH.replace needh v true;
-  in
-  let mark_used_vars_in e =
-    List.iter mark_used (Formulap.freevars e)
-  in
   let trans_close () =
     let h = VH.create (VH.length needh) in
     let rec t = function
       | [] -> ()
       | x::tl ->
         if VH.mem h x then t tl
-        else (mark_used x;
+        else (mark_used needh x;
               VH.add h x ();
               t (tl@VH.find_all vmaph x))
     in
     let module HU = Util.HashUtil(VH) in
     t (HU.get_hash_keys needh)
   in
-  let punt delta s = let v, ms, af, msdup, afdup = dwp ~simp ~k ~assign_mode:mode s
-                     in
-                     let e = match s with
-                     | Gcl.Assign (_, e) -> Some e
-                     | Gcl.Assume e -> Some e
-                     | Gcl.Assert e -> Some e
-                     | Gcl.Skip -> None
-                     | _ -> failwith "Not allowed to punt for complex statements"
-                     in
-                     BatOption.may mark_used_vars_in e;
-                     delta, v, ms, af, msdup, afdup
-  in
-  let punt_internal delta s = let _, v, ms, af, msdup, afdup = punt delta s in
-                              (v, ms, af, msdup, afdup)
-  in
-  let punt_external delta s = let delta, v, ms, af, msdup, afdup = punt delta s in
-                              delta, lazy (v, ms, af, msdup, afdup)
-  in
-  let rec dwpconc delta = function
-    | Gcl.Assign (v, e) as s ->
-      List.iter (fun v' -> VH.add vmaph v v') (Formulap.freevars e);
-      let value = eval delta e in
-      if Symbeval.is_concrete_mem_or_scalar value then
-        let delta = D.set delta v value in
-        delta, lazy (
-          if is_needed v
-             (* If needed, put the assignment in the formula.  For
-                memories, use the expression, since the conrete values can
-                be huge.  For scalars, use the concrete value. *)
-          then (match value with
-          | Symbolic _ -> punt_internal delta (Gcl.Assign (v, unwrap_symb value))
-          | ConcreteMem _ ->
-            punt_internal delta (Gcl.Assign (v, e)))
-          (* If the value is not needed in the formula, act like a Skip *)
-          else punt_internal delta Gcl.Skip
-        ) else punt_external delta s
-    | Gcl.Assume e as s ->
-      let value = eval delta e in
-      if value = Symbolic exp_true then punt_external delta Gcl.Skip
-      else if value = Symbolic exp_false then delta, lazy([], exp_false, exp_false, exp_false, exp_false)
-      else punt_external delta s
-    | Gcl.Assert e as s ->
-      let value = eval delta e in
-      if value = Symbolic exp_true then punt_external delta Skip
-      else if value = Symbolic exp_false then delta, lazy([], exp_true, exp_true, exp_true, exp_true)
-      else punt_external delta s
-    | Gcl.Choice (s1, s2) ->
-      let delta1, lazy1 = dwpconc delta s1 in
-      let delta2, lazy2 = dwpconc delta s2 in
-      let deltamerge = D.merge delta1 delta2 in
-
-      deltamerge, lazy (
-        let v1, ms1, af1, msdup1, afdup1 = Lazy.force lazy1 in
-        let v2, ms2, af2, msdup2, afdup2 = Lazy.force lazy2 in
-
-        let ms = simp (exp_or ms1 ms2) in
-        let msdup = simp (exp_or msdup1 msdup2) in
-        let af = simp (exp_or af1 af2) in
-        let afdup = simp (exp_or afdup1 afdup2) in
-
-        v1@v2, choose_best ms msdup, choose_best af afdup, msdup, afdup)
-    | Gcl.Seq (s1, s2) as _s ->
-      let delta1, lazy1 = dwpconc delta s1 in
-      let delta2, lazy2 = dwpconc delta1 s2 in
-      delta2, lazy (
-        let v1, ms1, af1, msdup1, afdup1 = Lazy.force lazy1 in
-        if msdup1 = exp_false then v1, exp_false, exp_false, exp_false, exp_false
-        else if afdup1 = exp_true then v1, ms1, ms1, msdup1, msdup1
-        else
-          let v2, ms2, af2, msdup2, afdup2 = Lazy.force lazy2 in
-          let v = [] in
-          let (v,ms1) = Wp.variableify ~name:"eddwp_seq_ms1" k v ms1 in
-          let (v,af1) = Wp.variableify ~name:"eddwp_seq_af1" k v af1 in
-
-          let ms = simp (exp_and ms1 (simp (exp_or af1 ms2))) in
-          let msdup = simp (exp_and msdup1 (simp (exp_or afdup1 msdup2))) in
-          let af = simp (exp_and ms1 (simp (exp_or af1 af2))) in
-          let afdup = simp (exp_and msdup1 (simp (exp_or afdup1 afdup2))) in
-
-          v@v1@v2, choose_best ms msdup, choose_best af afdup, msdup, afdup)
-    | Gcl.Skip as s -> punt_external delta s
-  in
-  let (delta, lazyr) = dwpconc (D.create ()) p in
+  let (delta, lazyr) = dwpconcint simp eval k needh vmaph mode (D.create ()) p in
   let q' =
     let value = eval delta q in
     unwrap_symb value
   in
-  mark_used_vars_in q';
+  mark_used_vars_in needh q';
   (* Compute transitive closure over used variables *)
   dprintf "Computing transitive closure..";
   trans_close ();

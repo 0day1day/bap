@@ -125,7 +125,6 @@ let build_passified_uwp iter wp ((cfg,ugclmap):Gcl.Ugcl.t) (q:exp) : exp =
   in
   let setwp bbid q =
     let v = lookupwpvar bbid in
-    BH.add wpvar bbid v;
     VH.add varexp v q
   in
   let rec compute_at bb =
