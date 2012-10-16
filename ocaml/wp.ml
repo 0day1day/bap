@@ -93,11 +93,6 @@ let build_uwp wp ((cfg,ugclmap):Gcl.Ugcl.t) (q:exp) : exp =
         (* Note: This duplicates the postcondition *)
         BatList.reduce (fun acc e -> binop AND acc e) (List.map get_wp s)
     in
-    let wp s q = match s with
-      | Choice _ ->
-        failwith "uwp: Choice should not appear inside a BB"
-      | _ -> wp s q
-    in
     let q_out = wp (ugclmap bbid) q_in in
     setwp bbid q_out
   in
@@ -142,13 +137,6 @@ let build_passified_uwp iter wp ((cfg,ugclmap):Gcl.Ugcl.t) (q:exp) : exp =
       | s -> (* Get the conjunction of our successors' preconditions *)
         let get_wp bb = Var(lookupwpvar (CA.G.V.label bb)) in
         BatList.reduce (fun acc e -> binop AND acc e) (List.map get_wp s)
-    in
-    let wp s q =
-      (*  We use CPS to avoid stack overflows *)
-      match s with
-      | Choice _ ->
-        failwith "efficent_uwp: Choice should not appear inside a BB"
-      | _ -> wp s q
     in
     let q_out = wp (ugclmap bbid) q_in in
     setwp bbid q_out

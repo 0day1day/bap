@@ -110,6 +110,13 @@ let compute_eddwp_lazyconc {k=k; mode=mode} cfg post =
   (Dwp.eddwp_lazyconc ~k mode gcl post, foralls)
 let compute_eddwp_lazyconc_gen = SsaVc compute_eddwp_lazyconc
 
+let compute_eddwp_lazyconc_uwp {k=k; mode=mode} cfg post =
+  (* Do not allow Gcl to rewrite Assigns.  We need to see the
+     Assignments to do concrete evaluation. *)
+  let ugcl = Gcl.Ugcl.of_ssacfg cfg in
+  (Dwp.eddwp_lazyconc_uwp ~k mode ugcl post, [])
+let compute_eddwp_lazyconc_uwp_gen = SsaVc compute_eddwp_lazyconc_uwp
+
 let compute_flanagansaxe {k=k; mode=mode} cfg post =
   let gcl, foralls = Gcl.passified_of_ssa ~mode cfg in
   (Wp.flanagansaxe ~k mode gcl post, foralls)
@@ -178,6 +185,7 @@ let vclist =
   :: ("eddwp", compute_eddwp_gen)
   :: ("eddwp_uwp", compute_eddwp_uwp_gen)
   :: ("eddwp_lazyconc", compute_eddwp_lazyconc_gen)
+  :: ("eddwp_lazyconc_uwp", compute_eddwp_lazyconc_uwp_gen)
   :: ("dwplet", compute_dwp_let_gen)
   :: ("dwp1", compute_dwp1_gen)
   :: ("flanagansaxe", compute_flanagansaxe_gen)
@@ -197,6 +205,7 @@ let pred_vclist =
   :: ("eddwp", compute_eddwp_gen)
   :: ("eddwp_uwp", compute_eddwp_uwp_gen)
   :: ("eddwp_lazyconc", compute_eddwp_lazyconc_gen)
+  :: ("eddwp_lazyconc_uwp", compute_eddwp_lazyconc_uwp_gen)
   :: ("dwplet", compute_dwp_let_gen)
   :: ("flanagansaxe", compute_flanagansaxe_gen)
   :: ("wp", compute_wp_gen)

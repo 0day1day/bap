@@ -75,6 +75,11 @@ val compute_eddwp_uwp_gen : t
 val compute_eddwp_lazyconc : ssa_vc
 val compute_eddwp_lazyconc_gen : t
 
+(** An unstructured implementation of [compute_eddwp_lazyconc] that
+    does not convert the entire program to GCL *)
+val compute_eddwp_lazyconc_uwp : ssa_vc
+val compute_eddwp_lazyconc_uwp_gen : t
+
 (** DWP implementation that uses forall quantifiers. *)
 val compute_dwp1 : ssa_vc
 (** General form of [compute_dwp1]. *)

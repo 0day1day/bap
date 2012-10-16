@@ -8,6 +8,20 @@ open Type
 module VH = Var.VarHash
 module VM = Var.VarMap
 
+module CA=Cfg.AST
+
+module RevCFG =
+struct
+  type t = CA.G.t
+  module V = CA.G.V
+  let iter_vertex = CA.G.iter_vertex
+  let iter_succ = CA.G.iter_pred
+  let in_degree = CA.G.out_degree
+end
+
+module Toposort = Graph.Topological.Make(Cfg.AST.G)
+module RToposort = Graph.Topological.Make(RevCFG);;
+
 module SymbolicMap = Symbeval.SymbolicSlowMap
 
 let unwrap_symb = function
@@ -242,6 +256,18 @@ module Make(D:Delta) = struct
     VH.replace needh v true
   let mark_used_vars_in needh e =
     List.iter (mark_used needh) (Formulap.freevars e)
+  let trans_close needh vmaph =
+    let h = VH.create (VH.length needh) in
+    let rec t = function
+      | [] -> ()
+      | x::tl ->
+        if VH.mem h x then t tl
+        else (mark_used needh x;
+              VH.add h x ();
+              t (tl@VH.find_all vmaph x))
+    in
+    let module HU = Util.HashUtil(VH) in
+    t (HU.get_hash_keys needh)
   let rec dwpconcint simp eval k needh vmaph mode delta =
     let is_needed v =
       try VH.find needh v
@@ -358,19 +384,6 @@ let eddwp_lazyconc ?(simp=or_simp) ?(k=1) ?(cf=true) (mode:formula_mode) (p:Gcl.
   let needh = VH.create 1000 in
   (* var -> vars referenced by var *)
   let vmaph = VH.create 1000 in
-  let trans_close () =
-    let h = VH.create (VH.length needh) in
-    let rec t = function
-      | [] -> ()
-      | x::tl ->
-        if VH.mem h x then t tl
-        else (mark_used needh x;
-              VH.add h x ();
-              t (tl@VH.find_all vmaph x))
-    in
-    let module HU = Util.HashUtil(VH) in
-    t (HU.get_hash_keys needh)
-  in
   let (delta, lazyr) = dwpconcint simp eval k needh vmaph mode (D.create ()) p in
   let q' =
     let value = eval delta q in
@@ -379,7 +392,7 @@ let eddwp_lazyconc ?(simp=or_simp) ?(k=1) ?(cf=true) (mode:formula_mode) (p:Gcl.
   mark_used_vars_in needh q';
   (* Compute transitive closure over used variables *)
   dprintf "Computing transitive closure..";
-  trans_close ();
+  trans_close needh vmaph;
   dprintf "done.";
   let v, ms, af, _, _ = Lazy.force lazyr in
   if mode = Sat then assert (ms === exp_true);
@@ -391,6 +404,102 @@ let eddwp_lazyconc ?(simp=or_simp) ?(k=1) ?(cf=true) (mode:formula_mode) (p:Gcl.
     exp_implies vo (exp_implies ms (exp_and (exp_not af) q'))
   | Foralls ->
     failwith "Foralls not supported yet"
+
+let eddwp_lazyconc_uwp ?(simp=or_simp) ?(k=1) ?(cf=true) mode ((cfg,ugclmap):Gcl.Ugcl.t) (q:exp) : exp =
+  Checks.acyclic_astcfg cfg "UWP";
+  (* dprintf "Starting uwp"; *)
+  (* Block -> var *)
+  let module BH = Cfg.BH in
+  let eval delta e = if cf
+    then D.simplify delta e
+    else Symbeval.Symbolic e
+  in
+  (* var -> is var needed? *)
+  let needh = VH.create 1000 in
+  (* var -> vars referenced by var *)
+  let vmaph = VH.create 1000 in
+  let wpvar = BH.create (CA.G.nb_vertex cfg) in
+  (* Var -> exp *)
+  let varexp = VH.create (CA.G.nb_vertex cfg) in
+  let lookupwpvar bbid =
+    let makevar bbid =
+      assert (not (BH.mem wpvar bbid));
+      let v = Var.newvar (Printf.sprintf "q_pre_%s" (Cfg.bbid_to_string bbid)) reg_1 in
+      BH.add wpvar bbid v;
+      v
+    in
+    try BH.find wpvar bbid
+    with Not_found -> makevar bbid
+  in
+  let setwp bbid q =
+    let v = lookupwpvar bbid in
+    VH.add varexp v q
+  in
+  let getwp bbid =
+    let v = lookupwpvar bbid in
+    VH.find varexp v
+  in
+  let rec compute_at bb =
+    (* Find the weakest precondition from the program exit to our
+       successors *)
+    let bbid = CA.G.V.label bb in
+    let q_in = match CA.G.succ cfg bb with
+      | [] when bbid = Cfg.BB_Exit ->
+        q (* The user supplied q *)
+      | [] when bbid = Cfg.BB_Error ->
+        exp_true (* The default postcondition is exp_true.  Note that
+                    BB_Error contains an assert false, so this doesn't really
+                    matter. *)
+      | [] -> failwith (Printf.sprintf "BB %s has no successors but should" (Cfg_ast.v2s bb))
+      | s -> (* Get the conjunction of our successors' preconditions *)
+        let get_wp bb = Var(lookupwpvar (CA.G.V.label bb)) in
+        BatList.reduce (fun acc e -> binop AND acc e) (List.map get_wp s)
+    in
+    let delta_in = match CA.G.pred cfg bb with
+      | [] when bbid = Cfg.BB_Entry ->
+        D.create ()
+      | [] -> failwith (Printf.sprintf "BB %s has no predecessors but should" (Cfg_ast.v2s bb))
+      | s -> let get_delta bb = fst (getwp (CA.G.V.label bb)) in
+             BatList.reduce D.merge (List.map get_delta s)
+    in
+    let wp s q delta =
+      let (delta', lazyr) = dwpconcint simp eval k needh vmaph mode delta s in 
+      let q' =
+        let value = eval delta q in
+        unwrap_symb value
+      in
+      mark_used_vars_in needh q';
+      delta', lazy (
+        let v, ms, af, _, _ = Lazy.force lazyr in
+        let vo = Wp.assignments_to_exp v in
+        match mode with
+        | Sat ->
+          exp_and vo (exp_implies ms (exp_and (exp_not af) q'))
+        | Validity ->
+          exp_implies vo (exp_implies ms (exp_and (exp_not af) q'))
+        | Foralls ->
+          failwith "Foralls not supported yet")
+    in
+    let (delta, lazy_q_out) = wp (ugclmap bbid) q_in delta_in in
+    setwp bbid (delta, lazy_q_out)
+  in
+  Toposort.iter compute_at cfg;
+(* Now we have a precondition for every block in terms of
+   postcondition variables of its successors. We just need to visit in
+   topological order and build up the whole expression now. *)
+  let build_assigns bb acc =
+    let bbid = CA.G.V.label bb in
+    let v = lookupwpvar bbid in
+    let _, lazywp = VH.find varexp v in
+    (v, Lazy.force lazywp)::acc
+  in
+  trans_close needh vmaph;
+  let assigns = RToposort.fold build_assigns cfg [] in
+  let build_exp bige (v,e) =
+    Let(v, e, bige)
+  in
+  (* FIXME: We shouldn't use entry here *)
+  List.fold_left build_exp (Var(lookupwpvar Cfg.BB_Entry)) assigns
 end
 
 let ast_size e =
@@ -403,7 +512,6 @@ let ast_size e =
   end in
   ignore(Ast_visitor.exp_accept vis e);
   !s
-
 
 (* Ed's DWP formulation.  If there are no Assumes, dwpms will always
    be true, and dwp degenerates to efficient (merging) fse. *)
@@ -482,3 +590,7 @@ let fwp ?(simp=or_simp) ?(k=1) (mode:formula_mode) (p:Gcl.t) q =
 let eddwp_lazyconc ?simp ?k ?cf mode p q =
   let module DWPCONC = Make(VMDelta) in
   DWPCONC.eddwp_lazyconc ?simp ?k ?cf mode p q
+
+let eddwp_lazyconc_uwp ?simp ?k ?cf mode p q =
+  let module DWPCONC = Make(VMDelta) in
+  DWPCONC.eddwp_lazyconc_uwp ?simp ?k ?cf mode p q
