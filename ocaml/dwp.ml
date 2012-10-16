@@ -25,7 +25,7 @@ module type Delta =
 sig
   type t
   val create : unit -> t
-  val merge : t -> t -> t * (var * Symbeval.varval option * Symbeval.varval option) list
+  val merge : t -> t -> t
   (** Take the intersection of two deltas. When there are conflicting
       bindings for a variable, there will be no binding in the final
       delta for that variable. *)
@@ -46,40 +46,11 @@ struct
   let create () =
     VM.empty
   let merge (d1:t) (d2:t) =
-    let o = ref [] in
-    let f =
-      VM.fold (fun var value newdelta ->
-        try
-          let newvalue = VM.find var newdelta in
-          if value = newvalue then
-          (* Newdelta already has the same value! We can just return newdelta as
-             is. *)
-            newdelta
-          else (
-          (* Newdelta has a CONFLICTING assignment.  We need to remove it. *)
-            dprintf "CONFLICT: Removing %s" (Pp.var_to_string var);
-            o := (var, Some value, Some newvalue) :: !o;
-            VM.remove var newdelta)
-        with Not_found ->
-          (* Conflict: Var only assigned in one branch. Don't add it. *)
-          dprintf "MISSING: Removing %s" (Pp.var_to_string var);
-          o := (var, Some value, None) :: !o;
-          newdelta
-      ) d1 d2
+    let f var x y = match x, y with
+      | Some a, Some b when a === b -> x
+      | _, _ -> None
     in
-    (* f has all the correct bindings in d1.  Now we need to remove
-       bindings that are only in d2. *)
-    let f = VM.fold (fun var value newdelta ->
-      if VM.mem var d1 then
-        (* This is in d1 and d2, we're okay *)
-        newdelta
-      else (
-        (* In d2 but not d1, remove *)
-        o := (var, None, Some value) :: !o;
-        VM.remove var newdelta)
-    ) f f
-    in
-    f, !o
+    VM.merge f d1 d2
   let set h v e =
     dprintf "Setting %s to %s" (Pp.var_to_string v) (Symbeval.symb_to_string e);
     VM.add v e h
@@ -365,10 +336,7 @@ let eddwp_lazyconc ?(simp=or_simp) ?(k=1) ?(cf=true) (mode:formula_mode) (p:Gcl.
     | Gcl.Choice (s1, s2) ->
       let delta1, lazy1 = dwpconc delta s1 in
       let delta2, lazy2 = dwpconc delta s2 in
-      let deltamerge, conflicts = D.merge delta1 delta2 in
-
-      (* Just because there is a conflict does not mean we need to mark the variable as used. *)
-      (* let () = List.iter (fun (v,_,_) -> mark_used v) conflicts in *)
+      let deltamerge = D.merge delta1 delta2 in
 
       deltamerge, lazy (
         let v1, ms1, af1, msdup1, afdup1 = Lazy.force lazy1 in
