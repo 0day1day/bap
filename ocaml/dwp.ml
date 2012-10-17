@@ -96,6 +96,9 @@ let or_simp = function
   | BinOp(AND, UnOp(NOT, e1), e2) when e1 == e2 -> exp_false
   | BinOp(AND, e1, e2) when e1 == e2 -> e1
   | e -> e
+(* let rec or_simp e = *)
+(*   let e' = or_simp_base e in *)
+(*   if e = e' then e else or_simp e' *)
 
 (* Dwp base implementation.  Returns a tuple consisting of variable
    bindings, de-duplicated ms, de-duplicated af, duplicated ms,
@@ -443,18 +446,6 @@ let eddwp_lazyconc_uwp ?(simp=or_simp) ?(k=1) ?(cf=true) mode ((cfg,ugclmap):Gcl
     (* Find the weakest precondition from the program exit to our
        successors *)
     let bbid = CA.G.V.label bb in
-    let q_in = match CA.G.succ cfg bb with
-      | [] when bbid = Cfg.BB_Exit ->
-        q (* The user supplied q *)
-      | [] when bbid = Cfg.BB_Error ->
-        exp_true (* The default postcondition is exp_true.  Note that
-                    BB_Error contains an assert false, so this doesn't really
-                    matter. *)
-      | [] -> failwith (Printf.sprintf "BB %s has no successors but should" (Cfg_ast.v2s bb))
-      | s -> (* Get the conjunction of our successors' preconditions *)
-        let get_wp bb = Var(lookupwpvar (CA.G.V.label bb)) in
-        BatList.reduce (fun acc e -> binop AND acc e) (List.map get_wp s)
-    in
     let delta_in = match CA.G.pred cfg bb with
       | [] when bbid = Cfg.BB_Entry ->
         D.create ()
@@ -462,38 +453,54 @@ let eddwp_lazyconc_uwp ?(simp=or_simp) ?(k=1) ?(cf=true) mode ((cfg,ugclmap):Gcl
       | s -> let get_delta bb = fst (getwp (CA.G.V.label bb)) in
              BatList.reduce D.merge (List.map get_delta s)
     in
+    let q_in = match CA.G.succ cfg bb with
+      | [] when bbid = Cfg.BB_Exit ->
+        let value = eval delta_in q in (* The user supplied q *)
+        let q' = unwrap_symb value in
+        mark_used_vars_in needh q';
+        lazy q'
+      | [] when bbid = Cfg.BB_Error ->
+        lazy exp_true (* The default postcondition is exp_true.  Note that
+                    BB_Error contains an assert false, so this doesn't really
+                    matter. *)
+      | [] -> failwith (Printf.sprintf "BB %s has no successors but should" (Cfg_ast.v2s bb))
+      | s -> (* Get the conjunction of our successors' preconditions *)
+        let get_wp bb = Var(lookupwpvar (CA.G.V.label bb)) in
+        lazy (BatList.reduce (fun acc e -> simp (exp_and acc e)) (List.map get_wp s))
+    in
     let wp s q delta =
-      let (delta', lazyr) = dwpconcint simp eval k needh vmaph mode delta s in 
-      let q' =
-        let value = eval delta q in
-        unwrap_symb value
-      in
-      mark_used_vars_in needh q';
+      let (delta', lazyr) = dwpconcint simp eval k needh vmaph mode delta s in
       delta', lazy (
-        let v, ms, af, _, _ = Lazy.force lazyr in
+        let v, ms, af, msdup, afdup = Lazy.force lazyr in
+        dprintf "bb %s ms %s af %s" (Cfg_ast.v2s bb) (Pp.ast_exp_to_string msdup) (Pp.ast_exp_to_string afdup);
+        dprintf "gcl %s" (Gcl.to_string s);
         let vo = Wp.assignments_to_exp v in
         match mode with
         | Sat ->
-          exp_and vo (exp_implies ms (exp_and (exp_not af) q'))
+          let normal = simp (exp_and vo (simp (exp_implies ms (simp (exp_and (exp_not af) q)))))
+          and dup = simp (exp_and vo (simp (exp_implies msdup (simp (exp_and (exp_not afdup) q)))))
+          in choose_best normal dup
         | Validity ->
-          exp_implies vo (exp_implies ms (exp_and (exp_not af) q'))
+          let normal = simp (exp_implies vo (simp (exp_implies ms (simp (exp_and (exp_not af) q)))))
+          and dup = simp (exp_implies vo (simp (exp_implies msdup (simp (exp_and (exp_not afdup) q)))))
+          in choose_best normal dup
         | Foralls ->
           failwith "Foralls not supported yet")
     in
-    let (delta, lazy_q_out) = wp (ugclmap bbid) q_in delta_in in
+    let (delta, lazy_q_out) = wp (ugclmap bbid) (Lazy.force q_in) delta_in in
     setwp bbid (delta, lazy_q_out)
   in
   Toposort.iter compute_at cfg;
 (* Now we have a precondition for every block in terms of
    postcondition variables of its successors. We just need to visit in
    topological order and build up the whole expression now. *)
+  trans_close needh vmaph;
   let build_assigns bb acc =
     let bbid = CA.G.V.label bb in
     let v = lookupwpvar bbid in
     let _, lazywp = VH.find varexp v in
     (v, Lazy.force lazywp)::acc
   in
-  trans_close needh vmaph;
   let assigns = RToposort.fold build_assigns cfg [] in
   let build_exp bige (v,e) =
     Let(v, e, bige)
