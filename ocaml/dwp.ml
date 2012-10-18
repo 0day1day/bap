@@ -399,12 +399,9 @@ let eddwp_lazyconc ?(simp=or_simp) ?(k=1) ?(cf=true) (mode:formula_mode) (p:Gcl.
   dprintf "done.";
   let v, ms, af, _, _ = Lazy.force lazyr in
   if mode = Sat then assert (ms === exp_true);
-  let vo = Wp.assignments_to_exp v in
   match mode with
-  | Sat ->
-    exp_and vo (exp_implies ms (exp_and (exp_not af) q'))
-  | Validity ->
-    exp_implies vo (exp_implies ms (exp_and (exp_not af) q'))
+  | Sat | Validity ->
+    Wp.assignments_to_lets v (exp_implies ms (exp_and (exp_not af) q'))
   | Foralls ->
     failwith "Foralls not supported yet"
 
@@ -530,14 +527,15 @@ let eddwp_lazyconc_uwp ?(simp=or_simp) ?(k=1) ?(cf=true) mode ((cfg,ugclmap):Gcl
     BatList.append ((msv, msvalue)::(afv, afvalue)::v) acc
   in
   let assigns = Toposort.fold build_assigns cfg [] in
-  let build_exp bige (v,e) =
-    Let(v, e, bige)
-  in
   (* FIXME: We shouldn't hardcode exit here *)
   let msv, afv = lookupwpvar Cfg.BB_Exit in
   let ms, af = Var msv, Var afv in
   let wp = exp_implies ms (exp_and (exp_not af) q') in
-  List.fold_left build_exp wp assigns
+  match mode with
+  | Sat | Validity ->
+    Wp.assignments_to_lets assigns wp
+  | Foralls ->
+    failwith "Foralls not supported yet"
 end
 
 let ast_size e =
@@ -565,14 +563,12 @@ let eddwp ?(normalusage=true) ?(simp=or_simp) ?(k=1) (mode:formula_mode) (p:Gcl.
      However, when we use eddwp from Uwp, this may not be true, since
      p is a small part of the whole program. *)
   if normalusage && mode = Sat then assert (ms === exp_true);
-  let vo = Wp.assignments_to_exp v in
   let o = match mode with
-    | Sat ->
-      exp_and vo (exp_implies ms (exp_and (exp_not af) q))
-    | Validity ->
-      exp_implies vo (exp_implies ms (exp_and (exp_not af) q))
+    | Sat | Validity ->
+      Wp.assignments_to_lets v (exp_implies ms (exp_and (exp_not af) q))
     | Foralls ->
-      failwith "Foralls not supported yet" in
+      failwith "Foralls not supported yet"
+  in
   dprintf "WP size: %d" (ast_size o); o
 
 let eddwp_uwp ?simp ?k mode =
@@ -611,12 +607,9 @@ let fwp ?(simp=or_simp) ?(k=1) (mode:formula_mode) (p:Gcl.t) q =
   in
   dprintf "GCL size: %d" (Gcl.size p);
   let (v,wp,_) = fwpint ~simp ~k p q in
-  let vo = Wp.assignments_to_exp v in
   let o = match mode with
-  | Sat ->
-    exp_and vo wp
-  | Validity ->
-    exp_implies vo wp
+  | Sat | Validity ->
+    Wp.assignments_to_lets v wp
   | Foralls ->
     failwith "Foralls not supported yet" in
   dprintf "WP size: %d" (ast_size o); o
