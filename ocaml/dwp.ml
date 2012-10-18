@@ -421,26 +421,27 @@ let eddwp_lazyconc_uwp ?(simp=or_simp) ?(k=1) ?(cf=true) mode ((cfg,ugclmap):Gcl
   let needh = VH.create 1000 in
   (* var -> vars referenced by var *)
   let vmaph = VH.create 1000 in
+  (* bb mapped to delta, ms, and af variables, msdup, afdup *)
   let wpvar = BH.create (CA.G.nb_vertex cfg) in
-  (* Var -> exp *)
-  let varexp = VH.create (CA.G.nb_vertex cfg) in
+  (* maps from BB to ms, af variables *)
+  let bbinfo = BH.create (CA.G.nb_vertex cfg) in
+  (* maps from BB to delta, lazy(ms, af values, and dups) *)
   let lookupwpvar bbid =
     let makevar bbid =
       assert (not (BH.mem wpvar bbid));
-      let v = Var.newvar (Printf.sprintf "q_pre_%s" (Cfg.bbid_to_string bbid)) reg_1 in
-      BH.add wpvar bbid v;
-      v
+      let v = Var.newvar (Printf.sprintf "ms_%s" (Cfg.bbid_to_string bbid)) reg_1 in
+      let v2 = Var.newvar (Printf.sprintf "af_%s" (Cfg.bbid_to_string bbid)) reg_1 in
+      BH.add wpvar bbid (v, v2);
+      v, v2
     in
     try BH.find wpvar bbid
     with Not_found -> makevar bbid
   in
-  let setwp bbid q =
-    let v = lookupwpvar bbid in
-    VH.add varexp v q
+  let setbbinfo bbid i =
+    BH.add bbinfo bbid i
   in
-  let getwp bbid =
-    let v = lookupwpvar bbid in
-    VH.find varexp v
+  let getbbinfo bbid =
+    BH.find bbinfo bbid
   in
   let rec compute_at bb =
     (* Find the weakest precondition from the program exit to our
@@ -450,63 +451,83 @@ let eddwp_lazyconc_uwp ?(simp=or_simp) ?(k=1) ?(cf=true) mode ((cfg,ugclmap):Gcl
       | [] when bbid = Cfg.BB_Entry ->
         D.create ()
       | [] -> failwith (Printf.sprintf "BB %s has no predecessors but should" (Cfg_ast.v2s bb))
-      | s -> let get_delta bb = fst (getwp (CA.G.V.label bb)) in
+      | s -> let get_delta bb = fst (getbbinfo (CA.G.V.label bb)) in
              BatList.reduce D.merge (List.map get_delta s)
     in
-    let q_in = match CA.G.succ cfg bb with
-      | [] when bbid = Cfg.BB_Exit ->
-        let value = eval delta_in q in (* The user supplied q *)
-        let q' = unwrap_symb value in
-        mark_used_vars_in needh q';
-        lazy q'
-      | [] when bbid = Cfg.BB_Error ->
-        lazy exp_true (* The default postcondition is exp_true.  Note that
-                    BB_Error contains an assert false, so this doesn't really
-                    matter. *)
-      | [] -> failwith (Printf.sprintf "BB %s has no successors but should" (Cfg_ast.v2s bb))
-      | s -> (* Get the conjunction of our successors' preconditions *)
-        let get_wp bb = Var(lookupwpvar (CA.G.V.label bb)) in
-        lazy (BatList.reduce (fun acc e -> simp (exp_and acc e)) (List.map get_wp s))
+    let (delta, lazyr) = dwpconcint simp eval k needh vmaph mode delta_in (ugclmap (CA.G.V.label bb)) in
+    let (delta, lazyr) =
+      delta, lazy (
+        let ms1, af1, msdup1, afdup1 = match CA.G.pred cfg bb with
+          | [] when bbid = Cfg.BB_Entry ->
+            exp_true, exp_false, exp_true, exp_false
+          | [] -> failwith (Printf.sprintf "BB %s has no predecessors but should" (Cfg_ast.v2s bb))
+          | s ->
+            (* Get the conjunction of our predecessors' post-conditions.
+
+               This is basically eddwp's Choose rule. *)
+            let bbinfo bb =
+              let _,l = getbbinfo (CA.G.V.label bb) in
+              let _,_,_,msdup,afdup = Lazy.force l in
+              let ms,af = lookupwpvar (CA.G.V.label bb) in
+              Var ms,Var af,msdup,afdup
+            in
+            BatList.reduce (fun (ms1,af1,msdup1,afdup1) (ms2,af2,msdup2,afdup2) ->
+
+              let ms = simp (exp_or ms1 ms2) in
+              let msdup = simp (exp_or msdup1 msdup2) in
+              let af = simp (exp_or af1 af2) in
+              let afdup = simp (exp_or afdup1 afdup2) in
+
+              choose_best ms msdup, choose_best af afdup, msdup, afdup) (List.map bbinfo s)
+        in
+
+        (* This is basically eddwp's Sequence rule. *)
+        if msdup1 = exp_false then [], exp_false, exp_false, exp_false, exp_false
+        else if afdup1 = exp_true then [], ms1, ms1, msdup1, msdup1
+        else
+          let v, ms2, af2, msdup2, afdup2 = Lazy.force lazyr in
+          (* let (v,ms1) = Wp.variableify ~name:"eddwp_seq_ms1" k v ms1 in *)
+          (* let (v,af1) = Wp.variableify ~name:"eddwp_seq_af1" k v af1 in *)
+
+          let ms = simp (exp_and ms1 (simp (exp_or af1 ms2))) in
+          let msdup = simp (exp_and msdup1 (simp (exp_or afdup1 msdup2))) in
+          let af = simp (exp_and ms1 (simp (exp_or af1 af2))) in
+          let afdup = simp (exp_and msdup1 (simp (exp_or afdup1 afdup2))) in
+
+          v, choose_best ms msdup, choose_best af afdup, msdup, afdup
+    )
     in
-    let wp s q delta =
-      let (delta', lazyr) = dwpconcint simp eval k needh vmaph mode delta s in
-      delta', lazy (
-        let v, ms, af, msdup, afdup = Lazy.force lazyr in
-        dprintf "bb %s ms %s af %s" (Cfg_ast.v2s bb) (Pp.ast_exp_to_string msdup) (Pp.ast_exp_to_string afdup);
-        dprintf "gcl %s" (Gcl.to_string s);
-        let vo = Wp.assignments_to_exp v in
-        match mode with
-        | Sat ->
-          let normal = simp (exp_and vo (simp (exp_implies ms (simp (exp_and (exp_not af) q)))))
-          and dup = simp (exp_and vo (simp (exp_implies msdup (simp (exp_and (exp_not afdup) q)))))
-          in choose_best normal dup
-        | Validity ->
-          let normal = simp (exp_implies vo (simp (exp_implies ms (simp (exp_and (exp_not af) q)))))
-          and dup = simp (exp_implies vo (simp (exp_implies msdup (simp (exp_and (exp_not afdup) q)))))
-          in choose_best normal dup
-        | Foralls ->
-          failwith "Foralls not supported yet")
-    in
-    let (delta, lazy_q_out) = wp (ugclmap bbid) (Lazy.force q_in) delta_in in
-    setwp bbid (delta, lazy_q_out)
+    setbbinfo bbid (delta, lazyr)
   in
   Toposort.iter compute_at cfg;
-(* Now we have a precondition for every block in terms of
-   postcondition variables of its successors. We just need to visit in
-   topological order and build up the whole expression now. *)
+
+  let q' =
+    let delta,_ = getbbinfo Cfg.BB_Exit in
+    let value = eval delta q in
+    unwrap_symb value
+  in
+  mark_used_vars_in needh q';
+
+  (* Now we have a precondition for every block in terms of
+     postcondition variables of its successors. We just need to visit in
+     topological order and build up the whole expression now. *)
   trans_close needh vmaph;
   let build_assigns bb acc =
     let bbid = CA.G.V.label bb in
-    let v = lookupwpvar bbid in
-    let _, lazywp = VH.find varexp v in
-    (v, Lazy.force lazywp)::acc
+    let msv, afv = lookupwpvar bbid in
+    let _, lazywp = getbbinfo bbid in
+    let v, msvalue, afvalue, _, _ = Lazy.force lazywp in
+    BatList.append ((msv, msvalue)::(afv, afvalue)::v) acc
   in
-  let assigns = RToposort.fold build_assigns cfg [] in
+  let assigns = Toposort.fold build_assigns cfg [] in
   let build_exp bige (v,e) =
     Let(v, e, bige)
   in
-  (* FIXME: We shouldn't use entry here *)
-  List.fold_left build_exp (Var(lookupwpvar Cfg.BB_Entry)) assigns
+  (* FIXME: We shouldn't hardcode exit here *)
+  let msv, afv = lookupwpvar Cfg.BB_Exit in
+  let ms, af = Var msv, Var afv in
+  let wp = exp_implies ms (exp_and (exp_not af) q') in
+  List.fold_left build_exp wp assigns
 end
 
 let ast_size e =
