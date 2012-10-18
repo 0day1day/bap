@@ -13,6 +13,9 @@ let insane s = raise (Sanity s)
 let wrapdebug f x y =
   if debug () then f x y
   else ()
+let wrapdebug2 f x y z =
+  if debug () then f x y z
+  else ()
 
 module MakeConnectedCheck(C:Cfg.CFG) = struct
   module R = Reachable.Make(C)
@@ -58,7 +61,20 @@ module MakeAcyclicCheck(C:Cfg.CFG) = struct
     | x::[] -> insane (Printf.sprintf "Analysis %s expects an acyclic graph, but the backedge from %s to %s forms a cycle. You should remove backedges before running %s." s (C.v2s (C.G.E.src x)) (C.v2s (C.G.E.dst x)) s)
     | x::y ->
       insane (Printf.sprintf "Analysis %s expects an acyclic graph, but the backedge from %s to %s, and %d other backedge(s), form at least one cycle. You should remove backedges before running %s." s (C.v2s (C.G.E.src x)) (C.v2s (C.G.E.dst x)) (List.length y) s)
+  let acyclic_check = wrapdebug acyclic_check
 end
 
 let acyclic_astcfg = let module AC = MakeAcyclicCheck(Cfg.AST) in AC.acyclic_check
 let acyclic_ssacfg = let module AC = MakeAcyclicCheck(Cfg.SSA) in AC.acyclic_check
+
+module MakeExitCheck(C:Cfg.CFG) = struct
+
+  let exit_check ?(allowed_exits=[Cfg.BB_Exit; Cfg.BB_Error]) g s =
+    C.G.iter_vertex (fun v ->
+      if C.G.out_degree g v = 0 && List.mem (C.G.V.label v) allowed_exits = false then
+        insane (Printf.sprintf "Analysis %s encountered an unexpected exit (sink) node %s in the graph." s (C.v2s v))) g
+  let exit_check ?allowed_exits = wrapdebug (exit_check ?allowed_exits)
+end
+
+let exit_check_astcfg = let module EC = MakeExitCheck(Cfg.AST) in EC.exit_check
+let exit_check_ssacfg = let module EC = MakeExitCheck(Cfg.SSA) in EC.exit_check
