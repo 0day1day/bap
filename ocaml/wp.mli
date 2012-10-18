@@ -108,3 +108,8 @@ val variableify :
 val assignments_to_exp : (Ast.var * Ast.exp) list -> Ast.exp
 (** Convert a list of variable assignments, such as those returned by
     {!variableify}, to a single expression. *)
+
+val assignments_to_lets : (Ast.var * Ast.exp) list -> Ast.exp -> Ast.exp
+(** [assignments_to_lets vars e] converts a list of variable
+    assignments, such as those returned by {!variableify}, to let bindings
+    surrounding expression [e]. *)
