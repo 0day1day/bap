@@ -62,7 +62,7 @@ struct
   let merge (d1:t) (d2:t) =
     let f var x y = match x, y with
       | Some a, Some b when a === b -> x
-      | _, _ -> None
+      | _, _ -> dprintf "Merge conflict: %s" (Pp.var_to_string var); None
     in
     VM.merge f d1 d2
   let set h v e =
@@ -409,7 +409,17 @@ let eddwp_lazyconc ?(simp=or_simp) ?(k=1) ?(cf=true) (mode:formula_mode) (p:Gcl.
     failwith "Foralls not supported yet"
 
 let eddwp_lazyconc_uwp ?(simp=or_simp) ?(k=1) ?(cf=true) mode ((cfg,ugclmap):Gcl.Ugcl.t) (q:exp) : exp =
+
+  (* We want executions that go to BB_Error to return false in the VC,
+     so we must add an edge from Error to Exit. *)
+  let cfg =
+    if CA.G.mem_vertex cfg (CA.G.V.create Cfg.BB_Error) then
+      CA.add_edge cfg (CA.G.V.create Cfg.BB_Error) (CA.G.V.create Cfg.BB_Exit)
+    else cfg
+  in
+
   Checks.acyclic_astcfg cfg "UWP";
+  Checks.exit_check_astcfg ~allowed_exits:[Cfg.BB_Exit] cfg "UWP";
   (* dprintf "Starting uwp"; *)
   (* Block -> var *)
   let module BH = Cfg.BH in

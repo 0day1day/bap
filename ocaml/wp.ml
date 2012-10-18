@@ -288,6 +288,11 @@ let assignments_to_exp_opt = function
   | [] -> None
   | e -> Some(assignments_to_exp e)
 
+let assignments_to_lets = function
+  | [] -> (fun e -> e)
+  | vars ->
+    (fun e -> List.fold_left (fun exp (v,e) -> Let(v,e,exp)) e vars)
+
 (** [dwp_g] is an implementation of [G] from the DWP paper.
 
    @arg f A function that maps a GCL statement to the [V], [N], and [W]
@@ -380,7 +385,7 @@ let dwp_let ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (mode:formula_mode) 
       | Validity -> exp_and (exp_not w) (exp_implies n q)
       | Foralls -> failwith "Foralls not supported in predicate DWP"
     in
-    List.fold_left (fun exp (v,e) -> Let(v,e,exp)) exp vars
+    assignments_to_lets vars exp
   )
 
 (*let flanagansaxe_dumb ?(simp=Util.id) (p:Gcl.t) =
