@@ -26,7 +26,6 @@ end
 
 module type SOLVER_INFO =
 sig
-  val timeout : int (** Default timeout in seconds *)
   val solvername : string (** Solver name *)
   val progname : string (** Name of program, to ensure it is in the path *)
   val cmdstr : string -> string (** Given a filename, produce a command string to invoke solver *)
@@ -173,8 +172,11 @@ struct
     let in_path () =
       Sys.command (Printf.sprintf "which %s > /dev/null" S.progname) == 0
 
-    let solve_formula_file ?(timeout=S.timeout) ?(remove=false) ?(printmodel=false) file =
-      ignore(alarm timeout);
+    let solve_formula_file ?timeout ?(remove=false) ?(printmodel=false) file =
+      (match timeout with
+      | Some timeout ->
+        ignore(alarm timeout)
+      | None -> ());
       let cmdline = S.progname ^ " " ^ S.cmdstr file in
 
       try
@@ -231,7 +233,6 @@ let print_model = function
 
 module STP_INFO =
 struct
-  let timeout = 60
   let solvername = "stp"
   let progname = "stp"
   let cmdstr f = "-p " ^ f
@@ -267,7 +268,6 @@ module STP = Make(STP_INFO)
 
 module STPSMTLIB_INFO =
 struct
-  let timeout = 60
   let solvername = "stp"
   let progname = "stp"
   let cmdstr f = "--SMTLIB1 -t " ^ f
@@ -302,7 +302,6 @@ module STPSMTLIB = Make(STPSMTLIB_INFO)
 
 module CVC3_INFO =
 struct
-  let timeout = 60
   let solvername = "cvc3"
   let progname = "cvc3"
   let cmdstr f = "+model " ^ f
@@ -358,7 +357,6 @@ module CVC3 = Make(CVC3_INFO)
 
 module CVC3SMTLIB_INFO =
 struct
-  let timeout = 60
   let solvername = "cvc3"
   let progname = "cvc3"
   let cmdstr f = "-lang smtlib " ^ f
@@ -370,7 +368,6 @@ module CVC3SMTLIB = Make(CVC3SMTLIB_INFO)
 
 module YICES_INFO =
 struct
-  let timeout = 60
   let solvername = "yices"
   let progname = "yices-smt"
   let cmdstr f = "-f " ^ f
@@ -382,7 +379,6 @@ module YICES = Make(YICES_INFO)
 
 module Z3_INFO =
 struct
-  let timeout = 60
   let solvername = "z3"
   let progname = "z3"
   let cmdstr f = "-smt2 " ^ f
@@ -394,7 +390,6 @@ module Z3 = Make(Z3_INFO)
 
 module BOOLECTOR_INFO =
 struct
-  let timeout = 60
   let solvername = "boolector"
   let progname = "boolector"
   let cmdstr f = "--smt2 " ^ f

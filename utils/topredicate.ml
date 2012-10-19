@@ -18,13 +18,10 @@ let suffix = ref ""
 let usedc = ref true
 let usesccvn = ref true
 let solve = ref false
-(* let dwpcf = ref true *)
-(* let sat = ref true *)
+let timeout = ref None
 
 (* Select which solver to use *)
 let solver = ref (Smtexec.STP.si);;
-
-(* DWP paper *)
 
 let set_solver s =
   solver := try Hashtbl.find Smtexec.solvers s
@@ -108,6 +105,8 @@ let speclist =
      "Perform sccvn on the SSA CFG.")
   ::("-solve", Arg.Unit (fun () -> solve := true),
      "Solve the generated formula.")
+  ::("-solvetimeout", Arg.Int (fun n -> timeout := Some n),
+     "<seconds> Set formula solving timeout. Default: no timeout.")
   ::("-validity", Arg.Unit (fun () -> options := {!options with mode = Type.Validity}),
      "Check for validity.")
   ::("-sat", Arg.Unit (fun () -> options := {!options with mode = Type.Sat}),
@@ -175,7 +174,7 @@ match !stpout with
   p#close;
   if !solve then (
     Printf.fprintf stderr "Solving\n"; flush stderr;
-    let r = (!solver)#solve_formula_file ~printmodel:true !stpoutname in
+    let r = (!solver)#solve_formula_file ?timeout:!timeout ~printmodel:true !stpoutname in
     Printf.fprintf stderr "Solve result: %s\n" (Smtexec.result_to_string r);
     match r with | Smtexec.SmtError _ -> failwith "Solver error" | _ -> ()
   )
