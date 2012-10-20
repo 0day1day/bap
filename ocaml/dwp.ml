@@ -463,15 +463,21 @@ let eddwp_lazyconc_uwp ?(simp=or_simp) ?(k=1) ?(cf=true) mode ((cfg,ugclmap):Gcl
     (* Find the weakest precondition from the program exit to our
        successors *)
     let bbid = CA.G.V.label bb in
-    let delta_in = match CA.G.pred cfg bb with
+    let delta_in, fallthrough1 = match CA.G.pred cfg bb with
       | [] when bbid = Cfg.BB_Entry ->
-        D.create ()
+        D.create (), true
       | [] -> failwith (Printf.sprintf "BB %s has no predecessors but should" (Cfg_ast.v2s bb))
-      | s -> let get_delta bb = fst (getbbinfo (CA.G.V.label bb)) in
-             BatList.reduce D.merge (List.map get_delta s)
+      | s -> let get_delta bb =
+               let delta,_,fallthrough = getbbinfo (CA.G.V.label bb) in
+               if fallthrough then Some delta else None
+             in
+             let fallthrough_deltas = BatList.filter_map get_delta s in
+             let merged_delta = try BatList.reduce D.merge fallthrough_deltas
+               with Invalid_argument "Empty List" -> D.create ()
+             in merged_delta, fallthrough_deltas <> []
     in
-    let (delta, lazyr, _) = dwpconcint simp eval k needh vmaph mode delta_in (ugclmap (CA.G.V.label bb)) in
-    let (delta, lazyr) =
+    let (delta, lazyr, fallthrough2) = dwpconcint simp eval k needh vmaph mode delta_in (ugclmap (CA.G.V.label bb)) in
+    let (delta, lazyr, fallthrough) =
       delta, lazy (
         let ms1, af1, msdup1, afdup1 = match CA.G.pred cfg bb with
           | [] when bbid = Cfg.BB_Entry ->
@@ -482,7 +488,7 @@ let eddwp_lazyconc_uwp ?(simp=or_simp) ?(k=1) ?(cf=true) mode ((cfg,ugclmap):Gcl
 
                This is basically eddwp's Choose rule. *)
             let bbinfo bb =
-              let _,l = getbbinfo (CA.G.V.label bb) in
+              let _,l,_ = getbbinfo (CA.G.V.label bb) in
               let _,_,_,msdup,afdup = Lazy.force l in
               let ms,af = lookupwpvar (CA.G.V.label bb) in
               Var ms,Var af,msdup,afdup
@@ -511,17 +517,18 @@ let eddwp_lazyconc_uwp ?(simp=or_simp) ?(k=1) ?(cf=true) mode ((cfg,ugclmap):Gcl
           let afdup = simp (exp_and msdup1 (simp (exp_or afdup1 afdup2))) in
 
           v, choose_best ms msdup, choose_best af afdup, msdup, afdup
-    )
+    ), fallthrough1 && fallthrough2
     in
-    setbbinfo bbid (delta, lazyr)
+    setbbinfo bbid (delta, lazyr, fallthrough)
   in
   Toposort.iter compute_at cfg;
 
   let q' =
-    let delta,_ = getbbinfo Cfg.BB_Exit in
+    let delta,_,_ = getbbinfo Cfg.BB_Exit in
     let value = eval delta q in
     unwrap_symb value
   in
+  dprintf "evaluated q: %s" (Pp.ast_exp_to_string q');
   mark_used_vars_in needh q';
 
   (* Now we have a precondition for every block in terms of
@@ -531,7 +538,7 @@ let eddwp_lazyconc_uwp ?(simp=or_simp) ?(k=1) ?(cf=true) mode ((cfg,ugclmap):Gcl
   let build_assigns bb acc =
     let bbid = CA.G.V.label bb in
     let msv, afv = lookupwpvar bbid in
-    let _, lazywp = getbbinfo bbid in
+    let _, lazywp, _ = getbbinfo bbid in
     let v, msvalue, afvalue, _, _ = Lazy.force lazywp in
     BatList.append ((msv, msvalue)::(afv, afvalue)::v) acc
   in
