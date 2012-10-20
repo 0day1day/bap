@@ -271,6 +271,10 @@ module Make(D:Delta) = struct
     in
     let module HU = Util.HashUtil(VH) in
     t (HU.get_hash_keys needh)
+  (* Returns delta, a lazy computation of v, ms, af, msdup, afdup,
+     and fallthrough, which indicates whether execution may pass to a
+     following statement.  Fallthrough is false after assert false or
+     assume false. *)
   let rec dwpconcint simp eval k needh vmaph mode delta =
     let is_needed v =
       try VH.find needh v
@@ -292,8 +296,8 @@ module Make(D:Delta) = struct
     let punt_internal delta s = let _, v, ms, af, msdup, afdup = punt delta s in
                                 (v, ms, af, msdup, afdup)
     in
-    let punt_external delta s = let delta, v, ms, af, msdup, afdup = punt delta s in
-                                delta, lazy (v, ms, af, msdup, afdup)
+    let punt_external ?(fallthrough=true) delta s = let delta, v, ms, af, msdup, afdup = punt delta s in
+                                delta, lazy (v, ms, af, msdup, afdup), fallthrough
     in
     let dwpconc = dwpconcint simp eval k needh vmaph mode in
     function
@@ -313,21 +317,26 @@ module Make(D:Delta) = struct
               punt_internal delta (Gcl.Assign (v, e)))
             (* If the value is not needed in the formula, act like a Skip *)
             else punt_internal delta Gcl.Skip
-          ) else punt_external delta s
+          ), true else punt_external delta s
       | Gcl.Assume e as s ->
         let value = eval delta e in
         if value = Symbolic exp_true then punt_external delta Gcl.Skip
-        else if value = Symbolic exp_false then delta, lazy([], exp_false, exp_false, exp_false, exp_false)
+        else if value = Symbolic exp_false then delta, lazy([], exp_false, exp_false, exp_false, exp_false), false
         else punt_external delta s
       | Gcl.Assert e as s ->
         let value = eval delta e in
         if value = Symbolic exp_true then punt_external delta Skip
-        else if value = Symbolic exp_false then delta, lazy([], exp_true, exp_true, exp_true, exp_true)
+        else if value = Symbolic exp_false then delta, lazy([], exp_true, exp_true, exp_true, exp_true), false
         else punt_external delta s
       | Gcl.Choice (s1, s2) ->
-        let delta1, lazy1 = dwpconc delta s1 in
-        let delta2, lazy2 = dwpconc delta s2 in
-        let deltamerge = D.merge delta1 delta2 in
+        let delta1, lazy1, fallthrough1 = dwpconc delta s1 in
+        let delta2, lazy2, fallthrough2 = dwpconc delta s2 in
+        let deltamerge = match fallthrough1, fallthrough2 with
+          | true, true -> D.merge delta1 delta2
+          | true, false -> delta1
+          | false, true -> delta2
+          | false, false -> D.create ()
+        in
 
         deltamerge, lazy (
           let v1, ms1, af1, msdup1, afdup1 = Lazy.force lazy1 in
@@ -338,10 +347,10 @@ module Make(D:Delta) = struct
           let af = simp (exp_or af1 af2) in
           let afdup = simp (exp_or afdup1 afdup2) in
 
-          v1@v2, choose_best ms msdup, choose_best af afdup, msdup, afdup)
+          v1@v2, choose_best ms msdup, choose_best af afdup, msdup, afdup), fallthrough1 || fallthrough2
       | Gcl.Seq (s1, s2) as _s ->
-        let delta1, lazy1 = dwpconc delta s1 in
-        let delta2, lazy2 = dwpconc delta1 s2 in
+        let delta1, lazy1, fallthrough1 = dwpconc delta s1 in
+        let delta2, lazy2, fallthrough2 = dwpconc delta1 s2 in
         delta2, lazy (
           let v1, ms1, af1, msdup1, afdup1 = Lazy.force lazy1 in
           if msdup1 = exp_false then v1, exp_false, exp_false, exp_false, exp_false
@@ -357,7 +366,7 @@ module Make(D:Delta) = struct
             let af = simp (exp_and ms1 (simp (exp_or af1 af2))) in
             let afdup = simp (exp_and msdup1 (simp (exp_or afdup1 afdup2))) in
 
-            v@v1@v2, choose_best ms msdup, choose_best af afdup, msdup, afdup)
+            v@v1@v2, choose_best ms msdup, choose_best af afdup, msdup, afdup), fallthrough1 && fallthrough2
       | Gcl.Skip as s -> punt_external delta s
 
 (* Ed's DWP formulation + concrete evaluation + lazy merging.
@@ -387,7 +396,7 @@ let eddwp_lazyconc ?(simp=or_simp) ?(k=1) ?(cf=true) (mode:formula_mode) (p:Gcl.
   let needh = VH.create 1000 in
   (* var -> vars referenced by var *)
   let vmaph = VH.create 1000 in
-  let (delta, lazyr) = dwpconcint simp eval k needh vmaph mode (D.create ()) p in
+  let (delta, lazyr, _) = dwpconcint simp eval k needh vmaph mode (D.create ()) p in
   let q' =
     let value = eval delta q in
     unwrap_symb value
@@ -461,7 +470,7 @@ let eddwp_lazyconc_uwp ?(simp=or_simp) ?(k=1) ?(cf=true) mode ((cfg,ugclmap):Gcl
       | s -> let get_delta bb = fst (getbbinfo (CA.G.V.label bb)) in
              BatList.reduce D.merge (List.map get_delta s)
     in
-    let (delta, lazyr) = dwpconcint simp eval k needh vmaph mode delta_in (ugclmap (CA.G.V.label bb)) in
+    let (delta, lazyr, _) = dwpconcint simp eval k needh vmaph mode delta_in (ugclmap (CA.G.V.label bb)) in
     let (delta, lazyr) =
       delta, lazy (
         let ms1, af1, msdup1, afdup1 = match CA.G.pred cfg bb with
