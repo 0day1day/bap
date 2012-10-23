@@ -562,28 +562,18 @@ struct
       type t = SI.t VM.t
       let top = VM.empty
       let equal = VM.equal (=)
-      let meet x y =
-        VM.fold
-          (fun k v res ->
-             try
-               let v' = VM.find k y in
-               let si = SI.union v v' in
-                 VM.add k si res
-             with Not_found ->
-               VM.add k v res
-          )
-          x y
-      let widen x y =
-        VM.fold
-          (fun k v res ->
-             try
-               let v' = VM.find k y in
-               let si = SI.widen v v' in
-                 VM.add k si res
-             with Not_found ->
-               VM.add k v res
-          )
-          x y
+      let meet =
+        VM.merge (fun k v1 v2 -> match v1, v2 with
+        | Some v1, Some v2 -> Some (SI.union v1 v2)
+        | Some v, None
+        | None, Some v -> Some v
+        | None, None -> None)
+      let widen =
+        VM.merge (fun k v1 v2 -> match v1, v2 with
+        | Some v1, Some v2 -> Some (SI.widen v1 v2)
+        | Some v, None
+        | None, Some v -> Some v
+        | None, None -> None)
     end
     module O = GraphDataflow.NOOPTIONS
     let s0 _ _ = CFG.G.V.create Cfg.BB_Entry
@@ -830,7 +820,8 @@ struct
   let eq k x y = match (x,y) with
      | ([r1,si1], [r2,si2]) when r1 == r2 ->
          [(global, SI.eq k si1 si2)]
-     | ([], _) | (_,[]) -> maybe
+     | (r, _) when r = top k -> maybe
+     | (_, r) when r = top k -> maybe
      | _ ->
          if List.exists (fun(r,s)-> List.exists (fun(r2,s2)-> r == r2 && SI.eq k s s2 <> SI.no) y) x
          then maybe
@@ -1028,7 +1019,7 @@ module MemStore = struct
   module M1 = BatMap.Make(struct type t = VS.region let compare = Var.compare end)
   module M2 = BatMap.Make(struct type t = int64 let compare = Int64.compare end)
 
-  (* VSA optional interface: specify a "real" memory read funtion *)
+  (* VSA optional interface: specify a "real" memory read function *)
   module O = struct
     type t = { initial_mem : (addr * char) list }
     let default = { initial_mem = [] }
@@ -1166,17 +1157,31 @@ module MemStore = struct
     if x == y then true
     else M1.equal (M2.equal (=)) x y
 
+  let merge_region f =
+    M2.merge (fun a v1 v2 -> match v1, v2 with
+    | Some v1, Some v2 -> Some (f v1 v2)
+    | Some v, None
+    | None, Some v -> Some v
+    | None, None -> None)
+
+  let merge_mem f =
+    M1.merge (fun r v1 v2 -> match v1, v2 with
+    | Some v1, Some v2 -> Some (merge_region f v1 v2)
+    | Some v, None
+    | None, Some v -> Some v
+    | None, None -> None)
+
   let intersection (x:t) (y:t) =
     if equal x y then x
-    else fold (fun addr v res -> write_concrete_intersection (VS.width v) res addr v) x y
+    else merge_mem VS.intersection x y
 
   let union (x:t) (y:t) =
     if equal x y then x
-    else fold (fun k v res -> write_concrete_weak (VS.width v) res k v) x y
+    else merge_mem VS.union x y
 
   let widen (x:t) (y:t) =
     if equal x y then x
-    else fold (fun k v res -> write_concrete_weak_widen (VS.width v) res k v) x y
+    else merge_mem VS.widen x y
 
 end
 
