@@ -219,9 +219,9 @@ object (self)
 	  let (bits, bits1) = (bits_of_width t, bits_of_width t1) in
 	  let (pre,post) = match ct with
 	    | CAST_SIGNED    -> ("SX(",", "^string_of_int bits^")")
-	    | CAST_LOW       -> ("", "["^string_of_int(bits - 1)^":0]")
+	    | CAST_LOW       -> ("(", "["^string_of_int(bits - 1)^":0])")
 	    | CAST_HIGH      ->
-		("", "["^string_of_int(bits1-1)^":"^string_of_int(bits1-bits)^"]")
+		("(", "["^string_of_int(bits1-1)^":"^string_of_int(bits1-bits)^"])")
 	    | CAST_UNSIGNED  ->
 		if bits = bits1 then ("","") else
 		  ("(0bin"^String.make (bits-bits1) '0'^" @ ", ")")
