@@ -29,6 +29,9 @@ let pipeline = ref []
 (* Initialization statements *)
 let inits = ref []
 
+(* Variable initializations *)
+let lazyinits = ref []
+
 let scope = ref (Grammar_private_scope.default_scope ())
 
 let init_stmts () =
@@ -89,7 +92,7 @@ let speclist =
        (let vname = ref "" and vval = ref "" in
 	[
 	  Arg.Set_string vname; Arg.Set_string vval;
-	  Arg.Unit (fun () -> mapv !vname !vval)
+	  Arg.Unit (fun () -> lazyinits := lazy (mapv !vname !vval) :: !lazyinits)
 	]),
      "<var> <expression> Set variable to expression before evaluation.")
   ::("-init-mem",
@@ -97,7 +100,7 @@ let speclist =
        (let maddr = ref "" and mval = ref "" in
 	[
 	  Arg.Set_string maddr; Arg.Set_string mval;
-	  Arg.Unit (fun () -> mapmem !maddr !mval)
+	  Arg.Unit (fun () -> lazyinits := lazy (mapmem !maddr !mval) :: !lazyinits)
 	]),
      "<addr expression> <value expression> Set variable to expression before evaluation.")
   :: Input.speclist
@@ -115,6 +118,12 @@ let prog =
   with Arg.Bad s ->
     Arg.usage speclist (s^"\n"^usage);
     exit 1
+;;
+
+(* Now handle the initializations, since we have the program's scope
+   available *)
+List.iter Lazy.force (List.rev !lazyinits)
+;;
 
 let rec apply_cmd prog = function
   | AnalysisAst f -> (
@@ -133,36 +142,36 @@ let rec apply_cmd prog = function
     | _ -> failwith "need explicit translation to SSA"
   )
   | TransformAst f -> (
-      match prog with
-      | Ast p -> Ast(f p)
-      | _ -> failwith "need explicit translation to AST"
-    )
+    match prog with
+    | Ast p -> Ast(f p)
+    | _ -> failwith "need explicit translation to AST"
+  )
   | TransformAstCfg f -> (
-      match prog with
-      | AstCfg p -> AstCfg(f p)
-      | _ -> failwith "need explicit translation to AST CFG"
-    )
+    match prog with
+    | AstCfg p -> AstCfg(f p)
+    | _ -> failwith "need explicit translation to AST CFG"
+  )
   | TransformSsa f -> (
-      match prog with
-      | Ssa p -> Ssa(f p)
-      | _ -> failwith "need explicit translation to SSA"
-    )
+    match prog with
+    | Ssa p -> Ssa(f p)
+    | _ -> failwith "need explicit translation to SSA"
+  )
   | ToCfg -> (
-      match prog with
-      | Ast p -> AstCfg(Cfg_ast.of_prog p)
-      | Ssa p -> AstCfg(Cfg_ssa.to_astcfg p)
-      | AstCfg _ as p -> prerr_endline "Warning: null transformation"; p
-    )
+    match prog with
+    | Ast p -> AstCfg(Cfg_ast.of_prog p)
+    | Ssa p -> AstCfg(Cfg_ssa.to_astcfg p)
+    | AstCfg _ as p -> prerr_endline "Warning: null transformation"; p
+  )
   | ToAst -> (
-      match prog with
-      | AstCfg p -> Ast(Cfg_ast.to_prog p)
-      | p -> apply_cmd (apply_cmd p ToCfg) ToAst
-    )
+    match prog with
+    | AstCfg p -> Ast(Cfg_ast.to_prog p)
+    | p -> apply_cmd (apply_cmd p ToCfg) ToAst
+  )
   | ToSsa -> (
-      match prog with
-      | AstCfg p -> Ssa(Cfg_ssa.of_astcfg p)
-      | p -> apply_cmd (apply_cmd p ToCfg) ToSsa
-    )
+    match prog with
+    | AstCfg p -> Ssa(Cfg_ssa.of_astcfg p)
+    | p -> apply_cmd (apply_cmd p ToCfg) ToSsa
+  )
 ;;
 
 List.fold_left apply_cmd (Ast prog) pipeline
