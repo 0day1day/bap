@@ -103,7 +103,7 @@ struct
   let empty k = (k, (-1L), 1L, 0L)
 
   let rec upper k i s =
-    assert (s >= 1L);
+    if s >= 1L then (
     let offset = int64_urem i s in
     let max = maxi k in
     let maxoffset = int64_urem max s in
@@ -115,10 +115,10 @@ struct
     if debug ()
     then (assert (o <= maxi k && o > maxi k -% s);
           assert (int64_urem o s = int64_urem i s));
-    o
+    o) else maxi k
 
   let rec lower k i s =
-    assert (s >= 1L);
+    if s >= 1L then (
     let offset = int64_urem i s in
     let min = mini k in
     let minoffset = int64_urem min s in
@@ -130,7 +130,7 @@ struct
     if debug ()
     then (assert (o >= mini k && o < mini k +% s);
           assert (int64_urem o s = int64_urem i s));
-    o
+    o) else mini k
 
   let remove_lower_bound (k,s,a,b) =
     (k,s,lower k b s,b)
