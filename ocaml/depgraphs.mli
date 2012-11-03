@@ -155,6 +155,15 @@ sig
     Cfg.AST.G.t ->
     (location, LS.t Var.VarMap.t) Hashtbl.t *
       (location -> Var.t -> LS.t)
+
+  (** Same as [usedef], but for def use chains.  That is, these
+      functions map definitions to their possible uses. *)
+  val defuse :
+    Cfg.AST.G.t ->
+    (location, LS.t Var.VarMap.t) Hashtbl.t *
+      (location -> Var.t -> LS.t)
+
+
 end
 
 (** Various functions relating to variable definitions in AST CFGs *)
