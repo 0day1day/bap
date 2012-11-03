@@ -623,6 +623,9 @@ struct
 	  let s = LS.add (LocationType.Loc (bb,!line)) s in
 	  lref := VM.add v s !lref;
 	  DoChildren
+        method visit_avar v =
+          lref := VM.add v (LS.singleton LocationType.Undefined) !lref;
+          DoChildren
       end
       in
       let stmts = Cfg.AST.get_stmts g bb in
@@ -790,14 +793,20 @@ struct
 	    let s = LS.add (LocationType.Loc (bb,!line)) s in
 	    lref := VM.add v s !lref;
 	    DoChildren
+          method visit_avar v =
+            lref := VM.add v (LS.singleton LocationType.Undefined) !lref;
+            DoChildren
 	end
 	in
 	List.iter
 	  (fun stmt ->
-	      (* Add the uses before this line *)
+	    (* Add the uses before this line *)
+            (match stmt with
+            | Ast.Move(v, _, _) ->
 	      Hashtbl.add h (bb,!line) !lref;
-	      ignore(Ast_visitor.stmt_accept v stmt);
-	      line := !line + 1
+            | _ -> ());
+	    ignore(Ast_visitor.stmt_accept v stmt);
+	    line := !line + 1
 	   ) stmts
       ) p;
     let find (bb,line) var =
