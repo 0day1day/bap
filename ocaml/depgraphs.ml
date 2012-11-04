@@ -785,7 +785,7 @@ struct
 	let (m:UseDefSpec.L.t) = dfin bb in
 	let stmts = Cfg.AST.get_stmts p bb in
 	let lref = ref m in
-	let line = ref 0 in
+	let line = ref ((List.length stmts) - 1) in
 	let v = object(self)
 	  inherit Ast_visitor.nop
     	  method visit_rvar v =
@@ -806,8 +806,8 @@ struct
 	      Hashtbl.add h (bb,!line) !lref;
             | _ -> ());
 	    ignore(Ast_visitor.stmt_accept v stmt);
-	    line := !line + 1
-	   ) stmts
+	    line := !line - 1
+	   ) (List.rev stmts)
       ) p;
     let find (bb,line) var =
       let m = Hashtbl.find h (bb,line) in
