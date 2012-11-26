@@ -106,6 +106,9 @@ let rec cast_unsigned tnew = function
   | e ->
     Cast(CAST_UNSIGNED, tnew, e)
 
+let exp_int i bits =
+  Int(bi i, Reg bits)
+
 let exp_ite ?t b e1 e2 =
   (* type inference shouldn't be needed when t is specified, but we're paranoid *)
   let tb = Typecheck.infer_ast ~check:false b in

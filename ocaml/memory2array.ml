@@ -21,7 +21,7 @@ open Type
 open Util
 open Var
 
-(** How big is normalized index? *)
+(** How big are normalized elements? *)
 let bitwidth = 8
 let normtype = Reg(bitwidth)
 
