@@ -45,8 +45,12 @@ let loopinfo_from_sa cfg =
         ) (bbs_of_node r))
         with Not_found -> None
       in
-      let head = try BatList.find_map find_pred ns
-        with Not_found -> failwith "loopinfo_from_sa: Failed to find head node of loop" in
+      let tl = List.map find_pred ns in
+      let tl = BatList.filter_map Util.id tl in
+      let head = match tl with
+        | [hd] -> hd
+        | _ -> failwith "loopinfo_from_sa: Failed to unroll irreducible loop"
+      in
       Loop(head, List.map conv ns)
     | SA.Region(_, ns) -> Other(List.map conv ns)
   in

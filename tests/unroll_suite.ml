@@ -25,7 +25,25 @@ let basic_nested () =
       assert_failure "Unrolling <10 times should produce an error"
   with Symbeval.Concrete.AssertFailed _ -> ()
 
+(* Make sure we get an error for irreducible loops *)
+let irreducible () =
+  let p, _ = Parser.program_from_file "IL/unroll/irreducible.il" in
+  let cfg = Cfg_ast.of_prog p in
+  let cfg = Prune_unreachable.prune_unreachable_ast cfg in
+  try ignore(Unroll.unroll_loops_sa cfg);
+      assert_failure "Unrolling an irreducible loop should fail"
+  with Failure _ -> ()
+
+(* Make sure we don't get an error for reducible loops *)
+let reducible () =
+  let p, _ = Parser.program_from_file "IL/unroll/reducible.il" in
+  let cfg = Cfg_ast.of_prog p in
+  let cfg = Prune_unreachable.prune_unreachable_ast cfg in
+  ignore(Unroll.unroll_loops_sa cfg)
+
 let suite = "Unroll" >:::
   [
     "basic_nested" >:: basic_nested;
+    "irreducible" >:: irreducible;
+    "reducible" >:: reducible;
   ]
