@@ -98,6 +98,7 @@ export SOURCES = \
 	hacks.ml \
 	coalesce.mli coalesce.ml \
 	structural_analysis.ml \
+	steensgard.mli steensgard.ml \
 	unroll.mli unroll.ml \
 	efse.ml \
 	dwp.mli dwp.ml \

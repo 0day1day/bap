@@ -10,18 +10,57 @@ open D
 type unrollf = ?count:int -> Cfg.AST.G.t -> Cfg.AST.G.t
 
 (* Generic nested loop information *)
-type loopinfo =
+type unrollinfo =
   | BB of C.G.V.t
-  | Other of loopinfo list
-  | Loop of C.G.V.t * loopinfo list (* head, body of loop including head *)
+  | Other of unrollinfo list
+  | Loop of C.G.V.t * unrollinfo list (* head, body of loop including head *)
+
+let rec string_of_unrollinfo = function
+  | BB bb -> Cfg_ast.v2s bb
+  | Other l -> "Other[" ^ List.fold_left (fun s li -> s ^ " " ^ (string_of_unrollinfo li)) "" l ^ " ]"
+  | Loop (head, l) -> "Loop[" ^ (Cfg_ast.v2s head) ^ "," ^ List.fold_left (fun s li -> s ^ " " ^ (string_of_unrollinfo li)) "" l ^ " ]"
 
 (* XXX: inefficient *)
-let rec bbs_from_loopinfo = function
+let rec bbs_from_unrollinfo = function
   | BB v -> [v]
-  | Other l | Loop (_, l) -> BatList.concat (List.map bbs_from_loopinfo l)
+  | Other l | Loop (_, l) -> BatList.concat (List.map bbs_from_unrollinfo l)
+
+let find_loop_head cfg bbs_of_node nodes =
+  let h = Hashtbl.create (List.length nodes) in
+  List.iter (fun n -> List.iter (fun bb -> Hashtbl.add h bb ()) (bbs_of_node n)) nodes;
+  let find_pred r =
+    (* Find a bb that has a predecessor not in h *)
+    try Some (List.find (fun bb ->
+      List.exists (fun bb' ->
+        Hashtbl.mem h bb' = false) (C.G.pred cfg bb)
+    ) (bbs_of_node r))
+    with Not_found -> None
+  in
+  let tl = List.map find_pred nodes in
+  let tl = BatList.filter_map Util.id tl in
+  match tl with
+  | [hd] -> hd
+  | _ -> failwith (Printf.sprintf "find_loop_head: Failed to identify loop head in [%s]. This is likely caused by an irreducible loop."
+    (Hashtbl.fold (fun n _ s -> (Cfg_ast.v2s n) ^ " " ^ s) h ""))
+
+(* Get loop information from Steensgard's algorithm *)
+let unrollinfo_from_steensgard cfg =
+  let rec bbs_from_steensgard = function
+    | Steensgard.BB v -> [v]
+    | Steensgard.Other l | Steensgard.Loop l ->
+      BatList.concat (List.map bbs_from_steensgard l)
+  in
+  let rec conv_info = function
+    | Steensgard.BB x -> BB x
+    | Steensgard.Other x -> Other (List.map conv_info x)
+    | Steensgard.Loop x ->
+      let head = find_loop_head cfg bbs_from_steensgard x in
+      Loop(head, List.map conv_info x)
+  in
+  conv_info (Steensgard.steensgard_ast cfg)
 
 (* Get loop information from structural analysis *)
-let loopinfo_from_sa cfg =
+let unrollinfo_from_sa cfg =
   let module SA = Structural_analysis in
   let module Dom = Dominator.Make(C.G) in
   let bbs_of_node =
@@ -31,26 +70,27 @@ let loopinfo_from_sa cfg =
     in
     get_nodes []
   in
-  let rec conv : SA.node -> loopinfo = function
+  let rec conv : SA.node -> unrollinfo = function
     | SA.BBlock b -> BB (C.G.V.create b)
-    | SA.Region((SA.SelfLoop | SA.WhileLoop | SA.NaturalLoop), ns) as r ->
-      let nodes = bbs_of_node r in
-      let h = Hashtbl.create (List.length nodes) in
-      List.iter (fun n -> Hashtbl.add h n ()) nodes;
-      let find_pred r =
-        (* Find a bb that has a predecessor not in h *)
-        try Some (List.find (fun bb ->
-          List.exists (fun bb' ->
-            Hashtbl.mem h bb' = false) (C.G.pred cfg bb)
-        ) (bbs_of_node r))
-        with Not_found -> None
-      in
-      let tl = List.map find_pred ns in
-      let tl = BatList.filter_map Util.id tl in
-      let head = match tl with
-        | [hd] -> hd
-        | _ -> failwith "loopinfo_from_sa: Failed to unroll irreducible loop"
-      in
+    | SA.Region((SA.SelfLoop | SA.WhileLoop | SA.NaturalLoop), ns) ->
+      let head = find_loop_head cfg bbs_of_node ns in
+      (* let nodes = bbs_of_node r in *)
+      (* let h = Hashtbl.create (List.length nodes) in *)
+      (* List.iter (fun n -> Hashtbl.add h n ()) nodes; *)
+      (* let find_pred r = *)
+      (*   (\* Find a bb that has a predecessor not in h *\) *)
+      (*   try Some (List.find (fun bb -> *)
+      (*     List.exists (fun bb' -> *)
+      (*       Hashtbl.mem h bb' = false) (C.G.pred cfg bb) *)
+      (*   ) (bbs_of_node r)) *)
+      (*   with Not_found -> None *)
+      (* in *)
+      (* let tl = List.map find_pred ns in *)
+      (* let tl = BatList.filter_map Util.id tl in *)
+      (* let head = match tl with *)
+      (*   | [hd] -> hd *)
+      (*   | _ -> failwith "loopinfo_from_sa: Failed to unroll irreducible loop" *)
+      (* in *)
       Loop(head, List.map conv ns)
     | SA.Region(_, ns) -> Other(List.map conv ns)
   in
@@ -141,7 +181,6 @@ let unroll_loop ?(count=8) ?(id=0) cfg head body =
     List.fold_left 
       (fun cfg (src, lab, dst) ->
          let src = ith_copy i src in
-              
          let dst = ith_copy i dst in
          let newedge = C.G.E.create src lab dst in
          C.add_edge_e cfg newedge
@@ -255,13 +294,14 @@ let unroll_bbs ?count ?id cfg head bbs =
   unroll_loop ?count ?id cfg head body
 
 
-let unroll_loops_internal ?count cfg loopinfo =
+let unroll_loops_internal ?count cfg unrollinfo =
   let () = Checks.connected_astcfg cfg "unroll_loops_internal" in
+  let () = if debug () then dprintf "Unroll info: %s" (string_of_unrollinfo unrollinfo) in
   let nunrolled = ref 0 in
 
   (* unroll_in cfg needs to return a CFG and a modified structure,
      since unrolling changes the structure of the CFG. *)
-  let rec unroll_in cfg : loopinfo -> C.G.t * loopinfo =
+  let rec unroll_in cfg : unrollinfo -> C.G.t * unrollinfo =
     let f (cfg,rl) n =
       let cfg,r = unroll_in cfg n in
       cfg, r::rl
@@ -280,7 +320,7 @@ let unroll_loops_internal ?count cfg loopinfo =
       in
 
       (* And then unroll the loop at the current level *)
-      let bbs = bbs_from_loopinfo r in
+      let bbs = bbs_from_unrollinfo r in
       dprintf "Found a loop with %d nodes" (List.length bbs);
       (* We need to return an updated region for the unrolled loop. *)
       let cfg, nl = unroll_bbs ?count ~id:!nunrolled cfg head bbs in
@@ -288,10 +328,13 @@ let unroll_loops_internal ?count cfg loopinfo =
       let make_region bb = BB bb in
       cfg, Other (List.map make_region nl)
   in
-  let cfg, _ = unroll_in cfg loopinfo in
+  let cfg, _ = unroll_in cfg unrollinfo in
   cfg
 
-let unroll_loops_sa ?count cfg =
-  unroll_loops_internal ?count cfg (loopinfo_from_sa cfg)
+let unroll_loops_steensgard ?count cfg =
+  unroll_loops_internal ?count cfg (unrollinfo_from_steensgard cfg)
 
-let unroll_loops = unroll_loops_sa
+let unroll_loops_sa ?count cfg =
+  unroll_loops_internal ?count cfg (unrollinfo_from_sa cfg)
+
+let unroll_loops = unroll_loops_steensgard
