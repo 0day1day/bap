@@ -26,17 +26,12 @@ let bracket set_up f tear_down () =
   let fixture = 
     set_up () 
   in
-  let () = 
     try
-      let () = f fixture in
-        tear_down fixture
+      f fixture;
+      tear_down fixture
     with e -> 
-      let () = 
-        tear_down fixture
-      in
-        raise e
-  in
-    ()
+      tear_down fixture;
+      raise e
 
 let bracket_tmpfile ?(prefix="ounit-") ?(suffix=".txt") ?mode f =
   bracket
