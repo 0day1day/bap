@@ -1,3 +1,2 @@
 <*.ml> or <*.mli>: camlp4of
-<pa_estring_top.*>: compiler-libs
 true: debug
