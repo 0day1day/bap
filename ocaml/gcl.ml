@@ -420,7 +420,8 @@ module Ugcl = struct
   type stmt = t
   type t = (CA.G.t * (CA.G.V.label -> stmt))
 
-let of_ssacfg ?entry ?exit  ?mode cfg =
+let of_ssacfg ?entry ?exit ?mode cfg =
+  Checks.acyclic_astcfg cfg "UGCL";
   let module BH = Cfg.BH in
   (* We use DSA here because we want edge splitting to happen.  We
      don't necessarily need full DSA. *)
