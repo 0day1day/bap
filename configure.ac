@@ -232,7 +232,7 @@ BAP_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 # Checks for header files.
 AC_HEADER_STDC
 AC_CHECK_HEADERS([fcntl.h stdint.h stdlib.h string.h unistd.h])
-AC_CHECK_HEADER([/usr/include/bfd.h], ,
+AC_CHECK_HEADER([bfd.h], ,
    AC_MSG_ERROR([You need BFD headers (e.g., libbfd-dev)]))
 dnl AC_CHECK_HEADER([/usr/include/sqlite3.h], ,
 dnl    AC_MSG_ERROR([You need sqlite3 headers (e.g., libsqlite3-dev, and sqlite3 is also recommended but not required)]))
