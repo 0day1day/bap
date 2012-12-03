@@ -42,6 +42,7 @@ type stmt =
   | Label of (label * attrs) (** A label we can jump to *)
   | Halt of (exp * attrs)
   | Assert of (exp * attrs)
+  | Assume of (exp * attrs)
   | Comment of (string * attrs) (** A comment to be ignored *)
   | Special of (string * attrs) (** A "special" statement. (does magic) *)
 
@@ -229,8 +230,9 @@ let num_stmt = function
   | Label _ -> 3
   | Halt _ -> 4
   | Assert _ -> 5
-  | Comment _ -> 6
-  | Special _ -> 7
+  | Assume _ -> 6
+  | Comment _ -> 7
+  | Special _ -> 8
 
 let getargs_stmt = function
   | Move(v,e,a) -> [e], [v], [], [a], []
@@ -238,7 +240,8 @@ let getargs_stmt = function
   | Label(l,a) -> [], [], [l], [a], []
   | Jmp(e,a)
   | Halt(e,a)
-  | Assert(e,a) -> [e], [], [], [a], []
+  | Assert(e,a)
+  | Assume(e,a) -> [e], [], [], [a], []
   | Comment(s,a)
   | Special(s,a) -> [], [], [], [a], [s]
 
@@ -310,5 +313,6 @@ let get_attrs = function
   | Label(_,a)
   | Halt(_,a)
   | Assert(_,a)
+  | Assume(_,a)
   | Comment(_,a)
   | Special(_,a) -> a

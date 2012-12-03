@@ -199,17 +199,20 @@ struct
 
   type myctx = (MemL.t,Form.t) ctx
 
-  (* Exceptions *)
-  exception ExcState of string * addr
-
   (* Program halted, with optional halt value, and with given execution context. *)
   exception Halted of varval option * myctx
 
   (* An unknown label was found *)
   exception UnknownLabel of label_kind
 
+  (* An error occured *)
+  exception Error of string * myctx
+
   (* An assertion failed *)
   exception AssertFailed of myctx
+
+  (* An assumption failed, so the program did not start *)
+  exception AssumptionFailed of myctx
 
   let byte_type = reg_8
   let index_type = reg_32
@@ -512,6 +515,12 @@ struct
 	       raise (AssertFailed({ctx with pred = pred}))
              | _ -> [{ctx with pc=next_pc}]
           )
+      | Assume (e,_) ->
+        (match eval_expr delta e with
+        | v when is_true_val v -> [{ctx with pc=next_pc}]
+        | v when is_false_val v ->
+          raise (AssumptionFailed(ctx))
+        | _ -> failwith "Symbolic assumptions are not supported by the symbolic evaluator")
       | Comment _ | Label _ ->
           [{ctx with pc=next_pc}]
       | Special _ as s -> 

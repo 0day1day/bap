@@ -187,7 +187,8 @@ let typecheck_stmt =
       let et = infer_te e in
       (* Can we return a memory? Does this make sense? *)
       check_reg et
-    | Assert(e, _) ->
+    | Assert(e, _)
+    | Assume(e, _) ->
       let et = infer_te e in
       check_bool et
     | Label _

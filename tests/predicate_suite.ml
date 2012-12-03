@@ -72,6 +72,24 @@ let basic_validity_setup () =
   let cfg = Prune_unreachable.prune_unreachable_ast cfg in
   cfg, m2actx;;
 
+(* A very basic test of assumption.  The goal of this test is to make
+   sure that symbeval_search handles assumption failures correctly. *)
+let assume_setup () =
+  let () = check () in
+  let m2actx = Memory2array.create_state () in
+  let prog = [
+    CJmp(BinOp(EQ, Var Disasm_i386.eax, Int(bi0, reg_32)), Lab("L1"), Lab("L2"), []);
+    Ast.Label(Name("L1"), []);
+    Jmp(Lab("end"), []);
+    Ast.Label(Name("L2"), []);
+    Ast.Assume(exp_false, []);
+    Ast.Label(Name("end"), []);
+  ] in
+  typecheck prog;
+  let cfg = Cfg_ast.of_prog prog in
+  let cfg = Prune_unreachable.prune_unreachable_ast cfg in
+  cfg, m2actx;;
+
 let c_setup () =
   let () = check () in
   let m2actx = Memory2array.create_state () in
@@ -158,6 +176,11 @@ let suite = "Predicate" >:::
       (bracket
 	 basic_validity_setup
 	 (valid_test "basic_validity_test"  (BinOp(EQ, Var Disasm_i386.ebx, BinOp(TIMES, Int(biconst 2, Reg 32), Var Disasm_i386.eax))) (Smtexec.Valid))
+	 predicate_stp_tear_down);
+    "predicate_assume_validity_test" >::
+      (bracket
+	 assume_setup
+	 (valid_test "assume_validity_test" exp_true (Smtexec.Valid))
 	 predicate_stp_tear_down);
     "predicate_error_solve_test" >::
       (bracket
