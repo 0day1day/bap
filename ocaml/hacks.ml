@@ -1,10 +1,11 @@
 (** Hacks *)
 
-open Type
 open Ast
 open Ast_convenience
-open Util
+open Ast_visitor
 open BatListFull
+open Type
+open Util
 
 module C = Cfg.AST
 module D = Debug.Make(struct let name = "Hacks" and default=`NoDebug end)
@@ -205,3 +206,37 @@ let replace_unknowns p =
   end
   in
   Ast_visitor.prog_accept v p
+
+(** Add an "assume false" statement to BB_Error and add an edge to
+    BB_Exit.
+
+    Useful for testing validity with a bounded number of loops.
+*)
+let bberror_assume_false graph =
+  let graph, error = Cfg_ast.find_error graph in
+  let graph, exit = Cfg_ast.find_exit graph in
+  let preds = C.G.pred graph error in
+  let assume_label = "AssumeFalse" in
+  let assume_stmts =
+    [
+      Label(Name assume_label, []);
+      Assume(exp_false, [StrAttr "The program does not start"])
+    ]
+  in
+  let graph, assume = C.create_vertex graph assume_stmts in
+  let replace_label = function
+    | Lab "BB_Error" -> ChangeTo (Lab assume_label)
+    | _ -> DoChildren
+  in
+  let reroute cfg node =
+    let stmts = C.get_stmts cfg node in
+    let stmts = (map_e replace_label)#prog stmts in
+    let cfg = C.set_stmts cfg node stmts in
+    (*let cfg = C.remove_edge cfg node error in*)
+    let cfg = C.add_edge cfg node assume in
+    cfg
+  in
+  let graph = C.remove_vertex graph error in
+  let graph = List.fold_left reroute graph preds in
+  let graph = C.add_edge graph assume exit in
+  graph
