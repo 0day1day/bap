@@ -469,8 +469,10 @@ let eddwp_lazyconc_uwp ?(simp=or_simp) ?(k=1) ?(cf=true) mode ((cfg,ugclmap):Gcl
       | [] -> failwith (Printf.sprintf "BB %s has no predecessors but should" (Cfg_ast.v2s bb))
       | s -> let get_delta bb =
                let delta,_,fallthrough = getbbinfo (CA.G.V.label bb) in
+               dprintf "pred bb %s fallthrough %b" (Cfg_ast.v2s bb) fallthrough;
                if fallthrough then Some delta else None
              in
+             dprintf "merging at %s" (Cfg_ast.v2s bb);
              let fallthrough_deltas = BatList.filter_map get_delta s in
              let merged_delta = try BatList.reduce D.merge fallthrough_deltas
                with Invalid_argument "Empty List" -> D.create ()
