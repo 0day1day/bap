@@ -31,7 +31,7 @@ export LLVM_PACKS = llvm llvm.analysis llvm.executionengine llvm.target llvm.sca
 endif
 
 
-export PACKS = bigarray str num unix camomile piqi.lib $(LLVM_PACKS)
+export PACKS = camlidl bigarray str num unix camomile piqi.lib $(LLVM_PACKS)
 export LIBS = zarith batteries oUnit pcre objsize graph libtrace bap
 export INCDIRS = $(BAP_OCAMLDIR) $(BIGINT) $(BATT) $(OUNIT) $(PCRE) $(OCAMLGRAPH) $(OBJSIZE) $(LIBTRACE)
 export OCAMLPATH = $(PIQIBUILDDIR)
