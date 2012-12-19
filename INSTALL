@@ -46,6 +46,14 @@ Install build dependencies for Fedora Core 15:
    ocaml-camomile-devel ocaml-camomile-data                \
    ocaml-camlp4-devel automake binutils-devel gcc-c++
 
+Install build dependencies for Mac OS X using opam and macports:
+
+  $ opam install ocamlfind camlidl camomile
+
+  $ port install binutils pcre
+
+CPPFLAGS="-I/opt/local/include/ -I$(opam config -var lib)/camlidl" LDFLAGS="-L/opt/local/lib -L/opt/local/lib/x86_64/" ./configure
+
 If you get an error that says there is an undefined reference to
 '__stack_chk_fail', either you need to reconfigure with gcc set to
 disable stack protection, or you have compiled part of the code
