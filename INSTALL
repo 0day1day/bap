@@ -52,7 +52,7 @@ Install build dependencies for Mac OS X using opam and macports:
 
   $ port install binutils pcre
 
-CPPFLAGS="-I/opt/local/include/ -I$(opam config -var lib)/camlidl" LDFLAGS="-L/opt/local/lib -L/opt/local/lib/x86_64/" ./configure
+CPPFLAGS="-I/opt/local/include/ -I$(opam config -var lib)/camlidl" INCDIRS="$(opam config -var lib)/camlidl" LDFLAGS="-L/opt/local/lib -L/opt/local/lib/x86_64/" ./configure
 
 If you get an error that says there is an undefined reference to
 '__stack_chk_fail', either you need to reconfigure with gcc set to

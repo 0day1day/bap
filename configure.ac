@@ -217,6 +217,7 @@ AC_CHECK_LIB([pcre], [pcre_config], , AC_MSG_ERROR([PCRE library not found]))
 
 AC_SUBST(VEX_DIR)
 
+AC_SUBST(INCDIRS)
 
 #cp libasmir/makefile.inc.in libasmir/makefile.inc
 rm -f libasmir/makefile.inc
@@ -232,7 +233,8 @@ BAP_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 # Checks for header files.
 AC_HEADER_STDC
-AC_CHECK_HEADERS([fcntl.h stdint.h stdlib.h string.h unistd.h])
+AC_CHECK_HEADERS([fcntl.h stdint.h stdlib.h string.h unistd.h], ,
+   AC_MSG_ERROR([Standard headers missing]))
 AC_CHECK_HEADER([bfd.h], ,
    AC_MSG_ERROR([You need BFD headers (e.g., libbfd-dev)]))
 AC_CHECK_HEADER([pcre.h], ,
