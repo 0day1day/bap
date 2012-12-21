@@ -3,9 +3,9 @@
 #include <assert.h>
 #include <string.h>
 #include <limits.h>
+#include <stdarg.h>
 
 #include "asm_program.h"
-#include "libiberty.h"
 
 /* This elf stuff is interal to BFD (TOO BAD) */
 
