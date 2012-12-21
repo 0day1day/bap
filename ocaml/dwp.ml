@@ -416,6 +416,10 @@ let eddwp_lazyconc ?(simp=or_simp) ?(k=1) ?(cf=true) (mode:formula_mode) (p:Gcl.
 
 let eddwp_lazyconc_uwp ?(simp=or_simp) ?(k=1) ?(cf=true) mode ((cfg,ugclmap):Gcl.Ugcl.t) (q:exp) : exp =
 
+  Checks.acyclic_astcfg cfg "UWP";
+  Checks.connected_astcfg cfg "UWP";
+  Checks.exit_check_astcfg ~allowed_exits:[Cfg.BB_Exit; Cfg.BB_Error] ~expected_exits:[Cfg.BB_Exit] cfg "UWP";
+
   (* We want executions that go to BB_Error to return false in the VC,
      so we must add an edge from Error to Exit. *)
   let cfg =
@@ -424,8 +428,6 @@ let eddwp_lazyconc_uwp ?(simp=or_simp) ?(k=1) ?(cf=true) mode ((cfg,ugclmap):Gcl
     else cfg
   in
 
-  Checks.acyclic_astcfg cfg "UWP";
-  Checks.exit_check_astcfg ~allowed_exits:[Cfg.BB_Exit] cfg "UWP";
   (* dprintf "Starting uwp"; *)
   (* Block -> var *)
   let module BH = Cfg.BH in
