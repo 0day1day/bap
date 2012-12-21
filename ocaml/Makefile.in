@@ -129,7 +129,9 @@ export CLIBS = asmir vex opcodes bfd iberty stdc++
 export CLIBS += $(SOLVER_CLIBS)
 export OCAMLPATH = $(PIQIBUILDDIR)
 export CFLAGS = -g
-export LDFLAGS = $(LIBASMIR_LDFLAGS) $(SOLVER_LDFLAGS)
+export CPPFLAGS = @CPPFLAGS@
+export LDFLAGS = $(LIBASMIR_LDFLAGS) $(SOLVER_LDFLAGS) @LDFLAGS@
+export OCAMLMKLIB_FLAGS = $(LDFLAGS)
 export PPFLAGS = $(SOLVER_PPFLAGS) $(LLVM_PPFLAGS)
 export INCDIRS = $(BIGINT) $(BATT) $(OUNIT) $(PCRE) $(OCAMLGRAPH) $(OBJSIZE) $(LIBTRACE) $(LIBTRACE)/piqi
 export LIBS = zarith batteries oUnit pcre graph objsize libtrace
@@ -158,8 +160,9 @@ runtop:	top
 
 libbfd.idl : bfdarch.idl
 
-bfdarch.idl : /usr/include/bfd.h
-	 $(CPP) $< | awk 'BEGIN { go=0; } /^enum bfd_architecture$$/ { go=1; } \
+bfdarch.idl:
+	echo '#include <bfd.h>' > /tmp/f.c
+	$(CPP) $(CPPFLAGS) /tmp/f.c | awk 'BEGIN { go=0; } /^enum bfd_architecture$$/ { go=1; } \
 		go && $$0 != "" { print; } \
 		/};$$/ { go=0; }' > $@
 

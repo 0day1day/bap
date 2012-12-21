@@ -268,7 +268,8 @@ AC_CONFIG_FILES([Makefile
                  libasmir/Makefile
                  libasmir/apps/Makefile
                  libasmir/src/Makefile
-                 libtracewrap/Makefile])
+                 libtracewrap/Makefile
+		 ocaml/Makefile])
 AC_OUTPUT
 
 # Configure ocamlgraph
