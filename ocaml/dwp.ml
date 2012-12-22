@@ -302,22 +302,25 @@ module Make(D:Delta) = struct
     let dwpconc = dwpconcint simp eval k needh vmaph mode in
     function
       | Gcl.Assign (v, e) as s ->
-        List.iter (fun v' -> VH.add vmaph v v') (Formulap.freevars e);
         let value = eval delta e in
         if Symbeval.is_concrete_mem_or_scalar value then
+          let e' = match value with
+            | Symbolic _ -> unwrap_symb value
+            | ConcreteMem _ -> e
+          in
+          List.iter (fun v' -> VH.add vmaph v v') (Formulap.freevars e');
           let delta = D.set delta v value in
           delta, lazy (
             if is_needed v
             (* If needed, put the assignment in the formula.  For
                memories, use the expression, since the conrete values can
                be huge.  For scalars, use the concrete value. *)
-            then (match value with
-            | Symbolic _ -> punt_internal delta (Gcl.Assign (v, unwrap_symb value))
-            | ConcreteMem _ ->
-              punt_internal delta (Gcl.Assign (v, e)))
+            then punt_internal delta (Gcl.Assign (v, e'))
             (* If the value is not needed in the formula, act like a Skip *)
             else punt_internal delta Gcl.Skip
-          ), true else punt_external delta s
+          ), true
+        else (List.iter (fun v' -> VH.add vmaph v v') (Formulap.freevars e);
+              punt_external delta s)
       | Gcl.Assume e as s ->
         let value = eval delta e in
         if value = Symbolic exp_true then punt_external delta Gcl.Skip
@@ -510,6 +513,7 @@ let eddwp_lazyconc_uwp ?(simp=or_simp) ?(k=1) ?(cf=true) mode ((cfg,ugclmap):Gcl
         (* This is basically eddwp's Sequence rule. *)
         if msdup1 = exp_false then [], exp_false, exp_false, exp_false, exp_false
         else if afdup1 = exp_true then [], ms1, ms1, msdup1, msdup1
+        else if fallthrough1 = false then [], ms1, af1, msdup1, afdup1
         else
           let v, ms2, af2, msdup2, afdup2 = Lazy.force lazyr in
           (* let (v,ms1) = Wp.variableify ~name:"eddwp_seq_ms1" k v ms1 in *)
