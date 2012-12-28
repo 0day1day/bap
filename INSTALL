@@ -1,7 +1,10 @@
-*** Basic installation ****
+*** Supported platforms ***
 
-We primarily build bap on Ubuntu Linux. It will likely also work on
-Debian systems.
+In general, we support Debian Stable, Debian Testing, and Ubuntu.  You
+can probably compile BAP on other distributions, but it might require
+code changes.
+
+*** Basic installation ****
 
 To build BAP on x86, do the following:
   $ ./autogen.sh
@@ -10,33 +13,46 @@ To build BAP on x86, do the following:
 -- or to make all and run unit tests after --
   $ make test
 
-Configure should report any dependencies you do not have.  You can
-satisfy most dependencies on Ubuntu 11.04/11.10/12.04 by running:
+Configure should report any dependencies you do not have.
+
+
+
+Install build dependencies for Ubuntu 11.04/11.10/12.04:
 
   $ sudo apt-get install ocaml ocaml-native-compilers ocaml-findlib camlidl \
     binutils-dev automake libcamomile-ocaml-dev otags libpcre3-dev          \
     camlp4-extra bison flex zlib1g-dev libgmp3-dev g++ libtool              \
     libbitstring-ocaml-dev libtool
 
-XXX: Does this work for Debian too?
+On x86_64 add the following packages:
+    gcc-multilib g++-multilib lib32z1-dev
 
 To build LLVM code generation, include:
    libllvm-ocaml-dev
 We have only tested with version 2.9, but other versions may work too.
 
-On x86_64 add the following packages:
-    gcc-multilib g++-multilib lib32z1-dev
-
 To compile the documentation, you also need
   $ sudo aptitude install texlive-base texlive-latex-base \
     texlive-latex-extra texlive-fonts-recommended
 
-The following command will install build dependencies on Fedora Core 15:
+Install build dependencies for Debian Stable:
+
+Install build dependencies for Debian Testing:
+
+Install build dependencies for Fedora Core 15:
 
   $ sudo yum install ocaml ocaml-ocamlgraph ocaml-findlib  \
    ocaml-camlidl-devel ocaml-ocamlgraph-devel ocaml-extlib \
    ocaml-camomile-devel ocaml-camomile-data                \
    ocaml-camlp4-devel automake binutils-devel gcc-c++
+
+Install build dependencies for Mac OS X using opam and macports:
+
+  $ opam install ocamlfind camlidl camomile
+
+  $ port install binutils pcre
+
+CPPFLAGS="-I/opt/local/include/ -I$(opam config -var lib)/camlidl" INCDIRS="$(opam config -var lib)/camlidl" LDFLAGS="-L/opt/local/lib -L/opt/local/lib/x86_64/" ./configure
 
 If you get an error that says there is an undefined reference to
 '__stack_chk_fail', either you need to reconfigure with gcc set to

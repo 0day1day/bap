@@ -12,6 +12,8 @@ AM_INIT_AUTOMAKE
 AC_SUBST(LIBTRACE_DIR)
 LIBTRACE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
+AC_SUBST(INCDIRS)
+
 # Checks for programs.
 AC_PROG_CXX
 AC_PROG_CC

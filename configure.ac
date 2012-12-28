@@ -23,7 +23,7 @@ AC_PROG_CXX
 AC_PROG_CC
 AC_PROG_MAKE_SET
 AC_PROG_RANLIB
-AC_PROG_OCAML
+AC_PROG_OCAML([3.12.0])
 AC_PROG_OCAMLFIND
 AC_PROG_CAMLIDL
 # This isn't essential
@@ -210,12 +210,14 @@ fi
 #echo "HERE: ${AC_LDFLAGS}"
 #AC_LIBS([-lasmir], [-lvex], [-lbfd], [-liberty])
 #AC_CHECK_LIB([asmir], [libasmir_version])
-AC_CHECK_LIB([bfd], [bfd_init])
-AC_CHECK_LIB([iberty], [xmalloc])
+AC_CHECK_LIB([bfd], [bfd_init], , AC_MSG_ERROR([BFD library not found]))
+AC_CHECK_LIB([iberty], [xmalloc], , AC_MSG_ERROR([Iberty library not found]))
+AC_CHECK_LIB([pcre], [pcre_config], , AC_MSG_ERROR([PCRE library not found]))
 #AC_CHECK_LIB([vex], [LibVEX_Version])
 
 AC_SUBST(VEX_DIR)
 
+AC_SUBST(INCDIRS)
 
 #cp libasmir/makefile.inc.in libasmir/makefile.inc
 rm -f libasmir/makefile.inc
@@ -231,9 +233,13 @@ BAP_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 # Checks for header files.
 AC_HEADER_STDC
-AC_CHECK_HEADERS([fcntl.h stdint.h stdlib.h string.h unistd.h])
+AC_CHECK_HEADERS([fcntl.h stdint.h stdlib.h string.h unistd.h], ,
+   AC_MSG_ERROR([Standard headers missing]))
 AC_CHECK_HEADER([bfd.h], ,
    AC_MSG_ERROR([You need BFD headers (e.g., libbfd-dev)]))
+AC_CHECK_HEADER([pcre.h], ,
+   AC_MSG_ERROR([You need libpcre headers (e.g., libpcre3-dev)]))
+
 dnl AC_CHECK_HEADER([/usr/include/sqlite3.h], ,
 dnl    AC_MSG_ERROR([You need sqlite3 headers (e.g., libsqlite3-dev, and sqlite3 is also recommended but not required)]))
 
@@ -262,7 +268,8 @@ AC_CONFIG_FILES([Makefile
                  libasmir/Makefile
                  libasmir/apps/Makefile
                  libasmir/src/Makefile
-                 libtracewrap/Makefile])
+                 libtracewrap/Makefile
+		 ocaml/Makefile])
 AC_OUTPUT
 
 # Configure ocamlgraph

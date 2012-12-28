@@ -7,7 +7,6 @@
 #include <assert.h>
 
 #include "asm_program.h"
-#include "libiberty.h"
 
 
   // Structure for rodata

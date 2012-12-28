@@ -13,7 +13,7 @@ export BCSUFFIX = .dbg
 
 export OCAMLPATH = $(PIQIBUILDDIR)
 
-export PACKS = piqi.lib unix camomile num
+export PACKS = camlidl piqi.lib unix camomile num
 
 export INCDIRS += $(BATT)
 export INCDIRS += $(LIBTRACEDIR) $(LIBTRACEDIR)/piqi

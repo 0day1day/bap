@@ -373,7 +373,7 @@ module YICES_INFO =
 struct
   let timeout = 60
   let solvername = "yices"
-  let progname = "yices"
+  let progname = "yices-smt"
   let cmdstr f = "-f " ^ f
   let parse_result = STPSMTLIB_INFO.parse_result_builder solvername
   let printer = ((new Smtlib1.pp_oc) :> Formulap.fppf)

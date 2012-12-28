@@ -7,6 +7,12 @@ BATT = @BAT_DIR@
 
 export OCAMLPATH = $(PIQIBUILDDIR)
 
+# We can't use $(CPP) here because the default (cc -E) won't work on
+# .idl files.
+export CAMLIDLFLAGS = -prepro cpp
+
+INCDIRS += @INCDIRS@
+
 PACKS = piqi.lib
 
 SOURCES = piqi/frame_piqi.ml \
