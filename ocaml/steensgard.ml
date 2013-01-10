@@ -34,6 +34,8 @@ struct
         dprintf "process_scc";
         match scc with
         | [] -> failwith "loopinfo_from_steensgard: impossible"
+        | [x] when C.G.mem_edge cfg x x -> dprintf "Self loop at %s" (C.v2s x);
+          Loop [BB(x)]
         | [x] -> dprintf "BB %s" (C.v2s x); BB x
         | _ ->
           let h = Hashtbl.create (List.length scc) in

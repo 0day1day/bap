@@ -18,7 +18,7 @@ type unrollinfo =
 let rec string_of_unrollinfo = function
   | BB bb -> Cfg_ast.v2s bb
   | Other l -> "Other[" ^ List.fold_left (fun s li -> s ^ " " ^ (string_of_unrollinfo li)) "" l ^ " ]"
-  | Loop (head, l) -> "Loop[" ^ (Cfg_ast.v2s head) ^ "," ^ List.fold_left (fun s li -> s ^ " " ^ (string_of_unrollinfo li)) "" l ^ " ]"
+  | Loop (head, l) -> "Loop[head: " ^ (Cfg_ast.v2s head) ^ ", body:" ^ List.fold_left (fun s li -> s ^ " " ^ (string_of_unrollinfo li)) "" l ^ " ]"
 
 (* XXX: inefficient *)
 let rec bbs_from_unrollinfo = function
