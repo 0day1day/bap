@@ -599,45 +599,6 @@ let eddwp_uwp ?simp ?k mode =
   let module Toposort = Graph.Topological.Make(Cfg.AST.G) in
   Wp.build_passified_uwp Toposort.iter (eddwp ~normalusage:false ?simp ?k mode)
 
-let fwp ?(simp=or_simp) ?(k=1) (mode:formula_mode) (p:Gcl.t) q =
-  (* Simple forward wp. Returns a tuple containing variable bindings, wp
-     S Q, and wlp S Q. *)
-  let rec fwpint ?(simp=or_simp) ?(k=1) ?assign_mode p q =
-    let fwpint = fwpint ~simp ~k ?assign_mode in match p with
-      | Assign (v,e) when assign_mode <> None ->
-        (match assign_mode with
-        | Some Sat -> fwpint (Assert (exp_eq (Var v) e)) q
-        | Some Validity -> fwpint (Assume (exp_eq (Var v) e)) q
-        | Some Foralls -> failwith "fwpint: Foralls not implemented"
-        | None -> failwith "fwpint: impossible")
-      | Assign _ -> failwith "fwpint requires an assignment free program"
-      | Assert e -> [], simp (exp_and e q), simp (exp_implies e q)
-      | Assume e -> let e' = simp (exp_implies e q) in [], e', e'
-      | Choice (s1, s2) ->
-        let (v,q) = Wp.variableify ~name:"qc" k [] q in
-        let v',wp1,wlp1 = fwpint s1 q in
-        let v'',wp2,wlp2 = fwpint s2 q in
-        v@v'@v'', simp (exp_and wp1 wp2), simp (exp_and wlp1 wlp2)
-      | Seq (s1, s2) as _s ->
-        let v,wp1,_ = fwpint s1 exp_true in
-        let v',_,wlp1 = fwpint s1 exp_false in
-        let (v,q) = Wp.variableify ~name:"qseq" k v q in
-        (* XXX: Why does commenting this out slow down the printer so
-           much? *)
-        let (v,wlp1) = Wp.variableify ~name:"wlp1" k v wlp1 in
-        let v'',wp2,wlp2 = fwpint s2 q in
-        v@v'@v'', exp_and wp1 (exp_or wlp1 wp2), exp_or wlp1 wlp2
-      | Skip -> [], q, q
-  in
-  dprintf "GCL size: %d" (Gcl.size p);
-  let (v,wp,_) = fwpint ~simp ~k p q in
-  let o = match mode with
-  | Sat | Validity ->
-    Wp.assignments_to_lets v wp
-  | Foralls ->
-    failwith "Foralls not supported yet" in
-  dprintf "WP size: %d" (ast_size o); o
-
 (* let eddwp_conc ?simp ?k ?cf mode p q = *)
 (*   let module DWPCONC = Make(VMDelta) in *)
 (*   DWPCONC.eddwp_conc ?simp ?k ?cf mode p q *)
