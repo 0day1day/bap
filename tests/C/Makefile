@@ -1,6 +1,6 @@
 include Makefile.defs
 
-CFLAGS = -m32 -static -fno-stack-protector
+CFLAGS = -m32 -fno-stack-protector
 
 all: $(CEXECS)
 
