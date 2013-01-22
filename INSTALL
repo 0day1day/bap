@@ -72,11 +72,15 @@ Install macports and opam.  Then install needed opam packages:
 
 Install required macports:
 
-  $ port install binutils pcre
+  $ port install pcre
+  $ port install -s binutils configure.post_args=--enable-targets=i386-elf,i386-pe
 
 And run configure:
 
-  $ CPPFLAGS="-I/opt/local/include/ -I$(opam config -var lib)/camlidl" INCDIRS="$(opam config -var lib)/camlidl" LDFLAGS="-L/opt/local/lib -L/opt/local/lib/x86_64/" ./configure
+  $ CPPFLAGS="-I/opt/local/include/ -I$(opam config -var lib)/camlidl"
+    INCDIRS="$(opam config -var lib)/camlidl"
+    LDFLAGS="-L/opt/local/lib -L/opt/local/lib/x86_64/"
+    ./configure
 
 *** SMT Solvers ***
 
