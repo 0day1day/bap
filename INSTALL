@@ -77,9 +77,9 @@ Install required macports:
 
 And run configure:
 
-  $ CPPFLAGS="-I/opt/local/include/ -I$(opam config -var lib)/camlidl"
-    INCDIRS="$(opam config -var lib)/camlidl"
-    LDFLAGS="-L/opt/local/lib -L/opt/local/lib/x86_64/"
+  $ CPPFLAGS="-I/opt/local/include/ -I$(opam config var lib)/camlidl" \
+    INCDIRS="$(opam config var lib)/camlidl" \
+    LDFLAGS="-L/opt/local/lib -L/opt/local/lib/x86_64/" \
     ./configure
 
 *** SMT Solvers ***
