@@ -127,7 +127,7 @@ all: nc dc
 
 # Recursive make
 tags:
-	echo 'Making tags (not really)'
+	-
 
 # Print out command line to start ocamldebug
 debug: dc
