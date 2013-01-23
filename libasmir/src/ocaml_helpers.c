@@ -1,6 +1,7 @@
 #include "asm_program.h"
 #include "vexmem.h"
 #include <assert.h>
+#include <bfd.h>
 #include <stdint.h>
 
 asection* bfd_sections( bfd *abfd) {
@@ -16,6 +17,10 @@ asection* bfd_next_section( asection *s) {
 
 bfd* asmir_get_bfd(asm_program_t *p) {
   return p->abfd;
+}
+
+enum bfd_flavour bfd_flavour(bfd* abfd) {
+  return (bfd_get_flavour(abfd));
 }
 
 address_t bfd_section_get_vma(asection *s) {
