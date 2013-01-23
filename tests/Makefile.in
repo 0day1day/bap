@@ -25,8 +25,9 @@ export PIQIBUILDDIR=$(BAP_DIR)/libtracewrap/libtrace/piqi/piqi/build/lib/ocaml
 # Stop annoying warnings about big_int duplication!
 #export OCAMLFIND_IGNORE_DUPS_IN=$(BAP_DIR)/bigint-3.12/otherlibs/num
 
-export LLVM_PACKS = $(if @HAVE_LLVM_AC@,@LLVM_PACKAGE@ @LLVM_PACKAGE@.analysis @LLVM_PACKAGE@.executionengine @LLVM_PACKAGE@.target @LLVM_PACKAGE@.scalar_opts @LLVM_PACKAGE@.bitwriter)
-
+ifeq (@HAVE_LLVM_AC@,yes)
+export LLVM_PACKS = @LLVM_PACKAGE@ @LLVM_PACKAGE@.analysis @LLVM_PACKAGE@.executionengine @LLVM_PACKAGE@.target @LLVM_PACKAGE@.scalar_opts @LLVM_PACKAGE@.bitwriter
+endif
 
 export PACKS = camlidl bigarray str num unix camomile piqi.lib $(LLVM_PACKS)
 export LIBS = zarith batteries oUnit pcre objsize graph libtrace bap

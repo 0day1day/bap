@@ -27,8 +27,10 @@ export SOLVER=$(BAP_DIR)/solvers
 include $(SOLVER)/makefile.inc
 -include ../../ocaml-proj/Makefile
 
-export LLVM_SRC = $(if @HAVE_LLVM_AC@,llvm_codegen.mli llvm_codegen.ml)
-export LLVM_PACKS = $(if @HAVE_LLVM_AC@,@LLVM_PACKAGE@ @LLVM_PACKAGE@.analysis @LLVM_PACKAGE@.executionengine @LLVM_PACKAGE@.target @LLVM_PACKAGE@.scalar_opts @LLVM_PACKAGE@.bitwriter)
+ifeq (@HAVE_LLVM_AC@,yes)
+export LLVM_SRC = llvm_codegen.mli llvm_codegen.ml
+export LLVM_PACKS = @LLVM_PACKAGE@ @LLVM_PACKAGE@.analysis @LLVM_PACKAGE@.executionengine @LLVM_PACKAGE@.target @LLVM_PACKAGE@.scalar_opts @LLVM_PACKAGE@.bitwriter
+endif
 
 #export LIB_PACK_NAME = bap
 
