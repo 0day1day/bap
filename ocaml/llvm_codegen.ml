@@ -62,7 +62,7 @@ class codegen ?(opts=true) memimpl =
   let the_fpm = PassManager.create_function the_module in
   (* Set up the optimizer pipeline.  Start with registering info about
    * how the target lays out data structures. *)
-  let () = Llvm_target.TargetData.add (ExecutionEngine.target_data execengine) the_fpm in
+  let () = Llvm_target.DataLayout.add (ExecutionEngine.target_data execengine) the_fpm in
 
   let () = if opts then (
 
@@ -268,7 +268,7 @@ object(self)
   (*   f *)
 
   (** Convert a single straight-line statement *)
-  method private convert_straightline_stmt s = 
+  method private convert_straightline_stmt s =
     (* dprintf "Converting stmt %s" (Pp.ast_stmt_to_string s); *)
     match s with
     | Label _ -> ()
