@@ -2238,7 +2238,11 @@ let parse_instr g addr =
     | 0x0f -> (
       let b2 = Char.code (g na) and na = s na in
       match b2 with (* Table A-3 *)
-      | 0x1f -> (Nop, na)
+      | 0x1f ->
+        (* Even though we don't use the operand to nop, we need to
+           parse it to get the next address *)
+        let _, _, na = parse_modrm32 na in
+        (Nop, na)
       | 0x12 | 0x13 | 0x28 | 0x29 | 0x6e | 0x7e | 0x6f | 0x7f | 0xd6 ->
         (* XXX: Clean up prefixes.  This will probably require some
            effort studying the manual. We probably don't do the right
