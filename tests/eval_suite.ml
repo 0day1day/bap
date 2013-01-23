@@ -51,9 +51,10 @@ let concrete_eval_test (ranges, s) =
   let s = find_call main_prog in
   let ctx2 = Symbeval.concretely_execute ~s ~i prog in
   let eax2 = Arithmetic.to_big_int(bim1,Type.Reg(32)) in
-  let msg = " from check_functions" in
+  let msg = "from check_functions" in
   typecheck prog;
-  check_functions msg ranges ["main"; "g"];
+  (try check_functions msg ranges ["main"; "g"]
+   with _ -> check_functions msg ranges ["_main"; "_g"]);
   check_eax ctx1 eax1;
   check_eax ctx2 eax2;;
 
