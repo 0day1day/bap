@@ -15,7 +15,7 @@ let concrete_eval_setup _ =
   let pp = new Pp.pp_oc out in
   let prog = Asmir.open_program test_file in
   let ranges = Asmir.get_function_ranges prog in
-  let (start_addr,_) = find_fun ranges "main" in
+  let (start_addr,_) = find_funs ranges ["main"; "_main"] in
   (* Silence floating point warnings for tests *)
   let _ = if (Asmir.get_print_warning()) then Asmir.set_print_warning(false) in
   let ir = Asmir.asmprogram_to_bap prog in
@@ -46,7 +46,7 @@ let concrete_eval_test (ranges, s) =
   let prog,_ = Parser.program_from_file il_file in
   let ctx1 = Symbeval.concretely_execute ~s prog in
   let eax1 = biconst 0x2a in
-  let (start_addr,end_addr) = find_fun ranges "main" in
+  let (start_addr,end_addr) = find_funs ranges ["main"; "_main"] in
   let main_prog = Test_common.find_prog_chunk prog start_addr end_addr in
   let s = find_call main_prog in
   let ctx2 = Symbeval.concretely_execute ~s ~i prog in

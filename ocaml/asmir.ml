@@ -978,7 +978,8 @@ let get_function_ranges p =
     | Bfd_target_coff_flavour ->
       (fun s -> s.bfd_symbol_flags land bsf_function <> 0)
     | Bfd_target_mach_o_flavour ->
-      (fun s -> true)
+      (fun s -> dprintf "Symbol %s, flags=%#x" s.bfd_symbol_name s.bfd_symbol_flags;
+	s.bfd_symbol_flags land bsf_global <> 0)
     | _ ->
       wprintf "Unknown file format flavour.  Assuming it has a function flag for symbols, which may be incorrect.";
       (fun s -> s.bfd_symbol_flags land bsf_function <> 0)

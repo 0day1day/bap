@@ -92,10 +92,11 @@ let check_pin_setup _ =
 
 
 (** Common functions across multipule tests **)
-let rec find_fun ?(msg="") ranges name = match ranges with
-  | [] -> assert_failure ("Could not find function "^name^msg)
-  | (n,s,e)::rs -> if (n = name) then (s,e) else find_fun ~msg rs name;;
+let rec find_funs ?(msg="") ranges names = match ranges with
+  | [] -> assert_failure ("Could not find functions "^msg)
+  | (n,s,e)::rs -> if (List.mem n names) then (s,e) else find_funs ~msg rs names;;
 
+let rec find_fun ?(msg="") ranges name = find_funs ~msg ranges [name]
 
 let rec find_call prog = 
   match prog with
