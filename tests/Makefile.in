@@ -73,9 +73,11 @@ all: $(TARGETS)
 test: all
 	./bap_test_suite
 
+.PHONY: ASM
 ASM:
 	make -C asm
 
+.PHONY: CTESTS
 CTESTS:
 	make -C C
 
