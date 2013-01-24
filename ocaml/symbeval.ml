@@ -164,7 +164,12 @@ sig
   val eval_symb_let : bool
 end
 
-module type Formula =
+(* Old formula type.  Hardcoded to output an expression, which doesn't
+   make sense for streaming formulas.
+
+   XXX: Get rid of this
+*)
+module type OldFormula =
 sig
   type t
   val true_formula : t
@@ -173,7 +178,10 @@ sig
   val output_formula : t -> Ast.exp
 end
 
-module type StreamFormula =
+(* Newer, flexible formula type.  The input and output types are
+   flexible.  For instance, the output will be type unit for streaming
+   formulas. *)
+module type FlexibleFormula =
 sig
   type t
   type init
@@ -186,13 +194,13 @@ end
 (** Module that handles how Assignments are handled. *)
 module type Assign =
   functor (MemL:MemLookup) ->
-    functor (Form:StreamFormula) ->
+    functor (Form:FlexibleFormula) ->
 sig
   (** Assign a variable. Does not modify the entire context in place. *)
   val assign : Var.t -> varval -> (MemL.t,Form.t) ctx -> (MemL.t,Form.t) ctx
 end
 
-module Make(MemL:MemLookup)(Tune:EvalTune)(Assign:Assign)(Form:StreamFormula) =
+module Make(MemL:MemLookup)(Tune:EvalTune)(Assign:Assign)(Form:FlexibleFormula) =
 struct
 
   module MemL=MemL
@@ -819,7 +827,7 @@ module ConcreteUnknownZeroMemL = BuildConcreteUnknownZeroMemL(MemVHBackEnd)
 (** Symbolic assigns are represented as Lets in the formula, except
     for temporaries.  If you use this, you should clear out temporaries
     after executing each instruction. *)
-module PredAssign(MemL: MemLookup)(Form: StreamFormula) =
+module PredAssign(MemL: MemLookup)(Form: FlexibleFormula) =
 struct
   let assign v ev ({delta=delta; pred=pred; pc=pc} as ctx) =
     let expr = symb_to_exp ev in
@@ -840,7 +848,7 @@ struct
 end
 
 (** Symbolic assigns are represented in delta *)
-module StdAssign(MemL:MemLookup)(Form:StreamFormula) =
+module StdAssign(MemL:MemLookup)(Form:FlexibleFormula) =
 struct
   open MemL
   let assign v ev ({delta=delta; pc=pc} as ctx) =
@@ -863,8 +871,10 @@ module SlowEval = AlwaysEvalLet
 module StdForm =
 struct
   type t = Ast.exp
+  type init = unit
+  type output = Ast.exp
 
-  let true_formula = exp_true
+  let init () = exp_true
 
   let add_to_formula formula expression _type =
     BinOp(AND, expression, formula)
@@ -876,8 +886,10 @@ end
 module LetBind =
 struct
   type t = (Ast.exp -> Ast.exp)
+  type init = unit
+  type output = Ast.exp
 
-  let true_formula = (fun e -> e)
+  let init () = (fun e -> e)
 
   let add_to_formula fbuild expression typ =
     (match expression, typ with
@@ -896,8 +908,10 @@ module LetBindOld =
 struct
   type f = And of Ast.exp | Let of (Var.t * Ast.exp)
   type t = f list
+  type init = unit
+  type output = Ast.exp
 
-  let true_formula = []
+  let init () = []
 
   let add_to_formula bindings expression typ =
     (match expression, typ with
@@ -921,9 +935,9 @@ struct
       create_formula exp_true bindings
 end
 
-(** Older Formulas build up formula before printing out but this functor makes 
-    it looks like streaming to evaluator *) 
-module StreamFormulaConverter(Form:Formula) =
+(* Convert OldFormulas to the more general FlexibleFormula
+   representation *)
+module FlexibleFormulaConverter(Form:OldFormula) =
 struct
   type t = Form.t
   type init = unit
@@ -936,19 +950,19 @@ struct
   let output_formula = Form.output_formula
 end
 
-module StreamFormulaConverterToStream(Form:Formula) = 
+module FlexibleFormulaConverterToStream(Form:FlexibleFormula with type init=unit with type output = Ast.exp) = 
 struct
   type fp = Formulap.fpp_oc
   type t = {printer : Formulap.fpp_oc; form_t : Form.t}
   type init = Formulap.fpp_oc
   type output = unit
 
-  let init printer = {printer=printer; form_t=Form.true_formula}
+  let init printer = {printer=printer; form_t=Form.init ()}
 
-  let add_to_formula ({printer; form_t} as record) exp typ = 
+  let add_to_formula ({printer=printer; form_t=form_t} as record) exp typ = 
     {record with form_t = Form.add_to_formula form_t exp typ}
 
-  let output_formula {printer; form_t} = 
+  let output_formula {printer=printer; form_t=form_t} =
     let formula = Form.output_formula form_t in
     let mem_hash = Memory2array.create_state () in
     let formula = Memory2array.coerce_exp_state mem_hash formula in
@@ -958,13 +972,9 @@ struct
     printer#close
 end
 
-module StdFormStreamOld = StreamFormulaConverter(StdForm)
-module LetBindStreamOld = StreamFormulaConverter(LetBind)
-module LetBindOldStreamOld = StreamFormulaConverter(LetBindOld)
-
-module StdFormStream = StreamFormulaConverterToStream(StdForm)
-module LetBindStream = StreamFormulaConverterToStream(LetBind)
-module LetBindOldStream = StreamFormulaConverterToStream(LetBindOld)
+module StdFormStream = FlexibleFormulaConverterToStream(StdForm)
+module LetBindStream = FlexibleFormulaConverterToStream(LetBind)
+module LetBindOldStream = FlexibleFormulaConverterToStream(LetBindOld)
 
 (** Print let formulas in a streaming fashion.  For example, given a trace:
     1. x = 5
@@ -973,10 +983,10 @@ module LetBindOldStream = StreamFormulaConverterToStream(LetBindOld)
 
     The formula (for smtlib) would look like:
     (and
-        (let x = 5 in
-            (x = 5)
-            (let y = 10 in
-                (true))))
+    (let x = 5 in
+    (x = 5)
+    (let y = 10 in
+    (true))))
 *)
 module LetBindStreamLet =
 struct
@@ -990,7 +1000,7 @@ struct
   let free_vars = ref Var.VarSet.empty;;
   let defined_vars = ref Var.VarSet.empty;;
 
-  let init {Formulap.formula_p; Formulap.free_var_p} = 
+  let init {Formulap.formula_p=formula_p; Formulap.free_var_p=free_var_p} = 
     (* Create and start a stack of functions to close parens of operations *)
     let close_funs = Stack.create() in
     free_var_p#open_benchmark_has_mem();
@@ -1000,7 +1010,10 @@ struct
     {formula_printer=formula_p; free_var_printer=free_var_p; 
      form_t=exp_true; close_funs=close_funs}
 
-  let add_to_formula ({formula_printer; free_var_printer; form_t; close_funs} as record) expression typ =
+  let add_to_formula ({formula_printer=formula_printer;
+                       free_var_printer=free_var_printer;
+                       form_t=form_t;
+                       close_funs=close_funs} as record) expression typ =
     (match expression, typ with
       | _, Equal ->
           formula_printer#print_assertion expression;
@@ -1021,7 +1034,10 @@ struct
       | _ -> failwith "internal error: adding malformed constraint to formula"
     )
 
-  let output_formula {formula_printer; free_var_printer;  form_t; close_funs} =
+  let output_formula {formula_printer=formula_printer;
+                      free_var_printer=free_var_printer;
+                      form_t=form_t;
+                      close_funs=close_funs} =
     formula_printer#print_assertion exp_true;
     Stack.iter (fun f -> f()) close_funs;
     formula_printer#close_benchmark(); 
@@ -1034,10 +1050,10 @@ struct
 end
 
 
-module Symbolic = Make(SymbolicMemL)(FastEval)(StdAssign)(StdFormStreamOld)
-module SymbolicSlow = Make(SymbolicMemL)(SlowEval)(StdAssign)(StdFormStreamOld)
+module Symbolic = Make(SymbolicMemL)(FastEval)(StdAssign)(StdForm)
+module SymbolicSlow = Make(SymbolicMemL)(SlowEval)(StdAssign)(StdForm)
 
-module Concrete = Make(ConcreteUnknownZeroMemL)(AlwaysEvalLet)(StdAssign)(StdFormStreamOld)
+module Concrete = Make(ConcreteUnknownZeroMemL)(AlwaysEvalLet)(StdAssign)(StdForm)
 
 (** Execute a program concretely *)
 let concretely_execute ?s ?(i=[]) p =

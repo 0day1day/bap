@@ -891,7 +891,7 @@ struct
 
 end
 
-module TraceConcreteAssign(MemL: MemLookup)(Form: StreamFormula) =
+module TraceConcreteAssign(MemL: MemLookup)(Form: FlexibleFormula) =
 struct
   let assign v ev ctx =
     let module StdAssign = Symbeval.StdAssign(MemL)(Form) in
@@ -900,7 +900,7 @@ struct
 end
 
 module TraceConcrete = 
-  Symbeval.Make(TraceConcreteDef)(AlwaysEvalLet)(TraceConcreteAssign)(StdFormStreamOld)
+  Symbeval.Make(TraceConcreteDef)(AlwaysEvalLet)(TraceConcreteAssign)(StdForm)
 
 (** Check all variables in delta to make sure they agree with operands
     loaded from a trace. We should be able to find bugs in BAP and the
@@ -1463,7 +1463,7 @@ struct
 
 end
 
-module TaintConcrete = Symbeval.Make(TaintConcreteDef)(FastEval)(StdAssign)(StdFormStreamOld)
+module TaintConcrete = Symbeval.Make(TaintConcreteDef)(FastEval)(StdAssign)(StdForm)
 
 (** Concretely execute a trace without using any operand information *)
 let concrete_rerun file stmts =
@@ -1564,7 +1564,7 @@ let solution_from_stp_formula file =
     that when we call is_temp we need to use the non-dsa variable
     name.
 *)
-module PredAssignTraces(MemL: MemLookup)(Form: StreamFormula) =
+module PredAssignTraces(MemL: MemLookup)(Form: FlexibleFormula) =
 struct
   let assign v ev ({delta=delta; pred=pred; pc=pc} as ctx) =
     dprintf "ev: %s" (Symbeval.symb_to_string ev);
@@ -1587,7 +1587,7 @@ struct
     {ctx with delta=delta'; pred=pred'; pc=Int64.succ pc}
 end
 
-(* module StreamingLetBind : StreamFormula =  *)
+(* module StreamingLetBind : FlexibleFormula =  *)
 (* struct *)
 (*   type t =  *)
 (* end *)
@@ -1626,7 +1626,7 @@ sig
   val output_exploit : string -> stmt list -> unit
 end
 
-module TraceSymbolicFunc (Tune: EvalTune) (Assign: Assign) (PrinterType: TracePrinter) (Form: StreamFormula with type init=PrinterType.fp with type output = unit) =
+module TraceSymbolicFunc (Tune: EvalTune) (Assign: Assign) (PrinterType: TracePrinter) (Form: FlexibleFormula with type init=PrinterType.fp with type output = unit) =
 struct 
   (* Set this to LetBindSimplify to use formula simplificiation *)
   module SymbolicEval = Symbeval.Make(SymbolicMemL)(Tune)(Assign)(Form)
