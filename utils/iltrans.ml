@@ -88,9 +88,9 @@ let to_dsa p =
 
 let output_structanal p =
   let cfg = Prune_unreachable.prune_unreachable_ast p in
-  ignore(Structural_analysis.structural_analysis cfg)
-  (* FIXME: print a pretty graph or something. For now the debugging
-     output is useful enough... *)
+  let sa = Structural_analysis.structural_analysis cfg in
+  print_endline "Structural analysis results:";
+  print_endline (Structural_analysis.node2s sa)
 
 let sccvn p =
   fst(Sccvn.replacer p)
@@ -103,11 +103,40 @@ let jumpelim p =
 let ast_coalesce = Coalesce.coalesce_ast
 let ssa_coalesce = Coalesce.coalesce_ssa
 
-(* Chop code added *)
 let ast_chop srcbb srcn trgbb trgn p =
   Ast_slice.CHOP_AST.chop p !srcbb !srcn !trgbb !trgn
 let ssa_chop srcbb srcn trgbb trgn p =
   Ssa_slice.CHOP_SSA.chop p !srcbb !srcn !trgbb !trgn
+
+let usedef p =
+  let module UD = Depgraphs.UseDef_AST in
+  let module VM = Var.VarMap in
+  let h,_ = UD.usedef p in
+  Hashtbl.iter
+    (fun (bb,i) varmap ->
+      Printf.printf "At location %s %d:\n" (Cfg_ast.v2s bb) i;
+      VM.iter
+        (fun v defset ->
+          let defs = try BatList.reduce (fun s s2 -> s^" "^s2) (List.map UD.LocationType.to_string (UD.LS.elements defset)) with _ -> "" in
+          Printf.printf "use %s -> def %s\n" (Pp.var_to_string v) defs
+        ) varmap;
+      Printf.printf "\n"
+    ) h
+
+let defuse p =
+  let module UD = Depgraphs.UseDef_AST in
+  let module VM = Var.VarMap in
+  let h,_ = UD.defuse p in
+  Hashtbl.iter
+    (fun (bb,i) varmap ->
+      Printf.printf "At location %s %d:\n" (Cfg_ast.v2s bb) i;
+      VM.iter
+        (fun v defset ->
+          let defs = BatList.reduce (fun s s2 -> s^" "^s2) (List.map UD.LocationType.to_string (UD.LS.elements defset)) in
+          Printf.printf "def %s -> use %s\n" (Pp.var_to_string v) defs
+        ) varmap;
+      Printf.printf "\n"
+    ) h
 
 let add c =
   pipeline := c :: !pipeline
@@ -169,9 +198,9 @@ let speclist =
      "Perform dead code ellimination.")
   ::("-adeadcode", uadd(TransformSsa adeadcode),
      "Perform aggressive dead code ellimination.")
-  ::("-ast-coalesce", uadd(TransformAstCfg ast_coalesce),
+  ::("-coalesce-ast", uadd(TransformAstCfg ast_coalesce),
      "Perform coalescing on the AST.")
-  ::("-ssa-coalesce", uadd(TransformSsa ssa_coalesce),
+  ::("-coalesce-ssa", uadd(TransformSsa ssa_coalesce),
      "Perform coalescing on the SSA.")
   ::("-jumpelim", uadd(TransformSsa jumpelim),
      "Control flow optimization.")
@@ -179,9 +208,9 @@ let speclist =
   (*    "Convert memory accesses to scalars (default mode).") *)
   (* ::("-memtoscalar-initro", uadd(AnalysisSsa memory2scalariroptir), *)
   (*    "Convert memory accesses to scalars (IndirectROPTIR mode).") *)
-  ::("-ssa-simp", uadd(TransformSsa Ssa_simp.simp_cfg),
+  ::("-simp-ssa", uadd(TransformSsa Ssa_simp.simp_cfg),
      "Perform all supported optimizations on SSA")
-  ::("-ssa-to-single-stmt",
+  ::("-single-stmt-ssa",
      uadd(TransformSsa Depgraphs.DDG_SSA.stmtlist_to_single_stmt),
      "Create new graph where every node has at most 1 SSA statement"
     )
@@ -364,14 +393,17 @@ let speclist =
   :: ("-prune-cfg",
       uadd(TransformAstCfg Prune_unreachable.prune_unreachable_ast),
       "Prune unreachable nodes from an AST CFG")
+  :: ("-prune-ssa",
+      uadd(TransformSsa Prune_unreachable.prune_unreachable_ssa),
+      "Prune unreachable nodes from a SSA CFG")
   :: ("-unroll",
       Arg.Int (fun i -> add (TransformAstCfg(Unroll.unroll_loops ~count:i))),
       "<n> Unroll loops n times")
   :: ("-rm-cycles", uadd(TransformAstCfg Hacks.remove_cycles),
       "Remove cycles")
-  :: ("-ast-rm-indirect", uadd(TransformAstCfg Hacks.ast_remove_indirect),
+  :: ("-rm-indirect-ast", uadd(TransformAstCfg Hacks.ast_remove_indirect),
       "Remove BB_Indirect")
-  :: ("-ssa-rm-indirect", uadd(TransformSsa Hacks.ssa_remove_indirect),
+  :: ("-rm-indirect-ssa", uadd(TransformSsa Hacks.ssa_remove_indirect),
       "Remove BB_Indirect")
   :: ("-typecheck", uadd(AnalysisAst Typecheck.typecheck_prog),
       "Typecheck program")
@@ -381,6 +413,10 @@ let speclist =
       "Replace all unknowns with zeros")
   :: ("-flatten-mem", uadd(TransformAst Flatten_mem.flatten_mem_program),
       "Flatten memory accesses")
+  :: ("-usedef", uadd(AnalysisAstCfg usedef),
+      "Compute and print use def chains")
+  :: ("-defuse", uadd(AnalysisAstCfg defuse),
+      "Compute and print def use chains")
   :: Input.speclist
 
 let anon x = raise(Arg.Bad("Unexpected argument: '"^x^"'"))

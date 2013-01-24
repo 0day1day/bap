@@ -540,17 +540,17 @@ let is_seed_label = (=) "ReadSyscall"
 let rec get_tid stmts =
   let rec get_tid_from_atts atts = 
     match atts with
-      | [] -> None
-      | a::ats -> (match a with
-          | ThreadId i -> Some(i)
-          | _ -> get_tid_from_atts ats)
+    | [] -> None
+    | a::ats -> (match a with
+      | ThreadId i -> Some(i)
+      | _ -> get_tid_from_atts ats)
   in
   (* If symbolic bytes are introduced, this should be a memory only operation
      and doesn't really have a thread ID, so set the thread ID to 0 *)
   match stmts with
-    | (Ast.Comment (c, _))::rest when (is_seed_label c) -> Some 0
-    | _ ->  get_tid_from_atts (get_attrs (List.hd stmts))
-        
+  | (Ast.Comment (c, _))::rest when (is_seed_label c) -> Some 0
+  | _ ->  get_tid_from_atts (get_attrs (List.hd stmts))
+
 (** Support muti-threaded traces by seperating variables per threadId *)
 module ThreadVar = struct
   type t = int * Var.t
@@ -858,7 +858,7 @@ struct
           wprintf "Unknown variable during eval: %s" (Var.name var);
         Symbolic(Int(bi0, (Var.typ var)))
 
-  let normalize = SymbolicMemL.normalize
+  let normalize = Symbeval.normalize
 
   let update_mem mu pos value endian =
     (match mu, pos with
@@ -886,6 +886,8 @@ struct
       )
 
     | _ -> failwith "Concrete evaluation should never have symbolic memories"
+
+  include Symbeval.BuildMemLPrinters(MemVHBackEnd)
 
 end
 
@@ -1149,7 +1151,7 @@ let run_block ?(next_label = None) ?(transformf = (fun s _ -> [s])) state memv t
   if not !consistency_check then (
     (* If we are not doing a consistency check, there's no reason to
        keep delta around. cleanup_delta completely clears delta *)
-    TraceConcrete.cleanup_delta state.delta
+    TraceConcrete.cleanup_delta state
   ) else (
     (* remove temps *)
     clean_delta state.delta;
@@ -1449,7 +1451,7 @@ struct
       )
 
   let lookup_mem mu index endian =
-    let normalize = SymbolicMemL.normalize in
+    let normalize = Symbeval.normalize in
     match mu, index with
     | ConcreteMem(m,v), Int(i,t) ->
 	(try AddrMap.find (normalize i t) m
@@ -1502,7 +1504,6 @@ let concrete_rerun file stmts =
 
 (* A quick and dirty way to estimate the formula size *)
 let formula_size formula =
-  let _max n1 n2 = if n1 > n2 then n1 else n2 in
   let (+) = Int64.add in
   let rec size = function
     | Ast.Ite(_,e1,e2) -> Int64.one + (size e1) + (size e2)
@@ -1575,7 +1576,7 @@ struct
                                 (MemL.update_var delta v ev, pred))
       else
         let expr = match ev with
-          | ConcreteMem (m,v) -> symb_to_exp (Symbeval.SymbolicMemL.conc2symb m v)
+          | ConcreteMem (m,v) -> symb_to_exp (Symbeval.conc2symb m v)
           | Symbolic e -> e
         in
         let constr = BinOp (EQ, Var v, expr) in
@@ -1824,9 +1825,9 @@ struct
       | None -> Printf.printf "Formula was unsatisfiable\n"; 
           failwith "Formula was unsatisfiable"
     in
-  (* The variables that we care about *)
+    (* The variables that we care about *)
     let is_input v = String.sub v 0 4 = "symb" in
-  (* A special function to sort interesting variables by name *)
+    (* A special function to sort interesting variables by name *)
     let underscore = Str.regexp_string "_" in
     let split_var = Str.split underscore in
     let var_to_string_num var = List.nth (split_var var) 1 in
@@ -1837,7 +1838,7 @@ struct
       in
       List.sort ~cmp:sort_aux
     in
-  (* Padding unused symbolic bytes *)
+    (* Padding unused symbolic bytes *)
     let pad_unused =
       let rec pad n acc = function
         | [] -> List.rev acc
@@ -1845,7 +1846,7 @@ struct
             pad (n+1) (first::acc) rest
         | ((var,_)::rest) as more ->
             assert ((var_to_num var) >= n);
-            pad (n+1) (("",1L)::acc) more
+            pad (n+1) (("",bi1)::acc) more
       in
       pad 1 []
     in
@@ -1853,8 +1854,8 @@ struct
     let sorted = sort symb_var_vals in
     let padded = if !padding then pad_unused sorted else sorted in
     let _, input = List.split padded in
-    let input = List.map Int64.to_int input in
-  (* Let's output the exploit string *)
+    let input = List.map Big_int_Z.int_of_big_int input in
+    (* Let's output the exploit string *)
     let cout = open_out file in
     List.iter (output_byte cout) input ;
     close_out cout;
@@ -1871,7 +1872,7 @@ type traceSymbolicType =
   | Substitution
 
 module StreamPrinter =
-struct 
+struct
 
   type fp = Formulap.double_printer_type
 

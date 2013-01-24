@@ -7,10 +7,14 @@ PINTRACES=pintraces
 endif
 
 BAPDIRS=libasmir ocaml utils tests $(PINTRACES)
-SUBDIRS=batteries zarith-1.0 ounit-1.1.0 pcre-ocaml ocamlgraph-1.8 objsize-0.16 libtracewrap VEX $(BAPDIRS)
+SUBDIRS=batteries zarith-1.0 ounit pcre-ocaml ocamlgraph-1.8 objsize-0.16 libtracewrap VEX $(BAPDIRS)
 
 test: all
 	$(MAKE) -C tests test
+
+install:
+	@echo "BAP does not support the install target"
+	@false
 
 .PHONY: cscope
 

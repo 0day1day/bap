@@ -92,6 +92,9 @@ let rec cast_unsigned tnew = function
   | e ->
     Cast(CAST_UNSIGNED, tnew, e)
 
+let exp_int i bits =
+  Int(bi i, Reg bits)
+
 let exp_ite ?t b e1 e2 =
   (* type inference shouldn't be needed when t is specified, but we're paranoid *)
   let tb = Typecheck.infer_ast ~check:false b in
@@ -266,7 +269,7 @@ let reverse_bytes e =
 let extract_byte n e =
   extract (biconst (n*8+7)) (biconst (n*8)) e
 
-(* Concatenate a list of expressions *)
+(* Concatenate an enumeration of expressions *)
 let concat_explist elist =
   reduce
     (fun l r -> l ++* r) elist

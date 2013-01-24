@@ -16,6 +16,8 @@ let collect_some f l x =
     | Some i -> i :: l
     | None -> l
 
+let addrt = Reg 32
+
 (*
  * Given a BAP IR for an instruction and the address of the next instruction,
  * returns a list of addresses that we should disassemble.
@@ -41,7 +43,7 @@ let get_code_addrs stmts next =
          false!
 
          As a result of this, next should be at the front of the list,
-         and we can use a Queue. *)
+         and we can use a Stack. *)
       | [] -> next :: l
       | (Ast.Jmp (e, attrs)) :: _ ->
         let addrs = collect_some get_addr l e in
@@ -62,7 +64,9 @@ let get_code_addrs stmts next =
             else get_code_addrs' rest (addrs @ l)
       | _ :: rest -> get_code_addrs' rest l
   in
-  get_code_addrs' stmts []
+  (* Reverse so that 'next' is last in the list, last added to the
+     stack, and thus first in the stack. *)
+  List.rev (get_code_addrs' stmts [])
 
 module Int64Set = Set.Make( 
   struct
@@ -77,7 +81,7 @@ let rdisasm_at ?(f=default) p startaddrs =
   let seen = ref Int64Set.empty in
   let out = ref [] in
   let outasm = ref "" in
-  let stack = Queue.create () in
+  let stack = Stack.create () in
   let numstmts = ref 0 in
 
   (* Remove duplicates or we'll get duplicate labels *)
@@ -85,24 +89,39 @@ let rdisasm_at ?(f=default) p startaddrs =
 
   (* Initialize with the startaddrs *)
   List.iter (fun startaddr ->
-    Queue.push startaddr stack;
-    seen := Int64Set.add startaddr !seen
+    Stack.push startaddr stack;
   ) startaddrs;
 
-  while not (Queue.is_empty stack) do
-    let addr = Queue.pop stack in
+  while not (Stack.is_empty stack) do
+    let addr = Stack.pop stack in
     try
-      let (statements, next) = Asmir.asm_addr_to_bap p addr in
-      let asm = Asmir.get_asm_instr_string p addr in
-      out := statements :: !out;
-      outasm := !outasm ^ "; " ^ asm;
-      numstmts := !numstmts + (List.length statements);
-      if not (f addr next statements) then raise Asmir.Disassembly_error;
-      List.iter
-        (fun x -> if not (Int64Set.mem x !seen)
-          then (Queue.push x stack; seen := Int64Set.add x !seen)
-          else ())
-        (get_code_addrs statements next)
+      if Int64Set.mem addr !seen then (
+        (* If we have already seen this address before, add a jump to
+           it to preserve control flow. If the instruction before us
+           is any type of jump, this is not necessary.*)
+        let add_jump = match !out with
+          | b::_ ->
+            (match List.rev b with
+            | Jmp _::_ | CJmp _::_ -> false
+            | _ -> true)
+          | _ -> true
+        in
+        if add_jump then
+          out := [Jmp(Int(Big_int_Z.big_int_of_int64 addr, addrt), [StrAttr "rdisasm"])] :: !out)
+      else (
+        let (statements, next) = Asmir.asm_addr_to_bap p addr in
+        let asm = Asmir.get_asm_instr_string p addr in
+        seen := Int64Set.add addr !seen;
+        out := statements :: !out;
+        outasm := !outasm ^ "; " ^ asm;
+        numstmts := !numstmts + (List.length statements);
+        if not (f addr next statements) then raise Asmir.Disassembly_error;
+        List.iter
+          (fun x ->
+            Stack.push x stack;
+            dprintf "Adding address %#Lx to the stack" x;
+          )
+          (get_code_addrs statements next))
     (*
      * Ignore invalid addresses.
      * (some programs have a call 0 for some reason)

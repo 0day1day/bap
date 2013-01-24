@@ -147,8 +147,7 @@ let rec apply_cmd prog = function
   )
   | AnalysisAst f -> (
     match prog with
-      | Ast p as p' -> f p; p'
-      | _ -> failwith "need explicit translation to AST"
+    | Ast p as p' -> f p; p'
   )
 ;;
 

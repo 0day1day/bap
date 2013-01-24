@@ -347,7 +347,7 @@ object (self)
      	 in
 	 let pe' = lazy (self#ast_exp_bv e') in
 	 lazy(
-  	   pp ("(extract["^string_of_big_int hbit^":"^string_of_big_int lbit^"]");
+  	   pp ("(( _ extract "^string_of_big_int hbit^" "^string_of_big_int lbit^")");
      	   space ();
 	   Lazy.force pe';
      	   cut ();
@@ -394,8 +394,8 @@ object (self)
 	    | CAST_UNSIGNED | CAST_SIGNED -> assert (delta >= 0));
 	  let (pre,post) = match ct with
 	    | _ when bitsnew = bitsold -> ("","")
-	    | CAST_LOW      -> ("(extract["^string_of_int(bitsnew-1)^":0]", ")")
-	    | CAST_HIGH     -> ("(extract["^string_of_int(bitsold-1)^":"^string_of_int(bitsold-bitsnew)^"]", ")")
+	    | CAST_LOW      -> ("((_ extract "^string_of_int(bitsnew-1)^" 0)", ")")
+	    | CAST_HIGH     -> ("((_ extract "^string_of_int(bitsold-1)^" "^string_of_int(bitsold-bitsnew)^")", ")")
 	    | CAST_UNSIGNED -> ("(zero_extend["^string_of_int(delta)^"]", ")")
 	    (* | CAST_UNSIGNED -> ("(concat bv0["^string_of_int(delta)^"] ", ")") *)
 	    | CAST_SIGNED -> ("(sign_extend["^string_of_int(delta)^"]", ")")
@@ -422,7 +422,7 @@ object (self)
      | Extract(h,l,e) ->
 	 let pe = lazy (self#ast_exp e) in
 	 lazy(
-	   pp ("(extract["^string_of_big_int(h)^":"^string_of_big_int(l)^"]");
+	   pp ("((_ extract "^string_of_big_int(h)^" "^string_of_big_int(l)^")");
 	   space ();
 	   Lazy.force pe;
 	   cut ();
@@ -804,7 +804,7 @@ object (self)
     pp "assert (";
     self#exists exists;
     self#forall foralls;
-    self#ast_exp_bool (UnOp(NOT, e));
+    self#ast_exp_bool (exp_not e);
     pp ");";
     self#formula ();
     self#close_benchmark ()

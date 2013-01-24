@@ -1,4 +1,4 @@
-(** 
+(**
     The type used for variables and functions to create and use them.
  *)
 

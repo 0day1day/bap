@@ -11,7 +11,7 @@ export OCAMLMAKEFILE=OCamlMakefile
 export LIBASMIR=../libasmir
 export BIGINT=$(BAP_DIR)/zarith-1.0
 export BATT=$(BAP_DIR)/batteries/_build/src
-export OUNIT=$(BAP_DIR)/ounit-1.1.0/_build/src/
+export OUNIT=$(BAP_DIR)/ounit/_build/src/
 export PCRE=$(BAP_DIR)/pcre-ocaml/lib
 export OCAMLGRAPH=$(BAP_DIR)/ocamlgraph-1.8
 export OBJSIZE=$(BAP_DIR)/objsize-0.16
@@ -60,6 +60,7 @@ export SOURCES = \
 	cfg_ast.mli cfg_ast.ml \
 	depgraphs.mli depgraphs.ml \
 	cfg_ssa.mli cfg_ssa.ml \
+	checks.mli checks.ml \
 	debug_snippets.ml \
 	sccvn.mli sccvn.ml \
 	deadcode.mli deadcode.ml \
@@ -94,12 +95,12 @@ export SOURCES = \
 	to_c.ml \
 	vsa.ml \
 	symbeval.ml symbeval_search.ml \
-	ast_slice.ml \
-	ssa_slice.ml \
-	structural_analysis.ml \
-	unroll.ml \
 	hacks.ml \
 	coalesce.mli coalesce.ml \
+	structural_analysis.ml \
+	unroll.mli unroll.ml \
+	ast_slice.ml \
+	ssa_slice.ml \
 	traces.ml \
 	traces_surgical.ml \
 	traces_backtaint.mli traces_backtaint.ml \
@@ -108,6 +109,7 @@ export SOURCES = \
 	template.ml \
 	syscall_id.mli syscall_id.ml \
 	graphDataflowW.ml \
+	vc.mli vc.ml \
 	$(SOLVER_SOURCES) \
 	$(PROJSOURCES) \
 

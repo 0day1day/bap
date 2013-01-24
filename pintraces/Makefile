@@ -77,7 +77,7 @@ TOOLS = $(TOOL_ROOTS:%=$(OBJDIR)%$(PINTOOL_SUFFIX))
 
 #FORMATOBJS = $(OBJDIR)frame.piqi.pb.o $(OBJDIR)exceptionframe.piqi.pb.o $(OBJDIR)stdframe.piqi.pb.o $(OBJDIR)taintintroframe.piqi.pb.o $(OBJDIR)types.piqi.pb.o $(OBJDIR)trace.container.o
 
-OBJS = $(OBJDIR)pivot.o $(OBJDIR)pin_trace.o $(OBJDIR)pin_taint.o $(OBJDIR)pin_frame.o $(OBJDIR)winsyscalls.o $(OBJDIR)pin_misc.o $(OBJDIR)reg_mapping_pin.o $(FORMATOBJS)
+OBJS = $(OBJDIR)pivot.o $(OBJDIR)pin_trace.o $(OBJDIR)pin_taint.o $(OBJDIR)pin_frame.o $(OBJDIR)pin_misc.o $(OBJDIR)reg_mapping_pin.o $(OBJDIR)winsyscalls.o $(FORMATOBJS)
 
 ROOT = $(realpath ..)
 
@@ -103,7 +103,7 @@ LIBS = $(LIBTRACE) -Wl,-rpath=$(PROTOBUFLIBDIR) -pthread  -pthread -lprotobuf -l
 #
 ##############################################################
 
-all: listregs tools reader
+all: listregs tools
 tools: $(OBJDIR) $(TOOLS)
 test: $(OBJDIR) $(TOOL_ROOTS:%=%.test)
 
@@ -139,12 +139,6 @@ $(OBJDIR)%.o : $(TRACEFORMATPBDIR)/%.cc
 
 $(OBJDIR)%.o : $(TRACEFORMATDIR)/%.cpp
 	$(CXX) -c $(CXXFLAGS) $(PIN_CXXFLAGS) ${OUTOPT}$@ $<
-
-reader: readtrace.cpp $(OBJDIR)pin_frame.o $(OBJDIR)pin_trace.o
-	$(CXX) -o $@ $^ $(CXXFLAGS)
-
-newreadtrace : newreadtrace.cpp $(LIBTRACE)
-	$(CXX) -o $@ $^ $(CXXFLAGS) $(LIB_PATHS) $(LIBS)
 
 pivottest: $(OBJDIR)pivot.o pivottest.cpp
 	$(CXX) -o $@ $^ $(CXXFLAGS) $(PIN_CXXFLAGS)

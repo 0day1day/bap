@@ -17,7 +17,7 @@ type exp = Ast.exp
     [Skip] does nothing.
     [Assign] assigns a value to an lvalue.
     [Seq(a,b)] evaluates [a] and then moves on to [b].
-    [Choice(a,b)] 
+    [Choice(a,b)]
     [Assert] goes on to the next expression in the sequence if it is true.
     [Assume] doesn't start when the condition is not true.
 *)
@@ -113,6 +113,16 @@ type gclhelp =
   | Cunchoice of gclhelp * gclhelp (* unfinished choice *)
   | CSeq of gclhelp list
 
+let rec gclhelp_to_string = function
+  | CAssign bb -> Printf.sprintf "CAssign(%s)" (Cfg_ast.v2s bb)
+  | CChoice(e, g1, g2) -> Printf.sprintf "CChoice(%s, (%s), (%s))" (Pp.ast_exp_to_string e) (gclhelp_to_string g1) (gclhelp_to_string g2)
+  | Cunchoice(g1, g2) -> Printf.sprintf "Cunchoice((%s), (%s))" (gclhelp_to_string g1) (gclhelp_to_string g2)
+  | CSeq([]) -> "Skip"
+  | CSeq(hd::tl) ->
+    "CSeq("^(List.fold_left (fun acc s ->
+      acc^"; "^(gclhelp_to_string s)
+    ) (gclhelp_to_string hd) tl)^")"
+
 let rec cgcl_size = function
   | CAssign _ -> 1
   | CChoice(_, g1, g2)
@@ -156,6 +166,7 @@ let rec string_of_cgcl = function
 (** [gclhelp_of_cfg cfg entry_node exit_node] returns an intermediate form that
     is between CFGs and the GCL. [cfg] must be acyclic. *)
 let gclhelp_of_astcfg ?entry ?exit cfg =
+  Checks.acyclic_astcfg cfg "GCL";
   let exit = match exit with
     | None -> CA.G.V.create Cfg.BB_Exit
     | Some x -> x
@@ -341,7 +352,7 @@ let rec remove_skips = function
 
 module C = Cfg.SSA
 
-let passified_of_ssa ?entry ?exit cfg =
+let passified_of_ssa ?entry ?exit mode cfg =
   let ast = Cfg_ssa.to_astcfg ~dsa:true cfg in
   let convert = function
     | Some v -> Some(CA.find_vertex ast (C.G.V.label v))
@@ -353,25 +364,28 @@ let passified_of_ssa ?entry ?exit cfg =
   let rec convert_gcl g = 
     match g with
     | Assign(v,e) ->
-	vars := v :: !vars;
-	Assume(exp_eq (Var v) e)
+      (match mode with
+      | Foralls -> vars := v :: !vars;
+        Assume(exp_eq (Var v) e)
+      | Validity -> Assume(exp_eq (Var v) e)
+      | Sat -> Assert(exp_eq (Var v) e))
     | Choice(a,b) ->
-	Choice(convert_gcl a, convert_gcl b)
+      Choice(convert_gcl a, convert_gcl b)
     | Seq(a,b) ->
-	Seq(convert_gcl a, convert_gcl b)
+      Seq(convert_gcl a, convert_gcl b)
     | Assume _ | Assert _ | Skip ->
-	g
+      g
   in
   let pgcl = convert_gcl gcl in
   (pgcl, list_unique !vars)
 
 
-let passified_of_astcfg ?entry ?exit cfg =
+let passified_of_astcfg ?entry ?exit mode cfg =
   let {Cfg_ssa.cfg=ssa; to_ssavar=tossa} = Cfg_ssa.trans_cfg cfg in
   let convert = function
     | Some v -> Some(C.find_vertex ssa (CA.G.V.label v))
     | None -> None
   in
   let entry = convert entry and exit = convert exit in
-  let (g,v) = passified_of_ssa ?entry ?exit ssa in
+  let (g,v) = passified_of_ssa ?entry ?exit mode ssa in
   (g,v,tossa)

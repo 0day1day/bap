@@ -478,6 +478,17 @@ static uint32_t GetBitsOfReg(REG r) {
         return 32;
         break;
 
+    case REG_MM0:
+    case REG_MM1:
+    case REG_MM2:
+    case REG_MM3:
+    case REG_MM4:
+    case REG_MM5:
+    case REG_MM6:
+    case REG_MM7:
+        return 64;
+        break;
+
     case REG_XMM0:
     case REG_XMM1:
     case REG_XMM2:

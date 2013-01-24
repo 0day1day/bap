@@ -44,13 +44,13 @@ let does_stp_work () =
     true
   else false
 
-let check_stp_path () =
-  print_endline("Checking for stp...");
-  match Unix.system("echo 'QUERY(TRUE);' | stp 2> /dev/null") with
-  | Unix.WEXITED(0) -> ()
-  | _ -> skip_if true 
-    "Skipping test.  Stp is not in PATH";;
-
+module SolverCheck(S:Smtexec.SOLVER) = struct
+  let check_solver_path () =
+    if S.in_path() = false then
+      skip_if true ("Skipping test. "^S.solvername^" is not in PATH");;
+end
+let check_stp_path =
+  let module SC = SolverCheck(Smtexec.STP) in SC.check_solver_path
 
 (** pin helpers **)
 let pin_path = (*ref "../pin/";;*)
@@ -155,14 +155,11 @@ let check_bigint_answer e correct =
 
 
 let check_eax ctx eax =
-  let pat = "R_EAX_" in
   Var.VarHash.iter 
     (fun k v ->
-      match k,v with
-      | var,Symbeval.Symbolic e ->
-	if (pmatch ~pat (Pp.var_to_string var)) 
-	then check_bigint_answer e eax
-	else ()
+      match v with
+      | Symbeval.Symbolic e when k = Disasm_i386.eax ->
+	check_bigint_answer e eax
       | _ -> ()
     ) ctx.Symbeval.delta;;
 

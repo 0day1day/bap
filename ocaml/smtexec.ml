@@ -5,9 +5,9 @@
 exception Alarm_signal_internal;;
 exception Alarm_signal of int;;
 
+open Big_int_convenience
 module D = Debug.Make(struct let name = "Smtexec" and default=`NoDebug end)
 open D
-
 open Unix
 
 type model = (string*int64) list option
@@ -38,6 +38,7 @@ end
 module type SOLVER =
 sig
   val solvername : string
+  val in_path : unit -> bool
   val solve_formula_file : ?timeout:int -> ?remove:bool -> ?printmodel:bool -> string -> result (** Solve a formula in a file *)
   val check_exp_validity : ?timeout:int -> ?remove:bool -> ?exists:(Ast.var list) -> ?foralls:(Ast.var list) -> Ast.exp -> result (** Check validity of an exp *)
   val create_cfg_formula :
@@ -169,13 +170,16 @@ struct
       (* FIXME: same for exists? *)
       write_formula ~exists ~foralls ?remove wp
 
+    let in_path () =
+      Sys.command (Printf.sprintf "which %s > /dev/null" S.progname) == 0
+
     let solve_formula_file ?(timeout=S.timeout) ?(remove=false) ?(printmodel=false) file =
       ignore(alarm timeout);
       let cmdline = S.progname ^ " " ^ S.cmdstr file in
 
       try
         dprintf "Executing: %s" cmdline;
-        if Sys.command (Printf.sprintf "which %s > /dev/null" S.progname) != 0 then
+        if in_path() = false then
           SmtError (Printf.sprintf "Solver program %s not in path" S.progname)
         else (
 	  let sout,serr,pstatus = syscall cmdline in
@@ -222,7 +226,7 @@ let parse_model solver s =
     None
 
 let print_model = function
-  | Some(l) -> Printf.printf "Model:\n"; List.iter (fun (v,i) -> Printf.printf "%s -> %#Lx\n" v i) l
+  | Some(l) -> Printf.printf "Model:\n"; List.iter (fun (v,i) -> Printf.printf "%s -> %s\n" v (~% i)) l
   | None -> Printf.printf "No model found\n"
 
 module STP_INFO =
@@ -369,8 +373,8 @@ module YICES_INFO =
 struct
   let timeout = 60
   let solvername = "yices"
-  let progname = "yices"
-  let cmdstr f = "-m " ^ f
+  let progname = "yices-smt"
+  let cmdstr f = "-f " ^ f
   let parse_result = STPSMTLIB_INFO.parse_result_builder solvername
   let printer = ((new Smtlib1.pp_oc) :> Formulap.fppf)
 end

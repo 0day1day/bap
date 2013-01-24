@@ -1,5 +1,39 @@
+#include <cassert>
 #include <iostream>
-#include "winsyscalls.h"
+#include <memory>
+#include <string>
+#include <stdint.h>
+#ifdef _WIN32
+#include <Windows.h>
+#endif
+
+using namespace std;
+//#include "winsyscalls.h"
+
+struct SCENTRY {
+    const char* name;
+    unsigned int   x[17];
+};
+
+enum os_t {
+    OS_NT_SP3,
+    OS_NT_SP4,
+    OS_NT_SP5,
+    OS_NT_SP6,
+    OS_2K_SP0,
+    OS_2K_SP1,
+    OS_2K_SP2,
+    OS_2K_SP3,
+    OS_2K_SP4,
+    OS_XP_SP0,
+    OS_XP_SP1,
+    OS_XP_SP2,
+    OS_XP_SP3,
+    OS_2003_SP0,
+    OS_2003_SP1,
+    OS_VISTA_SP0,
+    OS_SEVEN_SP0,
+};
 
 struct SCENTRY syscalls[] = {
 {"NtAcceptConnectPort", { 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, } },
@@ -435,9 +469,115 @@ struct SCENTRY syscalls[] = {
 {"NtYieldExecution", { 0x00D3, 0x00D2, 0x00D2, 0x00D2, 0x00F7, 0x00F7, 0x00F7, 0x00F7, 0x00F7, 0x0116, 0x0116, 0x0116, 0x0116, 0x0120, 0x0120, 0x0168, 0x0190, } },
 };
 
-const int numRows = sizeof(syscalls) / sizeof(SCENTRY);
+int num_syscalls = sizeof(syscalls) / sizeof(SCENTRY);
 
-using namespace std;
+//using namespace std;
+
+#ifdef _WIN32
+/** Get version */
+os_t get_win_version() {
+  OSVERSIONINFOEX osvi;
+  BOOL bIsWindowsXPorLater;
+
+  ZeroMemory(&osvi, sizeof(OSVERSIONINFOEX));
+  osvi.dwOSVersionInfoSize = sizeof(OSVERSIONINFOEX);
+
+  assert (GetVersionEx((LPOSVERSIONINFO) &osvi));
+
+  os_t WIN_VER;
+
+  // See http://msdn.microsoft.com/en-us/library/windows/desktop/ms724833(v=vs.85).aspx
+
+  if (osvi.dwMajorVersion == 6 &&
+      osvi.dwMinorVersion == 1 &&
+      osvi.wProductType == VER_NT_WORKSTATION &&
+      // Table hasn't been updated for Windows 7 SP1 yet...
+      osvi.wServicePackMajor <= 1) {
+    WIN_VER = OS_SEVEN_SP0;
+  } 
+  else if (osvi.dwMajorVersion == 6 &&
+      osvi.dwMinorVersion == 0 &&
+      osvi.wProductType == VER_NT_WORKSTATION &&
+      osvi.wServicePackMajor == 0) {
+    WIN_VER = OS_VISTA_SP0;
+  } 
+  else if (osvi.dwMajorVersion == 5 &&
+      osvi.dwMinorVersion == 2 &&
+      osvi.wProductType == VER_NT_SERVER &&
+      osvi.wServicePackMajor == 1) {
+    WIN_VER = OS_2003_SP1;
+  } 
+  else if (osvi.dwMajorVersion == 5 &&
+      osvi.dwMinorVersion == 2 &&
+      osvi.wProductType == VER_NT_SERVER &&
+      osvi.wServicePackMajor == 0) {
+    WIN_VER = OS_2003_SP0;
+  } 
+  else if (osvi.dwMajorVersion == 5 &&
+      osvi.dwMinorVersion == 1 &&
+      osvi.wProductType == VER_NT_WORKSTATION &&
+      osvi.wServicePackMajor == 3) {
+    WIN_VER = OS_XP_SP3;
+  } 
+  else if (osvi.dwMajorVersion == 5 &&
+      osvi.dwMinorVersion == 1 &&
+      osvi.wProductType == VER_NT_WORKSTATION &&
+      osvi.wServicePackMajor == 2) {
+    WIN_VER = OS_XP_SP2;
+  } 
+  else if (osvi.dwMajorVersion == 5 &&
+      osvi.dwMinorVersion == 1 &&
+      osvi.wProductType == VER_NT_WORKSTATION &&
+      osvi.wServicePackMajor == 1) {
+    WIN_VER = OS_XP_SP1;
+  } 
+  else if (osvi.dwMajorVersion == 5 &&
+      osvi.dwMinorVersion == 1 &&
+      osvi.wProductType == VER_NT_WORKSTATION &&
+      osvi.wServicePackMajor == 0) {
+    WIN_VER = OS_XP_SP0;
+  } 
+  else if (osvi.dwMajorVersion == 5 &&
+      osvi.dwMinorVersion == 0 &&
+      osvi.wProductType == VER_NT_WORKSTATION &&
+      osvi.wServicePackMajor == 4) {
+    WIN_VER = OS_2K_SP4;
+  } 
+  else if (osvi.dwMajorVersion == 5 &&
+      osvi.dwMinorVersion == 0 &&
+      osvi.wProductType == VER_NT_WORKSTATION &&
+      osvi.wServicePackMajor == 3) {
+    WIN_VER = OS_2K_SP3;
+  } 
+  else if (osvi.dwMajorVersion == 5 &&
+      osvi.dwMinorVersion == 0 &&
+      osvi.wProductType == VER_NT_WORKSTATION &&
+      osvi.wServicePackMajor == 2) {
+    WIN_VER = OS_2K_SP2;
+  } 
+  else if (osvi.dwMajorVersion == 5 &&
+      osvi.dwMinorVersion == 0 &&
+      osvi.wProductType == VER_NT_WORKSTATION &&
+      osvi.wServicePackMajor == 1) {
+    WIN_VER = OS_2K_SP1;
+  } 
+  else if (osvi.dwMajorVersion == 5 &&
+      osvi.dwMinorVersion == 0 &&
+      osvi.wProductType == VER_NT_WORKSTATION &&
+      osvi.wServicePackMajor == 0) {
+    WIN_VER = OS_2K_SP0;
+  } 
+  else {
+    cerr << "Unable to determine OS version: Major/minor/service "
+	 << osvi.dwMajorVersion << "/"
+	 << osvi.dwMinorVersion << "/"
+	 << osvi.wServicePackMajor << endl;
+    assert (0 && "Unable to determine OS version.");
+  }
+
+  return WIN_VER;
+}
+#endif
 
 /** Find name of system call num on os */
 auto_ptr<string> get_name(uint32_t num, os_t os) {
@@ -445,7 +585,7 @@ auto_ptr<string> get_name(uint32_t num, os_t os) {
 
   *s = "Unknown";
 
-  for (int i = 0; i < numRows; i++) {
+  for (int i = 0; i < num_syscalls; i++) {
     if (syscalls[i].x[os] == num) {
       *s = syscalls[i].name;
       return s;
@@ -456,10 +596,10 @@ auto_ptr<string> get_name(uint32_t num, os_t os) {
 }
 
 uint32_t get_syscall (const char* name, os_t os) {
-  for(int i = 0; i < numRows; i++) {
+  for(int i = 0; i < num_syscalls; i++) {
     if (syscalls[i].name == name) {
       return syscalls[i].x[os];
     }
   }
-  return 0;
+  return -1;
 }

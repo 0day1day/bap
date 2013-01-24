@@ -2,7 +2,7 @@
 
 module VH = Var.VarHash
 
-module D = Debug.Make(struct let name = "formula" and default=`NoDebug end)
+module D = Debug.Make(struct let name = "Formulap" and default=`NoDebug end)
 open D
 
 open Ast
@@ -22,7 +22,7 @@ let freevars e =
       method add_dec d =
 	if not(VH.mem found d || VH.mem ctx d)
 	then VH.add found d ()
-	else dprintf "Not adding %s." (Pp.var_to_string d)
+	(* else dprintf "Not adding %s." (Pp.var_to_string d) *)
 
       method visit_exp = function
 	| Let(v, e1, e2) ->

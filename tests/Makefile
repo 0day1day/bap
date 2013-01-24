@@ -15,7 +15,7 @@ export BAP_OCAMLDIR=$(BAP_DIR)/ocaml
 export OCAMLMAKEFILE=$(BAP_OCAMLDIR)/OCamlMakefile
 export BIGINT=$(BAP_DIR)/zarith-1.0
 export BATT=$(BAP_DIR)/batteries/_build/src
-export OUNIT=$(BAP_DIR)/ounit-1.1.0/_build/src/
+export OUNIT=$(BAP_DIR)/ounit/_build/src/
 export PCRE=$(BAP_DIR)/pcre-ocaml/lib
 export OCAMLGRAPH=$(BAP_DIR)/ocamlgraph-1.8
 export OBJSIZE=$(BAP_DIR)/objsize-0.16
@@ -62,6 +62,7 @@ define PROJ_baptest
 	predicate_suite.ml \
 	arithmetic_suite.ml \
 	dominator_suite.ml \
+	unroll_suite.ml \
 	bap_suite.ml
 	DOC_FILES=$(SOURCES)
 endef
@@ -69,7 +70,7 @@ export PROJ_baptest
 
 export BCSUFFIX = .dbg
 
-all: | $(TARGETS)
+all: $(TARGETS)
 
 test: all
 	./bap_test_suite

@@ -815,11 +815,10 @@ object (self)
     self#open_benchmark e;
     self#declare_new_freevars e;
     force_newline();
-    pp ":formula (";
+    pp ":formula ";
     self#exists exists;
     self#forall foralls;
-    self#ast_exp_bool e;
-    pp ");";
+    self#ast_exp_bool (exp_not e);
     self#close_benchmark ()
 
   (* (\** Is e a valid expression (always true)? *\) *)
