@@ -41,9 +41,9 @@ To compile the documentation, add:
   $ sudo aptitude install texlive-base texlive-latex-base \
     texlive-latex-extra texlive-fonts-recommended
 
-On Debian squeeze and wheezy, you must also install a new version of
-OCaml.  Follow the instructions in "Bootstrapping using ocamlbrew"
-after installing the appropriate packages above.
+On Debian squeeze, you must also install a new version of OCaml.
+Follow the instructions in "Bootstrapping using ocamlbrew" after
+installing the appropriate packages above.
 
 *** Bootstrapping using ocamlbrew ***
 
@@ -91,7 +91,7 @@ Run the following command to install required packages:
 
 *** Installation for Mac OS X ***
 
-Install macports.
+Install macports from https://www.macports.org/install.php
 
 Install required macports:
 
