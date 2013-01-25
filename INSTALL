@@ -95,10 +95,14 @@ Install macports from https://www.macports.org/install.php
 
 Install required macports:
 
-  $ port install opam pcre
+  $ port install autoconf automake ocaml opam pcre
   $ port install -s binutils configure.post_args=--enable-targets=i386-elf,i386-pe
 
 Install required opam packages:
+
+  If using opam for the first time:
+  $ opam init
+  Make sure to copy the suggested line to your ~/.profile and execute it.
 
   $ opam install ocamlfind camlidl camomile
 
