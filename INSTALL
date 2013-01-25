@@ -14,7 +14,7 @@ small changes.
 *** Basic installation ****
 
 To build BAP on x86, do the following:
-  $ ./autogen.sh
+  $ ./autogen.sh (if building from SVN)
   $ ./configure
   $ make
 -- or to make all and run unit tests after --
@@ -28,8 +28,7 @@ Run the following command to install required packages:
 
   $ sudo apt-get install ocaml ocaml-native-compilers ocaml-findlib camlidl \
     binutils-dev automake libcamomile-ocaml-dev otags libpcre3-dev          \
-    camlp4-extra bison flex zlib1g-dev libgmp3-dev g++ libtool              \
-    libbitstring-ocaml-dev
+    camlp4-extra bison flex zlib1g-dev libgmp3-dev g++ libtool
 
 On x86_64 also add:
   $ sudo apt-get install gcc-multilib g++-multilib lib32z1-dev
@@ -42,18 +41,44 @@ To compile the documentation, add:
   $ sudo aptitude install texlive-base texlive-latex-base \
     texlive-latex-extra texlive-fonts-recommended
 
-For Debian squeeze, you must install a new version of OCaml.  Follow
-the instructions in "Bootstrapping using ocamlbrew".
+On Debian squeeze and wheezy, you must also install a new version of
+OCaml.  Follow the instructions in "Bootstrapping using ocamlbrew"
+after installing the appropriate packages above.
 
 *** Bootstrapping using ocamlbrew ***
 
 To install ocaml 4.00.1 and opam using ocamlbrew:
 
-  $ curl -kL https://raw.github.com/edmcman/ocamlbrew/script/ocamlbrew-install | bash
+  $ curl -kL https://raw.github.com/edmcman/ocamlbrew/script/ocamlbrew-install | env OCAMLBREW_FLAGS="-r" bash
 
-Install the required packages using opam:
+Follow the directions printed on the screen about adding 'source
+<...>' to your ~/.bashrc file to make ocaml available whenever you
+start a shell.  Also run the 'source <...>' line in your shell to make
+ocaml available in your current session.
+
+At this point, running the following command should print version 3.12
+or newer, indicating you are using ocaml from ocamlbrew:
+
+  $ ocaml -version
+
+Next, install the required ocaml packages using opam:
 
   $ opam install ocamlfind camomile camlidl
+
+If you are installing on Debian/Ubuntu and used the above apt-get
+command to install packages, you should be able to build bap normally
+now (./autogen && ./configure && make).
+
+On any other system, you will need to use a special command line that
+tells bap where opam packages are:
+
+  $ ./autogen.sh (if building from SVN)
+  $ CPPFLAGS="-I/opt/local/include/ -I$(opam config var lib)/camlidl" \
+    INCDIRS="$(opam config var lib)/camlidl" \
+    LDFLAGS="-L/opt/local/lib -L/opt/local/lib/x86_64/" \
+    ./configure
+
+After this, run make normally.
 
 *** Installation for Fedora Core 15 ***
 
@@ -66,17 +91,20 @@ Run the following command to install required packages:
 
 *** Installation for Mac OS X ***
 
-Install macports and opam.  Then install needed opam packages:
-
-  $ opam install ocamlfind camlidl camomile
+Install macports.
 
 Install required macports:
 
-  $ port install pcre
+  $ port install opam pcre
   $ port install -s binutils configure.post_args=--enable-targets=i386-elf,i386-pe
+
+Install required opam packages:
+
+  $ opam install ocamlfind camlidl camomile
 
 And run configure:
 
+  $ ./autogen.sh (if building from SVN)
   $ CPPFLAGS="-I/opt/local/include/ -I$(opam config var lib)/camlidl" \
     INCDIRS="$(opam config var lib)/camlidl" \
     LDFLAGS="-L/opt/local/lib -L/opt/local/lib/x86_64/" \
