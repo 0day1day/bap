@@ -49,7 +49,7 @@ the instructions in "Bootstrapping using ocamlbrew".
 
 To install ocaml 4.00.1 and opam using ocamlbrew:
 
-  $ example
+  $ curl -kL https://raw.github.com/edmcman/ocamlbrew/script/ocamlbrew-install | bash
 
 Install the required packages using opam:
 
