@@ -102,7 +102,10 @@ let backwards_taint stmts locset =
       if (LocSet.mem (Loc.V l) !vars &&
 	    Typecheck.is_integer_type (Var.typ l)) then (
         vars := (LocSet.remove (Loc.V l) !vars);
-        vars := add_referenced vars e
+        let old_vars = !vars in
+        vars := add_referenced vars e;
+        if !vars = old_vars then
+          Printf.printf "Leaf instruction: %s\n" (Pp.ast_stmt_to_string stmt)
       ) else (
 	(* Alternatively, if there is a write to an interesting memory
 	   location, then we should also add any referenced
@@ -110,10 +113,17 @@ let backwards_taint stmts locset =
         let flag,mems = interesting_mem_write vars e in
         if flag then (
           vars := LocSet.diff !vars mems;
-          vars := add_referenced vars e)
+          let old_vars = !vars in
+          vars := add_referenced vars e;
+          if !vars = old_vars then
+            Printf.printf "Leaf instruction: %s\n" (Pp.ast_stmt_to_string stmt)
+        )
       )
     | _ -> ();
     );
+
+    if LocSet.cardinal !vars = 0 then failwith (Printf.sprintf "Empty taint set at %s" (Pp.ast_stmt_to_string stmt))
+
   ) rev_stmts;
   !vars
 
