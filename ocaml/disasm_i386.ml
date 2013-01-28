@@ -1868,24 +1868,24 @@ let parse_instr g addr =
     | _ -> disfailwith "unsupported displacement size"
   in
   let parse_imm8cb b =
-    let open Imm8Cb in
+    (* XXX: Use open Imm8Cb once we require ocaml 3.12 *)
     let (&) = Int64.logand in
-    let ssize = if (b & 1L) = 0L then Bytes else Words in
-    let ssign = if (b & 2L) = 0L then Unsigned else Signed in
+    let ssize = if (b & 1L) = 0L then Imm8Cb.Bytes else Imm8Cb.Words in
+    let ssign = if (b & 2L) = 0L then Imm8Cb.Unsigned else Imm8Cb.Signed in
     let agg = match b & 12L with
-      | 0L -> EqualAny
-      | 4L -> Ranges
-      | 8L -> EqualEach
-      | 12L -> EqualOrdered
+      | 0L -> Imm8Cb.EqualAny
+      | 4L -> Imm8Cb.Ranges
+      | 8L -> Imm8Cb.EqualEach
+      | 12L -> Imm8Cb.EqualOrdered
       | _ -> failwith "impossible"
     in
     let negintres1 = if (b & 16L) = 0L then false else true in
     let maskintres1 = if (b & 32L) = 0L then false else true in
-    let outselectsig = if (b & 64L) = 0L then LSB else MSB in
-    let outselectmask = sig_to_mask outselectsig in
+    let outselectsig = if (b & 64L) = 0L then Imm8Cb.LSB else Imm8Cb.MSB in
+    let outselectmask = Imm8Cb.sig_to_mask outselectsig in
     if (b & 128L) <> 0L then wprintf "Most significant bit of Imm8 control byte should be set to 0";
 
-    {ssize; ssign; agg; negintres1; maskintres1; outselectsig; outselectmask}
+    {Imm8Cb.ssize=ssize; Imm8Cb.ssign=ssign; Imm8Cb.agg=agg; Imm8Cb.negintres1=negintres1; Imm8Cb.maskintres1=maskintres1; Imm8Cb.outselectsig=outselectsig; Imm8Cb.outselectmask=outselectmask}
 
   in
   let parse_sib m a =
