@@ -68,6 +68,58 @@ type jumptarget =
   | Jabs of operand
   | Jrel of int64 * int64 (* next ins address, offset *)
 
+(* See section 4.1 of the Intel® 64 and IA-32 Architectures Software
+   Developer’s Manual, Volumes 2A & 2B: Instruction Set Reference
+   (order numbers 253666 and 253667) *)
+module Imm8Cb = struct
+
+  type ssize = Bytes | Words
+  type ssign = Signed | Unsigned
+  type agg = EqualAny | Ranges | EqualEach | EqualOrdered
+
+  type outselectsig = LSB | MSB (* For PCMPESTRI/PCMPISTRI, choosees LSB or MSB.  *)
+  type outselectmask = BITMASK | BYTEMASK (* For PCMPESTRM/PCMPISTRM, represents bit mask/word mask. *)
+
+  let sig_to_mask = function
+    | LSB -> BITMASK
+    | MSB -> BYTEMASK
+
+  (* See Section 4.1 of Intel manual for more
+     information on the immediate control byte.
+
+     i[0]:
+     0 = 16 packed bytes
+     1 =  8 packed words
+     i[1]:
+     0 = packed elements are unsigned
+     1 = packed elements are signed
+     i[3:2]:
+     00 = "equal any"
+     01 = "ranges"
+     10 = "each each"
+     11 = "equal ordered"
+     i[4]:
+     0 = IntRes1 unmodified
+     1 = IntRes1 is negated (1's complement)
+     i[5]:
+     0 = Negation of IntRes1 is for all 16 (8) bits
+     1 = Negation of IntRes1 is masked by reg/mem validity
+     i[6]:
+     0 = Use least significant bit for IntRes2
+     1 = Use most significant bit for IntRes2
+     i[7]: Undefined, set to 0.
+  *)
+  type imm8cb = {
+    ssize : ssize;
+    ssign : ssign;
+    agg : agg;
+    negintres1 : bool;
+    maskintres1 : bool;
+    outselectsig : outselectsig;
+    outselectmask : outselectmask;
+  }
+end
+
 type opcode =
   | Bswap of (typ * operand)
   | Retn of ((typ * operand) option) * bool (* bytes to release, far/near ret *)
@@ -132,7 +184,7 @@ type opcode =
   | Pmovmskb of (typ * operand * operand)
   | Pcmpeq of (typ * typ * operand * operand)
   | Palignr of (typ * operand * operand * operand)
-  | Pcmpistri of (typ * operand * operand * operand)
+  | Pcmpistri of (typ * operand * operand * operand * Imm8Cb.imm8cb)
   | Pshufd of operand * operand * operand
   | Leave of typ
   | Interrupt of operand
@@ -870,7 +922,7 @@ let rec to_ir addr next ss pref =
       let addresses = List.fold_left (fun acc -> function Oaddr a -> a::acc | _ -> acc) [] [src;dst] in
       List.map (fun addr -> Assert( (addr &* i32 15) ==* i32 0, [])) addresses
       @ [assn t dst result]
-  | Pcmpistri(t,xmm1,xmm2m128,imm) ->
+  | Pcmpistri(t,xmm1,xmm2m128,imm,imm8cb) ->
     (* All bytes and bits are numbered with zero being the least
        significant. This includes strings! *)
     (* NOTE: Strings are backwards, at least when they are in
@@ -1646,7 +1698,7 @@ module ToStr = struct
     | Movdq(_t,td,d,ts,s,align,name) ->
       Printf.sprintf "%s %s, %s" name (opr d) (opr s)
     | Palignr(t,dst,src,imm) -> Printf.sprintf "palignr %s, %s, %s" (opr dst) (opr src) (opr imm)
-    | Pcmpistri(t,dst,src,imm) -> Printf.sprintf "pcmpistri %s, %s, %s" (opr dst) (opr src) (opr imm)
+    | Pcmpistri(t,dst,src,imm,_) -> Printf.sprintf "pcmpistri %s, %s, %s" (opr dst) (opr src) (opr imm)
     | Pshufd(dst,src,imm) -> Printf.sprintf "palignr %s, %s, %s" (opr dst) (opr src) (opr imm)
     | Pcmpeq(t,elet,dst,src) -> Printf.sprintf "pcmpeq %s, %s" (opr dst) (opr src)
     | Pmovmskb(t,dst,src) -> Printf.sprintf "pmovmskb %s, %s" (opr dst) (opr src)
@@ -1814,6 +1866,27 @@ let parse_instr g addr =
     | Reg 16 -> parse_disp16
     | Reg 32 -> parse_disp32
     | _ -> disfailwith "unsupported displacement size"
+  in
+  let parse_imm8cb b =
+    let open Imm8Cb in
+    let (&) = Int64.logand in
+    let ssize = if (b & 1L) = 0L then Bytes else Words in
+    let ssign = if (b & 2L) = 0L then Unsigned else Signed in
+    let agg = match b & 12L with
+      | 0L -> EqualAny
+      | 4L -> Ranges
+      | 8L -> EqualEach
+      | 12L -> EqualOrdered
+      | _ -> failwith "impossible"
+    in
+    let negintres1 = if (b & 16L) = 0L then false else true in
+    let maskintres1 = if (b & 32L) = 0L then false else true in
+    let outselectsig = if (b & 64L) = 0L then LSB else MSB in
+    let outselectmask = sig_to_mask outselectsig in
+    if (b & 128L) <> 0L then wprintf "Most significant bit of Imm8 control byte should be set to 0";
+
+    {ssize; ssign; agg; negintres1; maskintres1; outselectsig; outselectmask}
+
   in
   let parse_sib m a =
     (* ISR 2.1.5 Table 2-3 *)
@@ -2294,47 +2367,25 @@ let parse_instr g addr =
           let (r, rm, na) = parse_modrm prefix.opsize na in
           let (i, na) = parse_imm8 na in
           (match i with
-                 (* See Section 4.1 of Intel manual for more
-                    information on the immediate control byte.
 
-                    i[0]:
-                    0 = 16 packed bytes
-                    1 =  8 packed words
-                    i[1]:
-                    0 = packed elements are unsigned
-                    1 = packed elements are signed
-                    i[3:2]:
-                    00 = "equal any"
-                    01 = "ranges"
-                    10 = "each each"
-                    11 = "equal ordered"
-                    i[4]:
-                    0 = IntRes1 unmodified
-                    1 = IntRes1 is negated (1's complement)
-                    i[5]:
-                    0 = Negation of IntRes1 is for all 16 (8) bits
-                    1 = Negation of IntRes1 is masked by reg/mem validity
-                    i[6]:
-                    0 = Use least significant bit for IntRes2
-                    1 = Use most significant bit for IntRes2
-                    i[7]: Undefined, set to 0.
-                 *)
+          (* Note: We only implement the case for unsigned
+             bytes equal ordered comparison for pcmpistri right
+             now.
 
-                 (* Note: We only implement the case for unsigned
-                    bytes equal ordered comparison for pcmpistri right
-                    now.
-
-                    XXX: When we implement the other cases, we should
-                    extract the control byte information into a record
-                    type.
-                 *)
-                 | Oimm 0xcL -> (Pcmpistri(prefix.mopsize, r, rm, i), na)
-                 | Oimm op  ->  unimplemented 
-		   (Printf.sprintf "unsupported pcmpistri op %02Lx" op)
-                 | _ ->  unimplemented "unsupported non-imm op for pcmpisgtri")
-             | b4 ->  unimplemented  
-	       (Printf.sprintf "unsupported opcode %02x %02x %02x" b1 b2 b3)
-          )
+             XXX: When we implement the other cases, we should
+             extract the control byte information into a record
+             type.
+          *)
+          | Oimm imm ->
+            if imm = 0xCL then
+              let imm8cb = parse_imm8cb imm in
+              (Pcmpistri(prefix.mopsize, r, rm, i, imm8cb), na)
+            else unimplemented
+	      (Printf.sprintf "unsupported pcmpistri op %02Lx" imm)
+          | _ ->  unimplemented "unsupported non-imm op for pcmpistri")
+        | b4 ->  unimplemented
+	  (Printf.sprintf "unsupported opcode %02x %02x %02x" b1 b2 b3)
+        )
       (* conditional moves *)
       | 0x40 | 0x41 | 0x42 | 0x43 | 0x44 | 0x45 | 0x46 | 0x47 | 0x48 | 0x49 
       | 0x4a | 0x4b | 0x4c | 0x4d | 0x4e | 0x4f ->
