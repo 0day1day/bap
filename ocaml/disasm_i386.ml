@@ -74,15 +74,31 @@ type jumptarget =
 module Imm8Cb = struct
 
   type ssize = Bytes | Words
+  let ssize_to_string = function
+    | Bytes -> "Bytes"
+    | Words -> "Words"
   type ssign = Signed | Unsigned
+  let ssign_to_string = function
+    | Signed -> "Signed"
+    | Unsigned -> "Unsigned"
   type agg = EqualAny | Ranges | EqualEach | EqualOrdered
-
+  let agg_to_string = function
+    | EqualAny -> "EqualAny"
+    | Ranges -> "Ranges"
+    | EqualEach -> "EqualEach"
+    | EqualOrdered -> "EqualOrdered"
   type outselectsig = LSB | MSB (* For PCMPESTRI/PCMPISTRI, choosees LSB or MSB.  *)
-  type outselectmask = BITMASK | BYTEMASK (* For PCMPESTRM/PCMPISTRM, represents bit mask/word mask. *)
+  let outselectsig_to_string = function
+    | LSB -> "LSB"
+    | MSB -> "MSB"
+  type outselectmask = Bitmask | Bytemask (* For PCMPESTRM/PCMPISTRM, represents bit mask/word mask. *)
+  let outselectmask_to_string = function
+    | Bitmask -> "Bitmask"
+    | Bytemask -> "Bytemask"
 
   let sig_to_mask = function
-    | LSB -> BITMASK
-    | MSB -> BYTEMASK
+    | LSB -> Bitmask
+    | MSB -> Bytemask
 
   (* See Section 4.1 of Intel manual for more
      information on the immediate control byte.
@@ -931,64 +947,158 @@ let rec to_ir addr next ss pref =
        string. *)
     let xmm1_e = op2e t xmm1 in
     let xmm2m128_e = op2e t xmm2m128 in
-      (* only handles imm == 0xc *)
-      assert (imm = Oimm 0xcL);
-      (* Is there a substring starting at i? *)
-      let get_bit i =
-        let get_indices base index =
-          let t = (base+index)*8 in
-          biconst (t+7), biconst t
+
+    let comment = match imm8cb with
+      | {Imm8Cb.agg=agg;
+         Imm8Cb.ssize=ssize;
+         Imm8Cb.ssign=ssign;
+         Imm8Cb.outselectsig=outselectsig} ->
+        Comment(Printf.sprintf "Imm8 control byte information.  Aggregation function: %s Element size: %s Element signedness: %s Significance: %s"
+                            (Imm8Cb.agg_to_string agg)
+                            (Imm8Cb.ssize_to_string ssize)
+                            (Imm8Cb.ssign_to_string ssign)
+                            (Imm8Cb.outselectsig_to_string outselectsig), [])
+    in
+
+    let nelem, nbits, elemt = match imm8cb with
+      | {Imm8Cb.ssize=Imm8Cb.Bytes} -> 16, 8, Reg 8
+      | {Imm8Cb.ssize=Imm8Cb.Words} -> 8, 16, Reg 16
+    in
+    (* Compute bit indices for a byte/word element index. Normally
+       index 0 would be the left-most, or most-significant byte. *)
+    let get_indices index =
+      assert (index < nelem);
+      let t = index*nbits in
+      biconst (t+nbits-1), biconst t
+    in
+    (* Get element index in e *)
+    let get_elem e index =
+      let h,l = get_indices index in
+      extract h l e
+    in
+    (* Get from xmm1/xmm2 *)
+    let get_xmm1 = get_elem xmm1_e
+    and get_xmm2 = get_elem xmm2m128_e
+    in
+
+    (* Get var name indicating whether index in xmm num is a valid
+       byte (before NULL byte). *)
+    let is_valid =
+      let vh = Hashtbl.create (2*nelem) in
+      (fun xmmnum index ->
+        try Hashtbl.find vh (xmmnum,index)
+        with Not_found ->
+          let v = nt ("is_valid_xmm"^string_of_int xmmnum^"_ele"^string_of_int index) reg_1 in
+          Hashtbl.add vh (xmmnum,index) v;
+          v)
+    in
+    let is_valid_xmm1 index = is_valid 1 index
+    and is_valid_xmm2 index = is_valid 2 index
+    in
+    let is_valid_xmm1_e index = Var(is_valid_xmm1 index)
+    and is_valid_xmm2_e index = Var(is_valid_xmm2 index)
+    in
+
+    (* Build expression that assigns the correct values to the
+       is_valid variables.  e is the inner expression that can
+       reference the variables. *)
+    let let_is_valid e =
+      let f acc i =
+        let acc = Let(is_valid_xmm1 i,
+            binop AND
+              (* Previous element is valid *)
+              (if i == 0 then exp_true else is_valid_xmm1_e (i-1))
+              (* Current element is valid *)
+              (binop NEQ (get_xmm1 i) (it 0 elemt)), acc)
         in
-        let fold_cmp acc j =
-          (* Compare the jth bit of the substring *)
-          let xmm1_e_byte = 
-            let u, l = get_indices 0 j in
-            Extract(u, l, xmm1_e)
-          in
-          let xmm2m128_e_byte =
-            let u, l = get_indices i j in
-            Extract(u, l, xmm2m128_e)
-          in
-          Ite(BinOp(EQ, Int(bi0, reg_8), xmm1_e_byte),
-            exp_true,
-            Ite(BinOp(NEQ, xmm2m128_e_byte, xmm1_e_byte),
-              exp_false,
-              acc
-            )
-          )
+        Let(is_valid_xmm2 i,
+            binop AND
+              (* Previous element is valid *)
+              (if i == 0 then exp_true else is_valid_xmm2_e (i-1))
+              (* Current element is valid *)
+              (binop NEQ (get_xmm2 i) (it 0 elemt)), acc)
+      in
+      fold f e (nelem-1---0)
+    in
+
+    let get_intres1_bit index = match imm8cb with
+      | {Imm8Cb.agg=Imm8Cb.EqualAny} ->
+        (* Is xmm1[index] at xmm2[j]? *)
+        let check_char acc j =
+          let eq = binop EQ (get_xmm1 index) (get_xmm2 j) in
+          let valid = binop AND (is_valid_xmm1_e index) (is_valid_xmm2_e j) in
+          ite reg_1 (binop AND eq valid) exp_true acc
         in
-        (fold fold_cmp exp_true ((15-i)---0))
-      in
-      let contains_null e =
-        fold (fun acc i ->
-          Ite(BinOp(EQ, Extract(biconst (i*8+7), biconst (i*8), e), Int(bi0, reg_8)),
-              exp_true,
-              acc
-          )
-        ) exp_false (0--15)
-      in
-      let msb e =
-        fold (fun acc i ->
-          Ite(BinOp(EQ, exp_true, Extract(biconst i, biconst i, e)),
-              Int(biconst i, reg_32),
-              acc
-          )
-        ) (Int(biconst 16, reg_32)) (15---0)
-      in
-      let bits = map get_bit (15---0) in
-      let res_e = concat_explist bits in
-      let int_res_2 = nt "IntRes2" reg_16 in
-      move int_res_2 res_e
-      (* This is supposed to be lsb, but lsb works in practice.
-         It's like we are generating IntRes in reverse. *)
-      :: move ecx (msb (Var int_res_2))
-      :: move cf (BinOp(NEQ, (Var int_res_2), Int(bi0, reg_16)))
-      :: move zf (contains_null xmm2m128_e)
-      :: move sf (contains_null xmm1_e)
-      :: move oF (Extract(bi0, bi0, (Var int_res_2)))
-      :: move af (Int(bi0, reg_1))
-      :: move pf (Int(bi0, reg_1))
-      :: []
+        (* Is xmm1[index] included in xmm2[j] for any j? *)
+        fold check_char exp_false (nelem-1---0)
+      | {Imm8Cb.agg=Imm8Cb.EqualEach} ->
+        (* Does xmm1[index] = xmm2[index]? *)
+        let bothinvalid = binop AND (is_valid_xmm1_e index) (is_valid_xmm2_e index) in
+        let eitherinvalid = binop OR (is_valid_xmm1_e index) (is_valid_xmm2_e index) in
+        let eq = binop EQ (get_xmm1 index) (get_xmm2 index) in
+        (* both invalid -> true
+           one invalid -> false
+           both valid -> check same byte *)
+        ite reg_1 bothinvalid exp_true
+          (ite reg_1 eitherinvalid exp_false
+             (ite reg_1 eq exp_true exp_false))
+      | {Imm8Cb.agg=Imm8Cb.EqualOrdered} ->
+        (* Does the substring xmm1 occur at xmm2[index]? *)
+        let check_char acc j =
+          let neq = binop NEQ (get_xmm1 j) (get_xmm2 (index+j)) in
+          let substrended = unop NOT (is_valid_xmm1_e j) in
+          let bigstrended = unop NOT (is_valid_xmm2_e (index+j)) in
+          (* substrended => true
+             bigstrended => false
+             byte diff => false
+             byte same => keep going  *)
+          ite reg_1 substrended exp_true
+            (ite reg_1 bigstrended exp_false
+               (ite reg_1 neq exp_false acc))
+        in
+        (* Is xmm1[j] equal to xmm2[index+j]? *)
+        fold check_char exp_true ((nelem-index-1)---0)
+      | _ -> unimplemented ("Unsupported agg function "^Imm8Cb.agg_to_string imm8cb.Imm8Cb.agg)
+    in
+    let bits = map get_intres1_bit (nelem-1---0) in
+    let res_e = let_is_valid (concat_explist bits) in
+    let int_res_1 = nt "IntRes1" reg_16 in
+    let int_res_2 = nt "IntRes2" reg_16 in
+
+    let contains_null e =
+      fold (fun acc i ->
+        ite reg_1 (binop EQ (get_elem e i) (it 0 elemt)) exp_true acc) exp_false (0--(nelem-1))
+    in
+    let sb e =
+      fold (fun acc i ->
+        ite reg_32 (binop EQ exp_true (extract (biconst i) (biconst i) e))
+          (it i reg_32)
+          acc
+        ) (it nelem reg_32)
+        (match imm8cb with
+        | {Imm8Cb.outselectsig=Imm8Cb.LSB} -> (nelem-1)---0
+        | {Imm8Cb.outselectsig=Imm8Cb.MSB} -> 0--(nelem-1))
+    in
+
+    comment
+    :: move int_res_1 (if nelem = 16 then res_e else cast_unsigned reg_16 res_e)
+    :: (match imm8cb with
+    | {Imm8Cb.negintres1=false} ->
+      move int_res_2 (Var int_res_1)
+    | {Imm8Cb.negintres1=true; Imm8Cb.maskintres1=false} ->
+      (* int_res_1 is bitwise-notted *)
+      move int_res_2 (unop NOT (Var int_res_1))
+    | {Imm8Cb.negintres1=true; Imm8Cb.maskintres1=true} ->
+      (* only the valid bytes in xmm2 are bitwise-notted *)
+      unimplemented "masking by valid bytes")
+    :: move ecx (sb (Var int_res_2))
+    :: move cf (BinOp(NEQ, (Var int_res_2), Int(bi0, reg_16)))
+    :: move zf (contains_null xmm2m128_e)
+    :: move sf (contains_null xmm1_e)
+    :: move oF (Extract(bi0, bi0, (Var int_res_2)))
+    :: move af (Int(bi0, reg_1))
+    :: move pf (Int(bi0, reg_1))
+    :: []
   | Pshufd (dst, src, imm) ->
     let t = r128 in (* pshufd is only defined for 128-bits *)
       let src_e = op2e t src in
@@ -2377,11 +2487,8 @@ let parse_instr g addr =
              type.
           *)
           | Oimm imm ->
-            if imm = 0xCL then
-              let imm8cb = parse_imm8cb imm in
-              (Pcmpistri(prefix.mopsize, r, rm, i, imm8cb), na)
-            else unimplemented
-	      (Printf.sprintf "unsupported pcmpistri op %02Lx" imm)
+            let imm8cb = parse_imm8cb imm in
+            (Pcmpistri(prefix.mopsize, r, rm, i, imm8cb), na)
           | _ ->  unimplemented "unsupported non-imm op for pcmpistri")
         | b4 ->  unimplemented
 	  (Printf.sprintf "unsupported opcode %02x %02x %02x" b1 b2 b3)
