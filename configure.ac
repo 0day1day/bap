@@ -270,3 +270,6 @@ AC_OUTPUT
 
 # Configure zarith
 (cd zarith-1.0 && ./configure)
+
+# Force libtracewrap to reconfigure
+rm -f libtracewrap/CONFIGURED
