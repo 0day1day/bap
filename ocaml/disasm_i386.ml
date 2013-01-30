@@ -999,26 +999,27 @@ let rec to_ir addr next ss pref =
     and is_valid_xmm2_e index = Var(is_valid_xmm2 index)
     in
 
-    (* Build expression that assigns the correct values to the
-       is_valid variables.  e is the inner expression that can
-       reference the variables. *)
-    let let_is_valid e =
+    (* Build expressions that assigns the correct values to the
+       is_valid variables. *)
+    let build_valid_xmm1 =
       let f acc i =
-        let acc = Let(is_valid_xmm1 i,
+        Let(is_valid_xmm1 i,
             binop AND
               (* Previous element is valid *)
               (if i == 0 then exp_true else is_valid_xmm1_e (i-1))
               (* Current element is valid *)
               (binop NEQ (get_xmm1 i) (it 0 elemt)), acc)
-        in
+      in (fun e -> fold f e (nelem-1---0))
+    in
+    let build_valid_xmm2 =
+      let f acc i =
         Let(is_valid_xmm2 i,
             binop AND
               (* Previous element is valid *)
               (if i == 0 then exp_true else is_valid_xmm2_e (i-1))
               (* Current element is valid *)
               (binop NEQ (get_xmm2 i) (it 0 elemt)), acc)
-      in
-      fold f e (nelem-1---0)
+      in (fun e -> fold f e (nelem-1---0))
     in
 
     let get_intres1_bit index = match imm8cb with
@@ -1081,7 +1082,7 @@ let rec to_ir addr next ss pref =
         fold check_char exp_true ((nelem-index-1)---0)
     in
     let bits = map get_intres1_bit (nelem-1---0) in
-    let res_e = let_is_valid (concat_explist bits) in
+    let res_e = build_valid_xmm1 (build_valid_xmm2 (concat_explist bits)) in
     let int_res_1 = nt "IntRes1" reg_16 in
     let int_res_2 = nt "IntRes2" reg_16 in
 
@@ -1101,7 +1102,7 @@ let rec to_ir addr next ss pref =
     in
 
     comment
-    :: move int_res_1 (if nelem = 16 then res_e else cast_unsigned reg_16 res_e)
+    :: move int_res_1 (cast_unsigned reg_16 res_e)
     :: (match imm8cb with
     | {Imm8Cb.negintres1=false} ->
       move int_res_2 (Var int_res_1)
@@ -1109,8 +1110,19 @@ let rec to_ir addr next ss pref =
       (* int_res_1 is bitwise-notted *)
       move int_res_2 (unop NOT (Var int_res_1))
     | {Imm8Cb.negintres1=true; Imm8Cb.maskintres1=true} ->
-      (* only the valid bytes in xmm2 are bitwise-notted *)
-      unimplemented "masking by valid bytes")
+      (* only the valid elements in xmm2 are bitwise-notted *)
+      (* XXX: Right now we duplicate the valid element computations
+         when negating the valid elements.  They are also used by the
+         aggregation functions.  A better way to implement this might
+         be to write the valid element information out as a temporary
+         bitvector.  The aggregation functions and this code would
+         then extract the relevant bit to see if an element is
+         valid. *)
+      let validvector =
+        let bits = map is_valid_xmm2_e (nelem-1---0) in
+        build_valid_xmm2 (cast_unsigned reg_16 (concat_explist bits))
+      in
+      move int_res_2 (binop XOR validvector (Var int_res_1)))
     :: move ecx (sb (Var int_res_2))
     :: move cf (BinOp(NEQ, (Var int_res_2), Int(bi0, reg_16)))
     :: move zf (contains_null xmm2m128_e)
