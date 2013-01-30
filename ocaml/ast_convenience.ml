@@ -95,8 +95,8 @@ let rec cast_unsigned tnew = function
   | e ->
     Cast(CAST_UNSIGNED, tnew, e)
 
-let exp_int i bits =
-  Int(bi i, Reg bits)
+let exp_int i bits = Int(i, Reg bits)
+let it i t = Int(biconst i, t)
 
 let exp_ite ?t b e1 e2 =
   (* type inference shouldn't be needed when t is specified, but we're paranoid *)
@@ -269,7 +269,8 @@ let extract_byte n e =
 (* Extract the nth least significant byte from e, starting with
    zero. n is an expression. *)
 let extract_byte_symbolic n e =
-  cast_low reg_8 (e >>* n)
+  let t = Typecheck.infer_ast n in
+  cast_low reg_8 (e >>* (n ** (it 8 t)))
 
 let reverse_bytes e =
   let bytes = Typecheck.bytes_of_width (Typecheck.infer_ast ~check:false e) in
