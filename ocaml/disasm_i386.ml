@@ -1026,11 +1026,32 @@ let rec to_ir addr next ss pref =
         (* Is xmm1[index] at xmm2[j]? *)
         let check_char acc j =
           let eq = binop EQ (get_xmm1 index) (get_xmm2 j) in
-          let valid = binop AND (is_valid_xmm1_e index) (is_valid_xmm2_e j) in
+          let valid = is_valid_xmm2_e j in
           ite reg_1 (binop AND eq valid) exp_true acc
         in
-        (* Is xmm1[index] included in xmm2[j] for any j? *)
-        fold check_char exp_false (nelem-1---0)
+        binop AND (is_valid_xmm1_e index)
+          (* Is xmm1[index] included in xmm2[j] for any j? *)
+          (fold check_char exp_false (nelem-1---0))
+      | {Imm8Cb.agg=Imm8Cb.Ranges} ->
+        (* Is there an even j such that xmm1[j] <= xmm2[index] <=
+           xmm1[j+1]? *)
+        let check_char acc j =
+          (* XXX: Should this be AND? *)
+          let rangevalid = binop AND (is_valid_xmm1_e (2*j)) (is_valid_xmm1_e (2*j+1)) in
+          let lte = match imm8cb with
+            | {Imm8Cb.ssign=Imm8Cb.Unsigned} -> LE
+            | {Imm8Cb.ssign=Imm8Cb.Signed} -> SLE
+          in
+          let inrange = binop AND
+            (binop lte (get_xmm1 (2*j)) (get_xmm2 index))
+            (binop lte (get_xmm2 index) (get_xmm1 (2*j+1)))
+          in
+          ite reg_1 (unop NOT rangevalid) exp_false
+            (ite reg_1 inrange exp_true acc)
+        in
+        binop AND (is_valid_xmm2_e index)
+          (* Is xmm2[index] in the jth range pair? *)
+          (fold check_char exp_false ((nelem/2-1)---0))
       | {Imm8Cb.agg=Imm8Cb.EqualEach} ->
         (* Does xmm1[index] = xmm2[index]? *)
         let bothinvalid = binop AND (is_valid_xmm1_e index) (is_valid_xmm2_e index) in
@@ -1058,7 +1079,6 @@ let rec to_ir addr next ss pref =
         in
         (* Is xmm1[j] equal to xmm2[index+j]? *)
         fold check_char exp_true ((nelem-index-1)---0)
-      | _ -> unimplemented ("Unsupported agg function "^Imm8Cb.agg_to_string imm8cb.Imm8Cb.agg)
     in
     let bits = map get_intres1_bit (nelem-1---0) in
     let res_e = let_is_valid (concat_explist bits) in
