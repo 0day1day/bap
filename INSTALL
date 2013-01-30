@@ -49,7 +49,7 @@ installing the appropriate packages above.
 
 To install ocaml 4.00.1 and opam using ocamlbrew:
 
-  $ curl -kL https://raw.github.com/edmcman/ocamlbrew/script/ocamlbrew-install | env OCAMLBREW_FLAGS="-r" bash
+  $ curl -kL https://raw.github.com/hcarty/ocamlbrew/master/ocamlbrew-install | env OCAMLBREW_FLAGS="-r" bash
 
 Follow the directions printed on the screen about adding 'source
 <...>' to your ~/.bashrc file to make ocaml available whenever you
