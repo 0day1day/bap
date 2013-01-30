@@ -966,7 +966,7 @@ let rec to_ir addr next ss pref =
       | {Imm8Cb.ssize=Imm8Cb.Words} -> 8, 16, Reg 16
     in
     (* Get element index in e *)
-    let get_elem e index = extract_byte index e in
+    let get_elem = extract_byte in
     (* Get from xmm1/xmm2 *)
     let get_xmm1 = get_elem xmm1_e
     and get_xmm2 = get_elem xmm2m128_e
@@ -1124,30 +1124,18 @@ let rec to_ir addr next ss pref =
     :: []
   | Pshufd (dst, src, imm) ->
     let t = r128 in (* pshufd is only defined for 128-bits *)
-      let src_e = op2e t src in
-      let imm_e = op2e t imm in
-      (* XXX: This would be more straight-forward if implemented using
-         map, instead of fold *)
-      let get_dword prev_dwords ndword =
-        let high = 2 * ndword + 1 |> biconst in
-        let low = 2 * ndword |> biconst in
-        let encoding = cast_unsigned t (Extract (high, low, imm_e)) in
-        let shift = encoding ** (it 32 t) in
-        let dword = src_e >>* shift in
-        let dword = cast_low r32 dword in
-        match prev_dwords with
-        | None ->
-          Some dword
-        | Some dwords ->
-          Some (Concat(dwords, dword))
-      in
-      let dst_dwords = fold get_dword None (0--3) in
-      (match dst_dwords with
-      | Some dwords ->
-        [assn t dst dwords]
-      | None ->
-        disfailwith "failed to read dwords for pshufd"
-      )
+    let src_e = op2e t src in
+    let imm_e = op2e t imm in
+    (* XXX: This would be more straight-forward if implemented using
+       map, instead of fold *)
+    let get_dword ndword =
+      let high = 2 * ndword + 1 in
+      let low = 2 * ndword in
+      let index = cast_unsigned t (extract high low imm_e) in
+      extract_element_symbolic reg_32 src_e index
+    in
+    let dwords = concat_explist (map get_dword (3---0)) in
+    [assn t dst dwords]
   | Pshufb (t, dst, src) ->
     let order_e = op2e t src in
     let dst_e = op2e t dst in
