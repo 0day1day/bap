@@ -45,7 +45,10 @@ let concat a b = match a,b with
     Int(i,t)
   | _ -> Concat(a, b)
 
-let extract h l e = match e with
+let extract h l e =
+  let h = Big_int_Z.big_int_of_int h in
+  let l = Big_int_Z.big_int_of_int l in
+  match e with
   | Int(i, t) ->
     let (i,t) = Arithmetic.extract h l (i,t) in
     Int(i,t)
@@ -258,16 +261,22 @@ let last_meaningful_stmt p =
   in
   f (List.rev p)
 
+(* Extract the nth least significant byte from e, starting with
+   zero. n is a non-negative integer *)
+let extract_byte n e =
+  extract (n*8+7) (n*8) e
+
+(* Extract the nth least significant byte from e, starting with
+   zero. n is an expression. *)
+let extract_byte_symbolic n e =
+  cast_low reg_8 (e >>* n)
+
 let reverse_bytes e =
   let bytes = Typecheck.bytes_of_width (Typecheck.infer_ast ~check:false e) in
-  let get_byte n = extract (biconst (n*8+7)) (biconst (n*8)) e in
+  let get_byte n = extract_byte n e in
   reduce
     (fun bige e -> bige ++* e)
     (map get_byte (0 -- (bytes-1)))
-
-(* Extract the nth least significant byte from e, starting with zero *)
-let extract_byte n e =
-  extract (biconst (n*8+7)) (biconst (n*8)) e
 
 (* Concatenate an enumeration of expressions *)
 let concat_explist elist =
