@@ -1147,7 +1147,7 @@ let rec to_ir addr next ss pref =
         | _ -> disfailwith "invalid size for pshufb"
       in
       let index = cast_unsigned t index in
-      let atindex = extract_byte_symbolic index dst_e in
+      let atindex = extract_byte_symbolic dst_e index in
       ite r8 highbit (it 0 r8) atindex
     in
     let n = (Typecheck.bits_of_width t) / 8 in
