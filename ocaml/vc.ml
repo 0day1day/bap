@@ -86,29 +86,29 @@ let compute_dwp_let {k=k; mode=mode} cfg post =
   (Wp.dwp_let ~k mode gcl post, foralls)
 let compute_dwp_let_gen = SsaVc compute_dwp_let
 
-let compute_eddwp {k=k; mode=mode} cfg post =
+let compute_fwp {k=k; mode=mode} cfg post =
   let gcl, foralls = Gcl.passified_of_ssa ~mode cfg in
-  (Dwp.eddwp ~k mode gcl post, foralls)
-let compute_eddwp_gen = SsaVc compute_eddwp
+  (Fwp.fwp ~k mode gcl post, foralls)
+let compute_fwp_gen = SsaVc compute_fwp
 
-let compute_eddwp_uwp {k=k; mode=mode} cfg post =
+let compute_fwp_uwp {k=k; mode=mode} cfg post =
   let ugcl = Gcl.Ugcl.of_ssacfg ~mode cfg in
-  (Dwp.eddwp_uwp ~k mode ugcl post, [])
-let compute_eddwp_uwp_gen = SsaVc compute_eddwp_uwp
+  (Fwp.fwp_uwp ~k mode ugcl post, [])
+let compute_fwp_uwp_gen = SsaVc compute_fwp_uwp
 
-let compute_eddwp_lazyconc {k=k; mode=mode} cfg post =
+let compute_fwp_lazyconc {k=k; mode=mode} cfg post =
   (* Do not allow Gcl to rewrite Assigns.  We need to see the
      Assignments to do concrete evaluation. *)
   let gcl, foralls = Gcl.passified_of_ssa ?mode:None cfg in
-  (Dwp.eddwp_lazyconc ~k mode gcl post, foralls)
-let compute_eddwp_lazyconc_gen = SsaVc compute_eddwp_lazyconc
+  (Fwp.fwp_lazyconc ~k mode gcl post, foralls)
+let compute_fwp_lazyconc_gen = SsaVc compute_fwp_lazyconc
 
-let compute_eddwp_lazyconc_uwp {k=k; mode=mode} cfg post =
+let compute_fwp_lazyconc_uwp {k=k; mode=mode} cfg post =
   (* Do not allow Gcl to rewrite Assigns.  We need to see the
      Assignments to do concrete evaluation. *)
   let ugcl = Gcl.Ugcl.of_ssacfg cfg in
-  (Dwp.eddwp_lazyconc_uwp ~k mode ugcl post, [])
-let compute_eddwp_lazyconc_uwp_gen = SsaVc compute_eddwp_lazyconc_uwp
+  (Fwp.fwp_lazyconc_uwp ~k mode ugcl post, [])
+let compute_fwp_lazyconc_uwp_gen = SsaVc compute_fwp_lazyconc_uwp
 
 let compute_flanagansaxe {k=k; mode=mode} cfg post =
   let gcl, foralls = Gcl.passified_of_ssa ~mode cfg in
@@ -138,10 +138,10 @@ let compute_fse_maxrepeat_gen i = AstVc (compute_fse_maxrepeat i)
 
 let vclist =
   ("dwp", compute_dwp_gen)
-  :: ("eddwp", compute_eddwp_gen)
-  :: ("eddwp_uwp", compute_eddwp_uwp_gen)
-  :: ("eddwp_lazyconc", compute_eddwp_lazyconc_gen)
-  :: ("eddwp_lazyconc_uwp", compute_eddwp_lazyconc_uwp_gen)
+  :: ("fwp", compute_fwp_gen)
+  :: ("fwp_uwp", compute_fwp_uwp_gen)
+  :: ("fwp_lazyconc", compute_fwp_lazyconc_gen)
+  :: ("fwp_lazyconc_uwp", compute_fwp_lazyconc_uwp_gen)
   :: ("dwplet", compute_dwp_let_gen)
   :: ("dwp1", compute_dwp1_gen)
   :: ("flanagansaxe", compute_flanagansaxe_gen)
@@ -158,10 +158,10 @@ let vclist =
 
 let pred_vclist =
   ("dwp", compute_dwp_gen)
-  :: ("eddwp", compute_eddwp_gen)
-  :: ("eddwp_uwp", compute_eddwp_uwp_gen)
-  :: ("eddwp_lazyconc", compute_eddwp_lazyconc_gen)
-  :: ("eddwp_lazyconc_uwp", compute_eddwp_lazyconc_uwp_gen)
+  :: ("fwp", compute_fwp_gen)
+  :: ("fwp_uwp", compute_fwp_uwp_gen)
+  :: ("fwp_lazyconc", compute_fwp_lazyconc_gen)
+  :: ("fwp_lazyconc_uwp", compute_fwp_lazyconc_uwp_gen)
   :: ("dwplet", compute_dwp_let_gen)
   :: ("flanagansaxe", compute_flanagansaxe_gen)
   :: ("wp", compute_wp_gen)

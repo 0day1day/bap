@@ -57,22 +57,22 @@ val compute_dwp_let_gen : t
     produces smaller formulas on programs that have no [Assume]
     statements.  However, it produces slightly larger formulas for
     programs with [Assume] statements. *)
-val compute_eddwp : ssa_vc
-val compute_eddwp_gen : t
+val compute_fwp : ssa_vc
+val compute_fwp_gen : t
 
-(** An unstructured implementation of [compute_eddwp] that does not
+(** An unstructured implementation of [compute_fwp] that does not
     convert the entire program to GCL *)
-val compute_eddwp_uwp : ssa_vc
-val compute_eddwp_uwp_gen : t
+val compute_fwp_uwp : ssa_vc
+val compute_fwp_uwp_gen : t
 
-(** Same as [compute_eddwp] but with concrete evaluation and lazy merging. *)
-val compute_eddwp_lazyconc : ssa_vc
-val compute_eddwp_lazyconc_gen : t
+(** Same as [compute_fwp] but with concrete evaluation and lazy merging. *)
+val compute_fwp_lazyconc : ssa_vc
+val compute_fwp_lazyconc_gen : t
 
-(** An unstructured implementation of [compute_eddwp_lazyconc] that
+(** An unstructured implementation of [compute_fwp_lazyconc] that
     does not convert the entire program to GCL *)
-val compute_eddwp_lazyconc_uwp : ssa_vc
-val compute_eddwp_lazyconc_uwp_gen : t
+val compute_fwp_lazyconc_uwp : ssa_vc
+val compute_fwp_lazyconc_uwp_gen : t
 
 (** DWP implementation that uses forall quantifiers. *)
 val compute_dwp1 : ssa_vc

@@ -47,14 +47,14 @@ let speclist =
      "<suffix> Add <suffix> to each variable name.")
   ::("-dwp", Arg.Unit(fun()-> vc := compute_dwp_gen),
      "Use efficient directionless weakest precondition")
-  ::("-eddwp", Arg.Unit(fun()-> vc := compute_eddwp_gen),
-     "Use Ed's efficient directionless weakest precondition algorithm")
-  ::("-eddwpuwp", Arg.Unit(fun()-> vc := compute_eddwp_uwp_gen),
-     "Use Ed's efficient directionless weakest precondition algorithm in UWP mode")
-  ::("-eddwplazyconc", Arg.Unit(fun()-> vc := compute_eddwp_lazyconc_gen),
-     "Use Ed's efficient directionless weakest precondition algorithm with concrete evaluation and lazy merging")
-  ::("-eddwplazyconcuwp", Arg.Unit(fun()-> vc := compute_eddwp_lazyconc_uwp_gen),
-     "Use Ed's efficient directionless weakest precondition algorithm with concrete evaluation and lazy merging directly on a CFG representation")
+  ::("-fwp", Arg.Unit(fun()-> vc := compute_fwp_gen),
+     "Use efficient directionless weakest precondition algorithm")
+  ::("-fwpuwp", Arg.Unit(fun()-> vc := compute_fwp_uwp_gen),
+     "Use efficient forward weakest precondition algorithm in UWP mode")
+  ::("-fwplazyconc", Arg.Unit(fun()-> vc := compute_fwp_lazyconc_gen),
+     "Use efficient forward weakest precondition algorithm with concrete evaluation and lazy merging")
+  ::("-fwplazyconcuwp", Arg.Unit(fun()-> vc := compute_fwp_lazyconc_uwp_gen),
+     "Use efficient forward weakest precondition algorithm with concrete evaluation and lazy merging directly on a CFG representation")
   ::("-dwpk", Arg.Int(fun i-> vc := compute_dwp_gen;
     options := {!options with k=i};
   ),

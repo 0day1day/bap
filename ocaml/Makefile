@@ -100,7 +100,7 @@ export SOURCES = \
 	structural_analysis.ml \
 	steensgard.mli steensgard.ml \
 	unroll.mli unroll.ml \
-	dwp.mli dwp.ml \
+	fwp.mli fwp.ml \
 	ast_slice.ml \
 	ssa_slice.ml \
 	traces.ml \

@@ -1,6 +1,6 @@
 open Ast
 open Ast_convenience
-module D = Debug.Make(struct let name = "Dwp" and default=`NoDebug end)
+module D = Debug.Make(struct let name = "Fwp" and default=`NoDebug end)
 open D
 open Gcl
 open Symbeval
@@ -96,11 +96,8 @@ let or_simp = function
   | BinOp(AND, UnOp(NOT, e1), e2) when e1 == e2 -> exp_false
   | BinOp(AND, e1, e2) when e1 == e2 -> e1
   | e -> e
-(* let rec or_simp e = *)
-(*   let e' = or_simp_base e in *)
-(*   if e = e' then e else or_simp e' *)
 
-(* Dwp base implementation.  Returns a tuple consisting of variable
+(* Fwp base implementation.  Returns a tuple consisting of variable
    bindings, de-duplicated ms, de-duplicated af, duplicated ms,
    duplicated af.  We need to keep both duplicated and de-duplicated
    versions of expressions for simplification.  For instance, we
@@ -111,20 +108,20 @@ let or_simp = function
    Memory is not a concern for the duplicated expressions because of
    memory sharing.
 *)
-let rec dwp ?(simp=or_simp) ?(k=1) ?assign_mode p =
-  let dwp = dwp ~simp ~k ?assign_mode in match p with
+let rec fwpint ?(simp=or_simp) ?(k=1) ?assign_mode p =
+  let fwp = fwpint ~simp ~k ?assign_mode in match p with
     | Assign (v,e) when assign_mode <> None ->
       (match assign_mode with
-      | Some Sat -> dwp (Assert (exp_eq (Var v) e))
-      | Some Validity -> dwp (Assume (exp_eq (Var v) e))
-      | Some Foralls -> failwith "dwp: Foralls not implemented"
-      | None -> failwith "dwp: impossible")
-    | Assign _ -> failwith "dwp requires an assignment free program"
+      | Some Sat -> fwp (Assert (exp_eq (Var v) e))
+      | Some Validity -> fwp (Assume (exp_eq (Var v) e))
+      | Some Foralls -> failwith "fwp: Foralls not implemented"
+      | None -> failwith "fwp: impossible")
+    | Assign _ -> failwith "fwp requires an assignment free program"
     | Assert e -> let ne = exp_not e in [], exp_true, ne, exp_true, ne
     | Assume e -> [], e, exp_false, e, exp_false
     | Choice (s1, s2) ->
-      let v1, ms1, af1, msdup1, afdup1 = dwp s1 in
-      let v2, ms2, af2, msdup2, afdup2 = dwp s2 in
+      let v1, ms1, af1, msdup1, afdup1 = fwp s1 in
+      let v2, ms2, af2, msdup2, afdup2 = fwp s2 in
 
       let ms = simp (exp_or ms1 ms2) in
       let msdup = simp (exp_or msdup1 msdup2) in
@@ -133,11 +130,11 @@ let rec dwp ?(simp=or_simp) ?(k=1) ?assign_mode p =
 
       v1@v2, choose_best ms msdup, choose_best af afdup, msdup, afdup
     | Seq (s1, s2) as _s ->
-      let v1, ms1, af1, msdup1, afdup1 = dwp s1 in
-      let v2, ms2, af2, msdup2, afdup2 = dwp s2 in
+      let v1, ms1, af1, msdup1, afdup1 = fwp s1 in
+      let v2, ms2, af2, msdup2, afdup2 = fwp s2 in
       let v = [] in
-      let (v,ms1) = Wp.variableify ~name:"eddwp_seq_ms1" k v ms1 in
-      let (v,af1) = Wp.variableify ~name:"eddwp_seq_af1" k v af1 in
+      let (v,ms1) = Wp.variableify ~name:"fwp_seq_ms1" k v ms1 in
+      let (v,af1) = Wp.variableify ~name:"fwp_seq_af1" k v af1 in
 
       let ms = simp (exp_and ms1 (simp (exp_or af1 ms2))) in
       let msdup = simp (exp_and msdup1 (simp (exp_or afdup1 msdup2))) in
@@ -149,112 +146,7 @@ let rec dwp ?(simp=or_simp) ?(k=1) ?assign_mode p =
 
 module Make(D:Delta) = struct
 
-(* This is fundamentally broken... we need to use lazy merging. *)
-
-(* (\* Ed's DWP formulation + concrete evaluation. *\) *)
-(* let eddwp_conc ?(simp=or_simp) ?(k=1) ?(cf=true) (mode:formula_mode) (p:Gcl.t) q = *)
-(*   (\* *)
-(*     Returns (v, dwpms P, dwpaf P). *)
-
-(*     Note: dwpms P = Not (wp P true) \/ Not (wlp P false) *)
-(*       and dwpaf P = Not (wp P true) *\) *)
-(*   let eval delta e = if cf *)
-(*     then D.simplify delta e *)
-(*     else Symbeval.Symbolic e *)
-(*   in *)
-(*   let punt delta s = let v, ms, af, msdup, afdup = dwp ~simp ~k ~assign_mode:mode s *)
-(*                      in delta, v, ms, af, msdup, afdup *)
-(*   in *)
-(*   let rec dwpconc delta = function *)
-(*     | Gcl.Assign (v, e) as s -> *)
-(*       let value = eval delta e in *)
-(*       if Symbeval.is_concrete_mem_or_scalar value then *)
-(*         D.set delta v value, [], exp_true, exp_false, exp_true, exp_false *)
-(*       else punt delta s *)
-(*     | Gcl.Assume e as s -> *)
-(*       let value = eval delta e in *)
-(*       if value = Symbolic exp_true then punt delta Skip *)
-(*       else if value = Symbolic exp_false then delta, [], exp_false, exp_false, exp_false, exp_false *)
-(*       else punt delta s *)
-(*     | Gcl.Assert e as s -> *)
-(*       let value = eval delta e in *)
-(*       if value = Symbolic exp_true then punt delta Skip *)
-(*       else if value = Symbolic exp_false then delta, [], exp_true, exp_true, exp_true, exp_true *)
-(*       else punt delta s *)
-(*     | Gcl.Choice (s1, s2) as _s -> *)
-(*       let delta1, v1, ms1, af1, msdup1, afdup1 = dwpconc delta s1 in *)
-(*       let delta2, v2, ms2, af2, msdup2, afdup2 = dwpconc delta s2 in *)
-(*       let deltamerge, conflicts = D.merge delta1 delta2 in *)
-
-(*         (\* Merging gives us a list of variable conflicts in the two *)
-(*            branches.  We can handle these by adding assignment *)
-(*            statements to the end of each branch, and then using the *)
-(*            Seq rule. (TODO: Prove this in Isabelle.)  However, we *)
-(*            already have a lot of formula pieces precomputed, so *)
-(*            instead of recursing and wasting all that work, we will *)
-(*            include a version of the sequence rule here that reuses *)
-(*            ms1, af1, etc.  *\) *)
-
-(*       let s1conflicts = BatList.filter_map (fun (v,x,_) -> *)
-(*         match x with Some x -> Some(v,x) | None -> None) conflicts in *)
-(*       let s2conflicts = BatList.filter_map (fun (v,_,x) -> *)
-(*         match x with Some x -> Some(v,x) | None -> None) conflicts in *)
-(*       let add_assign (v,ms,af,msdup,afdup) (var,e) = *)
-(*         if msdup = exp_false then v, exp_false, exp_false, exp_false, exp_false *)
-(*         else if afdup = exp_true then v, ms, ms, msdup, msdup *)
-(*         else let _, ms2, af2, msdup2, afdup2 = dwp ~simp ~k ~assign_mode:mode (Assign (var, unwrap_symb e)) in *)
-(*              let (v,ms) = Wp.variableify ~name:"eddwp_cseq_ms1" k v ms in *)
-(*              let (v,af) = Wp.variableify ~name:"eddwp_cseq_af1" k v af in *)
-(*              let ms = simp (exp_and ms (simp (exp_or af ms2))) in *)
-(*              let msdup = simp (exp_and msdup (simp (exp_or afdup msdup2))) in *)
-(*              let af = simp (exp_and ms (simp (exp_or af af2))) in *)
-(*              let afdup = simp (exp_and msdup (simp (exp_or afdup afdup2))) in *)
-(*              (v, choose_best ms msdup, choose_best af afdup, msdup, afdup) *)
-(*       in *)
-(*       let (v1', ms1, af1, msdup1, afdup1) = List.fold_left add_assign ([], ms1, af1, msdup1, afdup1) s1conflicts in *)
-(*       let (v2', ms2, af2, msdup2, afdup2) = List.fold_left add_assign ([], ms2, af2, msdup2, afdup2) s2conflicts in *)
-
-(*       let ms = simp (exp_or ms1 ms2) in *)
-(*       let msdup = simp (exp_or msdup1 msdup2) in *)
-(*       let af = simp (exp_or af1 af2) in *)
-(*       let afdup = simp (exp_or afdup1 afdup2) in *)
-
-(*       deltamerge, v1'@v2'@v1@v2, choose_best ms msdup, choose_best af afdup, msdup, afdup *)
-(*     | Gcl.Seq (s1, s2) as _s -> *)
-(*       let delta1, v1, ms1, af1, msdup1, afdup1 = dwpconc delta s1 in *)
-(*       (\* dprintf "%s ms1 %s af1 %s" (Gcl.to_string s1) (Pp.ast_exp_to_string msdup1) (Pp.ast_exp_to_string afdup1); *\) *)
-(*       if msdup1 = exp_false then delta1, v1, exp_false, exp_false, exp_false, exp_false *)
-(*       else if afdup1 = exp_true then delta1, v1, ms1, ms1, msdup1, msdup1 *)
-(*       else *)
-(*         let delta2, v2, ms2, af2, msdup2, afdup2 = dwpconc delta1 s2 in *)
-(*         let v = [] in *)
-(*         let (v,ms1) = Wp.variableify ~name:"eddwp_seq_ms1" k v ms1 in *)
-(*         let (v,af1) = Wp.variableify ~name:"eddwp_seq_af1" k v af1 in *)
-
-(*         let ms = simp (exp_and ms1 (simp (exp_or af1 ms2))) in *)
-(*         let msdup = simp (exp_and msdup1 (simp (exp_or afdup1 msdup2))) in *)
-(*         let af = simp (exp_and ms1 (simp (exp_or af1 af2))) in *)
-(*         let afdup = simp (exp_and msdup1 (simp (exp_or afdup1 afdup2))) in *)
-
-(*         delta2, v@v1@v2, choose_best ms msdup, choose_best af afdup, msdup, afdup *)
-(*     | Gcl.Skip as s -> punt delta s *)
-(*   in *)
-(*   let (delta,v,ms,af,_,_) = dwpconc (D.create ()) p in *)
-(*   if mode = Sat then assert (ms === exp_true); *)
-(*   let q' = *)
-(*     let value = eval delta q in *)
-(*     unwrap_symb value *)
-(*   in *)
-(*   let vo = Wp.assignments_to_exp v in *)
-(*   match mode with *)
-(*   | Sat -> *)
-(*     exp_and vo (exp_implies ms (exp_and (exp_not af) q')) *)
-(*   | Validity -> *)
-(*     exp_implies vo (exp_implies ms (exp_and (exp_not af) q')) *)
-(*   | Foralls -> *)
-(*     failwith "Foralls not supported yet" *)
-
-(* Internal function for eddwp lazy concrete eval *)
+(* Internal function for fwp lazy concrete eval *)
   let mark_used needh v =
     VH.replace needh v true
   let mark_used_vars_in needh e =
@@ -275,13 +167,13 @@ module Make(D:Delta) = struct
      and fallthrough, which indicates whether execution may pass to a
      following statement.  Fallthrough is false after assert false or
      assume false. *)
-  let rec dwpconcint simp eval k needh vmaph mode delta =
+  let rec fwpconcint simp eval k needh vmaph mode delta =
     let is_needed v =
       try VH.find needh v
       with Not_found -> false
     (* Mark v as being needed in the formula *)
     in
-    let punt delta s = let v, ms, af, msdup, afdup = dwp ~simp ~k ~assign_mode:mode s
+    let punt delta s = let v, ms, af, msdup, afdup = fwpint ~simp ~k ~assign_mode:mode s
                        in
                        let e = match s with
                          | Gcl.Assign (_, e) -> Some e
@@ -299,7 +191,7 @@ module Make(D:Delta) = struct
     let punt_external ?(fallthrough=true) delta s = let delta, v, ms, af, msdup, afdup = punt delta s in
                                 delta, lazy (v, ms, af, msdup, afdup), fallthrough
     in
-    let dwpconc = dwpconcint simp eval k needh vmaph mode in
+    let fwpconc = fwpconcint simp eval k needh vmaph mode in
     function
       | Gcl.Assign (v, e) as s ->
         let value = eval delta e in
@@ -332,8 +224,8 @@ module Make(D:Delta) = struct
         else if value = Symbolic exp_false then delta, lazy([], exp_true, exp_true, exp_true, exp_true), false
         else punt_external delta s
       | Gcl.Choice (s1, s2) ->
-        let delta1, lazy1, fallthrough1 = dwpconc delta s1 in
-        let delta2, lazy2, fallthrough2 = dwpconc delta s2 in
+        let delta1, lazy1, fallthrough1 = fwpconc delta s1 in
+        let delta2, lazy2, fallthrough2 = fwpconc delta s2 in
         let deltamerge = match fallthrough1, fallthrough2 with
           | true, true -> D.merge delta1 delta2
           | true, false -> delta1
@@ -352,8 +244,8 @@ module Make(D:Delta) = struct
 
           v1@v2, choose_best ms msdup, choose_best af afdup, msdup, afdup), fallthrough1 || fallthrough2
       | Gcl.Seq (s1, s2) as _s ->
-        let delta1, lazy1, fallthrough1 = dwpconc delta s1 in
-        let delta2, lazy2, fallthrough2 = dwpconc delta1 s2 in
+        let delta1, lazy1, fallthrough1 = fwpconc delta s1 in
+        let delta2, lazy2, fallthrough2 = fwpconc delta1 s2 in
         delta2, lazy (
           let v1, ms1, af1, msdup1, afdup1 = Lazy.force lazy1 in
           if msdup1 = exp_false then v1, exp_false, exp_false, exp_false, exp_false
@@ -361,8 +253,8 @@ module Make(D:Delta) = struct
           else
             let v2, ms2, af2, msdup2, afdup2 = Lazy.force lazy2 in
             let v = [] in
-            let (v,ms1) = Wp.variableify ~name:"eddwp_seq_ms1" k v ms1 in
-            let (v,af1) = Wp.variableify ~name:"eddwp_seq_af1" k v af1 in
+            let (v,ms1) = Wp.variableify ~name:"fwp_seq_ms1" k v ms1 in
+            let (v,af1) = Wp.variableify ~name:"fwp_seq_af1" k v af1 in
 
             let ms = simp (exp_and ms1 (simp (exp_or af1 ms2))) in
             let msdup = simp (exp_and msdup1 (simp (exp_or afdup1 msdup2))) in
@@ -372,7 +264,7 @@ module Make(D:Delta) = struct
             v@v1@v2, choose_best ms msdup, choose_best af afdup, msdup, afdup), fallthrough1 && fallthrough2
       | Gcl.Skip as s -> punt_external delta s
 
-(* Ed's DWP formulation + concrete evaluation + lazy merging.
+(* Ed's FWP formulation + concrete evaluation + lazy merging.
 
    This function concrete evaluates the entire program eagerly, but
    produces lazy expressions for the formulas.  We do this so that we
@@ -381,16 +273,16 @@ module Make(D:Delta) = struct
    we do not need to put x in the formula, because there is no
    reference to [x] in the formula. However, [Seq(Choice(Assign (x,
    5), Skip), Assert (x == 5))] would need to put [x] in the formula.
-   The difficulty is that DWP is going forward, but we don't know if a
+   The difficulty is that FWP is going forward, but we don't know if a
    variable is used until later in the program.  Thus the lazy
    expressions.
 *)
-let eddwp_lazyconc ?(simp=or_simp) ?(k=1) ?(cf=true) (mode:formula_mode) (p:Gcl.t) q =
+let fwp_lazyconc ?(simp=or_simp) ?(k=1) ?(cf=true) (mode:formula_mode) (p:Gcl.t) q =
   (*
-    Returns (v, dwpms P, dwpaf P).
+    Returns (v, fwpms P, fwpaf P).
 
-    Note: dwpms P = Not (wp P true) \/ Not (wlp P false)
-    and dwpaf P = Not (wp P true) *)
+    Note: fwpms P = Not (wp P true) \/ Not (wlp P false)
+    and fwpaf P = Not (wp P true) *)
   let eval delta e = if cf
     then D.simplify delta e
     else Symbeval.Symbolic e
@@ -399,7 +291,7 @@ let eddwp_lazyconc ?(simp=or_simp) ?(k=1) ?(cf=true) (mode:formula_mode) (p:Gcl.
   let needh = VH.create 1000 in
   (* var -> vars referenced by var *)
   let vmaph = VH.create 1000 in
-  let (delta, lazyr, _) = dwpconcint simp eval k needh vmaph mode (D.create ()) p in
+  let (delta, lazyr, _) = fwpconcint simp eval k needh vmaph mode (D.create ()) p in
   let q' =
     let value = eval delta q in
     unwrap_symb value
@@ -417,7 +309,7 @@ let eddwp_lazyconc ?(simp=or_simp) ?(k=1) ?(cf=true) (mode:formula_mode) (p:Gcl.
   | Foralls ->
     failwith "Foralls not supported yet"
 
-let eddwp_lazyconc_uwp ?(simp=or_simp) ?(k=1) ?(cf=true) mode ((cfg,ugclmap):Gcl.Ugcl.t) (q:exp) : exp =
+let fwp_lazyconc_uwp ?(simp=or_simp) ?(k=1) ?(cf=true) mode ((cfg,ugclmap):Gcl.Ugcl.t) (q:exp) : exp =
 
   Checks.acyclic_astcfg cfg "UWP";
   Checks.connected_astcfg cfg "UWP";
@@ -483,7 +375,7 @@ let eddwp_lazyconc_uwp ?(simp=or_simp) ?(k=1) ?(cf=true) mode ((cfg,ugclmap):Gcl
                with Invalid_argument "Empty List" -> D.create ()
              in merged_delta, fallthrough_deltas <> []
     in
-    let (delta, lazyr, fallthrough2) = dwpconcint simp eval k needh vmaph mode delta_in (ugclmap (CA.G.V.label bb)) in
+    let (delta, lazyr, fallthrough2) = fwpconcint simp eval k needh vmaph mode delta_in (ugclmap (CA.G.V.label bb)) in
     let (delta, lazyr, fallthrough) =
       delta, lazy (
         let ms1, af1, msdup1, afdup1 = match CA.G.pred cfg bb with
@@ -493,7 +385,7 @@ let eddwp_lazyconc_uwp ?(simp=or_simp) ?(k=1) ?(cf=true) mode ((cfg,ugclmap):Gcl
           | s ->
             (* Get the conjunction of our predecessors' post-conditions.
 
-               This is basically eddwp's Choose rule. *)
+               This is basically fwp's Choose rule. *)
             let bbinfo bb =
               let _,l,_ = getbbinfo (CA.G.V.label bb) in
               let _,_,_,msdup,afdup = Lazy.force l in
@@ -510,14 +402,14 @@ let eddwp_lazyconc_uwp ?(simp=or_simp) ?(k=1) ?(cf=true) mode ((cfg,ugclmap):Gcl
               choose_best ms msdup, choose_best af afdup, msdup, afdup) (List.map bbinfo s)
         in
 
-        (* This is basically eddwp's Sequence rule. *)
+        (* This is basically fwp's Sequence rule. *)
         if msdup1 = exp_false then [], exp_false, exp_false, exp_false, exp_false
         else if afdup1 = exp_true then [], ms1, ms1, msdup1, msdup1
         else if fallthrough1 = false then [], ms1, af1, msdup1, afdup1
         else
           let v, ms2, af2, msdup2, afdup2 = Lazy.force lazyr in
-          (* let (v,ms1) = Wp.variableify ~name:"eddwp_seq_ms1" k v ms1 in *)
-          (* let (v,af1) = Wp.variableify ~name:"eddwp_seq_af1" k v af1 in *)
+          (* let (v,ms1) = Wp.variableify ~name:"fwp_seq_ms1" k v ms1 in *)
+          (* let (v,af1) = Wp.variableify ~name:"fwp_seq_af1" k v af1 in *)
 
           let ms = simp (exp_and ms1 (simp (exp_or af1 ms2))) in
           let msdup = simp (exp_and msdup1 (simp (exp_or afdup1 msdup2))) in
@@ -573,18 +465,18 @@ let ast_size e =
   ignore(Ast_visitor.exp_accept vis e);
   !s
 
-(* Ed's DWP formulation.  If there are no Assumes, dwpms will always
-   be true, and dwp degenerates to efficient (merging) fse. *)
-let eddwp ?(normalusage=true) ?(simp=or_simp) ?(k=1) (mode:formula_mode) (p:Gcl.t) q =
+(* Ed's FWP formulation.  If there are no Assumes, fwpms will always
+   be true, and fwp degenerates to efficient (merging) fse. *)
+let fwp ?(normalusage=true) ?(simp=or_simp) ?(k=1) (mode:formula_mode) (p:Gcl.t) q =
   (*
-    Returns (v, dwpms P, dwpaf P).
+    Returns (v, fwpms P, fwpaf P).
 
-    Note: dwpms P = Not (wp P true) \/ Not (wlp P false)
-      and dwpaf P = Not (wp P true) *)
+    Note: fwpms P = Not (wp P true) \/ Not (wlp P false)
+      and fwpaf P = Not (wp P true) *)
   dprintf "GCL size: %d" (Gcl.size p);
-  let (v,ms,af,_,_) = dwp ~simp ~k p in
+  let (v,ms,af,_,_) = fwpint ~simp ~k p in
   (* If p is an entire program lifted in Sat mode, ms should be true.
-     However, when we use eddwp from Uwp, this may not be true, since
+     However, when we use fwp from Uwp, this may not be true, since
      p is a small part of the whole program. *)
   if normalusage && mode = Sat then assert (ms === exp_true);
   let o = match mode with
@@ -595,18 +487,18 @@ let eddwp ?(normalusage=true) ?(simp=or_simp) ?(k=1) (mode:formula_mode) (p:Gcl.
   in
   dprintf "WP size: %d" (ast_size o); o
 
-let eddwp_uwp ?simp ?k mode =
+let fwp_uwp ?simp ?k mode =
   let module Toposort = Graph.Topological.Make(Cfg.AST.G) in
-  Wp.build_passified_uwp Toposort.iter (eddwp ~normalusage:false ?simp ?k mode)
+  Wp.build_passified_uwp Toposort.iter (fwp ~normalusage:false ?simp ?k mode)
 
-(* let eddwp_conc ?simp ?k ?cf mode p q = *)
-(*   let module DWPCONC = Make(VMDelta) in *)
-(*   DWPCONC.eddwp_conc ?simp ?k ?cf mode p q *)
+(* let fwp_conc ?simp ?k ?cf mode p q = *)
+(*   let module FWPCONC = Make(VMDelta) in *)
+(*   FWPCONC.fwp_conc ?simp ?k ?cf mode p q *)
 
-let eddwp_lazyconc ?simp ?k ?cf mode p q =
-  let module DWPCONC = Make(VMDelta) in
-  DWPCONC.eddwp_lazyconc ?simp ?k ?cf mode p q
+let fwp_lazyconc ?simp ?k ?cf mode p q =
+  let module FWPCONC = Make(VMDelta) in
+  FWPCONC.fwp_lazyconc ?simp ?k ?cf mode p q
 
-let eddwp_lazyconc_uwp ?simp ?k ?cf mode p q =
-  let module DWPCONC = Make(VMDelta) in
-  DWPCONC.eddwp_lazyconc_uwp ?simp ?k ?cf mode p q
+let fwp_lazyconc_uwp ?simp ?k ?cf mode p q =
+  let module FWPCONC = Make(VMDelta) in
+  FWPCONC.fwp_lazyconc_uwp ?simp ?k ?cf mode p q
