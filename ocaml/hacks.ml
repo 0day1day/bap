@@ -230,7 +230,7 @@ let bberror_assume_false graph =
   in
   let reroute cfg node =
     let stmts = C.get_stmts cfg node in
-    let stmts = (map_e replace_label)#prog stmts in
+    let stmts = (Ast_mapper.map_e replace_label)#prog stmts in
     let cfg = C.set_stmts cfg node stmts in
     (*let cfg = C.remove_edge cfg node error in*)
     let cfg = C.add_edge cfg node assume in

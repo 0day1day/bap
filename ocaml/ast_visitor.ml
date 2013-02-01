@@ -150,26 +150,3 @@ and cfg_accept vis p =
        let oldstmts = Cfg.AST.get_stmts g abb in
        let newstmts = prog_accept vis oldstmts in
        Cfg.AST.set_stmts g abb newstmts) p p
-
-class type map = object
-  method exp : exp -> exp
-  method stmt : stmt -> stmt
-  method prog : program -> program
-  method cfg : Cfg.AST.G.t -> Cfg.AST.G.t
-end
-
-(* A generic mapper for expressions within a larger structure.
-
-   e.g., to map an expression within an expression you just do: (map_exp f)#exp e
- *)
-let map_e f =
-  let visitor = object(self) inherit nop method visit_exp = f end in
-  let mapper =
-    object(self)
-      method exp = exp_accept visitor
-      method stmt = stmt_accept visitor
-      method prog = prog_accept visitor
-      method cfg = cfg_accept visitor
-    end
-  in
-  (mapper :> map)

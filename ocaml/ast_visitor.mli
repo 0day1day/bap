@@ -78,12 +78,3 @@ val prog_accept : #t -> program -> program
 
 (** Visit an AST program in CFG form *)
 val cfg_accept : #t -> Cfg.AST.G.t -> Cfg.AST.G.t
-
-class type map = object
-  method exp : exp -> exp
-  method stmt : stmt -> stmt
-  method prog : program -> program
-  method cfg : Cfg.AST.G.t -> Cfg.AST.G.t
-end
-
-val map_e : (exp -> exp visit_action) -> map

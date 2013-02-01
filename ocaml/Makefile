@@ -51,6 +51,7 @@ export SOURCES = \
 	cfg.mli cfg.ml \
 	ast_visitor.mli ast_visitor.ml \
 	ssa_visitor.mli ssa_visitor.ml \
+	ast_mapper.mli ast_mapper.ml \
 	grammar_scope.ml \
 	memory2array.mli memory2array.ml \
 	flatten_mem.mli flatten_mem.ml \
