@@ -9,14 +9,12 @@ open Utils_common
 open Type
 
 type options = {
-  cf : bool;
   k : int;
   mode : formula_mode;
   full_subst : bool;
 }
 
 let default_options = {
-  cf = true;
   k = 1;
   mode = Sat;
   full_subst = true;
@@ -53,7 +51,7 @@ let vc_ssacfg vc options prog post  = match vc with
   | SsaVc vc -> vc options prog post
 
 let compute_dwp1 _ cfg post =
-  let (gcl, foralls) = Gcl.passified_of_ssa Foralls cfg in
+  let (gcl, foralls) = Gcl.passified_of_ssa ~mode:Foralls cfg in
   let (moreforalls, wp) = Wp.dwp_1st gcl post in
   (wp, moreforalls@foralls)
 let compute_dwp1_gen = SsaVc compute_dwp1
@@ -63,28 +61,57 @@ let compute_wp _ cfg post =
   (Wp.wp gcl post, [])
 let compute_wp_gen = CfgVc compute_wp
 
+let compute_passified_wp {mode=mode} cfg post =
+  let gcl, foralls = Gcl.passified_of_ssa ~mode cfg in
+  (Wp.passified_wp gcl post, foralls)
+let compute_passified_wp_gen = SsaVc compute_passified_wp
+
 let compute_uwp _ cfg post =
-  let ugcl = Ugcl.of_ssacfg cfg in
-  (Wp.uwp ugcl post, [])
+  let ugcl = Gcl.Ugcl.of_ssacfg cfg in
+  (Wp.dijkstra_uwp ugcl post, [])
 let compute_uwp_gen = SsaVc compute_uwp
 
 let compute_uwp_efficient {mode=mode} cfg post =
-  let ugcl = Ugcl.of_ssacfg ~passify:mode cfg in
+  let ugcl = Gcl.Ugcl.of_ssacfg ~mode cfg in
   (Wp.efficient_uwp ugcl post, [])
 let compute_uwp_efficient_gen = SsaVc compute_uwp_efficient
 
 let compute_dwp {k=k; mode=mode} cfg post =
-  let gcl, foralls = Gcl.passified_of_ssa mode cfg in
+  let gcl, foralls = Gcl.passified_of_ssa ~mode cfg in
   (Wp.dwp ~k mode gcl post, foralls)
 let compute_dwp_gen = SsaVc compute_dwp
 
 let compute_dwp_let {k=k; mode=mode} cfg post =
-  let gcl, foralls = Gcl.passified_of_ssa mode cfg in
+  let gcl, foralls = Gcl.passified_of_ssa ~mode cfg in
   (Wp.dwp_let ~k mode gcl post, foralls)
 let compute_dwp_let_gen = SsaVc compute_dwp_let
 
+let compute_fwp {k=k; mode=mode} cfg post =
+  let gcl, foralls = Gcl.passified_of_ssa ~mode cfg in
+  (Fwp.fwp ~k mode gcl post, foralls)
+let compute_fwp_gen = SsaVc compute_fwp
+
+let compute_fwp_uwp {k=k; mode=mode} cfg post =
+  let ugcl = Gcl.Ugcl.of_ssacfg ~mode cfg in
+  (Fwp.fwp_uwp ~k mode ugcl post, [])
+let compute_fwp_uwp_gen = SsaVc compute_fwp_uwp
+
+let compute_fwp_lazyconc {k=k; mode=mode} cfg post =
+  (* Do not allow Gcl to rewrite Assigns.  We need to see the
+     Assignments to do concrete evaluation. *)
+  let gcl, foralls = Gcl.passified_of_ssa ?mode:None cfg in
+  (Fwp.fwp_lazyconc ~k mode gcl post, foralls)
+let compute_fwp_lazyconc_gen = SsaVc compute_fwp_lazyconc
+
+let compute_fwp_lazyconc_uwp {k=k; mode=mode} cfg post =
+  (* Do not allow Gcl to rewrite Assigns.  We need to see the
+     Assignments to do concrete evaluation. *)
+  let ugcl = Gcl.Ugcl.of_ssacfg cfg in
+  (Fwp.fwp_lazyconc_uwp ~k mode ugcl post, [])
+let compute_fwp_lazyconc_uwp_gen = SsaVc compute_fwp_lazyconc_uwp
+
 let compute_flanagansaxe {k=k; mode=mode} cfg post =
-  let gcl, foralls = Gcl.passified_of_ssa mode cfg in
+  let gcl, foralls = Gcl.passified_of_ssa ~mode cfg in
   (Wp.flanagansaxe ~k mode gcl post, foralls)
 let compute_flanagansaxe_gen = SsaVc compute_flanagansaxe
 
@@ -111,8 +138,13 @@ let compute_fse_maxrepeat_gen i = AstVc (compute_fse_maxrepeat i)
 
 let vclist =
   ("dwp", compute_dwp_gen)
+  :: ("fwp", compute_fwp_gen)
+  :: ("fwp_uwp", compute_fwp_uwp_gen)
+  :: ("fwp_lazyconc", compute_fwp_lazyconc_gen)
+  :: ("fwp_lazyconc_uwp", compute_fwp_lazyconc_uwp_gen)
   :: ("dwplet", compute_dwp_let_gen)
   :: ("dwp1", compute_dwp1_gen)
+  :: ("pwp", compute_passified_wp_gen)
   :: ("flanagansaxe", compute_flanagansaxe_gen)
   :: ("wp", compute_wp_gen)
   :: ("uwp", compute_uwp_gen)
@@ -122,7 +154,12 @@ let vclist =
 
 let pred_vclist =
   ("dwp", compute_dwp_gen)
+  :: ("fwp", compute_fwp_gen)
+  :: ("fwp_uwp", compute_fwp_uwp_gen)
+  :: ("fwp_lazyconc", compute_fwp_lazyconc_gen)
+  :: ("fwp_lazyconc_uwp", compute_fwp_lazyconc_uwp_gen)
   :: ("dwplet", compute_dwp_let_gen)
+  :: ("pwp", compute_passified_wp_gen)
   :: ("flanagansaxe", compute_flanagansaxe_gen)
   :: ("wp", compute_wp_gen)
   :: ("uwp", compute_uwp_gen)

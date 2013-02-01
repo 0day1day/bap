@@ -47,7 +47,7 @@ export RESULTDEPS = $(BAP_OCAMLDIR)/bap.a
 
 # default subprojects to build
 ifndef SUBPROJS
-	export SUBPROJS = $(PROJUTILS) $(CODEGEN) toil iltrans ileval topredicate formula get_functions split streamtrans backtaint
+	export SUBPROJS = $(PROJUTILS) $(CODEGEN) toil iltrans ileval topredicate solvepredicate formula get_functions streamtrans backtaint
 endif
 
 define PROJ_toil
@@ -78,6 +78,13 @@ define PROJ_topredicate
 endef
 export PROJ_topredicate
 
+define PROJ_solvepredicate
+	RESULT=solvepredicate
+	SOURCES = solvepredicate.ml
+	DOC_FILES=$(SOURCES)
+endef
+export PROJ_solvepredicate
+
 define PROJ_formula
 	RESULT=formula
 	SOURCES = formula.ml
@@ -91,13 +98,6 @@ define PROJ_get_functions
 	DOC_FILES=$(SOURCES)
 endef
 export PROJ_get_functions
-
-define PROJ_split
-	RESULT=split_disjunction
-	SOURCES = split_disjunction.ml
-	DOC_FILES=$(SOURCES)
-endef
-export PROJ_split
 
 define PROJ_streamtrans
 	RESULT=streamtrans

@@ -48,7 +48,7 @@ let casttype_of_string = function
 
 %token LPAREN RPAREN LSQUARE RSQUARE
 %token COMMA SEMI EOF COLON
-%token CJMP JMP LABEL ADDR ASSERT HALT SPECIAL
+%token CJMP JMP LABEL ADDR ASSERT ASSUME HALT SPECIAL
 %token LET IN UNKNOWN WITH TRUE FALSE EBIG ELITTLE
 %token IF THEN ELSE
 %token PLUS MINUS  DIVIDE MOD SMOD TIMES 
@@ -110,7 +110,8 @@ program:
         | lval ASSIGN expr attrs semi { Move($1, $3, $4) }
         | lval EQUAL expr attrs semi { Move($1, $3, $4) }
         | HALT expr attrs semi { Halt($2, $3) }
-        | ASSERT expr attrs semi { Assert($2, $3) } 
+        | ASSERT expr attrs semi { Assert($2, $3) }
+        | ASSUME expr attrs semi { Assume($2, $3) }
         | LABEL ID attrs { Label(Name $2, $3) }
         | ADDR INT attrs { Label(Addr (int64_of_big_int $2), $3) }
         | COMMENT attrs { Comment($1, $2) }
