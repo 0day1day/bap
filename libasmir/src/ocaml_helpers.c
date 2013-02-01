@@ -1,4 +1,5 @@
 #include "asm_program.h"
+#include "config.h"
 #include "vexmem.h"
 #include <assert.h>
 #include <bfd.h>
