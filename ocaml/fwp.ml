@@ -491,10 +491,6 @@ let fwp_uwp ?simp ?k mode =
   let module Toposort = Graph.Topological.Make(Cfg.AST.G) in
   Wp.build_passified_uwp Toposort.iter (fwp ~normalusage:false ?simp ?k mode)
 
-(* let fwp_conc ?simp ?k ?cf mode p q = *)
-(*   let module FWPCONC = Make(VMDelta) in *)
-(*   FWPCONC.fwp_conc ?simp ?k ?cf mode p q *)
-
 let fwp_lazyconc ?simp ?k ?cf mode p q =
   let module FWPCONC = Make(VMDelta) in
   FWPCONC.fwp_lazyconc ?simp ?k ?cf mode p q
