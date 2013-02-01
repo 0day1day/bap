@@ -26,11 +26,12 @@ let ncjmp c t =
 let unknown t s =
   Unknown(s, t)
 
-let binop op a b = match (a,b) with
-  | (Int(a, at), Int(b, bt)) ->
+let binop op a b = match op,a,b with
+  | _, Int(a, at), Int(b, bt) ->
     assert (at = bt);
     let (i,t) = Arithmetic.binop op (a,at) (b,bt) in
     Int(i,t)
+  | (LSHIFT|RSHIFT|ARSHIFT), _, Int(z, _) when bi_is_zero z -> a
   | _ -> BinOp(op, a, b)
 
 let unop op a = match a with
@@ -45,7 +46,10 @@ let concat a b = match a,b with
     Int(i,t)
   | _ -> Concat(a, b)
 
-let extract h l e = match e with
+let extract h l e =
+  let h = Big_int_Z.big_int_of_int h in
+  let l = Big_int_Z.big_int_of_int l in
+  match e with
   | Int(i, t) ->
     let (i,t) = Arithmetic.extract h l (i,t) in
     Int(i,t)
@@ -106,8 +110,8 @@ let rec cast_unsigned tnew = function
   | e ->
     Cast(CAST_UNSIGNED, tnew, e)
 
-let exp_int i bits =
-  Int(bi i, Reg bits)
+let exp_int i bits = Int(i, Reg bits)
+let it i t = Int(biconst i, t)
 
 let exp_ite ?t b e1 e2 =
   (* type inference shouldn't be needed when t is specified, but we're paranoid *)
@@ -278,16 +282,32 @@ let last_meaningful_stmt p =
   in
   f (List.rev p)
 
+(* Extract the nth least significant element of type t from e,
+   starting with zero. n is a non-negative integer. *)
+let extract_element t e n =
+  let nbits = Typecheck.bits_of_width t in
+  extract (n*nbits+(nbits-1)) (n*nbits) e
+
+(* Extract the nth least significant byte from e, starting with
+   zero. n is a non-negative integer *)
+let extract_byte e n = extract_element reg_8 e n
+
+(* Extract the nth least significant element of type t from e,
+   starting with zero. n is an expression. *)
+let extract_element_symbolic t e n =
+  let et = Typecheck.infer_ast n in
+  cast_low t (e >>* (n ** (it (Typecheck.bits_of_width t) et)))
+
+(* Extract the nth least significant byte from e, starting with
+   zero. n is an expression. *)
+let extract_byte_symbolic e n = extract_element_symbolic reg_8 e n
+
 let reverse_bytes e =
   let bytes = Typecheck.bytes_of_width (Typecheck.infer_ast ~check:false e) in
-  let get_byte n = extract (biconst (n*8+7)) (biconst (n*8)) e in
+  let get_byte n = extract_byte e n in
   reduce
     (fun bige e -> bige ++* e)
     (map get_byte (0 -- (bytes-1)))
-
-(* Extract the nth least significant byte from e, starting with zero *)
-let extract_byte n e =
-  extract (biconst (n*8+7)) (biconst (n*8)) e
 
 (* Concatenate an enumeration of expressions *)
 let concat_explist elist =
