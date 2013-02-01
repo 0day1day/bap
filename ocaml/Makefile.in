@@ -131,7 +131,6 @@ export YFLAGS = -v
 
 export USE_CAMLP4 = yes
 
-export CLIBS = asmir vex opcodes bfd iberty stdc++
 export CLIBS += $(SOLVER_CLIBS)
 export OCAMLPATH = $(PIQIBUILDDIR)
 export CFLAGS = -g
