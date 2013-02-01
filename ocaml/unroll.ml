@@ -74,23 +74,6 @@ let unrollinfo_from_sa cfg =
     | SA.BBlock b -> BB (C.G.V.create b)
     | SA.Region((SA.SelfLoop | SA.WhileLoop | SA.NaturalLoop), ns) ->
       let head = find_loop_head cfg bbs_of_node ns in
-      (* let nodes = bbs_of_node r in *)
-      (* let h = Hashtbl.create (List.length nodes) in *)
-      (* List.iter (fun n -> Hashtbl.add h n ()) nodes; *)
-      (* let find_pred r = *)
-      (*   (\* Find a bb that has a predecessor not in h *\) *)
-      (*   try Some (List.find (fun bb -> *)
-      (*     List.exists (fun bb' -> *)
-      (*       Hashtbl.mem h bb' = false) (C.G.pred cfg bb) *)
-      (*   ) (bbs_of_node r)) *)
-      (*   with Not_found -> None *)
-      (* in *)
-      (* let tl = List.map find_pred ns in *)
-      (* let tl = BatList.filter_map Util.id tl in *)
-      (* let head = match tl with *)
-      (*   | [hd] -> hd *)
-      (*   | _ -> failwith "loopinfo_from_sa: Failed to unroll irreducible loop" *)
-      (* in *)
       Loop(head, List.map conv ns)
     | SA.Region(_, ns) -> Other(List.map conv ns)
   in
@@ -136,12 +119,10 @@ let unroll_loop ?(count=8) ?(id=0) cfg head body =
   let ith_copy i vertex =
     try Hashtbl.find unrollednodes (C.G.V.label vertex, i)
     with Not_found -> 
-     (*failwith ("No copy found for " 
-                ^ (string_of_int i) 
-                ^ "-th copy of vertex " 
-                ^ (Cfg.bbid_to_string (C.G.V.label vertex)));*)
-      dprintf "No copy found for %s-th copy" (string_of_int i);
-      dprintf "of vertex %s " (Cfg.bbid_to_string (C.G.V.label vertex));
+      (* When we copy edges leaving the loop, the destination will not
+         be found.  This is normal. *)
+      (* dprintf "No copy found for %s-th copy" (string_of_int i); *)
+      (* dprintf "of vertex %s " (Cfg.bbid_to_string (C.G.V.label vertex)); *)
       vertex
   in
   let fix_backedge ?(final=false) cfg i =
@@ -244,50 +225,7 @@ let unroll_loop ?(count=8) ?(id=0) cfg head body =
   (* Cfg_pp.AstBBidDot.output_graph oc cfg; *)
   (* Pervasives.close_out oc; *)
   cfg, nodelist
-(*
-  let rename_targets cfg v =
-    let getlabel le n =
-      let l = match lab_of_exp le with Some x -> x | _ -> failwith "indirect" in
-      if C.find_label cfg l == n then le
-      else
-	let rec find_label = function
-	  | Label(l,_)::_ -> exp_of_lab l
-	  | Comment _ :: xs -> find_label xs
-	  | _ -> failwith "missing replacement label FIXME" (* This could happen if l was an Addr *)
-	in
-	find_label (C.get_stmts cfg v)
-    in
-    let revstmts = List.rev (C.get_stmts cfg v) in
-    let revstmts' = match revstmts with
-      | (CJmp(c,t1,t2,attrs) as stmt)::rest ->
-	  let e1,e2 = match C.G.succ_e cfg v with
-	    | [e1;e2] when C.G.E.label e1 = Some true && C.G.E.label e2 = Some false ->
-		(e1,e2)
-	    | [e1;e2] when C.G.E.label e2 = Some true && C.G.E.label e1 = Some false ->
-		(e2,e1)
-	    | _ ->
-                let oc = open_out "test1" in
-                let ssa_func_cfg = Cfg_ssa.of_astcfg cfg in
-                Cfg_pp.SsaStmtsDot.output_graph oc ssa_func_cfg;
-                (*Cfg_pp.AstBBidDot.output_graph oc cfg;*)
-                close_out oc;
-		failwith ("Something is wrong with the edges or edge labels:"^(Pp.ast_stmt_to_string stmt))
-	  in
-	  let s1 = C.G.E.dst e1 and s2 = C.G.E.dst e2 in
-	  let t1' = getlabel t1 s1 and t2' = getlabel t2 s2 in
-	  if t1' = t1 && t2' = t2 then revstmts
-	  else CJmp(c,t1',t2',attrs)::rest
-      | Jmp _::rest
-      | rest ->
-	  rest
-    in
-    if revstmts == revstmts' then cfg
-    else C.set_stmts cfg v (List.rev revstmts')
-  in
 
-  cfg
-
-*)
 let unroll_bbs ?count ?id cfg head bbs =
   dprintf "unroll_bbs invoked";
   let body = List.filter ((<>)head) bbs in
