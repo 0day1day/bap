@@ -55,6 +55,20 @@ let extract h l e =
     Int(i,t)
   | _ -> Extract(h, l, e)
 
+(* More convenience functions for building common expressions. *)
+let exp_and e1 e2 = binop AND e1 e2
+let exp_or e1 e2 = binop OR e1 e2
+let exp_eq e1 e2 = binop EQ e1 e2
+let exp_not e = unop NOT e
+let exp_implies e1 e2 = exp_or (exp_not e1) e2
+
+let (exp_shl, exp_shr) =
+  let s dir e1 = function
+    | Int(i,_) when bi_is_zero i -> e1
+    | e2 -> BinOp(dir, e1, e2)
+  in
+  (s LSHIFT, s RSHIFT)
+
 let ( +* ) a b   = binop PLUS a b
 let ( -* ) a b   = binop MINUS a b
 let ( ** ) a b   = binop TIMES a b
@@ -130,6 +144,12 @@ let parse_ite = function
 	  Cast(CAST_SIGNED, nt, b1),
 	  e1) when Typecheck.infer_ast ~check:false b1 = Reg(1) ->
     Some(b1, e1, Int(zero_big_int, nt))
+  | _ -> None
+
+let parse_implies = function
+  | BinOp(OR,
+          UnOp(NOT, e1),
+          e2) -> Some(e1, e2)
   | _ -> None
 
 (** Duplicate any shared nodes. Useful for using physical location as

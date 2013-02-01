@@ -94,7 +94,7 @@ let rec infer_ast =
       in
       nt
     | Lab s ->
-        (* FIXME: no type for labels yet *)
+      (* FIXME: no type for labels yet *)
       reg_64
     | Int(_,t)
     | Unknown(_,t) ->
@@ -116,8 +116,9 @@ let rec infer_ast =
       );
       t
     | Let(v,e1,e2) ->
-        (* FIXME: check *)
-      infer_ast e2
+      (* XXX: Need a type context to check this correctly *)
+      ignore(infer_ast ~check e1);
+      infer_ast ~check e2
     | Load(arr,idx,endian, t) ->
       if check then check_idx arr idx endian t;
       t
@@ -186,7 +187,8 @@ let typecheck_stmt =
       let et = infer_te e in
       (* Can we return a memory? Does this make sense? *)
       check_reg et
-    | Assert(e, _) ->
+    | Assert(e, _)
+    | Assume(e, _) ->
       let et = infer_te e in
       check_bool et
     | Label _

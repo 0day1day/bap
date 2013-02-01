@@ -306,6 +306,10 @@ object (self)
 	pp "assert ";
 	self#ast_exp e;
 	self#attrs a
+    | Ast.Assume(e,a) ->
+	pp "assume ";
+	self#ast_exp e;
+	self#attrs a
     | Ast.Comment(s,a) ->
 	pp "/*";
 	pp s;
@@ -436,6 +440,10 @@ object (self)
 	pp "assert ";
 	self#ssa_value v;
 	self#attrs a
+    | Ssa.Assume(v,a) ->
+        pp "assume ";
+        self#ssa_value v;
+        self#attrs a
     | Ssa.Comment(s,a) ->
 	pp "/*";
 	pp s;
