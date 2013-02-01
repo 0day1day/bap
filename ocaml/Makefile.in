@@ -167,8 +167,9 @@ runtop:	top
 libbfd.idl : bfdarch.idl
 
 bfdarch.idl:
-	echo '#include <bfd.h>' > /tmp/f.c
-	$(CPP) $(CPPFLAGS) /tmp/f.c | awk 'BEGIN { go=0; } /^enum bfd_architecture$$/ { go=1; } \
+	echo '#include "config.h"' > /tmp/f.c
+	echo '#include <bfd.h>' >> /tmp/f.c
+	$(CPP) $(CPPFLAGS) -I$(LIBASMIR) /tmp/f.c | awk 'BEGIN { go=0; } /^enum bfd_architecture$$/ { go=1; } \
 		go && $$0 != "" { print; } \
 		/};$$/ { go=0; }' > $@
 
