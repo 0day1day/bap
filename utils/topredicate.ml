@@ -71,20 +71,6 @@ let speclist =
      "Use WP for Unstructured Programs")
   ::("-uwpe", Arg.Unit(fun()-> vc := compute_uwp_efficient_gen),
      "Use efficient WP for Unstructured Programs")
-  ::("-fse-unpass-dwp-paper", Arg.Unit(fun () -> vc := compute_fse_unpass_gen),
-     "Use inefficient FSE algorithm for unpassified programs in DWP paper.")
-  ::("-fse-pass-dwp-paper", Arg.Unit(fun () -> vc := compute_fse_pass_gen),
-     "Use inefficient FSE algorithm for passified programs in DWP paper.")
-  ::("-efse-pass-dwp-paper", Arg.Unit(fun () -> vc := compute_efse_pass_gen),
-     "Use efficient FSE algorithm for passified programs in DWP paper.")
-  ::("-efse-pass-merge-dwp-paper", Arg.Unit(fun () -> vc := compute_efse_mergepass_gen),
-     "Use efficient FSE algorithm for passified programs in DWP paper that adds concrete assignments to the formula only during merging.")
-  ::("-efse-pass-lazy-dwp-paper", Arg.Unit(fun () -> vc := compute_efse_lazypass_gen),
-     "Use efficient FSE algorithm for passified programs in DWP paper that lazily adds concrete assignments to the formula when merging.")
-  (* ::("-efse-pass-feas-dwp-paper", Arg.Unit(fun () -> vc := compute_efse_feaspass), *)
-  (*    "Use efficient FSE algorithm for passified programs in DWP paper with feasibility checking.") *)
-  ::("-nocf-dwp-paper", Arg.Unit(fun () -> options := {!options with cf = false}),
-     "Do not use constant folding in DWP paper algorithms")
   ::("-fse-bfs", Arg.Unit(fun()-> vc := compute_fse_bfs_gen),
      "Use naive forward symbolic execution with breath first search")
   ::("-fse-bfs-maxdepth", Arg.Int(fun i-> vc := compute_fse_bfs_maxdepth_gen i),

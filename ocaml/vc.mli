@@ -11,7 +11,6 @@
 (** Various options that can modify the behavior of VC generation
     algorithms. *)
 type options = {
-  cf : bool; (** Perform constant folding (concrete evaluation) during VC generation. Only used by EFSE algorithms. *)
   k : int; (** Expressions larger than [k] will be given their own temporary variable assignment in the formula. Only used by DWP algorithms. *)
   mode : Type.formula_mode; (** Indicates whether the formula should be valid for validity or satisfiability. This is currently only needed for VC algorithms that use passification, since passification introduces new free variables into the formula. *)
   full_subst : bool; (** [true] indicates that full substitution should be performed, even for [Let] expressions, in which case exponential blowup may occur. [false] enables partial substitution only. *)
@@ -104,23 +103,6 @@ val compute_uwp_gen : t
     passification. Output sub-exponentially sized formulas. *)
 val compute_uwp_efficient : ssa_vc
 val compute_uwp_efficient_gen : t
-
-(** {2 Experimental Efficient VC Generation Algorithms from DWP paper} *)
-
-val compute_fse_unpass : cfg_vc
-val compute_fse_unpass_gen : t
-
-val compute_fse_pass : cfg_vc
-val compute_fse_pass_gen : t
-
-val compute_efse_pass : cfg_vc
-val compute_efse_pass_gen : t
-
-val compute_efse_mergepass : cfg_vc
-val compute_efse_mergepass_gen : t
-
-val compute_efse_lazypass : cfg_vc
-val compute_efse_lazypass_gen : t
 
 (** {2 Symbolic Execution VC algorithms} *)
 
