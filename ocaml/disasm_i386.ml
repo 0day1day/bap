@@ -792,7 +792,7 @@ let rec to_ir addr next ss pref =
       | _ -> disfailwith "bswap: Expected 16 or 32 bit type"
     in
     [assn t op e]
-  | Retn (op, far_ret) when pref = [] ->
+  | Retn (op, far_ret) when pref = [] || pref = [repz]  || pref = [repnz]->
     let temp = nt "ra" r32 in
     let load_stmt = if far_ret 
       then (* TODO Mess with segment selectors here *)  
