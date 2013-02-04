@@ -30,6 +30,7 @@ void  protobuf_AddDesc_frame_2epiqi_2eproto();
 void protobuf_AssignDesc_frame_2epiqi_2eproto();
 void protobuf_ShutdownFile_frame_2epiqi_2eproto();
 
+class frame;
 class operand_list;
 class operand_info;
 class operand_info_specific;
@@ -51,9 +52,146 @@ class tagged_value_list;
 class value_source_tag;
 class value_list;
 class value_info;
-class frame;
 
 // ===================================================================
+
+class frame : public ::google::protobuf::Message {
+ public:
+  frame();
+  virtual ~frame();
+  
+  frame(const frame& from);
+  
+  inline frame& operator=(const frame& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  
+  inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const {
+    return _unknown_fields_;
+  }
+  
+  inline ::google::protobuf::UnknownFieldSet* mutable_unknown_fields() {
+    return &_unknown_fields_;
+  }
+  
+  static const ::google::protobuf::Descriptor* descriptor();
+  static const frame& default_instance();
+  
+  void Swap(frame* other);
+  
+  // implements Message ----------------------------------------------
+  
+  frame* New() const;
+  void CopyFrom(const ::google::protobuf::Message& from);
+  void MergeFrom(const ::google::protobuf::Message& from);
+  void CopyFrom(const frame& from);
+  void MergeFrom(const frame& from);
+  void Clear();
+  bool IsInitialized() const;
+  
+  int ByteSize() const;
+  bool MergePartialFromCodedStream(
+      ::google::protobuf::io::CodedInputStream* input);
+  void SerializeWithCachedSizes(
+      ::google::protobuf::io::CodedOutputStream* output) const;
+  ::google::protobuf::uint8* SerializeWithCachedSizesToArray(::google::protobuf::uint8* output) const;
+  int GetCachedSize() const { return _cached_size_; }
+  private:
+  void SharedCtor();
+  void SharedDtor();
+  void SetCachedSize(int size) const;
+  public:
+  
+  ::google::protobuf::Metadata GetMetadata() const;
+  
+  // nested types ----------------------------------------------------
+  
+  // accessors -------------------------------------------------------
+  
+  // optional .std_frame std_frame = 1;
+  inline bool has_std_frame() const;
+  inline void clear_std_frame();
+  static const int kStdFrameFieldNumber = 1;
+  inline const ::std_frame& std_frame() const;
+  inline ::std_frame* mutable_std_frame();
+  inline ::std_frame* release_std_frame();
+  
+  // optional .syscall_frame syscall_frame = 2;
+  inline bool has_syscall_frame() const;
+  inline void clear_syscall_frame();
+  static const int kSyscallFrameFieldNumber = 2;
+  inline const ::syscall_frame& syscall_frame() const;
+  inline ::syscall_frame* mutable_syscall_frame();
+  inline ::syscall_frame* release_syscall_frame();
+  
+  // optional .exception_frame exception_frame = 3;
+  inline bool has_exception_frame() const;
+  inline void clear_exception_frame();
+  static const int kExceptionFrameFieldNumber = 3;
+  inline const ::exception_frame& exception_frame() const;
+  inline ::exception_frame* mutable_exception_frame();
+  inline ::exception_frame* release_exception_frame();
+  
+  // optional .taint_intro_frame taint_intro_frame = 4;
+  inline bool has_taint_intro_frame() const;
+  inline void clear_taint_intro_frame();
+  static const int kTaintIntroFrameFieldNumber = 4;
+  inline const ::taint_intro_frame& taint_intro_frame() const;
+  inline ::taint_intro_frame* mutable_taint_intro_frame();
+  inline ::taint_intro_frame* release_taint_intro_frame();
+  
+  // optional .modload_frame modload_frame = 5;
+  inline bool has_modload_frame() const;
+  inline void clear_modload_frame();
+  static const int kModloadFrameFieldNumber = 5;
+  inline const ::modload_frame& modload_frame() const;
+  inline ::modload_frame* mutable_modload_frame();
+  inline ::modload_frame* release_modload_frame();
+  
+  // optional .key_frame key_frame = 6;
+  inline bool has_key_frame() const;
+  inline void clear_key_frame();
+  static const int kKeyFrameFieldNumber = 6;
+  inline const ::key_frame& key_frame() const;
+  inline ::key_frame* mutable_key_frame();
+  inline ::key_frame* release_key_frame();
+  
+  // @@protoc_insertion_point(class_scope:frame)
+ private:
+  inline void set_has_std_frame();
+  inline void clear_has_std_frame();
+  inline void set_has_syscall_frame();
+  inline void clear_has_syscall_frame();
+  inline void set_has_exception_frame();
+  inline void clear_has_exception_frame();
+  inline void set_has_taint_intro_frame();
+  inline void clear_has_taint_intro_frame();
+  inline void set_has_modload_frame();
+  inline void clear_has_modload_frame();
+  inline void set_has_key_frame();
+  inline void clear_has_key_frame();
+  
+  ::google::protobuf::UnknownFieldSet _unknown_fields_;
+  
+  ::std_frame* std_frame_;
+  ::syscall_frame* syscall_frame_;
+  ::exception_frame* exception_frame_;
+  ::taint_intro_frame* taint_intro_frame_;
+  ::modload_frame* modload_frame_;
+  ::key_frame* key_frame_;
+  
+  mutable int _cached_size_;
+  ::google::protobuf::uint32 _has_bits_[(6 + 31) / 32];
+  
+  friend void  protobuf_AddDesc_frame_2epiqi_2eproto();
+  friend void protobuf_AssignDesc_frame_2epiqi_2eproto();
+  friend void protobuf_ShutdownFile_frame_2epiqi_2eproto();
+  
+  void InitAsDefaultInstance();
+  static frame* default_instance_;
+};
+// -------------------------------------------------------------------
 
 class operand_list : public ::google::protobuf::Message {
  public:
@@ -2107,148 +2245,188 @@ class value_info : public ::google::protobuf::Message {
   void InitAsDefaultInstance();
   static value_info* default_instance_;
 };
+// ===================================================================
+
+
+// ===================================================================
+
+// frame
+
+// optional .std_frame std_frame = 1;
+inline bool frame::has_std_frame() const {
+  return (_has_bits_[0] & 0x00000001u) != 0;
+}
+inline void frame::set_has_std_frame() {
+  _has_bits_[0] |= 0x00000001u;
+}
+inline void frame::clear_has_std_frame() {
+  _has_bits_[0] &= ~0x00000001u;
+}
+inline void frame::clear_std_frame() {
+  if (std_frame_ != NULL) std_frame_->::std_frame::Clear();
+  clear_has_std_frame();
+}
+inline const ::std_frame& frame::std_frame() const {
+  return std_frame_ != NULL ? *std_frame_ : *default_instance_->std_frame_;
+}
+inline ::std_frame* frame::mutable_std_frame() {
+  set_has_std_frame();
+  if (std_frame_ == NULL) std_frame_ = new ::std_frame;
+  return std_frame_;
+}
+inline ::std_frame* frame::release_std_frame() {
+  clear_has_std_frame();
+  ::std_frame* temp = std_frame_;
+  std_frame_ = NULL;
+  return temp;
+}
+
+// optional .syscall_frame syscall_frame = 2;
+inline bool frame::has_syscall_frame() const {
+  return (_has_bits_[0] & 0x00000002u) != 0;
+}
+inline void frame::set_has_syscall_frame() {
+  _has_bits_[0] |= 0x00000002u;
+}
+inline void frame::clear_has_syscall_frame() {
+  _has_bits_[0] &= ~0x00000002u;
+}
+inline void frame::clear_syscall_frame() {
+  if (syscall_frame_ != NULL) syscall_frame_->::syscall_frame::Clear();
+  clear_has_syscall_frame();
+}
+inline const ::syscall_frame& frame::syscall_frame() const {
+  return syscall_frame_ != NULL ? *syscall_frame_ : *default_instance_->syscall_frame_;
+}
+inline ::syscall_frame* frame::mutable_syscall_frame() {
+  set_has_syscall_frame();
+  if (syscall_frame_ == NULL) syscall_frame_ = new ::syscall_frame;
+  return syscall_frame_;
+}
+inline ::syscall_frame* frame::release_syscall_frame() {
+  clear_has_syscall_frame();
+  ::syscall_frame* temp = syscall_frame_;
+  syscall_frame_ = NULL;
+  return temp;
+}
+
+// optional .exception_frame exception_frame = 3;
+inline bool frame::has_exception_frame() const {
+  return (_has_bits_[0] & 0x00000004u) != 0;
+}
+inline void frame::set_has_exception_frame() {
+  _has_bits_[0] |= 0x00000004u;
+}
+inline void frame::clear_has_exception_frame() {
+  _has_bits_[0] &= ~0x00000004u;
+}
+inline void frame::clear_exception_frame() {
+  if (exception_frame_ != NULL) exception_frame_->::exception_frame::Clear();
+  clear_has_exception_frame();
+}
+inline const ::exception_frame& frame::exception_frame() const {
+  return exception_frame_ != NULL ? *exception_frame_ : *default_instance_->exception_frame_;
+}
+inline ::exception_frame* frame::mutable_exception_frame() {
+  set_has_exception_frame();
+  if (exception_frame_ == NULL) exception_frame_ = new ::exception_frame;
+  return exception_frame_;
+}
+inline ::exception_frame* frame::release_exception_frame() {
+  clear_has_exception_frame();
+  ::exception_frame* temp = exception_frame_;
+  exception_frame_ = NULL;
+  return temp;
+}
+
+// optional .taint_intro_frame taint_intro_frame = 4;
+inline bool frame::has_taint_intro_frame() const {
+  return (_has_bits_[0] & 0x00000008u) != 0;
+}
+inline void frame::set_has_taint_intro_frame() {
+  _has_bits_[0] |= 0x00000008u;
+}
+inline void frame::clear_has_taint_intro_frame() {
+  _has_bits_[0] &= ~0x00000008u;
+}
+inline void frame::clear_taint_intro_frame() {
+  if (taint_intro_frame_ != NULL) taint_intro_frame_->::taint_intro_frame::Clear();
+  clear_has_taint_intro_frame();
+}
+inline const ::taint_intro_frame& frame::taint_intro_frame() const {
+  return taint_intro_frame_ != NULL ? *taint_intro_frame_ : *default_instance_->taint_intro_frame_;
+}
+inline ::taint_intro_frame* frame::mutable_taint_intro_frame() {
+  set_has_taint_intro_frame();
+  if (taint_intro_frame_ == NULL) taint_intro_frame_ = new ::taint_intro_frame;
+  return taint_intro_frame_;
+}
+inline ::taint_intro_frame* frame::release_taint_intro_frame() {
+  clear_has_taint_intro_frame();
+  ::taint_intro_frame* temp = taint_intro_frame_;
+  taint_intro_frame_ = NULL;
+  return temp;
+}
+
+// optional .modload_frame modload_frame = 5;
+inline bool frame::has_modload_frame() const {
+  return (_has_bits_[0] & 0x00000010u) != 0;
+}
+inline void frame::set_has_modload_frame() {
+  _has_bits_[0] |= 0x00000010u;
+}
+inline void frame::clear_has_modload_frame() {
+  _has_bits_[0] &= ~0x00000010u;
+}
+inline void frame::clear_modload_frame() {
+  if (modload_frame_ != NULL) modload_frame_->::modload_frame::Clear();
+  clear_has_modload_frame();
+}
+inline const ::modload_frame& frame::modload_frame() const {
+  return modload_frame_ != NULL ? *modload_frame_ : *default_instance_->modload_frame_;
+}
+inline ::modload_frame* frame::mutable_modload_frame() {
+  set_has_modload_frame();
+  if (modload_frame_ == NULL) modload_frame_ = new ::modload_frame;
+  return modload_frame_;
+}
+inline ::modload_frame* frame::release_modload_frame() {
+  clear_has_modload_frame();
+  ::modload_frame* temp = modload_frame_;
+  modload_frame_ = NULL;
+  return temp;
+}
+
+// optional .key_frame key_frame = 6;
+inline bool frame::has_key_frame() const {
+  return (_has_bits_[0] & 0x00000020u) != 0;
+}
+inline void frame::set_has_key_frame() {
+  _has_bits_[0] |= 0x00000020u;
+}
+inline void frame::clear_has_key_frame() {
+  _has_bits_[0] &= ~0x00000020u;
+}
+inline void frame::clear_key_frame() {
+  if (key_frame_ != NULL) key_frame_->::key_frame::Clear();
+  clear_has_key_frame();
+}
+inline const ::key_frame& frame::key_frame() const {
+  return key_frame_ != NULL ? *key_frame_ : *default_instance_->key_frame_;
+}
+inline ::key_frame* frame::mutable_key_frame() {
+  set_has_key_frame();
+  if (key_frame_ == NULL) key_frame_ = new ::key_frame;
+  return key_frame_;
+}
+inline ::key_frame* frame::release_key_frame() {
+  clear_has_key_frame();
+  ::key_frame* temp = key_frame_;
+  key_frame_ = NULL;
+  return temp;
+}
+
 // -------------------------------------------------------------------
-
-class frame : public ::google::protobuf::Message {
- public:
-  frame();
-  virtual ~frame();
-  
-  frame(const frame& from);
-  
-  inline frame& operator=(const frame& from) {
-    CopyFrom(from);
-    return *this;
-  }
-  
-  inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const {
-    return _unknown_fields_;
-  }
-  
-  inline ::google::protobuf::UnknownFieldSet* mutable_unknown_fields() {
-    return &_unknown_fields_;
-  }
-  
-  static const ::google::protobuf::Descriptor* descriptor();
-  static const frame& default_instance();
-  
-  void Swap(frame* other);
-  
-  // implements Message ----------------------------------------------
-  
-  frame* New() const;
-  void CopyFrom(const ::google::protobuf::Message& from);
-  void MergeFrom(const ::google::protobuf::Message& from);
-  void CopyFrom(const frame& from);
-  void MergeFrom(const frame& from);
-  void Clear();
-  bool IsInitialized() const;
-  
-  int ByteSize() const;
-  bool MergePartialFromCodedStream(
-      ::google::protobuf::io::CodedInputStream* input);
-  void SerializeWithCachedSizes(
-      ::google::protobuf::io::CodedOutputStream* output) const;
-  ::google::protobuf::uint8* SerializeWithCachedSizesToArray(::google::protobuf::uint8* output) const;
-  int GetCachedSize() const { return _cached_size_; }
-  private:
-  void SharedCtor();
-  void SharedDtor();
-  void SetCachedSize(int size) const;
-  public:
-  
-  ::google::protobuf::Metadata GetMetadata() const;
-  
-  // nested types ----------------------------------------------------
-  
-  // accessors -------------------------------------------------------
-  
-  // optional .std_frame std_frame = 1;
-  inline bool has_std_frame() const;
-  inline void clear_std_frame();
-  static const int kStdFrameFieldNumber = 1;
-  inline const ::std_frame& std_frame() const;
-  inline ::std_frame* mutable_std_frame();
-  inline ::std_frame* release_std_frame();
-  
-  // optional .syscall_frame syscall_frame = 2;
-  inline bool has_syscall_frame() const;
-  inline void clear_syscall_frame();
-  static const int kSyscallFrameFieldNumber = 2;
-  inline const ::syscall_frame& syscall_frame() const;
-  inline ::syscall_frame* mutable_syscall_frame();
-  inline ::syscall_frame* release_syscall_frame();
-  
-  // optional .exception_frame exception_frame = 3;
-  inline bool has_exception_frame() const;
-  inline void clear_exception_frame();
-  static const int kExceptionFrameFieldNumber = 3;
-  inline const ::exception_frame& exception_frame() const;
-  inline ::exception_frame* mutable_exception_frame();
-  inline ::exception_frame* release_exception_frame();
-  
-  // optional .taint_intro_frame taint_intro_frame = 4;
-  inline bool has_taint_intro_frame() const;
-  inline void clear_taint_intro_frame();
-  static const int kTaintIntroFrameFieldNumber = 4;
-  inline const ::taint_intro_frame& taint_intro_frame() const;
-  inline ::taint_intro_frame* mutable_taint_intro_frame();
-  inline ::taint_intro_frame* release_taint_intro_frame();
-  
-  // optional .modload_frame modload_frame = 5;
-  inline bool has_modload_frame() const;
-  inline void clear_modload_frame();
-  static const int kModloadFrameFieldNumber = 5;
-  inline const ::modload_frame& modload_frame() const;
-  inline ::modload_frame* mutable_modload_frame();
-  inline ::modload_frame* release_modload_frame();
-  
-  // optional .key_frame key_frame = 6;
-  inline bool has_key_frame() const;
-  inline void clear_key_frame();
-  static const int kKeyFrameFieldNumber = 6;
-  inline const ::key_frame& key_frame() const;
-  inline ::key_frame* mutable_key_frame();
-  inline ::key_frame* release_key_frame();
-  
-  // @@protoc_insertion_point(class_scope:frame)
- private:
-  inline void set_has_std_frame();
-  inline void clear_has_std_frame();
-  inline void set_has_syscall_frame();
-  inline void clear_has_syscall_frame();
-  inline void set_has_exception_frame();
-  inline void clear_has_exception_frame();
-  inline void set_has_taint_intro_frame();
-  inline void clear_has_taint_intro_frame();
-  inline void set_has_modload_frame();
-  inline void clear_has_modload_frame();
-  inline void set_has_key_frame();
-  inline void clear_has_key_frame();
-  
-  ::google::protobuf::UnknownFieldSet _unknown_fields_;
-  
-  ::std_frame* std_frame_;
-  ::syscall_frame* syscall_frame_;
-  ::exception_frame* exception_frame_;
-  ::taint_intro_frame* taint_intro_frame_;
-  ::modload_frame* modload_frame_;
-  ::key_frame* key_frame_;
-  
-  mutable int _cached_size_;
-  ::google::protobuf::uint32 _has_bits_[(6 + 31) / 32];
-  
-  friend void  protobuf_AddDesc_frame_2epiqi_2eproto();
-  friend void protobuf_AssignDesc_frame_2epiqi_2eproto();
-  friend void protobuf_ShutdownFile_frame_2epiqi_2eproto();
-  
-  void InitAsDefaultInstance();
-  static frame* default_instance_;
-};
-// ===================================================================
-
-
-// ===================================================================
 
 // operand_list
 
@@ -3730,184 +3908,6 @@ inline ::std::string* value_info::release_value() {
     value_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
     return temp;
   }
-}
-
-// -------------------------------------------------------------------
-
-// frame
-
-// optional .std_frame std_frame = 1;
-inline bool frame::has_std_frame() const {
-  return (_has_bits_[0] & 0x00000001u) != 0;
-}
-inline void frame::set_has_std_frame() {
-  _has_bits_[0] |= 0x00000001u;
-}
-inline void frame::clear_has_std_frame() {
-  _has_bits_[0] &= ~0x00000001u;
-}
-inline void frame::clear_std_frame() {
-  if (std_frame_ != NULL) std_frame_->::std_frame::Clear();
-  clear_has_std_frame();
-}
-inline const ::std_frame& frame::std_frame() const {
-  return std_frame_ != NULL ? *std_frame_ : *default_instance_->std_frame_;
-}
-inline ::std_frame* frame::mutable_std_frame() {
-  set_has_std_frame();
-  if (std_frame_ == NULL) std_frame_ = new ::std_frame;
-  return std_frame_;
-}
-inline ::std_frame* frame::release_std_frame() {
-  clear_has_std_frame();
-  ::std_frame* temp = std_frame_;
-  std_frame_ = NULL;
-  return temp;
-}
-
-// optional .syscall_frame syscall_frame = 2;
-inline bool frame::has_syscall_frame() const {
-  return (_has_bits_[0] & 0x00000002u) != 0;
-}
-inline void frame::set_has_syscall_frame() {
-  _has_bits_[0] |= 0x00000002u;
-}
-inline void frame::clear_has_syscall_frame() {
-  _has_bits_[0] &= ~0x00000002u;
-}
-inline void frame::clear_syscall_frame() {
-  if (syscall_frame_ != NULL) syscall_frame_->::syscall_frame::Clear();
-  clear_has_syscall_frame();
-}
-inline const ::syscall_frame& frame::syscall_frame() const {
-  return syscall_frame_ != NULL ? *syscall_frame_ : *default_instance_->syscall_frame_;
-}
-inline ::syscall_frame* frame::mutable_syscall_frame() {
-  set_has_syscall_frame();
-  if (syscall_frame_ == NULL) syscall_frame_ = new ::syscall_frame;
-  return syscall_frame_;
-}
-inline ::syscall_frame* frame::release_syscall_frame() {
-  clear_has_syscall_frame();
-  ::syscall_frame* temp = syscall_frame_;
-  syscall_frame_ = NULL;
-  return temp;
-}
-
-// optional .exception_frame exception_frame = 3;
-inline bool frame::has_exception_frame() const {
-  return (_has_bits_[0] & 0x00000004u) != 0;
-}
-inline void frame::set_has_exception_frame() {
-  _has_bits_[0] |= 0x00000004u;
-}
-inline void frame::clear_has_exception_frame() {
-  _has_bits_[0] &= ~0x00000004u;
-}
-inline void frame::clear_exception_frame() {
-  if (exception_frame_ != NULL) exception_frame_->::exception_frame::Clear();
-  clear_has_exception_frame();
-}
-inline const ::exception_frame& frame::exception_frame() const {
-  return exception_frame_ != NULL ? *exception_frame_ : *default_instance_->exception_frame_;
-}
-inline ::exception_frame* frame::mutable_exception_frame() {
-  set_has_exception_frame();
-  if (exception_frame_ == NULL) exception_frame_ = new ::exception_frame;
-  return exception_frame_;
-}
-inline ::exception_frame* frame::release_exception_frame() {
-  clear_has_exception_frame();
-  ::exception_frame* temp = exception_frame_;
-  exception_frame_ = NULL;
-  return temp;
-}
-
-// optional .taint_intro_frame taint_intro_frame = 4;
-inline bool frame::has_taint_intro_frame() const {
-  return (_has_bits_[0] & 0x00000008u) != 0;
-}
-inline void frame::set_has_taint_intro_frame() {
-  _has_bits_[0] |= 0x00000008u;
-}
-inline void frame::clear_has_taint_intro_frame() {
-  _has_bits_[0] &= ~0x00000008u;
-}
-inline void frame::clear_taint_intro_frame() {
-  if (taint_intro_frame_ != NULL) taint_intro_frame_->::taint_intro_frame::Clear();
-  clear_has_taint_intro_frame();
-}
-inline const ::taint_intro_frame& frame::taint_intro_frame() const {
-  return taint_intro_frame_ != NULL ? *taint_intro_frame_ : *default_instance_->taint_intro_frame_;
-}
-inline ::taint_intro_frame* frame::mutable_taint_intro_frame() {
-  set_has_taint_intro_frame();
-  if (taint_intro_frame_ == NULL) taint_intro_frame_ = new ::taint_intro_frame;
-  return taint_intro_frame_;
-}
-inline ::taint_intro_frame* frame::release_taint_intro_frame() {
-  clear_has_taint_intro_frame();
-  ::taint_intro_frame* temp = taint_intro_frame_;
-  taint_intro_frame_ = NULL;
-  return temp;
-}
-
-// optional .modload_frame modload_frame = 5;
-inline bool frame::has_modload_frame() const {
-  return (_has_bits_[0] & 0x00000010u) != 0;
-}
-inline void frame::set_has_modload_frame() {
-  _has_bits_[0] |= 0x00000010u;
-}
-inline void frame::clear_has_modload_frame() {
-  _has_bits_[0] &= ~0x00000010u;
-}
-inline void frame::clear_modload_frame() {
-  if (modload_frame_ != NULL) modload_frame_->::modload_frame::Clear();
-  clear_has_modload_frame();
-}
-inline const ::modload_frame& frame::modload_frame() const {
-  return modload_frame_ != NULL ? *modload_frame_ : *default_instance_->modload_frame_;
-}
-inline ::modload_frame* frame::mutable_modload_frame() {
-  set_has_modload_frame();
-  if (modload_frame_ == NULL) modload_frame_ = new ::modload_frame;
-  return modload_frame_;
-}
-inline ::modload_frame* frame::release_modload_frame() {
-  clear_has_modload_frame();
-  ::modload_frame* temp = modload_frame_;
-  modload_frame_ = NULL;
-  return temp;
-}
-
-// optional .key_frame key_frame = 6;
-inline bool frame::has_key_frame() const {
-  return (_has_bits_[0] & 0x00000020u) != 0;
-}
-inline void frame::set_has_key_frame() {
-  _has_bits_[0] |= 0x00000020u;
-}
-inline void frame::clear_has_key_frame() {
-  _has_bits_[0] &= ~0x00000020u;
-}
-inline void frame::clear_key_frame() {
-  if (key_frame_ != NULL) key_frame_->::key_frame::Clear();
-  clear_has_key_frame();
-}
-inline const ::key_frame& frame::key_frame() const {
-  return key_frame_ != NULL ? *key_frame_ : *default_instance_->key_frame_;
-}
-inline ::key_frame* frame::mutable_key_frame() {
-  set_has_key_frame();
-  if (key_frame_ == NULL) key_frame_ = new ::key_frame;
-  return key_frame_;
-}
-inline ::key_frame* frame::release_key_frame() {
-  clear_has_key_frame();
-  ::key_frame* temp = key_frame_;
-  key_frame_ = NULL;
-  return temp;
 }
 
 

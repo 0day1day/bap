@@ -15,6 +15,9 @@
 
 namespace {
 
+const ::google::protobuf::Descriptor* frame_descriptor_ = NULL;
+const ::google::protobuf::internal::GeneratedMessageReflection*
+  frame_reflection_ = NULL;
 const ::google::protobuf::Descriptor* operand_list_descriptor_ = NULL;
 const ::google::protobuf::internal::GeneratedMessageReflection*
   operand_list_reflection_ = NULL;
@@ -78,9 +81,6 @@ const ::google::protobuf::internal::GeneratedMessageReflection*
 const ::google::protobuf::Descriptor* value_info_descriptor_ = NULL;
 const ::google::protobuf::internal::GeneratedMessageReflection*
   value_info_reflection_ = NULL;
-const ::google::protobuf::Descriptor* frame_descriptor_ = NULL;
-const ::google::protobuf::internal::GeneratedMessageReflection*
-  frame_reflection_ = NULL;
 
 }  // namespace
 
@@ -91,350 +91,7 @@ void protobuf_AssignDesc_frame_2epiqi_2eproto() {
     ::google::protobuf::DescriptorPool::generated_pool()->FindFileByName(
       "frame.piqi.proto");
   GOOGLE_CHECK(file != NULL);
-  operand_list_descriptor_ = file->message_type(0);
-  static const int operand_list_offsets_[1] = {
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(operand_list, elem_),
-  };
-  operand_list_reflection_ =
-    new ::google::protobuf::internal::GeneratedMessageReflection(
-      operand_list_descriptor_,
-      operand_list::default_instance_,
-      operand_list_offsets_,
-      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(operand_list, _has_bits_[0]),
-      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(operand_list, _unknown_fields_),
-      -1,
-      ::google::protobuf::DescriptorPool::generated_pool(),
-      ::google::protobuf::MessageFactory::generated_factory(),
-      sizeof(operand_list));
-  operand_info_descriptor_ = file->message_type(1);
-  static const int operand_info_offsets_[5] = {
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(operand_info, operand_info_specific_),
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(operand_info, bit_length_),
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(operand_info, operand_usage_),
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(operand_info, taint_info_),
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(operand_info, value_),
-  };
-  operand_info_reflection_ =
-    new ::google::protobuf::internal::GeneratedMessageReflection(
-      operand_info_descriptor_,
-      operand_info::default_instance_,
-      operand_info_offsets_,
-      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(operand_info, _has_bits_[0]),
-      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(operand_info, _unknown_fields_),
-      -1,
-      ::google::protobuf::DescriptorPool::generated_pool(),
-      ::google::protobuf::MessageFactory::generated_factory(),
-      sizeof(operand_info));
-  operand_info_specific_descriptor_ = file->message_type(2);
-  static const int operand_info_specific_offsets_[2] = {
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(operand_info_specific, mem_operand_),
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(operand_info_specific, reg_operand_),
-  };
-  operand_info_specific_reflection_ =
-    new ::google::protobuf::internal::GeneratedMessageReflection(
-      operand_info_specific_descriptor_,
-      operand_info_specific::default_instance_,
-      operand_info_specific_offsets_,
-      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(operand_info_specific, _has_bits_[0]),
-      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(operand_info_specific, _unknown_fields_),
-      -1,
-      ::google::protobuf::DescriptorPool::generated_pool(),
-      ::google::protobuf::MessageFactory::generated_factory(),
-      sizeof(operand_info_specific));
-  reg_operand_descriptor_ = file->message_type(3);
-  static const int reg_operand_offsets_[1] = {
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(reg_operand, name_),
-  };
-  reg_operand_reflection_ =
-    new ::google::protobuf::internal::GeneratedMessageReflection(
-      reg_operand_descriptor_,
-      reg_operand::default_instance_,
-      reg_operand_offsets_,
-      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(reg_operand, _has_bits_[0]),
-      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(reg_operand, _unknown_fields_),
-      -1,
-      ::google::protobuf::DescriptorPool::generated_pool(),
-      ::google::protobuf::MessageFactory::generated_factory(),
-      sizeof(reg_operand));
-  mem_operand_descriptor_ = file->message_type(4);
-  static const int mem_operand_offsets_[1] = {
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(mem_operand, address_),
-  };
-  mem_operand_reflection_ =
-    new ::google::protobuf::internal::GeneratedMessageReflection(
-      mem_operand_descriptor_,
-      mem_operand::default_instance_,
-      mem_operand_offsets_,
-      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(mem_operand, _has_bits_[0]),
-      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(mem_operand, _unknown_fields_),
-      -1,
-      ::google::protobuf::DescriptorPool::generated_pool(),
-      ::google::protobuf::MessageFactory::generated_factory(),
-      sizeof(mem_operand));
-  operand_usage_descriptor_ = file->message_type(5);
-  static const int operand_usage_offsets_[4] = {
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(operand_usage, read_),
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(operand_usage, written_),
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(operand_usage, index_),
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(operand_usage, base_),
-  };
-  operand_usage_reflection_ =
-    new ::google::protobuf::internal::GeneratedMessageReflection(
-      operand_usage_descriptor_,
-      operand_usage::default_instance_,
-      operand_usage_offsets_,
-      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(operand_usage, _has_bits_[0]),
-      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(operand_usage, _unknown_fields_),
-      -1,
-      ::google::protobuf::DescriptorPool::generated_pool(),
-      ::google::protobuf::MessageFactory::generated_factory(),
-      sizeof(operand_usage));
-  taint_info_descriptor_ = file->message_type(6);
-  static const int taint_info_offsets_[3] = {
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(taint_info, no_taint_),
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(taint_info, taint_id_),
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(taint_info, taint_multiple_),
-  };
-  taint_info_reflection_ =
-    new ::google::protobuf::internal::GeneratedMessageReflection(
-      taint_info_descriptor_,
-      taint_info::default_instance_,
-      taint_info_offsets_,
-      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(taint_info, _has_bits_[0]),
-      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(taint_info, _unknown_fields_),
-      -1,
-      ::google::protobuf::DescriptorPool::generated_pool(),
-      ::google::protobuf::MessageFactory::generated_factory(),
-      sizeof(taint_info));
-  std_frame_descriptor_ = file->message_type(7);
-  static const int std_frame_offsets_[4] = {
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(std_frame, address_),
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(std_frame, thread_id_),
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(std_frame, rawbytes_),
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(std_frame, operand_list_),
-  };
-  std_frame_reflection_ =
-    new ::google::protobuf::internal::GeneratedMessageReflection(
-      std_frame_descriptor_,
-      std_frame::default_instance_,
-      std_frame_offsets_,
-      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(std_frame, _has_bits_[0]),
-      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(std_frame, _unknown_fields_),
-      -1,
-      ::google::protobuf::DescriptorPool::generated_pool(),
-      ::google::protobuf::MessageFactory::generated_factory(),
-      sizeof(std_frame));
-  syscall_frame_descriptor_ = file->message_type(8);
-  static const int syscall_frame_offsets_[4] = {
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(syscall_frame, address_),
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(syscall_frame, thread_id_),
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(syscall_frame, number_),
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(syscall_frame, argument_list_),
-  };
-  syscall_frame_reflection_ =
-    new ::google::protobuf::internal::GeneratedMessageReflection(
-      syscall_frame_descriptor_,
-      syscall_frame::default_instance_,
-      syscall_frame_offsets_,
-      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(syscall_frame, _has_bits_[0]),
-      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(syscall_frame, _unknown_fields_),
-      -1,
-      ::google::protobuf::DescriptorPool::generated_pool(),
-      ::google::protobuf::MessageFactory::generated_factory(),
-      sizeof(syscall_frame));
-  argument_list_descriptor_ = file->message_type(9);
-  static const int argument_list_offsets_[1] = {
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(argument_list, elem_),
-  };
-  argument_list_reflection_ =
-    new ::google::protobuf::internal::GeneratedMessageReflection(
-      argument_list_descriptor_,
-      argument_list::default_instance_,
-      argument_list_offsets_,
-      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(argument_list, _has_bits_[0]),
-      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(argument_list, _unknown_fields_),
-      -1,
-      ::google::protobuf::DescriptorPool::generated_pool(),
-      ::google::protobuf::MessageFactory::generated_factory(),
-      sizeof(argument_list));
-  exception_frame_descriptor_ = file->message_type(10);
-  static const int exception_frame_offsets_[4] = {
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(exception_frame, exception_number_),
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(exception_frame, thread_id_),
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(exception_frame, from_addr_),
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(exception_frame, to_addr_),
-  };
-  exception_frame_reflection_ =
-    new ::google::protobuf::internal::GeneratedMessageReflection(
-      exception_frame_descriptor_,
-      exception_frame::default_instance_,
-      exception_frame_offsets_,
-      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(exception_frame, _has_bits_[0]),
-      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(exception_frame, _unknown_fields_),
-      -1,
-      ::google::protobuf::DescriptorPool::generated_pool(),
-      ::google::protobuf::MessageFactory::generated_factory(),
-      sizeof(exception_frame));
-  taint_intro_frame_descriptor_ = file->message_type(11);
-  static const int taint_intro_frame_offsets_[1] = {
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(taint_intro_frame, taint_intro_list_),
-  };
-  taint_intro_frame_reflection_ =
-    new ::google::protobuf::internal::GeneratedMessageReflection(
-      taint_intro_frame_descriptor_,
-      taint_intro_frame::default_instance_,
-      taint_intro_frame_offsets_,
-      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(taint_intro_frame, _has_bits_[0]),
-      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(taint_intro_frame, _unknown_fields_),
-      -1,
-      ::google::protobuf::DescriptorPool::generated_pool(),
-      ::google::protobuf::MessageFactory::generated_factory(),
-      sizeof(taint_intro_frame));
-  taint_intro_list_descriptor_ = file->message_type(12);
-  static const int taint_intro_list_offsets_[1] = {
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(taint_intro_list, elem_),
-  };
-  taint_intro_list_reflection_ =
-    new ::google::protobuf::internal::GeneratedMessageReflection(
-      taint_intro_list_descriptor_,
-      taint_intro_list::default_instance_,
-      taint_intro_list_offsets_,
-      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(taint_intro_list, _has_bits_[0]),
-      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(taint_intro_list, _unknown_fields_),
-      -1,
-      ::google::protobuf::DescriptorPool::generated_pool(),
-      ::google::protobuf::MessageFactory::generated_factory(),
-      sizeof(taint_intro_list));
-  taint_intro_descriptor_ = file->message_type(13);
-  static const int taint_intro_offsets_[3] = {
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(taint_intro, addr_),
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(taint_intro, taint_id_),
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(taint_intro, value_),
-  };
-  taint_intro_reflection_ =
-    new ::google::protobuf::internal::GeneratedMessageReflection(
-      taint_intro_descriptor_,
-      taint_intro::default_instance_,
-      taint_intro_offsets_,
-      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(taint_intro, _has_bits_[0]),
-      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(taint_intro, _unknown_fields_),
-      -1,
-      ::google::protobuf::DescriptorPool::generated_pool(),
-      ::google::protobuf::MessageFactory::generated_factory(),
-      sizeof(taint_intro));
-  modload_frame_descriptor_ = file->message_type(14);
-  static const int modload_frame_offsets_[3] = {
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(modload_frame, module_name_),
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(modload_frame, low_address_),
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(modload_frame, high_address_),
-  };
-  modload_frame_reflection_ =
-    new ::google::protobuf::internal::GeneratedMessageReflection(
-      modload_frame_descriptor_,
-      modload_frame::default_instance_,
-      modload_frame_offsets_,
-      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(modload_frame, _has_bits_[0]),
-      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(modload_frame, _unknown_fields_),
-      -1,
-      ::google::protobuf::DescriptorPool::generated_pool(),
-      ::google::protobuf::MessageFactory::generated_factory(),
-      sizeof(modload_frame));
-  key_frame_descriptor_ = file->message_type(15);
-  static const int key_frame_offsets_[1] = {
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(key_frame, tagged_value_lists_),
-  };
-  key_frame_reflection_ =
-    new ::google::protobuf::internal::GeneratedMessageReflection(
-      key_frame_descriptor_,
-      key_frame::default_instance_,
-      key_frame_offsets_,
-      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(key_frame, _has_bits_[0]),
-      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(key_frame, _unknown_fields_),
-      -1,
-      ::google::protobuf::DescriptorPool::generated_pool(),
-      ::google::protobuf::MessageFactory::generated_factory(),
-      sizeof(key_frame));
-  tagged_value_lists_descriptor_ = file->message_type(16);
-  static const int tagged_value_lists_offsets_[1] = {
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(tagged_value_lists, elem_),
-  };
-  tagged_value_lists_reflection_ =
-    new ::google::protobuf::internal::GeneratedMessageReflection(
-      tagged_value_lists_descriptor_,
-      tagged_value_lists::default_instance_,
-      tagged_value_lists_offsets_,
-      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(tagged_value_lists, _has_bits_[0]),
-      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(tagged_value_lists, _unknown_fields_),
-      -1,
-      ::google::protobuf::DescriptorPool::generated_pool(),
-      ::google::protobuf::MessageFactory::generated_factory(),
-      sizeof(tagged_value_lists));
-  tagged_value_list_descriptor_ = file->message_type(17);
-  static const int tagged_value_list_offsets_[2] = {
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(tagged_value_list, value_source_tag_),
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(tagged_value_list, value_list_),
-  };
-  tagged_value_list_reflection_ =
-    new ::google::protobuf::internal::GeneratedMessageReflection(
-      tagged_value_list_descriptor_,
-      tagged_value_list::default_instance_,
-      tagged_value_list_offsets_,
-      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(tagged_value_list, _has_bits_[0]),
-      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(tagged_value_list, _unknown_fields_),
-      -1,
-      ::google::protobuf::DescriptorPool::generated_pool(),
-      ::google::protobuf::MessageFactory::generated_factory(),
-      sizeof(tagged_value_list));
-  value_source_tag_descriptor_ = file->message_type(18);
-  static const int value_source_tag_offsets_[2] = {
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(value_source_tag, no_thread_id_),
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(value_source_tag, thread_id_),
-  };
-  value_source_tag_reflection_ =
-    new ::google::protobuf::internal::GeneratedMessageReflection(
-      value_source_tag_descriptor_,
-      value_source_tag::default_instance_,
-      value_source_tag_offsets_,
-      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(value_source_tag, _has_bits_[0]),
-      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(value_source_tag, _unknown_fields_),
-      -1,
-      ::google::protobuf::DescriptorPool::generated_pool(),
-      ::google::protobuf::MessageFactory::generated_factory(),
-      sizeof(value_source_tag));
-  value_list_descriptor_ = file->message_type(19);
-  static const int value_list_offsets_[1] = {
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(value_list, elem_),
-  };
-  value_list_reflection_ =
-    new ::google::protobuf::internal::GeneratedMessageReflection(
-      value_list_descriptor_,
-      value_list::default_instance_,
-      value_list_offsets_,
-      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(value_list, _has_bits_[0]),
-      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(value_list, _unknown_fields_),
-      -1,
-      ::google::protobuf::DescriptorPool::generated_pool(),
-      ::google::protobuf::MessageFactory::generated_factory(),
-      sizeof(value_list));
-  value_info_descriptor_ = file->message_type(20);
-  static const int value_info_offsets_[4] = {
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(value_info, operand_info_specific_),
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(value_info, bit_length_),
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(value_info, taint_info_),
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(value_info, value_),
-  };
-  value_info_reflection_ =
-    new ::google::protobuf::internal::GeneratedMessageReflection(
-      value_info_descriptor_,
-      value_info::default_instance_,
-      value_info_offsets_,
-      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(value_info, _has_bits_[0]),
-      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(value_info, _unknown_fields_),
-      -1,
-      ::google::protobuf::DescriptorPool::generated_pool(),
-      ::google::protobuf::MessageFactory::generated_factory(),
-      sizeof(value_info));
-  frame_descriptor_ = file->message_type(21);
+  frame_descriptor_ = file->message_type(0);
   static const int frame_offsets_[6] = {
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(frame, std_frame_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(frame, syscall_frame_),
@@ -454,6 +111,349 @@ void protobuf_AssignDesc_frame_2epiqi_2eproto() {
       ::google::protobuf::DescriptorPool::generated_pool(),
       ::google::protobuf::MessageFactory::generated_factory(),
       sizeof(frame));
+  operand_list_descriptor_ = file->message_type(1);
+  static const int operand_list_offsets_[1] = {
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(operand_list, elem_),
+  };
+  operand_list_reflection_ =
+    new ::google::protobuf::internal::GeneratedMessageReflection(
+      operand_list_descriptor_,
+      operand_list::default_instance_,
+      operand_list_offsets_,
+      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(operand_list, _has_bits_[0]),
+      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(operand_list, _unknown_fields_),
+      -1,
+      ::google::protobuf::DescriptorPool::generated_pool(),
+      ::google::protobuf::MessageFactory::generated_factory(),
+      sizeof(operand_list));
+  operand_info_descriptor_ = file->message_type(2);
+  static const int operand_info_offsets_[5] = {
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(operand_info, operand_info_specific_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(operand_info, bit_length_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(operand_info, operand_usage_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(operand_info, taint_info_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(operand_info, value_),
+  };
+  operand_info_reflection_ =
+    new ::google::protobuf::internal::GeneratedMessageReflection(
+      operand_info_descriptor_,
+      operand_info::default_instance_,
+      operand_info_offsets_,
+      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(operand_info, _has_bits_[0]),
+      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(operand_info, _unknown_fields_),
+      -1,
+      ::google::protobuf::DescriptorPool::generated_pool(),
+      ::google::protobuf::MessageFactory::generated_factory(),
+      sizeof(operand_info));
+  operand_info_specific_descriptor_ = file->message_type(3);
+  static const int operand_info_specific_offsets_[2] = {
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(operand_info_specific, mem_operand_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(operand_info_specific, reg_operand_),
+  };
+  operand_info_specific_reflection_ =
+    new ::google::protobuf::internal::GeneratedMessageReflection(
+      operand_info_specific_descriptor_,
+      operand_info_specific::default_instance_,
+      operand_info_specific_offsets_,
+      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(operand_info_specific, _has_bits_[0]),
+      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(operand_info_specific, _unknown_fields_),
+      -1,
+      ::google::protobuf::DescriptorPool::generated_pool(),
+      ::google::protobuf::MessageFactory::generated_factory(),
+      sizeof(operand_info_specific));
+  reg_operand_descriptor_ = file->message_type(4);
+  static const int reg_operand_offsets_[1] = {
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(reg_operand, name_),
+  };
+  reg_operand_reflection_ =
+    new ::google::protobuf::internal::GeneratedMessageReflection(
+      reg_operand_descriptor_,
+      reg_operand::default_instance_,
+      reg_operand_offsets_,
+      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(reg_operand, _has_bits_[0]),
+      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(reg_operand, _unknown_fields_),
+      -1,
+      ::google::protobuf::DescriptorPool::generated_pool(),
+      ::google::protobuf::MessageFactory::generated_factory(),
+      sizeof(reg_operand));
+  mem_operand_descriptor_ = file->message_type(5);
+  static const int mem_operand_offsets_[1] = {
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(mem_operand, address_),
+  };
+  mem_operand_reflection_ =
+    new ::google::protobuf::internal::GeneratedMessageReflection(
+      mem_operand_descriptor_,
+      mem_operand::default_instance_,
+      mem_operand_offsets_,
+      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(mem_operand, _has_bits_[0]),
+      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(mem_operand, _unknown_fields_),
+      -1,
+      ::google::protobuf::DescriptorPool::generated_pool(),
+      ::google::protobuf::MessageFactory::generated_factory(),
+      sizeof(mem_operand));
+  operand_usage_descriptor_ = file->message_type(6);
+  static const int operand_usage_offsets_[4] = {
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(operand_usage, read_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(operand_usage, written_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(operand_usage, index_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(operand_usage, base_),
+  };
+  operand_usage_reflection_ =
+    new ::google::protobuf::internal::GeneratedMessageReflection(
+      operand_usage_descriptor_,
+      operand_usage::default_instance_,
+      operand_usage_offsets_,
+      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(operand_usage, _has_bits_[0]),
+      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(operand_usage, _unknown_fields_),
+      -1,
+      ::google::protobuf::DescriptorPool::generated_pool(),
+      ::google::protobuf::MessageFactory::generated_factory(),
+      sizeof(operand_usage));
+  taint_info_descriptor_ = file->message_type(7);
+  static const int taint_info_offsets_[3] = {
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(taint_info, no_taint_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(taint_info, taint_id_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(taint_info, taint_multiple_),
+  };
+  taint_info_reflection_ =
+    new ::google::protobuf::internal::GeneratedMessageReflection(
+      taint_info_descriptor_,
+      taint_info::default_instance_,
+      taint_info_offsets_,
+      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(taint_info, _has_bits_[0]),
+      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(taint_info, _unknown_fields_),
+      -1,
+      ::google::protobuf::DescriptorPool::generated_pool(),
+      ::google::protobuf::MessageFactory::generated_factory(),
+      sizeof(taint_info));
+  std_frame_descriptor_ = file->message_type(8);
+  static const int std_frame_offsets_[4] = {
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(std_frame, address_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(std_frame, thread_id_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(std_frame, rawbytes_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(std_frame, operand_list_),
+  };
+  std_frame_reflection_ =
+    new ::google::protobuf::internal::GeneratedMessageReflection(
+      std_frame_descriptor_,
+      std_frame::default_instance_,
+      std_frame_offsets_,
+      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(std_frame, _has_bits_[0]),
+      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(std_frame, _unknown_fields_),
+      -1,
+      ::google::protobuf::DescriptorPool::generated_pool(),
+      ::google::protobuf::MessageFactory::generated_factory(),
+      sizeof(std_frame));
+  syscall_frame_descriptor_ = file->message_type(9);
+  static const int syscall_frame_offsets_[4] = {
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(syscall_frame, address_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(syscall_frame, thread_id_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(syscall_frame, number_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(syscall_frame, argument_list_),
+  };
+  syscall_frame_reflection_ =
+    new ::google::protobuf::internal::GeneratedMessageReflection(
+      syscall_frame_descriptor_,
+      syscall_frame::default_instance_,
+      syscall_frame_offsets_,
+      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(syscall_frame, _has_bits_[0]),
+      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(syscall_frame, _unknown_fields_),
+      -1,
+      ::google::protobuf::DescriptorPool::generated_pool(),
+      ::google::protobuf::MessageFactory::generated_factory(),
+      sizeof(syscall_frame));
+  argument_list_descriptor_ = file->message_type(10);
+  static const int argument_list_offsets_[1] = {
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(argument_list, elem_),
+  };
+  argument_list_reflection_ =
+    new ::google::protobuf::internal::GeneratedMessageReflection(
+      argument_list_descriptor_,
+      argument_list::default_instance_,
+      argument_list_offsets_,
+      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(argument_list, _has_bits_[0]),
+      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(argument_list, _unknown_fields_),
+      -1,
+      ::google::protobuf::DescriptorPool::generated_pool(),
+      ::google::protobuf::MessageFactory::generated_factory(),
+      sizeof(argument_list));
+  exception_frame_descriptor_ = file->message_type(11);
+  static const int exception_frame_offsets_[4] = {
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(exception_frame, exception_number_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(exception_frame, thread_id_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(exception_frame, from_addr_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(exception_frame, to_addr_),
+  };
+  exception_frame_reflection_ =
+    new ::google::protobuf::internal::GeneratedMessageReflection(
+      exception_frame_descriptor_,
+      exception_frame::default_instance_,
+      exception_frame_offsets_,
+      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(exception_frame, _has_bits_[0]),
+      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(exception_frame, _unknown_fields_),
+      -1,
+      ::google::protobuf::DescriptorPool::generated_pool(),
+      ::google::protobuf::MessageFactory::generated_factory(),
+      sizeof(exception_frame));
+  taint_intro_frame_descriptor_ = file->message_type(12);
+  static const int taint_intro_frame_offsets_[1] = {
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(taint_intro_frame, taint_intro_list_),
+  };
+  taint_intro_frame_reflection_ =
+    new ::google::protobuf::internal::GeneratedMessageReflection(
+      taint_intro_frame_descriptor_,
+      taint_intro_frame::default_instance_,
+      taint_intro_frame_offsets_,
+      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(taint_intro_frame, _has_bits_[0]),
+      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(taint_intro_frame, _unknown_fields_),
+      -1,
+      ::google::protobuf::DescriptorPool::generated_pool(),
+      ::google::protobuf::MessageFactory::generated_factory(),
+      sizeof(taint_intro_frame));
+  taint_intro_list_descriptor_ = file->message_type(13);
+  static const int taint_intro_list_offsets_[1] = {
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(taint_intro_list, elem_),
+  };
+  taint_intro_list_reflection_ =
+    new ::google::protobuf::internal::GeneratedMessageReflection(
+      taint_intro_list_descriptor_,
+      taint_intro_list::default_instance_,
+      taint_intro_list_offsets_,
+      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(taint_intro_list, _has_bits_[0]),
+      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(taint_intro_list, _unknown_fields_),
+      -1,
+      ::google::protobuf::DescriptorPool::generated_pool(),
+      ::google::protobuf::MessageFactory::generated_factory(),
+      sizeof(taint_intro_list));
+  taint_intro_descriptor_ = file->message_type(14);
+  static const int taint_intro_offsets_[3] = {
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(taint_intro, addr_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(taint_intro, taint_id_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(taint_intro, value_),
+  };
+  taint_intro_reflection_ =
+    new ::google::protobuf::internal::GeneratedMessageReflection(
+      taint_intro_descriptor_,
+      taint_intro::default_instance_,
+      taint_intro_offsets_,
+      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(taint_intro, _has_bits_[0]),
+      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(taint_intro, _unknown_fields_),
+      -1,
+      ::google::protobuf::DescriptorPool::generated_pool(),
+      ::google::protobuf::MessageFactory::generated_factory(),
+      sizeof(taint_intro));
+  modload_frame_descriptor_ = file->message_type(15);
+  static const int modload_frame_offsets_[3] = {
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(modload_frame, module_name_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(modload_frame, low_address_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(modload_frame, high_address_),
+  };
+  modload_frame_reflection_ =
+    new ::google::protobuf::internal::GeneratedMessageReflection(
+      modload_frame_descriptor_,
+      modload_frame::default_instance_,
+      modload_frame_offsets_,
+      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(modload_frame, _has_bits_[0]),
+      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(modload_frame, _unknown_fields_),
+      -1,
+      ::google::protobuf::DescriptorPool::generated_pool(),
+      ::google::protobuf::MessageFactory::generated_factory(),
+      sizeof(modload_frame));
+  key_frame_descriptor_ = file->message_type(16);
+  static const int key_frame_offsets_[1] = {
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(key_frame, tagged_value_lists_),
+  };
+  key_frame_reflection_ =
+    new ::google::protobuf::internal::GeneratedMessageReflection(
+      key_frame_descriptor_,
+      key_frame::default_instance_,
+      key_frame_offsets_,
+      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(key_frame, _has_bits_[0]),
+      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(key_frame, _unknown_fields_),
+      -1,
+      ::google::protobuf::DescriptorPool::generated_pool(),
+      ::google::protobuf::MessageFactory::generated_factory(),
+      sizeof(key_frame));
+  tagged_value_lists_descriptor_ = file->message_type(17);
+  static const int tagged_value_lists_offsets_[1] = {
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(tagged_value_lists, elem_),
+  };
+  tagged_value_lists_reflection_ =
+    new ::google::protobuf::internal::GeneratedMessageReflection(
+      tagged_value_lists_descriptor_,
+      tagged_value_lists::default_instance_,
+      tagged_value_lists_offsets_,
+      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(tagged_value_lists, _has_bits_[0]),
+      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(tagged_value_lists, _unknown_fields_),
+      -1,
+      ::google::protobuf::DescriptorPool::generated_pool(),
+      ::google::protobuf::MessageFactory::generated_factory(),
+      sizeof(tagged_value_lists));
+  tagged_value_list_descriptor_ = file->message_type(18);
+  static const int tagged_value_list_offsets_[2] = {
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(tagged_value_list, value_source_tag_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(tagged_value_list, value_list_),
+  };
+  tagged_value_list_reflection_ =
+    new ::google::protobuf::internal::GeneratedMessageReflection(
+      tagged_value_list_descriptor_,
+      tagged_value_list::default_instance_,
+      tagged_value_list_offsets_,
+      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(tagged_value_list, _has_bits_[0]),
+      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(tagged_value_list, _unknown_fields_),
+      -1,
+      ::google::protobuf::DescriptorPool::generated_pool(),
+      ::google::protobuf::MessageFactory::generated_factory(),
+      sizeof(tagged_value_list));
+  value_source_tag_descriptor_ = file->message_type(19);
+  static const int value_source_tag_offsets_[2] = {
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(value_source_tag, no_thread_id_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(value_source_tag, thread_id_),
+  };
+  value_source_tag_reflection_ =
+    new ::google::protobuf::internal::GeneratedMessageReflection(
+      value_source_tag_descriptor_,
+      value_source_tag::default_instance_,
+      value_source_tag_offsets_,
+      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(value_source_tag, _has_bits_[0]),
+      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(value_source_tag, _unknown_fields_),
+      -1,
+      ::google::protobuf::DescriptorPool::generated_pool(),
+      ::google::protobuf::MessageFactory::generated_factory(),
+      sizeof(value_source_tag));
+  value_list_descriptor_ = file->message_type(20);
+  static const int value_list_offsets_[1] = {
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(value_list, elem_),
+  };
+  value_list_reflection_ =
+    new ::google::protobuf::internal::GeneratedMessageReflection(
+      value_list_descriptor_,
+      value_list::default_instance_,
+      value_list_offsets_,
+      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(value_list, _has_bits_[0]),
+      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(value_list, _unknown_fields_),
+      -1,
+      ::google::protobuf::DescriptorPool::generated_pool(),
+      ::google::protobuf::MessageFactory::generated_factory(),
+      sizeof(value_list));
+  value_info_descriptor_ = file->message_type(21);
+  static const int value_info_offsets_[4] = {
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(value_info, operand_info_specific_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(value_info, bit_length_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(value_info, taint_info_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(value_info, value_),
+  };
+  value_info_reflection_ =
+    new ::google::protobuf::internal::GeneratedMessageReflection(
+      value_info_descriptor_,
+      value_info::default_instance_,
+      value_info_offsets_,
+      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(value_info, _has_bits_[0]),
+      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(value_info, _unknown_fields_),
+      -1,
+      ::google::protobuf::DescriptorPool::generated_pool(),
+      ::google::protobuf::MessageFactory::generated_factory(),
+      sizeof(value_info));
 }
 
 namespace {
@@ -466,6 +466,8 @@ inline void protobuf_AssignDescriptorsOnce() {
 
 void protobuf_RegisterTypes(const ::std::string&) {
   protobuf_AssignDescriptorsOnce();
+  ::google::protobuf::MessageFactory::InternalRegisterGeneratedMessage(
+    frame_descriptor_, &frame::default_instance());
   ::google::protobuf::MessageFactory::InternalRegisterGeneratedMessage(
     operand_list_descriptor_, &operand_list::default_instance());
   ::google::protobuf::MessageFactory::InternalRegisterGeneratedMessage(
@@ -508,13 +510,13 @@ void protobuf_RegisterTypes(const ::std::string&) {
     value_list_descriptor_, &value_list::default_instance());
   ::google::protobuf::MessageFactory::InternalRegisterGeneratedMessage(
     value_info_descriptor_, &value_info::default_instance());
-  ::google::protobuf::MessageFactory::InternalRegisterGeneratedMessage(
-    frame_descriptor_, &frame::default_instance());
 }
 
 }  // namespace
 
 void protobuf_ShutdownFile_frame_2epiqi_2eproto() {
+  delete frame::default_instance_;
+  delete frame_reflection_;
   delete operand_list::default_instance_;
   delete operand_list_reflection_;
   delete operand_info::default_instance_;
@@ -557,8 +559,6 @@ void protobuf_ShutdownFile_frame_2epiqi_2eproto() {
   delete value_list_reflection_;
   delete value_info::default_instance_;
   delete value_info_reflection_;
-  delete frame::default_instance_;
-  delete frame_reflection_;
 }
 
 void protobuf_AddDesc_frame_2epiqi_2eproto() {
@@ -568,7 +568,13 @@ void protobuf_AddDesc_frame_2epiqi_2eproto() {
   GOOGLE_PROTOBUF_VERIFY_VERSION;
 
   ::google::protobuf::DescriptorPool::InternalAddGeneratedFile(
-    "\n\020frame.piqi.proto\"+\n\014operand_list\022\033\n\004el"
+    "\n\020frame.piqi.proto\"\355\001\n\005frame\022\035\n\tstd_fram"
+    "e\030\001 \001(\0132\n.std_frame\022%\n\rsyscall_frame\030\002 \001"
+    "(\0132\016.syscall_frame\022)\n\017exception_frame\030\003 "
+    "\001(\0132\020.exception_frame\022-\n\021taint_intro_fra"
+    "me\030\004 \001(\0132\022.taint_intro_frame\022%\n\rmodload_"
+    "frame\030\005 \001(\0132\016.modload_frame\022\035\n\tkey_frame"
+    "\030\006 \001(\0132\n.key_frame\"+\n\014operand_list\022\033\n\004el"
     "em\030\001 \003(\0132\r.operand_info\"\260\001\n\014operand_info"
     "\0225\n\025operand_info_specific\030\001 \002(\0132\026.operan"
     "d_info_specific\022\022\n\nbit_length\030\002 \002(\021\022%\n\ro"
@@ -608,15 +614,10 @@ void protobuf_AddDesc_frame_2epiqi_2eproto() {
     "nfo\0225\n\025operand_info_specific\030\001 \002(\0132\026.ope"
     "rand_info_specific\022\022\n\nbit_length\030\002 \002(\021\022\037"
     "\n\ntaint_info\030\003 \001(\0132\013.taint_info\022\r\n\005value"
-    "\030\004 \002(\014\"\355\001\n\005frame\022\035\n\tstd_frame\030\001 \001(\0132\n.st"
-    "d_frame\022%\n\rsyscall_frame\030\002 \001(\0132\016.syscall"
-    "_frame\022)\n\017exception_frame\030\003 \001(\0132\020.except"
-    "ion_frame\022-\n\021taint_intro_frame\030\004 \001(\0132\022.t"
-    "aint_intro_frame\022%\n\rmodload_frame\030\005 \001(\0132"
-    "\016.modload_frame\022\035\n\tkey_frame\030\006 \001(\0132\n.key"
-    "_frame", 1846);
+    "\030\004 \002(\014", 1846);
   ::google::protobuf::MessageFactory::InternalRegisterGeneratedFile(
     "frame.piqi.proto", &protobuf_RegisterTypes);
+  frame::default_instance_ = new frame();
   operand_list::default_instance_ = new operand_list();
   operand_info::default_instance_ = new operand_info();
   operand_info_specific::default_instance_ = new operand_info_specific();
@@ -638,7 +639,7 @@ void protobuf_AddDesc_frame_2epiqi_2eproto() {
   value_source_tag::default_instance_ = new value_source_tag();
   value_list::default_instance_ = new value_list();
   value_info::default_instance_ = new value_info();
-  frame::default_instance_ = new frame();
+  frame::default_instance_->InitAsDefaultInstance();
   operand_list::default_instance_->InitAsDefaultInstance();
   operand_info::default_instance_->InitAsDefaultInstance();
   operand_info_specific::default_instance_->InitAsDefaultInstance();
@@ -660,7 +661,6 @@ void protobuf_AddDesc_frame_2epiqi_2eproto() {
   value_source_tag::default_instance_->InitAsDefaultInstance();
   value_list::default_instance_->InitAsDefaultInstance();
   value_info::default_instance_->InitAsDefaultInstance();
-  frame::default_instance_->InitAsDefaultInstance();
   ::google::protobuf::internal::OnShutdown(&protobuf_ShutdownFile_frame_2epiqi_2eproto);
 }
 
@@ -670,6 +670,461 @@ struct StaticDescriptorInitializer_frame_2epiqi_2eproto {
     protobuf_AddDesc_frame_2epiqi_2eproto();
   }
 } static_descriptor_initializer_frame_2epiqi_2eproto_;
+
+
+// ===================================================================
+
+#ifndef _MSC_VER
+const int frame::kStdFrameFieldNumber;
+const int frame::kSyscallFrameFieldNumber;
+const int frame::kExceptionFrameFieldNumber;
+const int frame::kTaintIntroFrameFieldNumber;
+const int frame::kModloadFrameFieldNumber;
+const int frame::kKeyFrameFieldNumber;
+#endif  // !_MSC_VER
+
+frame::frame()
+  : ::google::protobuf::Message() {
+  SharedCtor();
+}
+
+void frame::InitAsDefaultInstance() {
+  std_frame_ = const_cast< ::std_frame*>(&::std_frame::default_instance());
+  syscall_frame_ = const_cast< ::syscall_frame*>(&::syscall_frame::default_instance());
+  exception_frame_ = const_cast< ::exception_frame*>(&::exception_frame::default_instance());
+  taint_intro_frame_ = const_cast< ::taint_intro_frame*>(&::taint_intro_frame::default_instance());
+  modload_frame_ = const_cast< ::modload_frame*>(&::modload_frame::default_instance());
+  key_frame_ = const_cast< ::key_frame*>(&::key_frame::default_instance());
+}
+
+frame::frame(const frame& from)
+  : ::google::protobuf::Message() {
+  SharedCtor();
+  MergeFrom(from);
+}
+
+void frame::SharedCtor() {
+  _cached_size_ = 0;
+  std_frame_ = NULL;
+  syscall_frame_ = NULL;
+  exception_frame_ = NULL;
+  taint_intro_frame_ = NULL;
+  modload_frame_ = NULL;
+  key_frame_ = NULL;
+  ::memset(_has_bits_, 0, sizeof(_has_bits_));
+}
+
+frame::~frame() {
+  SharedDtor();
+}
+
+void frame::SharedDtor() {
+  if (this != default_instance_) {
+    delete std_frame_;
+    delete syscall_frame_;
+    delete exception_frame_;
+    delete taint_intro_frame_;
+    delete modload_frame_;
+    delete key_frame_;
+  }
+}
+
+void frame::SetCachedSize(int size) const {
+  GOOGLE_SAFE_CONCURRENT_WRITES_BEGIN();
+  _cached_size_ = size;
+  GOOGLE_SAFE_CONCURRENT_WRITES_END();
+}
+const ::google::protobuf::Descriptor* frame::descriptor() {
+  protobuf_AssignDescriptorsOnce();
+  return frame_descriptor_;
+}
+
+const frame& frame::default_instance() {
+  if (default_instance_ == NULL) protobuf_AddDesc_frame_2epiqi_2eproto();  return *default_instance_;
+}
+
+frame* frame::default_instance_ = NULL;
+
+frame* frame::New() const {
+  return new frame;
+}
+
+void frame::Clear() {
+  if (_has_bits_[0 / 32] & (0xffu << (0 % 32))) {
+    if (has_std_frame()) {
+      if (std_frame_ != NULL) std_frame_->::std_frame::Clear();
+    }
+    if (has_syscall_frame()) {
+      if (syscall_frame_ != NULL) syscall_frame_->::syscall_frame::Clear();
+    }
+    if (has_exception_frame()) {
+      if (exception_frame_ != NULL) exception_frame_->::exception_frame::Clear();
+    }
+    if (has_taint_intro_frame()) {
+      if (taint_intro_frame_ != NULL) taint_intro_frame_->::taint_intro_frame::Clear();
+    }
+    if (has_modload_frame()) {
+      if (modload_frame_ != NULL) modload_frame_->::modload_frame::Clear();
+    }
+    if (has_key_frame()) {
+      if (key_frame_ != NULL) key_frame_->::key_frame::Clear();
+    }
+  }
+  ::memset(_has_bits_, 0, sizeof(_has_bits_));
+  mutable_unknown_fields()->Clear();
+}
+
+bool frame::MergePartialFromCodedStream(
+    ::google::protobuf::io::CodedInputStream* input) {
+#define DO_(EXPRESSION) if (!(EXPRESSION)) return false
+  ::google::protobuf::uint32 tag;
+  while ((tag = input->ReadTag()) != 0) {
+    switch (::google::protobuf::internal::WireFormatLite::GetTagFieldNumber(tag)) {
+      // optional .std_frame std_frame = 1;
+      case 1: {
+        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
+            ::google::protobuf::internal::WireFormatLite::WIRETYPE_LENGTH_DELIMITED) {
+          DO_(::google::protobuf::internal::WireFormatLite::ReadMessageNoVirtual(
+               input, mutable_std_frame()));
+        } else {
+          goto handle_uninterpreted;
+        }
+        if (input->ExpectTag(18)) goto parse_syscall_frame;
+        break;
+      }
+      
+      // optional .syscall_frame syscall_frame = 2;
+      case 2: {
+        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
+            ::google::protobuf::internal::WireFormatLite::WIRETYPE_LENGTH_DELIMITED) {
+         parse_syscall_frame:
+          DO_(::google::protobuf::internal::WireFormatLite::ReadMessageNoVirtual(
+               input, mutable_syscall_frame()));
+        } else {
+          goto handle_uninterpreted;
+        }
+        if (input->ExpectTag(26)) goto parse_exception_frame;
+        break;
+      }
+      
+      // optional .exception_frame exception_frame = 3;
+      case 3: {
+        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
+            ::google::protobuf::internal::WireFormatLite::WIRETYPE_LENGTH_DELIMITED) {
+         parse_exception_frame:
+          DO_(::google::protobuf::internal::WireFormatLite::ReadMessageNoVirtual(
+               input, mutable_exception_frame()));
+        } else {
+          goto handle_uninterpreted;
+        }
+        if (input->ExpectTag(34)) goto parse_taint_intro_frame;
+        break;
+      }
+      
+      // optional .taint_intro_frame taint_intro_frame = 4;
+      case 4: {
+        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
+            ::google::protobuf::internal::WireFormatLite::WIRETYPE_LENGTH_DELIMITED) {
+         parse_taint_intro_frame:
+          DO_(::google::protobuf::internal::WireFormatLite::ReadMessageNoVirtual(
+               input, mutable_taint_intro_frame()));
+        } else {
+          goto handle_uninterpreted;
+        }
+        if (input->ExpectTag(42)) goto parse_modload_frame;
+        break;
+      }
+      
+      // optional .modload_frame modload_frame = 5;
+      case 5: {
+        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
+            ::google::protobuf::internal::WireFormatLite::WIRETYPE_LENGTH_DELIMITED) {
+         parse_modload_frame:
+          DO_(::google::protobuf::internal::WireFormatLite::ReadMessageNoVirtual(
+               input, mutable_modload_frame()));
+        } else {
+          goto handle_uninterpreted;
+        }
+        if (input->ExpectTag(50)) goto parse_key_frame;
+        break;
+      }
+      
+      // optional .key_frame key_frame = 6;
+      case 6: {
+        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
+            ::google::protobuf::internal::WireFormatLite::WIRETYPE_LENGTH_DELIMITED) {
+         parse_key_frame:
+          DO_(::google::protobuf::internal::WireFormatLite::ReadMessageNoVirtual(
+               input, mutable_key_frame()));
+        } else {
+          goto handle_uninterpreted;
+        }
+        if (input->ExpectAtEnd()) return true;
+        break;
+      }
+      
+      default: {
+      handle_uninterpreted:
+        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
+            ::google::protobuf::internal::WireFormatLite::WIRETYPE_END_GROUP) {
+          return true;
+        }
+        DO_(::google::protobuf::internal::WireFormat::SkipField(
+              input, tag, mutable_unknown_fields()));
+        break;
+      }
+    }
+  }
+  return true;
+#undef DO_
+}
+
+void frame::SerializeWithCachedSizes(
+    ::google::protobuf::io::CodedOutputStream* output) const {
+  // optional .std_frame std_frame = 1;
+  if (has_std_frame()) {
+    ::google::protobuf::internal::WireFormatLite::WriteMessageMaybeToArray(
+      1, this->std_frame(), output);
+  }
+  
+  // optional .syscall_frame syscall_frame = 2;
+  if (has_syscall_frame()) {
+    ::google::protobuf::internal::WireFormatLite::WriteMessageMaybeToArray(
+      2, this->syscall_frame(), output);
+  }
+  
+  // optional .exception_frame exception_frame = 3;
+  if (has_exception_frame()) {
+    ::google::protobuf::internal::WireFormatLite::WriteMessageMaybeToArray(
+      3, this->exception_frame(), output);
+  }
+  
+  // optional .taint_intro_frame taint_intro_frame = 4;
+  if (has_taint_intro_frame()) {
+    ::google::protobuf::internal::WireFormatLite::WriteMessageMaybeToArray(
+      4, this->taint_intro_frame(), output);
+  }
+  
+  // optional .modload_frame modload_frame = 5;
+  if (has_modload_frame()) {
+    ::google::protobuf::internal::WireFormatLite::WriteMessageMaybeToArray(
+      5, this->modload_frame(), output);
+  }
+  
+  // optional .key_frame key_frame = 6;
+  if (has_key_frame()) {
+    ::google::protobuf::internal::WireFormatLite::WriteMessageMaybeToArray(
+      6, this->key_frame(), output);
+  }
+  
+  if (!unknown_fields().empty()) {
+    ::google::protobuf::internal::WireFormat::SerializeUnknownFields(
+        unknown_fields(), output);
+  }
+}
+
+::google::protobuf::uint8* frame::SerializeWithCachedSizesToArray(
+    ::google::protobuf::uint8* target) const {
+  // optional .std_frame std_frame = 1;
+  if (has_std_frame()) {
+    target = ::google::protobuf::internal::WireFormatLite::
+      WriteMessageNoVirtualToArray(
+        1, this->std_frame(), target);
+  }
+  
+  // optional .syscall_frame syscall_frame = 2;
+  if (has_syscall_frame()) {
+    target = ::google::protobuf::internal::WireFormatLite::
+      WriteMessageNoVirtualToArray(
+        2, this->syscall_frame(), target);
+  }
+  
+  // optional .exception_frame exception_frame = 3;
+  if (has_exception_frame()) {
+    target = ::google::protobuf::internal::WireFormatLite::
+      WriteMessageNoVirtualToArray(
+        3, this->exception_frame(), target);
+  }
+  
+  // optional .taint_intro_frame taint_intro_frame = 4;
+  if (has_taint_intro_frame()) {
+    target = ::google::protobuf::internal::WireFormatLite::
+      WriteMessageNoVirtualToArray(
+        4, this->taint_intro_frame(), target);
+  }
+  
+  // optional .modload_frame modload_frame = 5;
+  if (has_modload_frame()) {
+    target = ::google::protobuf::internal::WireFormatLite::
+      WriteMessageNoVirtualToArray(
+        5, this->modload_frame(), target);
+  }
+  
+  // optional .key_frame key_frame = 6;
+  if (has_key_frame()) {
+    target = ::google::protobuf::internal::WireFormatLite::
+      WriteMessageNoVirtualToArray(
+        6, this->key_frame(), target);
+  }
+  
+  if (!unknown_fields().empty()) {
+    target = ::google::protobuf::internal::WireFormat::SerializeUnknownFieldsToArray(
+        unknown_fields(), target);
+  }
+  return target;
+}
+
+int frame::ByteSize() const {
+  int total_size = 0;
+  
+  if (_has_bits_[0 / 32] & (0xffu << (0 % 32))) {
+    // optional .std_frame std_frame = 1;
+    if (has_std_frame()) {
+      total_size += 1 +
+        ::google::protobuf::internal::WireFormatLite::MessageSizeNoVirtual(
+          this->std_frame());
+    }
+    
+    // optional .syscall_frame syscall_frame = 2;
+    if (has_syscall_frame()) {
+      total_size += 1 +
+        ::google::protobuf::internal::WireFormatLite::MessageSizeNoVirtual(
+          this->syscall_frame());
+    }
+    
+    // optional .exception_frame exception_frame = 3;
+    if (has_exception_frame()) {
+      total_size += 1 +
+        ::google::protobuf::internal::WireFormatLite::MessageSizeNoVirtual(
+          this->exception_frame());
+    }
+    
+    // optional .taint_intro_frame taint_intro_frame = 4;
+    if (has_taint_intro_frame()) {
+      total_size += 1 +
+        ::google::protobuf::internal::WireFormatLite::MessageSizeNoVirtual(
+          this->taint_intro_frame());
+    }
+    
+    // optional .modload_frame modload_frame = 5;
+    if (has_modload_frame()) {
+      total_size += 1 +
+        ::google::protobuf::internal::WireFormatLite::MessageSizeNoVirtual(
+          this->modload_frame());
+    }
+    
+    // optional .key_frame key_frame = 6;
+    if (has_key_frame()) {
+      total_size += 1 +
+        ::google::protobuf::internal::WireFormatLite::MessageSizeNoVirtual(
+          this->key_frame());
+    }
+    
+  }
+  if (!unknown_fields().empty()) {
+    total_size +=
+      ::google::protobuf::internal::WireFormat::ComputeUnknownFieldsSize(
+        unknown_fields());
+  }
+  GOOGLE_SAFE_CONCURRENT_WRITES_BEGIN();
+  _cached_size_ = total_size;
+  GOOGLE_SAFE_CONCURRENT_WRITES_END();
+  return total_size;
+}
+
+void frame::MergeFrom(const ::google::protobuf::Message& from) {
+  GOOGLE_CHECK_NE(&from, this);
+  const frame* source =
+    ::google::protobuf::internal::dynamic_cast_if_available<const frame*>(
+      &from);
+  if (source == NULL) {
+    ::google::protobuf::internal::ReflectionOps::Merge(from, this);
+  } else {
+    MergeFrom(*source);
+  }
+}
+
+void frame::MergeFrom(const frame& from) {
+  GOOGLE_CHECK_NE(&from, this);
+  if (from._has_bits_[0 / 32] & (0xffu << (0 % 32))) {
+    if (from.has_std_frame()) {
+      mutable_std_frame()->::std_frame::MergeFrom(from.std_frame());
+    }
+    if (from.has_syscall_frame()) {
+      mutable_syscall_frame()->::syscall_frame::MergeFrom(from.syscall_frame());
+    }
+    if (from.has_exception_frame()) {
+      mutable_exception_frame()->::exception_frame::MergeFrom(from.exception_frame());
+    }
+    if (from.has_taint_intro_frame()) {
+      mutable_taint_intro_frame()->::taint_intro_frame::MergeFrom(from.taint_intro_frame());
+    }
+    if (from.has_modload_frame()) {
+      mutable_modload_frame()->::modload_frame::MergeFrom(from.modload_frame());
+    }
+    if (from.has_key_frame()) {
+      mutable_key_frame()->::key_frame::MergeFrom(from.key_frame());
+    }
+  }
+  mutable_unknown_fields()->MergeFrom(from.unknown_fields());
+}
+
+void frame::CopyFrom(const ::google::protobuf::Message& from) {
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+void frame::CopyFrom(const frame& from) {
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+bool frame::IsInitialized() const {
+  
+  if (has_std_frame()) {
+    if (!this->std_frame().IsInitialized()) return false;
+  }
+  if (has_syscall_frame()) {
+    if (!this->syscall_frame().IsInitialized()) return false;
+  }
+  if (has_exception_frame()) {
+    if (!this->exception_frame().IsInitialized()) return false;
+  }
+  if (has_taint_intro_frame()) {
+    if (!this->taint_intro_frame().IsInitialized()) return false;
+  }
+  if (has_modload_frame()) {
+    if (!this->modload_frame().IsInitialized()) return false;
+  }
+  if (has_key_frame()) {
+    if (!this->key_frame().IsInitialized()) return false;
+  }
+  return true;
+}
+
+void frame::Swap(frame* other) {
+  if (other != this) {
+    std::swap(std_frame_, other->std_frame_);
+    std::swap(syscall_frame_, other->syscall_frame_);
+    std::swap(exception_frame_, other->exception_frame_);
+    std::swap(taint_intro_frame_, other->taint_intro_frame_);
+    std::swap(modload_frame_, other->modload_frame_);
+    std::swap(key_frame_, other->key_frame_);
+    std::swap(_has_bits_[0], other->_has_bits_[0]);
+    _unknown_fields_.Swap(&other->_unknown_fields_);
+    std::swap(_cached_size_, other->_cached_size_);
+  }
+}
+
+::google::protobuf::Metadata frame::GetMetadata() const {
+  protobuf_AssignDescriptorsOnce();
+  ::google::protobuf::Metadata metadata;
+  metadata.descriptor = frame_descriptor_;
+  metadata.reflection = frame_reflection_;
+  return metadata;
+}
 
 
 // ===================================================================
@@ -6287,461 +6742,6 @@ void value_info::Swap(value_info* other) {
   ::google::protobuf::Metadata metadata;
   metadata.descriptor = value_info_descriptor_;
   metadata.reflection = value_info_reflection_;
-  return metadata;
-}
-
-
-// ===================================================================
-
-#ifndef _MSC_VER
-const int frame::kStdFrameFieldNumber;
-const int frame::kSyscallFrameFieldNumber;
-const int frame::kExceptionFrameFieldNumber;
-const int frame::kTaintIntroFrameFieldNumber;
-const int frame::kModloadFrameFieldNumber;
-const int frame::kKeyFrameFieldNumber;
-#endif  // !_MSC_VER
-
-frame::frame()
-  : ::google::protobuf::Message() {
-  SharedCtor();
-}
-
-void frame::InitAsDefaultInstance() {
-  std_frame_ = const_cast< ::std_frame*>(&::std_frame::default_instance());
-  syscall_frame_ = const_cast< ::syscall_frame*>(&::syscall_frame::default_instance());
-  exception_frame_ = const_cast< ::exception_frame*>(&::exception_frame::default_instance());
-  taint_intro_frame_ = const_cast< ::taint_intro_frame*>(&::taint_intro_frame::default_instance());
-  modload_frame_ = const_cast< ::modload_frame*>(&::modload_frame::default_instance());
-  key_frame_ = const_cast< ::key_frame*>(&::key_frame::default_instance());
-}
-
-frame::frame(const frame& from)
-  : ::google::protobuf::Message() {
-  SharedCtor();
-  MergeFrom(from);
-}
-
-void frame::SharedCtor() {
-  _cached_size_ = 0;
-  std_frame_ = NULL;
-  syscall_frame_ = NULL;
-  exception_frame_ = NULL;
-  taint_intro_frame_ = NULL;
-  modload_frame_ = NULL;
-  key_frame_ = NULL;
-  ::memset(_has_bits_, 0, sizeof(_has_bits_));
-}
-
-frame::~frame() {
-  SharedDtor();
-}
-
-void frame::SharedDtor() {
-  if (this != default_instance_) {
-    delete std_frame_;
-    delete syscall_frame_;
-    delete exception_frame_;
-    delete taint_intro_frame_;
-    delete modload_frame_;
-    delete key_frame_;
-  }
-}
-
-void frame::SetCachedSize(int size) const {
-  GOOGLE_SAFE_CONCURRENT_WRITES_BEGIN();
-  _cached_size_ = size;
-  GOOGLE_SAFE_CONCURRENT_WRITES_END();
-}
-const ::google::protobuf::Descriptor* frame::descriptor() {
-  protobuf_AssignDescriptorsOnce();
-  return frame_descriptor_;
-}
-
-const frame& frame::default_instance() {
-  if (default_instance_ == NULL) protobuf_AddDesc_frame_2epiqi_2eproto();  return *default_instance_;
-}
-
-frame* frame::default_instance_ = NULL;
-
-frame* frame::New() const {
-  return new frame;
-}
-
-void frame::Clear() {
-  if (_has_bits_[0 / 32] & (0xffu << (0 % 32))) {
-    if (has_std_frame()) {
-      if (std_frame_ != NULL) std_frame_->::std_frame::Clear();
-    }
-    if (has_syscall_frame()) {
-      if (syscall_frame_ != NULL) syscall_frame_->::syscall_frame::Clear();
-    }
-    if (has_exception_frame()) {
-      if (exception_frame_ != NULL) exception_frame_->::exception_frame::Clear();
-    }
-    if (has_taint_intro_frame()) {
-      if (taint_intro_frame_ != NULL) taint_intro_frame_->::taint_intro_frame::Clear();
-    }
-    if (has_modload_frame()) {
-      if (modload_frame_ != NULL) modload_frame_->::modload_frame::Clear();
-    }
-    if (has_key_frame()) {
-      if (key_frame_ != NULL) key_frame_->::key_frame::Clear();
-    }
-  }
-  ::memset(_has_bits_, 0, sizeof(_has_bits_));
-  mutable_unknown_fields()->Clear();
-}
-
-bool frame::MergePartialFromCodedStream(
-    ::google::protobuf::io::CodedInputStream* input) {
-#define DO_(EXPRESSION) if (!(EXPRESSION)) return false
-  ::google::protobuf::uint32 tag;
-  while ((tag = input->ReadTag()) != 0) {
-    switch (::google::protobuf::internal::WireFormatLite::GetTagFieldNumber(tag)) {
-      // optional .std_frame std_frame = 1;
-      case 1: {
-        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
-            ::google::protobuf::internal::WireFormatLite::WIRETYPE_LENGTH_DELIMITED) {
-          DO_(::google::protobuf::internal::WireFormatLite::ReadMessageNoVirtual(
-               input, mutable_std_frame()));
-        } else {
-          goto handle_uninterpreted;
-        }
-        if (input->ExpectTag(18)) goto parse_syscall_frame;
-        break;
-      }
-      
-      // optional .syscall_frame syscall_frame = 2;
-      case 2: {
-        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
-            ::google::protobuf::internal::WireFormatLite::WIRETYPE_LENGTH_DELIMITED) {
-         parse_syscall_frame:
-          DO_(::google::protobuf::internal::WireFormatLite::ReadMessageNoVirtual(
-               input, mutable_syscall_frame()));
-        } else {
-          goto handle_uninterpreted;
-        }
-        if (input->ExpectTag(26)) goto parse_exception_frame;
-        break;
-      }
-      
-      // optional .exception_frame exception_frame = 3;
-      case 3: {
-        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
-            ::google::protobuf::internal::WireFormatLite::WIRETYPE_LENGTH_DELIMITED) {
-         parse_exception_frame:
-          DO_(::google::protobuf::internal::WireFormatLite::ReadMessageNoVirtual(
-               input, mutable_exception_frame()));
-        } else {
-          goto handle_uninterpreted;
-        }
-        if (input->ExpectTag(34)) goto parse_taint_intro_frame;
-        break;
-      }
-      
-      // optional .taint_intro_frame taint_intro_frame = 4;
-      case 4: {
-        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
-            ::google::protobuf::internal::WireFormatLite::WIRETYPE_LENGTH_DELIMITED) {
-         parse_taint_intro_frame:
-          DO_(::google::protobuf::internal::WireFormatLite::ReadMessageNoVirtual(
-               input, mutable_taint_intro_frame()));
-        } else {
-          goto handle_uninterpreted;
-        }
-        if (input->ExpectTag(42)) goto parse_modload_frame;
-        break;
-      }
-      
-      // optional .modload_frame modload_frame = 5;
-      case 5: {
-        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
-            ::google::protobuf::internal::WireFormatLite::WIRETYPE_LENGTH_DELIMITED) {
-         parse_modload_frame:
-          DO_(::google::protobuf::internal::WireFormatLite::ReadMessageNoVirtual(
-               input, mutable_modload_frame()));
-        } else {
-          goto handle_uninterpreted;
-        }
-        if (input->ExpectTag(50)) goto parse_key_frame;
-        break;
-      }
-      
-      // optional .key_frame key_frame = 6;
-      case 6: {
-        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
-            ::google::protobuf::internal::WireFormatLite::WIRETYPE_LENGTH_DELIMITED) {
-         parse_key_frame:
-          DO_(::google::protobuf::internal::WireFormatLite::ReadMessageNoVirtual(
-               input, mutable_key_frame()));
-        } else {
-          goto handle_uninterpreted;
-        }
-        if (input->ExpectAtEnd()) return true;
-        break;
-      }
-      
-      default: {
-      handle_uninterpreted:
-        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
-            ::google::protobuf::internal::WireFormatLite::WIRETYPE_END_GROUP) {
-          return true;
-        }
-        DO_(::google::protobuf::internal::WireFormat::SkipField(
-              input, tag, mutable_unknown_fields()));
-        break;
-      }
-    }
-  }
-  return true;
-#undef DO_
-}
-
-void frame::SerializeWithCachedSizes(
-    ::google::protobuf::io::CodedOutputStream* output) const {
-  // optional .std_frame std_frame = 1;
-  if (has_std_frame()) {
-    ::google::protobuf::internal::WireFormatLite::WriteMessageMaybeToArray(
-      1, this->std_frame(), output);
-  }
-  
-  // optional .syscall_frame syscall_frame = 2;
-  if (has_syscall_frame()) {
-    ::google::protobuf::internal::WireFormatLite::WriteMessageMaybeToArray(
-      2, this->syscall_frame(), output);
-  }
-  
-  // optional .exception_frame exception_frame = 3;
-  if (has_exception_frame()) {
-    ::google::protobuf::internal::WireFormatLite::WriteMessageMaybeToArray(
-      3, this->exception_frame(), output);
-  }
-  
-  // optional .taint_intro_frame taint_intro_frame = 4;
-  if (has_taint_intro_frame()) {
-    ::google::protobuf::internal::WireFormatLite::WriteMessageMaybeToArray(
-      4, this->taint_intro_frame(), output);
-  }
-  
-  // optional .modload_frame modload_frame = 5;
-  if (has_modload_frame()) {
-    ::google::protobuf::internal::WireFormatLite::WriteMessageMaybeToArray(
-      5, this->modload_frame(), output);
-  }
-  
-  // optional .key_frame key_frame = 6;
-  if (has_key_frame()) {
-    ::google::protobuf::internal::WireFormatLite::WriteMessageMaybeToArray(
-      6, this->key_frame(), output);
-  }
-  
-  if (!unknown_fields().empty()) {
-    ::google::protobuf::internal::WireFormat::SerializeUnknownFields(
-        unknown_fields(), output);
-  }
-}
-
-::google::protobuf::uint8* frame::SerializeWithCachedSizesToArray(
-    ::google::protobuf::uint8* target) const {
-  // optional .std_frame std_frame = 1;
-  if (has_std_frame()) {
-    target = ::google::protobuf::internal::WireFormatLite::
-      WriteMessageNoVirtualToArray(
-        1, this->std_frame(), target);
-  }
-  
-  // optional .syscall_frame syscall_frame = 2;
-  if (has_syscall_frame()) {
-    target = ::google::protobuf::internal::WireFormatLite::
-      WriteMessageNoVirtualToArray(
-        2, this->syscall_frame(), target);
-  }
-  
-  // optional .exception_frame exception_frame = 3;
-  if (has_exception_frame()) {
-    target = ::google::protobuf::internal::WireFormatLite::
-      WriteMessageNoVirtualToArray(
-        3, this->exception_frame(), target);
-  }
-  
-  // optional .taint_intro_frame taint_intro_frame = 4;
-  if (has_taint_intro_frame()) {
-    target = ::google::protobuf::internal::WireFormatLite::
-      WriteMessageNoVirtualToArray(
-        4, this->taint_intro_frame(), target);
-  }
-  
-  // optional .modload_frame modload_frame = 5;
-  if (has_modload_frame()) {
-    target = ::google::protobuf::internal::WireFormatLite::
-      WriteMessageNoVirtualToArray(
-        5, this->modload_frame(), target);
-  }
-  
-  // optional .key_frame key_frame = 6;
-  if (has_key_frame()) {
-    target = ::google::protobuf::internal::WireFormatLite::
-      WriteMessageNoVirtualToArray(
-        6, this->key_frame(), target);
-  }
-  
-  if (!unknown_fields().empty()) {
-    target = ::google::protobuf::internal::WireFormat::SerializeUnknownFieldsToArray(
-        unknown_fields(), target);
-  }
-  return target;
-}
-
-int frame::ByteSize() const {
-  int total_size = 0;
-  
-  if (_has_bits_[0 / 32] & (0xffu << (0 % 32))) {
-    // optional .std_frame std_frame = 1;
-    if (has_std_frame()) {
-      total_size += 1 +
-        ::google::protobuf::internal::WireFormatLite::MessageSizeNoVirtual(
-          this->std_frame());
-    }
-    
-    // optional .syscall_frame syscall_frame = 2;
-    if (has_syscall_frame()) {
-      total_size += 1 +
-        ::google::protobuf::internal::WireFormatLite::MessageSizeNoVirtual(
-          this->syscall_frame());
-    }
-    
-    // optional .exception_frame exception_frame = 3;
-    if (has_exception_frame()) {
-      total_size += 1 +
-        ::google::protobuf::internal::WireFormatLite::MessageSizeNoVirtual(
-          this->exception_frame());
-    }
-    
-    // optional .taint_intro_frame taint_intro_frame = 4;
-    if (has_taint_intro_frame()) {
-      total_size += 1 +
-        ::google::protobuf::internal::WireFormatLite::MessageSizeNoVirtual(
-          this->taint_intro_frame());
-    }
-    
-    // optional .modload_frame modload_frame = 5;
-    if (has_modload_frame()) {
-      total_size += 1 +
-        ::google::protobuf::internal::WireFormatLite::MessageSizeNoVirtual(
-          this->modload_frame());
-    }
-    
-    // optional .key_frame key_frame = 6;
-    if (has_key_frame()) {
-      total_size += 1 +
-        ::google::protobuf::internal::WireFormatLite::MessageSizeNoVirtual(
-          this->key_frame());
-    }
-    
-  }
-  if (!unknown_fields().empty()) {
-    total_size +=
-      ::google::protobuf::internal::WireFormat::ComputeUnknownFieldsSize(
-        unknown_fields());
-  }
-  GOOGLE_SAFE_CONCURRENT_WRITES_BEGIN();
-  _cached_size_ = total_size;
-  GOOGLE_SAFE_CONCURRENT_WRITES_END();
-  return total_size;
-}
-
-void frame::MergeFrom(const ::google::protobuf::Message& from) {
-  GOOGLE_CHECK_NE(&from, this);
-  const frame* source =
-    ::google::protobuf::internal::dynamic_cast_if_available<const frame*>(
-      &from);
-  if (source == NULL) {
-    ::google::protobuf::internal::ReflectionOps::Merge(from, this);
-  } else {
-    MergeFrom(*source);
-  }
-}
-
-void frame::MergeFrom(const frame& from) {
-  GOOGLE_CHECK_NE(&from, this);
-  if (from._has_bits_[0 / 32] & (0xffu << (0 % 32))) {
-    if (from.has_std_frame()) {
-      mutable_std_frame()->::std_frame::MergeFrom(from.std_frame());
-    }
-    if (from.has_syscall_frame()) {
-      mutable_syscall_frame()->::syscall_frame::MergeFrom(from.syscall_frame());
-    }
-    if (from.has_exception_frame()) {
-      mutable_exception_frame()->::exception_frame::MergeFrom(from.exception_frame());
-    }
-    if (from.has_taint_intro_frame()) {
-      mutable_taint_intro_frame()->::taint_intro_frame::MergeFrom(from.taint_intro_frame());
-    }
-    if (from.has_modload_frame()) {
-      mutable_modload_frame()->::modload_frame::MergeFrom(from.modload_frame());
-    }
-    if (from.has_key_frame()) {
-      mutable_key_frame()->::key_frame::MergeFrom(from.key_frame());
-    }
-  }
-  mutable_unknown_fields()->MergeFrom(from.unknown_fields());
-}
-
-void frame::CopyFrom(const ::google::protobuf::Message& from) {
-  if (&from == this) return;
-  Clear();
-  MergeFrom(from);
-}
-
-void frame::CopyFrom(const frame& from) {
-  if (&from == this) return;
-  Clear();
-  MergeFrom(from);
-}
-
-bool frame::IsInitialized() const {
-  
-  if (has_std_frame()) {
-    if (!this->std_frame().IsInitialized()) return false;
-  }
-  if (has_syscall_frame()) {
-    if (!this->syscall_frame().IsInitialized()) return false;
-  }
-  if (has_exception_frame()) {
-    if (!this->exception_frame().IsInitialized()) return false;
-  }
-  if (has_taint_intro_frame()) {
-    if (!this->taint_intro_frame().IsInitialized()) return false;
-  }
-  if (has_modload_frame()) {
-    if (!this->modload_frame().IsInitialized()) return false;
-  }
-  if (has_key_frame()) {
-    if (!this->key_frame().IsInitialized()) return false;
-  }
-  return true;
-}
-
-void frame::Swap(frame* other) {
-  if (other != this) {
-    std::swap(std_frame_, other->std_frame_);
-    std::swap(syscall_frame_, other->syscall_frame_);
-    std::swap(exception_frame_, other->exception_frame_);
-    std::swap(taint_intro_frame_, other->taint_intro_frame_);
-    std::swap(modload_frame_, other->modload_frame_);
-    std::swap(key_frame_, other->key_frame_);
-    std::swap(_has_bits_[0], other->_has_bits_[0]);
-    _unknown_fields_.Swap(&other->_unknown_fields_);
-    std::swap(_cached_size_, other->_cached_size_);
-  }
-}
-
-::google::protobuf::Metadata frame::GetMetadata() const {
-  protobuf_AssignDescriptorsOnce();
-  ::google::protobuf::Metadata metadata;
-  metadata.descriptor = frame_descriptor_;
-  metadata.reflection = frame_reflection_;
   return metadata;
 }
 
