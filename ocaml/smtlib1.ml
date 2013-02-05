@@ -6,7 +6,7 @@ open Big_int_Z
 open Big_int_convenience
 open Typecheck
 
-module D = Debug.Make(struct let name = "smtlib1" and default=`Debug end)
+module D = Debug.Make(struct let name = "Smtlib1" and default=`NoDebug end)
 open D
 
 exception No_rule
@@ -56,22 +56,15 @@ class pp ?suffix:(s="") ft =
   in
 
   let opflatten e =
-    let rec oh bop e1 e2 =
-      let l1 = match e1 with
-	| BinOp(bop', e'1, e'2) when bop' = bop ->
-	    oh bop e'1 e'2
-	| _ -> [e1]
-      in
-      let l2 = match e2 with
-	| BinOp(bop', e'1, e'2) when bop' = bop ->
-	    oh bop e'1 e'2
-	| _ -> [e2]
-      in
-      BatList.append l1 l2
+    let rec oh bop e acc =
+      match e with
+      | BinOp(bop', e'1, e'2) when bop' = bop ->
+	oh bop e'1 (oh bop e'2 acc)
+      | _ -> e::acc
     in
     match e with
     | BinOp(bop, e1, e2) ->
-	oh bop e1 e2
+	oh bop e []
     | _ -> failwith "opflatten expects a binop"
   in
 
@@ -231,15 +224,13 @@ object (self)
       to print e as a bitvector (e.g., it should be printed as a
       boolean). *)
   method ast_exp_base e =
-    (* open lazily *)
-    (* let t = Typecheck.infer_ast e in *)
     let lazye = 
       (match e with
      | Int((i, Reg t) as p) ->
 	 let maskedval = Arithmetic.to_big_int p in
 	 (* pp "bv"; printf "%Lu" maskedval; pp "["; pi t; pp "]"; *)
 	 lazy(
-           pp "bv"; printf "%s" (string_of_big_int maskedval); pp "["; pi t; pp "]"
+           pp "bv"; pp (string_of_big_int maskedval); pp "["; pi t; pp "]"
          )
      | Int _ -> failwith "Ints may only have register types"
      | Var v ->
@@ -619,64 +610,76 @@ object (self)
        )
      (* Z3 does not treat xor as associative; they said they would
 	fix this on 3/28/2011. *)
-     | BinOp(XOR as bop, e1, e2) ->
-	 let t = infer_ast ~check:false e1 in
-	 let t' = infer_ast ~check:false e2 in
-    	 if t <> t' then
-    	   wprintf "Type mismatch: %s" (Pp.ast_exp_to_string e);
-    	 assert (t = t') ;
-    	 let fname = match bop with
-    	   | XOR -> "xor"
-	   | _ -> assert false
-    	 in
-	 lazy(
-	   pc '(';
-	   pp fname;
-	   space ();
-	   self#ast_exp_bool e1;
-	   space ();
-	   self#ast_exp_bool e2;
-	   cut ();
-	   pc ')'
-	 )
-     | BinOp((AND|OR(*|XOR*)) as bop, e1, e2) ->
-    	 let t = infer_ast ~check:false e1 in
-    	 let t' = infer_ast ~check:false e2 in
-    	 if t <> t' then
-    	   wprintf "Type mismatch: %s" (Pp.ast_exp_to_string e);
-    	 assert (t = t') ;
-    	 let fname = match bop with
-    	   | AND -> "and"
-    	   | OR -> "or"
-    	   | XOR -> "xor"
-	   | _ -> assert false
-    	 in
-	 let oplist = opflatten e in
-	 lazy(
-    	   pc '('; pp fname; 
-	   List.iter
-	     (fun e -> space (); self#ast_exp_bool e) oplist;
-	   pc ')';
-	 )
-     | Cast((CAST_LOW|CAST_HIGH|CAST_UNSIGNED|CAST_SIGNED),t, e1) ->
-     	  let t1 = infer_ast ~check:false e1 in
-     	  let (bitsnew, bitsold) = (bits_of_width t, bits_of_width t1) in
-     	  let delta = bitsnew - bitsold in
-     	  if delta = 0 
-	  then 
-	    lazy(self#ast_exp_bool e1) 
-	  else 
-	    (* (\* XXX: WTF? *\) *)
-	    (* let pe = self#bv_to_bool e in  *)
-	    (* lazy(Lazy.force pe) *)
-	    raise No_rule
-     | Var v ->
-	 let name,st = VH.find ctx v in
-	 (match st with
-	 | BitVec -> raise No_rule
-	 | Bool -> lazy(pp name)) 
-     | Let(v, e1, e2) -> self#letme v e1 e2 Bool
-     | _ -> raise No_rule
+      | BinOp(XOR as bop, e1, e2) ->
+	let t = infer_ast ~check:false e1 in
+	let t' = infer_ast ~check:false e2 in
+    	if t <> t' then
+    	  wprintf "Type mismatch: %s" (Pp.ast_exp_to_string e);
+    	assert (t = t') ;
+    	let fname = match bop with
+    	  | XOR -> "xor"
+	  | _ -> assert false
+    	in
+	lazy(
+	  pc '(';
+	  pp fname;
+	  space ();
+	  self#ast_exp_bool e1;
+	  space ();
+	  self#ast_exp_bool e2;
+	  cut ();
+	  pc ')'
+	)
+     | BinOp(OR, _, _) when parse_implies e <> None ->
+     	 let e1, e2 = match parse_implies e with
+     	   | Some(e1, e2) -> e1, e2
+     	   | None -> assert false
+     	 in
+         let pe1, pe2 = lazy (self#ast_exp_bool e1), lazy (self#ast_exp_bool e2) in
+         lazy(
+     	   pp "(implies";
+     	   space ();
+           Lazy.force pe1;
+     	   space ();
+           Lazy.force pe2;
+     	   cut ();
+     	   pc ')';
+         )
+      | BinOp((AND|OR(*|XOR*)) as bop, e1, e2) ->
+    	let t = infer_ast ~check:false e1 in
+    	let t' = infer_ast ~check:false e2 in
+    	if t <> t' then
+    	  wprintf "Type mismatch: %s" (Pp.ast_exp_to_string e);
+    	assert (t = t') ;
+    	let fname = match bop with
+    	  | AND -> "and"
+    	  | OR -> "or"
+    	  | XOR -> "xor"
+	  | _ -> assert false
+    	in
+	let oplist = opflatten e in
+	lazy(
+    	  pc '('; pp fname; 
+	  List.iter
+	    (fun e -> space (); self#ast_exp_bool e) oplist;
+	  pc ')';
+	)
+      | Cast((CAST_LOW|CAST_HIGH|CAST_UNSIGNED|CAST_SIGNED),t, e1) ->
+     	let t1 = infer_ast ~check:false e1 in
+     	let (bitsnew, bitsold) = (bits_of_width t, bits_of_width t1) in
+     	let delta = bitsnew - bitsold in
+     	if delta = 0 
+	then 
+	  lazy(self#ast_exp_bool e1) 
+	else 
+	  raise No_rule
+      | Var v ->
+	let name,st = VH.find ctx v in
+	(match st with
+	| BitVec -> raise No_rule
+	| Bool -> lazy(pp name))
+      | Let(v, e1, e2) -> self#letme v e1 e2 Bool
+      | _ -> raise No_rule
       ) in
     lazy (opn 0; Lazy.force lazye; cut (); cls ())
 
@@ -790,15 +793,15 @@ object (self)
   (*   pc ')'; *)
   (*   cls() *)
 
-  method assert_ast_exp_with_foralls ?(fvars=true) foralls e =
+  method assert_ast_exp ?(exists=[]) ?(foralls=[]) e =
     self#open_benchmark e;
-    if fvars then (
-      self#declare_new_freevars e;
-      force_newline();
-    );
+    pdebug "declaring new free variables... ";
+    self#declare_new_freevars e;
+    force_newline();
     opn 1;
     pp ":assumption";
     space();
+    self#exists exists;
     self#forall foralls;
     self#ast_exp_bool e;
     cut();
@@ -806,9 +809,6 @@ object (self)
     force_newline ();
     self#formula ();
     self#close_benchmark ()
-
-  method assert_ast_exp e =
-    self#assert_ast_exp_with_foralls [] e
 
   (** Is e a valid expression (always true)? *)
   method valid_ast_exp ?(exists=[]) ?(foralls=[]) e =
