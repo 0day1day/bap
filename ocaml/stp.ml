@@ -316,14 +316,13 @@ object (self)
     pp ");";
     cls()
 
-  method assert_ast_exp_with_foralls ?(fvars=true) foralls e =
+  method assert_ast_exp ?(exists=[]) ?(foralls=[]) e =
     opn 0;
-    if fvars then (
-      self#declare_new_freevars e;
-      force_newline();
-    );
+    self#declare_new_freevars e;
+    force_newline();
     pp "ASSERT(";
     space();
+    self#exists exists;
     self#forall foralls;
     pp "0bin1 =";
     force_newline();
@@ -349,9 +348,6 @@ object (self)
     force_newline();
     pp ");";
     cls();    
-
-  method assert_ast_exp e =
-    self#assert_ast_exp_with_foralls [] e
 
   method counterexample =
     force_newline();

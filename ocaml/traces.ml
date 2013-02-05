@@ -790,7 +790,20 @@ let print_block =
 
 let trace_length trace =
   print "Trace length: %d\n" (List.length trace)
-  
+
+let print_formula file formula =
+  let oc = open_out file in
+  let mem_hash = Memory2array.create_state () in
+  let formula = Memory2array.coerce_exp_state mem_hash formula in
+  let p = match !printer with
+    | "stp" -> ((new Stp.pp_oc oc) :> Formulap.fpp_oc)
+    | "smtlib1" -> ((new Smtlib1.pp_oc oc) :> Formulap.fpp_oc)
+    | _ -> failwith "Unknown printer"
+  in
+  (* let p = new Smtlib1.pp_oc oc in *)
+  let () = p#assert_ast_exp formula in
+  let () = p#counterexample in
+    p#close
 
 module Status = Util.StatusPrinter
 

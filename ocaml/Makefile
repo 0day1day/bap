@@ -51,6 +51,7 @@ export SOURCES = \
 	cfg.mli cfg.ml \
 	ast_visitor.mli ast_visitor.ml \
 	ssa_visitor.mli ssa_visitor.ml \
+	ast_mapper.mli ast_mapper.ml \
 	grammar_scope.ml \
 	memory2array.mli memory2array.ml \
 	flatten_mem.mli flatten_mem.ml \
@@ -77,7 +78,6 @@ export SOURCES = \
 	$(LLVM_SRC) \
 	syscall_models.ml \
 	gcl.mli gcl.ml \
-	ugcl.ml \
 	wp.mli wp.ml \
 	stp_grammar.mly stp_lexer.mll \
 	cvc3_grammar.mly cvc3_lexer.mll \
@@ -91,6 +91,7 @@ export SOURCES = \
 	grammar_private_scope.ml \
 	grammar.mly lexer.mll \
 	parser.ml \
+	tunegc.mli tunegc.ml \
 	input.mli input.ml \
 	to_c.ml \
 	vsa.ml \
@@ -98,7 +99,9 @@ export SOURCES = \
 	hacks.ml \
 	coalesce.mli coalesce.ml \
 	structural_analysis.ml \
+	steensgard.mli steensgard.ml \
 	unroll.mli unroll.ml \
+	fwp.mli fwp.ml \
 	ast_slice.ml \
 	ssa_slice.ml \
 	traces.ml \

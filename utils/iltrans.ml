@@ -411,6 +411,8 @@ let speclist =
       "Ensure all labels are unique")
   :: ("-replace-unknowns", uadd(TransformAst Hacks.replace_unknowns),
       "Replace all unknowns with zeros")
+  :: ("-bberror-assume-false", uadd(TransformAstCfg Hacks.bberror_assume_false),
+      "Add an \"assume false\" statement to BB_Error and add an edge to BB_Exit")
   :: ("-flatten-mem", uadd(TransformAst Flatten_mem.flatten_mem_program),
       "Flatten memory accesses")
   :: ("-usedef", uadd(AnalysisAstCfg usedef),
@@ -419,6 +421,7 @@ let speclist =
       "Compute and print def use chains")
   :: Input.speclist
 
+let () = Tunegc.set_gc ()
 let anon x = raise(Arg.Bad("Unexpected argument: '"^x^"'"))
 let () = Arg.parse speclist anon usage
 

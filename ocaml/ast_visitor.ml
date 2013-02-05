@@ -135,6 +135,7 @@ and stmt_accept visitor =
     | Label (l,a) -> Label (label_accept visitor l, a)
     | Comment _ as s -> s
     | Assert(e,a) -> Assert(exp_accept visitor e, a)
+    | Assume(e,a) -> Assume(exp_accept visitor e, a)
     | Halt(e,a) -> Halt(exp_accept visitor e, a)
     | Special _ as s -> s
   in

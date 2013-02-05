@@ -9,7 +9,7 @@ open Ast
 open Ast_convenience
 open Typecheck
 
-module D = Debug.Make(struct let name = "smtlib2" and default=`Debug end)
+module D = Debug.Make(struct let name = "Smtlib2" and default=`NoDebug end)
 open D
 
 exception No_rule
@@ -32,10 +32,8 @@ let use_booleans = ref true ;;
     is a 1-bit bap bitvector, it treats it as a bitvector in SMTLIB.
     ast_exp_bool_base only works on 1-bit bap bitvectors, and treats
     them as a boolean in SMTLIB.  Either function can raise the
-    No_rule exception, and should do so BEFORE PRINTING ANYTHING; this
-    is the whole purpose of using lazy evaluations.  When they work
-    normally, they return a lazy evaluation that if forced will print
-    the corresponding expression to the formatter.
+    No_rule exception.  When the check argument is set, the function
+    should raise No_rule before printing anything.
 
     ast_exp, ast_exp_bool, and ast_exp_bv are wrappers for the *_base
     functions.  They catch the No_rule exceptions, and send the request
@@ -59,22 +57,15 @@ class pp ?suffix:(s="") ft =
   in
 
   let opflatten e =
-    let rec oh bop e1 e2 =
-      let l1 = match e1 with
-	| BinOp(bop', e'1, e'2) when bop' = bop ->
-	    oh bop e'1 e'2
-	| _ -> [e1]
-      in
-      let l2 = match e2 with
-	| BinOp(bop', e'1, e'2) when bop' = bop ->
-	    oh bop e'1 e'2
-	| _ -> [e2]
-      in
-      BatList.append l1 l2
+    let rec oh bop e acc =
+      match e with
+      | BinOp(bop', e'1, e'2) when bop' = bop ->
+	oh bop e'1 (oh bop e'2 acc)
+      | _ -> e::acc
     in
     match e with
     | BinOp(bop, e1, e2) ->
-	oh bop e1 e2
+	oh bop e []
     | _ -> failwith "opflatten expects a binop"
   in
 
@@ -90,31 +81,34 @@ object (self)
   (* method print_assertion e = () *)
   (* method declare_new_free_vars (v : var list) = () *)
 
-  method bool_to_bv e =
-    let pe = self#ast_exp_bool_base e in
-    let ptrue = self#ast_exp_base exp_true in
-    let pfalse = self#ast_exp_base exp_false in
-    lazy(
+  method bool_to_bv ~check e =
+    if check then (
+      self#ast_exp_bool_base ~check e;
+      self#ast_exp_base ~check exp_true;
+      self#ast_exp_base ~check exp_false;
+      ()
+    ) else (
       pp "(ite";
       space ();
-      Lazy.force pe;
+      self#ast_exp_bool_base ~check e;
       space ();
-      Lazy.force ptrue;
+      self#ast_exp_base ~check exp_true;
       space ();
-      Lazy.force pfalse;
+      self#ast_exp_base ~check exp_false;
       cut ();
       pc ')'
     )
-
-  method bv_to_bool e =
-    let pe = self#ast_exp_base e in
-    let ptrue = self#ast_exp_base exp_true in
-    lazy(
+  method bv_to_bool ~check e =
+    if check then (
+      self#ast_exp_base ~check e;
+      self#ast_exp_base ~check exp_true;
+      ()
+    ) else (
       pp "(=";
       space ();
-      Lazy.force pe;
+      self#ast_exp_base ~check e;
       space ();
-      Lazy.force ptrue;
+      self#ast_exp_base ~check exp_true;
       cut ();
       pp ")"
     )
@@ -147,7 +141,7 @@ object (self)
     let t1 = Typecheck.infer_ast ~check:false e1 in
     let cmd,c,pf,vst=
       match t1,!use_booleans with
-        | Reg 1,true -> "flet","$",self#ast_exp_bool,Bool
+        | Reg 1,true -> "let","$",self#ast_exp_bool,Bool
         | _ -> "let","?",self#ast_exp,BitVec
     in
     (* The print functions called, ast_exp and ast_exp_bool never
@@ -205,7 +199,13 @@ object (self)
        
   method typ = function
     | Reg n ->	printf "(_ BitVec %d)" n
-    | Array(Reg idx, Reg elmt) -> printf "(Array %u %u)" idx elmt;
+    | Array((Reg idx as t1), (Reg elmt as t2)) ->
+      pp "(Array";
+      space ();
+      self#typ t1;
+      space ();
+      self#typ t2;
+      pc ')';
     | Array _ -> failwith "SMTLIB2 only supports Arrays with register indices and elements"
     | TMem _ ->	failwith "TMem unsupported by SMTLIB2"
 
@@ -218,7 +218,7 @@ object (self)
 
   method declare_new_free_var = self#decl_no_print
 
-  method print_free_var (Var.V(_,_,t) as v) =     
+  method print_free_var (Var.V(_,_,t) as v) =
     pp ":extrafuns (("; 
     self#var v; 
     space (); 
@@ -230,24 +230,27 @@ object (self)
     self#decl_no_print v;
     self#print_free_var v
 
+  (* Wrapper around a ~check functions to ensure the function does not
+     raise No_rule before calling it. *)
+  method tryit f e =
+    f ~check:true e;
+
+    (* If we get here, f did not raise No_rule.  So it had better not
+       raise it if we turn off check. *)
+    try
+      f ~check:false e
+    with No_rule -> failwith (Printf.sprintf "tryit: check is broken: %s" (Pp.ast_exp_to_string e))
+
   (** Prints the BAP expression e in SMTLIB format.  If e is a
       1-bit bitvector in BAP, then e is printed as a SMTLIB 1-bit
       bitvector.  Raises the No_rule exception if it is not possible
       to print e as a bitvector (e.g., it should be printed as a
       boolean). *)
-  method ast_exp_base e =
-    (* open lazily *)
-    (* let t = Typecheck.infer_ast e in *)
+  method ast_exp_base ~check e =
     let lazye = 
       (match e with
      | Int((i, Reg t) as p) ->
-	 let maskedval = 
-	   (try
-	      Arithmetic.to_big_int p
-	    with
-	      Arithmetic.ArithmeticEx _ -> 
-		if t >= 64 then i else failwith "Unable to set high bits to zero")	   
-	    in
+	 let maskedval = Arithmetic.to_big_int p in
 	 lazy (
 	   pp "(_ bv"; pp (string_of_big_int maskedval); space (); pi t; pc ')'
 	 )
@@ -396,9 +399,9 @@ object (self)
 	    | _ when bitsnew = bitsold -> ("","")
 	    | CAST_LOW      -> ("((_ extract "^string_of_int(bitsnew-1)^" 0)", ")")
 	    | CAST_HIGH     -> ("((_ extract "^string_of_int(bitsold-1)^" "^string_of_int(bitsold-bitsnew)^")", ")")
-	    | CAST_UNSIGNED -> ("(zero_extend["^string_of_int(delta)^"]", ")")
+	    | CAST_UNSIGNED -> ("((_ zero_extend "^string_of_int(delta)^")", ")")
 	    (* | CAST_UNSIGNED -> ("(concat bv0["^string_of_int(delta)^"] ", ")") *)
-	    | CAST_SIGNED -> ("(sign_extend["^string_of_int(delta)^"]", ")")
+	    | CAST_SIGNED -> ("((_ sign_extend "^string_of_int(delta)^")", ")")
 	  in
 	  let pe1 = lazy (self#ast_exp_bv e1) in
 	  lazy(
@@ -464,222 +467,231 @@ object (self)
       | _ -> raise No_rule
       )
     in
-    lazy (opn 0; Lazy.force lazye; cut (); cls())
-
+    if not check then (
+      opn 0; Lazy.force lazye; cut (); cls()
+    )
   (** Evaluate an expression to a bitvector, preferring bools instead
       of 1-bit bvs. *)
   method ast_exp e =
     if not !use_booleans then self#ast_exp_bv e
     else (
       let t = Typecheck.infer_ast ~check:false e in
-      if t = Reg(1) then
-	try
-	  (* ML is call by value, so the argument will be fully
-	     evaluated to a lazy evaluation.  If this suceeds without a
-	     No_rule exception, THEN the lazy evaluation will occur,
-	     causing the formatter to print.
-	     
-	     E.g., Lazy.force e is the same as let lazye = e in Lazy.force lazye.
-	  *)
-	  Lazy.force (self#bool_to_bv e)
-	with No_rule ->
-	  Lazy.force (self#ast_exp_base e)
-      else
-	Lazy.force (self#ast_exp_base e))
+      if t = Reg(1) then (
+        try
+          self#tryit self#bool_to_bv e
+        with No_rule ->
+          self#ast_exp_base ~check:false e
+      ) else
+	self#ast_exp_base ~check:false e)
 
   (** Evaluates an expression to a bitvector, preferring
       bitvectors over booleans. *)
   method ast_exp_bv e =
     try
-      Lazy.force (self#ast_exp_base e)
+      self#tryit self#ast_exp_base e
     with No_rule ->
-      Lazy.force (self#bool_to_bv e)
-      
+      self#bool_to_bv ~check:false e
   method print_assertion = self#ast_exp_bool
 
   (** Try to evaluate an expression to a boolean. If no good rule
       exists, then raises the No_rule exception. *)
-  method ast_exp_bool_base e =
-    let t = Typecheck.infer_ast ~check:false e in
-    assert (t = Reg(1));
-    let lazye = 
+  method ast_exp_bool_base ~check e =
+    if debug () then (
+      let t = Typecheck.infer_ast ~check:false e in
+      assert (t = Reg(1)));
+    let lazye =
       (match e with
-     | Int((i, Reg t) as p) when t = 1 ->
-	 let maskedval = Arithmetic.to_big_int p in
-	 (match maskedval with
-	  | bi when bi_is_zero bi -> lazy(pp "false")
-	  | bi when bi_is_one bi -> lazy(pp "true")
-	  | _ -> failwith "ast_exp_bool")
-     | Int((i, Reg t)) -> failwith "ast_exp_bool only takes reg_1 expressions"
-     | Int _ -> failwith "Ints may only have register types"
-     | Ite(cond, e1, e2) ->
-	 lazy(
-	   pp "(if_then_else";
-	   space ();
-	   self#ast_exp_bool cond;
-	   space ();
-	   self#ast_exp_bool e1;
-	   space ();
-	   self#ast_exp_bool e2;
-	   cut ();
-	   pc ')'
-	 )
-     | UnOp((NEG|NOT), o) ->
+      | Int((i, Reg t) as p) when t = 1 ->
+	let maskedval = Arithmetic.to_big_int p in
+	(match maskedval with
+	| bi when bi_is_zero bi -> lazy(pp "false")
+	| bi when bi_is_one bi -> lazy(pp "true")
+	| _ -> failwith "ast_exp_bool")
+      | Int((i, Reg t)) -> failwith "ast_exp_bool only takes reg_1 expressions"
+      | Int _ -> failwith "Ints may only have register types"
+      | Ite(cond, e1, e2) ->
+	lazy(
+	  pp "(if_then_else";
+	  space ();
+	  self#ast_exp_bool cond;
+	  space ();
+	  self#ast_exp_bool e1;
+	  space ();
+	  self#ast_exp_bool e2;
+	  cut ();
+	  pc ')'
+	)
+      | UnOp((NEG|NOT), o) ->
 	 (* neg and not are the same for one bit! *)
-	 lazy(
-	   pp "(not";
-	   space ();
-	   self#ast_exp_bool o;
-	   cut ();
-	   pc ')'
-	 )
-     | BinOp(NEQ, e1, e2) ->
-	 (* Rewrite NEQ in terms of EQ *)
-       let newe = UnOp(NOT, BinOp(EQ, e1, e2)) in
-       lazy(
-	 self#ast_exp_bool newe
-       )
-     | BinOp((OR|AND), _, _) when parse_ite e <> None ->
-     	 let b, e1, e2 = match parse_ite e with
-     	   | Some(b, e1, e2) -> b, e1, e2
-     	   | None -> assert false
-     	 in
-	 lazy(
-     	   pp "(if_then_else";
-     	   space ();
-     	   self#ast_exp_bool b;
-     	   space ();
-     	   self#ast_exp_bool e1;
-     	   space ();
-     	   self#ast_exp_bool e2;
-     	   cut ();
-     	   pc ')';
-	 )
+	lazy(
+	  pp "(not";
+	  space ();
+	  self#ast_exp_bool o;
+	  cut ();
+	  pc ')'
+	)
+      | BinOp(NEQ, e1, e2) ->
+       (* Rewrite NEQ in terms of EQ *)
+        let newe = UnOp(NOT, BinOp(EQ, e1, e2)) in
+        lazy(
+	  self#ast_exp_bool newe
+        )
+      | BinOp((OR|AND), _, _) when parse_ite e <> None ->
+     	let b, e1, e2 = match parse_ite e with
+     	  | Some(b, e1, e2) -> b, e1, e2
+     	  | None -> assert false
+     	in
+	lazy(
+     	  pp "(if_then_else";
+     	  space ();
+     	  self#ast_exp_bool b;
+     	  space ();
+     	  self#ast_exp_bool e1;
+     	  space ();
+     	  self#ast_exp_bool e2;
+     	  cut ();
+     	  pc ')';
+	)
      (* Short cuts for e = exp_true and e = exp_false *)
-     | BinOp(EQ, e1, e2) when full_exp_eq e1 (Int(bi1, Reg(1))) ->
-     	 lazy(self#ast_exp_bool e2)
-     | BinOp(EQ, e2, e1) when full_exp_eq e1 (Int(bi1, Reg(1))) ->
-     	 lazy(self#ast_exp_bool e2)
-     | BinOp(EQ, e1, e2) when full_exp_eq e1 (Int(bi0, Reg(1))) ->
-     	 lazy(self#ast_exp_bool (UnOp(NOT, e2)))
-     | BinOp(EQ, e2, e1) when full_exp_eq e1 (Int(bi0, Reg(1))) ->
-     	 lazy(self#ast_exp_bool (UnOp(NOT, e2)))
-     | BinOp(EQ, e1, e2) ->
+      | BinOp(EQ, e1, e2) when full_exp_eq e1 (Int(bi1, Reg(1))) ->
+     	lazy(self#ast_exp_bool e2)
+      | BinOp(EQ, e2, e1) when full_exp_eq e1 (Int(bi1, Reg(1))) ->
+     	lazy(self#ast_exp_bool e2)
+      | BinOp(EQ, e1, e2) when full_exp_eq e1 (Int(bi0, Reg(1))) ->
+     	lazy(self#ast_exp_bool (UnOp(NOT, e2)))
+      | BinOp(EQ, e2, e1) when full_exp_eq e1 (Int(bi0, Reg(1))) ->
+     	lazy(self#ast_exp_bool (UnOp(NOT, e2)))
+      | BinOp(EQ, e1, e2) ->
        (* These are predicates, which return boolean values. *)
-       let t1 = Typecheck.infer_ast ~check:false e1 in
-       let t2 = Typecheck.infer_ast ~check:false e2 in
-       assert (t1 = t2);
-       let f,pe1,pe2 = 
+        let t1 = Typecheck.infer_ast ~check:false e1 in
+        let t2 = Typecheck.infer_ast ~check:false e2 in
+        assert (t1 = t2);
+        let sym, f =
 	 (* If we can print as bool, we can use iff.  Otherwise, we
 	    can use =. *)
-	 if t1 = Reg(1) then (
-	   try
-	     "iff", self#ast_exp_bool_base e1, self#ast_exp_bool_base e2
-	   with No_rule ->
-	     (try
-		 "=", self#ast_exp_base e1, self#ast_exp_base e2
-	       with No_rule ->
-	     (* We have one bool, and one bv.  We'll have to use a
-		conversion. *)
-		 "iff", lazy (self#ast_exp_bool e1), lazy (self#ast_exp_bool e2))	     
-	 )
-	 else
-	   "=", lazy (self#ast_exp_bv e1), lazy (self#ast_exp_bv e2)
-       in
-       lazy(
-	 pp "(";
-	 pp f;
-	 space ();
-	 Lazy.force pe1;
-	 space ();
-	 Lazy.force pe2;
-	 pp ")";
-	 cut ();
-       )
-     | BinOp((LT|LE|SLT|SLE) as op, e1, e2) ->
+	  if t1 = Reg(1) then (
+            try
+              self#ast_exp_bool_base ~check:true e1;
+              self#ast_exp_bool_base ~check:true e2;
+              "=", self#ast_exp_bool_base ~check:false
+            with No_rule ->
+              (try
+                 self#ast_exp_base ~check:true e1;
+                 self#ast_exp_base ~check:true e2;
+                 "=", self#ast_exp_base ~check:false
+               with No_rule ->
+                 "=", self#ast_exp_bool)
+          ) else
+	    "=", self#ast_exp_bv
+        in
+        lazy(
+	  pp "(";
+	  pp sym;
+	  space ();
+	  f e1;
+	  space ();
+	  f e2;
+	  pp ")";
+	  cut ();
+        )
+      | BinOp((LT|LE|SLT|SLE) as op, e1, e2) ->
        (* These are predicates, which return boolean values. *)
-       let t1 = Typecheck.infer_ast ~check:false e1 in
-       let t2 = Typecheck.infer_ast ~check:false e2 in
-       assert (t1 = t2);
-       let f,pf = match op with
-	 | LT -> "bvult", self#ast_exp
-	 | LE -> "bvule", self#ast_exp
-	 | SLT -> "bvslt", self#ast_exp
-	 | SLE -> "bvsle", self#ast_exp
-	 | _ -> assert false
-       in
-       lazy(
-	 pp "(";
-	 pp f;
-	 space ();
-	 pf e1;
-	 space ();
-	 pf e2;
-	 pp ")";
-	 cut ();
-       )
+        let t1 = Typecheck.infer_ast ~check:false e1 in
+        let t2 = Typecheck.infer_ast ~check:false e2 in
+        assert (t1 = t2);
+        let f,pf = match op with
+	  | LT -> "bvult", self#ast_exp
+	  | LE -> "bvule", self#ast_exp
+	  | SLT -> "bvslt", self#ast_exp
+	  | SLE -> "bvsle", self#ast_exp
+	  | _ -> assert false
+        in
+        lazy(
+	  pp "(";
+	  pp f;
+	  space ();
+	  pf e1;
+	  space ();
+	  pf e2;
+	  pp ")";
+	  cut ();
+        )
      (* Z3 does not treat xor as associative; they said they would
 	fix this on 3/28/2011. *)
-     | BinOp(XOR as bop, e1, e2) ->
-	 let t = infer_ast ~check:false e1 in
-	 let t' = infer_ast ~check:false e2 in
-    	 if t <> t' then
-    	   wprintf "Type mismatch: %s" (Pp.ast_exp_to_string e);
-    	 assert (t = t') ;
-    	 let fname = match bop with
-    	   | XOR -> "xor"
-	   | _ -> assert false
-    	 in
-	 lazy(
-	   pc '(';
-	   pp fname;
-	   space ();
-	   self#ast_exp_bool e1;
-	   space ();
-	   self#ast_exp_bool e2;
-	   cut ();
-	   pc ')'
-	 )
-     | BinOp((AND|OR(*|XOR*)) as bop, e1, e2) ->
-    	 let t = infer_ast ~check:false e1 in
-    	 let t' = infer_ast ~check:false e2 in
-    	 if t <> t' then
-    	   wprintf "Type mismatch: %s" (Pp.ast_exp_to_string e);
-    	 assert (t = t') ;
-    	 let fname = match bop with
-    	   | AND -> "and"
-    	   | OR -> "or"
-    	   | XOR -> "xor"
-	   | _ -> assert false
-    	 in
-	 let oplist = opflatten e in
-	 lazy(
-    	   pc '('; pp fname; 
-	   List.iter
-	     (fun e -> space (); self#ast_exp_bool e) oplist;
-	   pc ')';
-	 )
-     | Cast((CAST_LOW|CAST_HIGH|CAST_UNSIGNED|CAST_SIGNED),t, e1) ->
-     	  let t1 = infer_ast ~check:false e1 in
-     	  let (bitsnew, bitsold) = (bits_of_width t, bits_of_width t1) in
-     	  let delta = bitsnew - bitsold in
-     	  if delta = 0 
-	  then 
-	    lazy(self#ast_exp_bool e1) 
-	  else 
-	    (* (\* XXX: WTF? *\) *)
-	    (* let pe = self#bv_to_bool e in  *)
-	    (* lazy(Lazy.force pe) *)
-	    raise No_rule
-     | Var v ->
-	 let name,st = VH.find ctx v in
-	 (match st with
-	 | BitVec -> raise No_rule
-	 | Bool -> lazy(pp name)) 
-     | Let(v, e1, e2) -> self#letme v e1 e2 Bool
-     | _ -> raise No_rule
+      | BinOp(XOR as bop, e1, e2) ->
+	let t = infer_ast ~check:false e1 in
+	let t' = infer_ast ~check:false e2 in
+    	if t <> t' then
+    	  wprintf "Type mismatch: %s" (Pp.ast_exp_to_string e);
+    	assert (t = t') ;
+    	let fname = match bop with
+    	  | XOR -> "xor"
+	  | _ -> assert false
+    	in
+	lazy(
+	  pc '(';
+	  pp fname;
+	  space ();
+	  self#ast_exp_bool e1;
+	  space ();
+	  self#ast_exp_bool e2;
+	  cut ();
+	  pc ')'
+	)
+     | BinOp(OR, _, _) when parse_implies e <> None ->
+     	 let e1, e2 = match parse_implies e with
+     	   | Some(e1, e2) -> e1, e2
+     	   | None -> assert false
+     	 in
+         let pe1, pe2 = lazy (self#ast_exp_bool e1), lazy (self#ast_exp_bool e2) in
+         lazy(
+     	   pp "(=>";
+     	   space ();
+           Lazy.force pe1;
+     	   space ();
+           Lazy.force pe2;
+     	   cut ();
+     	   pc ')';
+         )
+      | BinOp((AND|OR(*|XOR*)) as bop, e1, e2) ->
+    	let t = infer_ast ~check:false e1 in
+    	let t' = infer_ast ~check:false e2 in
+    	if t <> t' then
+    	  wprintf "Type mismatch: %s" (Pp.ast_exp_to_string e);
+    	assert (t = t') ;
+    	let fname = match bop with
+    	  | AND -> "and"
+    	  | OR -> "or"
+    	  | XOR -> "xor"
+	  | _ -> assert false
+    	in
+	let oplist = opflatten e in
+	lazy(
+    	  pc '('; pp fname; 
+	  List.iter
+	    (fun e -> space (); self#ast_exp_bool e) oplist;
+	  pc ')';
+	)
+      | Cast((CAST_LOW|CAST_HIGH|CAST_UNSIGNED|CAST_SIGNED),t, e1) ->
+     	let t1 = infer_ast ~check:false e1 in
+     	let (bitsnew, bitsold) = (bits_of_width t, bits_of_width t1) in
+     	let delta = bitsnew - bitsold in
+     	if delta = 0 
+	then 
+	  lazy(self#ast_exp_bool e1) 
+	else 
+	  raise No_rule
+      | Var v ->
+	let name,st = VH.find ctx v in
+	(match st with
+	| BitVec -> raise No_rule
+	| Bool -> lazy(pp name))
+      | Let(v, e1, e2) -> self#letme v e1 e2 Bool
+      | _ -> raise No_rule
       ) in
-    lazy (opn 0; Lazy.force lazye; cut (); cls ())
+    if not check then (
+      opn 0; Lazy.force lazye; cut (); cls ()
+    )
 
   (** Try to evaluate an expression to a boolean. If no good rule
       exists, uses bitvector conversion instead. *)
@@ -687,13 +699,15 @@ object (self)
     let t = Typecheck.infer_ast ~check:false e in
     assert (t = Reg(1));
     if !use_booleans then (
-      try Lazy.force (self#ast_exp_bool_base e)
+      try
+        self#tryit self#ast_exp_bool_base e
       with No_rule ->
-	Lazy.force (self#bv_to_bool e)
+	self#bv_to_bool ~check:false e
     ) else (
-      try Lazy.force (self#bv_to_bool e)
+      try
+        self#tryit self#bv_to_bool e
       with No_rule ->
-	Lazy.force (self#ast_exp_bool_base e)
+	self#ast_exp_bool_base ~check:false e
     )
 
   method forall = function
@@ -758,7 +772,7 @@ object (self)
     force_newline();
     pp "(set-info :smt-lib-version 2.0)";
     force_newline();
-    pp "(set-option :produce-assignments true)";
+    (* pp "(set-option :produce-assignments true)"; *)
     force_newline()
 
   method close_benchmark () =
@@ -775,15 +789,17 @@ object (self)
   (*   pc ')'; *)
   (*   cls() *)
 
-  method assert_ast_exp_with_foralls ?(fvars=true) foralls e =
+  method assert_ast_exp ?(exists=[]) ?(foralls=[]) e =
+    pdebug "Opening benchmark... ";
     self#open_benchmark e;
-    if fvars then (
-      self#declare_new_freevars e;
-      force_newline();
-    );
+    pdebug "declaring new free variables... ";
+    self#declare_new_freevars e;
+    force_newline();
+    pdebug "done\n";
     opn 1;
-    pp "(assert ";
+    pp "(assert";
     space();
+    self#exists exists;
     self#forall foralls;
     self#ast_exp_bool e;
     cut();
@@ -793,21 +809,8 @@ object (self)
     self#formula ();
     self#close_benchmark ()
 
-  method assert_ast_exp e =
-    self#assert_ast_exp_with_foralls [] e
-
-  (** Is e a valid expression (always true)? *)
-  method valid_ast_exp ?(exists=[]) ?(foralls=[]) e =
-    self#open_benchmark e;
-    self#declare_new_freevars e;
-    force_newline();
-    pp "assert (";
-    self#exists exists;
-    self#forall foralls;
-    self#ast_exp_bool (exp_not e);
-    pp ");";
-    self#formula ();
-    self#close_benchmark ()
+  method valid_ast_exp ?exists ?foralls e =
+    self#assert_ast_exp ?exists ?foralls (exp_not e)
 
   (* (\** Is e a valid expression (always true)? *\) *)
   (* method valid_ast_exp ?(exists=[]) ?(foralls=[]) e = *)
@@ -828,7 +831,8 @@ object (self)
   method formula () =
     pp "(check-sat)";
     force_newline();
-    pp "(get-assignment)"
+    (* pp "(get-assignment)" *)
+    pp "(exit)"
 
   method counterexample = ()
 

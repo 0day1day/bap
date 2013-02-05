@@ -8,17 +8,20 @@ trace analysis tasks.
 
 The PIN trace tool is located in the \cmdline{pintraces/} directory.
 Because of licensing reasons, we cannot distribute PIN with the trace
-tool.  The PIN tool cannot be build until PIN has been extracted
-inside of the \bap directory: if \bap is located in
-\cmdline{\$PATH/bap}, then PIN should be in
-\cmdline{\$PATH/bap/pin}.  On Linux, running the ./getpin.sh script
-from the \cmdline{\$PATH/bap/pintraces} directory will
-automatically download and extract PIN for Linux; the user is
-responsible for accepting the PIN license agreements.
+tool.  The PIN tool cannot be built until PIN has been extracted
+inside of the \bap directory.  In the following, we assume that
+\cmdline{\$BAPDIR} is set to the \bap directory. For example, if you
+extracted \bap to \cmdline{/home/user/Downloads/bap-x.y}, then you should
+replace \cmdline{\$BAPDIR} below with
+\texttt{/home/user/Downloads/bap-x.y}. Once downloaded, PIN should be
+extracted to \cmdline{\$BAPDIR/pin}.  On Linux, running the
+./getpin.sh script from the \cmdline{\$BAPDIR/pintraces}
+directory will automatically download and extract PIN for Linux; the
+user is responsible for accepting the PIN license agreements.
 
 On Windows, the process is more complicated.  We usually test with
-Windows 7, but some people have reported success with Windows XP SP3
-as well.  First, make sure that \cmdline{\$PATH} contains no
+Windows 7 and Windows XP SP3, but expect NT, 2000, 2003, Vista, and 7
+to work.  First, make sure that \cmdline{\$BAPDIR} contains no
 spaces. Then, install GNU Make for Windows
 (\url{http://gnuwin32.sourceforge.net/packages/make.htm}) and Visual
 C++ 2010 Express
@@ -26,31 +29,31 @@ C++ 2010 Express
 Make sure to add the directory containing \texttt{make} (the default
 is \verb!C:\Program Files\GnuWin32\bin!) to the Windows \texttt{Path}
 environment variable.  Also download PIN and extract it to the
-\cmdline{\$PATH/bap/pin} directory.  Next, we need to upgrade the
-Visual Studio project for Google's protobuffers library, which our PIN
-tool depends on\footnote{This can be done automatically at the command
-  line using devenv.exe, but this tool is only part of Visual Studio
+\cmdline{\$BAPDIR/pin} directory.  Next, we need to upgrade the Visual
+Studio project for Google's protobuffers library, which our PIN tool
+depends on\footnote{This can be done automatically at the command line
+  using devenv.exe, but this tool is only part of Visual Studio
   proper; it does not come with the Express versions.}.  To do this,
 navigate to the
-\cmdline{\$PATH/bap/libtracewrap/libtrace/protobuf/vsprojects}
-directory and open \cmdline{protobuf.sln}.  When the Visual Studio
-Conversion Wizard appears, click Finish and close the summary window.
-It is normal for the conversion process to have warnings, but not
-errors.  Next, right click on the libprotobuf project in the Solution
-Explorer, and select Properties.  Select the Release configuration at
-the top of the dialog box, and then navigate to the C/C++ Code
-Generation settings.  Change the Runtime Library to Multi-threaded
+\cmdline{\$BAPDIR/libtracewrap/libtrace/protobuf/vsprojects} directory
+and open \cmdline{protobuf.sln}.  When the Visual Studio Conversion
+Wizard appears, click Finish and close the summary window.  It is
+normal for the conversion process to have warnings, but not errors.
+Next, right click on the libprotobuf project in the Solution Explorer,
+and select Properties.  Select the Release configuration at the top of
+the dialog box, and then navigate to the C/C++ Code Generation
+settings.  Change the Runtime Library to Multi-threaded
 (/MT)\footnote{If you skip this step, you will get unresolved symbol
   errors while linking the PIN tool}.  Finally, close Visual Studio
 and save the changes to the project.  Open a Visual Studio command
-prompt, navigate to \cmdline{\$PATH/bap/libtracewrap/libtrace/src/cpp}
+prompt, navigate to \cmdline{\$BAPDIR/libtracewrap/libtrace/src/cpp}
 and run \cmdline{make -f Makefile.windows} to build protobuffers and
 the libtrace library.
 
 The PIN tool itself can be built by executing \cmdline{make} in the
-\cmdline{\$PATH/bap/pintraces} directory on both Windows and Linux.
+\cmdline{\$BAPDIR/pintraces} directory on both Windows and Linux.
 After compilation, the PIN tool should exist in
-\\ \cmdline{\$PATH/bap/pintraces/obj-ia32/gentrace.so} (or
+\\ \cmdline{\$BAPDIR/pintraces/obj-ia32/gentrace.so} (or
 gentrace.dll on Windows).  In the rest of the chapter, we will assume
 Linux is being used; most interaction with the trace tool is the same.
 
@@ -59,8 +62,8 @@ Linux is being used; most interaction with the trace tool is the same.
 To see the command line options to the trace tool, execute 
 
 \begin{verbatim} 
-$PATH/bap/pin/pin -t \
- $PATH/bap/pintraces/obj-ia32/gentrace.so -help -- /bin/ls
+$BAPDIR/pin/pin -t \
+ $BAPDIR/pintraces/obj-ia32/gentrace.so -help -- /bin/ls
 \end{verbatim}
 
 By default, the trace tool will only log instructions that are
@@ -78,15 +81,15 @@ echo ``helloooooooooooooooooo'' > readme
  to create the input file.  Then run 
 
 \begin{verbatim}
-make $PATH/bap/pintraces/examples/bof1/
+make -C $BAPDIR/pintraces/examples/bof1/
 \end{verbatim}
 
 and
 
 \begin{verbatim}
-$PATH/bap/pin/pin -t  \
- $PATH/bap/pintraces/obj-ia32/gentrace.so -taint-files readme \
- -- $PATH/bap/pintraces/examples/bof1/bof1
+$BAPDIR/pin/pin -t  \
+ $BAPDIR/pintraces/obj-ia32/gentrace.so -taint-files readme \
+ -- $BAPDIR/pintraces/examples/bof1/bof1
 \end{verbatim}
 
 The PIN tool will output
