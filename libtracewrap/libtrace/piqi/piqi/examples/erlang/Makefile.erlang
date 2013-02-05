@@ -11,7 +11,7 @@ EBIN_DIR = .
 
 
 PIQIC = piqic erlang
-PIQIC_FLAGS = --gen-defaults
+PIQIC_FLAGS =
 
 
 PIQI_FILES = addressbook.proto.piqi

@@ -1,4 +1,4 @@
-.ocaml-module "Topic" .protobuf-package "Topic"
+.ocaml-module "Topic" .proto-package "Topic"
 .custom-field ocaml-module
 
 .alias [ .name probability .type float ]

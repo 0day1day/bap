@@ -112,7 +112,6 @@ rule token = parse
   | "jmp"        { JMP } 
   | "halt"       { HALT }
   | "assert"     { ASSERT }
-  | "assume"     { ASSUME }
   | "special"    { SPECIAL }
   | "unknown"    { UNKNOWN }
   | "with"       { WITH }      

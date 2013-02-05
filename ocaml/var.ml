@@ -28,8 +28,8 @@ module VarHash = struct
      http://caml.inria.fr/mantis/view.php?id=5349 *)
   include Util.HashUtil(VHMake)
 end
-module VarMap = BatMap.Make(V)
-module VarSet = BatSet.Make(V)
+module VarMap = Map.Make(V)
+module VarSet = Set.Make(V)
 
 
 

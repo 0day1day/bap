@@ -1,9 +1,7 @@
 #ifndef TRACE_CONTAINER_HPP
 #define TRACE_CONTAINER_HPP
 
-#ifndef _WIN32
 #include "config.h"
-#endif
 #include "arch.hpp"
 
 /**

@@ -121,7 +121,6 @@ and stmt_accept visitor =
     | Label _ as s -> s
     | Comment _ as s-> s
     | Assert(e,a) -> Assert(value_accept visitor e, a)
-    | Assume(e,a) -> Assume(value_accept visitor e, a)
     | Halt(e,a) -> Halt(value_accept visitor e, a)
   in
   action (wrapstmt vischil) (visitor#visit_stmt)

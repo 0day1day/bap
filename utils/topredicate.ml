@@ -1,13 +1,13 @@
 open Ast
-open Ast_convenience
 open Grammar_scope
 open Type
 open Vc
 open Utils_common
 
 let usage = "Usage: "^Sys.argv.(0)^" <input options> [-o output]\n\
-             Compute Verification Conditions (VCs)"
+             Translate programs to the IL. "
 
+let fast_fse = ref false
 let options = ref Vc.default_options
 let irout = ref(Some stdout)
 let post = ref "true"
@@ -15,13 +15,37 @@ let stpout = ref None
 let stpoutname = ref ""
 let pstpout = ref None
 let suffix = ref ""
+let assert_vars = ref false
 let usedc = ref true
 let usesccvn = ref true
 let solve = ref false
-let timeout = ref None
+(* let dwpcf = ref true *)
+(* let sat = ref true *)
 
 (* Select which solver to use *)
 let solver = ref (Smtexec.STP.si);;
+
+let extract_vars e =
+  let rec h v = function
+    | BinOp(AND, BinOp(EQ,Var v1, e1), BinOp(EQ,Var v2, e2)) ->
+	((v2,e2)::(v1,e1)::v, None)
+    | BinOp(AND, BinOp(EQ,Var v1, e1), rest)
+    | BinOp(AND, rest, BinOp(EQ,Var v1, e1)) ->
+	h ((v1,e1)::v) rest
+    | BinOp(AND, e1, e2) ->
+	(match h v e1 with
+	 | (v, None) ->
+	     h v e2
+	 | (v, Some e1) ->
+	     match h v e2 with
+	     | (v, None) -> (v, Some e1)
+	     | (v, Some e2) -> (v, Some(exp_and e1 e2))
+	)
+    | e -> (v, Some e)
+  in
+  match h [] e with
+  | (v, Some e) -> (v,e)
+  | (v, None) -> (v, exp_true)
 
 let set_solver s =
   solver := try Hashtbl.find Smtexec.solvers s
@@ -46,27 +70,17 @@ let speclist =
   ::("-suffix", Arg.String (fun str -> suffix := str),
      "<suffix> Add <suffix> to each variable name.")
   ::("-dwp", Arg.Unit(fun()-> vc := compute_dwp_gen),
-     "Use efficient directionless weakest precondition")
-  ::("-fwp", Arg.Unit(fun()-> vc := compute_fwp_gen),
-     "Use efficient directionless weakest precondition algorithm")
-  ::("-fwpuwp", Arg.Unit(fun()-> vc := compute_fwp_uwp_gen),
-     "Use efficient forward weakest precondition algorithm in UWP mode")
-  ::("-fwplazyconc", Arg.Unit(fun()-> vc := compute_fwp_lazyconc_gen),
-     "Use efficient forward weakest precondition algorithm with concrete evaluation and lazy merging")
-  ::("-fwplazyconcuwp", Arg.Unit(fun()-> vc := compute_fwp_lazyconc_uwp_gen),
-     "Use efficient forward weakest precondition algorithm with concrete evaluation and lazy merging directly on a CFG representation")
+     "Use efficient directionless weakest precondition instead of the default")
   ::("-dwpk", Arg.Int(fun i-> vc := compute_dwp_gen;
     options := {!options with k=i};
-  ),
-     "Use efficient directionless weakest precondition")
+),
+     "Use efficient directionless weakest precondition instead of the default")
   ::("-dwp1", Arg.Unit(fun()-> vc := compute_dwp1_gen),
      "Use 1st order efficient directionless weakest precondition")
   ::("-flanagansaxe", Arg.Unit(fun()-> vc := compute_flanagansaxe_gen),
      "Use Flanagan & Saxe's algorithm instead of the default WP.")
   ::("-wp", Arg.Unit(fun()-> vc := compute_wp_gen),
-     "Use Dijkstra's WP on GCL.")
-  ::("-pwp", Arg.Unit(fun()-> vc := compute_passified_wp_gen),
-     "Efficient WP on passified GCL programs.")
+     "Use Dijkstra's WP, except with let instead of substitution.")
   ::("-uwp", Arg.Unit(fun()-> vc := compute_uwp_gen),
      "Use WP for Unstructured Programs")
   ::("-uwpe", Arg.Unit(fun()-> vc := compute_uwp_efficient_gen),
@@ -77,8 +91,12 @@ let speclist =
      "<n> FSE with breath first search, limiting search depth to n.")
   ::("-fse-maxrepeat", Arg.Int(fun i-> vc := compute_fse_maxrepeat_gen i),
      "<n> FSE excluding walks that visit a point more than n times.")
+  ::("-fse-fast", Arg.Set fast_fse,
+     "Perform FSE without full substitution.")
   ::("-solver", Arg.String set_solver,
      ("Use the specified solver. Choices: " ^ solvers))
+  ::("-extract-vars", Arg.Set assert_vars,
+     "Put vars in separate asserts")
   ::("-noopt", Arg.Unit (fun () -> usedc := false; usesccvn := false),
      "Do not perform any optimizations on the SSA CFG.")
   ::("-opt", Arg.Unit (fun () -> usedc := true; usesccvn := true),
@@ -89,15 +107,10 @@ let speclist =
      "Perform sccvn on the SSA CFG.")
   ::("-solve", Arg.Unit (fun () -> solve := true),
      "Solve the generated formula.")
-  ::("-solvetimeout", Arg.Int (fun n -> timeout := Some n),
-     "<seconds> Set formula solving timeout. Default: no timeout.")
   ::("-validity", Arg.Unit (fun () -> options := {!options with mode = Type.Validity}),
-     "Check for validity.")
-  ::("-sat", Arg.Unit (fun () -> options := {!options with mode = Type.Sat}),
-     "Check for satisfiability.")
+     "Check validity rather than satisfiability.")
   :: Input.speclist
 
-let () = Tunegc.set_gc ()
 let anon x = raise(Arg.Bad("Unexpected argument: '"^x^"'"))
 let () = Arg.parse speclist anon usage
 
@@ -147,21 +160,32 @@ match !stpout with
   let foralls = List.map (Memory2array.coerce_rvar_state ~scope m2a_state) foralls in 
   let pp = (((!solver)#printer) :> Formulap.fppf) in
   let p = pp ~suffix:!suffix oc in
-  (match !options with
-  | {mode=Sat} ->
-    p#assert_ast_exp ~foralls wp
-  | {mode=Validity} ->
-    p#valid_ast_exp ~foralls wp
-  | {mode=Foralls} ->
-    failwith "Foralls formula mode unsupported at this level");
+  if !assert_vars then (
+    let (vars,wp') = extract_vars wp in
+    List.iter (fun (v,e) -> p#assert_ast_exp (BinOp(EQ, Var v, e))) vars;
+    (match !options with
+    | {mode=Sat} ->
+      p#assert_ast_exp_with_foralls foralls wp'
+    | {mode=Validity} ->
+      p#valid_ast_exp ~foralls wp'
+    | {mode=Foralls} ->
+      failwith "Foralls formula mode unsupported at this level")
+  )
+  else (
+    (match !options with
+    | {mode=Sat} ->
+      p#assert_ast_exp_with_foralls foralls wp
+    | {mode=Validity} ->
+      p#valid_ast_exp ~foralls wp
+    | {mode=Foralls} ->
+      failwith "Foralls formula mode unsupported at this level")
+  );
   p#counterexample;
   p#close;
   if !solve then (
     Printf.fprintf stderr "Solving\n"; flush stderr;
-    let r = (!solver)#solve_formula_file ?timeout:!timeout ~printmodel:true !stpoutname in
-    Printf.fprintf stderr "Solve result: %s\n" (Smtexec.result_to_string r);
-    match r with | Smtexec.SmtError _ -> failwith "Solver error" | _ -> ()
-  )
+    let r = (!solver)#solve_formula_file ~printmodel:true !stpoutname in
+    Printf.fprintf stderr "Solve result: %s\n" (Smtexec.result_to_string r))
 
 ;;
 match !pstpout with

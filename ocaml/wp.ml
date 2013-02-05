@@ -9,7 +9,7 @@ open Ast_convenience
 open Type
 open Gcl
 
-module D = Debug.Make(struct let name = "Wp" and default=`Debug end)
+module D = Debug.Make(struct let name = "WP" and default=`Debug end)
 open D
 
 module BH = Cfg.BH
@@ -33,26 +33,6 @@ let wp ?(simp=Util.id) (p:Gcl.t) (q:exp) : exp =
   in
   wp q p  (fun x->x)
 
-let passified_wp ?(simp=Util.id) (p:Gcl.t) (q:exp) : exp =
-  (*  We use CPS to avoid stack overflows *)
-  let rec wp q s k =
-    match s with
-    | Skip -> k q
-    | Assume e ->
-      k (simp(exp_implies e q))
-    | Choice(s1, s2) ->
-      let v = Var.newvar "q" (Reg 1) in
-      let qe = Var v in
-      wp qe s1 (fun x -> wp qe s2 (fun y -> k(simp(Let(v,q,exp_and x y)))))
-    | Seq(s1, s2) ->
-      wp q s2 (fun x -> wp x s1 k)
-    | Assign(t, e) ->
-      failwith "Expected a passified program"
-    | Assert e ->
-      k (simp(exp_and e q))
-  in
-  wp q p  (fun x->x)
-
 module CA = Cfg.AST
 
 module RevCFG =
@@ -64,11 +44,11 @@ struct
   let in_degree = CA.G.out_degree
 end
 
-module Toposort = Graph.Topological.Make(Cfg.AST.G)
 module RToposort = Graph.Topological.Make(RevCFG);;
 
-let build_uwp wp ((cfg,ugclmap):Gcl.Ugcl.t) (q:exp) : exp =
-  Checks.acyclic_astcfg cfg "UWP";
+(** Same as [wp] but for unstructured programs. *)
+let uwp ?(simp=Util.id) ((cfg,ugclmap):Ugcl.t) (q:exp) : exp =
+  (* dprintf "Starting uwp"; *)
   (* Block -> exp *)
   let wpvar = BH.create (CA.G.nb_vertex cfg) in
   let lookupwpvar = BH.find wpvar in
@@ -90,36 +70,39 @@ let build_uwp wp ((cfg,ugclmap):Gcl.Ugcl.t) (q:exp) : exp =
       | [] -> failwith (Printf.sprintf "BB %s has no successors but should" (Cfg_ast.v2s bb))
       | s -> (* Get the conjunction of our successors' preconditions *)
         let get_wp bb = lookupwpvar (CA.G.V.label bb) in
-        (* Note: This duplicates the postcondition *)
-        BatList.reduce (fun acc e -> binop AND acc e) (List.map get_wp s)
+        simp (List.fold_left (fun acc bb -> binop AND acc (get_wp bb)) (get_wp (List.hd s)) (List.tl s))
     in
-    let q_out = wp (ugclmap bbid) q_in in
+    let rec wp q s k =
+      (*  We use CPS to avoid stack overflows *)
+      match s with
+      | Ugcl.Skip -> k q
+      | Ugcl.Assume e ->
+        k (simp(exp_implies e q))
+      | Ugcl.Seq(s1, s2) ->
+        wp q s2 (fun x -> wp x s1 k)
+      | Ugcl.Assign(t, e) ->
+        k(simp(Let(t, e, q)))
+      | Ugcl.Assert e ->
+        k (simp(exp_and e q))
+    in
+    let q_out = wp q_in (ugclmap bbid) Util.id in
     setwp bbid q_out
   in
   RToposort.iter compute_at cfg;
   lookupwpvar Cfg.BB_Entry
 
-let dijkstra_uwp = build_uwp wp
-
-let build_passified_uwp iter wp ((cfg,ugclmap):Gcl.Ugcl.t) (q:exp) : exp =
-  Checks.acyclic_astcfg cfg "UWP";
+(** Same as [efficient_wp] but for unstructured programs. *)
+let efficient_uwp ?(simp=Util.id) ((cfg,ugclmap):Ugcl.t) (q:exp) : exp =
   (* dprintf "Starting uwp"; *)
   (* Block -> var *)
   let wpvar = BH.create (CA.G.nb_vertex cfg) in
   (* Var -> exp *)
   let varexp = VH.create (CA.G.nb_vertex cfg) in
-  let lookupwpvar bbid =
-    let makevar bbid =
-      assert (not (BH.mem wpvar bbid));
-      let v = Var.newvar (Printf.sprintf "q_pre_%s" (Cfg.bbid_to_string bbid)) reg_1 in
-      BH.add wpvar bbid v;
-      v
-    in
-    try BH.find wpvar bbid
-    with Not_found -> makevar bbid
-  in
+  let lookupwpvar = BH.find wpvar in
   let setwp bbid q =
-    let v = lookupwpvar bbid in
+    let v = Var.newvar (Printf.sprintf "q_pre_%s" (Cfg.bbid_to_string bbid)) reg_1 in
+    assert (not (BH.mem wpvar bbid));
+    BH.add wpvar bbid v;
     VH.add varexp v q
   in
   let rec compute_at bb =
@@ -136,12 +119,25 @@ let build_passified_uwp iter wp ((cfg,ugclmap):Gcl.Ugcl.t) (q:exp) : exp =
       | [] -> failwith (Printf.sprintf "BB %s has no successors but should" (Cfg_ast.v2s bb))
       | s -> (* Get the conjunction of our successors' preconditions *)
         let get_wp bb = Var(lookupwpvar (CA.G.V.label bb)) in
-        BatList.reduce (fun acc e -> binop AND acc e) (List.map get_wp s)
+        List.fold_left (fun acc bb -> binop AND acc (get_wp bb)) (get_wp (List.hd s)) (List.tl s)
     in
-    let q_out = wp (ugclmap bbid) q_in in
+    let rec wp q s k =
+      (*  We use CPS to avoid stack overflows *)
+      match s with
+      | Ugcl.Skip -> k q
+      | Ugcl.Assume e ->
+        k (simp(exp_implies e q))
+      | Ugcl.Seq(s1, s2) ->
+        wp q s2 (fun x -> wp x s1 k)
+      | Ugcl.Assign(t, e) ->
+        k(simp(Let(t, e, q)))
+      | Ugcl.Assert e ->
+        k (simp(exp_and e q))
+    in
+    let q_out = wp q_in (ugclmap bbid) Util.id in
     setwp bbid q_out
   in
-  iter compute_at cfg;
+  RToposort.iter compute_at cfg;
 (* Now we have a precondition for every block in terms of
    postcondition variables of its successors. We just need to visit in
    topological order and build up the whole expression now. *)
@@ -156,8 +152,6 @@ let build_passified_uwp iter wp ((cfg,ugclmap):Gcl.Ugcl.t) (q:exp) : exp =
   in
   (* FIXME: We shouldn't use entry here *)
   List.fold_left build_exp (Var(lookupwpvar Cfg.BB_Entry)) assigns
-
-let efficient_uwp = build_passified_uwp RToposort.iter wp
 
 let efficient_wp ?(simp=Util.id) (p:Gcl.t) =
   let wlp_f_ctx = Hashtbl.create 113 in
@@ -227,10 +221,11 @@ let ast_size e =
   ignore(Ast_visitor.exp_accept vis e);
   !s
 
+
 (* helper for dwp *)
-let variableify ?(name=dwp_name) k v e =
-    if ast_size e > k then
-      let x = Var.newvar name (Typecheck.infer_ast e) in
+let variableify k v e =
+    if k <= 1 || ast_size e > k then
+      let x = Var.newvar dwp_name (Typecheck.infer_ast e) in
       let xe = Var x in
       ((x, e) :: v, xe)
     else
@@ -274,7 +269,7 @@ let rm_useless_vars vs n w =
 
 
 let assignments_to_exp = function
-  | [] -> exp_true
+  | [] -> None
   | v::vs ->
       let p2e (v,e) = BinOp(EQ, Var v, e) in
       let rec h e = function
@@ -283,24 +278,16 @@ let assignments_to_exp = function
 	    else h (exp_and (p2e a) e) rest
 	| [] -> e
       in
-      h (p2e v) vs
-let assignments_to_exp_opt = function
-  | [] -> None
-  | e -> Some(assignments_to_exp e)
+      Some(h (p2e v) vs)
 
-let assignments_to_lets = function
-  | [] -> (fun e -> e)
-  | vars ->
-    (fun e -> List.fold_left (fun exp (v,e) -> Let(v,e,exp)) e vars)
-
-(** [dwp_g] is an implementation of [G] from the DWP paper.
+(** [dwp_help] is an implementation of [G] from the DWP paper.
 
    @arg f A function that maps a GCL statement to the [V], [N], and [W]
    lists from the DWP algorithm.
    @arg p The GCL statement/program to run DWP on.
 *)
 
-let dwp_g ?(simp=Util.id) ?(k=1) f (p:Gcl.t) =
+let dwp_help ?(simp=Util.id) ?(k=1) f (p:Gcl.t) =
   let g (v, n, w) =
     let rec g' v ns ws fn fw =
       match (ns,ws) with
@@ -320,7 +307,7 @@ let dwp_g ?(simp=Util.id) ?(k=1) f (p:Gcl.t) =
   (* Surprisingly enough, this is a toss up. It makes some formulas
      much easier for CVC and others much harder. *)
   (* let (vs,n,w) = rm_useless_vars vs n w in *)
-  (assignments_to_exp_opt vs, vs, n, w)
+  (assignments_to_exp vs, vs, n, w)
 
 (** [f] from the DWP paper. *)
 let dwp_f ?(less_duplication=true) ?(k=1) g =
@@ -349,7 +336,7 @@ let dwp_f ?(less_duplication=true) ?(k=1) g =
 (** Generates a 1st order logic VC using the DWP algorithm. *)
 let dwp_1st ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (p:Gcl.t) =
   let f' = dwp_f ~less_duplication ~k in
-  let (vo, vs, n, w) = dwp_g ~simp ~k f' p in
+  let (vo, vs, n, w) = dwp_help ~simp ~k f' p in
   match vo with
   | Some v ->
       let vars = List.map fst vs in
@@ -357,27 +344,29 @@ let dwp_1st ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (p:Gcl.t) =
   | None ->
       (fun q -> ([], exp_and (exp_not w) (exp_implies n q)))
 
+
+
 let dwp_pred_help ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (p:Gcl.t) =
   let f' = dwp_f ~less_duplication ~k in
-  dwp_g ~simp ~k f' p
+  dwp_help ~simp ~k f' p
 
 (** Generates a predicate logic VC using the DWP algorithm. *)
-let dwp ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (mode:formula_mode) (p:Gcl.t) =
+let dwp ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (mode:Type.formula_mode) (p:Gcl.t) =
   let (vo, _, n, w) = dwp_pred_help ~simp ~less_duplication ~k p in
   match vo, mode with
   | Some v, Sat ->
-    (fun q -> (exp_and v (exp_and (exp_not w) (exp_implies n q))))
+    (fun q -> (exp_and v (exp_and (exp_not w) (exp_and n q))))
   | Some v, Validity ->
     (fun q -> (exp_implies v (exp_and (exp_not w) (exp_implies n q))))
   | None, Sat ->
-    (fun q -> (exp_and (exp_not w) (exp_implies n q)))
+    (fun q -> (exp_and (exp_not w) (exp_and n q)))
   | None, Validity ->
     (fun q -> (exp_and (exp_not w) (exp_implies n q)))
   | _, Foralls ->
     failwith "Foralls not supported in predicate DWP"
 
 
-let dwp_let ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (mode:formula_mode) (p:Gcl.t) =
+let dwp_let ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (mode:Type.formula_mode) (p:Gcl.t) =
   let (_, vars, n, w) = dwp_pred_help ~simp ~less_duplication ~k p in
   (fun q ->
     let exp = match mode with
@@ -385,8 +374,12 @@ let dwp_let ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (mode:formula_mode) 
       | Validity -> exp_and (exp_not w) (exp_implies n q)
       | Foralls -> failwith "Foralls not supported in predicate DWP"
     in
-    assignments_to_lets vars exp
+    List.fold_left (fun exp (v,e) -> Let(v,e,exp)) exp vars
   )
+
+(*let dwp = dwp_let*)
+
+
 
 (*let flanagansaxe_dumb ?(simp=Util.id) (p:Gcl.t) =
   let rec n = function
@@ -407,7 +400,7 @@ let dwp_let ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (mode:formula_mode) 
   )
 *)
 
-let flanagansaxe ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (mode:formula_mode) (p:Gcl.t) =
+let flanagansaxe ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (mode:Type.formula_mode) (p:Gcl.t) =
   let rec nw v = function
     | Assume e -> (e, exp_false, v)
     | Assert e ->
@@ -427,10 +420,14 @@ let flanagansaxe ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (mode:formula_m
   in
   let (ns,ws,v) = nw [] p in
   match assignments_to_exp v, mode with
-  | v, Sat ->
-    (fun q -> exp_and v (exp_and (exp_not ws) (exp_implies ns q)) )
-  | v, Validity ->
-    (fun q -> exp_implies v (exp_and (exp_not ws) (exp_implies ns q)) )
+  | Some v, Sat ->
+      (fun q -> exp_and v (exp_and (exp_not ws) (exp_and ns q)) )
+  | Some v, Validity ->
+      (fun q -> exp_implies v (exp_and (exp_not ws) (exp_implies ns q)) )
+  | None, Sat ->
+      (fun q -> exp_and (exp_not ws) (exp_and ns q) )
+  | None, Validity ->
+      (fun q -> exp_and (exp_not ws) (exp_implies ns q) )
   | _, Foralls ->
     failwith "Foralls not supported in predicate FS"
 

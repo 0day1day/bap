@@ -24,5 +24,8 @@ val get_stream_program : unit -> (Ast.program) Stream.t
 
 val init_ro : bool ref
 
+(* This really should go elsewhere! *)
+val set_gc : unit -> unit
+
 (* Rate to stream frames at *)
 val streamrate : int64 ref

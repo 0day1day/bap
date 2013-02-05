@@ -376,7 +376,7 @@ struct
     let rec transfer_stmt s l =
       match s with
 	| Assert(Var _, _)  (* FIXME: Do we want to say v is true? *)
-	| Assert _ | Assume _ | Jmp _ | CJmp _ | Label _ | Comment _
+	| Assert _ | Jmp _ | CJmp _ | Label _ | Comment _
 	| Halt _ ->
 	    l
 	| Move(v, e, _) ->
@@ -639,7 +639,7 @@ struct
     let rec transfer_stmt s l =
       match s with
 	| Assert(Var _, _)  (* FIXME: Do we want to say v is true? *)
-	| Assert _ | Assume _ | Jmp _ | CJmp _ | Label _ | Comment _
+	| Assert _ | Jmp _ | CJmp _ | Label _ | Comment _
 	| Halt _ ->
 	    l
 	| Move(v, e, _) ->
@@ -843,7 +843,7 @@ struct
     let rec transfer_stmt s l =
       match s with
 	| Assert(Var _, _)  (* FIXME: Do we want to say v is true? *)
-	| Assert _ | Assume _ | Jmp _ | CJmp _ | Label _ | Comment _
+	| Assert _ | Jmp _ | CJmp _ | Label _ | Comment _
 	| Halt _ ->
 	    l
 	| Move(v, e, _) ->

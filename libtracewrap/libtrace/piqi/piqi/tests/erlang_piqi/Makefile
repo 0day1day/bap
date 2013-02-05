@@ -4,7 +4,8 @@ all: prep test
 
 
 prep:
-	ln -sf ../piqi_misc/piqobj.piqi .
+	ln -sf ../../piqi.org/piqi.piqi .
+	ln -sf ../../piqilib/piqobj.piqi .
 	piqi convert --add-defaults -t pb piqi.piqi
 
 
@@ -20,6 +21,6 @@ test:
 
 
 clean:
-	rm -f piqobj.piqi piqi.piqi.* piqi_piqi.* piqobj_piqi.* t.*
+	rm -f *.piqi piqi.* piqi_piqi.* piqobj_piqi.* t.*
 	$(MAKE) -f Makefile.erlang clean
 

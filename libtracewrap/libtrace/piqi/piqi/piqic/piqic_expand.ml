@@ -1,6 +1,6 @@
 (*pp camlp4o -I `ocamlfind query piqi.syntax` pa_labelscope.cmo pa_openin.cmo *)
 (*
-   Copyright 2009, 2010, 2011, 2012, 2013 Anton Lavrik
+   Copyright 2009, 2010, 2011, 2012 Anton Lavrik
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -33,24 +33,20 @@ open Main
 let rec erlname_piqi (piqi:T.piqi) =
   let open P in
   begin
-    (* run the erlname procedure on the original module *)
-    Piqic_erlang.erlname_piqi (some_of piqi.original_piqi);
+    Piqic_erlang.erlname_piqi piqi; (* run the original erlname procedure *)
 
-    Piqic_erlang.erlname_functions piqi.P#extended_func;
-    Piqic_erlang.erlname_defs piqi.P#extended_typedef;
-    Piqic_erlang.erlname_defs piqi.P#extended_func_typedef;
+    Piqic_erlang.erlname_functions piqi.P#func;
+    Piqic_erlang.erlname_defs piqi.P#piqdef;
   end
 
 
 let rec mlname_piqi (piqi:T.piqi) =
   let open P in
   begin
-    (* run the mlname procedure on the original module *)
-    Piqic_ocaml.mlname_piqi (some_of piqi.original_piqi);
+    Piqic_ocaml.mlname_piqi piqi; (* run the original mlname procedure *)
 
-    Piqic_ocaml.mlname_functions piqi.P#extended_func;
-    Piqic_ocaml.mlname_defs piqi.P#extended_typedef;
-    Piqic_ocaml.mlname_defs piqi.P#extended_func_typedef;
+    Piqic_ocaml.mlname_functions piqi.P#func;
+    Piqic_ocaml.mlname_defs piqi.P#piqdef;
   end
 
 
@@ -65,6 +61,7 @@ let expand_file filename =
   if !flag_ocaml then Piqic_ocaml.init ();
 
   let piqi = Piqi.load_piqi filename in
+  let res_piqi = Piqi.expand_piqi piqi in
 
   (* chdir to the output directory *)
   Main.chdir_output !odir;
@@ -73,18 +70,16 @@ let expand_file filename =
 
   (* add the Module's name even if it wasn't set, this is required for custom
    * naming *)
-  let orig_piqi = some_of piqi.P#original_piqi in
-  orig_piqi.P#modname <- piqi.P#modname;
+  res_piqi.P#modname <- piqi.P#modname;
 
-  if !flag_erlang then erlname_piqi piqi;
-  if !flag_ocaml then mlname_piqi piqi;
+  if !flag_erlang then erlname_piqi res_piqi;
+  if !flag_ocaml then mlname_piqi res_piqi;
 
   if not !flag_binary_output
   then
-    let res_piqi = Piqi.expand_piqi piqi ~extensions:true ~functions:false in
     Piqi_pp.prettyprint_piqi ch res_piqi
   else
-    let code = Piqi.piqi_to_pb piqi in
+    let code = T.gen_piqi res_piqi in
     Piqirun.to_channel ch code
 
 

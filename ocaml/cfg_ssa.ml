@@ -188,9 +188,6 @@ let rec stmt2ssa ctx ~(revstmts: stmt list) s =
     | Ast.Assert(e,a) ->
 	let (revstmts,v) = exp2ssa ctx revstmts e in
 	  Assert(v,a)::revstmts
-    | Ast.Assume(e,a) ->
-	let (revstmts,v) = exp2ssa ctx revstmts e in
-	  Assume(v,a)::revstmts
     | Ast.Halt(e,a) ->
 	let (revstmts, v) = exp2ssa ctx revstmts e in 
 	  Halt(v,a)::revstmts
@@ -735,7 +732,6 @@ let stmt2ast tm =
     | Label(l,a) -> Ast.Label(l,a)
     | Comment(s,a) -> Ast.Comment(s,a)
     | Assert(t,a) -> Ast.Assert(v2a t, a)
-    | Assume(t,a) -> Ast.Assume(v2a t, a)
     | Halt(t,a) -> Ast.Halt(v2a t, a)
     | Move(l,e,a) -> Ast.Move(l, exp2ast tm e, a)
 

@@ -140,7 +140,7 @@ let of_prog ?(special_error = true) p =
 	(c, [s], true, Some v)
     | Assert(e,_) when e === exp_false ->
       g()
-    | Move _ | Assert _ | Assume _ ->
+    | Move _ | Assert _ ->
       (c, s::cur, false, addpred)
     | Comment _ ->
       (c, s::cur, onlylabs, addpred)

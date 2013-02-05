@@ -30,13 +30,6 @@ type t =
   | Seq of t * t
   | Skip
 
-val to_string : t -> string
-(** [to_string p] converts the GCL program [p] to a string for
-    debugging purposes. *)
-
-val size : t -> int
-(** [size p] computes the number of statements in [p]. *)
-
 (** {5 Functions to convert BAP programs to GCL} *)
 
 val of_astcfg : ?entry:Cfg.AST.G.V.t -> ?exit:Cfg.AST.G.V.t -> Cfg.AST.G.t -> t
@@ -62,7 +55,7 @@ val of_ast : Ast.program -> t
 (* val remove_skips : t -> t *)
 
 val passified_of_ssa :
-  ?entry:Cfg.SSA.G.V.t -> ?exit:Cfg.SSA.G.V.t -> ?mode:Type.formula_mode -> Cfg.SSA.G.t -> t * var list
+  ?entry:Cfg.SSA.G.V.t -> ?exit:Cfg.SSA.G.V.t -> Type.formula_mode -> Cfg.SSA.G.t -> t * var list
 (** [passified_of_ssa cfg] converts a SSA CFG [cfg] to a passified GCL
     program.  Passified GCL programs do not contain [Assign(v,e)]
     statements.  Instead, all assignments [Assign(v,e)] are replaced
@@ -77,7 +70,7 @@ val passified_of_ssa :
     @raise Not_found if [cfg] contains cycles.
 *)
 val passified_of_astcfg :
-  ?entry:Cfg.AST.G.V.t -> ?exit:Cfg.AST.G.V.t -> ?mode:Type.formula_mode -> Cfg.AST.G.t -> t * var list * (Var.t->Var.t)
+  ?entry:Cfg.AST.G.V.t -> ?exit:Cfg.AST.G.V.t -> Type.formula_mode -> Cfg.AST.G.t -> t * var list * (Var.t->Var.t)
 (** [passified_of_astcfg] is the same as {!passified_of_ssa}, except
     that it takes an ASG CFG as input. *)
 
@@ -96,19 +89,3 @@ val gclhelp_of_astcfg : ?entry:Cfg.AST.G.V.t -> ?exit:Cfg.AST.G.V.t -> Cfg.AST.G
 (** [gclhelp_of_astcfg cfg] converts [cfg] to the [gclhelp] representation. *)
 val gclhelp_to_string : gclhelp -> string
 (** [gclhelp_to_string gclh] converts the [gclhelp] representation [gclh] to a string *)
-
-(** {3 Unstructured GCL} *)
-
-(** GCL over unstructured programs (CFGs). *)
-module Ugcl : sig
-  (** Ugcl statements are just Gcl statements. However, the [Choice]
-      constructor is not used in Ugcl statements. *)
-  type stmt = t
-
-  (** Ugcl programs are a CFG, annotated with a map from each basic
-      block to a Ugcl statement. *)
-  type t = Cfg.AST.G.t * (Cfg.AST.G.V.label -> stmt)
-
-  (** Convert a SSACFG to Ugcl *)
-  val of_ssacfg : ?entry:Cfg.AST.G.V.t -> ?exit:Cfg.AST.G.V.t -> ?mode:Type.formula_mode -> Cfg.SSA.G.t -> t
-end

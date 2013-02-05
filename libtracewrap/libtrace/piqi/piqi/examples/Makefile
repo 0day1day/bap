@@ -4,7 +4,7 @@ all: test_builtin test_complex
 
 test_builtin:
 	set -e; \
-	for i in comment bool int float string empty; \
+	for i in comment bool int float string piq-text piq-word empty; \
 	do \
 		./test_piq $$i; \
 	done
@@ -13,10 +13,6 @@ test_builtin:
 test_complex:
 	./test_piqi empty
 	./test_piqi_proto empty
-
-	./test_piqi piq-format
-	./test_piq piq-word
-	./test_piq piq-text
 
 	./test_piq complex
 	./test_piqi complex
@@ -31,11 +27,13 @@ test_complex:
 	./test_piq list
 
 	./test_piq flag
-	./test_piq piqi-any
 
 	./test_piqi record-variant-list
 	./test_piqi_proto record-variant-list
 	./test_piq record-variant-list
+
+	ln -sf ../piqilib/piqobj.piqi .
+	./test_piqi piqobj
 
 	./test_piqi function
 	./test_piq function
@@ -49,4 +47,4 @@ test_complex:
 
 
 clean:
-	rm -f *.pb *.pib *.json *.xml *.piqi.proto* addressbook.proto.piqi
+	rm -f *.pb *.wire *.json *.xml *.piqi.proto* addressbook.proto.piqi piqobj.piqi

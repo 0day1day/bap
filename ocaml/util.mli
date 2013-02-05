@@ -197,10 +197,6 @@ sig
   (** Implementation of {!Hashtbl.replace} to work around OCaml
       bug. *)
   val hashtbl_replace : 'a H.t -> H.key -> 'a -> unit
-
-  (** Get the keys from a hash table.  If a key has multiple bindings,
-      it is included once per binding *)
-  val get_hash_keys : ?sort_keys:bool -> 'a H.t -> H.key list
 end
 
 (** Version of hashtbl_eq for polymorphic [Hashtbl]s *)

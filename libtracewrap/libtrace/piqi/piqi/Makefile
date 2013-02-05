@@ -1,10 +1,4 @@
-ifeq ($(MAKECMDGOALS),distclean)
--include Makefile.config
--include $(PIQI_ROOT)/make/Makefile.dirs
-else
-include Makefile.config
 include $(PIQI_ROOT)/make/Makefile.dirs
-endif
 
 
 DIRS = \
@@ -13,9 +7,7 @@ DIRS = \
 	piqicc piqic piqilib piqi-tools \
 
 
-.PHONY: deps build-dir install distclean \
-	ocaml ocaml-install ocaml-uninstall \
-	erlang erlang-clean
+.PHONY: deps install ocaml ocaml-install ocaml-uninstall erlang erlang-clean distclean
 
 
 # export installation and search path for OCaml dependencies
@@ -26,26 +18,18 @@ export OCAMLFIND_DESTDIR OCAMLPATH
 endif
 
 
-# export installation path for third-party deps and Piqi OCaml libraries
+# export installation path for Piqi OCaml libraries
 ifneq ($(findstring ocaml-,$(MAKECMDGOALS)),)
-ifneq ($(PIQI_OCAML_DESTDIR),)
-OCAMLFIND_DESTDIR = $(PIQI_OCAML_DESTDIR)
-OCAMLPATH = $(OCAMLFIND_DESTDIR)
-export OCAMLFIND_DESTDIR OCAMLPATH
+ifneq ($(PIQI_OCAML_PREFIX),)
+OCAMLFIND_INSTFLAGS = -destdir $(PIQI_OCAML_PREFIX)
 endif
 endif
 
 
-pre_target:: build-dir
-
-
-deps: build-dir
+deps:
 	$(MAKE) -C deps
+	mkdir -p $(OCAMLFIND_DESTDIR)
 	$(MAKE) -C deps install
-
-
-build-dir:
-	mkdir -p $(PIQI_BUILD)/lib/ocaml
 
 
 install:
@@ -59,14 +43,12 @@ ocaml:
 
 
 ocaml-install: ocaml-uninstall
-	test -d $(PIQI_OCAML_DESTDIR) || mkdir -p $(PIQI_OCAML_DESTDIR)
-	ocamlfind install piqi `ls $(PIQI_BUILD)/lib/ocaml/piqi/*`
-	$(MAKE) -C deps install
+	test -d $(PIQI_OCAML_PREFIX) || mkdir -p $(PIQI_OCAML_PREFIX)
+	ocamlfind install $(OCAMLFIND_INSTFLAGS) piqi `ls $(PIQI_BUILD)/lib/ocaml/piqi/*`
 
 
 ocaml-uninstall:
-	ocamlfind remove piqi
-	$(MAKE) -C deps uninstall
+	ocamlfind remove $(OCAMLFIND_INSTFLAGS) piqi
 
 
 erlang:
@@ -84,9 +66,6 @@ clean:: erlang-clean
 
 
 distclean:
-	if [ -f Makefile.config ]; then \
-		$(MAKE) clean; \
-		rm -rf $(PIQI_BUILD); \
-		rm Makefile.config; \
-	fi
+	$(MAKE) clean
+	rm -rf $(PIQI_BUILD)
 

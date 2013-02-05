@@ -559,7 +559,6 @@ let asm_addr_to_bap {asmp=prog; arch=arch; get=get} addr =
 	(try (Disasm.disasm_instr arch get addr)
 	 with Disasm_i386.Disasm_i386_exception s -> 
 	   DTest.dprintf "BAP unknown disasm_instr %Lx: %s" addr s;
-           DTest.dprintf "Faulting instruction: %s" (Libasmir.asmir_string_of_insn prog addr);
 	   DV.dprintf "disasm_instr %Lx: %s" addr s; raise Disasm.Unimplemented
 	)
       in

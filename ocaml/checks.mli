@@ -47,23 +47,3 @@ module MakeAcyclicCheck :
           acyclic graph. *)
       val acyclic_check : C.G.t sanityf
     end
-
-(** [exit_check_astcfg g s] raises an exception iff g contains an
-    unspecified exit node.  Allowed and expected exit node bbids can
-    be specified using [allowed_exits]. *)
-val exit_check_astcfg : ?allowed_exits:(Cfg.bbid list) -> ?expected_exits:(Cfg.bbid list) -> Cfg.AST.G.t sanityf
-
-(** [exit_check_ssacfg g s] raises an exception iff g contains an
-    unspecified exit node.  Allowed and expected exit node bbids can
-    be specified using [allowed_exits]. *)
-val exit_check_ssacfg : ?allowed_exits:(Cfg.bbid list) -> ?expected_exits:(Cfg.bbid list) -> Cfg.SSA.G.t sanityf
-
-(** Build an acyclic check for other graphs *)
-module MakeExitCheck :
-  functor (C : Cfg.CFG) ->
-    sig
-      (** [exit_check_ssacfg g s] raises an exception iff g contains
-          an unspecified exit node.  Allowed and expected exit node
-          bbids can be specified using [allowed_exits]. *)
-      val exit_check : ?allowed_exits:(Cfg.bbid list) -> ?expected_exits:(Cfg.bbid list) -> C.G.t sanityf
-    end

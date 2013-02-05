@@ -1,11 +1,10 @@
-include ../Makefile.config
 include $(PIQI_ROOT)/make/Makefile.dirs
 
 
 # Are Protocol Buffers tools installed? Assuming here that the C++ .so libraries
 # are installed as well.
 ifneq ($(shell which protoc), )
-DIRS_PROTO = \
+DIRS_DEPENDING_ON_PROTO = \
        piqi_proto \
        piqi_proto1 \
        piqi_packed \
@@ -20,7 +19,6 @@ DIRS_ERLANG = \
 	erlang_perf \
 	erlang_packed \
 	erlang_misc \
-	erlang_import \
 
 
 DIRS_OCAML = \
@@ -32,33 +30,17 @@ DIRS_OCAML = \
        ocaml_misc \
        ocaml_custom_types \
        ocaml_piq_config \
-       ocaml_riak_pb \
 
 
 DIRS = \
        examples \
-       self_spec \
-       piqi_misc \
+       piqi.org \
        piqi_server \
-       piqi_compile \
        $(DIRS_OCAML) \
-       $(DIRS_PROTO)
+       $(DIRS_DEPENDING_ON_PROTO)
 
 
-.PHONY: ocaml ocaml-clean erlang erlang-clean proto proto-clean
-
-
-proto:
-	set -e; \
-	for i in $(DIRS_PROTO); do \
-		$(MAKE) -C $$i; \
-	done
-
-
-proto-clean:
-	for i in $(DIRS_PROTO); do \
-		$(MAKE) -C $$i clean; \
-	done
+.PHONY: ocaml ocaml-clean erlang erlang-clean
 
 
 ocaml:

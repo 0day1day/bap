@@ -217,20 +217,17 @@ struct
 
   type myctx = (MemL.t,Form.t) ctx
 
+  (* Exceptions *)
+  exception ExcState of string * addr
+
   (* Program halted, with optional halt value, and with given execution context. *)
   exception Halted of varval option * myctx
 
   (* An unknown label was found *)
   exception UnknownLabel of label_kind
 
-  (* An error occured *)
-  exception Error of string * myctx
-
   (* An assertion failed *)
   exception AssertFailed of myctx
-
-  (* An assumption failed, so the program did not start *)
-  exception AssumptionFailed of myctx
 
   let byte_type = reg_8
   let index_type = reg_32
@@ -535,12 +532,6 @@ struct
 	       raise (AssertFailed({ctx with pred = pred}))
              | _ -> [{ctx with pc=next_pc}]
           )
-      | Assume (e,_) ->
-        (match eval_expr delta e with
-        | v when is_true_val v -> [{ctx with pc=next_pc}]
-        | v when is_false_val v ->
-          raise (AssumptionFailed(ctx))
-        | _ -> failwith "Symbolic assumptions are not supported by the symbolic evaluator")
       | Comment _ | Label _ ->
           [{ctx with pc=next_pc}]
       | Special _ as s -> 
@@ -554,8 +545,7 @@ struct
     try
       let stmt = inst_fetch state.sigma state.pc in
       dprintf "Executing %s" (Pp.ast_stmt_to_string stmt);
-      if debug () then (print_values state.delta;
-                        print_mem state.delta);
+      if debug () then print_values state.delta;
       eval_stmt state stmt
     with Failure str ->
       (prerr_endline ("Evaluation aborted at stmt No-"
@@ -976,7 +966,8 @@ struct
     let formula = Form.output_formula form_t in
     let mem_hash = Memory2array.create_state () in
     let formula = Memory2array.coerce_exp_state mem_hash formula in
-    let () = printer#assert_ast_exp formula in
+    let foralls = [] in
+    let () = printer#assert_ast_exp_with_foralls foralls formula in
     let () = printer#counterexample in
     printer#close
 end
@@ -1060,7 +1051,6 @@ end
 
 
 module Symbolic = Make(SymbolicMemL)(FastEval)(StdAssign)(StdForm)
-module SymbolicSlowMap = Make(BuildSymbolicMemL(MemVMBackEnd))(SlowEval)(StdAssign)(StdForm)
 module SymbolicSlow = Make(SymbolicMemL)(SlowEval)(StdAssign)(StdForm)
 
 module Concrete = Make(ConcreteUnknownZeroMemL)(AlwaysEvalLet)(StdAssign)(StdForm)

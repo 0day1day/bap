@@ -1,5 +1,5 @@
 (*
-   Copyright 2009, 2010, 2011, 2012, 2013 Anton Lavrik
+   Copyright 2009, 2010, 2011, 2012 Anton Lavrik
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -14,7 +14,8 @@
    limitations under the License.
 *)
 
-module U = Piqi_util
+
+open Piqi_common
 
 
 let has_parent name =
@@ -41,11 +42,13 @@ let get_local_name x =
     Not_found -> x
 
 
-let is_scoped_name name = String.contains name '/'
-
-
 let split_name x =
   get_module_name x, get_local_name x
+
+
+let make_local_name modname =
+  let name = get_local_name modname in
+  underscores_to_dashes name
 
 
 let is_valid_char allow = function
@@ -78,6 +81,11 @@ let some f = function
   | None -> true
   | Some x -> f x
     
+
+let is_valid_scoped_name x =
+  let m, n = split_name x in
+  some is_valid_name m && is_valid_name n
+
 
 let is_valid_pathname x =
   (* TODO: check domain name and URL/paths validity *)
@@ -130,11 +138,8 @@ let is_normal_name s =
   aux 0
 
 
-(* convert an arbitary valid name to lowercase name which words are separated by
- * dashes; for example "CamelCase" will become "camel-case"; already lowercased
- * names will remain intact *)
 let normalize_name s =
   if is_normal_name s
   then s
-  else U.string_of_list (normalize_list (U.list_of_string s))
+  else string_of_list (normalize_list (list_of_string s))
 

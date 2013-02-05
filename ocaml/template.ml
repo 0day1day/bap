@@ -46,7 +46,6 @@ struct
     val jmp     : (Ast.exp * Ast.attrs) -> process_stmt
     val cjmp    : (Ast.exp * Ast.exp * Ast.exp * Ast.attrs) -> process_stmt
     val assertt : (Ast.exp * Ast.attrs) -> process_stmt
-    val assume : (Ast.exp * Ast.attrs) -> process_stmt
     val comment : 'a -> process_stmt
     val label   : 'a -> process_stmt
     val special : (string * Ast.attrs) -> process_stmt
@@ -76,7 +75,6 @@ struct
       | Jmp j     -> Stmt.jmp j
       | CJmp c    -> Stmt.cjmp c
       | Assert a  -> Stmt.assertt a
-      | Assume a  -> Stmt.assume a
       | Comment c -> Stmt.comment c
       | Label l   -> Stmt.label l
       | Special s -> Stmt.special s

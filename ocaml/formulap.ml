@@ -46,7 +46,8 @@ class virtual fpp =
 object(self)
   method virtual forall : VH.key list -> unit
   method virtual ast_exp : Ast.exp -> unit
-  method virtual assert_ast_exp : ?exists:(var list) -> ?foralls:(var list) -> Ast.exp -> unit
+  method virtual assert_ast_exp : Ast.exp -> unit
+  method virtual assert_ast_exp_with_foralls : ?fvars:bool -> VH.key list -> Ast.exp -> unit
   method virtual valid_ast_exp : ?exists:(var list) -> ?foralls:(var list) -> Ast.exp -> unit
   method virtual counterexample : unit
 end

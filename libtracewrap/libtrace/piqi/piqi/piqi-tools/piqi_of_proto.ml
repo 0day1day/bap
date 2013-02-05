@@ -1,6 +1,6 @@
-(*pp camlp4o -I `ocamlfind query ulex` -I `ocamlfind query piqi.syntax` pa_labelscope.cmo pa_openin.cmo pa_ulex.cma *)
+(*pp camlp4o -I `ocamlfind query piqi.ulex` -I `ocamlfind query piqi.syntax` pa_labelscope.cmo pa_openin.cmo pa_ulex.cma *)
 (*
-   Copyright 2009, 2010, 2011, 2012, 2013 Anton Lavrik
+   Copyright 2009, 2010, 2011, 2012 Anton Lavrik
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -15,9 +15,6 @@
    limitations under the License.
 *)
 
-(*
- * conversion from Protocol Buffers definition files (.proto) to .piqi
- *)
 
 module D = Descriptor_piqi
 
@@ -38,13 +35,10 @@ module Idtable =
   struct
     module M = Map.Make(String)
 
-    type path = string list
-
     type t =
       {
         mutable names : (string * string) M.t; (* proto name -> (piqi name, file) *)
         mutable imports : string M.t; (* import file -> import name *)
-        mutable extensions : ((path * ProtoField.t) list) M.t; (* extendee -> extensions *)
         mutable package : string option; (* current package *)
         mutable file : string; (* current file *)
       }
@@ -56,7 +50,6 @@ module Idtable =
         imports = M.empty;
         package = None;
         file = "";
-        extensions = M.empty;
       }
 
 
@@ -66,14 +59,12 @@ module Idtable =
       ()
 
 
-    let make_fq_proto_name idtable proto_name =
-      match idtable.package with
-        | None -> "." ^ proto_name
-        | Some x -> "." ^ x ^ "." ^ proto_name
-
-
     let add_name idtable proto_name piqi_name =
-      let proto_name = make_fq_proto_name idtable proto_name in
+      let proto_name =
+        match idtable.package with
+          | None -> "." ^ proto_name 
+          | Some x -> "." ^ x ^ "." ^ proto_name
+      in
       debug "Idtable.add_name: %s -> %s\n" proto_name piqi_name;
       let value = (piqi_name, idtable.file) in
       idtable.names <- M.add proto_name value idtable.names
@@ -106,29 +97,9 @@ module Idtable =
                 (* basename + chop all extensions + underscores to dashes *)
                 let basename = Filename.basename file in
                 let basename = Piqi_file.chop_all_extensions basename in
-                U.underscores_to_dashes basename
+                Piqi_name.make_local_name basename
         in
         import_name ^ "/" ^ piqi_name
-
-
-    (* add another extension to the list of extensions stored per extendee *)
-    let add_extension idtable extendee extension =
-      debug "Idtable.add_extension: %s\n" extendee;
-      let l =
-        try M.find extendee idtable.extensions
-        with Not_found -> []
-      in
-      idtable.extensions <- M.add extendee (extension::l) idtable.extensions
-
-
-    (* find extensions by local proto_name *)
-    let find_extensions idtable proto_name =
-      let proto_name = make_fq_proto_name idtable proto_name in
-      debug "Idtable.find_extensions: %s\n" proto_name;
-      try
-        let l = M.find proto_name idtable.extensions in
-        List.rev l
-      with Not_found -> []
   end
 
 
@@ -157,7 +128,7 @@ let make_proto_name path =
 let format_name n =
   if !flag_normalize
   then Piqi_name.normalize_name n
-  else U.underscores_to_dashes n
+  else underscores_to_dashes n
 
 
 let make_piqi_name path =
@@ -171,12 +142,12 @@ let gen_enum_value path x =
   let piqi_name = format_name name in
   let proto_name =
     match path with
-      | [] -> iol [] (* empty -- no need for separate .protobuf-name *)
+      | [] -> iol [] (* empty -- no need for separate .proto-name *)
       | _ ->
           (* after formatting and probably normalizing name we need to convert
            * dashes back to underscores *)
-          let n = U.dashes_to_underscores (make_piqi_name (name :: path)) in
-          ios ".protobuf-name " ^^ ioq n
+          let n = dashes_to_underscores (make_piqi_name (name :: path)) in
+          ios ".proto-name " ^^ ioq n
   in
   iod " " [
     ios ".option [";
@@ -326,13 +297,13 @@ let gen_builtin_type = function
   | `type_double -> "float64"
   | `type_float -> "float32"
 
-  | `type_int64 -> "protobuf-int64"
+  | `type_int64 -> "proto-int64"
   | `type_uint64 -> "uint64"
   | `type_fixed64 -> "uint64-fixed"
   | `type_sfixed64 -> "int64-fixed"
   | `type_sint64 -> "int64"
 
-  | `type_int32 -> "protobuf-int32"
+  | `type_int32 -> "proto-int32"
   | `type_uint32 -> "uint32"
   | `type_fixed32 -> "uint32-fixed"
   | `type_sfixed32 -> "int32-fixed"
@@ -401,7 +372,7 @@ let gen_field_internals idtable ?(path=[]) x =
       | None -> ""
       | Some x ->
           if x.D.Field_options#packed = Some true
-          then ".protobuf-packed"
+          then ".wire-packed"
           else ""
   in
   iod "\n" [
@@ -423,8 +394,16 @@ let gen_field idtable ?path x =
   ]
 
 
-let gen_extension_field idtable (path, field) =
-  gen_field idtable field ~path
+(* NOTE: path is used only for nested extensions *)
+let gen_extension idtable ?path x =
+  let open ProtoField in
+  let type_name = gen_type idtable (some_of x.extendee) in
+  iod "\n" [
+    ios ".extend [";
+      ios ".typedef " ^^ ios type_name;
+      ios ".with" ^^ gen_field idtable ?path x;
+    ios "]";
+  ]
 
 
 let rec gen_message idtable ?(path=[]) x =
@@ -432,33 +411,29 @@ let rec gen_message idtable ?(path=[]) x =
   let path = (some_of x.name) :: path in
   let name = make_piqi_name path in
   let fields = List.map (gen_field idtable) x.field in
-
-  let proto_name = make_proto_name path in
-  let extensions = Idtable.find_extensions idtable proto_name in
-  let extension_fields = List.map (gen_extension_field idtable) extensions in
-
   let record =
     iod "\n" [
       ios ".record [";
         ios ".name " ^^ ios name;
         iol fields;
-        iol extension_fields;
       ios "]"
     ]
   in
   (* gen nested definitions *)
   let messages = List.map (gen_message idtable ~path) x.nested_type in
   let enums = List.map (gen_enum ~path) x.enum_type in
+  let extensions = List.map (gen_extension idtable ~path) x.extension in
   iod "\n" [
     record;
     iod "\n" messages;
     iod "\n" enums;
+    iod "\n" extensions;
   ]
 
 
 let gen_modname filename =
   (* XXX: revert slashes just in case *)
-  let filename = U.string_subst_char filename '\\' '/' in
+  let filename = string_subst_char filename '\\' '/' in
   let modname = Piqi_file.chop_all_extensions filename in
   modname
 
@@ -485,12 +460,49 @@ let gen_import idtable fname =
   ]
 
 
+let process_enum idtable ?(path=[]) x =
+  let open ProtoEnum in
+  begin
+    let path = (some_of x.name) :: path in
+    let proto_name = make_proto_name path in
+    let piqi_name = make_piqi_name path in
+    Idtable.add_name idtable proto_name piqi_name
+  end
+
+
+let rec process_message idtable ?(path=[]) x =
+  let open ProtoMessage in
+  begin
+    let path = (some_of x.name) :: path in
+    let proto_name = make_proto_name path in
+    let piqi_name = make_piqi_name path in
+    Idtable.add_name idtable proto_name piqi_name;
+    (* process nested definitions *)
+    List.iter (process_message idtable ~path) x.nested_type;
+    List.iter (process_enum idtable ~path) x.enum_type;
+  end
+
+
+let process_proto idtable (x:ProtoFile.t) =
+  let open ProtoFile in
+  begin
+    Idtable.enter_package idtable x.package (some_of x.name);
+    List.iter (process_message idtable) x.message_type;
+    List.iter (process_enum idtable) x.enum_type;
+    (* XXX: what about extensions? *)
+  end
+
+
 let gen_local_modname filename = 
   let modname = gen_modname filename in
-  let name = Piqi_name.get_local_name modname in
-  (* import name is mandatory when modname contain underscores *)
-  let is_optional = not (String.contains name '_') in
-  U.underscores_to_dashes name, is_optional
+  let name = Piqi_name.make_local_name modname in
+  let path_name = Piqi_name.get_local_name modname in
+  let is_optional =
+    (* import name is mandatory when modname doesn't contain a valid local name
+     *)
+    (name = path_name)
+  in
+  name, is_optional
 
 
 let name_imports idtable filenames =
@@ -527,18 +539,17 @@ let name_imports idtable filenames =
 let gen_proto idtable (x:ProtoFile.t) =
   let open ProtoFile in
   begin
+    process_proto idtable x;
     name_imports idtable x.dependency;
-
-    (* this is needed for resolving extensions *)
-    Idtable.enter_package idtable x.package (some_of x.name);
 
     let imports = List.map (gen_import idtable) x.dependency in
     let messages = List.map (gen_message idtable) x.message_type in
     let enums = List.map gen_enum x.enum_type in
+    let extensions = List.map (gen_extension idtable) x.extension in
     let package =
       match x.package with
         | None -> iol []
-        | Some x -> ios ".protobuf-package " ^^ ioq x
+        | Some x -> ios ".proto-package " ^^ ioq x
     in
     let code =
       iod "\n" [
@@ -546,47 +557,9 @@ let gen_proto idtable (x:ProtoFile.t) =
         iod "\n" imports;
         iod "\n" messages;
         iod "\n" enums;
+        iod "\n" extensions;
       ]
     in code
-  end
-
-
-let process_enum idtable ?(path=[]) x =
-  let open ProtoEnum in
-  begin
-    let path = (some_of x.name) :: path in
-    let proto_name = make_proto_name path in
-    let piqi_name = make_piqi_name path in
-    Idtable.add_name idtable proto_name piqi_name
-  end
-
-
-let process_extension idtable ?(path=[]) x =
-  let open ProtoField in
-  Idtable.add_extension idtable (some_of x.extendee) (path, x)
-
-
-let rec process_message idtable ?(path=[]) x =
-  let open ProtoMessage in
-  begin
-    let path = (some_of x.name) :: path in
-    let proto_name = make_proto_name path in
-    let piqi_name = make_piqi_name path in
-    Idtable.add_name idtable proto_name piqi_name;
-    (* process nested definitions *)
-    List.iter (process_message idtable ~path) x.nested_type;
-    List.iter (process_enum idtable ~path) x.enum_type;
-    List.iter (process_extension idtable ~path) x.extension;
-  end
-
-
-let process_proto idtable (x:ProtoFile.t) =
-  let open ProtoFile in
-  begin
-    Idtable.enter_package idtable x.package (some_of x.name);
-    List.iter (process_message idtable) x.message_type;
-    List.iter (process_enum idtable) x.enum_type;
-    List.iter (process_extension idtable) x.extension;
   end
 
 
@@ -599,15 +572,12 @@ let process_proto_set (x:ProtoFileSet.t) =
   let idtable = Idtable.empty in
   let rec aux = function
     | [] -> piqi_error "input FileDescriptorSet is empty"
-    | [x] ->
-        process_proto idtable x; x
+    | [x] -> x
     | h::t ->
         process_imported_proto idtable h;
         aux t
   in
-  (* process all the .proto modules and return the last one *)
   let proto = aux x.file in
-  (* generate .piqi from the last .proto module *)
   gen_proto idtable proto
 
 
@@ -620,7 +590,6 @@ let usage = "Usage: piqi of-proto [options] <.proto file>\nOptions:"
 
 let speclist =
   [
-    arg__debug;
     arg_o;
 
    "-I", Arg.String add_path,
@@ -651,8 +620,8 @@ let proto_to_wire ifile ofile =
 
 
 let read_proto_wire ifile =
-  let protobuf = Piq.open_pb ifile in
-  let proto_set = D.parse_file_descriptor_set protobuf in
+  let wireobj = Piq.open_pb ifile in
+  let proto_set = D.parse_file_descriptor_set wireobj in
   proto_set
 
 

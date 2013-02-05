@@ -18,7 +18,7 @@
         .name ee
         .type ee
         .repeated
-        .protobuf-packed
+        .wire-packed
     ]
 ]
 
@@ -26,6 +26,6 @@
 .list [
     .name ee-list
     .type ee
-    .protobuf-packed
+    .wire-packed
 ]
 

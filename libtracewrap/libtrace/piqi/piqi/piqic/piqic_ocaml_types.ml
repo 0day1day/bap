@@ -1,6 +1,6 @@
 (*pp camlp4o -I `ocamlfind query piqi.syntax` pa_labelscope.cmo pa_openin.cmo *)
 (*
-   Copyright 2009, 2010, 2011, 2012, 2013 Anton Lavrik
+   Copyright 2009, 2010, 2011, 2012 Anton Lavrik
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -20,8 +20,7 @@
  * generation of Ocaml type declarations
  *)
 
-module C = Piqi_common
-open C
+open Piqi_common
 open Iolist
 
 
@@ -53,14 +52,14 @@ let top_modname = ref ""
 let scoped_name name = !top_modname ^ "." ^ name
 
 
-let typedef_mlname = function
+let piqdef_mlname = function
   | `record t -> some_of t.R#ocaml_name
   | `variant t -> some_of t.V#ocaml_name
   | `enum t -> some_of t.E#ocaml_name
   | `alias t -> some_of t.A#ocaml_name
   | `list t -> some_of t.L#ocaml_name
   | _ ->
-      (* this function will be called only for named types (i.e. typedefs) *)
+      (* this function will be called only for named types (i.e. piqdefs) *)
       assert false
 
 
@@ -86,7 +85,7 @@ let rec gen_piqtype t ocaml_type =
           | `int -> "int"
           | `float -> "float"
           | `bool -> "bool"
-          | `string | `binary -> "string"
+          | `string | `word | `binary | `text -> "string"
           | `any ->
               if !Piqic_common.is_self_spec
               then scoped_name "any"
@@ -101,26 +100,28 @@ let rec gen_piqtype t ocaml_type =
 and gen_aliastype a =
   let open Alias in
   let ocaml_name = some_of a.ocaml_name in
-  let typename = gen_piqtype (some_of a.piqtype) a.ocaml_type in
+  let typename = gen_typeref a.typeref ?ocaml_type:a.ocaml_type in
   if ocaml_name = typename
   then ocaml_name (* don't generate aliases for built-in types *)
   else gen_deftype a.parent a.ocaml_name
 
 
-let ios_gen_piqtype ?ocaml_type (t :T.piqtype) =
-  ios (gen_piqtype t ocaml_type)
+and gen_typeref ?ocaml_type (t:T.typeref) =
+  gen_piqtype (piqtype t) ocaml_type
+
+
+let ios_gen_typeref ?ocaml_type t = ios (gen_typeref ?ocaml_type t)
 
 
 let gen_field_type f =
   let open F in
-  match f.piqtype with
+  match f.typeref with
     | None -> ios "bool"; (* flags are represented as booleans *)
     | Some t ->
-      let deftype = ios_gen_piqtype t in
+      let deftype = ios_gen_typeref t in
       match f.mode with
         | `required -> deftype
-        | `optional when f.default <> None && (not f.ocaml_optional) ->
-            deftype (* optional + default *)
+        | `optional when f.default <> None -> deftype (* optional + default *)
         | `optional -> deftype ^^ ios " option"
         | `repeated ->
             deftype ^^
@@ -129,21 +130,21 @@ let gen_field_type f =
             else ios " list"
 
 
-let mlname_of name piqtype =
-  match name, piqtype with
+let mlname_of name typeref =
+  match name, typeref with
     | Some n, _ -> n
-    | None, Some t -> typedef_mlname t
+    | None, Some t -> piqdef_mlname t
     | _ -> assert false
 
 
 (* XXX: move this functionality to mlname_*. mlname assignment should be done
  * once rahter than calling it from every place where it is needed *)
 let mlname_of_field f =
-  let open F in mlname_of f.ocaml_name f.piqtype
+  let open F in mlname_of f.ocaml_name f.typeref
 
 
 let mlname_of_option o =
-  let open O in mlname_of o.ocaml_name o.piqtype
+  let open O in mlname_of o.ocaml_name o.typeref
 
 
 let gen_field f = 
@@ -201,21 +202,17 @@ let is_local_def def =
 
 let gen_option o =
   let open Option in
-  match o.ocaml_name, o.piqtype with
-    | None, Some ((`variant v) as def) ->
+  match o.ocaml_name, o.typeref with
+    | None, Some ((`variant v) as def) | None, Some ((`enum v) as def) ->
         (* NOTE: for some reason, ocaml complains about fully qualified
          * polymorphic variants in recursive modules, so we need to use
          * non-qualified names in this case *)
         if is_local_def def
         then ios (some_of v.V#ocaml_name)
-        else ios_gen_piqtype def
-    | None, Some ((`enum e) as def) ->
-        if is_local_def def
-        then ios (some_of e.E#ocaml_name)
-        else ios_gen_piqtype def
+        else ios_gen_typeref def
     | _, Some t ->
         let n = gen_pvar_name (mlname_of_option o) in
-        n ^^ ios " of " ^^ ios_gen_piqtype t
+        n ^^ ios " of " ^^ ios_gen_typeref t
     | Some mln, None -> gen_pvar_name mln
     | None, None -> assert false
 
@@ -224,42 +221,28 @@ let gen_alias a =
   let open Alias in
   iol [
     ios (some_of a.ocaml_name); ios " = ";
-      ios_gen_piqtype (some_of a.piqtype) ?ocaml_type:a.ocaml_type ]
+      ios_gen_typeref a.typeref ?ocaml_type:a.ocaml_type ]
 
 
 let gen_list l =
   let open L in
   iol [
     ios (some_of l.ocaml_name); ios " = ";
-      ios_gen_piqtype (some_of l.piqtype);
+      ios_gen_typeref l.typeref;
       if l.ocaml_array
       then ios " array"
       else ios " list";
   ]
 
 
-let gen_options options =
-  let var_defs =
-    iod "|" (List.map gen_option options)
-  in
-  iol [ios "["; var_defs; ios "]"]
-
-
 let gen_variant v =
   let open Variant in
-  iol [
+  let var_defs =
+    iod "|" (List.map gen_option v.option)
+  in iol [
     ios (some_of v.ocaml_name);
     ios " = ";
-    gen_options v.option;
-  ]
-
-
-let gen_enum e =
-  let open Enum in
-  iol [
-    ios (some_of e.ocaml_name);
-    ios " = ";
-    gen_options e.option;
+    iol [ios "["; var_defs; ios "]"]
   ]
 
 
@@ -271,8 +254,7 @@ let gen_record r =
 
 let gen_def = function
   | `record t -> gen_record t
-  | `variant t -> gen_variant t
-  | `enum t -> gen_enum t
+  | `variant t | `enum t -> gen_variant t
   | `list t -> gen_list t
   | _ -> assert false
 
@@ -280,7 +262,7 @@ let gen_def = function
 let gen_alias a =
   let open Alias in
   let name = some_of a.ocaml_name in
-  let typename = gen_piqtype (some_of a.piqtype) a.ocaml_type in
+  let typename = gen_typeref a.typeref ?ocaml_type:a.ocaml_type in
   if name = typename
   then [] (* don't generate cyclic type abbreviation *)
   else [ gen_alias a ]
@@ -297,9 +279,9 @@ let gen_mod_def = function
   | _ -> []
 
 
-let gen_defs (defs:T.typedef list) =
-  let mod_defs = U.flatmap gen_mod_def defs in
-  let odefs = U.flatmap gen_def defs in
+let gen_defs (defs:T.piqdef list) =
+  let mod_defs = flatmap gen_mod_def defs in
+  let odefs = flatmap gen_def defs in
   let odef =
     let odef =
       if odefs = []
@@ -358,18 +340,27 @@ let gen_imports l =
  * variants in recursive modules, so instead of relying on OCaml, we need to
  * preorder variants ourselves without relying on OCaml to figure out the order
  * automatically *)
-let order_variant_defs variants =
+let order_defs defs =
+  (* we apply this specific ordering only to variants, to be more specific --
+   * only to those variants that include other variants by not specifying tags
+   * for the options *)
+  let variants, rest =
+    List.partition (function
+      | `variant x | `enum x -> true
+      | _ -> false)
+    defs
+  in
   (* topologically sort local variant defintions *)
   let cycle_visit def =
     Piqi_common.error def
-      ("cyclic OCaml variant definition: " ^ typedef_name def)
+      ("cyclic OCaml variant definition: " ^ piqdef_name def)
   in
   let get_adjacent_vertixes = function
     | `variant v ->
         (* get the list of included variants *)
-        U.flatmap (fun o ->
+        flatmap (fun o ->
           let open O in
-          match o.ocaml_name, o.piqtype with
+          match o.ocaml_name, o.typeref with
             | None, Some ((`variant _) as def)
             | None, Some ((`enum _) as def) ->
                 if is_local_def def (* omit any imported definitions *)
@@ -379,53 +370,14 @@ let order_variant_defs variants =
         ) v.V#option
     | _ -> []
   in
-  Piqi_graph.tsort variants get_adjacent_vertixes ~cycle_visit
-
-
-(* make sure we define aliases for built-in ocaml types first; some aliases
- * (e.g. float) can override the default OCaml type names which results in
- * cyclic type definitions without such ordering *)
-let order_alias_defs alias_defs =
-  let rank def =
-    match def with
-      | `alias x ->
-          if C.is_builtin_def def
-          then
-            (* aliases of built-in OCaml types go first *)
-            if x.A#ocaml_type <> None then 1 else 2
-          else 100
-      | _ ->
-          assert false
-  in
-  let compare_alias_defs a b =
-    rank a - rank b
-  in
-  List.stable_sort compare_alias_defs alias_defs
-
-
-let order_defs defs =
-  (* we apply this specific ordering only to variants, to be more specific --
-   * only to those variants that include other variants by not specifying tags
-   * for the options *)
-  let variants, rest =
-    List.partition (function
-      | `variant _ | `enum _ -> true
-      | _ -> false)
-    defs
-  in
-  let aliases, rest =
-    List.partition (function
-      | `alias _ -> true
-      | _ -> false)
-    rest
-  in
-  (* return the updated list of definitions with sorted variants and aliases *)
-  (order_alias_defs aliases) @ (order_variant_defs variants) @ rest
+  let variants = Piqi_graph.tsort variants get_adjacent_vertixes ~cycle_visit in
+  (* return the updated list of definitions with sorted variants *)
+  variants @ rest
 
 
 let gen_piqi (piqi:T.piqi) =
   iol [
     gen_imports piqi.P#resolved_import;
-    gen_defs (order_defs piqi.P#resolved_typedef);
+    gen_defs (order_defs piqi.P#resolved_piqdef);
   ]
 

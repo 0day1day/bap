@@ -1,4 +1,3 @@
-include ../Makefile.config
 include $(PIQI_ROOT)/make/Makefile.ocaml
 include $(PIQI_ROOT)/piqilib/Makefile.piqi_common
 
@@ -40,9 +39,9 @@ all: nc
 debug: dc top
 
 
-piqi_lang_piqi.ml: $(wildcard *.piqi)
+piqi_piqi.ml: $(wildcard *.piqi)
 	$(PIQICC) $(PIQICC_FLAGS) -o $@.tmp.ml \
-		--spec piqi.piqi --lang piqi-lang.piqi --impl piqi-impl.piqi
+		--boot piqi-boot.piqi --lang piqi-lang.piqi --impl piqi-impl.piqi
 	$(CAMLP4_O) -o $@ $@.tmp.ml
 
 

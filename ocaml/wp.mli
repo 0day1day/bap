@@ -21,33 +21,10 @@
     @param q is the post-condition.
 *)
 val wp : ?simp:(Ast.exp -> Ast.exp) -> Gcl.t -> Ast.exp -> Ast.exp
-
-(** [passified_wp] is similar to {!wp}, but is intended for passified
-    programs.  Unlike {!wp} it does not duplicate the post-condition. *)
-val passified_wp : ?simp:(Ast.exp -> Ast.exp) -> Gcl.t -> Ast.exp -> Ast.exp
-
-val build_uwp : (Gcl.t -> Ast.exp -> Ast.exp) -> Gcl.Ugcl.t -> Ast.exp -> Ast.exp
-(** [build_uwp wp] uses the GCL-based weakest precondition algorithm
-    for non-passified programs [wp] and builds an unstructured weakest
-    precondition algorithm from it. See "Weakest-Precondition of
-    Unstructured Programs" by Barnett for the general technique. *)
-
-val dijkstra_uwp : Gcl.Ugcl.t -> Ast.exp -> Ast.exp
-(** [dijkstra_wp] is [build_uwp Wp.wp] *)
-
-val build_passified_uwp : ((Cfg.AST.G.V.t -> unit) -> Cfg.AST.G.t -> unit) -> (Gcl.t -> Ast.exp -> Ast.exp) -> Gcl.Ugcl.t -> Ast.exp -> Ast.exp
-(** [build_passified_uwp iter wp] uses the GCL-based weakest
-    precondition algorithm [wp] for passified programs and builds an
-    unstructured weakest precondition algorithm from it. [iter]
-    specifies the iteration strategy, e.g., reverse topological
-    order. See "Weakest-Precondition of Unstructured Programs" by
-    Barnett for the general technique. *)
-
-val efficient_uwp : Gcl.Ugcl.t -> Ast.exp -> Ast.exp
-(** [efficient_uwp] is [build_passified_uwp RToposort.iter Wp.wp]. Note that the
-    [Choice] rule is not used, which is the only inefficient aspect of
-    [Wp.wp]. *)
-
+val uwp : ?simp:(Ast.exp -> Ast.exp) -> Ugcl.t -> Ast.exp -> Ast.exp
+(** Same as {!wp}, but avoids converting the program to GCL. See
+    "Weakest-Precondition of Unstructured Programs" by Barnett for the
+    general technique. *)
 val efficient_wp : ?simp:(Ast.exp -> Ast.exp) -> Gcl.t -> Ast.exp -> Ast.exp
 (** [efficient_wp p q] computes [wp(p,q)] using an algorithm that
     guarantees the resulting precondition will be linear in the size
@@ -62,9 +39,12 @@ val efficient_wp : ?simp:(Ast.exp -> Ast.exp) -> Gcl.t -> Ast.exp -> Ast.exp
 
     @param q is the post-condition.
 *)
+val efficient_uwp :
+  ?simp:(Ast.exp -> Ast.exp) -> Ugcl.t -> Ast.exp -> Ast.exp
+(** Same as {!efficient_wp} but does not convert to GCL. *)
 
 val flanagansaxe :
-  ?simp:(Ast.exp -> Ast.exp) ->
+  ?simp:('a -> 'a) ->
   ?less_duplication:bool -> ?k:int -> Type.formula_mode -> Gcl.t -> Ast.exp -> Ast.exp
 (** [flanagansaxe mode p q] computes [wp(p,q)] using Flanagan and
     Saxe's algorithm. The [mode] argument specifies whether the formula
@@ -73,7 +53,7 @@ val flanagansaxe :
 (** {5 Directionless Weakest Precondition Algorithms} *)
 
 val dwp_1st :
-  ?simp:(Ast.exp -> Ast.exp) ->
+  ?simp:('a -> 'a) ->
   ?less_duplication:bool ->
   ?k:int -> Gcl.t -> Ast.exp -> Ast.var list * Ast.exp
 (** [dwp_1st p q] returns a tuple [(vars, pc)] where [pc] is [wp(p,q)]
@@ -81,7 +61,7 @@ val dwp_1st :
     foralls. *)
 
 val dwp :
-  ?simp:(Ast.exp -> Ast.exp) ->
+  ?simp:('a -> 'a) ->
   ?less_duplication:bool -> ?k:int -> Type.formula_mode -> Gcl.t -> Ast.exp -> Ast.exp
 (** [dwp mode p q] is the same as {!dwp_1st}, except it generates a
     precondition that does not need quantifiers.  However, the [mode]
@@ -89,27 +69,8 @@ val dwp :
     for satisfiability or validity. *)
 
 val dwp_let :
-  ?simp:(Ast.exp -> Ast.exp) ->
+  ?simp:('a -> 'a) ->
   ?less_duplication:bool -> ?k:int -> Type.formula_mode -> Gcl.t -> Ast.exp -> Ast.exp
 (** [dwp_let] is just like {!dwp}, except that [dwp_let] wraps helper
     variables in [Let] expressions so they do not appear as free
     variables. *)
-
-(** {5 Utility Functions for Building WP Algorithms} *)
-
-val variableify :
-  ?name:string -> int -> (Ast.var * Ast.exp) list -> Ast.exp -> (Ast.var * Ast.exp) list * Ast.exp
-(** When given a list of variable assignments [v], [variableify s v e]
-    returns a tuple [(v',e')] where [v'] is an updated list of
-    variable assignments, and [e'] is guaranteed to be at most [s] in
-    size. Use this function to avoid duplicating large expressions in
-    formulas. *)
-
-val assignments_to_exp : (Ast.var * Ast.exp) list -> Ast.exp
-(** Convert a list of variable assignments, such as those returned by
-    {!variableify}, to a single expression. *)
-
-val assignments_to_lets : (Ast.var * Ast.exp) list -> Ast.exp -> Ast.exp
-(** [assignments_to_lets vars e] converts a list of variable
-    assignments, such as those returned by {!variableify}, to let bindings
-    surrounding expression [e]. *)

@@ -1,5 +1,5 @@
 (*
-   Copyright 2009, 2010, 2011, 2012, 2013 Anton Lavrik
+   Copyright 2009, 2010, 2011, 2012 Anton Lavrik
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -53,16 +53,17 @@ let open_output = function
         piqi_error ("failed to open output file: " ^ s)
 
 
-(* close previously opened output channel *)
 let close_output () =
+  close_out !och
+
+
+let close () =
   if !och != stdout
-  then close_out !och
+  then close_out !och;
 
-
-(* close previously opened input channel *)
-let close_input () =
   if !ich != stdin
-  then close_in !ich
+  then close_in !ich;
+  ()
 
 
 let tmp_files = ref []
@@ -77,9 +78,7 @@ let delete_file fname =
 
 
 let cleanup () =
-  close_input ();
-  close_output ();
-
+  close ();
   (* remove temporary files *)
   if not !flag_leave_tmp_files
   then List.iter delete_file !tmp_files;
@@ -156,9 +155,9 @@ let arg__debug =
    "--debug", Arg.Set_int Config.debug_level,
      "<level> debug level; any number greater than 0 turns on debug messages"
 
-let arg__no_builtin_types =
-   "--no-builtin-types", Arg.Set Config.flag_no_builtin_types,
-     "don't include built-in type definitions while processing .piqi"
+let arg__noboot =
+   "--noboot", Arg.Set Config.noboot,
+     "don't boot, i.e. don't use boot definitions while processing .piqi"
 
 let arg__strict =
    "--strict", Arg.Set Config.flag_strict,
@@ -175,7 +174,7 @@ let common_speclist =
    arg__no_warnings;
    arg__trace;
    arg__debug;
-   arg__no_builtin_types;
+   arg__noboot;
   ]
 
 
@@ -196,14 +195,6 @@ let parse_args
     begin
       Arg.usage speclist usage;
       exit 3;
-    end
-  else
-    begin
-      (* check location DB consistency on all debug levels *)
-      if !Piqi_config.debug_level >= 1 then Piqloc.check := true;
-      (* turn on extra debugging about source line number tracking *)
-      if !Piqi_config.debug_level >= 3 then Piqloc.trace := true;
-      if !Piqi_config.debug_level >= 4 then Piqloc.crash_on_error := true;
     end
 
 
@@ -297,7 +288,7 @@ let run_subcommand cmd_name =
 
 
 let run () =
-  (* set .piqi search path to contain CWD and $PIQI_PATH *)
+  (* set .piqi search path to contain CWD and $PIQI_DIR *)
   Config.init_paths ();
 
   if !Sys.interactive

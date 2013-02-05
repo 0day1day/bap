@@ -1,4 +1,3 @@
-include ../../Makefile.config
 
 PIQIC_PLUGIN = piqic-erlang-rpc
 

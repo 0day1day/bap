@@ -1,6 +1,6 @@
 (*pp camlp4o -I `ocamlfind query piqi.syntax` pa_labelscope.cmo pa_openin.cmo *)
 (*
-   Copyright 2009, 2010, 2011, 2012, 2013 Anton Lavrik
+   Copyright 2009, 2010, 2011, 2012 Anton Lavrik
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -37,15 +37,12 @@ let rec gen_parse_type ocaml_type wire_type wire_packed x =
         if !Piqic_common.is_self_spec
         then ios "parse_any"
         else ios "Piqi_piqi.parse_any"
-    | `alias a when wire_type <> None ->
-        (* need special handing for wire_type override *)
-        gen_parse_type a.A#ocaml_type wire_type wire_packed (some_of a.A#piqtype)
-    | (#T.typedef as x) ->
+    | (#T.piqdef as x) ->
         let modname = gen_parent x in
         iol [
           modname;
           packed; ios "parse_";
-          ios (typedef_mlname x)
+          ios (piqdef_mlname x)
         ]
     | _ -> (* gen parsers for built-in types *)
         iol [
@@ -57,18 +54,18 @@ let rec gen_parse_type ocaml_type wire_type wire_packed x =
           gen_cc " x))";
         ]
 
-
-let gen_parse_piqtype ?ocaml_type ?wire_type ?(wire_packed=false) (t:T.piqtype) =
-  gen_parse_type ocaml_type wire_type wire_packed t
+and gen_parse_typeref ?ocaml_type ?wire_type ?(wire_packed=false) (t:T.typeref) =
+  gen_parse_type ocaml_type wire_type wire_packed (piqtype t)
 
 
 (* TODO: parse defaults once at boot time rather than each time when we need to
  * parse a field *)
 let gen_default = function
   | None -> iol []
-  | Some piqi_any ->
-      let pb = Piqobj.pb_of_piqi_any piqi_any in
-      iol [ios "~default:"; ioq (String.escaped pb) ]
+  | Some {T.Any.binobj = Some x} ->
+      iol [ios "~default:"; ioq (String.escaped x) ]
+  | _ ->
+      assert false (* binobj should be defined by that time *)
 
 
 let esc x = ios "_" ^^ ios x
@@ -90,19 +87,19 @@ let gen_field_parser f =
   let fname = mlname_of_field f in
   let mode = gen_mode f in
   let fcons =
-  match f.piqtype with
-    | Some piqtype ->
+  match f.typeref with
+    | Some typeref ->
         (* field constructor *)
         iod " "
           [
             (* "parse_(required|optional|repeated)_field" function invocation *)
             ios "Piqirun.parse_" ^^ ios mode ^^ ios "_field";
               gen_code f.code;
-              gen_parse_piqtype piqtype ~wire_packed:f.protobuf_packed;
+              gen_parse_typeref typeref ~wire_packed:f.wire_packed;
               (* when parsing packed repeated fields, we should also accept
                * fields in unpacked representation; therefore, specifying an
                * unpacked field parser as another parameter *)
-              if f.protobuf_packed then gen_parse_piqtype piqtype else iol [];
+              if f.wire_packed then gen_parse_typeref typeref else iol [];
               ios " x";
               gen_default f.default;
           ]
@@ -178,7 +175,7 @@ let gen_enum e =
 
 let rec gen_option varname o =
   let open Option in
-  match o.ocaml_name, o.piqtype with
+  match o.ocaml_name, o.typeref with
     | Some mln, None -> (* boolean true *)
         iod " " [
           ios "|"; gen_code o.code; ios "when x = Piqirun.Varint 1"; ios "->";
@@ -189,7 +186,7 @@ let rec gen_option varname o =
     | None, Some ((`variant _) as t) | None, Some ((`enum _) as t) ->
         iod " " [
           ios "|"; gen_code o.code; ios "->";
-            ios "("; gen_parse_piqtype t; ios "x :>"; ios varname; ios ")"
+            ios "("; gen_parse_typeref t; ios "x :>"; ios varname; ios ")"
         ]
     | _, Some t ->
         let n = mlname_of_option o in
@@ -197,7 +194,7 @@ let rec gen_option varname o =
           ios "|"; gen_code o.code; ios "->";
             ios "let res = ";
               gen_cc "let count = curr_count() in refer count (";
-              gen_parse_piqtype t; ios "x";
+              gen_parse_typeref t; ios "x";
               gen_cc ")";
               ios "in";
               gen_pvar_name n; ios "res";
@@ -220,24 +217,23 @@ let gen_variant v =
     ]
 
 
-let gen_convert_of piqtype ocaml_type value =
-  gen_convert_value piqtype ocaml_type "_of_" value
+let gen_convert_of typeref ocaml_type value =
+  gen_convert_value typeref ocaml_type "_of_" value
 
 
 let gen_alias a ~wire_packed =
   let open Alias in
   let packed = ios (if wire_packed then "packed_" else "") in
-  let piqtype = some_of a.piqtype in
   iol [
     packed; ios "parse_"; ios (some_of a.ocaml_name); ios " x = ";
-    gen_convert_of piqtype a.ocaml_type (
+    gen_convert_of a.typeref a.ocaml_type (
       iol [
-        gen_parse_piqtype
-          piqtype
-          ?ocaml_type:a.ocaml_type
-          ?wire_type:a.protobuf_wire_type
-          ~wire_packed;
-        ios " x";
+        gen_parse_typeref
+          a.typeref
+            ?ocaml_type:a.ocaml_type
+            ?wire_type:a.wire_type
+            ~wire_packed;
+          ios " x";
       ]
     )
   ]
@@ -245,7 +241,7 @@ let gen_alias a ~wire_packed =
 
 let gen_alias a =
   let open Alias in
-  if Piqi_protobuf.can_be_packed (some_of a.piqtype)
+  if Piqi_wire.can_be_packed (piqtype a.typeref)
   then
     (* generate another function for packed encoding *)
     iod " and " [
@@ -263,14 +259,14 @@ let gen_list l =
       gen_cc "let count = next_count() in refer count (";
         (* Piqirun.parse_(packed_)?(list|array|array32|array64) *)
         ios "Piqirun.parse_"; repr;
-          ios " ("; gen_parse_piqtype (some_of l.piqtype) ~wire_packed:l.protobuf_packed; ios ")";
+          ios " ("; gen_parse_typeref l.typeref ~wire_packed:l.wire_packed; ios ")";
 
           (* when parsing packed repeated fields, we should also accept
            * fields in unpacked representation; therefore, specifying an
            * unpacked field parser as another parameter *)
-          if l.protobuf_packed
+          if l.wire_packed
           then iol [
-          ios " ("; gen_parse_piqtype (some_of l.piqtype); ios ")";
+          ios " ("; gen_parse_typeref l.typeref; ios ")";
           ]
           else iol [];
 
@@ -287,7 +283,7 @@ let gen_def = function
   | `alias t -> gen_alias t
 
 
-let gen_defs (defs:T.typedef list) =
+let gen_defs (defs:T.piqdef list) =
   let defs = List.map gen_def defs in
   if defs = []
   then iol []
@@ -314,4 +310,4 @@ let gen_defs (defs:T.typedef list) =
 
 
 let gen_piqi (piqi:T.piqi) =
-  gen_defs piqi.P#resolved_typedef
+  gen_defs piqi.P#resolved_piqdef

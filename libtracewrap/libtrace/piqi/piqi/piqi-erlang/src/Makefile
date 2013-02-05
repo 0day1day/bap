@@ -1,4 +1,3 @@
-include ../../Makefile.config
 
 ERL_SOURCES = \
 	$(PIQI_ERL_FILES) \
@@ -26,7 +25,7 @@ ERLC_FLAGS += -I ../include
 
 
 PIQIC = piqic
-PIQIC_FLAGS = --gen-defaults
+PIQIC_FLAGS =
 
 
 PIQI_FILES = piqi-rpc.piqi piqi-tools.piqi piqi.piqi

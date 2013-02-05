@@ -1,4 +1,3 @@
-include ../Makefile.config
 include $(PIQI_ROOT)/make/Makefile.ocaml
 
 
