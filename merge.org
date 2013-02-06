@@ -1,6 +1,5 @@
 * formulap.ml: Add assert/valid methods
 * stp.ml: test streaming printer
-* smtlib1.ml: still didn't merge right!!!!
 * traces.ml
 ** Remove traces.printer
 ** Move solve_formula?

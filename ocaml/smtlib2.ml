@@ -134,8 +134,8 @@ object (self)
     cut ();
     pc ')'    
 
-(** Seperate lemebegin and letmeend to allow for streaming generation of
-    formulas in utils/streamtrans.ml *)
+  (** Seperate let_begin and let_end to allow for streaming generation of
+      formulas in utils/streamtrans.ml *)
   method let_begin v e1 =
     let t1 = Typecheck.infer_ast ~check:false e1 in
     let cmd,c,pf,vst =
@@ -163,7 +163,7 @@ object (self)
       cut ();
       pc ')'
 
-  method letmemiddle st = 
+  method let_middle st =
       match st with
         | Bool -> self#ast_exp_bool
         | BitVec -> self#ast_exp
@@ -173,7 +173,7 @@ object (self)
   method letme v e1 e2 st =
     lazy(
       self#let_begin v e1;
-      self#letmemiddle st e2;
+      self#let_middle st e2;
       self#let_end v 
     )
 
