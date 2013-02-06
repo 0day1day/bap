@@ -152,14 +152,14 @@ to configure, replacing bap-dir with the path of your BAP directory.
 
 The PIN trace tool is located in the pintraces/ directory. Because of
 licensing reasons, we cannot distribute PIN with the trace tool. PIN
-must be extracted inside of the traces directory; for instance, if the
-traces branch is located in $PATH/traces, then PIN should be in
-$PATH/traces/pin. Running ./getpin.sh from the $PATH/traces/pintraces
-directory will automatically download and install PIN for Linux; the
-user is responsible for accepting the PIN license agreements. On
-Windows, PIN must be downloaded and extracted by hand. The PIN tool
-can be built by executing make in the $PATH/traces/experiemental
-directory.  On Windows, we reccomend using GNU Make for Windows
+must be extracted inside of the BAP directory; for instance, if BAP is
+located in $BAPDIR, then PIN should be in $BAPDIR/pin. Running
+./getpin.sh from the $BAPDIR/pintraces directory will automatically
+download and install PIN for Linux; the user is responsible for
+accepting the PIN license agreements. On Windows, PIN must be
+downloaded and extracted by hand. The PIN tool can be built by
+executing make in the $PATH/traces/experiemental directory.  On
+Windows, we reccomend using GNU Make for Windows
 (http://gnuwin32.sourceforge.net/packages/make.htm) and Visual C++
 2010 express
 (http://www.microsoft.com/visualstudio/en-us/products/2010-editions/visual-cpp-express).
