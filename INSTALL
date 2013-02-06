@@ -100,8 +100,7 @@ Install required packages using macports:
 
 Alternatively, install required packages using homebrew:
 
-  $ brew install gmp autoconf automake libtool ocaml opam pcre gettext
-  $ brew install binutils --enable-targets=i386-elf,i386-pe,x86_64
+  $ brew install gmp autoconf automake libtool ocaml opam pcre gettext binutils
 
 Install required opam packages:
 
