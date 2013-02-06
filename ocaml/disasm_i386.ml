@@ -792,7 +792,7 @@ let rec to_ir addr next ss pref =
       | _ -> disfailwith "bswap: Expected 16 or 32 bit type"
     in
     [assn t op e]
-  | Retn (op, far_ret) when pref = [] ->
+  | Retn (op, far_ret) when pref = [] || pref = [repz]  || pref = [repnz]->
     let temp = nt "ra" r32 in
     let load_stmt = if far_ret 
       then (* TODO Mess with segment selectors here *)  
@@ -2234,8 +2234,10 @@ let parse_instr g addr =
     | 0x9d -> (Popf(prefix.opsize), na)
     | 0x9e -> (Sahf, na)
     | 0x9f -> (Lahf, na)
-    | 0xa1 -> let (addr, na) = parse_disp32 na in
-	      (Mov(prefix.opsize, o_eax, Oaddr(l32 addr), None), na)
+    | 0xa0 | 0xa1 ->
+      let t = if b1 = 0xa0 then reg_8 else prefix.opsize in
+      let (addr, na) = parse_disp32 na in
+      (Mov(t, o_eax, Oaddr(l32 addr), None), na)
     | 0xa2 | 0xa3 ->
       let t = if b1 = 0xa2 then r8 else prefix.opsize in
       let (addr, na) = parse_disp32 na in

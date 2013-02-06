@@ -119,13 +119,18 @@ object (self)
     | Address a -> printf "@address \"0x%Lx\"" a;
     | Liveout -> pp "@set \"liveout\""
     | StrAttr s -> pp "@str \""; pp s; pc '\"'
-    | Context {name=s; mem=mem; value=v; index=i; t=Reg bits; taint=Taint t} -> 
+    | Context {name=s; mem=mem; value=v; index=i; t=Reg bits; usage=u; taint=Taint t} -> 
+      let ustr = match u with
+        | RD -> "rd" | RW -> "rw" | WR -> "wr"
+      in
       let ts = string_of_int t in
-	(*if t = Taint then "tainted" else "untainted" in*)
-	let ind = if mem then "[0x"^(Int64.format "%Lx" i)^"]" else "" in
-	pp "@context "; pc '"'; pp (s^ind); pc '"'; pp (" = 0x"^(Util.big_int_to_hex v)^ ", " ^ ts
+      (*if t = Taint then "tainted" else "untainted" in*)
+      let ind = if mem then "[0x"^(Int64.format "%Lx" i)^"]" else "" in
+      pp "@context "; pc '"'; pp (s^ind); pc '"'; pp (" = 0x"^(Util.big_int_to_hex v)^ ", " ^ ts
 			                              ^", u"
-			                              ^ (string_of_int bits))
+			                              ^ (string_of_int bits)
+                                                      ^", "
+                                                      ^ustr)
     | Context _ ->
       failwith "Contexts only specify register types"
     | ThreadId i -> pp "@tid \""; pp (string_of_int i); pp "\""
