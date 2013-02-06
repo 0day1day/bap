@@ -86,10 +86,6 @@ let gamma_lookup (g:varctx) s =
   with Not_found ->
     failwith("Disassembled code had undeclared variable '"^s^"'. Something is broken.")
 
-let gamma_reset gamma mem decls = 
-  Hashtbl.clear gamma;
-  gamma_populate gamma mem decls
-
 let gamma_extend = Hashtbl.add
 
 let gamma_unextend = Hashtbl.remove
@@ -411,11 +407,6 @@ let gamma_for_arch = function
   | Bfd_arch_arm  -> gamma_create x86_mem arm_regs
   | _ -> failwith "gamma_for_arch: unsupported arch"
 
-
-let gamma_for_arch_reset gamma = function
-  | Bfd_arch_i386 -> gamma_reset gamma x86_mem x86_regs
-  | Bfd_arch_arm  -> gamma_reset gamma x86_mem arm_regs
-  | _ -> failwith "gamma_for_arch_reset: unsupported arch"
 
 let get_asmprogram_arch {arch=arch}= arch
 

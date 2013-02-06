@@ -54,7 +54,6 @@ val tr_bap_blocks_t :
 
 val decls_for_arch : arch -> Ast.var list
 val gamma_for_arch : arch -> varctx
-val gamma_for_arch_reset : varctx -> arch -> unit
 
 val get_asmprogram_arch : asmprogram -> arch
 

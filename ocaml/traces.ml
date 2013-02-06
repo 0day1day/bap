@@ -111,9 +111,6 @@ let global =
 (** Create a lookup for our variables *)
 let gamma = Asmir.gamma_for_arch Asmir.arch_i386
 
-(** Allow gamma to be cleared.  Used if more then one trace is being loaded *)
-let clear_gamma () = Asmir.gamma_for_arch_reset gamma Asmir.arch_i386
-
 (** Convert name of a register to a var for that register *)
 let name_to_var name =
   try
