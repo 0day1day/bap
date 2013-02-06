@@ -164,20 +164,6 @@ sig
   val eval_symb_let : bool
 end
 
-(* Old formula type.  Hardcoded to output an expression, which doesn't
-   make sense for streaming formulas.
-
-   XXX: Get rid of this
-*)
-module type OldFormula =
-sig
-  type t
-  val true_formula : t
-  val add_to_formula : t -> Ast.exp -> form_type -> t
-  (* FIXME *)
-  val output_formula : t -> Ast.exp
-end
-
 (* Newer, flexible formula type.  The input and output types are
    flexible.  For instance, the output will be type unit for streaming
    formulas. *)
@@ -945,21 +931,6 @@ struct
       create_formula exp_true bindings
 end
 
-(* Convert OldFormulas to the more general FlexibleFormula
-   representation *)
-module FlexibleFormulaConverter(Form:OldFormula) =
-struct
-  type t = Form.t
-  type init = unit
-  type output = Ast.exp
-
-  let init () = Form.true_formula
-
-  let add_to_formula = Form.add_to_formula
-
-  let output_formula = Form.output_formula
-end
-
 module FlexibleFormulaConverterToStream(Form:FlexibleFormula with type init=unit with type output = Ast.exp) = 
 struct
   type fp = Formulap.fpp_oc
@@ -1004,7 +975,7 @@ struct
             free_var_printer : Formulap.stream_fpp_oc; 
             form_t : Ast.exp; 
             close_funs : (unit -> unit) Stack.t}
-  type init = Formulap.double_printer_type
+  type init = Formulap.split_stream_printer_type
   type output = unit
 
   let free_vars = ref Var.VarSet.empty;;
@@ -1012,11 +983,10 @@ struct
 
   let init {Formulap.formula_p=formula_p; Formulap.free_var_p=free_var_p} = 
     (* Create and start a stack of functions to close parens of operations *)
-    let close_funs = Stack.create() in
-    free_var_p#open_benchmark_has_mem();
-    formula_p#andstart();
-    Stack.push (formula_p#andend) close_funs;
-    Stack.push (formula_p#formula) close_funs;
+    let close_funs = Stack.create () in
+    free_var_p#open_stream_benchmark;
+    formula_p#and_start;
+    Stack.push (fun () -> formula_p#and_end) close_funs;
     {formula_printer=formula_p; free_var_printer=free_var_p; 
      form_t=exp_true; close_funs=close_funs}
 
@@ -1026,7 +996,7 @@ struct
                        close_funs=close_funs} as record) expression typ =
     (match expression, typ with
       | _, Equal ->
-          formula_printer#print_assertion expression;
+          formula_printer#and_constraint expression;
           (* SWXXX print space? *)
           record 
       | BinOp(EQ, Var v, value), Rename ->
@@ -1036,10 +1006,10 @@ struct
           in
           defined_vars := Var.VarSet.add v !defined_vars;
           let fp = Var.VarSet.diff fp !defined_vars in
-          Var.VarSet.iter formula_printer#declare_new_free_var fp;
+          Var.VarSet.iter formula_printer#predeclare_free_var fp;
           free_vars := Var.VarSet.union !free_vars fp;
-	  formula_printer#letmebegin v value;
-          Stack.push (fun () -> formula_printer#letmeend v) close_funs;
+	  formula_printer#let_begin v value;
+          Stack.push (fun () -> formula_printer#let_end v) close_funs;
           {record with close_funs=close_funs}
       | _ -> failwith "internal error: adding malformed constraint to formula"
     )
@@ -1048,13 +1018,12 @@ struct
                       free_var_printer=free_var_printer;
                       form_t=form_t;
                       close_funs=close_funs} =
-    formula_printer#print_assertion exp_true;
     Stack.iter (fun f -> f()) close_funs;
-    formula_printer#close_benchmark(); 
+    formula_printer#close_benchmark;
     (* Free vars go at the begining of the file but we don't know all of them
        until the end of the trace.  So we print them out to a seperate file
        and combine these at the end. *)
-    free_var_printer#declare_given_freevars (Var.VarSet.elements !free_vars);
+    Var.VarSet.iter free_var_printer#print_free_var !free_vars;
     formula_printer#flush; formula_printer#close;
     free_var_printer#flush; free_var_printer#close;
 end

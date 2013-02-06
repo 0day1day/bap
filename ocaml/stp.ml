@@ -36,15 +36,62 @@ object (self)
   inherit Formulap.fpp
   val used_vars : (string,Var.t) Hashtbl.t = Hashtbl.create 57
   val ctx : string VH.t = VH.create 57
-    
+
   val mutable unknown_counter = 0;
 
   val mutable let_counter = 0;
 
-  (* method  letmebegin v e = () *)
-  (* method  letmeend v = () *)
-  (* method print_assertion e = () *)
-  (* method declare_new_free_vars (v : var list) = () *)
+  method and_start =
+    pc '(';
+    self#ast_exp exp_true
+
+  method and_constraint e =
+    space ();
+    pc '&';
+    space ();
+    pc '(';
+    self#ast_exp e;
+    pc ')'
+
+  method and_end =
+    pc ')'
+
+  method let_begin v e =
+    pp "(LET ";
+	  (* v isn't allowed to shadow anything *)
+    let s = var2s v ^"_"^ string_of_int let_counter in
+    let_counter <- succ let_counter;
+    pp s;
+    pp " =";
+    opn 2; space();
+    self#ast_exp e;
+    space(); cls();
+    pp "IN"; space();
+    self#extend v s
+
+  method let_end v =
+    self#unextend v;
+    pc ')'
+
+  (* Nothing needed to open stp benchmark *)
+  method open_stream_benchmark = ()
+
+  (* Or to close it *)
+  method close_benchmark = ()
+
+  method declare_given_freevars fvs =
+    opn 0;
+    pp "% free variables:"; force_newline();
+    List.iter (fun v -> if not(VH.mem ctx v) then self#decl v) fvs;
+    pp "% end free variables."; force_newline();
+    cls()
+
+  method declare_new_freevars e =
+    dprintf "Computing freevars...";
+    let fvs = Formulap.freevars e in
+    self#declare_given_freevars fvs
+
+  method predeclare_free_var = self#decl_no_print
 
   method flush =
     flush();
@@ -67,25 +114,20 @@ object (self)
   method varname v =
     VH.find ctx v
 
-  method declare_new_freevars e =
-    opn 0;
-    pp "% free variables:"; force_newline();
-    dprintf "Computing freevars...";
-    let fvs = Formulap.freevars e in 
-    dprintf "... done";
-    List.iter (fun v -> if not(VH.mem ctx v) then self#decl v) fvs;
-    pp "% end free variables."; force_newline();
-    cls()
-       
   method typ = function
     | Reg n ->	printf "BITVECTOR(%u)" n
     | Array(idx,elmt) -> pp "ARRAY "; self#typ idx; pp " OF "; self#typ elmt
     | TMem _ ->	failwith "TMem unsupported by STP"
 
+  method decl_no_print v =
+    self#extend v (var2s v)
+
+  method print_free_var (Var.V(_,_,t) as v) =
+    self#var v; pp " : "; self#typ t; pp ";"; force_newline();
 
   method decl (Var.V(_,_,t) as v) =
-    self#extend v (var2s v);
-    self#var v; pp " : "; self#typ t; pp ";"; force_newline();
+    self#decl_no_print v;
+    self#print_free_var v
 
   method ast_exp e =
     opn 0;
@@ -243,20 +285,9 @@ object (self)
 	  failwith ("STP: don't know how to handle label names: "
 		      ^ (Pp.ast_exp_to_string e))
       | Let(v, e1, e2) ->
-	  pp "(LET ";
-	  (* v isn't allowed to shadow anything *)
-	  let s = var2s v ^"_"^ string_of_int let_counter in
-	  let_counter <- succ let_counter;
-	  pp s;
-	  pp " =";
-	  opn 2; space();
-	  self#ast_exp e1;
-	  space(); cls();
-	  pp "IN"; space();
-	  self#extend v s;
+          self#let_begin v e1;
 	  self#ast_exp e2;
-	  self#unextend v;
-	  pc ')'
+          self#let_end v
       | Load(arr,idx,endian, t) ->
 	  (* FIXME check arr is array and not mem *)
 	  self#ast_exp arr;
@@ -365,6 +396,7 @@ class pp_oc ?suffix:(s="") fd =
 object
   inherit pp ~suffix:s ft as super
   inherit Formulap.fpp_oc
+  inherit Formulap.stream_fpp_oc
   method close =
     super#close;
     close_out fd

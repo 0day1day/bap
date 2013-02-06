@@ -122,16 +122,18 @@ object (self)
     match (VH.find ctx v) with
         | n,_ -> pp n
 
-  method andstart () = 
+  method and_start =
     pp "(and ";
 
-  method andend () =
+  method and_constraint = self#ast_exp_bool
+
+  method and_end =
     cut ();
-    pc ')'    
+    pc ')'
 
 (** Seperate lemebegin and letmeend to allow for streaming generation of
     formulas in utils/streamtrans.ml *)
-  method letmebegin v e1 =
+  method let_begin v e1 =
     let t1 = Typecheck.infer_ast ~check:false e1 in
     let cmd,c,pf,vst=
       match t1,!use_booleans with
@@ -153,7 +155,7 @@ object (self)
       space ();
       self#extend v s vst;
 
-  method letmeend v =
+  method let_end v =
       self#unextend v;
       cut ();
       pc ')'    
@@ -167,9 +169,9 @@ object (self)
       No_rule. *)
   method letme v e1 e2 st =
     lazy(
-      self#letmebegin v e1;
+      self#let_begin v e1;
       self#letmemiddle st e2;
-      self#letmeend v 
+      self#let_end v 
     )
 
   method varname v =
@@ -204,7 +206,7 @@ object (self)
     in
     self#extend v (var2s v) sort
 
-  method declare_new_free_var = self#decl_no_print
+  method predeclare_free_var = self#decl_no_print
 
   method print_free_var (Var.V(_,_,t) as v) =
     pp ":extrafuns (("; 
@@ -485,8 +487,6 @@ object (self)
       Lazy.force (self#bool_to_bv e)
       
 
-  method print_assertion = self#ast_exp_bool
-
   (** Try to evaluate an expression to a boolean. If no good rule
       exists, then raises the No_rule exception. *)
   method ast_exp_bool_base e =
@@ -729,7 +729,10 @@ object (self)
 	pp "):";
 	cls();space();
 
-  method open_benchmark_has_mem () =
+  method open_stream_benchmark =
+    self#open_benchmark_with_logic "QF_AUFBV"
+
+  method open_benchmark_with_logic logic =
     pc '(';
     opn 0;
     pp "benchmark file.smt";
@@ -742,7 +745,7 @@ object (self)
     force_newline();
     pp ":category { Unknown }";
     force_newline();
-    pp (":logic QF_AUFBV");
+    pp (":logic "^logic);
     force_newline()
 
   method open_benchmark e =
@@ -767,22 +770,9 @@ object (self)
       | true -> "QF_AUFBV"
       | false -> "QF_BV"
     in
-    pc '(';
-    opn 0;
-    pp "benchmark file.smt";
-    force_newline();
-    pp ":status unknown";
-    force_newline();
-    pp ":source { Source Unknown }";
-    force_newline();
-    pp ":difficulty { Unknown }";
-    force_newline();
-    pp ":category { Unknown }";
-    force_newline();
-    pp (":logic "^(get_logic e));
-    force_newline()
+    self#open_benchmark_with_logic (get_logic e)
 
-  method close_benchmark () =
+  method close_benchmark =
     pc ')'; cls()
 
   (* method assert_eq v e = *)
@@ -809,8 +799,8 @@ object (self)
     cut();
     cls();
     force_newline ();
-    self#formula ();
-    self#close_benchmark ()
+    self#formula;
+    self#close_benchmark
 
   (** Is e a valid expression (always true)? *)
   method valid_ast_exp ?(exists=[]) ?(foralls=[]) e =
@@ -821,7 +811,7 @@ object (self)
     self#exists exists;
     self#forall foralls;
     self#ast_exp_bool (exp_not e);
-    self#close_benchmark ()
+    self#close_benchmark
 
   (* (\** Is e a valid expression (always true)? *\) *)
   (* method valid_ast_exp ?(exists=[]) ?(foralls=[]) e = *)
@@ -839,7 +829,7 @@ object (self)
   (*   self#close_benchmark () *)
 
 
-  method formula () =
+  method formula =
     pp ":formula true";
     force_newline();
 

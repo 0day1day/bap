@@ -35,10 +35,9 @@ let bytes_of_width t =
   if not ((b mod 8) = 0) then invalid_arg "bytes_of_width";
   b / 8
 
-let has_warned = ref false
-
 let rec infer_ast =
   let warn =
+    let has_warned = ref false in
     (fun () ->
       if !has_warned = false then (
         wprintf "infer_ast ~check option is deprecated.  Please use typecheck_expression instead.";

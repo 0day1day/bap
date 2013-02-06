@@ -73,13 +73,10 @@ object (self)
   inherit Formulap.fpp
   val used_vars : (string,Var.t) Hashtbl.t = Hashtbl.create 57
   val ctx : (string*sort) VH.t = VH.create 57
-    
+
   val mutable unknown_counter = 0;
 
   val mutable let_counter = 0;
-  
-  (* method print_assertion e = () *)
-  (* method declare_new_free_vars (v : var list) = () *)
 
   method bool_to_bv ~check e =
     if check then (
@@ -128,18 +125,20 @@ object (self)
     match (VH.find ctx v) with
     | n,_ -> pp n
 
-  method andstart () = 
+  method and_start =
     pp "(and ";
 
-  method andend () =
+  method and_constraint = self#ast_exp_bool
+
+  method and_end =
     cut ();
     pc ')'    
 
 (** Seperate lemebegin and letmeend to allow for streaming generation of
     formulas in utils/streamtrans.ml *)
-  method letmebegin v e1 =
+  method let_begin v e1 =
     let t1 = Typecheck.infer_ast ~check:false e1 in
-    let cmd,c,pf,vst=
+    let cmd,c,pf,vst =
       match t1,!use_booleans with
         | Reg 1,true -> "let","$",self#ast_exp_bool,Bool
         | _ -> "let","?",self#ast_exp,BitVec
@@ -159,10 +158,10 @@ object (self)
       space ();
       self#extend v s vst;
 
-  method letmeend v =
+  method let_end v =
       self#unextend v;
       cut ();
-      pc ')'    
+      pc ')'
 
   method letmemiddle st = 
       match st with
@@ -173,9 +172,9 @@ object (self)
       No_rule. *)
   method letme v e1 e2 st =
     lazy(
-      self#letmebegin v e1;
+      self#let_begin v e1;
       self#letmemiddle st e2;
-      self#letmeend v 
+      self#let_end v 
     )
 
   method varname v =
@@ -216,7 +215,7 @@ object (self)
     in
     self#extend v (var2s v) sort
 
-  method declare_new_free_var = self#decl_no_print
+  method predeclare_free_var = self#decl_no_print
 
   method print_free_var (Var.V(_,_,t) as v) =
     pp ":extrafuns (("; 
@@ -491,7 +490,6 @@ object (self)
       self#tryit self#ast_exp_base e
     with No_rule ->
       self#bool_to_bv ~check:false e
-  method print_assertion = self#ast_exp_bool
 
   (** Try to evaluate an expression to a boolean. If no good rule
       exists, then raises the No_rule exception. *)
@@ -738,14 +736,16 @@ object (self)
 	pp "):";
 	cls();space();
 
-  method open_benchmark_has_mem () =
-    pp ("(set-logic QF_ABV)"); 
+  method open_benchmark_with_logic logic =
+    pp ("(set-logic "^logic); pc ')';
     force_newline();
     pp "(set-info :smt-lib-version 2.0)";
     force_newline();
     pp "(set-option :produce-assignments true)";
     force_newline()
 
+  method open_stream_benchmark =
+    self#open_benchmark_with_logic "QF_ABV"
 
   method open_benchmark e =
     let has_mem e =
@@ -757,7 +757,7 @@ object (self)
 	  | Store _ -> found_mem := true; SkipChildren
 	  | Var v when not (is_integer_type (Var.typ v)) -> found_mem := true; SkipChildren
 	  | _ when !found_mem -> SkipChildren
-	  | _ -> DoChildren	  
+	  | _ -> DoChildren
       end
       in
       ignore(Ast_visitor.exp_accept v e);
@@ -768,14 +768,9 @@ object (self)
       | true -> "QF_ABV"
       | false -> "QF_BV"
     in
-    pp ("(set-logic "^(get_logic e)); pc ')';
-    force_newline();
-    pp "(set-info :smt-lib-version 2.0)";
-    force_newline();
-    (* pp "(set-option :produce-assignments true)"; *)
-    force_newline()
+    self#open_benchmark_with_logic (get_logic e)
 
-  method close_benchmark () =
+  method close_benchmark =
     ()
 
   (* method assert_eq v e = *)
@@ -806,8 +801,8 @@ object (self)
     pc ')';
     cls();
     force_newline ();
-    self#formula ();
-    self#close_benchmark ()
+    self#formula;
+    self#close_benchmark
 
   method valid_ast_exp ?exists ?foralls e =
     self#assert_ast_exp ?exists ?foralls (exp_not e)
@@ -828,7 +823,7 @@ object (self)
   (*   self#close_benchmark () *)
 
 
-  method formula () =
+  method formula =
     pp "(check-sat)";
     force_newline();
     (* pp "(get-assignment)" *)

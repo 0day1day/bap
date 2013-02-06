@@ -62,7 +62,7 @@ let allow_symbolic_indices = ref false
 
 let padding = ref true
 
-let printer = ref "smtlib1"
+let printer = ref "stp"
 
 let memtype = reg_32
 
@@ -1597,18 +1597,6 @@ struct
     {ctx with delta=delta'; pred=pred'; pc=Int64.succ pc}
 end
 
-(* module StreamingLetBind : FlexibleFormula =  *)
-(* struct *)
-(*   type t =  *)
-(* end *)
-
-(* module TraceSymbolicAssign(MemL: MemLookup)(Form: Formula) = *)
-(* struct *)
-(*   let assign v ev ctx = *)
-(*     let module PredAssign = PredAssignTraces(MemL)(Form) in *)
-(*     PredAssign.assign v ev ctx *)
-(* end *)
-
 module type TracePrinter =
 sig
   type fp
@@ -1874,30 +1862,23 @@ struct
 
 end
 
-type traceSymbolicType =
-  | NoSubNoLet
-  | NoSub
-  | NoSubStreamLet
-  | NoSubOpt
-  | Substitution
-
 module StreamPrinter =
 struct
 
-  type fp = Formulap.double_printer_type
+  type fp = Formulap.split_stream_printer_type
 
   let init_printer file s = 
     let oc = open_out (file^".tmp_exp") in
     let oc2 = open_out file in
     let p =
       match s with
-        | "smtlib1" -> 
-            {Formulap.formula_p = (new Smtlib1.pp_oc oc :> Formulap.stream_fpp_oc);
-             Formulap.free_var_p = (new Smtlib1.pp_oc oc2 :> Formulap.stream_fpp_oc)}
-        | "smtlib2" -> 
-            {Formulap.formula_p = (new Smtlib2.pp_oc oc :> Formulap.stream_fpp_oc);
-             Formulap.free_var_p = (new Smtlib2.pp_oc oc2 :> Formulap.stream_fpp_oc)}
-        | _ -> failwith ("Unknown printer "^s)
+      | "smtlib1" -> 
+        {Formulap.formula_p = (new Smtlib1.pp_oc oc :> Formulap.stream_fpp_oc);
+         Formulap.free_var_p = (new Smtlib1.pp_oc oc2 :> Formulap.stream_fpp_oc)}
+      | "smtlib2" -> 
+        {Formulap.formula_p = (new Smtlib2.pp_oc oc :> Formulap.stream_fpp_oc);
+         Formulap.free_var_p = (new Smtlib2.pp_oc oc2 :> Formulap.stream_fpp_oc)}
+      | _ -> failwith ("Unknown printer "^s)
     in 
     p
 end
@@ -1909,10 +1890,10 @@ struct
     let oc = open_out file in
     let p =
       match s with
-        | "smtlib1" -> ((new Smtlib1.pp_oc oc) :> fp)
-        | "smtlib2" -> ((new Smtlib2.pp_oc oc) :> fp)
-        | "stp" -> ((new Stp.pp_oc oc) :> fp) 
-        | _ -> failwith ("Unknown printer "^s)
+      | "smtlib1" -> ((new Smtlib1.pp_oc oc) :> fp)
+      | "smtlib2" -> ((new Smtlib2.pp_oc oc) :> fp)
+      | "stp" -> ((new Stp.pp_oc oc) :> fp) 
+      | _ -> failwith ("Unknown printer "^s)
     in 
     p
 end

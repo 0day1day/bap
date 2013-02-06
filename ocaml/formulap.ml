@@ -67,17 +67,26 @@ type fppf = ?suffix:string -> out_channel -> fpp_oc
 
 class virtual stream_fpp =
 object(self)
-  method virtual andstart : unit -> unit
-  method virtual andend : unit -> unit
-  method virtual letmebegin : var -> Ast.exp -> unit
-  method virtual letmeend : var -> unit
-  method virtual open_benchmark_has_mem : unit -> unit
-  method virtual close_benchmark : unit -> unit
-  method virtual print_assertion : Ast.exp -> unit
-  method virtual declare_given_freevars : var list -> unit
-  method virtual declare_new_free_var : var -> unit
+  (** Begin a list of constraints *)
+  method virtual and_start : unit
+  (** Add a constraint to a list of constraints *)
+  method virtual and_constraint : Ast.exp -> unit
+  (** End a list of constraints *)
+  method virtual and_end : unit
+  (** Begin a let binding *)
+  method virtual let_begin : var -> Ast.exp -> unit
+  (** End a let binding *)
+  method virtual let_end : var -> unit
+  (** Open a new benchmark for a streaming formula, which is assumed
+      to use the theory of bitvectors and arrays *)
+  method virtual open_stream_benchmark : unit
+  (** Close the benchmark *)
+  method virtual close_benchmark : unit
+  (** Declaring a variable consists of calling predeclare_free_var to
+      register the name and type, and then calling print_free_var. *)
+  method virtual predeclare_free_var : var -> unit
   method virtual print_free_var : var -> unit
-  method virtual formula : unit -> unit
+  (* XXX: assert/valid *)
 end
 
 class virtual stream_fpp_oc =
@@ -87,6 +96,8 @@ object(self)
   method virtual flush : unit
 end
 
-type double_printer_type = {formula_p : stream_fpp_oc;
-                            free_var_p : stream_fpp_oc}
-
+(** Printer type for streaming.  We need one printer for printing out
+    free variables, and one for printing the formula body.  We need
+    this because the body prints before we know the free variables. *)
+type split_stream_printer_type = {formula_p : stream_fpp_oc;
+                                  free_var_p : stream_fpp_oc}

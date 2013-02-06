@@ -353,7 +353,7 @@ let speclist =
   )
   ::("-trace-formula-format",
      Arg.Set_string Traces.printer,
-     "Set formula format (smtlib1 (default), smtlib2, or STP)."
+     "Set formula format (STP (default), smtlib1, or smtlib2)."
   )
   ::("-trace-exploit",
      Arg.String(fun f -> add(AnalysisAst(Traces.TraceSymbolicNoSub.output_exploit f))),
@@ -377,11 +377,6 @@ let speclist =
     )
   ::("-trace-check",
      Arg.Set Traces.consistency_check,
-     "Perform extra consistency checks"
-    )
-  ::("-trace-check-all",
-     Arg.Unit(fun () -> Traces.consistency_check := true;
-	   Traces.checkall := true),
      "Perform extra consistency checks"
     )
   ::("-trace-noopt",

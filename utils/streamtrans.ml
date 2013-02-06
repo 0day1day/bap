@@ -16,6 +16,13 @@ type cmd =
   | TransformAst of (ast -> ast)
   | AnalysisAst of (ast -> unit)
 
+type traceSymbolicType =
+  | NoSubNoLet
+  | NoSub
+  | NoSubStreamLet
+  | NoSubOpt
+  | Substitution
+
 (** Values for concrete execution *)
 let concrete_state = Traces.TraceConcrete.create_state ();;
 let mem_hash = Memory2array.create_state ();;
@@ -30,7 +37,7 @@ let rh = VH.create 10000;;  (* dsa vars to vars *)
 
 let outfile = ref "";;
 
-let traceSymbType = ref Traces.NoSub;;
+let traceSymbType = ref NoSub;;
 
 let pipeline = ref [];;
 
@@ -105,25 +112,25 @@ let speclist =
        "Don't use substitution but do use lets.")
   ::("-trace-formula-opt",
      Arg.String(fun f -> 
-       (outfile := f; traceSymbType := Traces.NoSubOpt;
+       (outfile := f; traceSymbType := NoSubOpt;
         add(AnalysisAst(StreamSymbolicNoSubOpt.generate_formulas f)))),
      "<file> Generate and output a trace formula to <file>.  "^
        "Don't use substitution but do use lets.")
   ::("-trace-formula-stream-let",
      Arg.String(fun f -> 
-       (outfile := f; traceSymbType := Traces.NoSubStreamLet;
+       (outfile := f; traceSymbType := NoSubStreamLet;
         add(AnalysisAst(StreamSymbolicNoSubStreamLet.generate_formulas f)))),
      "<file> Generate and output a trace formula to <file>.  "^
        "Don't use substitution but do use lets.")
   ::("-trace-formula-no-sub-no-let",
      Arg.String(fun f -> 
-       (outfile := f; traceSymbType := Traces.NoSubNoLet;
+       (outfile := f; traceSymbType := NoSubNoLet;
         add(AnalysisAst(StreamSymbolicNoSubNoLet.generate_formulas f)))),
      "<file> Generate and output a trace formula to <file>.  "^
        "Don't use substitution and do not use lets.")
   ::("-trace-formula-sub",
      Arg.String(fun f -> 
-       (outfile := f; traceSymbType := Traces.Substitution;
+       (outfile := f; traceSymbType := Substitution;
         add(AnalysisAst(StreamSymbolicSub.generate_formulas f)))),
      "<file> Generate and output a trace formula to <file>.  "^
        "Do use substitution.")
@@ -168,16 +175,16 @@ if (!outfile <> "") then (
   Traces.dsa_rev_map := None;
   print_endline("Outputting formula.");
   (match !traceSymbType with
-    | Traces.NoSub -> StreamSymbolicNoSub.output_formula ()
-    | Traces.NoSubOpt -> StreamSymbolicNoSubOpt.output_formula ()
-    | Traces.NoSubStreamLet -> 
-        StreamSymbolicNoSubStreamLet.output_formula ();
-        (* SWXXX Super ugly hack.  Prepend the free variables to the formula 
-           expression file.  The formula expression file is named 
-           outfile.tmp_exp and created in traces.ml *)
-        Hacks.append_file !outfile ((!outfile)^".tmp_exp");
-        Sys.remove((!outfile)^".tmp_exp")
-    | Traces.NoSubNoLet -> StreamSymbolicNoSubNoLet.output_formula ()
-    | Traces.Substitution -> StreamSymbolicSub.output_formula ());
+    | NoSub -> StreamSymbolicNoSub.output_formula ()
+    | NoSubOpt -> StreamSymbolicNoSubOpt.output_formula ()
+    | NoSubStreamLet -> 
+      StreamSymbolicNoSubStreamLet.output_formula ();
+      (* SWXXX Super ugly hack.  Prepend the free variables to the
+         formula expression file.  The formula expression file is
+         named outfile.tmp_exp and created in traces.ml *)
+      Hacks.append_file !outfile ((!outfile)^".tmp_exp");
+      Sys.remove((!outfile)^".tmp_exp")
+    | NoSubNoLet -> StreamSymbolicNoSubNoLet.output_formula ()
+    | Substitution -> StreamSymbolicSub.output_formula ());
 )
 

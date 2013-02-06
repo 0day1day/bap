@@ -1,0 +1,14 @@
+* formulap.ml: Add assert/valid methods
+* stp.ml: test streaming printer
+* smtlib1.ml: still didn't merge right!!!!
+* traces.ml
+** Remove traces.printer
+** Move solve_formula?
+** symbolic_run_block?
+** clean function: I bet we have this somewhere else
+* traces_suite: Shouldn't we test all trace mechanisms?
+* pin_suite: must have been renamed or something, missing in trunk
+* iltrans: only one -trace-formula
+* iltrans: change default formula format to stp
+* streamtrans: rewrite
+* merge.org: Remove me before merging :-)
