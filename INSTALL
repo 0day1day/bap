@@ -63,7 +63,7 @@ or newer, indicating you are using ocaml from ocamlbrew:
 
 Next, install the required ocaml packages using opam:
 
-  $ opam install ocamlfind camomile camlidl
+  $ opam install ocamlfind camomile camlidl otags
 
 If you are installing on Debian/Ubuntu and used the above apt-get
 command to install packages, you should be able to build bap normally
@@ -93,10 +93,15 @@ Run the following command to install required packages:
 
 Install macports from https://www.macports.org/install.php
 
-Install required macports:
+Install required packages using macports:
 
   $ port install gmp autoconf automake libtool ocaml opam pcre
   $ port install -s binutils configure.post_args=--enable-targets=i386-elf,i386-pe
+
+Alternatively, install required packages using homebrew:
+
+  $ brew install gmp autoconf automake libtool ocaml opam pcre gettext
+  $ brew install binutils --enable-targets=i386-elf,i386-pe,x86_64
 
 Install required opam packages:
 
@@ -104,14 +109,23 @@ Install required opam packages:
   $ opam init
   Make sure to copy the suggested line to your ~/.profile and execute it.
 
-  $ opam install ocamlfind camlidl camomile
+  $ opam install ocamlfind camlidl camomile otags
 
-And run configure:
+And run configure.
 
   $ ./autogen.sh (if building from SVN)
+
+If using macports:
   $ CPPFLAGS="-I/opt/local/include/ -I$(opam config var lib)/camlidl" \
     INCDIRS="$(opam config var lib)/camlidl" \
     LDFLAGS="-L/opt/local/lib -L/opt/local/lib/x86_64/" \
+    ./configure
+
+If using homebrew:
+  $ CPPFLAGS="-I/usr/local/include/ -I$(opam config var lib)/camlidl" \
+    INCDIRS="$(opam config var lib)/camlidl" \
+    LDFLAGS="-L/usr/local/lib -L/usr/local/lib/x86_64/
+    -L/usr/local/opt/gettext/lib -lintl" \
     ./configure
 
 *** SMT Solvers ***
@@ -136,20 +150,22 @@ to configure, replacing bap-dir with the path of your BAP directory.
 
 *** Installing pin ***
 
-The PIN trace tool is located in the pintraces/ directory. Because of licensing
-reasons, we cannot distribute PIN with the trace tool. PIN must be extracted
-inside of the traces directory; for instance, if the traces branch is located
-in $PATH/traces, then PIN should be in $PATH/traces/pin. Running ./getpin.sh
-from the $PATH/traces/pintraces directory will automatically download and
-install PIN for Linux; the user is responsible for accepting the PIN license
-agreements. On Windows, PIN must be downloaded and extracted by hand. The PIN
-tool can be built by executing make in the $PATH/traces/experiemental directory.
-On Windows, we reccomend using GNU Make for Windows
-(http://gnuwin32.sourceforge.net/packages/make.htm) and Visual C++ 2010 express
+The PIN trace tool is located in the pintraces/ directory. Because of
+licensing reasons, we cannot distribute PIN with the trace tool. PIN
+must be extracted inside of the traces directory; for instance, if the
+traces branch is located in $PATH/traces, then PIN should be in
+$PATH/traces/pin. Running ./getpin.sh from the $PATH/traces/pintraces
+directory will automatically download and install PIN for Linux; the
+user is responsible for accepting the PIN license agreements. On
+Windows, PIN must be downloaded and extracted by hand. The PIN tool
+can be built by executing make in the $PATH/traces/experiemental
+directory.  On Windows, we reccomend using GNU Make for Windows
+(http://gnuwin32.sourceforge.net/packages/make.htm) and Visual C++
+2010 express
 (http://www.microsoft.com/visualstudio/en-us/products/2010-editions/visual-cpp-express).
 After compilation, the PIN tool should exist in
-$PATH/traces/pintraces/obj-ia32/gentrace.so (or gentrace.dll on Windows).
-
+$PATH/traces/pintraces/obj-ia32/gentrace.so (or gentrace.dll on
+Windows).  See the documentation for more detail.
 
 
 *** Optional: Making the documentation ***
