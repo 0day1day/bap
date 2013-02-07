@@ -5,6 +5,7 @@
 ** Move solve_formula?
 ** symbolic_run_block?
 ** clean function: I bet we have this somewhere else
+** StreamPrinter and OldPrinter should go elsewhere!
 * traces_suite: Shouldn't we test all trace mechanisms?
 * streamtrans: rewrite
 * merge.org: Remove me before merging :-)

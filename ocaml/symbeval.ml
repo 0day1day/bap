@@ -969,8 +969,8 @@ module LetBindOldStream = FlexibleFormulaConverterToStream(LetBindOld)
 *)
 module LetBindStreamLet =
 struct
-  type t = {formula_printer : Formulap.stream_fpp_oc; 
-            free_var_printer : Formulap.stream_fpp_oc; 
+  type t = {formula_printer : Formulap.stream_fpp_file; 
+            free_var_printer : Formulap.stream_fpp_file; 
             form_t : Ast.exp; 
             close_funs : (unit -> unit) Stack.t}
   type init = Formulap.split_stream_printer_type
@@ -1024,6 +1024,7 @@ struct
     Var.VarSet.iter free_var_printer#print_free_var !free_vars;
     formula_printer#flush; formula_printer#close;
     free_var_printer#flush; free_var_printer#close;
+    Hacks.append_file formula_printer#filename free_var_printer#filename
 end
 
 

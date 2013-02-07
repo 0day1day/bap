@@ -95,8 +95,8 @@ export SOURCES = \
 	input.mli input.ml \
 	to_c.ml \
 	vsa.ml \
-	symbeval.ml symbeval_search.ml \
 	hacks.ml \
+	symbeval.ml symbeval_search.ml \
 	coalesce.mli coalesce.ml \
 	structural_analysis.ml \
 	steensgard.mli steensgard.ml \

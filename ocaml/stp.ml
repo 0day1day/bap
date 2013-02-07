@@ -43,17 +43,16 @@ object (self)
 
   method and_start =
     pc '(';
-    self#ast_exp exp_true
 
   method and_constraint e =
-    space ();
-    pc '&';
-    space ();
     pc '(';
     self#ast_exp e;
-    pc ')'
+    pc ')';
+    space ();
+    pc '&';
 
   method and_end =
+    self#ast_exp exp_true;
     pc ')'
 
   method let_begin v e =
@@ -396,9 +395,17 @@ class pp_oc ?suffix:(s="") fd =
 object
   inherit pp ~suffix:s ft as super
   inherit Formulap.fpp_oc
-  inherit Formulap.stream_fpp_oc
   method close =
     super#close;
     close_out fd
+end
+
+class pp_file ?suffix:(s="") filename =
+  let fd = open_out filename in
+object
+  (* inherit pp ~suffix:s ft as super *)
+  inherit pp_oc fd
+  inherit Formulap.stream_fpp_file
+  method filename = filename
 end
 
