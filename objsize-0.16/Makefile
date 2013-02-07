@@ -109,3 +109,6 @@ install : objsize.cma objsize.cmxa
 
 uninstall :
 	ocamlfind remove objsize
+
+tags:
+	-

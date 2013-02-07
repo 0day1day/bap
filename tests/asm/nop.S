@@ -1,4 +1,4 @@
-.global main
+.globl main
 		
 main:	
 	nop

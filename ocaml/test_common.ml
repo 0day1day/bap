@@ -92,10 +92,11 @@ let check_pin_setup _ =
 
 
 (** Common functions across multipule tests **)
-let rec find_fun ?(msg="") ranges name = match ranges with
-  | [] -> assert_failure ("Could not find function "^name^msg)
-  | (n,s,e)::rs -> if (n = name) then (s,e) else find_fun ~msg rs name;;
+let rec find_funs ?(msg="") ranges names = match ranges with
+  | [] -> assert_failure ("Could not find functions "^msg)
+  | (n,s,e)::rs -> if (List.mem n names) then (s,e) else find_funs ~msg rs names;;
 
+let rec find_fun ?(msg="") ranges name = find_funs ~msg ranges [name]
 
 let rec find_call prog = 
   match prog with
@@ -172,26 +173,24 @@ let typecheck p = Typecheck.typecheck_prog p;;
 (* Return list of statments between start_addr and end_addr *)
 let find_prog_chunk prog start_addr end_addr = 
   let rec find_prog_chunk_k prog starta enda k =
-    match prog with
-    | [] -> raise (RangeNotFound (start_addr, end_addr))
-    | p::ps -> 
-      match starta with
-      | Some(a) -> (match p with
-	| Ast.Label(Addr(addr),attrs) -> 
-		  (* If this is the start address we are looking for begin recording 
-		     with accumulator k.  Set starta to None so that we know we are in
-		     the desired range *)
-	  if (addr = a) then find_prog_chunk_k ps None enda (p::k)
-	  else find_prog_chunk_k ps starta enda k
-	| _ -> find_prog_chunk_k ps starta enda k
-      )
-	  (* Indicates we are inside desired block; return through end_addr *)
-      | None -> (match p with
-	| Ast.Label(Addr(addr),attrs) -> 
-	  if (addr = enda) then k
-	  else find_prog_chunk_k ps starta enda (p::k)
-	| _ -> find_prog_chunk_k ps starta enda (p::k)
-      )
+    match prog, starta with
+    (* Even if we don't hit the end address, return what we had so far *)
+    | [], None -> k
+    | [], _ -> raise (RangeNotFound (start_addr, end_addr))
+    | p::ps, Some a ->
+      (match p with
+      | Ast.Label(Addr(addr),attrs) when addr = a -> 
+	(* If this is the start address we are looking for begin recording 
+	   with accumulator k.  Set starta to None so that we know we are in
+	   the desired range *)
+	find_prog_chunk_k ps None enda (p::k)
+      | _ -> find_prog_chunk_k ps starta enda k)
+    | p::ps, None ->
+      (* Indicates we are inside desired block; return through end_addr *)
+      (match p with
+      | Ast.Label(Addr(addr),attrs) when addr = enda -> 
+        k
+      | _ -> find_prog_chunk_k ps starta enda (p::k))
   in
   List.rev (find_prog_chunk_k prog (Some start_addr) end_addr [])
 

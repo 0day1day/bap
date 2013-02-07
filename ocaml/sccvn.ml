@@ -1,5 +1,5 @@
 (** Strongly connected component based value numbering.
-    
+
     Currently we only implement the RPO algorithm, described in
     "SCC-Based Value Numbering" by Keith Cooper and Taylor Simpson.
     http://citeseer.ist.psu.edu/41805.html
@@ -123,9 +123,9 @@ let expid_eq e1 e2 =
     let b6 = List.for_all2 (=) l6 r6 in
     let b7 = List.for_all2 (=) l7 r7 in
     let b8 = List.for_all2 (==%) l8 r8 in
-    if b1 & b2 & b3 & b4 & b5 & b6 & b7 & b8 then
+    if b1 && b2 && b3 && b4 && b5 && b6 && b7 && b8 then
       true
-    else if b3 & b4 & b5 & b6 & b7 & b8 then
+    else if b3 && b4 && b5 && b6 && b7 && b8 then
       (* e1 and e2 are not physically equal.  But maybe the
          subexpressions are structurally, but not physically,
          equal. *)
