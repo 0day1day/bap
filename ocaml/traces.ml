@@ -1643,7 +1643,7 @@ sig
 end
 
 
-module MakeTraceSymbolic (Tune: EvalTune) (Assign: Assign) (FormAdapt: FormulaAdapter) (Form: FlexibleFormula with type init = FormAdapt.form_init with type output = unit) =
+module MakeTraceSymbolic (Tune: EvalTune) (Assign: Assign) (FormAdapt: FormulaAdapter) (Form: FlexibleFormula with type init = FormAdapt.form_init) =
 struct
   (* Set this to LetBindSimplify to use formula simplificiation *)
   module SymbolicEval = Symbeval.Make(SymbolicMemL)(Tune)(Assign)(Form)
