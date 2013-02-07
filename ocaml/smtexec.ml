@@ -31,6 +31,7 @@ sig
   val cmdstr : string -> string (** Given a filename, produce a command string to invoke solver *)
   val parse_result : ?printmodel:bool -> string -> string -> Unix.process_status -> result (** Given output, decide the result *)
   val printer : Formulap.fppf
+  val streaming_printer : Formulap.stream_fppf
 end
 
 (* Output type *)
@@ -262,6 +263,7 @@ struct
       failwith "Something weird happened."
   let parse_result = parse_result_builder solvername
   let printer = ((new Stp.pp_oc) :> Formulap.fppf)
+  let streaming_printer = ((new Stp.pp_oc) :> Formulap.stream_fppf)
 end
 
 module STP = Make(STP_INFO)
@@ -296,6 +298,7 @@ struct
         failwith "Something weird happened."
   let parse_result = parse_result_builder solvername
   let printer = ((new Smtlib1.pp_oc) :> Formulap.fppf)
+  let streaming_printer = ((new Smtlib1.pp_oc) :> Formulap.stream_fppf)
 end
 
 module STPSMTLIB = Make(STPSMTLIB_INFO)
@@ -351,6 +354,7 @@ struct
   (*     failwith "Something weird happened." *)
   let parse_result = STP_INFO.parse_result_builder solvername
   let printer = ((new Stp.pp_oc) :> Formulap.fppf)
+  let streaming_printer = ((new Stp.pp_oc) :> Formulap.stream_fppf)
 end
 
 module CVC3 = Make(CVC3_INFO)
@@ -362,6 +366,7 @@ struct
   let cmdstr f = "-lang smtlib " ^ f
   let parse_result = STPSMTLIB_INFO.parse_result_builder solvername
   let printer = ((new Smtlib1.pp_oc) :> Formulap.fppf)
+  let streaming_printer = ((new Smtlib1.pp_oc) :> Formulap.stream_fppf)
 end
 
 module CVC3SMTLIB = Make(CVC3SMTLIB_INFO)
@@ -373,6 +378,7 @@ struct
   let cmdstr f = f
   let parse_result = STPSMTLIB_INFO.parse_result_builder solvername
   let printer = ((new Smtlib1.pp_oc) :> Formulap.fppf)
+  let streaming_printer = ((new Smtlib1.pp_oc) :> Formulap.stream_fppf)
 end
 
 module YICES = Make(YICES_INFO)
@@ -384,6 +390,7 @@ struct
   let cmdstr f = "-smt2 " ^ f
   let parse_result = STPSMTLIB_INFO.parse_result_builder solvername
   let printer = ((new Smtlib2.pp_oc) :> Formulap.fppf)
+  let streaming_printer = ((new Smtlib2.pp_oc) :> Formulap.stream_fppf)
 end
 
 module Z3 = Make(Z3_INFO)
@@ -419,6 +426,7 @@ struct
         failwith "Something weird happened."
   let parse_result = parse_result_builder solvername
   let printer = ((new Smtlib2.pp_oc) :> Formulap.fppf)
+  let streaming_printer = ((new Smtlib2.pp_oc) :> Formulap.stream_fppf)
 end
 
 module BOOLECTOR = Make(BOOLECTOR_INFO)

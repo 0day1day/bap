@@ -969,28 +969,32 @@ module LetBindOldStream = FlexibleFormulaConverterToStream(LetBindOld)
 *)
 module LetBindStreamLet =
 struct
-  type t = {formula_printer : Formulap.stream_fpp_file; 
-            free_var_printer : Formulap.stream_fpp_file; 
-            form_t : Ast.exp; 
+  type t = {formula_printer : Formulap.stream_fpp_oc;
+            formula_filename : string;
+            free_var_printer : Formulap.stream_fpp_oc;
+            free_var_filename : string;
             close_funs : (unit -> unit) Stack.t}
-  type init = Formulap.split_stream_printer_type
+  type init = string * Formulap.stream_fppf
   type output = unit
 
   let free_vars = ref Var.VarSet.empty;;
   let defined_vars = ref Var.VarSet.empty;;
 
-  let init {Formulap.formula_p=formula_p; Formulap.free_var_p=free_var_p} = 
+  let init (filename,(make_printer:Formulap.stream_fppf)) =
     (* Create and start a stack of functions to close parens of operations *)
     let close_funs = Stack.create () in
-    free_var_p#open_stream_benchmark;
-    formula_p#and_start;
-    Stack.push (fun () -> formula_p#and_end) close_funs;
-    {formula_printer=formula_p; free_var_printer=free_var_p; 
-     form_t=exp_true; close_funs=close_funs}
+    let free_var_printer = make_printer (open_out filename) in
+    let tempfilename, tempoc = Filename.open_temp_file "letbindstream" "tmp" in
+    let formula_printer = make_printer tempoc in
+    free_var_printer#open_stream_benchmark;
+    formula_printer#and_start;
+    Stack.push (fun () -> formula_printer#and_end) close_funs;
+    {formula_printer=formula_printer; free_var_printer=free_var_printer;
+     formula_filename=filename; free_var_filename=tempfilename;
+     close_funs=close_funs}
 
   let add_to_formula ({formula_printer=formula_printer;
                        free_var_printer=free_var_printer;
-                       form_t=form_t;
                        close_funs=close_funs} as record) expression typ =
     (match expression, typ with
       | _, Equal ->
@@ -1012,10 +1016,9 @@ struct
       | _ -> failwith "internal error: adding malformed constraint to formula"
     )
 
-  let output_formula {formula_printer=formula_printer;
-                      free_var_printer=free_var_printer;
-                      form_t=form_t;
-                      close_funs=close_funs} =
+  let output_formula {formula_printer; free_var_printer;
+                      formula_filename; free_var_filename;
+                      close_funs} =
     Stack.iter (fun f -> f()) close_funs;
     formula_printer#close_benchmark;
     (* Free vars go at the begining of the file but we don't know all of them
@@ -1024,7 +1027,7 @@ struct
     Var.VarSet.iter free_var_printer#print_free_var !free_vars;
     formula_printer#flush; formula_printer#close;
     free_var_printer#flush; free_var_printer#close;
-    Hacks.append_file formula_printer#filename free_var_printer#filename
+    Hacks.append_file formula_filename free_var_filename
 end
 
 

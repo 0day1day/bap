@@ -64,7 +64,6 @@ end
 this. *)
 type fppf = ?suffix:string -> out_channel -> fpp_oc
 
-
 class virtual stream_fpp =
 object(self)
   (** Begin a list of constraints *)
@@ -89,17 +88,11 @@ object(self)
   (* XXX: assert/valid *)
 end
 
-class virtual stream_fpp_file =
+class virtual stream_fpp_oc =
 object(self)
   inherit stream_fpp
-  (* We need this for LetBindStreamLet, which appends the formula to the file containing the free variables *)
-  method virtual filename : string
   method virtual close : unit
   method virtual flush : unit
 end
 
-(** Printer type for streaming.  We need one printer for printing out
-    free variables, and one for printing the formula body.  We need
-    this because the body prints before we know the free variables. *)
-type split_stream_printer_type = {formula_p : stream_fpp_file;
-                                  free_var_p : stream_fpp_file}
+type stream_fppf = ?suffix:string -> out_channel -> stream_fpp_oc

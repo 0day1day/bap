@@ -1877,25 +1877,16 @@ end
 module StreamPrinter =
 struct
 
-  type fp = Formulap.split_stream_printer_type
+  type fp = string * Formulap.stream_fppf
 
   let init_printer file s = 
-    let f1 = file^".tmp_exp" in
-    let f2 = file in
-    let p =
-      match s with
-      | "stp" ->
-        {Formulap.formula_p = (new Stp.pp_file f1 :> Formulap.stream_fpp_file);
-         Formulap.free_var_p = (new Stp.pp_file f2 :> Formulap.stream_fpp_file)}
-      | "smtlib1" -> 
-        {Formulap.formula_p = (new Smtlib1.pp_file f1 :> Formulap.stream_fpp_file);
-         Formulap.free_var_p = (new Smtlib1.pp_file f2 :> Formulap.stream_fpp_file)}
-      | "smtlib2" -> 
-        {Formulap.formula_p = (new Smtlib2.pp_file f1 :> Formulap.stream_fpp_file);
-         Formulap.free_var_p = (new Smtlib2.pp_file f2 :> Formulap.stream_fpp_file)}
+    let printer = match s with
+      | "stp" -> ((new Stp.pp_oc) :> Formulap.stream_fppf)
+      | "smtlib1" -> ((new Smtlib1.pp_oc) :> Formulap.stream_fppf)
+      | "smtlib2" -> ((new Smtlib2.pp_oc) :> Formulap.stream_fppf)
       | _ -> failwith ("Unknown printer "^s)
-    in 
-    p
+    in
+    file, printer
 end
 
 module OldPrinter =
