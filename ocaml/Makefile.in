@@ -7,6 +7,10 @@ export OCAML_COMPAT='c'
 
 export BAP_DIR=$(CURDIR)/..
 
+# We can't use $(CPP) here because the default (cc -E) won't work on
+# .idl files.
+export CAMLIDLFLAGS = -prepro cpp
+
 export OCAMLMAKEFILE=OCamlMakefile
 export LIBASMIR=../libasmir
 export BIGINT=$(BAP_DIR)/zarith-1.0
@@ -23,10 +27,9 @@ export SOLVER=$(BAP_DIR)/solvers
 include $(SOLVER)/makefile.inc
 -include ../../ocaml-proj/Makefile
 
-include $(CURDIR)/makefile.inc
-ifdef HAVE_LLVM
+ifeq (@HAVE_LLVM_AC@,yes)
 export LLVM_SRC = llvm_codegen.mli llvm_codegen.ml
-export LLVM_PACKS = llvm llvm.analysis llvm.executionengine llvm.target llvm.scalar_opts llvm.bitwriter
+export LLVM_PACKS = @LLVM_PACKAGE@ @LLVM_PACKAGE@.analysis @LLVM_PACKAGE@.executionengine @LLVM_PACKAGE@.target @LLVM_PACKAGE@.scalar_opts @LLVM_PACKAGE@.bitwriter
 endif
 
 #export LIB_PACK_NAME = bap
@@ -128,12 +131,13 @@ export YFLAGS = -v
 
 export USE_CAMLP4 = yes
 
-export CLIBS = asmir vex opcodes bfd iberty stdc++
 export CLIBS += $(SOLVER_CLIBS)
 export OCAMLPATH = $(PIQIBUILDDIR)
 export CFLAGS = -g
-export LDFLAGS = $(LIBASMIR_LDFLAGS) $(SOLVER_LDFLAGS)
-export PPFLAGS = $(SOLVER_PPFLAGS) $(LLVM_PPFLAGS)
+export CPPFLAGS = @CPPFLAGS@
+export LDFLAGS = $(LIBASMIR_LDFLAGS) $(SOLVER_LDFLAGS) @LDFLAGS@
+export OCAMLMKLIB_FLAGS = $(LDFLAGS)
+export PPFLAGS = $(SOLVER_PPFLAGS) @LLVM_PPFLAGS@
 export INCDIRS = $(BIGINT) $(BATT) $(OUNIT) $(PCRE) $(OCAMLGRAPH) $(OBJSIZE) $(LIBTRACE) $(LIBTRACE)/piqi
 export LIBS = zarith batteries oUnit pcre graph objsize libtrace
 export RESULTDEPS = $(LIBASMIR)/src/libasmir.a $(VEX_DIR)/libvex.a $(LIBTRACE)/libtrace.cmxa
@@ -161,8 +165,10 @@ runtop:	top
 
 libbfd.idl : bfdarch.idl
 
-bfdarch.idl : /usr/include/bfd.h
-	 $(CPP) $< | awk 'BEGIN { go=0; } /^enum bfd_architecture$$/ { go=1; } \
+bfdarch.idl:
+	echo '#include "config.h"' > /tmp/f.c
+	echo '#include <bfd.h>' >> /tmp/f.c
+	$(CPP) $(CPPFLAGS) -I$(LIBASMIR) /tmp/f.c | awk 'BEGIN { go=0; } /^enum bfd_architecture$$/ { go=1; } \
 		go && $$0 != "" { print; } \
 		/};$$/ { go=0; }' > $@
 

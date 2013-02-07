@@ -974,8 +974,16 @@ let find_symbol {asmp=p} name =
 let get_function_ranges p =
   let symb = get_symbols p in
   ignore p; (* does this ensure p is live til here? *)
-  let is_function s =
-    s.bfd_symbol_flags land bsf_function <> 0
+  let is_function = match bfd_flavour (Libasmir.asmir_get_bfd p.asmp) with
+    | Bfd_target_elf_flavour
+    | Bfd_target_coff_flavour ->
+      (fun s -> s.bfd_symbol_flags land bsf_function <> 0)
+    | Bfd_target_mach_o_flavour ->
+      (fun s -> dprintf "Symbol %s, flags=%#x" s.bfd_symbol_name s.bfd_symbol_flags;
+	s.bfd_symbol_flags land bsf_global <> 0)
+    | _ ->
+      wprintf "Unknown file format flavour.  Assuming it has a function flag for symbols, which may be incorrect.";
+      (fun s -> s.bfd_symbol_flags land bsf_function <> 0)
   and symb_to_tuple s =
     (* FIXME: section_end doesn't seem to get the right values... *)
     (* did this fix it? --aij *)

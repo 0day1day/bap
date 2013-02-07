@@ -7,7 +7,7 @@ open Utils_common
 let basic_nested () =
   let p = Asmir.open_program "C/unroll" in
   let unroll n =
-    let cfg = match get_functions ~unroll:n ~names:["main"] p with
+    let cfg = match get_functions ~unroll:n ~names:["main";"_main"] p with
       | [(_,_,x)] -> x
       | _ -> failwith "Could not find unrolled main"
     in

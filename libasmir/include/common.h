@@ -11,7 +11,7 @@
 extern "C" {
 #endif
 
-
+#include "config.h"
 #include <bfd.h>
 
 #define DEFAULT_IRMAPFILE  "./asm2re.map"

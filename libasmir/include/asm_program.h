@@ -8,6 +8,7 @@ extern "C"
 #endif
 
 // from binutils
+#include "config.h"
 #include <bfd.h>
 #include <dis-asm.h>
 

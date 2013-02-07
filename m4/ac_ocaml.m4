@@ -80,7 +80,7 @@ AC_DEFUN([AC_PROG_OCAML], [
             AC_MSG_RESULT([yes])
         else
             AC_MSG_RESULT([no])
-            AC_MSG_ERROR([OCaml version unsufficient])
+            AC_MSG_ERROR([OCaml version unsufficient. See 'Bootstrapping using ocamlbrew' in the INSTALL file.])
         fi
     fi
 

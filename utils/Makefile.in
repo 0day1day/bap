@@ -22,17 +22,16 @@ export PIQIBUILDDIR=$(BAP_DIR)/libtracewrap/libtrace/piqi/piqi/build/lib/ocaml
 
 export OCAMLMAKEFILE=$(BAP_OCAMLDIR)/OCamlMakefile
 
-include $(BAP_OCAMLDIR)/makefile.inc
-ifdef HAVE_LLVM
+ifeq (@HAVE_LLVM_AC@,yes)
 export CODEGEN = codegen
-export LLVM_PACKS = llvm llvm.analysis llvm.executionengine llvm.target llvm.scalar_opts llvm.bitwriter
+export LLVM_PACKS = @LLVM_PACKAGE@ @LLVM_PACKAGE@.analysis @LLVM_PACKAGE@.executionengine @LLVM_PACKAGE@.target @LLVM_PACKAGE@.scalar_opts @LLVM_PACKAGE@.bitwriter
 endif
 
 # Stop annoying warnings about big_int duplication!
 #export OCAMLFIND_IGNORE_DUPS_IN=$(BAP_DIR)/bigint-3.12/otherlibs/num
 
 # ocamlfind packages required
-export PACKS = bigarray str num unix camomile piqi.lib $(LLVM_PACKS)
+export PACKS = camlidl bigarray str num unix camomile piqi.lib $(LLVM_PACKS)
 export LIBS = zarith batteries objsize oUnit graph pcre libtrace bap
 export INCDIRS = $(BAP_OCAMLDIR) $(BIGINT) $(BATT) $(OUNIT) $(PCRE) $(OCAMLGRAPH) $(OBJSIZE) $(LIBTRACE)
 export OCAMLPATH = $(PIQIBUILDDIR)
@@ -128,7 +127,7 @@ all: nc dc
 
 # Recursive make
 tags:
-	echo 'Making tags (not really)'
+	-
 
 # Print out command line to start ocamldebug
 debug: dc
