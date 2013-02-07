@@ -112,8 +112,6 @@ $ctx->checkout($rep_url, $local_path, $revision, $true);
 
 print "Finished checking out repository $rep_url\n";
 
-# Set path variable so autogen will work
-$ENV{'PATH'} = '/bin:/usr/bin:/home/swhitman/stp/bin';
 $ENV{'PIN_HOME'} = '/home/swhitman/pin/';
 
 # configure
