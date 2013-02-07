@@ -1629,8 +1629,10 @@ sig
   type state
 
   val create_state : user_init -> state
-  val construct_symbolic_run_formula : Var.t VH.t -> Var.t VH.t -> state -> stmt list -> state
+  (* Symbolically execute an entire trace at once *)
   val symbolic_run : user_init -> stmt list -> state
+  (* Symbolically execute some blocks of a trace for streaming *)
+  val symbolic_run_blocks : state -> stmt list -> state
   val generate_formula : user_init -> stmt list -> output
   val output_formula : state -> output
 
@@ -1651,14 +1653,17 @@ struct
   type user_init = FormAdapt.user_init
   type init = Form.init
   type output = Form.output
-  type state = SymbolicEval.myctx
+  type state = {symstate: SymbolicEval.myctx;
+                h: Var.t Var.VarHash.t; rh: Var.t Var.VarHash.t (*dsa maps*)}
 
   let status = ref 0
   let count = ref 0
 
-  let create_state i = SymbolicEval.create_state (FormAdapt.adapt i)
+  let create_state i = {symstate=SymbolicEval.create_state (FormAdapt.adapt i);
+                        h=VH.create 1000;
+                        rh=VH.create 10000}
 
-  let symbolic_run_block h rh state stmt = 
+  let symbolic_run_block ({h; rh; symstate} as state) stmt =
     let to_dsa stmt = to_dsa_stmt stmt h rh in
     let stmts = ref [] in
     (* dprintf "Dsa'ified stmt: %s" (Pp.ast_stmt_to_string stmt); *)
@@ -1674,30 +1679,31 @@ struct
           (* Printf.printf "%s\n" ("block no: " ^ (string_of_int !status)); *)
           (* Printf.printf "%s\n" (Pp.ast_stmt_to_string stmt); *)
           (* We have a new block *)
-          clean_delta state.delta;
+          clean_delta symstate.delta;
           status := !status + 1 ;
       | _ -> ());
 
     (* Double fold since we may have to add an assertion *)
-    List.fold_left
+    let symstate = List.fold_left
       (fun state stmt ->
         match SymbolicEval.eval_stmt state stmt with
           | [next] -> next
           | _ -> failwith "Jump in a straightline program"
-      ) state !stmts
+      ) symstate !stmts in
+    {state with symstate}
 
-  let construct_symbolic_run_formula h rh state trace =
+  let symbolic_run_blocks state trace =
     try
-      let state = List.fold_left (symbolic_run_block h rh) state trace in
+      let state = List.fold_left symbolic_run_block state trace in
       state
     with
       | Failure fail as e ->
           pdebug ("Symbolic Run Fail: "^fail);
           (*state.pred*)
           raise e
-      | SymbolicEval.Halted (_,state) ->
+      | SymbolicEval.Halted (_,symstate) ->
           pdebug "Symbolic Run ... Successful!";
-          state
+          {state with symstate}
       | SymbolicEval.AssertFailed _ as e ->
           pdebug "Failed assertion ..." ;
           (*state.pred*)
@@ -1705,19 +1711,15 @@ struct
 
   let symbolic_run userinit trace =
     Status.init "Symbolic Run" (List.length trace) ;
-    let h = VH.create 1000 in (* vars to dsa vars *)
-    let rh = VH.create 10000 in (* dsa vars to vars *)
-    dsa_rev_map := Some(rh);
     let trace = append_halt trace in
     (*  VH.clear TaintSymbolic.dsa_map; *)
     cleanup ();
-    let state = 
-      SymbolicEval.build_default_context trace (FormAdapt.adapt userinit)
-    in
+    let state = create_state userinit in
+    dsa_rev_map := Some state.rh;
     (* Find the memory variable *)
     let memv = find_memv trace in
     dprintf "Memory variable: %s" (Var.name memv);
-    let formula = construct_symbolic_run_formula h rh state trace in
+    let formula = symbolic_run_blocks state trace in
     Status.stop () ;
     dsa_rev_map := None;
     formula
@@ -1733,9 +1735,9 @@ struct
       | false -> trace_dce trace
     in
     let finalstate = symbolic_run i trace in
-    Form.output_formula finalstate.pred
+    Form.output_formula finalstate.symstate.pred
 
-  let output_formula state = Form.output_formula state.pred
+  let output_formula state = Form.output_formula state.symstate.pred
 
 end
 
@@ -1757,7 +1759,7 @@ struct
   let formula_valid_to_invalid ?(min=1) trace =
     let sym_and_output trace fname =
       let finalstate = symbolic_run (fname,Smtexec.STP.si) trace in
-      Form.output_formula finalstate.pred;
+      Form.output_formula finalstate.symstate.pred;
     in
     let trace = concrete trace in
     (* If we leave DCE on, it will screw up the consistency check. *)

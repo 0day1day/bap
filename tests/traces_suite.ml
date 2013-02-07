@@ -28,20 +28,21 @@ let pin_trace_setup _ =
   assert_command ~exit_code (!pin_path^pin) args;
   find_pin_out (Array.to_list (Sys.readdir "./")) tag;;
 
-
-let pin_trace_test pin_out =
-  let prog = Asmir.serialized_bap_from_trace_file pin_out in
-  typecheck prog;
-  Traces.consistency_check := true;
-  ignore(Traces.concrete prog);
-  Traces.consistency_check := false;
-  let t1 = Traces.add_payload "test" prog in
-  (* We should not get an exception because this should be satisfiable *)
-  ignore(Traces.TraceSymbolic.output_exploit (exploit_file,Smtexec.STP.si) t1);
-  let t2 = Traces.add_payload "\x00" prog in
-  Traces.cleanup();
-  (* Null bytes are not allowed, so we should get an exception *)
-  assert_raises ~msg:"Exploit should be impossible" (Failure "Formula was unsatisfiable") (fun () -> Traces.TraceSymbolic.output_exploit (exploit_file,Smtexec.STP.si) t2)
+module MakeTraceTest(TraceSymbolic:Traces.TraceSymbolic) = struct
+  let pin_trace_test pin_out =
+    let prog = Asmir.serialized_bap_from_trace_file pin_out in
+    typecheck prog;
+    Traces.consistency_check := true;
+    ignore(Traces.concrete prog);
+    Traces.consistency_check := false;
+    let t1 = Traces.add_payload "test" prog in
+    (* We should not get an exception because this should be satisfiable *)
+    ignore(Traces.TraceSymbolic.output_exploit (exploit_file,Smtexec.STP.si) t1);
+    let t2 = Traces.add_payload "\x00" prog in
+    Traces.cleanup();
+    (* Null bytes are not allowed, so we should get an exception *)
+    assert_raises ~msg:"Exploit should be impossible" (Failure "Formula was unsatisfiable") (fun () -> Traces.TraceSymbolic.output_exploit (exploit_file,Smtexec.STP.si) t2)
+end
 
 let backwards_taint_test pin_out =
   Traces.cleanup();
@@ -72,14 +73,17 @@ let backwards_taint_test pin_out =
 (* Note: This will leave the files pin.log and pintool.log by intention *)
 let pin_trace_cleanup pin_out =
   rm_and_ignore_list [pin_out ; exploit_file ; taint_file];;
-(*  Sys.remove pin_out; Sys.remove exploit_file; Sys.remove taint_file;; *)
 
 
 let suite = "Traces" >:::
   [
-    "pin_trace_test" >::
-      bracket pin_trace_setup pin_trace_test pin_trace_cleanup;
-    (* We record the same trace twice, which is kind of dumb *)
+    (* We record the same trace multiple times, which is kind of dumb *)
     "backwards_taint_test" >::
       bracket pin_trace_setup backwards_taint_test pin_trace_cleanup;
+    "pin_trace_test" >::
+      (let module M = MakeTraceTest(Traces.TraceSymbolic) in
+       bracket pin_trace_setup M.pin_trace_test pin_trace_cleanup);
+    "pin_trace_stream_test" >::
+      (let module M = MakeTraceTest(Traces.TraceSymbolicStream) in
+       bracket pin_trace_setup M.pin_trace_test pin_trace_cleanup);
   ]

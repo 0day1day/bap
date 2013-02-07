@@ -16,13 +16,6 @@ type cmd =
   | TransformAst of (ast -> ast)
   | AnalysisAst of (ast -> unit)
 
-type traceSymbolicType =
-  | NoSubNoLet
-  | NoSub
-  | NoSubStreamLet
-  | NoSubOpt
-  | Substitution
-
 (** Values for concrete execution *)
 let concrete_state = Traces.TraceConcrete.create_state ();;
 let mem_hash = Memory2array.create_state ();;
@@ -30,12 +23,6 @@ let thread_map = Traces.create_thread_map_state();;
 (* HACK to make sure default memory has a map to normalized memory *)
 ignore(Memory2array.coerce_rvar_state mem_hash Asmir.x86_mem);;
 
-
-(** Values for formula generation *)
-let h = VH.create 1000;; (* vars to dsa vars *)
-let rh = VH.create 10000;;  (* dsa vars to vars *)
-
-let traceSymbType = ref NoSub;;
 
 let pipeline = ref [];;
 
@@ -85,10 +72,11 @@ struct
         | Some s -> s
         (* If this is the first block, make a new state *)
         | None ->
+          (* Do we need to set dsa_rev_map? *)
           TraceSymbolic.create_state (filename,Smtexec.STP.si)
       in
       last_state :=
-        Some (TraceSymbolic.construct_symbolic_run_formula h rh state block)
+        Some (TraceSymbolic.symbolic_run_blocks state block)
 
   let output_formula () =
     match !last_state with
