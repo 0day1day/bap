@@ -11,3 +11,4 @@
 * iltrans: change default formula format to stp
 * streamtrans: rewrite
 * merge.org: Remove me before merging :-)
+* MakeStreamSymbolic/streamtrans: Remove last_state

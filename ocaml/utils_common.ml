@@ -32,17 +32,6 @@ let optimize_cfg ?(usedc=true) ?(usesccvn=true) cfg post =
   let cfg = Cfg_ssa.to_astcfg cfg in
   (cfg, p);;
 
-let stream_concrete mem_hash concrete_state thread_map block return =
-  let block = Memory2array.coerce_prog_state mem_hash block in
-  let memv = Memory2array.coerce_rvar_state mem_hash Asmir.x86_mem in
-  let block = Traces.explicit_thread_stmts block thread_map in
-  if return then
-    Traces.run_block ~transformf:Traces.trace_transform_stmt concrete_state memv thread_map block
-  else (
-    ignore(Traces.run_block concrete_state memv thread_map block);
-    []
-  )
-
 let get_functions ?unroll ?names p =
   let ranges = Asmir.get_function_ranges p in
   let do_function (n,s,e) =

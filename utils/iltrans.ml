@@ -245,13 +245,13 @@ let speclist =
      "Start debugging at item n."
     )
   ::("-trace-debug",
-     uadd(AnalysisAst Traces.TraceSymbolicNoSub.trace_valid_to_invalid),
+     uadd(AnalysisAst Traces.TraceSymbolic.trace_valid_to_invalid),
      "Formula debugging. Prints to files form_val and form_inv"
     )
   ::("-trace-conc-debug",
      Arg.Unit
        (fun () ->
-	  let f = Traces.TraceSymbolicNoSub.formula_valid_to_invalid ~min:!startdebug in
+	  let f = Traces.TraceSymbolic.formula_valid_to_invalid ~min:!startdebug in
 	  add(AnalysisAst f)
        ),
      "Formula debugging. Prints to files form_val and form_inv. Concretizes BEFORE debugging; useful for finding which assertion doesn't work."
@@ -336,27 +336,15 @@ let speclist =
      "<gaddress> <maddress> <sehaddress> <payload file> Use pivot at gaddress to transfer control (by overwriting SEH handler at sehaddress) to payload at maddress."
     )
   ::("-trace-formula",
-     Arg.String(fun f -> add(AnalysisAst(Traces.TraceSymbolicNoSub.generate_formula f))),
+     Arg.String(fun f -> add(AnalysisAst(Traces.TraceSymbolic.generate_formula f))),
      "<file> Output a trace formula to <file>"
     )
-  ::("-trace-formula-opt",
-     Arg.String(fun f -> add(AnalysisAst(Traces.TraceSymbolicNoSubOpt.generate_formula f))),
-     "<file> Output a trace formula to <file>"
-    )
-  ::("-trace-formula-no-sub-no-let",
-     Arg.String(fun f -> add(AnalysisAst(Traces.TraceSymbolicNoSubNoLet.generate_formula f))),
-     "Set formula format so it does not use substitution or let bindings (default is no substitution with let bindings)"
-  )
-  ::("-trace-formula-sub",
-     Arg.String(fun f -> add(AnalysisAst(Traces.TraceSymbolicSub.generate_formula f))),
-     "Set formula format so it uses substitution (default is no substitution with let bindings)"
-  )
   ::("-trace-formula-format",
      Arg.Set_string Traces.printer,
      "Set formula format (STP (default), smtlib1, or smtlib2)."
   )
   ::("-trace-exploit",
-     Arg.String(fun f -> add(AnalysisAst(Traces.TraceSymbolicNoSub.output_exploit f))),
+     Arg.String(fun f -> add(AnalysisAst(Traces.TraceSymbolic.output_exploit f))),
      "<file> Output the exploit string to <file>"
     )
   ::("-trace-assignments",
@@ -377,7 +365,11 @@ let speclist =
     )
   ::("-trace-check",
      Arg.Set Traces.consistency_check,
-     "Perform extra consistency checks"
+     "Perform consistency checks"
+    )
+  ::("-trace-check-all",
+     Arg.Set Traces.checkall,
+     "Perform extra consistency checks possible when all instructions are logged"
     )
   ::("-trace-noopt",
      Arg.Clear Traces.dce,

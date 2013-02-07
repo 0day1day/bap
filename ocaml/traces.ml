@@ -910,7 +910,7 @@ struct
 end
 
 module TraceConcrete = 
-  Symbeval.Make(TraceConcreteDef)(AlwaysEvalLet)(TraceConcreteAssign)(StdForm)
+  Symbeval.Make(TraceConcreteDef)(EvalSymbLet)(TraceConcreteAssign)(StdForm)
 
 (** Check all variables in delta to make sure they agree with operands
     loaded from a trace. We should be able to find bugs in BAP and the
@@ -1427,6 +1427,18 @@ let concrete trace =
   let actual_trace = run_blocks blocks memv length in
     actual_trace
 
+(** Concrete execution of a streamed trace block *)
+let concrete_stream mem_hash concrete_state thread_map block return =
+  let block = Memory2array.coerce_prog_state mem_hash block in
+  let memv = Memory2array.coerce_rvar_state mem_hash Asmir.x86_mem in
+  let block = explicit_thread_stmts block thread_map in
+  if return then
+    run_block ~transformf:trace_transform_stmt concrete_state memv thread_map block
+  else (
+    ignore(run_block concrete_state memv thread_map block);
+    []
+  )
+
 
 (* Normal concrete execution *)
 module TaintConcreteDef =
@@ -1473,7 +1485,7 @@ struct
 
 end
 
-module TaintConcrete = Symbeval.Make(TaintConcreteDef)(FastEval)(StdAssign)(StdForm)
+module TaintConcrete = Symbeval.Make(TaintConcreteDef)(DontEvalSymbLet)(StdAssign)(StdForm)
 
 (** Concretely execute a trace without using any operand information *)
 let concrete_rerun file stmts =
@@ -1608,7 +1620,7 @@ sig
   type init
   type output
   type state
-    
+
   val create_state : init -> state
   val construct_symbolic_run_formula : Var.t VH.t -> Var.t VH.t -> state -> stmt list -> state
   val init_formula_file : string -> init
@@ -1665,7 +1677,7 @@ struct
           | [next] -> next
           | _ -> failwith "Jump in a straightline program"
       ) state !stmts
-      
+
   let construct_symbolic_run_formula h rh state trace =
     try
       let state = List.fold_left (symbolic_run_block h rh) state trace in
@@ -1708,7 +1720,7 @@ struct
 
   (*************************************************************)
   (********************  Formula Generation  *******************)
-  (*************************************************************)      
+  (*************************************************************)
   let generate_formula file trace =
     let trace = concrete trace in
     (* If we leave DCE on, it will screw up the consistency check. *)
@@ -1899,17 +1911,10 @@ struct
 end
 
 
-module TraceSymbolicNoSubNoLet =
-  TraceSymbolicFunc(FastEval)(PredAssignTraces)(OldPrinter)(StdFormStream);;
-module TraceSymbolicNoSub =
-  TraceSymbolicFunc(FastEval)(PredAssignTraces)(OldPrinter)(LetBindStream);;
-module TraceSymbolicNoSubOpt =
-  TraceSymbolicFunc(SlowEval)(PredAssignTraces)(OldPrinter)(LetBindStream);;
-module TraceSymbolicSub =
-  TraceSymbolicFunc(SlowEval)(StdAssign)(OldPrinter)(LetBindStream);;
-
-module TraceSymbolicNoSubStreamLet = 
-  TraceSymbolicFunc(FastEval)(PredAssignTraces)(StreamPrinter)(LetBindStreamLet);;
+module TraceSymbolic =
+  TraceSymbolicFunc(DontEvalSymbLet)(PredAssignTraces)(OldPrinter)(LetBindStream);;
+module TraceSymbolicStream =
+  TraceSymbolicFunc(DontEvalSymbLet)(PredAssignTraces)(StreamPrinter)(LetBindStreamLet);;
 
 
 (** SWXXX Should this go somewhere else too? *)

@@ -38,11 +38,11 @@ let pin_trace_test pin_out =
   Traces.consistency_check := false;
   let t1 = Traces.add_payload "test" prog in
   (* We should not get an exception because this should be satisfiable *)
-  ignore(Traces.TraceSymbolicNoSub.output_exploit exploit_file t1);
+  ignore(Traces.TraceSymbolic.output_exploit exploit_file t1);
   let t2 = Traces.add_payload "\x00" prog in
   Traces.cleanup();
   (* Null bytes are not allowed, so we should get an exception *)
-  assert_raises ~msg:"Exploit should be impossible" (Failure "Formula was unsatisfiable") (fun () -> Traces.TraceSymbolicNoSub.output_exploit exploit_file t2)
+  assert_raises ~msg:"Exploit should be impossible" (Failure "Formula was unsatisfiable") (fun () -> Traces.TraceSymbolic.output_exploit exploit_file t2)
 
 let backwards_taint_test pin_out =
   Traces.cleanup();

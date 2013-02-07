@@ -35,14 +35,17 @@ ignore(Memory2array.coerce_rvar_state mem_hash Asmir.x86_mem);;
 let h = VH.create 1000;; (* vars to dsa vars *)
 let rh = VH.create 10000;;  (* dsa vars to vars *)
 
-let outfile = ref "";;
-
 let traceSymbType = ref NoSub;;
 
 let pipeline = ref [];;
 
+let final = ref [];;
+
 let add c =
   pipeline := c :: !pipeline
+
+let addfinal c =
+  final := c :: !final
 
 let uadd c =
   Arg.Unit(fun()-> add c)
@@ -59,81 +62,60 @@ let prints f =
 
 (** Concretely executes a block *)
 let concrete block = 
-  Utils_common.stream_concrete mem_hash concrete_state thread_map block false
+  Traces.concrete_stream mem_hash concrete_state thread_map block false
 
+(* XXX: This should really go somewhere else *)
 (** Symbolicly executes a block and builds formulas *)
-module StreamSymbolic (TraceSymbolic:Traces.TraceSymbolicRun) =
+module MakeStreamSymbolic (TraceSymbolic:Traces.TraceSymbolicRun with type output = unit) =
 struct
-  let last_state = ref None;;
 
-  let generate_formulas_setup block = 
-    let block = 
-      Utils_common.stream_concrete mem_hash concrete_state thread_map block true
+  let last_state = ref None
+
+  let generate_formulas_setup block =
+    let block =
+      Traces.concrete_stream mem_hash concrete_state thread_map block true
     in
     let block = Traces.remove_specials block in
     let block = Hacks.replace_unknowns block in
     block
 
   let generate_formulas filename block =
-    let block = generate_formulas_setup block in
-    let state = match !last_state with 
-      | Some s -> s
-      | None ->
+      let block = generate_formulas_setup block in
+      let state = match !last_state with
+        | Some s -> s
+        (* If this is the first block, make a new state *)
+        | None ->
           TraceSymbolic.create_state (TraceSymbolic.init_formula_file filename)
-    in
-    last_state := 
-      Some (TraceSymbolic.construct_symbolic_run_formula h rh state block)
-      
-  let output_formula () = 
+      in
+      last_state :=
+        Some (TraceSymbolic.construct_symbolic_run_formula h rh state block)
+
+  let output_formula () =
     match !last_state with
       | Some s -> TraceSymbolic.output_formula s
       | None -> failwith "Can not output formula for empty state!"
 end
 
-module StreamSymbolicNoSubNoLet = StreamSymbolic(Traces.TraceSymbolicNoSubNoLet)
-module StreamSymbolicNoSub = StreamSymbolic(Traces.TraceSymbolicNoSub)
-module StreamSymbolicNoSubOpt = StreamSymbolic(Traces.TraceSymbolicNoSubOpt)
-module StreamSymbolicSub = StreamSymbolic(Traces.TraceSymbolicSub)
-
-module StreamSymbolicNoSubStreamLet = 
-  StreamSymbolic(Traces.TraceSymbolicNoSubStreamLet)
+module StreamSymbolic =
+  MakeStreamSymbolic(Traces.TraceSymbolicStream)
 
 let speclist =
   ("-print", Arg.String(fun f -> add(TransformAst(prints f))),
    "<file> Print each statement in the trace to file.")
-  ::("-concrete", uadd(TransformAst(concrete)),
-     "Concretely execute each block.")
+  ::("-trace-check",
+     Arg.Set Traces.consistency_check,
+     "Perform consistency checks"
+    )
+  ::("-trace-check-all",
+     Arg.Set Traces.checkall,
+     "Perform extra consistency checks possible when all instructions are logged"
+    )
   ::("-trace-formula",
-     Arg.String(fun f -> 
-       (outfile := f; 
-        add(AnalysisAst(StreamSymbolicNoSub.generate_formulas f)))
+     Arg.String(fun f ->
+       add(AnalysisAst(StreamSymbolic.generate_formulas f));
+       addfinal(StreamSymbolic.output_formula)
      ),
-     "<file> Generate and output a trace formula to <file>.  "^
-       "Don't use substitution but do use lets.")
-  ::("-trace-formula-opt",
-     Arg.String(fun f -> 
-       (outfile := f; traceSymbType := NoSubOpt;
-        add(AnalysisAst(StreamSymbolicNoSubOpt.generate_formulas f)))),
-     "<file> Generate and output a trace formula to <file>.  "^
-       "Don't use substitution but do use lets.")
-  ::("-trace-formula-stream-let",
-     Arg.String(fun f -> 
-       (outfile := f; traceSymbType := NoSubStreamLet;
-        add(AnalysisAst(StreamSymbolicNoSubStreamLet.generate_formulas f)))),
-     "<file> Generate and output a trace formula to <file>.  "^
-       "Don't use substitution but do use lets.")
-  ::("-trace-formula-no-sub-no-let",
-     Arg.String(fun f -> 
-       (outfile := f; traceSymbType := NoSubNoLet;
-        add(AnalysisAst(StreamSymbolicNoSubNoLet.generate_formulas f)))),
-     "<file> Generate and output a trace formula to <file>.  "^
-       "Don't use substitution and do not use lets.")
-  ::("-trace-formula-sub",
-     Arg.String(fun f -> 
-       (outfile := f; traceSymbType := Substitution;
-        add(AnalysisAst(StreamSymbolicSub.generate_formulas f)))),
-     "<file> Generate and output a trace formula to <file>.  "^
-       "Do use substitution.")
+     "<file> Generate and output a trace formula to <file>.")
   :: Input.stream_speclist
 
 let anon x = raise(Arg.Bad("Unexpected argument: '"^x^"'"))
@@ -158,33 +140,17 @@ let rec apply_cmd prog = function
   )
 ;;
 
-if (!outfile <> "") then
-  (** Set for formula generation *)
-  Traces.dsa_rev_map := Some(rh)
-else (
-  Traces.checkall := true;
-  Traces.consistency_check := true
-);
+(* if (!outfile <> "") then *)
+(*   (\** Set for formula generation *\) *)
+(*   Traces.dsa_rev_map := Some(rh) *)
+(* else ( *)
+(*   Traces.checkall := true; *)
+(*   Traces.consistency_check := true *)
+(* ); *)
 
 Stream.iter
   (fun block ->
     ignore(List.fold_left apply_cmd (Ast block) pipeline)
   ) prog;
 
-if (!outfile <> "") then (
-  Traces.dsa_rev_map := None;
-  print_endline("Outputting formula.");
-  (match !traceSymbType with
-    | NoSub -> StreamSymbolicNoSub.output_formula ()
-    | NoSubOpt -> StreamSymbolicNoSubOpt.output_formula ()
-    | NoSubStreamLet -> 
-      StreamSymbolicNoSubStreamLet.output_formula ();
-      (* SWXXX Super ugly hack.  Prepend the free variables to the
-         formula expression file.  The formula expression file is
-         named outfile.tmp_exp and created in traces.ml *)
-      Hacks.append_file !outfile ((!outfile)^".tmp_exp");
-      Sys.remove((!outfile)^".tmp_exp")
-    | NoSubNoLet -> StreamSymbolicNoSubNoLet.output_formula ()
-    | Substitution -> StreamSymbolicSub.output_formula ());
-)
-
+List.iter (fun f -> f ()) !final;;

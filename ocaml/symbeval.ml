@@ -851,17 +851,15 @@ struct
     {ctx with delta=update_var delta v ev; pc=Int64.succ pc}
 end
 
-module FastEval =
+module DontEvalSymbLet =
 struct
   let eval_symb_let = false
 end
 
-module AlwaysEvalLet =
+module EvalSymbLet =
 struct
   let eval_symb_let = true
 end
-(** Deprecated name *)
-module SlowEval = AlwaysEvalLet
 
 (** Just build a straightforward expression; does not use Lets *)
 module StdForm =
@@ -1029,11 +1027,11 @@ struct
 end
 
 
-module Symbolic = Make(SymbolicMemL)(FastEval)(StdAssign)(StdForm)
-module SymbolicSlowMap = Make(BuildSymbolicMemL(MemVMBackEnd))(SlowEval)(StdAssign)(StdForm)
-module SymbolicSlow = Make(SymbolicMemL)(SlowEval)(StdAssign)(StdForm)
+module Symbolic = Make(SymbolicMemL)(DontEvalSymbLet)(StdAssign)(StdForm)
+module SymbolicSlowMap = Make(BuildSymbolicMemL(MemVMBackEnd))(EvalSymbLet)(StdAssign)(StdForm)
+module SymbolicSlow = Make(SymbolicMemL)(EvalSymbLet)(StdAssign)(StdForm)
 
-module Concrete = Make(ConcreteUnknownZeroMemL)(AlwaysEvalLet)(StdAssign)(StdForm)
+module Concrete = Make(ConcreteUnknownZeroMemL)(EvalSymbLet)(StdAssign)(StdForm)
 
 (** Execute a program concretely *)
 let concretely_execute ?s ?(i=[]) p =
