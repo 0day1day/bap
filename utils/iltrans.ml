@@ -1,6 +1,8 @@
 let usage = "Usage: "^Sys.argv.(0)^" <input options> [transformations and outputs]\n\
              Transform BAP IL programs. "
 
+open Utils_common
+
 type ast = Ast.program
 type astcfg = Cfg.AST.G.t
 type ssa = Cfg.SSA.G.t
@@ -336,15 +338,13 @@ let speclist =
      "<gaddress> <maddress> <sehaddress> <payload file> Use pivot at gaddress to transfer control (by overwriting SEH handler at sehaddress) to payload at maddress."
     )
   ::("-trace-formula",
-     Arg.String(fun f -> add(AnalysisAst(Traces.TraceSymbolic.generate_formula f))),
+     Arg.String(fun f -> add(AnalysisAst(Traces.TraceSymbolic.generate_formula (f,!Solver.solver)))),
      "<file> Output a trace formula to <file>"
     )
-  ::("-trace-formula-format",
-     Arg.Set_string Traces.printer,
-     "Set formula format (STP (default), smtlib1, or smtlib2)."
-  )
+  ::("-trace-solver", Arg.String Solver.set_solver,
+     ("Use the specified solver for traces. Choices: " ^ Solver.solvers))
   ::("-trace-exploit",
-     Arg.String(fun f -> add(AnalysisAst(Traces.TraceSymbolic.output_exploit f))),
+     Arg.String(fun f -> add(AnalysisAst(Traces.TraceSymbolic.output_exploit (f,!Solver.solver)))),
      "<file> Output the exploit string to <file>"
     )
   ::("-trace-assignments",

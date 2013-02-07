@@ -19,6 +19,7 @@ type result = Valid | Invalid (*of model*) | SmtError of string | Timeout
 class type smtexec =
 object
   method printer : Formulap.fppf
+  method streaming_printer : Formulap.stream_fppf
   method solvername : string
   method solve_formula_file : ?timeout:int -> ?remove:bool -> ?printmodel:bool -> string -> result
   (* XXX: Add other methods *)
@@ -207,6 +208,7 @@ struct
       method solvername = S.solvername
       method solve_formula_file = solve_formula_file
       method printer = S.printer
+      method streaming_printer = S.streaming_printer
     end
 
     let si = new c

@@ -61,6 +61,18 @@ let get_functions ?unroll ?names p =
   in
   BatList.filter_map do_function ranges
 
+module Solver = struct
+  (* Select which solver to use *)
+  let solver = ref (Smtexec.STP.si);;
+
+  let set_solver s =
+    solver := try Hashtbl.find Smtexec.solvers s
+      with Not_found ->
+        failwith "Unknown solver"
+
+  let solvers = Hashtbl.fold (fun k _ s -> k ^ " " ^ s) Smtexec.solvers ""
+end
+
 let jitexecute inits p =
 IFDEF WITH_LLVM THEN
   let cfg = Cfg_ast.of_prog p in
@@ -72,5 +84,3 @@ IFDEF WITH_LLVM THEN
 ELSE
   failwith "LLVM not enabled"
 END;;
-
-

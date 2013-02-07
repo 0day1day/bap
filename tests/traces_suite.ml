@@ -24,7 +24,6 @@ let pin_trace_setup _ =
   (* check_file (pin_path^pin); *)
   (* check_file (gentrace_path^gentrace); *)
   check_stp_path();
-  Traces.printer := "stp";
   create_input_file();
   assert_command ~exit_code (!pin_path^pin) args;
   find_pin_out (Array.to_list (Sys.readdir "./")) tag;;
@@ -38,11 +37,11 @@ let pin_trace_test pin_out =
   Traces.consistency_check := false;
   let t1 = Traces.add_payload "test" prog in
   (* We should not get an exception because this should be satisfiable *)
-  ignore(Traces.TraceSymbolic.output_exploit exploit_file t1);
+  ignore(Traces.TraceSymbolic.output_exploit (exploit_file,Smtexec.STP.si) t1);
   let t2 = Traces.add_payload "\x00" prog in
   Traces.cleanup();
   (* Null bytes are not allowed, so we should get an exception *)
-  assert_raises ~msg:"Exploit should be impossible" (Failure "Formula was unsatisfiable") (fun () -> Traces.TraceSymbolic.output_exploit exploit_file t2)
+  assert_raises ~msg:"Exploit should be impossible" (Failure "Formula was unsatisfiable") (fun () -> Traces.TraceSymbolic.output_exploit (exploit_file,Smtexec.STP.si) t2)
 
 let backwards_taint_test pin_out =
   Traces.cleanup();

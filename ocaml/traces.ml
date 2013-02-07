@@ -1609,23 +1609,29 @@ struct
     {ctx with delta=delta'; pred=pred'; pc=Int64.succ pc}
 end
 
-module type TracePrinter =
+(** Modules that convert user_init data to a FlexibleFormula's init
+    type *)
+module type FormulaAdapter =
 sig
-  type fp
-  val init_printer : string -> string -> fp
+  type user_init
+  type form_init
+  val adapt : user_init -> form_init
 end
 
-module type TraceSymbolicRun =
+module type TraceSymbolic =
 sig
+  (* Formula types *)
+  type user_init
   type init
   type output
+
+  (* Symb. exec. state *)
   type state
 
-  val create_state : init -> state
+  val create_state : user_init -> state
   val construct_symbolic_run_formula : Var.t VH.t -> Var.t VH.t -> state -> stmt list -> state
-  val init_formula_file : string -> init
-  val symbolic_run : stmt list -> string -> state
-  val generate_formula : string -> stmt list -> output
+  val symbolic_run : user_init -> stmt list -> state
+  val generate_formula : user_init -> stmt list -> output
   val output_formula : state -> output
 
   (******************* Formula Debugging  **********************)
@@ -1633,14 +1639,16 @@ sig
   val trace_valid_to_invalid : stmt list -> unit
 
   (****************  Exploit String Generation  ****************)
-  val output_exploit : string -> stmt list -> unit
+  val output_exploit : user_init -> stmt list -> unit
 end
 
-module TraceSymbolicFunc (Tune: EvalTune) (Assign: Assign) (PrinterType: TracePrinter) (Form: FlexibleFormula with type init=PrinterType.fp with type output = unit) =
-struct 
+
+module MakeTraceSymbolic (Tune: EvalTune) (Assign: Assign) (FormAdapt: FormulaAdapter) (Form: FlexibleFormula with type init = FormAdapt.form_init with type output = unit) =
+struct
   (* Set this to LetBindSimplify to use formula simplificiation *)
   module SymbolicEval = Symbeval.Make(SymbolicMemL)(Tune)(Assign)(Form)
 
+  type user_init = FormAdapt.user_init
   type init = Form.init
   type output = Form.output
   type state = SymbolicEval.myctx
@@ -1648,7 +1656,7 @@ struct
   let status = ref 0
   let count = ref 0
 
-  let create_state = SymbolicEval.create_state
+  let create_state i = SymbolicEval.create_state (FormAdapt.adapt i)
 
   let symbolic_run_block h rh state stmt = 
     let to_dsa stmt = to_dsa_stmt stmt h rh in
@@ -1695,11 +1703,7 @@ struct
           (*state.pred*)
           raise e
 
-
-  let init_formula_file filename = PrinterType.init_printer filename !printer
-    
-
-  let symbolic_run trace filename =
+  let symbolic_run userinit trace =
     Status.init "Symbolic Run" (List.length trace) ;
     let h = VH.create 1000 in (* vars to dsa vars *)
     let rh = VH.create 10000 in (* dsa vars to vars *)
@@ -1708,7 +1712,7 @@ struct
     (*  VH.clear TaintSymbolic.dsa_map; *)
     cleanup ();
     let state = 
-      SymbolicEval.build_default_context trace (init_formula_file filename) 
+      SymbolicEval.build_default_context trace (FormAdapt.adapt userinit)
     in
     (* Find the memory variable *)
     let memv = find_memv trace in
@@ -1721,25 +1725,29 @@ struct
   (*************************************************************)
   (********************  Formula Generation  *******************)
   (*************************************************************)
-  let generate_formula file trace =
+  let generate_formula i trace =
     let trace = concrete trace in
     (* If we leave DCE on, it will screw up the consistency check. *)
     let trace = match !consistency_check || (not !dce) with
       | true -> trace
       | false -> trace_dce trace
     in
-    let finalstate = symbolic_run trace file in
+    let finalstate = symbolic_run i trace in
     Form.output_formula finalstate.pred
 
   let output_formula state = Form.output_formula state.pred
 
-  (* let output_formula file trace = *)
-  (*   let formula = generate_formula trace in *)
-  (*   (\*dprintf "formula size: %Ld\n" (formula_size formula) ;*\) *)
-  (*   Status.init "Printing out formula" 0; *)
-  (*   print_formula file formula ; *)
-  (*   Status.stop () *)
+end
 
+(* User gives a filename and an SMT *)
+type standard_user_init = string * Smtexec.smtexec
+
+(* Extra stuff when user_init = standard_user_init *)
+module MakeTraceSymbolicStandard (Tune: EvalTune) (Assign: Assign) (FormAdapt: FormulaAdapter with type user_init = standard_user_init) (Form: FlexibleFormula with type init = FormAdapt.form_init with type output = unit) =
+struct
+
+  module TraceSymbolic = MakeTraceSymbolic(Tune)(Assign)(FormAdapt)(Form)
+  include TraceSymbolic
 
   (*************************************************************)
   (******************* Formula Debugging  **********************)
@@ -1748,7 +1756,7 @@ struct
      wrong. *)
   let formula_valid_to_invalid ?(min=1) trace =
     let sym_and_output trace fname =
-      let finalstate = symbolic_run trace fname in
+      let finalstate = symbolic_run (fname,Smtexec.STP.si) trace in
       Form.output_formula finalstate.pred;
     in
     let trace = concrete trace in
@@ -1798,7 +1806,7 @@ struct
         let middle = (l + u) / 2 in
         let trace = BatList.take middle trace in
         try
-          ignore (generate_formula "temp" trace) ;
+          ignore (generate_formula ("temp",Smtexec.STP.si) trace) ;
           ignore (solve_formula "temp" "tempout") ;
           ignore(Unix.system("cat tempout"));
           match solution_from_stp_formula "tempout" with
@@ -1816,8 +1824,8 @@ struct
                bsearch l (u-1))
     in
     let (l,u) = bsearch 1 length in
-    ignore (generate_formula "form_val" (BatList.take l trace)) ;
-    ignore (generate_formula "form_inv" (BatList.take u trace)) 
+    ignore (generate_formula ("form_val",Smtexec.STP.si) (BatList.take l trace)) ;
+    ignore (generate_formula ("form_inv",Smtexec.STP.si) (BatList.take u trace))
 
 
 (*************************************************************)
@@ -1827,12 +1835,12 @@ struct
   let formula_storage = ".formula"
   let answer_storage = ".answer"
 
-  let output_exploit file trace =
-    ignore (generate_formula formula_storage trace) ;
+  let output_exploit (file,s) trace =
+    ignore (generate_formula (formula_storage,s) trace) ;
     solve_formula formula_storage answer_storage ;
     let var_vals = match solution_from_stp_formula answer_storage with
       | Some(x) -> x
-      | None -> Printf.printf "Formula was unsatisfiable\n"; 
+      | None -> Printf.printf "Formula was unsatisfiable\n";
           failwith "Formula was unsatisfiable"
     in
     (* The variables that we care about *)
@@ -1874,41 +1882,28 @@ struct
 
 end
 
-module StreamPrinter =
+module StreamPrinterAdapter =
 struct
-
-  type fp = string * Formulap.stream_fppf
-
-  let init_printer file s = 
-    let printer = match s with
-      | "stp" -> ((new Stp.pp_oc) :> Formulap.stream_fppf)
-      | "smtlib1" -> ((new Smtlib1.pp_oc) :> Formulap.stream_fppf)
-      | "smtlib2" -> ((new Smtlib2.pp_oc) :> Formulap.stream_fppf)
-      | _ -> failwith ("Unknown printer "^s)
-    in
-    file, printer
+  type user_init = standard_user_init
+  type form_init = Symbeval.LetBindStreamLet.init
+  let adapt ((file,smt):user_init) =
+    file, smt#streaming_printer
 end
 
-module OldPrinter =
-struct 
-  type fp = Formulap.fpp_oc 
-  let init_printer file s = 
+module OldPrinterAdapter =
+struct
+  type user_init = standard_user_init
+  type form_init = Formulap.fpp_oc
+  let adapt ((file,smt):user_init) =
     let oc = open_out file in
-    let p =
-      match s with
-      | "smtlib1" -> ((new Smtlib1.pp_oc oc) :> fp)
-      | "smtlib2" -> ((new Smtlib2.pp_oc oc) :> fp)
-      | "stp" -> ((new Stp.pp_oc oc) :> fp) 
-      | _ -> failwith ("Unknown printer "^s)
-    in 
-    p
+    smt#printer oc
 end
 
 
 module TraceSymbolic =
-  TraceSymbolicFunc(DontEvalSymbLet)(PredAssignTraces)(OldPrinter)(LetBindStream);;
+  MakeTraceSymbolicStandard(DontEvalSymbLet)(PredAssignTraces)(OldPrinterAdapter)(LetBindStream);;
 module TraceSymbolicStream =
-  TraceSymbolicFunc(DontEvalSymbLet)(PredAssignTraces)(StreamPrinter)(LetBindStreamLet);;
+  MakeTraceSymbolicStandard(DontEvalSymbLet)(PredAssignTraces)(StreamPrinterAdapter)(LetBindStreamLet);;
 
 
 (** SWXXX Should this go somewhere else too? *)

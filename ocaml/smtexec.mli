@@ -20,6 +20,7 @@ val result_to_string : result -> string
 class type smtexec =
 object
   method printer : Formulap.fppf
+  method streaming_printer : Formulap.stream_fppf
   method solvername : string
   method solve_formula_file : ?timeout:int -> ?remove:bool -> ?printmodel:bool -> string -> result
 end

@@ -66,7 +66,7 @@ let concrete block =
 
 (* XXX: This should really go somewhere else *)
 (** Symbolicly executes a block and builds formulas *)
-module MakeStreamSymbolic (TraceSymbolic:Traces.TraceSymbolicRun with type output = unit) =
+module MakeStreamSymbolic (TraceSymbolic:Traces.TraceSymbolic with type user_init = Traces.standard_user_init with type output = unit) =
 struct
 
   let last_state = ref None
@@ -85,7 +85,7 @@ struct
         | Some s -> s
         (* If this is the first block, make a new state *)
         | None ->
-          TraceSymbolic.create_state (TraceSymbolic.init_formula_file filename)
+          TraceSymbolic.create_state (filename,Smtexec.STP.si)
       in
       last_state :=
         Some (TraceSymbolic.construct_symbolic_run_formula h rh state block)
