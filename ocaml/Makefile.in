@@ -110,6 +110,7 @@ export SOURCES = \
 	traces.ml \
 	traces_surgical.ml \
 	traces_backtaint.mli traces_backtaint.ml \
+	traces_stream.mli traces_stream.ml \
 	utils_common.ml \
 	test_common.ml \
 	template.ml \
