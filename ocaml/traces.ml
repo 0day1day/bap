@@ -1820,9 +1820,7 @@ struct
   let formula_storage = ".formula"
   let answer_storage = ".answer"
 
-  let output_exploit (file,s) trace =
-    ignore (generate_formula (formula_storage,s) trace) ;
-    solve_formula formula_storage answer_storage ;
+  let parse_answer_to file =
     let var_vals = match solution_from_stp_formula answer_storage with
       | Some(x) -> x
       | None -> Printf.printf "Formula was unsatisfiable\n";
@@ -1865,12 +1863,16 @@ struct
     print "Exploit string was written out to file \"%s\"\n" file ;
     flush stdout
 
+  let output_exploit (file,s) trace =
+    ignore (generate_formula (formula_storage,s) trace) ;
+    solve_formula formula_storage answer_storage ;
+    parse_answer_to file
 end
 
 module StreamPrinterAdapter =
 struct
   type user_init = standard_user_init
-  type form_init = Symbeval.LetBindStreamLet.init
+  type form_init = Symbeval.LetBindStream.init
   let adapt ((file,smt):user_init) =
     file, smt#streaming_printer
 end
@@ -1886,9 +1888,9 @@ end
 
 
 module TraceSymbolic =
-  MakeTraceSymbolicStandard(DontEvalSymbLet)(PredAssignTraces)(OldPrinterAdapter)(LetBindStream);;
+  MakeTraceSymbolicStandard(DontEvalSymbLet)(PredAssignTraces)(OldPrinterAdapter)(LetBindFakeStream);;
 module TraceSymbolicStream =
-  MakeTraceSymbolicStandard(DontEvalSymbLet)(PredAssignTraces)(StreamPrinterAdapter)(LetBindStreamLet);;
+  MakeTraceSymbolicStandard(DontEvalSymbLet)(PredAssignTraces)(StreamPrinterAdapter)(LetBindStream);;
 
 
 (** SWXXX Should this go somewhere else too? *)

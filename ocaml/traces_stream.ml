@@ -25,7 +25,7 @@ let concrete return =
 module MakeStreamSymbolic (TraceSymbolic:Traces.TraceSymbolic with type user_init = Traces.standard_user_init with type output = unit) =
 struct
 
-  let generate_formulas_setup mem_hash concrete_state thread_map block =
+  let generate_formula_setup mem_hash concrete_state thread_map block =
     let block =
       concrete_stream mem_hash concrete_state thread_map block true
     in
@@ -38,7 +38,7 @@ struct
      global.  It would be more elegant to have a general utility for
      keeping stack in streamtrans.ml, but I'm not sure how to do
      that. *)
-  let generate_formulas filename solver =
+  let generate_formula filename solver =
     let last_state = ref None in
     let mem_hash = Memory2array.create_state () in
     let concrete_state = Traces.TraceConcrete.create_state () in
@@ -47,7 +47,7 @@ struct
     ignore(Memory2array.coerce_rvar_state mem_hash Asmir.x86_mem);
     (* Streaming function *)
     (fun block ->
-      let block = generate_formulas_setup mem_hash concrete_state thread_map block in
+      let block = generate_formula_setup mem_hash concrete_state thread_map block in
       let state = match !last_state with
         | Some s -> s
         (* If this is the first block, make a new state *)
@@ -68,4 +68,4 @@ end
 module StreamSymbolic =
   MakeStreamSymbolic(Traces.TraceSymbolicStream)
 
-let generate_formulas = StreamSymbolic.generate_formulas
+let generate_formula = StreamSymbolic.generate_formula

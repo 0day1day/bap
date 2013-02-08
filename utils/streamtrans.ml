@@ -62,7 +62,7 @@ let speclist =
      "<pass> Concretely execute, and optionally pass on concretized IL.")
   ::("-trace-formula",
      Arg.String(fun f ->
-       let stream, final = Traces_stream.generate_formulas f !Solver.solver in
+       let stream, final = Traces_stream.generate_formula f !Solver.solver in
        add(AnalysisAst stream);
        addfinal(final)
      ),

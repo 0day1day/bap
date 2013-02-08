@@ -951,9 +951,9 @@ struct
     printer#close
 end
 
-module StdFormStream = FlexibleFormulaConverterToStream(StdForm)
-module LetBindStream = FlexibleFormulaConverterToStream(LetBind)
-module LetBindOldStream = FlexibleFormulaConverterToStream(LetBindOld)
+module StdFormFakeStream = FlexibleFormulaConverterToStream(StdForm)
+module LetBindFakeStream = FlexibleFormulaConverterToStream(LetBind)
+module LetBindOldFakeStream = FlexibleFormulaConverterToStream(LetBindOld)
 
 (** Print let formulas in a streaming fashion.  For example, given a trace:
     1. x = 5
@@ -967,7 +967,7 @@ module LetBindOldStream = FlexibleFormulaConverterToStream(LetBindOld)
     (let y = 10 in
     (true))))
 *)
-module LetBindStreamLet =
+module LetBindStream =
 struct
   type t = {formula_printer : Formulap.stream_fpp_oc;
             formula_filename : string;

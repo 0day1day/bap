@@ -47,6 +47,15 @@ module MakeTraceTest(TraceSymbolic:Traces.TraceSymbolic) = struct
     assert_raises ~msg:"Exploit should be impossible" (Failure "Formula was unsatisfiable") (fun () -> Traces.TraceSymbolic.output_exploit (exploit_file,Smtexec.STP.si) t2)
 end
 
+let pin_stream_trace_test pin_out =
+  let open Traces.TraceSymbolicStream in
+  let stream = Asmir.serialized_bap_stream_from_trace_file !Input.streamrate pin_out in
+  let streamf, finalf = Traces_stream.generate_formula formula_storage Smtexec.STP.si in
+  Stream.iter streamf stream;
+  finalf ();
+  Traces.solve_formula formula_storage answer_storage;
+  parse_answer_to exploit_file
+
 let backwards_taint_test pin_out =
   Traces.cleanup();
   let prog = Asmir.serialized_bap_from_trace_file pin_out in
@@ -88,7 +97,9 @@ let suite = "Traces" >:::
     "pin_trace_test" >::
       (let module M = MakeTraceTest(Traces.TraceSymbolic) in
        bracket pin_trace_setup M.pin_trace_test pin_trace_cleanup);
-    "pin_trace_stream_test" >::
+    "pin_trace_letbind_test" >::
       (let module M = MakeTraceTest(Traces.TraceSymbolicStream) in
        bracket pin_trace_setup M.pin_trace_test pin_trace_cleanup);
+    "pin_trace_stream_test" >::
+      bracket pin_trace_setup pin_stream_trace_test pin_trace_cleanup
   ]
