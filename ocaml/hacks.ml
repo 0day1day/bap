@@ -217,7 +217,9 @@ let append_file src dst =
       do_append oc_out oc_in
     with End_of_file -> ()
   in
-  do_append oc1 oc2
+  do_append oc1 oc2;
+  close_out oc1;
+  close_in oc2
 
 (** Add an "assume false" statement to BB_Error and add an edge to
     BB_Exit.

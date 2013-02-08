@@ -1872,7 +1872,7 @@ end
 module StreamPrinterAdapter =
 struct
   type user_init = standard_user_init
-  type form_init = Symbeval.LetBindStream.init
+  type form_init = Symbeval.LetBindStreamSat.init
   let adapt ((file,smt):user_init) =
     file, smt#streaming_printer
 end
@@ -1890,7 +1890,7 @@ end
 module TraceSymbolic =
   MakeTraceSymbolicStandard(DontEvalSymbLet)(PredAssignTraces)(OldPrinterAdapter)(LetBindFakeStream);;
 module TraceSymbolicStream =
-  MakeTraceSymbolicStandard(DontEvalSymbLet)(PredAssignTraces)(StreamPrinterAdapter)(LetBindStream);;
+  MakeTraceSymbolicStandard(DontEvalSymbLet)(PredAssignTraces)(StreamPrinterAdapter)(LetBindStreamSat);;
 
 
 (** SWXXX Should this go somewhere else too? *)

@@ -81,11 +81,22 @@ object(self)
   method virtual open_stream_benchmark : unit
   (** Close the benchmark *)
   method virtual close_benchmark : unit
+  (** Request a counter-example *)
+  method virtual counterexample : unit
   (** Declaring a variable consists of calling predeclare_free_var to
       register the name and type, and then calling print_free_var. *)
   method virtual predeclare_free_var : var -> unit
   method virtual print_free_var : var -> unit
-  (* XXX: assert/valid *)
+
+  (* Assuming free variables are already present, print the beginning of an assertion that e is satisfiable *)
+  method virtual assert_ast_exp_begin : ?exists:(var list) -> ?foralls:(var list) -> unit -> unit
+  (* Print the end of the assertion *)
+  method virtual assert_ast_exp_end : unit
+
+  (* Assuming free variables are already present, print the beginning of an assertion that e is valid *)
+  method virtual valid_ast_exp_begin : ?exists:(var list) -> ?foralls:(var list) -> unit -> unit
+  (* Print the end of the assertion *)
+  method virtual valid_ast_exp_end : unit
 end
 
 class virtual stream_fpp_oc =

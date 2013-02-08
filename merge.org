@@ -1,7 +1,7 @@
-* formulap.ml: Add assert/valid methods
-* stp.ml: test streaming printer
+* traces.ml: Do we care about validity formulas? I guess not
+* testing: Test streaming symb. eval. with non-stp
 * traces.ml
-** Move solve_formula?
+** Change solve_formula to use smtexec
 ** symbolic_run_block?
 ** clean function: I bet we have this somewhere else
 * merge.org: Remove me before merging :-)

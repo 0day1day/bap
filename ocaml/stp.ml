@@ -335,49 +335,51 @@ object (self)
 	pp "):";
 	cls();space();
 
-  method assert_eq v e =
+  method assert_ast_exp_begin ?(exists=[]) ?(foralls=[]) () =
     opn 0;
-    self#declare_new_freevars (BinOp(EQ, Var v, e));
-    force_newline();
-    pp "ASSERT(";
-    self#var v;
-    pc '=';
-    self#ast_exp e;
-    pp ");";
-    cls()
-
-  method assert_ast_exp ?(exists=[]) ?(foralls=[]) e =
-    opn 0;
-    self#declare_new_freevars e;
-    force_newline();
     pp "ASSERT(";
     space();
     self#exists exists;
     self#forall foralls;
     pp "0bin1 =";
-    force_newline();
-    self#ast_exp e;
+    force_newline()
+
+  method assert_ast_exp_end =
     force_newline();
     pp ");";
     force_newline();
     pp "QUERY(FALSE);";
     cls();
 
-  (** Is e a valid expression (always true)? *)
-  method valid_ast_exp ?(exists=[]) ?(foralls=[]) e =
-    opn 0;
+  method assert_ast_exp ?(exists=[]) ?(foralls=[]) e =
     self#declare_new_freevars e;
     force_newline();
+    self#assert_ast_exp_begin ~exists ~foralls ();
+    self#ast_exp e;
+    self#assert_ast_exp_end
+
+  method valid_ast_exp_begin ?(exists=[]) ?(foralls=[]) () =
+    opn 0;
+    force_newline();
     pp "QUERY(";
-    space();    
+    space();
     self#exists exists;
     self#forall foralls;
     pp "0bin1 =";
-    force_newline();
-    self#ast_exp e;
+    force_newline()
+
+  method valid_ast_exp_end =
     force_newline();
     pp ");";
-    cls();    
+    cls()
+
+  (** Is e a valid expression (always true)? *)
+  method valid_ast_exp ?(exists=[]) ?(foralls=[]) e =
+    self#declare_new_freevars e;
+    force_newline();
+    self#valid_ast_exp_begin ~exists ~foralls ();
+    self#ast_exp e;
+    self#valid_ast_exp_end
 
   method counterexample =
     force_newline();

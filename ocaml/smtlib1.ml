@@ -784,62 +784,46 @@ object (self)
   method close_benchmark =
     pc ')'; cls()
 
-  (* method assert_eq v e = *)
-  (*   opn 0; *)
-  (*   self#declare_new_freevars (BinOp(EQ, Var v, e)); *)
-  (*   force_newline(); *)
-  (*   pp ":assumption (="; *)
-  (*   self#var v; *)
-  (*   space (); *)
-  (*   self#ast_exp e; *)
-  (*   pc ')'; *)
-  (*   cls() *)
+  method assert_ast_exp_begin ?(exists=[]) ?(foralls=[]) () =
+    force_newline();
+    opn 1;
+    pp ":assumption";
+    space();
+    self#exists exists;
+    self#forall foralls
+
+  method assert_ast_exp_end =
+    cut();
+    cls();
+    force_newline ();
+    self#formula ()
 
   method assert_ast_exp ?(exists=[]) ?(foralls=[]) e =
     pdebug "Opening benchmark... ";
     self#open_benchmark e;
     pdebug "declaring new free variables... ";
     self#declare_new_freevars e;
-    force_newline();
-    pdebug "done\n";
-    opn 1;
-    pp ":assumption";
-    space();
-    self#exists exists;
-    self#forall foralls;
+    self#assert_ast_exp_begin ~exists ~foralls ();
     self#ast_exp_bool e;
-    cut();
-    cls();
-    force_newline ();
-    self#formula ();
+    self#assert_ast_exp_end;
     self#close_benchmark
 
-  (** Is e a valid expression (always true)? *)
+  method valid_ast_exp_begin ?(exists=[]) ?(foralls=[]) () =
+    force_newline();
+    pp ":formula (not";
+    space ();
+    self#exists exists;
+    self#forall foralls
+
+  method valid_ast_exp_end = pc ')'
+
   method valid_ast_exp ?(exists=[]) ?(foralls=[]) e =
     self#open_benchmark e;
     self#declare_new_freevars e;
-    force_newline();
-    pp ":formula ";
-    self#exists exists;
-    self#forall foralls;
-    self#ast_exp_bool (exp_not e);
+    self#valid_ast_exp_begin ~exists ~foralls ();
+    self#ast_exp_bool e;
+    self#valid_ast_exp_end;
     self#close_benchmark
-
-  (* (\** Is e a valid expression (always true)? *\) *)
-  (* method valid_ast_exp ?(exists=[]) ?(foralls=[]) e = *)
-  (*   self#open_benchmark (); *)
-  (*   self#declare_new_freevars e; *)
-  (*   force_newline(); *)
-  (*   pp ":formula ("; *)
-  (*   self#exists exists; *)
-  (*   self#forall foralls; *)
-  (*   pp "(= bv1[1] "; *)
-  (*   force_newline(); *)
-  (*   self#ast_exp e; *)
-  (*   force_newline(); *)
-  (*   pp "));"; *)
-  (*   self#close_benchmark () *)
-
 
   method formula () =
     pp ":formula true";

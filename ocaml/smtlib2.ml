@@ -773,39 +773,49 @@ object (self)
   method close_benchmark =
     ()
 
-  (* method assert_eq v e = *)
-  (*   opn 0; *)
-  (*   self#declare_new_freevars (BinOp(EQ, Var v, e)); *)
-  (*   force_newline(); *)
-  (*   pp ":assumption (="; *)
-  (*   self#var v; *)
-  (*   space (); *)
-  (*   self#ast_exp e; *)
-  (*   pc ')'; *)
-  (*   cls() *)
+  method assert_ast_exp_begin ?(exists=[]) ?(foralls=[]) () =
+    force_newline();
+    opn 1;
+    pp "(assert";
+    space();
+    self#exists exists;
+    self#forall foralls
+
+  method assert_ast_exp_end =
+    cut();
+    pc ')';
+    cls();
+    force_newline ();
+    self#formula
 
   method assert_ast_exp ?(exists=[]) ?(foralls=[]) e =
     pdebug "Opening benchmark... ";
     self#open_benchmark e;
     pdebug "declaring new free variables... ";
     self#declare_new_freevars e;
-    force_newline();
-    pdebug "done\n";
-    opn 1;
-    pp "(assert";
-    space();
-    self#exists exists;
-    self#forall foralls;
+    self#assert_ast_exp_begin ~exists ~foralls ();
     self#ast_exp_bool e;
-    cut();
-    pc ')';
-    cls();
-    force_newline ();
-    self#formula;
+    self#assert_ast_exp_end;
     self#close_benchmark
 
+  method valid_ast_exp_begin ?(exists=[]) ?(foralls=[]) () =
+    self#assert_ast_exp_begin ~exists ~foralls ();
+    pp "(not";
+    space()
+
+  method valid_ast_exp_end =
+    pc ')';
+    self#assert_ast_exp_end
+
   method valid_ast_exp ?exists ?foralls e =
-    self#assert_ast_exp ?exists ?foralls (exp_not e)
+    pdebug "Opening benchmark... ";
+    self#open_benchmark e;
+    pdebug "declaring new free variables... ";
+    self#declare_new_freevars e;
+    self#valid_ast_exp_begin ?exists ?foralls ();
+    self#ast_exp_bool e;
+    self#valid_ast_exp_end;
+    self#close_benchmark
 
   (* (\** Is e a valid expression (always true)? *\) *)
   (* method valid_ast_exp ?(exists=[]) ?(foralls=[]) e = *)

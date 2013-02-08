@@ -967,7 +967,7 @@ module LetBindOldFakeStream = FlexibleFormulaConverterToStream(LetBindOld)
     (let y = 10 in
     (true))))
 *)
-module LetBindStream =
+module LetBindStreamSat =
 struct
   type t = {formula_printer : Formulap.stream_fpp_oc;
             formula_filename : string;
@@ -987,8 +987,11 @@ struct
     let tempfilename, tempoc = Filename.open_temp_file "letbindstream" "tmp" in
     let formula_printer = make_printer tempoc in
     free_var_printer#open_stream_benchmark;
+    Stack.push (fun () -> formula_printer#close_benchmark) close_funs;
+    Stack.push (fun () -> formula_printer#counterexample) close_funs;
+    formula_printer#assert_ast_exp_begin ();
+    Stack.push (fun () -> formula_printer#assert_ast_exp_end) close_funs;
     formula_printer#and_start;
-    Stack.push (fun () -> formula_printer#and_end) close_funs;
     {formula_printer=formula_printer; free_var_printer=free_var_printer;
      formula_filename=tempfilename; free_var_filename=filename;
      close_funs=close_funs}
@@ -1000,7 +1003,7 @@ struct
       | _, Equal ->
           formula_printer#and_constraint expression;
           (* SWXXX print space? *)
-          record 
+          record
       | BinOp(EQ, Var v, value), Rename ->
           let fp_list = Formulap.freevars value in
           let fp = 
@@ -1019,8 +1022,9 @@ struct
   let output_formula {formula_printer; free_var_printer;
                       formula_filename; free_var_filename;
                       close_funs} =
+    (* We must close the and before closing the lets *)
+    formula_printer#and_end;
     Stack.iter (fun f -> f()) close_funs;
-    formula_printer#close_benchmark;
     (* Free vars go at the begining of the file but we don't know all of them
        until the end of the trace.  So we print them out to a seperate file
        and combine these at the end. *)
