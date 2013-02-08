@@ -20,6 +20,7 @@ let pin_trace_setup _ =
 	["-t"; (gentrace_path^gentrace); "-taint-files"; taint_file;
 	 "-o"; tag^pin_out_suffix; "--"; bof; taint_file ] in
   let exit_code = Unix.WEXITED(0) in
+  Traces.cleanup();
   check_pin_setup();
   (* check_file (pin_path^pin); *)
   (* check_file (gentrace_path^gentrace); *)
@@ -39,8 +40,10 @@ module MakeTraceTest(TraceSymbolic:Traces.TraceSymbolic) = struct
     (* We should not get an exception because this should be satisfiable *)
     ignore(Traces.TraceSymbolic.output_exploit (exploit_file,Smtexec.STP.si) t1);
     let t2 = Traces.add_payload "\x00" prog in
-    Traces.cleanup();
     (* Null bytes are not allowed, so we should get an exception *)
+    (* We need to cleanup traces in between runs, or we'll get an
+       error. *)
+    Traces.cleanup();
     assert_raises ~msg:"Exploit should be impossible" (Failure "Formula was unsatisfiable") (fun () -> Traces.TraceSymbolic.output_exploit (exploit_file,Smtexec.STP.si) t2)
 end
 
@@ -49,10 +52,10 @@ let backwards_taint_test pin_out =
   let prog = Asmir.serialized_bap_from_trace_file pin_out in
   typecheck prog;
   let input_locations = Test_common.backwards_taint prog in
-(* The buffer is eight bytes large, so make sure all bytes are
-   coming from after that.  This isn't exact, since copying eight bytes
-   at a time (XMM register) could make us off by seven bytes, but that
-   seems unlikely... *)
+  (* The buffer is eight bytes large, so make sure all bytes are
+     coming from after that.  This isn't exact, since copying eight bytes
+     at a time (XMM register) could make us off by seven bytes, but that
+     seems unlikely... *)
   assert_bool "Early symbolic bytes affect crash"
     (LocSet.for_all
        (function
@@ -72,7 +75,9 @@ let backwards_taint_test pin_out =
 
 (* Note: This will leave the files pin.log and pintool.log by intention *)
 let pin_trace_cleanup pin_out =
-  rm_and_ignore_list [pin_out ; exploit_file ; taint_file];;
+  rm_and_ignore_list [pin_out ; exploit_file ; taint_file];
+  Traces.cleanup()
+;;
 
 
 let suite = "Traces" >:::

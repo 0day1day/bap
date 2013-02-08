@@ -19,7 +19,7 @@ type cmd =
 (** Values for concrete execution *)
 let concrete_state = Traces.TraceConcrete.create_state ();;
 let mem_hash = Memory2array.create_state ();;
-let thread_map = Traces.create_thread_map_state();;
+let thread_map = Traces.create_thread_map_state ();;
 (* HACK to make sure default memory has a map to normalized memory *)
 ignore(Memory2array.coerce_rvar_state mem_hash Asmir.x86_mem);;
 

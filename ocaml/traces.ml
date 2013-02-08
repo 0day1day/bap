@@ -565,16 +565,12 @@ module TVHash = struct
   include Util.HashUtil(TVMake)
 end
 
-let create_thread_map_state () = TVHash.create 1000
+let create_thread_map_state () : Var.t TVHash.t = TVHash.create 1000
 
-(** look up - if tid and var have been used, lookup that.  Otherwise make a new
-one and store that 
-Pass in a state object 
-*)
 let lookup_thread_map map threadIDopt (Var.V(_,_,t) as avar) =
   match threadIDopt, t with
     | Some(threadID), Reg _ ->
-        let nvar = 
+        let nvar =
           try TVHash.find map (threadID, avar)
           with Not_found ->
             let new_name = (Var.name avar) in
@@ -1129,7 +1125,7 @@ let run_block ?(next_label = None) ?(transformf = (fun s _ -> [s])) state memv t
       it was a label set addr to that; execute the block.  If it's not found
       verify that all stmts are labels and comments.  Otherwise print a warning 
   *)
-  let tid = (get_tid block) in
+  let tid = get_tid block in
   let addr = 
     (try
       List.find 
@@ -1313,7 +1309,7 @@ let run_blocks blocks memv length =
   counter := 1 ;
   Status.init "Concrete Run" length ;
   let state = TraceConcrete.create_state () in
-  let thread_map = create_thread_map_state() in
+  let thread_map = create_thread_map_state () in
   let (rev_trace,_) = List.fold_left 
     (fun (acc,remaining) block -> 
       Status.inc();
@@ -1328,7 +1324,7 @@ let run_blocks blocks memv length =
 	| _ ->
 	  let l = get_next_label remaining in 
 	  let block = explicit_thread_stmts block thread_map in
-	  run_block ~next_label:(l) ~transformf:trace_transform_stmt state memv thread_map block)
+	  run_block ~next_label:l ~transformf:trace_transform_stmt state memv thread_map block)
       in
       (
 	(* If we are doing a consistency check, saving the concretized
