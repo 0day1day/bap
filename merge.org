@@ -4,7 +4,4 @@
 ** Move solve_formula?
 ** symbolic_run_block?
 ** clean function: I bet we have this somewhere else
-* traces_suite: Shouldn't we test all trace mechanisms?
-* streamtrans: rewrite
 * merge.org: Remove me before merging :-)
-* MakeStreamSymbolic/streamtrans: Remove last_state
