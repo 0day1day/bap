@@ -1423,19 +1423,6 @@ let concrete trace =
   let actual_trace = run_blocks blocks memv length in
     actual_trace
 
-(** Concrete execution of a streamed trace block *)
-let concrete_stream mem_hash concrete_state thread_map block return =
-  let block = Memory2array.coerce_prog_state mem_hash block in
-  let memv = Memory2array.coerce_rvar_state mem_hash Asmir.x86_mem in
-  let block = explicit_thread_stmts block thread_map in
-  if return then
-    run_block ~transformf:trace_transform_stmt concrete_state memv thread_map block
-  else (
-    ignore(run_block concrete_state memv thread_map block);
-    []
-  )
-
-
 (* Normal concrete execution *)
 module TaintConcreteDef =
 struct

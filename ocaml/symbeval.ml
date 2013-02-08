@@ -990,7 +990,7 @@ struct
     formula_printer#and_start;
     Stack.push (fun () -> formula_printer#and_end) close_funs;
     {formula_printer=formula_printer; free_var_printer=free_var_printer;
-     formula_filename=filename; free_var_filename=tempfilename;
+     formula_filename=tempfilename; free_var_filename=filename;
      close_funs=close_funs}
 
   let add_to_formula ({formula_printer=formula_printer;
