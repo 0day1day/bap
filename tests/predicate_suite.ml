@@ -152,11 +152,8 @@ let predicate_stp_tear_down _ =
   rm_and_ignore_list [g_il ; stp_out];;
 
 let fold_vcs (s,f) =
-  let n = ref 1 in
   List.map (fun ((vcname,_) as vc) ->
-    let o = s^"_"^vcname >:: f vc in
-    incr n;
-    o
+    s^"_"^vcname >:: f vc
   ) Vc.pred_vclist
 
 let suite = "Predicate" >:::

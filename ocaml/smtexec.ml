@@ -18,10 +18,11 @@ type result = Valid | Invalid of model | SmtError of string | Timeout
     first-class modules, we wouldn't need this. *)
 class type smtexec =
 object
+  method in_path : unit -> bool
   method printer : Formulap.fppf
-  method streaming_printer : Formulap.stream_fppf
-  method solvername : string
   method solve_formula_file : ?timeout:int -> ?remove:bool -> ?getmodel:bool -> string -> result
+  method solvername : string
+  method streaming_printer : Formulap.stream_fppf
   (* XXX: Add other methods *)
 end
 
@@ -205,9 +206,10 @@ struct
       solve_formula_file ~remove ?timeout filename
 
     class c = object(self)
-      method solvername = S.solvername
-      method solve_formula_file = solve_formula_file
+      method in_path = in_path
       method printer = S.printer
+      method solve_formula_file = solve_formula_file
+      method solvername = S.solvername
       method streaming_printer = S.streaming_printer
     end
 
@@ -273,7 +275,7 @@ module STP = Make(STP_INFO)
 
 module STPSMTLIB_INFO =
 struct
-  let solvername = "stp"
+  let solvername = "stp_smtlib"
   let progname = "stp"
   let cmdstr f = "--SMTLIB1 -t " ^ f
   let parse_result_builder solvername ?(getmodel=false) stdout stderr pstatus =
@@ -365,7 +367,7 @@ module CVC3 = Make(CVC3_INFO)
 
 module CVC3SMTLIB_INFO =
 struct
-  let solvername = "cvc3"
+  let solvername = "cvc3_smtlib"
   let progname = "cvc3"
   let cmdstr f = "-lang smtlib " ^ f
   let parse_result = STPSMTLIB_INFO.parse_result_builder solvername
@@ -437,15 +439,15 @@ end
 module BOOLECTOR = Make(BOOLECTOR_INFO)
 
 let solvers = Hashtbl.create 10;;
-List.iter (fun (n,s) -> Hashtbl.add solvers n s)
+List.iter (fun s -> Hashtbl.add solvers s#solvername s)
   (
-    ("stp", STP.si)
-    ::("stp_smtlib", STPSMTLIB.si)
-    ::("cvc3", CVC3.si)
-    ::("cvc3_smtlib", CVC3SMTLIB.si)
-    ::("yices", YICES.si)
-    ::("z3", Z3.si)
-    ::("boolector", BOOLECTOR.si)
+    STP.si
+    :: STPSMTLIB.si
+    :: CVC3.si
+    :: CVC3SMTLIB.si
+    :: YICES.si
+    :: Z3.si
+    :: BOOLECTOR.si
     ::[]
   )
 

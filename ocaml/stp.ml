@@ -122,7 +122,7 @@ object (self)
     self#extend v (var2s v)
 
   method print_free_var (Var.V(_,_,t) as v) =
-    self#var v; pp " : "; self#typ t; pp ";"; force_newline();
+    self#var v; pp " : "; self#typ t; pp ";"; force_newline()
 
   method decl (Var.V(_,_,t) as v) =
     self#decl_no_print v;

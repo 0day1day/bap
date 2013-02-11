@@ -21,10 +21,11 @@ val result_to_string : result -> string
     first order modules, we wouldn't need this. *)
 class type smtexec =
 object
+  method in_path : unit -> bool
   method printer : Formulap.fppf
-  method streaming_printer : Formulap.stream_fppf
-  method solvername : string
   method solve_formula_file : ?timeout:int -> ?remove:bool -> ?getmodel:bool -> string -> result
+  method solvername : string
+  method streaming_printer : Formulap.stream_fppf
 end
 
 module type SOLVER =

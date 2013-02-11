@@ -47,13 +47,14 @@ module MakeTraceTest(TraceSymbolic:Traces.TraceSymbolic) = struct
     assert_raises ~msg:"Exploit should be impossible" (Failure "Formula was unsatisfiable") (fun () -> Traces.TraceSymbolic.output_exploit (exploit_file,Smtexec.STP.si) t2)
 end
 
-let pin_stream_trace_test pin_out =
+let pin_stream_trace_test solver pin_out =
+  skip_if (not (solver#in_path ())) (solver#solvername ^ " not on path");
   let open Traces.TraceSymbolicStream in
   let stream = Asmir.serialized_bap_stream_from_trace_file !Input.streamrate pin_out in
-  let streamf, finalf = Traces_stream.generate_formula formula_storage Smtexec.STP.si in
+  let streamf, finalf = Traces_stream.generate_formula formula_storage solver in
   Stream.iter streamf stream;
   finalf ();
-  match Smtexec.STP.si#solve_formula_file ~getmodel:true formula_storage with
+  match solver#solve_formula_file ~getmodel:true formula_storage with
   | Smtexec.Invalid m ->
     parse_answer_to m exploit_file
   | _ -> parse_answer_to None exploit_file
@@ -90,6 +91,10 @@ let pin_trace_cleanup pin_out =
   Traces.cleanup()
 ;;
 
+let fold_solvers (s,f) =
+  List.map (fun solver ->
+    s^"_"^solver#solvername >:: f solver
+  ) (Util.get_hash_values Smtexec.solvers)
 
 let suite = "Traces" >:::
   [
@@ -102,6 +107,7 @@ let suite = "Traces" >:::
     "pin_trace_letbind_test" >::
       (let module M = MakeTraceTest(Traces.TraceSymbolicStream) in
        bracket pin_trace_setup M.pin_trace_test pin_trace_cleanup);
-    "pin_trace_stream_test" >::
-      bracket pin_trace_setup pin_stream_trace_test pin_trace_cleanup
-  ]
+  ] @
+  fold_solvers ("pin_trace_stream_test",
+                (fun solver ->
+                  bracket pin_trace_setup (pin_stream_trace_test solver) pin_trace_cleanup))
