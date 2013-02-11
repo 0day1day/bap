@@ -230,10 +230,6 @@ let speclist =
      uadd(TransformAst Traces_surgical.check_slice),
      "Slice a trace based on the overwritten return address"
     )
-  ::("-trace-clean",
-     uadd(TransformAst Traces.clean),
-     "Remove labels and comments from a concretized trace"
-    )
   ::("-trace-reconcrete",
      Arg.String(fun f -> add(TransformAst(Traces.concrete_rerun f))),
      "Execute a concretized trace with the specified input file."

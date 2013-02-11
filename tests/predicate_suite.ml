@@ -165,7 +165,7 @@ let suite = "Predicate" >:::
     "predicate_basic_solve_test" >::
       (bracket
 	 basic_setup
-	 (sat_test "basic_solve" (BinOp(EQ, Var Disasm_i386.eax, Int(biconst 42, Reg 32))) (Smtexec.Invalid))
+	 (sat_test "basic_solve" (BinOp(EQ, Var Disasm_i386.eax, Int(biconst 42, Reg 32))) (Smtexec.Invalid None))
 	 predicate_stp_tear_down);
     "predicate_basic_unsolve_test" >::
       (bracket
@@ -185,7 +185,7 @@ let suite = "Predicate" >:::
     "predicate_error_solve_test" >::
       (bracket
 	 error_setup
-	 (sat_test "error_solve" (BinOp(EQ, Var Disasm_i386.eax, Int(biconst 41, Reg 32))) (Smtexec.Invalid))
+	 (sat_test "error_solve" (BinOp(EQ, Var Disasm_i386.eax, Int(biconst 41, Reg 32))) (Smtexec.Invalid None))
 	 predicate_stp_tear_down);
     "predicate_error_unsolve_test" >::
       (bracket
@@ -195,7 +195,7 @@ let suite = "Predicate" >:::
     "predicate_C_solve_test" >::
       (bracket
          c_setup
-         (sat_test "C_solve" (BinOp(EQ, Var Disasm_i386.eax, Int(biconst 42, Reg 32))) (Smtexec.Invalid))
+         (sat_test "C_solve" (BinOp(EQ, Var Disasm_i386.eax, Int(biconst 42, Reg 32))) (Smtexec.Invalid None))
          predicate_stp_tear_down);
     "predicate_C_unsolve_test" >::
       (bracket

@@ -10,9 +10,9 @@ module D = Debug.Make(struct let name = "Smtexec" and default=`NoDebug end)
 open D
 open Unix
 
-type model = (string*int64) list option
+type model = (string*Big_int_Z.big_int) list option
 
-type result = Valid | Invalid (*of model*) | SmtError of string | Timeout
+type result = Valid | Invalid of model | SmtError of string | Timeout
 
 (** Class type to embed SMT execution functions.  If OCaml < 3.12 had
     first-class modules, we wouldn't need this. *)
@@ -21,7 +21,7 @@ object
   method printer : Formulap.fppf
   method streaming_printer : Formulap.stream_fppf
   method solvername : string
-  method solve_formula_file : ?timeout:int -> ?remove:bool -> ?printmodel:bool -> string -> result
+  method solve_formula_file : ?timeout:int -> ?remove:bool -> ?getmodel:bool -> string -> result
   (* XXX: Add other methods *)
 end
 
@@ -30,7 +30,7 @@ sig
   val solvername : string (** Solver name *)
   val progname : string (** Name of program, to ensure it is in the path *)
   val cmdstr : string -> string (** Given a filename, produce a command string to invoke solver *)
-  val parse_result : ?printmodel:bool -> string -> string -> Unix.process_status -> result (** Given output, decide the result *)
+  val parse_result : ?getmodel:bool -> string -> string -> Unix.process_status -> result (** Given output, decide the result *)
   val printer : Formulap.fppf
   val streaming_printer : Formulap.stream_fppf
 end
@@ -40,7 +40,7 @@ module type SOLVER =
 sig
   val solvername : string
   val in_path : unit -> bool
-  val solve_formula_file : ?timeout:int -> ?remove:bool -> ?printmodel:bool -> string -> result (** Solve a formula in a file *)
+  val solve_formula_file : ?timeout:int -> ?remove:bool -> ?getmodel:bool -> string -> result (** Solve a formula in a file *)
   val check_exp_validity : ?timeout:int -> ?remove:bool -> ?exists:(Ast.var list) -> ?foralls:(Ast.var list) -> Ast.exp -> result (** Check validity of an exp *)
   val create_cfg_formula :
     ?remove:bool -> ?exists:Ast.var list ->  ?foralls:Ast.var list
@@ -135,7 +135,7 @@ let syscall cmd =
 let result_to_string result =
   match result with
   | Valid -> "Valid"
-  | Invalid -> "Invalid"
+  | Invalid _ -> "Invalid"
   | SmtError s -> "SmtError: " ^ s
   | Timeout -> "Timeout"
 
@@ -174,7 +174,7 @@ struct
     let in_path () =
       Sys.command (Printf.sprintf "which %s > /dev/null" S.progname) == 0
 
-    let solve_formula_file ?timeout ?(remove=false) ?(printmodel=false) file =
+    let solve_formula_file ?timeout ?(remove=false) ?(getmodel=false) file =
       (match timeout with
       | Some timeout ->
         ignore(alarm timeout)
@@ -192,7 +192,7 @@ struct
 	  ignore(alarm 0);
 
           dprintf "Parsing result...";
-          let r = S.parse_result ~printmodel sout serr pstatus in
+          let r = S.parse_result ~getmodel sout serr pstatus in
           if remove then (try Unix.unlink file with _ -> ());
           r)
 
@@ -239,7 +239,7 @@ struct
   let solvername = "stp"
   let progname = "stp"
   let cmdstr f = "-p " ^ f
-  let parse_result_builder solvername ?(printmodel=false) stdout stderr pstatus =
+  let parse_result_builder solvername ?(getmodel=false) stdout stderr pstatus =
     let failstat = match pstatus with
       | WEXITED(c) -> c > 0
       | _ -> true
@@ -253,10 +253,11 @@ struct
     if isvalid then
       Valid
     else if isinvalid then (
-      if printmodel then
-        (let m = parse_model solvername stdout in
-        print_model m);
-      Invalid
+      Invalid (if getmodel then
+          (let m = parse_model solvername stdout in
+           print_model m;
+           m) else None)
+
     ) else if fail then (
       dprintf "output: %s\nerror: %s" stdout stderr;
       SmtError ("SMT solver failed: " ^ stderr)
@@ -275,7 +276,7 @@ struct
   let solvername = "stp"
   let progname = "stp"
   let cmdstr f = "--SMTLIB1 -t " ^ f
-  let parse_result_builder solvername ?(printmodel=false) stdout stderr pstatus =
+  let parse_result_builder solvername ?(getmodel=false) stdout stderr pstatus =
     let failstat = match pstatus with
       | WEXITED(c) -> c > 0
       | _ -> true
@@ -292,10 +293,11 @@ struct
     ) else if isunsat then
         Valid
       else if issat then (
-        if printmodel then
-          (let m = parse_model solvername stdout in
-           print_model m);
-        Invalid
+        Invalid (if getmodel
+          then let m = parse_model solvername stdout in
+               print_model m;
+               m
+          else None)
       ) else
         failwith "Something weird happened."
   let parse_result = parse_result_builder solvername
@@ -402,7 +404,7 @@ struct
   let solvername = "boolector"
   let progname = "boolector"
   let cmdstr f = "--smt2 " ^ f
-  let parse_result_builder solvername ?(printmodel=false) stdout stderr pstatus =
+  let parse_result_builder solvername ?(getmodel=false) stdout stderr pstatus =
     let failstat = match pstatus with
       | WEXITED(c) -> c == 1
       | _ -> true
@@ -420,10 +422,11 @@ struct
     ) else if isunsat then
         Valid
       else if issat then (
-        if printmodel then
-          (let m = parse_model solvername stdout in
-           print_model m);
-        Invalid
+        Invalid (if getmodel
+          then let m = parse_model solvername stdout in
+               print_model m;
+               m
+          else None)
       ) else
         failwith "Something weird happened."
   let parse_result = parse_result_builder solvername

@@ -62,8 +62,6 @@ let allow_symbolic_indices = ref false
 
 let padding = ref true
 
-let printer = ref "stp"
-
 let memtype = reg_32
 
 let endtrace = "This is the final trace block"
@@ -783,20 +781,6 @@ let print_block =
 
 let trace_length trace =
   print "Trace length: %d\n" (List.length trace)
-
-let print_formula file formula =
-  let oc = open_out file in
-  let mem_hash = Memory2array.create_state () in
-  let formula = Memory2array.coerce_exp_state mem_hash formula in
-  let p = match !printer with
-    | "stp" -> ((new Stp.pp_oc oc) :> Formulap.fpp_oc)
-    | "smtlib1" -> ((new Smtlib1.pp_oc oc) :> Formulap.fpp_oc)
-    | _ -> failwith "Unknown printer"
-  in
-  (* let p = new Smtlib1.pp_oc oc in *)
-  let () = p#assert_ast_exp formula in
-  let () = p#counterexample in
-    p#close
 
 module Status = Util.StatusPrinter
 
@@ -1529,38 +1513,6 @@ let formula_size formula =
     size formula
 
 
-(** SWXXX These should go somewhere else, maybe util.ml? *)
-let solve_formula ?format input output =
-  (* print "Querying STP for a satisfying answer\n" ;  *)
-  flush stdout;
-  let opt = 
-    match !printer with
-      | "smtlib1" -> " --SMTLIB1 -m"
-      | "smtlib2" -> " --SMTLIB2"
-      | "stp" -> ""
-      | _ -> failwith "Unknown printer" 
-  in
-  let cmd ="stp" ^ opt ^ " < " ^ input ^ " > " ^ output in
-  Status.init "Solving formula" 0 ;
-  (match Unix.system cmd with
-      | Unix.WEXITED 0 -> ()
-      | _ -> failwith ("STP query failed, consider increasing"
-                         ^ " the stack with ulimit"));
-  Status.stop ()
-
-let solution_from_stp_formula file =
-  let cin = open_in file in
-  try
-    let lexbuf = Lexing.from_channel cin in
-    let solution = Stp_grammar.main Stp_lexer.token lexbuf in
-    Lexing.flush_input lexbuf;
-    close_in cin;
-    solution
-  with _ as e -> (* Make sure that we close oc if there is a parse exception *)
-    close_in cin;
-    raise e
-
-
 (** Symbolic assigns are represented as Lets in the formula, except
     for temporaries.  If you use this, you should clear out temporaries
     after executing each instruction.
@@ -1753,6 +1705,7 @@ struct
     let length = List.length trace in
     Printf.printf "Starting search: %d trace length\n" length;
     let rec bsearch l u =
+      let open Smtexec in
       Printf.printf "Searching %d %d\n" l u ;
       if l >= u - 1 then (l,u)
       else
@@ -1760,13 +1713,11 @@ struct
         let trace = BatList.take middle trace in
         try
           sym_and_output trace "temp";
-          ignore (solve_formula "temp" "tempout") ;
-          ignore(Unix.system("cat tempout"));
-          match solution_from_stp_formula "tempout" with
-            | Some _ -> Printf.printf "going higher\n";
+          match STP.si#solve_formula_file ~getmodel:true "temp" with
+            | Invalid _ -> Printf.printf "going higher\n";
                 bsearch middle u
-            | None -> Printf.printf "going lower\n";
-                bsearch l middle
+            | _ -> (Printf.printf "going lower\n";
+                    bsearch l middle)
         with
           | Failure _ ->
               (Printf.printf "going lower\n";
@@ -1783,6 +1734,7 @@ struct
   (* Binary search over the trace IL to see where things go
      wrong. *)
   let trace_valid_to_invalid trace =
+    let open Smtexec in
     let length = List.length trace in
     let rec bsearch l u =
       Printf.printf "Searching %d %d\n" l u ;
@@ -1791,14 +1743,12 @@ struct
         let middle = (l + u) / 2 in
         let trace = BatList.take middle trace in
         try
-          ignore (generate_formula ("temp",Smtexec.STP.si) trace) ;
-          ignore (solve_formula "temp" "tempout") ;
-          ignore(Unix.system("cat tempout"));
-          match solution_from_stp_formula "tempout" with
-            | Some _ -> Printf.printf "going higher\n";
+          ignore (generate_formula ("temp",STP.si) trace) ;
+          match STP.si#solve_formula_file ~getmodel:true "temp" with
+            | Invalid _ -> Printf.printf "going higher\n";
                 bsearch middle u
-            | None -> Printf.printf "going lower\n";
-                bsearch l middle
+            | _ -> Printf.printf "going lower\n";
+              bsearch l middle
         with
           | Failure _ ->
               (Printf.printf "going lower\n";
@@ -1820,8 +1770,8 @@ struct
   let formula_storage = ".formula"
   let answer_storage = ".answer"
 
-  let parse_answer_to file =
-    let var_vals = match solution_from_stp_formula answer_storage with
+  let parse_answer_to model outfile =
+    let var_vals = match model with
       | Some(x) -> x
       | None -> Printf.printf "Formula was unsatisfiable\n";
           failwith "Formula was unsatisfiable"
@@ -1857,16 +1807,17 @@ struct
     let _, input = List.split padded in
     let input = List.map Big_int_Z.int_of_big_int input in
     (* Let's output the exploit string *)
-    let cout = open_out file in
+    let cout = open_out outfile in
     List.iter (output_byte cout) input ;
     close_out cout;
-    print "Exploit string was written out to file \"%s\"\n" file ;
+    print "Exploit string was written out to file \"%s\"\n" outfile ;
     flush stdout
 
   let output_exploit (file,s) trace =
-    ignore (generate_formula (formula_storage,s) trace) ;
-    solve_formula formula_storage answer_storage ;
-    parse_answer_to file
+    generate_formula (formula_storage,s) trace;
+    match s#solve_formula_file ~getmodel:true formula_storage with
+    | Smtexec.Invalid m -> parse_answer_to m file
+    | _ -> parse_answer_to None file
 end
 
 module StreamPrinterAdapter =
@@ -1891,17 +1842,6 @@ module TraceSymbolic =
   MakeTraceSymbolicStandard(DontEvalSymbLet)(PredAssignTraces)(OldPrinterAdapter)(LetBindFakeStream);;
 module TraceSymbolicStream =
   MakeTraceSymbolicStandard(DontEvalSymbLet)(PredAssignTraces)(StreamPrinterAdapter)(LetBindStreamSat);;
-
-
-(** SWXXX Should this go somewhere else too? *)
-let clean =
-  let rec clean_aux acc = function
-    | (Comment _) :: ss | (Label _) :: ss -> clean_aux acc ss
-    | s :: ss -> clean_aux (s::acc) ss
-    | [] -> List.rev acc
-  in
-  clean_aux []
-
 
 (*************************************************************)
 (********************  Exploit Generation  *******************)

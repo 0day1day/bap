@@ -53,8 +53,10 @@ let pin_stream_trace_test pin_out =
   let streamf, finalf = Traces_stream.generate_formula formula_storage Smtexec.STP.si in
   Stream.iter streamf stream;
   finalf ();
-  Traces.solve_formula formula_storage answer_storage;
-  parse_answer_to exploit_file
+  match Smtexec.STP.si#solve_formula_file ~getmodel:true formula_storage with
+  | Smtexec.Invalid m ->
+    parse_answer_to m exploit_file
+  | _ -> parse_answer_to None exploit_file
 
 let backwards_taint_test pin_out =
   Traces.cleanup();

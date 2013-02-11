@@ -7,9 +7,11 @@
    @author ejs
 *)
 
+type model = (string*Big_int_Z.big_int) list option
+
 (** The result of solving a formula. *)
 type result = Valid (** The formula was valid or unsatisfiable. *)
-              | Invalid (** The formula was invalid or satisfiable. *)
+              | Invalid of model (** The formula was invalid or satisfiable. *)
               | SmtError of string (** The solver failed.  Possible reasons for this include the formula having invalid syntax and the solver running out of memory. *)
               | Timeout (** The solver took too long to solve the formula. *)
 val result_to_string : result -> string
@@ -22,7 +24,7 @@ object
   method printer : Formulap.fppf
   method streaming_printer : Formulap.stream_fppf
   method solvername : string
-  method solve_formula_file : ?timeout:int -> ?remove:bool -> ?printmodel:bool -> string -> result
+  method solve_formula_file : ?timeout:int -> ?remove:bool -> ?getmodel:bool -> string -> result
 end
 
 module type SOLVER =
@@ -32,11 +34,11 @@ sig
   val in_path : unit -> bool
   (** [in_path ()] returns [true] if and only if the solver appears to be in the in the [PATH]. *)
 
-  val solve_formula_file : ?timeout:int -> ?remove:bool -> ?printmodel:bool -> string -> result 
+  val solve_formula_file : ?timeout:int -> ?remove:bool -> ?getmodel:bool -> string -> result 
   (** [solve_formula_file f] solves the formula in [f]. 
       @param timeout Sets the timeout duration in seconds.
       @param remove If set, remove the formula after solving it.
-      @param printmodel If set, prints a satisfiable model if one is found. 
+      @param getmodel If set, prints and returns a satisfiable model if one is found. 
   *)
 
   val check_exp_validity : ?timeout:int -> ?remove:bool -> ?exists:(Ast.var list) -> ?foralls:(Ast.var list) -> Ast.exp -> result 
