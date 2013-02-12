@@ -395,8 +395,8 @@ struct
   let progname = "z3"
   let cmdstr f = "-smt2 " ^ f
   let parse_result = STPSMTLIB_INFO.parse_result_builder solvername
-  let printer = ((new Smtlib2.pp_oc) :> Formulap.fppf)
-  let streaming_printer = ((new Smtlib2.pp_oc) :> Formulap.stream_fppf)
+  let printer = ((new Smtlib2.pp_oc ~opts:[]) :> Formulap.fppf)
+  let streaming_printer = ((new Smtlib2.pp_oc ~opts:[]) :> Formulap.stream_fppf)
 end
 
 module Z3 = Make(Z3_INFO)
@@ -432,8 +432,8 @@ struct
       ) else
         failwith "Something weird happened."
   let parse_result = parse_result_builder solvername
-  let printer = ((new Smtlib2.pp_oc) :> Formulap.fppf)
-  let streaming_printer = ((new Smtlib2.pp_oc) :> Formulap.stream_fppf)
+  let printer = ((new Smtlib2.pp_oc ~opts:[Smtlib2.NoSetOption]) :> Formulap.fppf)
+  let streaming_printer = ((new Smtlib2.pp_oc ~opts:[Smtlib2.NoSetOption]) :> Formulap.stream_fppf)
 end
 
 module BOOLECTOR = Make(BOOLECTOR_INFO)

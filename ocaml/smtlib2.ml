@@ -44,7 +44,7 @@ let use_booleans = ref true ;;
     returning lazy evaluations, since they can never return No_rule.
 *)
 
-class pp ft =
+class pp ?(opts=[]) ft =
   let pp = Format.pp_print_string ft
   and pc = Format.pp_print_char ft
   and pi = Format.pp_print_int ft
@@ -58,6 +58,7 @@ class pp ft =
   let var2s (Var.V(num,name,_)) =
     name^"_"^(string_of_int num)
   in
+  let setoption = not (List.mem NoSetOption opts) in
 
   let opflatten e =
     let rec oh bop e acc =
@@ -752,8 +753,10 @@ object (self)
     force_newline();
     pp "(set-info :smt-lib-version 2.0)";
     force_newline();
-    pp "(set-option :produce-assignments true)";
-    force_newline()
+    if setoption then (
+      pp "(set-option :produce-assignments true)";
+      force_newline()
+    )
 
   method open_stream_benchmark =
     self#open_benchmark_with_logic "QF_ABV"
@@ -858,10 +861,10 @@ object (self)
 end
 
 
-class pp_oc fd =
+class pp_oc ?opts fd =
   let ft = Format.formatter_of_out_channel fd in
 object
-  inherit pp ft as super
+  inherit pp ?opts ft as super
   inherit Formulap.fpp_oc
   inherit Formulap.stream_fpp_oc
 
