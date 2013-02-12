@@ -19,7 +19,7 @@ module VH = Var.VarHash
 type sort = BitVec | Bool
 
 type option =
-  | NoSetOption (** Boolector doesn't support (set-option) *)
+  | SetOptionProduceAssignments (** Z3 only *)
 
 let use_booleans = ref true ;;
 
@@ -58,7 +58,7 @@ class pp ?(opts=[]) ft =
   let var2s (Var.V(num,name,_)) =
     name^"_"^(string_of_int num)
   in
-  let setoption = not (List.mem NoSetOption opts) in
+  let setoption = List.mem SetOptionProduceAssignments opts in
 
   let opflatten e =
     let rec oh bop e acc =
