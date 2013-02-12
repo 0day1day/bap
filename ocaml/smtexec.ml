@@ -287,7 +287,7 @@ struct
     let issat = BatString.exists stdout "sat" in
     let isunsat = BatString.exists stdout "unsat" in
 
-    (*       dprintf "fail: %b %b %b" fail isinvalid isvalid; *)
+    dprintf "fail: %b %b %b" fail issat isunsat;
 
     if fail then (
       dprintf "output: %s\nerror: %s" stdout stderr;

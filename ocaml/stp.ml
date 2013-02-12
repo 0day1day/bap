@@ -42,7 +42,7 @@ object (self)
   val mutable let_counter = 0;
 
   method and_start =
-    pc '(';
+    pc '('
 
   method and_constraint e =
     pc '(';
@@ -50,6 +50,11 @@ object (self)
     pc ')';
     space ();
     pc '&';
+    pc '(';
+    space ();
+
+  method and_close_constraint =
+    pc ')'
 
   method and_end =
     self#ast_exp exp_true;

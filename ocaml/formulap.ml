@@ -66,11 +66,17 @@ type fppf = ?suffix:string -> out_channel -> fpp_oc
 
 class virtual stream_fpp =
 object(self)
-  (** Begin a list of constraints *)
+  (** Begin a list of constraints at the start of the formula *)
   method virtual and_start : unit
   (** Add a constraint to a list of constraints *)
   method virtual and_constraint : Ast.exp -> unit
-  (** End a list of constraints *)
+  (** Close constraint at end of the formula
+
+      E.g., print ')' *)
+  method virtual and_close_constraint : unit
+  (** End a list of constraints at the end of the formula
+
+      E.g., print 'true' *)
   method virtual and_end : unit
   (** Begin a let binding *)
   method virtual let_begin : var -> Ast.exp -> unit

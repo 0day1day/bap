@@ -125,14 +125,18 @@ object (self)
     match (VH.find ctx v) with
     | n,_ -> pp n
 
-  method and_start =
+  method and_start = ()
+
+  method and_constraint e =
     pp "(and ";
+    space ();
+    self#ast_exp_bool e;
+    space ()
 
-  method and_constraint = self#ast_exp_bool
+  method and_close_constraint =
+    pc ')'
 
-  method and_end =
-    cut ();
-    pc ')'    
+  method and_end = ()
 
   (** Seperate let_begin and let_end to allow for streaming generation of
       formulas in utils/streamtrans.ml *)
@@ -146,7 +150,7 @@ object (self)
     (* The print functions called, ast_exp and ast_exp_bool never
        raise No_rule. So, we don't need to evaluate them before the lazy
        block. *)
-      pp "("; pp cmd; pp " (";
+      pp "("; pp cmd; pp " ((";
       (* v isn't allowed to shadow anything. also, smtlib requires it be
          prefixed with ? or $ *)
       let s = c ^ var2s v ^"_"^ string_of_int let_counter in
@@ -154,6 +158,7 @@ object (self)
       pp s;
       pc ' ';
       pf e1;
+      pc ')';
       pc ')';
       space ();
       self#extend v s vst;
@@ -218,11 +223,14 @@ object (self)
   method predeclare_free_var = self#decl_no_print
 
   method print_free_var (Var.V(_,_,t) as v) =
-    pp ":extrafuns (("; 
-    self#var v; 
-    space (); 
-    self#typ t; 
-    pp "))"; 
+    pp "(declare-fun";
+    space ();
+    self#var v;
+    space ();
+    pp "()";
+    space ();
+    self#typ t;
+    pc ')';
     force_newline()
 
   method decl v =

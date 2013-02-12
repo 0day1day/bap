@@ -214,7 +214,8 @@ let del_symbolic = Hashtbl.remove global.symbolic
 let cleanup () =
   Hashtbl.clear global.vars;
   Hashtbl.clear global.memory;
-  Hashtbl.clear global.symbolic
+  Hashtbl.clear global.symbolic;
+  dsa_rev_map := None
 
 let conc_mem_fold f =
   Hashtbl.fold f global.memory
@@ -1773,8 +1774,7 @@ struct
   let parse_answer_to model outfile =
     let var_vals = match model with
       | Some(x) -> x
-      | None -> Printf.printf "Formula was unsatisfiable\n";
-          failwith "Formula was unsatisfiable"
+      | None -> failwith "No model found"
     in
     (* The variables that we care about *)
     let is_input v = String.sub v 0 4 = "symb" in

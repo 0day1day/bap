@@ -973,12 +973,11 @@ struct
             formula_filename : string;
             free_var_printer : Formulap.stream_fpp_oc;
             free_var_filename : string;
-            close_funs : (unit -> unit) Stack.t}
+            close_funs : (unit -> unit) Stack.t;
+            mutable free_vars : Var.VarSet.t;
+            mutable defined_vars : Var.VarSet.t}
   type init = string * Formulap.stream_fppf
   type output = unit
-
-  let free_vars = ref Var.VarSet.empty;;
-  let defined_vars = ref Var.VarSet.empty;;
 
   let init (filename,(make_printer:Formulap.stream_fppf)) =
     (* Create and start a stack of functions to close parens of operations *)
@@ -994,41 +993,42 @@ struct
     formula_printer#and_start;
     {formula_printer=formula_printer; free_var_printer=free_var_printer;
      formula_filename=tempfilename; free_var_filename=filename;
-     close_funs=close_funs}
+     close_funs=close_funs;
+     free_vars=Var.VarSet.empty; defined_vars=Var.VarSet.empty}
 
   let add_to_formula ({formula_printer=formula_printer;
                        free_var_printer=free_var_printer;
                        close_funs=close_funs} as record) expression typ =
     (match expression, typ with
       | _, Equal ->
-          formula_printer#and_constraint expression;
-          (* SWXXX print space? *)
-          record
+        formula_printer#and_constraint expression;
+        Stack.push (fun () -> formula_printer#and_close_constraint) close_funs;
+        record
       | BinOp(EQ, Var v, value), Rename ->
-          let fp_list = Formulap.freevars value in
-          let fp = 
-            List.fold_left (fun s e -> Var.VarSet.add e s) Var.VarSet.empty fp_list
-          in
-          defined_vars := Var.VarSet.add v !defined_vars;
-          let fp = Var.VarSet.diff fp !defined_vars in
-          Var.VarSet.iter formula_printer#predeclare_free_var fp;
-          free_vars := Var.VarSet.union !free_vars fp;
-	  formula_printer#let_begin v value;
-          Stack.push (fun () -> formula_printer#let_end v) close_funs;
-          {record with close_funs=close_funs}
+        let fp_list = Formulap.freevars value in
+        let fp =
+          List.fold_left (fun s e -> Var.VarSet.add e s) Var.VarSet.empty fp_list
+        in
+        record.defined_vars <- Var.VarSet.add v record.defined_vars;
+        let fp = Var.VarSet.diff fp record.defined_vars in
+        Var.VarSet.iter formula_printer#predeclare_free_var fp;
+        Var.VarSet.iter free_var_printer#predeclare_free_var fp;
+        record.free_vars <- Var.VarSet.union record.free_vars fp;
+	formula_printer#let_begin v value;
+        Stack.push (fun () -> formula_printer#let_end v) close_funs;
+        {record with close_funs=close_funs}
       | _ -> failwith "internal error: adding malformed constraint to formula"
     )
 
   let output_formula {formula_printer; free_var_printer;
                       formula_filename; free_var_filename;
-                      close_funs} =
-    (* We must close the and before closing the lets *)
+                      close_funs; free_vars} =
     formula_printer#and_end;
     Stack.iter (fun f -> f()) close_funs;
     (* Free vars go at the begining of the file but we don't know all of them
        until the end of the trace.  So we print them out to a seperate file
        and combine these at the end. *)
-    Var.VarSet.iter free_var_printer#print_free_var !free_vars;
+    Var.VarSet.iter free_var_printer#print_free_var free_vars;
     formula_printer#flush; formula_printer#close;
     free_var_printer#flush; free_var_printer#close;
     Hacks.append_file formula_filename free_var_filename
