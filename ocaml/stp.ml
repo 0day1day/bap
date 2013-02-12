@@ -17,7 +17,7 @@ module VH = Var.VarHash
 
 
 
-class pp ?suffix:(s="") ft =
+class pp ft =
   let pp = Format.pp_print_string ft
   and pc = Format.pp_print_char ft
   and pi = Format.pp_print_int ft
@@ -29,7 +29,7 @@ class pp ?suffix:(s="") ft =
   and flush = Format.pp_print_flush ft
   and cls = Format.pp_close_box ft in
   let var2s (Var.V(num,name,_)) =
-    name^"_"^(string_of_int num)^s
+    name^"_"^(string_of_int num)
   in
 
 object (self)
@@ -397,10 +397,10 @@ object (self)
 end
 
 
-class pp_oc ?suffix:(s="") fd =
+class pp_oc fd =
   let ft = Format.formatter_of_out_channel fd in
 object
-  inherit pp ~suffix:s ft as super
+  inherit pp ft as super
   inherit Formulap.fpp_oc
   inherit Formulap.stream_fpp_oc
   method close =

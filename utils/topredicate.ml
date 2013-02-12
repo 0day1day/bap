@@ -14,7 +14,6 @@ let post = ref "true"
 let stpout = ref None
 let stpoutname = ref ""
 let pstpout = ref None
-let suffix = ref ""
 let usedc = ref true
 let usesccvn = ref true
 let solve = ref false
@@ -33,8 +32,6 @@ let speclist =
      "Quiet: Supress outputting the WP in the BAP IL.")
   ::("-post", Arg.Set_string post,
      "<exp> Use <exp> as the postcondition (defaults to \"true\")")
-  ::("-suffix", Arg.String (fun str -> suffix := str),
-     "<suffix> Add <suffix> to each variable name.")
   ::("-dwp", Arg.Unit(fun()-> vc := compute_dwp_gen),
      "Use efficient directionless weakest precondition")
   ::("-fwp", Arg.Unit(fun()-> vc := compute_fwp_gen),
@@ -136,7 +133,7 @@ match !stpout with
   let () = print_endline "Printing predicate as SMT formula" in
   let foralls = List.map (Memory2array.coerce_rvar_state ~scope m2a_state) foralls in 
   let pp = (((!Solver.solver)#printer) :> Formulap.fppf) in
-  let p = pp ~suffix:!suffix oc in
+  let p = pp oc in
   (match !options with
   | {mode=Sat} ->
     p#assert_ast_exp ~foralls wp
@@ -160,7 +157,7 @@ match !pstpout with
   let () = print_endline "Printing predicate as SMT formula" in
   let foralls = List.map (Memory2array.coerce_rvar_state m2a_state) foralls in 
   let pp = (((!Solver.solver)#printer) :> Formulap.fppf) in
-  let p = pp ~suffix:!suffix oc in
+  let p = pp oc in
   p#forall foralls;
   p#ast_exp wp;
   p#close

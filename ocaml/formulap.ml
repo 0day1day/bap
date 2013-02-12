@@ -62,7 +62,7 @@ end
 
    I guess we should/could change the type of fpp_oc too to avoid
 this. *)
-type fppf = ?suffix:string -> out_channel -> fpp_oc
+type fppf = out_channel -> fpp_oc
 
 class virtual stream_fpp =
 object(self)
@@ -112,4 +112,4 @@ object(self)
   method virtual flush : unit
 end
 
-type stream_fppf = ?suffix:string -> out_channel -> stream_fpp_oc
+type stream_fppf = out_channel -> stream_fpp_oc
