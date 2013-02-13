@@ -9,6 +9,8 @@ open D
 (* Type of unroll function *)
 type unrollf = ?count:int -> Cfg.AST.G.t -> Cfg.AST.G.t
 
+type node_mapping = (Cfg.AST.G.V.t * Cfg.AST.G.V.t) list
+
 (* Generic nested loop information *)
 type unrollinfo =
   | BB of C.G.V.t
@@ -215,8 +217,10 @@ let unroll_loop ?(count=8) ?(id=0) cfg head body =
   in
 
   let cfg = C.G.fold_vertex rename_targets cfg cfg in
+
+  let nodes = List.map (fun node -> ((C.G.V.label node, 0), node)) nodes in
   let nodelist = Hashtbl.fold (fun k v l ->
-    v::l
+    (k, v)::l
   ) unrollednodes nodes in
 
   (* let oc = Pervasives.open_out "unroll.dot" in *)
@@ -239,22 +243,22 @@ let unroll_loops_internal ?count cfg unrollinfo =
 
   (* unroll_in cfg needs to return a CFG and a modified structure,
      since unrolling changes the structure of the CFG. *)
-  let rec unroll_in cfg : unrollinfo -> C.G.t * unrollinfo =
-    let f (cfg,rl) n =
-      let cfg,r = unroll_in cfg n in
-      cfg, r::rl
+  let rec unroll_in cfg mapping : unrollinfo -> C.G.t * unrollinfo * node_mapping =
+    let f (cfg,rl,mapping) n =
+      let cfg,r,mapping = unroll_in cfg mapping n in
+      cfg, r::rl, mapping
     in
     function
-    | BB _ as r -> cfg, r
+    | BB _ as r -> cfg, r,[]
     | Other ns ->
       (* Recurse *)
-      let cfg, rl = List.fold_left f (cfg,[]) ns in
-      cfg, Other(List.rev rl)
+      let cfg, rl, mapping = List.fold_left f (cfg,[],mapping) ns in
+      cfg, Other(List.rev rl),mapping
     | Loop(head, ns) ->
       (* First unroll any nested loops *)
-      let cfg, r =
-        let cfg, rl = List.fold_left f (cfg,[]) ns in
-        cfg, Other(List.rev rl)
+      let cfg, r, mapping =
+        let cfg, rl, mapping = List.fold_left f (cfg,[],mapping) ns in
+        cfg, Other(List.rev rl),mapping
       in
 
       (* And then unroll the loop at the current level *)
@@ -263,16 +267,19 @@ let unroll_loops_internal ?count cfg unrollinfo =
       (* We need to return an updated region for the unrolled loop. *)
       let cfg, nl = unroll_bbs ?count ~id:!nunrolled cfg head bbs in
       incr nunrolled;
-      let make_region bb = BB bb in
-      cfg, Other (List.map make_region nl)
+      let make_region (_,bb) = BB bb in
+      cfg, Other (List.map make_region nl), mapping
   in
-  let cfg, _ = unroll_in cfg unrollinfo in
-  cfg
+  let cfg, _, mapping = unroll_in cfg [] unrollinfo in
+  cfg, mapping
 
-let unroll_loops_steensgard ?count cfg =
+let unroll_loops_with_mapping ?count cfg =
   unroll_loops_internal ?count cfg (unrollinfo_from_steensgard cfg)
 
+let unroll_loops_steensgard ?count cfg =
+  fst (unroll_loops_with_mapping ?count cfg)
+
 let unroll_loops_sa ?count cfg =
-  unroll_loops_internal ?count cfg (unrollinfo_from_sa cfg)
+  fst (unroll_loops_internal ?count cfg (unrollinfo_from_sa cfg))
 
 let unroll_loops = unroll_loops_steensgard
