@@ -1,2 +1,0 @@
-* testing: Test streaming symb. eval. with non-stp
-* merge.org: Remove me before merging :-)
