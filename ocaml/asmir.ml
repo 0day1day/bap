@@ -66,19 +66,15 @@ let tr_regtype = function
 (* maps a string variable to the var we are using for it *)
 type varctx = (string,Var.t) Hashtbl.t
 
-
-let gamma_populate h mem decls = 
-  List.iter (fun (Var.V(_,nm,_) as var) -> Hashtbl.add h nm var) decls;
-  Hashtbl.add h "$mem" mem;
-  Hashtbl.add h "mem" mem
-
-(** [gamma_create mem decls] creates a new varctx for use during translation. 
+(** [gamma_create mem decls] creates a new varctx for use during translation.
     [mem] is the var that should be used for memory references, and [decls]
     should be a list of variables already in scope.
 *)
 let gamma_create mem decls : varctx =
   let h = Hashtbl.create 57 in
-  gamma_populate h mem decls;
+  List.iter (fun (Var.V(_,nm,_) as var) -> Hashtbl.add h nm var) decls;
+  Hashtbl.add h "$mem" mem;
+  Hashtbl.add h "mem" mem;
   h
 
 let gamma_lookup (g:varctx) s =

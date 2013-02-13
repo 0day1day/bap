@@ -1332,14 +1332,11 @@ let run_blocks blocks memv length =
     @param h The map from original var names to most recent dsa var
     @param rh The map from a dsa var back to the original var
     @return The DSA'ified statement
-
-    @note Does not use DSA for 'mem'.
 *)
 let to_dsa_stmt s h rh =
   let dsa_ctr = ref 0 in
   let new_name (Var.V(_,s,t) as v) =
-    (* if is_mem v then v *)
-    (* else *) if is_symbolic v then v
+    if is_symbolic v then v
     else (
       dsa_ctr := !dsa_ctr + 1;
       assert (!dsa_ctr <> 0);
