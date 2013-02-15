@@ -65,9 +65,11 @@ let pin_stream_trace_test solver pin_out =
   | Smtexec.Invalid m ->
     (try parse_answer_to m exploit_file
      with Failure "No model found" ->
-       todo ("Model parsing of "^solver#solvername^" not working"))
-  | Smtexec.Valid -> failwith "Trace should be satisfiable but is unsatisfiable"
-  | _ -> failwith "An error occured while solving the formula"
+       skip_if true ("Model parsing of "^solver#solvername^" not complete"))
+  | Smtexec.Valid -> assert_failure "Trace should be satisfiable but is unsatisfiable"
+  | _ ->
+    skip_if (solver == Smtexec.STPSMTLIB.si) "STP has a bug right now: https://groups.google.com/d/topic/stp-users/OVXDFyCgTuY/discussion";
+    assert_failure "An error occured while solving the formula"
 
 let backwards_taint_test pin_out =
   Traces.cleanup();

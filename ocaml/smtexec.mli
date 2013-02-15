@@ -74,6 +74,8 @@ module STPSMTLIB : SOLVER
 module CVC3 : SOLVER
 module CVC3SMTLIB : SOLVER
 module YICES : SOLVER
+module Z3 : SOLVER
+module BOOLECTOR : SOLVER
 
 (** A Hashtbl that maps solver names to the corresponding {!SOLVER} module. *)
 val solvers : (string,smtexec) Hashtbl.t

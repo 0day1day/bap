@@ -9,7 +9,7 @@ let basic_nested () =
   let unroll n =
     let cfg = match get_functions ~unroll:n ~names:["main";"_main"] p with
       | [(_,_,x)] -> x
-      | _ -> failwith "Could not find unrolled main"
+      | _ -> assert_failure "Could not find unrolled main"
     in
     let exiT = C.G.V.create Cfg.BB_Exit in
     let stmts = C.get_stmts cfg exiT in
