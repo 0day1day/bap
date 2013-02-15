@@ -249,7 +249,7 @@ let unroll_loops_internal ?count cfg unrollinfo =
       cfg, r::rl, mapping
     in
     function
-    | BB _ as r -> cfg, r,[]
+    | BB _ as r -> cfg, r,mapping
     | Other ns ->
       (* Recurse *)
       let cfg, rl, mapping = List.fold_left f (cfg,[],mapping) ns in
@@ -266,6 +266,9 @@ let unroll_loops_internal ?count cfg unrollinfo =
       dprintf "Found a loop with %d nodes" (List.length bbs);
       (* We need to return an updated region for the unrolled loop. *)
       let cfg, nl = unroll_bbs ?count ~id:!nunrolled cfg head bbs in
+      let mapping = List.fold_left (fun acc ((old_label, _), new_node) ->
+        (Cfg.AST.find_vertex cfg old_label, new_node)::acc
+      ) mapping nl in
       incr nunrolled;
       let make_region (_,bb) = BB bb in
       cfg, Other (List.map make_region nl), mapping
