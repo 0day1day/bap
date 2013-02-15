@@ -98,8 +98,8 @@ export SOURCES = \
 	input.mli input.ml \
 	to_c.ml \
 	vsa.ml \
-	symbeval.ml symbeval_search.ml \
 	hacks.ml \
+	symbeval.ml symbeval_search.ml \
 	coalesce.mli coalesce.ml \
 	structural_analysis.ml \
 	steensgard.mli steensgard.ml \
@@ -110,6 +110,7 @@ export SOURCES = \
 	traces.ml \
 	traces_surgical.ml \
 	traces_backtaint.mli traces_backtaint.ml \
+	traces_stream.mli traces_stream.ml \
 	utils_common.ml \
 	test_common.ml \
 	template.ml \

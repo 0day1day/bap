@@ -186,6 +186,10 @@ val memoize : ?size:int -> ('a -> 'b) -> 'a -> 'b
     it is included once per binding *)
 val get_hash_keys : ?sort_keys:bool -> ('a, 'b) Hashtbl.t -> 'a list
 
+(** Get the values from a hash table.  If a key has multiple bindings,
+    the value is included once per binding *)
+val get_hash_values : ?sort_values:bool -> ('a, 'b) Hashtbl.t -> 'b list
+
 (** Extension of [Hashtbl]s *)
 module HashUtil :
   functor (H : Hashtbl.S) ->
@@ -201,6 +205,11 @@ sig
   (** Get the keys from a hash table.  If a key has multiple bindings,
       it is included once per binding *)
   val get_hash_keys : ?sort_keys:bool -> 'a H.t -> H.key list
+
+  (** Get the values from a hash table.  If a key has multiple bindings,
+      the value is included once per binding *)
+  val get_hash_values : ?sort_values:bool -> 'a H.t -> 'a list
+
 end
 
 (** Version of hashtbl_eq for polymorphic [Hashtbl]s *)

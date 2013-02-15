@@ -39,7 +39,7 @@ let () =
 ;;
 
 Printf.fprintf stderr "Solving\n"; flush stderr;
-let r = (!solver)#solve_formula_file ~printmodel:true (BatOption.get !fname) in
+let r = (!solver)#solve_formula_file ~getmodel:true (BatOption.get !fname) in
 Printf.fprintf stderr "Solve result: %s\n" (Smtexec.result_to_string r);
 match r with | Smtexec.SmtError _ -> failwith "Solver error" | _ -> ()
 ;;

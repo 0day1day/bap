@@ -108,98 +108,99 @@ let c_setup () =
   g_cfg, m2actx;;
 
 
-let sat_test testname post stp_result (g_cfg, m2actx) =
+let sat_test testname post stp_result (name,vc) (g_cfg, m2actx) =
   let post = Memory2array.coerce_exp_state m2actx post in
-  let test_vc (name,vc) =
-    print_endline ("Testing "^testname^" with "^name^" VC algorithm");
-    let vcout, foralls = Vc.vc_astcfg vc Vc.default_options g_cfg post in
-    let foralls = List.map (Memory2array.coerce_rvar_state m2actx) foralls in
-    let pp = ((solver#printer) :> Formulap.fppf) in
-    let oc = open_out stp_out in
-    let p = pp oc in
-    p#assert_ast_exp ~foralls vcout;
-    p#counterexample;
-    p#close;
-    (let r = solver#solve_formula_file stp_out in
-     if (r <> stp_result) then (
-       assert_failure ("Predicate solution for " ^ name
-                       ^ " was not "
-                       ^(Smtexec.result_to_string stp_result)
-                       ^" but "^(Smtexec.result_to_string r))))
-  in
-  (* Test with each VC algorithm *)
-  List.iter test_vc Vc.pred_vclist;
+  print_endline ("Testing "^testname^" with "^name^" VC algorithm");
+  let vcout, foralls = Vc.vc_astcfg vc Vc.default_options g_cfg post in
+  let foralls = List.map (Memory2array.coerce_rvar_state m2actx) foralls in
+  let pp = ((solver#printer) :> Formulap.fppf) in
+  let oc = open_out stp_out in
+  let p = pp oc in
+  p#assert_ast_exp ~foralls vcout;
+  p#counterexample;
+  p#close;
+  (let r = solver#solve_formula_file stp_out in
+   if (r <> stp_result) then (
+     assert_failure ("Predicate solution for " ^ name
+                     ^ " was not "
+                     ^(Smtexec.result_to_string stp_result)
+                     ^" but "^(Smtexec.result_to_string r))))
 ;;
 
-let valid_test testname post stp_result (g_cfg, m2actx) =
+let valid_test testname post stp_result (name,vc) (g_cfg, m2actx) =
   let post = Memory2array.coerce_exp_state m2actx post in
-  let test_vc (name,vc) =
-    print_endline ("Testing "^testname^" with "^name^" VC algorithm");
-    let options = {Vc.default_options with Vc.mode = Validity} in
-    let vcout, foralls = Vc.vc_astcfg vc options g_cfg post in
-    let foralls = List.map (Memory2array.coerce_rvar_state m2actx) foralls in
-    let pp = ((solver#printer) :> Formulap.fppf) in
-    let oc = open_out stp_out in
-    let p = pp oc in
-    p#valid_ast_exp ~foralls vcout;
-    p#counterexample;
-    p#close;
-    (let r = solver#solve_formula_file stp_out in
-     if (r <> stp_result) then (
-       assert_failure ("Predicate solution for " ^ name
-                       ^ " was not "
-                       ^(Smtexec.result_to_string stp_result)
-                       ^" but "^(Smtexec.result_to_string r))))
-  in
-  (* Test with each VC algorithm *)
-  List.iter test_vc Vc.pred_vclist;
+  print_endline ("Testing "^testname^" with "^name^" VC algorithm");
+  let options = {Vc.default_options with Vc.mode = Validity} in
+  let vcout, foralls = Vc.vc_astcfg vc options g_cfg post in
+  let foralls = List.map (Memory2array.coerce_rvar_state m2actx) foralls in
+  let pp = ((solver#printer) :> Formulap.fppf) in
+  let oc = open_out stp_out in
+  let p = pp oc in
+  p#valid_ast_exp ~foralls vcout;
+  p#counterexample;
+  p#close;
+  (let r = solver#solve_formula_file stp_out in
+   if (r <> stp_result) then (
+     assert_failure ("Predicate solution for " ^ name
+                     ^ " was not "
+                     ^(Smtexec.result_to_string stp_result)
+                     ^" but "^(Smtexec.result_to_string r))))
 ;;
 
 
 let predicate_stp_tear_down _ = 
   rm_and_ignore_list [g_il ; stp_out];;
 
+let fold_vcs (s,f) =
+  List.map (fun ((vcname,_) as vc) ->
+    s^"_"^vcname >:: f vc
+  ) Vc.pred_vclist
 
 let suite = "Predicate" >:::
-  [
-    "predicate_basic_solve_test" >::
-      (bracket
+    fold_vcs ("predicate_basic_solve_test",
+      (fun vc -> bracket
 	 basic_setup
-	 (sat_test "basic_solve" (BinOp(EQ, Var Disasm_i386.eax, Int(biconst 42, Reg 32))) (Smtexec.Invalid))
-	 predicate_stp_tear_down);
-    "predicate_basic_unsolve_test" >::
-      (bracket
-	 basic_setup
-	 (sat_test "basic_unsolve"  (BinOp(EQ, Var Disasm_i386.eax, Int(biconst 2, Reg 32))) (Smtexec.Valid))
-	 predicate_stp_tear_down);
-    "predicate_basic_validity_test" >::
-      (bracket
-	 basic_validity_setup
-	 (valid_test "basic_validity_test"  (BinOp(EQ, Var Disasm_i386.ebx, BinOp(TIMES, Int(biconst 2, Reg 32), Var Disasm_i386.eax))) (Smtexec.Valid))
-	 predicate_stp_tear_down);
-    "predicate_assume_validity_test" >::
-      (bracket
-	 assume_setup
-	 (valid_test "assume_validity_test" exp_true (Smtexec.Valid))
-	 predicate_stp_tear_down);
-    "predicate_error_solve_test" >::
-      (bracket
-	 error_setup
-	 (sat_test "error_solve" (BinOp(EQ, Var Disasm_i386.eax, Int(biconst 41, Reg 32))) (Smtexec.Invalid))
-	 predicate_stp_tear_down);
-    "predicate_error_unsolve_test" >::
-      (bracket
-	 error_setup
-	 (sat_test "error_unsolve"  (BinOp(EQ, Var Disasm_i386.eax, Int(biconst 42, Reg 32))) (Smtexec.Valid))
-	 predicate_stp_tear_down);
-    "predicate_C_solve_test" >::
-      (bracket
+	 (sat_test "basic_solve" (BinOp(EQ, Var Disasm_i386.eax, Int(biconst 42, Reg 32))) (Smtexec.Invalid None) vc)
+	 predicate_stp_tear_down))
+  @
+    fold_vcs ("predicate_basic_unsolve_test",
+      (fun vc -> bracket
+         basic_setup
+         (sat_test "basic_unsolve"  (BinOp(EQ, Var Disasm_i386.eax, Int(biconst 2, Reg 32))) (Smtexec.Valid) vc)
+         predicate_stp_tear_down))
+  @
+    fold_vcs ("predicate_basic_validity_test",
+      (fun vc -> bracket
+         basic_validity_setup
+         (valid_test "basic_validity_test"  (BinOp(EQ, Var Disasm_i386.ebx, BinOp(TIMES, Int(biconst 2, Reg 32), Var Disasm_i386.eax))) (Smtexec.Valid) vc)
+         predicate_stp_tear_down))
+  @
+    fold_vcs ("predicate_assume_validity_test",
+      (fun vc -> bracket
+         assume_setup
+         (valid_test "assume_validity_test" exp_true (Smtexec.Valid) vc)
+         predicate_stp_tear_down))
+  @
+    fold_vcs ("predicate_error_solve_test",
+      (fun vc -> bracket
+         error_setup
+         (sat_test "error_solve" (BinOp(EQ, Var Disasm_i386.eax, Int(biconst 41, Reg 32))) (Smtexec.Invalid None) vc)
+         predicate_stp_tear_down))
+  @
+    fold_vcs ("predicate_error_unsolve_test",
+      (fun vc -> bracket
+         error_setup
+         (sat_test "error_unsolve"  (BinOp(EQ, Var Disasm_i386.eax, Int(biconst 42, Reg 32))) (Smtexec.Valid) vc)
+         predicate_stp_tear_down))
+  @
+    fold_vcs ("predicate_C_solve_test",
+      (fun vc -> bracket
          c_setup
-         (sat_test "C_solve" (BinOp(EQ, Var Disasm_i386.eax, Int(biconst 42, Reg 32))) (Smtexec.Invalid))
-         predicate_stp_tear_down);
-    "predicate_C_unsolve_test" >::
-      (bracket
+         (sat_test "C_solve" (BinOp(EQ, Var Disasm_i386.eax, Int(biconst 42, Reg 32))) (Smtexec.Invalid None) vc)
+         predicate_stp_tear_down))
+  @
+    fold_vcs ("predicate_C_unsolve_test",
+      (fun vc -> bracket
          c_setup
-         (sat_test "C_unsolve" (BinOp(EQ, Var Disasm_i386.eax, Int(biconst 43, Reg 32))) (Smtexec.Valid))
-         predicate_stp_tear_down);
-  ]
+         (sat_test "C_unsolve" (BinOp(EQ, Var Disasm_i386.eax, Int(biconst 43, Reg 32))) (Smtexec.Valid) vc)
+         predicate_stp_tear_down))

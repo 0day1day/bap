@@ -18,6 +18,9 @@ module VH = Var.VarHash
 
 type sort = BitVec | Bool
 
+type option =
+  | SetOptionProduceAssignments (** Z3 only *)
+
 let use_booleans = ref true ;;
 
 (** This printer has to deal with a number of differences between the
@@ -41,7 +44,7 @@ let use_booleans = ref true ;;
     returning lazy evaluations, since they can never return No_rule.
 *)
 
-class pp ?suffix:(s="") ft =
+class pp ?(opts=[]) ft =
   let pp = Format.pp_print_string ft
   and pc = Format.pp_print_char ft
   and pi = Format.pp_print_int ft
@@ -53,8 +56,9 @@ class pp ?suffix:(s="") ft =
   and flush = Format.pp_print_flush ft
   and cls = Format.pp_close_box ft in
   let var2s (Var.V(num,name,_)) =
-    name^"_"^(string_of_int num)^s
+    name^"_"^(string_of_int num)
   in
+  let setoption = List.mem SetOptionProduceAssignments opts in
 
   let opflatten e =
     let rec oh bop e acc =
@@ -73,7 +77,7 @@ object (self)
   inherit Formulap.fpp
   val used_vars : (string,Var.t) Hashtbl.t = Hashtbl.create 57
   val ctx : (string*sort) VH.t = VH.create 57
-    
+
   val mutable unknown_counter = 0;
 
   val mutable let_counter = 0;
@@ -125,29 +129,61 @@ object (self)
     match (VH.find ctx v) with
     | n,_ -> pp n
 
-  (** Returns a lazy expression that prints let v = e1 in e2. Never raises No_rule. *)
-  method letme v e1 e2 st =
+  method and_start = ()
+
+  method and_constraint e =
+    pp "(and ";
+    space ();
+    self#ast_exp_bool e;
+    space ()
+
+  method and_close_constraint =
+    pc ')'
+
+  method and_end = ()
+
+  (** Seperate let_begin and let_end to allow for streaming generation of
+      formulas in utils/streamtrans.ml *)
+  method let_begin v e1 =
     let t1 = Typecheck.infer_ast ~check:false e1 in
-    let cmd,c,pf,vst = match t1,!use_booleans with Reg 1,true -> "let","$",self#ast_exp_bool,Bool | _ -> "let","?",self#ast_exp,BitVec in
-    let pf2 = match st with Bool -> self#ast_exp_bool | BitVec -> self#ast_exp in
+    let cmd,c,pf,vst =
+      match t1,!use_booleans with
+        | Reg 1,true -> "let","$",self#ast_exp_bool,Bool
+        | _ -> "let","?",self#ast_exp,BitVec
+    in
     (* The print functions called, ast_exp and ast_exp_bool never
        raise No_rule. So, we don't need to evaluate them before the lazy
        block. *)
-    lazy(
       pp "("; pp cmd; pp " ((";
-      (* v isn't allowed to shadow anything. also, smtlib requires it be prefixed with ? or $ *)
+      (* v isn't allowed to shadow anything. also, smtlib requires it be
+         prefixed with ? or $ *)
       let s = c ^ var2s v ^"_"^ string_of_int let_counter in
       let_counter <- succ let_counter;
       pp s;
       pc ' ';
       pf e1;
-      pp "))";
+      pc ')';
+      pc ')';
       space ();
       self#extend v s vst;
-      pf2 e2;
+
+  method let_end v =
       self#unextend v;
       cut ();
       pc ')'
+
+  method let_middle st =
+      match st with
+        | Bool -> self#ast_exp_bool
+        | BitVec -> self#ast_exp
+
+  (** Returns a lazy expression that prints let v = e1 in e2. Never raises 
+      No_rule. *)
+  method letme v e1 e2 st =
+    lazy(
+      self#let_begin v e1;
+      self#let_middle st e2;
+      self#let_end v 
     )
 
   method varname v =
@@ -158,13 +194,16 @@ object (self)
     match VH.find ctx v with
     | _,st -> st
 
-  method declare_new_freevars e =
+  method declare_given_freevars es =
     force_newline();
     pp "; free variables:"; force_newline();
-    let fvs = Formulap.freevars e in 
-    List.iter (fun v -> if not(VH.mem ctx v) then self#decl v) fvs;
+    List.iter (fun v -> if not(VH.mem ctx v) then self#decl v) es;
     pp "; end free variables."; 
     force_newline()
+ 
+  method declare_new_freevars e =
+    let fvs = Formulap.freevars e in 
+    self#declare_given_freevars fvs
        
   method typ = function
     | Reg n ->	printf "(_ BitVec %d)" n
@@ -178,13 +217,29 @@ object (self)
     | Array _ -> failwith "SMTLIB2 only supports Arrays with register indices and elements"
     | TMem _ ->	failwith "TMem unsupported by SMTLIB2"
 
-  method decl (Var.V(_,_,t) as v) =
+ method decl_no_print (Var.V(_,_,t) as v) =
     let sort = match t with
       (* | Reg 1 -> Bool (\* Let's try making all 1-bit bvs bools for now *\) *)
       | _ -> BitVec
     in
-    self#extend v (var2s v) sort;
-    pp "(declare-fun "; self#var v; space (); pp "()"; space (); self#typ t; pp ")"; force_newline();
+    self#extend v (var2s v) sort
+
+  method predeclare_free_var = self#decl_no_print
+
+  method print_free_var (Var.V(_,_,t) as v) =
+    pp "(declare-fun";
+    space ();
+    self#var v;
+    space ();
+    pp "()";
+    space ();
+    self#typ t;
+    pc ')';
+    force_newline()
+
+  method decl v =
+    self#decl_no_print v;
+    self#print_free_var v
 
   (* Wrapper around a ~check functions to ensure the function does not
      raise No_rule before calling it. *)
@@ -693,6 +748,19 @@ object (self)
 	pp "):";
 	cls();space();
 
+  method open_benchmark_with_logic logic =
+    pp ("(set-logic "^logic); pc ')';
+    force_newline();
+    pp "(set-info :smt-lib-version 2.0)";
+    force_newline();
+    if setoption then (
+      pp "(set-option :produce-assignments true)";
+      force_newline()
+    )
+
+  method open_stream_benchmark =
+    self#open_benchmark_with_logic "QF_ABV"
+
   method open_benchmark e =
     let has_mem e =
       let found_mem = ref false in
@@ -703,7 +771,7 @@ object (self)
 	  | Store _ -> found_mem := true; SkipChildren
 	  | Var v when not (is_integer_type (Var.typ v)) -> found_mem := true; SkipChildren
 	  | _ when !found_mem -> SkipChildren
-	  | _ -> DoChildren	  
+	  | _ -> DoChildren
       end
       in
       ignore(Ast_visitor.exp_accept v e);
@@ -714,49 +782,54 @@ object (self)
       | true -> "QF_ABV"
       | false -> "QF_BV"
     in
-    pp ("(set-logic "^(get_logic e)); pc ')';
-    force_newline();
-    pp "(set-info :smt-lib-version 2.0)";
-    force_newline();
-    (* pp "(set-option :produce-assignments true)"; *)
-    force_newline()
+    self#open_benchmark_with_logic (get_logic e)
 
-  method close_benchmark () =
+  method close_benchmark =
     ()
 
-  (* method assert_eq v e = *)
-  (*   opn 0; *)
-  (*   self#declare_new_freevars (BinOp(EQ, Var v, e)); *)
-  (*   force_newline(); *)
-  (*   pp ":assumption (="; *)
-  (*   self#var v; *)
-  (*   space (); *)
-  (*   self#ast_exp e; *)
-  (*   pc ')'; *)
-  (*   cls() *)
+  method assert_ast_exp_begin ?(exists=[]) ?(foralls=[]) () =
+    force_newline();
+    opn 1;
+    pp "(assert";
+    space();
+    self#exists exists;
+    self#forall foralls
+
+  method assert_ast_exp_end =
+    cut();
+    pc ')';
+    cls();
+    force_newline ();
+    self#formula
 
   method assert_ast_exp ?(exists=[]) ?(foralls=[]) e =
     pdebug "Opening benchmark... ";
     self#open_benchmark e;
     pdebug "declaring new free variables... ";
     self#declare_new_freevars e;
-    force_newline();
-    pdebug "done\n";
-    opn 1;
-    pp "(assert";
-    space();
-    self#exists exists;
-    self#forall foralls;
+    self#assert_ast_exp_begin ~exists ~foralls ();
     self#ast_exp_bool e;
-    cut();
+    self#assert_ast_exp_end;
+    self#close_benchmark
+
+  method valid_ast_exp_begin ?(exists=[]) ?(foralls=[]) () =
+    self#assert_ast_exp_begin ~exists ~foralls ();
+    pp "(not";
+    space()
+
+  method valid_ast_exp_end =
     pc ')';
-    cls();
-    force_newline ();
-    self#formula ();
-    self#close_benchmark ()
+    self#assert_ast_exp_end
 
   method valid_ast_exp ?exists ?foralls e =
-    self#assert_ast_exp ?exists ?foralls (exp_not e)
+    pdebug "Opening benchmark... ";
+    self#open_benchmark e;
+    pdebug "declaring new free variables... ";
+    self#declare_new_freevars e;
+    self#valid_ast_exp_begin ?exists ?foralls ();
+    self#ast_exp_bool e;
+    self#valid_ast_exp_end;
+    self#close_benchmark
 
   (* (\** Is e a valid expression (always true)? *\) *)
   (* method valid_ast_exp ?(exists=[]) ?(foralls=[]) e = *)
@@ -774,7 +847,7 @@ object (self)
   (*   self#close_benchmark () *)
 
 
-  method formula () =
+  method formula =
     pp "(check-sat)";
     force_newline();
     (* pp "(get-assignment)" *)
@@ -788,13 +861,14 @@ object (self)
 end
 
 
-class pp_oc ?suffix:(s="") fd =
+class pp_oc ?opts fd =
   let ft = Format.formatter_of_out_channel fd in
 object
-  inherit pp ~suffix:s ft as super
+  inherit pp ?opts ft as super
   inherit Formulap.fpp_oc
+  inherit Formulap.stream_fpp_oc
+
   method close =
     super#close;
     close_out fd
 end
-

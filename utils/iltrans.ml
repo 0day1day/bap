@@ -1,6 +1,8 @@
 let usage = "Usage: "^Sys.argv.(0)^" <input options> [transformations and outputs]\n\
              Transform BAP IL programs. "
 
+open Utils_common
+
 type ast = Ast.program
 type astcfg = Cfg.AST.G.t
 type ssa = Cfg.SSA.G.t
@@ -228,10 +230,6 @@ let speclist =
      uadd(TransformAst Traces_surgical.check_slice),
      "Slice a trace based on the overwritten return address"
     )
-  ::("-trace-clean",
-     uadd(TransformAst Traces.clean),
-     "Remove labels and comments from a concretized trace"
-    )
   ::("-trace-reconcrete",
      Arg.String(fun f -> add(TransformAst(Traces.concrete_rerun f))),
      "Execute a concretized trace with the specified input file."
@@ -245,13 +243,13 @@ let speclist =
      "Start debugging at item n."
     )
   ::("-trace-debug",
-     uadd(AnalysisAst Traces.trace_valid_to_invalid),
+     uadd(AnalysisAst Traces.TraceSymbolic.trace_valid_to_invalid),
      "Formula debugging. Prints to files form_val and form_inv"
     )
   ::("-trace-conc-debug",
      Arg.Unit
        (fun () ->
-	  let f = Traces.formula_valid_to_invalid ~min:!startdebug in
+	  let f = Traces.TraceSymbolic.formula_valid_to_invalid ~min:!startdebug in
 	  add(AnalysisAst f)
        ),
      "Formula debugging. Prints to files form_val and form_inv. Concretizes BEFORE debugging; useful for finding which assertion doesn't work."
@@ -336,15 +334,13 @@ let speclist =
      "<gaddress> <maddress> <sehaddress> <payload file> Use pivot at gaddress to transfer control (by overwriting SEH handler at sehaddress) to payload at maddress."
     )
   ::("-trace-formula",
-     Arg.String(fun f -> add(AnalysisAst(Traces.output_formula f))),
-     "<file> Output the STP trace formula to <file>"
+     Arg.String(fun f -> add(AnalysisAst(Traces.TraceSymbolic.generate_formula (f,!Solver.solver)))),
+     "<file> Output a trace formula to <file>"
     )
-  ::("-trace-formula-format",
-     Arg.Set_string Traces.printer,
-     "Set formula format (STP (default) or smtlib1)."
-  )
+  ::("-trace-solver", Arg.String Solver.set_solver,
+     ("Use the specified solver for traces. Choices: " ^ Solver.solvers))
   ::("-trace-exploit",
-     Arg.String(fun f -> add(AnalysisAst(Traces.output_exploit f))),
+     Arg.String(fun f -> add(AnalysisAst(Traces.TraceSymbolic.output_exploit (f,!Solver.solver)))),
      "<file> Output the exploit string to <file>"
     )
   ::("-trace-assignments",
@@ -365,12 +361,11 @@ let speclist =
     )
   ::("-trace-check",
      Arg.Set Traces.consistency_check,
-     "Perform extra consistency checks"
+     "Perform consistency checks"
     )
   ::("-trace-check-all",
-     Arg.Unit(fun () -> Traces.consistency_check := true;
-	   Traces.checkall := true),
-     "Perform extra consistency checks"
+     Arg.Set Traces.checkall,
+     "Perform extra consistency checks possible when all instructions are logged"
     )
   ::("-trace-noopt",
      Arg.Clear Traces.dce,

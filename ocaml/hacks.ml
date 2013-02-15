@@ -207,6 +207,20 @@ let replace_unknowns p =
   in
   Ast_visitor.prog_accept v p
 
+(** Append src to dst *)
+let append_file src dst =
+  let oc1 = open_out_gen [Open_text; Open_append] 0o640 dst in
+  let oc2 = open_in src in
+  let rec do_append oc_out oc_in =
+    try 
+      output_string oc_out ((input_line oc_in)^"\n");
+      do_append oc_out oc_in
+    with End_of_file -> ()
+  in
+  do_append oc1 oc2;
+  close_out oc1;
+  close_in oc2
+
 (** Add an "assume false" statement to BB_Error and add an edge to
     BB_Exit.
 

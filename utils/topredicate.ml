@@ -14,21 +14,10 @@ let post = ref "true"
 let stpout = ref None
 let stpoutname = ref ""
 let pstpout = ref None
-let suffix = ref ""
 let usedc = ref true
 let usesccvn = ref true
 let solve = ref false
 let timeout = ref None
-
-(* Select which solver to use *)
-let solver = ref (Smtexec.STP.si);;
-
-let set_solver s =
-  solver := try Hashtbl.find Smtexec.solvers s
-  with Not_found ->
-    failwith "Unknown solver"
-
-let solvers = Hashtbl.fold (fun k _ s -> k ^ " " ^ s) Smtexec.solvers ""
 
 let vc = ref compute_wp_gen
 
@@ -43,8 +32,6 @@ let speclist =
      "Quiet: Supress outputting the WP in the BAP IL.")
   ::("-post", Arg.Set_string post,
      "<exp> Use <exp> as the postcondition (defaults to \"true\")")
-  ::("-suffix", Arg.String (fun str -> suffix := str),
-     "<suffix> Add <suffix> to each variable name.")
   ::("-dwp", Arg.Unit(fun()-> vc := compute_dwp_gen),
      "Use efficient directionless weakest precondition")
   ::("-fwp", Arg.Unit(fun()-> vc := compute_fwp_gen),
@@ -77,8 +64,8 @@ let speclist =
      "<n> FSE with breath first search, limiting search depth to n.")
   ::("-fse-maxrepeat", Arg.Int(fun i-> vc := compute_fse_maxrepeat_gen i),
      "<n> FSE excluding walks that visit a point more than n times.")
-  ::("-solver", Arg.String set_solver,
-     ("Use the specified solver. Choices: " ^ solvers))
+  ::("-solver", Arg.String Solver.set_solver,
+     ("Use the specified solver. Choices: " ^ Solver.solvers))
   ::("-noopt", Arg.Unit (fun () -> usedc := false; usesccvn := false),
      "Do not perform any optimizations on the SSA CFG.")
   ::("-opt", Arg.Unit (fun () -> usedc := true; usesccvn := true),
@@ -145,8 +132,8 @@ match !stpout with
 | Some oc ->
   let () = print_endline "Printing predicate as SMT formula" in
   let foralls = List.map (Memory2array.coerce_rvar_state ~scope m2a_state) foralls in 
-  let pp = (((!solver)#printer) :> Formulap.fppf) in
-  let p = pp ~suffix:!suffix oc in
+  let pp = (((!Solver.solver)#printer) :> Formulap.fppf) in
+  let p = pp oc in
   (match !options with
   | {mode=Sat} ->
     p#assert_ast_exp ~foralls wp
@@ -158,7 +145,7 @@ match !stpout with
   p#close;
   if !solve then (
     Printf.fprintf stderr "Solving\n"; flush stderr;
-    let r = (!solver)#solve_formula_file ?timeout:!timeout ~printmodel:true !stpoutname in
+    let r = (!Solver.solver)#solve_formula_file ?timeout:!timeout ~getmodel:true !stpoutname in
     Printf.fprintf stderr "Solve result: %s\n" (Smtexec.result_to_string r);
     match r with | Smtexec.SmtError _ -> failwith "Solver error" | _ -> ()
   )
@@ -169,8 +156,8 @@ match !pstpout with
 | Some oc ->
   let () = print_endline "Printing predicate as SMT formula" in
   let foralls = List.map (Memory2array.coerce_rvar_state m2a_state) foralls in 
-  let pp = (((!solver)#printer) :> Formulap.fppf) in
-  let p = pp ~suffix:!suffix oc in
+  let pp = (((!Solver.solver)#printer) :> Formulap.fppf) in
+  let p = pp oc in
   p#forall foralls;
   p#ast_exp wp;
   p#close

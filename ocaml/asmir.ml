@@ -66,7 +66,7 @@ let tr_regtype = function
 (* maps a string variable to the var we are using for it *)
 type varctx = (string,Var.t) Hashtbl.t
 
-(** [gamma_create mem decls] creates a new varctx for use during translation. 
+(** [gamma_create mem decls] creates a new varctx for use during translation.
     [mem] is the var that should be used for memory references, and [decls]
     should be a list of variables already in scope.
 *)
@@ -83,7 +83,6 @@ let gamma_lookup (g:varctx) s =
     failwith("Disassembled code had undeclared variable '"^s^"'. Something is broken.")
 
 let gamma_extend = Hashtbl.add
-
 
 let gamma_unextend = Hashtbl.remove
 
@@ -841,13 +840,16 @@ module SerializedTrace = struct
                    usage=WR;
                    taint=Taint (Int64.to_int tid)})
       in
+      let convert_thread_id x = Type.ThreadId (Int64.to_int x)
+      in
       function
-        | `std_frame({Std_frame.operand_list=ol}) -> List.map convert_operand_info ol
+        | `std_frame({Std_frame.operand_list=ol; Std_frame.thread_id=tid}) -> (convert_thread_id tid) :: List.map convert_operand_info ol
         | `syscall_frame _ -> []
         | `exception_frame _ -> []
         | `taint_intro_frame({Taint_intro_frame.taint_intro_list=til}) -> List.map convert_taint_info til
         | `modload_frame _ -> []
         | `key_frame _ -> []
+        | `metadata_frame _ -> []
     in
     let raise_frame arch f =
       let get_stmts =
@@ -879,6 +881,7 @@ module SerializedTrace = struct
           | `key_frame _ ->
       (* Implement key frame later *)
             []
+          | `metadata_frame _ -> []
       in
       add_operands (get_stmts f) (get_attrs f)
     in
