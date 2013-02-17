@@ -568,17 +568,17 @@ let create_thread_map_state () : Var.t TVHash.t = TVHash.create 1000
 
 let lookup_thread_map map threadIDopt (Var.V(_,_,t) as avar) =
   match threadIDopt, t with
-    | Some(threadID), Reg _ ->
-        let nvar =
-          try TVHash.find map (threadID, avar)
-          with Not_found ->
-            let new_name = (Var.name avar) in
-            let newervar = Var.newvar new_name t in
-            TVHash.add map (threadID, avar) newervar;
-            newervar
-        in
-        nvar
-    | Some(threadID), _ -> avar (* Ignore non register variables *)
+    | Some(threadID), Reg _ when Disasm.is_temp avar = false ->
+      let nvar =
+        try TVHash.find map (threadID, avar)
+        with Not_found ->
+          let new_name = (Var.name avar) in
+          let newervar = Var.newvar new_name t in
+          TVHash.add map (threadID, avar) newervar;
+          newervar
+      in
+      nvar
+    | Some(threadID), _ -> avar (* Ignore non register variables and temporaries *)
     | None, _ -> failwith "Can not lookup vars if no thread id exists!"
 
 (** Rename variables so they are unique to the thread they are found in *)
