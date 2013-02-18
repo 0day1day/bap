@@ -257,7 +257,7 @@ let st_t = Reg 80
 
 (** Only use this for registers, not temporaries *)
 let nv = Var.newvar
-let nt = Disasm_temp.nt
+let nt = Var_temp.nt
 
 (* registers *)
 

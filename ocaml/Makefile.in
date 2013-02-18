@@ -47,7 +47,7 @@ export SOURCES = \
 	arithmetic.ml \
 	ast.ml \
 	ssa.ml \
-	disasm_temp.ml \
+	var_temp.mli var_temp.ml \
 	pp.ml \
 	typecheck.mli typecheck.ml \
 	ast_convenience.ml \
