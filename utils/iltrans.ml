@@ -38,6 +38,11 @@ let output_ast_cfg f p =
   Cfg_pp.AstStmtsDot.output_graph oc p;
   close_out oc
 
+let output_ast_asms f p =
+  let oc = open_out f in
+  Cfg_pp.AstAsmsDot.output_graph oc p;
+  close_out oc
+
 let output_ast_bbids f p =
   let oc = open_out f in
   Cfg_pp.AstBBidDot.output_graph oc p;
@@ -151,6 +156,8 @@ let speclist =
    "<file> Pretty print AST to <file>.")
   ::("-pp-ast-cfg", Arg.String (fun f -> add(AnalysisAstCfg(output_ast_cfg f))),
      "<file> Pretty print AST graph to <file> (in Graphviz format)")
+  ::("-pp-ast-asms", Arg.String (fun f -> add(AnalysisAstCfg(output_ast_asms f))),
+     "<file> Pretty print AST graph to <file> (in Graphviz format) (only assembly)")
   ::("-pp-ast-bbids", Arg.String(fun f -> add(AnalysisAstCfg(output_ast_bbids f))),
      "<file> Pretty print AST graph to <file> (in Graphviz format) (no stmts)")
   ::("-pp-ast-cdg", Arg.String (fun f -> add(AnalysisAstCfg(output_ast_cdg f))),
