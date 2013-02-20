@@ -303,6 +303,7 @@ let opt_expid info var exp =
       sameas v
   | Bin(XOR, x, HInt(bi,_))
   | Bin(PLUS, x, HInt(bi,_))
+  | Bin(MINUS, x, HInt(bi,_))
   | Bin(LSHIFT, x, HInt(bi,_))
   | Bin(RSHIFT, x, HInt(bi,_))
   | Bin(ARSHIFT, x, HInt(bi,_)) when bi_is_zero bi ->
