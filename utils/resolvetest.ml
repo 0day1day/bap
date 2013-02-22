@@ -2,15 +2,15 @@ open Ast
 open Type
 open Utils_common
 
-let usage = "Usage: "^Sys.argv.(0)^" <Binary>\n\
+let usage = "Usage: "^Sys.argv.(0)^" <binary>\n\
              Test program to resolve indirect jumps"
-
-let speclist = []
 
 let arg = ref 0;;
 let binname = ref None;;
 let fname = ref None;;
 let timeout = ref 30;;
+
+let speclist = []
 
 let anon x =
   (match !arg with
@@ -40,6 +40,7 @@ let lift_func (n,s,e) =
     flush stdout;
     let cfg,_ = Asmir_disasm.vsa_at asmp s in
     let cfg = Hacks.ast_remove_indirect cfg in
+    let cfg = Ast_cond_simplify.simplifycond_cfg cfg in
     Cfg_pp.AstStmtsDot.output_graph (open_out ("resolve"^n^".dot")) cfg)
 let lift_func =
   Util.timeout !timeout lift_func

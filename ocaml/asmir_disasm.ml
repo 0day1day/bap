@@ -97,9 +97,9 @@ module VSA_SPEC = struct
       let _df_in, df_out = Vsa.AlmostVSA.DF.worklist_iterate_widen ~nmeets:50 ~opts:{Vsa.AlmostVSA.DFP.O.initial_mem=Asmir.get_readable_mem_contents_list asmp} cfg in
       let vs = Vsa.AlmostVSA.DFP.exp2vs (df_out v) e in
       dprintf "VSA resolved %s to %s" (Pp.ast_exp_to_string e) (Vsa.VS.to_string vs);
-      (match Vsa.VS.concrete ~max:50 vs with
+      (match Vsa.VS.concrete ~max:1024 vs with
       | Some x -> Addrs (List.map (fun a -> Addr a) x), ()
-      | None -> wprintf "VSA disassembly failed to resolve %s to a specific concrete set" (Pp.ast_exp_to_string e); Indirect, ())
+      | None -> wprintf "VSA disassembly failed to resolve %s/%s to a specific concrete set" (Pp.ast_exp_to_string e) (Vsa.VS.to_string vs); Indirect, ())
       (* Rely on recursive descent for easy stuff *)
     | o, () -> o, ()
 
