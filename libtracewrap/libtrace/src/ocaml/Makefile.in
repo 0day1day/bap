@@ -29,4 +29,7 @@ all:
 	$(MAKE) ncl
 	$(MAKE) dcl
 
+tags:
+	-
+
 include $(OCAMLMAKEFILE)

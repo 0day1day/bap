@@ -42,5 +42,8 @@ endif
 
 all:	nc dc
 
+tags:
+	-
+
 %:
 	$(MAKE) -f $(OCAMLMAKEFILE) subprojs SUBTARGET=$@

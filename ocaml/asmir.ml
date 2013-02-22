@@ -66,7 +66,7 @@ let tr_regtype = function
 (* maps a string variable to the var we are using for it *)
 type varctx = (string,Var.t) Hashtbl.t
 
-(** [gamma_create mem decls] creates a new varctx for use during translation. 
+(** [gamma_create mem decls] creates a new varctx for use during translation.
     [mem] is the var that should be used for memory references, and [decls]
     should be a list of variables already in scope.
 *)
@@ -83,7 +83,6 @@ let gamma_lookup (g:varctx) s =
     failwith("Disassembled code had undeclared variable '"^s^"'. Something is broken.")
 
 let gamma_extend = Hashtbl.add
-
 
 let gamma_unextend = Hashtbl.remove
 
@@ -547,6 +546,7 @@ let asm_addr_to_bap {asmp=prog; arch=arch; get=get} addr =
 	(try (Disasm.disasm_instr arch get addr)
 	 with Disasm_i386.Disasm_i386_exception s -> 
 	   DTest.dprintf "BAP unknown disasm_instr %Lx: %s" addr s;
+           DTest.dprintf "Faulting instruction: %s" (Libasmir.asmir_string_of_insn prog addr);
 	   DV.dprintf "disasm_instr %Lx: %s" addr s; raise Disasm.Unimplemented
 	)
       in
@@ -840,13 +840,16 @@ module SerializedTrace = struct
                    usage=WR;
                    taint=Taint (Int64.to_int tid)})
       in
+      let convert_thread_id x = Type.ThreadId (Int64.to_int x)
+      in
       function
-        | `std_frame({Std_frame.operand_list=ol}) -> List.map convert_operand_info ol
+        | `std_frame({Std_frame.operand_list=ol; Std_frame.thread_id=tid}) -> (convert_thread_id tid) :: List.map convert_operand_info ol
         | `syscall_frame _ -> []
         | `exception_frame _ -> []
         | `taint_intro_frame({Taint_intro_frame.taint_intro_list=til}) -> List.map convert_taint_info til
         | `modload_frame _ -> []
         | `key_frame _ -> []
+        | `metadata_frame _ -> []
     in
     let raise_frame arch f =
       let get_stmts =
@@ -878,6 +881,7 @@ module SerializedTrace = struct
           | `key_frame _ ->
       (* Implement key frame later *)
             []
+          | `metadata_frame _ -> []
       in
       add_operands (get_stmts f) (get_attrs f)
     in
@@ -973,8 +977,16 @@ let find_symbol {asmp=p} name =
 let get_function_ranges p =
   let symb = get_symbols p in
   ignore p; (* does this ensure p is live til here? *)
-  let is_function s =
-    s.bfd_symbol_flags land bsf_function <> 0
+  let is_function = match bfd_flavour (Libasmir.asmir_get_bfd p.asmp) with
+    | Bfd_target_elf_flavour
+    | Bfd_target_coff_flavour ->
+      (fun s -> s.bfd_symbol_flags land bsf_function <> 0)
+    | Bfd_target_mach_o_flavour ->
+      (fun s -> dprintf "Symbol %s, flags=%#x" s.bfd_symbol_name s.bfd_symbol_flags;
+	s.bfd_symbol_flags land bsf_global <> 0)
+    | _ ->
+      wprintf "Unknown file format flavour.  Assuming it has a function flag for symbols, which may be incorrect.";
+      (fun s -> s.bfd_symbol_flags land bsf_function <> 0)
   and symb_to_tuple s =
     (* FIXME: section_end doesn't seem to get the right values... *)
     (* did this fix it? --aij *)

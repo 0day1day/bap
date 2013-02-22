@@ -605,9 +605,11 @@ struct
       exp_true
       forms
     in
-    (* If NOT e is NOT invalid, then e is satisfiable *)
+    (* If NOT e is invalid, then e is satisfiable *)
     let validf = unop NOT f in
-    (S.check_exp_validity validf) = Smtexec.Invalid
+    match S.check_exp_validity validf with
+    | Smtexec.Invalid _ -> true
+    | _ -> false
 
   let get_model _ = failwith "unimplemented"
   let model_exp _ = failwith "unimplemented"

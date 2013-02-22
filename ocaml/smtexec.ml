@@ -10,28 +10,30 @@ module D = Debug.Make(struct let name = "Smtexec" and default=`NoDebug end)
 open D
 open Unix
 
-type model = (string*int64) list option
+type model = (string*Big_int_Z.big_int) list option
 
-type result = Valid | Invalid (*of model*) | SmtError of string | Timeout
+type result = Valid | Invalid of model | SmtError of string | Timeout
 
 (** Class type to embed SMT execution functions.  If OCaml < 3.12 had
     first-class modules, we wouldn't need this. *)
 class type smtexec =
 object
+  method in_path : unit -> bool
   method printer : Formulap.fppf
+  method solve_formula_file : ?timeout:int -> ?remove:bool -> ?getmodel:bool -> string -> result
   method solvername : string
-  method solve_formula_file : ?timeout:int -> ?remove:bool -> ?printmodel:bool -> string -> result
+  method streaming_printer : Formulap.stream_fppf
   (* XXX: Add other methods *)
 end
 
 module type SOLVER_INFO =
 sig
-  val timeout : int (** Default timeout in seconds *)
   val solvername : string (** Solver name *)
   val progname : string (** Name of program, to ensure it is in the path *)
   val cmdstr : string -> string (** Given a filename, produce a command string to invoke solver *)
-  val parse_result : ?printmodel:bool -> string -> string -> Unix.process_status -> result (** Given output, decide the result *)
+  val parse_result : ?getmodel:bool -> string -> string -> Unix.process_status -> result (** Given output, decide the result *)
   val printer : Formulap.fppf
+  val streaming_printer : Formulap.stream_fppf
 end
 
 (* Output type *)
@@ -39,7 +41,7 @@ module type SOLVER =
 sig
   val solvername : string
   val in_path : unit -> bool
-  val solve_formula_file : ?timeout:int -> ?remove:bool -> ?printmodel:bool -> string -> result (** Solve a formula in a file *)
+  val solve_formula_file : ?timeout:int -> ?remove:bool -> ?getmodel:bool -> string -> result (** Solve a formula in a file *)
   val check_exp_validity : ?timeout:int -> ?remove:bool -> ?exists:(Ast.var list) -> ?foralls:(Ast.var list) -> Ast.exp -> result (** Check validity of an exp *)
   val create_cfg_formula :
     ?remove:bool -> ?exists:Ast.var list ->  ?foralls:Ast.var list
@@ -134,7 +136,7 @@ let syscall cmd =
 let result_to_string result =
   match result with
   | Valid -> "Valid"
-  | Invalid -> "Invalid"
+  | Invalid _ -> "Invalid"
   | SmtError s -> "SmtError: " ^ s
   | Timeout -> "Timeout"
 
@@ -173,8 +175,11 @@ struct
     let in_path () =
       Sys.command (Printf.sprintf "which %s > /dev/null" S.progname) == 0
 
-    let solve_formula_file ?(timeout=S.timeout) ?(remove=false) ?(printmodel=false) file =
-      ignore(alarm timeout);
+    let solve_formula_file ?timeout ?(remove=false) ?(getmodel=false) file =
+      (match timeout with
+      | Some timeout ->
+        ignore(alarm timeout)
+      | None -> ());
       let cmdline = S.progname ^ " " ^ S.cmdstr file in
 
       try
@@ -188,7 +193,7 @@ struct
 	  ignore(alarm 0);
 
           dprintf "Parsing result...";
-          let r = S.parse_result ~printmodel sout serr pstatus in
+          let r = S.parse_result ~getmodel sout serr pstatus in
           if remove then (try Unix.unlink file with _ -> ());
           r)
 
@@ -201,9 +206,11 @@ struct
       solve_formula_file ~remove ?timeout filename
 
     class c = object(self)
-      method solvername = S.solvername
-      method solve_formula_file = solve_formula_file
+      method in_path = in_path
       method printer = S.printer
+      method solve_formula_file = solve_formula_file
+      method solvername = S.solvername
+      method streaming_printer = S.streaming_printer
     end
 
     let si = new c
@@ -218,7 +225,7 @@ let parse_model solver s =
       | "stp" -> Stp_grammar.main Stp_lexer.token lexbuf
       | "cvc3" -> Cvc3_grammar.main Cvc3_lexer.token lexbuf
       | "yices" -> Yices_grammar.main Yices_lexer.token lexbuf
-      | _ -> failwith "Unknown solver"
+      | other -> wprintf "Model parsing for %s unsupported" other; None
     in
     Lexing.flush_input lexbuf;
     solution
@@ -231,11 +238,10 @@ let print_model = function
 
 module STP_INFO =
 struct
-  let timeout = 60
   let solvername = "stp"
   let progname = "stp"
   let cmdstr f = "-p " ^ f
-  let parse_result_builder solvername ?(printmodel=false) stdout stderr pstatus =
+  let parse_result_builder solvername ?(getmodel=false) stdout stderr pstatus =
     let failstat = match pstatus with
       | WEXITED(c) -> c > 0
       | _ -> true
@@ -249,10 +255,11 @@ struct
     if isvalid then
       Valid
     else if isinvalid then (
-      if printmodel then
-        (let m = parse_model solvername stdout in
-        print_model m);
-      Invalid
+      Invalid (if getmodel then
+          (let m = parse_model solvername stdout in
+           print_model m;
+           m) else None)
+
     ) else if fail then (
       dprintf "output: %s\nerror: %s" stdout stderr;
       SmtError ("SMT solver failed: " ^ stderr)
@@ -261,17 +268,17 @@ struct
       failwith "Something weird happened."
   let parse_result = parse_result_builder solvername
   let printer = ((new Stp.pp_oc) :> Formulap.fppf)
+  let streaming_printer = ((new Stp.pp_oc) :> Formulap.stream_fppf)
 end
 
 module STP = Make(STP_INFO)
 
 module STPSMTLIB_INFO =
 struct
-  let timeout = 60
-  let solvername = "stp"
+  let solvername = "stp_smtlib"
   let progname = "stp"
-  let cmdstr f = "--SMTLIB1 -t " ^ f
-  let parse_result_builder solvername ?(printmodel=false) stdout stderr pstatus =
+  let cmdstr f = "--SMTLIB2 -t " ^ f
+  let parse_result_builder solvername ?(getmodel=false) stdout stderr pstatus =
     let failstat = match pstatus with
       | WEXITED(c) -> c > 0
       | _ -> true
@@ -280,30 +287,30 @@ struct
     let issat = BatString.exists stdout "sat" in
     let isunsat = BatString.exists stdout "unsat" in
 
-    (*       dprintf "fail: %b %b %b" fail isinvalid isvalid; *)
+    dprintf "fail: %b %b %b" fail issat isunsat;
 
-    if isunsat then
-      Valid
-    else if issat then (
-      if printmodel then
-        (let m = parse_model solvername stdout in
-         print_model m);
-      Invalid
-    ) else if fail then (
+    if fail then (
       dprintf "output: %s\nerror: %s" stdout stderr;
-      SmtError ("SMT solver failed: " ^ stderr)
-    )
-    else
-      failwith "Something weird happened."
+      SmtError ("SMT solver failed: " ^ (stderr^stdout))
+    ) else if isunsat then
+        Valid
+      else if issat then (
+        Invalid (if getmodel
+          then let m = parse_model solvername stdout in
+               print_model m;
+               m
+          else None)
+      ) else
+        failwith "Something weird happened."
   let parse_result = parse_result_builder solvername
-  let printer = ((new Smtlib1.pp_oc) :> Formulap.fppf)
+  let printer = ((new Smtlib2.pp_oc ~opts:[]) :> Formulap.fppf)
+  let streaming_printer = ((new Smtlib2.pp_oc ~opts:[]) :> Formulap.stream_fppf)
 end
 
 module STPSMTLIB = Make(STPSMTLIB_INFO)
 
 module CVC3_INFO =
 struct
-  let timeout = 60
   let solvername = "cvc3"
   let progname = "cvc3"
   let cmdstr f = "+model " ^ f
@@ -353,42 +360,94 @@ struct
   (*     failwith "Something weird happened." *)
   let parse_result = STP_INFO.parse_result_builder solvername
   let printer = ((new Stp.pp_oc) :> Formulap.fppf)
+  let streaming_printer = ((new Stp.pp_oc) :> Formulap.stream_fppf)
 end
 
 module CVC3 = Make(CVC3_INFO)
 
 module CVC3SMTLIB_INFO =
 struct
-  let timeout = 60
-  let solvername = "cvc3"
+  let solvername = "cvc3_smtlib"
   let progname = "cvc3"
   let cmdstr f = "-lang smtlib " ^ f
   let parse_result = STPSMTLIB_INFO.parse_result_builder solvername
   let printer = ((new Smtlib1.pp_oc) :> Formulap.fppf)
+  let streaming_printer = ((new Smtlib1.pp_oc) :> Formulap.stream_fppf)
 end
 
 module CVC3SMTLIB = Make(CVC3SMTLIB_INFO)
 
 module YICES_INFO =
 struct
-  let timeout = 60
   let solvername = "yices"
   let progname = "yices-smt"
-  let cmdstr f = "-f " ^ f
+  let cmdstr f = f
   let parse_result = STPSMTLIB_INFO.parse_result_builder solvername
   let printer = ((new Smtlib1.pp_oc) :> Formulap.fppf)
+  let streaming_printer = ((new Smtlib1.pp_oc) :> Formulap.stream_fppf)
 end
 
 module YICES = Make(YICES_INFO)
 
+module Z3_INFO =
+struct
+  let solvername = "z3"
+  let progname = "z3"
+  let cmdstr f = "-smt2 " ^ f
+  let parse_result = STPSMTLIB_INFO.parse_result_builder solvername
+  let printer = ((new Smtlib2.pp_oc ~opts:[Smtlib2.SetOptionProduceAssignments]) :> Formulap.fppf)
+  let streaming_printer = ((new Smtlib2.pp_oc ~opts:[Smtlib2.SetOptionProduceAssignments]) :> Formulap.stream_fppf)
+end
+
+module Z3 = Make(Z3_INFO)
+
+module BOOLECTOR_INFO =
+struct
+  let solvername = "boolector"
+  let progname = "boolector"
+  let cmdstr f = "--smt2 " ^ f
+  let parse_result_builder solvername ?(getmodel=false) stdout stderr pstatus =
+    let failstat = match pstatus with
+      | WEXITED(c) -> c == 1
+      | _ -> true
+    in
+    (* Boolector returns different values for sat/unsat *)
+    let fail = failstat || BatString.exists stderr "Fatal" in
+    let issat = BatString.exists stdout "sat" in
+    let isunsat = BatString.exists stdout "unsat" in
+
+    (*       dprintf "fail: %b %b %b" fail isinvalid isvalid; *)
+
+    if fail then (
+      dprintf "output: %s\nerror: %s" stdout stderr;
+      SmtError ("SMT solver failed: " ^ (stderr^stdout))
+    ) else if isunsat then
+        Valid
+      else if issat then (
+        Invalid (if getmodel
+          then let m = parse_model solvername stdout in
+               print_model m;
+               m
+          else None)
+      ) else
+        failwith "Something weird happened."
+  let parse_result = parse_result_builder solvername
+  let printer = ((new Smtlib2.pp_oc ~opts:[]) :> Formulap.fppf)
+  let streaming_printer = ((new Smtlib2.pp_oc ~opts:[]) :> Formulap.stream_fppf)
+end
+
+module BOOLECTOR = Make(BOOLECTOR_INFO)
+
 let solvers = Hashtbl.create 10;;
-List.iter (fun (n,s) -> Hashtbl.add solvers n s)
+List.iter (fun s -> Hashtbl.add solvers s#solvername s)
   (
-    ("stp", STP.si)
-    ::("stp_smtlib", STPSMTLIB.si)
-    ::("cvc3", CVC3.si)
-    ::("cvc3_smtlib", CVC3SMTLIB.si)
-    ::("yices", YICES.si)
+    STP.si
+    :: STPSMTLIB.si
+    :: CVC3.si
+    :: CVC3SMTLIB.si
+    :: YICES.si
+    :: Z3.si
+    :: BOOLECTOR.si
     ::[]
   )
 

@@ -7,9 +7,9 @@ open Utils_common
 let basic_nested () =
   let p = Asmir.open_program "C/unroll" in
   let unroll n =
-    let cfg = match get_functions ~unroll:n ~names:["main"] p with
+    let cfg = match get_functions ~unroll:n ~names:["main";"_main"] p with
       | [(_,_,x)] -> x
-      | _ -> failwith "Could not find unrolled main"
+      | _ -> assert_failure "Could not find unrolled main"
     in
     let exiT = C.G.V.create Cfg.BB_Exit in
     let stmts = C.get_stmts cfg exiT in
@@ -26,24 +26,26 @@ let basic_nested () =
   with Symbeval.Concrete.AssertFailed _ -> ()
 
 (* Make sure we get an error for irreducible loops *)
-let irreducible () =
+let irreducible unrollf () =
   let p, _ = Parser.program_from_file "IL/unroll/irreducible.il" in
   let cfg = Cfg_ast.of_prog p in
   let cfg = Prune_unreachable.prune_unreachable_ast cfg in
-  try ignore(Unroll.unroll_loops_sa cfg);
+  try ignore(unrollf cfg);
       assert_failure "Unrolling an irreducible loop should fail"
   with Failure _ -> ()
 
 (* Make sure we don't get an error for reducible loops *)
-let reducible () =
+let reducible unrollf () =
   let p, _ = Parser.program_from_file "IL/unroll/reducible.il" in
   let cfg = Cfg_ast.of_prog p in
   let cfg = Prune_unreachable.prune_unreachable_ast cfg in
-  ignore(Unroll.unroll_loops_sa cfg)
+  ignore(unrollf cfg)
 
 let suite = "Unroll" >:::
   [
     "basic_nested" >:: basic_nested;
-    "irreducible" >:: irreducible;
-    "reducible" >:: reducible;
+    "irreducible_sa" >:: irreducible Unroll.unroll_loops_sa;
+    "reducible_sa" >:: reducible Unroll.unroll_loops_sa;
+    "irreducible_steensgard" >:: irreducible Unroll.unroll_loops_steensgard;
+    "reducible_steensgard" >:: reducible Unroll.unroll_loops_steensgard;
   ]

@@ -32,24 +32,6 @@ let optimize_cfg ?(usedc=true) ?(usesccvn=true) cfg post =
   let cfg = Cfg_ssa.to_astcfg cfg in
   (cfg, p);;
 
-(* let to_ssagcl cfg post = *)
-(*   let gcl = Gcl.of_astcfg cfg in *)
-(*   (gcl, post);; *)
-
-(* let to_ssapassgcl cfg post = *)
-(*   let (gcl, _) = Gcl.passified_of_ssa cfg in *)
-(*   (gcl, post) *)
-
-(* let to_ugcl passify cfg post = *)
-(*   let gcl = Ugcl.of_ssacfg ~passify:passify cfg in *)
-(*   (gcl, post) *)
-
-let stream_concrete ?(tag = "") mem_hash concrete_state block =
-  let block = Memory2array.coerce_prog_state mem_hash block in
-  let memv = Memory2array.coerce_rvar_state mem_hash Asmir.x86_mem in
-  ignore(Traces.run_block concrete_state memv block);
-  []
-
 let get_functions ?unroll ?names p =
   let ranges = Asmir.get_function_ranges p in
   let do_function (n,s,e) =
@@ -79,6 +61,18 @@ let get_functions ?unroll ?names p =
   in
   BatList.filter_map do_function ranges
 
+module Solver = struct
+  (* Select which solver to use *)
+  let solver = ref (Smtexec.STP.si);;
+
+  let set_solver s =
+    solver := try Hashtbl.find Smtexec.solvers s
+      with Not_found ->
+        failwith "Unknown solver"
+
+  let solvers = Hashtbl.fold (fun k _ s -> k ^ " " ^ s) Smtexec.solvers ""
+end
+
 let jitexecute inits p =
 IFDEF WITH_LLVM THEN
   let cfg = Cfg_ast.of_prog p in
@@ -90,4 +84,3 @@ IFDEF WITH_LLVM THEN
 ELSE
   failwith "LLVM not enabled"
 END;;
-

@@ -343,3 +343,6 @@ priv/guest_s390_toIR.o: $(ALL_HEADERS) priv/guest_s390_toIR.c
 priv/host_s390_disasm.o: $(ALL_HEADERS) priv/host_s390_disasm.c
 	$(CC) $(CCFLAGS) $(ALL_INCLUDES) -o priv/host_s390_disasm.o \
 					 -c priv/host_s390_disasm.c
+
+tags:
+	-

@@ -11,7 +11,6 @@
 (** Various options that can modify the behavior of VC generation
     algorithms. *)
 type options = {
-  cf : bool; (** Perform constant folding (concrete evaluation) during VC generation. Only used by EFSE algorithms. *)
   k : int; (** Expressions larger than [k] will be given their own temporary variable assignment in the formula. Only used by DWP algorithms. *)
   mode : Type.formula_mode; (** Indicates whether the formula should be valid for validity or satisfiability. This is currently only needed for VC algorithms that use passification, since passification introduces new free variables into the formula. *)
   full_subst : bool; (** [true] indicates that full substitution should be performed, even for [Let] expressions, in which case exponential blowup may occur. [false] enables partial substitution only. *)
@@ -54,6 +53,27 @@ val compute_dwp_gen : t
 val compute_dwp_let : ssa_vc
 val compute_dwp_let_gen : t
 
+(** Alternate formulation of DWP that is easier to understand and
+    produces smaller formulas on programs that have no [Assume]
+    statements.  However, it produces slightly larger formulas for
+    programs with [Assume] statements. *)
+val compute_fwp : ssa_vc
+val compute_fwp_gen : t
+
+(** An unstructured implementation of [compute_fwp] that does not
+    convert the entire program to GCL *)
+val compute_fwp_uwp : ssa_vc
+val compute_fwp_uwp_gen : t
+
+(** Same as [compute_fwp] but with concrete evaluation and lazy merging. *)
+val compute_fwp_lazyconc : ssa_vc
+val compute_fwp_lazyconc_gen : t
+
+(** An unstructured implementation of [compute_fwp_lazyconc] that
+    does not convert the entire program to GCL *)
+val compute_fwp_lazyconc_uwp : ssa_vc
+val compute_fwp_lazyconc_uwp_gen : t
+
 (** DWP implementation that uses forall quantifiers. *)
 val compute_dwp1 : ssa_vc
 (** General form of [compute_dwp1]. *)
@@ -69,6 +89,10 @@ val compute_flanagansaxe_gen : t
     exponentially sized formulas. *)
 val compute_wp : cfg_vc
 val compute_wp_gen : t
+
+(** Efficient weakest precondition on passified GCL programs. *)
+val compute_passified_wp : ssa_vc
+val compute_passified_wp_gen : t
 
 (** Unstructured Weakest Precondition that operates on a CFG-like
     representation. Produces exponentially sized formulas. *)

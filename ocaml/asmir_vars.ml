@@ -22,7 +22,7 @@ let arm_regs =
       "R12";
       "R13";
       "R14";
-      "R15";
+      "R15T";
       "CC";
       "CC_OP";
       "CC_DEP1";

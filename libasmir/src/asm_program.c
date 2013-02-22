@@ -10,6 +10,7 @@
 /* This elf stuff is interal to BFD (TOO BAD) */
 
 #define SHT_PROGBITS	1		/* Program specific (private) data */
+#define PT_GNU_STACK  0x6474e551
 
 struct elf_internal_phdr {
   unsigned long	p_type;			/* Identifies program segment type */
@@ -196,7 +197,7 @@ bfd_vma asmir_get_base_address(asm_program_t *prog) {
        shows sections when an ELF file contains both. So, we need to
        use ELF-specific functions to learn the segment address, which
        is typically different than the section address. */
-      int i;
+      int i, is_nice;
       size_t ubound = bfd_get_elf_phdr_upper_bound(abfd);
       Elf_Internal_Phdr *phdrs = bfd_alloc(abfd, ubound);
       if (phdrs == NULL) { bfd_perror(NULL); assert(0); }
@@ -204,9 +205,19 @@ bfd_vma asmir_get_base_address(asm_program_t *prog) {
       if (n == -1) { bfd_perror(NULL); assert(0); }
 
       for (i = 0; i < n; i++) {
-        //fprintf(stderr, "VA: %#" BFD_VMA_FMT "x Align: %#" BFD_VMA_FMT "x Aligned: %#" BFD_VMA_FMT "x\n", phdrs[i].p_vaddr, phdrs[i].p_align, phdrs[i].p_vaddr & (~(phdrs[i].p_align)));
+        /*
+        fprintf(stderr, "VA: %#" BFD_VMA_FMT "x Align: %#" BFD_VMA_FMT "x Aligned: %#" BFD_VMA_FMT "x p_flags: %#" BFD_VMA_FMT "x p_type: %#"BFD_VMA_FMT "x\n", 
+            phdrs[i].p_vaddr, 
+            phdrs[i].p_align, 
+            phdrs[i].p_vaddr & (~(phdrs[i].p_align)), 
+            phdrs[i].p_flags, 
+            phdrs[i].p_type);
+        */
         bfd_vma aligned = phdrs[i].p_vaddr & (~(phdrs[i].p_align));
-        if ((phdrs[i].p_flags & SHT_PROGBITS) && aligned < lowest) { lowest = aligned; }
+        /* STACK segment has vaddr=paddr=0. If we don't ignore it, imagebase=0*/
+        is_nice = (phdrs[i].p_flags & SHT_PROGBITS) && 
+                (phdrs[i].p_type != PT_GNU_STACK);
+        if (is_nice && aligned < lowest) { lowest = aligned; }
       }
     } else {
 

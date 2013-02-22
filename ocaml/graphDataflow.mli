@@ -71,7 +71,7 @@ module type DATAFLOW =
 module Make :
   functor (D : DATAFLOW) ->
 sig
-  (** [worklist_iterage g] returns a worklist algorithm for graph [g]
+  (** [worklist_iterate g] returns a worklist algorithm for graph [g]
       as a pair of functions [in,out]. [in], when given a node [v],
       computes the lattice value going in to that node, [v]. [out],
       when given a node [v], computes the lattice value exiting

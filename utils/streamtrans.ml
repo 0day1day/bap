@@ -1,7 +1,15 @@
 let usage = "Usage: "^Sys.argv.(0)^" <input options> [transformations and outputs]\n\
              Transform BAP IL programs. "
 
+(* XXX: How can we allow each element in the pipeline to maintain its
+   own stage between blocks?  The problem is each element might need a
+   different type.  If we could have polymorphic arrays/lists, that would
+   work.  *)
+
 open BatListFull
+open Utils_common
+
+module VH = Var.VarHash
 
 type ast = Ast.program
 (*type astcfg = Cfg.AST.G.t
@@ -12,16 +20,17 @@ type prog =
 
 type cmd = 
   | TransformAst of (ast -> ast)
+  | AnalysisAst of (ast -> unit)
 
-let concrete_state = Traces.TraceConcrete.create_state ();;
-let mem_hash = Memory2array.create_state ();;
-(* HACK to make sure default memory has a map to normalized memory *)
-ignore(Memory2array.coerce_rvar_state mem_hash Asmir.x86_mem);;
+let pipeline = ref [];;
 
-let pipeline = ref []
+let final = ref [];;
 
 let add c =
   pipeline := c :: !pipeline
+
+let addfinal c =
+  final := c :: !final
 
 let uadd c =
   Arg.Unit(fun()-> add c)
@@ -35,21 +44,38 @@ let prints f =
     pp#ast_program block;
     block)
 
-(** Concretely executes a block *)
-let concrete block = Utils_common.stream_concrete mem_hash concrete_state block
-
-
 let speclist =
   ("-print", Arg.String(fun f -> add(TransformAst(prints f))),
    "<file> Print each statement in the trace to file.")
-  ::("-concrete", uadd(TransformAst(concrete)),
-     "Concretely execute each block.")
+  ::("-trace-check",
+     Arg.Set Traces.consistency_check,
+     "Perform consistency checks"
+    )
+  ::("-trace-check-all",
+     Arg.Set Traces.checkall,
+     "Perform extra consistency checks possible when all instructions are logged"
+    )
+  ::("-trace-concrete",
+     Arg.Bool(fun b ->
+       add(TransformAst(Traces_stream.concrete b))
+     ),
+     "<pass> Concretely execute, and optionally pass on concretized IL.")
+  ::("-trace-formula",
+     Arg.String(fun f ->
+       let stream, final = Traces_stream.generate_formula f !Solver.solver in
+       add(AnalysisAst stream);
+       addfinal(final)
+     ),
+     "<file> Generate and output a trace formula to <file>.")
+  ::("-trace-solver", Arg.String Solver.set_solver,
+     ("Use the specified solver for traces. Choices: " ^ Solver.solvers))
   :: Input.stream_speclist
 
 let anon x = raise(Arg.Bad("Unexpected argument: '"^x^"'"))
 let () = Arg.parse speclist anon usage
 
 let pipeline = List.rev !pipeline
+let final = List.rev !final
 
 let prog =
   try Input.get_stream_program ()
@@ -62,14 +88,15 @@ let rec apply_cmd prog = function
     match prog with
     | Ast p -> Ast(f p)
   )
+  | AnalysisAst f -> (
+    match prog with
+    | Ast p as p' -> f p; p'
+  )
 ;;
-
-Traces.checkall := true;
-Traces.consistency_check := true;
 
 Stream.iter
   (fun block ->
     ignore(List.fold_left apply_cmd (Ast block) pipeline)
-  ) prog
+  ) prog;
 
-
+List.iter (fun f -> f ()) final;;
