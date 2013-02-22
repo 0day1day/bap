@@ -972,6 +972,18 @@ let rec to_ir addr next ss pref =
     and get_xmm2 = get_elem xmm2m128_e
     in
 
+    (* Build expressions that assigns the correct values to the
+       is_valid variables. *)
+    let build_valid_xmm_i is_valid_i is_valid_xmm_i_e get_xmm_i =
+      let f acc i =
+        (* Previous element is valid *)
+        let prev_valid = if i == 0 then exp_true else is_valid_xmm_i_e (i-1) in
+        (* Current element is valid *)
+        let curr_valid = get_xmm_i i <>* it 0 elemt in
+        Let(is_valid_i i, prev_valid &* curr_valid, acc)
+      in (fun e -> fold f e (nelem-1---0))
+    in
+
     (* Get var name indicating whether index in xmm num is a valid
        byte (before NULL byte). *)
     let is_valid =
@@ -990,28 +1002,8 @@ let rec to_ir addr next ss pref =
     and is_valid_xmm2_e index = Var(is_valid_xmm2 index)
     in
 
-    (* Build expressions that assigns the correct values to the
-       is_valid variables. *)
-    let build_valid_xmm1 =
-      let f acc i =
-        Let(is_valid_xmm1 i,
-            (* Previous element is valid *)
-            (if i == 0 then exp_true else (
-              is_valid_xmm1_e (i-1)
-              (* Current element is valid *)
-              &* (get_xmm1 i <>* it 0 elemt))), acc)
-      in (fun e -> fold f e (nelem-1---0))
-    in
-    let build_valid_xmm2 =
-      let f acc i =
-        Let(is_valid_xmm2 i,
-              (* Previous element is valid *)
-              (if i == 0 then exp_true else (
-                is_valid_xmm2_e (i-1)
-                (* Current element is valid *)
-                &* (get_xmm2 i <>* it 0 elemt))), acc)
-      in (fun e -> fold f e (nelem-1---0))
-    in
+    let build_valid_xmm1 = build_valid_xmm_i is_valid_xmm1 is_valid_xmm1_e get_xmm1 in
+    let build_valid_xmm2 = build_valid_xmm_i is_valid_xmm2 is_valid_xmm2_e get_xmm2 in
 
     let get_intres1_bit index = match imm8cb with
       | {Imm8Cb.agg=Imm8Cb.EqualAny} ->
