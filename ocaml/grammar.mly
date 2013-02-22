@@ -20,6 +20,25 @@ let mk_attr lab string =
   | "tid" -> ThreadId(int_of_string string)
   | _ -> err ("Unknown attribute @"^lab)
 
+let mk_context =
+  let memre = Str.regexp "^mem\\[\\([^][]+\\)\\]$" in
+  (fun name value taint typ usage ->
+    if Str.string_match memre name 0 then
+      (* Memory value *)
+      let index = Str.matched_group 1 name in
+      let index = Big_int_Z.big_int_of_string index in
+      let index = Big_int_Z.int64_of_big_int index in
+      {name=name; mem=true; t=typ; index=index; value=value; usage=usage; taint=taint}
+    else
+      {name=name; mem=false; t=typ; index=0L; value=value; usage=usage; taint=taint}
+  )
+
+let usage_of_string = function
+  | "rd" | "RD" -> RD
+  | "rw" | "RW" -> RW
+  | "wr" | "WR" -> WR
+  | s -> err ("Unknown operand usage "^s)
+
 let typ_of_string = 
   let tre = Str.regexp "^u\\([0-9]+\\)$" in
   function
@@ -48,7 +67,7 @@ let casttype_of_string = function
 
 %token LPAREN RPAREN LSQUARE RSQUARE
 %token COMMA SEMI EOF COLON
-%token CJMP JMP LABEL ADDR ASSERT HALT SPECIAL
+%token CJMP JMP LABEL ADDR ASSERT ASSUME HALT SPECIAL
 %token LET IN UNKNOWN WITH TRUE FALSE EBIG ELITTLE
 %token IF THEN ELSE
 %token PLUS MINUS  DIVIDE MOD SMOD TIMES 
@@ -88,7 +107,7 @@ let casttype_of_string = function
 program: 
       | stmtlist EOF { $1 }
 
-          stmtlist:
+stmtlist:
       | revstmtlist  { List.rev $1 }
 
         /* This is needed, because if we say stmtlist := stmt stmtlist, then the parser
@@ -99,30 +118,36 @@ program:
               This is confirmed at
               http://plus.kaist.ac.kr/~shoh/ocaml/ocamllex-ocamlyacc/ocamlyacc-tutorial/sec-recursive-rules.html
             */
-              revstmtlist:
+revstmtlist:
         | revstmtlist stmt  {  $2 :: $1 }
         | { [] }
 
-            stmt:
+stmt:
         | JMP expr attrs semi { Jmp($2, $3) }
         | CJMP expr COMMA expr COMMA expr attrs semi { CJmp($2, $4, $6, $7)  }
         | SPECIAL STRING attrs semi { Special($2, $3)}
         | lval ASSIGN expr attrs semi { Move($1, $3, $4) }
         | lval EQUAL expr attrs semi { Move($1, $3, $4) }
         | HALT expr attrs semi { Halt($2, $3) }
-        | ASSERT expr attrs semi { Assert($2, $3) } 
+        | ASSERT expr attrs semi { Assert($2, $3) }
+        | ASSUME expr attrs semi { Assume($2, $3) }
         | LABEL ID attrs { Label(Name $2, $3) }
         | ADDR INT attrs { Label(Addr (int64_of_big_int $2), $3) }
         | COMMENT attrs { Comment($1, $2) }
 
 
-            plusminusint:
+plusminusint:
         | INT { $1 }
         | MINUS INT { minus_big_int $2 }
 
-            context:
-        | STRING LSQUARE INT RSQUARE EQUAL INT COMMA plusminusint COMMA styp { {name=$1; mem=true; t=$10; index=int64_of_big_int $3; value=$6; usage=RD; (* XXX fix me *) taint=Taint(int_of_big_int $8)} } /* memory */
-| STRING EQUAL INT COMMA plusminusint COMMA typ { {name=$1; mem=false; t=$7; index=0L; value=$3; usage=RD; (* XXX fix me *) taint=Taint(int_of_big_int $5)} } /* non memory */
+taint:
+        | plusminusint { Taint(int_of_big_int $1) }
+
+usage:
+        | ID { usage_of_string $1 }
+
+context:
+        | STRING EQUAL INT COMMA taint COMMA typ COMMA usage { mk_context $1 $3 $5 $7 $9 }
 
 attrs:
 |    { [] }

@@ -100,11 +100,25 @@ let rec infer_ast =
     | Unknown(_,t) ->
       t
     | Cast(ct,t,e) ->
-        (* FIXME: check *)
+      let te = infer_ast ~check e in
+      if check then (
+        check_reg t;
+        check_reg te;
+        let bitse = bits_of_width te in
+        let bitst = bits_of_width t in
+        match ct with
+        | CAST_UNSIGNED
+        | CAST_SIGNED ->
+          if bitst < bitse then terror (Printf.sprintf "Cast type %s is a widening case, but it was used to narrow %s to %s" (Pp.ct_to_string ct) (Pp.typ_to_string te) (Pp.typ_to_string t))
+        | CAST_HIGH
+        | CAST_LOW ->
+          if bitst > bitse then terror (Printf.sprintf "Cast type %s is a narrowing case, but it was used to widen %s to %s" (Pp.ct_to_string ct) (Pp.typ_to_string te) (Pp.typ_to_string t))
+      );
       t
     | Let(v,e1,e2) ->
-        (* FIXME: check *)
-      infer_ast e2
+      (* XXX: Need a type context to check this correctly *)
+      ignore(infer_ast ~check e1);
+      infer_ast ~check e2
     | Load(arr,idx,endian, t) ->
       if check then check_idx arr idx endian t;
       t
@@ -140,9 +154,10 @@ and check_idx arr idx endian t =
   if not(is_integer_type ti) then terror "Index must be a register type";
   match ta with
   | Array(i,e) ->
-      check_subt ti i "Index type not suitable for indexing into this array. Was %s, needed %s.";
+      check_subt ti i "Index type not suitable for indexing into this array. Index has type %s, but array has type %s.";
       check_subt t e "Can't get a %s from array of %s";
-  | TMem _ -> ();
+  | TMem i -> check_subt ti i "Index type not suitable for indexing into this array. Index has type %s, but the array has type %s.";
+
   | _ -> terror "Indexing only allowed from array or mem."
 
 and check_cjmp_direct e =
@@ -207,7 +222,8 @@ let typecheck_stmt =
       let et = infer_te e in
       (* Can we return a memory? Does this make sense? *)
       check_reg et
-    | Assert(e, _) ->
+    | Assert(e, _)
+    | Assume(e, _) ->
       let et = infer_te e in
       check_bool et
     | Label _

@@ -164,25 +164,29 @@ sig
   val eval_symb_let : bool
 end
 
-module type Formula =
+(* Newer, flexible formula type.  The input and output types are
+   flexible.  For instance, the output will be type unit for streaming
+   formulas. *)
+module type FlexibleFormula =
 sig
   type t
-  val true_formula : t
+  type init
+  type output
+  val init : init -> t 
   val add_to_formula : t -> Ast.exp -> form_type -> t
-    (* FIXME *)
-  val output_formula : t -> Ast.exp
+  val output_formula : t -> output
 end
 
 (** Module that handles how Assignments are handled. *)
 module type Assign =
   functor (MemL:MemLookup) ->
-    functor (Form:Formula) ->
+    functor (Form:FlexibleFormula) ->
 sig
   (** Assign a variable. Does not modify the entire context in place. *)
   val assign : Var.t -> varval -> (MemL.t,Form.t) ctx -> (MemL.t,Form.t) ctx
 end
 
-module Make(MemL: MemLookup)(Tune: EvalTune)(Assign: Assign)(Form: Formula) =
+module Make(MemL:MemLookup)(Tune:EvalTune)(Assign:Assign)(Form:FlexibleFormula) =
 struct
 
   module MemL=MemL
@@ -199,17 +203,20 @@ struct
 
   type myctx = (MemL.t,Form.t) ctx
 
-  (* Exceptions *)
-  exception ExcState of string * addr
-
   (* Program halted, with optional halt value, and with given execution context. *)
   exception Halted of varval option * myctx
 
   (* An unknown label was found *)
   exception UnknownLabel of label_kind
 
+  (* An error occured *)
+  exception Error of string * myctx
+
   (* An assertion failed *)
   exception AssertFailed of myctx
+
+  (* An assumption failed, so the program did not start *)
+  exception AssumptionFailed of myctx
 
   let byte_type = reg_8
   let index_type = reg_32
@@ -245,12 +252,12 @@ struct
   let output_formula    = Form.output_formula
 
   (* Initializers *)
-  let create_state () =
+  let create_state form_init =
     let sigma : (addr, instr) Hashtbl.t = Hashtbl.create 5700
     and pc = Int64.zero
     and delta : MemL.t = MemL.create ()
     and lambda : (label_kind, addr) Hashtbl.t = Hashtbl.create 5700 in
-      {pred=Form.true_formula; delta=delta; sigma=sigma; lambda=lambda; pc=pc}
+    {pred=(Form.init form_init); delta=delta; sigma=sigma; lambda=lambda; pc=pc}
 
   let initialize_prog state prog_stmts =
     Hashtbl.clear state.sigma ;
@@ -272,8 +279,8 @@ struct
   let cleanup_delta state =
     state.delta <- MemL.clear state.delta
 
-  let build_default_context prog_stmts =
-    let state = create_state() in
+  let build_default_context prog_stmts form_init =
+    let state = create_state form_init in
       initialize_prog state prog_stmts ;
       state
 
@@ -435,7 +442,8 @@ struct
 		 (* Splitting introduces blowup.  Can we avoid it? *)
 		 eval_expr delta (Memory2array.split_loads mem ind t endian)
 	     | Array _ ->
-		 failwith ("loading array currently unsupported" ^ (Pp.typ_to_string t))
+		 failwith ("loading array currently unsupported" 
+                           ^ (Pp.typ_to_string t))
 	     | _ -> failwith "not a loadable type"
 	  )
       | Store (mem,ind,value,endian,t) ->
@@ -469,7 +477,8 @@ struct
     let get_label e =
       let v = eval_expr delta e in
 	match lab_of_exp (symb_to_exp v) with
-	  | None -> failwith ("not a valid label "^(Pp.ast_exp_to_string (symb_to_exp v)))
+	  | None -> failwith ("not a valid label "
+                              ^(Pp.ast_exp_to_string (symb_to_exp v)))
 	  | Some lab -> label_decode lambda lab
     in
     let next_pc = Int64.succ pc in
@@ -497,7 +506,8 @@ struct
 		 [{ctx with pc=get_label e1}]
              | v when is_false_val v ->
 		 [{ctx with pc=get_label e2}]
-             | v -> failwith ("not a boolean condition: " ^ (Pp.ast_exp_to_string (symb_to_exp v)))
+             | v -> failwith ("not a boolean condition: " 
+                              ^ (Pp.ast_exp_to_string (symb_to_exp v)))
           )
       | Assert (e,_) ->
           (match eval_expr delta e with
@@ -507,11 +517,16 @@ struct
 	       (*pdebug("Adding assertion: " ^ (Pp.ast_exp_to_string pred')) ;*)
 	       [{ctx with pred=pred'; pc=next_pc}]
              | v when is_false_val v ->
-               let pred = Form.true_formula in
                let pred = add_constraint pred exp_false Equal in
 	       raise (AssertFailed({ctx with pred = pred}))
              | _ -> [{ctx with pc=next_pc}]
           )
+      | Assume (e,_) ->
+        (match eval_expr delta e with
+        | v when is_true_val v -> [{ctx with pc=next_pc}]
+        | v when is_false_val v ->
+          raise (AssumptionFailed(ctx))
+        | _ -> failwith "Symbolic assumptions are not supported by the symbolic evaluator")
       | Comment _ | Label _ ->
           [{ctx with pc=next_pc}]
       | Special _ as s -> 
@@ -525,14 +540,15 @@ struct
     try
       let stmt = inst_fetch state.sigma state.pc in
       dprintf "Executing %s" (Pp.ast_stmt_to_string stmt);
-      if debug () then print_values state.delta;
+      if debug () then (print_values state.delta;
+                        print_mem state.delta);
       eval_stmt state stmt
     with Failure str ->
       (prerr_endline ("Evaluation aborted at stmt No-"
                       ^(Int64.to_string state.pc)
                       ^"\nreason: "^str);
        if debug () then (print_values state.delta;
-                      print_mem state.delta);
+                         print_mem state.delta);
        (* print_endline ("Path predicate: "^(Pp.ast_exp_to_string (output_formula state.pred))); *)
        [])
       | Not_found ->
@@ -540,7 +556,7 @@ struct
                         ^(Int64.to_string state.pc)
                         ^"\nreason: "^(Printf.sprintf "PC not found: %#Lx" state.pc));
          if debug () then (print_values state.delta;
-                        print_mem state.delta);
+                           print_mem state.delta);
          (* print_endline ("Path predicate: "^(Pp.ast_exp_to_string (output_formula state.pred))); *)
          [])
 
@@ -807,7 +823,7 @@ module ConcreteUnknownZeroMemL = BuildConcreteUnknownZeroMemL(MemVHBackEnd)
 (** Symbolic assigns are represented as Lets in the formula, except
     for temporaries.  If you use this, you should clear out temporaries
     after executing each instruction. *)
-module PredAssign(MemL: MemLookup)(Form: Formula) =
+module PredAssign(MemL: MemLookup)(Form: FlexibleFormula) =
 struct
   let assign v ev ({delta=delta; pred=pred; pc=pc} as ctx) =
     let expr = symb_to_exp ev in
@@ -820,38 +836,39 @@ struct
       else
         let constr = BinOp (EQ, Var v, expr) in
         pdebug ((Var.name v) ^ " = " ^ (Pp.ast_exp_to_string expr)) ;
-        let delta' = MemL.remove_var delta v in (* shouldn't matter because of dsa, but remove any old version anyway *)
+        (* shouldn't matter because of dsa, but remove any old version anyway *)
+        let delta' = MemL.remove_var delta v in 
         (delta', Form.add_to_formula pred constr Rename)
     in
     {ctx with delta=delta'; pred=pred'; pc=Int64.succ pc}
 end
 
 (** Symbolic assigns are represented in delta *)
-module StdAssign(MemL:MemLookup)(Form:Formula) =
+module StdAssign(MemL:MemLookup)(Form:FlexibleFormula) =
 struct
   open MemL
   let assign v ev ({delta=delta; pc=pc} as ctx) =
     {ctx with delta=update_var delta v ev; pc=Int64.succ pc}
 end
 
-module FastEval =
+module DontEvalSymbLet =
 struct
   let eval_symb_let = false
 end
 
-module AlwaysEvalLet =
+module EvalSymbLet =
 struct
   let eval_symb_let = true
 end
-(** Deprecated name *)
-module SlowEval = AlwaysEvalLet
 
 (** Just build a straightforward expression; does not use Lets *)
 module StdForm =
 struct
   type t = Ast.exp
+  type init = unit
+  type output = Ast.exp
 
-  let true_formula = exp_true
+  let init () = exp_true
 
   let add_to_formula formula expression _type =
     BinOp(AND, expression, formula)
@@ -863,8 +880,10 @@ end
 module LetBind =
 struct
   type t = (Ast.exp -> Ast.exp)
+  type init = unit
+  type output = Ast.exp
 
-  let true_formula = (fun e -> e)
+  let init () = (fun e -> e)
 
   let add_to_formula fbuild expression typ =
     (match expression, typ with
@@ -883,8 +902,10 @@ module LetBindOld =
 struct
   type f = And of Ast.exp | Let of (Var.t * Ast.exp)
   type t = f list
+  type init = unit
+  type output = Ast.exp
 
-  let true_formula = []
+  let init () = []
 
   let add_to_formula bindings expression typ =
     (match expression, typ with
@@ -908,21 +929,121 @@ struct
       create_formula exp_true bindings
 end
 
+module FlexibleFormulaConverterToStream(Form:FlexibleFormula with type init=unit with type output = Ast.exp) = 
+struct
+  type fp = Formulap.fpp_oc
+  type t = {printer : Formulap.fpp_oc; form_t : Form.t}
+  type init = Formulap.fpp_oc
+  type output = unit
 
-module Symbolic = Make(SymbolicMemL)(FastEval)(StdAssign)(StdForm)
-module SymbolicSlowMap = Make(BuildSymbolicMemL(MemVMBackEnd))(SlowEval)(StdAssign)(StdForm)
-module SymbolicSlow = Make(SymbolicMemL)(SlowEval)(StdAssign)(StdForm)
+  let init printer = {printer=printer; form_t=Form.init ()}
 
-(** Concrete evaluator based on Hashtables *)
-module Concrete = Make(ConcreteUnknownZeroMemL)(AlwaysEvalLet)(StdAssign)(StdForm)
+  let add_to_formula ({printer=printer; form_t=form_t} as record) exp typ = 
+    {record with form_t = Form.add_to_formula form_t exp typ}
 
-(** Concrete evaluator based on Maps *)
-module ConcreteMap = Make(BuildConcreteMemL(MemVMBackEnd))(AlwaysEvalLet)(StdAssign)(StdForm)
+  let output_formula {printer=printer; form_t=form_t} =
+    let formula = Form.output_formula form_t in
+    let mem_hash = Memory2array.create_state () in
+    let formula = Memory2array.coerce_exp_state mem_hash formula in
+    let foralls = [] in
+    let () = printer#assert_ast_exp ~foralls formula in
+    let () = printer#counterexample in
+    printer#close
+end
+
+module StdFormFakeStream = FlexibleFormulaConverterToStream(StdForm)
+module LetBindFakeStream = FlexibleFormulaConverterToStream(LetBind)
+module LetBindOldFakeStream = FlexibleFormulaConverterToStream(LetBindOld)
+
+(** Print let formulas in a streaming fashion.  For example, given a trace:
+    1. x = 5
+    2. assert (x = 5)
+    3. y = 10
+
+    The formula (for smtlib) would look like:
+    (and
+    (let x = 5 in
+    (x = 5)
+    (let y = 10 in
+    (true))))
+*)
+module LetBindStreamSat =
+struct
+  type t = {formula_printer : Formulap.stream_fpp_oc;
+            formula_filename : string;
+            free_var_printer : Formulap.stream_fpp_oc;
+            free_var_filename : string;
+            close_funs : (unit -> unit) Stack.t;
+            mutable free_vars : Var.VarSet.t;
+            mutable defined_vars : Var.VarSet.t}
+  type init = string * Formulap.stream_fppf
+  type output = unit
+
+  let init (filename,(make_printer:Formulap.stream_fppf)) =
+    (* Create and start a stack of functions to close parens of operations *)
+    let close_funs = Stack.create () in
+    let free_var_printer = make_printer (open_out filename) in
+    let tempfilename, tempoc = Filename.open_temp_file "letbindstream" "tmp" in
+    let formula_printer = make_printer tempoc in
+    free_var_printer#open_stream_benchmark;
+    Stack.push (fun () -> formula_printer#close_benchmark) close_funs;
+    Stack.push (fun () -> formula_printer#counterexample) close_funs;
+    formula_printer#assert_ast_exp_begin ();
+    Stack.push (fun () -> formula_printer#assert_ast_exp_end) close_funs;
+    formula_printer#and_start;
+    {formula_printer=formula_printer; free_var_printer=free_var_printer;
+     formula_filename=tempfilename; free_var_filename=filename;
+     close_funs=close_funs;
+     free_vars=Var.VarSet.empty; defined_vars=Var.VarSet.empty}
+
+  let add_to_formula ({formula_printer=formula_printer;
+                       free_var_printer=free_var_printer;
+                       close_funs=close_funs} as record) expression typ =
+    (match expression, typ with
+      | _, Equal ->
+        formula_printer#and_constraint expression;
+        Stack.push (fun () -> formula_printer#and_close_constraint) close_funs;
+        record
+      | BinOp(EQ, Var v, value), Rename ->
+        let fp_list = Formulap.freevars value in
+        let fp =
+          List.fold_left (fun s e -> Var.VarSet.add e s) Var.VarSet.empty fp_list
+        in
+        record.defined_vars <- Var.VarSet.add v record.defined_vars;
+        let fp = Var.VarSet.diff fp record.defined_vars in
+        Var.VarSet.iter formula_printer#predeclare_free_var fp;
+        Var.VarSet.iter free_var_printer#predeclare_free_var fp;
+        record.free_vars <- Var.VarSet.union record.free_vars fp;
+	formula_printer#let_begin v value;
+        Stack.push (fun () -> formula_printer#let_end v) close_funs;
+        {record with close_funs=close_funs}
+      | _ -> failwith "internal error: adding malformed constraint to formula"
+    )
+
+  let output_formula {formula_printer; free_var_printer;
+                      formula_filename; free_var_filename;
+                      close_funs; free_vars} =
+    formula_printer#and_end;
+    Stack.iter (fun f -> f()) close_funs;
+    (* Free vars go at the begining of the file but we don't know all of them
+       until the end of the trace.  So we print them out to a seperate file
+       and combine these at the end. *)
+    Var.VarSet.iter free_var_printer#print_free_var free_vars;
+    formula_printer#flush; formula_printer#close;
+    free_var_printer#flush; free_var_printer#close;
+    Hacks.append_file formula_filename free_var_filename
+end
+
+
+module Symbolic = Make(SymbolicMemL)(DontEvalSymbLet)(StdAssign)(StdForm)
+module SymbolicSlowMap = Make(BuildSymbolicMemL(MemVMBackEnd))(EvalSymbLet)(StdAssign)(StdForm)
+module SymbolicSlow = Make(SymbolicMemL)(EvalSymbLet)(StdAssign)(StdForm)
+
+module Concrete = Make(ConcreteUnknownZeroMemL)(EvalSymbLet)(StdAssign)(StdForm)
 
 (** Execute a program concretely *)
 let concretely_execute ?s ?(i=[]) p =
   let rec step ctx =
-    dprintf "Step time";
     let s = try Concrete.inst_fetch ctx.sigma ctx.pc
       with Not_found ->
         failwith (Printf.sprintf "Fetching instruction %#Lx failed; you probably need to add a halt to the end of your program" ctx.pc)
@@ -936,7 +1057,7 @@ let concretely_execute ?s ?(i=[]) p =
     | false, [next] -> step next
     | _, _ -> failwith "step"
   in
-  let ctx = Concrete.build_default_context p in
+  let ctx = Concrete.build_default_context p () in
   (* Evaluate initialization statements *)
   let ctx = List.fold_left (fun ctx s ->
 			      dprintf "Init %s" (Pp.ast_stmt_to_string s);

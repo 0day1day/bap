@@ -9,6 +9,34 @@ typedef  unsigned long long int address_t;
 // Include bfd_architecture extracted from the local system's bfd.h
 #include "bfdarch.idl"
 
+enum bfd_flavour
+{
+  bfd_target_unknown_flavour,
+  bfd_target_aout_flavour,
+  bfd_target_coff_flavour,
+  bfd_target_ecoff_flavour,
+  bfd_target_xcoff_flavour,
+  bfd_target_elf_flavour,
+  bfd_target_ieee_flavour,
+  bfd_target_nlm_flavour,
+  bfd_target_oasys_flavour,
+  bfd_target_tekhex_flavour,
+  bfd_target_srec_flavour,
+  bfd_target_verilog_flavour,
+  bfd_target_ihex_flavour,
+  bfd_target_som_flavour,
+  bfd_target_os9k_flavour,
+  bfd_target_versados_flavour,
+  bfd_target_msdos_flavour,
+  bfd_target_ovax_flavour,
+  bfd_target_evax_flavour,
+  bfd_target_mmo_flavour,
+  bfd_target_mach_o_flavour,
+  bfd_target_pef_flavour,
+  bfd_target_pef_xlib_flavour,
+  bfd_target_sym_flavour
+};
+
 struct bfd;
 
 typedef [abstract] struct bfd* bfdp;
@@ -56,6 +84,8 @@ typedef unsigned long long bfd_size_type;
 bfd_boolean bfd_get_section_contents
 (bfdp abfd, section_ptr section, [out, length_is(count), bigarray] char location[], file_ptr offset,
  bfd_size_type count);
+
+enum bfd_flavour bfd_flavour(bfdp abfd);
 
 address_t bfd_section_get_vma(section_ptr s);
 bfd_size_type bfd_section_get_size(section_ptr s);

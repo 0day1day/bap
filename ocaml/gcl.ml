@@ -4,7 +4,7 @@ open BatListFull
 open Type
 open Util
 open Ast
-
+open Ast_convenience
 
 module D = Debug.Make(struct let name = "GCL" and default=`Debug end)
 open D
@@ -28,6 +28,23 @@ type t =
   | Choice of t * t
   | Seq of t * t
   | Skip 
+
+let rec to_string = function
+  | Assume e -> "Assume("^Pp.ast_exp_to_string e^")"
+  | Assign(v, e) -> "Assign("^Pp.var_to_string v^", "^Pp.ast_exp_to_string e^")"
+  | Assert e -> "Assert("^Pp.ast_exp_to_string e^")"
+  | Choice(g1, g2) -> "CChoice("^to_string g1^", "^to_string g2^")"
+  | Seq(g1, g2) -> "Seq("^to_string g1^", "^to_string g2^")"
+  | Skip -> "Skip"
+
+let rec size = function
+  | Assume _ | Assign _ | Assert _ | Skip -> 1
+  | Seq(g1, g2) | Choice(g1, g2) -> size g1 + size g2 + 1
+
+let concat s1 s2 = match s1, s2 with
+  | Skip, x -> x
+  | x, Skip -> x
+  | s1, s2 -> Seq(s1, s2)
 
 (* let rec gcl_equal s1 s2 = *)
 (*   let num = function *)
@@ -66,8 +83,14 @@ type t =
     A straightline trace cannot have any CJmps, and any Jmps it might have must
     jump to the label following them. (Ie, any jump must be a no-op)
 *)
-let rec of_rev_straightline ?(acc=Skip) trace =
+let rec of_rev_straightline ?mode ?(acc=Skip) trace =
   let prepend g = function
+    | Move(l,e,_) when mode <> None ->
+      (match mode with
+      | None -> failwith "of_rev_straightline: impossible"
+      | Some Sat -> Seq(Assert(exp_eq (Var l) e), g)
+      | Some Validity -> Seq(Assume(exp_eq (Var l) e), g)
+      | Some Foralls -> failwith "of_rev_straightline: Foralls unimplemented")
     | Move(l,e,_) -> Seq(Assign(l,e), g)
     | CJmp _
     | Jmp _ ->
@@ -79,7 +102,8 @@ let rec of_rev_straightline ?(acc=Skip) trace =
       invalid_arg "Found halt in straightline code"
     | Special _ ->
 	invalid_arg "Found special in straightline code"
-    | Ast.Assert(e, _) -> Seq(Assert(e), g)
+    | Ast.Assert(e, _) -> Seq(Assert e, g)
+    | Ast.Assume(e, _) -> Seq(Assume e, g)
   in
   (* fold_left of reversed list, rather than fold_right, because
    * fold_right is not tail recursive *)
@@ -89,7 +113,7 @@ let rec of_rev_straightline ?(acc=Skip) trace =
     Debug_snippets.print_ast trace;
     raise e
 
-let of_straightline trace = of_rev_straightline(List.rev trace)
+let of_straightline ?mode trace = of_rev_straightline ?mode (List.rev trace)
 
 
 
@@ -352,7 +376,7 @@ let rec remove_skips = function
 
 module C = Cfg.SSA
 
-let passified_of_ssa ?entry ?exit mode cfg =
+let passified_of_ssa ?entry ?exit ?mode cfg =
   let ast = Cfg_ssa.to_astcfg ~dsa:true cfg in
   let convert = function
     | Some v -> Some(CA.find_vertex ast (C.G.V.label v))
@@ -361,14 +385,16 @@ let passified_of_ssa ?entry ?exit mode cfg =
   let entry = convert entry and exit = convert exit in
   let gcl = of_astcfg ?entry ?exit ast in
   let vars = ref [] in
-  let rec convert_gcl g = 
+  let rec convert_gcl g =
     match g with
-    | Assign(v,e) ->
+    | Assign(v,e) when mode <> None ->
       (match mode with
-      | Foralls -> vars := v :: !vars;
+      | Some Foralls -> vars := v :: !vars;
         Assume(exp_eq (Var v) e)
-      | Validity -> Assume(exp_eq (Var v) e)
-      | Sat -> Assert(exp_eq (Var v) e))
+      | Some Validity -> Assume(exp_eq (Var v) e)
+      | Some Sat -> Assert(exp_eq (Var v) e)
+      | None -> failwith "passified_of_ssa: impossible")
+    | Assign(v,e) -> g
     | Choice(a,b) ->
       Choice(convert_gcl a, convert_gcl b)
     | Seq(a,b) ->
@@ -380,12 +406,89 @@ let passified_of_ssa ?entry ?exit mode cfg =
   (pgcl, list_unique !vars)
 
 
-let passified_of_astcfg ?entry ?exit mode cfg =
+let passified_of_astcfg ?entry ?exit ?mode cfg =
   let {Cfg_ssa.cfg=ssa; to_ssavar=tossa} = Cfg_ssa.trans_cfg cfg in
   let convert = function
     | Some v -> Some(C.find_vertex ssa (CA.G.V.label v))
     | None -> None
   in
   let entry = convert entry and exit = convert exit in
-  let (g,v) = passified_of_ssa ?entry ?exit mode ssa in
+  let (g,v) = passified_of_ssa ?entry ?exit ?mode ssa in
   (g,v,tossa)
+
+module Ugcl = struct
+
+  type stmt = t
+  type t = (CA.G.t * (CA.G.V.label -> stmt))
+
+let of_ssacfg ?entry ?exit ?mode cfg =
+  Checks.acyclic_ssacfg cfg "UGCL";
+  let module BH = Cfg.BH in
+  (* We use DSA here because we want edge splitting to happen.  We
+     don't necessarily need full DSA. *)
+  let cfg = Cfg_ssa.to_astcfg ~dsa:true cfg in
+  (* Map BBs to their ugcl *)
+  let ugclh = BH.create (CA.G.nb_vertex cfg) in
+  (* How do we convert from CFG AST to Unstructured GCL?
+
+     Ast.Move -> Ugcl.Assign
+     Ast.Label -> Skip
+     Ast.Assert -> Ugcl.Assert
+     Ast.Comment -> Skip
+     Ast.Special -> error
+     Ast.Halt -> error
+
+     Control:
+     Ast.Jmp -> Skip, since Jmps are redundant in CFG form
+     Ast.CJmp e t1 t2 -> We convert the CJmp to a Skip, but push
+       Assume e to the beginning of t1, and Assume (not e) to t2.
+       FIXME: Why does edge splitting ensure that there is a unique
+       predecessor?
+  *)
+  let save_gcl bb gcl =
+    assert (not (BH.mem ugclh bb));
+    BH.add ugclh bb gcl
+  in
+  let prepend s bb =
+    BH.replace ugclh bb (concat s (BH.find ugclh bb))
+  in
+  let prepend_assume e bb =
+    let t,f = match CA.G.succ_e cfg bb with
+    | [f;t] when Cfg.edge_direction (CA.G.E.label t) = Some true &&
+              Cfg.edge_direction (CA.G.E.label f) = Some false ->
+      t, f
+    | [t;f] when Cfg.edge_direction (CA.G.E.label t) = Some true &&
+              Cfg.edge_direction (CA.G.E.label f) = Some false ->
+      t, f
+    | _ -> failwith "Unable to find successors of cjmp"
+    in
+    (* Make sure bb is only predecessor of its successors *)
+    let e2bbid e = CA.G.V.label (CA.G.E.dst e) in
+    assert (match CA.G.pred cfg (CA.G.E.dst t), CA.G.pred cfg (CA.G.E.dst f) with
+    | [x], [y] -> true
+    | _ -> false);
+    prepend (Assume e) (e2bbid t);
+    prepend (Assume (unop NOT e)) (e2bbid f)
+  in
+  let compute_at b =
+    let bb_s = CA.get_stmts cfg b in
+    (* Debug_snippets.print_ast bb_s; *)
+    let ugcl = match List.rev bb_s with
+      | [] -> Skip
+      | (Ast.Jmp _ | Ast.Halt _)::rest -> of_straightline ?mode (List.rev rest)
+      | Ast.CJmp(e, _, _, _)::rest ->
+        (* Prepend Assume e and Assume not e to successors *)
+        prepend_assume e b;
+        of_straightline ?mode (List.rev rest)
+      | _ -> of_straightline ?mode bb_s
+    in
+    save_gcl (CA.G.V.label b) ugcl
+  in
+  RToposort.iter compute_at cfg;
+  (* RToposort.iter *)
+  (*   (fun bb -> *)
+  (*     dprintf "BB: %s GCL: %s" (Cfg_ast.v2s bb) (string_of_stmt (BH.find ugclh (CA.G.V.label bb))) *)
+  (*   ) cfg; *)
+  cfg, BH.find ugclh
+
+end

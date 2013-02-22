@@ -779,16 +779,19 @@ FrameOption_t TaintTracker::taintPostSC(const uint32_t bytes,
         if (bytes == STATUS_SUCCESS) {
           WINDOWS::PIO_STATUS_BLOCK psb = reinterpret_cast<WINDOWS::PIO_STATUS_BLOCK> (args[4]);
           assert(psb);
-          assert(psb->Information);
-          length = psb->Information;
-          addr = args[5];
-          assert(addr);
-          cerr << "Tainting " 
-               << length 
-               << " bytes from read @" << addr << endl;
-          return introMemTaintFromFd(args[0], addr, length);
-          //return true;
+
+          /* Information can be NULL when the request fails */
+          if (psb->Information) {
+            length = psb->Information;
+            addr = args[5];
+            assert(addr);
+            cerr << "Tainting " 
+                 << length 
+                 << " bytes from read @" << addr << endl;
+            return introMemTaintFromFd(args[0], addr, length);
+          }
         }
+        break;
   case __NR_setinfofilewin:
     if (bytes == STATUS_SUCCESS) {
       uint32_t c = args[4];

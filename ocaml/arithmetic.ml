@@ -155,9 +155,9 @@ let concat ((_,lt) as lv) ((_,rt) as rv) =
     | _ -> failwith "concat"
   in
   let nt = Reg(bitsl + bitsr) in
-  let lv = cast CAST_LOW lv nt in
-  let rv = cast CAST_LOW rv nt in
-  let lv = binop LSHIFT lv (biconst bitsr, lt) in
+  let lv = cast CAST_UNSIGNED lv nt in
+  let rv = cast CAST_UNSIGNED rv nt in
+  let lv = binop LSHIFT lv (biconst bitsr, nt) in
   binop OR lv rv
 
 

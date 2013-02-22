@@ -13,6 +13,7 @@ module D = Debug.Make(struct let name="memory2array" and default=`Debug end)
 open D
 
 open Ast
+open Ast_convenience
 open BatListFull
 open Big_int_Z
 open Grammar_scope
@@ -20,7 +21,7 @@ open Type
 open Util
 open Var
 
-(** How big is normalized index? *)
+(** How big are normalized elements? *)
 let bitwidth = 8
 let normtype = Reg(bitwidth)
 
@@ -40,7 +41,7 @@ let split_load array index indextype accesstype endian bytenum =
 let split_load_list array index indextype accesstype endian =
   assert (endian === exp_false);
   let elesize = getwidth accesstype in
-  let mvar = newvar "loadnorm" (Array(indextype, normtype)) in
+  let mvar = Var_temp.nt "loadnorm" (Array(indextype, normtype)) in
   (Util.mapn (split_load (Var mvar) index indextype accesstype endian) (elesize - 1), mvar)
 
 let split_loads array index accesstype endian =
@@ -60,8 +61,8 @@ let split_write_list array index accesstype endian data =
   assert (endian === exp_false);
   let inftype = Typecheck.infer_ast array in
   let indextype = Typecheck.infer_ast ~check:false index in
-  let tempmemvar = newvar "tempmem" inftype in
-  let tempvalvar = newvar "tempval" accesstype in
+  let tempmemvar = Var_temp.nt "tempmem" inftype in
+  let tempvalvar = Var_temp.nt "tempval" accesstype in
   let elesize = getwidth accesstype in
   let singlewrites = Util.mapn (split_write (Var tempmemvar) index indextype accesstype endian (Var tempvalvar)) (elesize - 2) in
   (singlewrites @ [(split_write array index indextype accesstype endian (Var tempvalvar) (elesize - 1))], tempmemvar, tempvalvar)

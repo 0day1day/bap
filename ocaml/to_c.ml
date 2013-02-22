@@ -101,6 +101,8 @@ object(self)
 	 pp "assert(";
 	 self#ast_exp e;
 	 pp ");"
+     | Assume(e,_) ->
+         failwith "Assume statements can not be translated to C"
      | Halt(e,_) ->
 	 pp "exit(";
 	 self#ast_exp e;

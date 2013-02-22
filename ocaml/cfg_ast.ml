@@ -64,7 +64,10 @@ let add_new_bb indirectt c revstmts addpred =
               just silently use the old block.  If not, raise an
               exception because we are defining a label twice. *)
          if full_stmts_eq stmts ostmts then
-           Some(v) else failwith (Printf.sprintf "Duplicate label usage: label %s" (Pp.label_to_string l))
+           Some(v) 
+         else 
+           failwith (Printf.sprintf "Duplicate label usage: label %s" 
+                       (Pp.label_to_string l))
        with Not_found -> None) (* The label does not exist *)
     | _ -> None
   in
@@ -137,7 +140,7 @@ let f ~special_error (indirectt, nodes, edges, c, cur,onlylabs, addpred) s =
     (indirectt, v::nodes, edges, c, [s], true, Some v)
   | Assert(e,_) when e === exp_false ->
     g ()
-  | Move _ | Assert _ ->
+  | Move _ | Assert _ | Assume _ ->
     (indirectt, nodes, edges, c, s::cur, false, addpred)
   | Comment _ ->
     (indirectt, nodes, edges, c, s::cur, onlylabs, addpred)

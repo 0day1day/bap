@@ -293,6 +293,11 @@ let get_hash_keys ?(sort_keys=false) htbl =
   if (sort_keys) then List.sort (Pervasives.compare) l
   else l
 
+let get_hash_values ?(sort_values=false) htbl =
+  let l = Hashtbl.fold (fun key data prev -> data::prev) htbl [] in
+  if (sort_values) then List.sort (Pervasives.compare) l
+  else l
+
 module HashUtil (H:Hashtbl.S) =
 struct
 
@@ -311,6 +316,15 @@ struct
     H.remove table x;
     H.add table x y
 
+  let get_hash_keys ?(sort_keys=false) htbl =
+    let l = H.fold (fun key data prev -> key::prev) htbl [] in
+    if (sort_keys) then List.sort (Pervasives.compare) l
+    else l
+
+  let get_hash_values ?(sort_values=false) htbl =
+    let l = H.fold (fun key data prev -> data::prev) htbl [] in
+    if (sort_values) then List.sort (Pervasives.compare) l
+    else l
 end
 
 (* GRR, Hashtbl doesn't ascribe to the Hashtbl.S signature *)

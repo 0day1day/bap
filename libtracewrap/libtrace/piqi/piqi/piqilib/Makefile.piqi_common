@@ -1,3 +1,4 @@
+# This Makefile is used by piqilib, piqic and piqicc
 
 all:
 
@@ -8,6 +9,8 @@ all:
 
 PIQI_SOURCES_HEAD = \
 	piqloc.ml \
+	piqi_util.ml \
+	piq_ast.ml \
 
 
 PIQI_SOURCES_TAIL = \
@@ -17,24 +20,31 @@ PIQI_SOURCES_TAIL = \
 	piqi_config.ml \
 	piqi_iolist.ml \
 	piqi_graph.ml \
+	piqi_name.ml \
 	piqi_common.ml \
 	piqi_file.ml \
 	piqi_main.ml \
-	piqi_name.ml \
-	piqi_wire.ml \
+	piqi_protobuf.ml \
 	piqi_db.ml \
 	\
 	piq_lexer.ml \
 	piq_parser.ml \
 	piq_gen.ml \
 	\
+	piqi_json_type.mli \
+	piqi_xml_type.mli \
+	\
+	piqi_objstore.ml \
+	piqobj.ml \
 	piqobj_common.ml \
-	piqobj_of_piq.ml \
+	piqobj_to_protobuf.ml \
+	piqobj_of_protobuf.ml \
 	piqobj_to_piq.ml \
-	piqobj_to_wire.ml \
-	piqobj_of_wire.ml \
+	piqobj_of_piq.ml \
 	\
 	piqi.ml \
+	\
+	piqi_pp.ml \
 
 
 PIQI_SOURCES = $(PIQI_SOURCES_HEAD) $(PIQI_SOURCES_TAIL)
@@ -43,12 +53,11 @@ PIQI_SOURCES = $(PIQI_SOURCES_HEAD) $(PIQI_SOURCES_TAIL)
 SOURCES = \
 	piqi_version.ml \
 	$(PIQI_SOURCES_HEAD) \
-	piqi_piqi.ml \
-	piqobj.ml \
+	piqi_lang_piqi.ml \
 	$(PIQI_SOURCES_TAIL)
 
 
-PRE_TARGETS = piqi_version.ml piqi_piqi.ml piqobj.ml
+PRE_TARGETS = piqi_version.ml piqi_lang_piqi.ml
 
 
 PACKS = ulex easy-format piqirun
@@ -62,9 +71,6 @@ PACKS = ulex easy-format piqirun
 # INCDIRS += +camlp4
 # USE_CAMLP4 = yes
 
-
-piqobj.ml: $(PIQI_ROOT)/piqilib/piqobj.ml.m4
-	m4 $< >$@
 
 piqi_version.ml: $(PIQI_ROOT)/VERSION
 	echo "let version = \"`head -1 $<`\"" >$@

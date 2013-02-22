@@ -128,9 +128,9 @@ sig
   val compute_pdg : Cfg.AST.G.t -> Cfg.AST.G.t
 end
 
-(** {3 Use/Def Analyses} *)
+(** {3 Use/Def and Def/Use Analyses} *)
 
-(** Use/Def chains on AST CFGs *)
+(** Use/Def and Def/Use chains on AST CFGs *)
 module UseDef_AST :
 sig
   (** A statement location is identified by a basic block and the
@@ -155,6 +155,15 @@ sig
     Cfg.AST.G.t ->
     (location, LS.t Var.VarMap.t) Hashtbl.t *
       (location -> Var.t -> LS.t)
+
+  (** Same as [usedef], but for def use chains.  That is, these
+      functions map definitions to their possible uses. *)
+  val defuse :
+    Cfg.AST.G.t ->
+    (location, LS.t Var.VarMap.t) Hashtbl.t *
+      (location -> Var.t -> LS.t)
+
+
 end
 
 (** Various functions relating to variable definitions in AST CFGs *)

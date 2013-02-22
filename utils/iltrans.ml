@@ -1,6 +1,8 @@
 let usage = "Usage: "^Sys.argv.(0)^" <input options> [transformations and outputs]\n\
              Transform BAP IL programs. "
 
+open Utils_common
+
 type ast = Ast.program
 type astcfg = Cfg.AST.G.t
 type ssa = Cfg.SSA.G.t
@@ -36,6 +38,11 @@ let output_ast f p =
 let output_ast_cfg f p =
   let oc = open_out f in
   Cfg_pp.AstStmtsDot.output_graph oc p;
+  close_out oc
+
+let output_ast_asms f p =
+  let oc = open_out f in
+  Cfg_pp.AstAsmsDot.output_graph oc p;
   close_out oc
 
 let output_ast_bbids f p =
@@ -121,6 +128,36 @@ let ast_chop srcbb srcn trgbb trgn p =
 let ssa_chop srcbb srcn trgbb trgn p =
   Ssa_slice.CHOP_SSA.chop p !srcbb !srcn !trgbb !trgn
 
+let usedef p =
+  let module UD = Depgraphs.UseDef_AST in
+  let module VM = Var.VarMap in
+  let h,_ = UD.usedef p in
+  Hashtbl.iter
+    (fun (bb,i) varmap ->
+      Printf.printf "At location %s %d:\n" (Cfg_ast.v2s bb) i;
+      VM.iter
+        (fun v defset ->
+          let defs = try BatList.reduce (fun s s2 -> s^" "^s2) (List.map UD.LocationType.to_string (UD.LS.elements defset)) with _ -> "" in
+          Printf.printf "use %s -> def %s\n" (Pp.var_to_string v) defs
+        ) varmap;
+      Printf.printf "\n"
+    ) h
+
+let defuse p =
+  let module UD = Depgraphs.UseDef_AST in
+  let module VM = Var.VarMap in
+  let h,_ = UD.defuse p in
+  Hashtbl.iter
+    (fun (bb,i) varmap ->
+      Printf.printf "At location %s %d:\n" (Cfg_ast.v2s bb) i;
+      VM.iter
+        (fun v defset ->
+          let defs = BatList.reduce (fun s s2 -> s^" "^s2) (List.map UD.LocationType.to_string (UD.LS.elements defset)) in
+          Printf.printf "def %s -> use %s\n" (Pp.var_to_string v) defs
+        ) varmap;
+      Printf.printf "\n"
+    ) h
+
 let add c =
   pipeline := c :: !pipeline
 
@@ -132,6 +169,8 @@ let speclist =
    "<file> Pretty print AST to <file>.")
   ::("-pp-ast-cfg", Arg.String (fun f -> add(AnalysisAstCfg(output_ast_cfg f))),
      "<file> Pretty print AST graph to <file> (in Graphviz format)")
+  ::("-pp-ast-asms", Arg.String (fun f -> add(AnalysisAstCfg(output_ast_asms f))),
+     "<file> Pretty print AST graph to <file> (in Graphviz format) (only assembly)")
   ::("-pp-ast-bbids", Arg.String(fun f -> add(AnalysisAstCfg(output_ast_bbids f))),
      "<file> Pretty print AST graph to <file> (in Graphviz format) (no stmts)")
   ::("-pp-ast-cdg", Arg.String (fun f -> add(AnalysisAstCfg(output_ast_cdg f))),
@@ -211,10 +250,6 @@ let speclist =
      uadd(TransformAst Traces_surgical.check_slice),
      "Slice a trace based on the overwritten return address"
     )
-  ::("-trace-clean",
-     uadd(TransformAst Traces.clean),
-     "Remove labels and comments from a concretized trace"
-    )
   ::("-trace-reconcrete",
      Arg.String(fun f -> add(TransformAst(Traces.concrete_rerun f))),
      "Execute a concretized trace with the specified input file."
@@ -228,13 +263,13 @@ let speclist =
      "Start debugging at item n."
     )
   ::("-trace-debug",
-     uadd(AnalysisAst Traces.trace_valid_to_invalid),
+     uadd(AnalysisAst Traces.TraceSymbolic.trace_valid_to_invalid),
      "Formula debugging. Prints to files form_val and form_inv"
     )
   ::("-trace-conc-debug",
      Arg.Unit
        (fun () ->
-	  let f = Traces.formula_valid_to_invalid ~min:!startdebug in
+	  let f = Traces.TraceSymbolic.formula_valid_to_invalid ~min:!startdebug in
 	  add(AnalysisAst f)
        ),
      "Formula debugging. Prints to files form_val and form_inv. Concretizes BEFORE debugging; useful for finding which assertion doesn't work."
@@ -319,15 +354,13 @@ let speclist =
      "<gaddress> <maddress> <sehaddress> <payload file> Use pivot at gaddress to transfer control (by overwriting SEH handler at sehaddress) to payload at maddress."
     )
   ::("-trace-formula",
-     Arg.String(fun f -> add(AnalysisAst(Traces.output_formula f))),
-     "<file> Output the STP trace formula to <file>"
+     Arg.String(fun f -> add(AnalysisAst(Traces.TraceSymbolic.generate_formula (f,!Solver.solver)))),
+     "<file> Output a trace formula to <file>"
     )
-  ::("-trace-formula-format",
-     Arg.Set_string Traces.printer,
-     "Set formula format (STP (default) or smtlib1)."
-  )
+  ::("-trace-solver", Arg.String Solver.set_solver,
+     ("Use the specified solver for traces. Choices: " ^ Solver.solvers))
   ::("-trace-exploit",
-     Arg.String(fun f -> add(AnalysisAst(Traces.output_exploit f))),
+     Arg.String(fun f -> add(AnalysisAst(Traces.TraceSymbolic.output_exploit (f,!Solver.solver)))),
      "<file> Output the exploit string to <file>"
     )
   ::("-trace-assignments",
@@ -348,12 +381,11 @@ let speclist =
     )
   ::("-trace-check",
      Arg.Set Traces.consistency_check,
-     "Perform extra consistency checks"
+     "Perform consistency checks"
     )
   ::("-trace-check-all",
-     Arg.Unit(fun () -> Traces.consistency_check := true;
-	   Traces.checkall := true),
-     "Perform extra consistency checks"
+     Arg.Set Traces.checkall,
+     "Perform extra consistency checks possible when all instructions are logged"
     )
   ::("-trace-noopt",
      Arg.Clear Traces.dce,
@@ -382,6 +414,8 @@ let speclist =
       "Ensure all labels are unique")
   :: ("-replace-unknowns", uadd(TransformAst Hacks.replace_unknowns),
       "Replace all unknowns with zeros")
+  :: ("-bberror-assume-false", uadd(TransformAstCfg Hacks.bberror_assume_false),
+      "Add an \"assume false\" statement to BB_Error and add an edge to BB_Exit")
   :: ("-flatten-mem", uadd(TransformAst Flatten_mem.flatten_mem_program),
       "Flatten memory accesses")
   :: ("-vsa", uadd(AnalysisAstCfg vsa_print),
@@ -390,8 +424,13 @@ let speclist =
       "Simplify conditions")
   :: ("-no-ssa-tac", Arg.Unit (fun () -> tac := false),
      "Disable three address code in SSA representation.")
+  :: ("-usedef", uadd(AnalysisAstCfg usedef),
+      "Compute and print use def chains")
+  :: ("-defuse", uadd(AnalysisAstCfg defuse),
+      "Compute and print def use chains")
   :: Input.speclist
 
+let () = Tunegc.set_gc ()
 let anon x = raise(Arg.Bad("Unexpected argument: '"^x^"'"))
 let () = Arg.parse speclist anon usage
 

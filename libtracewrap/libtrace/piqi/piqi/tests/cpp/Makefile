@@ -2,10 +2,7 @@ all: prep test
 
 
 prep:
-	rm -f piqi.org; ln -s . piqi.org
-	ln -sf ../../piqi.org/piqi.piqi .
-	piqi expand piqi.piqi > piqi-expanded.piqi
-	piqi convert -t pb -o piqi.piqi.pb piqi-expanded.piqi
+	piqi convert -t pb piqi.piqi
 
 
 test:
@@ -18,6 +15,6 @@ test:
 
 
 clean:
-	rm -f *.piqi piqi.* t.*
+	rm -f piqi.piqi.* t.*
 	$(MAKE) -f Makefile.cpp clean
 

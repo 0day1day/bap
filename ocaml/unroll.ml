@@ -6,6 +6,81 @@ module C = Cfg.AST
 module D = Debug.Make(struct let name = "Unroll" and default=`NoDebug end)
 open D
 
+(* Type of unroll function *)
+type unrollf = ?count:int -> Cfg.AST.G.t -> Cfg.AST.G.t
+
+type node_mapping = (Cfg.AST.G.V.t * Cfg.AST.G.V.t) list
+
+(* Generic nested loop information *)
+type unrollinfo =
+  | BB of C.G.V.t
+  | Other of unrollinfo list
+  | Loop of C.G.V.t * unrollinfo list (* head, body of loop including head *)
+
+let rec string_of_unrollinfo = function
+  | BB bb -> Cfg_ast.v2s bb
+  | Other l -> "Other[" ^ List.fold_left (fun s li -> s ^ " " ^ (string_of_unrollinfo li)) "" l ^ " ]"
+  | Loop (head, l) -> "Loop[head: " ^ (Cfg_ast.v2s head) ^ ", body:" ^ List.fold_left (fun s li -> s ^ " " ^ (string_of_unrollinfo li)) "" l ^ " ]"
+
+(* XXX: inefficient *)
+let rec bbs_from_unrollinfo = function
+  | BB v -> [v]
+  | Other l | Loop (_, l) -> BatList.concat (List.map bbs_from_unrollinfo l)
+
+let find_loop_head cfg bbs_of_node nodes =
+  let h = Hashtbl.create (List.length nodes) in
+  List.iter (fun n -> List.iter (fun bb -> Hashtbl.add h bb ()) (bbs_of_node n)) nodes;
+  let find_pred r =
+    (* Find a bb that has a predecessor not in h *)
+    try Some (List.find (fun bb ->
+      List.exists (fun bb' ->
+        Hashtbl.mem h bb' = false) (C.G.pred cfg bb)
+    ) (bbs_of_node r))
+    with Not_found -> None
+  in
+  let tl = List.map find_pred nodes in
+  let tl = BatList.filter_map Util.id tl in
+  match tl with
+  | [hd] -> hd
+  | _ -> failwith (Printf.sprintf "find_loop_head: Failed to identify loop head in [%s]. This is likely caused by an irreducible loop."
+    (Hashtbl.fold (fun n _ s -> (Cfg_ast.v2s n) ^ " " ^ s) h ""))
+
+(* Get loop information from Steensgard's algorithm *)
+let unrollinfo_from_steensgard cfg =
+  let rec bbs_from_steensgard = function
+    | Steensgard.BB v -> [v]
+    | Steensgard.Other l | Steensgard.Loop l ->
+      BatList.concat (List.map bbs_from_steensgard l)
+  in
+  let rec conv_info = function
+    | Steensgard.BB x -> BB x
+    | Steensgard.Other x -> Other (List.map conv_info x)
+    | Steensgard.Loop x ->
+      let head = find_loop_head cfg bbs_from_steensgard x in
+      Loop(head, List.map conv_info x)
+  in
+  conv_info (Steensgard.steensgard_ast cfg)
+
+(* Get loop information from structural analysis *)
+let unrollinfo_from_sa cfg =
+  let module SA = Structural_analysis in
+  let module Dom = Dominator.Make(C.G) in
+  let bbs_of_node =
+    let rec get_nodes acc = function
+      | SA.BBlock b -> (C.G.V.create b)::acc
+      | SA.Region(_, ns) -> List.fold_left get_nodes acc ns
+    in
+    get_nodes []
+  in
+  let rec conv : SA.node -> unrollinfo = function
+    | SA.BBlock b -> BB (C.G.V.create b)
+    | SA.Region((SA.SelfLoop | SA.WhileLoop | SA.NaturalLoop), ns) ->
+      let head = find_loop_head cfg bbs_of_node ns in
+      Loop(head, List.map conv ns)
+    | SA.Region(_, ns) -> Other(List.map conv ns)
+  in
+  conv (SA.structural_analysis cfg)
+
 let unroll_loop ?(count=8) ?(id=0) cfg head body =
   dprintf "Unrolling loop for %s with %d nodes" (Cfg.bbid_to_string (C.G.V.label head)) (List.length body);
   let nodes = head::body in
@@ -13,9 +88,9 @@ let unroll_loop ?(count=8) ?(id=0) cfg head body =
   let ohead = head in
   let edges = List.fold_left
     (fun acc node ->
-       List.fold_left
-         (fun acc outedge ->
-            let dst = C.G.E.dst outedge in
+      List.fold_left
+        (fun acc outedge ->
+          let dst = C.G.E.dst outedge in
             (*if List.mem dst nodes then*)
             let lab = C.G.E.label outedge in
             (node,lab,dst)::acc 
@@ -46,12 +121,10 @@ let unroll_loop ?(count=8) ?(id=0) cfg head body =
   let ith_copy i vertex =
     try Hashtbl.find unrollednodes (C.G.V.label vertex, i)
     with Not_found -> 
-     (*failwith ("No copy found for " 
-                ^ (string_of_int i) 
-                ^ "-th copy of vertex " 
-                ^ (Cfg.bbid_to_string (C.G.V.label vertex)));*)
-      dprintf "No copy found for %s-th copy" (string_of_int i);
-      dprintf "of vertex %s " (Cfg.bbid_to_string (C.G.V.label vertex));
+      (* When we copy edges leaving the loop, the destination will not
+         be found.  This is normal. *)
+      (* dprintf "No copy found for %s-th copy" (string_of_int i); *)
+      (* dprintf "of vertex %s " (Cfg.bbid_to_string (C.G.V.label vertex)); *)
       vertex
   in
   let fix_backedge ?(final=false) cfg i =
@@ -91,7 +164,6 @@ let unroll_loop ?(count=8) ?(id=0) cfg head body =
     List.fold_left 
       (fun cfg (src, lab, dst) ->
          let src = ith_copy i src in
-              
          let dst = ith_copy i dst in
          let newedge = C.G.E.create src lab dst in
          C.add_edge_e cfg newedge
@@ -147,8 +219,10 @@ let unroll_loop ?(count=8) ?(id=0) cfg head body =
   in
 
   let cfg = C.G.fold_vertex rename_targets cfg cfg in
+
+  let nodes = List.map (fun node -> ((C.G.V.label node, 0), node)) nodes in
   let nodelist = Hashtbl.fold (fun k v l ->
-    v::l
+    (k, v)::l
   ) unrollednodes nodes in
 
   (* let oc = Pervasives.open_out "unroll.dot" in *)
@@ -157,108 +231,60 @@ let unroll_loop ?(count=8) ?(id=0) cfg head body =
   (* Cfg_pp.AstBBidDot.output_graph oc cfg; *)
   (* Pervasives.close_out oc; *)
   cfg, nodelist
-(*
-  let rename_targets cfg v =
-    let getlabel le n =
-      let l = match lab_of_exp le with Some x -> x | _ -> failwith "indirect" in
-      if C.find_label cfg l == n then le
-      else
-	let rec find_label = function
-	  | Label(l,_)::_ -> exp_of_lab l
-	  | Comment _ :: xs -> find_label xs
-	  | _ -> failwith "missing replacement label FIXME" (* This could happen if l was an Addr *)
-	in
-	find_label (C.get_stmts cfg v)
-    in
-    let revstmts = List.rev (C.get_stmts cfg v) in
-    let revstmts' = match revstmts with
-      | (CJmp(c,t1,t2,attrs) as stmt)::rest ->
-	  let e1,e2 = match C.G.succ_e cfg v with
-	    | [e1;e2] when C.G.E.label e1 = Some true && C.G.E.label e2 = Some false ->
-		(e1,e2)
-	    | [e1;e2] when C.G.E.label e2 = Some true && C.G.E.label e1 = Some false ->
-		(e2,e1)
-	    | _ ->
-                let oc = open_out "test1" in
-                let ssa_func_cfg = Cfg_ssa.of_astcfg cfg in
-                Cfg_pp.SsaStmtsDot.output_graph oc ssa_func_cfg;
-                (*Cfg_pp.AstBBidDot.output_graph oc cfg;*)
-                close_out oc;
-		failwith ("Something is wrong with the edges or edge labels:"^(Pp.ast_stmt_to_string stmt))
-	  in
-	  let s1 = C.G.E.dst e1 and s2 = C.G.E.dst e2 in
-	  let t1' = getlabel t1 s1 and t2' = getlabel t2 s2 in
-	  if t1' = t1 && t2' = t2 then revstmts
-	  else CJmp(c,t1',t2',attrs)::rest
-      | Jmp _::rest
-      | rest ->
-	  rest
-    in
-    if revstmts == revstmts' then cfg
-    else C.set_stmts cfg v (List.rev revstmts')
-  in
 
-  cfg
-
-*)
-let unroll_bbs ?count ?id idom cfg bbs =
+let unroll_bbs ?count ?id cfg head bbs =
   dprintf "unroll_bbs invoked";
-  let nodes = List.map (C.find_vertex cfg) bbs in
-  let h = Hashtbl.create (List.length nodes) in
-  List.iter (fun n -> Hashtbl.add h n ()) nodes;
-  let rec findhead n =
-    let n' = idom n in
-    if Hashtbl.mem h n' then findhead n'
-    else n
-  in
-  let head = findhead (List.hd nodes) in
-  let body = List.filter ((<>)head) nodes in
+  let body = List.filter ((<>)head) bbs in
   unroll_loop ?count ?id cfg head body
 
 
-let unroll_loops ?count cfg =
-  let module SA = Structural_analysis in
-  let module Dom = Dominator.Make(C.G) in
-  let () = Checks.connected_astcfg cfg "unroll_loops" in
+let unroll_loops_internal ?count cfg unrollinfo =
+  let () = Checks.connected_astcfg cfg "unroll_loops_internal" in
+  let () = if debug () then dprintf "Unroll info: %s" (string_of_unrollinfo unrollinfo) in
   let nunrolled = ref 0 in
-  let idom = Dom.compute_idom cfg (C.find_vertex cfg Cfg.BB_Entry) in
-  let bbs_of_node =
-    let rec get_nodes acc = function
-      | SA.BBlock b -> b::acc
-      | SA.Region(_, ns) -> List.fold_left get_nodes acc ns
-    in
-    get_nodes []
-  in
+
   (* unroll_in cfg needs to return a CFG and a modified structure,
      since unrolling changes the structure of the CFG. *)
-  let rec unroll_in cfg : SA.node -> C.G.t * SA.node = function
-    | SA.BBlock _ as r -> cfg, r
-    | SA.Region(rt, ns) as r ->
-      dprintf "Found region: %s" (SA.node2s r);
+  let rec unroll_in cfg mapping : unrollinfo -> C.G.t * unrollinfo * node_mapping =
+    let f (cfg,rl,mapping) n =
+      let cfg,r,mapping = unroll_in cfg mapping n in
+      cfg, r::rl, mapping
+    in
+    function
+    | BB _ as r -> cfg, r,mapping
+    | Other ns ->
+      (* Recurse *)
+      let cfg, rl, mapping = List.fold_left f (cfg,[],mapping) ns in
+      cfg, Other(List.rev rl),mapping
+    | Loop(head, ns) ->
       (* First unroll any nested loops *)
-      let f (cfg,rl) n =
-        let cfg,r = unroll_in cfg n in
-        cfg, r::rl
-      in
-      let cfg, r =
-        let cfg, rl = List.fold_left f (cfg,[]) ns in
-        cfg, SA.Region(rt, List.rev rl)
+      let cfg, r, mapping =
+        let cfg, rl, mapping = List.fold_left f (cfg,[],mapping) ns in
+        cfg, Other(List.rev rl),mapping
       in
 
-      (* If the top level region is a loop, unroll that *)
-      match rt with
-      | SA.SelfLoop | SA.WhileLoop | SA.NaturalLoop ->
-	let bbs = bbs_of_node r in
-	dprintf "Found a loop with %d nodes" (List.length bbs);
-        (* We need to return an updated region for the unrolled loop.
-           However, the region does not need to be correct, it only
-           need contain the correct bbs, since it is only used by
-           bbs_of_node. *)
-	let cfg, nl = unroll_bbs ?count ~id:!nunrolled idom cfg bbs in
-        incr nunrolled;
-        let make_region bb = SA.BBlock (C.G.V.label bb) in
-        cfg, SA.Region(SA.Proper, List.map make_region nl)
-      | _ -> cfg, r
+      (* And then unroll the loop at the current level *)
+      let bbs = bbs_from_unrollinfo r in
+      dprintf "Found a loop with %d nodes" (List.length bbs);
+      (* We need to return an updated region for the unrolled loop. *)
+      let cfg, nl = unroll_bbs ?count ~id:!nunrolled cfg head bbs in
+      let mapping = List.fold_left (fun acc ((old_label, _), new_node) ->
+        (Cfg.AST.find_vertex cfg old_label, new_node)::acc
+      ) mapping nl in
+      incr nunrolled;
+      let make_region (_,bb) = BB bb in
+      cfg, Other (List.map make_region nl), mapping
   in
-  let cfg, _ = unroll_in cfg (SA.structural_analysis cfg) in
-  cfg
+  let cfg, _, mapping = unroll_in cfg [] unrollinfo in
+  cfg, mapping
+
+let unroll_loops_with_mapping ?count cfg =
+  unroll_loops_internal ?count cfg (unrollinfo_from_steensgard cfg)
+
+let unroll_loops_steensgard ?count cfg =
+  fst (unroll_loops_with_mapping ?count cfg)
+
+let unroll_loops_sa ?count cfg =
+  fst (unroll_loops_internal ?count cfg (unrollinfo_from_sa cfg))
+
+let unroll_loops = unroll_loops_steensgard

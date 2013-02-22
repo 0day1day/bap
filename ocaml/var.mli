@@ -34,4 +34,4 @@ val compare : t -> t -> int
 
 module VarHash : Hashtbl.S with type key = t
 module VarMap : BatMap.S with type key = t
-module VarSet : Set.S with type elt = t
+module VarSet : BatSet.S with type elt = t

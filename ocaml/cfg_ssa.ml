@@ -161,8 +161,11 @@ let rec stmt2ssa ctx ?tac ~(revstmts: stmt list) s =
     | Ast.Assert(e,a) ->
 	let (revstmts,v) = exp2ssa ~revstmts e in
 	  Assert(v,a)::revstmts
+    | Ast.Assume(e,a) ->
+	let (revstmts,v) = exp2ssa ~revstmts e in
+	  Assume(v,a)::revstmts
     | Ast.Halt(e,a) ->
-	let (revstmts, v) = exp2ssa ~revstmts e in 
+	let (revstmts,v) = exp2ssa ~revstmts e in 
 	  Halt(v,a)::revstmts
 	
 
@@ -397,6 +400,7 @@ let uninitialized cfg =
     let rec f_s = function
       | Move(v, e, _) -> add assnd v; f_e e
       | Assert(e, _)
+      | Assume(e, _)
       | Halt(e, _)
       | Jmp(e, _) -> f_e e
       | CJmp(e1, e2, e3, _) -> f_e e1; f_e e2; f_e e3
@@ -719,6 +723,7 @@ let stmt2ast tm e =
     | Label(l,a) -> Ast.Label(l,a)
     | Comment(s,a) -> Ast.Comment(s,a)
     | Assert(t,a) -> Ast.Assert(e2a t, a)
+    | Assume(t,a) -> Ast.Assume(e2a t, a)
     | Halt(t,a) -> Ast.Halt(e2a t, a)
     | Move(l,e,a) -> Ast.Move(l, exp2ast tm e, a)
 

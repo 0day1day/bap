@@ -609,6 +609,69 @@ struct
     let is_directed = true
   end
 
+  module DefUseSpec(*:GraphDataflow.DATAFLOW*) =
+  struct
+
+    module G = Cfg.AST.G
+    module L = UseDefL
+    module O = GraphDataflow.NOOPTIONS
+
+    let node_transfer_function _opts (g:G.t) (bb:G.V.t) (l:L.t) =
+      let lref = ref l in
+      let line = ref 0 in
+      let v = object(self)
+	inherit Ast_visitor.nop
+    	method visit_rvar v =
+	  let s = LS.empty in
+	  let s = LS.add (LocationType.Loc (bb,!line)) s in
+	  lref := VM.add v s !lref;
+	  DoChildren
+        method visit_avar v =
+          lref := VM.add v (LS.singleton LocationType.Undefined) !lref;
+          DoChildren
+      end
+      in
+      let stmts = Cfg.AST.get_stmts g bb in
+      List.iter
+	(fun stmt ->
+	   ignore(Ast_visitor.stmt_accept v stmt);
+	   line := !line + 1
+	) stmts;
+      !lref
+    let edge_transfer_function _ _ _ l = l
+    let s0 _ _ = Cfg.AST.G.V.create Cfg.BB_Exit
+
+    (* Set each variable to undefined at the starting point *)
+    let init _ (g:G.t) = 
+      let defs p =
+	let vars = ref VS.empty in
+	let visitor = object(self)
+	  inherit Ast_visitor.nop
+	    (* Add each variable to vars *)
+	  method visit_avar v =
+	    vars := VS.add v !vars;
+	    (* 	Printf.printf "Def: We are adding %s_%d\n" (Var.name v) (Var.id v); *)
+	    DoChildren
+	  method visit_rvar v =
+	    vars := VS.add v !vars;
+	    (* 	Printf.printf "Def: We are adding %s_%d\n" (Var.name v) (Var.id v); *)
+	    DoChildren
+	end 
+	in
+	ignore(Ast_visitor.cfg_accept visitor p);
+	!vars
+      in
+      let m = VM.empty in
+      VS.fold
+	(fun v m' ->
+	   let s = LS.empty in
+	   let s = LS.add LocationType.Undefined s in
+	   VM.add v s m'
+	) (defs g) m
+
+    let dir _ = GraphDataflow.Backward
+  end
+
   module UseDefSpec(*:GraphDataflow.DATAFLOW*) =
   struct
 
@@ -671,17 +734,14 @@ struct
     let dir _ = GraphDataflow.Forward
   end
 
-  module DF = GraphDataflow.Make(UseDefSpec)
-
-  let worklist = DF.worklist_iterate
-
   (* 
       Given a program, returns 1) a hash function mapping locations to
       the definitions available at that location 2) a function that
       returns the definitions for a (variable, location) pair 
   *)
   let usedef p =
-    let dfin,_ = worklist p in
+    let module USEDEFDF = GraphDataflow.Make(UseDefSpec) in
+    let dfin,_ = USEDEFDF.worklist_iterate p in
     let h = Hashtbl.create 1000 in
     Cfg.AST.G.iter_vertex
       (fun bb ->
@@ -715,6 +775,51 @@ struct
 	   means there was a disconnected graph and the information never
 	   propagated... *)
 	wprintf "Reached variable reference for %s with no definitions (including undefined!) This probably means this location is unreachable. Returning an empty set" (Pp.var_to_string var);
+	LS.empty
+    in
+    h, find
+
+  (* Given a program, returns 1) a hash function mapping locations to
+     the uses of the definition (if any) at that location 2) a
+     function that returns the uses for a (variable, location) pair *)
+  let defuse p =
+    let module DEFUSEDF = GraphDataflow.Make(DefUseSpec) in
+    let dfin,_ = DEFUSEDF.worklist_iterate p in
+    let h = Hashtbl.create 1000 in
+    Cfg.AST.G.iter_vertex
+      (fun bb ->
+	let (m:UseDefSpec.L.t) = dfin bb in
+	let stmts = Cfg.AST.get_stmts p bb in
+	let lref = ref m in
+	let line = ref ((List.length stmts) - 1) in
+	let v = object(self)
+	  inherit Ast_visitor.nop
+    	  method visit_rvar v =
+	    let s = LS.empty in
+	    let s = LS.add (LocationType.Loc (bb,!line)) s in
+	    lref := VM.add v s !lref;
+	    DoChildren
+          method visit_avar v =
+            lref := VM.add v (LS.singleton LocationType.Undefined) !lref;
+            DoChildren
+	end
+	in
+	List.iter
+	  (fun stmt ->
+	    (* Add the uses before this line *)
+            (match stmt with
+            | Ast.Move(v, _, _) ->
+	      Hashtbl.add h (bb,!line) !lref;
+            | _ -> ());
+	    ignore(Ast_visitor.stmt_accept v stmt);
+	    line := !line - 1
+	   ) (List.rev stmts)
+      ) p;
+    let find (bb,line) var =
+      let m = Hashtbl.find h (bb,line) in
+      try
+	VM.find var m
+      with Not_found -> 
 	LS.empty
     in
     h, find

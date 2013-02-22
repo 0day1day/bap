@@ -617,7 +617,7 @@ struct
     let rec stmt_transfer_function _ _ _ s l =
       match s with
         | Assert(Var _, _)  (* FIXME: Do we want to say v is true? *)
-        | Assert _ | Jmp _ | CJmp _ | Label _ | Comment _
+        | Assert _ | Assume _ | Jmp _ | CJmp _ | Label _ | Comment _
         | Halt _ ->
             l
         | Special _ -> L.top
@@ -967,7 +967,7 @@ struct
     let rec stmt_transfer_function _ _ _ s l =
       match s with
         | Assert(Var _, _)  (* FIXME: Do we want to say v is true? *)
-        | Assert _ | Jmp _ | CJmp _ | Label _ | Comment _
+        | Assert _ | Assume _ | Jmp _ | CJmp _ | Label _ | Comment _
         | Halt _ ->
             l
         | Special _ -> L.top
@@ -1398,7 +1398,7 @@ struct
       dprintf "Executing %s" (Pp.ast_stmt_to_string s);
       match s with
         | Assert(Var _, _)  (* FIXME: Do we want to say v is true? *)
-        | Assert _ | Jmp _ | CJmp _ | Label _ | Comment _
+        | Assert _ | Assume _ | Jmp _ | CJmp _ | Label _ | Comment _
         | Halt _ ->
             l
         | Special _ -> L.top

@@ -109,6 +109,7 @@ and stmt_accept visitor =
     | Label _ as s -> s
     | Comment _ as s-> s
     | Assert(e,a) -> Assert(exp_accept visitor e, a)
+    | Assume(e,a) -> Assume(exp_accept visitor e, a)
     | Halt(e,a) -> Halt(exp_accept visitor e, a)
   in
   action (wrapstmt vischil) (visitor#visit_stmt)

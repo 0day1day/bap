@@ -29,7 +29,7 @@ module VarHash = struct
   include Util.HashUtil(VHMake)
 end
 module VarMap = BatMap.Make(V)
-module VarSet = Set.Make(V)
+module VarSet = BatSet.Make(V)
 
 
 

@@ -175,6 +175,37 @@ struct
   let edge_attributes = edge_labels_ast
 end
 
+module PrintAstAsms =
+struct
+
+  exception Found of string
+
+  let append olds news =
+    if olds = "" then news
+    else olds ^ "\n" ^ news
+
+  let print g b =
+    let open Type in
+    let stmts = CA.get_stmts g b in
+    let out = List.fold_left (fun s stmt -> match stmt with
+    | Ast.Label(Addr a, attrs) ->
+      let addrstr = Printf.sprintf "%#Lx" a in
+      let newasmsstr = 
+        try let newasms = BatList.find_map
+              (function
+                | Asm asm -> Some asm
+                | _ -> None) attrs in
+            newasms
+        with Not_found -> "Unknown" in
+      append s (addrstr ^ ": " ^ newasmsstr)
+    | _ -> s) "" stmts in
+    match out with
+    | "" -> Cfg.bbid_to_string(CA.G.V.label b)
+    | _ -> out
+
+  let edge_attributes = edge_labels_ast
+end
+
 module CSG = struct
   include CS.G
   type exp = CS.exp
@@ -190,6 +221,9 @@ module CAG = struct
 end
 module AstStmtsPrinter = MakeCfgPrinter (CAG) (PrintAstStmts) (DefAttributor)
 module AstStmtsDot = Graph.Graphviz.Dot (AstStmtsPrinter)
+
+module AstAsmsPrinter = MakeCfgPrinter (CAG) (PrintAstAsms) (DefAttributor)
+module AstAsmsDot = Graph.Graphviz.Dot (AstAsmsPrinter)
 
 module SsaBBidPrinter =
 struct
