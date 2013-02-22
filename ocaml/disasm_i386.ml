@@ -1038,8 +1038,10 @@ let rec to_ir addr next ss pref =
           &* fold check_char exp_false ((nelem/2-1)---0)
       | {Imm8Cb.agg=Imm8Cb.EqualEach} ->
         (* Does xmm1[index] = xmm2[index]? *)
-        let bothinvalid = is_valid_xmm1_e index &* is_valid_xmm2_e index in
-        let eitherinvalid = is_valid_xmm1_e index |* is_valid_xmm2_e index in
+        let xmm1_invalid = unop NOT (is_valid_xmm1_e index) in
+        let xmm2_invalid = unop NOT (is_valid_xmm2_e index) in
+        let bothinvalid = xmm1_invalid &* xmm2_invalid in
+        let eitherinvalid = xmm1_invalid |* xmm2_invalid in
         let eq = get_xmm1 index ==* get_xmm2 index in
         (* both invalid -> true
            one invalid -> false
