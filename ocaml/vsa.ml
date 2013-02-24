@@ -82,6 +82,9 @@ struct
     else if not (debug ()) then Printf.sprintf "%Lu[%Ld,%Ld]" s lb ub
     else Printf.sprintf "(%d)%Lu[%Ld,%Ld]" k s lb ub
 
+  let size (_,s,lb,ub) =
+    (ub -% lb) /% s
+
   let highbit k =
     if k = 1 then 1L else I.shift_left 1L (k-1)
 
@@ -719,6 +722,9 @@ struct
     | (_, (k,_,_,_))::_ -> k
     | [] -> failwith "width: empty value set"
 
+  let size k vs =
+    BatList.reduce (+%) (List.map (fun (_,si) -> SI.size si) vs)
+
   let pp_address p (r, si) =
     if r == global then p "$" else p(Pp.var_to_string r);
     p " |=> ";
@@ -808,6 +814,12 @@ struct
     let g vs1 vs2 = match vs1, vs2 with
       | [(r1,si1)], [(r2,si2)] when r1 == global && r2 == global -> [(r1, f k si1 si2)]
       | _ -> raise(Unimplemented "unimplemented binop") in
+    g
+
+  let si_to_vs_unop_function f k =
+    let g vs1 = match vs1 with
+      | [(r1,si1)] when r1 == global -> [(r1, f k si1)]
+      | _ -> raise(Unimplemented "unimplemented unop") in
     g
 
   let concat = si_to_vs_binop_function SI.concat
@@ -961,7 +973,10 @@ struct
       | SLE as bop
         -> VS.si_to_vs_binop_function (SimpleVSA.DFP.binop_to_si_function bop)
 
-    let unop_to_vs_function _ = (raise(Unimplemented "unop") : int -> VS.t -> VS.t)
+    let unop_to_vs_function = function
+      | NEG
+      | NOT as unop
+        -> VS.si_to_vs_unop_function (SimpleVSA.DFP.unop_to_si_function unop)
 
 
     let rec stmt_transfer_function _ _ _ s l =
@@ -1141,8 +1156,11 @@ module MemStore = struct
       | [(r, (_,0L,x,y))] when x = y ->
         write_concrete_strong k ae (r,x) vl
       | _ ->
-        (* XXX: Implement a short circuiting mechanism *)
-        widen_mem (VS.fold (fun v a -> write_concrete_weak k a v vl) addr ae)
+        (match !mem_max with
+        | Some m ->
+          if VS.size k addr > Int64.of_int m then top
+          else widen_mem (VS.fold (fun v a -> write_concrete_weak k a v vl) addr ae)
+        | None -> widen_mem (VS.fold (fun v a -> write_concrete_weak k a v vl) addr ae))
 
   let write_intersection k ae addr vl =
     match addr with
@@ -1229,7 +1247,7 @@ module AbsEnv = struct
   let do_find_vs ae v =
     try match VM.find v ae with
       | `Scalar vs -> vs
-      | _ -> VS.top (bits_of_width (Var.typ v))
+      | _ -> failwith "type mismatch" (*VS.top (bits_of_width (Var.typ v))*)
     with Not_found -> VS.top (bits_of_width (Var.typ v))
 
   (* let astval2vs ae = function *)
@@ -1366,9 +1384,9 @@ struct
             MemStore.read (bits_of_width t) ?o (do_find_ae l m) (exp2vs ?o l i)
           | Cast _ ->
             raise(Unimplemented "FIXME")
-          | _ ->
+          | Load _ | Concat _ | Extract _ | Ite _ | Unknown _ | Let _ | Store _ ->
             raise(Unimplemented "unimplemented expression type"))
-          with Unimplemented _ | Invalid_argument _ -> VS.top nbits
+          with Unimplemented s | Invalid_argument s -> DV.dprintf "unimplemented %s %s!" s (Pp.ast_exp_to_string e); VS.top nbits
         in `Scalar new_vs
       )
       | TMem _ | Array _ -> (
