@@ -247,6 +247,9 @@ initialize_sections(asm_program_t *prog, bfd_vma base)
   section_t **nextseg = &prog->segs;
   asection *section;
 
+  /* Set to NULL in case there are zero segments. */
+  *nextseg = NULL;
+
   /* Look for the section loaded into the lowest memory address */
   if (base != -1) {
 
