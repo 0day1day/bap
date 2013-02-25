@@ -748,22 +748,22 @@ let set_pszf t r =
    2 is just xor, we can simplify to AF = r_4 xor op1_4 xor op2_4.
 *)
 
-(* Helper functions to set flags for adding *)
-let set_aopszf_add t s1 s2 r =
+let set_apszf t s1 s2 r =
   let bit4 = it (1 lsl 4) t in
   move af (bit4 ==* (bit4 &* ((r ^* s1) ^* s2)))
-  ::move oF (cast_high r1 ((s1 =* s2) &* (s1 ^* r)))
   ::set_pszf t r
+
+(* Helper functions to set flags for adding *)
+let set_aopszf_add t s1 s2 r =
+  move oF (cast_high r1 ((s1 =* s2) &* (s1 ^* r)))
+  ::set_apszf t s1 s2 r
 
 let set_flags_add t s1 s2 r =
   move cf (r <* s1)
   ::set_aopszf_add t s1 s2 r
 
 (* Helper functions to set flags for subtracting *)
-let set_apszf_sub t s1 s2 r =
-  let bit4 = it (1 lsl 4) t in
-  move af (bit4 ==* ((bit4 &* ((r ^* s1) ^* s2))))
-  ::set_pszf t r
+let set_apszf_sub t s1 s2 r = set_apszf t s1 s2 r
 
 let set_aopszf_sub t s1 s2 r =
   move oF (cast_high r1 ((s1 ^* s2) &* (s1 ^* r)))
@@ -1543,8 +1543,7 @@ let rec to_ir addr next ss pref =
     *)
                (* sub overflow | add overflow *)
     :: move cf ((sube >* orig_d) |* (sube <* orig_s))
-    :: move af (Unknown("AF for sbb unimplemented", r1))
-    :: set_pszf t d
+    :: set_apszf t orig_s orig_d d
   | Cmp(t, o1, o2) ->
     let tmp = nt "t" t in
     move tmp (op2e t o1 -* op2e t o2)
