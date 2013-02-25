@@ -71,7 +71,7 @@ type jumptarget =
 (* See section 4.1 of the Intel® 64 and IA-32 Architectures Software
    Developer’s Manual, Volumes 2A & 2B: Instruction Set Reference
    (order numbers 253666 and 253667) *)
-module Imm8Cb = struct
+module Pcmp = struct
 
   type ssize = Bytes | Words
   let ssize_to_string = function
@@ -134,6 +134,21 @@ module Imm8Cb = struct
     outselectsig : outselectsig;
     outselectmask : outselectmask;
   }
+
+type out = Index | Mask
+let out_to_string = function
+  | Index -> "Index"
+  | Mask -> "Mask"
+type len = Implicit | Explicit
+let len_to_string = function
+  | Implicit -> "Implicit"
+  | Explicit -> "Explicit"
+
+(** Information about the type of pcmp instruction. *)
+type pcmpinfo = {
+  out : out;
+  len : len;
+}
 end
 
 type opcode =
@@ -200,7 +215,7 @@ type opcode =
   | Pmovmskb of (typ * operand * operand)
   | Pcmpeq of (typ * typ * operand * operand)
   | Palignr of (typ * operand * operand * operand)
-  | Pcmpistri of (typ * operand * operand * operand * Imm8Cb.imm8cb)
+  | Pcmpstr of (typ * operand * operand * operand * Pcmp.imm8cb * Pcmp.pcmpinfo)
   | Pshufb of typ * operand * operand
   | Pshufd of operand * operand * operand
   | Leave of typ
@@ -299,6 +314,7 @@ and fpu_ctrl = nv "R_FPU_CONTROL" r16
 and mxcsr = nv "R_MXCSR" r32
 
 let xmms = Array.init 8 (fun i -> nv (Printf.sprintf "R_XMM%d" i) xmm_t)
+let xmm0 = xmms.(0)
 
 (* floating point registers *)
 let st = Array.init 8 (fun i -> nv (Printf.sprintf "R_ST%d" i) st_t)
@@ -939,7 +955,7 @@ let rec to_ir addr next ss pref =
       let addresses = List.fold_left (fun acc -> function Oaddr a -> a::acc | _ -> acc) [] [src;dst] in
       List.map (fun addr -> Assert( (addr &* i32 15) ==* i32 0, [])) addresses
       @ [assn t dst result]
-  | Pcmpistri(t,xmm1,xmm2m128,imm,imm8cb) ->
+  | Pcmpstr(t,xmm1,xmm2m128,imm,imm8cb,pcmpinfo) ->
     (* All bytes and bits are numbered with zero being the least
        significant. This includes strings! *)
     (* NOTE: Strings are backwards, at least when they are in
@@ -950,20 +966,22 @@ let rec to_ir addr next ss pref =
     let xmm2m128_e = op2e t xmm2m128 in
 
     let comment = match imm8cb with
-      | {Imm8Cb.agg=agg;
-         Imm8Cb.ssize=ssize;
-         Imm8Cb.ssign=ssign;
-         Imm8Cb.outselectsig=outselectsig} ->
-        Comment(Printf.sprintf "Imm8 control byte information.  Aggregation function: %s Element size: %s Element signedness: %s Significance: %s"
-                            (Imm8Cb.agg_to_string agg)
-                            (Imm8Cb.ssize_to_string ssize)
-                            (Imm8Cb.ssign_to_string ssign)
-                            (Imm8Cb.outselectsig_to_string outselectsig), [])
+      | {Pcmp.agg=agg;
+         Pcmp.ssize=ssize;
+         Pcmp.ssign=ssign;
+         Pcmp.outselectsig=outselectsig;
+         Pcmp.outselectmask=outselectmask} ->
+        Comment(Printf.sprintf "Imm8 control byte information.  Aggregation function: %s Element size: %s Element signedness: %s Significance: %s Mask type: %s"
+                            (Pcmp.agg_to_string agg)
+                            (Pcmp.ssize_to_string ssize)
+                            (Pcmp.ssign_to_string ssign)
+                            (Pcmp.outselectsig_to_string outselectsig)
+                            (Pcmp.outselectmask_to_string outselectmask), [])
     in
 
     let nelem, nbits, elemt = match imm8cb with
-      | {Imm8Cb.ssize=Imm8Cb.Bytes} -> 16, 8, Reg 8
-      | {Imm8Cb.ssize=Imm8Cb.Words} -> 8, 16, Reg 16
+      | {Pcmp.ssize=Pcmp.Bytes} -> 16, 8, Reg 8
+      | {Pcmp.ssize=Pcmp.Words} -> 8, 16, Reg 16
     in
     (* Get element index in e *)
     let get_elem = extract_byte in
@@ -988,12 +1006,16 @@ let rec to_ir addr next ss pref =
        byte (before NULL byte). *)
     let is_valid =
       let vh = Hashtbl.create (2*nelem) in
-      (fun xmmnum index ->
-        try Hashtbl.find vh (xmmnum,index)
-        with Not_found ->
-          let v = nt ("is_valid_xmm"^string_of_int xmmnum^"_ele"^string_of_int index) r1 in
-          Hashtbl.add vh (xmmnum,index) v;
-          v)
+      match pcmpinfo with
+      | {Pcmp.len=Pcmp.Implicit} ->
+        (fun xmmnum index ->
+          try Hashtbl.find vh (xmmnum,index)
+          with Not_found ->
+            let v = nt ("is_valid_xmm"^string_of_int xmmnum^"_ele"^string_of_int index) r1 in
+            Hashtbl.add vh (xmmnum,index) v;
+            v)
+      | {Pcmp.len=Pcmp.Explicit} ->
+        unimplemented "explicit-length pcmpstr"
     in
     let is_valid_xmm1 index = is_valid 1 index
     and is_valid_xmm2 index = is_valid 2 index
@@ -1006,7 +1028,7 @@ let rec to_ir addr next ss pref =
     let build_valid_xmm2 = build_valid_xmm_i is_valid_xmm2 is_valid_xmm2_e get_xmm2 in
 
     let get_intres1_bit index = match imm8cb with
-      | {Imm8Cb.agg=Imm8Cb.EqualAny} ->
+      | {Pcmp.agg=Pcmp.EqualAny} ->
         (* Is xmm1[index] at xmm2[j]? *)
         let check_char acc j =
           let eq = (get_xmm1 index) ==* (get_xmm2 j) in
@@ -1016,15 +1038,15 @@ let rec to_ir addr next ss pref =
         binop AND (is_valid_xmm1_e index)
           (* Is xmm1[index] included in xmm2[j] for any j? *)
           (fold check_char exp_false (nelem-1---0))
-      | {Imm8Cb.agg=Imm8Cb.Ranges} ->
+      | {Pcmp.agg=Pcmp.Ranges} ->
         (* Is there an even j such that xmm1[j] <= xmm2[index] <=
            xmm1[j+1]? *)
         let check_char acc j =
           (* XXX: Should this be AND? *)
           let rangevalid = is_valid_xmm1_e (2*j) &* is_valid_xmm1_e (2*j+1) in
           let lte = match imm8cb with
-            | {Imm8Cb.ssign=Imm8Cb.Unsigned} -> LE
-            | {Imm8Cb.ssign=Imm8Cb.Signed} -> SLE
+            | {Pcmp.ssign=Pcmp.Unsigned} -> LE
+            | {Pcmp.ssign=Pcmp.Signed} -> SLE
           in
           let inrange =
             binop lte (get_xmm1 (2*j)) (get_xmm2 index)
@@ -1036,7 +1058,7 @@ let rec to_ir addr next ss pref =
         is_valid_xmm2_e index
           (* Is xmm2[index] in the jth range pair? *)
           &* fold check_char exp_false ((nelem/2-1)---0)
-      | {Imm8Cb.agg=Imm8Cb.EqualEach} ->
+      | {Pcmp.agg=Pcmp.EqualEach} ->
         (* Does xmm1[index] = xmm2[index]? *)
         let xmm1_invalid = unop NOT (is_valid_xmm1_e index) in
         let xmm2_invalid = unop NOT (is_valid_xmm2_e index) in
@@ -1049,7 +1071,7 @@ let rec to_ir addr next ss pref =
         ite r1 bothinvalid exp_true
           (ite r1 eitherinvalid exp_false
              (ite r1 eq exp_true exp_false))
-      | {Imm8Cb.agg=Imm8Cb.EqualOrdered} ->
+      | {Pcmp.agg=Pcmp.EqualOrdered} ->
         (* Does the substring xmm1 occur at xmm2[index]? *)
         let check_char acc j =
           let neq = get_xmm1 j <>* get_xmm2 (index+j) in
@@ -1075,6 +1097,7 @@ let rec to_ir addr next ss pref =
       fold (fun acc i ->
         ite r1 (get_elem e i ==* it 0 elemt) exp_true acc) exp_false (0--(nelem-1))
     in
+    (* For pcmpistri/pcmpestri *)
     let sb e =
       fold (fun acc i ->
         ite r32 (exp_true ==* extract i i e)
@@ -1082,19 +1105,29 @@ let rec to_ir addr next ss pref =
           acc
         ) (it nelem r32)
         (match imm8cb with
-        | {Imm8Cb.outselectsig=Imm8Cb.LSB} -> (nelem-1)---0
-        | {Imm8Cb.outselectsig=Imm8Cb.MSB} -> 0--(nelem-1))
+        | {Pcmp.outselectsig=Pcmp.LSB} -> (nelem-1)---0
+        | {Pcmp.outselectsig=Pcmp.MSB} -> 0--(nelem-1))
     in
-
+    (* For pcmpistrm/pcmpestrm *)
+    let mask e =
+      match imm8cb with
+      | {Pcmp.outselectmask=Pcmp.Bitmask} ->
+        cast_unsigned r128 e
+      | {Pcmp.outselectmask=Pcmp.Bytemask} ->
+        let get_element i =
+          cast_unsigned elemt (extract i i e)
+        in
+        concat_explist (map get_element ((nelem-1)---0))
+    in
     comment
     :: move int_res_1 (cast_unsigned r16 res_e)
     :: (match imm8cb with
-    | {Imm8Cb.negintres1=false} ->
+    | {Pcmp.negintres1=false} ->
       move int_res_2 (Var int_res_1)
-    | {Imm8Cb.negintres1=true; Imm8Cb.maskintres1=false} ->
+    | {Pcmp.negintres1=true; Pcmp.maskintres1=false} ->
       (* int_res_1 is bitwise-notted *)
       move int_res_2 (unop NOT (Var int_res_1))
-    | {Imm8Cb.negintres1=true; Imm8Cb.maskintres1=true} ->
+    | {Pcmp.negintres1=true; Pcmp.maskintres1=true} ->
       (* only the valid elements in xmm2 are bitwise-notted *)
       (* XXX: Right now we duplicate the valid element computations
          when negating the valid elements.  They are also used by the
@@ -1108,7 +1141,9 @@ let rec to_ir addr next ss pref =
         build_valid_xmm2 (cast_unsigned r16 (concat_explist bits))
       in
       move int_res_2 (validvector ^* Var int_res_1))
-    :: move ecx (sb (Var int_res_2))
+    :: (match pcmpinfo with
+    | {Pcmp.out=Pcmp.Index} -> move ecx (sb (Var int_res_2))
+    | {Pcmp.out=Pcmp.Mask} -> move xmm0 (mask (Var int_res_2)))
     :: move cf (Var int_res_2 <>* it 0 r16)
     :: move zf (contains_null xmm2m128_e)
     :: move sf (contains_null xmm1_e)
@@ -1829,7 +1864,7 @@ module ToStr = struct
     | Movdq(_t,td,d,ts,s,align,name) ->
       Printf.sprintf "%s %s, %s" name (opr d) (opr s)
     | Palignr(t,dst,src,imm) -> Printf.sprintf "palignr %s, %s, %s" (opr dst) (opr src) (opr imm)
-    | Pcmpistri(t,dst,src,imm,_) -> Printf.sprintf "pcmpistri %s, %s, %s" (opr dst) (opr src) (opr imm)
+    | Pcmpstr(t,dst,src,imm,_,_) -> Printf.sprintf "pcmpstr %s, %s, %s" (opr dst) (opr src) (opr imm)
     | Pshufd(dst,src,imm) -> Printf.sprintf "pshufd %s, %s, %s" (opr dst) (opr src) (opr imm)
     | Pshufb(t,dst,src) -> Printf.sprintf "pshufb %s, %s" (opr dst) (opr src)
     | Pcmpeq(t,elet,dst,src) -> Printf.sprintf "pcmpeq %s, %s" (opr dst) (opr src)
@@ -2000,24 +2035,24 @@ let parse_instr g addr =
     | _ -> disfailwith "unsupported displacement size"
   in
   let parse_imm8cb b =
-    (* XXX: Use open Imm8Cb once we require ocaml 3.12 *)
+    (* XXX: Use open Pcmp once we require ocaml 3.12 *)
     let (&) = Int64.logand in
-    let ssize = if (b & 1L) = 0L then Imm8Cb.Bytes else Imm8Cb.Words in
-    let ssign = if (b & 2L) = 0L then Imm8Cb.Unsigned else Imm8Cb.Signed in
+    let ssize = if (b & 1L) = 0L then Pcmp.Bytes else Pcmp.Words in
+    let ssign = if (b & 2L) = 0L then Pcmp.Unsigned else Pcmp.Signed in
     let agg = match b & 12L with
-      | 0L -> Imm8Cb.EqualAny
-      | 4L -> Imm8Cb.Ranges
-      | 8L -> Imm8Cb.EqualEach
-      | 12L -> Imm8Cb.EqualOrdered
+      | 0L -> Pcmp.EqualAny
+      | 4L -> Pcmp.Ranges
+      | 8L -> Pcmp.EqualEach
+      | 12L -> Pcmp.EqualOrdered
       | _ -> failwith "impossible"
     in
     let negintres1 = if (b & 16L) = 0L then false else true in
     let maskintres1 = if (b & 32L) = 0L then false else true in
-    let outselectsig = if (b & 64L) = 0L then Imm8Cb.LSB else Imm8Cb.MSB in
-    let outselectmask = Imm8Cb.sig_to_mask outselectsig in
+    let outselectsig = if (b & 64L) = 0L then Pcmp.LSB else Pcmp.MSB in
+    let outselectmask = Pcmp.sig_to_mask outselectsig in
     if (b & 128L) <> 0L then wprintf "Most significant bit of Imm8 control byte should be set to 0";
 
-    {Imm8Cb.ssize=ssize; Imm8Cb.ssign=ssign; Imm8Cb.agg=agg; Imm8Cb.negintres1=negintres1; Imm8Cb.maskintres1=maskintres1; Imm8Cb.outselectsig=outselectsig; Imm8Cb.outselectmask=outselectmask}
+    {Pcmp.ssize=ssize; Pcmp.ssign=ssign; Pcmp.agg=agg; Pcmp.negintres1=negintres1; Pcmp.maskintres1=maskintres1; Pcmp.outselectsig=outselectsig; Pcmp.outselectmask=outselectmask}
 
   in
   let parse_sib m a =
@@ -2500,7 +2535,7 @@ let parse_instr g addr =
           let (r, rm, na) = parse_modrm prefix.opsize na in
 	  let (i, na) = parse_imm8 na in
           (Palignr(prefix.mopsize, r, rm, i), na)
-        | 0x63 ->
+        | 0x62 | 0x63 ->
           let (r, rm, na) = parse_modrm prefix.opsize na in
           let (i, na) = parse_imm8 na in
           (match i with
@@ -2515,7 +2550,12 @@ let parse_instr g addr =
           *)
           | Oimm imm ->
             let imm8cb = parse_imm8cb imm in
-            (Pcmpistri(prefix.mopsize, r, rm, i, imm8cb), na)
+            let pcmp = {Pcmp.out=(match b3 with
+                                 | 0x62 -> Pcmp.Mask
+                                 | 0x63 -> Pcmp.Index
+                                 | _ -> disfailwith "bug");
+                        Pcmp.len=Pcmp.Implicit} in
+            (Pcmpstr(prefix.mopsize, r, rm, i, imm8cb, pcmp), na)
           | _ ->  unimplemented "unsupported non-imm op for pcmpistri")
         | b4 ->  unimplemented
 	  (Printf.sprintf "unsupported opcode %02x %02x %02x" b1 b2 b3)
