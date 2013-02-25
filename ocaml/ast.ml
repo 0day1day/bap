@@ -52,17 +52,27 @@ type program = stmt list
 
 (** Make an expression corresponding to the given label, for use as the
     target of a [Jmp]. *)
-let exp_of_lab = function
-  | Name s -> Lab s
-  | Addr a -> Int(big_int_of_int64 a, Reg 64)
+let exp_of_lab = 
+  let re = Str.regexp "^pc_\\(.*\\)+" in
+  function
+    (* VEX style pc_0x1234 labels *)
+    | Name s when Str.string_match re s 0 ->
+      Int(Util.big_int_of_string (Str.matched_group 1 s), Reg 64)
+    | Name s -> Lab s
+    | Addr a -> Int(big_int_of_int64 a, Reg 64)
 
 (** If possible, make a label that would be refered to by the given
     expression. *)
-let lab_of_exp = function
-  | Lab s -> Some(Name s)
-  | Int(i, t) ->
-    Some(Addr(int64_of_big_int (Arithmetic.to_big_int (i,t))))
-  | _ -> None
+let lab_of_exp =
+  let re = Str.regexp "^pc_\\(.*\\)+" in
+  function
+    (* VEX style pc_0x1234 labels *)
+    | Lab s when Str.string_match re s 0 ->
+      Some(Addr(Int64.of_string (Str.matched_group 1 s)))
+    | Lab s -> Some(Name s)
+    | Int(i, t) ->
+      Some(Addr(int64_of_big_int (Arithmetic.to_big_int (i,t))))
+    | _ -> None
 
 let reg_1 = Reg 1
 and reg_8 = Reg 8
