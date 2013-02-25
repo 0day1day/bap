@@ -367,6 +367,7 @@ and esi_e = Var esi
 and edi_e = Var edi
 and ecx_e = Var ecx
 and eax_e = Var eax
+and edx_e = Var edx
 
 let mem = nv "mem" (TMem(r32))
 let mem_e = Var mem
@@ -991,31 +992,41 @@ let rec to_ir addr next ss pref =
     in
 
     (* Build expressions that assigns the correct values to the
-       is_valid variables. *)
-    let build_valid_xmm_i is_valid_i is_valid_xmm_i_e get_xmm_i =
+       is_valid variables using implicit (NULL-based) string
+       length. *)
+    let build_implicit_valid_xmm_i is_valid_xmm_i get_xmm_i =
       let f acc i =
         (* Previous element is valid *)
-        let prev_valid = if i == 0 then exp_true else is_valid_xmm_i_e (i-1) in
-        (* Current element is valid *)
+        let prev_valid = if i == 0 then exp_true else Var (is_valid_xmm_i (i-1)) in
+          (* Current element is valid *)
         let curr_valid = get_xmm_i i <>* it 0 elemt in
-        Let(is_valid_i i, prev_valid &* curr_valid, acc)
+        Let(is_valid_xmm_i i, prev_valid &* curr_valid, acc)
       in (fun e -> fold f e (nelem-1---0))
+    in
+
+    (* Build expressions that assigns the correct values to the
+       is_valid variables using explicit string length. *)
+    let build_explicit_valid_xmm_i is_valid_xmm_i sizee =
+      (* Max size is nelem *)
+      let sizev = nt "sz" reg_32 in
+      let sizee = exp_ite (binop LT (it nelem reg_32) sizee) (it nelem reg_32) sizee in
+      let f acc i =
+        (* Current element is valid *)
+        let curr_valid = binop LE (it i reg_32) (Var sizev) in
+        Let(is_valid_xmm_i i, curr_valid, acc)
+      in (fun e -> Let(sizev, sizee, fold f e (nelem-1---0)))
     in
 
     (* Get var name indicating whether index in xmm num is a valid
        byte (before NULL byte). *)
     let is_valid =
       let vh = Hashtbl.create (2*nelem) in
-      match pcmpinfo with
-      | {Pcmp.len=Pcmp.Implicit} ->
-        (fun xmmnum index ->
-          try Hashtbl.find vh (xmmnum,index)
-          with Not_found ->
-            let v = nt ("is_valid_xmm"^string_of_int xmmnum^"_ele"^string_of_int index) r1 in
-            Hashtbl.add vh (xmmnum,index) v;
-            v)
-      | {Pcmp.len=Pcmp.Explicit} ->
-        unimplemented "explicit-length pcmpstr"
+      (fun xmmnum index ->
+        try Hashtbl.find vh (xmmnum,index)
+        with Not_found ->
+          let v = nt ("is_valid_xmm"^string_of_int xmmnum^"_ele"^string_of_int index) r1 in
+          Hashtbl.add vh (xmmnum,index) v;
+          v)
     in
     let is_valid_xmm1 index = is_valid 1 index
     and is_valid_xmm2 index = is_valid 2 index
@@ -1024,8 +1035,15 @@ let rec to_ir addr next ss pref =
     and is_valid_xmm2_e index = Var(is_valid_xmm2 index)
     in
 
-    let build_valid_xmm1 = build_valid_xmm_i is_valid_xmm1 is_valid_xmm1_e get_xmm1 in
-    let build_valid_xmm2 = build_valid_xmm_i is_valid_xmm2 is_valid_xmm2_e get_xmm2 in
+    let build_valid_xmm1,build_valid_xmm2 =
+      match pcmpinfo with
+      | {Pcmp.len=Pcmp.Implicit} ->
+        build_implicit_valid_xmm_i is_valid_xmm1 get_xmm1,
+        build_implicit_valid_xmm_i is_valid_xmm2 get_xmm2
+      | {Pcmp.len=Pcmp.Explicit} ->
+        build_explicit_valid_xmm_i is_valid_xmm1 eax_e,
+        build_explicit_valid_xmm_i is_valid_xmm2 edx_e
+    in
 
     let get_intres1_bit index = match imm8cb with
       | {Pcmp.agg=Pcmp.EqualAny} ->
@@ -2535,7 +2553,7 @@ let parse_instr g addr =
           let (r, rm, na) = parse_modrm prefix.opsize na in
 	  let (i, na) = parse_imm8 na in
           (Palignr(prefix.mopsize, r, rm, i), na)
-        | 0x62 | 0x63 ->
+        | 0x60 | 0x61 | 0x62 | 0x63 ->
           let (r, rm, na) = parse_modrm prefix.opsize na in
           let (i, na) = parse_imm8 na in
           (match i with
@@ -2550,11 +2568,8 @@ let parse_instr g addr =
           *)
           | Oimm imm ->
             let imm8cb = parse_imm8cb imm in
-            let pcmp = {Pcmp.out=(match b3 with
-                                 | 0x62 -> Pcmp.Mask
-                                 | 0x63 -> Pcmp.Index
-                                 | _ -> disfailwith "bug");
-                        Pcmp.len=Pcmp.Implicit} in
+            let pcmp = {Pcmp.out=if b3 land 0x1 = 0x1 then Pcmp.Mask else Pcmp.Index;
+                        Pcmp.len=if b3 land 0x2 = 0x2 then Pcmp.Implicit else Pcmp.Explicit} in
             (Pcmpstr(prefix.mopsize, r, rm, i, imm8cb, pcmp), na)
           | _ ->  unimplemented "unsupported non-imm op for pcmpistri")
         | b4 ->  unimplemented
