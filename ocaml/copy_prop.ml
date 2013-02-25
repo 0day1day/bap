@@ -50,8 +50,8 @@ module CPSpecSSA = struct
     let default _ = false
   end
 
-  let stmt_transfer_function stop_at g _ stmt l =
-    let l = match l with | L.Map m -> m | L.Top -> failwith "Expected Map, not Top" in
+  let stmt_transfer_function stop_at g (_bb,_) stmt l =
+    let l = match l with | L.Map m -> m | L.Top -> failwith (Printf.sprintf "Expected Map, not Top at %s" (Cfg_ssa.v2s _bb)) in
     L.Map (match stmt with
     | s when stop_at s ->
       VM.empty
@@ -105,8 +105,8 @@ module CPSpecAST = struct
     let default _ = false
   end
 
-  let stmt_transfer_function stop_at g loc stmt l =
-    let l = match l with | L.Map m -> m | L.Top -> failwith "Expected Map, not Top" in
+  let stmt_transfer_function stop_at g ((_bb,_) as loc) stmt l =
+    let l = match l with | L.Map m -> m | L.Top -> failwith (Printf.sprintf "Expected Map, not Top at %s" (Cfg_ast.v2s _bb)) in
     L.Map (match stmt with
     | s when stop_at s ->
       VM.empty
