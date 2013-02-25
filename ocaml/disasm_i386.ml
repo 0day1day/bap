@@ -1012,7 +1012,7 @@ let rec to_ir addr next ss pref =
       let sizee = exp_ite (binop LT (it nelem reg_32) sizee) (it nelem reg_32) sizee in
       let f acc i =
         (* Current element is valid *)
-        let curr_valid = binop LE (it i reg_32) (Var sizev) in
+        let curr_valid = binop LT (it i reg_32) (Var sizev) in
         Let(is_valid_xmm_i i, curr_valid, acc)
       in (fun e -> Let(sizev, sizee, fold f e (nelem-1---0)))
     in
