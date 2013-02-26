@@ -366,29 +366,40 @@ struct
     check_reduced2 k x y;
     (* Get the lower and upper bound for y, as shift amounts.  Shifts
        amounts are always in [0,k]. *)
+
     let (z1,z2) = toshifts k y
     (* Set the upper bits of a and b to 0 *)
     and aa = trunc k a
     and bb = trunc k b
     (* Shift and cast as signed number *)
     and shift n z = extend k (shifter n z) in
-    (* Shift lower bound of x by minimum shift amount *)
-    let a1 = shift aa z1
-    (* Shift lower bound of x by maximum shift amount *)
-    and a2 = shift aa z2
-    (* Shift upper bound of x by minimum shift amount *)
-    and b1 = shift bb z1
-    (* Shift upper bound of x by maximum shift amount *)
-    and b2 = shift bb z2
-    (* Compute new stride info. *)
-    and s' = match dir with
-      | `Rightshift -> int64_umax (Int64.shift_right_logical s1 z2) 1L
-      | `Leftshift -> int64_umax (Int64.shift_left s1 z2) 1L
+
+    (* Shift the lower bound by all possible shift amounts, and the
+       upper bound by all possible shift amounts.  The min/max of the
+       resulting values is the min/max bound of the shift result. *)
+
+    let open BatPervasives in
+    let mins = List.map (shift aa) (BatList.of_enum (z1--z2))
+    and maxs = List.map (shift bb) (BatList.of_enum (z1--z2)) in
+    let shifts = mins@maxs in
+
+    let l = BatList.reduce min shifts in
+    let u = BatList.reduce max shifts in
+
+    let sign x = x >= 0L in
+    let simpleshift =
+    (* We have a simple shift if all shifts never change the sign of
+       the value *)
+      let minok = List.for_all (fun x -> sign x = sign aa) mins in
+      let maxok = List.for_all (fun x -> sign x = sign bb) maxs in
+      minok && maxok
     in
-    (* Finally pick the lower and upper bounds.  All the values above
-       are checked because of sign overflow. *)
-    let l = min (min a1 a2) (min b1 b2)
-    and u = max (max a1 a2) (max b1 b2) in
+
+    let s' = match simpleshift, dir with
+      | true, `Rightshift -> int64_umax (Int64.shift_right_logical s1 z2) 1L
+      | true, `Leftshift -> int64_umax (Int64.shift_left s1 z2) 1L
+      | false, _ -> 1L
+    in
     renorm k (k,s',l,u)
 
   (** Logical right-shift *)
@@ -822,6 +833,8 @@ struct
       | _ -> raise(Unimplemented "unimplemented unop") in
     g
 
+  let si_to_vs_cast_function = si_to_vs_unop_function
+
   let concat = si_to_vs_binop_function SI.concat
 
   let yes = [(global, SI.yes)]
@@ -978,6 +991,13 @@ struct
       | NOT as unop
         -> VS.si_to_vs_unop_function (SimpleVSA.DFP.unop_to_si_function unop)
 
+    let cast_to_vs_function = function
+      | CAST_UNSIGNED
+      | CAST_SIGNED
+      | CAST_HIGH
+      | CAST_LOW as ct
+        -> VS.si_to_vs_cast_function (SimpleVSA.DFP.cast_to_si_function ct)
+
 
     let rec stmt_transfer_function _ _ _ s l =
       match s with
@@ -1009,8 +1029,10 @@ struct
                 (*     (do_find x) xs *)
                 (* | Phi [] -> *)
                 (*   failwith "Encountered empty Phi expression" *)
-                | Cast _ ->
-                  raise(Unimplemented "FIXME")
+                | Cast (ct, t, x) ->
+                  let f = cast_to_vs_function ct in
+                  let k = Typecheck.bits_of_width t in
+                  f k (exp2vs x)
                 | _ ->
                   raise(Unimplemented "unimplemented expression type"))
                 with Unimplemented _ | Invalid_argument _ -> VS.top (bits_of_width (Typecheck.infer_ast ~check:false e))
@@ -1382,8 +1404,10 @@ struct
                ie: _e and _t should be the same for all loads and
                stores of m. *)
             MemStore.read (bits_of_width t) ?o (do_find_ae l m) (exp2vs ?o l i)
-          | Cast _ ->
-            raise(Unimplemented "FIXME")
+          | Cast (ct, t, x) ->
+            let f = RegionVSA.DFP.cast_to_vs_function ct in
+            let k = Typecheck.bits_of_width t in
+            f k (exp2vs ?o l x)
           | Load _ | Concat _ | Extract _ | Ite _ | Unknown _ | Let _ | Store _ ->
             raise(Unimplemented "unimplemented expression type"))
           with Unimplemented s | Invalid_argument s -> DV.dprintf "unimplemented %s %s!" s (Pp.ast_exp_to_string e); VS.top nbits
