@@ -168,6 +168,10 @@ TAGS: $(SOURCES)
 runtop:	top
 	./bap.top -I $(BIGINT) -I $(BATT)
 
+.PHONY: debug
+debug:
+	@echo ocamldebug -I $(BIGINT) -I $(BATT) -I $(BAP_DIR)/ocaml -I $(BAP_DIR)/utils
+
 libbfd.idl : bfdarch.idl
 
 bfdarch.idl:

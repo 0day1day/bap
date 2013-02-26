@@ -5,7 +5,8 @@
     Debugging output is controlled via environment variables:
     - [BAP_LOGFILE]
     If set, debug messages will be written to the file
-    $BAP_LOGFILE. The default is to write to standard error.
+    $BAP_LOGFILE. The default is to write to standard error. Alternatively,
+    the set_logfile function changes the file at run-time.
 
     - [BAP_DEBUG_MODULES]
     Specifies which modules should have debugging enabled or disabled. The list
@@ -27,6 +28,9 @@
 
     @author David Brumley
 *)
+
+val set_logfile : out_channel -> unit
+(** Sets the file to which the debug messages will be written *)
 
 (** A DEBUG module is used by client code to add debugging code that
     can be easily enabled or disabled through environment variables. *)
