@@ -2568,7 +2568,7 @@ let parse_instr g addr =
           *)
           | Oimm imm ->
             let imm8cb = parse_imm8cb imm in
-            let pcmp = {Pcmp.out=if b3 land 0x1 = 0x1 then Pcmp.Mask else Pcmp.Index;
+            let pcmp = {Pcmp.out=if b3 land 0x1 = 0x1 then Pcmp.Index else Pcmp.Mask;
                         Pcmp.len=if b3 land 0x2 = 0x2 then Pcmp.Implicit else Pcmp.Explicit} in
             (Pcmpstr(prefix.mopsize, r, rm, i, imm8cb, pcmp), na)
           | _ ->  unimplemented "unsupported non-imm op for pcmpistri")
