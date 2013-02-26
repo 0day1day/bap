@@ -74,7 +74,6 @@ let speclist =
     ("-ir", (* to be removed in next versions *)
      Arg.String(fun s -> addinput (`Il s)),
      "<file> Read input from an IL file. (deprecated)");
-    ("-always-vex", Arg.Set Asmir.always_vex, "Only use vex to lift to IL" );
   ] @ trace_speclist
 
 

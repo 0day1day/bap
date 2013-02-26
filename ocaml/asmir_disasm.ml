@@ -123,6 +123,7 @@ module Make(D:DISASM)(F:FUNCID) = struct
       try c, CA.find_label c (Addr a)
       with Not_found ->
         let (prog, next) = Asmir.asm_addr_to_bap p a in
+        if Asmir.bap_fully_modeled prog = false then raise Asmir.Memory_error;
         Hashtbl.replace succh a next;
 
         let (c', edges, bbs, fallthrough) = Cfg_ast.add_prog c prog in

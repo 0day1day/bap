@@ -22,8 +22,6 @@ module BArray = Bigarray.Array1
 exception Disassembly_error;;
 exception Memory_error;;
 
-let always_vex = ref false;;
-
 type arch = Libbfd.bfd_architecture
 type asmprogram = {asmp : Libasmir.asm_program_t;
 		   arch : arch;
@@ -542,7 +540,7 @@ let get_asm = function
 (*     wprintf "Could not check equivalence for %Lx: Not_found" a *)
 
 
-(** Translate only one address of a  Libasmir.asm_program_t to Vine *)
+(** Translate only one address of a  Libasmir.asm_program_t to BAP *)
 let asm_addr_to_bap {asmp=prog; arch=arch; get_exec=get_exec} addr =
   let fallback() =
     let g = gamma_for_arch arch in
@@ -562,29 +560,26 @@ let asm_addr_to_bap {asmp=prog; arch=arch; get_exec=get_exec} addr =
       destroy_bap_block block;
       (ir, next)
   in
-  if (!always_vex) then fallback() 
-  else (
-    try 
-      let (ir,na) as v = 
-	(try (Disasm.disasm_instr arch get_exec addr)
-	 with Disasm_i386.Disasm_i386_exception s -> 
-	   DTest.dprintf "BAP unknown disasm_instr %Lx: %s" addr s;
-           DTest.dprintf "Faulting instruction: %s" (Libasmir.asmir_string_of_insn prog addr);
-	   DV.dprintf "disasm_instr %Lx: %s" addr s; raise Disasm.Unimplemented
-	)
-      in
-      DV.dprintf "Disassembled %Lx directly" addr;
+  try 
+    let (ir,na) as v = 
+      (try (Disasm.disasm_instr arch get_exec addr)
+       with Disasm_i386.Disasm_i386_exception s -> 
+	 DTest.dprintf "BAP unknown disasm_instr %Lx: %s" addr s;
+         DTest.dprintf "Faulting instruction: %s" (Libasmir.asmir_string_of_insn prog addr);
+	 DV.dprintf "disasm_instr %Lx: %s" addr s; raise Disasm.Unimplemented
+      )
+    in
+    DV.dprintf "Disassembled %Lx directly" addr;
       (* if DCheck.debug then check_equivalence addr v (fallback()); *)
-	  (* If we don't have a string disassembly, use binutils disassembler *)
-      (match ir with
-      | Label(l, [])::rest ->
-		(Label(l, [Asm(Libasmir.asmir_string_of_insn prog addr)])::rest,
-		 na)
-      | _ -> v)
-	with Disasm.Unimplemented ->
-      DV.dprintf "Disassembling %Lx through VEX" addr;
-      fallback()
-  )
+      (* If we don't have a string disassembly, use binutils disassembler *)
+    (match ir with
+    | Label(l, [])::rest ->
+      (Label(l, [Asm(Libasmir.asmir_string_of_insn prog addr)])::rest,
+       na)
+    | _ -> v)
+  with Disasm.Unimplemented ->
+    DV.dprintf "Disassembling %Lx through VEX" addr;
+    fallback()
 
 let flatten ll =
 	List.rev (List.fold_left (fun accu l -> List.rev_append l accu) [] ll)
@@ -614,7 +609,7 @@ let asmprogram_section_to_bap p s =
   let size = bfd_section_size s and vma = bfd_section_vma s in
   asmprogram_to_bap_range p vma (Int64.add vma size)
 
-(** Translate an entire Libasmir.asm_program_t into a Vine program *)
+(** Translate an entire Libasmir.asm_program_t into a BAP program *)
 let asmprogram_to_bap ?(init_ro=false) p =
   let irs = List.map 
 	(fun s -> 
@@ -625,6 +620,11 @@ let asmprogram_to_bap ?(init_ro=false) p =
     let m = gamma_lookup g "$mem" in
     get_rodata_assignments ~prepend_to:ir m p
   else ir
+
+let bap_fully_modeled p =
+  List.for_all (function
+    | Special _ -> false
+    | _ -> true) p
 
 (* Returns a single ASM instruction (as a list IL statements) from a
    sequence of bytes. *)

@@ -23,8 +23,6 @@ type arch
 val arch_i386 : arch
 val arch_arm : arch
 
-val always_vex : bool ref
-
 type varctx
 
 val gamma_create : Var.t -> Var.t list -> varctx
@@ -67,6 +65,11 @@ val asmprogram_to_bap : ?init_ro:bool -> asmprogram -> Ast.program
 val asm_addr_to_bap : (*varctx ->*) asmprogram -> address_t -> Ast.program * address_t
 
 val asmprogram_to_bap_range : ?init_ro:bool -> asmprogram -> address_t -> address_t  -> Ast.program
+
+(** [bap_fully_modeled p] returns [true] when [p] represents a fully
+    lifted BAP program. [bap_lift_success p] will return [false] if an
+    unmodeled instruction or system call is encountered. *)
+val bap_fully_modeled : Ast.program -> bool
 
 (** Load entire trace into memory at once.  If pin is true, loads a
     PinTrace.  If pin is false, loads an old, TEMU-based trace format. *)
