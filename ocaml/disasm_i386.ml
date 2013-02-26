@@ -181,7 +181,6 @@ type opcode =
   | Sahf
   | Lahf
   | Add of (typ * operand * operand)
-  | Pand of (typ * operand * operand)
   | Adc of (typ * operand * operand)
   | Inc of typ * operand
   | Dec of typ * operand
@@ -195,7 +194,6 @@ type opcode =
   | And of (typ * operand * operand)
   | Or of (typ * operand * operand)
   | Xor of (typ * operand * operand)
-  | Pxor of (typ * operand * operand)
   | Test of (typ * operand * operand)
   | Ptest of (typ * operand * operand)
   | Not of (typ * operand)
@@ -213,6 +211,7 @@ type opcode =
   | Fldcw of operand
   | Fld of operand
   | Fst of (operand * bool)
+  | Pbinop of (typ * binop_type * string * operand * operand)
   | Pmovmskb of (typ * operand * operand)
   | Pcmpeq of (typ * typ * operand * operand)
   | Palignr of (typ * operand * operand * operand)
@@ -906,6 +905,8 @@ let rec to_ir addr next ss pref =
       else []
     in
     d::al
+  | Pbinop(t, bop, s, o1, o2) ->
+    [assn t o1 (binop bop (op2e t o1) (op2e t o2))]
   | Pcmpeq (t,elet,dst,src) ->
       let ncmps = (bits_of_width t) / (bits_of_width elet) in
       let elebits = bits_of_width elet in
@@ -1201,9 +1202,6 @@ let rec to_ir addr next ss pref =
     let n = (Typecheck.bits_of_width t) / 8 in
     let e = concat_explist (map get_bit ((n-1)---0)) in
     [assn t dst e]
-  | Pxor(t, o1, o2) ->
-    (* Pxor does not set any flags! *)
-    [assn t o1 (op2e t o1 ^* op2e t o2)]
   | Lea(r, a) when pref = [] ->
     [assn r32 r a]
   | Call(o1, ra) when pref = [] ->
@@ -1649,9 +1647,6 @@ let rec to_ir addr next ss pref =
     :: move cf exp_false
     :: move af (Unknown("AF is undefined after and", r1))
     :: set_pszf t (op2e t o1)
-  | Pand(t, o1, o2) ->
-    (* Pand does not set any flags! *)
-    [assn t o1 (op2e t o1 &* op2e t o2)]
   | Or(t, o1, o2) ->
     assn t o1 (op2e t o1 |* op2e t o2)
     :: move oF exp_false
@@ -1938,10 +1933,8 @@ module ToStr = struct
     | Xadd(t,d,s) -> Printf.sprintf "xadd %s, %s" (opr d) (opr s)
     | Xchg(t,d,s) -> Printf.sprintf "xchg %s, %s" (opr d) (opr s)
     | And(t,d,s) -> Printf.sprintf "and %s, %s" (opr d) (opr s)
-    | Pand(t,d,s) -> Printf.sprintf "pand %s, %s" (opr d) (opr s)
     | Or(t,d,s) -> Printf.sprintf "or %s, %s" (opr d) (opr s)
     | Xor(t,d,s) -> Printf.sprintf "xor %s, %s" (opr d) (opr s)
-    | Pxor(t,d,s)  -> Printf.sprintf "pxor %s, %s" (opr d) (opr s)
     | Test(t,d,s) -> Printf.sprintf "test %s, %s" (opr d) (opr s)
     | Ptest(t,d,s) -> Printf.sprintf "ptest %s, %s" (opr d) (opr s)
     | Not(t,o) -> Printf.sprintf "not %s" (opr o)
@@ -1963,6 +1956,7 @@ module ToStr = struct
     | Leave _ -> "leave"
     | Interrupt(o) -> Printf.sprintf "int %s" (opr o)
     | Sysenter -> "sysenter"
+    | Pbinop(t,_,opstr,d,s) -> Printf.sprintf "%s %s, %s" opstr (opr d) (opr s)
 
   let to_string pref op =
     disfailwith "fallback to libdisasm"
@@ -2668,13 +2662,16 @@ let parse_instr g addr =
         (Bswap(prefix.opsize, Oreg(b2 & 7)), na)
       | 0xdb ->
         let r, rm, na = parse_modrm32 na in
-        (Pand(prefix.mopsize, r, rm), na)
+        (Pbinop(prefix.mopsize, AND, "pand", r, rm), na)
       | 0xd7 ->
         let r, rm, na = parse_modrm32 na in
         (Pmovmskb(prefix.mopsize, r, rm), na)
+      | 0xeb ->
+        let r, rm, na = parse_modrm32 na in
+        (Pbinop(prefix.mopsize, OR, "por", r, rm), na)
       | 0xef ->
 	let d, s, na = parse_modrm32 na in
-	(Pxor(prefix.mopsize,d,s), na)
+	(Pbinop(prefix.mopsize, XOR, "pxor", d,s), na)
       | _ -> unimplemented 
 	(Printf.sprintf "unsupported opcode: %02x %02x" b1 b2)
     )
