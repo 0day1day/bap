@@ -1,5 +1,12 @@
 New in BAP 0.7:
-* Updated to support 3.12 <= ocaml <= 4.00
+* BAP now supports ocaml 4.00 (see INSTALL)
+* BAP is supported on OS X (see INSTALL)
+* New support for streaming symbolic execution of traces
+* New VC framework
+* New VC implementations: FWP and PWP
+* Misc. bug fixes and performance improvements to SMT printers
+* Steensgard loop nesting forest algorithm
+* Improved loop unrolling for irreducible loops using Steensgard's algorithm
 
 New in BAP 0.6:
 * General bug fixes to PIN trace tool and trace reading API
