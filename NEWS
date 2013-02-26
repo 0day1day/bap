@@ -7,6 +7,7 @@ New in BAP 0.7:
 * Misc. bug fixes and performance improvements to SMT printers
 * Steensgard loop nesting forest algorithm
 * Improved loop unrolling for irreducible loops using Steensgard's algorithm
+* New function identification heuristics for stripped binaries
 
 New in BAP 0.6:
 * General bug fixes to PIN trace tool and trace reading API
