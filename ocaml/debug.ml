@@ -1,23 +1,22 @@
-let debug_string = prerr_string
+let logfile = ref stderr
+let set_logfile log = logfile := log
 
-let debug_endline = prerr_endline
+let debug_string s = output_string !logfile s
+let debug_endline s =
+  debug_string s;
+  debug_string "\n";
+  flush !logfile
 
 (* Disabling global debugging turns off all debug functionality for all modules *)
 let global_debug = ref true
 let set_global_debug v = global_debug := v
 
-let output_endline oc s =
-  output_string oc s;
-  output_char oc '\n';
-  flush oc
-
 (* Use the appropriate logfile, as per environment variables *)
-let (debug_string,debug_endline) =
+let () =
   try
     let filename = Sys.getenv "BAP_LOGFILE" in
-    let oc = open_out_gen [Open_append;Open_creat] 0o664 filename in
-    (output_string oc, output_endline oc)
-  with Not_found -> (debug_string,debug_endline)
+    set_logfile (open_out_gen [Open_append;Open_creat] 0o664 filename)
+  with Not_found -> ()
 
 
 let get_env_options varname defvalue = 

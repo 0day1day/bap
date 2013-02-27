@@ -52,7 +52,8 @@ let speclist =
      "Perform consistency checks"
     )
   ::("-trace-check-all",
-     Arg.Set Traces.checkall,
+     Arg.Unit (fun () -> Traces.checkall := true;
+       Traces.consistency_check := true),
      "Perform extra consistency checks possible when all instructions are logged"
     )
   ::("-trace-concrete",
