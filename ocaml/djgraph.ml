@@ -8,20 +8,16 @@
  *   DOI=10.1145/236114.236115 http://doi.acm.org/10.1145/236114.236115
  *)
 
+(* TODO (ed) Add djgraph.mli file *)
+(* TODO (ed) Add dot printer? Would be a good test of API, but would
+   require a slightly more complex signature. (label_to_string, etc.)
+   Maybe we can create a separate functor for this. *)
+
 (* The miminal set of graph features necessary for DJGraph.Make. *)
 module type G = sig
-  type t
+  include Dominator.G
 
-  module V : Graph.Sig.VERTEX
-
-  val iter_vertex : (V.t -> unit) -> t -> unit
-  val nb_vertex : t -> int
   val iter_edges : (V.t -> V.t -> unit) -> t -> unit
-
-  (* Required to support Dominator.G. *)
-  val pred : t -> V.t -> V.t list
-  val succ : t -> V.t -> V.t list
-  val fold_vertex : (V.t -> 'a -> 'a) -> t -> 'a -> 'a
 end
 
 (*
@@ -37,8 +33,11 @@ module DJE =  struct
 
   exception NotComparable
 
+  (* XXX (ed) It seems like we should encapsulate the original edge,
+     or at least the edge label, into our edge type, as we do for
+     vertices. *)
   (* TODO(awreece) Can we avoid needing a comparison function? *)
-  let compare l r = raise NotComparable
+  let compare = compare
   let default = D
 end
 
@@ -73,6 +72,7 @@ module Make: MakeType = functor(G : G) -> struct
   include DJG
   open DJG
 
+  (* TODO (ed) These seem like they would fit in module V better. *)
   (*
    * to_underlying : V.t -> G.V.t
    *
