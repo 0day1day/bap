@@ -825,7 +825,7 @@ let rec to_ir addr next ss pref =
       ) in
       load_stmt::
       esp_stmts@
-      [Jmp(Var temp, [StrAttr "ret"])]
+      [Jmp(Var temp, reta)]
   | Mov(t, dst, src, condition) when pref = [] || pref = [pref_addrsize] ->
     let c_src = (match condition with 
       | None -> op2e t src
