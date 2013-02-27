@@ -1,0 +1,253 @@
+.include [
+         .module type
+]
+
+% See ast.ml for explanations
+
+.variant [
+         .name exp
+
+         .option [
+                 .type load
+         ]
+
+         .option [
+                 .type store
+         ]
+
+         .option [
+                 .type binop
+         ]
+
+         .option [
+                 .type unop
+         ]
+
+         .option [
+                 .type var
+         ]
+
+         .option [
+                 .type lab
+         ]
+
+         .option [
+                 .type inte
+         ]
+
+         .option [
+                 .type cast
+         ]
+
+         .option [
+                 .type let
+         ]
+
+         .option [
+                 .type unknown
+         ]
+
+         .option [
+                 .type ite
+         ]
+
+         .option [
+                 .type extract
+         ]
+
+         .option [
+                 .type concat
+         ]
+]
+
+.record [
+        .name load
+
+        .field [
+               .name memory
+               .type exp
+        ]
+
+        .field [
+               .name address
+               .type exp
+        ]
+
+        .field [
+               .name endian
+               .type exp
+        ]
+
+        .field [
+               .type type
+        ]
+]
+
+.record [
+        .name store
+
+        .field [
+               .name memory
+               .type exp
+        ]
+
+        .field [
+               .name address
+               .type exp
+        ]
+
+        .field [
+               .name value
+               .type exp
+        ]
+
+        .field [
+               .name endian
+               .type exp
+        ]
+
+        .field [
+               .type type
+        ]
+]
+
+.record [
+        .name binop
+
+        .field [
+               .type binop-type
+        ]
+
+        .field [
+               .name lexp
+               .type exp
+        ]
+
+        .field [
+               .name rexp
+               .type exp
+        ]
+]
+
+.record [
+        .name unop
+
+        .field [
+               .type unop-type
+        ]
+
+        .field [
+               .type exp
+        ]
+]
+
+.record [
+        .name inte
+
+        .field [
+               .name int
+               .type binary
+        ]
+
+        .field [
+               .type type
+        ]
+]
+
+.record [
+        .name cast
+
+        .field [
+               .type cast-type
+        ]
+
+        .field [
+               .name new-type
+               .type type
+        ]
+
+        .field [
+               .type exp
+        ]
+]
+
+.record [
+        .name let
+
+        .field [
+               .type var
+        ]
+
+        .field [
+               .name e1
+               .type exp
+        ]
+
+        .field [
+               .name e2
+               .type exp
+        ]
+]
+
+.record [
+        .name unknown
+
+        .field [
+               .type string
+        ]
+
+        .field [
+               .type type
+        ]
+]
+
+.record [
+        .name ite
+
+        .field [
+               .name condition
+               .type exp
+        ]
+
+        .field [
+               .name iftrue
+               .type exp
+        ]
+
+        .field [
+               .name iffalse
+               .type exp
+        ]
+]
+
+.record [
+        .name extract
+
+        .field [
+               .name hbit
+               .type int
+        ]
+
+        .field [
+               .name lbit
+               .type int
+        ]
+
+        .field [
+               .type exp
+        ]
+]
+
+.record [
+        .name concat
+
+        .field [
+               .name le
+               .type exp
+        ]
+
+        .field [
+               .name re
+               .type exp
+        ]
+]

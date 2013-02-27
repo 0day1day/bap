@@ -1,0 +1,169 @@
+.include [
+         .module exp
+]
+
+% See ast.ml for explanations
+
+.variant [
+         .name stmt
+
+         .option [
+                 .type move
+         ]
+
+         .option [
+                 .type jmp
+         ]
+
+         .option [
+                 .type cjmp
+         ]
+
+         .option [
+                 .type label-stmt
+         ]
+
+         .option [
+                 .type halt
+         ]
+
+         .option [
+                 .type assert
+         ]
+
+         .option [
+                 .type assume
+         ]
+
+         .option [
+                 .type comment
+         ]
+
+         .option [
+                 .type special
+         ]
+
+]
+
+.record [
+        .name move
+
+        .field [
+               .type var
+        ]
+
+        .field [
+               .type exp
+        ]
+
+        .field [
+               .type attributes
+        ]
+]
+
+.record [
+        .name jmp
+
+        .field [
+               .type exp
+        ]
+
+        .field [
+               .type attributes
+        ]
+]
+
+.record [
+        .name cjmp
+
+        .field [
+               .name cond
+               .type exp
+        ]
+
+        .field [
+               .name iftrue
+               .type exp
+        ]
+
+        .field [
+               .name iffalse
+               .type exp
+        ]
+
+        .field [
+               .type attributes
+        ]
+]
+
+.record [
+        .name label-stmt
+
+        .field [
+               .type label
+        ]
+
+        .field [
+               .type attributes
+        ]
+]
+
+.record [
+        .name halt
+
+        .field [
+               .type exp
+        ]
+
+        .field [
+               .type attributes
+        ]
+]
+
+.record [
+        .name assert
+
+        .field [
+               .type exp
+        ]
+
+        .field [
+               .type attributes
+        ]
+]
+
+.record [
+        .name assume
+
+        .field [
+               .type exp
+        ]
+
+        .field [
+               .type attributes
+        ]
+]
+
+.record [
+        .name comment
+
+        .field [
+               .type string
+        ]
+
+        .field [
+               .type attributes
+        ]
+]
+
+.record [
+        .name special
+
+        .field [
+               .type string
+        ]
+
+        .field [
+               .type attributes
+        ]
+]

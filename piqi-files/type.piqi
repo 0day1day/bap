@@ -1,0 +1,321 @@
+.variant [
+         .name type
+
+         .option [
+                 .type reg
+         ]
+
+         .option [
+                 .type tmem
+         ]
+
+         .option [
+                 .type array
+         ]
+]
+
+.alias [
+        .name reg
+        .type int
+]
+
+.record [
+        .name tmem
+
+        .field [
+               .name indextype
+               .type type
+        ]
+]
+
+.record [
+        .name array
+
+        .field [
+               .name index-type
+               .type type
+        ]
+
+        .field [
+               .name element-type
+               .type type
+        ]
+]
+
+.variant [
+        .name label
+
+        .option [
+                .name name
+                .type string
+        ]
+
+        .option [
+                .name addr
+                .type address
+        ]
+]
+
+.enum [
+      .name cast-type
+
+      .option [ .name cast-unsigned ]
+      .option [ .name cast-signed ]
+      .option [ .name cast-high ]
+      .option [ .name cast-low ]
+]
+
+.enum [
+      .name binop-type
+
+      .option [ .name plus ]
+      .option [ .name minus ]
+      .option [ .name times ]
+      .option [ .name divide ]
+      .option [ .name sdivide ]
+      .option [ .name mod ]
+      .option [ .name smod ]
+      .option [ .name lshift ]
+      .option [ .name rshift ]
+      .option [ .name arshift ]
+      .option [ .name and ]
+      .option [ .name or ]
+      .option [ .name xor ]
+      .option [ .name eq ]
+      .option [ .name neq ]
+      .option [ .name lt ]
+      .option [ .name le ]
+      .option [ .name slt ]
+      .option [ .name sle ]
+]
+
+.enum [
+      .name unop-type
+
+      .option [ .name neg ]
+      .option [ .name not ]
+]
+
+.record [
+        .name var
+
+        .field [
+               .name name
+               .type string
+        ]
+
+        .field [
+               .name id
+               .type int
+        ]
+
+        .field [
+               .type type
+        ]
+]
+
+.alias [
+       .name lab
+       .type string
+]
+
+.variant [
+        .name attribute
+
+        .option [
+               .type asm
+        ]
+
+        .option [
+               .type address
+        ]
+
+        .option [
+               .type liveout
+        ]
+
+        .option [
+               .type strattr
+        ]
+
+        .option [
+               .type context
+        ]
+
+        .option [
+               .type thread-id
+        ]
+
+        .option [
+               .type synthetic
+        ]
+]
+
+.list [
+      .name attributes
+      .type attribute
+]
+
+.alias [
+       .name asm
+       .type string
+]
+
+.alias [
+       .name address
+       .type int64
+]
+
+.record [
+       .name liveout
+]
+
+.record [
+       .name synthetic
+]
+
+.alias [
+       .name strattr
+       .type string
+]
+
+.alias [
+       .name thread-id
+       .type uint64
+]
+
+.variant [
+         .name operand-info-specific
+
+         .option [
+                 .type mem-operand
+                 .code 1
+         ]
+
+         .option [
+                 .type reg-operand
+                 .code 2
+         ]
+]
+
+% Represent a register operand value
+.record [
+        .name reg-operand
+        % Register name
+        .field [
+               .name name
+               .type string
+               .code 1
+        ]
+]
+
+.alias [
+       .name bit-length
+       .type int
+]
+
+.alias [
+       .name taint-id
+       .type uint64
+]
+
+.record [
+      .name operand-usage
+
+      % Is this operand read during this instruction?
+      .field [
+             .name read
+             .type bool
+             .code 1
+      ]
+
+      % Is this operand written to?
+      .field [
+             .name written
+             .type bool
+             .code 2
+      ]
+
+      % Is this operand used as the index of a memory lookup?
+      .field [
+             .name index
+             .type bool
+             .code 3
+      ]
+
+      % Is this operand used as the base of a memory lookup?
+      .field [
+             .name base
+             .type bool
+             .code 4
+      ]
+]
+
+% Represent a memory operand value
+.record [
+        .name mem-operand
+
+        % Address
+        .field [
+               .type address
+               .code 1
+        ]
+]
+
+.variant [
+         .name taint-info
+
+         % Operand not tainted
+         .option [
+                 .name no-taint
+                 .code 1
+         ]
+
+         % Taint from a single source
+         .option [
+                 .type taint-id
+                 .code 2
+         ]
+
+         % Taint from more than one source
+         .option [
+                 .name taint-multiple
+                 .code 3
+         ]
+]
+
+.record [
+        .name context
+
+        % Mem/register specific stuff.
+        .field [
+               .type operand-info-specific
+               .code 1
+        ]
+
+
+        % Size in bits
+        .field [
+               .type bit-length
+               .code 2
+        ]
+
+        % Usage (read, written, both)
+        .field [
+               .type operand-usage
+               .code 3
+        ]
+
+        % Taint information
+        .field [
+               .type taint-info
+               .code 4
+        ]
+
+        % Value
+        .field [
+               .name value
+               .type binary
+               .code 5
+        ]
+]
