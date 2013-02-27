@@ -2537,15 +2537,22 @@ let parse_instr g addr =
       | 0x31 -> (Rdtsc, na)
       | 0x34 -> (Sysenter, na)
       | 0x38 ->
-        let b2 = Char.code (g na) and na = s na in
-        (match b2 with
+        (* Three byte opcodes *)
+        let b3 = Char.code (g na) and na = s na in
+        (match b3 with
+        | 0x37 when prefix.opsize_override ->
+          let r, rm, na = parse_modrm32 na in
+          (Pcmp(reg_128, reg_64, SLT, "pcmpgt", r, rm), na)
+        | 0x29 when prefix.opsize_override ->
+          let r, rm, na = parse_modrm32 na in
+          (Pcmp(reg_128, reg_64, EQ, "pcmpeq", r, rm), na)
         | 0x17 when prefix.opsize_override ->
           let d, s, na = parse_modrm32 na in
           (Ptest(r128, d, s), na)
         | 0x00 ->
           let d, s, na = parse_modrm32 na in
           (Pshufb(prefix.mopsize, d, s), na)
-        | _ -> disfailwith (Printf.sprintf "opcode unsupported: 0f 38 %02x" b2))
+        | _ -> disfailwith (Printf.sprintf "opcode unsupported: 0f 38 %02x" b3))
       | 0x3a ->
         let b3 = Char.code (g na) and na = s na in
         (match b3 with
