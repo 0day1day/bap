@@ -4,6 +4,11 @@
 
 % See ast.ml for explanations
 
+.list [
+      .name program
+      .type stmt
+]
+
 .variant [
          .name stmt
 
