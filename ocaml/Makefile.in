@@ -41,6 +41,7 @@ export SOURCES = \
 	util.mli util.ml \
 	big_int_convenience.ml \
 	dominator.ml \
+	djgraph.ml \
 	graphDataflow.mli graphDataflow.ml \
 	type.mli type.ml \
 	var.mli var.ml \
