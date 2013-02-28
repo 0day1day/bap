@@ -214,6 +214,7 @@ type opcode =
   | Fld of operand
   | Fst of (operand * bool)
   | Punpck of (typ * typ * order * operand * operand) (* dest size, element size, low/high elements, dest, src *)
+  | Ppackedbinop of (typ * typ * binop_type * string * operand * operand) (* Perform a generic packed binary operation. dest size, element size, binop, assembly string, dest, src *)
   | Pbinop of (typ * binop_type * string * operand * operand)
   | Pmovmskb of (typ * operand * operand)
   | Pcmp of (typ * typ * binop_type * string * operand * operand)
@@ -512,6 +513,15 @@ let lt i t = Int(Arithmetic.to_big_int (big_int_of_int64 i,t), t)
 
 let i32 i = Int(biconst i, r32)
 let it i t = Int(biconst i, t)
+
+(* Get elemt from low opcode bits *)
+let lowbits2elemt b =
+  match b & 3 with
+  | 0 -> reg_8
+  | 1 -> reg_16
+  | 2 -> reg_32
+  | 3 -> reg_64
+  | _ -> disfailwith "invalid"
 
 (* converts a register number to the corresponding 32bit register variable *)
 let bits2reg32 = function
@@ -929,23 +939,40 @@ let rec to_ir addr next ss pref =
     [move st se;
      move dt de;
      assn t d e]
+  | Ppackedbinop(t, et, bop, _, d, s) ->
+    let nelem = match t, et with
+      | Reg n, Reg n' -> n / n'
+      | _ -> disfailwith "invalid"
+    in
+    let getelement o i =
+      (* assumption: immediate operands are repeated for all vector
+         elements *)
+      match o with
+      | Oimm i -> op2e et o
+      | _ -> extract_element et (op2e t o) i
+    in
+    let f i =
+      binop bop (getelement d i) (getelement s i)
+    in
+    let e = concat_explist (map f ((nelem-1)---0)) in
+    [assn t d e]
   | Pbinop(t, bop, s, o1, o2) ->
     [assn t o1 (binop bop (op2e t o1) (op2e t o2))]
   | Pcmp (t,elet,bop,_,dst,src) ->
-      let ncmps = (bits_of_width t) / (bits_of_width elet) in
-      let elebits = bits_of_width elet in
-      let src = match src with
-        | Oreg i -> op2e t src
-        | Oaddr a -> load t a
-        | Oimm _ | Oseg _ -> disfailwith "invalid"
-      in
-      let compare_region i =
-        let byte1 = Extract(biconst (i*elebits-1), biconst ((i-1)*elebits), src) in
-        let byte2 = Extract(biconst (i*elebits-1), biconst ((i-1)*elebits), op2e t dst) in
-        let tmp = nt ("t" ^ string_of_int i) elet in
-        Var tmp, move tmp (Ite(binop bop byte1 byte2, lt (-1L) elet, lt 0L elet))
-      in
-      let indices = BatList.init ncmps (fun i -> i + 1) in (* list 1-nbytes *)
+    let ncmps = (bits_of_width t) / (bits_of_width elet) in
+    let elebits = bits_of_width elet in
+    let src = match src with
+      | Oreg i -> op2e t src
+      | Oaddr a -> load t a
+      | Oimm _ | Oseg _ -> disfailwith "invalid"
+    in
+    let compare_region i =
+      let byte1 = Extract(biconst (i*elebits-1), biconst ((i-1)*elebits), src) in
+      let byte2 = Extract(biconst (i*elebits-1), biconst ((i-1)*elebits), op2e t dst) in
+      let tmp = nt ("t" ^ string_of_int i) elet in
+      Var tmp, move tmp (Ite(binop bop byte1 byte2, lt (-1L) elet, lt 0L elet))
+    in
+    let indices = BatList.init ncmps (fun i -> i + 1) in (* list 1-nbytes *)
       let comparisons = List.map compare_region indices in
       let temps, cmps = List.split comparisons in
       let temps = List.rev temps in
@@ -1984,7 +2011,8 @@ module ToStr = struct
     | Leave _ -> "leave"
     | Interrupt(o) -> Printf.sprintf "int %s" (opr o)
     | Sysenter -> "sysenter"
-    | Pbinop(t,_,opstr,d,s) -> Printf.sprintf "%s %s, %s" opstr (opr d) (opr s)
+    | Pbinop(_,_,opstr,d,s) -> Printf.sprintf "%s %s, %s" opstr (opr d) (opr s)
+    | Ppackedbinop(_,_,_,opstr,d,s) -> Printf.sprintf "%s %s, %s" opstr (opr d) (opr s)
 
   let to_string pref op =
     disfailwith "fallback to libdisasm"
@@ -2638,9 +2666,23 @@ let parse_instr g addr =
           | _ -> disfailwith "impossible" in
         (Pcmp(prefix.mopsize, elet, bop, bstr, r, rm), na)
       | 0x70 when prefix.opsize = r16 ->
-          let r, rm, na = parse_modrm prefix.opsize na in
-          let i, na = parse_imm8 na in
-          (Pshufd(r, rm, i), na)
+        let r, rm, na = parse_modrm prefix.opsize na in
+        let i, na = parse_imm8 na in
+        (Pshufd(r, rm, i), na)
+      | 0x71 | 0x72 | 0x73 ->
+        let t = prefix.mopsize in
+        let r, rm, na = parse_modrm32 na in
+        let bop, str, et = match b2, r with
+          | _, Oreg 2 -> RSHIFT, "psrl", lowbits2elemt b2
+          | _, Oreg 6 -> LSHIFT, "psll", lowbits2elemt b2
+          | _, Oreg 4 -> ARSHIFT, "psra", lowbits2elemt b2
+          | 0x73, Oreg 3 when prefix.opsize_override -> RSHIFT, "psrl", reg_128
+          | 0x73, Oreg 7 when prefix.opsize_override -> LSHIFT, "psll", reg_128
+          | _, Oreg i -> disfailwith (Printf.sprintf "invalid psrl/psll encoding b2=%#x r=%#x" b2 i)
+          | _ -> disfailwith "impossible"
+        in
+        let i, na = parse_imm8 na in
+        (Ppackedbinop(t, et, bop, str, rm, i), na)
       | 0x80 | 0x81 | 0x82 | 0x83 | 0x84 | 0x85 | 0x86 | 0x87 | 0x88 | 0x89
       | 0x8a | 0x8b | 0x8c | 0x8d | 0x8e | 0x8f ->
         let (i,na) = parse_disp32 na in
@@ -2713,6 +2755,17 @@ let parse_instr g addr =
           )
       | 0xc8 | 0xc9 | 0xca | 0xcb | 0xcc | 0xcd | 0xce | 0xcf ->
         (Bswap(prefix.opsize, Oreg(b2 & 7)), na)
+      | 0xd1 | 0xd2 | 0xd3 | 0xe1 | 0xe2 | 0xf1 | 0xf2 | 0xf3 ->
+        let t = prefix.mopsize in
+        let r, rm, na = parse_modrm32 na in
+        let et = lowbits2elemt b2 in
+        let bop, str = match b2 & 0xf0 with
+          | 0xd0 -> RSHIFT, "psrl"
+          | 0xe0 -> ARSHIFT, "psra"
+          | 0xf0 -> LSHIFT, "psll"
+          | _ -> disfailwith "invalid"
+        in
+        (Ppackedbinop(t, et, bop, str, r, rm), na)
       | 0xdb ->
         let r, rm, na = parse_modrm32 na in
         (Pbinop(prefix.mopsize, AND, "pand", r, rm), na)
