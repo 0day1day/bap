@@ -179,5 +179,5 @@ let stmt_to_piqi : Ast.stmt -> Stmt_piqi.stmt = function
 let prog_to_piqi = List.map stmt_to_piqi
 
 let to_pb p = Stmt_piqi_ext.gen_program (prog_to_piqi p) `pb
-let to_json p = Stmt_piqi_ext.gen_program (prog_to_piqi p) `xml_pretty
-let to_xml p = Stmt_piqi_ext.gen_program (prog_to_piqi p) `json_pretty
+let to_json p = Stmt_piqi_ext.gen_program (prog_to_piqi p) `json_pretty
+let to_xml p = Stmt_piqi_ext.gen_program (prog_to_piqi p) `xml_pretty
