@@ -988,7 +988,7 @@ let rec to_ir addr next ss pref =
       | {ssize=Words} -> 8, 16, Reg 16
     in
     (* Get element index in e *)
-    let get_elem = extract_byte in
+    let get_elem = extract_element elemt in
     (* Get from xmm1/xmm2 *)
     let get_xmm1 = get_elem xmm1_e
     and get_xmm2 = get_elem xmm2m128_e
