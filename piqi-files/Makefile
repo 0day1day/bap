@@ -9,15 +9,15 @@ OTHERPIQIFILES=$(filter-out $(PIQIFILE), $(wildcard *.piqi))
 PROTOFILES=$(addsuffix .proto, $(PIQIFILES))
 MLFILES=$(addsuffix _piqi.ml, $(basename $(PIQIFILE)))
 MLEXTFILES=$(addsuffix _piqi_ext.ml, $(basename $(PIQIFILE)))
-PROTOCFILES=$(addsuffix .piqi.pb.cc, $(basename $(PIQIFILE)))
-PROTOHFILES=$(addsuffix .piqi.pb.h, $(basename $(PIQIFILE)))
+PROTOCFILES=$(addprefix $(PBDIR)/, $(addsuffix .piqi.pb.cc, $(basename $(PIQIFILE))))
+PROTOHFILES=$(addprefix $(PBDIR)/, $(addsuffix .piqi.pb.h, $(basename $(PIQIFILE))))
 
 PIQIDIR=$(TRACEDIR)/piqi/piqi/bin
 PIQI=$(PIQIDIR)/piqi
 PIQIC=$(PIQIDIR)/piqic
 PROTOC=$(TRACEDIR)/protobuf/src/protoc
 
-PIQIFLAGS = --pp
+#PIQIFLAGS = --pp
 #PIQIFLAGS = --pp --leave-tmp-files
 
 all: $(PROTOCFILES) $(PROTOHFILES) $(MLFILES) $(MLEXTFILES)
@@ -28,8 +28,10 @@ $(PIQIFILE) : $(OTHERPIQIFILES)
 %.piqi.proto : %.piqi
 	$(PIQI) to-proto $<
 
-%.piqi.pb.cc %.piqi.pb.hh : %.piqi.proto
-	$(PROTOC) $< --cpp_out=.
+$(PBDIR)/%.piqi.pb.cc $(PBDIR)/%.piqi.pb.hh : %.piqi.proto
+	$(PROTOC) $< --cpp_out=$(PBDIR)
+	$(PROTOC) $< --java_out=$(PBDIR)
+	$(PROTOC) $< --python_out=$(PBDIR)
 
 #%_piqi.ml : %.piqi
 #	piqic ocaml $(PIQIFLAGS) $<
@@ -40,11 +42,11 @@ $(PIQIFILE) : $(OTHERPIQIFILES)
 clean:
 	rm -f $(PROTOFILES) $(MLFILES) $(MLEXTFILES) $(PROTOCFILES) $(PROTOHFILES)
 
-.PHONY: install-pb install-piqi install
-install-pb: $(PROTOCFILES) $(PROTOHFILES)
-	cp $^ $(PBDIR)
+.PHONY: install-piqi install
+# install-pb: $(PROTOCFILES) $(PROTOHFILES)
+# 	cp $^ $(PBDIR)
 
 install-piqi: $(MLFILES) $(MLEXTFILES)
 	cp $^ $(MLDIR)
 
-install: install-pb install-piqi
+install: install-piqi

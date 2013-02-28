@@ -14,38 +14,47 @@
 
          .option [
                  .type move
+                 .code 1
          ]
 
          .option [
                  .type jmp
+                 .code 2
          ]
 
          .option [
                  .type cjmp
+                 .code 3
          ]
 
          .option [
                  .type label-stmt
+                 .code 4
          ]
 
          .option [
                  .type halt
+                 .code 5
          ]
 
          .option [
-                 .type assert
+                 .type assert-stmt
+                 .code 6
          ]
 
          .option [
                  .type assume
+                 .code 7
          ]
 
          .option [
                  .type comment
+                 .code 8
          ]
 
          .option [
                  .type special
+                 .code 9
          ]
 
 ]
@@ -126,7 +135,7 @@
 ]
 
 .record [
-        .name assert
+        .name assert-stmt
 
         .field [
                .type exp

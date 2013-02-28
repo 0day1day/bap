@@ -9,54 +9,67 @@
 
          .option [
                  .type load
+                 .code 1
          ]
 
          .option [
                  .type store
+                 .code 2
          ]
 
          .option [
                  .type binop
+                 .code 3
          ]
 
          .option [
                  .type unop
+                 .code 4
          ]
 
          .option [
                  .type var
+                 .code 5
          ]
 
          .option [
                  .type lab
+                 .code 6
          ]
 
          .option [
                  .type inte
+                 .code 7
          ]
 
          .option [
                  .type cast
+                 .code 8
          ]
 
          .option [
-                 .type let
+                 .type let-exp
+                 .code 9
          ]
 
          .option [
                  .type unknown
+                 .code 10
          ]
 
          .option [
                  .type ite
+                 .code 11
          ]
 
          .option [
                  .type extract
+                 .code 12
          ]
 
          .option [
                  .type concat
+                 .code 13
          ]
 ]
 
@@ -79,7 +92,7 @@
         ]
 
         .field [
-               .type type
+               .type typ
         ]
 ]
 
@@ -107,7 +120,7 @@
         ]
 
         .field [
-               .type type
+               .type typ
         ]
 ]
 
@@ -146,11 +159,13 @@
 
         .field [
                .name int
-               .type binary
+               % This should probably be binary, but there is no easy
+               % way to convert from big int to binary
+               .type string
         ]
 
         .field [
-               .type type
+               .type typ
         ]
 ]
 
@@ -163,7 +178,7 @@
 
         .field [
                .name new-type
-               .type type
+               .type typ
         ]
 
         .field [
@@ -172,7 +187,7 @@
 ]
 
 .record [
-        .name let
+        .name let-exp
 
         .field [
                .type var
@@ -197,7 +212,7 @@
         ]
 
         .field [
-               .type type
+               .type typ
         ]
 ]
 

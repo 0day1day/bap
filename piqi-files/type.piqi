@@ -1,16 +1,19 @@
 .variant [
-         .name type
+         .name typ
 
          .option [
                  .type reg
+                 .code 1
          ]
 
          .option [
                  .type tmem
+                 .code 2
          ]
 
          .option [
                  .type array
+                 .code 3
          ]
 ]
 
@@ -23,8 +26,8 @@
         .name tmem
 
         .field [
-               .name indextype
-               .type type
+               .name index-type
+               .type typ
         ]
 ]
 
@@ -33,12 +36,12 @@
 
         .field [
                .name index-type
-               .type type
+               .type typ
         ]
 
         .field [
                .name element-type
-               .type type
+               .type typ
         ]
 ]
 
@@ -59,41 +62,41 @@
 .enum [
       .name cast-type
 
-      .option [ .name cast-unsigned ]
-      .option [ .name cast-signed ]
-      .option [ .name cast-high ]
-      .option [ .name cast-low ]
+      .option [ .name cast-unsigned .code 1 ]
+      .option [ .name cast-signed .code 2 ]
+      .option [ .name cast-high .code 3 ]
+      .option [ .name cast-low .code 4 ]
 ]
 
 .enum [
       .name binop-type
 
-      .option [ .name plus ]
-      .option [ .name minus ]
-      .option [ .name times ]
-      .option [ .name divide ]
-      .option [ .name sdivide ]
-      .option [ .name mod ]
-      .option [ .name smod ]
-      .option [ .name lshift ]
-      .option [ .name rshift ]
-      .option [ .name arshift ]
-      .option [ .name and ]
-      .option [ .name or ]
-      .option [ .name xor ]
-      .option [ .name eq ]
-      .option [ .name neq ]
-      .option [ .name lt ]
-      .option [ .name le ]
-      .option [ .name slt ]
-      .option [ .name sle ]
+      .option [ .name plus .code 1 ]
+      .option [ .name minus .code 2 ]
+      .option [ .name times .code 3 ]
+      .option [ .name divide .code 4 ]
+      .option [ .name sdivide .code 5 ]
+      .option [ .name modbop .code 6 ]
+      .option [ .name smod .code 7 ]
+      .option [ .name lshift .code 8 ]
+      .option [ .name rshift .code 9 ]
+      .option [ .name arshift .code 10 ]
+      .option [ .name andbop .code 11 ]
+      .option [ .name orbop .code 12 ]
+      .option [ .name xor .code 13 ]
+      .option [ .name eq .code 14 ]
+      .option [ .name neq .code 15 ]
+      .option [ .name lt .code 16 ]
+      .option [ .name le .code 17 ]
+      .option [ .name slt .code 18 ]
+      .option [ .name sle .code 19 ]
 ]
 
 .enum [
       .name unop-type
 
-      .option [ .name neg ]
-      .option [ .name not ]
+      .option [ .name neg .code 1 ]
+      .option [ .name not .code 2 ]
 ]
 
 .record [
@@ -110,7 +113,7 @@
         ]
 
         .field [
-               .type type
+               .type typ
         ]
 ]
 
@@ -124,30 +127,43 @@
 
         .option [
                .type asm
+               .code 1
         ]
 
         .option [
                .type address
+               .code 2
         ]
 
         .option [
                .type liveout
+               .code 3
         ]
 
         .option [
                .type strattr
+               .code 4
         ]
 
         .option [
                .type context
+               .code 5
         ]
 
         .option [
                .type thread-id
+               .code 6
         ]
 
         .option [
                .type synthetic
+               .code 7
+        ]
+
+        .option [
+                .name other
+                .type string
+                .code 8
         ]
 ]
 
@@ -315,7 +331,7 @@
         % Value
         .field [
                .name value
-               .type binary
+               .type string
                .code 5
         ]
 ]

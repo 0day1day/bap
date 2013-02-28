@@ -33,7 +33,7 @@ endif
 # ocamlfind packages required
 export PACKS = camlidl bigarray str num unix camomile piqi.lib $(LLVM_PACKS)
 export LIBS = zarith batteries objsize oUnit graph pcre libtrace bap
-export INCDIRS = $(BAP_OCAMLDIR) $(BIGINT) $(BATT) $(OUNIT) $(PCRE) $(OCAMLGRAPH) $(OBJSIZE) $(LIBTRACE)
+export INCDIRS = $(BAP_OCAMLDIR) $(BAP_OCAMLDIR)/piqi $(BIGINT) $(BATT) $(OUNIT) $(PCRE) $(OCAMLGRAPH) $(OBJSIZE) $(LIBTRACE)
 export OCAMLPATH = $(PIQIBUILDDIR)
 
 # -rdynamic lets LLVM JIT see dynamic symbols

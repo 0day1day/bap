@@ -60,6 +60,21 @@ let output_ast_pdg f p =
     Cfg_pp.AstStmtsDot.output_graph oc pdg;
     close_out oc
 
+let output_ast_pb f p =
+  let oc = open_out_bin f in
+  output_string oc (Ast_piqi.to_pb p);
+  close_out oc
+
+let output_ast_json f p =
+  let oc = open_out_bin f in
+  output_string oc (Ast_piqi.to_json p);
+  close_out oc
+
+let output_ast_xml f p =
+  let oc = open_out_bin f in
+  output_string oc (Ast_piqi.to_xml p);
+  close_out oc
+
 let output_ssa f p =
   let oc = open_out f in
   Cfg_pp.SsaStmtsDot.output_graph oc p;
@@ -154,6 +169,12 @@ let uadd c =
 let speclist =
   ("-pp-ast", Arg.String(fun f -> add(AnalysisAst(output_ast f))),
    "<file> Pretty print AST to <file>.")
+  ::("-pp-ast-pb", Arg.String (fun f -> add(AnalysisAst(output_ast_pb f))),
+     "<file> Output AST program to <file> in protobuf format.")
+  ::("-pp-ast-json", Arg.String (fun f -> add(AnalysisAst(output_ast_json f))),
+     "<file> Output AST program to <file> in JSON format.")
+  ::("-pp-ast-xml", Arg.String (fun f -> add(AnalysisAst(output_ast_xml f))),
+     "<file> Output AST program to <file> in XML format.")
   ::("-pp-ast-cfg", Arg.String (fun f -> add(AnalysisAstCfg(output_ast_cfg f))),
      "<file> Pretty print AST graph to <file> (in Graphviz format)")
   ::("-pp-ast-asms", Arg.String (fun f -> add(AnalysisAstCfg(output_ast_asms f))),
