@@ -23,8 +23,6 @@ type arch
 val arch_i386 : arch
 val arch_arm : arch
 
-val always_vex : bool ref
-
 type varctx
 
 val gamma_create : Var.t -> Var.t list -> varctx
@@ -112,4 +110,19 @@ val get_print_warning : unit -> bool
 
 val set_use_simple_segments : bool -> unit
 
-val get_prog_contents : asmprogram -> int64 -> char
+(** [get_exec_mem_contents p] returns a function [f] such that [f
+    addr] returns the executable byte in memory at [addr] if one exists.
+    If no such byte exists, @raises {!Memory_error}. *)
+val get_exec_mem_contents : asmprogram -> int64 -> char
+
+(** [get_exec_mem_contents_list p] returns a list of [(addr, byte)]
+    tuples indicating the executable memory at [addr] is [byte]. *)
+val get_exec_mem_contents_list : asmprogram -> (address_t * char) list
+
+(** [get_readable_mem_contents] is like {!get_exec_mem_contents} but
+    for any readable memory. *)
+val get_readable_mem_contents : asmprogram -> int64 -> char
+
+(** [get_readable_mem_contents_list p] is like
+    {!get_exec_mem_contents_list} but for any readable memory. *)
+val get_readable_mem_contents_list : asmprogram -> (address_t * char) list

@@ -22,13 +22,15 @@ module BArray = Bigarray.Array1
 exception Disassembly_error;;
 exception Memory_error;;
 
-let always_vex = ref false;;
-
 type arch = Libbfd.bfd_architecture
 type asmprogram = {asmp : Libasmir.asm_program_t;
 		   arch : arch;
 		   secs : section_ptr list;
-		   get : int64 -> char }
+                   (** Get executable code bytes *)
+		   get_exec : int64 -> char;
+                   (** Get any readable bytes. *)
+                   get_readable : int64 -> char;
+ }
 
 
 let arch_i386 = Bfd_arch_i386
@@ -38,7 +40,7 @@ let arch_arm  = Bfd_arch_arm
 (** How many blocks to obtain when reading a FULL trace (not streaming) *)
 let trace_blocksize = ref 100000L
 
-module D = Debug.Make(struct let name = "ASMIR" and default=`Debug end)
+module D = Debug.Make(struct let name = "Asmir" and default=`NoDebug end)
 open D
 
 module Status = Util.StatusPrinter
@@ -448,20 +450,30 @@ let is_code s =
   let flags = bfd_section_get_flags s in
   Int64.logand flags Libbfd.sEC_CODE <> 0L
 
-let section_contents ?(codeonly=true) prog secs =
+let codeonly s = is_load s && is_code s
+let loaded s = is_load s
+
+(** Returns a list of [(addr,array)] tuples where [addr] is the
+    starting address of a memory segment, and [array] is an array
+    representing the memory starting at address [addr]. *)
+let section_memory_helper ?(which=codeonly) prog secs =
   let bfd = Libasmir.asmir_get_bfd prog in
   let sc l s =
     let size = bfd_section_size s and vma = bfd_section_vma s
     and flags = bfd_section_get_flags s
     and name = bfd_section_name s in
     dprintf "Found section %s at %Lx with size %Ld. flags=%Lx" name vma size flags;
-    if is_load s && ((not codeonly) || is_code s) then
-    (* if Int64.logand Libbfd.sEC_LOAD flags <> 0L then *)
+    if which s then
+      (* if Int64.logand Libbfd.sEC_LOAD flags <> 0L then *)
       let (ok, a) = Libbfd.bfd_get_section_contents bfd s 0L size in
       if ok <> 0 then (vma, a)::l else (dprintf "failed."; l)
     else l
   in
   let bits = List.fold_left sc [] secs in
+  bits
+
+let section_contents ?(which=codeonly) prog secs =
+  let bits = section_memory_helper ~which prog secs in
   let get a =
     (* let open Int64 in *)
     let (-) = Int64.sub in
@@ -474,6 +486,14 @@ let section_contents ?(codeonly=true) prog secs =
   in
   get
 
+let section_contents_list ?(which=codeonly) prog secs =
+  let bits = section_memory_helper ~which prog secs in
+  let (+) = Int64.add in
+  let al l (base,arr) =
+    (* [base, ..., base + len(arr)) *)
+    foldn (fun l n -> (base + (Int64.of_int n), arr.{n})::l) l ((BArray.dim arr) - 1)
+  in
+  List.fold_left al [] bits
 
 (** Open a binary file for translation *)
 let open_program ?base filename =
@@ -485,8 +505,9 @@ let open_program ?base filename =
     (* tell the GC how to free resources associated with prog *)
   Gc.finalise Libasmir.asmir_close prog;
   let secs = Array.to_list (get_all_sections prog)  in
-  let get = section_contents prog secs in
-  {asmp=prog; arch=Libasmir.asmir_get_asmp_arch prog; secs=secs; get=get}
+  let get_exec = section_contents prog secs in
+  let get_readable = section_contents ~which:loaded prog secs in 
+ {asmp=prog; arch=Libasmir.asmir_get_asmp_arch prog; secs=secs; get_exec=get_exec; get_readable=get_readable}
 
 
 let get_asm = function
@@ -519,8 +540,8 @@ let get_asm = function
 (*     wprintf "Could not check equivalence for %Lx: Not_found" a *)
 
 
-(** Translate only one address of a  Libasmir.asm_program_t to Vine *)
-let asm_addr_to_bap {asmp=prog; arch=arch; get=get} addr =
+(** Translate only one address of a  Libasmir.asm_program_t to BAP *)
+let asm_addr_to_bap {asmp=prog; arch=arch; get_exec=get_exec} addr =
   let fallback() =
     let g = gamma_for_arch arch in
     let (block, next) = Libasmir.asmir_addr_to_bap prog addr in
@@ -539,29 +560,26 @@ let asm_addr_to_bap {asmp=prog; arch=arch; get=get} addr =
       destroy_bap_block block;
       (ir, next)
   in
-  if (!always_vex) then fallback() 
-  else (
-    try 
-      let (ir,na) as v = 
-	(try (Disasm.disasm_instr arch get addr)
-	 with Disasm_i386.Disasm_i386_exception s -> 
-	   DTest.dprintf "BAP unknown disasm_instr %Lx: %s" addr s;
-           DTest.dprintf "Faulting instruction: %s" (Libasmir.asmir_string_of_insn prog addr);
-	   DV.dprintf "disasm_instr %Lx: %s" addr s; raise Disasm.Unimplemented
-	)
-      in
-      DV.dprintf "Disassembled %Lx directly" addr;
+  try 
+    let (ir,na) as v = 
+      (try (Disasm.disasm_instr arch get_exec addr)
+       with Disasm_i386.Disasm_i386_exception s -> 
+	 DTest.dprintf "BAP unknown disasm_instr %Lx: %s" addr s;
+         DTest.dprintf "Faulting instruction: %s" (Libasmir.asmir_string_of_insn prog addr);
+	 DV.dprintf "disasm_instr %Lx: %s" addr s; raise Disasm.Unimplemented
+      )
+    in
+    DV.dprintf "Disassembled %Lx directly" addr;
       (* if DCheck.debug then check_equivalence addr v (fallback()); *)
-	  (* If we don't have a string disassembly, use binutils disassembler *)
-      (match ir with
-      | Label(l, [])::rest ->
-		(Label(l, [Asm(Libasmir.asmir_string_of_insn prog addr)])::rest,
-		 na)
-      | _ -> v)
-	with Disasm.Unimplemented ->
-      DV.dprintf "Disassembling %Lx through VEX" addr;
-      fallback()
-  )
+      (* If we don't have a string disassembly, use binutils disassembler *)
+    (match ir with
+    | Label(l, [])::rest ->
+      (Label(l, [Asm(Libasmir.asmir_string_of_insn prog addr)])::rest,
+       na)
+    | _ -> v)
+  with Disasm.Unimplemented ->
+    DV.dprintf "Disassembling %Lx through VEX" addr;
+    fallback()
 
 let flatten ll =
 	List.rev (List.fold_left (fun accu l -> List.rev_append l accu) [] ll)
@@ -591,7 +609,7 @@ let asmprogram_section_to_bap p s =
   let size = bfd_section_size s and vma = bfd_section_vma s in
   asmprogram_to_bap_range p vma (Int64.add vma size)
 
-(** Translate an entire Libasmir.asm_program_t into a Vine program *)
+(** Translate an entire Libasmir.asm_program_t into a BAP program *)
 let asmprogram_to_bap ?(init_ro=false) p =
   let irs = List.map 
 	(fun s -> 
@@ -607,8 +625,8 @@ let asmprogram_to_bap ?(init_ro=false) p =
    sequence of bytes. *)
 let byte_insn_to_bap arch addr bytes =
   let prog = Libasmir.byte_insn_to_asmp arch addr bytes in
-  let get a = bytes.(Int64.to_int (Int64.sub a addr)) in
-  let (pr, n) = asm_addr_to_bap {asmp=prog; arch=arch; secs=[]; get=get} addr in
+  let get_exec a = bytes.(Int64.to_int (Int64.sub a addr)) in
+  let (pr, n) = asm_addr_to_bap {asmp=prog; arch=arch; secs=[]; get_exec=get_exec; get_readable=get_exec} addr in
   Libasmir.asmir_close prog;
   pr, Int64.sub n addr
 
@@ -618,11 +636,11 @@ let byte_sequence_to_bap bytes arch addr =
   let prog = Libasmir.byte_insn_to_asmp arch addr bytes in
   let len = Array.length bytes in
   let end_addr = Int64.add addr (Int64.of_int len) in
-  let get a = bytes.(Int64.to_int (Int64.sub a addr)) in
+  let get_exec a = bytes.(Int64.to_int (Int64.sub a addr)) in
   let rec read_all acc cur_addr =
     if cur_addr >= end_addr then List.rev acc
     else
-      let prog, next = asm_addr_to_bap {asmp=prog; arch=arch; secs=[]; get=get} cur_addr in
+      let prog, next = asm_addr_to_bap {asmp=prog; arch=arch; secs=[]; get_exec=get_exec; get_readable=get_exec} cur_addr in
       read_all (prog::acc) next
   in
   let il = read_all [] addr in
@@ -1067,5 +1085,11 @@ let get_print_warning = Libasmir.asmir_get_print_warning
 
 let set_use_simple_segments = Libasmir.asmir_set_use_simple_segments
 
-let get_prog_contents {get=get} addr =
-  get addr
+let get_exec_mem_contents {get_exec=get_exec} =
+  get_exec
+
+let get_exec_mem_contents_list {asmp=asmp; secs=secs} = section_contents_list ~which:is_code asmp secs
+
+let get_readable_mem_contents {get_readable=get_readable} = get_readable
+
+let get_readable_mem_contents_list {asmp=asmp; secs=secs} = section_contents_list ~which:loaded asmp secs
