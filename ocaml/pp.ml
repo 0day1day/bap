@@ -508,6 +508,7 @@ let make_varctx () =
 (* These functions will not remember variable names across separate
    invocations *)
 let value_to_string = pp2string (fun p -> p#ssa_value)
+let attr_to_string = pp2string (fun p -> p#attr)
 let label_to_string = pp2string (fun p -> p#label)
 let ssa_exp_to_string = pp2string (fun p -> p#ssa_exp)
 let ssa_stmt_to_string = pp2string (fun p -> p#ssa_stmt)
