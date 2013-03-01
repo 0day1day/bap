@@ -85,7 +85,7 @@ val serialized_bap_stream_from_trace_file : int64 -> string -> (Ast.stmt list) S
 val get_symbols : ?all:bool -> asmprogram -> asymbol array
 val find_symbol : asmprogram -> string -> asymbol
 
-val get_function_ranges : asmprogram -> (string * address_t * address_t) list
+val get_flavour : asmprogram -> bfd_flavour
 
 val get_all_asections : asmprogram -> section_ptr array
 
@@ -120,10 +120,14 @@ val set_use_simple_segments : bool -> unit
     If no such byte exists, @raises {!Memory_error}. *)
 val get_exec_mem_contents : asmprogram -> int64 -> char
 
+(** [get_exec_mem_contents_list p] returns a list of [(addr, byte)]
+    tuples indicating the executable memory at [addr] is [byte]. *)
+val get_exec_mem_contents_list : asmprogram -> (address_t * char) list
+
 (** [get_readable_mem_contents] is like {!get_exec_mem_contents} but
     for any readable memory. *)
 val get_readable_mem_contents : asmprogram -> int64 -> char
 
-(** [get_readable_mem_contents_list p] returns a list of [(addr,
-    byte)] tuples indicating the memory at [addr] is [byte]. *)
+(** [get_readable_mem_contents_list p] is like
+    {!get_exec_mem_contents_list} but for any readable memory. *)
 val get_readable_mem_contents_list : asmprogram -> (address_t * char) list

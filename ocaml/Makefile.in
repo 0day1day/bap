@@ -93,9 +93,10 @@ export SOURCES = \
 	asmir_vars.ml \
 	asmir_consts.ml \
 	asmir.mli asmir.ml \
-    hacks.ml \
-    vsa.ml \
-    asmir_disasm.mli asmir_disasm.ml \
+	hacks.ml \
+	vsa.ml \
+	asmir_disasm.mli asmir_disasm.ml \
+	func_boundary.mli func_boundary.ml \
 	asmir_rdisasm.mli asmir_rdisasm.ml \
 	grammar_private_scope.ml \
 	grammar.mly lexer.mll \

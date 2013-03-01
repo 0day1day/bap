@@ -131,7 +131,7 @@ let rdisasm_at ?(f=default) p startaddrs =
   List.concat (List.rev !out), !outasm
 
 let rdisasm ?(f=default) p =
-  let func_starts = List.map (function (_, s, _) -> s) (Asmir.get_function_ranges p) in
+  let func_starts = List.map (function (_, s, _) -> s) (Func_boundary.get_function_ranges p) in
   let startaddrs = Asmir.get_start_addr p :: func_starts in
   rdisasm_at ~f p startaddrs
 

@@ -73,8 +73,8 @@ let t_mod dividend divisor =
        r -% (abs_big_int divisor)
     else raise (ArithmeticEx "t_mod: If dividend < 0 then r can't be greater than 0!")
 
-(* shifting by more than the number of bits or by negative values
- * will be the same as shifting by the number of bits. *)
+(* shifting by more than the number of bits or by negative values will
+ * be the same as shifting by the max number of bits. *)
 let toshift shiftedt v =
   let max = bits_of_width shiftedt
   and i = to_big_int v in

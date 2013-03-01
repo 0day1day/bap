@@ -9,8 +9,14 @@ let arg = ref 0;;
 let binname = ref None;;
 let fname = ref None;;
 let timeout = ref 30;;
+let recoverf = ref Asmir_disasm.vsa_at
 
-let speclist = []
+let speclist =
+  ("-vsa", Arg.Unit (fun () -> recoverf := Asmir_disasm.vsa_at),
+   "Use VSA based CFG recovery (default).")
+  :: ("-rdescent", Arg.Unit (fun () -> recoverf := Asmir_disasm.recursive_descent_at),
+      "Use recursive descent based CFG recovery.")
+  :: []
 
 let anon x =
   (match !arg with
@@ -27,13 +33,13 @@ if !arg < 1 then
 
 let asmp = Asmir.open_program (BatOption.get !binname);;
 
-let funcs = Asmir.get_function_ranges asmp;;
+let funcs = Func_boundary.get_function_ranges asmp;;
 
 let lift_func (n,s,e) =
   let go = match !fname with
     | Some x when n = x -> true
     | Some _ -> false
-    | None _ -> true
+    | None -> true
   in
   if go then (
     Printf.printf "Lifting %s\n" n;

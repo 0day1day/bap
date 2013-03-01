@@ -997,62 +997,7 @@ let find_symbol {asmp=p} name =
   if err <= 0 then failwith "find_symbol";
   BatArray.find (fun sym -> if sym.bfd_symbol_name = name then true else false) arr
 
-let get_function_ranges p =
-  let symb = get_symbols p in
-  ignore p; (* does this ensure p is live til here? *)
-  let is_function = match bfd_flavour (Libasmir.asmir_get_bfd p.asmp) with
-    | Bfd_target_elf_flavour
-    | Bfd_target_coff_flavour ->
-      (fun s -> s.bfd_symbol_flags land bsf_function <> 0)
-    | Bfd_target_mach_o_flavour ->
-      (fun s -> dprintf "Symbol %s, flags=%#x" s.bfd_symbol_name s.bfd_symbol_flags;
-	s.bfd_symbol_flags land bsf_global <> 0)
-    | _ ->
-      wprintf "Unknown file format flavour.  Assuming it has a function flag for symbols, which may be incorrect.";
-      (fun s -> s.bfd_symbol_flags land bsf_function <> 0)
-  and symb_to_tuple s =
-    (* FIXME: section_end doesn't seem to get the right values... *)
-    (* did this fix it? --aij *)
-    let sec = s.bfd_symbol_section in
-    let vma = bfd_section_vma sec in
-    (Int64.add s.bfd_symbol_value vma,
-     Int64.add vma (bfd_section_size sec),
-     s.bfd_symbol_name)
-  in
-  let starts =
-    Array.fold_left
-      (fun l s -> if is_function s then symb_to_tuple s :: l else l)
-      [] symb
-  in
-  let starts = Array.of_list starts in
-  (* FIXME: probably should do unsigned comparison *)
-  Array.fast_sort compare starts;
-  (*let ranges = Array.mapi
-    (fun i (s,e,name) ->
-       let e' =
-	 try let (s,_,_) = starts.(i+1) in s
-	 with Invalid_argument "index out of bounds" -> e
-       in
-       if e' < e || e = s then (name,s,e') else (name,s,e)
-    ) starts
-  *)
-  let ranges = Array.mapi
-    (fun i (s,e,name) ->
-       let e' =
-	 try let (s,_,_) = starts.(i+1) in s
-	 with Invalid_argument "index out of bounds" -> s
-       in
-       (name,s,e') (* section_end doesn't work *)
-    ) starts
-  in
-  let unfiltered = Array.to_list ranges in
-  (* filter out functions that start at 0 *)
-  List.filter (function 
-		 |(_,0L,_) -> false
-		 |("_init",_,_) -> false
-		 | _ -> true)
-    unfiltered
-
+let get_flavour p = bfd_flavour (Libasmir.asmir_get_bfd p.asmp)
 
 let get_section_startaddr p sectionname =
   Libasmir.asmir_get_sec_startaddr p.asmp sectionname
@@ -1092,6 +1037,8 @@ let set_use_simple_segments = Libasmir.asmir_set_use_simple_segments
 
 let get_exec_mem_contents {get_exec=get_exec} =
   get_exec
+
+let get_exec_mem_contents_list {asmp=asmp; secs=secs} = section_contents_list ~which:is_code asmp secs
 
 let get_readable_mem_contents {get_readable=get_readable} = get_readable
 
