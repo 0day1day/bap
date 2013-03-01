@@ -56,6 +56,8 @@ let compute_segment_bases = ref true
 
 exception Disasm_i386_exception of string
 
+type binopf = Ast.exp -> Ast.exp -> Ast.exp
+
 type order = Low | High
 
 type direction = Forward | Backward
@@ -214,7 +216,7 @@ type opcode =
   | Fld of operand
   | Fst of (operand * bool)
   | Punpck of (typ * typ * order * operand * operand) (* dest size, element size, low/high elements, dest, src *)
-  | Ppackedbinop of (typ * typ * binop_type * string * operand * operand) (* Perform a generic packed binary operation. dest size, element size, binop, assembly string, dest, src *)
+  | Ppackedbinop of (typ * typ * binopf * string * operand * operand) (* Perform a generic packed binary operation. dest size, element size, binop, assembly string, dest, src *)
   | Pbinop of (typ * binop_type * string * operand * operand)
   | Pmovmskb of (typ * operand * operand)
   | Pcmp of (typ * typ * binop_type * string * operand * operand)
@@ -939,7 +941,7 @@ let rec to_ir addr next ss pref =
     [move st se;
      move dt de;
      assn t d e]
-  | Ppackedbinop(t, et, bop, _, d, s) ->
+  | Ppackedbinop(t, et, fbop, _, d, s) ->
     let nelem = match t, et with
       | Reg n, Reg n' -> n / n'
       | _ -> disfailwith "invalid"
@@ -952,7 +954,7 @@ let rec to_ir addr next ss pref =
       | _ -> extract_element et (op2e t o) i
     in
     let f i =
-      binop bop (getelement d i) (getelement s i)
+      fbop (getelement d i) (getelement s i)
     in
     let e = concat_explist (map f ((nelem-1)---0)) in
     [assn t d e]
@@ -2595,18 +2597,32 @@ let parse_instr g addr =
         (* Three byte opcodes *)
         let b3 = Char.code (g na) and na = s na in
         (match b3 with
-        | 0x37 when prefix.opsize_override ->
-          let r, rm, na = parse_modrm32 na in
-          (Pcmp(reg_128, reg_64, SLT, "pcmpgt", r, rm), na)
-        | 0x29 when prefix.opsize_override ->
-          let r, rm, na = parse_modrm32 na in
-          (Pcmp(reg_128, reg_64, EQ, "pcmpeq", r, rm), na)
-        | 0x17 when prefix.opsize_override ->
-          let d, s, na = parse_modrm32 na in
-          (Ptest(r128, d, s), na)
         | 0x00 ->
           let d, s, na = parse_modrm32 na in
           (Pshufb(prefix.mopsize, d, s), na)
+        | 0x17 when prefix.opsize_override ->
+          let d, s, na = parse_modrm32 na in
+          (Ptest(r128, d, s), na)
+        | 0x29 when prefix.opsize_override ->
+          let r, rm, na = parse_modrm32 na in
+          (Pcmp(reg_128, reg_64, EQ, "pcmpeq", r, rm), na)
+        | 0x37 when prefix.opsize_override ->
+          let r, rm, na = parse_modrm32 na in
+          (Pcmp(reg_128, reg_64, SLT, "pcmpgt", r, rm), na)
+        | 0x38 | 0x39 when prefix.opsize_override ->
+          let r, rm, na = parse_modrm32 na in
+          let et = match b3 with
+            | 0x38 -> reg_8 | 0x39 -> reg_32
+            | _ -> disfailwith "invalid"
+          in
+          (Ppackedbinop(prefix.mopsize, et, Ast_convenience.min_symbolic ~signed:true, "pmins", r, rm), na)
+        | 0x3a | 0x3b when prefix.opsize_override ->
+          let r, rm, na = parse_modrm32 na in
+          let et = match b3 with
+            | 0x3a -> reg_16 | 0x3b -> reg_32
+            | _ -> disfailwith "invalid"
+          in
+          (Ppackedbinop(prefix.mopsize, et, Ast_convenience.min_symbolic ~signed:false, "pminu", r, rm), na)
         | _ -> disfailwith (Printf.sprintf "opcode unsupported: 0f 38 %02x" b3))
       | 0x3a ->
         let b3 = Char.code (g na) and na = s na in
@@ -2672,17 +2688,17 @@ let parse_instr g addr =
       | 0x71 | 0x72 | 0x73 ->
         let t = prefix.mopsize in
         let r, rm, na = parse_modrm32 na in
-        let bop, str, et = match b2, r with
-          | _, Oreg 2 -> RSHIFT, "psrl", lowbits2elemt b2
-          | _, Oreg 6 -> LSHIFT, "psll", lowbits2elemt b2
-          | _, Oreg 4 -> ARSHIFT, "psra", lowbits2elemt b2
-          | 0x73, Oreg 3 when prefix.opsize_override -> RSHIFT, "psrl", reg_128
-          | 0x73, Oreg 7 when prefix.opsize_override -> LSHIFT, "psll", reg_128
+        let fbop, str, et = match b2, r with
+          | _, Oreg 2 -> binop RSHIFT, "psrl", lowbits2elemt b2
+          | _, Oreg 6 -> binop LSHIFT, "psll", lowbits2elemt b2
+          | _, Oreg 4 -> binop ARSHIFT, "psra", lowbits2elemt b2
+          | 0x73, Oreg 3 when prefix.opsize_override -> binop RSHIFT, "psrl", reg_128
+          | 0x73, Oreg 7 when prefix.opsize_override -> binop LSHIFT, "psll", reg_128
           | _, Oreg i -> disfailwith (Printf.sprintf "invalid psrl/psll encoding b2=%#x r=%#x" b2 i)
           | _ -> disfailwith "impossible"
         in
         let i, na = parse_imm8 na in
-        (Ppackedbinop(t, et, bop, str, rm, i), na)
+        (Ppackedbinop(t, et, fbop, str, rm, i), na)
       | 0x80 | 0x81 | 0x82 | 0x83 | 0x84 | 0x85 | 0x86 | 0x87 | 0x88 | 0x89
       | 0x8a | 0x8b | 0x8c | 0x8d | 0x8e | 0x8f ->
         let (i,na) = parse_disp32 na in
@@ -2759,19 +2775,25 @@ let parse_instr g addr =
         let t = prefix.mopsize in
         let r, rm, na = parse_modrm32 na in
         let et = lowbits2elemt b2 in
-        let bop, str = match b2 & 0xf0 with
-          | 0xd0 -> RSHIFT, "psrl"
-          | 0xe0 -> ARSHIFT, "psra"
-          | 0xf0 -> LSHIFT, "psll"
+        let fbop, str = match b2 & 0xf0 with
+          | 0xd0 -> binop RSHIFT, "psrl"
+          | 0xe0 -> binop ARSHIFT, "psra"
+          | 0xf0 -> binop LSHIFT, "psll"
           | _ -> disfailwith "invalid"
         in
-        (Ppackedbinop(t, et, bop, str, r, rm), na)
+        (Ppackedbinop(t, et, fbop, str, r, rm), na)
+      | 0xda ->
+        let r, rm, na = parse_modrm32 na in
+        (Ppackedbinop(prefix.mopsize, reg_8, Ast_convenience.min_symbolic ~signed:false, "pminub", r, rm), na)
       | 0xdb ->
         let r, rm, na = parse_modrm32 na in
         (Pbinop(prefix.mopsize, AND, "pand", r, rm), na)
       | 0xd7 ->
         let r, rm, na = parse_modrm32 na in
         (Pmovmskb(prefix.mopsize, r, rm), na)
+      | 0xea ->
+        let r, rm, na = parse_modrm32 na in
+        (Ppackedbinop(prefix.mopsize, reg_16, Ast_convenience.min_symbolic ~signed:true, "pmins", r, rm), na)
       | 0xeb ->
         let r, rm, na = parse_modrm32 na in
         (Pbinop(prefix.mopsize, OR, "por", r, rm), na)
