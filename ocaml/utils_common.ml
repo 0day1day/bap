@@ -33,7 +33,7 @@ let optimize_cfg ?(usedc=true) ?(usesccvn=true) cfg post =
   (cfg, p);;
 
 let get_functions ?unroll ?names p =
-  let ranges = Asmir.get_function_ranges p in
+  let ranges = Func_boundary.get_function_ranges p in
   let do_function (n,s,e) =
     let inc = match names with
       | Some l -> List.mem n l

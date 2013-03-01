@@ -80,7 +80,7 @@ val serialized_bap_stream_from_trace_file : int64 -> string -> (Ast.stmt list) S
 val get_symbols : ?all:bool -> asmprogram -> asymbol array
 val find_symbol : asmprogram -> string -> asymbol
 
-val get_function_ranges : asmprogram -> (string * address_t * address_t) list
+val get_flavour : asmprogram -> bfd_flavour
 
 val get_all_asections : asmprogram -> section_ptr array
 
