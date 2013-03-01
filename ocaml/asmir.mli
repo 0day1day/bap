@@ -23,8 +23,6 @@ type arch
 val arch_i386 : arch
 val arch_arm : arch
 
-val always_vex : bool ref
-
 type varctx
 
 val gamma_create : Var.t -> Var.t list -> varctx
@@ -82,7 +80,7 @@ val serialized_bap_stream_from_trace_file : int64 -> string -> (Ast.stmt list) S
 val get_symbols : ?all:bool -> asmprogram -> asymbol array
 val find_symbol : asmprogram -> string -> asymbol
 
-val get_function_ranges : asmprogram -> (string * address_t * address_t) list
+val get_flavour : asmprogram -> bfd_flavour
 
 val get_all_asections : asmprogram -> section_ptr array
 
@@ -112,4 +110,19 @@ val get_print_warning : unit -> bool
 
 val set_use_simple_segments : bool -> unit
 
-val get_prog_contents : asmprogram -> int64 -> char
+(** [get_exec_mem_contents p] returns a function [f] such that [f
+    addr] returns the executable byte in memory at [addr] if one exists.
+    If no such byte exists, @raises {!Memory_error}. *)
+val get_exec_mem_contents : asmprogram -> int64 -> char
+
+(** [get_exec_mem_contents_list p] returns a list of [(addr, byte)]
+    tuples indicating the executable memory at [addr] is [byte]. *)
+val get_exec_mem_contents_list : asmprogram -> (address_t * char) list
+
+(** [get_readable_mem_contents] is like {!get_exec_mem_contents} but
+    for any readable memory. *)
+val get_readable_mem_contents : asmprogram -> int64 -> char
+
+(** [get_readable_mem_contents_list p] is like
+    {!get_exec_mem_contents_list} but for any readable memory. *)
+val get_readable_mem_contents_list : asmprogram -> (address_t * char) list

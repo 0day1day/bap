@@ -33,7 +33,7 @@ let optimize_cfg ?(usedc=true) ?(usesccvn=true) cfg post =
   (cfg, p);;
 
 let get_functions ?unroll ?names p =
-  let ranges = Asmir.get_function_ranges p in
+  let ranges = Func_boundary.get_function_ranges p in
   let do_function (n,s,e) =
     let inc = match names with
       | Some l -> List.mem n l
@@ -43,17 +43,15 @@ let get_functions ?unroll ?names p =
       if inc then (
         let ir = Asmir.asmprogram_to_bap_range p s e in
         let ir = Hacks.ret_to_jmp ir in
-        let cfg = Cfg_ast.of_prog ir in
-        let cfg = Prune_unreachable.prune_unreachable_ast cfg in
-        let cfg = match unroll with
-          | Some n ->
-            let cfg = Unroll.unroll_loops ~count:n cfg in
-            Hacks.remove_cycles cfg
-          | None -> cfg
-        in
-        let cfg = Prune_unreachable.prune_unreachable_ast cfg in
-        let ir = Cfg_ast.to_prog cfg in
-        Some (n,ir,cfg))
+        match unroll with
+          | Some num ->
+            let cfg = Cfg_ast.of_prog ir in
+            let cfg = Prune_unreachable.prune_unreachable_ast cfg in
+            let cfg = Unroll.unroll_loops ~count:num cfg in
+            let cfg = Hacks.remove_cycles cfg in
+            let cfg = Prune_unreachable.prune_unreachable_ast cfg in
+            Some (n, Cfg_ast.to_prog cfg, Some cfg)
+          | None -> Some (n, ir, None))
       else None
     with ex ->
       Printf.eprintf "Warning: problem with %s (0x%Lx-0x%Lx): %s\n" n s e (Printexc.to_string ex);

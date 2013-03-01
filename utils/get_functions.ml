@@ -34,7 +34,7 @@ if !file = "" then (
 if !prefix = "" then rangeonly := true
 
 let p = Asmir.open_program !file
-let ranges = Asmir.get_function_ranges p
+let ranges = Func_boundary.get_function_ranges p
 
 let doit ranges = match !rangeonly with
   | true ->
