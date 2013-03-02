@@ -124,11 +124,13 @@ AS_IF([which etags >/dev/null 2>&1],
 AM_CONDITIONAL([HAVE_ETAGS], [test x$HAVE_ETAGS = xtrue])
 
 # Checks for ocaml libraries
+AC_MSG_CHECKING([for camomile])
 ocamlfind query camomile >/dev/null 2>&1
 if test $? != 0; then
-   echo "bap requires camomile-dev"
-   exit -1
+   AC_MSG_RESULT([no])
+   AC_MSG_ERROR([camomile ocaml package not found])
 fi
+AC_MSG_RESULT([yes])
 
 VEX_DIR=`pwd`/'VEX'
 VEX_VERSION=2201
