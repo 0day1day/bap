@@ -124,8 +124,9 @@ export SOURCES = \
 	$(PROJSOURCES) \
 
 RESULT = bap
-DOC_FILES := $(filter %.mli, $(SOURCES)) $(filter %.ml, $(SOURCES))
 
+# Filter out the automatic piqi files
+DOC_FILES := $(filter-out piqi/stmt_piqi%, $(filter %.mli, $(SOURCES)) $(filter %.ml, $(SOURCES)))
 
 
 # ocamlfind packages required
@@ -151,7 +152,7 @@ export LIBDIRS += $(SOLVER_LIBDIRS) $(LIBTRACE)
 OCAMLLDFLAGS = -thread # just for make top
 OCAMLFLAGS = -thread -warn-error Aelz -annot # -for-pack Bap #-w A
 # merge everything but descriptions.
-OCAMLDOCFLAGS = -m avlsoper
+OCAMLDOCFLAGS = -m avlsoper -sort
 
 all: dcl ncl
 
