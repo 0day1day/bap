@@ -192,7 +192,7 @@ AC_DEFUN([AC_PROG_CAMLP4], [
     _AC_OCAML_CHECK_VERSION_FATAL(CAMLP4, camlp4)
 
     # Checking for Camlp4o
-    _AC_OCAML_PATH_PROG_NONFATAL(CAMLP4O, camlp4o)
+    _AC_OCAML_PATH_PROG_FATAL(CAMLP4O, camlp4o)
 
     # Checking for Camlp4of
     _AC_OCAML_PATH_PROG_FATAL(CAMLP4OF, camlp4of)
