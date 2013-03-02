@@ -71,9 +71,6 @@ let speclist =
     ("-il",
      Arg.String(fun s -> addinput (`Il s)),
      "<file> Read input from an IL file.");
-    ("-ir", (* to be removed in next versions *)
-     Arg.String(fun s -> addinput (`Il s)),
-     "<file> Read input from an IL file. (deprecated)");
   ] @ trace_speclist
 
 
