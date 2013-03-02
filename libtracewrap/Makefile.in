@@ -9,5 +9,5 @@ default: all
 	$(MAKE) -C libtrace $@
 
 CONFIGURED: libtrace/Makefile.am libtrace/configure.ac
-	(cd libtrace && ./autogen.sh && INCDIRS="@INCDIRS@" CPPFLAGS="@CPPFLAGS@" CFLAGS=-m32 CXXFLAGS=-m32 ./configure --with-batteries=@BAP_DIR@/batteries/_build/src)
+	(cd libtrace && INCDIRS="@INCDIRS@" CPPFLAGS="@CPPFLAGS@" CFLAGS=-m32 CXXFLAGS=-m32 ./configure --with-batteries=@BAP_DIR@/batteries/_build/src)
 	touch CONFIGURED
