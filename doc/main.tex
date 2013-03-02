@@ -2,9 +2,7 @@
 
 %\usepackage[draft]{djb}
 \usepackage{shortcuts}
-\usepackage{fullpage}
-\usepackage{fancyhdr}
-\pagestyle{fancyplain}
+%\usepackage{fullpage}
 \usepackage{code}
 \usepackage{subfig}
 \usepackage{listings}
@@ -19,6 +17,12 @@
 \usepackage{cite}
 
 \newcommand{\doctitle}{The \bap Handbook}
+
+\usepackage{fancyhdr}
+\setlength{\headsep}{25pt}
+\rhead[]{\rightmark}
+\lhead[\leftmark]{}
+%\chead[\leftmark]{\rightmark}
 \pagestyle{fancy}
 
 \newcommand{\cmdline}[1]{\texttt{#1}}
