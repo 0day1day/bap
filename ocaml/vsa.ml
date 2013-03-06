@@ -573,6 +573,7 @@ struct
     module CFG = Cfg.AST
     module L =
     struct
+      (* XXX: This is wrong *)
       type t = SI.t VM.t
       let top = VM.empty
       let equal = VM.equal (=)
@@ -931,6 +932,7 @@ struct
     module CFG = Cfg.AST
     module L =
     struct
+      (* XXX: This is wrong *)
       type t = VS.t VM.t
       let top = VM.empty
       let equal = VM.equal (=)
@@ -1297,31 +1299,53 @@ struct
     module CFG = Cfg.AST
     module L =
     struct
-      type t = AbsEnv.t
-      let top = AbsEnv.empty
-      let equal = AbsEnv.equal
+      type t = AbsEnv.t option
+      let top = None
+      let equal = BatOption.eq ~eq:AbsEnv.equal
       let meet (x:t) (y:t) =
         if equal x y then x
-        else VM.merge
-          (fun k v1 v2 -> match v1, v2 with
-          | Some (`Scalar a), Some (`Scalar b) -> Some(`Scalar(VS.union a b ))
-          | Some (`Array a), Some (`Array b) -> Some(`Array(MemStore.union a b))
-          | Some (`Scalar _), Some (`Array _)
-          | Some (`Array _), Some (`Scalar _) -> failwith "Tried to meet scalar and array"
-          | (Some _ as s), None
-          | None, (Some _ as s) -> s
-          | None, None -> None) x y
+        else match x, y with
+        | None, None -> None
+        | (Some _ as s), None
+        | None, (Some _ as s) -> s
+        | Some x, Some y ->
+          Some (VM.merge
+                  (fun k v1 v2 -> match v1, v2 with
+                  | Some (`Scalar a), Some (`Scalar b) -> Some(`Scalar(VS.union a b ))
+                  | Some (`Array a), Some (`Array b) -> Some(`Array(MemStore.union a b))
+                  | Some (`Scalar _), Some (`Array _)
+                  | Some (`Array _), Some (`Scalar _) -> failwith "Tried to meet scalar and array"
+                  | Some (`Scalar a), None
+                  | None, Some (`Scalar a) ->
+                    (* Defined on one side; top on the other -> top *)
+                    Some (`Scalar (VS.top (VS.width a)))
+                  | Some (`Array a), None
+                  | None, Some (`Array a) ->
+                    (* Defined on one side; top on the other -> top *)
+                    Some (`Array MemStore.top)
+                  | None, None -> None) x y)
       let widen (x:t) (y:t) =
         if equal x y then x
-        else VM.merge
-          (fun k v1 v2 -> match v1, v2 with
-          | Some (`Scalar a), Some (`Scalar b) -> dprintf "widening %s" (Pp.var_to_string k); Some(`Scalar(VS.widen a b))
-          | Some (`Array a), Some (`Array b) -> Some(`Array(MemStore.union a b))
-          | Some (`Scalar _), Some (`Array _)
-          | Some (`Array _), Some (`Scalar _) -> failwith "Tried to widen scalar and array"
-          | (Some _ as s), None
-          | None, (Some _ as s) -> s
-          | None, None -> None) x y
+        else match x, y with
+        | None, None -> None
+        | (Some _ as s), None
+        | None, (Some _ as s) -> s
+        | Some x, Some y ->
+          Some (VM.merge
+                  (fun k v1 v2 -> match v1, v2 with
+                  | Some (`Scalar a), Some (`Scalar b) -> dprintf "widening %s" (Pp.var_to_string k); Some(`Scalar(VS.widen a b ))
+                  | Some (`Array a), Some (`Array b) -> dprintf "widening %s" (Pp.var_to_string k); Some(`Array(MemStore.widen a b))
+                  | Some (`Scalar _), Some (`Array _)
+                  | Some (`Array _), Some (`Scalar _) -> failwith "Tried to widen scalar and array"
+                  | Some (`Scalar a), None
+                  | None, Some (`Scalar a) ->
+                    (* Defined on one side; top on the other -> top *)
+                    Some (`Scalar (VS.top (VS.width a)))
+                  | Some (`Array a), None
+                  | None, Some (`Array a) ->
+                    (* Defined on one side; top on the other -> top *)
+                    Some (`Array MemStore.top)
+                  | None, None -> None) x y)
 
 (*      let widen x y =
         let v = widen x y in
@@ -1342,7 +1366,7 @@ struct
         it's own region. (For use as an inital value in the dataflow problem.)
     *)
     let init_vars vars =
-      List.fold_left (fun vm x -> VM.add x (`Scalar [(x, SI.zero (bits_of_width (Var.typ x)))]) vm) L.top vars
+      List.fold_left (fun vm x -> VM.add x (`Scalar [(x, SI.zero (bits_of_width (Var.typ x)))]) vm) AbsEnv.empty vars
 
     let init_mem vm {O.initial_mem=initial_mem} =
       let write_mem m (a,v) =
@@ -1356,7 +1380,7 @@ struct
 
     let init o g : L.t =
       let vm = init_vars [sp] in
-      init_mem vm o
+      Some(init_mem vm o)
 
     let dir _ = GraphDataflow.Forward
 
@@ -1428,6 +1452,10 @@ struct
         in `Array new_vs
       )
 
+    let get_map = function
+      | Some l -> l
+      | None -> failwith "Unable to get absenv; this should be impossible!"
+
     let rec stmt_transfer_function o _ _ s l =
       dprintf "Executing %s" (Pp.ast_stmt_to_string s);
       match s with
@@ -1437,6 +1465,7 @@ struct
             l
         | Special _ -> L.top
         | Move(v, e, _) ->
+          let l = get_map l in
           try
             let new_vs = exp2aev ~o l e in
             if DV.debug () then
@@ -1444,19 +1473,20 @@ struct
             | `Scalar new_vs ->
               DV.dprintf "Assign %s <- %s" (Pp.var_to_string v) (VS.to_string new_vs)
             | _ -> ());
-            VM.add v new_vs l
+            Some (VM.add v new_vs l)
           with Invalid_argument _ | Not_found ->
-            l
+            Some l
 
     let edge_transfer_function o g edge _ l =
       dprintf "edge from %s to %s" (Cfg_ast.v2s (Cfg.AST.G.E.src edge)) (Cfg_ast.v2s (Cfg.AST.G.E.dst edge));
+      let l = get_map l in
       let accept_signed_bop bop =
         match !signedness_hack, bop with
         | false, (SLE|SLT) -> true
         | true, (SLE|SLT|LE|LT) -> true
         | _, _ -> false
       in
-      match CFG.G.E.label edge with
+      let l = match CFG.G.E.label edge with
       (* Because strided intervals represent signed numbers, we
          cannot convert unsigned inequalities to strided intervals (try
          it). *)
@@ -1573,9 +1603,16 @@ struct
         VM.add v2 (`Scalar vs_v2) l
       | Some(_, e) -> dprintf "no edge match %s" (Pp.ast_exp_to_string e); l
       | _ -> l
+      in Some l
 
   end
 
   module DF = CfgDataflow.MakeWide(DFP)
 
 end
+
+(* Main vsa interface *)
+let vsa ?nmeets ?opts g =
+  Checks.connected_astcfg g "VSA";
+  AlmostVSA.DF.worklist_iterate_widen ?nmeets ?opts g
+

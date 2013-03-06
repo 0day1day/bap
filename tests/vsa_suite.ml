@@ -7,8 +7,9 @@ let simple_test filename var v () =
   let p = Asmir.asmprogram_to_bap (Asmir.open_program filename) in
   let cfg = Cfg_ast.of_prog p in
   let cfg = Ast_cond_simplify.simplifycond_cfg cfg in
-  let _df_in, df_out = Vsa.AlmostVSA.DF.worklist_iterate_widen ~nmeets cfg in
+  let _df_in, df_out = Vsa.vsa ~nmeets cfg in
   let l = df_out (Cfg.AST.G.V.create Cfg.BB_Exit) in
+  let l = BatOption.get l in
   let v' = VM.find var l in
   assert_equal ~msg:(Printf.sprintf "Value set %s for %s was different than expected value %s" (Vsa.AbsEnv.value_to_string v') (Pp.var_to_string var) (Vsa.AbsEnv.value_to_string v)) v v'
 

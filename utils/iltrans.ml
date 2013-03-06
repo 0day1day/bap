@@ -115,10 +115,10 @@ let ssa_coalesce = Coalesce.coalesce_ssa
 let vsa_print g =
   let g = Hacks.ast_remove_indirect g in
   let g = Ast_cond_simplify.simplifycond_cfg g in
-  let _df_in, df_out = Vsa.AlmostVSA.DF.worklist_iterate_widen ~nmeets:50 g in
+  let _df_in, df_out = Vsa.vsa ~nmeets:50 g in
   Cfg.AST.G.iter_vertex (fun v ->
     Printf.printf "VSA @%s" (Cfg_ast.v2s v);
-    Vsa.AbsEnv.pp print_string (df_out v);
+    Vsa.AbsEnv.pp print_string (BatOption.get (df_out v));
     print_string "\n\n"
   ) g
 
