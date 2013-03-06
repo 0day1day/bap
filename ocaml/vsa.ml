@@ -1219,7 +1219,7 @@ module MemStore = struct
 
   let union (x:t) (y:t) =
     if equal x y then x
-    else merge_mem VS.union x y
+    else widen_mem (merge_mem VS.union x y)
 
   let widen (x:t) (y:t) =
     if equal x y then x
