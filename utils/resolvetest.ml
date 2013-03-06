@@ -16,6 +16,8 @@ let speclist =
    "Use VSA based CFG recovery (default).")
   :: ("-rdescent", Arg.Unit (fun () -> recoverf := Asmir_disasm.recursive_descent_at),
       "Use recursive descent based CFG recovery.")
+  :: ("-timeout", Arg.Set_int timeout,
+      "<seconds> Set the per-functiom timeout.")
   :: []
 
 let anon x =
@@ -30,6 +32,8 @@ let () = Arg.parse speclist anon usage;;
 if !arg < 1 then
   (Arg.usage speclist usage;
    exit 1);;
+
+Tunegc.set_gc ();;
 
 let asmp = Asmir.open_program (BatOption.get !binname);;
 

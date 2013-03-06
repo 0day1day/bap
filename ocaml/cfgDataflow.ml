@@ -1,5 +1,7 @@
 (* Dataflow for CFGs *)
 
+module D = Debug.Make(struct let name = "CfgDataflow" and default = `NoDebug end)
+open D
 open GraphDataflow
 
 module type CFG =
@@ -16,6 +18,7 @@ sig
     val fold_vertex : (V.t -> 'a -> 'a) -> t -> 'a -> 'a
   end
   val get_stmts : G.t -> G.V.t -> lang
+  val v2s : G.V.t -> string
 end
 
 module type DATAFLOW =
@@ -56,6 +59,7 @@ struct
     module G=D.CFG.G
     module O=D.O
     let node_transfer_function o g v l =
+      dprintf "node_transfer_function @%s" (D.CFG.v2s v);
       let l, _ = fold o (fun s (l,i) -> D.stmt_transfer_function o g (v,i) s l, i+1) (l,0) (D.CFG.get_stmts g v) in
       l
     let edge_transfer_function o g e l =
@@ -63,7 +67,9 @@ struct
         | Some(_,e) -> Some e
         | None -> None
       in
-      D.edge_transfer_function o g e arg l
+      let o = D.edge_transfer_function o g e arg l in
+      dprintf "edge_transfer_done";
+      o
     let s0 = D.s0
     let init = D.init
     let dir = D.dir

@@ -1197,12 +1197,14 @@ module MemStore = struct
     if x == y then true
     else M1.equal (M2.equal (=)) x y
 
-  let merge_region f =
-    M2.merge (fun a v1 v2 -> match v1, v2 with
-    | Some v1, Some v2 -> Some (f v1 v2)
-    | Some v, None
-    | None, Some v -> Some v
-    | None, None -> None)
+  let merge_region f x y =
+    if M2.equal (=) x y then x
+    else
+      M2.merge (fun a v1 v2 -> match v1, v2 with
+      | Some v1, Some v2 -> Some (f v1 v2)
+      | Some v, None
+      | None, Some v -> Some v
+      | None, None -> None) x y
 
   let merge_mem f =
     M1.merge (fun r v1 v2 -> match v1, v2 with
@@ -1300,36 +1302,26 @@ struct
       let equal = AbsEnv.equal
       let meet (x:t) (y:t) =
         if equal x y then x
-        else VM.fold
-          (fun k v res ->
-            try
-              let v' = VM.find k y in
-              let vs = match v, v' with
-                | (`Scalar a, `Scalar b) -> `Scalar(VS.union a b)
-                | (`Array a, `Array b) -> `Array(MemStore.union a b)
-                | _ -> failwith "Tried to meet scalar and array"
-              in
-              VM.add k vs res
-            with Not_found ->
-              VM.add k v res
-          )
-          x y
+        else VM.merge
+          (fun k v1 v2 -> match v1, v2 with
+          | Some (`Scalar a), Some (`Scalar b) -> Some(`Scalar(VS.union a b ))
+          | Some (`Array a), Some (`Array b) -> Some(`Array(MemStore.union a b))
+          | Some (`Scalar _), Some (`Array _)
+          | Some (`Array _), Some (`Scalar _) -> failwith "Tried to meet scalar and array"
+          | (Some _ as s), None
+          | None, (Some _ as s) -> s
+          | None, None -> None) x y
       let widen (x:t) (y:t) =
         if equal x y then x
-        else VM.fold
-          (fun k v res ->
-            try
-              let v' = VM.find k y in
-              let vs = match v, v' with
-                | (`Scalar a, `Scalar b) -> dprintf "widening %s" (Pp.var_to_string k); `Scalar(VS.widen a b)
-                | (`Array a, `Array b) -> `Array(MemStore.widen a b)
-                | _ -> failwith "Tried to widen scalar and array"
-              in
-              VM.add k vs res
-            with Not_found ->
-              VM.add k v res
-          )
-          x y
+        else VM.merge
+          (fun k v1 v2 -> match v1, v2 with
+          | Some (`Scalar a), Some (`Scalar b) -> dprintf "widening %s" (Pp.var_to_string k); Some(`Scalar(VS.widen a b))
+          | Some (`Array a), Some (`Array b) -> Some(`Array(MemStore.union a b))
+          | Some (`Scalar _), Some (`Array _)
+          | Some (`Array _), Some (`Scalar _) -> failwith "Tried to widen scalar and array"
+          | (Some _ as s), None
+          | None, (Some _ as s) -> s
+          | None, None -> None) x y
 
 (*      let widen x y =
         let v = widen x y in

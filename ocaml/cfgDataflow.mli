@@ -18,6 +18,7 @@ sig
     val fold_vertex : (V.t -> 'a -> 'a) -> t -> 'a -> 'a
   end
   val get_stmts : G.t -> G.V.t -> lang
+  val v2s : G.V.t -> string
 end
 
 (** A dataflow problem is defined by a lattice over a CFG. *)

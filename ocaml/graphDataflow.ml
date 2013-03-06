@@ -162,7 +162,6 @@ struct
           (* Note we must mark b as visited after we look at the
              affected elements, because we look for back edges there. *)
           H.replace visited b ();
-          dprintf "visited";
 	  let newwklist = worklist@list_difference affected_elems worklist
 	  in
 	  do_work newwklist
