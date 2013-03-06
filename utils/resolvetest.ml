@@ -2,12 +2,12 @@ open Ast
 open Type
 open Utils_common
 
-let usage = "Usage: "^Sys.argv.(0)^" <binary>\n\
+let usage = "Usage: "^Sys.argv.(0)^" <binary> [function list]\n\
              Test program to resolve indirect jumps"
 
 let arg = ref 0;;
 let binname = ref None;;
-let fname = ref None;;
+let fnames = ref None;;
 let timeout = ref 30;;
 let recoverf = ref Asmir_disasm.vsa_at
 
@@ -19,10 +19,10 @@ let speclist =
   :: []
 
 let anon x =
-  (match !arg with
-  | 1 -> fname := Some x
-  | 0 -> binname := Some x
-  | _ -> failwith "Expected two arguments");
+  (match !arg, !fnames with
+  | 0, _ -> binname := Some x
+  | _, None -> fnames := Some [x]
+  | _, Some l -> fnames := Some (x::l));
   incr arg;;
 
 let () = Arg.parse speclist anon usage;;
@@ -36,8 +36,8 @@ let asmp = Asmir.open_program (BatOption.get !binname);;
 let funcs = Func_boundary.get_function_ranges asmp;;
 
 let lift_func (n,s,e) =
-  let go = match !fname with
-    | Some x when n = x -> true
+  let go = match !fnames with
+    | Some l when List.mem n l -> true
     | Some _ -> false
     | None -> true
   in
