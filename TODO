@@ -1,6 +1,5 @@
 Missing features:
 * CFG Recovery
-* Function identification without symbols
 
 Disassembly stuff:
 * Include symbols in disassembly
@@ -15,7 +14,6 @@ Design issues:
 Other:
 * Fix up documentation.
 * Write more .mli files.
-* Test on/port to OSX
 * Redo the patched VEX thing properly. (using a vendor branch)
 
 Bigger projects:

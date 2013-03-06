@@ -165,7 +165,7 @@ module Make(D:DISASM)(F:FUNCID) = struct
         let l' = match addcond, lbl with
           | true, Addr a ->
             if l <> None then failwith "add_resolved_edge: Indirect conditional jumps are unimplemented";
-            Some(true (* XXX: This is meaningless! *), binop EQ e (Int(bi64 a, Typecheck.infer_ast ~check:false e)))
+            Some(true (* XXX: This is meaningless! *), binop EQ e (Int(bi64 a, Typecheck.infer_ast e)))
           | true, Name _ -> failwith "add_resolved_edge: It is not possible to resolve indirect jump to a named label"
           | false, _ -> l
         in

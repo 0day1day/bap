@@ -45,7 +45,7 @@ let split_load_list array index indextype accesstype endian =
   (Util.mapn (split_load (Var mvar) index indextype accesstype endian) (elesize - 1), mvar)
 
 let split_loads array index accesstype endian =
-  let indextype = Typecheck.infer_ast ~check:false index in
+  let indextype = Typecheck.infer_ast index in
   let (singlereads, mvar) = split_load_list array index indextype accesstype endian in
   let orexp = List.fold_left exp_or (List.hd singlereads) (List.tl singlereads) in
   Let(mvar, array, orexp)
@@ -60,7 +60,7 @@ let split_write array index indextype accesstype endian data bytenum =
 let split_write_list array index accesstype endian data =
   assert (endian === exp_false);
   let inftype = Typecheck.infer_ast array in
-  let indextype = Typecheck.infer_ast ~check:false index in
+  let indextype = Typecheck.infer_ast index in
   let tempmemvar = Var_temp.nt "tempmem" inftype in
   let tempvalvar = Var_temp.nt "tempval" accesstype in
   let elesize = getwidth accesstype in

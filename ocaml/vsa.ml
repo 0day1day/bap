@@ -626,7 +626,7 @@ struct
       | CAST_LOW -> SI.cast_low
       | CAST_HIGH -> SI.cast_high
 
-    let bits_of_exp e = bits_of_width (Typecheck.infer_ast ~check:false e)
+    let bits_of_exp e = bits_of_width (Typecheck.infer_ast e)
 
     let rec stmt_transfer_function _ _ _ s l =
       match s with
@@ -1035,7 +1035,7 @@ struct
                   f k (exp2vs x)
                 | _ ->
                   raise(Unimplemented "unimplemented expression type"))
-                with Unimplemented _ | Invalid_argument _ -> VS.top (bits_of_width (Typecheck.infer_ast ~check:false e))
+                with Unimplemented _ | Invalid_argument _ -> VS.top (bits_of_width (Typecheck.infer_ast e))
               in
               let new_vs = exp2vs e in
               VM.add v new_vs l
@@ -1370,7 +1370,7 @@ struct
       | `Scalar vs -> vs
       | _ -> failwith "exp2vs: Expected scalar"
     and exp2aev ?o l e : AbsEnv.value =
-      match Typecheck.infer_ast ~check:false e with
+      match Typecheck.infer_ast e with
       | Reg nbits -> (
         let new_vs = try (match e with
           | Int(i,t)->

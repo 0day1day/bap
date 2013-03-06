@@ -192,13 +192,13 @@ object (self)
 	 (* STP barfs on 0, so we don't put the shift *)
 	 self#ast_exp e1
      | BinOp(LSHIFT, e1, Int(i,_)) ->
-	 let  t = infer_ast ~check:false e1 in
+	 let  t = infer_ast e1 in
 	 pp "(("; self#ast_exp e1; pp" << "; pp (string_of_big_int i); pp ")[";
 	 pp (string_of_int(bits_of_width t - 1)); pp":0])"
      | BinOp(RSHIFT, e1, Int(i,_)) -> (* Same sort of deal :( *)
 	 pc '('; self#ast_exp e1; pp " >> "; pp(string_of_big_int i); pc ')'
      | BinOp(ARSHIFT, e1, Int(i,_)) -> (* Same sort of deal :( *)
-	 let t = infer_ast ~check:false e1 in
+	 let t = infer_ast e1 in
 	 let bits = string_of_int (bits_of_width t) in
 	 let gethigh = sub_big_int (big_int_of_int (bits_of_width t)) i in
 	 let gethigh = sub_big_int gethigh bi1 in
@@ -212,7 +212,7 @@ object (self)
 	   pp ":"; pp (Int64.to_string b); pp "], "; pp bits; pc ')';
 	 )
       | BinOp((LSHIFT|RSHIFT|ARSHIFT) as bop, e1, e2) ->
-	  let t2 = infer_ast ~check:false e2 in
+	  let t2 = infer_ast e2 in
 	  let const n = Int(biconst n,t2) in
 	  let put_one n = self#ast_exp (BinOp(bop, e1, const n)) in
 	  let rec put_all n =
@@ -230,8 +230,8 @@ object (self)
 	  in
 	  put_all 0;
       | BinOp(bop, e1, e2) as e ->
-	  let t = infer_ast ~check:false e1 in
-	  let t' = infer_ast ~check:false e2 in
+	  let t = infer_ast e1 in
+	  let t' = infer_ast e2 in
 	  if t <> t' then
 	    wprintf "Type mismatch: %s" (Pp.ast_exp_to_string e);
 	  assert (t = t') ;
@@ -266,7 +266,7 @@ object (self)
 	  self#ast_exp e2;
 	  pp post
       | Cast(ct,t, e1) ->
-	  let t1 = infer_ast ~check:false e1 in
+	  let t1 = infer_ast e1 in
 	  let (bits, bits1) = (bits_of_width t, bits_of_width t1) in
 	  let (pre,post) = match ct with
 	    | CAST_SIGNED    -> ("SX(",", "^string_of_int bits^")")

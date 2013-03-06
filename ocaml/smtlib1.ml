@@ -139,7 +139,7 @@ object (self)
   (** Seperate let_begin and let_end to allow for streaming generation of
       formulas in utils/streamtrans.ml *)
   method let_begin v e1 =
-    let t1 = Typecheck.infer_ast ~check:false e1 in
+    let t1 = Typecheck.infer_ast e1 in
     let cmd,c,pf,vst=
       match t1,!use_booleans with
         | Reg 1,true -> "flet","$",self#ast_exp_bool,Bool
@@ -321,8 +321,8 @@ object (self)
      	   pc ')';
 	 )
      | BinOp((PLUS|MINUS|TIMES|DIVIDE|SDIVIDE|MOD|SMOD|AND|OR|XOR|LSHIFT|RSHIFT|ARSHIFT) as bop, e1, e2) as e ->
-	 let t = infer_ast ~check:false e1 in
-	 let t' = infer_ast ~check:false e2 in
+	 let t = infer_ast e1 in
+	 let t' = infer_ast e2 in
 	 if t <> t' then
 	   wprintf "Type mismatch: %s" (Pp.ast_exp_to_string e);
 	 assert (t = t') ;
@@ -360,14 +360,14 @@ object (self)
      	   cut ();
      	   pc ')';
 	 )
-     | Cast((CAST_UNSIGNED|CAST_SIGNED) as ct, t, e1) when (infer_ast ~check:false e1) = Reg(1) ->
+     | Cast((CAST_UNSIGNED|CAST_SIGNED) as ct, t, e1) when (infer_ast e1) = Reg(1) ->
 	 (* Optimization: 
 	    CAST(UNSIGNED, Reg n, bool_e) =
 	    ite bool_e 1[n] 0[n]
 	    CAST(SIGNED, Reg n, bool_e) =
 	    ite bool_e -1[n] 0[n]
 	 *)
-	 let t1 = infer_ast ~check:false e1 in
+	 let t1 = infer_ast e1 in
 	 let (bitsnew, bitsold) = (bits_of_width t, bits_of_width t1) in
 	 let delta = bitsnew - bitsold in
 	 let textend, fextend = match ct with
@@ -393,7 +393,7 @@ object (self)
 	     )
 	 )	 	       
      | Cast((CAST_LOW|CAST_HIGH|CAST_UNSIGNED|CAST_SIGNED) as ct, t, e1) ->
-	  let t1 = infer_ast ~check:false e1 in
+	  let t1 = infer_ast e1 in
 	  let (bitsnew, bitsold) = (bits_of_width t, bits_of_width t1) in
 	  let delta = bitsnew - bitsold in
 	  (match ct with
@@ -480,7 +480,7 @@ object (self)
   method ast_exp e =
     if not !use_booleans then self#ast_exp_bv e
     else (
-      let t = Typecheck.infer_ast ~check:false e in
+      let t = Typecheck.infer_ast e in
       if t = Reg(1) then (
         try
           self#tryit self#bool_to_bv e
@@ -501,7 +501,7 @@ object (self)
       exists, then raises the No_rule exception. *)
   method ast_exp_bool_base ~check e =
     if debug () then (
-      let t = Typecheck.infer_ast ~check:false e in
+      let t = Typecheck.infer_ast e in
       assert (t = Reg(1)));
     let lazye =
       (match e with
@@ -567,8 +567,8 @@ object (self)
      	lazy(self#ast_exp_bool (UnOp(NOT, e2)))
       | BinOp(EQ, e1, e2) ->
        (* These are predicates, which return boolean values. *)
-        let t1 = Typecheck.infer_ast ~check:false e1 in
-        let t2 = Typecheck.infer_ast ~check:false e2 in
+        let t1 = Typecheck.infer_ast e1 in
+        let t2 = Typecheck.infer_ast e2 in
         assert (t1 = t2);
         let sym, f =
 	  (* If we can print as bool, we can use iff.  Otherwise, we
@@ -600,8 +600,8 @@ object (self)
         )
       | BinOp((LT|LE|SLT|SLE) as op, e1, e2) ->
         (* These are predicates, which return boolean values. *)
-        let t1 = Typecheck.infer_ast ~check:false e1 in
-        let t2 = Typecheck.infer_ast ~check:false e2 in
+        let t1 = Typecheck.infer_ast e1 in
+        let t2 = Typecheck.infer_ast e2 in
         assert (t1 = t2);
         let f,pf = match op with
 	  | LT -> "bvult", self#ast_exp
@@ -623,8 +623,8 @@ object (self)
      (* Z3 does not treat xor as associative; they said they would
 	fix this on 3/28/2011. *)
       | BinOp(XOR as bop, e1, e2) ->
-	let t = infer_ast ~check:false e1 in
-	let t' = infer_ast ~check:false e2 in
+	let t = infer_ast e1 in
+	let t' = infer_ast e2 in
     	if t <> t' then
     	  wprintf "Type mismatch: %s" (Pp.ast_exp_to_string e);
     	assert (t = t') ;
@@ -658,8 +658,8 @@ object (self)
      	  pc ')';
         )
       | BinOp((AND|OR(*|XOR*)) as bop, e1, e2) ->
-    	let t = infer_ast ~check:false e1 in
-    	let t' = infer_ast ~check:false e2 in
+    	let t = infer_ast e1 in
+    	let t' = infer_ast e2 in
     	if t <> t' then
     	  wprintf "Type mismatch: %s" (Pp.ast_exp_to_string e);
     	assert (t = t') ;
@@ -677,7 +677,7 @@ object (self)
 	  pc ')';
 	)
       | Cast((CAST_LOW|CAST_HIGH|CAST_UNSIGNED|CAST_SIGNED),t, e1) ->
-     	let t1 = infer_ast ~check:false e1 in
+     	let t1 = infer_ast e1 in
      	let (bitsnew, bitsold) = (bits_of_width t, bits_of_width t1) in
      	let delta = bitsnew - bitsold in
      	if delta = 0 
@@ -700,7 +700,7 @@ object (self)
   (** Try to evaluate an expression to a boolean. If no good rule
       exists, uses bitvector conversion instead. *)
   method ast_exp_bool e =
-    let t = Typecheck.infer_ast ~check:false e in
+    let t = Typecheck.infer_ast e in
     assert (t = Reg(1));
     if !use_booleans then (
       try

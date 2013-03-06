@@ -50,6 +50,8 @@ export SOURCES = \
 	var_temp.mli var_temp.ml \
 	pp.ml \
 	typecheck.mli typecheck.ml \
+	piqi/stmt_piqi.ml piqi/stmt_piqi_ext.ml \
+	piqi/ast_piqi.mli piqi/ast_piqi.ml \
 	ast_convenience.ml \
 	cfg.mli cfg.ml \
 	cfgDataflow.mli cfgDataflow.ml \
@@ -126,8 +128,9 @@ export SOURCES = \
 	$(PROJSOURCES) \
 
 RESULT = bap
-DOC_FILES := $(filter %.mli, $(SOURCES)) $(filter %.ml, $(SOURCES))
 
+# Filter out the automatic piqi files
+DOC_FILES := $(filter-out piqi/stmt_piqi%, $(filter %.mli, $(SOURCES)) $(filter %.ml, $(SOURCES)))
 
 
 # ocamlfind packages required
@@ -145,7 +148,7 @@ export LDFLAGS = $(LIBASMIR_LDFLAGS) $(SOLVER_LDFLAGS) @LDFLAGS@
 export OCAMLMKLIB_FLAGS = $(LDFLAGS)
 export PPFLAGS = $(SOLVER_PPFLAGS) @LLVM_PPFLAGS@
 export INCDIRS = $(BIGINT) $(BATT) $(OUNIT) $(PCRE) $(OCAMLGRAPH) $(OBJSIZE) $(LIBTRACE) $(LIBTRACE)/piqi
-export LIBS = zarith batteries oUnit pcre graph objsize libtrace
+export LIBS =
 export RESULTDEPS = $(LIBASMIR)/src/libasmir.a $(VEX_DIR)/libvex.a $(LIBTRACE)/libtrace.cmxa
 export LIBDIRS = $(LIBASMIR)/src $(VEX_DIR)
 export LIBDIRS += $(SOLVER_LIBDIRS) $(LIBTRACE)
@@ -153,7 +156,7 @@ export LIBDIRS += $(SOLVER_LIBDIRS) $(LIBTRACE)
 OCAMLLDFLAGS = -thread # just for make top
 OCAMLFLAGS = -thread -warn-error Aelz -annot # -for-pack Bap #-w A
 # merge everything but descriptions.
-OCAMLDOCFLAGS = -m avlsoper
+OCAMLDOCFLAGS = -m avlsoper -sort
 
 all: dcl ncl
 

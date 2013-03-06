@@ -1000,7 +1000,7 @@ let rec to_ir addr next ss pref =
       let src_e = op2e t src in
       let imm = op2e t imm in
       let concat = dst_e ++* src_e in
-      let t_concat = Typecheck.infer_ast ~check:false concat in
+      let t_concat = Typecheck.infer_ast concat in
       let shift = concat >>* (cast_unsigned t_concat (imm <<* (it 3 t))) in
       let high, low = match t with
         | Reg 128 -> biconst 127, bi0
@@ -2688,16 +2688,18 @@ let parse_instr g addr =
       | 0x71 | 0x72 | 0x73 ->
         let t = prefix.mopsize in
         let r, rm, na = parse_modrm32 na in
-        let fbop, str, et = match b2, r with
-          | _, Oreg 2 -> binop RSHIFT, "psrl", lowbits2elemt b2
-          | _, Oreg 6 -> binop LSHIFT, "psll", lowbits2elemt b2
-          | _, Oreg 4 -> binop ARSHIFT, "psra", lowbits2elemt b2
-          | 0x73, Oreg 3 when prefix.opsize_override -> binop RSHIFT, "psrl", reg_128
-          | 0x73, Oreg 7 when prefix.opsize_override -> binop LSHIFT, "psll", reg_128
-          | _, Oreg i -> disfailwith (Printf.sprintf "invalid psrl/psll encoding b2=%#x r=%#x" b2 i)
+        let i, na = parse_imm8 na in
+        let open BatInt64.Infix in
+        let fbop, str, et, i = match b2, r, i with
+          | _, Oreg 2, _ -> binop RSHIFT, "psrl", lowbits2elemt b2, i
+          | _, Oreg 6, _ -> binop LSHIFT, "psll", lowbits2elemt b2, i
+          | _, Oreg 4, _ -> binop ARSHIFT, "psra", lowbits2elemt b2, i
+          (* The shift amount of next two elements are multipled by eight *)
+          | 0x73, Oreg 3, Oimm i when prefix.opsize_override -> binop RSHIFT, "psrldq", reg_128, Oimm (i*8L)
+          | 0x73, Oreg 7, Oimm i when prefix.opsize_override -> binop LSHIFT, "pslldq", reg_128, Oimm (i*8L)
+          | _, Oreg i, _ -> disfailwith (Printf.sprintf "invalid psrl/psll encoding b2=%#x r=%#x" b2 i)
           | _ -> disfailwith "impossible"
         in
-        let i, na = parse_imm8 na in
         (Ppackedbinop(t, et, fbop, str, rm, i), na)
       | 0x80 | 0x81 | 0x82 | 0x83 | 0x84 | 0x85 | 0x86 | 0x87 | 0x88 | 0x89
       | 0x8a | 0x8b | 0x8c | 0x8d | 0x8e | 0x8f ->

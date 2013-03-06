@@ -161,14 +161,14 @@ object(self)
     | Concat _ as c -> self#convert_exp (Ast_convenience.rm_concat c)
     (* Let for integer types *)
     | Let(v, e, e') when Typecheck.is_integer_type (Var.typ v)
-        && Typecheck.is_integer_type (Typecheck.infer_ast ~check:false e') ->
+        && Typecheck.is_integer_type (Typecheck.infer_ast e') ->
       let () = VH.add ctx.letvars v (self#convert_exp e) in
       let save = self#convert_exp e' in
       VH.remove ctx.letvars v;
       save
     (* Let for memory bindings that return integer type (Loads) needs to be flattened *)
     | Let(v, e, e') as bige when Typecheck.is_mem_type (Var.typ v)
-        && Typecheck.is_integer_type (Typecheck.infer_ast ~check:false e') ->
+        && Typecheck.is_integer_type (Typecheck.infer_ast e') ->
       self#convert_exp (Flatten_mem.flatten_loads bige)
     | Int(i, t) ->
       let lt = self#convert_type t in
@@ -401,11 +401,11 @@ object(self)
         method visit_stmt s =
           match s, !t with
           | Halt(e, _), None ->
-            t := Some(Typecheck.infer_ast ~check:false e);
+            t := Some(Typecheck.infer_ast e);
             SkipChildren
-          | Halt(e, _), Some t when (Typecheck.infer_ast ~check:false e) = t ->
+          | Halt(e, _), Some t when (Typecheck.infer_ast e) = t ->
             SkipChildren
-          | Halt(e, _), Some t when (Typecheck.infer_ast ~check:false e) <> t ->
+          | Halt(e, _), Some t when (Typecheck.infer_ast e) <> t ->
             failwith "Program is not well typed: multiple return value types"
           | _ ->
             SkipChildren
