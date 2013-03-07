@@ -6,6 +6,7 @@ let nmeets = 50
 let simple_test filename var v () =
   let p = Asmir.asmprogram_to_bap (Asmir.open_program filename) in
   let cfg = Cfg_ast.of_prog p in
+  let cfg = Prune_unreachable.prune_unreachable_ast cfg in
   let cfg = Ast_cond_simplify.simplifycond_cfg cfg in
   let _df_in, df_out = Vsa.vsa ~nmeets cfg in
   let l = df_out (Cfg.AST.G.V.create Cfg.BB_Exit) in
