@@ -9,6 +9,7 @@ open Type
 (* XXX: Handle conditional function calls *)
 (* VSA dataflow reuse *)
 (* Call/ret behavior *)
+(* Reprocess indirect jumps *)
 
 type succs = | Addrs of label list
              | Error
@@ -218,7 +219,9 @@ module Make(D:DISASM)(F:FUNCID) = struct
           let dumb_translate_call cfg (s,l,e) =
             let revstmts = match List.rev (CA.get_stmts !c s) with
               | CJmp _::_ -> failwith "Conditional function calls are not implemented"
-              | Jmp _ as s::tl -> Comment(Printf.sprintf "Function call removed: %s" (Pp.ast_stmt_to_string s), [])::tl
+              | Jmp _::tl as stmts -> List.map (function
+                  | Label _ as s -> s
+                  | s -> Comment(Printf.sprintf "Function call removed: %s" (Pp.ast_stmt_to_string s), [])) stmts
               | _ -> failwith "Unable to rewrite function call"
             in
             CA.set_stmts cfg s (List.rev revstmts)

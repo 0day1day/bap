@@ -78,7 +78,7 @@ struct
     s = (-1L) && lb = 1L && ub = 0L
 
   let to_string ((k,s,lb,ub) as si) =
-    if is_empty si then "[]"
+    if is_empty si then "[empty]"
     else if not (debug ()) then Printf.sprintf "%Lu[%Ld,%Ld]" s lb ub
     else Printf.sprintf "(%d)%Lu[%Ld,%Ld]" k s lb ub
 
@@ -559,8 +559,9 @@ struct
     else (k, s', l, u)
   let widen = renormbin' widen
 
-  let rec fold f (k,s,a,b) init =
+  let rec fold f ((k,s,a,b) as si) init =
     if a = b then f a init
+    else if is_empty si then init
     else fold f (k, s, a+%s ,b) (f a init)
 
 end (* module SI *)
@@ -783,7 +784,10 @@ struct
   let aboveeq_unsigned k i = [(global, SI.aboveeq_unsigned k i)]
   let beloweq_unsigned k i = [(global, SI.beloweq_unsigned k i)]
 
-  let add k x y = match (x,y) with
+  let add k x y =
+    let e = empty k in
+    if x = e || y = e then e
+    else match (x,y) with
     | ([r2,si2],[r1,si1]) when r1 == global ->
       let allow_overflow = r2 == global in
       [(r2, SI.add ~allow_overflow k si1 si2)]
@@ -881,11 +885,12 @@ struct
            Hashtbl.add hx r si
          in
          List.iter add x;
-         List.fold_left
+         let o = List.fold_left
            (fun l (r,si) ->
              try (r, SI.intersection si (Hashtbl.find hx r))::l
              with Not_found -> l)
-           [] y
+           [] y in
+         if o = [] then empty k else o
 
   let widen x y =
     let k = width x in
@@ -1114,7 +1119,7 @@ module MemStore = struct
       VS.top k
 
   let read k ?o ae = function
-    | [] -> failwith "empty value sets not allowed"
+    | v when v = VS.empty k -> VS.empty k
     | addrs -> (* FIXME: maybe shortcut this *)
       try
         let res =
@@ -1419,6 +1424,7 @@ struct
             (* FIXME: assumes deendianized.
                ie: _e and _t should be the same for all loads and
                stores of m. *)
+            DV.dprintf "doing a read from %s" (VS.to_string (exp2vs ?o l i));
             MemStore.read (bits_of_width t) ?o (do_find_ae l m) (exp2vs ?o l i)
           | Cast (ct, t, x) ->
             let f = RegionVSA.DFP.cast_to_vs_function ct in
@@ -1437,7 +1443,7 @@ struct
                     (* FIXME: assumes deendianized.
                        ie: _e and _t should be the same for all loads and
                        stores of m. *)
-            dprintf "doing a write... to %s of %s." (VS.to_string (exp2vs ?o l i)) (VS.to_string (exp2vs ?o l v));
+            DV.dprintf "doing a write... to %s of %s." (VS.to_string (exp2vs ?o l i)) (VS.to_string (exp2vs ?o l v));
             (* dprintf "size %#Lx" (VS.numconcrete (exp2vs ?o l i)); *)
             MemStore.write (bits_of_width t)  (do_find_ae l m) (exp2vs ?o l i) (exp2vs ?o l v)
           (* | Phi(x::xs) -> *)
