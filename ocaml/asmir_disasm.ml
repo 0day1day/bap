@@ -94,15 +94,24 @@ module VSA_SPEC = struct
       let cfg = Hacks.ast_exit_indirect (CA.copy g) in
       let cfg = Ast_cond_simplify.simplifycond_cfg cfg in
       let cfg = Prune_unreachable.prune_unreachable_ast cfg in
-      (* Cfg_pp.AstStmtsDot.output_graph (open_out "vsa.dot") cfg; *)
+      (* let cfg = Coalesce.coalesce_ast ~nocoalesce:[v] cfg in
+      Cfg_pp.AstStmtsDot.output_graph (open_out "vsa.dot") cfg; *)
       dprintf "Starting VSA now";
       let _df_in, df_out = Vsa.vsa ~nmeets:50 ~opts:{Vsa.AlmostVSA.DFP.O.initial_mem=Asmir.get_readable_mem_contents_list asmp} cfg in
       let vs = Vsa.AlmostVSA.DFP.exp2vs (BatOption.get (df_out v)) e in
       dprintf "VSA resolved %s to %s" (Pp.ast_exp_to_string e) (Vsa.VS.to_string vs);
       (match Vsa.VS.concrete ~max:1024 vs with
       | Some x -> dprintf "VSA finished"; Addrs (List.map (fun a -> Addr a) x), ()
-      | None -> wprintf "VSA disassembly failed to resolve %s/%s to a specific concrete set" (Pp.ast_exp_to_string e) (Vsa.VS.to_string vs); Indirect, ())
-      (* Rely on recursive descent for easy stuff *)
+      | None -> wprintf "VSA disassembly failed to resolve %s/%s to a specific concrete set" (Pp.ast_exp_to_string e) (Vsa.VS.to_string vs);
+        if debug () then (
+          Cfg.AST.G.iter_vertex (fun v ->
+            Printf.eprintf "VSA @%s" (Cfg_ast.v2s v);
+            Vsa.AbsEnv.pp prerr_string (BatOption.get (df_out v));
+            dprintf "\n\n"
+          ) cfg
+        );
+        Indirect, ())
+        (* Rely on recursive descent for easy stuff *)
     | o, () -> o, ()
 
 end
