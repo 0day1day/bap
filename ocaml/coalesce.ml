@@ -104,6 +104,8 @@ struct
 
           (* Remove unused successors *)
           let graph = List.fold_left C.remove_vertex graph successors in
+          (* Don't revisit successors *)
+          List.iter add_visited successors;
 
           (* Replace the contents of init *)
           let big_stmt_block = C.join_stmts init_stmts big_stmt_block in
