@@ -542,21 +542,24 @@ let get_asm = function
 
 (** Translate only one address of a  Libasmir.asm_program_t to BAP *)
 let asm_addr_to_bap {asmp=prog; arch=arch; get_exec=get_exec} addr =
-  (try
-     let (ir,na) as v = Disasm.disasm_instr arch get_exec addr in
+  let (ir, na) = try
+     let v = Disasm.disasm_instr arch get_exec addr in
      DV.dprintf "Disassembled %Lx directly" addr;
-     (match ir with
-     | Label(l, [])::rest ->
-       (Label(l, [Asm(Libasmir.asmir_string_of_insn prog addr)])::rest,
-	na)
-     | _ -> v)
+     v
    with Disasm_i386.Disasm_i386_exception s ->
      DTest.dprintf "BAP unknown disasm_instr %Lx: %s" addr s;
      DV.dprintf "disasm_instr %Lx: %s" addr s;
-     ([Special(Printf.sprintf "Unknown instruction at %Lx: %s " addr s, []);
-       Comment("All blocks must have two statements", [])],
-      Int64.add addr (Int64.of_int (Libasmir.asmir_get_instr_length prog addr)))
-  )
+     let ir =
+       Special(Printf.sprintf "Unknown instruction at %Lx: %s " addr s, [])::[]
+     in
+     Disasm_i386.ToIR.add_labels addr ir,
+     Int64.add addr (Int64.of_int (Libasmir.asmir_get_instr_length prog addr))
+  in
+  let ir = match ir with
+    | Label(l, [])::rest ->
+      Label(l, [Asm(Libasmir.asmir_string_of_insn prog addr)])::rest
+    | _ -> ir
+  in (ir, na)
 
 let flatten ll =
 	List.rev (List.fold_left (fun accu l -> List.rev_append l accu) [] ll)
