@@ -41,21 +41,23 @@ For this sample disassembly, we can begin execution at address
 halt execution, we'll manually add a halt command to the lifted IL.
 For this example, you could search for the string
 \verb!addr 0x804827a! in test.il, which marks the beginning of the ret
-instruction in the lifted IL.  Inserting \verb!halt true!  after the
-address and label statements will cause the evaluator to halt.  For
-instance:
+instruction in the lifted IL.  Inserting \verb!halt R_EAX:u32!  after
+the address and label statements will cause the evaluator to halt and
+return the value in eax.  For instance:
 
 \begin{verbatim}
 addr 0x804827a @asm "ret    "
 label pc_0x804827a
-halt true
+halt R_EAX:u32
 \end{verbatim}
 
-Now, issue \cmdline{ileval -il test.il -eval-at mainaddr}, where mainaddr
-is the address to start from.  BAP will evaluate the IL program.  If
-debugging output is enabled, it will print each statement as it is
-evaluated.  After halting, BAP will print the state of registers and
-memory. Unsurprisingly, the terminal value of eax is 42.  
+Now, issue \cmdline{ileval -il test.il -eval-at mainaddr}, where
+mainaddr is the address to start from.  BAP will evaluate the IL
+program.  If debugging output is enabled (by setting the
+\texttt{BAP\_DEBUG\_MODULES} environment variable to
+\texttt{SymbEval}), it will print each statement as it is evaluated.
+After halting, BAP will print the return value, which is
+eax. Unsurprisingly, the returned value of eax is 42.
 
 Now let's begin execution starting from the call instruction in main
 (0x8048250). This will allow us to modify the input to the function
@@ -63,9 +65,9 @@ g. The -init-var and -init-mem options allow the user to specify an
 initial value for a variable (register) or memory address
 respectively.  To replicate what we just did and use an input of 42,
 we can use the following the command \cmdline{ileval -il test.il
-  -init-mem R\_ESP\_1:u32 42:u32 -eval-at 0x8048274}. Notice that this
+  -init-mem R\_ESP:u32 42:u32 -eval-at 0x8048274}. Notice that this
 begins execution at the call instruction instead of the beginning of
 main.  Unsurprisingly, eax has a final value of 42 again.  If we
 instead change the memory pointed to by esp to 43, by \cmdline{ileval
-  -il test.il -init-mem R\_ESP\_1:u32 43:u32 -eval-at 0x8048274}, eax has
+  -il test.il -init-mem R\_ESP:u32 43:u32 -eval-at 0x8048274}, eax has
 a final value of -1.

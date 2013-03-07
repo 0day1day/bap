@@ -25,7 +25,7 @@ let main () =
   in
   let values = List.filter (fun (v,_) -> is_input v) values in
   let sorted = sort values in
-    List.iter (fun (_, num) -> Printf.printf "\\x%02Lx" num) sorted
+    List.iter (fun (_, num) -> Printf.printf "\\x%s" (Util.big_int_to_hex ~pad:2 num)) sorted
 
 ;;
 

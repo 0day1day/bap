@@ -1,5 +1,5 @@
 (** Strongly connected component based value numbering.
-    
+
     Currently we only implement the RPO algorithm, described in
     "SCC-Based Value Numbering" by Keith Cooper and Taylor Simpson.
     http://citeseer.ist.psu.edu/41805.html
@@ -123,9 +123,9 @@ let expid_eq e1 e2 =
     let b6 = List.for_all2 (=) l6 r6 in
     let b7 = List.for_all2 (=) l7 r7 in
     let b8 = List.for_all2 (==%) l8 r8 in
-    if b1 & b2 & b3 & b4 & b5 & b6 & b7 & b8 then
+    if b1 && b2 && b3 && b4 && b5 && b6 && b7 && b8 then
       true
-    else if b3 & b4 & b5 & b6 & b7 & b8 then
+    else if b3 && b4 && b5 && b6 && b7 && b8 then
       (* e1 and e2 are not physically equal.  But maybe the
          subexpressions are structurally, but not physically,
          equal. *)
@@ -303,6 +303,7 @@ let opt_expid info var exp =
       sameas v
   | Bin(XOR, x, HInt(bi,_))
   | Bin(PLUS, x, HInt(bi,_))
+  | Bin(MINUS, x, HInt(bi,_))
   | Bin(LSHIFT, x, HInt(bi,_))
   | Bin(RSHIFT, x, HInt(bi,_))
   | Bin(ARSHIFT, x, HInt(bi,_)) when bi_is_zero bi ->
@@ -402,7 +403,7 @@ let rpo ~opt cfg =
           VH.add info.vn2eid x eid;
           EH.add info.eid2vn eid h;
         );
-        `DoChildren
+        DoChildren
     end
     in
     C.G.iter_vertex
@@ -521,27 +522,27 @@ let replacer ?(opt=true) cfg =
     method visit_value = function
       | Ssa.Var v ->
           (match hash_replacement pos (vn v) with
-           | Some(Ssa.Var var) when v == var -> `SkipChildren
+           | Some(Ssa.Var var) when v == var -> SkipChildren
            | Some v' ->
                changed := true;
                dprintf "Replacing var %s with %s" (Pp.var_to_string v) (Pp.value_to_string v');
-               `ChangeTo v'
-           | None -> `SkipChildren
+               ChangeTo v'
+           | None -> SkipChildren
           )
-      | _  -> `SkipChildren
+      | _  -> SkipChildren
 
     method visit_stmt = function
       | Ssa.Move(_,Val _, _) -> (* visit value will handle that properly *)
-          `DoChildren
+          DoChildren
       | Ssa.Move(v,e, a) -> (
           match hash_replacement pos (vn v) with
           | Some vl ->
               changed := true;
               dprintf "Replacing exp %s with %s" (Pp.ssa_exp_to_string e) (Pp.value_to_string vl);
-              `ChangeTo(Move(v, Val vl, a))
-          | None -> `DoChildren
+              ChangeTo(Move(v, Val vl, a))
+          | None -> DoChildren
         )
-      | _ -> `DoChildren
+      | _ -> DoChildren
   end
   in
   let somechange = ref false in

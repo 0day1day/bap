@@ -1,12 +1,12 @@
 \section{\texttt{iltrans}: Programs Transformations on \bil Code}
-The {\tt iltrans} tool translates our IL in various ways.  The options
-to {\tt iltrans} specify a sequence of transformations, optionally
-printing out the result of the transformation.   For example,
-executing:
+The {\tt iltrans} tool applies transformations and analyses to \bil.
+The arguments to {\tt iltrans} specify a sequence of transformations,
+optionally printing out the result of the transformation.  For
+example, executing:
 \begin{verbatim}
  iltrans -trans1 -trans2 outfile -trans3 infile
 \end{verbatim}
-would read in {\tt infile}, perfore transformation {\tt trans1}, the
+would read in {\tt infile}, perform transformation {\tt trans1}, the
 output of which is fed to {\tt trans2}, the output of which is again
 fed to {\tt trans3} as well as printed to {\tt outfile}. Although this
 may seem a little strange at first, the tool is designed to make it
@@ -86,8 +86,7 @@ program. %% We describe our implementation of chopping in more detail
 \paragraph{Data-flow and Optimizations.} {\tt iltrans} interfaces with
 the generic data-flow engine in \bap.  The data-flow engine works on
 user-defined lattices, such as those for constant propagation, dead
-code elimination, etc.  {\tt iltrans} interfaces with several
-implements several data-flow analyses. \bap currently implements
+code elimination, etc.  \bap currently implements
 Simpson's global value numbering~\cite{simpson:1996}, (aggressive)
 dead-code elimination~\cite{muchnick:1997}, and live-variable
 analysis~\cite{muchnick:1997}.
@@ -107,8 +106,7 @@ procedure STP to return a satisfying answer for a query can be cut in
 half by first using program optimization to simplify the
 query~\cite{brumley:2008}.
 
-
-
-
-
-
+%%% Local Variables: 
+%%% mode: latex
+%%% TeX-master: "../main"
+%%% End: 

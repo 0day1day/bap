@@ -481,6 +481,7 @@ enum FrameType {
       // XXX: Additional registers?
 
       KeyFrame() : Frame(FRM_KEY) {}
+      virtual ~KeyFrame() { }
       virtual std::ostream &serialize(std::ostream &out, uint16_t sz = 0);
       virtual std::istream &unserializePart(std::istream &in);
 

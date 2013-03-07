@@ -13,6 +13,7 @@ module D = Debug.Make(struct let name="memory2array" and default=`Debug end)
 open D
 
 open Ast
+open Ast_convenience
 open BatListFull
 open Big_int_Z
 open Grammar_scope
@@ -20,7 +21,7 @@ open Type
 open Util
 open Var
 
-(** How big is normalized index? *)
+(** How big are normalized elements? *)
 let bitwidth = 8
 let normtype = Reg(bitwidth)
 
@@ -40,11 +41,11 @@ let split_load array index indextype accesstype endian bytenum =
 let split_load_list array index indextype accesstype endian =
   assert (endian === exp_false);
   let elesize = getwidth accesstype in
-  let mvar = newvar "loadnorm" (Array(indextype, normtype)) in
+  let mvar = Var_temp.nt "loadnorm" (Array(indextype, normtype)) in
   (Util.mapn (split_load (Var mvar) index indextype accesstype endian) (elesize - 1), mvar)
 
 let split_loads array index accesstype endian =
-  let indextype = Typecheck.infer_ast ~check:false index in
+  let indextype = Typecheck.infer_ast index in
   let (singlereads, mvar) = split_load_list array index indextype accesstype endian in
   let orexp = List.fold_left exp_or (List.hd singlereads) (List.tl singlereads) in
   Let(mvar, array, orexp)
@@ -59,9 +60,9 @@ let split_write array index indextype accesstype endian data bytenum =
 let split_write_list array index accesstype endian data =
   assert (endian === exp_false);
   let inftype = Typecheck.infer_ast array in
-  let indextype = Typecheck.infer_ast ~check:false index in
-  let tempmemvar = newvar "tempmem" inftype in
-  let tempvalvar = newvar "tempval" accesstype in
+  let indextype = Typecheck.infer_ast index in
+  let tempmemvar = Var_temp.nt "tempmem" inftype in
+  let tempvalvar = Var_temp.nt "tempval" accesstype in
   let elesize = getwidth accesstype in
   let singlewrites = Util.mapn (split_write (Var tempmemvar) index indextype accesstype endian (Var tempvalvar)) (elesize - 2) in
   (singlewrites @ [(split_write array index indextype accesstype endian (Var tempvalvar) (elesize - 1))], tempmemvar, tempvalvar)
@@ -126,9 +127,9 @@ object (self)
   method visit_avar avar =
     match Var.typ(avar) with
     |	TMem(idxt) ->
-      `ChangeToAndDoChildren (get_array_var avar)
+      ChangeToAndDoChildren (get_array_var avar)
     |	_ ->
-      `DoChildren
+      DoChildren
 
   method visit_rvar = self#visit_avar
 
@@ -139,25 +140,25 @@ object (self)
 	  let width = (getwidth t) in
 	  match width with
 	  | 1 -> (* Printf.printf "Cool\n"; *)
-	      `DoChildren
+	      DoChildren
 	  | _ -> (* Printf.printf "Need to split\n"; *)
 	    let arr = Ast_visitor.exp_accept self arr in
 	    let newexpr = split_loads arr idx t endian
 	    in
 	    (* Printf.printf "New Load %s\n" (Pp.ast_exp_to_string newexpr); *)
 	    (* djb: still need to descend into children *)
-	    `ChangeToAndDoChildren newexpr)
+	    ChangeToAndDoChildren newexpr)
       | Store(arr,idx,data,endian,t) -> ((* Printf.printf "Store %s %s %s Reg%d\n" (Pp.ast_exp_to_string arr) (Pp.ast_exp_to_string idx) (Pp.ast_exp_to_string data) (getwidth t); *)
           let width = (getwidth t) in
           match width with
           | 1 -> (* Printf.printf "Cool!\n"; *)
-	      `DoChildren
+	      DoChildren
           | _ -> (* Printf.printf "Need to split\n"; *)
 	      let arr = Ast_visitor.exp_accept self arr in
               let newexpr = split_writes arr idx t endian data in
-	      `ChangeToAndDoChildren newexpr
+	      ChangeToAndDoChildren newexpr
         )
-      | _ -> `DoChildren
+      | _ -> DoChildren
   end
 
 

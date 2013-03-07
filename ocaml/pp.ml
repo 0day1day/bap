@@ -70,7 +70,7 @@ let var_to_string ?ctx (Var.V(id,name,t) as v) =
   | None ->
 	name ^ "_" ^ string_of_int id ^ ":" ^ typ_to_string t
   | Some(vars,names) ->
-    if debug then (
+    if debug() then (
       if (not !printed_varctx_warning) &&
         (Hashtbl.length names > reasonable_size_varctx ||
         VH.length vars > reasonable_size_varctx) then (
@@ -119,13 +119,18 @@ object (self)
     | Address a -> printf "@address \"0x%Lx\"" a;
     | Liveout -> pp "@set \"liveout\""
     | StrAttr s -> pp "@str \""; pp s; pc '\"'
-    | Context {name=s; mem=mem; value=v; index=i; t=Reg bits; taint=Taint t} -> 
+    | Context {name=s; mem=mem; value=v; index=i; t=Reg bits; usage=u; taint=Taint t} -> 
+      let ustr = match u with
+        | RD -> "rd" | RW -> "rw" | WR -> "wr"
+      in
       let ts = string_of_int t in
-	(*if t = Taint then "tainted" else "untainted" in*)
-	let ind = if mem then "[0x"^(Int64.format "%Lx" i)^"]" else "" in
-	pp "@context "; pp (s^ ind ^" = 0x"^(Util.hex_of_big_int v)^ ", " ^ ts
-			      ^", u"
-			      ^ (string_of_int bits))
+      (*if t = Taint then "tainted" else "untainted" in*)
+      let ind = if mem then "[0x"^(Int64.format "%Lx" i)^"]" else "" in
+      pp "@context "; pc '"'; pp (s^ind); pc '"'; pp (" = 0x"^(Util.big_int_to_hex v)^ ", " ^ ts
+			                              ^", u"
+			                              ^ (string_of_int bits)
+                                                      ^", "
+                                                      ^ustr)
     | Context _ ->
       failwith "Contexts only specify register types"
     | ThreadId i -> pp "@tid \""; pp (string_of_int i); pp "\""
@@ -146,7 +151,7 @@ object (self)
     | (bi,t) ->
         if (abs_big_int bi) <% bia
         then pp (string_of_big_int bi)
-        else pp ("0x"^(Util.hex_of_big_int (Arithmetic.to_big_int (i,t))));
+        else pp ("0x"^(Util.big_int_to_hex (Arithmetic.to_big_int (i,t))));
         pp ":"; self#typ t
 
 
@@ -306,6 +311,10 @@ object (self)
 	pp "assert ";
 	self#ast_exp e;
 	self#attrs a
+    | Ast.Assume(e,a) ->
+	pp "assume ";
+	self#ast_exp e;
+	self#attrs a
     | Ast.Comment(s,a) ->
 	pp "/*";
 	pp s;
@@ -436,6 +445,10 @@ object (self)
 	pp "assert ";
 	self#ssa_value v;
 	self#attrs a
+    | Ssa.Assume(v,a) ->
+        pp "assume ";
+        self#ssa_value v;
+        self#attrs a
     | Ssa.Comment(s,a) ->
 	pp "/*";
 	pp s;
@@ -495,6 +508,7 @@ let make_varctx () =
 (* These functions will not remember variable names across separate
    invocations *)
 let value_to_string = pp2string (fun p -> p#ssa_value)
+let attr_to_string = pp2string (fun p -> p#attr)
 let label_to_string = pp2string (fun p -> p#label)
 let ssa_exp_to_string = pp2string (fun p -> p#ssa_exp)
 let ssa_stmt_to_string = pp2string (fun p -> p#ssa_stmt)

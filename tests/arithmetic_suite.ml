@@ -19,14 +19,14 @@ let truncating_division_test ?(n=10000) () =
     match Random.int64 2L with
     | 0L -> 1L
     | 1L -> -1L
-    | _ -> failwith "not possible"
+    | _ -> assert_failure "not possible"
   in
   let rec getrand ?(acc=[]) = function
     | 0 -> acc
     | n when n > 0 -> 
         getrand ~acc:((Int64.mul (getrandsign ()) (Random.int64 Int64.max_int),
                       Int64.mul (getrandsign ()) (Random.int64 Int64.max_int)) :: acc) (n-1)
-    | _ -> failwith "getrand: negative value"
+    | _ -> assert_failure "getrand: negative value"
   in
   (* List.iter (fun (x,y) -> Printf.printf "woo: %Lx\n" x) (getrand [] 100) *)
   let testcases = getrand n in

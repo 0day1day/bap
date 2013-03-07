@@ -1,18 +1,28 @@
 \documentclass[11pt,twoside]{book}
 
-\usepackage[draft]{djb}
+%\usepackage[draft]{djb}
 \usepackage{shortcuts}
-\usepackage{fullpage}
-\usepackage{fancyhdr}
-\pagestyle{fancyplain}
+%\usepackage{fullpage}
 \usepackage{code}
 \usepackage{subfig}
 \usepackage{listings}
 \usepackage{url}
 \usepackage{verbatim}
 \usepackage{graphicx}
+\usepackage{placeins}
+\usepackage{xspace}
+\usepackage{amsfonts,amsmath,amssymb,amsthm}
+\usepackage{hyperref}
+\usepackage{proof}
+\usepackage{cite}
 
 \newcommand{\doctitle}{The \bap Handbook}
+
+\usepackage{fancyhdr}
+\setlength{\headsep}{25pt}
+\rhead[]{\rightmark}
+\lhead[\leftmark]{}
+%\chead[\leftmark]{\rightmark}
 \pagestyle{fancy}
 
 \newcommand{\cmdline}[1]{\texttt{#1}}
@@ -29,9 +39,9 @@
 \begin{document}
 
 \title{\doctitle}
-\author{David Brumley and Ivan Jager}
+\author{David Brumley, Ivan Jager, Edward J. Schwartz, and Spencer Whitman}
 \date{\today}
- 
+
 \maketitle
 \thispagestyle{plain}
 

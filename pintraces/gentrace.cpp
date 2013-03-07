@@ -86,6 +86,10 @@ namespace WINDOWS {
 // necessary.
 #define BUFFER_SIZE 10240
 
+// Leave this much extra room in the frame buffer, for some unexpected
+// frames.
+#define FUDGE 5
+
 // Add a keyframe every KEYFRAME_FREQ instructions.
 #define KEYFRAME_FREQ 10240
 
@@ -474,6 +478,17 @@ static uint32_t GetBitsOfReg(REG r) {
         return 32;
         break;
 
+    case REG_MM0:
+    case REG_MM1:
+    case REG_MM2:
+    case REG_MM3:
+    case REG_MM4:
+    case REG_MM5:
+    case REG_MM6:
+    case REG_MM7:
+        return 64;
+        break;
+
     case REG_XMM0:
     case REG_XMM1:
     case REG_XMM2:
@@ -567,13 +582,12 @@ VOID TActivate()
 //
 ADDRINT CheckBuffer(UINT32 count)
 {
-    return (g_bufidx + count) >= BUFFER_SIZE;
-
+  return (g_bufidx + count) >= BUFFER_SIZE - FUDGE;
 }
 
 ADDRINT CheckBufferEx(BOOL cond, UINT32 count, UINT32 count2)
 {
-    return cond && ((g_bufidx + count + count2) >= BUFFER_SIZE);
+  return cond && ((g_bufidx + count + count2) >= BUFFER_SIZE - FUDGE);
 }
 
 // Callers must ensure mutual exclusion
@@ -1114,6 +1128,8 @@ VOID AppendBuffer(ADDRINT addr,
         //cerr << "Logging instruction " << rawbytes0 << " " << rawbytes1 << endl;
 
         // Now, fill in the buffer with information
+
+	assert (g_bufidx < BUFFER_SIZE);
       
         g_buffer[g_bufidx].addr = addr;
         g_buffer[g_bufidx].tid = tid;

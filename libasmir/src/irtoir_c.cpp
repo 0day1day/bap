@@ -1,5 +1,5 @@
+#include "config.h"
 #include <string.h>
-
 #include <bfd.h>
 // maybe all the header files should be moved to 
 // libasmir/include? - ethan

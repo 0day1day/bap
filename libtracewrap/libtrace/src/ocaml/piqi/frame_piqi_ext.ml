@@ -14,6 +14,8 @@ let _bool_piqtype = Piqirun_ext.find_piqtype "bool"
   
 let _int64_piqtype = Piqirun_ext.find_piqtype "int64"
   
+let _frame_piqtype = Piqirun_ext.find_piqtype "frame/frame"
+  
 let _thread_id_piqtype = Piqirun_ext.find_piqtype "frame/thread-id"
   
 let _address_piqtype = Piqirun_ext.find_piqtype "frame/address"
@@ -76,328 +78,333 @@ let _value_list_piqtype = Piqirun_ext.find_piqtype "frame/value-list"
   
 let _value_info_piqtype = Piqirun_ext.find_piqtype "frame/value-info"
   
-let _frame_piqtype = Piqirun_ext.find_piqtype "frame/frame"
-  
-let parse_uint64 x (format : Piqirun_ext.input_format) =
-  let x_pb = Piqirun_ext.convert _uint64_piqtype format `pb x in
+let parse_uint64 ?opts x (format : Piqirun_ext.input_format) =
+  let x_pb = Piqirun_ext.convert _uint64_piqtype format `pb x ?opts in
   let buf = Piqirun.init_from_string x_pb in Frame_piqi.parse_uint64 buf
   
-let parse_int x (format : Piqirun_ext.input_format) =
-  let x_pb = Piqirun_ext.convert _int_piqtype format `pb x in
+let parse_int ?opts x (format : Piqirun_ext.input_format) =
+  let x_pb = Piqirun_ext.convert _int_piqtype format `pb x ?opts in
   let buf = Piqirun.init_from_string x_pb in Frame_piqi.parse_int buf
   
-let parse_binary x (format : Piqirun_ext.input_format) =
-  let x_pb = Piqirun_ext.convert _binary_piqtype format `pb x in
+let parse_binary ?opts x (format : Piqirun_ext.input_format) =
+  let x_pb = Piqirun_ext.convert _binary_piqtype format `pb x ?opts in
   let buf = Piqirun.init_from_string x_pb in Frame_piqi.parse_binary buf
   
-let parse_string x (format : Piqirun_ext.input_format) =
-  let x_pb = Piqirun_ext.convert _string_piqtype format `pb x in
+let parse_string ?opts x (format : Piqirun_ext.input_format) =
+  let x_pb = Piqirun_ext.convert _string_piqtype format `pb x ?opts in
   let buf = Piqirun.init_from_string x_pb in Frame_piqi.parse_string buf
   
-let parse_bool x (format : Piqirun_ext.input_format) =
-  let x_pb = Piqirun_ext.convert _bool_piqtype format `pb x in
+let parse_bool ?opts x (format : Piqirun_ext.input_format) =
+  let x_pb = Piqirun_ext.convert _bool_piqtype format `pb x ?opts in
   let buf = Piqirun.init_from_string x_pb in Frame_piqi.parse_bool buf
   
-let parse_int64 x (format : Piqirun_ext.input_format) =
-  let x_pb = Piqirun_ext.convert _int64_piqtype format `pb x in
+let parse_int64 ?opts x (format : Piqirun_ext.input_format) =
+  let x_pb = Piqirun_ext.convert _int64_piqtype format `pb x ?opts in
   let buf = Piqirun.init_from_string x_pb in Frame_piqi.parse_int64 buf
   
-let parse_thread_id x (format : Piqirun_ext.input_format) =
-  let x_pb = Piqirun_ext.convert _thread_id_piqtype format `pb x in
+let parse_frame ?opts x (format : Piqirun_ext.input_format) =
+  let x_pb = Piqirun_ext.convert _frame_piqtype format `pb x ?opts in
+  let buf = Piqirun.init_from_string x_pb in Frame_piqi.parse_frame buf
+  
+let parse_thread_id ?opts x (format : Piqirun_ext.input_format) =
+  let x_pb = Piqirun_ext.convert _thread_id_piqtype format `pb x ?opts in
   let buf = Piqirun.init_from_string x_pb in Frame_piqi.parse_thread_id buf
   
-let parse_address x (format : Piqirun_ext.input_format) =
-  let x_pb = Piqirun_ext.convert _address_piqtype format `pb x in
+let parse_address ?opts x (format : Piqirun_ext.input_format) =
+  let x_pb = Piqirun_ext.convert _address_piqtype format `pb x ?opts in
   let buf = Piqirun.init_from_string x_pb in Frame_piqi.parse_address buf
   
-let parse_bit_length x (format : Piqirun_ext.input_format) =
-  let x_pb = Piqirun_ext.convert _bit_length_piqtype format `pb x in
+let parse_bit_length ?opts x (format : Piqirun_ext.input_format) =
+  let x_pb = Piqirun_ext.convert _bit_length_piqtype format `pb x ?opts in
   let buf = Piqirun.init_from_string x_pb in Frame_piqi.parse_bit_length buf
   
-let parse_taint_id x (format : Piqirun_ext.input_format) =
-  let x_pb = Piqirun_ext.convert _taint_id_piqtype format `pb x in
+let parse_taint_id ?opts x (format : Piqirun_ext.input_format) =
+  let x_pb = Piqirun_ext.convert _taint_id_piqtype format `pb x ?opts in
   let buf = Piqirun.init_from_string x_pb in Frame_piqi.parse_taint_id buf
   
-let parse_exception_number x (format : Piqirun_ext.input_format) =
-  let x_pb = Piqirun_ext.convert _exception_number_piqtype format `pb x in
+let parse_exception_number ?opts x (format : Piqirun_ext.input_format) =
+  let x_pb =
+    Piqirun_ext.convert _exception_number_piqtype format `pb x ?opts in
   let buf = Piqirun.init_from_string x_pb
   in Frame_piqi.parse_exception_number buf
   
-let parse_operand_list x (format : Piqirun_ext.input_format) =
-  let x_pb = Piqirun_ext.convert _operand_list_piqtype format `pb x in
+let parse_operand_list ?opts x (format : Piqirun_ext.input_format) =
+  let x_pb = Piqirun_ext.convert _operand_list_piqtype format `pb x ?opts in
   let buf = Piqirun.init_from_string x_pb
   in Frame_piqi.parse_operand_list buf
   
-let parse_operand_info x (format : Piqirun_ext.input_format) =
-  let x_pb = Piqirun_ext.convert _operand_info_piqtype format `pb x in
+let parse_operand_info ?opts x (format : Piqirun_ext.input_format) =
+  let x_pb = Piqirun_ext.convert _operand_info_piqtype format `pb x ?opts in
   let buf = Piqirun.init_from_string x_pb
   in Frame_piqi.parse_operand_info buf
   
-let parse_operand_info_specific x (format : Piqirun_ext.input_format) =
+let parse_operand_info_specific ?opts x (format : Piqirun_ext.input_format) =
   let x_pb =
-    Piqirun_ext.convert _operand_info_specific_piqtype format `pb x in
+    Piqirun_ext.convert _operand_info_specific_piqtype format `pb x ?opts in
   let buf = Piqirun.init_from_string x_pb
   in Frame_piqi.parse_operand_info_specific buf
   
-let parse_reg_operand x (format : Piqirun_ext.input_format) =
-  let x_pb = Piqirun_ext.convert _reg_operand_piqtype format `pb x in
+let parse_reg_operand ?opts x (format : Piqirun_ext.input_format) =
+  let x_pb = Piqirun_ext.convert _reg_operand_piqtype format `pb x ?opts in
   let buf = Piqirun.init_from_string x_pb in Frame_piqi.parse_reg_operand buf
   
-let parse_mem_operand x (format : Piqirun_ext.input_format) =
-  let x_pb = Piqirun_ext.convert _mem_operand_piqtype format `pb x in
+let parse_mem_operand ?opts x (format : Piqirun_ext.input_format) =
+  let x_pb = Piqirun_ext.convert _mem_operand_piqtype format `pb x ?opts in
   let buf = Piqirun.init_from_string x_pb in Frame_piqi.parse_mem_operand buf
   
-let parse_operand_usage x (format : Piqirun_ext.input_format) =
-  let x_pb = Piqirun_ext.convert _operand_usage_piqtype format `pb x in
+let parse_operand_usage ?opts x (format : Piqirun_ext.input_format) =
+  let x_pb = Piqirun_ext.convert _operand_usage_piqtype format `pb x ?opts in
   let buf = Piqirun.init_from_string x_pb
   in Frame_piqi.parse_operand_usage buf
   
-let parse_taint_info x (format : Piqirun_ext.input_format) =
-  let x_pb = Piqirun_ext.convert _taint_info_piqtype format `pb x in
+let parse_taint_info ?opts x (format : Piqirun_ext.input_format) =
+  let x_pb = Piqirun_ext.convert _taint_info_piqtype format `pb x ?opts in
   let buf = Piqirun.init_from_string x_pb in Frame_piqi.parse_taint_info buf
   
-let parse_std_frame x (format : Piqirun_ext.input_format) =
-  let x_pb = Piqirun_ext.convert _std_frame_piqtype format `pb x in
+let parse_std_frame ?opts x (format : Piqirun_ext.input_format) =
+  let x_pb = Piqirun_ext.convert _std_frame_piqtype format `pb x ?opts in
   let buf = Piqirun.init_from_string x_pb in Frame_piqi.parse_std_frame buf
   
-let parse_syscall_frame x (format : Piqirun_ext.input_format) =
-  let x_pb = Piqirun_ext.convert _syscall_frame_piqtype format `pb x in
+let parse_syscall_frame ?opts x (format : Piqirun_ext.input_format) =
+  let x_pb = Piqirun_ext.convert _syscall_frame_piqtype format `pb x ?opts in
   let buf = Piqirun.init_from_string x_pb
   in Frame_piqi.parse_syscall_frame buf
   
-let parse_argument_list x (format : Piqirun_ext.input_format) =
-  let x_pb = Piqirun_ext.convert _argument_list_piqtype format `pb x in
+let parse_argument_list ?opts x (format : Piqirun_ext.input_format) =
+  let x_pb = Piqirun_ext.convert _argument_list_piqtype format `pb x ?opts in
   let buf = Piqirun.init_from_string x_pb
   in Frame_piqi.parse_argument_list buf
   
-let parse_argument x (format : Piqirun_ext.input_format) =
-  let x_pb = Piqirun_ext.convert _argument_piqtype format `pb x in
+let parse_argument ?opts x (format : Piqirun_ext.input_format) =
+  let x_pb = Piqirun_ext.convert _argument_piqtype format `pb x ?opts in
   let buf = Piqirun.init_from_string x_pb in Frame_piqi.parse_argument buf
   
-let parse_exception_frame x (format : Piqirun_ext.input_format) =
-  let x_pb = Piqirun_ext.convert _exception_frame_piqtype format `pb x in
+let parse_exception_frame ?opts x (format : Piqirun_ext.input_format) =
+  let x_pb =
+    Piqirun_ext.convert _exception_frame_piqtype format `pb x ?opts in
   let buf = Piqirun.init_from_string x_pb
   in Frame_piqi.parse_exception_frame buf
   
-let parse_taint_intro_frame x (format : Piqirun_ext.input_format) =
-  let x_pb = Piqirun_ext.convert _taint_intro_frame_piqtype format `pb x in
+let parse_taint_intro_frame ?opts x (format : Piqirun_ext.input_format) =
+  let x_pb =
+    Piqirun_ext.convert _taint_intro_frame_piqtype format `pb x ?opts in
   let buf = Piqirun.init_from_string x_pb
   in Frame_piqi.parse_taint_intro_frame buf
   
-let parse_taint_intro_list x (format : Piqirun_ext.input_format) =
-  let x_pb = Piqirun_ext.convert _taint_intro_list_piqtype format `pb x in
+let parse_taint_intro_list ?opts x (format : Piqirun_ext.input_format) =
+  let x_pb =
+    Piqirun_ext.convert _taint_intro_list_piqtype format `pb x ?opts in
   let buf = Piqirun.init_from_string x_pb
   in Frame_piqi.parse_taint_intro_list buf
   
-let parse_taint_intro x (format : Piqirun_ext.input_format) =
-  let x_pb = Piqirun_ext.convert _taint_intro_piqtype format `pb x in
+let parse_taint_intro ?opts x (format : Piqirun_ext.input_format) =
+  let x_pb = Piqirun_ext.convert _taint_intro_piqtype format `pb x ?opts in
   let buf = Piqirun.init_from_string x_pb in Frame_piqi.parse_taint_intro buf
   
-let parse_modload_frame x (format : Piqirun_ext.input_format) =
-  let x_pb = Piqirun_ext.convert _modload_frame_piqtype format `pb x in
+let parse_modload_frame ?opts x (format : Piqirun_ext.input_format) =
+  let x_pb = Piqirun_ext.convert _modload_frame_piqtype format `pb x ?opts in
   let buf = Piqirun.init_from_string x_pb
   in Frame_piqi.parse_modload_frame buf
   
-let parse_key_frame x (format : Piqirun_ext.input_format) =
-  let x_pb = Piqirun_ext.convert _key_frame_piqtype format `pb x in
+let parse_key_frame ?opts x (format : Piqirun_ext.input_format) =
+  let x_pb = Piqirun_ext.convert _key_frame_piqtype format `pb x ?opts in
   let buf = Piqirun.init_from_string x_pb in Frame_piqi.parse_key_frame buf
   
-let parse_tagged_value_lists x (format : Piqirun_ext.input_format) =
-  let x_pb = Piqirun_ext.convert _tagged_value_lists_piqtype format `pb x in
+let parse_tagged_value_lists ?opts x (format : Piqirun_ext.input_format) =
+  let x_pb =
+    Piqirun_ext.convert _tagged_value_lists_piqtype format `pb x ?opts in
   let buf = Piqirun.init_from_string x_pb
   in Frame_piqi.parse_tagged_value_lists buf
   
-let parse_tagged_value_list x (format : Piqirun_ext.input_format) =
-  let x_pb = Piqirun_ext.convert _tagged_value_list_piqtype format `pb x in
+let parse_tagged_value_list ?opts x (format : Piqirun_ext.input_format) =
+  let x_pb =
+    Piqirun_ext.convert _tagged_value_list_piqtype format `pb x ?opts in
   let buf = Piqirun.init_from_string x_pb
   in Frame_piqi.parse_tagged_value_list buf
   
-let parse_value_source_tag x (format : Piqirun_ext.input_format) =
-  let x_pb = Piqirun_ext.convert _value_source_tag_piqtype format `pb x in
+let parse_value_source_tag ?opts x (format : Piqirun_ext.input_format) =
+  let x_pb =
+    Piqirun_ext.convert _value_source_tag_piqtype format `pb x ?opts in
   let buf = Piqirun.init_from_string x_pb
   in Frame_piqi.parse_value_source_tag buf
   
-let parse_value_list x (format : Piqirun_ext.input_format) =
-  let x_pb = Piqirun_ext.convert _value_list_piqtype format `pb x in
+let parse_value_list ?opts x (format : Piqirun_ext.input_format) =
+  let x_pb = Piqirun_ext.convert _value_list_piqtype format `pb x ?opts in
   let buf = Piqirun.init_from_string x_pb in Frame_piqi.parse_value_list buf
   
-let parse_value_info x (format : Piqirun_ext.input_format) =
-  let x_pb = Piqirun_ext.convert _value_info_piqtype format `pb x in
+let parse_value_info ?opts x (format : Piqirun_ext.input_format) =
+  let x_pb = Piqirun_ext.convert _value_info_piqtype format `pb x ?opts in
   let buf = Piqirun.init_from_string x_pb in Frame_piqi.parse_value_info buf
   
-let parse_frame x (format : Piqirun_ext.input_format) =
-  let x_pb = Piqirun_ext.convert _frame_piqtype format `pb x in
-  let buf = Piqirun.init_from_string x_pb in Frame_piqi.parse_frame buf
-  
-let gen_uint64 x (format : Piqirun_ext.output_format) =
+let gen_uint64 ?opts x (format : Piqirun_ext.output_format) =
   let buf = Frame_piqi.gen_uint64 x in
   let x_pb = Piqirun.to_string buf
-  in Piqirun_ext.convert _uint64_piqtype `pb format x_pb
+  in Piqirun_ext.convert _uint64_piqtype `pb format x_pb ?opts
   
-let gen_int x (format : Piqirun_ext.output_format) =
+let gen_int ?opts x (format : Piqirun_ext.output_format) =
   let buf = Frame_piqi.gen_int x in
   let x_pb = Piqirun.to_string buf
-  in Piqirun_ext.convert _int_piqtype `pb format x_pb
+  in Piqirun_ext.convert _int_piqtype `pb format x_pb ?opts
   
-let gen_binary x (format : Piqirun_ext.output_format) =
+let gen_binary ?opts x (format : Piqirun_ext.output_format) =
   let buf = Frame_piqi.gen_binary x in
   let x_pb = Piqirun.to_string buf
-  in Piqirun_ext.convert _binary_piqtype `pb format x_pb
+  in Piqirun_ext.convert _binary_piqtype `pb format x_pb ?opts
   
-let gen_string x (format : Piqirun_ext.output_format) =
+let gen_string ?opts x (format : Piqirun_ext.output_format) =
   let buf = Frame_piqi.gen_string x in
   let x_pb = Piqirun.to_string buf
-  in Piqirun_ext.convert _string_piqtype `pb format x_pb
+  in Piqirun_ext.convert _string_piqtype `pb format x_pb ?opts
   
-let gen_bool x (format : Piqirun_ext.output_format) =
+let gen_bool ?opts x (format : Piqirun_ext.output_format) =
   let buf = Frame_piqi.gen_bool x in
   let x_pb = Piqirun.to_string buf
-  in Piqirun_ext.convert _bool_piqtype `pb format x_pb
+  in Piqirun_ext.convert _bool_piqtype `pb format x_pb ?opts
   
-let gen_int64 x (format : Piqirun_ext.output_format) =
+let gen_int64 ?opts x (format : Piqirun_ext.output_format) =
   let buf = Frame_piqi.gen_int64 x in
   let x_pb = Piqirun.to_string buf
-  in Piqirun_ext.convert _int64_piqtype `pb format x_pb
+  in Piqirun_ext.convert _int64_piqtype `pb format x_pb ?opts
   
-let gen_thread_id x (format : Piqirun_ext.output_format) =
-  let buf = Frame_piqi.gen_thread_id x in
-  let x_pb = Piqirun.to_string buf
-  in Piqirun_ext.convert _thread_id_piqtype `pb format x_pb
-  
-let gen_address x (format : Piqirun_ext.output_format) =
-  let buf = Frame_piqi.gen_address x in
-  let x_pb = Piqirun.to_string buf
-  in Piqirun_ext.convert _address_piqtype `pb format x_pb
-  
-let gen_bit_length x (format : Piqirun_ext.output_format) =
-  let buf = Frame_piqi.gen_bit_length x in
-  let x_pb = Piqirun.to_string buf
-  in Piqirun_ext.convert _bit_length_piqtype `pb format x_pb
-  
-let gen_taint_id x (format : Piqirun_ext.output_format) =
-  let buf = Frame_piqi.gen_taint_id x in
-  let x_pb = Piqirun.to_string buf
-  in Piqirun_ext.convert _taint_id_piqtype `pb format x_pb
-  
-let gen_exception_number x (format : Piqirun_ext.output_format) =
-  let buf = Frame_piqi.gen_exception_number x in
-  let x_pb = Piqirun.to_string buf
-  in Piqirun_ext.convert _exception_number_piqtype `pb format x_pb
-  
-let gen_operand_list x (format : Piqirun_ext.output_format) =
-  let buf = Frame_piqi.gen_operand_list x in
-  let x_pb = Piqirun.to_string buf
-  in Piqirun_ext.convert _operand_list_piqtype `pb format x_pb
-  
-let gen_operand_info x (format : Piqirun_ext.output_format) =
-  let buf = Frame_piqi.gen_operand_info x in
-  let x_pb = Piqirun.to_string buf
-  in Piqirun_ext.convert _operand_info_piqtype `pb format x_pb
-  
-let gen_operand_info_specific x (format : Piqirun_ext.output_format) =
-  let buf = Frame_piqi.gen_operand_info_specific x in
-  let x_pb = Piqirun.to_string buf
-  in Piqirun_ext.convert _operand_info_specific_piqtype `pb format x_pb
-  
-let gen_reg_operand x (format : Piqirun_ext.output_format) =
-  let buf = Frame_piqi.gen_reg_operand x in
-  let x_pb = Piqirun.to_string buf
-  in Piqirun_ext.convert _reg_operand_piqtype `pb format x_pb
-  
-let gen_mem_operand x (format : Piqirun_ext.output_format) =
-  let buf = Frame_piqi.gen_mem_operand x in
-  let x_pb = Piqirun.to_string buf
-  in Piqirun_ext.convert _mem_operand_piqtype `pb format x_pb
-  
-let gen_operand_usage x (format : Piqirun_ext.output_format) =
-  let buf = Frame_piqi.gen_operand_usage x in
-  let x_pb = Piqirun.to_string buf
-  in Piqirun_ext.convert _operand_usage_piqtype `pb format x_pb
-  
-let gen_taint_info x (format : Piqirun_ext.output_format) =
-  let buf = Frame_piqi.gen_taint_info x in
-  let x_pb = Piqirun.to_string buf
-  in Piqirun_ext.convert _taint_info_piqtype `pb format x_pb
-  
-let gen_std_frame x (format : Piqirun_ext.output_format) =
-  let buf = Frame_piqi.gen_std_frame x in
-  let x_pb = Piqirun.to_string buf
-  in Piqirun_ext.convert _std_frame_piqtype `pb format x_pb
-  
-let gen_syscall_frame x (format : Piqirun_ext.output_format) =
-  let buf = Frame_piqi.gen_syscall_frame x in
-  let x_pb = Piqirun.to_string buf
-  in Piqirun_ext.convert _syscall_frame_piqtype `pb format x_pb
-  
-let gen_argument_list x (format : Piqirun_ext.output_format) =
-  let buf = Frame_piqi.gen_argument_list x in
-  let x_pb = Piqirun.to_string buf
-  in Piqirun_ext.convert _argument_list_piqtype `pb format x_pb
-  
-let gen_argument x (format : Piqirun_ext.output_format) =
-  let buf = Frame_piqi.gen_argument x in
-  let x_pb = Piqirun.to_string buf
-  in Piqirun_ext.convert _argument_piqtype `pb format x_pb
-  
-let gen_exception_frame x (format : Piqirun_ext.output_format) =
-  let buf = Frame_piqi.gen_exception_frame x in
-  let x_pb = Piqirun.to_string buf
-  in Piqirun_ext.convert _exception_frame_piqtype `pb format x_pb
-  
-let gen_taint_intro_frame x (format : Piqirun_ext.output_format) =
-  let buf = Frame_piqi.gen_taint_intro_frame x in
-  let x_pb = Piqirun.to_string buf
-  in Piqirun_ext.convert _taint_intro_frame_piqtype `pb format x_pb
-  
-let gen_taint_intro_list x (format : Piqirun_ext.output_format) =
-  let buf = Frame_piqi.gen_taint_intro_list x in
-  let x_pb = Piqirun.to_string buf
-  in Piqirun_ext.convert _taint_intro_list_piqtype `pb format x_pb
-  
-let gen_taint_intro x (format : Piqirun_ext.output_format) =
-  let buf = Frame_piqi.gen_taint_intro x in
-  let x_pb = Piqirun.to_string buf
-  in Piqirun_ext.convert _taint_intro_piqtype `pb format x_pb
-  
-let gen_modload_frame x (format : Piqirun_ext.output_format) =
-  let buf = Frame_piqi.gen_modload_frame x in
-  let x_pb = Piqirun.to_string buf
-  in Piqirun_ext.convert _modload_frame_piqtype `pb format x_pb
-  
-let gen_key_frame x (format : Piqirun_ext.output_format) =
-  let buf = Frame_piqi.gen_key_frame x in
-  let x_pb = Piqirun.to_string buf
-  in Piqirun_ext.convert _key_frame_piqtype `pb format x_pb
-  
-let gen_tagged_value_lists x (format : Piqirun_ext.output_format) =
-  let buf = Frame_piqi.gen_tagged_value_lists x in
-  let x_pb = Piqirun.to_string buf
-  in Piqirun_ext.convert _tagged_value_lists_piqtype `pb format x_pb
-  
-let gen_tagged_value_list x (format : Piqirun_ext.output_format) =
-  let buf = Frame_piqi.gen_tagged_value_list x in
-  let x_pb = Piqirun.to_string buf
-  in Piqirun_ext.convert _tagged_value_list_piqtype `pb format x_pb
-  
-let gen_value_source_tag x (format : Piqirun_ext.output_format) =
-  let buf = Frame_piqi.gen_value_source_tag x in
-  let x_pb = Piqirun.to_string buf
-  in Piqirun_ext.convert _value_source_tag_piqtype `pb format x_pb
-  
-let gen_value_list x (format : Piqirun_ext.output_format) =
-  let buf = Frame_piqi.gen_value_list x in
-  let x_pb = Piqirun.to_string buf
-  in Piqirun_ext.convert _value_list_piqtype `pb format x_pb
-  
-let gen_value_info x (format : Piqirun_ext.output_format) =
-  let buf = Frame_piqi.gen_value_info x in
-  let x_pb = Piqirun.to_string buf
-  in Piqirun_ext.convert _value_info_piqtype `pb format x_pb
-  
-let gen_frame x (format : Piqirun_ext.output_format) =
+let gen_frame ?opts x (format : Piqirun_ext.output_format) =
   let buf = Frame_piqi.gen_frame x in
   let x_pb = Piqirun.to_string buf
-  in Piqirun_ext.convert _frame_piqtype `pb format x_pb
+  in Piqirun_ext.convert _frame_piqtype `pb format x_pb ?opts
+  
+let gen_thread_id ?opts x (format : Piqirun_ext.output_format) =
+  let buf = Frame_piqi.gen_thread_id x in
+  let x_pb = Piqirun.to_string buf
+  in Piqirun_ext.convert _thread_id_piqtype `pb format x_pb ?opts
+  
+let gen_address ?opts x (format : Piqirun_ext.output_format) =
+  let buf = Frame_piqi.gen_address x in
+  let x_pb = Piqirun.to_string buf
+  in Piqirun_ext.convert _address_piqtype `pb format x_pb ?opts
+  
+let gen_bit_length ?opts x (format : Piqirun_ext.output_format) =
+  let buf = Frame_piqi.gen_bit_length x in
+  let x_pb = Piqirun.to_string buf
+  in Piqirun_ext.convert _bit_length_piqtype `pb format x_pb ?opts
+  
+let gen_taint_id ?opts x (format : Piqirun_ext.output_format) =
+  let buf = Frame_piqi.gen_taint_id x in
+  let x_pb = Piqirun.to_string buf
+  in Piqirun_ext.convert _taint_id_piqtype `pb format x_pb ?opts
+  
+let gen_exception_number ?opts x (format : Piqirun_ext.output_format) =
+  let buf = Frame_piqi.gen_exception_number x in
+  let x_pb = Piqirun.to_string buf
+  in Piqirun_ext.convert _exception_number_piqtype `pb format x_pb ?opts
+  
+let gen_operand_list ?opts x (format : Piqirun_ext.output_format) =
+  let buf = Frame_piqi.gen_operand_list x in
+  let x_pb = Piqirun.to_string buf
+  in Piqirun_ext.convert _operand_list_piqtype `pb format x_pb ?opts
+  
+let gen_operand_info ?opts x (format : Piqirun_ext.output_format) =
+  let buf = Frame_piqi.gen_operand_info x in
+  let x_pb = Piqirun.to_string buf
+  in Piqirun_ext.convert _operand_info_piqtype `pb format x_pb ?opts
+  
+let gen_operand_info_specific ?opts x (format : Piqirun_ext.output_format) =
+  let buf = Frame_piqi.gen_operand_info_specific x in
+  let x_pb = Piqirun.to_string buf
+  in Piqirun_ext.convert _operand_info_specific_piqtype `pb format x_pb ?opts
+  
+let gen_reg_operand ?opts x (format : Piqirun_ext.output_format) =
+  let buf = Frame_piqi.gen_reg_operand x in
+  let x_pb = Piqirun.to_string buf
+  in Piqirun_ext.convert _reg_operand_piqtype `pb format x_pb ?opts
+  
+let gen_mem_operand ?opts x (format : Piqirun_ext.output_format) =
+  let buf = Frame_piqi.gen_mem_operand x in
+  let x_pb = Piqirun.to_string buf
+  in Piqirun_ext.convert _mem_operand_piqtype `pb format x_pb ?opts
+  
+let gen_operand_usage ?opts x (format : Piqirun_ext.output_format) =
+  let buf = Frame_piqi.gen_operand_usage x in
+  let x_pb = Piqirun.to_string buf
+  in Piqirun_ext.convert _operand_usage_piqtype `pb format x_pb ?opts
+  
+let gen_taint_info ?opts x (format : Piqirun_ext.output_format) =
+  let buf = Frame_piqi.gen_taint_info x in
+  let x_pb = Piqirun.to_string buf
+  in Piqirun_ext.convert _taint_info_piqtype `pb format x_pb ?opts
+  
+let gen_std_frame ?opts x (format : Piqirun_ext.output_format) =
+  let buf = Frame_piqi.gen_std_frame x in
+  let x_pb = Piqirun.to_string buf
+  in Piqirun_ext.convert _std_frame_piqtype `pb format x_pb ?opts
+  
+let gen_syscall_frame ?opts x (format : Piqirun_ext.output_format) =
+  let buf = Frame_piqi.gen_syscall_frame x in
+  let x_pb = Piqirun.to_string buf
+  in Piqirun_ext.convert _syscall_frame_piqtype `pb format x_pb ?opts
+  
+let gen_argument_list ?opts x (format : Piqirun_ext.output_format) =
+  let buf = Frame_piqi.gen_argument_list x in
+  let x_pb = Piqirun.to_string buf
+  in Piqirun_ext.convert _argument_list_piqtype `pb format x_pb ?opts
+  
+let gen_argument ?opts x (format : Piqirun_ext.output_format) =
+  let buf = Frame_piqi.gen_argument x in
+  let x_pb = Piqirun.to_string buf
+  in Piqirun_ext.convert _argument_piqtype `pb format x_pb ?opts
+  
+let gen_exception_frame ?opts x (format : Piqirun_ext.output_format) =
+  let buf = Frame_piqi.gen_exception_frame x in
+  let x_pb = Piqirun.to_string buf
+  in Piqirun_ext.convert _exception_frame_piqtype `pb format x_pb ?opts
+  
+let gen_taint_intro_frame ?opts x (format : Piqirun_ext.output_format) =
+  let buf = Frame_piqi.gen_taint_intro_frame x in
+  let x_pb = Piqirun.to_string buf
+  in Piqirun_ext.convert _taint_intro_frame_piqtype `pb format x_pb ?opts
+  
+let gen_taint_intro_list ?opts x (format : Piqirun_ext.output_format) =
+  let buf = Frame_piqi.gen_taint_intro_list x in
+  let x_pb = Piqirun.to_string buf
+  in Piqirun_ext.convert _taint_intro_list_piqtype `pb format x_pb ?opts
+  
+let gen_taint_intro ?opts x (format : Piqirun_ext.output_format) =
+  let buf = Frame_piqi.gen_taint_intro x in
+  let x_pb = Piqirun.to_string buf
+  in Piqirun_ext.convert _taint_intro_piqtype `pb format x_pb ?opts
+  
+let gen_modload_frame ?opts x (format : Piqirun_ext.output_format) =
+  let buf = Frame_piqi.gen_modload_frame x in
+  let x_pb = Piqirun.to_string buf
+  in Piqirun_ext.convert _modload_frame_piqtype `pb format x_pb ?opts
+  
+let gen_key_frame ?opts x (format : Piqirun_ext.output_format) =
+  let buf = Frame_piqi.gen_key_frame x in
+  let x_pb = Piqirun.to_string buf
+  in Piqirun_ext.convert _key_frame_piqtype `pb format x_pb ?opts
+  
+let gen_tagged_value_lists ?opts x (format : Piqirun_ext.output_format) =
+  let buf = Frame_piqi.gen_tagged_value_lists x in
+  let x_pb = Piqirun.to_string buf
+  in Piqirun_ext.convert _tagged_value_lists_piqtype `pb format x_pb ?opts
+  
+let gen_tagged_value_list ?opts x (format : Piqirun_ext.output_format) =
+  let buf = Frame_piqi.gen_tagged_value_list x in
+  let x_pb = Piqirun.to_string buf
+  in Piqirun_ext.convert _tagged_value_list_piqtype `pb format x_pb ?opts
+  
+let gen_value_source_tag ?opts x (format : Piqirun_ext.output_format) =
+  let buf = Frame_piqi.gen_value_source_tag x in
+  let x_pb = Piqirun.to_string buf
+  in Piqirun_ext.convert _value_source_tag_piqtype `pb format x_pb ?opts
+  
+let gen_value_list ?opts x (format : Piqirun_ext.output_format) =
+  let buf = Frame_piqi.gen_value_list x in
+  let x_pb = Piqirun.to_string buf
+  in Piqirun_ext.convert _value_list_piqtype `pb format x_pb ?opts
+  
+let gen_value_info ?opts x (format : Piqirun_ext.output_format) =
+  let buf = Frame_piqi.gen_value_info x in
+  let x_pb = Piqirun.to_string buf
+  in Piqirun_ext.convert _value_info_piqtype `pb format x_pb ?opts
   
 let print_uint64 x = Pervasives.print_endline (gen_uint64 x `piq)
   
@@ -422,6 +429,10 @@ let prerr_bool x = Pervasives.prerr_endline (gen_bool x `piq)
 let print_int64 x = Pervasives.print_endline (gen_int64 x `piq)
   
 let prerr_int64 x = Pervasives.prerr_endline (gen_int64 x `piq)
+  
+let print_frame x = Pervasives.print_endline (gen_frame x `piq)
+  
+let prerr_frame x = Pervasives.prerr_endline (gen_frame x `piq)
   
 let print_thread_id x = Pervasives.print_endline (gen_thread_id x `piq)
   
@@ -554,9 +565,5 @@ let prerr_value_list x = Pervasives.prerr_endline (gen_value_list x `piq)
 let print_value_info x = Pervasives.print_endline (gen_value_info x `piq)
   
 let prerr_value_info x = Pervasives.prerr_endline (gen_value_info x `piq)
-  
-let print_frame x = Pervasives.print_endline (gen_frame x `piq)
-  
-let prerr_frame x = Pervasives.prerr_endline (gen_frame x `piq)
   
 

@@ -37,7 +37,6 @@ let rec rm_and_ignore_list paths =
 
 
 (** STP helpers **)
-let stp_path = "../stpwrap/stp/bin/";;
 let stp = "stp";;
 
 let does_stp_work () =
@@ -45,15 +44,13 @@ let does_stp_work () =
     true
   else false
 
-let check_stp_path file =
-  print_endline("Checking for stp...");
-  match Unix.system("echo 'QUERY(TRUE);' | stp 2> /dev/null") with
-  | Unix.WEXITED(0) -> ()
-  | _ -> (if (Sys.file_exists file) 
-    then let path = Sys.getenv("PATH") in Unix.putenv "PATH" (path^":"^stp_path)
-    else skip_if true 
-      ("Skipping test.  Stp is not in PATH and can not find file "^file));;
-
+module SolverCheck(S:Smtexec.SOLVER) = struct
+  let check_solver_path () =
+    if S.in_path() = false then
+      skip_if true ("Skipping test. "^S.solvername^" is not in PATH");;
+end
+let check_stp_path =
+  let module SC = SolverCheck(Smtexec.STP) in SC.check_solver_path
 
 (** pin helpers **)
 let pin_path = (*ref "../pin/";;*)
@@ -87,7 +84,7 @@ let check_pin_setup _ =
   if (Sys.file_exists cat_arg) 
   then assert_command ~foutput ~verbose:true "cat" [cat_arg] else ();
   (* Check environment variable for path to pin *)
-  let env_pin_path = try Sys.getenv "PIN_PATH" with _ -> "" in
+  let env_pin_path = try Sys.getenv "PIN_HOME" with _ -> "" in
   if (env_pin_path <> "") then pin_path := env_pin_path;
   check_file(!pin_path^pin);
   check_file(gentrace_path^gentrace);
@@ -95,10 +92,11 @@ let check_pin_setup _ =
 
 
 (** Common functions across multipule tests **)
-let rec find_fun ?(msg="") ranges name = match ranges with
-  | [] -> assert_failure ("Could not find function "^name^msg)
-  | (n,s,e)::rs -> if (n = name) then (s,e) else find_fun ~msg rs name;;
+let rec find_funs ?(msg="") ranges names = match ranges with
+  | [] -> assert_failure ("Could not find functions "^msg)
+  | (n,s,e)::rs -> if (List.mem n names) then (s,e) else find_funs ~msg rs names;;
 
+let rec find_fun ?(msg="") ranges name = find_funs ~msg ranges [name]
 
 let rec find_call prog = 
   match prog with
@@ -158,14 +156,11 @@ let check_bigint_answer e correct =
 
 
 let check_eax ctx eax =
-  let pat = "R_EAX_" in
   Var.VarHash.iter 
     (fun k v ->
-      match k,v with
-      | var,Symbeval.Symbolic e ->
-	if (pmatch ~pat (Pp.var_to_string var)) 
-	then check_bigint_answer e eax
-	else ()
+      match v with
+      | Symbeval.Symbolic e when k = Disasm_i386.eax ->
+	check_bigint_answer e eax
       | _ -> ()
     ) ctx.Symbeval.delta;;
 
@@ -178,26 +173,24 @@ let typecheck p = Typecheck.typecheck_prog p;;
 (* Return list of statments between start_addr and end_addr *)
 let find_prog_chunk prog start_addr end_addr = 
   let rec find_prog_chunk_k prog starta enda k =
-    match prog with
-    | [] -> raise (RangeNotFound (start_addr, end_addr))
-    | p::ps -> 
-      match starta with
-      | Some(a) -> (match p with
-	| Ast.Label(Addr(addr),attrs) -> 
-		  (* If this is the start address we are looking for begin recording 
-		     with accumulator k.  Set starta to None so that we know we are in
-		     the desired range *)
-	  if (addr = a) then find_prog_chunk_k ps None enda (p::k)
-	  else find_prog_chunk_k ps starta enda k
-	| _ -> find_prog_chunk_k ps starta enda k
-      )
-	  (* Indicates we are inside desired block; return through end_addr *)
-      | None -> (match p with
-	| Ast.Label(Addr(addr),attrs) -> 
-	  if (addr = enda) then k
-	  else find_prog_chunk_k ps starta enda (p::k)
-	| _ -> find_prog_chunk_k ps starta enda (p::k)
-      )
+    match prog, starta with
+    (* Even if we don't hit the end address, return what we had so far *)
+    | [], None -> k
+    | [], _ -> raise (RangeNotFound (start_addr, end_addr))
+    | p::ps, Some a ->
+      (match p with
+      | Ast.Label(Addr(addr),attrs) when addr = a -> 
+	(* If this is the start address we are looking for begin recording 
+	   with accumulator k.  Set starta to None so that we know we are in
+	   the desired range *)
+	find_prog_chunk_k ps None enda (p::k)
+      | _ -> find_prog_chunk_k ps starta enda k)
+    | p::ps, None ->
+      (* Indicates we are inside desired block; return through end_addr *)
+      (match p with
+      | Ast.Label(Addr(addr),attrs) when addr = enda -> 
+        k
+      | _ -> find_prog_chunk_k ps starta enda (p::k))
   in
   List.rev (find_prog_chunk_k prog (Some start_addr) end_addr [])
 
@@ -217,3 +210,13 @@ let rec summarize_results res =
   match res with
   | [] -> None
   | r::rs -> summarize r; summarize_results rs;;
+
+let backwards_taint prog =
+  let prog = Traces.concrete prog in
+
+  (* Flatten memory *)
+  let prog = Flatten_mem.flatten_mem_program prog in
+
+  (* Try to identify fault *)
+  let fault_location = Traces_backtaint.identify_fault_location prog in
+  Traces_backtaint.backwards_taint prog fault_location

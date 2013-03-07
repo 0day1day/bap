@@ -1,4 +1,4 @@
-%% Copyright 2009, 2010, 2011 Anton Lavrik
+%% Copyright 2009, 2010, 2011, 2012, 2013 Anton Lavrik
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
 
-%% @doc Extended Piqi compiler for Erlang
+%% Extended Piqi compiler for Erlang
 %%
 %% This module contains extended version of the Piqi compiler for Erlang. It
 %% calls the base compiler ("piqic erlang") as a first step, and then generates
@@ -49,9 +49,10 @@ usage() ->
   --no-warnings don't print warnings
   --trace turn on tracing
   --debug <level> debug level; any number greater than 0 turns on debug messages
-  --noboot don't boot, i.e. don't use boot definitions while processing .piqi
+  --no-builtin-types don't include built-in type definitions
   -C <output directory> specify output directory
   --normalize <true|false> normalize identifiers (default: true)
+  --gen-defaults generate default value constructors for generated types
   -help  Display this list of options
   --help  Display this list of options
 "
@@ -164,7 +165,7 @@ custom_args() -> "--embed-piqi ".
 gen_piqi(Piqi) ->
     Mod = Piqi#piqi.module,
     ErlMod = Piqi#piqi.erlang_module,
-    Defs = Piqi#piqi.piqdef,
+    Defs = Piqi#piqi.typedef,
     Functions = Piqi#piqi.func,
 
     Filename = binary_to_list(ErlMod) ++ "_ext.erl",
@@ -190,21 +191,28 @@ gen_embedded_piqi(ErlMod) ->
     ].
 
 
-piqdef_name({piq_record, X}) -> X#piq_record.name;
-piqdef_name({variant, X}) -> X#variant.name;
-piqdef_name({enum, X}) -> X#variant.name;
-piqdef_name({alias, X}) -> X#alias.name;
-piqdef_name({piq_list, X}) -> X#piq_list.name.
+typedef_name({piqi_record, X}) -> X#piqi_record.name;
+typedef_name({variant, X}) -> X#variant.name;
+typedef_name({enum, X}) -> X#enum.name;
+typedef_name({alias, X}) -> X#alias.name;
+typedef_name({piqi_list, X}) -> X#piqi_list.name.
 
 
-piqdef_erlname({piq_record, X}) -> X#piq_record.erlang_name;
-piqdef_erlname({variant, X}) -> X#variant.erlang_name;
-piqdef_erlname({enum, X}) -> X#variant.erlang_name;
-piqdef_erlname({alias, X}) -> X#alias.erlang_name;
-piqdef_erlname({piq_list, X}) -> X#piq_list.erlang_name.
+typedef_erlname({piqi_record, X}) -> X#piqi_record.erlang_name;
+typedef_erlname({variant, X}) -> X#variant.erlang_name;
+typedef_erlname({enum, X}) -> X#enum.erlang_name;
+typedef_erlname({alias, X}) -> X#alias.erlang_name;
+typedef_erlname({piqi_list, X}) -> X#piqi_list.erlang_name.
 
 
 gen_parse(Mod, ErlMod, Name, ErlName) ->
+    [
+        gen_parse_2(Mod, ErlMod, Name, ErlName),
+        gen_parse_3(Mod, ErlMod, Name, ErlName)
+    ].
+
+
+gen_parse_2(Mod, ErlMod, Name, ErlName) ->
     [
         "parse_", ErlName, "(X, Format) ->\n",
         "    ", ErlMod, ":parse_", ErlName, "(\n",
@@ -212,11 +220,33 @@ gen_parse(Mod, ErlMod, Name, ErlName) ->
     ].
 
 
+gen_parse_3(Mod, ErlMod, Name, ErlName) ->
+    [
+        "parse_", ErlName, "(X, Format, Options) ->\n",
+        "    ", ErlMod, ":parse_", ErlName, "(\n",
+        "        ", gen_convert(Mod, Name, "Format", "'pb'", "X, Options"), ").\n\n"
+    ].
+
+
 gen_gen(Mod, ErlMod, Name, ErlName) ->
+    [
+        gen_gen_2(Mod, ErlMod, Name, ErlName),
+        gen_gen_3(Mod, ErlMod, Name, ErlName)
+    ].
+
+
+gen_gen_2(Mod, ErlMod, Name, ErlName) ->
     [
         "gen_", ErlName, "(X, Format) ->\n",
         "    Iolist = ", ErlMod, ":gen_", ErlName, "(X),\n",
         "    ", gen_convert(Mod, Name, "'pb'", "Format", "iolist_to_binary(Iolist)"), ".\n\n"
+    ].
+
+gen_gen_3(Mod, ErlMod, Name, ErlName) ->
+    [
+        "gen_", ErlName, "(X, Format, Options) ->\n",
+        "    Iolist = ", ErlMod, ":gen_", ErlName, "(X),\n",
+        "    ", gen_convert(Mod, Name, "'pb'", "Format", "iolist_to_binary(Iolist), Options"), ".\n\n"
     ].
 
 
@@ -232,14 +262,14 @@ gen_convert(Mod, Name, InputFormat, OutputFormat, Data) ->
 
 
 gen_parse_def(Mod, ErlMod, Def) ->
-    Name = piqdef_name(Def),
-    ErlName = piqdef_erlname(Def),
+    Name = typedef_name(Def),
+    ErlName = typedef_erlname(Def),
     gen_parse(Mod, ErlMod, Name, ErlName).
 
 
 gen_gen_def(Mod, ErlMod, Def) ->
-    Name = piqdef_name(Def),
-    ErlName = piqdef_erlname(Def),
+    Name = typedef_name(Def),
+    ErlName = typedef_erlname(Def),
     gen_gen(Mod, ErlMod, Name, ErlName).
 
 

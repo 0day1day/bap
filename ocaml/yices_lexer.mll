@@ -1,6 +1,8 @@
 {
   open Yices_grammar
   (* TODO: add support for memories *)
+
+  exception LexError of string
 }
 
 let digit = ['0'-'9''A'-'F''a'-'f']
@@ -14,11 +16,14 @@ rule token = parse
   | ';'              { SEMICOLON }
   | '('              { LBRACKET }
   | ')'              { RBRACKET }
+  | "---"            { SDASHES }
   | "----"           { DASHES }
+  | "???"            { QUESTIONMARKS }
   | "MODEL"          { MODEL }
   | "ASSERT"         { ASSERT }
   | "sat"            { INVALID }
   | "unsat"          { VALID }
+  | "default:"       { DEFAULT }
   | "0hex"           { read_num lexbuf }
   | "0x"             { read_num lexbuf }
   | "0b"             { read_num lexbuf }
@@ -27,6 +32,10 @@ rule token = parse
   | _                { token lexbuf }
 
 and read_num = parse
-  | digit+ as n      { VAL(Int64.of_string ("0b"^n)) }
+  | digit+ as n      {
+    try VAL(Util.big_int_of_string ("0b"^n))
+    with Failure "int_of_string" ->
+      raise(LexError "Error converting integer");
+    }
   | _                { token lexbuf }
 

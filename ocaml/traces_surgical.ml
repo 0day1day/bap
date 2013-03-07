@@ -93,10 +93,10 @@ let trace_transform_stmt2 stmt evalf =
           let num = concretize idx in
           let bytes = get_bytes t in
           let exp = load (int64_of_big_int num) t bytes in
-            `ChangeTo exp
-      | _ -> `DoChildren
+            ChangeTo exp
+      | _ -> DoChildren
     method visit_stmt = function
-      | _ -> `DoChildren
+      | _ -> DoChildren
   end
   in
   let break_move num value t bytes =
@@ -163,7 +163,7 @@ let get_symbolic_seeds2 memv = function
   | _ -> []
 
 (** Running each block separately *)
-let run_and_subst_block state memv block = 
+let run_and_subst_block state memv thread_map block = 
   let addr, block = hd_tl block in
   let input_seeds = get_symbolic_seeds2 memv addr in
   pdebug ("Running block: " ^ (string_of_int !counter) ^ " " ^ (Pp.ast_stmt_to_string addr));
@@ -181,7 +181,7 @@ let run_and_subst_block state memv block =
 
   (* Assign concrete values to regs/memory *)
   let block, extra =
-    let assigns = assign_vars memv false in
+    let assigns = assign_vars memv (lookup_thread_map thread_map (get_tid block)) false in
     (* List.iter *)
     (*   (fun stmt -> dprintf "assign stmt: %s" (Pp.ast_stmt_to_string stmt)) assigns;	 *)
     assigns @ block, List.length assigns
@@ -201,9 +201,9 @@ let run_and_subst_block state memv block =
       | Symbolic(e) -> e
       | _ -> failwith "Expected symbolic" 
     in
-    executed := Util.fast_append input_seeds !executed ;
+    executed := BatList.append input_seeds !executed ;
       if !place >= extra then (
-    executed := Util.fast_append (trace_transform_stmt2 stmt evalf) !executed ; 
+    executed := BatList.append (trace_transform_stmt2 stmt evalf) !executed ; 
       );
         place := !place + 1;
     (*print_endline (Pp.ast_stmt_to_string stmt) ;*)
@@ -241,14 +241,14 @@ let run_and_subst_block state memv block =
       | TraceConcrete.Halted _ -> 
 	  (addr::info::List.rev (List.tl !executed))
 
-let run_and_subst_blocks blocks memv length =
+let run_and_subst_blocks blocks memv thread_map length =
   counter := 1 ;
   Status.init "Concrete Substitution Run" length ;
   let state = TraceConcrete.create_state () in
   let rev_trace = List.fold_left 
     (fun acc block -> 
        Status.inc() ;   
-       List.rev_append (run_and_subst_block state memv block) acc
+       List.rev_append (run_and_subst_block state memv thread_map block) acc
     ) [] blocks
   in
   Status.stop () ;
@@ -262,8 +262,8 @@ let dicer =
     let vis = object(self)
       inherit Ast_visitor.nop
       method visit_exp = function
-        | Ast.Var v -> inset := NameSet.add (Var.name v) !inset ; `DoChildren 
-        | _ -> `DoChildren
+        | Ast.Var v -> inset := NameSet.add (Var.name v) !inset ; DoChildren 
+        | _ -> DoChildren
     end
     in
     let make_sets = function
@@ -311,10 +311,12 @@ let concrete_substitution trace =
   let no_specials = remove_specials trace in
   (* let no_unknowns = remove_unknowns no_specials in *)
   let memv = find_memv no_specials in
+  let thread_map = create_thread_map_state() in
+  let no_specials = explicit_thread_stmts no_specials thread_map in
   let blocks = trace_to_blocks no_specials in
   (*pdebug ("blocks: " ^ (string_of_int (List.length blocks)));*)
   let length = List.length blocks in
-  let actual_trace = run_and_subst_blocks blocks memv length in
+  let actual_trace = run_and_subst_blocks blocks memv thread_map length in
     actual_trace
 
 let check_slice trace = 
@@ -329,8 +331,8 @@ let slice varname trace =
   let vis = object(self)
     inherit Ast_visitor.nop
     method visit_exp = function
-      | Ast.Var v -> maps := NameSet.add (Var.name v) !maps ; `DoChildren 
-      | _ -> `DoChildren
+      | Ast.Var v -> maps := NameSet.add (Var.name v) !maps ; DoChildren 
+      | _ -> DoChildren
   end
   in
   let run_all acc = function 

@@ -2,8 +2,10 @@
 
 The {\tt toil} tool lifts binary code to \bil.  Lifting up binary code
 to the IL consists of two steps:
-\begin{itemize}\squish
-\item First, the binary file is opened using libbfd. BAP can read binaries from any bfd-supported binary, including ELF and PE binaries.  
+\begin{itemize}
+\item First, the binary file is opened using libbfd. BAP can read
+  binaries from any bfd-supported binary, including ELF and PE
+  binaries.
 
 \item Second, the executable code in the binary is disassembled.  {\tt
   toil} currently uses a linear sweep disassembler.
@@ -15,41 +17,45 @@ to the IL consists of two steps:
 Lifted assembly instructions have all of the side-effects explicitly
 exposed.  As a result, a single typical assembly instruction will be
 lifted as a sequence of \bil instructions.  For example, the {\tt add
-  eax,0x2} x86 instruction is lifted as:
+  \$2, \%eax} instruction is lifted as:
 
 \begin{centering}
 \begin{scriptsize}
-\begin{tightcode}
-tmp1 = EAX;
-EAX = EAX + 2;
-//eflags calculation
-CF = (EAX<tmp1);
-tmp2 = cast(low, EAX, reg8\_t);
-PF = (!cast(low,
-              ((((tmp2>>7)^(tmp2>>6))^((tmp2>>5)^(tmp2>>4)))^
-              (((tmp2>>3)^(tmp2>>2))^((tmp2>>1)^tmp2)))), reg1\_t);
-AF = (1==(16\&(EAX^(tmp1^2))));
-ZF = (EAX==0);
-SF = (1==(1\&(EAX>>31)));
-OF = (1==(1\&(((tmp1^(2^0xFFFFFFFF))\&(tmp1^EAX))>>31)));
-\end{tightcode}
+\begin{verbatim}
+addr 0x0 @asm "add    $0x2,%eax"
+label pc_0x0
+T_t1:u32 = R_EAX:u32
+T_t2:u32 = 2:u32
+R_EAX:u32 = R_EAX:u32 + T_t2:u32
+R_CF:bool = R_EAX:u32 < T_t1:u32
+R_OF:bool = high:bool((T_t1:u32 ^ ~T_t2:u32) & (T_t1:u32 ^ R_EAX:u32))
+R_AF:bool = 0x10:u32 == (0x10:u32 & (R_EAX:u32 ^ T_t1:u32 ^ T_t2:u32))
+R_PF:bool =
+  ~low:bool(R_EAX:u32 >> 7:u32 ^ R_EAX:u32 >> 6:u32 ^ R_EAX:u32 >> 5:u32 ^
+            R_EAX:u32 >> 4:u32 ^ R_EAX:u32 >> 3:u32 ^ R_EAX:u32 >> 2:u32 ^
+            R_EAX:u32 >> 1:u32 ^ R_EAX:u32)
+R_SF:bool = high:bool(R_EAX:u32)
+R_ZF:bool = 0:u32 == R_EAX:u32
+\end{verbatim}
 \end{scriptsize}
 \end{centering}
 
 The lifted \bil code explicitly detail all the side-effects of the
-{\tt add} instruction, including all 6 {\tt eflags} that are updated
-by the operation.  As another example, an instruction with the {\tt
-  rep} prefix (whose semantics are in Figure~\ref{vine:rep}) is lifted
-as a sequence of instructions that form a loop.
+{\tt add} instruction, including all six flags that are updated by the
+operation.  As another example, an instruction with the {\tt rep}
+prefix (whose semantics are in Figure~\ref{vine:rep}) is lifted as a
+sequence of instructions that form a loop.
 
-In addition to binary files, {\tt toil} can also lift an instruction trace
-to the IL. Conditional branches in a trace are lifted as {\tt assert}
-statements so that the executed branch is followed. This is done to
-prevent branching outside the trace to an unknown instruction.
-%% We probably shouldn't mention TEMU since it's unsupported.
-%% The
-%% TEMU~\cite{temu} dynamic analysis tool currently supports generating
-%% traces in the \bap trace format.
+In addition to binary files, {\tt toil} can also lift an instruction
+trace to the IL.  The most recent BAP trace format can be lifted using
+the {\tt -serializedtrace} option.
 
+{\tt toil} can output to several formats for easy parsing, including
+protobuf, JSON, and XML.  These formats are selected via the {\tt
+  -topb}, {\tt -tojson}, and {\tt -toxml} options.  Code for reading
+the protobuf encoding is in the {\tt piqi-files/protobuf} directory.
 
-
+%%% Local Variables: 
+%%% mode: latex
+%%% TeX-master: "../main"
+%%% End: 

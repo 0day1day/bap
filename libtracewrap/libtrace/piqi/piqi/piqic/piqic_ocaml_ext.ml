@@ -1,6 +1,6 @@
 (*pp camlp4o -I `ocamlfind query piqi.syntax` pa_labelscope.cmo pa_openin.cmo *)
 (*
-   Copyright 2009, 2010, 2011 Anton Lavrik
+   Copyright 2009, 2010, 2011, 2012, 2013 Anton Lavrik
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ open C
 open Iolist
 
 
-let piqdef_mlname = Piqic_ocaml_types.piqdef_mlname
+let typedef_mlname = Piqic_ocaml_types.typedef_mlname
 
 
 let gen_init_piqi ocaml_mod =
@@ -40,7 +40,7 @@ let gen_init_piqi ocaml_mod =
 
 
 let gen_init_piqtype def =
-  let mlname = piqdef_mlname def in
+  let mlname = typedef_mlname def in
   let scoped_name = C.full_piqi_typename (def :> T.piqtype) in
   iod " " [
     ios "let _" ^^ ios mlname ^^ ios "_piqtype =";
@@ -58,10 +58,11 @@ let gen_convert mlname input_format output_format data =
 
 
 let gen_parse ocaml_mod def =
-  let mlname = piqdef_mlname def in
+  let mlname = typedef_mlname def in
   iod " " [
-    ios "let parse_" ^^ ios mlname; ios "x (format :Piqirun_ext.input_format) =";
-      ios "let x_pb ="; gen_convert mlname "format" "`pb" "x";
+    ios "let parse_" ^^ ios mlname;
+        ios "?opts"; ios "x (format :Piqirun_ext.input_format) =";
+      ios "let x_pb ="; gen_convert mlname "format" "`pb" "x"; ios "?opts";
       ios "in";
       ios "let buf = Piqirun.init_from_string x_pb";
       ios "in";
@@ -71,20 +72,21 @@ let gen_parse ocaml_mod def =
 
 
 let gen_gen ocaml_mod def =
-  let mlname = piqdef_mlname def in
+  let mlname = typedef_mlname def in
   iod " " [
-    ios "let gen_" ^^ ios mlname; ios "x (format :Piqirun_ext.output_format) =";
+    ios "let gen_" ^^ ios mlname;
+        ios "?opts"; ios "x (format :Piqirun_ext.output_format) =";
       ios "let buf = "; ios ocaml_mod ^^ ios ".gen_" ^^ ios mlname; ios "x";
       ios "in";
       ios "let x_pb = Piqirun.to_string buf";
       ios "in";
-      gen_convert mlname "`pb" "format" "x_pb";
+      gen_convert mlname "`pb" "format" "x_pb"; ios "?opts";
       eol;
   ]
 
 
 let gen_print def =
-  let mlname = piqdef_mlname def in
+  let mlname = typedef_mlname def in
   iod " " [
     ios "let print_" ^^ ios mlname; ios "x =";
       ios "Pervasives.print_endline (gen_" ^^ ios mlname; ios "x `piq)";
@@ -97,7 +99,7 @@ let gen_print def =
 
 let gen_code piqi =
   let ocaml_mod = some_of piqi.P#ocaml_module in
-  let defs = piqi.P#resolved_piqdef in
+  let defs = piqi.P#resolved_typedef in
 
   let type_initializers = List.map gen_init_piqtype defs in
   let parsers = List.map (gen_parse ocaml_mod) defs in
@@ -124,17 +126,15 @@ let piqic_ext piqi =
   let code = gen_code piqi in
 
   let ofile =
-    match !ofile with
-      | "" ->
-          let modname = some_of piqi.P#ocaml_module in
-          String.uncapitalize modname ^ "_ext.ml"
-      | x -> x
+    let modname = some_of piqi.P#ocaml_module in
+    String.uncapitalize modname ^ "_ext.ml"
   in
   Piqic_ocaml.gen_output_file ofile code
 
 
 let piqic_file ifile =
-  Piqic_common.init ();
+  Piqic_ocaml.init ();
+
   (* load input .piqi file *)
   let piqi = Piqi.load_piqi ifile in
 
@@ -148,7 +148,7 @@ let piqic_file ifile =
 let usage = "Usage: piqic ocaml-ext [options] <.piqi file>\nOptions:"
 
 
-let speclist = Piqic_ocaml.speclist
+let speclist = Main.common_speclist @ Piqic_ocaml.common_speclist
 
 
 let run () =

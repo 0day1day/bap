@@ -1,6 +1,5 @@
-(** Dataflow module for use with the ocamlgraph library
-
-    @author Ivan Jager
+(* Dataflow module for use with the ocamlgraph library
+   @author Ivan Jager
 *)
 
 open Util

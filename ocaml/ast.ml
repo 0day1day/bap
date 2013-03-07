@@ -38,10 +38,11 @@ type stmt =
 				      var on the left *)
   | Jmp of (exp * attrs) (** Jump to a label/address *)
   | CJmp of (exp * exp * exp * attrs)
-      (** Conditional jump. If e1 is true, jumps to e2, otherwise jumps to e3 *)
+  (** Conditional jump. If e1 is true, jumps to e2, otherwise jumps to e3 *)
   | Label of (label * attrs) (** A label we can jump to *)
   | Halt of (exp * attrs)
   | Assert of (exp * attrs)
+  | Assume of (exp * attrs)
   | Comment of (string * attrs) (** A comment to be ignored *)
   | Special of (string * attrs) (** A "special" statement. (does magic) *)
 
@@ -60,8 +61,7 @@ let exp_of_lab = function
 let lab_of_exp = function
   | Lab s -> Some(Name s)
   | Int(i, t) ->
-      (* Some(Addr(Int64.logand i (Int64.pred(Int64.shift_left 1L bits)))) *)
-      Some(Addr(int64_of_big_int (Arithmetic.to_big_int (i,t))))
+    Some(Addr(int64_of_big_int (Arithmetic.to_big_int (i,t))))
   | _ -> None
     
 
@@ -79,20 +79,6 @@ let exp_true = Int(bi1, reg_1)
 
 let little_endian = exp_false
 let big_endian = exp_true
-
-(** More convenience functions for building common expressions. *)
-let exp_and e1 e2 = BinOp(AND, e1, e2)
-let exp_or e1 e2 = BinOp(OR, e1, e2)
-let exp_eq e1 e2 = BinOp(EQ, e1, e2)
-let exp_not e = UnOp(NOT, e)
-let exp_implies e1 e2 = exp_or (exp_not e1) e2
-
-let (exp_shl, exp_shr) =
-  let s dir e1 = function
-    | Int(i,_) when bi_is_zero i -> e1
-    | e2 -> BinOp(dir, e1, e2)
-  in
-  (s LSHIFT, s RSHIFT)
 
 let newlab =
   let c = ref 0 in
@@ -244,8 +230,9 @@ let num_stmt = function
   | Label _ -> 3
   | Halt _ -> 4
   | Assert _ -> 5
-  | Comment _ -> 6
-  | Special _ -> 7
+  | Assume _ -> 6
+  | Comment _ -> 7
+  | Special _ -> 8
 
 let getargs_stmt = function
   | Move(v,e,a) -> [e], [v], [], [a], []
@@ -253,7 +240,8 @@ let getargs_stmt = function
   | Label(l,a) -> [], [], [l], [a], []
   | Jmp(e,a)
   | Halt(e,a)
-  | Assert(e,a) -> [e], [], [], [a], []
+  | Assert(e,a)
+  | Assume(e,a) -> [e], [], [], [a], []
   | Comment(s,a)
   | Special(s,a) -> [], [], [], [a], [s]
 
@@ -325,5 +313,6 @@ let get_attrs = function
   | Label(_,a)
   | Halt(_,a)
   | Assert(_,a)
+  | Assume(_,a)
   | Comment(_,a)
   | Special(_,a) -> a

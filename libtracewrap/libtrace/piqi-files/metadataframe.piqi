@@ -6,14 +6,16 @@
 .record [
         .name metadata-frame
 
-        % Trace creator version string.  Be as verbose as possible, including SVN revisions, etc.
+        % Trace creator version string.  Be as verbose as possible, including 
+        % SVN revisions, etc.
         .field [
                .name trace-writer-version
                .type string
                .optional
         ]
 
-        % Options given to trace creator.  For the BAP PIN trace tool, this will just be the command line arguments.
+        % Options given to trace creator.  For the BAP PIN trace tool, this will
+        % just be the command line arguments.
         .field [
                .name trace-options
                .type string

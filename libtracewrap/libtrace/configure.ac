@@ -12,6 +12,8 @@ AM_INIT_AUTOMAKE
 AC_SUBST(LIBTRACE_DIR)
 LIBTRACE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
+AC_SUBST(INCDIRS)
+
 # Checks for programs.
 AC_PROG_CXX
 AC_PROG_CC
@@ -44,6 +46,8 @@ AC_HEADER_STDBOOL
 AC_C_INLINE
 AC_TYPE_SIZE_T
 AC_TYPE_UINT64_T
+AC_SYS_LARGEFILE
+AC_FUNC_FSEEKO
 
 # Checks for library functions.
 AC_CHECK_FUNCS([memset])

@@ -22,13 +22,15 @@ module BArray = Bigarray.Array1
 exception Disassembly_error;;
 exception Memory_error;;
 
-let always_vex = ref false;;
-
 type arch = Libbfd.bfd_architecture
 type asmprogram = {asmp : Libasmir.asm_program_t;
 		   arch : arch;
 		   secs : section_ptr list;
-		   get : int64 -> char }
+                   (** Get executable code bytes *)
+		   get_exec : int64 -> char;
+                   (** Get any readable bytes. *)
+                   get_readable : int64 -> char;
+ }
 
 
 let arch_i386 = Bfd_arch_i386
@@ -38,7 +40,7 @@ let arch_arm  = Bfd_arch_arm
 (** How many blocks to obtain when reading a FULL trace (not streaming) *)
 let trace_blocksize = ref 100000L
 
-module D = Debug.Make(struct let name = "ASMIR" and default=`Debug end)
+module D = Debug.Make(struct let name = "Asmir" and default=`NoDebug end)
 open D
 
 module Status = Util.StatusPrinter
@@ -66,7 +68,7 @@ let tr_regtype = function
 (* maps a string variable to the var we are using for it *)
 type varctx = (string,Var.t) Hashtbl.t
 
-(** [gamma_create mem decls] creates a new varctx for use during translation. 
+(** [gamma_create mem decls] creates a new varctx for use during translation.
     [mem] is the var that should be used for memory references, and [decls]
     should be a list of variables already in scope.
 *)
@@ -83,7 +85,6 @@ let gamma_lookup (g:varctx) s =
     failwith("Disassembled code had undeclared variable '"^s^"'. Something is broken.")
 
 let gamma_extend = Hashtbl.add
-
 
 let gamma_unextend = Hashtbl.remove
 
@@ -449,20 +450,30 @@ let is_code s =
   let flags = bfd_section_get_flags s in
   Int64.logand flags Libbfd.sEC_CODE <> 0L
 
-let section_contents ?(codeonly=true) prog secs =
+let codeonly s = is_load s && is_code s
+let loaded s = is_load s
+
+(** Returns a list of [(addr,array)] tuples where [addr] is the
+    starting address of a memory segment, and [array] is an array
+    representing the memory starting at address [addr]. *)
+let section_memory_helper ?(which=codeonly) prog secs =
   let bfd = Libasmir.asmir_get_bfd prog in
   let sc l s =
     let size = bfd_section_size s and vma = bfd_section_vma s
     and flags = bfd_section_get_flags s
     and name = bfd_section_name s in
     dprintf "Found section %s at %Lx with size %Ld. flags=%Lx" name vma size flags;
-    if is_load s && ((not codeonly) || is_code s) then
-    (* if Int64.logand Libbfd.sEC_LOAD flags <> 0L then *)
+    if which s then
+      (* if Int64.logand Libbfd.sEC_LOAD flags <> 0L then *)
       let (ok, a) = Libbfd.bfd_get_section_contents bfd s 0L size in
       if ok <> 0 then (vma, a)::l else (dprintf "failed."; l)
     else l
   in
   let bits = List.fold_left sc [] secs in
+  bits
+
+let section_contents ?(which=codeonly) prog secs =
+  let bits = section_memory_helper ~which prog secs in
   let get a =
     (* let open Int64 in *)
     let (-) = Int64.sub in
@@ -475,6 +486,14 @@ let section_contents ?(codeonly=true) prog secs =
   in
   get
 
+let section_contents_list ?(which=codeonly) prog secs =
+  let bits = section_memory_helper ~which prog secs in
+  let (+) = Int64.add in
+  let al l (base,arr) =
+    (* [base, ..., base + len(arr)) *)
+    foldn (fun l n -> (base + (Int64.of_int n), arr.{n})::l) l ((BArray.dim arr) - 1)
+  in
+  List.fold_left al [] bits
 
 (** Open a binary file for translation *)
 let open_program ?base filename =
@@ -486,8 +505,9 @@ let open_program ?base filename =
     (* tell the GC how to free resources associated with prog *)
   Gc.finalise Libasmir.asmir_close prog;
   let secs = Array.to_list (get_all_sections prog)  in
-  let get = section_contents prog secs in
-  {asmp=prog; arch=Libasmir.asmir_get_asmp_arch prog; secs=secs; get=get}
+  let get_exec = section_contents prog secs in
+  let get_readable = section_contents ~which:loaded prog secs in 
+ {asmp=prog; arch=Libasmir.asmir_get_asmp_arch prog; secs=secs; get_exec=get_exec; get_readable=get_readable}
 
 
 let get_asm = function
@@ -520,22 +540,22 @@ let get_asm = function
 (*     wprintf "Could not check equivalence for %Lx: Not_found" a *)
 
 
-(** Translate only one address of a  Libasmir.asm_program_t to Vine *)
-let asm_addr_to_bap {asmp=prog; arch=arch; get=get} addr =
-  (try 
-     let (ir,na) as v = Disasm.disasm_instr arch get addr in
+(** Translate only one address of a  Libasmir.asm_program_t to BAP *)
+let asm_addr_to_bap {asmp=prog; arch=arch; get_exec=get_exec} addr =
+  (try
+     let (ir,na) as v = Disasm.disasm_instr arch get_exec addr in
      DV.dprintf "Disassembled %Lx directly" addr;
      (match ir with
      | Label(l, [])::rest ->
        (Label(l, [Asm(Libasmir.asmir_string_of_insn prog addr)])::rest,
 	na)
      | _ -> v)
-   with Disasm_i386.Disasm_i386_exception s -> 
+   with Disasm_i386.Disasm_i386_exception s ->
      DTest.dprintf "BAP unknown disasm_instr %Lx: %s" addr s;
-     DV.dprintf "disasm_instr %Lx: %s" addr s; 
+     DV.dprintf "disasm_instr %Lx: %s" addr s;
      ([Special(Printf.sprintf "Unknown instruction at %Lx: %s " addr s, []);
        Comment("All blocks must have two statements", [])],
-      Int64.succ addr)
+      Int64.add addr (Int64.of_int (Libasmir.asmir_get_instr_length prog addr)))
   )
 
 let flatten ll =
@@ -567,7 +587,7 @@ let asmprogram_section_to_bap p s =
   let size = bfd_section_size s and vma = bfd_section_vma s in
   asmprogram_to_bap_range p vma (Int64.add vma size)
 
-(** Translate an entire Libasmir.asm_program_t into a Vine program *)
+(** Translate an entire Libasmir.asm_program_t into a BAP program *)
 let asmprogram_to_bap ?(init_ro=false) p =
   let irs = List.map
 	(fun s ->
@@ -583,8 +603,8 @@ let asmprogram_to_bap ?(init_ro=false) p =
    sequence of bytes. *)
 let byte_insn_to_bap arch addr bytes =
   let prog = Libasmir.byte_insn_to_asmp arch addr bytes in
-  let get a = bytes.(Int64.to_int (Int64.sub a addr)) in
-  let (pr, n) = asm_addr_to_bap {asmp=prog; arch=arch; secs=[]; get=get} addr in
+  let get_exec a = bytes.(Int64.to_int (Int64.sub a addr)) in
+  let (pr, n) = asm_addr_to_bap {asmp=prog; arch=arch; secs=[]; get_exec=get_exec; get_readable=get_exec} addr in
   Libasmir.asmir_close prog;
   pr, Int64.sub n addr
 
@@ -594,11 +614,11 @@ let byte_sequence_to_bap bytes arch addr =
   let prog = Libasmir.byte_insn_to_asmp arch addr bytes in
   let len = Array.length bytes in
   let end_addr = Int64.add addr (Int64.of_int len) in
-  let get a = bytes.(Int64.to_int (Int64.sub a addr)) in
+  let get_exec a = bytes.(Int64.to_int (Int64.sub a addr)) in
   let rec read_all acc cur_addr =
     if cur_addr >= end_addr then List.rev acc
     else
-      let prog, next = asm_addr_to_bap {asmp=prog; arch=arch; secs=[]; get=get} cur_addr in
+      let prog, next = asm_addr_to_bap {asmp=prog; arch=arch; secs=[]; get_exec=get_exec; get_readable=get_exec} cur_addr in
       read_all (prog::acc) next
   in
   let il = read_all [] addr in
@@ -736,7 +756,7 @@ module PinTrace = struct
     while !c do
       let (tmp_c,revstmts) =
         alt_bap_from_trace_file_range_rev filename off !trace_blocksize in
-      ir := Util.fast_append revstmts !ir;
+      ir := BatList.append revstmts !ir;
       c := tmp_c;
     done;
     let r = List.rev !ir in
@@ -782,7 +802,7 @@ module SerializedTrace = struct
                    mem=true;
                    t=Reg b;
                    index=a;
-                   value=Util.big_int_of_binstring ~e:Util.Little v;
+                   value=Util.big_int_of_binstring ~e:`Little v;
                    usage=convert_usage use;
                    taint=convert_taint t})
         | {Operand_info.operand_info_specific=`reg_operand({Reg_operand.name=n});
@@ -794,7 +814,7 @@ module SerializedTrace = struct
                    mem=false;
                    t=Reg b;
                    index=0L;
-                   value=Util.big_int_of_binstring ~e:Util.Little v;
+                   value=Util.big_int_of_binstring ~e:`Little v;
                    usage=convert_usage use;
                    taint=convert_taint t})
       in
@@ -803,7 +823,7 @@ module SerializedTrace = struct
            Taint_intro.taint_id=tid;
            Taint_intro.value=value} ->
           let v = match value with
-            | Some x -> Util.big_int_of_binstring ~e:Util.Little x
+            | Some x -> Util.big_int_of_binstring ~e:`Little x
             | None -> Big_int_convenience.bi0
           in
           Context({name="mem";
@@ -814,13 +834,16 @@ module SerializedTrace = struct
                    usage=WR;
                    taint=Taint (Int64.to_int tid)})
       in
+      let convert_thread_id x = Type.ThreadId (Int64.to_int x)
+      in
       function
-        | `std_frame({Std_frame.operand_list=ol}) -> List.map convert_operand_info ol
+        | `std_frame({Std_frame.operand_list=ol; Std_frame.thread_id=tid}) -> (convert_thread_id tid) :: List.map convert_operand_info ol
         | `syscall_frame _ -> []
         | `exception_frame _ -> []
         | `taint_intro_frame({Taint_intro_frame.taint_intro_list=til}) -> List.map convert_taint_info til
         | `modload_frame _ -> []
         | `key_frame _ -> []
+        | `metadata_frame _ -> []
     in
     let raise_frame arch f =
       let get_stmts =
@@ -852,6 +875,7 @@ module SerializedTrace = struct
           | `key_frame _ ->
       (* Implement key frame later *)
             []
+          | `metadata_frame _ -> []
       in
       add_operands (get_stmts f) (get_attrs f)
     in
@@ -944,54 +968,7 @@ let find_symbol {asmp=p} name =
   if err <= 0 then failwith "find_symbol";
   BatArray.find (fun sym -> if sym.bfd_symbol_name = name then true else false) arr
 
-let get_function_ranges p =
-  let symb = get_symbols p in
-  ignore p; (* does this ensure p is live til here? *)
-  let is_function s =
-    s.bfd_symbol_flags land bsf_function <> 0
-  and symb_to_tuple s =
-    (* FIXME: section_end doesn't seem to get the right values... *)
-    (* did this fix it? --aij *)
-    let sec = s.bfd_symbol_section in
-    let vma = bfd_section_vma sec in
-    (Int64.add s.bfd_symbol_value vma,
-     Int64.add vma (bfd_section_size sec),
-     s.bfd_symbol_name)
-  in
-  let starts =
-    Array.fold_left
-      (fun l s -> if is_function s then symb_to_tuple s :: l else l)
-      [] symb
-  in
-  let starts = Array.of_list starts in
-  (* FIXME: probably should do unsigned comparison *)
-  Array.fast_sort compare starts;
-  (*let ranges = Array.mapi
-    (fun i (s,e,name) ->
-       let e' =
-	 try let (s,_,_) = starts.(i+1) in s
-	 with Invalid_argument "index out of bounds" -> e
-       in
-       if e' < e || e = s then (name,s,e') else (name,s,e)
-    ) starts
-  *)
-  let ranges = Array.mapi
-    (fun i (s,e,name) ->
-       let e' =
-	 try let (s,_,_) = starts.(i+1) in s
-	 with Invalid_argument "index out of bounds" -> s
-       in
-       (name,s,e') (* section_end doesn't work *)
-    ) starts
-  in
-  let unfiltered = Array.to_list ranges in
-  (* filter out functions that start at 0 *)
-  List.filter (function 
-		 |(_,0L,_) -> false
-		 |("_init",_,_) -> false
-		 | _ -> true)
-    unfiltered
-
+let get_flavour p = bfd_flavour (Libasmir.asmir_get_bfd p.asmp)
 
 let get_section_startaddr p sectionname =
   Libasmir.asmir_get_sec_startaddr p.asmp sectionname
@@ -1029,5 +1006,11 @@ let get_print_warning = Libasmir.asmir_get_print_warning
 
 let set_use_simple_segments = Libasmir.asmir_set_use_simple_segments
 
-let get_prog_contents {get=get} addr =
-  get addr
+let get_exec_mem_contents {get_exec=get_exec} =
+  get_exec
+
+let get_exec_mem_contents_list {asmp=asmp; secs=secs} = section_contents_list ~which:is_code asmp secs
+
+let get_readable_mem_contents {get_readable=get_readable} = get_readable
+
+let get_readable_mem_contents_list {asmp=asmp; secs=secs} = section_contents_list ~which:loaded asmp secs

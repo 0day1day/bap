@@ -6,6 +6,7 @@
 
 let (<<) = (lsl)
 
+let bsf_global = 1 << 1
 let bsf_debugging = 1 << 2
 let bsf_function = 1 << 3
 

@@ -4,15 +4,15 @@
 
 module D = Debug.Make(struct let name = "Debug_snippets" and default=`Debug end)
 open D
+open Type
 
 (** AST debugging visitor *)
 
 let v = object(self)
   inherit Ast_visitor.nop
-    (* Add each variable to definedvars *)
   method visit_stmt stmt =
     dprintf "Stmt: %s" (Pp.ast_stmt_to_string stmt);
-    `SkipChildren
+    SkipChildren
 end 
   
 let print_astcfg p =
@@ -25,10 +25,9 @@ let print_ast p =
 
 let v = object(self)
   inherit Ssa_visitor.nop
-    (* Add each variable to definedvars *)
   method visit_stmt stmt =
     dprintf "Stmt: %s" (Pp.ssa_stmt_to_string stmt);
-    `SkipChildren
+    SkipChildren
 end 
   
 let print_ssacfg p =

@@ -34,3 +34,6 @@ clean:
 	@cd lib && $(MAKE) clean
 	@for dir in $(EXAMPLES); do (cd $$dir && $(MAKE) $@); done
 	@rm -f doc
+
+tags:
+	-

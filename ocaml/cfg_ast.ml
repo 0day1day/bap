@@ -23,32 +23,27 @@ let create c l stmts =
   let c = C.add_vertex c v in
   (C.set_stmts c v stmts, v)
 
-(** Create BB_Entry in a graph *)
 let create_entry g =
   create g BB_Entry [Comment("entry node",[])]
 
-(** Find BB_Entry in a graph, or raise an exception if not already present. *)
 let find_entry g =
   try
     g, C.find_vertex g BB_Entry
   with Not_found ->
     failwith "BB_Entry is missing! This should not happen."
 
-(** Find BB_Error in a graph, or add it if not already present. *)
 let find_error g =
   try
     g, C.find_vertex g BB_Error
   with Not_found ->
     create g BB_Error [Label(Name "BB_Error", []); Assert(exp_false, [])]
 
-(** Find BB_Exit in a graph, or add it if not already present. *)
 let find_exit g =
   try
     g, C.find_vertex g BB_Exit
   with Not_found ->
     create g BB_Exit [(*Label(Name "BB_Exit", []); *)Comment("exit node",[])]
 
-(** Find BB_Indirect in a graph, or add it if not already present. *)
 let find_indirect g =
   try
     g, C.find_vertex g BB_Indirect
@@ -81,7 +76,10 @@ let of_prog ?(special_error = true) p =
             just silently use the old block.  If not, raise an
             exception because we are defining a label twice. *)
          if full_stmts_eq stmts ostmts then
-           Some(v) else failwith (Printf.sprintf "Duplicate label usage: label %s" (Pp.label_to_string l))
+           Some(v) 
+         else 
+           failwith (Printf.sprintf "Duplicate label usage: label %s" 
+                       (Pp.label_to_string l))
        with Not_found -> None) (* The label does not exist *)
     | _ -> None
   in
@@ -142,7 +140,7 @@ let of_prog ?(special_error = true) p =
 	(c, [s], true, Some v)
     | Assert(e,_) when e === exp_false ->
       g()
-    | Move _ | Assert _ ->
+    | Move _ | Assert _ | Assume _ ->
       (c, s::cur, false, addpred)
     | Comment _ ->
       (c, s::cur, onlylabs, addpred)

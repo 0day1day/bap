@@ -28,62 +28,42 @@ proposed assembly-level alias analysis~\cite{brumley:2006:alias} is
 correct with respect to the operational semantics of \bap.
 
 
-\subsection{Limitations of \bap} 
+\subsection{Limitations of \bap}
 
-\bap is designed to enable program analysis of binary program
-states. Therefore, analyses that depends upon more than the
-operational semantics of the instruction fall outside the scope of
-\bap. For example, creating an analysis of the timing behavior of
-binary programs falls outside the current scope of \bap.
-
-Some architectures, such as later versions of ARM, are bi-endian where
-the endianness is specified by a register status flag and can be
-changed mid-program. \bap currently supports big and little endian,
-but does not support bi-endian architectures. Adding support is
-straight-forward by changing {\tt store} and {\tt load} instructions
-to have an additional field indicating the endianness (which can then
-be removed by normalizing memory appropriately).  If we annotate
-individual loads and stores, we would need to remove the endianness as
-part of the memory type declaration in order to prevent the semantics
-allowing type-incompatible loads and stores on memory.
-
-\bap does not strongly associated an assembly instruction to the
-corresponding sequence of lifted IL instructions.  Currently \bap
-prefixes a sequence of IL instructions with a comment containing the
-pretty-printed assembly.  However, an analysis itself does not know
-which IL instructions arose from which assembly.  Although users of
-\bap often seem to want to tie IL instructions to assembly
-instructions, it is unclear how to accomplish this in flexible way
-that is also non-intrusive to analyses themselves.
-
-One principle in \bap is to  note explicitly in the IL any unhandled
-instructions during lifting.  For each architecture supported, there
-may be many instructions which \bap cannot lift.  Such instructions
-are noted in the IL as either {\tt special} or {\tt unknown}. For
-example, \bap does not currently support floating point numbers. The
-central reason lies in properly defining the semantics of floating
-point with respect to rounding.  This is a problem we plan on tackling
-in future versions of \bap.
+\begin{description}
+\item[Architectures] \bap only supports x86 right now.  We intend to
+  add support for x86-64 and ARM in the future.
+\item[Semantics] \bap is designed to enable program analysis of binary
+  program states. Therefore, analyses that depend upon more than the
+  operational semantics of the instruction fall outside the scope of
+  \bap. For example, creating an analysis of the timing behavior of
+  binary programs falls outside the current scope of \bap.
+\item[User-mode instructions] \bap only models user-mode level
+  instructions.  Unhandled instructions will be lifted as {\tt
+    special} statements or {\tt unknown} expressions.
+\item[Integer instructions] \bap only models instructions that
+  manipulate integers.  In particular, \bap does not model floating
+  point instructions.
+\item[Indirect jumps] \bap does not currently resolve indirect jumps,
+  or perform ``CFG recovery''.  We plan to add this in a future
+  release.
+\end{description}
 
 \subsection{Is Lifting Correct?}
 
 Assembly instructions are lifted to \bap in a syntax directed manner.
-One may view that the \bap IL is a model of the underlying assembly.
-There is a chance, however, that lifting could produce incorrect
+One may view the \bap IL as a model of the underlying assembly.  There
+is a chance, however, that lifting could produce incorrect
 IL. Although it is impossible to say that all assembly instructions
 are correctly lifted, the advantage of \bap's design is that only the
 lifting process needs to understand the semantics of the original
 assembly.
 
-
-We have developed several measures to make sure our IL is
-correct. First, we have a series of unit tests for IL translations. A
-unit test executes both the real instruction and the lifted IL in a
-know pre-state and verifies both terminate in the same post-state.
-Second, we have performed larger scale tests that verify the
-executions consisting of millions of instructions produce the same
-output value on the corresponding IL.  
-
+We perform nightly testing to make sure that \bap's model of execution
+matches what happens on a real x86 processor.  Our nightly tests also
+tell us which instructions are used in our test programs that are not
+modeled in \bap.  The results of these tests are always available at
+\url{http://bap.ece.cmu.edu/nightly-reports/}.
 
 \subsection{Size of Lifting IL for a Program}
 
@@ -104,6 +84,7 @@ keeping track of control and data dependencies since there are few
 syntactic cues in assembly to help. \bap, on the other hand, obviates
 all data and control dependencies within the code. 
 
-
-
-
+%%% Local Variables: 
+%%% mode: latex
+%%% TeX-master: "../main"
+%%% End: 

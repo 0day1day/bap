@@ -112,8 +112,6 @@ $ctx->checkout($rep_url, $local_path, $revision, $true);
 
 print "Finished checking out repository $rep_url\n";
 
-# Set path variable so autogen will work
-$ENV{'PATH'} = '/bin:/usr/bin';
 $ENV{'PIN_HOME'} = '/home/swhitman/pin/';
 
 # configure
@@ -132,7 +130,7 @@ if(defined $getpin) {
 
 # make test
 print "Making test\n";
-check_system("nice make -j test");
+check_system("nice make -j4 test");
 
 
 # leave $local_path before removing it

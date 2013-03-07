@@ -99,7 +99,7 @@ object(self)
 
     let toc_offset = LargeFile.pos_out oc in
     (* Make sure the toc is the right size. *)
-    let () = assert ((Int64.div (Int64.pred num_frames) frames_per_toc_entry) = Int64.of_int (List.length toc)) in
+    let () = assert ((num_frames = 0L) || (Int64.div (Int64.pred num_frames) frames_per_toc_entry) = Int64.of_int (List.length toc)) in
     (* Write frames per toc entry. *)
     let () = write_i64 oc frames_per_toc_entry in
     (* Write toc to file. *)
@@ -204,26 +204,23 @@ class reader filename =
 
     method get_frame : frame =
       let () = self#check_end_of_trace "get_frame on non-existant frame" in
-
       let frame_len = read_i64 ic in
       if (frame_len <= 0L) then
         raise (TraceException (Printf.sprintf "Read zero-length frame at offset %#Lx" (LargeFile.pos_in ic)));
-
       let buf = String.create (Int64.to_int frame_len) in
       (* Read the frame info buf. *)
       let () = really_input ic buf 0 (Int64.to_int frame_len) in
       let f = Frame_piqi.parse_frame (Piqirun.init_from_string buf) in
       let () = current_frame <- Int64.succ current_frame in
-
       f
 
     method get_frames requested_frames =
       let () = self#check_end_of_trace "get_frame on non-existant frame" in
-
       (* The number of frames we copy is bounded by the number of
          frames left in the trace. *)
-      let num_frames = min requested_frames (Int64.sub num_frames current_frame) in
-
+      let 
+          num_frames = min requested_frames (Int64.sub num_frames current_frame)
+      in
       List.rev (foldn64 ~t:1L (fun l n -> self#get_frame :: l) [] num_frames)
 
     method end_of_trace =

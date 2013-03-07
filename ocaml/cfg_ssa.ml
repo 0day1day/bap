@@ -12,7 +12,7 @@ open Cfg
 open Type
 open BatListFull
 
-module D = Debug.Make(struct let name = "SSA" and default=`Debug end)
+module D = Debug.Make(struct let name = "SSA" and default=`NoDebug end)
 open D
 
 module VH = Var.VarHash
@@ -188,6 +188,9 @@ let rec stmt2ssa ctx ~(revstmts: stmt list) s =
     | Ast.Assert(e,a) ->
 	let (revstmts,v) = exp2ssa ctx revstmts e in
 	  Assert(v,a)::revstmts
+    | Ast.Assume(e,a) ->
+	let (revstmts,v) = exp2ssa ctx revstmts e in
+	  Assume(v,a)::revstmts
     | Ast.Halt(e,a) ->
 	let (revstmts, v) = exp2ssa ctx revstmts e in 
 	  Halt(v,a)::revstmts
@@ -682,20 +685,20 @@ let create_tm c =
 	   VH.remove tm v;
 	   VH.replace refd v false)
        with Not_found -> VH.add refd v true);
-      `DoChildren
+      DoChildren
 
     method visit_stmt = function
       | Move(_, Phi _, _) ->
-	  `DoChildren
+	  DoChildren
       | Move(v,e,_) ->
 	  (* FIXME: should we check whether we introduced this var? *)
           (* FIX: we introduced it if it is named "temp" *)
 	  if (try VH.find refd v with Not_found -> true) 
               && (Var.name v == ssa_temp_name)
 	  then VH.add tm v e;
-	  `DoChildren
+	  DoChildren
       | _ ->
-	  `DoChildren
+	  DoChildren
   end in
   C.G.iter_vertex
     (fun b -> ignore(Ssa_visitor.stmts_accept vis (C.get_stmts c b)))
@@ -732,6 +735,7 @@ let stmt2ast tm =
     | Label(l,a) -> Ast.Label(l,a)
     | Comment(s,a) -> Ast.Comment(s,a)
     | Assert(t,a) -> Ast.Assert(v2a t, a)
+    | Assume(t,a) -> Ast.Assume(v2a t, a)
     | Halt(t,a) -> Ast.Halt(v2a t, a)
     | Move(l,e,a) -> Ast.Move(l, exp2ast tm e, a)
 

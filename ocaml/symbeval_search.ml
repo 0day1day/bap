@@ -1,5 +1,6 @@
 (** A module to try out search strategies on symbolic execution *)
 
+open Ast_convenience
 module D = Debug.Make(struct let name = "SearchFSE" and default=`Debug end)
 open D
 
@@ -13,16 +14,22 @@ sig
   end
 
   module Form : sig
-    include Formula
+      type t
+      type init = unit
+      type output = Ast.exp
+      val init : init -> t 
+      val add_to_formula : t -> Ast.exp -> form_type -> t
+      val output_formula : t -> output
   end
 
   type myctx = (MemL.t,Form.t) ctx
 
-  exception ExcState of string * addr
   exception Halted of varval option * myctx
+  exception Error of string * myctx
   exception UnknownLabel of label_kind
   exception AssertFailed of myctx
-  val init : Ast.stmt list -> myctx
+  exception AssumptionFailed of myctx
+  val init : Ast.stmt list -> Form.init -> myctx
   val eval : myctx -> myctx list
   val eval_expr : MemL.t -> Ast.exp -> varval
 
@@ -68,6 +75,8 @@ struct
 	      let q = symb_to_exp (Symbolic.eval_expr s.delta post) in
               let pred = Symbolic.Form.add_to_formula s.pred q Equal in
 	      ([], pred :: predicates)
+          | Symbolic.AssumptionFailed {pred=pred} ->
+              ([], pred :: predicates)
 	  | Symbolic.AssertFailed {pc=pc} ->
 	      wprintf "failed assertion at %Ld\n" pc;
 	      ([], predicates)  (* try other branches *)
@@ -76,10 +85,13 @@ struct
 	search post predicates q
 
   let eval_ast_program initdata prog post =
-    let ctx = Symbolic.init prog in
+    let ctx = Symbolic.init prog () in
     let predicates = search post [] (S.start_at ctx initdata) in
-    if debug then dprintf "Explored %d paths." (List.length predicates);
-    Util.list_join Ast.exp_or (List.map Symbolic.Form.output_formula predicates)
+    if debug() then dprintf "Explored %d paths." (List.length predicates);
+    match predicates with
+    | [] -> Ast.exp_false
+    | _ ->
+      BatList.reduce exp_or (List.map Symbolic.Form.output_formula predicates)
 
 end
 
@@ -213,17 +225,10 @@ module MaxrepeatDFS = MakeSearch(
 	    if count >= i then None
 	    else Some(nst, EdgeMap.add edge (count+1) m)
 	  in
-	  let newstates = Util.list_map_some addedge newstates in
+	  let newstates = BatList.filter_map addedge newstates in
 	  (newstates@q, i)
   end)
 module MaxrepeatDFSNaive = MaxrepeatDFS(NaiveSymb)
 module MaxrepeatDFSFast = MaxrepeatDFS(FastSymb)
 let maxrepeat_ast_program = MaxrepeatDFSNaive.eval_ast_program
 let maxrepeat_ast_program_fast = MaxrepeatDFSFast.eval_ast_program
-
-let rec conceval_ast_program ctx =
-  try
-    match (Symbolic.eval ctx) with
-    | [next] -> conceval_ast_program next
-    | _ -> failwith "More than one state returned in concrete execution!"
-  with _ -> ctx

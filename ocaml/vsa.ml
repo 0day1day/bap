@@ -125,7 +125,7 @@ struct
     else
       top k
 
-  let neg = if debug then renormun neg else neg
+  let neg = if debug() then renormun neg else neg
 	
   (** Subtractionf of strided intervals *)
   let sub k a b =
@@ -210,7 +210,7 @@ struct
   let lognot (_k:int) (s,l,u) =
     (s, bnot u, bnot l)
 
-  let lognot = if debug then renormun lognot else lognot
+  let lognot = if debug() then renormun lognot else lognot
 
 
   (** Bitwise AND *)
@@ -376,7 +376,7 @@ struct
     let rec transfer_stmt s l =
       match s with
 	| Assert(Var _, _)  (* FIXME: Do we want to say v is true? *)
-	| Assert _ | Jmp _ | CJmp _ | Label _ | Comment _
+	| Assert _ | Assume _ | Jmp _ | CJmp _ | Label _ | Comment _
 	| Halt _ ->
 	    l
 	| Move(v, e, _) ->
@@ -639,7 +639,7 @@ struct
     let rec transfer_stmt s l =
       match s with
 	| Assert(Var _, _)  (* FIXME: Do we want to say v is true? *)
-	| Assert _ | Jmp _ | CJmp _ | Label _ | Comment _
+	| Assert _ | Assume _ | Jmp _ | CJmp _ | Label _ | Comment _
 	| Halt _ ->
 	    l
 	| Move(v, e, _) ->
@@ -843,7 +843,7 @@ struct
     let rec transfer_stmt s l =
       match s with
 	| Assert(Var _, _)  (* FIXME: Do we want to say v is true? *)
-	| Assert _ | Jmp _ | CJmp _ | Label _ | Comment _
+	| Assert _ | Assume _ | Jmp _ | CJmp _ | Label _ | Comment _
 	| Halt _ ->
 	    l
 	| Move(v, e, _) ->

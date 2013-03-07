@@ -6,16 +6,6 @@ and streaminputs = ref None
 and streamrate = ref 10000L (* Unless specified grab this many frames at a time *)
 and pintrace = ref false
 
-(* Set garbage collector options whenever we see -trace. *)
-let set_gc () =
-  Gc.set
-    {
-      (Gc.get ()) with
-	Gc.minor_heap_size = 32000000; (* 128 mb *)
-	Gc.major_heap_increment = 16000000; (* 64 mb *)
-	Gc.max_overhead = 100; (* compact after 100% overhead *)
-    }
-
 let toint64 s =
   try Int64.of_string s
   with Failure "int_of_string" -> raise(Arg.Bad("invalid int64: "^s))
@@ -26,21 +16,39 @@ let setint64 r s =  r := toint64 s
 let stream_speclist =
   (* let addinput i = streaminputs := i :: !streaminputs in *)
   [
-	("-rate",
-	 Arg.String(setint64 streamrate), "<rate> Stream at rate frames");
+    ("-rate",
+     Arg.String(setint64 streamrate), "<rate> Stream at rate frames");
     ("-tracestream",
-     Arg.String(fun s -> streaminputs := Some(`Tracestream s)),
+     Arg.String(fun s ->
+       streaminputs := Some(`Tracestream s)),
      "<file> Read a PinTrace to be processed as a stream.");
     ("-serializedtracestream",
-     Arg.String(fun s -> streaminputs := Some(`Serializedtracestream s)),
+     Arg.String(fun s ->
+       streaminputs := Some(`Serializedtracestream s)),
      "<file> Read a SerializedTrace to be processed as a stream.");
     ("-pin",
      Arg.Set pintrace,
      "Enable pin trace.");
   ]
 
+let addinput i = inputs := i :: !inputs
+
+let trace_speclist =
+[
+    ("-trace",
+     Arg.String(fun s ->
+       addinput (`Trace s)),
+     "<file> Read in a trace and lift it to the IL");
+    ("-serializedtrace",
+     Arg.String(fun s ->
+       addinput (`Serializedtrace s)),
+     "<file> Read in a SerializedTrace and lift it to the IL");
+    ("-pin",
+     Arg.Set pintrace,
+     "Enable pin trace");
+]
+
 let speclist =
-  let addinput i = inputs := i :: !inputs in
   [
     ("-init-ro", Arg.Set (init_ro), "Access rodata.");
     ("-bin",
@@ -60,27 +68,10 @@ let speclist =
                [Arg.Set_string f;
                 Arg.String (fun s -> addinput (`Binrecurseat (!f, toint64 s)))]),
      "<file> <start> Lift binary to the IL using a recursive descent algorithm starting at <start>.");
-    ("-trace",
-     Arg.String(fun s ->
-		  set_gc () ;
-		  addinput (`Trace s)),
-     "<file> Read in a trace and lift it to the IL");
-    ("-serializedtrace",
-     Arg.String(fun s ->
-		  set_gc () ;
-		  addinput (`Serializedtrace s)),
-     "<file> Read in a SerializedTrace and lift it to the IL");
     ("-il",
      Arg.String(fun s -> addinput (`Il s)),
      "<file> Read input from an IL file.");
-    ("-ir", (* to be removed in next versions *)
-     Arg.String(fun s -> addinput (`Il s)),
-     "<file> Read input from an IL file. (deprecated)");
-    ("-pin", (* enable pin trace *)
-     Arg.Set pintrace,
-     "Enable pin trace");
-	("-always-vex", Arg.Set Asmir.always_vex, "Only use vex to lift to IL" );
-  ]
+  ] @ trace_speclist
 
 
 
@@ -101,7 +92,7 @@ let get_program () =
       List.append (fst (Asmir_rdisasm.rdisasm p)) oldp, oldscope
     | `Binrecurseat (f, s) ->
       let p = Asmir.open_program f in
-      List.append (fst (Asmir_rdisasm.rdisasm_at p s)) oldp, oldscope
+      List.append (fst (Asmir_rdisasm.rdisasm_at p [s])) oldp, oldscope
     | `Trace f ->
       List.append (Asmir.bap_from_trace_file ~pin:!pintrace f) oldp, oldscope
     | `Serializedtrace f ->

@@ -26,11 +26,12 @@ let ncjmp c t =
 let unknown t s =
   Unknown(s, t)
 
-let binop op a b = match (a,b) with
-  | (Int(a, at), Int(b, bt)) ->
+let binop op a b = match op,a,b with
+  | _, Int(a, at), Int(b, bt) ->
     assert (at = bt);
     let (i,t) = Arithmetic.binop op (a,at) (b,bt) in
     Int(i,t)
+  | (LSHIFT|RSHIFT|ARSHIFT), _, Int(z, _) when bi_is_zero z -> a
   | _ -> BinOp(op, a, b)
 
 let unop op a = match a with
@@ -45,11 +46,28 @@ let concat a b = match a,b with
     Int(i,t)
   | _ -> Concat(a, b)
 
-let extract h l e = match e with
+let extract h l e =
+  let h = Big_int_Z.big_int_of_int h in
+  let l = Big_int_Z.big_int_of_int l in
+  match e with
   | Int(i, t) ->
     let (i,t) = Arithmetic.extract h l (i,t) in
     Int(i,t)
   | _ -> Extract(h, l, e)
+
+(* More convenience functions for building common expressions. *)
+let exp_and e1 e2 = binop AND e1 e2
+let exp_or e1 e2 = binop OR e1 e2
+let exp_eq e1 e2 = binop EQ e1 e2
+let exp_not e = unop NOT e
+let exp_implies e1 e2 = exp_or (exp_not e1) e2
+
+let (exp_shl, exp_shr) =
+  let s dir e1 = function
+    | Int(i,_) when bi_is_zero i -> e1
+    | e2 -> BinOp(dir, e1, e2)
+  in
+  (s LSHIFT, s RSHIFT)
 
 let ( +* ) a b   = binop PLUS a b
 let ( -* ) a b   = binop MINUS a b
@@ -92,11 +110,14 @@ let rec cast_unsigned tnew = function
   | e ->
     Cast(CAST_UNSIGNED, tnew, e)
 
+let exp_int i bits = Int(i, Reg bits)
+let it i t = Int(biconst i, t)
+
 let exp_ite ?t b e1 e2 =
   (* type inference shouldn't be needed when t is specified, but we're paranoid *)
-  let tb = Typecheck.infer_ast ~check:false b in
-  let t1 = Typecheck.infer_ast ~check:false e1 in
-  let t2 = Typecheck.infer_ast ~check:false e2 in
+  let tb = Typecheck.infer_ast b in
+  let t1 = Typecheck.infer_ast e1 in
+  let t2 = Typecheck.infer_ast e2 in
   assert (t1 = t2);
   assert (tb = Reg(1));
 
@@ -116,13 +137,19 @@ let parse_ite = function
   | BinOp(OR,
 	  BinOp(AND, b1, e1),
 	  BinOp(AND, UnOp(NOT, b2), e2)
-  ) when full_exp_eq b1 b2 && Typecheck.infer_ast ~check:false b1 = Reg(1) ->
+  ) when full_exp_eq b1 b2 && Typecheck.infer_ast b1 = Reg(1) ->
     Some(b1, e1, e2)
       (* In case one branch is optimized away *)
   | BinOp(AND,
 	  Cast(CAST_SIGNED, nt, b1),
-	  e1) when Typecheck.infer_ast ~check:false b1 = Reg(1) ->
+	  e1) when Typecheck.infer_ast b1 = Reg(1) ->
     Some(b1, e1, Int(zero_big_int, nt))
+  | _ -> None
+
+let parse_implies = function
+  | BinOp(OR,
+          UnOp(NOT, e1),
+          e2) -> Some(e1, e2)
   | _ -> None
 
 (** Duplicate any shared nodes. Useful for using physical location as
@@ -157,7 +184,7 @@ let parse_extract = function
      	    Original: extract 0:bits(t)-1, and then shift left by i bits.
      	    New: extract i:bits(t)-1+i
      	 *)
-     	 let et = infer_ast ~check:false e' in
+     	 let et = infer_ast e' in
      	 let bits_t = big_int_of_int (bits_of_width t) in
      	 let lbit = i in
      	 let hbit = (lbit +% bits_t) -% bi1 in
@@ -187,8 +214,8 @@ let parse_concat = function
 		Cast(CAST_UNSIGNED, nt1, el),
 		Int(bits, _)))
       when nt1 = nt2
-	&& bits ==% big_int_of_int(bits_of_width (infer_ast ~check:false er))
-	&& bits_of_width nt1 = bits_of_width (infer_ast ~check:false el) + bits_of_width (infer_ast ~check:false er) (* Preserve the type *)
+	&& bits ==% big_int_of_int(bits_of_width (infer_ast er))
+	&& bits_of_width nt1 = bits_of_width (infer_ast el) + bits_of_width (infer_ast er) (* Preserve the type *)
 	->
       Some(el, er)
   | BinOp(OR,
@@ -204,8 +231,8 @@ let parse_concat = function
       (* If we cast to nt1 and nt2 and we get the same thing, the
 	 optimizer probably just dropped the cast. *)
       when Arithmetic.to_big_int (i, nt2) ==% Arithmetic.to_big_int (i, nt1)
-	&& bits ==% big_int_of_int(bits_of_width (infer_ast ~check:false er))
-	&& bits_of_width nt1 = bits_of_width (infer_ast ~check:false el) + bits_of_width (infer_ast ~check:false er) (* Preserve the type *)
+	&& bits ==% big_int_of_int(bits_of_width (infer_ast er))
+	&& bits_of_width nt1 = bits_of_width (infer_ast el) + bits_of_width (infer_ast er) (* Preserve the type *)
 	->
       Some(el, er)
   | _ -> None
@@ -231,7 +258,7 @@ let rm_extract = function
       let nt = Reg(nb) in
       assert(h >=% bi0);
       assert (nb >= 0);
-      let t = infer_ast ~check:false e in
+      let t = infer_ast e in
       let e = if l <>% bi0 then e >>* Int(l, t) else e in
       let e = if t <> nt then cast_low nt e else e in
       e
@@ -240,8 +267,8 @@ let rm_extract = function
 let rm_concat = function
   | Concat(le, re) ->
       let bitsl,bitsr =
-	Typecheck.bits_of_width (Typecheck.infer_ast ~check:false le),
-	Typecheck.bits_of_width (Typecheck.infer_ast ~check:false re)
+	Typecheck.bits_of_width (Typecheck.infer_ast le),
+	Typecheck.bits_of_width (Typecheck.infer_ast re)
       in
       let nt = Reg(bitsl + bitsr) in
       exp_or ((cast_unsigned nt le) <<* Int(big_int_of_int bitsr, nt)) (cast_unsigned nt re)
@@ -255,18 +282,39 @@ let last_meaningful_stmt p =
   in
   f (List.rev p)
 
+
+let min_symbolic ~signed e1 e2 =
+  let bop = if signed then SLT else LT in
+  exp_ite (binop bop e1 e2) e1 e2
+
+(* Extract the nth least significant element of type t from e,
+   starting with zero. n is a non-negative integer. *)
+let extract_element t e n =
+  let nbits = Typecheck.bits_of_width t in
+  extract (n*nbits+(nbits-1)) (n*nbits) e
+
+(* Extract the nth least significant byte from e, starting with
+   zero. n is a non-negative integer *)
+let extract_byte e n = extract_element reg_8 e n
+
+(* Extract the nth least significant element of type t from e,
+   starting with zero. n is an expression. *)
+let extract_element_symbolic t e n =
+  let et = Typecheck.infer_ast n in
+  cast_low t (e >>* (n ** (it (Typecheck.bits_of_width t) et)))
+
+(* Extract the nth least significant byte from e, starting with
+   zero. n is an expression. *)
+let extract_byte_symbolic e n = extract_element_symbolic reg_8 e n
+
 let reverse_bytes e =
-  let bytes = Typecheck.bytes_of_width (Typecheck.infer_ast ~check:false e) in
-  let get_byte n = extract (biconst (n*8+7)) (biconst (n*8)) e in
+  let bytes = Typecheck.bytes_of_width (Typecheck.infer_ast e) in
+  let get_byte n = extract_byte e n in
   reduce
     (fun bige e -> bige ++* e)
     (map get_byte (0 -- (bytes-1)))
 
-(* Extract the nth least significant byte from e, starting with zero *)
-let extract_byte n e =
-  extract (biconst (n*8+7)) (biconst (n*8)) e
-
-(* Concatenate a list of expressions *)
+(* Concatenate an enumeration of expressions *)
 let concat_explist elist =
   reduce
     (fun l r -> l ++* r) elist

@@ -88,17 +88,18 @@ TaintTracker::TaintTracker(ValSpecRec * env)
 {
 #ifdef _WIN32
 
-// Windows versions from 
-// http://msdn.microsoft.com/en-us/library/aa383745(v=vs.85).aspx
-#if NTDDI_VERSION == 0x06010000
-  #define WIN_VER OS_SEVEN_SP0
-#elif NTDDI_VERSION == 0x05010300
-  #define WIN_VER OS_XP_SP3
-#endif
+  os_t WIN_VER = get_win_version();
 
-  for ( unsigned i = 0; i < total_syscall_num; i++ ) {
-    const char * name = syscall_array[i];
-    syscall_map.insert( std::pair<unsigned int, unsigned int>( get_syscall(name, WIN_VER), i ) );
+  // cerr << "WIN_VER=" << WIN_VER << ", SEVEN=" << OS_SEVEN_SP0 << endl;
+
+  for ( unsigned i = 0; i < num_syscalls; i++ ) {
+    const char *name = syscalls[i].name;
+    int from = get_syscall(name, WIN_VER);
+    int to = get_syscall(name, OS_SEVEN_SP0);
+    if (from != -1 && to != -1) {
+      //cerr << "mapping " << name << ": " << from << " to " << to << endl; 
+      syscall_map.insert( std::pair<unsigned int, unsigned int>( from, to ));
+    }
   }
 #endif
 }
@@ -495,12 +496,25 @@ bool TaintTracker::taintPreSC(uint32_t callno, const uint64_t *args, /* out */ u
   switch (callno) {
 #ifndef _WIN32 /* unix */
       case __NR_open:
+      {
         // FIXME: use PIN_SafeCopy
         strncpy(filename, (char *)args[0],128); 
-        if (taint_files.find(string(filename)) != taint_files.end()) {
-          cerr << "Opening tainted file: " << string(filename) << endl;
-          state = __NR_open;
-        }
+
+	// Search for each tainted filename in filename
+	string cppfilename(filename);
+	for (std::set<string>::iterator i = taint_files.begin();
+	     i != taint_files.end();
+	     i++) {
+	  if (cppfilename.find(*i) != string::npos) {
+	    state = __NR_open;
+	  }
+	}
+	if (state == __NR_open) {
+	  cerr << "Opening tainted file: " << cppfilename << endl;
+	} else {
+	  cerr << "Not opening " << cppfilename << endl;
+	}
+      }
         break;
       case __NR_close:
         state = __NR_close;
@@ -557,11 +571,19 @@ bool TaintTracker::taintPreSC(uint32_t callno, const uint64_t *args, /* out */ u
 	cerr << "Warning: Could not convert all characters" << endl;
       }
       
-      if (taint_files.find(string(tempstr)) != taint_files.end()) {
-	cerr << "Opening tainted file: " << string(tempstr) << endl;
-	state = __NR_createfilewin;
+      // Search for each tainted filename in tempstr
+      string tempcppstr(tempstr);
+      for (std::set<string>::iterator i = taint_files.begin();
+	   i != taint_files.end();
+	   i++) {
+	if (tempcppstr.find(*i) != string::npos) {
+	  state = __NR_createfilewin;
+	}
+      }
+      if (state == __NR_createfilewin) {
+	cerr << "Opening tainted file: " << tempcppstr << endl;
       } else {
-	cerr << "Not opening " << string(tempstr) << endl;
+	cerr << "Not opening " << tempcppstr << endl;
       }
       
       break;
@@ -585,6 +607,7 @@ bool TaintTracker::taintPreSC(uint32_t callno, const uint64_t *args, /* out */ u
     break;
 
   case __NR_createsectionwin:
+    cerr << "create section win" << endl;
     if (args[6]) {
       state = __NR_createsectionwin;
     }
@@ -609,6 +632,7 @@ bool TaintTracker::taintPreSC(uint32_t callno, const uint64_t *args, /* out */ u
     // }
     break;
   case __NR_mapviewofsectionwin:
+    cerr << "map view of section" << endl;
     if (sections.find(args[0]) != sections.end()) {
       reading_tainted = true;
       cerr << "found a t-mmap " << endl;
@@ -619,7 +643,7 @@ bool TaintTracker::taintPreSC(uint32_t callno, const uint64_t *args, /* out */ u
     
   default:
     //    LOG(string("Unknown system call") + *(get_name(callno)) + string("\n"));
-    // cerr << "Unknown system call " << *(get_name(callno)) << endl;
+    //    cerr << "Unknown system call " << callno << " " << *(get_name(callno)) << endl;
     break;
   }
   return reading_tainted;
@@ -755,16 +779,19 @@ FrameOption_t TaintTracker::taintPostSC(const uint32_t bytes,
         if (bytes == STATUS_SUCCESS) {
           WINDOWS::PIO_STATUS_BLOCK psb = reinterpret_cast<WINDOWS::PIO_STATUS_BLOCK> (args[4]);
           assert(psb);
-          assert(psb->Information);
-          length = psb->Information;
-          addr = args[5];
-          assert(addr);
-          cerr << "Tainting " 
-               << length 
-               << " bytes from read @" << addr << endl;
-          return introMemTaintFromFd(args[0], addr, length);
-          //return true;
+
+          /* Information can be NULL when the request fails */
+          if (psb->Information) {
+            length = psb->Information;
+            addr = args[5];
+            assert(addr);
+            cerr << "Tainting " 
+                 << length 
+                 << " bytes from read @" << addr << endl;
+            return introMemTaintFromFd(args[0], addr, length);
+          }
         }
+        break;
   case __NR_setinfofilewin:
     if (bytes == STATUS_SUCCESS) {
       uint32_t c = args[4];
@@ -800,7 +827,7 @@ FrameOption_t TaintTracker::taintPostSC(const uint32_t bytes,
       case __NR_mapviewofsectionwin:
         if (bytes == STATUS_SUCCESS) {
 	  /* XXX: Determine offset into file. */
-          length = 0; // disabled args[6];  /// XXX: possibly wrong
+          length = *(reinterpret_cast<uint32_t *> (args[6]));  /// XXX: possibly wrong
           addr = *(reinterpret_cast<uint32_t *> (args[2])); /// XXX: possibly wrong
           assert(addr);
           cerr << "Tainting " 

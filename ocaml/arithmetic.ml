@@ -6,6 +6,7 @@
     @author Ivan Jager
  *)
 
+
 module D = Debug.Make(struct let name = "Arithmetic" and default = `NoDebug end)
 open Big_int_Z
 open Big_int_convenience
@@ -14,6 +15,9 @@ open Type
 
 exception ArithmeticEx of string
 
+let power_of_two = Util.memoize (shift_left_big_int bi1)
+let bitmask = Util.memoize (fun i -> power_of_two i -% bi1)
+
 let bits_of_width = function
   | Reg n -> n
   | _ -> failwith "Expected register type"
@@ -21,19 +25,15 @@ let bits_of_width = function
 (* drop high bits to type t *)
 let to_big_int (i,t) =
   let bits = bits_of_width t in
-  let modv = bi1 <<% bits in (* 2^bits *)
-  let final = mod_big_int i modv in (* i mod 2^bits *)
-  (* mod always returns a positive number *)
-  final
+  and_big_int i (bitmask bits)
 
 (* sign extend to type t *)
 let to_sbig_int (i,t) =
   let bits = bits_of_width t in
-  let modv = bi1 <<% (bits-1) in (* 2^(bits-1) *)
-  let final = mod_big_int i modv in (* i mod 2^(bits-1) *)
+  let final = to_big_int (i, Reg(bits-1)) in
   (* mod always returns a positive number *)
   let sign = i >>% (bits-1) in
-  if bi_is_zero sign then (* positive *) final else (* negative *) minus_big_int (modv -% (to_big_int (final, Reg(bits-1))))
+  if bi_is_zero sign then (* positive *) final else (* negative *) minus_big_int ((power_of_two (bits-1) -% final))
 
 (* signed truncating division implemented using euclidean division.
 
@@ -73,8 +73,8 @@ let t_mod dividend divisor =
        r -% (abs_big_int divisor)
     else raise (ArithmeticEx "t_mod: If dividend < 0 then r can't be greater than 0!")
 
-(* shifting by more than the number of bits or by negative values
- * will be the same as shifting by the number of bits. *)
+(* shifting by more than the number of bits or by negative values will
+ * be the same as shifting by the max number of bits. *)
 let toshift shiftedt v =
   let max = bits_of_width shiftedt
   and i = to_big_int v in
@@ -83,7 +83,7 @@ let toshift shiftedt v =
   then int_of_big_int i
   else
     (pdebug("shifting "^string_of_int max^"-bit value by "
-	    ^string_of_big_int i);
+            ^string_of_big_int i);
      max)
 
 (* "cast" an int64 to a value *)
@@ -135,7 +135,7 @@ let cast ct ((_,t) as v) t2 =
        to_val t2 (to_sbig_int v)
    | CAST_HIGH ->
        to_val t2
-	 (shift_right_big_int (to_big_int v) (bits1-bits))
+      (shift_right_big_int (to_big_int v) (bits1-bits))
    | CAST_LOW ->
        to_val t2 (to_big_int v)
   )
@@ -155,9 +155,9 @@ let concat ((_,lt) as lv) ((_,rt) as rv) =
     | _ -> failwith "concat"
   in
   let nt = Reg(bitsl + bitsr) in
-  let lv = cast CAST_LOW lv nt in
-  let rv = cast CAST_LOW rv nt in
-  let lv = binop LSHIFT lv (biconst bitsr, lt) in
+  let lv = cast CAST_UNSIGNED lv nt in
+  let rv = cast CAST_UNSIGNED rv nt in
+  let lv = binop LSHIFT lv (biconst bitsr, nt) in
   binop OR lv rv
 
 

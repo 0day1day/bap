@@ -1,3 +1,20 @@
+New in BAP 0.7:
+* New function identification heuristics in get_functions for stripped binaries
+* Serialized output formats for easy parsing of BIL outside of BAP
+* Support for ocaml 4.00 (see INSTALL)
+* Support for OS X as a host platform (see INSTALL)
+* New support for streaming symbolic execution of traces
+* New VC framework
+* New VC implementations: FWP and PWP
+* Misc. bug fixes and performance improvements to SMT printers
+* Misc. improvements to x86 lifting
+* Steensgard loop nesting forest algorithm
+* Improved loop unrolling for irreducible loops using Steensgard's algorithm
+
+New in BAP 0.6:
+* General bug fixes to PIN trace tool and trace reading API
+* Major bug fix for PIN tool on Windows that fixes taint analysis
+
 New in BAP 0.5:
 
 * Aggressive dead code elimination

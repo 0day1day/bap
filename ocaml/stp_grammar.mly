@@ -1,6 +1,5 @@
-
 %token <string> VAR
-%token <int64> VAL
+%token <Big_int_Z.big_int> VAL
 
 %token SEMICOLON
 %token LBRACKET RBRACKET
@@ -13,7 +12,7 @@
 %token EOF
 
 %start main
-%type <(string * int64) list option> main
+%type <(string * Big_int_Z.big_int) list option> main
 
 %%
 

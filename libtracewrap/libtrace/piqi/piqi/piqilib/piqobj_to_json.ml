@@ -1,6 +1,6 @@
 (*pp camlp4o -I `ocamlfind query piqi.syntax` pa_labelscope.cmo pa_openin.cmo *)
 (*
-   Copyright 2009, 2010, 2011 Anton Lavrik
+   Copyright 2009, 2010, 2011, 2012, 2013 Anton Lavrik
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -15,29 +15,22 @@
    limitations under the License.
 *)
 
-open Piqi_json_common
-
 
 module C = Piqi_common
 open C
 
-
-let _ = Piqilib.init ()
-
-
-module R = Piqobj.Record
-module F = Piqobj.Field
-module V = Piqobj.Variant
-module E = Piqobj.Variant
-module O = Piqobj.Option
-module A = Piqobj.Alias
-module Any = Piqobj.Any
-module L = Piqobj.List
+open Piqobj_common
 
 
-(* boot code *)
-(* XXX: move ast def to Piqi module? *)
-let ast_def = Piqi.find_embedded_piqtype "ast"
+type json = Piqi_json_type.json
+
+
+(* configuration/command-line option:
+ *
+ * omit undefined fields in JSON output; if false, they will be present in the
+ * output with their values set to "null", e.g. {"foo":null}
+ *)
+let omit_null_fields = ref true
 
 
 let make_named name value =
@@ -45,7 +38,7 @@ let make_named name value =
 
 
 let make_name name =
-  name, `Null ()
+  name, `Bool true
 
 
 let rec gen_obj (x:Piqobj.obj) :json =
@@ -57,8 +50,6 @@ let rec gen_obj (x:Piqobj.obj) :json =
     | `bool x -> `Bool x
     | `string x -> `String x
     | `binary x -> `String (Piqi_base64.encode x)
-    | `word x -> `String x
-    | `text x -> `String x
     | `any x -> gen_any x
     (* custom types *)
     | `record x -> gen_record x
@@ -68,41 +59,51 @@ let rec gen_obj (x:Piqobj.obj) :json =
     | `alias x -> gen_alias x
 
 
-and gen_typed_obj x =
-  let name = Piqobj_common.full_typename x in
-  let json = gen_obj x in
-  `Assoc [
-    "_piqtype", `String name;
-    "_piqobj", json;
-  ]
-
-
 and gen_any x =
   let open Any in
-  (* XXX: is ast always defined? *)
-
-  (* TODO: handle typed *)
-  let ast = some_of x.any.T.Any.ast in
-  (* convert ast to binary *)
-  let binobj = Piqirun.gen_binobj T.gen__ast ast in
-  (* convert binary ast to piqobj of type ast *)
-  let piqtype = ast_def in
-  let piqobj = Piqobj_of_wire.parse_binobj piqtype binobj in
-  (* generate json from the piqobj *)
-  gen_obj piqobj
+  if not !Piqi_config.gen_extended_piqi_any
+  then
+    match Piqobj.json_of_any x with
+      | None -> `Null ()
+      | Some json_ast -> json_ast
+  else (* non-sybolic piqi-any representation *)
+    let make_json_field name value f =
+      match value with
+        | None when !omit_null_fields -> []
+        | None ->
+            [name, `Null ()]
+        | Some x ->
+            [name, f x]
+    in
+    let typename = make_json_field "type" x.typename (fun name -> `String name)
+    in
+    let protobuf = make_json_field "protobuf" (Piqobj.pb_of_any x) (fun pb ->
+      `String (Piqi_base64.encode pb))
+    in
+    let json = make_json_field "json" (Piqobj.json_of_any x) (fun json_ast ->
+      json_ast)
+    in
+    `Assoc (
+      (* this field indicates that this is an extended piqi-any representation
+       * (it is necessary for detecting which variant of piqi-any represenation
+       * is used and to make either representation automatically reversible) *)
+      ("piqi_type", `String "piqi-any") ::
+      (* actual content *)
+      (typename @ protobuf @ json)
+    )
 
 
 and gen_record x =
   let open R in
-  let field_types = x.piqtype.T.Record.field in
-  `Assoc (flatmap (gen_field x.field) field_types)
+  let field_types = x.t.T.Record.field in
+  `Assoc (U.flatmap (gen_field x.field) field_types)
 
 
 and gen_field fields t =
   let open T.Field in
   let name = some_of t.json_name in
   let open F in
-  let pred f = f.piqtype == t in
+  let pred f = f.t == t in
   match t.mode with
     | `required | `optional ->
         (try
@@ -113,12 +114,19 @@ and gen_field fields t =
                | Some obj -> make_named name (gen_obj obj)
           in [res]
         with
-          Not_found -> [])
+          Not_found ->
+            if !omit_null_fields
+            then []
+            else [make_named name (`Null ())]
+        )
     | `repeated ->
         let fields = List.find_all pred fields in
-        let json_fields = List.map (fun f -> gen_obj (some_of f.obj)) fields in
-        let res = make_named name (`List json_fields) in
-        [res]
+        if fields = [] && !omit_null_fields
+        then []
+        else
+          let json_fields = List.map (fun f -> gen_obj (some_of f.obj)) fields in
+          let res = make_named name (`List json_fields) in
+          [res]
 
 
 and gen_variant x =
@@ -129,20 +137,20 @@ and gen_variant x =
 
 and gen_option x =
   let open O in
-  let name = some_of x.piqtype.T.Option.json_name in
+  let name = some_of x.t.T.Option.json_name in
   match x.obj with
     | None -> make_name name
     | Some obj -> make_named name (gen_obj obj)
 
 
 and gen_enum x =
-  let open V in
+  let open E in
   gen_enum_option x.option
 
 
 and gen_enum_option x =
   let open O in
-  let name = some_of x.piqtype.T.Option.json_name in
+  let name = some_of x.t.T.Option.json_name in
   `String name
 
 
@@ -156,4 +164,8 @@ and gen_alias x =
   match x.obj with
     | `alias x -> gen_alias x
     | x -> gen_obj x
+
+
+let _ =
+  Piqobj.to_json := gen_obj
 

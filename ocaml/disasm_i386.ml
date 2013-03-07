@@ -14,7 +14,9 @@ module VH=Var.VarHash
 module D = Debug.Make(struct let name = "Disasm_i386" and default=`NoDebug end)
 open D
 
-(* 
+let compute_segment_bases = ref true
+
+(*
    Note: In general, the function g is the get memory function.  The variable
    na refers to the next address or next instruction.
 
@@ -54,16 +56,104 @@ open D
 
 exception Disasm_i386_exception of string
 
+type binopf = Ast.exp -> Ast.exp -> Ast.exp
+
+type order = Low | High
+
 type direction = Forward | Backward
 
 type operand =
   | Oreg of int
+  | Oseg of int
   | Oaddr of Ast.exp
   | Oimm of int64 (* XXX: Should this be big_int? *)
 
 type jumptarget =
   | Jabs of operand
   | Jrel of int64 * int64 (* next ins address, offset *)
+
+(* See section 4.1 of the Intel® 64 and IA-32 Architectures Software
+   Developer’s Manual, Volumes 2A & 2B: Instruction Set Reference
+   (order numbers 253666 and 253667) *)
+module Pcmpstr = struct
+
+  type ssize = Bytes | Words
+  let ssize_to_string = function
+    | Bytes -> "Bytes"
+    | Words -> "Words"
+  type ssign = Signed | Unsigned
+  let ssign_to_string = function
+    | Signed -> "Signed"
+    | Unsigned -> "Unsigned"
+  type agg = EqualAny | Ranges | EqualEach | EqualOrdered
+  let agg_to_string = function
+    | EqualAny -> "EqualAny"
+    | Ranges -> "Ranges"
+    | EqualEach -> "EqualEach"
+    | EqualOrdered -> "EqualOrdered"
+  type outselectsig = LSB | MSB (* For PCMPESTRI/PCMPISTRI, choosees LSB or MSB.  *)
+  let outselectsig_to_string = function
+    | LSB -> "LSB"
+    | MSB -> "MSB"
+  type outselectmask = Bitmask | Bytemask (* For PCMPESTRM/PCMPISTRM, represents bit mask/word mask. *)
+  let outselectmask_to_string = function
+    | Bitmask -> "Bitmask"
+    | Bytemask -> "Bytemask"
+
+  let sig_to_mask = function
+    | LSB -> Bitmask
+    | MSB -> Bytemask
+
+  (* See Section 4.1 of Intel manual for more
+     information on the immediate control byte.
+
+     i[0]:
+     0 = 16 packed bytes
+     1 =  8 packed words
+     i[1]:
+     0 = packed elements are unsigned
+     1 = packed elements are signed
+     i[3:2]:
+     00 = "equal any"
+     01 = "ranges"
+     10 = "each each"
+     11 = "equal ordered"
+     i[4]:
+     0 = IntRes1 unmodified
+     1 = IntRes1 is negated (1's complement)
+     i[5]:
+     0 = Negation of IntRes1 is for all 16 (8) bits
+     1 = Negation of IntRes1 is masked by reg/mem validity
+     i[6]:
+     0 = Use least significant bit for IntRes2
+     1 = Use most significant bit for IntRes2
+     i[7]: Undefined, set to 0.
+  *)
+  type imm8cb = {
+    ssize : ssize;
+    ssign : ssign;
+    agg : agg;
+    negintres1 : bool;
+    maskintres1 : bool;
+    outselectsig : outselectsig;
+    outselectmask : outselectmask;
+  }
+
+type out = Index | Mask
+let out_to_string = function
+  | Index -> "Index"
+  | Mask -> "Mask"
+type len = Implicit | Explicit
+let len_to_string = function
+  | Implicit -> "Implicit"
+  | Explicit -> "Explicit"
+
+(** Information about the type of pcmp instruction. *)
+type pcmpinfo = {
+  out : out;
+  len : len;
+}
+end
 
 type opcode =
   | Bswap of (typ * operand)
@@ -108,7 +198,6 @@ type opcode =
   | And of (typ * operand * operand)
   | Or of (typ * operand * operand)
   | Xor of (typ * operand * operand)
-  | Pxor of (typ * operand * operand)
   | Test of (typ * operand * operand)
   | Ptest of (typ * operand * operand)
   | Not of (typ * operand)
@@ -126,10 +215,14 @@ type opcode =
   | Fldcw of operand
   | Fld of operand
   | Fst of (operand * bool)
+  | Punpck of (typ * typ * order * operand * operand) (* dest size, element size, low/high elements, dest, src *)
+  | Ppackedbinop of (typ * typ * binopf * string * operand * operand) (* Perform a generic packed binary operation. dest size, element size, binop, assembly string, dest, src *)
+  | Pbinop of (typ * binop_type * string * operand * operand)
   | Pmovmskb of (typ * operand * operand)
-  | Pcmpeq of (typ * typ * operand * operand)
+  | Pcmp of (typ * typ * binop_type * string * operand * operand)
   | Palignr of (typ * operand * operand * operand)
-  | Pcmpistri of (typ * operand * operand * operand)
+  | Pcmpstr of (typ * operand * operand * operand * Pcmpstr.imm8cb * Pcmpstr.pcmpinfo)
+  | Pshufb of typ * operand * operand
   | Pshufd of operand * operand * operand
   | Leave of typ
   | Interrupt of operand
@@ -185,7 +278,7 @@ let st_t = Reg 80
 
 (** Only use this for registers, not temporaries *)
 let nv = Var.newvar
-let nt = Disasm_temp.nt
+let nt = Var_temp.nt
 
 (* registers *)
 
@@ -209,48 +302,50 @@ and oF = nv "R_OF" r1
 
 and dflag = nv "R_DFLAG" r32 (* 1 if DF=0 or -1 if DF=1 *)
 
+(* segment registers and bases *)
 and fs_base = nv "R_FS_BASE" r32
 and gs_base = nv "R_GS_BASE" r32
+
+and cs = nv "R_CS" r16
+and ds = nv "R_DS" r16
+and es = nv "R_ES" r16
+and fs = nv "R_FS" r16
+and gs = nv "R_GS" r16
+and ss = nv "R_SS" r16
+
+and gdt = nv "R_GDT" r32
+and ldt = nv "R_LDT" r32
 
 and fpu_ctrl = nv "R_FPU_CONTROL" r16
 and mxcsr = nv "R_MXCSR" r32
 
 let xmms = Array.init 8 (fun i -> nv (Printf.sprintf "R_XMM%d" i) xmm_t)
+let xmm0 = xmms.(0)
 
 (* floating point registers *)
 let st = Array.init 8 (fun i -> nv (Printf.sprintf "R_ST%d" i) st_t)
 
 let regs : var list =
-  ebp::esp::esi::edi::eip::eax::ebx::ecx::edx::eflags::cf::pf::af::zf::sf::oF::dflag::fs_base::gs_base::fpu_ctrl::mxcsr::
+  ebp::esp::esi::edi::eip::eax::ebx::ecx::edx::eflags::cf::pf::af::zf::sf::oF::dflag::fs_base::gs_base::cs::ds::es::fs::gs::ss::fpu_ctrl::mxcsr::
   List.map (fun (n,t) -> Var.newvar n t)
     [
 
   (* VEX left-overs from calc'ing condition flags *)
-  ("R_CC_OP", reg_32);
-  ("R_CC_DEP1", reg_32);
-  ("R_CC_DEP2", reg_32);
-  ("R_CC_NDEP", reg_32);
+  ("R_CC_OP", r32);
+  ("R_CC_DEP1", r32);
+  ("R_CC_DEP2", r32);
+  ("R_CC_NDEP", r32);
 
   (* status flags/misc *)
-  ("R_IDFLAG", reg_32);
-  ("R_ACFLAG", reg_32);
-  ("R_EMWARN", reg_32);
-  ("R_LDT", reg_32);
-  ("R_GDT", reg_32);
-  ("R_IP_AT_SYSCALL", reg_32);
-
-  (* segment regs *)
-  ("R_CS", reg_16);
-  ("R_DS", reg_16);
-  ("R_ES", reg_16);
-  ("R_FS", reg_16);
-  ("R_GS", reg_16);
-  ("R_SS", reg_16);
+  ("R_IDFLAG", r32);
+  ("R_ACFLAG", r32);
+  ("R_EMWARN", r32);
+  ("R_IP_AT_SYSCALL", r32);
 
   (* floating point *)
-  ("R_FTOP", reg_32);
-  ("R_FPROUND", reg_32);
-  ("R_FC3210", reg_32);
+  ("R_FTOP", r32);
+  ("R_FPROUND", r32);
+  ("R_FC3210", r32);
 
     ]
     @ Array.to_list xmms
@@ -265,12 +360,20 @@ and o_ebp = Oreg 5
 and o_esi = Oreg 6
 and o_edi = Oreg 7
 
+let o_es = Oseg 0
+and o_cs = Oseg 1
+and o_ss = Oseg 2
+and o_ds = Oseg 3
+and o_fs = Oseg 4
+and o_gs = Oseg 5
+
 let esp_e = Var esp
 and ebp_e = Var ebp
 and esi_e = Var esi
 and edi_e = Var edi
 and ecx_e = Var ecx
 and eax_e = Var eax
+and edx_e = Var edx
 
 let mem = nv "mem" (TMem(r32))
 let mem_e = Var mem
@@ -287,7 +390,10 @@ and dflag_e = Var dflag
 
    x86 uses values 0 and 1 for forward and backwards. *)
 let x86_dflag_e =
-  ite reg_1 (dflag_e ==* Int(bi1, reg_32)) exp_false exp_true
+  ite r1 (dflag_e ==* Int(bi1, r32)) exp_false exp_true
+
+let gdt_e = Var gdt
+and ldt_e = Var ldt
 
 let esiaddr = Oaddr esi_e
 and ediaddr = Oaddr edi_e
@@ -301,11 +407,11 @@ and seg_gs = Some gs_base
 
 (* eflags *)
 let dflag_to_bap e =
-  ite reg_32 (e ==* exp_false) (Int(bi1, reg_32)) (Int(bim1, reg_32))
+  ite r32 (e ==* exp_false) (Int(bi1, r32)) (Int(bim1, r32))
 
 let bap_to_eflags =
-  let undefined d = Unknown(Printf.sprintf "Undefined EFLAGS bit %d" d, reg_1) in
-  let unmodeled s = Unknown("Unmodeled EFLAGS bit " ^ s, reg_1) in
+  let undefined d = Unknown(Printf.sprintf "Undefined EFLAGS bit %d" d, r1) in
+  let unmodeled s = Unknown("Unmodeled EFLAGS bit " ^ s, r1) in
   undefined 31                  (* 31 *)
   :: undefined 30               (* 30 *)
   :: undefined 29               (* 29 *)
@@ -410,8 +516,17 @@ let lt i t = Int(Arithmetic.to_big_int (big_int_of_int64 i,t), t)
 let i32 i = Int(biconst i, r32)
 let it i t = Int(biconst i, t)
 
+(* Get elemt from low opcode bits *)
+let lowbits2elemt b =
+  match b & 3 with
+  | 0 -> reg_8
+  | 1 -> reg_16
+  | 2 -> reg_32
+  | 3 -> reg_64
+  | _ -> disfailwith "invalid"
+
 (* converts a register number to the corresponding 32bit register variable *)
-let bits2reg32= function
+let bits2reg32 = function
   | 0 -> eax
   | 1 -> ecx
   | 2 -> edx
@@ -424,7 +539,21 @@ let bits2reg32= function
 
 let bits2xmm b = xmms.(b)
 
-and reg2bits r = Util.list_firstindex [eax; ecx; edx; ebx; esp; ebp; esi; edi] ((==)r)
+and reg2bits r =
+  let (i,_) = BatList.findi (fun _ x -> x == r) [eax; ecx; edx; ebx; esp; ebp; esi; edi] in
+  i
+
+let bits2segreg = function
+  | 0 -> es
+  | 1 -> cs
+  | 2 -> ss
+  | 3 -> ds
+  | 4 -> fs
+  | 5 -> gs
+  | 6 | 7 -> failwith "bits2segreg: reserved"
+  | _ -> failwith "bits2regseg: invalid"
+
+let bits2segrege b = Var(bits2segreg b)
 
 let bits2xmme b = Var(bits2xmm b)
 
@@ -509,31 +638,62 @@ let op2e_s ss t = function
   | Oreg r when t = r16 -> bits2reg16e r
   | Oreg r when t = r8 -> bits2reg8e r
   | Oreg r -> unimplemented "unknown register"
+  | Oseg r when t = r16 -> bits2segrege r
+  | Oseg r -> disfailwith "Segment register when t is not r16"
   | Oaddr e -> load_s ss t e
   | Oimm i -> Int(Arithmetic.to_big_int (big_int_of_int64 i,t), t)
 
 let assn_s s t v e =
+  (* Assign to some bits of v, starting at bit off, while preserving the other bits *)
+  let sub_assn ?(off=0) t v e =
+    let concat_exps = ref [] in
+    let bits = Typecheck.bits_of_width (Var.typ v) in
+    let assnbits = Typecheck.bits_of_width t in
+
+    (* Add the upper preserved bits, if any *)
+    let ubh = (bits-1) and ubl = (assnbits+off) in
+    if ubh > ubl then
+      concat_exps := extract ubh ubl (Var v)::!concat_exps;
+
+    (* Add e *)
+    concat_exps := e::!concat_exps;
+
+    (* Add the lower preserved bits, if any *)
+    let lbh = (off-1) and lbl = 0 in
+    if lbh > lbl then
+      concat_exps := extract lbh lbl (Var v)::!concat_exps;
+
+    let final_e = BatList.reduce (fun big_e e -> Ast_convenience.concat e big_e) !concat_exps in
+    move v final_e
+  in
   match v with
   | Oreg r when t = r128 -> move (bits2xmm r) e
+  | Oreg r when t = r64 ->
+    let v = bits2xmm r in
+    sub_assn t v e
   | Oreg r when t = r32 -> move (bits2reg32 r) e
   | Oreg r when t = r16 ->
     let v = bits2reg32 r in
-    move v ((Var v &* l32 0xffff0000L) |* cast_unsigned r32 e)
+    sub_assn t v e
   | Oreg r when t = r8 && r < 4 ->
     let v = bits2reg32 r in
-    move v ((Var v &* l32 0xffffff00L) |* cast_unsigned r32 e)
+    sub_assn t v e
   | Oreg r when t = r8 ->
     let v = bits2reg32 (r land 3) in
-    move v ((Var v &* l32 0xffff00ffL) |* (cast_unsigned r32 e <<* i32 8))
+    sub_assn ~off:8 t v e
   | Oreg _ -> unimplemented "assignment to sub registers"
+  | Oseg r when t = r16 ->
+    let v = bits2segreg r in
+    move v e
+  | Oseg r -> disfailwith "Can't assign to non 16 bit segment register"
   | Oaddr a -> store_s s t a e
   | Oimm _ -> disfailwith "disasm_i386: Can't assign to an immediate value"
 
 (* Double width operands, as used by multiplication and division *)
 let op_dbl = function
-  | Reg 8 -> [reg_16, o_eax]
-  | Reg 16 -> [reg_16, o_edx; reg_16, o_eax]
-  | Reg 32 -> [reg_32, o_edx; reg_32, o_eax]
+  | Reg 8 -> [r16, o_eax]
+  | Reg 16 -> [r16, o_edx; r16, o_eax]
+  | Reg 32 -> [r32, o_edx; r32, o_eax]
   | _ -> disfailwith "op_dbl only defined for Reg 8, 16, and 32"
 
 (* Return an expression for a double-width operand, as used by the div
@@ -553,7 +713,7 @@ let assn_dbl_s s t e = match op_dbl t with
     let tmp = nt "t" (Reg (Typecheck.bits_of_width t * 2)) in
     let f (stmts, off) (ct, o) = 
       let newoff = off + Typecheck.bits_of_width ct in
-      assn_s s ct o (extract (biconst (newoff-1)) (biconst off) (Var tmp))::stmts, newoff
+      assn_s s ct o (extract (newoff-1) off (Var tmp))::stmts, newoff
     in
     List.rev (fst (List.fold_left f ([move tmp e], 0) (List.rev l))), Var tmp
 
@@ -563,7 +723,7 @@ let compute_jump_target s = function
   | Jrel (na,offset) ->
     let na = biconst64 na in
     let offset = biconst64 offset in
-    let i,t = Arithmetic.binop PLUS (na,reg_32) (offset,reg_32) in
+    let i,t = Arithmetic.binop PLUS (na,r32) (offset,r32) in
     Int(i,t)
 let jump_target = compute_jump_target
 
@@ -620,22 +780,22 @@ let set_pszf t r =
    2 is just xor, we can simplify to AF = r_4 xor op1_4 xor op2_4.
 *)
 
-(* Helper functions to set flags for adding *)
-let set_aopszf_add t s1 s2 r =
+let set_apszf t s1 s2 r =
   let bit4 = it (1 lsl 4) t in
   move af (bit4 ==* (bit4 &* ((r ^* s1) ^* s2)))
-  ::move oF (cast_high r1 ((s1 =* s2) &* (s1 ^* r)))
   ::set_pszf t r
+
+(* Helper functions to set flags for adding *)
+let set_aopszf_add t s1 s2 r =
+  move oF (cast_high r1 ((s1 =* s2) &* (s1 ^* r)))
+  ::set_apszf t s1 s2 r
 
 let set_flags_add t s1 s2 r =
   move cf (r <* s1)
   ::set_aopszf_add t s1 s2 r
 
 (* Helper functions to set flags for subtracting *)
-let set_apszf_sub t s1 s2 r =
-  let bit4 = it (1 lsl 4) t in
-  move af (bit4 ==* ((bit4 &* ((r ^* s1) ^* s2))))
-  ::set_pszf t r
+let set_apszf_sub t s1 s2 r = set_apszf t s1 s2 r
 
 let set_aopszf_sub t s1 s2 r =
   move oF (cast_high r1 ((s1 ^* s2) &* (s1 ^* r)))
@@ -664,7 +824,7 @@ let rec to_ir addr next ss pref =
       | _ -> disfailwith "bswap: Expected 16 or 32 bit type"
     in
     [assn t op e]
-  | Retn (op, far_ret) when pref = [] ->
+  | Retn (op, far_ret) when pref = [] || pref = [repz]  || pref = [repnz]->
     let temp = nt "ra" r32 in
     let load_stmt = if far_ret 
       then (* TODO Mess with segment selectors here *)  
@@ -680,13 +840,37 @@ let rec to_ir addr next ss pref =
       ) in
       load_stmt::
       esp_stmts@
-      [Jmp(Var temp, [StrAttr "ret"])]
+      [Jmp(Var temp, reta)]
   | Mov(t, dst, src, condition) when pref = [] || pref = [pref_addrsize] ->
     let c_src = (match condition with 
       | None -> op2e t src
       | Some(c) -> ite t c (op2e t src) (op2e t dst))
     in
-      [assn t dst c_src]
+    (* Find base by looking at LDT or GDT *)
+    let base_e e =
+      (* 0 = GDT, 1 = LDT *)
+      let ti = extract 3 3 e in
+      let base = ite r32 ti ldt_e gdt_e in
+      (* Extract index into table *)
+      let index = cast_unsigned r32 (extract 15 4 e) <<* i32 6 in
+      (* Load the table entry *)
+      let table_entry = loadm mem r64 (base +* index) in
+      (* Extract the base *)
+      concat_explist
+        (BatList.enum
+           (extract 63 56 table_entry
+            :: extract 39 32 table_entry
+            :: extract 31 16 table_entry
+            :: []))
+    in
+    let bs =
+      let dst_e = op2e t dst in
+      if dst = o_fs && !compute_segment_bases then [move fs_base (base_e dst_e)]
+      else if dst = o_gs && !compute_segment_bases then [move gs_base (base_e dst_e)]
+      else []
+    in
+    assn t dst c_src
+    :: bs
   | Movs(Reg bits as t) ->
       let stmts =
 	store_s seg_es t edi_e (load_s seg_es t esi_e)
@@ -709,7 +893,7 @@ let rec to_ir addr next ss pref =
     let (s, al) = match s with
       | Oreg i -> op2e ts s, []
       | Oaddr a -> op2e ts s, [a]
-      | Oimm _ -> disfailwith "invalid"
+      | Oimm _ | Oseg _ -> disfailwith "invalid"
     in
     let b = bits_of_width in
     let s =
@@ -728,7 +912,7 @@ let rec to_ir addr next ss pref =
 	(* let r = op2e t d in *)
 	(* move r s, al *)
       | Oaddr a -> assn td d s, a::al
-      | Oimm _ -> disfailwith "invalid"
+      | Oimm _ | Oseg _ -> disfailwith "invalid"
     in
     let al =
       if align then
@@ -736,21 +920,61 @@ let rec to_ir addr next ss pref =
       else []
     in
     d::al
-  | Pcmpeq (t,elet,dst,src) ->
-      let ncmps = (bits_of_width t) / (bits_of_width elet) in
-      let elebits = bits_of_width elet in
-      let src = match src with
-        | Oreg i -> op2e t src
-        | Oaddr a -> load t a
-        | Oimm _ -> disfailwith "invalid"
-      in
-      let compare_region i =
-        let byte1 = Extract(biconst (i*elebits-1), biconst ((i-1)*elebits), src) in
-        let byte2 = Extract(biconst (i*elebits-1), biconst ((i-1)*elebits), op2e t dst) in
-        let tmp = nt ("t" ^ string_of_int i) elet in
-        Var tmp, move tmp (Ite(byte1 ==* byte2, lt (-1L) elet, lt 0L elet))
-      in
-      let indices = BatList.init ncmps (fun i -> i + 1) in (* list 1-nbytes *)
+  | Punpck(t, et, o, d, s) ->
+    let nelem = match t, et with
+      | Reg n, Reg n' -> n / n'
+      | _ -> disfailwith "invalid"
+    in
+    assert (nelem mod 2 = 0);
+    let nelem_per_src = nelem / 2 in
+    let halft = Reg ((Typecheck.bits_of_width t)/2) in
+    let castf = match o with
+      | High -> cast_high halft
+      | Low -> cast_low halft
+    in
+    let se, de = castf (op2e t s), castf (op2e t d) in
+    let st, dt = nt "s" halft, nt "d" halft in
+    let mape i =
+      BatList.enum [extract_element et (Var st) i; extract_element et (Var dt) i]
+    in
+    let e = concat_explist (BatEnum.flatten (map mape ((nelem_per_src-1)---0))) in
+    [move st se;
+     move dt de;
+     assn t d e]
+  | Ppackedbinop(t, et, fbop, _, d, s) ->
+    let nelem = match t, et with
+      | Reg n, Reg n' -> n / n'
+      | _ -> disfailwith "invalid"
+    in
+    let getelement o i =
+      (* assumption: immediate operands are repeated for all vector
+         elements *)
+      match o with
+      | Oimm i -> op2e et o
+      | _ -> extract_element et (op2e t o) i
+    in
+    let f i =
+      fbop (getelement d i) (getelement s i)
+    in
+    let e = concat_explist (map f ((nelem-1)---0)) in
+    [assn t d e]
+  | Pbinop(t, bop, s, o1, o2) ->
+    [assn t o1 (binop bop (op2e t o1) (op2e t o2))]
+  | Pcmp (t,elet,bop,_,dst,src) ->
+    let ncmps = (bits_of_width t) / (bits_of_width elet) in
+    let elebits = bits_of_width elet in
+    let src = match src with
+      | Oreg i -> op2e t src
+      | Oaddr a -> load t a
+      | Oimm _ | Oseg _ -> disfailwith "invalid"
+    in
+    let compare_region i =
+      let byte1 = Extract(biconst (i*elebits-1), biconst ((i-1)*elebits), src) in
+      let byte2 = Extract(biconst (i*elebits-1), biconst ((i-1)*elebits), op2e t dst) in
+      let tmp = nt ("t" ^ string_of_int i) elet in
+      Var tmp, move tmp (Ite(binop bop byte1 byte2, lt (-1L) elet, lt 0L elet))
+    in
+    let indices = BatList.init ncmps (fun i -> i + 1) in (* list 1-nbytes *)
       let comparisons = List.map compare_region indices in
       let temps, cmps = List.split comparisons in
       let temps = List.rev temps in
@@ -776,7 +1000,7 @@ let rec to_ir addr next ss pref =
       let src_e = op2e t src in
       let imm = op2e t imm in
       let concat = dst_e ++* src_e in
-      let t_concat = Typecheck.infer_ast ~check:false concat in
+      let t_concat = Typecheck.infer_ast concat in
       let shift = concat >>* (cast_unsigned t_concat (imm <<* (it 3 t))) in
       let high, low = match t with
         | Reg 128 -> biconst 127, bi0
@@ -787,7 +1011,7 @@ let rec to_ir addr next ss pref =
       let addresses = List.fold_left (fun acc -> function Oaddr a -> a::acc | _ -> acc) [] [src;dst] in
       List.map (fun addr -> Assert( (addr &* i32 15) ==* i32 0, [])) addresses
       @ [assn t dst result]
-  | Pcmpistri(t,xmm1,xmm2m128,imm) ->
+  | Pcmpstr(t,xmm1,xmm2m128,imm,imm8cb,pcmpinfo) ->
     (* All bytes and bits are numbered with zero being the least
        significant. This includes strings! *)
     (* NOTE: Strings are backwards, at least when they are in
@@ -796,91 +1020,242 @@ let rec to_ir addr next ss pref =
        string. *)
     let xmm1_e = op2e t xmm1 in
     let xmm2m128_e = op2e t xmm2m128 in
-      (* only handles imm == 0xc *)
-      assert (imm = Oimm 0xcL);
-      (* Is there a substring starting at i? *)
-      let get_bit i =
-        let get_indices base index =
-          let t = (base+index)*8 in
-          biconst (t+7), biconst t
+
+    let open Pcmpstr in
+    let comment = match imm8cb with
+      | {agg=agg;
+         ssize=ssize;
+         ssign=ssign;
+         outselectsig=outselectsig;
+         outselectmask=outselectmask} ->
+        Comment(Printf.sprintf "Imm8 control byte information.  Aggregation function: %s Element size: %s Element signedness: %s Significance: %s Mask type: %s"
+                            (agg_to_string agg)
+                            (ssize_to_string ssize)
+                            (ssign_to_string ssign)
+                            (outselectsig_to_string outselectsig)
+                            (outselectmask_to_string outselectmask), [])
+    in
+
+    let nelem, nbits, elemt = match imm8cb with
+      | {ssize=Bytes} -> 16, 8, Reg 8
+      | {ssize=Words} -> 8, 16, Reg 16
+    in
+    (* Get element index in e *)
+    let get_elem = extract_element elemt in
+    (* Get from xmm1/xmm2 *)
+    let get_xmm1 = get_elem xmm1_e
+    and get_xmm2 = get_elem xmm2m128_e
+    in
+
+    (* Build expressions that assigns the correct values to the
+       is_valid variables using implicit (NULL-based) string
+       length. *)
+    let build_implicit_valid_xmm_i is_valid_xmm_i get_xmm_i =
+      let f acc i =
+        (* Previous element is valid *)
+        let prev_valid = if i == 0 then exp_true else Var (is_valid_xmm_i (i-1)) in
+          (* Current element is valid *)
+        let curr_valid = get_xmm_i i <>* it 0 elemt in
+        Let(is_valid_xmm_i i, prev_valid &* curr_valid, acc)
+      in (fun e -> fold f e (nelem-1---0))
+    in
+
+    (* Build expressions that assigns the correct values to the
+       is_valid variables using explicit string length. *)
+    let build_explicit_valid_xmm_i is_valid_xmm_i sizee =
+      (* Max size is nelem *)
+      let sizev = nt "sz" reg_32 in
+      let sizee = exp_ite (binop LT (it nelem reg_32) sizee) (it nelem reg_32) sizee in
+      let f acc i =
+        (* Current element is valid *)
+        let curr_valid = binop LT (it i reg_32) (Var sizev) in
+        Let(is_valid_xmm_i i, curr_valid, acc)
+      in (fun e -> Let(sizev, sizee, fold f e (nelem-1---0)))
+    in
+
+    (* Get var name indicating whether index in xmm num is a valid
+       byte (before NULL byte). *)
+    let is_valid =
+      let vh = Hashtbl.create (2*nelem) in
+      (fun xmmnum index ->
+        try Hashtbl.find vh (xmmnum,index)
+        with Not_found ->
+          let v = nt ("is_valid_xmm"^string_of_int xmmnum^"_ele"^string_of_int index) r1 in
+          Hashtbl.add vh (xmmnum,index) v;
+          v)
+    in
+    let is_valid_xmm1 index = is_valid 1 index
+    and is_valid_xmm2 index = is_valid 2 index
+    in
+    let is_valid_xmm1_e index = Var(is_valid_xmm1 index)
+    and is_valid_xmm2_e index = Var(is_valid_xmm2 index)
+    in
+
+    let build_valid_xmm1,build_valid_xmm2 =
+      match pcmpinfo with
+      | {len=Implicit} ->
+        build_implicit_valid_xmm_i is_valid_xmm1 get_xmm1,
+        build_implicit_valid_xmm_i is_valid_xmm2 get_xmm2
+      | {len=Explicit} ->
+        build_explicit_valid_xmm_i is_valid_xmm1 eax_e,
+        build_explicit_valid_xmm_i is_valid_xmm2 edx_e
+    in
+
+    let get_intres1_bit index = match imm8cb with
+      | {agg=EqualAny} ->
+        (* Is xmm1[index] at xmm2[j]? *)
+        let check_char acc j =
+          let eq = (get_xmm1 index) ==* (get_xmm2 j) in
+          let valid = is_valid_xmm2_e j in
+          ite r1 (eq &* valid) exp_true acc
         in
-        let fold_cmp acc j =
-          (* Compare the jth bit of the substring *)
-          let xmm1_e_byte = 
-            let u, l = get_indices 0 j in
-            Extract(u, l, xmm1_e)
+        binop AND (is_valid_xmm1_e index)
+          (* Is xmm1[index] included in xmm2[j] for any j? *)
+          (fold check_char exp_false (nelem-1---0))
+      | {agg=Ranges} ->
+        (* Is there an even j such that xmm1[j] <= xmm2[index] <=
+           xmm1[j+1]? *)
+        let check_char acc j =
+          (* XXX: Should this be AND? *)
+          let rangevalid = is_valid_xmm1_e (2*j) &* is_valid_xmm1_e (2*j+1) in
+          let lte = match imm8cb with
+            | {ssign=Unsigned} -> LE
+            | {ssign=Signed} -> SLE
           in
-          let xmm2m128_e_byte =
-            let u, l = get_indices i j in
-            Extract(u, l, xmm2m128_e)
+          let inrange =
+            binop lte (get_xmm1 (2*j)) (get_xmm2 index)
+            &* binop lte (get_xmm2 index) (get_xmm1 (2*j+1))
           in
-          Ite(BinOp(EQ, Int(bi0, reg_8), xmm1_e_byte),
-            exp_true,
-            Ite(BinOp(NEQ, xmm2m128_e_byte, xmm1_e_byte),
-              exp_false,
-              acc
-            )
-          )
+          ite r1 (unop NOT rangevalid) exp_false
+            (ite r1 inrange exp_true acc)
         in
-        (fold fold_cmp exp_true ((15-i)---0))
+        is_valid_xmm2_e index
+          (* Is xmm2[index] in the jth range pair? *)
+          &* fold check_char exp_false ((nelem/2-1)---0)
+      | {agg=EqualEach} ->
+        (* Does xmm1[index] = xmm2[index]? *)
+        let xmm1_invalid = unop NOT (is_valid_xmm1_e index) in
+        let xmm2_invalid = unop NOT (is_valid_xmm2_e index) in
+        let bothinvalid = xmm1_invalid &* xmm2_invalid in
+        let eitherinvalid = xmm1_invalid |* xmm2_invalid in
+        let eq = get_xmm1 index ==* get_xmm2 index in
+        (* both invalid -> true
+           one invalid -> false
+           both valid -> check same byte *)
+        ite r1 bothinvalid exp_true
+          (ite r1 eitherinvalid exp_false
+             (ite r1 eq exp_true exp_false))
+      | {agg=EqualOrdered} ->
+        (* Does the substring xmm1 occur at xmm2[index]? *)
+        let check_char acc j =
+          let neq = get_xmm1 j <>* get_xmm2 (index+j) in
+          let substrended = unop NOT (is_valid_xmm1_e j) in
+          let bigstrended = unop NOT (is_valid_xmm2_e (index+j)) in
+          (* substrended => true
+             bigstrended => false
+             byte diff => false
+             byte same => keep going  *)
+          ite r1 substrended exp_true
+            (ite r1 bigstrended exp_false
+               (ite r1 neq exp_false acc))
+        in
+        (* Is xmm1[j] equal to xmm2[index+j]? *)
+        fold check_char exp_true ((nelem-index-1)---0)
+    in
+    let bits = map get_intres1_bit (nelem-1---0) in
+    let res_e = build_valid_xmm1 (build_valid_xmm2 (concat_explist bits)) in
+    let int_res_1 = nt "IntRes1" r16 in
+    let int_res_2 = nt "IntRes2" r16 in
+
+    let contains_null e =
+      fold (fun acc i ->
+        ite r1 (get_elem e i ==* it 0 elemt) exp_true acc) exp_false (0--(nelem-1))
+    in
+    (* For pcmpistri/pcmpestri *)
+    let sb e =
+      fold (fun acc i ->
+        ite r32 (exp_true ==* extract i i e)
+          (it i r32)
+          acc
+        ) (it nelem r32)
+        (match imm8cb with
+        | {outselectsig=LSB} -> (nelem-1)---0
+        | {outselectsig=MSB} -> 0--(nelem-1))
+    in
+    (* For pcmpistrm/pcmpestrm *)
+    let mask e =
+      match imm8cb with
+      | {outselectmask=Bitmask} ->
+        cast_unsigned r128 e
+      | {outselectmask=Bytemask} ->
+        let get_element i =
+          cast_unsigned elemt (extract i i e)
+        in
+        concat_explist (map get_element ((nelem-1)---0))
+    in
+    comment
+    :: move int_res_1 (cast_unsigned r16 res_e)
+    :: (match imm8cb with
+    | {negintres1=false} ->
+      move int_res_2 (Var int_res_1)
+    | {negintres1=true; maskintres1=false} ->
+      (* int_res_1 is bitwise-notted *)
+      move int_res_2 (unop NOT (Var int_res_1))
+    | {negintres1=true; maskintres1=true} ->
+      (* only the valid elements in xmm2 are bitwise-notted *)
+      (* XXX: Right now we duplicate the valid element computations
+         when negating the valid elements.  They are also used by the
+         aggregation functions.  A better way to implement this might
+         be to write the valid element information out as a temporary
+         bitvector.  The aggregation functions and this code would
+         then extract the relevant bit to see if an element is
+         valid. *)
+      let validvector =
+        let bits = map is_valid_xmm2_e (nelem-1---0) in
+        build_valid_xmm2 (cast_unsigned r16 (concat_explist bits))
       in
-      let contains_null e =
-        fold (fun acc i ->
-          Ite(BinOp(EQ, Extract(biconst (i*8+7), biconst (i*8), e), Int(bi0, reg_8)),
-              exp_true,
-              acc
-          )
-        ) exp_false (0--15)
-      in
-      let msb e =
-        fold (fun acc i ->
-          Ite(BinOp(EQ, exp_true, Extract(biconst i, biconst i, e)),
-              Int(biconst i, reg_32),
-              acc
-          )
-        ) (Int(biconst 16, reg_32)) (15---0)
-      in
-      let bits = map get_bit (15---0) in
-      let res_e = concat_explist bits in
-      let int_res_2 = nt "IntRes2" reg_16 in
-      move int_res_2 res_e
-      (* This is supposed to be lsb, but lsb works in practice.
-         It's like we are generating IntRes in reverse. *)
-      :: move ecx (msb (Var int_res_2))
-      :: move cf (BinOp(NEQ, (Var int_res_2), Int(bi0, reg_16)))
-      :: move zf (contains_null xmm2m128_e)
-      :: move sf (contains_null xmm1_e)
-      :: move oF (Extract(bi0, bi0, (Var int_res_2)))
-      :: move af (Int(bi0, reg_1))
-      :: move pf (Int(bi0, reg_1))
-      :: []
+      move int_res_2 (validvector ^* Var int_res_1))
+    :: (match pcmpinfo with
+    | {out=Index} -> move ecx (sb (Var int_res_2))
+    | {out=Mask} -> move xmm0 (mask (Var int_res_2)))
+    :: move cf (Var int_res_2 <>* it 0 r16)
+    :: move zf (contains_null xmm2m128_e)
+    :: move sf (contains_null xmm1_e)
+    :: move oF (extract 0 0 (Var int_res_2))
+    :: move af (it 0 r1)
+    :: move pf (it 0 r1)
+    :: []
   | Pshufd (dst, src, imm) ->
     let t = r128 in (* pshufd is only defined for 128-bits *)
-      let src_e = op2e t src in
-      let imm_e = op2e t imm in
-      let get_dword prev_dwords ndword =
-        let high = 2 * ndword + 1 |> biconst in
-        let low = 2 * ndword |> biconst in
-        let encoding = cast_unsigned t (Extract (high, low, imm_e)) in
-        let shift = encoding ** (it 32 t) in
-        let dword = src_e >>* shift in
-        let dword = cast_low r32 dword in
-        match prev_dwords with
-          | None ->
-              Some dword
-          | Some dwords ->
-              Some (Concat(dwords, dword))
-        in
-      let dst_dwords = fold get_dword None (0--3) in
-      (match dst_dwords with
-         | Some dwords ->
-             [assn t dst dwords]
-         | None ->
-             disfailwith "failed to read dwords for pshufd"
-      )
-  | Pxor(t, o1, o2) ->
-    [assn t o1 (op2e t o1 ^* op2e t o2)]
-    (* Pxor does not set any flags! *)
+    let src_e = op2e t src in
+    let imm_e = op2e t imm in
+    (* XXX: This would be more straight-forward if implemented using
+       map, instead of fold *)
+    let get_dword ndword =
+      let high = 2 * ndword + 1 in
+      let low = 2 * ndword in
+      let index = cast_unsigned t (extract high low imm_e) in
+      extract_element_symbolic reg_32 src_e index
+    in
+    let dwords = concat_explist (map get_dword (3---0)) in
+    [assn t dst dwords]
+  | Pshufb (t, dst, src) ->
+    let order_e = op2e t src in
+    let dst_e = op2e t dst in
+    let get_bit i =
+      let highbit = extract ((i*8)+7) ((i*8)+7) order_e in
+      let index = match t with
+        | Reg 64 -> extract ((i*8)+2) ((i*8)+0) order_e (* 3 bits *)
+        | Reg 128 -> extract ((i*8)+3) ((i*8)+0) order_e (* 4 bits *)
+        | _ -> disfailwith "invalid size for pshufb"
+      in
+      let index = cast_unsigned t index in
+      let atindex = extract_byte_symbolic dst_e index in
+      ite r8 highbit (it 0 r8) atindex
+    in
+    let n = (Typecheck.bits_of_width t) / 8 in
+    let e = concat_explist (map get_bit ((n-1)---0)) in
+    [assn t dst e]
   | Lea(r, a) when pref = [] ->
     [assn r32 r a]
   | Call(o1, ra) when pref = [] ->
@@ -1032,6 +1407,7 @@ let rec to_ir addr next ss pref =
             let shift = (cast_low r8 offset) &* (it 7 r8) in
             byte, shift
         | Oimm _ -> disfailwith "Immediate bases not allowed"
+        | Oseg _ -> disfailwith "Segment registers not allowed"
       in
       [
         move cf (cast_low r1 (value >>* shift));
@@ -1190,30 +1566,28 @@ let rec to_ir addr next ss pref =
     in
     let tmp = nt "t" t in
     let extractlist =
-      List.map
-        (fun i -> 
-          let i = biconst i in
+      BatList.of_enum (map
+        (fun i ->
           extract i i (Var tmp))
-        (BatList.of_enum (((bits_of_width t)-1)---0))
+        (((bits_of_width t)-1)---0))
     in
     move tmp (load_s seg_ss t esp_e)
     :: move esp (esp_e +* i32 (bytes_of_width t))
     :: List.flatten (List.map2 (fun f e -> f e) assnsf extractlist)
   | Sahf ->
     let assnsf = assns_lflags_to_bap in
-    let tah = nt "AH" reg_8 in
+    let tah = nt "AH" r8 in
     let extractlist =
-      List.map
+      BatList.of_enum (map
         (fun i ->
-          let i = biconst i in
           extract i i (Var tah))
-        (BatList.of_enum (7---0))
+        (7---0))
     in
     move tah ah_e
     :: List.flatten (List.map2 (fun f e -> f e) assnsf extractlist)
   | Lahf ->
     let o_ah = Oreg 4 in
-    [assn reg_8 o_ah lflags_e]
+    [assn r8 o_ah lflags_e]
   | Add(t, o1, o2) ->
     let tmp = nt "t1" t and tmp2 = nt "t2" t in
     move tmp (op2e t o1)
@@ -1233,7 +1607,7 @@ let rec to_ir addr next ss pref =
     move orig1 (op2e t o1)
     :: move orig2 (op2e t o2)
     :: assn t o1 (s1 +* s2 +* cast_unsigned t cf_e)
-    :: move cf (extract (biconst bits) (biconst bits) bige)
+    :: move cf (extract bits bits bige)
     :: set_aopszf_add t s1 s2 r
   | Inc(t, o) (* o = o + 1 *) ->
     let tmp = nt "t" t in
@@ -1275,8 +1649,7 @@ let rec to_ir addr next ss pref =
     *)
                (* sub overflow | add overflow *)
     :: move cf ((sube >* orig_d) |* (sube <* orig_s))
-    :: move af (Unknown("AF for sbb unimplemented", r1))
-    :: set_pszf t d
+    :: set_apszf t orig_s orig_d d
   | Cmp(t, o1, o2) ->
     let tmp = nt "t" t in
     move tmp (op2e t o1 -* op2e t o2)
@@ -1387,7 +1760,7 @@ let rec to_ir addr next ss pref =
     let flag =
       let highbit = bits_of_width new_t - 1 in
       let lowbit = bits_of_width new_t / 2 in
-      extract (biconst highbit) (biconst lowbit) assne <>* it 0 t
+      extract highbit lowbit assne <>* it 0 t
     in
     assnstmts
       @
@@ -1411,7 +1784,7 @@ let rec to_ir addr next ss pref =
 	     going to check if the upper bits are != 0 *)
           let highbit = bits_of_width new_t - 1 in
           let lowbit = bits_of_width new_t / 2 in
-          extract (biconst highbit) (biconst lowbit) assne <>* it 0 t
+          extract highbit lowbit assne <>* it 0 t
         in
         assnstmts @
 	  [move oF flag;
@@ -1528,9 +1901,18 @@ module ToStr = struct
 	| 7 -> "edi"
 	| v -> unimplemented (Printf.sprintf "Don't know what oreg %i is." v)
 
+  let sreg2str = function
+    | 0 -> "es"
+    | 1 -> "cs"
+    | 2 -> "ss"
+    | 3 -> "ds"
+    | 4 -> "fs"
+    | 5 -> "gs"
+    | v -> unimplemented (Printf.sprintf "Don't know what segment register %d is." v)
 
   let opr = function
     | Oreg v -> oreg2str v
+    | Oseg v -> sreg2str v
     | Oimm i -> Printf.sprintf "$0x%Lx" i
     | Oaddr a -> Pp.ast_exp_to_string a
 
@@ -1553,9 +1935,13 @@ module ToStr = struct
     | Movdq(_t,td,d,ts,s,align,name) ->
       Printf.sprintf "%s %s, %s" name (opr d) (opr s)
     | Palignr(t,dst,src,imm) -> Printf.sprintf "palignr %s, %s, %s" (opr dst) (opr src) (opr imm)
-    | Pcmpistri(t,dst,src,imm) -> Printf.sprintf "pcmpistri %s, %s, %s" (opr dst) (opr src) (opr imm)
-    | Pshufd(dst,src,imm) -> Printf.sprintf "palignr %s, %s, %s" (opr dst) (opr src) (opr imm)
-    | Pcmpeq(t,elet,dst,src) -> Printf.sprintf "pcmpeq %s, %s" (opr dst) (opr src)
+    | Punpck(_,_,o,d,s) ->
+      let o = match o with | High -> "h" | Low -> "l" in
+      Printf.sprintf "punpck%s %s, %s" o (opr d) (opr s)
+    | Pcmpstr(t,dst,src,imm,_,_) -> Printf.sprintf "pcmpstr %s, %s, %s" (opr dst) (opr src) (opr imm)
+    | Pshufd(dst,src,imm) -> Printf.sprintf "pshufd %s, %s, %s" (opr dst) (opr src) (opr imm)
+    | Pshufb(t,dst,src) -> Printf.sprintf "pshufb %s, %s" (opr dst) (opr src)
+    | Pcmp(t,elet,_,str,dst,src) -> Printf.sprintf "%s %s, %s" str (opr dst) (opr src)
     | Pmovmskb(t,dst,src) -> Printf.sprintf "pmovmskb %s, %s" (opr dst) (opr src)
     | Lea(r,a) -> Printf.sprintf "lea %s, %s" (opr r) (opr (Oaddr a))
     | Call(a, ra) -> Printf.sprintf "call %s" (opr a)
@@ -1606,7 +1992,6 @@ module ToStr = struct
     | And(t,d,s) -> Printf.sprintf "and %s, %s" (opr d) (opr s)
     | Or(t,d,s) -> Printf.sprintf "or %s, %s" (opr d) (opr s)
     | Xor(t,d,s) -> Printf.sprintf "xor %s, %s" (opr d) (opr s)
-    | Pxor(t,d,s)  -> Printf.sprintf "pxor %s, %s" (opr d) (opr s)
     | Test(t,d,s) -> Printf.sprintf "test %s, %s" (opr d) (opr s)
     | Ptest(t,d,s) -> Printf.sprintf "ptest %s, %s" (opr d) (opr s)
     | Not(t,o) -> Printf.sprintf "not %s" (opr o)
@@ -1628,6 +2013,8 @@ module ToStr = struct
     | Leave _ -> "leave"
     | Interrupt(o) -> Printf.sprintf "int %s" (opr o)
     | Sysenter -> "sysenter"
+    | Pbinop(_,_,opstr,d,s) -> Printf.sprintf "%s %s, %s" opstr (opr d) (opr s)
+    | Ppackedbinop(_,_,_,opstr,d,s) -> Printf.sprintf "%s %s, %s" opstr (opr d) (opr s)
 
   let to_string pref op =
     disfailwith "fallback to libdisasm"
@@ -1704,13 +2091,13 @@ let parse_instr g addr =
     int64_of_big_int (Arithmetic.to_sbig_int (biconst64 i, t)) in
   let parse_sint8 a =
     let (i, na) = parse_int8 a in
-    (to_signed i reg_8, na)
+    (to_signed i r8, na)
   and parse_sint16 a =
     let (i, na) = parse_int16 a in
-    (to_signed i reg_16, na)
+    (to_signed i r16, na)
   and parse_sint32 a =
     let (i, na) = parse_int32 a in
-    (to_signed i reg_32, na)
+    (to_signed i r32, na)
   in
   let parse_disp8 = parse_sint8
   and parse_disp16 = parse_sint16
@@ -1721,6 +2108,27 @@ let parse_instr g addr =
     | Reg 16 -> parse_disp16
     | Reg 32 -> parse_disp32
     | _ -> disfailwith "unsupported displacement size"
+  in
+  let parse_imm8cb b =
+    let open Pcmpstr in
+    let (&) = Int64.logand in
+    let ssize = if (b & 1L) = 0L then Bytes else Words in
+    let ssign = if (b & 2L) = 0L then Unsigned else Signed in
+    let agg = match b & 12L with
+      | 0L -> EqualAny
+      | 4L -> Ranges
+      | 8L -> EqualEach
+      | 12L -> EqualOrdered
+      | _ -> failwith "impossible"
+    in
+    let negintres1 = if (b & 16L) = 0L then false else true in
+    let maskintres1 = if (b & 32L) = 0L then false else true in
+    let outselectsig = if (b & 64L) = 0L then LSB else MSB in
+    let outselectmask = sig_to_mask outselectsig in
+    if (b & 128L) <> 0L then wprintf "Most significant bit of Imm8 control byte should be set to 0";
+
+    {ssize=ssize; ssign=ssign; agg=agg; negintres1=negintres1; maskintres1=maskintres1; outselectsig=outselectsig; outselectmask=outselectmask}
+
   in
   let parse_sib m a =
     (* ISR 2.1.5 Table 2-3 *)
@@ -1737,17 +2145,21 @@ let parse_instr g addr =
       if ss = 0 then (base +* idx, na)
       else (base +* (idx <<* i32 ss), na)
   in
-  let parse_modrm16ext a =
-    (* ISR 2.1.5 Table 2-1 *)
+  let parse_modrmbits a =
     let b = Char.code (g a)
     and na = s a in
     let r = (b>>3) & 7
     and m = b >> 6
     and rm = b & 7 in
+    (b, r, m, rm, na)
+  in
+  let parse_modrm16ext a =
+    (* ISR 2.1.5 Table 2-1 *)
+    let b, r, m, rm, na = parse_modrmbits a in
     match m with (* MOD *)
     | 0 -> (match rm with
-      | 6 -> let (disp, na) = parse_disp16 (s a) in (r, Oaddr(l16 disp), na)
-      | n when n < 8 -> (r, Oaddr(eaddr16 rm), s a)
+      | 6 -> let (disp, na) = parse_disp16 na in (r, Oaddr(l16 disp), na)
+      | n when n < 8 -> (r, Oaddr(eaddr16 rm), na)
       | _ -> disfailwith "Impossible"
     )
     | 1 | 2 ->
@@ -1755,25 +2167,25 @@ let parse_instr g addr =
       let (disp, na) = 
 	if m = 1 then parse_disp8 na else (*2*) parse_disp16 na in
       (r, Oaddr(base +* l16 disp), na)
-    | 3 -> (r, Oreg rm, s a)
+    | 3 -> (r, Oreg rm, na)
     | _ -> disfailwith "Impossible"
   in
   let parse_modrm16 a =
     let (r, rm, na) = parse_modrm16ext a in
     (Oreg r, rm, na)
   in
+  let parse_modrm16seg a =
+    let (r, rm, na) = parse_modrm16ext a in
+    (Oseg r, rm, na)
+  in
   let parse_modrm32ext a =
     (* ISR 2.1.5 Table 2-2 *)
-    let b = Char.code (g a)
-    and na = s a in
-    let r = (b>>3) & 7
-    and m = b >> 6
-    and rm = b & 7 in
+    let b, r, m, rm, na = parse_modrmbits a in
     match m with (* MOD *)
     | 0 -> (match rm with
-      | 4 -> let (sib, na) = parse_sib m (s a) in (r, Oaddr sib, na)
-      | 5 -> let (disp, na) = parse_disp32 (s a) in (r, Oaddr(l32 disp), na)
-      | n -> (r, Oaddr(bits2reg32e n), s a)
+      | 4 -> let (sib, na) = parse_sib m na in (r, Oaddr sib, na)
+      | 5 -> let (disp, na) = parse_disp32 na in (r, Oaddr(l32 disp), na)
+      | n -> (r, Oaddr(bits2reg32e n), na)
     )
     | 1 | 2 ->
       let (base, na) = 
@@ -1781,7 +2193,7 @@ let parse_instr g addr =
       let (disp, na) = 
 	if m = 1 then parse_disp8 na else (*2*) parse_disp32 na in
       (r, Oaddr(base +* l32 disp), na)
-    | 3 -> (r, Oreg rm, s a)
+    | 3 -> (r, Oreg rm, na)
     | _ -> disfailwith "Impossible"
   in
   let parse_modrm32 a =
@@ -1791,6 +2203,10 @@ let parse_instr g addr =
     let (r, rm, na) = parse_modrm32ext a in
     let rm = match rm with Oreg r -> Oreg (reg2xmm r) | _ -> rm in
     (Oreg(bits2xmm r), rm, na) *)
+  in
+  let parse_modrm32seg a =
+    let (r, rm, na) = parse_modrm32ext a in
+    (Oseg r, rm, na)
   in
   let parse_modrm opsize a = parse_modrm32 a in
   (* Parse 8-bits as unsigned integer *)
@@ -1836,10 +2252,10 @@ let parse_instr g addr =
   ) in
   let get_opcode pref prefix a =
     (* We should rename these, since the 32 at the end is misleading. *)
-    let parse_disp32, parse_modrm32, parse_modrm32ext =
-      if prefix.addrsize_override 
-      then parse_disp16, parse_modrm16, parse_modrm16ext
-      else parse_disp32, parse_modrm32, parse_modrm32ext
+    let parse_disp32, parse_modrm32, parse_modrm32seg, parse_modrm32ext =
+      if prefix.addrsize_override
+      then parse_disp16, parse_modrm16, parse_modrm16seg, parse_modrm16ext
+      else parse_disp32, parse_modrm32, parse_modrm32seg, parse_modrm32ext
     in
     let b1 = Char.code (g a)
     and na = s a in
@@ -1905,11 +2321,14 @@ let parse_instr g addr =
 	      (Mov(r8, r, rm, None), na)
     | 0x8b -> let (r, rm, na) = parse_modrm32 na in
 	      (Mov(prefix.opsize, r, rm, None), na)
+    | 0x8c -> let (r, rm, na) = parse_modrm32seg na in
+              (Mov(r16, rm, r, None), na)
     | 0x8d -> let (r, rm, na) = parse_modrm prefix.opsize na in
 	      (match rm with
 	      | Oaddr a -> (Lea(r, a), na)
-	      | _ -> disfailwith "invalid lea (must be address)"
-	      )
+	      | _ -> disfailwith "invalid lea (must be address)")
+    | 0x8e -> let (r, rm, na) = parse_modrm32seg na in
+              (Mov(r16, r, rm, None), na)
     | 0x90 -> (Nop, na)
     | 0x91 | 0x92 | 0x93 | 0x94 | 0x95 | 0x96 | 0x97 ->
       let reg = Oreg (b1 & 7) in
@@ -1918,10 +2337,14 @@ let parse_instr g addr =
     | 0x9d -> (Popf(prefix.opsize), na)
     | 0x9e -> (Sahf, na)
     | 0x9f -> (Lahf, na)
-    | 0xa1 -> let (addr, na) = parse_disp32 na in
-	      (Mov(prefix.opsize, o_eax, Oaddr(l32 addr), None), na)
-    | 0xa3 -> let (addr, na) = parse_disp32 na in
-	      (Mov(prefix.opsize, Oaddr(l32 addr), o_eax, None), na)
+    | 0xa0 | 0xa1 ->
+      let t = if b1 = 0xa0 then reg_8 else prefix.opsize in
+      let (addr, na) = parse_disp32 na in
+      (Mov(t, o_eax, Oaddr(l32 addr), None), na)
+    | 0xa2 | 0xa3 ->
+      let t = if b1 = 0xa2 then r8 else prefix.opsize in
+      let (addr, na) = parse_disp32 na in
+      (Mov(t, Oaddr(l32 addr), o_eax, None), na)
     | 0xa4 -> (Movs r8, na)
     | 0xa5 -> (Movs prefix.opsize, na)
     | 0xa6 -> (Cmps r8, na)
@@ -2063,14 +2486,14 @@ let parse_instr g addr =
 		 )
 	       | 6 -> 
 		 (match b1 with
-                 | 0xf6 -> (Div(reg_8, rm) , na)
+                 | 0xf6 -> (Div(r8, rm) , na)
                  | 0xf7 -> (Div(t, rm), na)
 		 | _ -> disfailwith
 		   (Printf.sprintf "impossible opcode: %02x/%d" b1 r)
 		 )
 	       | 7 -> 
 		 (match b1 with
-                 | 0xf6 -> (Idiv(reg_8, rm) , na)
+                 | 0xf6 -> (Idiv(r8, rm) , na)
                  | 0xf7 -> (Idiv(t, rm), na)
 		 | _ -> disfailwith
 		   (Printf.sprintf "impossible opcode: %02x/%d" b1 r)
@@ -2132,12 +2555,20 @@ let parse_instr g addr =
     | 0x0f -> (
       let b2 = Char.code (g na) and na = s na in
       match b2 with (* Table A-3 *)
-      | 0x1f -> (Nop, na)
-      | 0x28 | 0x29 | 0x6e | 0x7e | 0x6f | 0x7f | 0xd6 ->
+      | 0x1f ->
+        (* Even though we don't use the operand to nop, we need to
+           parse it to get the next address *)
+        let _, _, na = parse_modrm32 na in
+        (Nop, na)
+      | 0x12 | 0x13 | 0x28 | 0x29 | 0x6e | 0x7e | 0x6f | 0x7f | 0xd6 ->
         (* XXX: Clean up prefixes.  This will probably require some
-           effort understaind the manual. We probably don't do the
-           right thing on weird cases (too many prefixes set). *)
+           effort studying the manual. We probably don't do the right
+           thing on weird cases (too many prefixes set). *)
         let t, name, align, tsrc, tdest = match b2 with
+          | 0x12 | 0x13 when prefix.opsize_override ->
+            r128, "movlpd", false, r64, r64
+          | 0x12 | 0x13 when not prefix.opsize_override ->
+            r128, "movlps", false, r64, r64
           | 0x28 | 0x29 when prefix.opsize_override ->
 	    r128, "movapd", true, r128, r128
           | 0x28 | 0x29 when not prefix.opsize_override -> 
@@ -2154,21 +2585,45 @@ let parse_instr g addr =
         in
 	let r, rm, na = parse_modrm32 na in
 	let s, d = match b2 with
-          | 0x6f | 0x6e | 0x28 -> rm, r
-          | 0x7f | 0x7e | 0x29 | 0xd6 -> r, rm
+          | 0x12 | 0x6f | 0x6e | 0x28 -> rm, r
+          | 0x13 | 0x7f | 0x7e | 0x29 | 0xd6 -> r, rm
 	  | _ -> disfailwith 
 	    (Printf.sprintf "impossible mov(a/d) condition: %02x" b2)
         in
 	(Movdq(t, tdest, d, tsrc, s, align, name), na)
       | 0x31 -> (Rdtsc, na)
       | 0x34 -> (Sysenter, na)
-      | 0x38 when prefix.opsize_override ->
-          let b2 = Char.code (g na) and na = s na in
-          (match b2 with
-            | 0x17 ->
-              let d, s, na = parse_modrm32 na in
-              (Ptest(r128, d, s), na)
-            | _ -> disfailwith (Printf.sprintf "opcode missing: %02x" b2))
+      | 0x38 ->
+        (* Three byte opcodes *)
+        let b3 = Char.code (g na) and na = s na in
+        (match b3 with
+        | 0x00 ->
+          let d, s, na = parse_modrm32 na in
+          (Pshufb(prefix.mopsize, d, s), na)
+        | 0x17 when prefix.opsize_override ->
+          let d, s, na = parse_modrm32 na in
+          (Ptest(r128, d, s), na)
+        | 0x29 when prefix.opsize_override ->
+          let r, rm, na = parse_modrm32 na in
+          (Pcmp(reg_128, reg_64, EQ, "pcmpeq", r, rm), na)
+        | 0x37 when prefix.opsize_override ->
+          let r, rm, na = parse_modrm32 na in
+          (Pcmp(reg_128, reg_64, SLT, "pcmpgt", r, rm), na)
+        | 0x38 | 0x39 when prefix.opsize_override ->
+          let r, rm, na = parse_modrm32 na in
+          let et = match b3 with
+            | 0x38 -> reg_8 | 0x39 -> reg_32
+            | _ -> disfailwith "invalid"
+          in
+          (Ppackedbinop(prefix.mopsize, et, Ast_convenience.min_symbolic ~signed:true, "pmins", r, rm), na)
+        | 0x3a | 0x3b when prefix.opsize_override ->
+          let r, rm, na = parse_modrm32 na in
+          let et = match b3 with
+            | 0x3a -> reg_16 | 0x3b -> reg_32
+            | _ -> disfailwith "invalid"
+          in
+          (Ppackedbinop(prefix.mopsize, et, Ast_convenience.min_symbolic ~signed:false, "pminu", r, rm), na)
+        | _ -> disfailwith (Printf.sprintf "opcode unsupported: 0f 38 %02x" b3))
       | 0x3a ->
         let b3 = Char.code (g na) and na = s na in
         (match b3 with
@@ -2176,65 +2631,76 @@ let parse_instr g addr =
           let (r, rm, na) = parse_modrm prefix.opsize na in
 	  let (i, na) = parse_imm8 na in
           (Palignr(prefix.mopsize, r, rm, i), na)
-        | 0x63 ->
+        | 0x60 | 0x61 | 0x62 | 0x63 ->
           let (r, rm, na) = parse_modrm prefix.opsize na in
           let (i, na) = parse_imm8 na in
           (match i with
-                 (* See Section 4.1 of Intel manual for more
-                    information on the immediate control byte.
 
-                    i[0]:
-                    0 = 16 packed bytes
-                    1 =  8 packed words
-                    i[1]:
-                    0 = packed elements are unsigned
-                    1 = packed elements are signed
-                    i[3:2]:
-                    00 = "equal any"
-                    01 = "ranges"
-                    10 = "each each"
-                    11 = "equal ordered"
-                    i[4]:
-                    0 = IntRes1 unmodified
-                    1 = IntRes1 is negated (1's complement)
-                    i[5]:
-                    0 = Negation of IntRes1 is for all 16 (8) bits
-                    1 = Negation of IntRes1 is masked by reg/mem validity
-                    i[6]:
-                    0 = Use least significant bit for IntRes2
-                    1 = Use most significant bit for IntRes2
-                    i[7]: Undefined, set to 0.
-                 *)
+          (* Note: We only implement the case for unsigned
+             bytes equal ordered comparison for pcmpistri right
+             now.
 
-                 (* Note: We only implement the case for unsigned
-                    bytes equal ordered comparison for pcmpistri right
-                    now.
-
-                    XXX: When we implement the other cases, we should
-                    extract the control byte information into a record
-                    type.
-                 *)
-                 | Oimm 0xcL -> (Pcmpistri(prefix.mopsize, r, rm, i), na)
-                 | Oimm op  ->  unimplemented 
-		   (Printf.sprintf "unsupported pcmpistri op %02Lx" op)
-                 | _ ->  unimplemented "unsupported non-imm op for pcmpisgtri")
-             | b4 ->  unimplemented  
-	       (Printf.sprintf "unsupported opcode %02x %02x %02x" b1 b2 b3)
-          )
+             XXX: When we implement the other cases, we should
+             extract the control byte information into a record
+             type.
+          *)
+          | Oimm imm ->
+            let open Pcmpstr in
+            let imm8cb = parse_imm8cb imm in
+            let pcmp = {out=if b3 land 0x1 = 0x1 then Index else Mask;
+                        len=if b3 land 0x2 = 0x2 then Implicit else Explicit} in
+            (Pcmpstr(prefix.mopsize, r, rm, i, imm8cb, pcmp), na)
+          | _ ->  unimplemented "unsupported non-imm op for pcmpistri")
+        | b4 ->  unimplemented
+	  (Printf.sprintf "unsupported opcode %02x %02x %02x" b1 b2 b3)
+        )
       (* conditional moves *)
       | 0x40 | 0x41 | 0x42 | 0x43 | 0x44 | 0x45 | 0x46 | 0x47 | 0x48 | 0x49 
       | 0x4a | 0x4b | 0x4c | 0x4d | 0x4e | 0x4f ->
 	let (r, rm, na) = parse_modrm32 na in
 	(Mov(prefix.opsize, r, rm, Some(cc_to_exp b2)), na)
-      | 0x70 when prefix.opsize = r16 ->
-          let r, rm, na = parse_modrm prefix.opsize na in
-          let i, na = parse_imm8 na in
-          (Pshufd(r, rm, i), na)
-      | 0x74 | 0x75 | 0x76 as o ->
+      | 0x60 | 0x61 | 0x62 | 0x68 | 0x69 | 0x6a | 0x6c | 0x6d ->
+        let order = match b2 with
+          | 0x60 | 0x61 | 0x62 | 0x6c -> Low
+          | 0x68 | 0x69 | 0x70 | 0x6d -> High
+          | _ -> disfailwith "impossible"
+        in
+        let elemt = match b2 with
+          | 0x60 | 0x68 -> reg_8
+          | 0x61 | 0x69 -> reg_16
+          | 0x62 | 0x6a -> reg_32
+          | 0x6c | 0x6d -> reg_64
+          | _ -> disfailwith "impossible"
+        in
+        let (r, rm, na) = parse_modrm32 na in
+        (Punpck(prefix.mopsize, elemt, order, r, rm), na)
+      | 0x64 | 0x65 | 0x66 | 0x74 | 0x75 | 0x76  as o ->
         let r, rm, na = parse_modrm32 na in
-        let elet = match o with | 0x74 -> r8 | 0x75 -> r16 | 0x76 -> r32 | _ ->
+        let elet = match o & 0x6 with | 0x4 -> r8 | 0x5 -> r16 | 0x6 -> r32 | _ ->
 	  disfailwith "impossible" in
-        (Pcmpeq(prefix.mopsize, elet, r, rm), na)
+        let bop, bstr = match o & 0x70 with | 0x70 -> EQ, "pcmpeq" | 0x60 -> SLT, "pcmpgt"
+          | _ -> disfailwith "impossible" in
+        (Pcmp(prefix.mopsize, elet, bop, bstr, r, rm), na)
+      | 0x70 when prefix.opsize = r16 ->
+        let r, rm, na = parse_modrm prefix.opsize na in
+        let i, na = parse_imm8 na in
+        (Pshufd(r, rm, i), na)
+      | 0x71 | 0x72 | 0x73 ->
+        let t = prefix.mopsize in
+        let r, rm, na = parse_modrm32 na in
+        let i, na = parse_imm8 na in
+        let open BatInt64.Infix in
+        let fbop, str, et, i = match b2, r, i with
+          | _, Oreg 2, _ -> binop RSHIFT, "psrl", lowbits2elemt b2, i
+          | _, Oreg 6, _ -> binop LSHIFT, "psll", lowbits2elemt b2, i
+          | _, Oreg 4, _ -> binop ARSHIFT, "psra", lowbits2elemt b2, i
+          (* The shift amount of next two elements are multipled by eight *)
+          | 0x73, Oreg 3, Oimm i when prefix.opsize_override -> binop RSHIFT, "psrldq", reg_128, Oimm (i*8L)
+          | 0x73, Oreg 7, Oimm i when prefix.opsize_override -> binop LSHIFT, "pslldq", reg_128, Oimm (i*8L)
+          | _, Oreg i, _ -> disfailwith (Printf.sprintf "invalid psrl/psll encoding b2=%#x r=%#x" b2 i)
+          | _ -> disfailwith "impossible"
+        in
+        (Ppackedbinop(t, et, fbop, str, rm, i), na)
       | 0x80 | 0x81 | 0x82 | 0x83 | 0x84 | 0x85 | 0x86 | 0x87 | 0x88 | 0x89
       | 0x8a | 0x8b | 0x8c | 0x8d | 0x8e | 0x8f ->
         let (i,na) = parse_disp32 na in
@@ -2307,12 +2773,35 @@ let parse_instr g addr =
           )
       | 0xc8 | 0xc9 | 0xca | 0xcb | 0xcc | 0xcd | 0xce | 0xcf ->
         (Bswap(prefix.opsize, Oreg(b2 & 7)), na)
+      | 0xd1 | 0xd2 | 0xd3 | 0xe1 | 0xe2 | 0xf1 | 0xf2 | 0xf3 ->
+        let t = prefix.mopsize in
+        let r, rm, na = parse_modrm32 na in
+        let et = lowbits2elemt b2 in
+        let fbop, str = match b2 & 0xf0 with
+          | 0xd0 -> binop RSHIFT, "psrl"
+          | 0xe0 -> binop ARSHIFT, "psra"
+          | 0xf0 -> binop LSHIFT, "psll"
+          | _ -> disfailwith "invalid"
+        in
+        (Ppackedbinop(t, et, fbop, str, r, rm), na)
+      | 0xda ->
+        let r, rm, na = parse_modrm32 na in
+        (Ppackedbinop(prefix.mopsize, reg_8, Ast_convenience.min_symbolic ~signed:false, "pminub", r, rm), na)
+      | 0xdb ->
+        let r, rm, na = parse_modrm32 na in
+        (Pbinop(prefix.mopsize, AND, "pand", r, rm), na)
       | 0xd7 ->
-          let r, rm, na = parse_modrm32 na in
-          (Pmovmskb(prefix.mopsize, r, rm), na)
+        let r, rm, na = parse_modrm32 na in
+        (Pmovmskb(prefix.mopsize, r, rm), na)
+      | 0xea ->
+        let r, rm, na = parse_modrm32 na in
+        (Ppackedbinop(prefix.mopsize, reg_16, Ast_convenience.min_symbolic ~signed:true, "pmins", r, rm), na)
+      | 0xeb ->
+        let r, rm, na = parse_modrm32 na in
+        (Pbinop(prefix.mopsize, OR, "por", r, rm), na)
       | 0xef ->
 	let d, s, na = parse_modrm32 na in
-	(Pxor(prefix.mopsize,d,s), na)
+	(Pbinop(prefix.mopsize, XOR, "pxor", d,s), na)
       | _ -> unimplemented 
 	(Printf.sprintf "unsupported opcode: %02x %02x" b1 b2)
     )

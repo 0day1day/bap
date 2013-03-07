@@ -1,12 +1,14 @@
 (** Hacks *)
 
-open Type
 open Ast
-open Util
+open Ast_convenience
+open Ast_visitor
 open BatListFull
+open Type
+open Util
 
 module C = Cfg.AST
-module D = Debug.Make(struct let name = "Hacks" and default=`Debug end)
+module D = Debug.Make(struct let name = "Hacks" and default=`NoDebug end)
 open D
 
 let ra_final = Var.newvar "ra_final" reg_32
@@ -161,7 +163,8 @@ let uniqueify_labels p =
     in
     let n =
       try (Hashtbl.find lh strl)+1
-      with Not_found -> 0 in
+      with Not_found -> 0 
+    in
     Hashtbl.replace lh strl n;
         (* Keep the first name unique to make sure cjmptrace labels
            don't get broken *)
@@ -173,14 +176,7 @@ let uniqueify_labels p =
   in
   let renamelabels = object(self)
     inherit Ast_visitor.nop
-    method visit_stmt = function
-      | Label(l, attrs) ->
-        `ChangeTo (Label(find_new_label l, attrs))
-      | _ -> `DoChildren
-
-    method visit_exp e = match lab_of_exp e with
-    | Some l -> `ChangeToAndDoChildren (exp_of_lab (find_new_label l))
-    | None -> `DoChildren
+    method visit_label l = ChangeTo (find_new_label l)
   end
   in
   Ast_visitor.prog_accept renamelabels p
@@ -205,8 +201,56 @@ let replace_unknowns p =
     inherit Ast_visitor.nop
     method visit_exp = function
       | Unknown(_, t) ->
-        `ChangeTo (i t)
-      | _ -> `DoChildren
+        ChangeTo (i t)
+      | _ -> DoChildren
   end
   in
   Ast_visitor.prog_accept v p
+
+(** Append src to dst *)
+let append_file src dst =
+  let oc1 = open_out_gen [Open_text; Open_append] 0o640 dst in
+  let oc2 = open_in src in
+  let rec do_append oc_out oc_in =
+    try 
+      output_string oc_out ((input_line oc_in)^"\n");
+      do_append oc_out oc_in
+    with End_of_file -> ()
+  in
+  do_append oc1 oc2;
+  close_out oc1;
+  close_in oc2
+
+(** Add an "assume false" statement to BB_Error and add an edge to
+    BB_Exit.
+
+    Useful for testing validity with a bounded number of loops.
+*)
+let bberror_assume_false graph =
+  let graph, error = Cfg_ast.find_error graph in
+  let graph, exit = Cfg_ast.find_exit graph in
+  let preds = C.G.pred graph error in
+  let assume_label = "AssumeFalse" in
+  let assume_stmts =
+    [
+      Label(Name assume_label, []);
+      Assume(exp_false, [StrAttr "The program does not start"])
+    ]
+  in
+  let graph, assume = C.create_vertex graph assume_stmts in
+  let replace_label = function
+    | Lab "BB_Error" -> ChangeTo (Lab assume_label)
+    | _ -> DoChildren
+  in
+  let reroute cfg node =
+    let stmts = C.get_stmts cfg node in
+    let stmts = (Ast_mapper.map_e replace_label)#prog stmts in
+    let cfg = C.set_stmts cfg node stmts in
+    (*let cfg = C.remove_edge cfg node error in*)
+    let cfg = C.add_edge cfg node assume in
+    cfg
+  in
+  let graph = C.remove_vertex graph error in
+  let graph = List.fold_left reroute graph preds in
+  let graph = C.add_edge graph assume exit in
+  graph

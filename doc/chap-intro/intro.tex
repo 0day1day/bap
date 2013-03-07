@@ -15,21 +15,21 @@ to code in binary (i.e., executable) form.  Most common, off-the-shelf
 (COTS) software (e.g., Microsoft Windows, Adobe Acrobat, etc.) is only
 available to end-users in binary form.  Malicious code (i.e., malware)
 created by attackers is typically only available in binary form.  The
-ubiquity of binary code means any security techniques that only
+ubiquity of binary code ensures that security techniques which only
 require access to the program binary are likely to be widely
 applicable. Further, binary code analysis allows us to argue about the
 security of the code that will run, not just the code that was
-compiled. 
+compiled.
 
 
-A binary-centric approach to software security requires the ability
-to perform program analysis on binary code. A program analysis
-(whether it be static or dynamic) is an algorithm for determining the
-effects of a set of statements in the programming language under
-consideration.  Thus, a binary-centric approach requires that
-we 1) be able to analyze each instruction in a manner faithful to its
-semantics, and 2) provide a way of encoding an algorithm over those
-instructions. 
+A binary-centric approach to software security requires the ability to
+perform program analysis on binary code. A program analysis (whether
+it be static or dynamic) is an algorithm for determining the effects
+of a set of statements in the programming language under
+consideration.  Thus, a binary-centric approach requires 1) the
+ability to analyze each instruction in a manner faithful to its
+semantics, and 2) a method for encoding an algorithm over those
+instructions.
 
 However, there are two primary challenges to performing accurate and
 faithful analysis on modern binary code. First, code analysis at the
@@ -50,19 +50,19 @@ only use program analyses that are suitable for the unique
 characteristics of binary code.  In particular, binary code lacks
 abstractions that are often fundamental to source code and source code
 analysis, such as:
-\begin{itemize}\squish
-\item {\bf Functions.} The function abstraction does not exist at
-  the binary level.  Instead, control flow in a binary program is
+\begin{itemize}
+\item {\bf Functions.} The function abstraction does not exist at the
+  binary level.  Instead, control flow in a binary program is
   performed by jumps. For example, the x86 instruction {\tt call x} is
   just syntactic sugar (i.e., shorthand) for storing the number in the
   instruction pointer register {\tt eip} at the address named by the
   register {\tt esp}, decrementing {\tt esp} by the architecture word
-  size, then loading the {\tt eip} with number {\tt x}. Indeed, it is
-  perfectly valid in assembly, and sometimes happens in practice, that
-  one may call into the middle of a ``function'', or have a single
-  ``function'' separated into non-contiguous pieces. The lack of a
-  function abstraction poses significant scalability challenges to
-  binary analysis.
+  size, and then loading the {\tt eip} with number {\tt x}. Indeed, it
+  is perfectly valid in assembly, and sometimes happens in practice,
+  that one may call into the middle of a ``function'', or have a
+  single ``function'' separated into non-contiguous pieces. The lack
+  of a function abstraction poses significant scalability challenges
+  to binary analysis.
 
 \item {\bf Memory vs. Buffers.} Binary code does not have buffers, it
   has \emph{memory}.  While the OS may determine a particular memory
@@ -114,9 +114,9 @@ target: ...
 \end{figure}
 
 One approach is to disassemble binary code into a sequence of assembly
-instructions, then perform program analysis directly over the assembly
-instructions.  This type of assembly-specific approach is \naive
-because each analysis would have to individually understand the
+instructions, and then perform program analysis directly over the
+assembly instructions.  This type of assembly-specific approach is
+\naive because each analysis would have to individually understand the
 semantics of the assembly, which is difficult.
 
 For example, consider the basic program analysis problem of
@@ -136,20 +136,20 @@ instruction.
 In order to determine when the jump on line 3 is taken, an analysis
 must reconstruct all side-effects of {\tt add} and {\tt shl}.  The
 proper control flow diagram is shown in Figure~\ref{vine:shl-add}.  As
-demonstrated by this three line program, even though a program may look
-simple, determining the effects may be complicated. An
+demonstrated by this three line program, even though a program may
+look simple, determining the effects may be complicated. An
 assembly-specific approach would require each analysis to reason about
-the complex semantics.
+such complex semantics.
 
 
-Worse, many architectures allow instruction prefixes, which can further
-complicate the semantics. For example, in x86 a {\tt rep} prefix turns
-an instruction essentially into a single instruction loop, e.g.,
-{\tt rep $i$ $s$,$d$} will repeatedly execute operation $i$ on
-arguments $s$ and $d$.  The exact semantics (per
+Worse, many architectures allow instruction prefixes, which can
+further complicate the semantics. For example, in x86 a {\tt rep}
+prefix essentially turns an instruction into a single instruction
+loop, e.g., {\tt rep $i$ $s$,$d$} will repeatedly execute operation
+$i$ on arguments $s$ and $d$.  The exact semantics (per
 Intel~\cite{intel:x86}) of {\tt rep} are shown in
 Figure~\ref{vine:rep}. An assembly-specific approach would have to
-consider this complicated logic for any instruction that may carry to
+consider this complicated logic for any instruction that may carry the
 {\tt rep} prefix. If analyses are written directly on assembly, each
 analysis would duplicate this logic.
 
@@ -187,19 +187,19 @@ analysis would duplicate this logic.
 If there were only a few instructions, perhaps the complexity would
 not be too onerous.  Modern architectures, however, typically have
 hundreds of instructions. x86, for example, has well over 300
-instructions (recall the Intel x86 manuals~\cite{intel:x86} weigh over
-11 lbs).
+instructions (which are documented in over 11 lbs of
+manuals~\cite{intel:x86}).
 
-
-Overall, an assembly specific approach is unattractive because writing
-analyses over modern complex instruction, such as the logic found in
-Figures~\ref{vine:rep} and~\ref{vine:shl-add}, tends to be tedious and
-error-prone. For example, the current version of
-DynInst~\cite{dyninst} (version 5.2) and Phoenix~\cite{phoenix} (April
-2008 SDK Build), two popular architectures for binary analysis, will not
-create a correct control flow graph for the three line program.
-Verifying a program analysis is correct over a large and
-complicated instruction set seems even more difficult. % Further, an
+% This is very outdated now.
+% Overall, an assembly specific approach is unattractive because writing
+% analyses over modern instruction sets tends to be tedious and
+% error-prone. For example, the current version of
+% DynInst~\cite{dyninst} (version 5.2) and Phoenix~\cite{phoenix} (April
+% 2008 SDK Build), two popular architectures for binary analysis, will
+% not create a correct control flow graph for the three line program.
+% Verifying a program analysis is correct over a large and complicated
+% instruction set seems even more difficult.
+% Further, an
 % assembly-specific approach is specific to a single architecture.  All
 % analysis would have to be ported each time we want to consider a new
 % architecture.  Thus, analysis could not take advantage of the common
@@ -252,3 +252,8 @@ applicable.
 % program analysis may have to consider hundreds of cases, and each case
 % may be associated with extensive code to handle the complexity of a
 % particular instruction.
+
+%%% Local Variables: 
+%%% mode: latex
+%%% TeX-master: "../main"
+%%% End: 
