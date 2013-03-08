@@ -1,7 +1,8 @@
 /** Given a REG, return a trace type (or VT_NONE for failure) */
 
+#include <iostream>
 #include "pin.H"
-#include "pin_frame.h"
+#include "pin_misc.h"
 
 uint32_t GetTypeOfReg(REG r) {
   if (REG_is_gr8(r)) return VT_REG8;
@@ -18,6 +19,10 @@ uint32_t GetTypeOfReg(REG r) {
 
   // Otherwise, print a warning...
   
-  cerr << "Warning: Unknown register size of register " << REG_StringShort(r) << endl;
+  std::cerr << "Warning: Unknown register size of register " << REG_StringShort(r) << std::endl;
   return VT_NONE;
+}
+
+bool valid_regmem_type(pintrace::RegMem_t rm) {
+    return (pintrace::NONE <= rm.type && rm.type <= pintrace::MEM);
 }

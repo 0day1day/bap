@@ -1,13 +1,17 @@
 #include <errno.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <assert.h>
 #include <string.h>
 #include <limits.h>
 #include <stdarg.h>
 
 #include "asm_program.h"
+#include "common.h"
+#include "config.h"
+#include <bfd.h>
 
-/* This elf stuff is interal to BFD (TOO BAD) */
+/* This elf stuff is internal to BFD (TOO BAD) */
 
 #define SHT_PROGBITS	1		/* Program specific (private) data */
 #define PT_GNU_STACK  0x6474e551
@@ -548,3 +552,30 @@ asection** asmir_get_all_sections(asm_program_t *prog, long *out) {
   return NULL;
 }
 
+asm_program_t*
+byte_insn_to_asmp(enum bfd_architecture arch, address_t addr, unsigned char *bb_bytes, unsigned int len)
+{
+  asm_program_t *prog = asmir_new_asmp_for_arch(arch);
+  unsigned char *bytes = (unsigned char*)bfd_alloc(prog->abfd, len);
+  assert(bytes);
+  // copy the string, because the old one is freed when we return
+  memcpy(bytes, bb_bytes, len);
+  section_t *sec = (section_t*)bfd_alloc(prog->abfd, sizeof(section_t));
+  assert(sec);
+  
+  sec->start_addr = addr;
+  sec->datasize = len;
+  sec->end_addr = addr+len;
+  sec->data = bytes;
+  sec->is_code = 1;
+  sec->next = NULL;
+  prog->segs = sec;
+
+  struct disassemble_info *disasm_info = &prog->disasm_info;
+  disasm_info->buffer = bytes;
+  disasm_info->buffer_vma = addr;
+  disasm_info->buffer_length = len;
+  disasm_info->section = NULL;
+
+  return prog;
+}
