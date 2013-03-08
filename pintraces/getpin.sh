@@ -1,9 +1,13 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 
 # $Id$
 # Download and extract Pin
 
 set -x
+
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+cd $DIR
 
 # check if pin dir exists first
 

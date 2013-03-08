@@ -73,7 +73,7 @@ TOOL_ROOTS = gentrace
 
 TOOLS = $(TOOL_ROOTS:%=$(OBJDIR)%$(PINTOOL_SUFFIX))
 
-OBJS = $(OBJDIR)pivot.o $(OBJDIR)pin_misc.o $(OBJDIR)reg_mapping_pin.o $(OBJDIR)winsyscalls.o $(FORMATOBJS)
+OBJS = $(OBJDIR)pivot.o $(OBJDIR)pin_misc.o $(OBJDIR)pin_taint.o $(OBJDIR)reg_mapping_pin.o $(OBJDIR)winsyscalls.o $(FORMATOBJS)
 
 ROOT = $(realpath ..)
 
