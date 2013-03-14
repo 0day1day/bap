@@ -38,6 +38,7 @@ endif
 export SOURCES = \
 	debug.mli debug.ml \
 	BatListFull.ml \
+	worklist.mli worklist.ml \
 	util.mli util.ml \
 	big_int_convenience.ml \
 	dominator.ml \
