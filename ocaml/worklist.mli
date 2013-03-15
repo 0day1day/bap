@@ -21,6 +21,10 @@ val add : 'a -> 'a t -> unit
 val push : 'a -> 'a t -> unit
 (** [push] is a synonym for [add]. *)
 
+val add_list : 'a list -> 'a t -> unit
+(** [add_list l w] adds the elements in [l] to the worklist [w].
+*)
+
 val take : 'a t -> 'a
 (** [take w] removes and returns the first element of worklist [w], or
     raises [Empty] if the worklist is empty. *)

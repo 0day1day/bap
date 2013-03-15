@@ -1,3 +1,5 @@
+(* XXX: Use list implementation as in graphDataFlow *)
+
 include Queue
 
 let add x w =
@@ -8,3 +10,6 @@ let add x w =
   with Exit -> ()
 
 let push = add
+
+let add_list l w =
+  List.iter (fun e -> add e w) l

@@ -498,7 +498,7 @@ struct
           no
 
   let union ((k,s1,a,b) as si1) ((k',s2,c,d) as si2) =
-    if k <> k' then failwith "union: expected same bitwidth intervals";
+    if k <> k' then raise (Invalid_argument "bitwidth");
     (* Empty sets *)
     if is_empty si1 then si2
     else if is_empty si2 then si1
@@ -524,7 +524,7 @@ struct
 
   let intersection ((k,s1,a,b) as si1) ((k',s2,c,d) as si2) =
     if is_empty si1 || is_empty si2 then empty k
-    else if k <> k' then failwith "intersection: expected same bitwidth intervals"
+    else if k <> k' then raise (Invalid_argument "bitwidth")
     else
     let l = max a c
     and u = min b d in
@@ -863,7 +863,7 @@ struct
 
   let union x y =
     let k = width x in
-    if debug () then (assert (k = width y));
+    if not (k = width y) then raise (Invalid_argument "bitwidth");
     if x = top k || y = top k then top k else
       let h = Hashtbl.create (List.length x + List.length y) in
       let add (r,si) =
@@ -877,7 +877,7 @@ struct
 
   let intersection x y =
     let k = width x in
-    if debug () then (assert (k = width y));
+    if not (k = width y) then raise (Invalid_argument "bitwidth");
     if x = top k then y
     else if y = top k then x
     else let hx = Hashtbl.create (List.length x) in
@@ -1083,7 +1083,7 @@ module MemStore = struct
     fold (fun (r,i) vs () ->
       let region = if r == VS.global then "$" else Pp.var_to_string r in
       p (Printf.sprintf " %s[%#Lx] -> %s\n" region i (VS.to_string vs))) a ();
-    p "End contents."
+    p "End contents.\n"
 
   (* let read_concrete_real ?o (r,i) =match o with *)
   (*   | Some {O.get_mem=get_mem} when r = VS.global -> *)
@@ -1208,16 +1208,19 @@ module MemStore = struct
     if M2.equal (=) x y then x
     else
       M2.merge (fun a v1 v2 -> match v1, v2 with
-      | Some v1, Some v2 -> Some (f v1 v2)
-      | Some v, None
-      | None, Some v -> Some v
+      | Some v1, Some v2 ->
+        (* Note: Value sets are not guaranteed to be the same width *)
+        (try Some (f v1 v2)
+         with Invalid_argument "bitwidth" -> None)
+      | Some _, None
+      | None, Some _ (*-> Some v*)
       | None, None -> None) x y
 
   let merge_mem f =
     M1.merge (fun r v1 v2 -> match v1, v2 with
     | Some v1, Some v2 -> Some (merge_region f v1 v2)
-    | Some v, None
-    | None, Some v -> Some v
+    | Some _, None
+    | None, Some _ (* -> Some v*)
     | None, None -> None)
 
   let intersection (x:t) (y:t) =
@@ -1575,7 +1578,7 @@ struct
         let vs_v = exp2vs ~o l le in
         let vs_c = vsf (bits_of_width t) (int64_of_big_int i) in
         let vs_int = VS.intersection vs_v vs_c in
-        dprintf "%s dst %s vs_v %s vs_c %s vs_int %s" (Pp.var_to_string m) (Cfg_ast.v2s (CFG.G.E.dst edge)) (VS.to_string vs_v) (VS.to_string vs_c) (VS.to_string vs_int);
+        dprintf "%s dst %s vs_v %s vs_c %s vs_int %s" (Pp.ast_exp_to_string le) (Cfg_ast.v2s (CFG.G.E.dst edge)) (VS.to_string vs_v) (VS.to_string vs_c) (VS.to_string vs_int);
         let orig_mem = do_find_ae l m in
         let new_mem = MemStore.write_intersection (bits_of_width t) orig_mem (exp2vs l ind) vs_int in
         VM.add m (`Array new_mem) l

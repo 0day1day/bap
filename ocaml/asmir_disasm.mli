@@ -22,7 +22,12 @@ end
 
 module type DISASM = sig
   module State : STATE
-  val get_succs : Asmir.asmprogram -> Cfg.AST.G.t -> Cfg.AST.G.V.t * Cfg.AST.G.E.label * Ast.exp -> State.t -> succs * State.t (** Function that returns the successors of a node *)
+  val get_succs : Asmir.asmprogram -> Cfg.AST.G.t -> Cfg.AST.G.V.t * Cfg.AST.G.E.label * Ast.exp -> State.t -> succs * State.t
+  (** Function that returns the successors of a node *)
+
+  val fixpoint : bool
+  (** Should [get_succs] be called until a fixpoint is reached? *)
+
 end
 
 module Make :
