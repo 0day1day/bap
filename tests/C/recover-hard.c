@@ -1,4 +1,6 @@
-int main(int input) {
+#include <stdio.h>
+
+int f(int input) {
   int x = 0;
   while (x < 100) {
     switch (x) {
@@ -12,5 +14,10 @@ int main(int input) {
     }
   }
 
+  printf("woo\n");
   return x;
+}
+
+int main() {
+  f(3);
 }

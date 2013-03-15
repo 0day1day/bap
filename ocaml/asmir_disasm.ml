@@ -117,7 +117,7 @@ module VSA_SPEC = struct
           ) cfg
         );
         Indirect, ())
-        (* Rely on recursive descent for easy stuff *)
+    (* Rely on recursive descent for easy stuff *)
     | o, () -> o, ()
 
   let fixpoint = true
@@ -169,6 +169,28 @@ module Make(D:DISASM)(F:FUNCID) = struct
             | Some v -> (v,None,exp_of_lab (Addr next))::edges
             | None -> edges
           in
+
+          (* Rewrite any calls from this address *)
+          let c', edges = match F.find_calls c' bbs edges F.State.init with
+            | [], _ -> c', edges
+            | call_edges, _ ->
+            (* We found edges corresponding to calls *)
+              let others = Util.list_difference edges call_edges in
+              let fallthrough = List.map (fun (s,l,e) -> (s,l, exp_of_lab (Addr next))) call_edges in
+              let dumb_translate_call cfg (s,l,e) =
+                let revstmts = match List.rev (CA.get_stmts cfg s) with
+                  | CJmp _::_ -> failwith "Conditional function calls are not implemented"
+                  | Jmp _::tl as stmts -> List.map (function
+                      | Label _ as s -> s
+                      | s -> Comment(Printf.sprintf "Function call removed: %s" (Pp.ast_stmt_to_string s), [])) stmts
+                  | _ -> failwith "Unable to rewrite function call"
+                in
+                CA.set_stmts cfg s (List.rev revstmts)
+              in
+              let c' = List.fold_left dumb_translate_call c' call_edges in
+              c', BatList.append others fallthrough
+          in
+
           Hashtbl.replace edgeh a (bbs, edges, next);
           Worklist.add (bbs, edges, next) q;
           c', CA.find_label c' (Addr a)
@@ -221,26 +243,7 @@ module Make(D:DISASM)(F:FUNCID) = struct
       (* Main loop *)
       while not (Worklist.is_empty q) do
         let (bbs, unresolved_edges, succ) = Worklist.pop q in
-        let c', unresolved_edges = match F.find_calls !c bbs unresolved_edges F.State.init with
-          | [], _ -> !c, unresolved_edges
-          | call_edges, _ ->
-          (* We found edges corresponding to calls *)
-            let others = Util.list_difference unresolved_edges call_edges in
-            let fallthrough = List.map (fun (s,l,e) -> (s,l, exp_of_lab (Addr succ))) call_edges in
-            let dumb_translate_call cfg (s,l,e) =
-              let revstmts = match List.rev (CA.get_stmts !c s) with
-                | CJmp _::_ -> failwith "Conditional function calls are not implemented"
-                | Jmp _::tl as stmts -> List.map (function
-                    | Label _ as s -> s
-                    | s -> Comment(Printf.sprintf "Function call removed: %s" (Pp.ast_stmt_to_string s), [])) stmts
-                | _ -> failwith "Unable to rewrite function call"
-              in
-              CA.set_stmts cfg s (List.rev revstmts)
-            in
-            let c' = List.fold_left dumb_translate_call !c call_edges in
-            c', BatList.append others fallthrough
-        in
-        let c',state' = List.fold_left process_edge (c',!state) unresolved_edges in
+        let c',state' = List.fold_left process_edge (!c,!state) unresolved_edges in
         c := c';
         state := state'
       done;
