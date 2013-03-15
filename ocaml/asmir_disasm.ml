@@ -11,6 +11,8 @@ open Type
 (* Call/ret behavior *)
 (* Reprocess indirect jumps *)
 
+let no_indirect = true
+
 type succs = | Addrs of label list
              | Error
              | Exit
@@ -116,7 +118,9 @@ module VSA_SPEC = struct
             dprintf "\n\n"
           ) cfg
         );
-        Indirect, ())
+        if no_indirect
+        then failwith (Printf.sprintf "VSA disassembly failed to resolve %s/%s to a specific concrete set" (Pp.ast_exp_to_string e) (Vsa.VS.to_string vs))
+        else Indirect, ())
     (* Rely on recursive descent for easy stuff *)
     | o, () -> o, ()
 
