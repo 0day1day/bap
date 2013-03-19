@@ -51,7 +51,11 @@ let lift_func (n,s,e) =
     let cfg,_ = Asmir_disasm.vsa_at asmp s in
     let cfg = Hacks.ast_remove_indirect cfg in
     let cfg = Ast_cond_simplify.simplifycond_cfg cfg in
-    Cfg_pp.AstStmtsDot.output_graph (open_out ("resolve"^n^".dot")) cfg)
+    Cfg_pp.AstStmtsDot.output_graph (open_out ("resolve"^n^".dot")) cfg;
+    let pp = new Pp.pp_oc (open_out ("resolve"^n^".il")) in
+    pp#ast_program (Cfg_ast.to_prog cfg);
+    pp#close
+  )
 let lift_func =
   Util.timeout !timeout lift_func
 let lift_func ((n,_,_) as x) =
