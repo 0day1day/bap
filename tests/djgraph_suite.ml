@@ -3,7 +3,6 @@ open OUnit
 
 module G = Graph.Pack.Digraph
 module DJG = Djgraph.Make(G)
-module DJE = Djgraph.DJE
 
 let n = G.V.create;;
 
@@ -34,7 +33,7 @@ and vend = n 10
  * vertices in the underlying graph.
  *)
 
-type dj_edge_spec = DJE.t * G.V.t
+type dj_edge_spec = Djgraph.edge_type * G.V.t
 type dj_vertex_spec = G.V.t * int * (dj_edge_spec list)
 type vertex_spec = G.V.t * (G.V.t list)
 type test = G.V.t * (vertex_spec list) * (dj_vertex_spec list)
@@ -51,15 +50,15 @@ let main_sreedhar : test = (v0, [
   (vh, [va; vc; vend]); 
   (vend, [])
 ], [
-  (v0, 0, [(DJE.D, va); (DJE.D, vend)]);
-  (va, 1, [(DJE.D, vb); (DJE.D, vc); (DJE.D, vd); (DJE.D, vf); (DJE.D, vh)]);
-  (vb, 2, [(DJE.CJ, vd)]);
-  (vc, 2, [(DJE.CJ, vd); (DJE.D, ve)]);
-  (vd, 2, [(DJE.CJ, vf); (DJE.D, vg)]);
-  (ve, 3, [(DJE.CJ, vf)]);
-  (vf, 2, [(DJE.CJ, vh)]);
-  (vg, 3, [(DJE.BJ, vd); (DJE.CJ, vh)]);
-  (vh, 2, [(DJE.BJ, va); (DJE.CJ, vc); (DJE.CJ, vend)]);
+  (v0, 0, [(Djgraph.D, va); (Djgraph.D, vend)]);
+  (va, 1, [(Djgraph.D, vb); (Djgraph.D, vc); (Djgraph.D, vd); (Djgraph.D, vf); (Djgraph.D, vh)]);
+  (vb, 2, [(Djgraph.CJ, vd)]);
+  (vc, 2, [(Djgraph.CJ, vd); (Djgraph.D, ve)]);
+  (vd, 2, [(Djgraph.CJ, vf); (Djgraph.D, vg)]);
+  (ve, 3, [(Djgraph.CJ, vf)]);
+  (vf, 2, [(Djgraph.CJ, vh)]);
+  (vg, 3, [(Djgraph.BJ, vd); (Djgraph.CJ, vh)]);
+  (vh, 2, [(Djgraph.BJ, va); (Djgraph.CJ, vc); (Djgraph.CJ, vend)]);
   (vend, 1, [])
 ]) 
 
@@ -70,11 +69,11 @@ let mini_sreedhar : test = (va, [
   (vd, [vb]);
   (ve, [vc]);
 ], [
-  (va, 0, [(DJE.D, vb); (DJE.D, vc)]);
-  (vb, 1, [(DJE.CJ, vc); (DJE.D, vd)]);
-  (vc, 1, [(DJE.CJ, vb); (DJE.D, ve)]);
-  (vd, 2, [(DJE.BJ, vb)]);
-  (ve, 2, [(DJE.BJ, vc)])
+  (va, 0, [(Djgraph.D, vb); (Djgraph.D, vc)]);
+  (vb, 1, [(Djgraph.CJ, vc); (Djgraph.D, vd)]);
+  (vc, 1, [(Djgraph.CJ, vb); (Djgraph.D, ve)]);
+  (vd, 2, [(Djgraph.BJ, vb)]);
+  (ve, 2, [(Djgraph.BJ, vc)])
 ])
 
 (*
@@ -121,9 +120,9 @@ let verify_djgraph djg_spec djg =
     assert_equal ~msg:("Invalid type for edge " 
                        ^ (s_of_djv (DJG.E.src edge)) ^  "->"
                        ^ (s_of_djv (DJG.E.dst edge))) 
-                 ~printer:(fun t -> match t with | DJE.D -> "D"
-                                                 | DJE.CJ -> "CJ"
-                                                 | DJE.BJ -> "BJ")
+                 ~printer:(fun t -> match t with | Djgraph.D -> "D"
+                                                 | Djgraph.CJ -> "CJ"
+                                                 | Djgraph.BJ -> "BJ")
                  edge_type (DJG.E.label edge); nedges + 1 in
   let find_vertex_spec v = 
     try List.find (fun (u, _, _) -> u = v) djg_spec

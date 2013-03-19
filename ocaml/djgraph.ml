@@ -13,33 +13,13 @@
    require a slightly more complex signature. (label_to_string, etc.)
    Maybe we can create a separate functor for this. *)
 
-(* The miminal set of graph features necessary for DJGraph.Make. *)
 module type G = sig
   include Dominator.G
 
   val iter_edges : (V.t -> V.t -> unit) -> t -> unit
 end
 
-(*
- * DJ Edges can be D edges (dominating edges) or J (joining edges). D edges are
- * edges in the underlying dominator tree. There are two types of J edge:
- *  - BJ (back join). An edge x -> y is a BJ edge if y dom x
- *  - CJ (cross join). An edge x -> y is a CJ edge otherwise.
- *
- *  Warning: DJ Edges are not comparable.
- *)
-module DJE =  struct
-  type t = D | BJ | CJ
-
-  exception NotComparable
-
-  (* XXX (ed) It seems like we should encapsulate the original edge,
-     or at least the edge label, into our edge type, as we do for
-     vertices. *)
-  (* TODO(awreece) Can we avoid needing a comparison function? *)
-  let compare = compare
-  let default = D
-end
+type edge_type = D | BJ | CJ
 
 (* 
  * Make is a functor that returns a Djgraph module. Note that a Djgraph is an
@@ -48,7 +28,7 @@ end
 module type MakeType =
   functor (Gr: G) ->
     sig
-      include Graph.Sig.I with type E.label = DJE.t
+      include Graph.Sig.I with type E.label = edge_type
 
       val dj_graph: Gr.t -> Gr.V.t -> t
       (* The underlying vertex in the graph. *)
@@ -68,7 +48,18 @@ module Make: MakeType = functor(G : G) -> struct
     let compare (_,u) (_,v) = G.V.compare u v
     let hash (_,v) = G.V.hash v
     let equal (_,u) (_,v) = G.V.equal u v
-  end)(DJE)
+  end)(struct
+    type t = edge_type
+
+    exception NotComparable
+
+    (* XXX (ed) It seems like we should encapsulate the original edge,
+       or at least the edge label, into our edge type, as we do for
+       vertices. *)
+    (* TODO(awreece) Can we avoid needing a comparison function? *)
+    let compare = compare
+    let default = D
+  end)
   include DJG
   open DJG
 
@@ -137,15 +128,15 @@ module Make: MakeType = functor(G : G) -> struct
                          let vv = g_to_djg v in
                          DJG.add_edge_e dj_graph (DJG.E.create uv t vv) in
     (*
-     * Add DJE.D edges from v to every vertex in idoms, the list of vertices
-     * it immediately dominates.
+     * Add D edges from v to every vertex in idoms, the list of vertices it
+     * immediately dominates.
      *)
-    let add_d_edges v idoms = List.iter (add_edge DJE.D v) idoms in
-    (* Add the correct DJE.J edge from u to v if there is no D edge already *)
+    let add_d_edges v idoms = List.iter (add_edge D v) idoms in
+    (* Add the correct J edge from u to v if there is no D edge already *)
     let maybe_add_j_edge s d = if DJG.mem_edge dj_graph (g_to_djg s) (g_to_djg d)
                                then () else if dom d s
-                               then add_edge DJE.BJ s d
-                               else add_edge DJE.CJ s d in
+                               then add_edge BJ s d
+                               else add_edge CJ s d in
     let () = G.iter_vertex (fun v -> add_d_edges v (dom_tree v)) graph in
     let () = G.iter_edges maybe_add_j_edge graph in
     dj_graph
