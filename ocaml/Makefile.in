@@ -104,6 +104,7 @@ export SOURCES = \
 	coalesce.mli coalesce.ml \
 	structural_analysis.ml \
 	steensgard.mli steensgard.ml \
+	lnf.mli lnf.ml \
 	unroll.mli unroll.ml \
 	fwp.mli fwp.ml \
 	ast_slice.ml \
