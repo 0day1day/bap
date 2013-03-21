@@ -17,10 +17,8 @@ sig
 end
 
 (* body is a superset of headers. *)
-type 'a loopinfo = { headers: 'a list; body: 'a list }
-
-type 'a lnt = 'a loopinfo * 'a lnf
-and 'a lnf = Empty | Forest of 'a lnt list
+type 'a lnt = { headers: 'a list; body: 'a list; children: 'a lnf }
+and 'a lnf = 'a lnt list
 
 module Make(C:G) =
 struct
@@ -35,7 +33,7 @@ struct
         match scc with
         | [] -> failwith "loopinfo_from_steensgard: impossible"
         | [x] -> dprintf "Self loop at %s" (C.v2s x);
-          ({headers=scc; body=scc}, Empty)
+          { headers=scc; body=scc; children=[] }
         | _ ->
           let h = Hashtbl.create (List.length scc) in
           List.iter (fun v -> dprintf "scc %s" (C.v2s v); Hashtbl.add h v ()) scc;
@@ -68,19 +66,16 @@ struct
                                                 | _ -> true 
           ) (Comp.scc_list cfg) in
 
-          let loopinfo = {headers=(VS.elements entry_nodes); body=scc} in
-
-          match sccs with 
-          | [] -> (loopinfo, Empty)
-          | _ -> (loopinfo, Forest(List.map (process_scc cfg) sccs))
+          { headers=(VS.elements entry_nodes)
+          ; body=scc
+          ; children=(List.map (process_scc cfg) sccs) }
 
       in
       match sccs with
       | [] -> failwith "loopinfo_from_steensgard: impossible"
-      | _ -> Forest(List.map (process_scc cfg) sccs)
+      | _ -> List.map (process_scc cfg) sccs
     in
     f cfg
-
 end
 
 let steensgard_ast =
