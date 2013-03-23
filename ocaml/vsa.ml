@@ -83,7 +83,8 @@ struct
     else Printf.sprintf "(%d)%Lu[%Ld,%Ld]" k s lb ub
 
   let size (_,s,lb,ub) =
-    (ub -% lb) /% s
+    if s = 0L then 1L
+    else (ub -% lb) /% s
 
   let highbit k =
     if k = 1 then 1L else I.shift_left 1L (k-1)
