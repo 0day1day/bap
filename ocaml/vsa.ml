@@ -398,7 +398,7 @@ struct
 
     let s' = match simpleshift, dir with
       | true, `Rightshift -> int64_umax (Int64.shift_right_logical s1 z2) 1L
-      | true, `Leftshift -> int64_umax (Int64.shift_left s1 z2) 1L
+      | true, `Leftshift -> int64_umax (Int64.shift_left s1 z1) 1L
       | false, _ -> 1L
     in
     renorm k (k,s',l,u)
