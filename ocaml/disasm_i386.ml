@@ -282,17 +282,17 @@ let nt = Var_temp.nt
 
 (* registers *)
 
-let ebp = nv "R_EBP" r32
-and esp = nv "R_ESP" r32
-and esi = nv "R_ESI" r32
-and edi = nv "R_EDI" r32
-and eip = nv "R_EIP" r32 (* why is eip in here? *)
-and eax = nv "R_EAX" r32
-and ebx = nv "R_EBX" r32
-and ecx = nv "R_ECX" r32
-and edx = nv "R_EDX" r32
-and eflags = nv "EFLAGS" r32 (* why is eflags in here? *)
-  (* condition flag bits *)
+let rbp = nv "R_RBP" r64
+and rsp = nv "R_RSP" r64
+and rsi = nv "R_RSI" r64
+and rdi = nv "R_RDI" r64
+and rip = nv "R_RIP" r64 (* why is rip in here? *)
+and rax = nv "R_RAX" r64
+and rbx = nv "R_RBX" r64
+and rcx = nv "R_RCX" r64
+and rdx = nv "R_RDX" r64
+and rflags = nv "RFLAGS" r64 (* why is eflags in here? *)
+(* condition flag bits *)
 and cf = nv "R_CF" r1
 and pf = nv "R_PF" r1
 and af = nv "R_AF" r1
@@ -300,11 +300,11 @@ and zf = nv "R_ZF" r1
 and sf = nv "R_SF" r1
 and oF = nv "R_OF" r1
 
-and dflag = nv "R_DFLAG" r32 (* 1 if DF=0 or -1 if DF=1 *)
+and dflag = nv "R_DFLAG" r64 (* 1 if DF=0 or -1 if DF=1 *)
 
 (* segment registers and bases *)
-and fs_base = nv "R_FS_BASE" r32
-and gs_base = nv "R_GS_BASE" r32
+and fs_base = nv "R_FS_BASE" r64
+and gs_base = nv "R_GS_BASE" r64
 
 and cs = nv "R_CS" r16
 and ds = nv "R_DS" r16
@@ -313,8 +313,8 @@ and fs = nv "R_FS" r16
 and gs = nv "R_GS" r16
 and ss = nv "R_SS" r16
 
-and gdt = nv "R_GDT" r32
-and ldt = nv "R_LDT" r32
+and gdt = nv "R_GDT" r64
+and ldt = nv "R_LDT" r64
 
 and fpu_ctrl = nv "R_FPU_CONTROL" r16
 and mxcsr = nv "R_MXCSR" r32
@@ -322,11 +322,14 @@ and mxcsr = nv "R_MXCSR" r32
 let xmms = Array.init 8 (fun i -> nv (Printf.sprintf "R_XMM%d" i) xmm_t)
 let xmm0 = xmms.(0)
 
+(* r8 through r15 *)
+let rs = Array.init 8 (fun i -> nv (Printf.sprintf "R_%d" (i+8)) r64)
+
 (* floating point registers *)
 let st = Array.init 8 (fun i -> nv (Printf.sprintf "R_ST%d" i) st_t)
 
 let regs : var list =
-  ebp::esp::esi::edi::eip::eax::ebx::ecx::edx::eflags::cf::pf::af::zf::sf::oF::dflag::fs_base::gs_base::cs::ds::es::fs::gs::ss::fpu_ctrl::mxcsr::
+  rbp::rsp::rsi::rdi::rip::rax::rbx::rcx::rdx::rflags::cf::pf::af::zf::sf::oF::dflag::fs_base::gs_base::cs::ds::es::fs::gs::ss::fpu_ctrl::mxcsr::
   List.map (fun (n,t) -> Var.newvar n t)
     [
 
@@ -351,14 +354,14 @@ let regs : var list =
     @ Array.to_list xmms
     @ Array.to_list st   (* floating point *)
 
-let o_eax = Oreg 0
-and o_ecx = Oreg 1
-and o_edx = Oreg 2
-and o_ebx = Oreg 3
-and o_esp = Oreg 4
-and o_ebp = Oreg 5
-and o_esi = Oreg 6
-and o_edi = Oreg 7
+let o_rax = Oreg 0
+and o_rcx = Oreg 1
+and o_rdx = Oreg 2
+and o_rbx = Oreg 3
+and o_rsp = Oreg 4
+and o_rbp = Oreg 5
+and o_rsi = Oreg 6
+and o_rdi = Oreg 7
 
 let o_es = Oseg 0
 and o_cs = Oseg 1
@@ -367,13 +370,13 @@ and o_ds = Oseg 3
 and o_fs = Oseg 4
 and o_gs = Oseg 5
 
-let esp_e = Var esp
-and ebp_e = Var ebp
-and esi_e = Var esi
-and edi_e = Var edi
-and ecx_e = Var ecx
-and eax_e = Var eax
-and edx_e = Var edx
+let rsp_e = Var rsp
+and rbp_e = Var rbp
+and rsi_e = Var rsi
+and rdi_e = Var rdi
+and rcx_e = Var rcx
+and rax_e = Var rax
+and rdx_e = Var rdx
 
 let mem = nv "mem" (TMem(r32))
 let mem_e = Var mem
@@ -395,8 +398,8 @@ let x86_dflag_e =
 let gdt_e = Var gdt
 and ldt_e = Var ldt
 
-let esiaddr = Oaddr esi_e
-and ediaddr = Oaddr edi_e
+let esiaddr = Oaddr rsi_e
+and ediaddr = Oaddr rdi_e
 
 let seg_cs = None
 and seg_ss = None
@@ -409,10 +412,42 @@ and seg_gs = Some gs_base
 let dflag_to_bap e =
   ite r32 (e ==* exp_false) (Int(bi1, r32)) (Int(bim1, r32))
 
-let bap_to_eflags =
+let bap_to_rflags =
   let undefined d = Unknown(Printf.sprintf "Undefined EFLAGS bit %d" d, r1) in
   let unmodeled s = Unknown("Unmodeled EFLAGS bit " ^ s, r1) in
-  undefined 31                  (* 31 *)
+     undefined 63               (* 63 *)
+  :: undefined 62               (* 62 *)
+  :: undefined 61               (* 61 *)
+  :: undefined 60               (* 60 *)
+  :: undefined 59               (* 59 *)
+  :: undefined 58               (* 58 *)
+  :: undefined 57               (* 57 *)
+  :: undefined 56               (* 56 *)
+  :: undefined 55               (* 55 *)
+  :: undefined 54               (* 54 *)
+  :: undefined 53               (* 53 *)
+  :: undefined 52               (* 52 *)
+  :: undefined 51               (* 51 *)
+  :: undefined 50               (* 50 *)
+  :: undefined 49               (* 49 *)
+  :: undefined 48               (* 48 *)
+  :: undefined 47               (* 47 *)
+  :: undefined 46               (* 46 *)
+  :: undefined 45               (* 45 *)
+  :: undefined 44               (* 44 *)
+  :: undefined 43               (* 43 *)
+  :: undefined 42               (* 42 *)
+  :: undefined 41               (* 41 *)
+  :: undefined 40               (* 40 *)
+  :: undefined 39               (* 39 *)
+  :: undefined 38               (* 38 *)
+  :: undefined 37               (* 37 *)
+  :: undefined 36               (* 36 *)
+  :: undefined 35               (* 35 *)
+  :: undefined 34               (* 34 *)
+  :: undefined 33               (* 33 *)
+  :: undefined 32               (* 32 *)
+  :: undefined 31               (* 31 *)
   :: undefined 30               (* 30 *)
   :: undefined 29               (* 29 *)
   :: undefined 28               (* 28 *)
@@ -445,16 +480,50 @@ let bap_to_eflags =
   :: undefined 1                (*  1 *)
   :: cf_e                       (*  0 *)
   :: []
+let bap_to_eflags = BatList.drop 32 bap_to_rflags
 let bap_to_flags = BatList.drop 16 bap_to_eflags
 let bap_to_lflags = BatList.drop 8 bap_to_flags
 
+let rflags_e = BatList.reduce (++*) bap_to_rflags
 let eflags_e = BatList.reduce (++*) bap_to_eflags
 and flags_e = BatList.reduce (++*) bap_to_flags
 and lflags_e = BatList.reduce (++*) bap_to_lflags
 
-let eflags_to_bap =
+let rflags_to_bap =
   let assn v = Some(v, Util.id) in
-  None                          (* 31 *)
+     None                       (* 63 *)
+  :: None                       (* 62 *)
+  :: None                       (* 61 *)
+  :: None                       (* 60 *)
+  :: None                       (* 59 *)
+  :: None                       (* 58 *)
+  :: None                       (* 57 *)
+  :: None                       (* 56 *)
+  :: None                       (* 55 *)
+  :: None                       (* 54 *)
+  :: None                       (* 53 *)
+  :: None                       (* 52 *)
+  :: None                       (* 51 *)
+  :: None                       (* 50 *)
+  :: None                       (* 49 *)
+  :: None                       (* 48 *)
+  :: None                       (* 47 *)
+  :: None                       (* 46 *)
+  :: None                       (* 45 *)
+  :: None                       (* 44 *)
+  :: None                       (* 43 *)
+  :: None                       (* 42 *)
+  :: None                       (* 41 *)
+  :: None                       (* 40 *)
+  :: None                       (* 39 *)
+  :: None                       (* 38 *)
+  :: None                       (* 37 *)
+  :: None                       (* 36 *)
+  :: None                       (* 35 *)
+  :: None                       (* 34 *)
+  :: None                       (* 33 *)
+  :: None                       (* 32 *)
+  :: None                       (* 31 *)
   :: None                       (* 30 *)
   :: None                       (* 29 *)
   :: None                       (* 28 *)
@@ -487,15 +556,17 @@ let eflags_to_bap =
   :: None                       (* 01 *)
   :: assn cf                    (* 00 *)
   :: []
+let eflags_to_bap = BatList.drop 32 rflags_to_bap
 let flags_to_bap = BatList.drop 16 eflags_to_bap
 let lflags_to_bap = BatList.drop 8 flags_to_bap
 (* A list of functions for assigning each bit in eflags *)
-let assns_eflags_to_bap =
+let assns_rflags_to_bap =
   List.map
     (function
       | None -> (fun e -> [])
       | Some (v,f) -> (fun e -> [Move(v,f e,[])]))
-    eflags_to_bap
+    rflags_to_bap
+let assns_eflags_to_bap = BatList.drop 32 assns_rflags_to_bap
 let assns_flags_to_bap = BatList.drop 16 assns_eflags_to_bap
 let assns_lflags_to_bap = BatList.drop 8 assns_flags_to_bap
 
@@ -527,20 +598,20 @@ let lowbits2elemt b =
 
 (* converts a register number to the corresponding 32bit register variable *)
 let bits2reg32 = function
-  | 0 -> eax
-  | 1 -> ecx
-  | 2 -> edx
-  | 3 -> ebx
-  | 4 -> esp
-  | 5 -> ebp
-  | 6 -> esi
-  | 7 -> edi
-  | _ -> failwith "bits2reg32 takes 3 bits"
+  | 0 -> rax
+  | 1 -> rcx
+  | 2 -> rdx
+  | 3 -> rbx
+  | 4 -> rsp
+  | 5 -> rbp
+  | 6 -> rsi
+  | 7 -> rdi
+  | _ -> failwith "bits2reg32 takes e bits"
 
 let bits2xmm b = xmms.(b)
 
 and reg2bits r =
-  let (i,_) = BatList.findi (fun _ x -> x == r) [eax; ecx; edx; ebx; esp; ebp; esi; edi] in
+  let (i,_) = BatList.findi (fun _ x -> x == r) [rax; rcx; rdx; rbx; rsp; rbp; rsi; rdi] in
   i
 
 let bits2segreg = function
@@ -578,18 +649,18 @@ let reg2xmm r =
    users. *)
 let subregs =
   let hi r = (reg2bits r) + 4 in
-  (eax, "R_AL", bits2reg8e (reg2bits eax))
-  :: (ecx, "R_CL", bits2reg8e (reg2bits ecx))
-  :: (edx, "R_DL", bits2reg8e (reg2bits edx))
-  :: (ebx, "R_BL", bits2reg8e (reg2bits ebx))
-  :: (eax, "R_AH", bits2reg8e (hi eax))
-  :: (ecx, "R_CH", bits2reg8e (hi ecx))
-  :: (edx, "R_DH", bits2reg8e (hi edx))
-  :: (ebx, "R_BH", bits2reg8e (hi ebx))
-  :: (eax, "R_AX", bits2reg16e (reg2bits eax))
-  :: (ecx, "R_CX", bits2reg16e (reg2bits ecx))
-  :: (edx, "R_DX", bits2reg16e (reg2bits edx))
-  :: (ebx, "R_BX", bits2reg16e (reg2bits ebx))
+  (rax, "R_AL", bits2reg8e (reg2bits rax))
+  :: (rcx, "R_CL", bits2reg8e (reg2bits rcx))
+  :: (rdx, "R_DL", bits2reg8e (reg2bits rdx))
+  :: (rbx, "R_BL", bits2reg8e (reg2bits rbx))
+  :: (rax, "R_AH", bits2reg8e (hi rax))
+  :: (rcx, "R_CH", bits2reg8e (hi rcx))
+  :: (rdx, "R_DH", bits2reg8e (hi rdx))
+  :: (rbx, "R_BH", bits2reg8e (hi rbx))
+  :: (rax, "R_AX", bits2reg16e (reg2bits rax))
+  :: (rcx, "R_CX", bits2reg16e (reg2bits rcx))
+  :: (rdx, "R_DX", bits2reg16e (reg2bits rdx))
+  :: (rbx, "R_BX", bits2reg16e (reg2bits rbx))
   :: []
 
 let subregs_find =
@@ -600,14 +671,14 @@ let subregs_find =
 (* effective addresses for 16-bit addressing *)
 let eaddr16 = function
   (* R/M byte *)
-  | 0 -> (Var ebx) +* (Var esi)
-  | 1 -> (Var ebx) +* (Var edi)
-  | 2 -> (Var ebp) +* (Var esi)
-  | 3 -> (Var ebp) +* (Var edi)
-  | 4 -> Var esi
-  | 5 -> Var edi
-  | 6 -> Var ebp
-  | 7 -> Var ebx
+  | 0 -> (Var rbx) +* (Var rsi)
+  | 1 -> (Var rbx) +* (Var rdi)
+  | 2 -> (Var rbp) +* (Var rsi)
+  | 3 -> (Var rbp) +* (Var rdi)
+  | 4 -> Var rsi
+  | 5 -> Var rdi
+  | 6 -> Var rbp
+  | 7 -> Var rbx
   | _ -> disfailwith "eaddr16 takes only 0-7"
 
 let eaddr16e b = cast_low r16 (eaddr16 b)
@@ -691,9 +762,9 @@ let assn_s s t v e =
 
 (* Double width operands, as used by multiplication and division *)
 let op_dbl = function
-  | Reg 8 -> [r16, o_eax]
-  | Reg 16 -> [r16, o_edx; r16, o_eax]
-  | Reg 32 -> [r32, o_edx; r32, o_eax]
+  | Reg 8 -> [r16, o_rax]
+  | Reg 16 -> [r16, o_rdx; r16, o_rax]
+  | Reg 32 -> [r32, o_rdx; r32, o_rax]
   | _ -> disfailwith "op_dbl only defined for Reg 8, 16, and 32"
 
 (* Return an expression for a double-width operand, as used by the div
