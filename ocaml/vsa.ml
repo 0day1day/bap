@@ -84,7 +84,7 @@ struct
 
   let size (_,s,lb,ub) =
     if s = 0L then 1L
-    else (ub -% lb) /% s
+    else ((ub -% lb) /% s) +% 1L
 
   let highbit k =
     if k = 1 then 1L else I.shift_left 1L (k-1)
