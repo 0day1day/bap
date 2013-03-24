@@ -15,6 +15,7 @@ let short_tests = [
   Dominator_suite.suite;
   Djgraph_suite.suite;
   Unroll_suite.suite;
+  Steensgard_suite.suite;
 ];;
 
 let bap_tests = ("BAP" >::: short_tests);;

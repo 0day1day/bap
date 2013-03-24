@@ -105,6 +105,7 @@ export SOURCES = \
 	structural_analysis.ml \
 	steensgard.mli steensgard.ml \
 	lnf.mli lnf.ml \
+	lnf_steensgard.mli lnf_steensgard.ml \
 	unroll.mli unroll.ml \
 	fwp.mli fwp.ml \
 	ast_slice.ml \

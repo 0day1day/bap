@@ -61,6 +61,7 @@ define PROJ_baptest
 	arithmetic_suite.ml \
 	dominator_suite.ml \
 	djgraph_suite.ml \
+	steensgard_suite.ml \
 	unroll_suite.ml \
 	bap_suite.ml
 	DOC_FILES=$(SOURCES)
