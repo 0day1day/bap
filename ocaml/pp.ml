@@ -95,6 +95,7 @@ class pp ft =
   let pp = F.pp_print_string ft
   and pc = F.pp_print_char ft
   and space = Format.pp_print_space ft
+  and break () = Format.pp_print_break ft 0 0
   and printf = Format.fprintf ft
   and opn  = F.pp_open_box ft
   and cls = F.pp_close_box ft in
@@ -190,7 +191,8 @@ object (self)
       | PLUS | MINUS -> 80
       | TIMES | DIVIDE | SDIVIDE | MOD | SMOD -> 90
     in
-    opn 0;
+    break ();
+    opn 1;
     (match e with
      | Ast.Load(arr,idx,edn,t) ->
 	 lparen 110;
@@ -348,7 +350,8 @@ object (self)
     | x -> self#ssa_value x
 
   method ssa_exp e =
-    opn 0;
+    break ();
+    opn 1;
     (match e with
      | Ssa.Load(arr,idx,edn, t) ->
 	 self#ssa_value arr;
