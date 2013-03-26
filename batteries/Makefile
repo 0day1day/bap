@@ -70,6 +70,7 @@ clean:
 	${RM} qtest/*_t.ml qtest/test_mods.mllib
 	${RM} src/batteries_config.ml
 	${RM} src/batCamomile.ml
+	${RM} all
 	$(OCAMLBUILD) -clean
 
 doc:
