@@ -58,11 +58,12 @@ else
   MODE = bytecode
 endif
 
-.PHONY: all clean doc install uninstall reinstall test qtest camfail camfailunk
+.PHONY: clean doc install uninstall reinstall test qtest camfail camfailunk
 
-all: src/batCamomile.ml
+all: VERSION src/batCamomile.ml
 	@echo "Build mode:" $(MODE)
 	$(OCAMLBUILD) $(OCAMLBUILDFLAGS) $(TARGETS)
+	touch all
 
 clean:
 	${RM} apidocs
