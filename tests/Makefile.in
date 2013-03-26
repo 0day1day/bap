@@ -29,7 +29,7 @@ ifeq (@HAVE_LLVM_AC@,yes)
 export LLVM_PACKS = @LLVM_PACKAGE@ @LLVM_PACKAGE@.analysis @LLVM_PACKAGE@.executionengine @LLVM_PACKAGE@.target @LLVM_PACKAGE@.scalar_opts @LLVM_PACKAGE@.bitwriter
 endif
 
-export PACKS = camlidl bigarray str num unix camomile piqi.lib $(LLVM_PACKS)
+export PACKS = bigarray str num unix camomile piqi.lib $(LLVM_PACKS)
 export LIBS = zarith batteries oUnit pcre objsize graph libtrace bap
 export INCDIRS = $(BAP_OCAMLDIR) $(BIGINT) $(BATT) $(OUNIT) $(PCRE) $(OCAMLGRAPH) $(OBJSIZE) $(LIBTRACE)
 export OCAMLPATH = $(PIQIBUILDDIR)
