@@ -58,6 +58,20 @@ let steensgard_fig3 : test = (v0, [
   {headers=[vc]; body=[vc; vd]; children=[]}
 ]}])
 
+let ramalingam_fig2 : test = (v0, [
+  (v0, [va; vend]);
+  (va, [vb; vc]);
+  (vb, [vd]);
+  (vc, [ve]);
+  (vd, [vb; ve; vend]);
+  (ve, [vc; vd; vend]);
+  (vend, [])
+], [
+  {headers=[vb; vc]; body=[vb; vc; vd; ve]; children=[
+    {headers=[vd; ve]; body=[vd; ve]; children=[]}
+  ]}
+])
+
 (*
  * build_graph: vertex_spec list -> G.t
  *
@@ -86,5 +100,6 @@ let suite = "Steensgard" >:::
   [
     "steensgard_fig2_test" >:: (fun () -> run_test steensgard_fig2);
     "steensgard_fig3_test" >:: (fun () -> run_test steensgard_fig3);
+    "ramalingam_fig2_test" >:: (fun () -> run_test ramalingam_fig2);
   ]
 
