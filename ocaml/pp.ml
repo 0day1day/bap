@@ -95,9 +95,9 @@ class pp ft =
   let pp = F.pp_print_string ft
   and pc = F.pp_print_char ft
   and space = Format.pp_print_space ft
-  and break () = Format.pp_print_break ft 0 0
+  and break () = Format.pp_print_break ft 0 1
   and printf = Format.fprintf ft
-  and opn  = F.pp_open_box ft
+  and opn  = F.pp_open_hovbox ft
   and cls = F.pp_close_box ft in
   let comma () = pp ","; space() in
   let vctx = (VH.create 100, Hashtbl.create 100) in
@@ -191,8 +191,7 @@ object (self)
       | PLUS | MINUS -> 80
       | TIMES | DIVIDE | SDIVIDE | MOD | SMOD -> 90
     in
-    break ();
-    opn 1;
+    opn 0;
     (match e with
      | Ast.Load(arr,idx,edn,t) ->
 	 lparen 110;
@@ -237,8 +236,10 @@ object (self)
      | Ast.Concat(le, re) ->
 	 pp "concat:";
 	 pc '[';
+         break ();
 	 self#ast_exp le;
 	 pp "][";
+         break ();
 	 self#ast_exp re;
 	 pc ']'
      | Ast.BinOp(b,x,y) ->
@@ -350,8 +351,7 @@ object (self)
     | x -> self#ssa_value x
 
   method ssa_exp e =
-    break ();
-    opn 1;
+    opn 0;
     (match e with
      | Ssa.Load(arr,idx,edn, t) ->
 	 self#ssa_value arr;
