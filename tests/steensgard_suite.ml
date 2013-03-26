@@ -14,16 +14,16 @@ open Lnf
 
 let n = G.V.create;;
 
-let v0 = n 1
-and va = n 2
-and vb = n 3
-and vc = n 4
-and vd = n 5
-and ve = n 6
-and vf = n 7
-and vg = n 8
-and vh = n 9
-and vend = n 10
+let v0 = n 0
+and va = n 1
+and vb = n 2
+and vc = n 3
+and vd = n 4
+and ve = n 5
+and vf = n 6
+and vg = n 7
+and vh = n 8
+and vend = n 9
 
 (* 
  * TODO(awreece) Is there a better way?
@@ -77,9 +77,10 @@ let build_graph vertex_spec_list =
 let run_test (v0,edge_list,expected_lnf) =
   let g = build_graph edge_list in
   let lnf = L.lnf g in
+  let g = build_graph edge_list in
   assert_bool ("Invalid lnf: " ^ (Lnf.string_of_lnf G.v2s lnf))
               (Lnf.validate_lnf lnf);
-  assert_equal ~printer:(Lnf.string_of_lnf G.v2s) expected_lnf lnf
+              assert_equal ~printer:(Lnf.string_of_lnf G.v2s) expected_lnf lnf
 
 let suite = "Steensgard" >:::
   [

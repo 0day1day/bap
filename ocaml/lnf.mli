@@ -10,6 +10,7 @@ sig
 
   val remove_edge_e : t -> E.t -> unit
   val v2s : V.t -> string
+  val nb_vertex : t -> int
 end
 
 (* body is a superset of headers. *)
@@ -28,3 +29,8 @@ module type MakeType =
     sig
       val lnf : Gr.t -> Gr.V.t lnf
     end
+
+module Dot : functor(Gr: G) ->
+sig
+  val to_dot: ?e2s:(Gr.E.t -> string) -> Gr.t -> Gr.V.t lnf -> string
+end
