@@ -69,11 +69,12 @@ module Dot(Gr: G) =
 struct
   let to_dot ?(e2s=(fun _ -> "")) graph lnf =
     let module VS = Set.Make(Gr.V) in
+    let module H = Hashtbl.Make(Gr.V) in
     (*
      * A map from vertex -> the set of nodes that are a header of it
      * for some loop. This allows us to identify loop back edges.
      *)
-    let h = Hashtbl.create (Gr.nb_vertex graph) in
+    let h = H.create (Gr.nb_vertex graph) in
     let loops_processed = ref 0 in
 
     (*
@@ -124,11 +125,11 @@ struct
        * to record for each body node the set of headers that dominate it.
        *)
       let add_header_relationship vertex header =
-        let () = if not (Hashtbl.mem h vertex)
-                 then Hashtbl.add h vertex VS.empty
+        let () = if not (H.mem h vertex)
+                 then H.add h vertex VS.empty
                  else () in
-        let s = Hashtbl.find h vertex in
-        Hashtbl.replace h vertex (VS.add header s) in
+        let s = H.find h vertex in
+        H.replace h vertex (VS.add header s) in
       let () = List.iter (fun v -> List.iter (add_header_relationship v)
                                              lnt.headers)
                          lnt.body in
@@ -147,7 +148,7 @@ struct
     let string_of_edge edge =
       let src = Gr.E.src edge in
       let dst = Gr.E.dst edge in
-      let headers_of_src = if Hashtbl.mem h src then Hashtbl.find h src else VS.empty in
+      let headers_of_src = if H.mem h src then H.find h src else VS.empty in
       (*
        * To keep the output pretty, loopback edges shouldn't constrain the
        * layout.
