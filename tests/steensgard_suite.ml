@@ -91,10 +91,9 @@ let build_graph vertex_spec_list =
 let run_test (v0,edge_list,expected_lnf) =
   let g = build_graph edge_list in
   let lnf = L.lnf g in
-  let g = build_graph edge_list in
   assert_bool ("Invalid lnf: " ^ (Lnf.string_of_lnf G.v2s lnf))
               (Lnf.validate_lnf lnf);
-              assert_equal ~printer:(Lnf.string_of_lnf G.v2s) expected_lnf lnf
+  assert_equal ~printer:(Lnf.string_of_lnf G.v2s) expected_lnf lnf
 
 let suite = "Steensgard" >:::
   [

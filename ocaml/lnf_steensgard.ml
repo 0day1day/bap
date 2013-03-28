@@ -13,6 +13,7 @@ module Make(C: G) =
 struct
   (* Get loop information from Steensgard's loop forest *)
   let lnf cfg =
+    (* XXX: We should really make a copy here *)
     let module Comp = Graph.Components.Make(C) in
     let module VS = Set.Make(C.V) in
     let f cfg =
@@ -33,7 +34,6 @@ struct
         | _ ->
           let h = Hashtbl.create (List.length scc) in
           List.iter (fun v -> dprintf "scc %s" (C.v2s v); Hashtbl.add h v ()) scc;
-          let cfg = cfg in
 
           let entry_nodes = C.fold_edges_e (fun e s ->
             if Hashtbl.mem h (C.E.dst e) = true && Hashtbl.mem h (C.E.src e) = false
@@ -62,6 +62,7 @@ struct
                                                 | _ -> true
           ) (Comp.scc_list cfg) in
 
+          (* XXX: Probably makes more sense to sort in the steensgard test than here *)
           { headers=List.sort compare (VS.elements entry_nodes)
           ; body=List.sort compare scc
           ; children=List.sort compare (List.map (process_scc cfg) sccs) }
