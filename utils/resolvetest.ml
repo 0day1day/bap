@@ -57,9 +57,9 @@ let lift_func (n,s,e) =
     pp#close
   )
 let lift_func =
-  Util.timeout !timeout lift_func
+  Util.timeout ~secs:!timeout ~f:lift_func
 let lift_func ((n,_,_) as x) =
-  try lift_func x
+  try lift_func ~x
   with e ->
     Printf.printf "Lifting %s failed: %s\n" n (Printexc.to_string e)
 

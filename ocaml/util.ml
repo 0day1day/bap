@@ -592,8 +592,8 @@ struct
     flush stdout
 end
 
-let timeout_option n f =
-  (fun x ->
+let timeout_option ~secs ~f =
+  (fun ~x ->
     let b = Sys.signal Sys.sigalrm (Sys.Signal_handle (fun _ -> raise Timeout)) in
     if b <> Sys.Signal_default then failwith "timeout: Expected exclusive use of alarm signal";
     let cleanup () =
@@ -601,7 +601,7 @@ let timeout_option n f =
       Sys.set_signal Sys.sigalrm b
     in
     try
-      let old = Unix.alarm n in
+      let old = Unix.alarm secs in
       if old <> 0 then failwith "timeout: Expected exclusive use of Unix.alarm";
       let o = (f x) in
         (* turn alarm off *)
@@ -612,9 +612,9 @@ let timeout_option n f =
     (* Propagate exceptions up *)
     | e -> cleanup (); raise e)
 
-let timeout n f =
-  let f = timeout_option n f in
-  (fun x ->
+let timeout ~secs ~f =
+  let f = timeout_option ~secs ~f in
+  (fun ~x ->
     match f x with | Some x -> x | None -> raise Timeout)
 
 let rec print_separated_list ps sep lst = 
