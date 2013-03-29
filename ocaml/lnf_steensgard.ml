@@ -68,9 +68,7 @@ struct
           ; children=List.sort compare (List.map (process_scc cfg) sccs) }
 
       in
-      match sccs with
-      | [] -> failwith "loopinfo_from_steensgard: impossible"
-      | _ -> List.sort compare (List.map (process_scc cfg) sccs)
+      List.sort compare (List.map (process_scc cfg) sccs)
     in
     f cfg
 end
