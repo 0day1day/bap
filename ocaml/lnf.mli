@@ -27,7 +27,7 @@ val string_of_lnt : ('a -> string) -> 'a lnt -> string
 module type MakeType =
   functor (Gr: G) ->
     sig
-      val lnf : Gr.t -> Gr.V.t lnf
+      val lnf : Gr.t -> Gr.V.t -> Gr.V.t lnf
     end
 
 module Dot : functor(Gr: G) ->

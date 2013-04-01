@@ -106,6 +106,7 @@ export SOURCES = \
 	steensgard.mli steensgard.ml \
 	lnf.mli lnf.ml \
 	lnf_steensgard.mli lnf_steensgard.ml \
+	lnf_havlak.mli lnf_havlak.ml \
 	unroll.mli unroll.ml \
 	fwp.mli fwp.ml \
 	ast_slice.ml \

@@ -8,7 +8,7 @@ struct
   let v2s v = string_of_int (V.label v)
 end
 
-module L = Lnf_steensgard.Make(G)
+module L = Lnf_havlak.Make(G)
 
 open Lnf
 
@@ -38,26 +38,6 @@ and vend = n 9
 type vertex_spec = G.V.t * (G.V.t list)
 type test = G.V.t * (vertex_spec list) * G.V.t lnf
 
-let steensgard_fig2 : test = (v0, [
-  (v0, [va; vend]);
-  (va, [vb; vc]);
-  (vb, [vc]);
-  (vc, [vd]);
-  (vd, [vb]);
-  (vend, [])
-], [{headers=[vb; vc]; body=[vb; vc; vd]; children=[]}])
-
-let steensgard_fig3 : test = (v0, [
-  (v0, [va; vend]);
-  (va, [vb]);
-  (vb, [vc]);
-  (vc, [vd]);
-  (vd, [vb; vc]);
-  (vend, [])
-], [{headers=[vb]; body=[vb; vc; vd]; children=[
-  {headers=[vc]; body=[vc; vd]; children=[]}
-]}])
-
 let ramalingam_fig2 : test = (v0, [
   (v0, [va; vend]);
   (va, [vb; vc]);
@@ -67,8 +47,10 @@ let ramalingam_fig2 : test = (v0, [
   (ve, [vc; vd; vend]);
   (vend, [])
 ], [
-  {headers=[vb; vc]; body=[vb; vc; vd; ve]; children=[
-    {headers=[vd; ve]; body=[vd; ve]; children=[]}
+  {headers=[vb]; body=[vb; vc; vd; ve]; children=[
+    {headers=[vd]; body=[vc; vd; ve]; children=[
+      {headers=[ve]; body=[vc; ve]; children=[]}
+    ]}
   ]}
 ])
 
@@ -94,12 +76,10 @@ let run_test (v0,edge_list,expected_lnf) =
   let g = build_graph edge_list in
   assert_bool ("Invalid lnf: " ^ (Lnf.string_of_lnf G.v2s lnf))
               (Lnf.validate_lnf lnf);
-  assert_equal ~printer:(Lnf.string_of_lnf G.v2s) expected_lnf lnf
+              assert_equal ~printer:(Lnf.string_of_lnf G.v2s) expected_lnf lnf
 
 let suite = "Steensgard" >:::
   [
-    "steensgard_fig2_test" >:: (fun () -> run_test steensgard_fig2);
-    "steensgard_fig3_test" >:: (fun () -> run_test steensgard_fig3);
     "ramalingam_fig2_test" >:: (fun () -> run_test ramalingam_fig2);
   ]
 

@@ -23,7 +23,6 @@ let rec is_subset sub sup =
   | [], _ -> true
   | x::_, [] -> false
   | x::subrest, y::suprest when x = y -> is_subset subrest suprest
-  | x::subrest, y::suprest when x > y -> false
   | _, y::suprest -> is_subset sub suprest
 
 let rec setminus a b =
@@ -62,7 +61,7 @@ and string_of_lnt print_fun lnt =
 module type MakeType =
   functor (Gr: G) ->
     sig
-      val lnf : Gr.t -> Gr.V.t lnf
+      val lnf : Gr.t -> Gr.V.t -> Gr.V.t lnf
     end
 
 module Dot(Gr: G) =
