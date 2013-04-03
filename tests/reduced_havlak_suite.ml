@@ -8,7 +8,7 @@ struct
   let v2s v = string_of_int (V.label v)
 end
 
-module L = Lnf_havlak.Make(G)
+module L = Lnf_reduced_havlak.Make(G)
 
 open Lnf
 
@@ -47,11 +47,7 @@ let ramalingam_fig2 : test = (v0, [
   (ve, [vc; vd; vend]);
   (vend, [])
 ], [
-  {headers=[vb]; body=[vb; vc; vd; ve]; children=[
-    {headers=[vd]; body=[vc; vd; ve]; children=[
-      {headers=[ve]; body=[vc; ve]; children=[]}
-    ]}
-  ]}
+  {headers=[vb; vd; ve]; body=[vb; vc; vd; ve]; children=[]}
 ])
 
 (*
@@ -78,7 +74,7 @@ let run_test (v0,edge_list,expected_lnf) =
               (Lnf.validate_lnf lnf);
   assert_equal ~printer:(Lnf.string_of_lnf G.v2s) expected_lnf lnf
 
-let suite = "Havlak" >:::
+let suite = "ReducedHavlak" >:::
   [
     "ramalingam_fig2_test" >:: (fun () -> run_test ramalingam_fig2);
   ]

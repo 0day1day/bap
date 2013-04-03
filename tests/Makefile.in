@@ -63,6 +63,7 @@ define PROJ_baptest
 	djgraph_suite.ml \
 	steensgard_suite.ml \
 	havlak_suite.ml \
+	reduced_havlak_suite.ml \
 	unroll_suite.ml \
 	bap_suite.ml
 	DOC_FILES=$(SOURCES)
