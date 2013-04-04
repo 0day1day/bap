@@ -280,18 +280,22 @@ let st_t = Reg 80
 let nv = Var.newvar
 let nt = Var_temp.nt
 
+type multiarchreg = { v32: Var.t; v64: Var.t }
+(* new multi-arch variable *)
+let nmv n32 t32 n64 t64 = { v32=nv n32 t32; v64=nv n64 t64; }
+
 (* registers *)
 
-let ebp = nv "R_EBP" r32
-and esp = nv "R_ESP" r32
-and esi = nv "R_ESI" r32
-and edi = nv "R_EDI" r32
-and eip = nv "R_EIP" r32 (* why is eip in here? *)
-and eax = nv "R_EAX" r32
-and ebx = nv "R_EBX" r32
-and ecx = nv "R_ECX" r32
-and edx = nv "R_EDX" r32
-and eflags = nv "EFLAGS" r32 (* why is eflags in here? *)
+let rbp = nmv "R_EBP" r32 "R_RBP" r64
+and rsp = nmv "R_ESP" r32 "R_RSP" r64
+and rsi = nmv "R_ESI" r32 "R_RSI" r64
+and rdi = nmv "R_EDI" r32 "R_RDI" r64
+and rip = nmv "R_EIP" r32 "R_RIP" r64 (* XXX why is eip in here? *)
+and rax = nmv "R_EAX" r32 "R_RAX" r64
+and rbx = nmv "R_EBX" r32 "R_RBX" r64
+and rcx = nmv "R_ECX" r32 "R_RCX" r64
+and rdx = nmv "R_EDX" r32 "R_RDX" r64
+and rflags = nmv "EFLAGS" r32 "RFLAGS" r64 (* XXX why is eflags in here? *)
   (* condition flag bits *)
 and cf = nv "R_CF" r1
 and pf = nv "R_PF" r1
@@ -318,6 +322,9 @@ and ldt = nv "R_LDT" r32
 
 and fpu_ctrl = nv "R_FPU_CONTROL" r16
 and mxcsr = nv "R_MXCSR" r32
+
+(* r8 -> r15 *)
+let nums = Array.init 8 (fun i -> nv (Printf.sprintf "R_%d" (i+8)) r64)
 
 let xmms = Array.init 8 (fun i -> nv (Printf.sprintf "R_XMM%d" i) xmm_t)
 let xmm0 = xmms.(0)
@@ -350,6 +357,7 @@ let regs : var list =
     ]
     @ Array.to_list xmms
     @ Array.to_list st   (* floating point *)
+    @ Array.to_list nums
 
 let o_eax = Oreg 0
 and o_ecx = Oreg 1
