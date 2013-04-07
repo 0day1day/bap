@@ -95,8 +95,9 @@ class pp ft =
   let pp = F.pp_print_string ft
   and pc = F.pp_print_char ft
   and space = Format.pp_print_space ft
+  and break () = Format.pp_print_break ft 0 1
   and printf = Format.fprintf ft
-  and opn  = F.pp_open_box ft
+  and opn  = F.pp_open_hovbox ft
   and cls = F.pp_close_box ft in
   let comma () = pp ","; space() in
   let vctx = (VH.create 100, Hashtbl.create 100) in
@@ -235,8 +236,10 @@ object (self)
      | Ast.Concat(le, re) ->
 	 pp "concat:";
 	 pc '[';
+         break ();
 	 self#ast_exp le;
 	 pp "][";
+         break ();
 	 self#ast_exp re;
 	 pc ']'
      | Ast.BinOp(b,x,y) ->

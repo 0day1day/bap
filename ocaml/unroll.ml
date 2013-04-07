@@ -42,7 +42,7 @@ let find_loop_head cfg bbs_of_node nodes =
   let tl = BatList.filter_map Util.id tl in
   match tl with
   | [hd] -> hd
-  | _ -> failwith (Printf.sprintf "find_loop_head: Failed to identify loop head in [%s]. This is likely caused by an irreducible loop."
+  | _ -> failwith (Printf.sprintf "find_loop_head: Failed to identify loop head in [%s]."
     (Hashtbl.fold (fun n _ s -> (Cfg_ast.v2s n) ^ " " ^ s) h ""))
 
 (* Get loop information from Steensgard's algorithm *)
