@@ -20,7 +20,7 @@ let basic_nested () =
   and main_10 = unroll 10 in
   (* The program should work when loops are unrolled 10 times, but no fewer *)
   let ctx = Symbeval.concretely_execute main_10 in
-  assert_equal ~msg:"The output of the program should be 100" (Symbeval.Concrete.lookup_var ctx.Symbeval.delta Disasm_i386.eax) (Symbeval.Symbolic(Int(bi 100, reg_32)));
+  assert_equal ~msg:"The output of the program should be 100" (Symbeval.Concrete.lookup_var ctx.Symbeval.delta Disasm_i386.R32.eax) (Symbeval.Symbolic(Int(bi 100, reg_32)));
   try ignore(Symbeval.concretely_execute main_9);
       assert_failure "Unrolling <10 times should produce an error"
   with Symbeval.Concrete.AssertFailed _ -> ()

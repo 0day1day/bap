@@ -8,7 +8,7 @@ open Cfg
 module D = Debug.Make(struct let name = "Syscall_id" and default=`NoDebug end)
 open D
 
-let syscall_reg = Disasm_i386.eax;;
+let syscall_reg = Disasm_i386.R32.eax;;
 
 module S = Big_int_convenience.BIS
 

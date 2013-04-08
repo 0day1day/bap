@@ -54,11 +54,11 @@ let linux_get_model = function
   | 1 ->
       (* exit *)
       (* Exit code is in ebx *)
-    Some(Halt(Var Disasm_i386.ebx, [])
+    Some(Halt(Var Disasm_i386.R32.ebx, [])
          :: [])
   | 252 ->
     (* exit group *)
-    Some(Halt(Var Disasm_i386.ebx, [])
+    Some(Halt(Var Disasm_i386.R32.ebx, [])
          :: [])
   | _ ->
       None
@@ -71,5 +71,5 @@ let linux_syscall_to_il eax =
     | None ->
         let sys_name = linux_get_name eax in
         Special (sys_name, [])
-        :: Move(Disasm_i386.eax, Unknown("System call output", reg_32), [])
+        :: Move(Disasm_i386.R32.eax, Unknown("System call output", reg_32), [])
         :: []

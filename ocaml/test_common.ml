@@ -159,7 +159,7 @@ let check_eax ctx eax =
   Var.VarHash.iter 
     (fun k v ->
       match v with
-      | Symbeval.Symbolic e when k = Disasm_i386.eax ->
+      | Symbeval.Symbolic e when k = Disasm_i386.R32.eax ->
 	check_bigint_answer e eax
       | _ -> ()
     ) ctx.Symbeval.delta;;

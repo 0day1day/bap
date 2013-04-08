@@ -1208,7 +1208,7 @@ let run_block ?(next_label = None) ?(transformf = (fun s _ -> [s])) state memv t
        HACK: This is a pretty ugly hack.
     *)
     if Syscall_models.x86_is_system_call stmt then
-      let eax = evalf (Var Disasm_i386.eax) in
+      let eax = evalf (Var Disasm_i386.R32.eax) in
       let stmts = (match eax with
         | Int(i, _) ->
           Syscall_models.linux_syscall_to_il (int_of_big_int i)

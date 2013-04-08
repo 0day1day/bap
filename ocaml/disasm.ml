@@ -4,7 +4,7 @@ exception Unimplemented
 
 let disasm_instr arch =
   match arch with
-  | Libbfd.Bfd_arch_i386 -> Disasm_i386.disasm_instr
+  | Libbfd.Bfd_arch_i386 -> Disasm_i386.disasm_instr Disasm_i386.B32
   | _ -> raise Unimplemented
 
 let is_temp = Var_temp.is_temp

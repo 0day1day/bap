@@ -3,7 +3,7 @@
 open Type
 
 let x86_regs = Disasm_i386.regs
-let x86_mem = Disasm_i386.mem
+let x86_mem = Disasm_i386.R32.mem
 
 let arm_regs =
   List.map (fun n -> Var.newvar n (Reg 32))
