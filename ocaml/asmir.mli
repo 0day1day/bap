@@ -54,6 +54,7 @@ val decls_for_arch : arch -> Ast.var list
 val gamma_for_arch : arch -> varctx
 
 val get_asmprogram_arch : asmprogram -> arch
+val get_asmprogram_mach : asmprogram -> machine_t
 
 val x86_mem : Var.t
 val x86_regs : Var.t list
@@ -99,10 +100,10 @@ val is_load : section_ptr -> bool
 val is_code : section_ptr -> bool
 
 val byte_insn_to_bap :
-  bfd_architecture -> address_t -> char array -> Ast.program * int64
+  bfd_architecture -> machine_t -> address_t -> char array -> Ast.program * int64
 
 val byte_sequence_to_bap :
-  char array -> bfd_architecture -> address_t -> Ast.program list
+  char array -> bfd_architecture -> machine_t -> address_t -> Ast.program list
 
 val set_print_warning : bool -> unit
 

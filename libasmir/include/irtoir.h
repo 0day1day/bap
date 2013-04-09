@@ -179,7 +179,7 @@ extern "C" {
 
   /* extern bap_blocks_t * asmir_asmprogram_to_bap(asm_program_t *prog); */
   /* extern bap_blocks_t * asmir_asmprogram_range_to_bap(asm_program_t *prog, address_t start, address_t end); */
-  extern asm_program_t* byte_insn_to_asmp(bfd_architecture arch, address_t addr, unsigned char *bb_bytes, unsigned int len);
+  extern asm_program_t* byte_insn_to_asmp(bfd_architecture arch, unsigned long mach, address_t addr, unsigned char *bb_bytes, unsigned int len);
   extern bap_block_t* asmir_addr_to_bap(asm_program_t *p, address_t addr, address_t *next);
 
   extern int asmir_bap_blocks_size(bap_blocks_t *bs);

@@ -382,26 +382,25 @@ enum bfd_architecture asmir_get_asmp_arch(asm_program_t *prog) {
   return bfd_get_arch(prog->abfd);
 }
 
+unsigned long asmir_get_asmp_mach(asm_program_t *prog) {
+  return bfd_get_mach(prog->abfd);
+}
 
 // from old translate.cpp fake_prog_for_arch()
 // Returns a fake asm_program_t for use when disassembling bits out of memory
-asm_program_t* asmir_new_asmp_for_arch(enum bfd_architecture arch)
+asm_program_t* asmir_new_asmp_for_arch(enum bfd_architecture arch, unsigned long mach)
 {
-  
-  int machine = 0; // TODO: pick based on arch
   asm_program_t *prog = malloc(sizeof(asm_program_t));
   assert(prog);
-  
+
   prog->abfd = bfd_openw("/dev/null", NULL);
   if (!prog->abfd) {
     bfd_perror("Unable to open fake bfd");
   }
-  
-  assert(prog->abfd);
-  bfd_set_arch_info(prog->abfd, bfd_lookup_arch(arch, machine));
 
-  //not in .h bfd_default_set_arch_mach(prog->abfd, arch, machine);
-  bfd_set_arch_info(prog->abfd, bfd_lookup_arch(arch, machine));
+  assert(prog->abfd);
+  bfd_set_arch_info(prog->abfd, bfd_lookup_arch(arch, mach));
+
   init_disasm_info(prog);
 
   // Use a special read memory function

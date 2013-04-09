@@ -25,6 +25,7 @@ exception Memory_error;;
 type arch = Libbfd.bfd_architecture
 type asmprogram = {asmp : Libasmir.asm_program_t;
 		   arch : arch;
+                   mach : int;
 		   secs : section_ptr list;
                    (** Get executable code bytes *)
 		   get_exec : int64 -> char;
@@ -406,7 +407,8 @@ let gamma_for_arch = function
   | _ -> failwith "gamma_for_arch: unsupported arch"
 
 
-let get_asmprogram_arch {arch=arch}= arch
+let get_asmprogram_arch {arch} = arch
+let get_asmprogram_mach {mach} = mach
 
 let fold_memory_data f md acc =
   let size = Libasmir.memory_data_size md - 1 in
@@ -507,7 +509,7 @@ let open_program ?base filename =
   let secs = Array.to_list (get_all_sections prog)  in
   let get_exec = section_contents prog secs in
   let get_readable = section_contents ~which:loaded prog secs in 
- {asmp=prog; arch=Libasmir.asmir_get_asmp_arch prog; secs=secs; get_exec=get_exec; get_readable=get_readable}
+ {asmp=prog; arch=Libasmir.asmir_get_asmp_arch prog; mach=Libasmir.asmir_get_asmp_mach prog; secs=secs; get_exec=get_exec; get_readable=get_readable}
 
 
 let get_asm = function
@@ -541,7 +543,7 @@ let get_asm = function
 
 
 (** Translate only one address of a  Libasmir.asm_program_t to BAP *)
-let asm_addr_to_bap {asmp=prog; arch=arch; get_exec=get_exec} addr =
+let asm_addr_to_bap {asmp=prog; arch; mach; get_exec} addr =
   let fallback() =
     let g = gamma_for_arch arch in
     let (block, next) = Libasmir.asmir_addr_to_bap prog addr in
@@ -562,7 +564,7 @@ let asm_addr_to_bap {asmp=prog; arch=arch; get_exec=get_exec} addr =
   in
   try 
     let (ir,na) as v = 
-      (try (Disasm.disasm_instr arch get_exec addr)
+      (try (Disasm.disasm_instr arch mach get_exec addr)
        with Disasm_i386.Disasm_i386_exception s -> 
 	 DTest.dprintf "BAP unknown disasm_instr %Lx: %s" addr s;
          DTest.dprintf "Faulting instruction: %s" (Libasmir.asmir_string_of_insn prog addr);
@@ -623,16 +625,16 @@ let asmprogram_to_bap ?(init_ro=false) p =
 
 (* Returns a single ASM instruction (as a list IL statements) from a
    sequence of bytes. *)
-let byte_insn_to_bap arch addr bytes =
+let byte_insn_to_bap arch mach addr bytes =
   let prog = Libasmir.byte_insn_to_asmp arch addr bytes in
   let get_exec a = bytes.(Int64.to_int (Int64.sub a addr)) in
-  let (pr, n) = asm_addr_to_bap {asmp=prog; arch=arch; secs=[]; get_exec=get_exec; get_readable=get_exec} addr in
+  let (pr, n) = asm_addr_to_bap {asmp=prog; arch; mach; secs=[]; get_exec; get_readable=get_exec} addr in
   Libasmir.asmir_close prog;
   pr, Int64.sub n addr
 
 (* Transforms a byte sequence (byte array), to a list of lists of IL
    statements *)
-let byte_sequence_to_bap bytes arch addr =
+let byte_sequence_to_bap bytes arch mach addr =
   let prog = Libasmir.byte_insn_to_asmp arch addr bytes in
   let len = Array.length bytes in
   let end_addr = Int64.add addr (Int64.of_int len) in
@@ -640,7 +642,7 @@ let byte_sequence_to_bap bytes arch addr =
   let rec read_all acc cur_addr =
     if cur_addr >= end_addr then List.rev acc
     else
-      let prog, next = asm_addr_to_bap {asmp=prog; arch=arch; secs=[]; get_exec=get_exec; get_readable=get_exec} cur_addr in
+      let prog, next = asm_addr_to_bap {asmp=prog; arch; mach; secs=[]; get_exec; get_readable=get_exec} cur_addr in
       read_all (prog::acc) next
   in
   let il = read_all [] addr in
@@ -709,7 +711,7 @@ module PinTrace = struct
     | Libasmir.FRM_STD2 -> 
       let bytes, addr, _ = Libasmir.asmir_frame_get_insn_bytes f in
     (* Array.iter (fun x -> dprintf "Byte: %x" (int_of_char x)) bytes; *)
-      let stmts, _ = byte_insn_to_bap arch addr bytes in
+      let stmts, _ = byte_insn_to_bap arch Libbfd.mACH_i386_i386 addr bytes in
       stmts
     | Libasmir.FRM_TAINT -> 
       [Comment("ReadSyscall", []); Comment("All blocks must have two statements", [])]
@@ -869,13 +871,13 @@ module SerializedTrace = struct
         | `key_frame _ -> []
         | `metadata_frame _ -> []
     in
-    let raise_frame arch f =
+    let raise_frame arch mach f =
       let get_stmts =
         function
           | `std_frame(f) ->
-      (* Convert string to byte array *)
+            (* Convert string to byte array *)
             let a = Array.of_list (BatString.to_list f.Std_frame.rawbytes) in
-            let stmts, _ = byte_insn_to_bap arch f.Std_frame.address a in
+            let stmts, _ = byte_insn_to_bap arch mach f.Std_frame.address a in
             stmts
           | `syscall_frame({Syscall_frame.number=callno;
                             Syscall_frame.address=addr;
@@ -914,7 +916,7 @@ module SerializedTrace = struct
     while not r#end_of_trace && checkctr () do
       let frames = r#get_frames blocksize in
     (* XXX: Remove use of Obj.magic in an elegant way... *)
-      out := List.rev_append (List.flatten (List.map (raise_frame (Obj.magic r#get_arch)) frames)) !out;
+      out := List.rev_append (List.flatten (List.map (raise_frame (Obj.magic r#get_arch) (Int64.to_int r#get_machine)) frames)) !out;
       counter := Int64.add !counter (Int64.of_int (List.length frames));
     done;
 

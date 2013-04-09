@@ -16,17 +16,17 @@ open D
 
 let compute_segment_bases = ref true
 
-(*
-   Note: In general, the function g is the get memory function.  The variable
-   na refers to the next address or next instruction.
+(* Note: In general, the function g is the get memory function.  The
+   variable na refers to the next address or next instruction.
 
-   To help understand this file, please refer to the
-   Intel Instruction Set Reference. For consistency, any section numbers
-   here are wrt Order Number: 253666-035US June 2010 and 253667-035US.
+   To help understand this file, please refer to the Intel Instruction
+   Set Reference. For consistency, any section numbers here are wrt
+   Order Number: 253666-035US June 2010 and 253667-035US.
 
 
-  The x86 instruction format is as follows:
+   The x86 instruction format is as follows:
    Instuction Prefixexs: 0-4bytes (1 byte per prefix)
+   Optional Rex Prefix: 1 byte
    Opcode: 1 - 3 bytes.
    ModR/M: 1 optional byte
    SIB: 1 optional byte
@@ -58,10 +58,10 @@ exception Disasm_i386_exception of string
 
 type binopf = Ast.exp -> Ast.exp -> Ast.exp
 
-type mode = B32 | B64
+type mode = X86 | X8664
 let type_of_mode = function
-  | B32 -> Reg 32
-  | B64 -> Reg 64
+  | X86 -> Reg 32
+  | X8664 -> Reg 64
 
 type order = Low | High
 
@@ -69,6 +69,7 @@ type direction = Forward | Backward
 
 type operand =
   | Oreg of int
+  | Oxmm of int
   | Oseg of int
   | Oaddr of Ast.exp
   | Oimm of int64 (* XXX: Should this be big_int? *)
@@ -249,14 +250,27 @@ and pref_gs = 0x65
 and pref_opsize = 0x66
 and pref_addrsize = 0x67
 
+(* See Table 2-4: REX Prefix Fields. *)
+type rex = {
+  rex_w : bool; (* Bit 3: 1 = 64-bit operand size *)
+  rex_r : bool; (* Bit 2: Extension of ModR/M reg field *)
+  rex_x : bool; (* Bit 1: Extension of SIB index field *)
+  rex_b : bool; (* Bit 0: Extension of ModR/M r/m field, SIB base
+                   field, or opcode reg field *)
+}
+
 type prefix = {
-  opsize   : typ;
-  mopsize  : typ;
+  addrsize : typ;
+  opsize   : typ; (* General operand size *)
+  bopsize  : typ; (* Operand size that defaults to machine size
+                     (e.g. for pop) *)
+  mopsize  : typ; (* Multi-scalar operand size *)
   repeat   : bool;
   nrepeat  : bool;
   addrsize_override : bool;
   opsize_override : bool;
-  (* add more as needed *)
+  rex : rex option;
+(* add more as needed *)
 }
 
 (** disfailwith is a non-fatal disassembly exception. *)
@@ -291,8 +305,8 @@ type multiarchreg = { v32: Var.t; v64: Var.t }
 let nmv n32 t32 n64 t64 = { v32=nv n32 t32; v64=nv n64 t64; }
 
 let gv m { v32; v64 } = match m with
-  | B32 -> v32
-  | B64 -> v64
+  | X86 -> v32
+  | X8664 -> v64
 
 let ge m mv = Var (gv m mv)
 
@@ -562,16 +576,16 @@ let l32 i = lt i r32
 let l16 i = lt i r16
 
 let int64_of_mode = function
-  | B32 -> l32
-  | B64 -> l64
+  | X86 -> l32
+  | X8664 -> l64
 
 let it i t = Int(Arithmetic.to_big_int (biconst i, t), t)
 let i64 i = it i r64
 let i32 i = it i r32
 
 let int_of_mode = function
-  | B32 -> i32
-  | B64 -> i64
+  | X86 -> i32
+  | X8664 -> i64
 
 (* Get elemt from low opcode bits *)
 let lowbits2elemt b =
@@ -583,7 +597,7 @@ let lowbits2elemt b =
   | _ -> disfailwith "invalid"
 
 (* converts a register number to the corresponding register variable *)
-let bits2reg32 = function
+let bits2genreg = function
   | 0 -> rax
   | 1 -> rcx
   | 2 -> rdx
@@ -592,7 +606,7 @@ let bits2reg32 = function
   | 5 -> rbp
   | 6 -> rsi
   | 7 -> rdi
-  | _ -> failwith "bits2reg32 takes 3 bits"
+  | _ -> failwith "bits2genreg takes 3 bits"
 
 let bits2xmm b = xmms.(b)
 
@@ -614,11 +628,14 @@ let bits2segrege b = Var(bits2segreg b)
 
 let bits2xmme b = Var(bits2xmm b)
 
-let bits2reg64e b =
+let bits2xmm64e b =
   cast_low r64 (bits2xmme b)
 
+let bits2reg64e m b =
+  ge m (bits2genreg b)
+
 let bits2reg32e m b =
-  cast_low r32 (ge m (bits2reg32 b))
+  cast_low r32 (ge m (bits2genreg b))
 
 let bits2reg16e m b =
   cast_low r16 (bits2reg32e m b)
@@ -689,8 +706,10 @@ let storem m t a e =
   move m (Store(Var m, a, e, little_endian, t))
 
 let op2e_s m ss t = function
-  | Oreg r when t = r128 -> bits2xmme r
-  | Oreg r when t = r64 -> bits2reg64e r
+  | Oxmm r when t = r128 -> bits2xmme r
+  | Oxmm r when t = r64 -> bits2xmme r
+  | Oxmm r -> disfailwith "invalid xmm size"
+  | Oreg r when t = r64 -> bits2reg64e m r
   | Oreg r when t = r32 -> bits2reg32e m r
   | Oreg r when t = r16 -> bits2reg16e m r
   | Oreg r when t = r8 -> bits2reg8e m r
@@ -723,28 +742,27 @@ let assn_s m s t v e =
     let final_e = BatList.reduce (fun big_e e -> Ast_convenience.concat e big_e) !concat_exps in
     move v final_e
   in
-  match v with
-  | Oreg r when t = r128 -> move (bits2xmm r) e
-  | Oreg r when t = r64 ->
+  match v, t with
+  | Oxmm r, Reg (128|64) ->
     let v = bits2xmm r in
     sub_assn t v e
-  | Oreg r when t = r32 -> move (gv m (bits2reg32 r)) e
-  | Oreg r when t = r16 ->
-    let v = gv m (bits2reg32 r) in
+  | Oxmm r, _ -> disfailwith "unknown xmm type"
+  | Oreg r, Reg (64|32|16) ->
+    let v = gv m (bits2genreg r) in
     sub_assn t v e
-  | Oreg r when t = r8 && r < 4 ->
-    let v = gv m (bits2reg32 r) in
+  | Oreg r, Reg 8 when r < 4 ->
+    let v = gv m (bits2genreg r) in
     sub_assn t v e
-  | Oreg r when t = r8 ->
-    let v = gv m (bits2reg32 (r land 3)) in
+  | Oreg r, Reg 8 ->
+    let v = gv m (bits2genreg (r land 3)) in
     sub_assn ~off:8 t v e
-  | Oreg _ -> unimplemented "assignment to sub registers"
-  | Oseg r when t = r16 ->
+  | Oreg _, _ -> unimplemented "assignment to sub registers"
+  | Oseg r, _ when t = r16 ->
     let v = bits2segreg r in
     move v e
-  | Oseg r -> disfailwith "Can't assign to non 16 bit segment register"
-  | Oaddr a -> store_s m s t a e
-  | Oimm _ -> disfailwith "disasm_i386: Can't assign to an immediate value"
+  | Oseg r, _ -> disfailwith "Can't assign to non 16 bit segment register"
+  | Oaddr a, _ -> store_s m s t a e
+  | Oimm _, _ -> disfailwith "disasm_i386: Can't assign to an immediate value"
 
 (* Double width operands, as used by multiplication and division *)
 let op_dbl = function
@@ -909,9 +927,7 @@ let rec to_ir m addr next ss pref =
     let e = match t with
       | Reg 32 ->
         reverse_bytes (op2e t op)
-      | Reg 16 ->
-        unknown t "result of bswap is undefined for 16 bit operand"
-      | _ -> disfailwith "bswap: Expected 16 or 32 bit type"
+      | _ -> disfailwith "bswap: Expected 32 bit type"
     in
     [assn t op e]
   | Retn (op, far_ret) when pref = [] || pref = [repz]  || pref = [repnz]->
@@ -981,9 +997,9 @@ let rec to_ir m addr next ss pref =
     [assn t dst (cast_signed t (op2e ts src))]
   | Movdq(t, td, d, ts, s, align, _name) ->
     let (s, al) = match s with
-      | Oreg i -> op2e ts s, []
+      | Oxmm _ -> op2e ts s, []
       | Oaddr a -> op2e ts s, [a]
-      | Oimm _ | Oseg _ -> disfailwith "invalid"
+      | Oreg _ | Oimm _ | Oseg _ -> disfailwith "invalid"
     in
     let b = bits_of_width in
     let s =
@@ -998,11 +1014,9 @@ let rec to_ir m addr next ss pref =
       else s
     in
     let (d, al) = match d with
-      | Oreg i -> assn td d s, al
-	(* let r = op2e t d in *)
-	(* move r s, al *)
+      | Oxmm i -> assn td d s, al
       | Oaddr a -> assn td d s, a::al
-      | Oimm _ | Oseg _ -> disfailwith "invalid"
+      | Oreg _ | Oimm _ | Oseg _ -> disfailwith "invalid"
     in
     let al =
       if align then
@@ -1054,9 +1068,9 @@ let rec to_ir m addr next ss pref =
     let ncmps = (bits_of_width t) / (bits_of_width elet) in
     let elebits = bits_of_width elet in
     let src = match src with
-      | Oreg i -> op2e t src
+      | Oxmm i -> op2e t src
       | Oaddr a -> load t a
-      | Oimm _ | Oseg _ -> disfailwith "invalid"
+      | Oreg _ | Oimm _ | Oseg _ -> disfailwith "invalid"
     in
     let compare_region i =
       let byte1 = Extract(biconst (i*elebits-1), biconst ((i-1)*elebits), src) in
@@ -1496,8 +1510,7 @@ let rec to_ir m addr next ss pref =
             let byte = load r8 (a +* (offset >>* (it 3 t))) in
             let shift = (cast_low r8 offset) &* (it 7 r8) in
             byte, shift
-        | Oimm _ -> disfailwith "Immediate bases not allowed"
-        | Oseg _ -> disfailwith "Segment registers not allowed"
+        | Oxmm _ | Oseg _ | Oimm _ -> disfailwith "Invalid bt operand"
       in
       [
         move cf (cast_low r1 (value >>* shift));
@@ -1993,6 +2006,8 @@ module ToStr = struct
 	| 7 -> "edi"
 	| v -> unimplemented (Printf.sprintf "Don't know what oreg %i is." v)
 
+  let oxmm2str i = "xmm"^(string_of_int i)
+
   let sreg2str = function
     | 0 -> "es"
     | 1 -> "cs"
@@ -2004,6 +2019,7 @@ module ToStr = struct
 
   let opr = function
     | Oreg v -> oreg2str v
+    | Oxmm v -> oxmm2str v
     | Oseg v -> sreg2str v
     | Oimm i -> Printf.sprintf "$0x%Lx" i
     | Oaddr a -> Pp.ast_exp_to_string a
@@ -2141,13 +2157,34 @@ let parse_instr m g addr =
     | _ -> None
   in
   let get_prefixes a =
+    let rex a = match m with
+      | X86 -> None, a
+      | X8664 ->
+        let i = Char.code (g a) in
+        if i >= 0x40 && i <= 0x4f
+        then Some i, s a
+        else None, a
+    in
     let rec f l a =
       match get_prefix (g a) with
       | Some p -> f (p::l) (s a)
       | None -> (l, a)
     in
-    f [] a
+    (* Legacy prefixes *)
+    let leg, a = f [] a in
+    (* Add rex *)
+    let rex, a = rex a in
+    rex, leg, a
   in
+  let parse_rex i =
+    {
+      rex_w = i land 0x8 = 0x8;
+      rex_r = i land 0x4 = 0x4;
+      rex_x = i land 0x2 = 0x2;
+      rex_b = i land 0x1 = 0x1;
+    }
+  in
+
 (*  let int2prefix ?(jmp=false) = function
     | 0xf0 -> Some Lock
     | 0xf2 -> Some Repnz
@@ -2346,10 +2383,11 @@ let parse_instr m g addr =
   ) in
   let get_opcode pref prefix a =
     (* We should rename these, since the 32 at the end is misleading. *)
-    let parse_disp32, parse_modrm32, parse_modrm32seg, parse_modrm32ext =
-      if prefix.addrsize_override
-      then parse_disp16, parse_modrm16, parse_modrm16seg, parse_modrm16ext
-      else parse_disp32, parse_modrm32, parse_modrm32seg, parse_modrm32ext
+    let parse_disp32, parse_modrm32, parse_modrm32seg, parse_modrm32ext = match prefix.addrsize with
+      | Reg 16 ->
+        parse_disp16, parse_modrm16, parse_modrm16seg, parse_modrm16ext
+      | Reg 32 -> parse_disp32, parse_modrm32, parse_modrm32seg, parse_modrm32ext
+      | t -> failwith "Bad address type"
     in
     let mi = int_of_mode m in
     let mi64 = int64_of_mode m in
@@ -2362,9 +2400,9 @@ let parse_instr m g addr =
     | 0x48 | 0x49 | 0x4a | 0x4b | 0x4c | 0x4d | 0x4e | 0x4f ->
       (Dec(prefix.opsize, Oreg(b1 & 7)), na)
     | 0x50 | 0x51 | 0x52 | 0x53 | 0x54 | 0x55 | 0x56 | 0x57 ->
-      (Push(prefix.opsize, Oreg(b1 & 7)), na)
+      (Push(prefix.bopsize, Oreg(b1 & 7)), na)
     | 0x58 | 0x59 | 0x5a | 0x5b | 0x5c | 0x5d | 0x5e | 0x5f ->
-      (Pop(prefix.opsize, Oreg(b1 & 7)), na)
+      (Pop(prefix.bopsize, Oreg(b1 & 7)), na)
     | 0x68 | 0x6a  ->
       let (o, na) = 
 	(* SWXXX Sign extend these? *)
@@ -2788,22 +2826,22 @@ let parse_instr m g addr =
         let r, rm, na = parse_modrm32 na in
         let i, na = parse_imm8 na in
         let open BatInt64.Infix in
-        let fbop, str, et, i = match b2, r, i with
-          | _, Oreg 2, _ -> binop RSHIFT, "psrl", lowbits2elemt b2, i
-          | _, Oreg 6, _ -> binop LSHIFT, "psll", lowbits2elemt b2, i
-          | _, Oreg 4, _ -> binop ARSHIFT, "psra", lowbits2elemt b2, i
+            let fbop, str, et, i = match b2, r, i with
+              | _, Oreg 2, _ -> binop RSHIFT, "psrl", lowbits2elemt b2, i
+              | _, Oreg 6, _ -> binop LSHIFT, "psll", lowbits2elemt b2, i
+              | _, Oreg 4, _ -> binop ARSHIFT, "psra", lowbits2elemt b2, i
           (* The shift amount of next two elements are multipled by eight *)
-          | 0x73, Oreg 3, Oimm i when prefix.opsize_override -> binop RSHIFT, "psrldq", reg_128, Oimm (i*8L)
-          | 0x73, Oreg 7, Oimm i when prefix.opsize_override -> binop LSHIFT, "pslldq", reg_128, Oimm (i*8L)
-          | _, Oreg i, _ -> disfailwith (Printf.sprintf "invalid psrl/psll encoding b2=%#x r=%#x" b2 i)
-          | _ -> disfailwith "impossible"
-        in
-        (Ppackedbinop(t, et, fbop, str, rm, i), na)
+              | 0x73, Oreg 3, Oimm i when prefix.opsize_override -> binop RSHIFT, "psrldq", reg_128, Oimm (i*8L)
+              | 0x73, Oreg 7, Oimm i when prefix.opsize_override -> binop LSHIFT, "pslldq", reg_128, Oimm (i*8L)
+              | _, Oreg i, _ -> disfailwith (Printf.sprintf "invalid psrl/psll encoding b2=%#x r=%#x" b2 i)
+              | _ -> disfailwith "impossible"
+            in
+            (Ppackedbinop(t, et, fbop, str, rm, i), na)
       | 0x80 | 0x81 | 0x82 | 0x83 | 0x84 | 0x85 | 0x86 | 0x87 | 0x88 | 0x89
       | 0x8a | 0x8b | 0x8c | 0x8d | 0x8e | 0x8f ->
         let (i,na) = parse_disp32 na in
 	(Jcc(Jabs(Oimm(Int64.add i na)), cc_to_exp b2), na)
-    (* add other opcodes for setcc here *)
+      (* add other opcodes for setcc here *)
       | 0x90 | 0x91 | 0x92 | 0x93 | 0x94 | 0x95 | 0x96 | 0x97 | 0x98 | 0x99
       | 0x9a | 0x9b | 0x9c | 0x9d | 0x9e | 0x9f ->
         let r, rm, na = parse_modrm r8 na in
@@ -2812,9 +2850,9 @@ let parse_instr m g addr =
 	(Setcc(r8, rm, cc_to_exp b2), na)
       | 0xa2 -> (Cpuid, na)
       | 0xa3 | 0xba ->
-          let (r, rm, na) = parse_modrm prefix.opsize na in
-          let r, na = if b2 = 0xba then parse_imm8 na else r, na in
-          (Bt(prefix.opsize, r, rm), na)
+        let (r, rm, na) = parse_modrm prefix.opsize na in
+        let r, na = if b2 = 0xba then parse_imm8 na else r, na in
+        (Bt(prefix.opsize, r, rm), na)
       | 0xa4 ->
 	(* shld *)
         let (r, rm, na) = parse_modrm prefix.opsize na in
@@ -2834,13 +2872,13 @@ let parse_instr m g addr =
         let (r, rm, na) = parse_modrm prefix.opsize na in
 	(Shiftd(RSHIFT, prefix.opsize, rm, r, o_rcx), na)
       | 0xae ->
-          let (r, rm, na) = parse_modrm32ext na in
-          (match r with
-             | 2 -> (Ldmxcsr rm, na) (* ldmxcsr *)
-             | 3 -> (Stmxcsr rm, na) (* stmxcsr *)
-             | _ -> unimplemented 
-	       (Printf.sprintf "unsupported opcode: %02x %02x/%d" b1 b2 r)
-          )
+        let (r, rm, na) = parse_modrm32ext na in
+        (match r with
+        | 2 -> (Ldmxcsr rm, na) (* ldmxcsr *)
+        | 3 -> (Stmxcsr rm, na) (* stmxcsr *)
+        | _ -> unimplemented 
+	  (Printf.sprintf "unsupported opcode: %02x %02x/%d" b1 b2 r)
+        )
       | 0xaf ->
 	let (r, rm, na) = parse_modrm prefix.opsize na in
 	(Imul(prefix.opsize, (false,r), r, rm), na)
@@ -2857,18 +2895,18 @@ let parse_instr m g addr =
         (Bs (prefix.opsize, r, rm, dir), na)
       | 0xbe
       | 0xbf -> let st = if b2 = 0xbe then r8 else r16 in
-          let r, rm, na = parse_modrm32 na in
-          (Movsx(prefix.opsize, r, st, rm), na)
+                let r, rm, na = parse_modrm32 na in
+                (Movsx(prefix.opsize, r, st, rm), na)
       | 0xc1 ->
-          let r, rm, na = parse_modrm32 na in
-          (Xadd(prefix.opsize, r, rm), na)
+        let r, rm, na = parse_modrm32 na in
+        (Xadd(prefix.opsize, r, rm), na)
       | 0xc7 ->
-          let r, rm, na = parse_modrm32ext na in
-          (match r with
-            | 1 -> (Cmpxchg8b(rm), na)
-            | _ -> unimplemented 
-	      (Printf.sprintf "unsupported opcode: %02x %02x/%d" b1 b2 r)
-          )
+        let r, rm, na = parse_modrm32ext na in
+        (match r with
+        | 1 -> (Cmpxchg8b(rm), na)
+        | _ -> unimplemented 
+	  (Printf.sprintf "unsupported opcode: %02x %02x/%d" b1 b2 r)
+        )
       | 0xc8 | 0xc9 | 0xca | 0xcb | 0xcc | 0xcd | 0xce | 0xcf ->
         (Bswap(prefix.opsize, Oreg(b2 & 7)), na)
       | 0xd1 | 0xd2 | 0xd3 | 0xe1 | 0xe2 | 0xf1 | 0xf2 | 0xf3 ->
@@ -2906,21 +2944,35 @@ let parse_instr m g addr =
     | n -> unimplemented (Printf.sprintf "unsupported opcode: %02x" n)
 
   in
-  let pref, a = get_prefixes addr in
+  let rex, pref, a = get_prefixes addr in
+  let rex = BatOption.map parse_rex rex in
   (* Opsize for regular instructions, MMX/SSE2 instructions
 
      The opsize override makes regular operands smaller, but MMX
      operands larger.  *)
-  let opsize, mopsize = 
-    if List.mem pref_opsize pref then r16,r128 else r32,r64 in
+  let archsize = type_of_mode m in
+  let opsize, bopsize, mopsize =
+    if List.mem pref_opsize pref then r16,r16,r128 else r32,archsize,r64
+  in
+  let opsize = match rex with
+    | Some {rex_w=true} -> r64 (* See Table 3-4: Effective Operand-
+                                  and Address-Size Attributes in 64-Bit Mode *)
+    | Some {rex_w=false} | None -> opsize
+  in
+  let addrsize =
+    if List.mem pref_addrsize pref then r16 else r32
+  in
   let prefix =
     {
-      opsize = opsize;
-      mopsize = mopsize;
+      addrsize;
+      opsize;
+      bopsize;
+      mopsize;
       repeat = List.mem repz pref;
       nrepeat = List.mem repnz pref;
       addrsize_override = List.mem pref_addrsize pref;
-      opsize_override = List.mem pref_opsize pref
+      opsize_override = List.mem pref_opsize pref;
+      rex;
     }
   in
   let op, a = get_opcode pref prefix a in
@@ -2928,25 +2980,25 @@ let parse_instr m g addr =
 
 let parse_prefixes m pref op =
   (* FIXME: how to deal with conflicting prefixes? *)
-  let rec f t s r = function
-    | [] -> (t, BatOption.map (gv m) s, List.rev r)
-    | 0x2e::p -> f t seg_cs r p
-    | 0x36::p -> f t seg_ss r p
-    | 0x3e::p -> f t seg_ds r p
-    | 0x26::p -> f t seg_es r p
-    | 0x64::p -> f t seg_fs r p
-    | 0x65::p -> f t seg_gs r p
-    | 0xf0::p -> f t s r p (* discard lock prefix *)
-    | 0x66::p -> f r16 s r p
-    | p::ps -> f t s (p::r) ps
+  let rec f s r = function
+    | [] -> (BatOption.map (gv m) s, List.rev r)
+    | 0x2e::p -> f seg_cs r p
+    | 0x36::p -> f seg_ss r p
+    | 0x3e::p -> f seg_ds r p
+    | 0x26::p -> f seg_es r p
+    | 0x64::p -> f seg_fs r p
+    | 0x65::p -> f seg_gs r p
+    | 0xf0::p -> f s r p (* discard lock prefix *)
+    | 0x66::p -> f s r p
+    | p::ps -> f s (p::r) ps
   in
-  f r32 None [] pref
+  f None [] pref
 
 let disasm_instr m g addr =
   let (pref, op, na) = parse_instr m g addr in
-  let (_, ss, pref) =  parse_prefixes m pref op in
+  let (ss, pref) =  parse_prefixes m pref op in
   let ir = ToIR.to_ir m addr na ss pref op in
-  let asm = 
-    try Some(ToStr.to_string m pref op) with Disasm_i386_exception _ -> None 
+  let asm =
+    try Some(ToStr.to_string m pref op) with Disasm_i386_exception _ -> None
   in
   (ToIR.add_labels ?asm addr ir, na)

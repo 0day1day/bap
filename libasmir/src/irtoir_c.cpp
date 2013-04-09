@@ -138,9 +138,9 @@ extern "C" {
 }
 
 asm_program_t*
-byte_insn_to_asmp(bfd_architecture arch, address_t addr, unsigned char *bb_bytes, unsigned int len)
+byte_insn_to_asmp(bfd_architecture arch, unsigned long mach, address_t addr, unsigned char *bb_bytes, unsigned int len)
 {
-  asm_program_t *prog = asmir_new_asmp_for_arch(arch);
+  asm_program_t *prog = asmir_new_asmp_for_arch(arch, mach);
   unsigned char *bytes = (unsigned char*)bfd_alloc(prog->abfd, len);
   assert(bytes);
   // copy the string, because the old one is freed when we return

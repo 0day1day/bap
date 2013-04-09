@@ -267,7 +267,7 @@ bap_blocks_t * read_trace_from_file(const string &filename,
        * we only support x86 for now - ethan                          */
       VexArch arch = VexArchX86;
       /* XXX Suspected memory leak! (Is prog freed?) */
-      asm_program_t * prog = asmir_new_asmp_for_arch(bfd_arch_i386);
+      asm_program_t * prog = asmir_new_asmp_for_arch(bfd_arch_i386, bfd_mach_i386_i386);
       
       // Initializations
       translate_init();
