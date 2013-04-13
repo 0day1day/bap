@@ -298,7 +298,7 @@ initialize_bfd(const char *filename)
     return NULL;
   }
 
-  abfd = bfd_openr(filename, target);
+  abfd = bfd_openr(filename, NULL);
   if(abfd == NULL) {
     fprintf(stderr, "initialize_bfd: cannot open %s\n", filename);
     return NULL;

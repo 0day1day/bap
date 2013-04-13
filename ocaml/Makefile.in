@@ -176,8 +176,12 @@ libbfd.idl : bfdarch.idl
 bfdarch.idl:
 	echo '#include "config.h"' > /tmp/f.c
 	echo '#include <bfd.h>' >> /tmp/f.c
+	echo 'typedef unsigned long machine_t;' >> /tmp/f.c
+	echo 'const machine_t MACH_i386_i386 = bfd_mach_i386_i386;' >> /tmp/f.c
+	echo 'const machine_t MACH_i386_x86_64 = bfd_mach_x86_64;' >> /tmp/f.c
 	$(CPP) $(CPPFLAGS) -I$(LIBASMIR) /tmp/f.c | awk 'BEGIN { go=0; } /^enum bfd_architecture$$/ { go=1; } \
 		go && $$0 != "" { print; } \
+		/machine_t/ { print; } \
 		/};$$/ { go=0; }' > $@
 
 # You may also tell "make" at the command-line what kind of target to

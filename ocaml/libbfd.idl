@@ -9,8 +9,6 @@ typedef  unsigned long long int address_t;
 // Include bfd_architecture extracted from the local system's bfd.h
 #include "bfdarch.idl"
 
-typedef unsigned long machine_t;
-
 enum bfd_flavour
 {
   bfd_target_unknown_flavour,
@@ -38,9 +36,6 @@ enum bfd_flavour
   bfd_target_pef_xlib_flavour,
   bfd_target_sym_flavour
 };
-
-const machine_t MACH_i386_i386 = 0x4;
-const machine_t MACH_i386_x86_64 = 0x8;
 
 struct bfd;
 
