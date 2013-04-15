@@ -65,7 +65,7 @@ module RECURSIVE_DESCENT_SPEC = struct
     type t = unit
     let init = ()
   end
-  let get_succs _asmp g (v,l,e) () =
+  let get_succs_int ?(no_indirect=no_indirect) _asmp g (v,l,e) () =
     let o = match List.rev (CA.get_stmts g v), l with
       | last::_, None when FUNCFINDER_DUMB.is_ret_stmt last ->
         Exit
@@ -78,11 +78,15 @@ module RECURSIVE_DESCENT_SPEC = struct
       | _::_, None ->
         (match lab_of_exp e with
         | Some l -> Addrs [l]
-        | None -> Indirect)
+        | None ->
+          if no_indirect
+          then failwith "Indirect jump encountered by recursive descent"
+          else Indirect)
       | _::_, Some _ -> failwith "error"
       | [], _ -> Addrs []
     in
     o, ()
+  let get_succs asmp g e () = get_succs_int asmp g e ()
 
   let fixpoint = false
 end
@@ -94,7 +98,7 @@ module VSA_SPEC = struct
   end
 
   let get_succs asmp g (v,l,e) () =
-    match RECURSIVE_DESCENT_SPEC.get_succs asmp g (v,l,e) () with
+    match RECURSIVE_DESCENT_SPEC.get_succs_int ~no_indirect:false asmp g (v,l,e) () with
     | Indirect, () ->
       (* Do VSA stuff *)
       dprintf "Resolving %s with VSA" (Pp.ast_exp_to_string e);
