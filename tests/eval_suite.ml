@@ -14,7 +14,7 @@ let concrete_eval_setup _ =
   let out = open_out il_file in
   let pp = new Pp.pp_oc out in
   let prog = Asmir.open_program test_file in
-  let ranges = Asmir.get_function_ranges prog in
+  let ranges = Func_boundary.get_function_ranges prog in
   let (start_addr,_) = find_funs ranges ["main"; "_main"] in
   (* Silence floating point warnings for tests *)
   let _ = if (Asmir.get_print_warning()) then Asmir.set_print_warning(false) in

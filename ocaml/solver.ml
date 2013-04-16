@@ -526,7 +526,7 @@ struct
   let model_exp ctx model e =
     let newe = convert ctx e in
     match get_concrete_value ctx model newe with
-    | true, i -> Ast.Int(biconst i, Typecheck.infer_ast ~check:false e)
+    | true, i -> Ast.Int(biconst i, Typecheck.infer_ast e)
     | _ -> serror ("Unable to find evaluation of " ^ (Pp.ast_exp_to_string e) ^ " in model")
 
   (* Printing a Z3 solution *)

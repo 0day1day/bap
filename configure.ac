@@ -7,7 +7,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.59)
-AC_INIT(Bap, 0.6, bap-dev@lists.andrew.cmu.edu)
+AC_INIT(Bap, 0.7, bap-dev@lists.andrew.cmu.edu)
 AC_CONFIG_SRCDIR([libasmir/src/asm_program.c])
 AC_CONFIG_HEADER([libasmir/config.h])
 
@@ -22,9 +22,11 @@ AC_PROG_CC
 AC_PROG_MAKE_SET
 AC_PROG_RANLIB
 AC_PROG_OCAML([3.12.0])
+AC_PROG_CAMLP4
 AC_PROG_OCAMLFIND
 AC_PROG_CAMLIDL
 #AC_PROG_LIBTOOL
+
 
 # Check for Z3
 AC_ARG_WITH([z3],
@@ -124,11 +126,13 @@ AS_IF([which etags >/dev/null 2>&1],
 AM_CONDITIONAL([HAVE_ETAGS], [test x$HAVE_ETAGS = xtrue])
 
 # Checks for ocaml libraries
+AC_MSG_CHECKING([for camomile])
 ocamlfind query camomile >/dev/null 2>&1
 if test $? != 0; then
-   echo "bap requires camomile-dev"
-   exit -1
+   AC_MSG_RESULT([no])
+   AC_MSG_ERROR([camomile ocaml package not found])
 fi
+AC_MSG_RESULT([yes])
 
 VEX_DIR=`pwd`/'VEX'
 VEX_VERSION=2201

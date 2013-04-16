@@ -115,9 +115,9 @@ let it i t = Int(biconst i, t)
 
 let exp_ite ?t b e1 e2 =
   (* type inference shouldn't be needed when t is specified, but we're paranoid *)
-  let tb = Typecheck.infer_ast ~check:false b in
-  let t1 = Typecheck.infer_ast ~check:false e1 in
-  let t2 = Typecheck.infer_ast ~check:false e2 in
+  let tb = Typecheck.infer_ast b in
+  let t1 = Typecheck.infer_ast e1 in
+  let t2 = Typecheck.infer_ast e2 in
   assert (t1 = t2);
   assert (tb = Reg(1));
 
@@ -137,12 +137,12 @@ let parse_ite = function
   | BinOp(OR,
 	  BinOp(AND, b1, e1),
 	  BinOp(AND, UnOp(NOT, b2), e2)
-  ) when full_exp_eq b1 b2 && Typecheck.infer_ast ~check:false b1 = Reg(1) ->
+  ) when full_exp_eq b1 b2 && Typecheck.infer_ast b1 = Reg(1) ->
     Some(b1, e1, e2)
       (* In case one branch is optimized away *)
   | BinOp(AND,
 	  Cast(CAST_SIGNED, nt, b1),
-	  e1) when Typecheck.infer_ast ~check:false b1 = Reg(1) ->
+	  e1) when Typecheck.infer_ast b1 = Reg(1) ->
     Some(b1, e1, Int(zero_big_int, nt))
   | _ -> None
 
@@ -184,7 +184,7 @@ let parse_extract = function
      	    Original: extract 0:bits(t)-1, and then shift left by i bits.
      	    New: extract i:bits(t)-1+i
      	 *)
-     	 let et = infer_ast ~check:false e' in
+     	 let et = infer_ast e' in
      	 let bits_t = big_int_of_int (bits_of_width t) in
      	 let lbit = i in
      	 let hbit = (lbit +% bits_t) -% bi1 in
@@ -214,8 +214,8 @@ let parse_concat = function
 		Cast(CAST_UNSIGNED, nt1, el),
 		Int(bits, _)))
       when nt1 = nt2
-	&& bits ==% big_int_of_int(bits_of_width (infer_ast ~check:false er))
-	&& bits_of_width nt1 = bits_of_width (infer_ast ~check:false el) + bits_of_width (infer_ast ~check:false er) (* Preserve the type *)
+	&& bits ==% big_int_of_int(bits_of_width (infer_ast er))
+	&& bits_of_width nt1 = bits_of_width (infer_ast el) + bits_of_width (infer_ast er) (* Preserve the type *)
 	->
       Some(el, er)
   | BinOp(OR,
@@ -231,8 +231,8 @@ let parse_concat = function
       (* If we cast to nt1 and nt2 and we get the same thing, the
 	 optimizer probably just dropped the cast. *)
       when Arithmetic.to_big_int (i, nt2) ==% Arithmetic.to_big_int (i, nt1)
-	&& bits ==% big_int_of_int(bits_of_width (infer_ast ~check:false er))
-	&& bits_of_width nt1 = bits_of_width (infer_ast ~check:false el) + bits_of_width (infer_ast ~check:false er) (* Preserve the type *)
+	&& bits ==% big_int_of_int(bits_of_width (infer_ast er))
+	&& bits_of_width nt1 = bits_of_width (infer_ast el) + bits_of_width (infer_ast er) (* Preserve the type *)
 	->
       Some(el, er)
   | _ -> None
@@ -258,7 +258,7 @@ let rm_extract = function
       let nt = Reg(nb) in
       assert(h >=% bi0);
       assert (nb >= 0);
-      let t = infer_ast ~check:false e in
+      let t = infer_ast e in
       let e = if l <>% bi0 then e >>* Int(l, t) else e in
       let e = if t <> nt then cast_low nt e else e in
       e
@@ -267,8 +267,8 @@ let rm_extract = function
 let rm_concat = function
   | Concat(le, re) ->
       let bitsl,bitsr =
-	Typecheck.bits_of_width (Typecheck.infer_ast ~check:false le),
-	Typecheck.bits_of_width (Typecheck.infer_ast ~check:false re)
+	Typecheck.bits_of_width (Typecheck.infer_ast le),
+	Typecheck.bits_of_width (Typecheck.infer_ast re)
       in
       let nt = Reg(bitsl + bitsr) in
       exp_or ((cast_unsigned nt le) <<* Int(big_int_of_int bitsr, nt)) (cast_unsigned nt re)
@@ -281,6 +281,11 @@ let last_meaningful_stmt p =
     | [] -> failwith "No meaningful statements"
   in
   f (List.rev p)
+
+
+let min_symbolic ~signed e1 e2 =
+  let bop = if signed then SLT else LT in
+  exp_ite (binop bop e1 e2) e1 e2
 
 (* Extract the nth least significant element of type t from e,
    starting with zero. n is a non-negative integer. *)
@@ -303,7 +308,7 @@ let extract_element_symbolic t e n =
 let extract_byte_symbolic e n = extract_element_symbolic reg_8 e n
 
 let reverse_bytes e =
-  let bytes = Typecheck.bytes_of_width (Typecheck.infer_ast ~check:false e) in
+  let bytes = Typecheck.bytes_of_width (Typecheck.infer_ast e) in
   let get_byte n = extract_byte e n in
   reduce
     (fun bige e -> bige ++* e)

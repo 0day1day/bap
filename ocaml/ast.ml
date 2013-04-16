@@ -38,7 +38,7 @@ type stmt =
 				      var on the left *)
   | Jmp of (exp * attrs) (** Jump to a label/address *)
   | CJmp of (exp * exp * exp * attrs)
-      (** Conditional jump. If e1 is true, jumps to e2, otherwise jumps to e3 *)
+  (** Conditional jump. If e1 is true, jumps to e2, otherwise jumps to e3 *)
   | Label of (label * attrs) (** A label we can jump to *)
   | Halt of (exp * attrs)
   | Assert of (exp * attrs)

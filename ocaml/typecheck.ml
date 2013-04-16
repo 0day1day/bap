@@ -35,100 +35,90 @@ let bytes_of_width t =
   if not ((b mod 8) = 0) then invalid_arg "bytes_of_width";
   b / 8
 
-let rec infer_ast =
-  let warn =
-    let has_warned = ref false in
-    (fun () ->
-      if !has_warned = false then (
-        wprintf "infer_ast ~check option is deprecated.  Please use typecheck_expression instead.";
-        has_warned := true
-    ))
-  in
-  (fun ?(check=true) e ->
-    if check then warn ();
-    match e with
-    | Var v ->
-    (* FIXME: Check context *)
-      Var.typ v
-    | UnOp(_, e) ->
-      if check then 
-	(let t = infer_ast ~check e in
-	 check_reg t);
-      infer_ast ~check:false e;
-    | BinOp(o,e1,e2) as e ->
-      if check then (
-	let t1 = infer_ast ~check e1
-	and t2 = infer_ast ~check e2 in
-	check_same t1 t2 ~e;
-	match o with
-	| EQ | NEQ -> ()
-	| _ -> check_reg t1);
-      (match o with
-      | EQ | NEQ | LT | LE | SLT | SLE -> reg_1
-      | _ -> infer_ast ~check:false e1
-      )
-    | Ite(b,e1,e2) ->
-      if check then 
-	(let t1 = infer_ast ~check e1
-	and t2 = infer_ast ~check e2 in
-	 check_same t1 t2);
-      infer_ast ~check:false e1 
-    | Extract(h,l,e) ->
-      let ns = int_of_big_int(h -% l +% bi1) in
-      let nt = Reg ns in
-      if check then (
-	match infer_ast ~check:true e with
-	| Reg(oldn) ->
-	  if (ns <= 0) then terror("Extract must extract at least one bit");
-	  if l <% bi0 then terror("Lower bit index must be at least 0");
-	  if h >% (big_int_of_int oldn) -% bi1 then terror("Upper bit index must be at most one less than the size of the original register")
-	| _ -> terror ("Extract expects Reg type")
-      );
-      nt
-    | Concat(le, re) ->
-      let lt, rt = infer_ast ~check le, infer_ast ~check re in
-      let nt = match lt, rt with
-	| Reg(lb), Reg(rb) ->
-	  Reg(lb+rb)
-	| _ -> terror "Concat expects Reg type"
-      in
-      nt
-    | Lab s ->
+let rec infer_ast_internal check e =
+  match e with
+  | Var v ->
+      (* FIXME: Check context *)
+    Var.typ v
+  | UnOp(_, e) ->
+    if check then 
+      (let t = infer_ast_internal true e in
+       check_reg t);
+    infer_ast_internal false e;
+  | BinOp(o,e1,e2) as e ->
+    if check then (
+      let t1 = infer_ast_internal true e1
+      and t2 = infer_ast_internal true e2 in
+      check_same t1 t2 ~e;
+      match o with
+      | EQ | NEQ -> ()
+      | _ -> check_reg t1);
+    (match o with
+    | EQ | NEQ | LT | LE | SLT | SLE -> reg_1
+    | _ -> infer_ast_internal false e1
+    )
+  | Ite(b,e1,e2) ->
+    if check then 
+      (let t1 = infer_ast_internal true e1
+       and t2 = infer_ast_internal true e2 in
+       check_same t1 t2);
+    infer_ast_internal false e1
+  | Extract(h,l,e) ->
+    let ns = int_of_big_int(h -% l +% bi1) in
+    let nt = Reg ns in
+    if check then (
+      match infer_ast_internal true e with
+      | Reg(oldn) ->
+	if (ns <= 0) then terror("Extract must extract at least one bit");
+	if l <% bi0 then terror("Lower bit index must be at least 0");
+	if h >% (big_int_of_int oldn) -% bi1 then terror("Upper bit index must be at most one less than the size of the original register")
+      | _ -> terror ("Extract expects Reg type")
+    );
+    nt
+  | Concat(le, re) ->
+    let lt, rt = infer_ast_internal check le, infer_ast_internal check re in
+    let nt = match lt, rt with
+      | Reg(lb), Reg(rb) ->
+	Reg(lb+rb)
+      | _ -> terror "Concat expects Reg type"
+    in
+    nt
+  | Lab s ->
       (* FIXME: no type for labels yet *)
-      reg_64
-    | Int(_,t)
-    | Unknown(_,t) ->
-      t
-    | Cast(ct,t,e) ->
-      let te = infer_ast ~check e in
-      if check then (
-        check_reg t;
-        check_reg te;
-        let bitse = bits_of_width te in
-        let bitst = bits_of_width t in
-        match ct with
-        | CAST_UNSIGNED
-        | CAST_SIGNED ->
-          if bitst < bitse then terror (Printf.sprintf "Cast type %s is a widening case, but it was used to narrow %s to %s" (Pp.ct_to_string ct) (Pp.typ_to_string te) (Pp.typ_to_string t))
-        | CAST_HIGH
-        | CAST_LOW ->
-          if bitst > bitse then terror (Printf.sprintf "Cast type %s is a narrowing case, but it was used to widen %s to %s" (Pp.ct_to_string ct) (Pp.typ_to_string te) (Pp.typ_to_string t))
-      );
-      t
-    | Let(v,e1,e2) ->
-      (* XXX: Need a type context to check this correctly *)
-      ignore(infer_ast ~check e1);
-      infer_ast ~check e2
-    | Load(arr,idx,endian, t) ->
-      if check then check_idx arr idx endian t;
-      t
-    | Store(arr,idx,vl, endian, t) ->
-      if check then (
-	check_idx arr idx endian t;
-	let tv = infer_ast vl in
-	check_subt tv t "Can't store value with type %s as a %s";
-      );
-      infer_ast ~check:false arr)
+    reg_64
+  | Int(_,t)
+  | Unknown(_,t) ->
+    t
+  | Cast(ct,t,e) ->
+    let te = infer_ast_internal check e in
+    if check then (
+      check_reg t;
+      check_reg te;
+      let bitse = bits_of_width te in
+      let bitst = bits_of_width t in
+      match ct with
+      | CAST_UNSIGNED
+      | CAST_SIGNED ->
+        if bitst < bitse then terror (Printf.sprintf "Cast type %s is a widening case, but it was used to narrow %s to %s" (Pp.ct_to_string ct) (Pp.typ_to_string te) (Pp.typ_to_string t))
+      | CAST_HIGH
+      | CAST_LOW ->
+        if bitst > bitse then terror (Printf.sprintf "Cast type %s is a narrowing case, but it was used to widen %s to %s" (Pp.ct_to_string ct) (Pp.typ_to_string te) (Pp.typ_to_string t))
+    );
+    t
+  | Let(v,e1,e2) ->
+    (* XXX: Need a type context to check this correctly *)
+    if check then ignore(infer_ast_internal true e1);
+    infer_ast_internal check e2
+  | Load(arr,idx,endian, t) ->
+    if check then check_idx arr idx endian t;
+    t
+  | Store(arr,idx,vl, endian, t) ->
+    if check then (
+      check_idx arr idx endian t;
+      let tv = infer_ast_internal true vl in
+      check_subt tv t "Can't store value with type %s as a %s";
+    );
+    infer_ast_internal false arr
 
 and check_same ?e ?s t1 t2 =
   if t1 <> t2 then
@@ -147,9 +137,9 @@ and check_bool t =
     terror (Printf.sprintf "Expected bool type, but got %s" (Pp.typ_to_string t))
 
 and check_idx arr idx endian t =
-  let ta = infer_ast arr
-  and ti = infer_ast idx
-  and te = infer_ast endian in
+  let ta = infer_ast_internal true arr
+  and ti = infer_ast_internal true idx
+  and te = infer_ast_internal true endian in
   if te <> reg_1 then terror "Endian must be a boolean";
   if not(is_integer_type ti) then terror "Index must be a register type";
   match ta with
@@ -160,14 +150,16 @@ and check_idx arr idx endian t =
 
   | _ -> terror "Indexing only allowed from array or mem."
 
-let typecheck_expression e = ignore(infer_ast ~check:true e)
+let infer_ast = infer_ast_internal false
+
+let typecheck_expression e = ignore(infer_ast_internal true e)
 
 (* Quick, informal, AST statement type checking.
 
    XXX: Formal type checking rules!
 *)
 let typecheck_stmt =
-  let infer_te = infer_ast ~check:true in
+  let infer_te = infer_ast_internal true in
   function
     | Move(v, e, _) as s ->
       let vt = Var.typ v in

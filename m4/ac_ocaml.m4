@@ -180,6 +180,7 @@ AC_DEFUN([AC_PROG_OCAML], [
 # Check CamlP4 and set the following variables:
 #   CAMLP4      camlp4
 #   CAMLP4O     camlp4o
+#   CAMLP4OF    camlp4of
 #   CAMLP4R     camlp4r
 #   CAMLP4LIB   parser library path
 #  Fails if camlp4 is not found
@@ -191,7 +192,10 @@ AC_DEFUN([AC_PROG_CAMLP4], [
     _AC_OCAML_CHECK_VERSION_FATAL(CAMLP4, camlp4)
 
     # Checking for Camlp4o
-    _AC_OCAML_PATH_PROG_NONFATAL(CAMLP4O, camlp4o)
+    _AC_OCAML_PATH_PROG_FATAL(CAMLP4O, camlp4o)
+
+    # Checking for Camlp4of
+    _AC_OCAML_PATH_PROG_FATAL(CAMLP4OF, camlp4of)
 
     # Checking for Camlp4r
     _AC_OCAML_PATH_PROG_NONFATAL(CAMLP4R, camlp4r)
