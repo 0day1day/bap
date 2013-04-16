@@ -226,6 +226,7 @@ type opcode =
   | Pshufd of operand * operand * operand
   | Leave of typ
   | Interrupt of operand
+  | Interrupt3 (* Trap to debugger *)
   | Sysenter
 
 (* prefix names *)
@@ -1848,6 +1849,8 @@ let rec to_ir addr next ss pref =
   | Leave t when pref = [] -> (* #UD if Lock prefix is used *)
     Move(esp, ebp_e, [])
     ::to_ir addr next ss pref (Pop(t, o_ebp))
+  | Interrupt3 ->
+    [Special("int3", [])]
   | Interrupt(Oimm i) ->
     [Special(Printf.sprintf "int %Lx" i, [])]
   | Sysenter ->
@@ -2012,6 +2015,7 @@ module ToStr = struct
     | Cld -> "cld"
     | Leave _ -> "leave"
     | Interrupt(o) -> Printf.sprintf "int %s" (opr o)
+    | Interrupt3 -> "int3"
     | Sysenter -> "sysenter"
     | Pbinop(_,_,opstr,d,s) -> Printf.sprintf "%s %s, %s" opstr (opr d) (opr s)
     | Ppackedbinop(_,_,_,opstr,d,s) -> Printf.sprintf "%s %s, %s" opstr (opr d) (opr s)
@@ -2380,9 +2384,10 @@ let parse_instr g addr =
 	      | _ -> disfailwith (Printf.sprintf "Invalid opcode: %02x/%d" b1 e)
 	      )
     | 0xc9 -> (Leave prefix.opsize, na)
+    | 0xcc -> (Interrupt3, na)
     | 0xcd -> let (i,na) = parse_imm8 na in
 	      (Interrupt(i), na)
-                
+
     (* 0xd8-0xdf can be followed by a secondary opcode, OR a modrm
        byte. But the secondary opcode is only used when the modrm
        byte does not specify a memory address. *)
