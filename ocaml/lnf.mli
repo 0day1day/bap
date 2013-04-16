@@ -6,11 +6,11 @@
 
 module type G =
 sig
-  include Graph.Sig.I
+  include Graph.Builder.S
 
-  val remove_edge_e : t -> E.t -> unit
-  val v2s : V.t -> string
-  val nb_vertex : t -> int
+  val remove_edge_e : G.t -> G.E.t -> G.t
+  val remove_edge : G.t -> G.V.t -> G.V.t -> G.t
+  val v2s : G.V.t -> string
 end
 
 (* body is a superset of headers. *)
@@ -27,10 +27,10 @@ val string_of_lnt : ('a -> string) -> 'a lnt -> string
 module type MakeType =
   functor (Gr: G) ->
     sig
-      val lnf : Gr.t -> Gr.V.t -> Gr.V.t lnf
+      val lnf : Gr.G.t -> Gr.G.V.t -> Gr.G.V.t lnf
     end
 
 module Dot : functor(Gr: G) ->
 sig
-  val to_dot: ?e2s:(Gr.E.t -> string) -> Gr.t -> Gr.V.t lnf -> string
+  val to_dot: ?e2s:(Gr.G.E.t -> string) -> Gr.G.t -> Gr.G.V.t lnf -> string
 end

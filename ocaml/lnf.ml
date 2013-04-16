@@ -1,10 +1,10 @@
 module type G =
 sig
-  include Graph.Sig.I
+  include Graph.Builder.S
 
-  val remove_edge_e : t -> E.t -> unit
-  val v2s : V.t -> string
-  val nb_vertex : t -> int
+  val remove_edge_e : G.t -> G.E.t -> G.t
+  val remove_edge : G.t -> G.V.t -> G.V.t -> G.t
+  val v2s : G.V.t -> string
 end
 
 (* body is a superset of headers. *)
@@ -61,19 +61,19 @@ and string_of_lnt print_fun lnt =
 module type MakeType =
   functor (Gr: G) ->
     sig
-      val lnf : Gr.t -> Gr.V.t -> Gr.V.t lnf
+      val lnf : Gr.G.t -> Gr.G.V.t -> Gr.G.V.t lnf
     end
 
 module Dot(Gr: G) =
 struct
   let to_dot ?(e2s=(fun _ -> "")) graph lnf =
-    let module VS = Set.Make(Gr.V) in
-    let module H = Hashtbl.Make(Gr.V) in
+    let module VS = Set.Make(Gr.G.V) in
+    let module H = Hashtbl.Make(Gr.G.V) in
     (*
      * A map from vertex -> the set of nodes that are a header of it
      * for some loop. This allows us to identify loop back edges.
      *)
-    let h = H.create (Gr.nb_vertex graph) in
+    let h = H.create (Gr.G.nb_vertex graph) in
     let loops_processed = ref 0 in
 
     (*
@@ -145,8 +145,8 @@ struct
      *)
     let _, subgraphs_string = process_lnf lnf [] in
     let string_of_edge edge =
-      let src = Gr.E.src edge in
-      let dst = Gr.E.dst edge in
+      let src = Gr.G.E.src edge in
+      let dst = Gr.G.E.dst edge in
       let headers_of_src = if H.mem h src then H.find h src else VS.empty in
       (*
        * To keep the output pretty, loopback edges shouldn't constrain the
@@ -160,6 +160,6 @@ struct
     (* And finally, the return value! *)
     "digraph top {\n" ^
     subgraphs_string ^
-    (Gr.fold_edges_e (fun e p -> p ^ (string_of_edge e)) graph "") ^
+    (Gr.G.fold_edges_e (fun e p -> p ^ (string_of_edge e)) graph "") ^
     "}"
 end

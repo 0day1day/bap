@@ -77,26 +77,28 @@ end
 
 module Make(C: G) =
 struct
-  module VH = Hashtbl.Make(C.V)
-  module VS = Set.Make(C.V)
+  module VH = Hashtbl.Make(C.G.V)
+  module VS = Set.Make(C.G.V)
 
-  module VUF = UF(C.V)
+  module VUF = UF(C.G.V)
 
-  module Dom = Dominator.Make(C)
+  module Dom = Dominator.Make(C.G)
 
-  module Dfs = Graph.Traverse.Dfs(C)
+  module Dfs = Graph.Traverse.Dfs(C.G)
 
   type dfs_edge = Tree | Forward | Back | Cross
 
   (* Get loop information from Havlakcs loop forest *)
   let lnf cfg v0 =
-    let loop_parent = VH.create (C.nb_vertex cfg) in
-    let loopTree = VUF.create (C.nb_vertex cfg) in
-    let mergedLoops = VUF.create (C.nb_vertex cfg) in
-    let crossFwdEdges = VH.create (C.nb_vertex cfg) in
+    let cfg = ref cfg in
 
-    let dfs_parent = VH.create (C.nb_vertex cfg) in
-    let rev_dfs_order = ref [] in
+    let loop_parent = VH.create (C.G.nb_vertex !cfg) in
+    let loopTree = VUF.create (C.G.nb_vertex !cfg) in
+    let mergedLoops = VUF.create (C.G.nb_vertex !cfg) in
+    let crossFwdEdges = VH.create (C.G.nb_vertex !cfg) in
+
+    let dfs_parent = VH.create (C.G.nb_vertex !cfg) in
+        let rev_dfs_order = ref [] in
     let prev = Stack.create () in
     let () = Stack.push v0 prev in
     let () = Dfs.iter_component ~pre:(fun v ->
@@ -109,17 +111,18 @@ struct
                                 ~post:(fun v ->
                                         ignore (Stack.pop prev);
                                       )
-                                cfg v0 in
+                                !cfg v0 in
     let () = VH.remove dfs_parent v0 in
+
 
     let classify_edge u v =
       let rec is_ancestor u v =
-        if C.V.equal u v then true
+        if C.G.V.equal u v then true
         else if VH.mem dfs_parent v then is_ancestor u (VH.find dfs_parent v)
         else false in
 
       (* The entry node has indegree 0, so everything else has a dfs parent. *)
-      if C.V.equal u (VH.find dfs_parent v) then Tree
+      if C.G.V.equal u (VH.find dfs_parent v) then Tree
       else if is_ancestor u v then Forward
       else if is_ancestor v u then Back
       else Cross in
@@ -137,31 +140,31 @@ struct
       let workList = Queue.create () in
 
       (* TODO(awreece) Do we have to recompute here? We *do* modify the graph. *)
-      let dom = (Dom.compute_all cfg v0).Dom.dom in
+      let dom = (Dom.compute_all !cfg v0).Dom.dom in
 
-      let () = C.iter_pred (fun y ->
+      let () = C.G.iter_pred (fun y ->
         if dom potentialHeader y  (* If y -> potentialHeader is a backedge. *)
         then
           let ltfy = VUF.find loopTree y in
-          if not (C.V.equal ltfy potentialHeader)
+          if not (C.G.V.equal ltfy potentialHeader)
           then Queue.push ltfy workList
           else ()
         else ()
-      ) cfg potentialHeader in
+      ) !cfg potentialHeader in
 
       let loopBody = ref [] in
 
       while not (Queue.is_empty workList) do
         let y = Queue.pop workList in
         let () = loopBody := y::!loopBody in
-        C.iter_pred (fun z ->
+        C.G.iter_pred (fun z ->
           let ltfz = VUF.find loopTree z in
-          if not (List.exists (C.V.equal ltfz) !loopBody) &&
-             not (C.V.equal ltfz potentialHeader) &&
-             not (Queue.fold (fun p v -> p || (C.V.equal ltfz v)) false workList)
+          if not (List.exists (C.G.V.equal ltfz) !loopBody) &&
+             not (C.G.V.equal ltfz potentialHeader) &&
+             not (Queue.fold (fun p v -> p || (C.G.V.equal ltfz v)) false workList)
           then Queue.push ltfz workList
           else ()
-          ) cfg y
+          ) !cfg y
       done;
       if not (BatList.is_empty !loopBody)
       then (collapse !loopBody potentialHeader;
@@ -185,7 +188,7 @@ struct
     let processCrossFwdEdges x =
       List.iter (fun (y,z) ->
         (* TODO(awreece) Oh god, which UF do we use? I think loopTree... *)
-        C.add_edge cfg (VUF.find loopTree y) (VUF.find loopTree z);
+        cfg := C.add_edge !cfg (VUF.find loopTree y) (VUF.find loopTree z);
         mergeLoopsWithEntryVertex z
       ) (VH.find crossFwdEdges x) in
 
@@ -200,7 +203,7 @@ struct
         then oldNode
         else let node1 = Stack.pop stack1 in
              let node2 = Stack.pop stack2 in
-             if C.V.equal node1 node2
+             if C.G.V.equal node1 node2
              then findFirstDifferent stack1 stack2 node1
              else oldNode in
 
@@ -212,24 +215,24 @@ struct
       findFirstDifferent parentX parentY v0 in
 
     let constructReducedHavlakForest () =
-      let () = C.iter_edges (fun y x ->
+      let () = C.G.iter_edges (fun y x ->
         match classify_edge y x with
         | Cross | Forward ->
             let ancestor = lca y x in
             let newList = (y,x)::(VH.find crossFwdEdges ancestor) in
-            C.remove_edge cfg y x;
+            let () = cfg := C.remove_edge !cfg y x in
             VH.replace crossFwdEdges ancestor newList
         | _ -> ()
-      ) cfg in
+      ) !cfg in
       List.iter (fun x ->
         processCrossFwdEdges x;
         findloop x
       ) !rev_dfs_order in
 
     let makeExplicitRepresentation () =
-      let lnfNodes = VH.create (C.nb_vertex cfg) in
+      let lnfNodes = VH.create (C.G.nb_vertex !cfg) in
       let topLevelLoops = ref VS.empty in
-      let repToChildren = VH.create (C.nb_vertex cfg) in
+      let repToChildren = VH.create (C.G.nb_vertex !cfg) in
 
       let getLnfNode repHeader = if VH.mem lnfNodes repHeader
                                  then VH.find lnfNodes repHeader

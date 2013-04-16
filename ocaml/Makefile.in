@@ -108,6 +108,7 @@ export SOURCES = \
 	structural_analysis.ml \
 	steensgard.mli steensgard.ml \
 	lnf.mli lnf.ml \
+	lnf_ramalingam.mli lnf_ramalingam.ml \
 	lnf_steensgard.mli lnf_steensgard.ml \
 	lnf_havlak.mli lnf_havlak.ml \
 	lnf_reduced_havlak.mli lnf_reduced_havlak.ml \

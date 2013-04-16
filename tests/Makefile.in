@@ -61,6 +61,7 @@ define PROJ_baptest
 	arithmetic_suite.ml \
 	dominator_suite.ml \
 	djgraph_suite.ml \
+	lnf_test.ml \
 	steensgard_suite.ml \
 	havlak_suite.ml \
 	reduced_havlak_suite.ml \
