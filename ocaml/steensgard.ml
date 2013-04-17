@@ -40,7 +40,6 @@ struct
         | _ ->
           let h = Hashtbl.create (List.length scc) in
           List.iter (fun v -> dprintf "scc %s" (C.v2s v); Hashtbl.add h v ()) scc;
-          let cfg = cfg in
 
           let entry_nodes = C.G.fold_edges_e (fun e s ->
             if Hashtbl.mem h (C.G.E.dst e) = true && Hashtbl.mem h (C.G.E.src e) = false
