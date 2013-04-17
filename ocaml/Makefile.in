@@ -42,6 +42,7 @@ export SOURCES = \
 	util.mli util.ml \
 	big_int_convenience.ml \
 	dominator.ml \
+	djgraph.mli djgraph.ml \
 	graphDataflow.mli graphDataflow.ml \
 	type.mli type.ml \
 	var.mli var.ml \
@@ -111,6 +112,12 @@ export SOURCES = \
 	symbeval.ml symbeval_search.ml \
 	structural_analysis.ml \
 	steensgard.mli steensgard.ml \
+	lnf.mli lnf.ml \
+	lnf_ramalingam.mli lnf_ramalingam.ml \
+	lnf_steensgard.mli lnf_steensgard.ml \
+	lnf_havlak.mli lnf_havlak.ml \
+	lnf_reduced_havlak.mli lnf_reduced_havlak.ml \
+	lnf_sreedhar.mli lnf_sreedhar.ml \
 	unroll.mli unroll.ml \
 	fwp.mli fwp.ml \
 	ast_slice.ml \

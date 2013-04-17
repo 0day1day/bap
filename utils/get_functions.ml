@@ -10,13 +10,13 @@ let speclist =
   ::("-unroll", Arg.Int (fun x -> unroll := Some x), "Unroll loops n times.")
   ::[]
 
-let file = ref ""
+let file = ref None
 let prefix = ref ""
 let names = ref []
 let n = ref 0
 let anon x =
   (match !n with
-   | 0 -> file := x
+   | 0 -> file := Some x
    | 1 -> prefix := x
    | _ -> names := x :: !names
   );
@@ -27,13 +27,13 @@ Arg.parse speclist anon usage;
 names := List.rev !names;
 if !rangeonly && !prefix <> "" then
   names := !prefix :: !names;
-if !file = "" then (
+if !file = None then (
   Arg.usage speclist usage;
   exit 1
 );
 if !prefix = "" then rangeonly := true
 
-let p = Asmir.open_program !file
+let p = Asmir.open_program (BatOption.get !file)
 let ranges = Func_boundary.get_function_ranges p
 
 let doit ranges = match !rangeonly with
