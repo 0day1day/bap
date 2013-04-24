@@ -123,7 +123,7 @@ If using macports:
 If using homebrew:
   $ CPPFLAGS="-I/usr/local/include/ -I$(opam config var lib)/camlidl" \
     INCDIRS="$(opam config var lib)/camlidl" \
-    LDFLAGS="-L/usr/local/lib -L/usr/local/lib/x86_64/
+    LDFLAGS="-L/usr/local/lib -L/usr/local/lib/x86_64/ \
     -L/usr/local/opt/gettext/lib -lintl" \
     ./configure
 

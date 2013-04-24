@@ -47,8 +47,15 @@ export RESULTDEPS = $(BAP_OCAMLDIR)/bap.a
 
 # default subprojects to build
 ifndef SUBPROJS
-	export SUBPROJS = $(PROJUTILS) $(CODEGEN) toil iltrans ileval topredicate solvepredicate formula get_functions streamtrans backtaint
+	export SUBPROJS = $(PROJUTILS) $(CODEGEN) toil iltrans ileval topredicate solvepredicate formula get_functions streamtrans backtaint identify_loops
 endif
+
+define PROJ_identify_loops
+	RESULT=identify_loops
+	SOURCES = identify_loops.ml
+	DOC_FILES=$(SOURCES)
+endef
+export PROJ_identify_loops
 
 define PROJ_toil
 	RESULT=toil
