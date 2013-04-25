@@ -2,6 +2,7 @@
 #define _PIN_MISC_H
 
 #include "pin.H"
+#include <stdint.h>
 
 namespace pintrace {
 
