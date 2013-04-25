@@ -10,5 +10,5 @@ let disasm_instr arch =
 let is_temp = Var_temp.is_temp
 
 let is_decode_error = function
-  | Ast.Special("VEX decode error", []) -> true
+  | Ast.Special(s, _) when BatString.starts_with s "Unknown instruction" -> true
   | _ -> false

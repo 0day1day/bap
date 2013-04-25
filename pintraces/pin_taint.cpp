@@ -1,6 +1,5 @@
 #include "pin.H"
 #include "pin_taint.h"
-#include "pin_frame.h"
 #include "pin_syscalls.h"
 #include "winsyscalls.h"
 #include "trace.container.hpp"

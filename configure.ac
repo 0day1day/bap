@@ -134,9 +134,6 @@ if test $? != 0; then
 fi
 AC_MSG_RESULT([yes])
 
-VEX_DIR=`pwd`/'VEX'
-VEX_VERSION=2201
-
 # Checks for libraries.
 AC_CHECK_LIB([bfd], [bfd_init], , AC_MSG_ERROR([BFD library not found]))
 AC_CHECK_LIB([iberty], [xmalloc], , AC_MSG_ERROR([Iberty library not found]))
@@ -144,16 +141,13 @@ AC_CHECK_LIB([pcre], [pcre_config], , AC_MSG_ERROR([PCRE library not found]))
 # zlib is apparently needed by bfd
 AC_CHECK_LIB([z], [inflate], , AC_MSG_ERROR([zlib library not found]))
 
-AC_SUBST(VEX_DIR)
-
 AC_SUBST(INCDIRS)
 
 rm -f libasmir/makefile.inc
-echo "VEX_DIR=${VEX_DIR}" >> libasmir/makefile.inc
-echo "LIBASMIR_CXXFLAGS=-I${VEX_DIR}/pub -I`pwd`/src/include $CXXFLAGS" >> libasmir/makefile.inc
-echo "LIBASMIR_LDFLAGS=-L${VEX_DIR} -L`pwd`/src $LDFLAGS" >> libasmir/makefile.inc
-echo "LIBASMIR_LIBS=-lasmir -lvex -lbfd -ldl -liberty -lz" >> libasmir/makefile.inc
-echo "CLIBS=asmir vex opcodes bfd z iberty stdc++" >> libasmir/makefile.inc
+echo "LIBASMIR_CXXFLAGS=-I`pwd`/src/include $CXXFLAGS" >> libasmir/makefile.inc
+echo "LIBASMIR_LDFLAGS=-L`pwd`/src $LDFLAGS" >> libasmir/makefile.inc
+echo "LIBASMIR_LIBS=-lasmir -lbfd -ldl -liberty -lz" >> libasmir/makefile.inc
+echo "CLIBS=asmir opcodes bfd z iberty stdc++" >> libasmir/makefile.inc
 AC_SUBST(ASMIR_DIR)
 ASMIR_DIR="`pwd`/libasmir"
 
@@ -173,7 +167,6 @@ AC_CHECK_HEADER([pcre.h], ,
 AC_HEADER_STDBOOL
 AC_C_CONST
 AC_TYPE_SIZE_T
-AC_DEFINE_UNQUOTED([VEX_VERSION], [${VEX_VERSION}], [The VEX SVN Version])
 
 AC_CHECK_SIZEOF(bfd_vma, [], [#include <bfd.h>])
 
@@ -187,7 +180,6 @@ AC_CHECK_FUNCS([bzero memset strstr strtoul])
 
 AC_CONFIG_FILES([Makefile
                  libasmir/Makefile
-                 libasmir/apps/Makefile
                  libasmir/src/Makefile
                  libtracewrap/Makefile
 		 ocaml/Makefile

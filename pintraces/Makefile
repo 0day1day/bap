@@ -69,19 +69,13 @@ endif
 ##############################################################
 
 
-TOOL_ROOTS = gentrace #ctxtest
+TOOL_ROOTS = gentrace
 
 TOOLS = $(TOOL_ROOTS:%=$(OBJDIR)%$(PINTOOL_SUFFIX))
 
-# FORMATOBJS = $(OBJDIR)frame.piqi.pb.o $(OBJDIR)types.piqi.pb.o $(OBJDIR)trace.container.o
-
-#FORMATOBJS = $(OBJDIR)frame.piqi.pb.o $(OBJDIR)exceptionframe.piqi.pb.o $(OBJDIR)stdframe.piqi.pb.o $(OBJDIR)taintintroframe.piqi.pb.o $(OBJDIR)types.piqi.pb.o $(OBJDIR)trace.container.o
-
-OBJS = $(OBJDIR)pivot.o $(OBJDIR)pin_trace.o $(OBJDIR)pin_taint.o $(OBJDIR)pin_frame.o $(OBJDIR)pin_misc.o $(OBJDIR)reg_mapping_pin.o $(OBJDIR)winsyscalls.o $(FORMATOBJS)
+OBJS = $(OBJDIR)pivot.o $(OBJDIR)pin_misc.o $(OBJDIR)pin_taint.o $(OBJDIR)reg_mapping_pin.o $(OBJDIR)winsyscalls.o $(FORMATOBJS)
 
 ROOT = $(realpath ..)
-
-TRACEDIR = $(ROOT)/libasmir/src/traces
 
 TRACEFORMATDIR = $(ROOT)/libtracewrap/libtrace/src/cpp
 TRACEFORMATCOMMON = $(ROOT)/libtracewrap/libtrace/src/common
@@ -90,7 +84,7 @@ LIBTRACE = $(TRACEFORMATDIR)/libtrace.a
 
 PROTOBUFDIR = $(ROOT)/libtracewrap/libtrace/protobuf/src
 
-CXXFLAGS += -I$(TRACEFORMATCOMMON) -I../libasmir/include -I../libasmir/src/traces -I$(TRACEFORMATDIR) -I$(TRACEFORMATPBDIR) -I$(PROTOBUFDIR) -DUSING_PIN
+CXXFLAGS += -I$(TRACEFORMATCOMMON) -I$(TRACEFORMATDIR) -I$(TRACEFORMATPBDIR) -I$(PROTOBUFDIR) -I. -DUSING_PIN
 
 # XXX We should probably use libtool
 PROTOBUFLIBDIR = $(PROTOBUFDIR)/.libs
@@ -103,33 +97,12 @@ LIBS = $(LIBTRACE) -Wl,-rpath=$(PROTOBUFLIBDIR) -pthread  -pthread -lprotobuf -l
 #
 ##############################################################
 
-all: listregs tools
+all: tools
 tools: $(OBJDIR) $(TOOLS)
 test: $(OBJDIR) $(TOOL_ROOTS:%=%.test)
 
 $(OBJDIR):
 	-mkdir "$(OBJDIR)"
-
-#$(OBJDIR)gentrace.o : gentrace.cpp 
-#	$(CXX) -c $(CXXFLAGS) $(PIN_CXXFLAGS) ${OUTOPT}$@ $<
-
-#$(OBJDIR)pivot.o : pivot.cpp
-#	$(CXX) -c $(CXXFLAGS) $(PIN_CXXFLAGS) ${OUTOPT}$@ $<
-
-#$(OBJDIR)pin_frame.o : $(TRACEDIR)/pin_frame.cpp
-#	$(CXX) -c $(CXXFLAGS) $(PIN_CXXFLAGS) ${OUTOPT}$@ $<
-
-#$(OBJDIR)pin_trace.o : $(TRACEDIR)/pin_trace.cpp
-#	$(CXX) -c $(CXXFLAGS) $(PIN_CXXFLAGS) ${OUTOPT}$@ $<
-
-#$(OBJDIR)pin_taint.o : $(TRACEDIR)/pin_taint.cpp
-#	$(CXX) -c $(CXXFLAGS) $(PIN_CXXFLAGS) ${OUTOPT}$@ $<
-
-#$(OBJDIR)winsyscalls.o : $(TRACEDIR)/winsyscalls.cpp
-#	$(CXX) -c $(CXXFLAGS) $(PIN_CXXFLAGS) ${OUTOPT}$@ $<
-
-$(OBJDIR)%.o : $(TRACEDIR)/%.cpp
-	$(CXX) -c $(CXXFLAGS) $(PIN_CXXFLAGS) ${OUTOPT}$@ $<
 
 $(OBJDIR)%.o : %.cpp
 	$(CXX) -c $(CXXFLAGS) $(PIN_CXXFLAGS) ${OUTOPT}$@ $<
@@ -139,17 +112,6 @@ $(OBJDIR)%.o : $(TRACEFORMATPBDIR)/%.cc
 
 $(OBJDIR)%.o : $(TRACEFORMATDIR)/%.cpp
 	$(CXX) -c $(CXXFLAGS) $(PIN_CXXFLAGS) ${OUTOPT}$@ $<
-
-pivottest: $(OBJDIR)pivot.o pivottest.cpp
-	$(CXX) -o $@ $^ $(CXXFLAGS) $(PIN_CXXFLAGS)
-
-listregs: listregs.cpp
-	$(CXX) -o $@ $^ $(CXXFLAGS) $(PIN_CXXFLAGS)
-
-pinregs.h : listregs $(OBJDIR)ctxtest$(PINTOOL_SUFFIX)
-	./listregs pinregs.h
-
-#gentrace.cpp : pinregs.h
 
 $(TOOLS): $(PIN_LIBNAMES)
 

@@ -16,8 +16,6 @@ let concrete_eval_setup _ =
   let prog = Asmir.open_program test_file in
   let ranges = Func_boundary.get_function_ranges prog in
   let (start_addr,_) = find_funs ranges ["main"; "_main"] in
-  (* Silence floating point warnings for tests *)
-  let _ = if (Asmir.get_print_warning()) then Asmir.set_print_warning(false) in
   let ir = Asmir.asmprogram_to_bap prog in
   let outir = inject_stmt ir start_addr "ret" halt_stmt in 
   pp#ast_program outir;
