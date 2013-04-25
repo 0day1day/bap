@@ -74,11 +74,12 @@ if test "$(uname -m)" == "x86_64";
 fi
 
 # Check for PIN
-PIN_HOME=${PIN_HOME:=$(pwd)/pin}
-AC_CHECK_FILE([$PIN_HOME],
+PIN_ROOT=${PIN_ROOT:=$(pwd)/pin}
+AC_CHECK_FILE([$PIN_ROOT],
               [HAVE_PIN=true],
               [HAVE_PIN=false; AC_MSG_WARN([Pin not found. BAP pintraces will be unavailable.])])
 
+AC_SUBST(PIN_ROOT)
 AM_CONDITIONAL([HAVE_PIN], [test x$HAVE_PIN = xtrue])
 
 # Conditionally build llvm
@@ -182,6 +183,7 @@ AC_CONFIG_FILES([Makefile
                  libasmir/Makefile
                  libasmir/src/Makefile
                  libtracewrap/Makefile
+                 pintraces/Makefile
 		 ocaml/Makefile
                  utils/Makefile
                  tests/Makefile])

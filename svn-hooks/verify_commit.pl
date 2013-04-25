@@ -112,7 +112,7 @@ $ctx->checkout($rep_url, $local_path, $revision, $true);
 
 print "Finished checking out repository $rep_url\n";
 
-$ENV{'PIN_HOME'} = '/home/swhitman/pin/';
+$ENV{'PIN_ROOT'} = '/home/swhitman/pin/';
 
 # configure
 print "Configuring\n";
