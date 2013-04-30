@@ -102,22 +102,50 @@ following commands, we assume this file is named trace.bpt.
 To lift the trace data and print it, run 
 
 \begin{verbatim}
-iltrans -serializedtrace trace.bpt -pp-ast /dev/stdout
+iltrans -trace trace.bpt -pp-ast /dev/stdout
 \end{verbatim}
 
-It is also possible to concretize the trace, which removes jumps and performs
-memory concretization, by executing 
+The lifted trace data should look something like:
 
 \begin{verbatim}
-iltrans -serializedtrace trace.bpt -trace-concrete -pp-ast /dev/stdout
+addr 0x8048670 @asm "mov    0x804a034,%eax" @tid "0"
+  @context "R_EAX" = 0x68, 1, u32, wr
+  @context "mem[0x804a034]" = 0x5, 0, u8, rd
+  @context "mem[0x804a035]" = 0x0, 0, u8, rd
+  @context "mem[0x804a036]" = 0x0, 0, u8, rd
+  @context "mem[0x804a037]" = 0x0, 0, u8, rd
+label pc_0x8048670
+R_EAX:u32 = mem:?u32[0x804a034:u32, e_little]:u32
 \end{verbatim}
 
-Adding the -trace-check option before -trace-concrete causes BAP to compare its
-internal evaluator's notion of state with the actual values recorded in the
-trace.  It can be used to check for bugs in the IL.  Finally, running 
+In addition to the lifted IL, there are several trace-specific
+annotations.  \texttt{@tid "0"} indicates that thread 0 executed this
+instruction.  The \texttt{@context} attribute provides information
+about this instruction's operands.  The four values in the tuple refer
+to the operand's initial value, its taint identifier, data type, and
+access type, respectively.  Positive taint identifiers indicate the
+operand was only tainted by the taint source with the corresponding
+number.  For example, taint identifier five generally corresponds to
+the fifth symbolic byte introduced into the program.  An operand may
+have a taint identifier of negative one if it is tainted by multiple
+source bytes.  A taint identifier of zero corresopnds to an untainted
+operand.  The access type is one of read only (rd), write only (wr),
+or both (rw).
+
+It is also possible to concretize the trace after lifting, which
+removes jumps and performs memory concretization, by executing
 
 \begin{verbatim}
-iltrans -serializedtrace trace.bpt -trace-formula f
+iltrans -trace trace.bpt -trace-concrete -pp-ast /dev/stdout
+\end{verbatim}
+
+Adding the -trace-check option before -trace-concrete causes BAP to
+compare its internal evaluator's notion of state with the actual
+values recorded in the trace.  It can be used to check for bugs in the
+IL.  Finally, running
+
+\begin{verbatim}
+iltrans -trace trace.bpt -trace-formula f
 \end{verbatim}
 
 will symbolically execute the trace and output the generated verification

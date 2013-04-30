@@ -28,7 +28,7 @@ Run the following command to install required packages:
 
   $ sudo apt-get install ocaml ocaml-native-compilers ocaml-findlib camlidl \
     binutils-dev automake libcamomile-ocaml-dev otags libpcre3-dev          \
-    camlp4-extra bison flex zlib1g-dev libgmp3-dev g++ libtool
+    camlp4-extra bison flex zlib1g-dev libgmp3-dev g++ libtool make
 
 On x86_64 also add:
   $ sudo apt-get install gcc-multilib g++-multilib lib32z1-dev
