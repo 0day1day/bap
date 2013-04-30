@@ -128,7 +128,7 @@ operand was only tainted by the taint source with the corresponding
 number.  For example, taint identifier five generally corresponds to
 the fifth symbolic byte introduced into the program.  An operand may
 have a taint identifier of negative one if it is tainted by multiple
-source bytes.  A taint identifier of zero corresopnds to an untainted
+source bytes.  A taint identifier of zero corresponds to an untainted
 operand.  The access type is one of read only (rd), write only (wr),
 or both (rw).
 
@@ -149,5 +149,5 @@ iltrans -trace trace.bpt -trace-formula f
 \end{verbatim}
 
 will symbolically execute the trace and output the generated verification
-condtion to the file f. This can then be solved with stp to find satisfying
+condition to the file f. This can then be solved with stp to find satisfying
 answers to the trace.
