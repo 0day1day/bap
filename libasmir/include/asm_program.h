@@ -12,8 +12,6 @@ extern "C"
 #include <bfd.h>
 #include <dis-asm.h>
 
-#include "common.h"
-
 #ifdef __cplusplus
 }
 #endif
@@ -77,15 +75,6 @@ extern void set_trace_bytes(void *bytes, size_t len, bfd_vma addr);
 // dissassemble an instruction and return the asm string
 extern char* asmir_string_of_insn(asm_program_t *prog, bfd_vma inst);
 extern enum bfd_architecture asmir_get_asmp_arch(asm_program_t *prog);
-
-
-  // get_rodata
-extern void destroy_memory_data(memory_data_t *md);
-extern address_t memory_cell_data_address(memory_cell_data_t *md);
-extern int memory_cell_data_value(memory_cell_data_t *md);
-extern int memory_data_size(memory_data_t *md);
-extern memory_cell_data_t * memory_data_get(memory_data_t *md, int i);
-extern memory_data_t * get_rodata (asm_program_t *prog);
 
 
 // Argh, these functions are documented at

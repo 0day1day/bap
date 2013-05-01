@@ -21,14 +21,7 @@ let stream_speclist =
     ("-tracestream",
      Arg.String(fun s ->
        streaminputs := Some(`Tracestream s)),
-     "<file> Read a PinTrace to be processed as a stream.");
-    ("-serializedtracestream",
-     Arg.String(fun s ->
-       streaminputs := Some(`Serializedtracestream s)),
-     "<file> Read a SerializedTrace to be processed as a stream.");
-    ("-pin",
-     Arg.Set pintrace,
-     "Enable pin trace.");
+     "<file> Read a trace to be processed as a stream.");
   ]
 
 let addinput i = inputs := i :: !inputs
@@ -39,13 +32,6 @@ let trace_speclist =
      Arg.String(fun s ->
        addinput (`Trace s)),
      "<file> Read in a trace and lift it to the IL");
-    ("-serializedtrace",
-     Arg.String(fun s ->
-       addinput (`Serializedtrace s)),
-     "<file> Read in a SerializedTrace and lift it to the IL");
-    ("-pin",
-     Arg.Set pintrace,
-     "Enable pin trace");
 ]
 
 let speclist =
@@ -94,8 +80,6 @@ let get_program () =
       let p = Asmir.open_program f in
       List.append (fst (Asmir_rdisasm.rdisasm_at p [s])) oldp, oldscope
     | `Trace f ->
-      List.append (Asmir.bap_from_trace_file ~pin:!pintrace f) oldp, oldscope
-    | `Serializedtrace f ->
       List.append (Asmir.serialized_bap_from_trace_file f) oldp, oldscope
   in
   try
@@ -111,8 +95,6 @@ let get_program () =
 let get_stream_program () = match !streaminputs with
   | None -> raise(Arg.Bad "No input specified")
   | Some(`Tracestream f) -> 
-    Asmir.bap_stream_from_trace_file ~rate:!streamrate ~pin:!pintrace f
-  | Some(`Serializedtracestream f) ->
     Asmir.serialized_bap_stream_from_trace_file !streamrate f
 
 

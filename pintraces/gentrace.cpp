@@ -11,20 +11,18 @@
 #include <cstdlib>
 #include <time.h>
 
-#include "pin_frame.h"
-#include "pin_trace.h"
+//#include "pin_frame.h"
+//#include "pin_trace.h"
 #include "reg_mapping_pin.h"
-#include "cache.h"
+//#include "cache.h"
 
 /* The new trace container format */
 #include "trace.container.hpp"
 
-//#include "pin_frame.cpp"
-//#include "pin_trace.cpp"
-
 #include "pivot.h"
 
 #include "pin_taint.h"
+#include "pin_misc.h"
 
 using namespace pintrace;
 using namespace SerializedTrace;

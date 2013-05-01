@@ -253,10 +253,10 @@ struct
 
   (* Initializers *)
   let create_state form_init =
-    let sigma : (addr, instr) Hashtbl.t = Hashtbl.create 5700
+    let sigma : (addr, instr) Hashtbl.t = Hashtbl.create 32
     and pc = Int64.zero
     and delta : MemL.t = MemL.create ()
-    and lambda : (label_kind, addr) Hashtbl.t = Hashtbl.create 5700 in
+    and lambda : (label_kind, addr) Hashtbl.t = Hashtbl.create 32 in
     {pred=(Form.init form_init); delta=delta; sigma=sigma; lambda=lambda; pc=pc}
 
   let initialize_prog state prog_stmts =
@@ -582,7 +582,7 @@ struct
 
   let copy delta = VH.copy delta
   let clear delta = VH.clear delta; delta
-  let create () = VH.create 5000
+  let create () = VH.create 32
   let fold delta f i = VH.fold f delta i
 
   (** Number of variable locations stored in state *)

@@ -10,7 +10,7 @@
 #include <set>
 #include <vector>
 #include <string.h>
-#include "pin_frame.h"
+#include "pin_misc.h"
 #include "trace.container.hpp"
 
 // Size of temporary buffers
@@ -28,11 +28,6 @@ typedef uint32_t var;
 #define MIXED_TAINT 0xFFFFFFFF
 #define NOTAINT 0
 typedef uint32_t t;
-
-#define MASK1 0x000000FF
-#define MASK2 0x0000FF00
-#define MASK3 0x00FF0000
-#define MASK4 0xFF000000
 
 typedef std::map<var,t> context;
 

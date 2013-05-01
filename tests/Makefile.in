@@ -30,8 +30,8 @@ export LLVM_PACKS = @LLVM_PACKAGE@ @LLVM_PACKAGE@.analysis @LLVM_PACKAGE@.execut
 endif
 
 export PACKS = camlidl bigarray str num unix camomile piqi.lib $(LLVM_PACKS)
-export LIBS = zarith batteries oUnit pcre objsize graph libtrace bap
-export INCDIRS = $(BAP_OCAMLDIR) $(BIGINT) $(BATT) $(OUNIT) $(PCRE) $(OCAMLGRAPH) $(OBJSIZE) $(LIBTRACE)
+export LIBS = zarith batteries oUnit pcre objsize graph libtrace $(PROJLIBS) bap
+export INCDIRS = $(BAP_OCAMLDIR) $(BIGINT) $(BATT) $(OUNIT) $(PCRE) $(OCAMLGRAPH) $(OBJSIZE) $(LIBTRACE) $(PROJINCDIRS)
 export OCAMLPATH = $(PIQIBUILDDIR)
 
 # Include sources from ../ocaml in the automatically generated dependencies.

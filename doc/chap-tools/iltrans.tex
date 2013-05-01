@@ -45,23 +45,17 @@ currently use {\tt zgrviewer}~\cite{zgrviewer} for viewing the
 resulting dot files.
 
 
-One issue when constructing  graphs of an assembly program is
+One issue when constructing graphs of an assembly program is
 determining the successors of jumps to computed values, called {\it
-  indirect} jumps.  Resolving indirect jumps usually involves a program
-analysis that require a CFG, e.g., VSA~\cite{balakrishnan:2007}. Thus,
-there is a potential circular dependency.  Note that an indirect jump
-may potentially go anywhere, including the heap or code that has not
-been previously disassembled.
-
-Our solution is to designate a special node as a successor of
-unresolved indirect jump targets in the CFG.  We provide this so an
-analysis that depends on a correct CFG can recognize that we do not
-know the subsequent state. For example, a data-flow analysis could
-widen all facts to the lattice bottom.  Most normal analyses will
-first run an indirect jump resolution analysis in order to build a
-more precise CFG that resolves indirect jumps to a list of possible
-jump targets.  %% {\tt iltrans} provides one such analysis, called Value Set
-%% Analysis~\cite{balakrishnan:2007}.
+  indirect} jumps. We designate a special node, {\tt BB\_Indirect}, as
+a successor of unresolved indirect jump targets in the CFG.  We
+provide this so an analysis that depends on a correct CFG can
+recognize that we do not know the subsequent successor. For example, a
+data-flow analysis could widen all facts to the lattice bottom.  Most
+normal analyses will first run an indirect jump resolution analysis in
+order to build a more precise CFG that resolves indirect jumps to a
+list of possible jump targets.  Such a pass will be released in a
+future version of BAP.
 
 \paragraph{Single Static Assignment.} {\tt iltrans} supports
 conversion to and from single static assignment (SSA)

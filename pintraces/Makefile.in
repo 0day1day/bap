@@ -1,0 +1,7 @@
+.PHONY: default tags
+default: all
+
+%:
+	make -f Makefile.pin PIN_ROOT=@PIN_ROOT@ TARGET=ia32 $@
+
+tags:
