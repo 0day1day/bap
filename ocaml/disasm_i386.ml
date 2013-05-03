@@ -271,8 +271,8 @@ type prefix = {
   opsize_override : bool;
   rex : rex option;
   r_extend : int; (* extended r bit *)
-  rm_extend : int; (* extended rm bit *)
-  sib_extend : int; (* extended sib bit *)
+  rm_extend : int; (* extended rm bit or sib base *)
+  sib_extend : int; (* extended sib index bit *)
 (* add more as needed *)
 }
 
@@ -2236,15 +2236,18 @@ let parse_instr m g addr =
   let parse_sint8 = parse_sint 8 in
   let parse_sint16 = parse_sint 16 in
   let parse_sint32 = parse_sint 32 in
+  let parse_sint64 = parse_sint 64 in
 
   let parse_disp8 = parse_sint8
   and parse_disp16 = parse_sint16
   and parse_disp32 = parse_sint32
+  and parse_disp64 = parse_sint64
   in
   let parse_disp:(Type.typ -> int64 -> big_int * int64) = function
     | Reg 8 ->  parse_disp8
     | Reg 16 -> parse_disp16
     | Reg 32 -> parse_disp32
+    | Reg 64 -> parse_disp64
     | _ -> disfailwith "unsupported displacement size"
   in
   let parse_imm8cb b =
@@ -2269,20 +2272,31 @@ let parse_instr m g addr =
     {ssize=ssize; ssign=ssign; agg=agg; negintres1=negintres1; maskintres1=maskintres1; outselectsig=outselectsig; outselectmask=outselectmask}
 
   in
-  let parse_sib modb a =
+  let parse_sib rex modb a =
     (* ISR 2.1.5 Table 2-3 *)
+    let e b = (if b then 1 else 0) << 3 in
+    let rex_b, rex_x = match rex with
+      | Some {rex_b; rex_x} -> rex_b, rex_x
+      | None -> false, false
+    in
     let b = Char.code (g a) in
-    let ss = b >> 6 and idx = (b>>3) & 7 in
+    let bm = big_int_of_mode m in
+    let im = int_of_mode m in
+    let bits2rege = match m with
+      | X86 -> bits2reg32e
+      | X8664 -> bits2reg64e
+    in
+    let ss = b >> 6 and idx = ((b>>3) & 7) lor (e rex_x) in
     let base, na = 
       match ((b & 7), modb) with (* base register, MOD *)
-      | 5, 0 -> let (i,na) = parse_disp32 (s a) in (b32 i, na)
-      | _, 0 | _, 1 | _, 2 -> (bits2reg32e m (b & 7), s a)
+      | 5, 0 -> let (i,na) = parse_disp32 (s a) in (bm i, na)
+      | _, 0 | _, 1 | _, 2 -> (bits2rege m ((b & 7) lor (e rex_b)), s a)
       | _ -> disfailwith (Printf.sprintf "impossible opcode: sib b=%02x" b)
     in
     if idx = 4 then (base, na) else
-      let idx = bits2reg32e m idx in
+      let idx = bits2rege m idx in
       if ss = 0 then (base +* idx, na)
-      else (base +* (idx <<* i32 ss), na)
+      else (base +* (idx <<* im ss), na)
   in
   let parse_modrmbits a =
     let b = Char.code (g a)
@@ -2331,37 +2345,48 @@ let parse_instr m g addr =
     let (r, rm, na) = parse_modrm16ext rex a in
     (Oseg r, rm, na)
   in
-  let parse_modrm32int a b r modb rm na =
+  let parse_modrm32int rex ia a b r modb rm na =
     (* ISR 2.1.5 Table 2-2 *)
+    let bm = big_int_of_mode m in
     match modb with (* MOD *)
     | 0 -> (match rm with
-      | 4 -> let (sib, na) = parse_sib modb na in (r, Oaddr sib, na)
-      | 5 -> let (disp, na) = parse_disp32 na in (r, Oaddr(b32 disp), na)
+      | 4 -> let (sib, na) = parse_sib rex modb na in (r, Oaddr sib, na)
+      | 5 ->
+        (* See Table 2-7. RIP-Relative Addressing.
+
+           In 32-bit mode, this is a displacement.  In 64-bit mode,
+           this is RIP + displacement
+        *)
+        (match m with
+        | X86 ->
+          let (disp, na) = parse_disp32 na in (r, Oaddr(b32 disp), na)
+        | X8664 ->
+          let (disp, na) = parse_disp32 na in (r, Oaddr(b64 disp +* l64 ia), na))
       | n -> (r, Oaddr(bits2reg32e m n), na)
     )
     | 1 | 2 ->
       let (base, na) = 
-	if 4 = rm then parse_sib modb na else (bits2reg32e m rm, na) in
+	if 4 = rm then parse_sib rex modb na else (bits2reg32e m rm, na) in
       let (disp, na) = 
 	if modb = 1 then parse_disp8 na else (*2*) parse_disp32 na in
-      (r, Oaddr(base +* b32 disp), na)
+      (r, Oaddr(base +* bm disp), na)
     | 3 -> (r, Oreg rm, na)
     | _ -> disfailwith "Impossible"
   in
-  let parse_modrm32ext rex a =
+  let parse_modrm32ext rex ia a =
     let b, r, modb, rm, na = parse_modrmbits64 rex a in
-    parse_modrm32int a b r modb rm na
+    parse_modrm32int rex ia a b r modb rm na
   in
-  let parse_modrm32 rex a =
-    let (r, rm, na) = parse_modrm32ext rex a in
+  let parse_modrm32 rex ia a =
+    let (r, rm, na) = parse_modrm32ext rex ia a in
     (Oreg r, rm, na)
 (*  and parse_modrmxmm a =
     let (r, rm, na) = parse_modrm32ext a in
     let rm = match rm with Oreg r -> Oreg (reg2xmm r) | _ -> rm in
     (Oreg(bits2xmm r), rm, na) *)
   in
-  let parse_modrm32seg rex a =
-    let (r, rm, na) = parse_modrm32ext rex a in
+  let parse_modrm32seg rex ia a =
+    let (r, rm, na) = parse_modrm32ext rex ia a in
     (Oseg r, rm, na)
   in
   (* let parse_modrm64ext a rex = *)
@@ -2418,7 +2443,7 @@ let parse_instr m g addr =
     let parse_disp32, parse_modrm32, parse_modrm32seg, parse_modrm32ext = match prefix.addrsize with
       | Reg 16 ->
         parse_disp16, parse_modrm16 rex, parse_modrm16seg rex, parse_modrm16ext rex
-      | Reg (32|64) -> parse_disp32, parse_modrm32 rex, parse_modrm32seg rex, parse_modrm32ext rex
+      | Reg (32|64) -> parse_disp32, parse_modrm32 rex a, parse_modrm32seg rex a, parse_modrm32ext rex a
       | t -> failwith "Bad address type"
     in
     let mi = int_of_mode m in

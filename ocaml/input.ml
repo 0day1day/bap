@@ -84,8 +84,7 @@ let get_program () =
   in
   try
     let p,scope = List.fold_left get_one ([], Grammar_private_scope.default_scope ()) (List.rev !inputs) in
-      (* (try Printexc.print Typecheck.typecheck_prog p with _ -> ()); *)
-      (* Always typecheck input programs. *)
+    (* Always typecheck input programs. *)
     Printexc.print Typecheck.typecheck_prog p;
     p,scope
   with e ->
