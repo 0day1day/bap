@@ -2227,6 +2227,7 @@ let parse_instr m g addr =
   let parse_int8 = parse_int 8 in
   let parse_int16 = parse_int 16 in
   let parse_int32 = parse_int 32 in
+  let parse_int64 = parse_int 64 in
 
   let to_signed i t = Arithmetic.to_sbig_int (i, t) in
   let parse_sint nbits a =
@@ -2416,13 +2417,20 @@ let parse_instr m g addr =
   and parse_simm32 a =
     let (i, na) = parse_sint32 a in
     (Oimm i, na)
+  and parse_imm64 a =
+    let (i, na) = parse_int64 a in
+    (Oimm i, na)
+  and _parse_simm64 a =
+    let (i, na) = parse_sint64 a in
+    (Oimm i, na)
   in
   let parse_immz t a = match t with
     | Reg 16 -> parse_imm16 a
-    | Reg 32 | Reg 64 -> parse_imm32 a
+    | Reg 32 -> parse_imm32 a
+    | Reg 64 -> parse_imm64 a
     | _ -> disfailwith "parse_immz unsupported size"
   in
-  let parse_immv = parse_immz in (* until we do amd64 *)
+  let parse_immv = parse_immz in
   let parse_immb = parse_imm8 in
   let parse_immw = parse_imm16 in 
   (* let parse_immd = parse_imm32 in *)
@@ -2443,7 +2451,8 @@ let parse_instr m g addr =
     let parse_disp32, parse_modrm32, parse_modrm32seg, parse_modrm32ext = match prefix.addrsize with
       | Reg 16 ->
         parse_disp16, parse_modrm16 rex, parse_modrm16seg rex, parse_modrm16ext rex
-      | Reg (32|64) -> parse_disp32, parse_modrm32 rex a, parse_modrm32seg rex a, parse_modrm32ext rex a
+      | Reg 32 -> parse_disp32, parse_modrm32 rex a, parse_modrm32seg rex a, parse_modrm32ext rex a
+      | Reg 64 -> parse_disp64, parse_modrm32 rex a, parse_modrm32seg rex a, parse_modrm32ext rex a
       | t -> failwith "Bad address type"
     in
     let mi = int_of_mode m in
