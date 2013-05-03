@@ -333,7 +333,7 @@ and zf = nv "R_ZF" r1
 and sf = nv "R_SF" r1
 and oF = nv "R_OF" r1
 
-and dflag = nv "R_DFLAG" r32 (* 1 if DF=0 or -1 if DF=1 *)
+and df = nv "R_DF" r1
 
 (* segment registers and bases *)
 and fs_base = nmv "R_FS_BASE" r32 "R_FS_BASE" r64
@@ -364,7 +364,7 @@ let st = Array.init 8 (fun i -> nv (Printf.sprintf "R_ST%d" i) st_t)
 let mvs {v64; v32} = [v64; v32]
 
 let regs : var list =
-  cf::pf::af::zf::sf::oF::dflag::cs::ds::es::fs::gs::ss::fpu_ctrl::mxcsr::
+  cf::pf::af::zf::sf::oF::df::cs::ds::es::fs::gs::ss::fpu_ctrl::mxcsr::
   List.flatten (List.map (fun {v64; v32} -> [v64; v32]) (rbp::rsp::rsi::rdi::rip::rax::rbx::rcx::rdx::rflags::fs_base::gs_base::Array.to_list nums))
   @ List.map (fun (n,t) -> Var.newvar n t)
     [
@@ -451,13 +451,7 @@ and zf_e = Var zf
 and sf_e = Var sf
 and of_e = Var oF
 
-and dflag_e = Var dflag
-
-(* BAP's dflag is 1 or -1, indicating forward or backwards.
-
-   x86 uses values 0 and 1 for forward and backwards. *)
-let x86_dflag_e =
-  ite r1 (dflag_e ==* Int(bi1, r32)) exp_false exp_true
+and df_e = Var df
 
 let gdt_e = Var gdt
 and ldt_e = Var ldt
@@ -470,8 +464,9 @@ and seg_fs = Some fs_base
 and seg_gs = Some gs_base
 
 (* eflags *)
-let dflag_to_bap e =
-  ite r32 (e ==* exp_false) (Int(bi1, r32)) (Int(bim1, r32))
+let df_to_offset m e =
+  let t = type_of_mode m in
+  ite t (e ==* exp_false) (it 1 t) (it (-1) t)
 
 let bap_to_eflags =
   let undefined d = Unknown(Printf.sprintf "Undefined EFLAGS bit %d" d, r1) in
@@ -497,7 +492,7 @@ let bap_to_eflags =
   :: unmodeled "IOPL1"          (* 13 *)
   :: unmodeled "IOPL2"          (* 12 *)
   :: of_e                       (* 11 *)
-  :: x86_dflag_e                (* 10 *)
+  :: df_e                       (* 10 *)
   :: unmodeled "IF"             (*  9 *)
   :: unmodeled "TF"             (*  8 *)
   :: sf_e                       (*  7 *)
@@ -539,7 +534,7 @@ let eflags_to_bap =
   :: None                       (* 13 *)
   :: None                       (* 12 *)
   :: assn oF                    (* 11 *)
-  :: Some(dflag, dflag_to_bap)  (* 10 *)
+  :: assn df                    (* 10 *)
   :: None                       (* 09 *)
   :: None                       (* 08 *)
   :: assn sf                    (* 07 *)
@@ -822,11 +817,12 @@ let jump_target = compute_jump_target
 let bytes_of_width = Typecheck.bytes_of_width
 let bits_of_width = Typecheck.bits_of_width
 
-let string_incr t v =
+let string_incr m t v =
+  let i = int_of_mode m in
   if t = r8 then
-    move v (Var v +* dflag_e)
+    move v (Var v +* df_to_offset m df_e)
   else
-    move v (Var v +* (dflag_e ** i32(bytes_of_width t)))
+    move v (Var v +* (df_to_offset m df_e ** i (bytes_of_width t)))
 
 let rep_wrap ?check_zf ~m ~addr ~next stmts =
   let mi = int64_of_mode m in
@@ -995,8 +991,8 @@ let rec to_ir m addr next ss pref =
   | Movs(Reg bits as t) ->
       let stmts =
 	store_s m seg_es t rdi_e (load_s m seg_es t rsi_e)
-	:: string_incr t rsi
-	:: string_incr t rdi
+	:: string_incr m t rsi
+	:: string_incr m t rdi
 	:: []
       in
       if pref = [] then
@@ -1609,8 +1605,8 @@ let rec to_ir m addr next ss pref =
       move src1 (op2e t (Oaddr rsi_e))
       :: move src2 (op2e_s m seg_es t (Oaddr rdi_e))
       :: move tmpres (Var src1 -* Var src2)
-      :: string_incr t rsi
-      :: string_incr t rdi
+      :: string_incr m t rsi
+      :: string_incr m t rdi
       :: set_flags_sub t (Var src1) (Var src2) (Var tmpres)
     in
     if pref = [] then
@@ -1625,7 +1621,7 @@ let rec to_ir m addr next ss pref =
       move src1 (cast_low t (Var rax))
       :: move src2 (op2e_s m seg_es t (Oaddr rdi_e))
       :: move tmpres (Var src1 -* Var src2)
-      :: string_incr t rdi
+      :: string_incr m t rdi
       :: set_flags_sub t (Var src1) (Var src2) (Var tmpres)
     in
     if pref = [] then
@@ -1636,7 +1632,7 @@ let rec to_ir m addr next ss pref =
       unimplemented "unsupported flags in scas"
   | Stos(Reg bits as t) ->
     let stmts = [store_s m seg_es t rdi_e (op2e t o_rax);
-		 string_incr t rdi]
+		 string_incr m t rdi]
     in
     if pref = [] then
       stmts
@@ -1962,7 +1958,7 @@ let rec to_ir m addr next ss pref =
 	 move r (Unknown ((n^" undefined after div"), t)) in
        List.map undef [cf; oF; sf; zf; af; pf])
   | Cld ->
-    [Move(dflag, i32 1, [])]
+    [Move(df, exp_false, [])]
   | Leave t when pref = [] -> (* #UD if Lock prefix is used *)
     Move(rsp, rbp_e, [])
     ::to_ir m addr next ss pref (Pop(t, o_rbp))
