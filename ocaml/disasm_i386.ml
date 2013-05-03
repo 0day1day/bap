@@ -636,7 +636,7 @@ let bits2segreg = function
   | 3 -> ds
   | 4 -> fs
   | 5 -> gs
-  | 6 | 7 -> failwith "bits2segreg: reserved"
+  | 6 | 7 -> disfailwith "bits2segreg: reserved"
   | _ -> failwith "bits2regseg: invalid"
 
 let bits2segrege b = Var(bits2segreg b)
@@ -2318,6 +2318,7 @@ let parse_instr m g addr =
     let rm = e rex_b lor rm in
     b, r, modb, rm, na
   in
+  (* 16 bit addressing *)
   let parse_modrm16int a b r modb rm na =
     (* ISR 2.1.5 Table 2-1 *)
     match modb with (* MOD *)
@@ -2346,9 +2347,15 @@ let parse_instr m g addr =
     let (r, rm, na) = parse_modrm16ext rex a in
     (Oseg r, rm, na)
   in
-  let parse_modrm32int rex ia a b r modb rm na =
+  (* 32 and 64-bit addressing *)
+  let parse_modrm3264int rex at ia a b r modb rm na =
     (* ISR 2.1.5 Table 2-2 *)
     let bm = big_int_of_mode m in
+    let bits2rege = match at with
+      | Reg 32 -> (fun b -> cast_unsigned (type_of_mode m) (bits2reg32e m b))
+      | Reg 64 -> bits2reg64e m
+      | _ -> failwith "parse_modrm3264int: invalid address type"
+    in
     match modb with (* MOD *)
     | 0 -> (match rm with
       | 4 -> let (sib, na) = parse_sib rex modb na in (r, Oaddr sib, na)
@@ -2363,31 +2370,31 @@ let parse_instr m g addr =
           let (disp, na) = parse_disp32 na in (r, Oaddr(b32 disp), na)
         | X8664 ->
           let (disp, na) = parse_disp32 na in (r, Oaddr(b64 disp +* l64 ia), na))
-      | n -> (r, Oaddr(bits2reg32e m n), na)
+      | n -> (r, Oaddr(bits2rege n), na)
     )
     | 1 | 2 ->
-      let (base, na) = 
-	if 4 = rm then parse_sib rex modb na else (bits2reg32e m rm, na) in
-      let (disp, na) = 
+      let (base, na) =
+	if 4 = rm then parse_sib rex modb na else (bits2rege rm, na) in
+      let (disp, na) =
 	if modb = 1 then parse_disp8 na else (*2*) parse_disp32 na in
       (r, Oaddr(base +* bm disp), na)
     | 3 -> (r, Oreg rm, na)
     | _ -> disfailwith "Impossible"
   in
-  let parse_modrm32ext rex ia a =
+  let parse_modrm3264ext rex at ia a =
     let b, r, modb, rm, na = parse_modrmbits64 rex a in
-    parse_modrm32int rex ia a b r modb rm na
+    parse_modrm3264int rex at ia a b r modb rm na
   in
-  let parse_modrm32 rex ia a =
-    let (r, rm, na) = parse_modrm32ext rex ia a in
+  let parse_modrm3264 rex at ia a =
+    let (r, rm, na) = parse_modrm3264ext rex at ia a in
     (Oreg r, rm, na)
 (*  and parse_modrmxmm a =
     let (r, rm, na) = parse_modrm32ext a in
     let rm = match rm with Oreg r -> Oreg (reg2xmm r) | _ -> rm in
     (Oreg(bits2xmm r), rm, na) *)
   in
-  let parse_modrm32seg rex ia a =
-    let (r, rm, na) = parse_modrm32ext rex ia a in
+  let parse_modrm3264seg rex at ia a =
+    let (r, rm, na) = parse_modrm3264ext rex at ia a in
     (Oseg r, rm, na)
   in
   (* let parse_modrm64ext a rex = *)
@@ -2446,13 +2453,13 @@ let parse_instr m g addr =
       Oimm v
     | _ -> disfailwith "sign_ext only handles Oimm"
   ) in
-  let get_opcode pref ({rex; rm_extend} as prefix) a =
+  let get_opcode pref ({rex; rm_extend; addrsize} as prefix) a =
     (* We should rename these, since the 32 at the end is misleading. *)
-    let parse_disp32, parse_modrm32, parse_modrm32seg, parse_modrm32ext = match prefix.addrsize with
+    let parse_disp32, parse_modrm32, parse_modrm32seg, parse_modrm32ext = match addrsize with
       | Reg 16 ->
         parse_disp16, parse_modrm16 rex, parse_modrm16seg rex, parse_modrm16ext rex
-      | Reg 32 -> parse_disp32, parse_modrm32 rex a, parse_modrm32seg rex a, parse_modrm32ext rex a
-      | Reg 64 -> parse_disp64, parse_modrm32 rex a, parse_modrm32seg rex a, parse_modrm32ext rex a
+      | Reg 32 -> parse_disp32, parse_modrm3264 rex addrsize a, parse_modrm3264seg rex addrsize a, parse_modrm3264ext rex addrsize a
+      | Reg 64 -> parse_disp64, parse_modrm3264 rex addrsize a, parse_modrm3264seg rex addrsize a, parse_modrm3264ext rex addrsize a
       | t -> failwith "Bad address type"
     in
     let mi = int_of_mode m in
