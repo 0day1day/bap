@@ -1372,7 +1372,7 @@ let rec to_ir m addr next ss pref =
     let e = concat_explist (map get_bit ((n-1)---0)) in
     [assn t dst e]
   | Lea(r, a) when pref = [] ->
-    [assn r32 r a]
+    [assn mt r a]
   | Call(o1, ra) when pref = [] ->
     (* If o1 is an immediate, we should syntactically have Jump(imm)
        so that the CFG algorithm knows where the jump goes.  Otherwise
