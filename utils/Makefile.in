@@ -32,8 +32,8 @@ endif
 
 # ocamlfind packages required
 export PACKS = camlidl bigarray str num unix camomile piqi.lib $(LLVM_PACKS)
-export LIBS = zarith batteries objsize oUnit graph pcre libtrace bap
-export INCDIRS = $(BAP_OCAMLDIR) $(BAP_OCAMLDIR)/piqi $(BIGINT) $(BATT) $(OUNIT) $(PCRE) $(OCAMLGRAPH) $(OBJSIZE) $(LIBTRACE)
+export LIBS = zarith batteries objsize oUnit graph pcre libtrace $(PROJLIBS) bap
+export INCDIRS = $(BAP_OCAMLDIR) $(BAP_OCAMLDIR)/piqi $(BIGINT) $(BATT) $(OUNIT) $(PCRE) $(OCAMLGRAPH) $(OBJSIZE) $(LIBTRACE) $(PROJINCDIRS)
 export OCAMLPATH = $(PIQIBUILDDIR)
 
 # -rdynamic lets LLVM JIT see dynamic symbols
@@ -47,8 +47,15 @@ export RESULTDEPS = $(BAP_OCAMLDIR)/bap.a
 
 # default subprojects to build
 ifndef SUBPROJS
-	export SUBPROJS = $(PROJUTILS) $(CODEGEN) toil iltrans ileval topredicate solvepredicate formula get_functions streamtrans backtaint
+	export SUBPROJS = $(PROJUTILS) $(CODEGEN) toil iltrans ileval topredicate solvepredicate formula get_functions streamtrans backtaint identify_loops
 endif
+
+define PROJ_identify_loops
+	RESULT=identify_loops
+	SOURCES = identify_loops.ml
+	DOC_FILES=$(SOURCES)
+endef
+export PROJ_identify_loops
 
 define PROJ_toil
 	RESULT=toil

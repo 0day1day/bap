@@ -13,7 +13,12 @@ let short_tests = [
   Predicate_suite.suite;
   Arithmetic_suite.suite;
   Dominator_suite.suite;
+  Djgraph_suite.suite;
   Unroll_suite.suite;
+  Steensgard_suite.suite;
+  Havlak_suite.suite;
+(*  Reduced_havlak_suite.suite; *)
+  Sreedhar_suite.suite;
 ];;
 
 let bap_tests = ("BAP" >::: short_tests);;

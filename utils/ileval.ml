@@ -102,8 +102,9 @@ let speclist =
        (let maddr = ref "" and mval = ref "" in
 	[
 	  Arg.Set_string maddr; Arg.Set_string mval;
-          let maddr = !maddr and mval = !mval in
-	  Arg.Unit (fun () -> lazyinits := lazy (mapmem maddr mval) :: !lazyinits)
+	  Arg.Unit (fun () ->
+            let maddr = !maddr and mval = !mval in
+            lazyinits := lazy (mapmem maddr mval) :: !lazyinits)
 	]),
      "<addr expression> <value expression> Set variable to expression before evaluation.")
   :: Input.speclist
