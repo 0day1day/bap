@@ -346,8 +346,8 @@ and fs = nv "R_FS" r16
 and gs = nv "R_GS" r16
 and ss = nv "R_SS" r16
 
-and gdt = nv "R_GDT" r32
-and ldt = nv "R_LDT" r32
+and gdt = nmv "R_GDTR" r32 "R_GDTR" r64
+and ldt = nmv "R_LDTR" r32 "R_LDTR" r64
 
 and fpu_ctrl = nv "R_FPU_CONTROL" r16
 and mxcsr = nv "R_MXCSR" r32
@@ -452,9 +452,6 @@ and sf_e = Var sf
 and of_e = Var oF
 
 and df_e = Var df
-
-let gdt_e = Var gdt
-and ldt_e = Var ldt
 
 let seg_cs = None
 and seg_ss = None
@@ -967,15 +964,22 @@ let rec to_ir m addr next ss pref =
     let base_e e =
       (* 0 = GDT, 1 = LDT *)
       let ti = extract 3 3 e in
-      let base = ite r32 ti ldt_e gdt_e in
+      let base = ite mt ti (ge m ldt) (ge m gdt) in
       (* Extract index into table *)
-      let index = cast_unsigned r32 (extract 15 4 e) <<* i32 6 in
+      let entry_size, entry_shift = match m with
+        | X86 -> r64, 6 (* 1<<6 = 64 *)
+        | X8664 -> r128, 7 (* 1<<7 = 128 *)
+      in
+      let index = cast_unsigned mt (extract 15 4 e) <<* mi entry_shift in
       (* Load the table entry *)
-      let table_entry = load_s m None r64 (base +* index) in
+      let table_entry = load_s m None entry_size (base +* index) in
       (* Extract the base *)
       concat_explist
         (BatList.enum
-           (extract 63 56 table_entry
+           ((match m with
+           | X86 -> []
+           | X8664 -> extract 95 64 table_entry :: [])
+            @  extract 63 56 table_entry
             :: extract 39 32 table_entry
             :: extract 31 16 table_entry
             :: []))
@@ -1386,7 +1390,7 @@ let rec to_ir m addr next ss pref =
     | Oimm _ ->
       let t = nt "target" mt in
       [move t target;
-       move rsp (rsp_e -* mi 4);
+       move rsp (rsp_e -* mi (bytes_of_width mt));
        store_s m None mt rsp_e (mi64 ra);
        Jmp(target, calla)]
     | _ ->
@@ -2461,6 +2465,7 @@ let parse_instr m g addr =
     let mi = int_of_mode m in
     let _mi64 = int64_of_mode m in
     let mbi = big_int_of_mode m in
+    let mt = type_of_mode m in
     let b1 = Char.code (g a)
     and na = s a in
     match b1 with (* Table A-2 *)
@@ -2572,7 +2577,7 @@ let parse_instr m g addr =
       let far_ret = if (b1 = 0xc2 or b1 = 0xc3) then false else true in
       if (b1 = 0xc3 or b1 = 0xcb) then (Retn(None, far_ret), na) 
       else let (imm,na) = parse_immw na in 
-	   (Retn(Some(r32, imm), far_ret), na)
+	   (Retn(Some(mt, imm), far_ret), na)
     | 0xc6
     | 0xc7 -> let t = if b1 = 0xc6 then r8 else prefix.opsize in
 	      let (e, rm, na) = parse_modrm32ext na in
