@@ -51,7 +51,9 @@ let bimf = big_int_of_int (-0xf)
 let biconst i = big_int_of_int i
 let bi = biconst
 let biconst32 i = big_int_of_int32 i
+let bi32 = big_int_of_int32
 let biconst64 i = big_int_of_int64 i
+let bi64 = big_int_of_int64
 
 let big_int_of_bool = function
   | true -> bi1
