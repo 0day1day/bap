@@ -9,7 +9,8 @@ let simple_test filename var v () =
   let cfg = Prune_unreachable.prune_unreachable_ast cfg in
   let cfg = Ast_cond_simplify.simplifycond_cfg cfg in
   let _df_in, df_out = Vsa.vsa ~nmeets cfg in
-  let l = df_out (Cfg.AST.G.V.create Cfg.BB_Exit) in
+  let exiT = Cfg.AST.G.V.create Cfg.BB_Exit in
+  let l = df_out (Vsa.last_loc cfg exiT) in
   let l = BatOption.get l in
   let v' = VM.find var l in
   assert_equal ~msg:(Printf.sprintf "Value set %s for %s was different than expected value %s" (Vsa.AbsEnv.value_to_string v') (Pp.var_to_string var) (Vsa.AbsEnv.value_to_string v)) v v'

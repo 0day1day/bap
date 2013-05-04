@@ -94,6 +94,10 @@ sig
       (zero-indexed) in [bb]. *)
   val worklist_iterate_stmt : ?init:(D.O.t -> D.CFG.G.t -> D.L.t) ->
     ?opts:D.O.t -> D.CFG.G.t -> (D.CFG.G.V.t * int -> D.L.t) * (D.CFG.G.V.t * int -> D.L.t)
+
+  (** Returns the location corresponding to the last statement in
+      [bb]. *)
+  val last_loc : D.CFG.G.t -> D.CFG.G.V.t -> D.CFG.G.V.t * int
 end
 
 (** Build a custom dataflow algorithm for the given dataflow problem
@@ -112,4 +116,14 @@ sig
   *)
   val worklist_iterate_widen : ?init:(D.O.t -> D.CFG.G.t -> D.L.t) ->
     ?nmeets:int -> ?opts:D.O.t -> D.CFG.G.t -> (D.CFG.G.V.t -> D.L.t) * (D.CFG.G.V.t -> D.L.t)
+
+(** Like [worklist_iterate_widen], except the dataflow is done on
+    the statement level. A statement [bb,n] is the [n]th stmt
+    (zero-indexed) in [bb]. *)
+  val worklist_iterate_widen_stmt : ?init:(D.O.t -> D.CFG.G.t -> D.L.t) ->
+    ?nmeets:int -> ?opts:D.O.t -> D.CFG.G.t -> (D.CFG.G.V.t * int -> D.L.t) * (D.CFG.G.V.t * int -> D.L.t)
+
+  (** Returns the location corresponding to the last statement in
+      [bb]. *)
+  val last_loc : D.CFG.G.t -> D.CFG.G.V.t -> D.CFG.G.V.t * int
 end

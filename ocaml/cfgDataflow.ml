@@ -89,11 +89,13 @@ struct
       l
     in
     winstmt, woutstmt
+  let last_loc g v =
+    v, List.length (D.CFG.get_stmts g v) - 1
 end
 
 module Make (D:DATAFLOW) =
 struct
-  let worklist_iterate, worklist_iterate_stmt =
+  let worklist_iterate, worklist_iterate_stmt, last_loc =
     let module DFSPEC = struct
       module L = struct
         include D.L
@@ -109,5 +111,6 @@ struct
     end in
     let module DF = MakeWide(DFSPEC) in
     DF.worklist_iterate_widen ~nmeets:0,
-    DF.worklist_iterate_widen_stmt ~nmeets:0
+    DF.worklist_iterate_widen_stmt ~nmeets:0,
+    DF.last_loc
 end

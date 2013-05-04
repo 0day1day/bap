@@ -118,7 +118,7 @@ let vsa_print g =
   let _df_in, df_out = Vsa.vsa ~nmeets:50 g in
   Cfg.AST.G.iter_vertex (fun v ->
     Printf.printf "VSA @%s" (Cfg_ast.v2s v);
-    Vsa.AbsEnv.pp print_string (BatOption.get (df_out v));
+    Vsa.AbsEnv.pp print_string (BatOption.get (df_out (Vsa.last_loc g v)));
     print_string "\n\n"
   ) g
 

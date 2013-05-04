@@ -121,7 +121,7 @@ let simplifycond_cfg g =
     let stmts = C.get_stmts g v in
     match List.rev stmts with
     | CJmp(e, tt, tf, a)::tl ->
-      let _, copyprop = cp (v, List.length tl) in
+      let _, copyprop, _ = cp (v, List.length tl) in
       let e' = simplify_exp (copyprop e) in
       dprintf "e: %s e': %s" (Pp.ast_exp_to_string e) (Pp.ast_exp_to_string e');
       (* Update statement *)

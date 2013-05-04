@@ -1624,5 +1624,6 @@ end
 (* Main vsa interface *)
 let vsa ?nmeets ?opts g =
   Checks.connected_astcfg g "VSA";
-  AlmostVSA.DF.worklist_iterate_widen ?nmeets ?opts g
+  AlmostVSA.DF.worklist_iterate_widen_stmt ?nmeets ?opts g
 
+let last_loc = AlmostVSA.DF.last_loc

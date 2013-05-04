@@ -72,7 +72,9 @@ end
 module CPSpecAST = struct
 
   module L = struct
-    type et = Middle of (Cfg.AST.G.V.t * int) * Ast.exp (** One assigned exp *) | Bottom (** Multiple assigned exps *)
+    type et =
+      | Middle of (Cfg.AST.G.V.t * int) * Ast.exp (** One assigned exp *)
+      | Bottom (** Multiple assigned exps *)
     let et_to_string = function
       | Middle (v,e) -> Printf.sprintf "Middle %s" (Pp.ast_exp_to_string e)
       | Bottom -> "Bottom"
@@ -220,8 +222,16 @@ let copyprop_ast ?stop_at g =
       (match v with
       | CPSpecAST.L.Middle (loc, x) ->
         let aste = propagate dfin loc loc x in
-      (* dprintf "%s maps to %s" (Pp.var_to_string k) (Pp.ast_exp_to_string aste); *)
-      VM.add k aste newmap
-    | _ ->
-      newmap)
-  ) l VM.empty, propagate dfin loc loc)
+        (* dprintf "%s maps to %s" (Pp.var_to_string k) (Pp.ast_exp_to_string aste); *)
+        VM.add k aste newmap
+      | _ ->
+        newmap)
+    ) l VM.empty,
+
+    propagate dfin loc loc,
+
+    (* Export converted lattice value *)
+    VM.filter_map (fun _ v -> match v with
+      | CPSpecAST.L.Middle (loc, e) -> Some(loc, e)
+      | CPSpecAST.L.Bottom -> None) l
+  )

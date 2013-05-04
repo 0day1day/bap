@@ -109,22 +109,75 @@ module VSA_SPEC = struct
       (* let cfg = Coalesce.coalesce_ast ~nocoalesce:[v] cfg in
       Cfg_pp.AstStmtsDot.output_graph (open_out "vsa.dot") cfg; *)
       dprintf "Starting VSA now";
-      let _df_in, df_out = Vsa.vsa ~nmeets:50 ~opts:{Vsa.AlmostVSA.DFP.O.initial_mem=Asmir.get_readable_mem_contents_list asmp} cfg in
-      let vs = Vsa.AlmostVSA.DFP.exp2vs (BatOption.get (df_out v)) e in
-      dprintf "VSA resolved %s to %s" (Pp.ast_exp_to_string e) (Vsa.VS.to_string vs);
-      (match Vsa.VS.concrete ~max:1024 vs with
-      | Some x -> dprintf "VSA finished"; Addrs (List.map (fun a -> Addr a) x), ()
-      | None -> wprintf "VSA disassembly failed to resolve %s/%s to a specific concrete set" (Pp.ast_exp_to_string e) (Vsa.VS.to_string vs);
+      let df_in, df_out = Vsa.vsa ~nmeets:50 ~opts:{Vsa.AlmostVSA.DFP.O.initial_mem=Asmir.get_readable_mem_contents_list asmp} cfg in
+
+      let add_indirect () =
         if debug () then (
           Cfg.AST.G.iter_vertex (fun v ->
             Printf.eprintf "VSA @%s" (Cfg_ast.v2s v);
-            Vsa.AbsEnv.pp prerr_string (BatOption.get (df_out v));
+            Vsa.AbsEnv.pp prerr_string (BatOption.get (df_out (Vsa.last_loc g v)));
             dprintf "\n\n"
           ) cfg
         );
         if no_indirect
-        then failwith (Printf.sprintf "VSA disassembly failed to resolve %s/%s to a specific concrete set" (Pp.ast_exp_to_string e) (Vsa.VS.to_string vs))
-        else Indirect, ())
+        then failwith "VSA disassembly failed to resolve an indirect jump to a specific concrete set"
+        else Indirect, ()
+      in
+
+      let fallback () =
+        let vs = Vsa.AlmostVSA.DFP.exp2vs (BatOption.get (df_out (Vsa.last_loc g v))) e in
+        dprintf "VSA resolved %s to %s" (Pp.ast_exp_to_string e) (Vsa.VS.to_string vs);
+        (match Vsa.VS.concrete ~max:1024 vs with
+        | Some x -> dprintf "VSA finished"; Addrs (List.map (fun a -> Addr a) x), ()
+        | None -> wprintf "VSA disassembly failed to resolve %s/%s to a specific concrete set" (Pp.ast_exp_to_string e) (Vsa.VS.to_string vs);
+          add_indirect ())
+      in
+
+      (* Value sets are very good at representing the addresses that
+         point to the elements in a jump table.  For instance,
+         jump_table + 4*index is a value set.  However, there is no
+         guarantee that the address stored *in* the jump table,
+         i.e. M[jump_table + 4*index] are aligned.  To ameliaorate
+         this fact, we can apply copy propagation to the jump
+         expression, to see if we get something like [Jump Load(e)].
+         If we do, we can enumerate the addresses in [e], and then put
+         the values [M[e]] in a set.  This is basically what VSA will
+         do, except that it will also convert M[e] to a value set
+         before it returns, which introduced imprecision. *)
+
+      (match e with
+      | Var var ->
+        (* Ok, we matched a variable.  Let's see what copy propagation
+           says. *)
+        let copyprop = Copy_prop.copyprop_ast cfg in
+        let loc = v, (List.length (CA.get_stmts g v)) - 1 in
+        let _, _, m = copyprop loc in
+        (try
+           let loc', e' = Var.VarMap.find var m in
+           match e' with
+           | Load(m, e, endian, t) ->
+             (* The variable copy propagates to a memory load.
+                Perfect.  This is looking like a jump table lookup. *)
+             let l = BatOption.get (df_in loc') in
+             let exp2vs = Vsa.AlmostVSA.DFP.exp2vs l in
+             let vs = exp2vs e in
+             dprintf "VSA resolved memory index %s to %s" (Pp.ast_exp_to_string e) (Vsa.VS.to_string (Vsa.AlmostVSA.DFP.exp2vs l e));
+             (match Vsa.VS.concrete ~max:1024 vs with
+             | Some l -> dprintf "VSA finished";
+               (* We got some concrete values for the index.  Now
+                  let's do an abstract load for each index, and try to
+                  get concrete numbers for that. *)
+               let reads = List.map (fun a ->
+                 let a = bi64 a in
+                 let vs = exp2vs (Load(m, Int(a, Typecheck.infer_ast e), endian, t)) in
+                 let conc = Vsa.VS.concrete ~max:1024 vs in
+                 BatOption.get conc) l in
+               Addrs (List.map (fun a -> Addr a) (List.flatten reads)), ()
+             | None -> wprintf "VSA disassembly failed to resolve %s/%s to a specific concrete set" (Pp.ast_exp_to_string e) (Vsa.VS.to_string vs);
+               add_indirect ())
+           | _ -> fallback ()
+         with Not_found | BatOption.No_value -> fallback ())
+      | _ -> fallback ())
     (* Rely on recursive descent for easy stuff *)
     | o, () -> o, ()
 
