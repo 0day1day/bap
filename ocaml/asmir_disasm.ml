@@ -145,6 +145,28 @@ module VSA_SPEC = struct
          do, except that it will also convert M[e] to a value set
          before it returns, which introduced imprecision. *)
 
+      let special_memory loc m e endian t =
+        (* The variable copy propagates to a memory load.
+           Perfect.  This is looking like a jump table lookup. *)
+        let l = BatOption.get (df_in loc) in
+        let exp2vs = Vsa.AlmostVSA.DFP.exp2vs l in
+        let vs = exp2vs e in
+        dprintf "VSA resolved memory index %s to %s" (Pp.ast_exp_to_string e) (Vsa.VS.to_string (Vsa.AlmostVSA.DFP.exp2vs l e));
+        (match Vsa.VS.concrete ~max:1024 vs with
+        | Some l -> dprintf "VSA finished";
+               (* We got some concrete values for the index.  Now
+                  let's do an abstract load for each index, and try to
+                  get concrete numbers for that. *)
+          let reads = List.map (fun a ->
+            let a = bi64 a in
+            let vs = exp2vs (Load(m, Int(a, Typecheck.infer_ast e), endian, t)) in
+            let conc = Vsa.VS.concrete ~max:1024 vs in
+            BatOption.get conc) l in
+          Addrs (List.map (fun a -> Addr a) (List.flatten reads)), ()
+        | None -> wprintf "VSA disassembly failed to resolve %s/%s to a specific concrete set" (Pp.ast_exp_to_string e) (Vsa.VS.to_string vs);
+          add_indirect ())
+      in
+
       (match e with
       | Var var ->
         (* Ok, we matched a variable.  Let's see what copy propagation
@@ -156,27 +178,11 @@ module VSA_SPEC = struct
            let loc', e' = Var.VarMap.find var m in
            match e' with
            | Load(m, e, endian, t) ->
-             (* The variable copy propagates to a memory load.
-                Perfect.  This is looking like a jump table lookup. *)
-             let l = BatOption.get (df_in loc') in
-             let exp2vs = Vsa.AlmostVSA.DFP.exp2vs l in
-             let vs = exp2vs e in
-             dprintf "VSA resolved memory index %s to %s" (Pp.ast_exp_to_string e) (Vsa.VS.to_string (Vsa.AlmostVSA.DFP.exp2vs l e));
-             (match Vsa.VS.concrete ~max:1024 vs with
-             | Some l -> dprintf "VSA finished";
-               (* We got some concrete values for the index.  Now
-                  let's do an abstract load for each index, and try to
-                  get concrete numbers for that. *)
-               let reads = List.map (fun a ->
-                 let a = bi64 a in
-                 let vs = exp2vs (Load(m, Int(a, Typecheck.infer_ast e), endian, t)) in
-                 let conc = Vsa.VS.concrete ~max:1024 vs in
-                 BatOption.get conc) l in
-               Addrs (List.map (fun a -> Addr a) (List.flatten reads)), ()
-             | None -> wprintf "VSA disassembly failed to resolve %s/%s to a specific concrete set" (Pp.ast_exp_to_string e) (Vsa.VS.to_string vs);
-               add_indirect ())
+             special_memory loc' m e endian t
            | _ -> fallback ()
          with Not_found | BatOption.No_value -> fallback ())
+      | Load(m, e, endian, t) ->
+        special_memory (Vsa.last_loc g v) m e endian t
       | _ -> fallback ())
     (* Rely on recursive descent for easy stuff *)
     | o, () -> o, ()
