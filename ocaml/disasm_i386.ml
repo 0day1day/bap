@@ -170,7 +170,7 @@ type opcode =
   | Movzx of typ * operand * typ * operand (* dsttyp, dst, srctyp, src *)
   | Movsx of typ * operand * typ * operand (* dsttyp, dst, srctyp, src *)
   | Movdq of typ * typ * operand * typ * operand * bool * string (* move type, dst type, dst op, src type, src op, aligned, name *)
-  | Lea of operand * Ast.exp
+  | Lea of typ * operand * Ast.exp
   | Call of operand * int64 (* int64 is RA *)
   | Shift of binop_type * typ * operand * operand
   | Shiftd of binop_type * typ * operand * operand * operand
@@ -1375,8 +1375,14 @@ let rec to_ir m addr next ss pref =
     let n = (Typecheck.bits_of_width t) / 8 in
     let e = concat_explist (map get_bit ((n-1)---0)) in
     [assn t dst e]
-  | Lea(r, a) when pref = [] ->
-    [assn mt r a]
+  | Lea(t, r, a) when pref = [] ->
+    (* See Table 3-64 *)
+    let a = match Typecheck.infer_ast a, t with
+      | Reg addrbits, Reg opbits when addrbits > opbits -> cast_low t a
+      | Reg _, Reg _ -> a
+      | _ -> failwith "impossible"
+    in
+    [assn t r a]
   | Call(o1, ra) when pref = [] ->
     (* If o1 is an immediate, we should syntactically have Jump(imm)
        so that the CFG algorithm knows where the jump goes.  Otherwise
@@ -1396,7 +1402,7 @@ let rec to_ir m addr next ss pref =
     | _ ->
       let t = nt "target" mt in
       [move t target;
-       move rsp (rsp_e -* mi 4);
+       move rsp (rsp_e -* mi (bytes_of_width mt));
        store_s m None mt rsp_e (mi64 ra);
        Jmp(Var t, calla)])
   | Jump(o) ->
@@ -2066,7 +2072,7 @@ module ToStr = struct
     | Pshufb(t,dst,src) -> Printf.sprintf "pshufb %s, %s" (opr dst) (opr src)
     | Pcmp(t,elet,_,str,dst,src) -> Printf.sprintf "%s %s, %s" str (opr dst) (opr src)
     | Pmovmskb(t,dst,src) -> Printf.sprintf "pmovmskb %s, %s" (opr dst) (opr src)
-    | Lea(r,a) -> Printf.sprintf "lea %s, %s" (opr r) (opr (Oaddr a))
+    | Lea(t,r,a) -> Printf.sprintf "lea %s, %s" (opr r) (opr (Oaddr a))
     | Call(a, ra) -> Printf.sprintf "call %s" (opr a)
     | Shift _ -> "shift"
     | Shiftd _ -> "shiftd"
@@ -2288,8 +2294,8 @@ let parse_instr m g addr =
       | X8664 -> bits2reg64e
     in
     let ss = b >> 6 and idx = ((b>>3) & 7) lor (e rex_x) in
-    let base, na = 
-      match ((b & 7), modb) with (* base register, MOD *)
+    let base, na =
+      match (b & 7, modb & 7) with (* base register, MOD *)
       | 5, 0 -> let (i,na) = parse_disp32 (s a) in (bm i, na)
       | _, 0 | _, 1 | _, 2 -> (bits2rege m ((b & 7) lor (e rex_b)), s a)
       | _ -> disfailwith (Printf.sprintf "impossible opcode: sib b=%02x" b)
@@ -2321,8 +2327,8 @@ let parse_instr m g addr =
   (* 16 bit addressing *)
   let parse_modrm16int a b r modb rm na =
     (* ISR 2.1.5 Table 2-1 *)
-    match modb with (* MOD *)
-    | 0 -> (match rm with
+    match modb & 7 with (* MOD *)
+    | 0 -> (match rm & 7 with
       | 6 -> let (disp, na) = parse_disp16 na in (r, Oaddr(b16 disp), na)
       | n when n < 8 -> (r, Oaddr(eaddr16 m rm), na)
       | _ -> disfailwith "Impossible"
@@ -2330,7 +2336,7 @@ let parse_instr m g addr =
     | 1 | 2 ->
       let (base, na) = eaddr16 m rm, na in
       let (disp, na) = 
-	if modb = 1 then parse_disp8 na else (*2*) parse_disp16 na in
+	if (modb & 7) = 1 then parse_disp8 na else (*2*) parse_disp16 na in
       (r, Oaddr(base +* b16 disp), na)
     | 3 -> (r, Oreg rm, na)
     | _ -> disfailwith "Impossible"
@@ -2356,8 +2362,8 @@ let parse_instr m g addr =
       | Reg 64 -> bits2reg64e m
       | _ -> failwith "parse_modrm3264int: invalid address type"
     in
-    match modb with (* MOD *)
-    | 0 -> (match rm with
+    match modb & 7 with (* MOD *)
+    | 0 -> (match rm & 7 with
       | 4 -> let (sib, na) = parse_sib rex modb na in (r, Oaddr sib, na)
       | 5 ->
         (* See Table 2-7. RIP-Relative Addressing.
@@ -2370,7 +2376,7 @@ let parse_instr m g addr =
           let (disp, na) = parse_disp32 na in (r, Oaddr(b32 disp), na)
         | X8664 ->
           let (disp, na) = parse_disp32 na in (r, Oaddr(b64 disp +* l64 ia), na))
-      | n -> (r, Oaddr(bits2rege n), na)
+      | n -> (r, Oaddr(bits2rege rm), na)
     )
     | 1 | 2 ->
       let (base, na) =
@@ -2453,9 +2459,14 @@ let parse_instr m g addr =
       Oimm v
     | _ -> disfailwith "sign_ext only handles Oimm"
   ) in
+  (* This is for opcodes like e9 *)
+  let expanded_jump_type opsize = match m with
+    | X86 -> opsize
+    | X8664 -> r32
+  in
   let get_opcode pref ({rex; rm_extend; addrsize} as prefix) a =
     (* We should rename these, since the 32 at the end is misleading. *)
-    let parse_disp32, parse_modrm32, parse_modrm32seg, parse_modrm32ext = match addrsize with
+    let parse_disp_addr, parse_modrm_addr, parse_modrmseg_addr, parse_modrmext_addr = match addrsize with
       | Reg 16 ->
         parse_disp16, parse_modrm16 rex, parse_modrm16seg rex, parse_modrm16ext rex
       | Reg 32 -> parse_disp32, parse_modrm3264 rex addrsize a, parse_modrm3264seg rex addrsize a, parse_modrm3264ext rex addrsize a
@@ -2485,7 +2496,7 @@ let parse_instr m g addr =
       in
       (Push(prefix.opsize, o), na)
     | 0x69 | 0x6b ->
-      let (r, rm, na) = parse_modrm32 na in
+      let (r, rm, na) = parse_modrm_addr na in
       let ((o, na), ot) = 
 	if b1 = 0x6b then (parse_simmb na, r8) else 
 	  if (prefix.opsize = r16) then (parse_simmw na, r16) 
@@ -2497,7 +2508,7 @@ let parse_instr m g addr =
       let (i,na) = parse_disp8 na in
       (Jcc(Jabs(Oimm(i +% (bi64 na))), cc_to_exp b1), na)
     | 0x80 | 0x81 | 0x82 | 0x83 -> 
-      let (r, rm, na) = parse_modrm32ext na in
+      let (r, rm, na) = parse_modrmext_addr na in
       let (o2, na) =
 	if b1 = 0x81 then parse_immz prefix.opsize na
 	else let (o,na) = parse_simmb na
@@ -2517,26 +2528,26 @@ let parse_instr m g addr =
 	(Printf.sprintf "impossible opcode: %02x/%d" b1 r)
       )
     | 0x84
-    | 0x85 -> let (r, rm, na) = parse_modrm32 na in
+    | 0x85 -> let (r, rm, na) = parse_modrm_addr na in
 	      let o = if b1 = 0x84 then r8 else prefix.opsize in
 	      (Test(o, rm, r), na)
-    | 0x87 -> let (r, rm, na) = parse_modrm32 na in
+    | 0x87 -> let (r, rm, na) = parse_modrm_addr na in
 	      (Xchg(prefix.opsize, r, rm), na)
-    | 0x88 -> let (r, rm, na) = parse_modrm32 na in
+    | 0x88 -> let (r, rm, na) = parse_modrm_addr na in
 	      (Mov(r8, rm, r, None), na)
-    | 0x89 -> let (r, rm, na) = parse_modrm32 na in
+    | 0x89 -> let (r, rm, na) = parse_modrm_addr na in
 	      (Mov(prefix.opsize, rm, r, None), na)
-    | 0x8a -> let (r, rm, na) = parse_modrm32 na in
+    | 0x8a -> let (r, rm, na) = parse_modrm_addr na in
 	      (Mov(r8, r, rm, None), na)
-    | 0x8b -> let (r, rm, na) = parse_modrm32 na in
+    | 0x8b -> let (r, rm, na) = parse_modrm_addr na in
 	      (Mov(prefix.opsize, r, rm, None), na)
-    | 0x8c -> let (r, rm, na) = parse_modrm32seg na in
+    | 0x8c -> let (r, rm, na) = parse_modrmseg_addr na in
               (Mov(r16, rm, r, None), na)
-    | 0x8d -> let (r, rm, na) = parse_modrm32 na in
+    | 0x8d -> let (r, rm, na) = parse_modrm_addr na in
 	      (match rm with
-	      | Oaddr a -> (Lea(r, a), na)
+	      | Oaddr a -> (Lea(prefix.opsize, r, a), na)
 	      | _ -> disfailwith "invalid lea (must be address)")
-    | 0x8e -> let (r, rm, na) = parse_modrm32seg na in
+    | 0x8e -> let (r, rm, na) = parse_modrmseg_addr na in
               (Mov(r16, r, rm, None), na)
     | 0x90 -> (Nop, na)
     | 0x91 | 0x92 | 0x93 | 0x94 | 0x95 | 0x96 | 0x97 ->
@@ -2548,11 +2559,11 @@ let parse_instr m g addr =
     | 0x9f -> (Lahf, na)
     | 0xa0 | 0xa1 ->
       let t = if b1 = 0xa0 then reg_8 else prefix.opsize in
-      let (addr, na) = parse_disp32 na in
+      let (addr, na) = parse_disp_addr na in
       (Mov(t, o_rax, Oaddr(mbi addr), None), na)
     | 0xa2 | 0xa3 ->
       let t = if b1 = 0xa2 then r8 else prefix.opsize in
-      let (addr, na) = parse_disp32 na in
+      let (addr, na) = parse_disp_addr na in
       (Mov(t, Oaddr(mbi addr), o_rax, None), na)
     | 0xa4 -> (Movs r8, na)
     | 0xa5 -> (Movs prefix.opsize, na)
@@ -2580,7 +2591,7 @@ let parse_instr m g addr =
 	   (Retn(Some(mt, imm), far_ret), na)
     | 0xc6
     | 0xc7 -> let t = if b1 = 0xc6 then r8 else prefix.opsize in
-	      let (e, rm, na) = parse_modrm32ext na in
+	      let (e, rm, na) = parse_modrmext_addr na in
 	      let (i,na) = 
 		if b1 = 0xc6 then parse_immb na else parse_immz t na 
 	      in
@@ -2598,7 +2609,7 @@ let parse_instr m g addr =
        byte does not specify a memory address. *)
     | 0xd8 | 0xd9 | 0xda | 0xdb | 0xdc | 0xdd | 0xde | 0xdf ->
       let b2, _ = parse_int8 na in
-      let (r, rm, na) = parse_modrm32ext na in
+      let (r, rm, na) = parse_modrmext_addr na in
       (match r, rm with
       | 2, Oaddr _ -> 
         (match b1 with 
@@ -2632,15 +2643,17 @@ let parse_instr m g addr =
         unimplemented (Printf.sprintf "unsupported opcode: %02x %s" b1 (Util.big_int_to_hex ~pad:2 b2))
       )
 
-    | 0xe8 -> let (i,na) = parse_disp32 na in
+    | 0xe8 -> let t = expanded_jump_type prefix.opsize in
+              let (i,na) = parse_disp t na in
 	      (Call(Oimm(i +% (bi64 na)), na), na)
-    | 0xe9 -> let (i,na) = parse_disp prefix.opsize na in
-	      (Jump(Jabs(Oimm(i +% (bi64 na)))), na)
+    | 0xe9 -> let t = expanded_jump_type prefix.opsize in
+              let (i,na) = parse_disp t na in
+              (Jump(Jabs(Oimm(i +% (bi64 na)))), na)
     | 0xeb -> let (i,na) = parse_disp8 na in
 	      (Jump(Jabs(Oimm(i +% (bi64 na)))), na)
     | 0xc0 | 0xc1
     | 0xd0 | 0xd1 | 0xd2
-    | 0xd3 -> let (r, rm, na) = parse_modrm32ext na in
+    | 0xd3 -> let (r, rm, na) = parse_modrmext_addr na in
 	      let opsize = if (b1 & 1) = 0 then r8 else prefix.opsize in
 	      let (amt, na) = match b1 & 0xfe with
 		| 0xc0 -> parse_imm8 na
@@ -2673,7 +2686,7 @@ let parse_instr m g addr =
     | 0xf4 -> (Hlt, na)
     | 0xf6
     | 0xf7 -> let t = if b1 = 0xf6 then r8 else prefix.opsize in
-	      let (r, rm, na) = parse_modrm32ext na in
+	      let (r, rm, na) = parse_modrmext_addr na in
 	      (match r with (* Grp 3 *)
 	       | 0 ->
 		 let (imm, na) = 
@@ -2714,14 +2727,14 @@ let parse_instr m g addr =
 		 disfailwith (Printf.sprintf "impossible opcode: %02x/%d" b1 r)
 	      )
     | 0xfc -> (Cld, na)
-    | 0xfe -> let (r, rm, na) = parse_modrm32ext na in
+    | 0xfe -> let (r, rm, na) = parse_modrmext_addr na in
 	      (match r with (* Grp 4 *)
                 | 0 -> (Inc(r8, rm), na)
                 | 1 -> (Dec(r8, rm), na)
 	        | _ -> disfailwith 
 		  (Printf.sprintf "impossible opcode: %02x/%d" b1 r)
 	      )
-    | 0xff -> let (r, rm, na) = parse_modrm32ext na in
+    | 0xff -> let (r, rm, na) = parse_modrmext_addr na in
 	      (match r with (* Grp 5 *)
                 | 0 -> (Inc(prefix.opsize, rm), na)
                 | 1 -> (Dec(prefix.opsize, rm), na)
@@ -2751,9 +2764,9 @@ let parse_instr m g addr =
 	in
 	let t = if (b1 & 1) = 0  then r8 else prefix.opsize in
 	let (o1, o2, na) = match b1 & 7 with
-	  | 0 | 1 -> let r, rm, na = parse_modrm32 na in
+	  | 0 | 1 -> let r, rm, na = parse_modrm_addr na in
 		     (rm, r, na)
-	  | 2 | 3 -> let r, rm, na = parse_modrm32 na in
+	  | 2 | 3 -> let r, rm, na = parse_modrm_addr na in
 		     (r, rm, na)
 	  | 4 -> let i, na = parse_immb na in
 		 (o_rax, i, na)
@@ -2770,7 +2783,7 @@ let parse_instr m g addr =
       | 0x1f ->
         (* Even though we don't use the operand to nop, we need to
            parse it to get the next address *)
-        let _, _, na = parse_modrm32 na in
+        let _, _, na = parse_modrm_addr na in
         (Nop, na)
       | 0x12 | 0x13 | 0x28 | 0x29 | 0x6e | 0x7e | 0x6f | 0x7f | 0xd6 ->
         (* XXX: Clean up prefixes.  This will probably require some
@@ -2795,7 +2808,7 @@ let parse_instr m g addr =
           | _ -> unimplemented
 	    (Printf.sprintf "mov opcode case missing: %02x" b2)
         in
-	let r, rm, na = parse_modrm32 na in
+	let r, rm, na = parse_modrm_addr na in
 	let s, d = match b2 with
           | 0x12 | 0x6f | 0x6e | 0x28 -> rm, r
           | 0x13 | 0x7f | 0x7e | 0x29 | 0xd6 -> r, rm
@@ -2810,26 +2823,26 @@ let parse_instr m g addr =
         let b3 = Char.code (g na) and na = s na in
         (match b3 with
         | 0x00 ->
-          let d, s, na = parse_modrm32 na in
+          let d, s, na = parse_modrm_addr na in
           (Pshufb(prefix.mopsize, d, s), na)
         | 0x17 when prefix.opsize_override ->
-          let d, s, na = parse_modrm32 na in
+          let d, s, na = parse_modrm_addr na in
           (Ptest(r128, d, s), na)
         | 0x29 when prefix.opsize_override ->
-          let r, rm, na = parse_modrm32 na in
+          let r, rm, na = parse_modrm_addr na in
           (Pcmp(reg_128, reg_64, EQ, "pcmpeq", r, rm), na)
         | 0x37 when prefix.opsize_override ->
-          let r, rm, na = parse_modrm32 na in
+          let r, rm, na = parse_modrm_addr na in
           (Pcmp(reg_128, reg_64, SLT, "pcmpgt", r, rm), na)
         | 0x38 | 0x39 when prefix.opsize_override ->
-          let r, rm, na = parse_modrm32 na in
+          let r, rm, na = parse_modrm_addr na in
           let et = match b3 with
             | 0x38 -> reg_8 | 0x39 -> reg_32
             | _ -> disfailwith "invalid"
           in
           (Ppackedbinop(prefix.mopsize, et, Ast_convenience.min_symbolic ~signed:true, "pmins", r, rm), na)
         | 0x3a | 0x3b when prefix.opsize_override ->
-          let r, rm, na = parse_modrm32 na in
+          let r, rm, na = parse_modrm_addr na in
           let et = match b3 with
             | 0x3a -> reg_16 | 0x3b -> reg_32
             | _ -> disfailwith "invalid"
@@ -2840,11 +2853,11 @@ let parse_instr m g addr =
         let b3 = Char.code (g na) and na = s na in
         (match b3 with
         | 0x0f ->
-          let (r, rm, na) = parse_modrm32 na in
+          let (r, rm, na) = parse_modrm_addr na in
 	  let (i, na) = parse_imm8 na in
           (Palignr(prefix.mopsize, r, rm, i), na)
         | 0x60 | 0x61 | 0x62 | 0x63 ->
-          let (r, rm, na) = parse_modrm32 na in
+          let (r, rm, na) = parse_modrm_addr na in
           let (i, na) = parse_imm8 na in
           (match i with
 
@@ -2869,7 +2882,7 @@ let parse_instr m g addr =
       (* conditional moves *)
       | 0x40 | 0x41 | 0x42 | 0x43 | 0x44 | 0x45 | 0x46 | 0x47 | 0x48 | 0x49 
       | 0x4a | 0x4b | 0x4c | 0x4d | 0x4e | 0x4f ->
-	let (r, rm, na) = parse_modrm32 na in
+	let (r, rm, na) = parse_modrm_addr na in
 	(Mov(prefix.opsize, r, rm, Some(cc_to_exp b2)), na)
       | 0x60 | 0x61 | 0x62 | 0x68 | 0x69 | 0x6a | 0x6c | 0x6d ->
         let order = match b2 with
@@ -2884,22 +2897,22 @@ let parse_instr m g addr =
           | 0x6c | 0x6d -> reg_64
           | _ -> disfailwith "impossible"
         in
-        let (r, rm, na) = parse_modrm32 na in
+        let (r, rm, na) = parse_modrm_addr na in
         (Punpck(prefix.mopsize, elemt, order, r, rm), na)
       | 0x64 | 0x65 | 0x66 | 0x74 | 0x75 | 0x76  as o ->
-        let r, rm, na = parse_modrm32 na in
+        let r, rm, na = parse_modrm_addr na in
         let elet = match o & 0x6 with | 0x4 -> r8 | 0x5 -> r16 | 0x6 -> r32 | _ ->
 	  disfailwith "impossible" in
         let bop, bstr = match o & 0x70 with | 0x70 -> EQ, "pcmpeq" | 0x60 -> SLT, "pcmpgt"
           | _ -> disfailwith "impossible" in
         (Pcmp(prefix.mopsize, elet, bop, bstr, r, rm), na)
       | 0x70 when prefix.opsize = r16 ->
-        let r, rm, na = parse_modrm32 na in
+        let r, rm, na = parse_modrm_addr na in
         let i, na = parse_imm8 na in
         (Pshufd(r, rm, i), na)
       | 0x71 | 0x72 | 0x73 ->
         let t = prefix.mopsize in
-        let r, rm, na = parse_modrm32 na in
+        let r, rm, na = parse_modrm_addr na in
         let i, na = parse_imm8 na in
         let open BatInt64.Infix in
             let fbop, str, et, i = match b2, r, i with
@@ -2915,40 +2928,41 @@ let parse_instr m g addr =
             (Ppackedbinop(t, et, fbop, str, rm, i), na)
       | 0x80 | 0x81 | 0x82 | 0x83 | 0x84 | 0x85 | 0x86 | 0x87 | 0x88 | 0x89
       | 0x8a | 0x8b | 0x8c | 0x8d | 0x8e | 0x8f ->
-        let (i,na) = parse_disp32 na in
+        let t = expanded_jump_type prefix.opsize in
+        let (i,na) = parse_disp t na in
 	(Jcc(Jabs(Oimm(i +% (bi64 na))), cc_to_exp b2), na)
       (* add other opcodes for setcc here *)
       | 0x90 | 0x91 | 0x92 | 0x93 | 0x94 | 0x95 | 0x96 | 0x97 | 0x98 | 0x99
       | 0x9a | 0x9b | 0x9c | 0x9d | 0x9e | 0x9f ->
-        let r, rm, na = parse_modrm32 na in
+        let r, rm, na = parse_modrm_addr na in
 	(* unclear what happens otherwise *)
 	assert (prefix.opsize = r32);
 	(Setcc(r8, rm, cc_to_exp b2), na)
       | 0xa2 -> (Cpuid, na)
       | 0xa3 | 0xba ->
-        let (r, rm, na) = parse_modrm32 na in
+        let (r, rm, na) = parse_modrm_addr na in
         let r, na = if b2 = 0xba then parse_imm8 na else r, na in
         (Bt(prefix.opsize, r, rm), na)
       | 0xa4 ->
 	(* shld *)
-        let (r, rm, na) = parse_modrm32 na in
+        let (r, rm, na) = parse_modrm_addr na in
 	let (i, na) = parse_imm8 na in
 	(Shiftd(LSHIFT, prefix.opsize, rm, r, i), na)
       | 0xa5 ->
 	(* shld *)
-        let (r, rm, na) = parse_modrm32 na in
+        let (r, rm, na) = parse_modrm_addr na in
 	(Shiftd(LSHIFT, prefix.opsize, rm, r, o_rcx), na)
       | 0xac ->
 	(* shrd *)
-        let (r, rm, na) = parse_modrm32 na in
+        let (r, rm, na) = parse_modrm_addr na in
 	let (i, na) = parse_imm8 na in
 	(Shiftd(RSHIFT, prefix.opsize, rm, r, i), na)
       | 0xad ->
 	(* shrd *)
-        let (r, rm, na) = parse_modrm32 na in
+        let (r, rm, na) = parse_modrm_addr na in
 	(Shiftd(RSHIFT, prefix.opsize, rm, r, o_rcx), na)
       | 0xae ->
-        let (r, rm, na) = parse_modrm32ext na in
+        let (r, rm, na) = parse_modrmext_addr na in
         (match r with
         | 2 -> (Ldmxcsr rm, na) (* ldmxcsr *)
         | 3 -> (Stmxcsr rm, na) (* stmxcsr *)
@@ -2956,28 +2970,28 @@ let parse_instr m g addr =
 	  (Printf.sprintf "unsupported opcode: %02x %02x/%d" b1 b2 r)
         )
       | 0xaf ->
-	let (r, rm, na) = parse_modrm32 na in
+	let (r, rm, na) = parse_modrm_addr na in
 	(Imul(prefix.opsize, (false,r), r, rm), na)
       | 0xb1 ->
-        let r, rm, na = parse_modrm32 na in
+        let r, rm, na = parse_modrm_addr na in
         (Cmpxchg (prefix.opsize, r, rm), na)
       | 0xb6
       | 0xb7 -> let st = if b2 = 0xb6 then r8 else r16 in
-		let r, rm, na = parse_modrm32 na in
+		let r, rm, na = parse_modrm_addr na in
 		(Movzx(prefix.opsize, r, st, rm), na)
       | 0xbc | 0xbd ->
         let dir = match b2 with | 0xbc -> Forward | 0xbd -> Backward | _ -> failwith "impossible" in
-        let r, rm, na = parse_modrm32 na in
+        let r, rm, na = parse_modrm_addr na in
         (Bs (prefix.opsize, r, rm, dir), na)
       | 0xbe
       | 0xbf -> let st = if b2 = 0xbe then r8 else r16 in
-                let r, rm, na = parse_modrm32 na in
+                let r, rm, na = parse_modrm_addr na in
                 (Movsx(prefix.opsize, r, st, rm), na)
       | 0xc1 ->
-        let r, rm, na = parse_modrm32 na in
+        let r, rm, na = parse_modrm_addr na in
         (Xadd(prefix.opsize, r, rm), na)
       | 0xc7 ->
-        let r, rm, na = parse_modrm32ext na in
+        let r, rm, na = parse_modrmext_addr na in
         (match r with
         | 1 -> (Cmpxchg8b(rm), na)
         | _ -> unimplemented 
@@ -2987,7 +3001,7 @@ let parse_instr m g addr =
         (Bswap(prefix.opsize, Oreg(rm_extend lor (b2 & 7))), na)
       | 0xd1 | 0xd2 | 0xd3 | 0xe1 | 0xe2 | 0xf1 | 0xf2 | 0xf3 ->
         let t = prefix.mopsize in
-        let r, rm, na = parse_modrm32 na in
+        let r, rm, na = parse_modrm_addr na in
         let et = lowbits2elemt b2 in
         let fbop, str = match b2 & 0xf0 with
           | 0xd0 -> binop RSHIFT, "psrl"
@@ -2997,22 +3011,22 @@ let parse_instr m g addr =
         in
         (Ppackedbinop(t, et, fbop, str, r, rm), na)
       | 0xda ->
-        let r, rm, na = parse_modrm32 na in
+        let r, rm, na = parse_modrm_addr na in
         (Ppackedbinop(prefix.mopsize, reg_8, Ast_convenience.min_symbolic ~signed:false, "pminub", r, rm), na)
       | 0xdb ->
-        let r, rm, na = parse_modrm32 na in
+        let r, rm, na = parse_modrm_addr na in
         (Pbinop(prefix.mopsize, AND, "pand", r, rm), na)
       | 0xd7 ->
-        let r, rm, na = parse_modrm32 na in
+        let r, rm, na = parse_modrm_addr na in
         (Pmovmskb(prefix.mopsize, r, rm), na)
       | 0xea ->
-        let r, rm, na = parse_modrm32 na in
+        let r, rm, na = parse_modrm_addr na in
         (Ppackedbinop(prefix.mopsize, reg_16, Ast_convenience.min_symbolic ~signed:true, "pmins", r, rm), na)
       | 0xeb ->
-        let r, rm, na = parse_modrm32 na in
+        let r, rm, na = parse_modrm_addr na in
         (Pbinop(prefix.mopsize, OR, "por", r, rm), na)
       | 0xef ->
-	let d, s, na = parse_modrm32 na in
+	let d, s, na = parse_modrm_addr na in
 	(Pbinop(prefix.mopsize, XOR, "pxor", d,s), na)
       | _ -> unimplemented 
 	(Printf.sprintf "unsupported opcode: %02x %02x" b1 b2)
