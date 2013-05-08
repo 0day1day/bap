@@ -1,5 +1,5 @@
 let usage = "Usage: "^Sys.argv.(0)^" <input options> [transformations and outputs]\n\
-             Transform BAP IL programs. "
+             Evaluate BAP IL programs. "
 
 open Ast
 
