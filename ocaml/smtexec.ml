@@ -145,14 +145,17 @@ struct
 
   let solvername = S.solvername
 
+  let maybe_remove remove name =
+    if remove then
+    (try
+      Unix.unlink name
+    with _ -> ())
+    else ()
+
   (** Write given formula out to random filename and return the filename *)
     let write_formula ?(exists=[]) ?(foralls=[]) ?(remove=true) f  =
       let name, oc = Filename.open_temp_file ("formula" ^ (string_of_int (getpid ())))  ".stp" in
-      at_exit (fun () ->
-	         if remove then
-		   try
-		     Unix.unlink name
-		   with _ -> ());
+      at_exit (fun () -> maybe_remove remove name);
       dprintf "Using temporary file %s" name;
       let pp = S.printer oc in
       pp#valid_ast_exp ~exists:exists ~foralls:foralls f;
