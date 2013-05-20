@@ -609,7 +609,9 @@ struct
     let validf = unop NOT f in
     match S.check_exp_validity validf with
     | Smtexec.Invalid _ -> true
-    | _ -> false
+    | Smtexec.Valid -> false
+    | Smtexec.SmtError(s) -> failwith ("is_sat: SMTError: " ^ s)
+    | Smtexec.Timeout -> failwith "is_sat: timeout"
 
   let get_model _ = failwith "unimplemented"
   let model_exp _ = failwith "unimplemented"
