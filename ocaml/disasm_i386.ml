@@ -1270,9 +1270,7 @@ let rec to_ir addr next ss pref =
     let target = op2e r32 o1 in
     (match o1 with
     | Oimm _ ->
-      let t = nt "target" r32 in
-      [move t target;
-       move esp (esp_e -* i32 4);
+      [move esp (esp_e -* i32 4);
        store_s None r32 esp_e (l32 ra);
        Jmp(target, calla)]
     | _ ->
