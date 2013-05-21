@@ -20,6 +20,11 @@ let mk_attr lab string =
   | "tid" -> ThreadId(int_of_string string)
   | _ -> err ("Unknown attribute @"^lab)
 
+let mk_attr2 lab string1 string2 =
+  match lab with
+  | "namedstr" -> NamedStrAttr (string1, string2)
+  | _ -> err ("Unknown attribute @"^lab)
+
 let mk_context =
   let memre = Str.regexp "^mem\\[\\([^][]+\\)\\]$" in
   (fun name value taint typ usage ->
@@ -155,6 +160,7 @@ attrs:
 
 attr:
 | AT ID STRING { mk_attr $2 $3 }
+| AT ID STRING STRING { mk_attr2 $2 $3 $4 }
 | AT ID context { Context($3) }
 
 lval:

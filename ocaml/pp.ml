@@ -120,6 +120,7 @@ object (self)
     | Address a -> printf "@address \"0x%Lx\"" a;
     | Liveout -> pp "@set \"liveout\""
     | StrAttr s -> pp "@str \""; pp s; pc '\"'
+    | NamedStrAttr (n, s) -> pp "@namedstr \""; pp n; pc '\"'; space (); pc '\"'; pp s; pc '\"'
     | Context {name=s; mem=mem; value=v; index=i; t=Reg bits; usage=u; taint=Taint t} -> 
       let ustr = match u with
         | RD -> "rd" | RW -> "rw" | WR -> "wr"

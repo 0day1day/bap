@@ -88,9 +88,10 @@ type attribute =
   | Address of addr (** The address corresponding to lifted IL. *)
   | Liveout (** Statement should be considered live by deadcode elimination *)
   | StrAttr of string (** Generic printable and parseable attribute *)
-  | Context of context         (** Information about the
-                                   instruction operands from a
-                                   trace. *)
+  | NamedStrAttr of string * string (** Generic printable and parseable attribute *)
+  | Context of context (** Information about the
+                           instruction operands from a
+                           trace. *)
   | ThreadId of int (** Executed by a specific thread *)
   | ExnAttr of exn (** Generic extensible attribute, but no parsing *)
   | InitRO (** The memory in this assignment is stored in the binary *)
