@@ -753,7 +753,7 @@ let rep_wrap ?check_zf ~addr ~next stmts =
   @ [endstmt]
 
 let reta = [StrAttr "ret"]
-and calla e = [StrAttr "call"; NamedStrAttr ("call", Pp.ast_exp_to_string e)]
+and calla = [StrAttr "call"]
 
 let compute_sf result = cast_high r1 result
 let compute_zf t result = Int(bi0, t) ==* result
@@ -1272,13 +1272,13 @@ let rec to_ir addr next ss pref =
     | Oimm _ ->
       [move esp (esp_e -* i32 4);
        store_s None r32 esp_e (l32 ra);
-       Jmp(target, calla target)]
+       Jmp(target, calla)]
     | _ ->
       let t = nt "target" r32 in
       [move t target;
        move esp (esp_e -* i32 4);
        store_s None r32 esp_e (l32 ra);
-       Jmp(Var t, calla (Var t))])
+       Jmp(Var t, calla)])
   | Jump(o) ->
     [Jmp(jump_target ss o, [])]
   | Jcc(o, c) ->

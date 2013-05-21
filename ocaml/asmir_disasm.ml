@@ -249,7 +249,10 @@ module Make(D:DISASM)(F:FUNCID) = struct
                   | CJmp _::_ -> failwith "Conditional function calls are not implemented"
                   | Jmp _::tl as stmts -> List.map (function
                       | Label _ as s -> s
-                      | s -> Comment(Printf.sprintf "Function call removed: %s" (Pp.ast_stmt_to_string s), [])) stmts
+                      | Jmp(e, _) as s ->
+                        Comment(Printf.sprintf "Function call removed: %s" (Pp.ast_stmt_to_string s), [NamedStrAttr("calltarget", Pp.ast_exp_to_string e)])
+                      | s ->
+                        Comment(Printf.sprintf "Function call removed: %s" (Pp.ast_stmt_to_string s), [])) stmts
                   | _ -> failwith "Unable to rewrite function call"
                 in
                 CA.set_stmts cfg s (List.rev revstmts)
