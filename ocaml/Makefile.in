@@ -65,9 +65,9 @@ export SOURCES = \
 	prune_unreachable.mli prune_unreachable.ml \
 	cfg_pp.ml \
 	cfg_ast.mli cfg_ast.ml \
+	checks.mli checks.ml \
 	depgraphs.mli depgraphs.ml \
 	cfg_ssa.mli cfg_ssa.ml \
-	checks.mli checks.ml \
 	debug_snippets.ml \
 	sccvn.mli sccvn.ml \
 	deadcode.mli deadcode.ml \
