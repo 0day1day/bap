@@ -83,6 +83,7 @@ val serialized_bap_from_trace_file : string -> Ast.program
 val serialized_bap_stream_from_trace_file : int64 -> string -> (Ast.stmt list) Stream.t
 
 val get_symbols : ?all:bool -> asmprogram -> asymbol array
+val get_dynamic_symbols : asmprogram -> asymbol array
 val find_symbol : asmprogram -> string -> asymbol
 
 val get_flavour : asmprogram -> bfd_flavour

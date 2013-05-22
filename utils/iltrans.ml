@@ -95,6 +95,31 @@ let to_dsa p =
   let p,_ = Traces.to_dsa p in
   p
 
+let output_domtree g =
+  let module C = Cfg.AST in
+  let module D = Dominator.Make(struct
+    include C.G
+    let v2s = C.v2s
+  end) in
+  let idom = D.compute_idom g (C.find_vertex g Cfg.BB_Entry) in
+  let dom_tree = D.idom_to_dom_tree g idom in
+  C.G.iter_vertex (fun v ->
+    Printf.printf "%s is the immediate dominator of %s\n" (C.v2s v) (BatString.join ", " (List.map C.v2s (dom_tree v)));
+  ) g
+
+let output_pdomtree g =
+  let module C = Cfg.AST in
+  let module C' = Depgraphs.MakeRevCfg(C) in
+  let module D = Dominator.Make(struct
+    include C'
+    let v2s = C.v2s
+  end) in
+  let idom = D.compute_idom g (C.find_vertex g Cfg.BB_Exit) in
+  let dom_tree = D.idom_to_dom_tree g idom in
+  C.G.iter_vertex (fun v ->
+    Printf.printf "%s is the immediate post-dominator of %s\n" (C.v2s v) (BatString.join ", " (List.map C.v2s (dom_tree v)));
+  ) g
+
 let output_structanal p =
   let cfg = Prune_unreachable.prune_unreachable_ast p in
   let sa = Structural_analysis.structural_analysis cfg in
@@ -189,6 +214,10 @@ let speclist =
      "Print variables without variable ID numbers")
   ::("-struct", Arg.Unit (fun () -> add(AnalysisAstCfg(output_structanal))),
      "Structural analysis.")
+  ::("-domtree", Arg.Unit (fun () -> add(AnalysisAstCfg output_domtree)),
+     "Output the dominator tree.")
+  ::("-pdomtree", Arg.Unit (fun () -> add(AnalysisAstCfg output_pdomtree)),
+     "Output the post dominator tree.")
   ::("-to-cfg", uadd(ToCfg),
      "Convert to an AST CFG.")
   ::("-to-ast", uadd(ToAst),

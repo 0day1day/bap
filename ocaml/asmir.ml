@@ -465,6 +465,11 @@ let get_symbols ?(all=false) {asmp=p} =
   if err <= 0 then failwith "get_symbols";
   arr
 
+let get_dynamic_symbols {asmp=p} =
+  let (arr,err) = asmir_get_dynsymbols p in
+  if err <= 0 then failwith "get_dynamic_symbols";
+  arr
+
 (* XXX: Very inefficient *)
 let find_symbol {asmp=p} name =
   let (arr,err) = asmir_get_all_symbols p in

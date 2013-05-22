@@ -40,6 +40,18 @@ sig
   val compute_cdg : G.t -> G.t
 end
 
+(** Functor to reverse a CFG *)
+module MakeRevCfg :
+  functor (C : Cfg.CFG) -> sig
+    type t = C.G.t
+    module V : Graph.Sig.VERTEX with type label = C.G.V.label and type t = C.G.V.t
+    val pred : t -> V.t -> V.t list
+    val succ : t -> V.t -> V.t list
+    val nb_vertex : t -> int
+    val fold_vertex : (V.t -> 'a -> 'a) -> t -> 'a -> 'a
+    val iter_vertex : (V.t -> unit) -> t -> unit
+  end
+
 (** Functor to produce control dependence analysis module for a CFG *)
 module MakeCDG :
   functor (C : Cfg.CFG) -> CDG with module G = C.G

@@ -55,12 +55,12 @@ asymbol ** asmir_get_all_symbols(asm_program_t *prog, long *num)
   asymbol **synth_symbol_table_final;
   asymbol **symbol_table;
   asymbol **dynsymbol_table;
-  
+
   if (do_asserts) {
     make_assertions();
     do_asserts = 0;
   }
-  
+
   storage_needed = bfd_get_symtab_upper_bound(prog->abfd);
   if (storage_needed <= 0) goto fail;
 
@@ -95,11 +95,11 @@ asymbol ** asmir_get_all_symbols(asm_program_t *prog, long *num)
 
   /* Point after the stuff we just copied */
   out_ptr = synth_symbol_table_final + numsyms;
-  
+
   for (i = 0; i < numsynthsyms; i++) {
     *(out_ptr++) = &(synth_symbol_table[i]);
   }
-  
+
   *num = numsynthsyms + numsyms;
   return synth_symbol_table_final;
 
@@ -137,3 +137,35 @@ asymbol ** asmir_get_symbols(asm_program_t *prog, long *num)
   return NULL;
 
 }
+
+asymbol ** asmir_get_dynsymbols(asm_program_t* prog, long *num)
+{
+  static int do_asserts = 1;
+  asymbol **dyn_sym = NULL;
+  long storage_needed, res;
+  unsigned long dynsymcount = 0;
+  unsigned long synsymcount = 0;
+
+  if (do_asserts) {
+    make_assertions();
+    do_asserts = 0;
+  }
+
+  if ( !(bfd_get_file_flags(prog->abfd) & HAS_SYMS) ) goto fail;
+
+  storage_needed = bfd_get_dynamic_symtab_upper_bound(prog->abfd);
+  if (storage_needed <= 0) goto fail;
+
+  dyn_sym = (asymbol**) bfd_alloc( prog->abfd, storage_needed );
+
+  dynsymcount = bfd_canonicalize_dynamic_symtab( prog->abfd, dyn_sym );
+  if ( dynsymcount < 0 ) goto fail;
+
+  *num = dynsymcount;
+  return dyn_sym;
+
+  fail:
+  *num = 0;
+  return NULL;
+}
+
