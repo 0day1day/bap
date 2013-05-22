@@ -50,16 +50,19 @@ struct
   (* reverse graph  *)
   module G' = MakeRevCfg(C)
 
+  module Check = Checks.MakeExitCheck(C)
+
   (* inverse dominators module *)
   module D = Dominator.Make(G') 
-
   let compute_cd_internal ?idom cfg =
     (* Note that we don't add an extra entry node, so everything is control
        dependent on the entry node of the CFG *)
     let idom = match idom with
-      | None -> let exit_node = C.find_vertex cfg BB_Exit in
-                let () = dprintf "compute_cd: computing idom" in
-                D.compute_idom cfg exit_node
+      | None ->
+        Check.exit_check cfg "compute_cd";
+        let exit_node = C.find_vertex cfg BB_Exit in
+        let () = dprintf "compute_cd: computing idom" in
+        D.compute_idom cfg exit_node
       | Some idom -> idom
     in
     let () = dprintf "compute_cd: computing dom tree" in
@@ -70,6 +73,7 @@ struct
   let compute_cd cfg = compute_cd_internal cfg
 
   let compute_cdg cfg =
+    Check.exit_check cfg "compute_cdg";
     let exit_node = C.find_vertex cfg BB_Exit in
     let () = dprintf "compute_cdg: computing idom" in
     let idom = D.compute_idom cfg exit_node in
