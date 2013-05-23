@@ -180,7 +180,9 @@ let copyprop_ast ?stop_at g =
     ignore(Ast_visitor.exp_accept v e);
     !s
   in
-  let rec propagate dfin origloc loc e =
+  let module UD = Depgraphs.UseDef_AST in
+  let module LS = UD.LS in
+  let rec propagate dfin origloc visitedlocs loc e =
     let l = get_map (dfin loc) in
     let vis = object(self)
       inherit Ast_visitor.nop
@@ -188,26 +190,24 @@ let copyprop_ast ?stop_at g =
         | Ast.Var v ->
           (try
              match VM.find v l with
-             | CPSpecAST.L.Middle (loc, e) ->
+             | CPSpecAST.L.Middle (newloc, e) ->
                (* Use copy propagation results AT the location of the
                   earlier definition, but only if all definitions of
                   variables in e are the ones in scope at the current
                   location *)
-               let module UD = Depgraphs.UseDef_AST in
-               let module LS = UD.LS in
                (* Make sure all variables referenced in e are the same
                   definitions at the original location *)
                if VS.for_all
                  (fun use ->
                    let vdefs = defs origloc use in
-                   let vdefs' = defs loc use in
+                   let vdefs' = defs newloc use in
                    (* Same definitions *)
                    vdefs = vdefs'
-                   (* No cycle *)
-                   && Depgraphs.UseDef_AST.LS.mem (Depgraphs.UseDef_AST.LocationType.Loc origloc) vdefs = false
+                   (* No cycle: The definitions do not include a previously visited location *)
+                   && LS.is_empty (LS.inter vdefs visitedlocs)
                   ) (vars_in e)
                then
-                 ChangeTo (propagate dfin origloc loc e)
+                 ChangeTo (propagate dfin origloc (LS.add (UD.LocationType.Loc newloc) visitedlocs) newloc e)
                else SkipChildren
              | _ -> SkipChildren
            with Not_found -> SkipChildren)
@@ -221,14 +221,14 @@ let copyprop_ast ?stop_at g =
     VM.fold (fun k v newmap ->
       (match v with
       | CPSpecAST.L.Middle (loc, x) ->
-        let aste = propagate dfin loc loc x in
+        let aste = propagate dfin loc (LS.singleton (UD.LocationType.Loc loc)) loc x in
         (* dprintf "%s maps to %s" (Pp.var_to_string k) (Pp.ast_exp_to_string aste); *)
         VM.add k aste newmap
       | _ ->
         newmap)
     ) l VM.empty,
 
-    propagate dfin loc loc,
+    propagate dfin loc (LS.singleton (UD.LocationType.Loc loc)) loc,
 
     (* Export converted lattice value *)
     VM.filter_map (fun _ v -> match v with
