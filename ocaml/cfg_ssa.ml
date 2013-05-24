@@ -311,8 +311,8 @@ let rec trans_cfg ?tac cfg =
             C.add_edge_e g newe
           ) g b g
       | Ssa.Jmp (e, _)::_ ->
-        let (g,_) = C.G.fold_succ_e
-          (fun e (g,es) ->
+        C.G.fold_succ_e
+          (fun e g ->
             let g = C.remove_edge_e g e in
             let new_lab = match CA.G.E.label (es2a e) with
               | Some(a, Ast.BinOp(EQ, e1, e2)) ->
@@ -324,10 +324,8 @@ let rec trans_cfg ?tac cfg =
               | None -> None
             in
             let newe = C.G.E.create (C.G.E.src e) new_lab (C.G.E.dst e) in
-            C.add_edge_e g newe, es
-          ) g b (g, ES.empty)
-        in
-        g
+            C.add_edge_e g newe
+          ) g b g
       | _ -> g
     in
     dprintf "going on to children";
