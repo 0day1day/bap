@@ -145,7 +145,7 @@ let copyprop_ssa ?stop_at g =
     Ssa_visitor.exp_accept vis v
   in
 
-  let l = dfout (Cfg.SSA.G.V.create Cfg.BB_Error) in
+  let l = dfout (Cfg.SSA.G.V.create Cfg.BB_Exit) in
   let l = match l with
     | CPSpecSSA.L.Map m -> m
     | _ -> failwith "Expected to find a map: BB_Exit probably unreachable"
