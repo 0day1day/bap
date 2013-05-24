@@ -109,10 +109,10 @@ type ssastmtloc = SSA.G.V.t * int
 
 (** {3 Helper functions for CFG conversions} *)
 (* These are for cfg_ast.ml and cfg_ssa.ml to be able to translate without
-   breaking nextid. Poke Ivan if you think you need them for something else. *)
+   breaking nextid. *)
 
-val map_ast2ssa : (Ast.stmt list -> Ssa.stmt list) -> (AST.exp -> SSA.exp) -> AST.G.t -> SSA.G.t
-val map_ssa2ast : (Ssa.stmt list -> Ast.stmt list) -> (SSA.exp -> AST.exp) -> SSA.G.t -> AST.G.t
+val map_ast2ssa : (Ast.stmt list -> Ssa.stmt list) -> (AST.exp -> SSA.exp) -> AST.G.t -> SSA.G.t * (SSA.G.V.t -> AST.G.V.t) * (SSA.G.E.t -> AST.G.E.t)
+val map_ssa2ast : (Ssa.stmt list -> Ast.stmt list) -> (SSA.exp -> AST.exp) -> SSA.G.t -> AST.G.t * (AST.G.V.t -> SSA.G.V.t) * (AST.G.E.t -> SSA.G.E.t)
 
 
 

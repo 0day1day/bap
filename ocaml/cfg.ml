@@ -328,23 +328,29 @@ end
 
 module MkMap(A:CFG_PRIV)(B:CFG_PRIV) =
 struct
+  module VM = Map.Make(B.G.V)
+  module EM = Map.Make(B.G.E)
   let map conv_stmts conv_exp ({nextid=n} as cfg) =
     let s = B.empty() in
     let t vertex = B.G.V.create (A.G.V.label vertex) in
-    let te e =
+    let per_edge e (g, em) =
       let new_lab = match A.G.E.label e with
         | Some(b, e) -> Some(b, conv_exp e)
         | None -> None
       in
-      B.G.E.create (t (A.G.E.src e)) new_lab (t (A.G.E.dst e)) in
-    let per_vertex v g =
+      let e' = B.G.E.create (t (A.G.E.src e)) new_lab (t (A.G.E.dst e)) in
+      let em = EM.add e' e em in
+      B.add_edge_e g e', em
+    in
+    let per_vertex v (g, vm) =
       let v' = t v in
       let g = B.add_vertex g v' in
-      B.set_stmts g v' (conv_stmts (A.get_stmts cfg v))
+      let vm = VM.add v' v vm in
+      B.set_stmts g v' (conv_stmts (A.get_stmts cfg v)), vm
     in
-    let s = A.G.fold_vertex per_vertex cfg s in
-    let s = A.G.fold_edges_e (fun e s -> B.add_edge_e s (te e)) cfg s in
-    { s with nextid = n}
+    let s, vm = A.G.fold_vertex per_vertex cfg (s, VM.empty) in
+    let s, em = A.G.fold_edges_e per_edge cfg (s, EM.empty) in
+    { s with nextid = n }, (fun v -> VM.find v vm), (fun e -> EM.find e em)
 end
 
 module M2ssa = MkMap(AST)(SSA)

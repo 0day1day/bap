@@ -222,7 +222,7 @@ let rec trans_cfg ?tac cfg =
 
   let cfg = Prune_unreachable.prune_unreachable_ast (CA.copy cfg) in
   pdebug "Creating new cfg";
-  let ssa = Cfg.map_ast2ssa (fun _ -> []) (fun _ -> exp_true) cfg in
+  let ssa, vs2a, es2a = Cfg.map_ast2ssa (fun _ -> []) (fun _ -> exp_true) cfg in
   pdebug "Computing defsites";
   let (defsites, globals) = defsites cfg in
     (* keep track of where we need to insert phis *)
@@ -296,7 +296,7 @@ let rec trans_cfg ?tac cfg =
       dprintf "translating stmts";
       let stmts' = stmts2ssa ctx ?tac stmts in
       let g = C.set_stmts ssa b stmts' in
-      (* Update the edge labels of any conditional jumps *)
+      (* Update the edge labels *)
       match List.rev stmts' with
       | Ssa.CJmp (v, _, _, _)::_ ->
         C.G.fold_succ_e
@@ -310,6 +310,24 @@ let rec trans_cfg ?tac cfg =
             let newe = C.G.E.create (C.G.E.src e) new_lab (C.G.E.dst e) in
             C.add_edge_e g newe
           ) g b g
+      | Ssa.Jmp (e, _)::_ ->
+        let (g,_) = C.G.fold_succ_e
+          (fun e (g,es) ->
+            let g = C.remove_edge_e g e in
+            let new_lab = match CA.G.E.label (es2a e) with
+              | Some(a, Ast.BinOp(EQ, e1, e2)) ->
+                (match exp2ssa ~revstmts:[] ctx e1, exp2ssa ~revstmts:[] ctx e2 with
+                | ([], e1'), ([], e2') ->
+                  Some(a, BinOp(EQ, e1', e2'))
+                | _ -> failwith "expected conversion without side-effects")
+              | Some _ -> failwith "unknown edge condition format"
+              | None -> None
+            in
+            let newe = C.G.E.create (C.G.E.src e) new_lab (C.G.E.dst e) in
+            C.add_edge_e g newe, es
+          ) g b (g, ES.empty)
+        in
+        g
       | _ -> g
     in
     dprintf "going on to children";
@@ -739,7 +757,8 @@ let stmts2ast tm stmts =
 
 (** Convert an ssa cfg (with phis already removed) back to a ast cfg *)
 let cfg2ast tm cfg =
-  Cfg.map_ssa2ast (stmts2ast tm) (fun e -> exp2ast tm e) cfg
+  let astcfg, _, _ = Cfg.map_ssa2ast (stmts2ast tm) (fun e -> exp2ast tm e) cfg in
+  astcfg
 
 (** Convert an SSA CFG to an AST CFG. *)
 let to_astcfg ?(remove_temps=true) ?(dsa=false) c =
