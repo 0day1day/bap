@@ -241,27 +241,27 @@ let rec trans_cfg ?tac cfg =
     let rec do_work = function
       | [] -> ()
       | n::worklist ->
-	  let worklist =
-	    List.fold_left
-	      (fun toadd y ->
-		 let y = C.G.V.label y in (* for now *)
-		 if not(Hashtbl.mem phis (y,v))
-		 then (Hashtbl.add phis (y,v) (v,[]);
-		       if List.mem y (defsites v) then toadd else y::toadd )
-		 else toadd
-	      )
-	      worklist
-	      (df (C.G.V.create n))
-	  in
-	    do_work worklist
+	let worklist =
+	  List.fold_left
+	    (fun toadd y ->
+	      let y = C.G.V.label y in (* for now *)
+	      if not(Hashtbl.mem phis (y,v))
+	      then (Hashtbl.add phis (y,v) (v,[]);
+		    if List.mem y (defsites v) then toadd else y::toadd )
+	      else toadd
+	    )
+	    worklist
+	    (df (C.G.V.create n))
+	in
+	do_work worklist
     in
-      do_work (defsites v)
+    do_work (defsites v)
   in
   dprintf "Adding phis";
   List.iter add_phis_for_var globals;
   dprintf "Added %d phis" (Hashtbl.length phis);
-    (* we now have an entry in phis for every phi expression
-       we need to add, although we still don't have the RHS and LHS. *)
+  (* we now have an entry in phis for every phi expression
+     we need to add, although we still don't have the RHS and LHS. *)
   dprintf "Grouping phis by block";
   let blockphis =
     (* returns the phis for a given block *)
@@ -282,51 +282,58 @@ let rec trans_cfg ?tac cfg =
       (* create variables for our phis *)
       List.iter
 	(fun v ->
-	   let v' = Var.renewvar v in
-	   let (v'',vs) = Hashtbl.find phis (bbid,v) in
-	     assert(v'' == v);
-	     Hashtbl.replace phis (bbid,v) (v',vs);
-	     extend v v'
+	  let v' = Var.renewvar v in
+	  let (v'',vs) = Hashtbl.find phis (bbid,v) in
+	  assert(v'' == v);
+	  Hashtbl.replace phis (bbid,v) (v',vs);
+	  extend v v'
 	)
 	(blockphis bbid)
     in
-    let ssa = 
+    let ssa =
       (* rename variables *)
       let stmts = CA.get_stmts cfg cfgb in
       dprintf "translating stmts";
-      let stmts' = stmts2ssa ctx ?tac stmts in
-      let g = C.set_stmts ssa b stmts' in
-      (* Update the edge labels *)
-      match List.rev stmts' with
-      | Ssa.CJmp (v, _, _, _)::_ ->
-        C.G.fold_succ_e
-          (fun e g ->
-            let g = C.remove_edge_e g e in
-            let new_lab = match C.G.E.label e with
-              | Some(true, _) -> Some(true, BinOp(EQ, v, val_true))
-              | Some(false, _) -> Some(false, BinOp(EQ, v, val_false))
-              | None -> failwith "Successor of a CJmp should have a label"
-            in
-            let newe = C.G.E.create (C.G.E.src e) new_lab (C.G.E.dst e) in
-            C.add_edge_e g newe
-          ) g b g
-      | Ssa.Jmp (e, _)::_ ->
-        C.G.fold_succ_e
-          (fun e g ->
-            let g = C.remove_edge_e g e in
-            let new_lab = match CA.G.E.label (es2a e) with
-              | Some(a, Ast.BinOp(EQ, e1, e2)) ->
-                (match exp2ssa ~revstmts:[] ctx e1, exp2ssa ~revstmts:[] ctx e2 with
-                | ([], e1'), ([], e2') ->
-                  Some(a, BinOp(EQ, e1', e2'))
-                | _ -> failwith "expected conversion without side-effects")
-              | Some _ -> failwith "unknown edge condition format"
-              | None -> None
-            in
-            let newe = C.G.E.create (C.G.E.src e) new_lab (C.G.E.dst e) in
-            C.add_edge_e g newe
-          ) g b g
-      | _ -> g
+      let ssa, stmts' = match List.rev stmts with
+        | Ast.CJmp _::_ ->
+          let stmts' = stmts2ssa ctx ?tac stmts in
+          let v = match List.rev stmts' with
+            | Ssa.CJmp (v, _, _, _)::_ -> v
+            | _ -> failwith "impossible"
+          in
+          C.G.fold_succ_e
+            (fun e ssa ->
+              let ssa = C.remove_edge_e ssa e in
+              let new_lab = match C.G.E.label e with
+                | Some(true, _) -> Some(true, BinOp(EQ, v, val_true))
+                | Some(false, _) -> Some(false, BinOp(EQ, v, val_false))
+                | None -> failwith "Successor of a CJmp should have a label"
+              in
+              let newe = C.G.E.create (C.G.E.src e) new_lab (C.G.E.dst e) in
+              C.add_edge_e ssa newe
+            ) ssa b ssa, stmts'
+        | Ast.Jmp (e, _) as jmp::tl ->
+          let revstmts = List.rev (stmts2ssa ctx ?tac tl) in
+          let ssa, revstmts = C.G.fold_succ_e
+            (fun e (ssa, revstmts) ->
+              let ssa = C.remove_edge_e ssa e in
+              let new_lab, revstmts = match CA.G.E.label (es2a e) with
+                | Some(a, Ast.BinOp(EQ, e1, e2)) ->
+                  let revstmts, e1' = exp2ssa ~revstmts ctx e1 in
+                  let revstmts, e2' = exp2ssa ~revstmts ctx e2 in
+                  Some(a, Ssa.BinOp(EQ, e1', e2')), revstmts
+                | Some _ -> failwith "unknown edge condition format"
+                | None -> None, revstmts
+              in
+              let newe = C.G.E.create (C.G.E.src e) new_lab (C.G.E.dst e) in
+              C.add_edge_e ssa newe, revstmts
+            ) ssa b (ssa, revstmts)
+          in
+          let revstmts = stmt2ssa ctx ?tac ~revstmts jmp in
+          ssa, List.rev revstmts
+        | _ -> let stmts' = stmts2ssa ctx ?tac stmts in ssa, stmts'
+      in
+      C.set_stmts ssa b stmts'
     in
     dprintf "going on to children";
     (* rename children *)
@@ -335,32 +342,30 @@ let rec trans_cfg ?tac cfg =
       (* Update any phis in our successors *)
       List.iter
 	(fun s ->
-	   let s = C.G.V.label s in
-	   List.iter
-	     (fun v ->
-		try
-		  let (p,vs) = Hashtbl.find phis (s,v) in
-                  (* Note that lookup v will return different results
-                     for each predecessor. There is also no guarantee
-                     that each predecessor will have a unique
-                     definition. *)
-		  let v' = lookup v in
-                  if List.mem v' vs then ()
-                  else Hashtbl.replace phis (s,v) (p, v'::vs)
-		with Not_found ->
-		  failwith("phi for variable "^Pp.var_to_string v
-			   ^" not found in "^Cfg.bbid_to_string s)
-	     )
-	     (blockphis s)
+	  let s = C.G.V.label s in
+	  List.iter
+	    (fun v ->
+	      try
+		let (p,vs) = Hashtbl.find phis (s,v) in
+                (* Note that lookup v will return different results
+                   for each predecessor. There is also no guarantee
+                   that each predecessor will have a unique
+                   definition. *)
+		let v' = lookup v in
+                if List.mem v' vs then ()
+                else Hashtbl.replace phis (s,v) (p, v'::vs)
+	      with Not_found ->
+		failwith("phi for variable "^Pp.var_to_string v
+			 ^" not found in "^Cfg.bbid_to_string s)
+	    )
+	    (blockphis s)
 	)
 	(C.G.succ ssa b)
     in
     (* save context for exit node *)
     (if bbid = BB_Exit then (
-      (* dprintf "Exit ctx:"; *)
-      (* VH.iter (fun k v -> dprintf "%s -> %s" (Pp.var_to_string k) (Pp.var_to_string v)) vh_ctx; *)
       VH.iter (fun k v -> VH.replace exitctx k (VH.find vh_ctx k)) vh_ctx ));
-   (* restore context *)
+    (* restore context *)
     Ctx.pop ctx;
     ssa
   in
@@ -368,33 +373,32 @@ let rec trans_cfg ?tac cfg =
   dprintf "Adding %d phis to the CFG" (Hashtbl.length phis);
   let rec split_labels revlabels stmts =
     match stmts with
-      | ((Label _ | Comment _) as s)::ss ->
-	  split_labels (s::revlabels) ss
-      | _ -> (revlabels, stmts)
+    | ((Label _ | Comment _) as s)::ss ->
+      split_labels (s::revlabels) ss
+    | _ -> (revlabels, stmts)
   in
   let ssa =
     (* actually add all our phis to the CFG *)
     C.G.fold_vertex
       (fun b ssa ->
-	 let bbid = C.G.V.label b in
-	 let vars = blockphis bbid in
-	 let (revlabs,stmts) = split_labels [] (C.get_stmts ssa b) in
-	 let stmts =
-	   List.fold_left
-	     (fun s v ->
-		let (p,vs) = Hashtbl.find phis (bbid,v) in
-		assert(vs <> []);
-		(* FIXME: do something reasonable with attributes *)
-		Move(p,Phi(vs), [])::s )
-	     stmts
-	     vars
-	 in
-	 C.set_stmts ssa b (List.rev_append revlabs stmts)
+	let bbid = C.G.V.label b in
+	let vars = blockphis bbid in
+	let (revlabs,stmts) = split_labels [] (C.get_stmts ssa b) in
+	let stmts =
+	  List.fold_left
+	    (fun s v ->
+	      let (p,vs) = Hashtbl.find phis (bbid,v) in
+	      assert(vs <> []);
+	      (* FIXME: do something reasonable with attributes *)
+	      Move(p,Phi(vs), [])::s )
+	    stmts
+	    vars
+	in
+	C.set_stmts ssa b (List.rev_append revlabs stmts)
       )
       ssa ssa
   in
   dprintf "Done translating to SSA";
-  (* VH.iter (fun k v -> dprintf "%s -> %s" (Pp.var_to_string k) (Pp.var_to_string v)) exitctx; *)
   {cfg=ssa; to_astvar=VH.find to_oldvar; to_ssavar=VH.find exitctx}
 
 (** Translates a CFG into SSA form. *)
