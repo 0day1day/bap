@@ -224,6 +224,7 @@ type opcode =
   | Punpck of (typ * typ * order * operand * operand) (* dest size, element size, low/high elements, dest, src *)
   | Ppackedbinop of (typ * typ * binopf * string * operand * operand) (* Perform a generic packed binary operation. dest size, element size, binop, assembly string, dest, src *)
   | Pbinop of (typ * binop_type * string * operand * operand)
+  | Pmov of (typ * typ * typ * operand * operand * cast_type * string) (* Packed move. dest size, dest elt size, src elt size, dest, src, ext(signed/zero), name *)
   | Pmovmskb of (typ * operand * operand)
   | Pcmp of (typ * typ * binop_type * string * operand * operand)
   | Palignr of (typ * operand * operand * operand)
@@ -1100,6 +1101,19 @@ let rec to_ir m addr next ss pref =
         (* could also be done with shifts *)
       let store_back = List.fold_left (fun acc i -> Concat(acc,i)) (List.hd temps) (List.tl temps) in
       cmps @ [assn t dst store_back]
+  | Pmov (t, dstet, srcet, dst, src, ext, _) ->
+    let nelem = match t, dstet with
+      | Reg n, Reg n' -> n / n'
+      | _ -> disfailwith "invalid"
+    in
+    let getelt op i = extract_element srcet (op2e t op) i in
+    let extcast = match ext with
+      | CAST_UNSIGNED | CAST_SIGNED -> cast ext dstet
+      | _ -> disfailwith "invalid"
+    in
+    let extend i = extcast (getelt src i) in
+    let e = concat_explist (map extend ((nelem - 1)---0)) in
+    [assn t dst e]
   | Pmovmskb (t,dst,src) ->
       let nbytes = bytes_of_width t in
       let src = match src with
@@ -2071,6 +2085,7 @@ module ToStr = struct
     | Pshufd(dst,src,imm) -> Printf.sprintf "pshufd %s, %s, %s" (opr dst) (opr src) (opr imm)
     | Pshufb(t,dst,src) -> Printf.sprintf "pshufb %s, %s" (opr dst) (opr src)
     | Pcmp(t,elet,_,str,dst,src) -> Printf.sprintf "%s %s, %s" str (opr dst) (opr src)
+    | Pmov(t,_,_,dst,src,_,name) -> Printf.sprintf "%s %s, %s" name (opr dst) (opr src)
     | Pmovmskb(t,dst,src) -> Printf.sprintf "pmovmskb %s, %s" (opr dst) (opr src)
     | Lea(t,r,a) -> Printf.sprintf "lea %s, %s" (opr r) (opr (Oaddr a))
     | Call(a, ra) -> Printf.sprintf "call %s" (opr a)
@@ -2831,6 +2846,27 @@ let parse_instr m g addr =
         | 0x29 when prefix.opsize_override ->
           let r, rm, na = parse_modrm_addr na in
           (Pcmp(reg_128, reg_64, EQ, "pcmpeq", r, rm), na)
+        | 0x20 | 0x21 | 0x22 | 0x23 | 0x24 | 0x25
+        | 0x30 | 0x31 | 0x32 | 0x33 | 0x34 | 0x35 when prefix.opsize_override ->
+          (* pmovsx and pmovzx *)
+          let r, rm, na = parse_modrm32 na in
+          (* determine sign/zero extension *)
+          let ext, name = match (b3 & 0xf0) with
+            | 0x20 -> CAST_SIGNED, "pmovsx"
+            | 0x30 -> CAST_UNSIGNED, "pmovzx"
+            | _ -> disfailwith "impossible"
+          in
+          (* determine dest/src element size *)
+          let dstet, srcet, fullname = match (b3 & 0x0f) with
+            | 0x00 -> r16, r8, name ^ "bw"
+            | 0x01 -> r32, r8, name ^ "bd"
+            | 0x02 -> r64, r8, name ^ "bq"
+            | 0x03 -> r32, r16, name ^ "wd"
+            | 0x04 -> r64, r16, name ^ "wq"
+            | 0x05 -> r64, r32, name ^ "dq"
+            | _ -> disfailwith "impossible"
+          in
+          (Pmov(prefix.mopsize, dstet, srcet, r, rm, ext, fullname), na)
         | 0x37 when prefix.opsize_override ->
           let r, rm, na = parse_modrm_addr na in
           (Pcmp(reg_128, reg_64, SLT, "pcmpgt", r, rm), na)
