@@ -2849,7 +2849,7 @@ let parse_instr m g addr =
         | 0x20 | 0x21 | 0x22 | 0x23 | 0x24 | 0x25
         | 0x30 | 0x31 | 0x32 | 0x33 | 0x34 | 0x35 when prefix.opsize_override ->
           (* pmovsx and pmovzx *)
-          let r, rm, na = parse_modrm32 na in
+          let r, rm, na = parse_modrm_addr na in
           (* determine sign/zero extension *)
           let ext, name = match (b3 & 0xf0) with
             | 0x20 -> CAST_SIGNED, "pmovsx"
