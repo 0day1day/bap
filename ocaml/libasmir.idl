@@ -28,6 +28,10 @@ asmir_get_symbols(asm_program_t prog,
 asmir_get_all_symbols(asm_program_t prog,
                       [out] long *num);
 
+[length_is(*num)] asymbol*
+asmir_get_dynsymbols(asm_program_t prog,
+                     [out] long *num);
+
 [length_is(*num)] section_ptr*
 asmir_get_all_sections(asm_program_t prog,
                        [out] long *num);

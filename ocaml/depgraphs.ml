@@ -3,10 +3,12 @@
     dependence graph (CDG). 
 *)
 
-module VS = Var.VarSet
-module VH = Var.VarHash
 open Cfg
+module D = Debug.Make(struct let name = "Depgraphs" and default=`NoDebug end)
+open D
 open Type
+module VH = Var.VarHash
+module VS = Var.VarSet
 
 module type CDG =
 sig
@@ -22,57 +24,74 @@ sig
   val compute_cdg : G.t -> G.t
 end
 
+module MakeRevCfg (C: CFG) =
+struct
+  module G = C.G
+  type t = G.t
+  module V = G.V
+
+  let pred c n = 
+    match G.V.label n with
+      BB_Entry -> (C.find_vertex c BB_Exit)::(G.succ c n)
+    | _ -> G.succ c n 
+  let succ = G.pred
+  let nb_vertex = G.nb_vertex
+  let fold_vertex = G.fold_vertex
+  let iter_vertex = G.iter_vertex
+  let v2s = C.v2s
+end
+
 module MakeCDG (C: CFG) = 
 struct
   module G = C.G
 
-  module Dbg = Debug.Make(struct let name = "CDG" and default=`NoDebug end)
-  open Dbg
-
-  (* the graph we will return *)
-(*  module CDG =   Graph.Persistent.Digraph.Concrete(G.V) *)
-(*  include CDG *)
-
   (* reverse graph  *)
-  module G' = struct
-    type t = G.t
-    module V = G.V
+  module G' = MakeRevCfg(C)
 
-    let pred c n = 
-      match G.V.label n with
-	  BB_Entry -> (C.find_vertex c BB_Exit)::(G.succ c n)
-	| _ -> G.succ c n 
-    let succ = G.pred
-    let nb_vertex = G.nb_vertex
-    let fold_vertex = G.fold_vertex
-    let iter_vertex = G.iter_vertex
-
-  end 
+  module Check = Checks.MakeExitCheck(C)
 
   (* inverse dominators module *)
   module D = Dominator.Make(G') 
-    
-
-    
-  let compute_cd cfg =
+  let compute_cd_internal ?idom cfg =
     (* Note that we don't add an extra entry node, so everything is control
        dependent on the entry node of the CFG *)
-    let exit_node = C.find_vertex cfg  BB_Exit in 
+    let idom = match idom with
+      | None ->
+        Check.exit_check cfg "compute_cd";
+        let exit_node = C.find_vertex cfg BB_Exit in
+        let () = dprintf "compute_cd: computing idom" in
+        D.compute_idom cfg exit_node
+      | Some idom -> idom
+    in
+    let () = dprintf "compute_cd: computing dom tree" in
+    let dom_tree = D.idom_to_dom_tree cfg idom in
+    let () = dprintf "compute_cd: computing dom frontier" in
+    D.compute_dom_frontier cfg dom_tree idom
+
+  let compute_cd cfg = compute_cd_internal cfg
+
+  let compute_cdg cfg =
+    Check.exit_check cfg "compute_cdg";
+    let exit_node = C.find_vertex cfg BB_Exit in
     let () = dprintf "compute_cdg: computing idom" in
     let idom = D.compute_idom cfg exit_node in
     let () = dprintf "compute_cdg: computing dom tree" in
-    let dom_tree = D.idom_to_dom_tree cfg idom in
-    let () = dprintf "compute_cdg: computing dom frontier" in
-      D.compute_dom_frontier cfg dom_tree idom 
-
-  let compute_cdg cfg  = 
-    let df = compute_cd cfg in 
+    let df = compute_cd_internal ~idom cfg in
+    let exit_node = C.find_vertex cfg BB_Exit in
+    let idom = D.compute_idom cfg exit_node in
     let vertices =  C.G.fold_vertex (fun v g -> C.add_vertex g v) cfg (C.empty ()) in
       C.G.fold_vertex
 	(fun v g ->
-	   if C.G.in_degree cfg v > 0
-	   then List.fold_left (fun g v' -> C.add_edge g v' v) g (df v)
-	   else g (* can't compute DF for lonely nodes *)
+          (* When we reverse a graph, non-terminating parts of the
+             graph will become unreachable.  Unfortunately, the
+             dominator algorithms we use largely assume all nodes are
+             reachable. We ignore nodes that are unreachable to avoid
+             falsely marking them as control dependencies. We abuse
+             [idom] here to check for reachability.  *)
+          let is_reachable = try ignore(idom v); true with Not_found -> false in
+	  if C.G.in_degree cfg v > 0 && is_reachable
+	  then List.fold_left (fun g v' -> C.add_edge g v' v) g (df v)
+	  else g (* can't compute DF for lonely nodes *)
 	)
 	cfg vertices
 
