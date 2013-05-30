@@ -341,7 +341,7 @@ void TaintTracker::acceptHelper(uint32_t fd) {
 }
 
 FrameOption_t TaintTracker::recvHelper(uint32_t fd, void *ptr, size_t len) {
-  uint32_t addr = reinterpret_cast<uint32_t> (ptr);
+  ADDRINT addr = reinterpret_cast<ADDRINT> (ptr);
 
   if (fds.find(fd) != fds.end()) {
     cerr << "Tainting " << len << " bytes of recv @" << addr << endl;
@@ -389,7 +389,7 @@ std::vector<frame> TaintTracker::taintArgs(int argc, char **argv)
     for ( int i = 1 ; i < argc ; i++ ) {
       cerr << "Tainting " << argv[i] << endl;
       size_t len = strlen(argv[i]);
-      FrameOption_t fo = introMemTaint((uint32_t)argv[i], len, "Arguments", -1);
+      FrameOption_t fo = introMemTaint((ADDRINT)argv[i], len, "Arguments", -1);
       if (fo.b) { fv.push_back(fo.f); }
     }
   }
@@ -466,7 +466,7 @@ std::vector<frame> TaintTracker::taintEnv(char **env)
     var = var.substr(0,equal);
     if (taint_env.find(var) != taint_env.end()) {
       uint32_t len = strlen(env[i]) - var.size();
-      uint32_t addr = (uint32_t)env[i]+equal+1;
+      ADDRINT addr = (ADDRINT)env[i]+equal+1;
       cerr << "Tainting environment variable: " << var << " @" << (int)addr << endl;
       FrameOption_t fo = introMemTaint(addr, len, "environment variable", -1);
       if (fo.b) { fv.push_back(fo.f); }
