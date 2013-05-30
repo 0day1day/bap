@@ -61,6 +61,4 @@ AC_CONFIG_FILES([Makefile
 AC_OUTPUT
 
 # Configure google protobuf
-# Note: protobuf must be compiled for 32-bit because it is linked by pintraces
-# code, which is 32-bit
 (cd protobuf && ./configure)
