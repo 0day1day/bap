@@ -2629,22 +2629,22 @@ let parse_instr g addr =
           (* pmovsx and pmovzx *)
           let r, rm, na = parse_modrm32 na in
           (* determine sign/zero extension *)
-          let ext, extname = match (b3 & 0xf0) with
-            | 0x20 -> CAST_UNSIGNED, "zx"
-            | 0x30 -> CAST_SIGNED, "sx"
+          let ext, name = match (b3 & 0xf0) with
+            | 0x20 -> CAST_SIGNED, "pmovsx"
+            | 0x30 -> CAST_UNSIGNED, "pmovzx"
             | _ -> disfailwith "impossible"
           in
           (* determine dest/src element size *)
-          let dstet, srcet, name = match (b3 & 0x0f) with
-            | 0x00 -> r16, r8, extname ^ "bw"
-            | 0x01 -> r32, r8, extname ^ "bd"
-            | 0x02 -> r64, r8, extname ^ "bq"
-            | 0x03 -> r32, r16, extname ^ "wd"
-            | 0x04 -> r64, r16, extname ^ "wq"
-            | 0x05 -> r64, r32, extname ^ "dq"
+          let dstet, srcet, fullname = match (b3 & 0x0f) with
+            | 0x00 -> r16, r8, name ^ "bw"
+            | 0x01 -> r32, r8, name ^ "bd"
+            | 0x02 -> r64, r8, name ^ "bq"
+            | 0x03 -> r32, r16, name ^ "wd"
+            | 0x04 -> r64, r16, name ^ "wq"
+            | 0x05 -> r64, r32, name ^ "dq"
             | _ -> disfailwith "impossible"
           in
-          (Pmov(prefix.mopsize, dstet, srcet, r, rm, ext, name), na)
+          (Pmov(prefix.mopsize, dstet, srcet, r, rm, ext, fullname), na)
         | 0x37 when prefix.opsize_override ->
           let r, rm, na = parse_modrm32 na in
           (Pcmp(reg_128, reg_64, SLT, "pcmpgt", r, rm), na)
