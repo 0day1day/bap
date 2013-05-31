@@ -481,8 +481,8 @@ static uint32_t GetBitsOfReg(REG r) {
      * Since the instruction register changes, we
      * need a way to distinguish which architecture we're under
      */
-    if (s = "R_RIP") return 64;
-    if (s = "R_EIP") return 32;
+    if (s == "R_RIP") return 64;
+    if (s == "R_EIP") return 32;
 
     switch (r) {
     case REG_SEG_CS:
