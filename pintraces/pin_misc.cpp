@@ -15,10 +15,13 @@ uint32_t pintrace::GetTypeOfReg(REG r) {
   if (s == "eip" || s == "eflags") {
     // No problem for these
     return VT_REG32;
+  } else if (s == "rip" || s == "rflags") {
+    // Likewise for the 64-bit registers
+    return VT_REG64;
   }
 
   // Otherwise, print a warning...
-  
+
   std::cerr << "Warning: Unknown register size of register " << REG_StringShort(r) << std::endl;
   return VT_NONE;
 }
