@@ -51,48 +51,37 @@ switch (id) {
     //case REG_PHYSICAL_CONTEXT_BEGIN:
     
     //case REG_GR_BASE:
-/*#if defined(TARGET_IA32E)
+#if defined(TARGET_IA32E)
     // Context registers in the Intel(R) 64 architecture
-    case REG_RDI = case REG_GR_BASE:  ///< rdi
-    case REG_GDI = case REG_RDI:      ///< edi on a 32 bit machine: rdi on 64
-    case REG_RSI:                ///< rsi
-    case REG_GSI = case REG_RSI:      ///< esi on a 32 bit machine: rsi on 64
-    case REG_RBP:                ///< rbp
-    case REG_GBP = case REG_RBP:      ///< ebp on a 32 bit machine: rbp on 64
-    case REG_RSP:                ///< rsp
-    case REG_STACK_PTR = case REG_RSP:///< esp on a 32 bit machine: rsp on 64
-    case REG_RBX:                ///< rbx
-    case REG_GBX = case REG_RBX:      ///< ebx on a 32 bit machine: rbx on 64
-    case REG_RDX:                ///< rdx
-    case REG_GDX = case REG_RDX:      ///< edx on a 32 bit machine: rdx on 64
-    case REG_RCX:                ///< rcx
-    case REG_GCX = case REG_RCX:      ///< ecx on a 32 bit machine: rcx on 64
-    case REG_RAX:                ///< rax
-    case REG_GAX = case REG_RAX:      ///< eax on a 32 bit machine: rax on 64
-    case REG_R8:
-    case REG_R9:
-    case REG_R10:
-    case REG_R11:
-    case REG_R12:
-    case REG_R13:
-    case REG_R14:
-    case REG_R15:
-    case REG_GR_LAST = case REG_R15:
+    // We don't need to have cases for G* registers, since they're defined
+    // as equal to their equivalents (R* for 64 bit, E* for 32 bit) in the enum.
+    case REG_RDI: return string("R_RDI");
+    case REG_RSI: return string("R_RSI");     
+    case REG_RBP: return string("R_RBP");     
+    case REG_RSP: return string("R_RSP");
+    case REG_RBX: return string("R_RBX");
+    case REG_RDX: return string("R_RDX");
+    case REG_RCX: return string("R_RCX");
+    case REG_RAX: return string("R_RAX");
+    case REG_R8: return string("R_R8");
+    case REG_R9: return string("R_R9");
+    case REG_R10: return string("R_R10");
+    case REG_R11: return string("R_R11");
+    case REG_R12: return string("R_R12");
+    case REG_R13: return string("R_R13");
+    case REG_R14: return string("R_R14");
+    case REG_R15: return string("R_R15");
 
-    case REG_SEG_BASE:
-    case REG_SEG_CS = case REG_SEG_BASE:
-    case REG_SEG_SS:
-    case REG_SEG_DS:
-    case REG_SEG_ES:
-    case REG_SEG_FS:
-    case REG_SEG_GS:
-    case REG_SEG_LAST = case REG_SEG_GS:
+    case REG_SEG_CS: return string("CS");
+    case REG_SEG_SS: return string("SS");
+    case REG_SEG_DS: return string("DS");
+    case REG_SEG_ES: return string("ES");
+    case REG_SEG_FS: return string("FS");
+    case REG_SEG_GS: return string("GS");
 
-    case REG_RFLAGS:
-    case REG_GFLAGS=case REG_RFLAGS:
-    case REG_RIP:
-    case REG_INST_PTR = case REG_RIP:
-#else*/
+    case REG_RFLAGS: return string("RFLAGS");
+    case REG_RIP: return string("RIP");
+#else
     // Context registers in the IA-32 architecture
     case REG_EDI:  return string("R_EDI");
     //case REG_GDI:
@@ -135,10 +124,9 @@ switch (id) {
     case REG_EFLAGS:  return string("EFLAGS");
     //case REG_GFLAGS:
     //case REG_EFLAGS:
-    //case REG_EIP:
+    case REG_EIP:
     case REG_INST_PTR:  return string("R_EIP");
-    //case REG_EIP:
-//#endif
+#endif
     
     //case REG_PHYSICAL_CONTEXT_END:
     //case REG_INST_PTR:
@@ -168,48 +156,47 @@ switch (id) {
     //case REG_FLAGS:
     //case REG_IP:
     
-/*#if defined(TARGET_IA32E)
+#if defined(TARGET_IA32E)
     // partial registers in the Intel(R) 64 architecture
-    case REG_EDI:
-    case REG_DIL:
-    case REG_ESI:
-    case REG_SIL:
-    case REG_EBP:
-    case REG_BPL:
-    case REG_ESP:
-    case REG_SPL:
-    case REG_EBX:
-    case REG_EDX:
-    case REG_ECX:
-    case REG_EAX:
-    case REG_EFLAGS:
-    case REG_EIP:
-
-    case REG_R8B:
-    case REG_R8W:
-    case REG_R8D:
-    case REG_R9B:
-    case REG_R9W:
-    case REG_R9D:
-    case REG_R10B:
-    case REG_R10W:
-    case REG_R10D:
-    case REG_R11B:
-    case REG_R11W:
-    case REG_R11D:
-    case REG_R12B:
-    case REG_R12W:
-    case REG_R12D:    
-    case REG_R13B:
-    case REG_R13W:
-    case REG_R13D:
-    case REG_R14B:
-    case REG_R14W:
-    case REG_R14D:
-    case REG_R15B:
-    case REG_R15W:
-    case REG_R15D:    
-#endif*/
+    case REG_EDI: return string("R_EDI");
+    case REG_DIL: return string("R_DIL");
+    case REG_ESI: return string("R_ESI");
+    case REG_SIL: return string("R_SIL");
+    case REG_EBP: return string("R_EBP");
+    case REG_BPL: return string("R_BPL");
+    case REG_ESP: return string("R_ESP");
+    case REG_SPL: return string("R_SPL");
+    case REG_EBX: return string("R_EBX");
+    case REG_EDX: return string("R_EDX");
+    case REG_ECX: return string("R_ECX");
+    case REG_EAX: return string("R_EAX");
+    case REG_EFLAGS: return string("EFLAGS");
+    case REG_EIP: return string("R_EIP");
+    case REG_R8B: return string("R_R8B");
+    case REG_R8W: return string("R_R8W");
+    case REG_R8D: return string("R_R8D");
+    case REG_R9B: return string("R_R9B");
+    case REG_R9W: return string("R_R9W");
+    case REG_R9D: return string("R_R9D");
+    case REG_R10B: return string("R_R10B");
+    case REG_R10W: return string("R_R10W");
+    case REG_R10D: return string("R_R10D");
+    case REG_R11B: return string("R_R11B");
+    case REG_R11W: return string("R_R11W");
+    case REG_R11D: return string("R_R11D");
+    case REG_R12B: return string("R_R12B");
+    case REG_R12W: return string("R_R12W");
+    case REG_R12D: return string("R_R12D");    
+    case REG_R13B: return string("R_R13B");
+    case REG_R13W: return string("R_R13W");
+    case REG_R13D: return string("R_R13D");
+    case REG_R14B: return string("R_R14B");
+    case REG_R14W: return string("R_R14W");
+    case REG_R14D: return string("R_R14D");
+    case REG_R15B: return string("R_R15B");
+    case REG_R15W: return string("R_R15W");
+    case REG_R15D: return string("R_R15D");    
+#endif
     
 /*
     case REG_MM_BASE:
@@ -235,10 +222,7 @@ switch (id) {
     case REG_EMM_LAST = case REG_EMM7:
 
     case REG_MXT:
-    
-    case REG_XMM_BASE:
 */
-    // case REG_XMM0 = case REG_XMM_BASE:
     case REG_XMM0:
       return string("R_XMM0");
     case REG_XMM1:
@@ -256,28 +240,25 @@ switch (id) {
     case REG_XMM7:
       return string("R_XMM7");
     
-      //#if defined(TARGET_IA32E)
+#if defined(TARGET_IA32E)
     // additional xmm registers in the Intel(R) 64 architecture
-    // case REG_XMM8:
-    //   return string("XMM8");
-    // case REG_XMM9:
-    //   return string("XMM9");
-    // case REG_XMM10:
-    //   return string("XMM10");
-    // case REG_XMM11:
-    //   return string("XMM11");
-    // case REG_XMM12:
-    //   return string("XMM12");
-    // case REG_XMM13:
-    //   return string("XMM13");
-    // case REG_XMM14:
-    //   return string("XMM14");
-    // case REG_XMM15:
-    //   return string("XMM15");
-//     case REG_XMM_LAST = case REG_XMM15:
-// #else    
-//     case REG_XMM_LAST = case REG_XMM7:
-// #endif
+    case REG_XMM8:
+      return string("XMM8");
+    case REG_XMM9:
+      return string("XMM9");
+    case REG_XMM10:
+      return string("XMM10");
+    case REG_XMM11:
+      return string("XMM11");
+    case REG_XMM12:
+      return string("XMM12");
+    case REG_XMM13:
+      return string("XMM13");
+    case REG_XMM14:
+      return string("XMM14");
+    case REG_XMM15:
+      return string("XMM15");
+#endif
       /*
     case REG_YMM_BASE:
     case REG_YMM0 = case REG_YMM_BASE:
