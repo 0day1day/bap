@@ -477,12 +477,6 @@ static uint32_t GetBitsOfReg(REG r) {
     if (REG_ST_BASE <= r && r <= REG_ST_LAST) return 80;
 
     string s = REG_StringShort(r);
-    /*
-     * Since the instruction register changes, we
-     * need a way to distinguish which architecture we're under
-     */
-    if (s == "R_RIP") return 64;
-    if (s == "R_EIP") return 32;
 
     switch (r) {
     case REG_SEG_CS:
@@ -494,15 +488,12 @@ static uint32_t GetBitsOfReg(REG r) {
         return 16;
         break;
 
-//  Removed this case so we can handle it correctly based on
-//  whether it's EIP or RIP
-//    case REG_INST_PTR:
+    case REG_EIP:
     case REG_EFLAGS:
     case REG_MXCSR:
         return 32;
         break;
 
-    case REG_RFLAGS:
     case REG_MM0:
     case REG_MM1:
     case REG_MM2:
@@ -522,14 +513,6 @@ static uint32_t GetBitsOfReg(REG r) {
     case REG_XMM5:
     case REG_XMM6:
     case REG_XMM7:
-    case REG_XMM8:
-    case REG_XMM9:
-    case REG_XMM10:
-    case REG_XMM11:
-    case REG_XMM12:
-    case REG_XMM13:
-    case REG_XMM14:
-    case REG_XMM15:
         return 128;
         break;
 
@@ -543,6 +526,29 @@ static uint32_t GetBitsOfReg(REG r) {
     case REG_YMM7:
         return 256;
         break;
+
+/*
+ * Specifically 64-bit registers
+ * General purpose registers are handled
+ * by REG_is_gr above
+ */
+#if defined(ARCH_64)
+    case REG_RIP:
+    case REG_RFLAGS:
+        return 64;
+        break;
+
+    case REG_XMM8:
+    case REG_XMM9:
+    case REG_XMM10:
+    case REG_XMM11:
+    case REG_XMM12:
+    case REG_XMM13:
+    case REG_XMM14:
+    case REG_XMM15:
+        return 128;
+        break;
+#endif
 
     default:
         break;
