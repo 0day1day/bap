@@ -24,13 +24,29 @@
 #include "pin_taint.h"
 #include "pin_misc.h"
 
+// Determine architecture
+#if _WIN32 || _WIN64
+  #if _WIN64
+    #define ARCH_64
+  #else
+    #define ARCH_32
+  #endif
+#endif
+#if __GNUC__
+  #if __x86_64__ || __ppc64__
+    #define ARCH_64
+  #else
+    #define ARCH_32
+  #endif
+#endif
+
 using namespace pintrace;
 using namespace SerializedTrace;
 
 const ADDRINT ehandler_fs_offset = 0;
 const ADDRINT ehandler_nptr_offset = 0;
 const ADDRINT ehandler_handler_offset = 4;
-const ADDRINT ehandler_invalid_ptr = 0xFFFFFFFF;
+const ADDRINT ehandler_invalid_ptr = ~0x0;
 const ADDRINT ehandler_size = 8;
 /** The offset esp has from when the exception is initially handled to
     when the handler is called. */
@@ -188,12 +204,14 @@ KNOB<string> TaintedEnv(KNOB_MODE_APPEND, "pintool",
                         "taint-env", "", 
                         "Environment variables to be considered tainted");
 
-KNOB<uint32_t> TaintStart(KNOB_MODE_WRITEONCE, "pintool",
+KNOB<ADDRINT> TaintStart(KNOB_MODE_WRITEONCE, "pintool",
                           "taint-start", "0x0", 
                           "All logged instructions will have higher addresses");
 
-KNOB<uint32_t> TaintEnd(KNOB_MODE_WRITEONCE, "pintool",
-                        "taint-end", "0xffffffff", 
+// XXX: When we merge with the 32 bit version, we'll need to change this
+//      to have the appropriate 32/64 bit max address.
+KNOB<ADDRINT> TaintEnd(KNOB_MODE_WRITEONCE, "pintool",
+                        "taint-end", "0xffffffffffffffff", 
                         "All logged instructions will have lower addresses");
 
 KNOB<string> FollowProgs(KNOB_MODE_APPEND, "pintool",
@@ -221,7 +239,7 @@ KNOB<int> SkipTaints(KNOB_MODE_WRITEONCE, "pintool",
                      "Skip this many taint introductions");
 
 struct FrameBuf {
-    uint32_t addr;
+    ADDRINT addr;
     uint32_t tid;
     uint32_t insn_length;
 
@@ -391,7 +409,7 @@ bool g_taint_introduced;
 // True if the trigger address was resolved.
 bool g_trig_resolved;
 
-uint32_t g_trig_addr;
+ADDRINT g_trig_addr;
 
 // We use a signed integer because sometimes the countdown will be
 // decremented past zero.
@@ -407,7 +425,7 @@ PIN_LOCK lock;
 ValSpecRec values[MAX_VALUES_COUNT];
 
 // Address ranges
-uint32_t start_addr, end_addr;
+ADDRINT start_addr, end_addr;
 
 // Pivot set
 pivot_set ps;
@@ -519,11 +537,11 @@ static uint32_t GetBitsOfReg(REG r) {
     return -1;
 }
 
-static uint32_t GetByteSize(RegMem_t vtype) {
+static size_t GetByteSize(RegMem_t vtype) {
     return (vtype.size / 8);
 }
 
-static uint32_t GetBitSize(RegMem_t type) {
+static size_t GetBitSize(RegMem_t type) {
     return type.size;
 }
 
@@ -1602,9 +1620,9 @@ VOID InstrBlock(BBL bbl)
          * operands to make this explicit. */
       
         if (memRead) {
-            uint32_t bytes = GetByteSize(memReadTy);
+            size_t bytes = GetByteSize(memReadTy);
         
-            for (uint32_t offset = 0; offset < bytes; offset++) {
+            for (size_t offset = 0; offset < bytes; offset++) {
                 IARGLIST_AddArguments(arglist_helper,
                                       IARG_UINT32, (uint32_t)MEM,
                                       IARG_UINT32, 8, // one byte
@@ -1618,9 +1636,9 @@ VOID InstrBlock(BBL bbl)
         }
 
         if (memRead2) {
-            uint32_t bytes = GetByteSize(memReadTy);
+            size_t bytes = GetByteSize(memReadTy);
 
-            for (uint32_t offset = 0; offset < bytes; offset++) {        
+            for (size_t offset = 0; offset < bytes; offset++) {        
                 IARGLIST_AddArguments(arglist_helper,
                                       IARG_UINT32, (uint32_t)MEM,
                                       IARG_UINT32, 8, // one byte
@@ -1634,9 +1652,9 @@ VOID InstrBlock(BBL bbl)
         }
 
         if (memWrite) {
-            uint32_t bytes = GetByteSize(memWriteTy);
+            size_t bytes = GetByteSize(memWriteTy);
 
-            for (uint32_t offset = 0; offset < bytes; offset++) {        
+            for (size_t offset = 0; offset < bytes; offset++) {        
           
                 IARGLIST_AddArguments(arglist_helper,
                                       IARG_UINT32, (uint32_t)MEM,
@@ -1675,8 +1693,8 @@ VOID InstrBlock(BBL bbl)
                 }
 
                 IARGLIST_AddArguments(arglist_helper,
-                                      IARG_UINT32, (uint32_t)REGISTER,
-                                      IARG_UINT32, 32, // Register size in bits
+                                      IARG_ADDRINT, (ADDRINT)REGISTER,
+                                      IARG_UINT32, 64, // Register size in bits
                                       IARG_UINT32, addreg,
                                       //IARG_MEMORYWRITE_SIZE,
                                       IARG_PTR, 0,
@@ -2226,7 +2244,8 @@ VOID SyscallExit(THREADID tid, CONTEXT *ctx, SYSCALL_STANDARD std, VOID *v)
 {
     ThreadInfo_t *ti = NULL;
     SyscallInfo_t si;
-    uint32_t addr, length;
+    ADDRINT addr;
+    uint32_t length;
 
     /*
      * Synchronization note: We assume there is only one system call per
@@ -2519,7 +2538,7 @@ int main(int argc, char *argv[])
     cerr << hex;
 
     // A sanity check for AppendBuffer
-    assert(sizeof(RPassType) == sizeof(ADDRINT));
+    //assert(sizeof(RPassType) == sizeof(ADDRINT));
   
     PIN_InitSymbols();
 

@@ -52,7 +52,7 @@ typedef std::map<var,t> context;
 
 struct ValSpecRec {
   pintrace::RegMem_t type;               // Type of value specifier.
-  uint32_t loc;                // Location of this value.
+  ADDRINT loc;                // Location of this value.
   pintrace::PIN_REGISTER value;// Actual value.
   uint32_t usage;              // Operand usage (R, RW, W, etc)
   uint32_t taint;              // Taint status of the value
@@ -86,11 +86,11 @@ extern int g_skipTaints;
 
 /* functions */
 
-bool defaultPolicy(uint32_t addr, uint32_t length, const char *msg);
+bool defaultPolicy(ADDRINT addr, uint32_t length, const char *msg);
 
 namespace pintrace { // We will use namespace to avoid collision
 
-  typedef bool(*TAINT_POLICY_FUN)(uint32_t addr, uint32_t length, const char *msg);
+  typedef bool(*TAINT_POLICY_FUN)(ADDRINT addr, uint32_t length, const char *msg);
 
   struct fdInfo_t {
     fdInfo_t() {
@@ -119,7 +119,7 @@ namespace pintrace { // We will use namespace to avoid collision
 
      FrameOption_t taintPostSC(const uint32_t bytes,
                                const uint64_t * args,
-                               uint32_t &addr,
+                               ADDRINT &addr,
                                uint32_t &length,
                                const uint32_t state);
 
@@ -177,9 +177,9 @@ namespace pintrace { // We will use namespace to avoid collision
 
      uint32_t getRegTaint(context &delta, uint32_t reg_int);
 
-     uint32_t getMemTaint(uint32_t addr, RegMem_t type);
+     uint32_t getMemTaint(ADDRINT addr, RegMem_t type);
 
-     void untaintMem(uint32_t addr);
+     void untaintMem(ADDRINT addr);
        
      static uint32_t getSize(RegMem_t type);
 
@@ -235,9 +235,9 @@ namespace pintrace { // We will use namespace to avoid collision
 
      uint32_t getTaint(context &ctx, uint32_t elem);
 
-     FrameOption_t introMemTaint(uint32_t addr, uint32_t length, const char *source, int64_t offset);
+     FrameOption_t introMemTaint(ADDRINT addr, uint32_t length, const char *source, int64_t offset);
 
-     FrameOption_t introMemTaintFromFd(uint32_t fd, uint32_t addr, uint32_t length);
+     FrameOption_t introMemTaintFromFd(uint32_t fd, ADDRINT addr, uint32_t length);
      
      void setTaint(context &ctx, uint32_t key, uint32_t tag);
 

@@ -162,7 +162,7 @@ void PIVOT_testpivot(pivot_set ps, CONTEXT *ctx, TaintTracker &tt) {
 
       bytes = PIN_SafeCopy(&ptr, (void*)a, sizeof(intptr_t));
       if (bytes == sizeof(intptr_t)) {
-	a = ptr;
+        a = ptr;
       }
       break;
 
@@ -180,7 +180,7 @@ void PIVOT_testpivot(pivot_set ps, CONTEXT *ctx, TaintTracker &tt) {
           size_t consecTainted = 0;
           uint32_t readable = PIN_SafeCopy(tempbuf, (void*)a, 1);
           
-          for (uint32_t base = a; tt.getMemTaint(base, pintrace::INVALIDREGMEM) != NOTAINT; base++, consecTainted++) { 
+          for (ADDRINT base = a; tt.getMemTaint(base, pintrace::INVALIDREGMEM) != NOTAINT; base++, consecTainted++) { 
             /* .... */
           }
           

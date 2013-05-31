@@ -58,7 +58,7 @@ auto_ptr<string> GetNarrowOfWide(wchar_t *in) {
 }
 
 /** Default Taint policy function */
-bool defaultPolicy(uint32_t addr, uint32_t length, const char *msg) {
+bool defaultPolicy(ADDRINT addr, uint32_t length, const char *msg) {
   static int intronum = -1;
 
   intronum++;
@@ -209,7 +209,7 @@ void TaintTracker::printMem()
 // addr. If offset is -1, new tainted bytes are assigned. Otherwise,
 // the (source,offset) tuple are compared for each byte to see if that
 // resource has been used before, and if so, the same taint number is given.
-FrameOption_t TaintTracker::introMemTaint(uint32_t addr, uint32_t length, const char *source, int64_t offset) {
+FrameOption_t TaintTracker::introMemTaint(ADDRINT addr, uint32_t length, const char *source, int64_t offset) {
 
   FrameOption_t fb;
 
@@ -250,7 +250,7 @@ FrameOption_t TaintTracker::introMemTaint(uint32_t addr, uint32_t length, const 
 
 // Reads length bytes from source at offset, putting the bytes at
 // addr. Also adds length to the offset of the resource.
-FrameOption_t TaintTracker::introMemTaintFromFd(uint32_t fd, uint32_t addr, uint32_t length) {
+FrameOption_t TaintTracker::introMemTaintFromFd(uint32_t fd, ADDRINT addr, uint32_t length) {
   assert(fds.find(fd) != fds.end());
   FrameOption_t tfs = introMemTaint(addr, length, fds[fd].name.c_str(), fds[fd].offset);
   fds[fd].offset += length;
@@ -275,7 +275,7 @@ uint32_t TaintTracker::getTaint(context &ctx, uint32_t elem)
 }
 
 // 
-uint32_t TaintTracker::getMemTaint(uint32_t addr, RegMem_t type)
+uint32_t TaintTracker::getMemTaint(ADDRINT addr, RegMem_t type)
 {
   uint32_t tag = NOTAINT;
   //cerr << "Getting memory " << addr << endl;
@@ -287,7 +287,7 @@ uint32_t TaintTracker::getMemTaint(uint32_t addr, RegMem_t type)
   return tag;
 }
 
-void TaintTracker::untaintMem(uint32_t addr) {
+void TaintTracker::untaintMem(ADDRINT addr) {
   setTaint(memory, addr, NOTAINT);
 }
 
@@ -444,8 +444,8 @@ std::vector<frame> TaintTracker::taintEnv(char *env, wchar_t *wenv)
       if (taint_env.find(var) != taint_env.end()) {
         uint32_t numChars = wcslen(wenv) - var.size();
 	uint32_t numBytes = numChars * sizeof(wchar_t);
-        uint32_t addr = (uint32_t) (wenv+equal+1);
-        cerr << "Tainting environment variable: " << var << " @" << (int)addr << " " << numChars << " bytes" << endl;
+        ADDRINT addr = (ADDRINT) (wenv+equal+1);
+        cerr << "Tainting environment variable: " << var << " @" << (unsigned long)addr << " " << numChars << " bytes" << endl;
 	FrameOption_t fo = introMemTaint(addr, numBytes, "Environment Variable", -1);
 	if (fo.b) { fv.push_back(fo.f); }
       }
@@ -467,7 +467,7 @@ std::vector<frame> TaintTracker::taintEnv(char **env)
     if (taint_env.find(var) != taint_env.end()) {
       uint32_t len = strlen(env[i]) - var.size();
       ADDRINT addr = (ADDRINT)env[i]+equal+1;
-      cerr << "Tainting environment variable: " << var << " @" << (int)addr << endl;
+      cerr << "Tainting environment variable: " << var << " @" << (unsigned long)addr << endl;
       FrameOption_t fo = introMemTaint(addr, len, "environment variable", -1);
       if (fo.b) { fv.push_back(fo.f); }
     }
@@ -651,7 +651,7 @@ bool TaintTracker::taintPreSC(uint32_t callno, const uint64_t *args, /* out */ u
  /** This function is called immediately following a system call. */
 FrameOption_t TaintTracker::taintPostSC(const uint32_t bytes, 
                                      const uint64_t *args,
-                                     uint32_t &addr,
+                                     ADDRINT &addr,
                                      uint32_t &length,
 				     const uint32_t state)
 {
@@ -666,7 +666,7 @@ FrameOption_t TaintTracker::taintPostSC(const uint32_t bytes,
       case __NR_socketcall:
         switch (args[0]) {
             case _A1_recv:
-              addr = ((uint32_t *)args[1])[1];
+              addr = ((ADDRINT *)args[1])[1];
               fd = args[0];
               length = bytes;
               cerr << "Tainting " 
@@ -711,7 +711,7 @@ FrameOption_t TaintTracker::taintPostSC(const uint32_t bytes,
       case __NR_mmap:
       case __NR_mmap2:
       {
-        addr = bytes;
+        addr = (ADDRINT)bytes;
         fd = args[5];
         length = args[1];
         uint32_t offset = args[6];
@@ -827,7 +827,7 @@ FrameOption_t TaintTracker::taintPostSC(const uint32_t bytes,
         if (bytes == STATUS_SUCCESS) {
 	  /* XXX: Determine offset into file. */
           length = *(reinterpret_cast<uint32_t *> (args[6]));  /// XXX: possibly wrong
-          addr = *(reinterpret_cast<uint32_t *> (args[2])); /// XXX: possibly wrong
+          addr = *(reinterpret_cast<ADDRINT *> (args[2])); /// XXX: possibly wrong
           assert(addr);
           cerr << "Tainting " 
                << length 
@@ -874,7 +874,7 @@ void TaintTracker::resetTaint(context &delta) {
 // Add taint 'tag' to all written operands
 void TaintTracker::addTaintToWritten(context &delta, uint32_t tag)
 {
-  uint32_t loc;
+  ADDRINT loc;
   cerr <<hex ;
   for (uint32_t i = 0 ; i < count ; i++) {
     if ((values[i].usage & WR) == WR)  {
