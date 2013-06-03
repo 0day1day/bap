@@ -30,7 +30,7 @@
 #else
   #define dbg_printf(...)
 #endif
-  
+
 
 // Determine architecture
 #if _WIN32 || _WIN64
@@ -52,7 +52,7 @@
 // for the TraceContainerWriter
 #ifdef ARCH_64
   #define bfd_arch bfd_arch_i386
-  #define bfd_mach bfd_mach_i386_x86_64
+  #define bfd_mach bfd_mach_x86_64
 #else
   #define bfd_arch bfd_arch_i386
   #define bfd_mach bfd_mach_i386_i386
@@ -660,7 +660,7 @@ ADDRINT CheckBufferEx(BOOL cond, UINT32 count, UINT32 count2)
 // Callers must ensure mutual exclusion
 VOID FlushInstructions()
 {
-    dbg_printf("FlushInstructions\n"); 
+    dbg_printf("FlushInstructions\n");
     for(uint32_t i = 0; i < g_bufidx; i++) {
 
         frame fnew;
@@ -760,7 +760,7 @@ VOID AddRegister(tagged_value_list *tol, const CONTEXT *ctx, REG r, THREADID thr
 VOID FlushBuffer(BOOL addKeyframe, const CONTEXT *ctx, THREADID threadid, BOOL needlock)
 {
     dbg_printf("FlushBuffer\n");
-    
+
     LLOG("Begin flushing buffer.\n");
 
     if (needlock) {
@@ -827,7 +827,7 @@ VOID FlushBuffer(BOOL addKeyframe, const CONTEXT *ctx, THREADID threadid, BOOL n
 
 /** Wrapper for accept */
 uint32_t AcceptWrapper(CONTEXT *ctx, AFUNPTR fp, THREADID tid, uint32_t s, void *addr, int *addrlen) {
-    
+
     cerr << "AcceptWrapper" << endl;
 
     uint32_t ret;
@@ -1829,7 +1829,7 @@ VOID InstrBlock(BBL bbl)
 VOID InstrTrace(TRACE trace, VOID *v)
 {
     dbg_printf("InstrTrace v=%p\n", v);
-    
+
     /* Decide if we want to log this trace by examining the entrance address. */
     ADDRINT addr = TRACE_Address(trace);
     if (dontLog(addr)) {
@@ -1843,7 +1843,7 @@ VOID InstrTrace(TRACE trace, VOID *v)
 VOID ThreadEnd(THREADID threadid, CONTEXT *ctx, INT32 code, VOID *v)
 {
     dbg_printf("ThreadEnd tid=%d, code=%d, v=%p\n", threadid, code, v);
-    
+
     ThreadInfo_t *ti = NULL;
 
     cerr << "Thread " << threadid << " ending" << endl;
@@ -2377,7 +2377,7 @@ VOID FollowParent(THREADID threadid, const CONTEXT* ctxt, VOID * arg)
 }
 
 VOID ExceptionHandler(THREADID threadid, CONTEXT_CHANGE_REASON reason, const CONTEXT *from, CONTEXT *to, INT32 info, VOID *v) {
-    
+
     dbg_printf("ExceptionHandler tid=%d info=0x%x v=%p\n", threadid, info, v);
     /*
       CONTEXT_CHANGE_REASON_FATALSIGNAL 	 Receipt of fatal Unix signal.
@@ -2517,7 +2517,7 @@ VOID ExceptionHandler(THREADID threadid, CONTEXT_CHANGE_REASON reason, const CON
 VOID FollowChild(THREADID threadid, const CONTEXT* ctxt, VOID * arg)
 {
     dbg_printf("FollowChild tid=%d arg=%p\n", threadid, arg);
-    
+
     int i;
 
     LLOG("follow child\n");
