@@ -1143,7 +1143,7 @@ VOID AppendBuffer(ADDRINT addr,
         assert(valid_regmem_type(values[i].type));
 
         values[i].type.size = va_arg(va, uint32_t);
-        values[i].loc = va_arg(va, uint32_t);
+        values[i].loc = va_arg(va, ADDRINT);
         values[i].value.dword[0] = va_arg(va, uint32_t);
         values[i].usage = va_arg(va, uint32_t);
         if (tracker->isMem(values[i].type)) {
