@@ -58,12 +58,12 @@
   #define BFD_ARCH bfd_arch_i386
   #define BFD_MACH bfd_mach_x86_64
   #define STACK_OFFSET 8
-  #define MAX_ADDRESS "0xffffffffffffffffffffffffffffffff"
+  #define MAX_ADDRESS "0xffffffffffffffff"
 #else
   #define BFD_ARCH bfd_arch_i386
   #define BFD_MACH bfd_mach_i386_i386
   #define STACK_OFFSET 4
-  #define MAX_ADDRESS "0xffffffffffffffff"
+  #define MAX_ADDRESS "0xffffffff"
 #endif
 
 using namespace pintrace;
@@ -1324,7 +1324,6 @@ VOID AppendBuffer(ADDRINT addr,
          * four.  Of course, this isn't correct in general.  XXX: Fix
          * this so it works for any last instruction. */
         ADDRINT gsp = PIN_GetContextReg(ctx, REG_STACK_PTR);
-        // XXX: merging: set offset appropriately per architecture.
         PIN_SetContextReg(ctx, REG_STACK_PTR, gsp + STACK_OFFSET);
 
         PIVOT_testpivot(ps, ctx, *tracker);
@@ -1884,7 +1883,6 @@ VOID ThreadStart(THREADID threadid, CONTEXT *ctx, INT32 flags, VOID *v)
     if (firstthread) {
         firstthread = false;
 #ifndef _WIN32 /* unix */
-        //XXX: when merging 32/64, make sure to adjust the offsets appropriately
         int argc = *(int*)(PIN_GetContextReg(ctx, REG_STACK_PTR));
         char **argv = (char**) (PIN_GetContextReg(ctx, REG_STACK_PTR) + STACK_OFFSET);
         char **env = (char**) (PIN_GetContextReg(ctx, REG_STACK_PTR)+(argc+1) * STACK_OFFSET);
