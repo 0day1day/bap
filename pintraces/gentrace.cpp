@@ -24,6 +24,14 @@
 #include "pin_taint.h"
 #include "pin_misc.h"
 
+#define DEBUG
+#ifdef DEBUG
+  #define dbg_printf(...) printf(__VA_ARGS__)
+#else
+  #define dbg_printf(...)
+#endif
+  
+
 // Determine architecture
 #if _WIN32 || _WIN64
   #if _WIN64
@@ -275,6 +283,7 @@ enum RPassType { P_VALUE, P_REF, P_CONTEXT, P_FPX87 };
  * Given a register, decide how to pass it.
  */
 static RPassType howPass(REG r) {
+    dbg_printf("howPass r=%d\n", r);
 
     if(REG_is_fr_for_get_context(r))
       return P_CONTEXT;
@@ -294,6 +303,7 @@ static RPassType howPass(REG r) {
  * Avoiding logging some addresses.
  */
 static bool dontLog(ADDRINT addr) {
+    dbg_printf("dontLog addr=0x%lx\n", addr);
 
     IMG i = IMG_FindByAddress(addr);
     if (IMG_Valid(i)) {
@@ -467,6 +477,7 @@ ThreadInfo_t* NewThreadInfo(void) {
 
 /** Given a REG, return the number of bits in the reg */
 static uint32_t GetBitsOfReg(REG r) {
+    dbg_printf("GetBitsOfReg r=%d\n", r);
     if (REG_is_gr8(r)) return 8;
     if (REG_is_gr16(r)) return 16;
     if (REG_is_gr32(r)) return 32;
@@ -533,7 +544,7 @@ static uint32_t GetBitsOfReg(REG r) {
  * by REG_is_gr above
  */
 #if defined(ARCH_64)
-    case REG_RIP:
+    case REG_INST_PTR:
     case REG_RFLAGS:
         return 64;
         break;
@@ -583,6 +594,7 @@ ADDRINT CheckTrigger()
 
 /** Reinstrument all images. XXX: Remove me. */
 VOID InstrumentIMG() {
+    dbg_printf("InstrumentIMG\n");
     PIN_LockClient();
     for (IMG i = APP_ImgHead(); IMG_Valid(i); i = IMG_Next(i)) {
         ModLoad(i, (void*)1);
@@ -592,6 +604,7 @@ VOID InstrumentIMG() {
 
 VOID Activate(CONTEXT *ctx)
 {
+    dbg_printf("Activate\n");
     cerr << "Activating logging" << endl;
     g_active = true;
     PIN_RemoveInstrumentation();
@@ -607,6 +620,7 @@ VOID Activate(CONTEXT *ctx)
 */
 VOID TActivate()
 {
+    dbg_printf("TActivate\n");
     cerr << "Activating taint analysis " << endl;
     g_active = true; /* Any instruction could be logged because taint is
                         introduced. */
@@ -621,18 +635,22 @@ VOID TActivate()
 //
 ADDRINT CheckBuffer(UINT32 count)
 {
+  dbg_printf("CheckBuffer count=%d\n", count);
+
   return (g_bufidx + count) >= BUFFER_SIZE - FUDGE;
 }
 
 ADDRINT CheckBufferEx(BOOL cond, UINT32 count, UINT32 count2)
 {
+  dbg_printf("CheckBufferEx cond=%d, count=%d, count2=%d\n", cond, count, count2);
+
   return cond && ((g_bufidx + count + count2) >= BUFFER_SIZE - FUDGE);
 }
 
 // Callers must ensure mutual exclusion
 VOID FlushInstructions()
 {
-
+    dbg_printf("FlushInstructions\n"); 
     for(uint32_t i = 0; i < g_bufidx; i++) {
 
         frame fnew;
@@ -707,6 +725,8 @@ VOID FlushInstructions()
 
 /* Add a PIN register to a value list. Helper function for FlushBuffer */
 VOID AddRegister(tagged_value_list *tol, const CONTEXT *ctx, REG r, THREADID threadid) {
+    dbg_printf("AddRegister r=%d, tid=%d\n", r, threadid);
+
     tol->mutable_value_source_tag()->set_thread_id(threadid);
     value_info *v = tol->mutable_value_list()->add_elem();
     v->mutable_operand_info_specific()->mutable_reg_operand()->set_name(REG_StringShort(r));
@@ -729,7 +749,8 @@ VOID AddRegister(tagged_value_list *tol, const CONTEXT *ctx, REG r, THREADID thr
 //
 VOID FlushBuffer(BOOL addKeyframe, const CONTEXT *ctx, THREADID threadid, BOOL needlock)
 {
-
+    dbg_printf("FlushBuffer\n");
+    
     LLOG("Begin flushing buffer.\n");
 
     if (needlock) {
@@ -796,7 +817,7 @@ VOID FlushBuffer(BOOL addKeyframe, const CONTEXT *ctx, THREADID threadid, BOOL n
 
 /** Wrapper for accept */
 uint32_t AcceptWrapper(CONTEXT *ctx, AFUNPTR fp, THREADID tid, uint32_t s, void *addr, int *addrlen) {
-
+    
     cerr << "AcceptWrapper" << endl;
 
     uint32_t ret;
@@ -1028,6 +1049,8 @@ void* GetEnvAWrap(CONTEXT *ctx, AFUNPTR fp, THREADID tid) {
  * executed when using -logone-after. It transfer control back to the
  * same instruction to log its operands after execution. */
 VOID PostInstruction(ADDRINT addr, CONTEXT *ctx) {
+    dbg_printf("PostInstruction addr=0x%lx\n", addr);
+
     g_exit_next = true;
     PIN_SetContextReg(ctx, REG_INST_PTR, addr);
     PIN_ExecuteAt(ctx);
@@ -1060,6 +1083,10 @@ VOID AppendBuffer(ADDRINT addr,
                   ...
                   )
 {
+    dbg_printf("AppendBuffer addr=0x%lx tid=%d isBranch=%d, insn_length=%d"
+               "rawbytes=%x %x %x %x\n", addr, tid, isBranch, insn_length,
+               rawbytes0, rawbytes1, rawbytes2, rawbytes3);
+
     va_list va;
     va_start(va, values_count);
 
@@ -1304,7 +1331,7 @@ VOID AppendBuffer(ADDRINT addr,
 
 VOID InstrBlock(BBL bbl)
 {
-
+    dbg_printf("InstrBlock\n");
     // Now we need to get the values.
 
     uint32_t valcount;
@@ -1791,7 +1818,8 @@ VOID InstrBlock(BBL bbl)
 
 VOID InstrTrace(TRACE trace, VOID *v)
 {
-
+    dbg_printf("InstrTrace v=%p\n", v);
+    
     /* Decide if we want to log this trace by examining the entrance address. */
     ADDRINT addr = TRACE_Address(trace);
     if (dontLog(addr)) {
@@ -1804,6 +1832,8 @@ VOID InstrTrace(TRACE trace, VOID *v)
 
 VOID ThreadEnd(THREADID threadid, CONTEXT *ctx, INT32 code, VOID *v)
 {
+    dbg_printf("ThreadEnd tid=%d, code=%d, v=%p\n", threadid, code, v);
+    
     ThreadInfo_t *ti = NULL;
 
     cerr << "Thread " << threadid << " ending" << endl;
@@ -1816,6 +1846,8 @@ VOID ThreadEnd(THREADID threadid, CONTEXT *ctx, INT32 code, VOID *v)
 
 VOID ThreadStart(THREADID threadid, CONTEXT *ctx, INT32 flags, VOID *v)
 {
+    dbg_printf("ThreadStart tid=%d, flags=0x%x, v=%p\n", threadid, flags, v);
+
     // Get the command line arguments before _start is called
     // This only works with Linux conventions in mind
     static int firstthread = true;
@@ -1832,9 +1864,9 @@ VOID ThreadStart(THREADID threadid, CONTEXT *ctx, INT32 flags, VOID *v)
     if (firstthread) {
         firstthread = false;
 #ifndef _WIN32 /* unix */
-        int argc = *(int*)(PIN_GetContextReg(ctx, REG_ESP));
-        char **argv = (char**) (PIN_GetContextReg(ctx, REG_ESP)+4);
-        char **env = (char**) (PIN_GetContextReg(ctx, REG_ESP)+(argc+1)*4);
+        int argc = *(int*)(PIN_GetContextReg(ctx, REG_STACK_PTR));
+        char **argv = (char**) (PIN_GetContextReg(ctx, REG_STACK_PTR)+8);
+        char **env = (char**) (PIN_GetContextReg(ctx, REG_STACK_PTR)+(argc+1)*8);
         std::vector<frame> frms = tracker->taintArgs(argc, argv);
         g_twnew->add<std::vector<frame> > (frms);
         frms = tracker->taintEnv(env);
@@ -2203,6 +2235,8 @@ VOID ModLoad(IMG img, VOID *v)
 
 VOID SyscallEntry(THREADID tid, CONTEXT *ctx, SYSCALL_STANDARD std, VOID *v)
 {
+    dbg_printf("SyscallEntry tid=%d, v=%p\n", tid, v);
+
     ThreadInfo_t *ti = NULL;
     SyscallInfo_t si;
 
@@ -2265,6 +2299,8 @@ VOID SyscallEntry(THREADID tid, CONTEXT *ctx, SYSCALL_STANDARD std, VOID *v)
 
 VOID SyscallExit(THREADID tid, CONTEXT *ctx, SYSCALL_STANDARD std, VOID *v)
 {
+    dbg_printf("SyscallExit tid=%d v=%p\n", tid, v);
+
     ThreadInfo_t *ti = NULL;
     SyscallInfo_t si;
     ADDRINT addr;
@@ -2314,6 +2350,8 @@ VOID SyscallExit(THREADID tid, CONTEXT *ctx, SYSCALL_STANDARD std, VOID *v)
 
 VOID FollowParent(THREADID threadid, const CONTEXT* ctxt, VOID * arg)
 {
+    dbg_printf("FollowParent tid=%d arg=%p\n", threadid, arg);
+
     int i;
 
     LLOG("fparent\n");
@@ -2329,6 +2367,8 @@ VOID FollowParent(THREADID threadid, const CONTEXT* ctxt, VOID * arg)
 }
 
 VOID ExceptionHandler(THREADID threadid, CONTEXT_CHANGE_REASON reason, const CONTEXT *from, CONTEXT *to, INT32 info, VOID *v) {
+    
+    dbg_printf("ExceptionHandler tid=%d info=0x%x v=%p\n", threadid, info, v);
     /*
       CONTEXT_CHANGE_REASON_FATALSIGNAL 	 Receipt of fatal Unix signal.
       CONTEXT_CHANGE_REASON_SIGNAL 	 Receipt of handled Unix signal.
@@ -2466,6 +2506,8 @@ VOID ExceptionHandler(THREADID threadid, CONTEXT_CHANGE_REASON reason, const CON
 
 VOID FollowChild(THREADID threadid, const CONTEXT* ctxt, VOID * arg)
 {
+    dbg_printf("FollowChild tid=%d arg=%p\n", threadid, arg);
+    
     int i;
 
     LLOG("follow child\n");
@@ -2556,6 +2598,7 @@ INT32 Usage()
 
 int main(int argc, char *argv[])
 {
+    dbg_printf("Entered main.\n");
     stringstream ss;
 
     cerr << hex;
