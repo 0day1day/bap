@@ -50,12 +50,20 @@
 
 // Set the correct architecture and machine values
 // for the TraceContainerWriter
+/*
+ * A useful set of macros that we can customize for different
+ * architectures as simply as possible.
+ */
 #ifdef ARCH_64
   #define BFD_ARCH bfd_arch_i386
   #define BFD_MACH bfd_mach_x86_64
+  #define STACK_OFFSET 8
+  #define MAX_ADDRESS "0xffffffffffffffffffffffffffffffff"
 #else
   #define BFD_ARCH bfd_arch_i386
   #define BFD_MACH bfd_mach_i386_i386
+  #define STACK_OFFSET 4
+  #define MAX_ADDRESS "0xffffffffffffffff"
 #endif
 
 using namespace pintrace;
@@ -226,10 +234,8 @@ KNOB<ADDRINT> TaintStart(KNOB_MODE_WRITEONCE, "pintool",
                           "taint-start", "0x0",
                           "All logged instructions will have higher addresses");
 
-// XXX: When we merge with the 32 bit version, we'll need to change this
-//      to have the appropriate 32/64 bit max address.
 KNOB<ADDRINT> TaintEnd(KNOB_MODE_WRITEONCE, "pintool",
-                        "taint-end", "0xffffffffffffffff",
+                        "taint-end", MAX_ADDRESS,
                         "All logged instructions will have lower addresses");
 
 KNOB<string> FollowProgs(KNOB_MODE_APPEND, "pintool",
@@ -509,8 +515,6 @@ static uint32_t GetBitsOfReg(REG r) {
         return 16;
         break;
 
-    case REG_EIP:
-    case REG_EFLAGS:
     case REG_MXCSR:
         return 32;
         break;
@@ -549,13 +553,13 @@ static uint32_t GetBitsOfReg(REG r) {
         break;
 
 /*
- * Specifically 64-bit registers
- * General purpose registers are handled
- * by REG_is_gr above
+ * Handle any extra registers specific to an architecture
+ * and defines any ambiguous registers
+ * (E.g., REG_INST_PTR can be 64 or 32 based on the architecture)
  */
 #if defined(ARCH_64)
     case REG_INST_PTR:
-    case REG_RFLAGS:
+    case REG_GFLAGS:
         return 64;
         break;
 
@@ -568,6 +572,11 @@ static uint32_t GetBitsOfReg(REG r) {
     case REG_XMM14:
     case REG_XMM15:
         return 128;
+        break;
+#elif defined(ARCH_32)
+    case REG_INST_PTR:
+    case REG_GFLAGS:
+        return 32;
         break;
 #endif
 
@@ -780,15 +789,15 @@ VOID FlushBuffer(BOOL addKeyframe, const CONTEXT *ctx, THREADID threadid, BOOL n
 
         frame f;
         tagged_value_list *tol = f.mutable_key_frame()->mutable_tagged_value_lists()->add_elem();
-        AddRegister(tol, ctx, REG_EAX, threadid);
-        AddRegister(tol, ctx, REG_EBX, threadid);
-        AddRegister(tol, ctx, REG_ECX, threadid);
-        AddRegister(tol, ctx, REG_EDX, threadid);
-        AddRegister(tol, ctx, REG_ESI, threadid);
-        AddRegister(tol, ctx, REG_EDI, threadid);
-        AddRegister(tol, ctx, REG_ESP, threadid);
-        AddRegister(tol, ctx, REG_EBP, threadid);
-        AddRegister(tol, ctx, REG_EFLAGS, threadid);
+        AddRegister(tol, ctx, REG_GAX, threadid);
+        AddRegister(tol, ctx, REG_GBX, threadid);
+        AddRegister(tol, ctx, REG_GCX, threadid);
+        AddRegister(tol, ctx, REG_GDX, threadid);
+        AddRegister(tol, ctx, REG_GSI, threadid);
+        AddRegister(tol, ctx, REG_GDI, threadid);
+        AddRegister(tol, ctx, REG_STACK_PTR, threadid);
+        AddRegister(tol, ctx, REG_GBP, threadid);
+        AddRegister(tol, ctx, REG_GFLAGS, threadid);
         AddRegister(tol, ctx, REG_SEG_CS, threadid);
         AddRegister(tol, ctx, REG_SEG_DS, threadid);
         AddRegister(tol, ctx, REG_SEG_SS, threadid);
@@ -1314,9 +1323,9 @@ VOID AppendBuffer(ADDRINT addr,
         /* Let's assume this was a ret for now and increment esp by
          * four.  Of course, this isn't correct in general.  XXX: Fix
          * this so it works for any last instruction. */
-        ADDRINT esp = PIN_GetContextReg(ctx, REG_STACK_PTR);
+        ADDRINT gsp = PIN_GetContextReg(ctx, REG_STACK_PTR);
         // XXX: merging: set offset appropriately per architecture.
-        PIN_SetContextReg(ctx, REG_STACK_PTR, esp+8);
+        PIN_SetContextReg(ctx, REG_STACK_PTR, gsp + STACK_OFFSET);
 
         PIVOT_testpivot(ps, ctx, *tracker);
 
@@ -1877,8 +1886,8 @@ VOID ThreadStart(THREADID threadid, CONTEXT *ctx, INT32 flags, VOID *v)
 #ifndef _WIN32 /* unix */
         //XXX: when merging 32/64, make sure to adjust the offsets appropriately
         int argc = *(int*)(PIN_GetContextReg(ctx, REG_STACK_PTR));
-        char **argv = (char**) (PIN_GetContextReg(ctx, REG_STACK_PTR)+8);
-        char **env = (char**) (PIN_GetContextReg(ctx, REG_STACK_PTR)+(argc+1)*8);
+        char **argv = (char**) (PIN_GetContextReg(ctx, REG_STACK_PTR) + STACK_OFFSET);
+        char **env = (char**) (PIN_GetContextReg(ctx, REG_STACK_PTR)+(argc+1) * STACK_OFFSET);
         std::vector<frame> frms = tracker->taintArgs(argc, argv);
         g_twnew->add<std::vector<frame> > (frms);
         frms = tracker->taintEnv(env);
