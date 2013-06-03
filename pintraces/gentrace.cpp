@@ -48,6 +48,16 @@
   #endif
 #endif
 
+// Set the correct architecture and machine values
+// for the TraceContainerWriter
+#ifdef ARCH_64
+  #define bfd_arch bfd_arch_i386
+  #define bfd_mach bfd_mach_i386_x86_64
+#else
+  #define bfd_arch bfd_arch_i386
+  #define bfd_mach bfd_mach_i386_i386
+#endif
+
 using namespace pintrace;
 using namespace SerializedTrace;
 
@@ -2517,7 +2527,8 @@ VOID FollowChild(THREADID threadid, const CONTEXT* ctxt, VOID * arg)
     assert(i < BUFFER_SIZE);
     g_threadname[i++] = 'c';
 
-    g_twnew = new TraceContainerWriter((g_threadname + KnobOut.Value()).c_str(), bfd_arch_i386, bfd_mach_i386_i386, default_frames_per_toc_entry, false);
+//    g_twnew = new TraceContainerWriter((g_threadname + KnobOut.Value()).c_str(), bfd_arch_i386, bfd_mach_i386_i386, default_frames_per_toc_entry, false);
+    g_twnew = new TraceContainerWriter((g_threadname + KnobOut.Value()).c_str(), bfd_arch, bfd_mach, default_frames_per_toc_entry, false);
 
     g_bufidx = 0;
     g_kfcount = 0;
@@ -2707,7 +2718,8 @@ int main(int argc, char *argv[])
 
     ss << PIN_GetPid() << "-" << KnobOut.Value();
 
-    g_twnew = new TraceContainerWriter(ss.str().c_str(), bfd_arch_i386, bfd_mach_i386_i386, default_frames_per_toc_entry, false);
+//    g_twnew = new TraceContainerWriter(ss.str().c_str(), bfd_arch_i386, bfd_mach_i386_i386, default_frames_per_toc_entry, false);
+    g_twnew = new TraceContainerWriter(ss.str().c_str(), bfd_arch, bfd_mach, default_frames_per_toc_entry, false);
 
     g_bufidx = 0;
     g_kfcount = 0;
