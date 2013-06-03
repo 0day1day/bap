@@ -299,7 +299,7 @@ enum RPassType { P_VALUE, P_REF, P_CONTEXT, P_FPX87 };
  * Given a register, decide how to pass it.
  */
 static RPassType howPass(REG r) {
-    dbg_printf("howPass r=%d\n", r);
+    dbg_printf("howPass r=%d (%s)\n", r, pin_register_name(r).c_str());
 
     if(REG_is_fr_for_get_context(r))
       return P_CONTEXT;
@@ -1102,7 +1102,7 @@ VOID AppendBuffer(ADDRINT addr,
                   ...
                   )
 {
-    dbg_printf("AppendBuffer addr=0x%lx tid=%d isBranch=%d, insn_length=%d"
+    dbg_printf("AppendBuffer addr=0x%lx tid=%d isBranch=%d, insn_length=%d "
                "rawbytes=%x %x %x %x\n", addr, tid, isBranch, insn_length,
                rawbytes0, rawbytes1, rawbytes2, rawbytes3);
 
