@@ -1315,7 +1315,8 @@ VOID AppendBuffer(ADDRINT addr,
          * four.  Of course, this isn't correct in general.  XXX: Fix
          * this so it works for any last instruction. */
         ADDRINT esp = PIN_GetContextReg(ctx, REG_STACK_PTR);
-        PIN_SetContextReg(ctx, REG_STACK_PTR, esp+4);
+        // XXX: merging: set offset appropriately per architecture.
+        PIN_SetContextReg(ctx, REG_STACK_PTR, esp+8);
 
         PIVOT_testpivot(ps, ctx, *tracker);
 
@@ -1874,6 +1875,7 @@ VOID ThreadStart(THREADID threadid, CONTEXT *ctx, INT32 flags, VOID *v)
     if (firstthread) {
         firstthread = false;
 #ifndef _WIN32 /* unix */
+        //XXX: when merging 32/64, make sure to adjust the offsets appropriately
         int argc = *(int*)(PIN_GetContextReg(ctx, REG_STACK_PTR));
         char **argv = (char**) (PIN_GetContextReg(ctx, REG_STACK_PTR)+8);
         char **env = (char**) (PIN_GetContextReg(ctx, REG_STACK_PTR)+(argc+1)*8);
