@@ -48,8 +48,6 @@
   #endif
 #endif
 
-// Set the correct architecture and machine values
-// for the TraceContainerWriter
 /*
  * A useful set of macros that we can customize for different
  * architectures as simply as possible.
@@ -59,11 +57,13 @@
   #define BFD_MACH bfd_mach_x86_64
   #define STACK_OFFSET 8
   #define MAX_ADDRESS "0xffffffffffffffff"
-#else
+  #define MEM_ACCESS qword
+#elif ARCH_32
   #define BFD_ARCH bfd_arch_i386
   #define BFD_MACH bfd_mach_i386_i386
   #define STACK_OFFSET 4
   #define MAX_ADDRESS "0xffffffff"
+  #define MEM_ACCESS dword
 #endif
 
 using namespace pintrace;
@@ -1144,11 +1144,11 @@ VOID AppendBuffer(ADDRINT addr,
 
         values[i].type.size = va_arg(va, uint32_t);
         values[i].loc = va_arg(va, ADDRINT);
-        values[i].value.qword[0] = va_arg(va, ADDRINT);
+        values[i].value.MEM_ACCESS[0] = va_arg(va, ADDRINT);
         values[i].usage = va_arg(va, uint32_t);
         if (tracker->isMem(values[i].type)) {
             /* Add memory byte offset */
-            values[i].loc += values[i].value.qword[0];
+            values[i].loc += values[i].value.MEM_ACCESS[0];
         }
     }
 
@@ -1252,13 +1252,13 @@ VOID AppendBuffer(ADDRINT addr,
                 /* Find how we should access the register value */
                 switch(howPass(r)) {
                 case P_CONTEXT:
-                    g_buffer[g_bufidx].valspecs[i].value.qword[0] =
-                        PIN_GetContextReg(ctx, r);
+                      g_buffer[g_bufidx].valspecs[i].value.MEM_ACCESS[0] =
+                          PIN_GetContextReg(ctx, r);
                     break;
 
                 case P_REF:
                     dbg_printf("in AppendBuffer: getting register value.\n");
-                    pr = (LEVEL_VM::PIN_REGISTER*) values[i].value.qword[0];
+                    pr = (LEVEL_VM::PIN_REGISTER*) values[i].value.MEM_ACCESS[0];
                     cerr << "pr: " << pr << endl;
                     memcpy(&(g_buffer[g_bufidx].valspecs[i].value),
                            pr,
