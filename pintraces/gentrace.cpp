@@ -53,8 +53,8 @@
  * architectures as simply as possible.
  */
 #ifdef ARCH_64
-  #define BFD_ARCH bfd_arch_i386
-  #define BFD_MACH bfd_mach_x86_64
+  #define BFD_ARCH bfd_arch_ia64
+  #define BFD_MACH bfd_mach_ia64_elf64
   #define STACK_OFFSET 8
   #define MAX_ADDRESS "0xffffffffffffffff"
   #define MEM_ACCESS qword
