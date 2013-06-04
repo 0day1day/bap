@@ -32,22 +32,6 @@
 #endif
 
 
-// Determine architecture
-#if _WIN32 || _WIN64
-  #if _WIN64
-    #define ARCH_64
-  #else
-    #define ARCH_32
-  #endif
-#endif
-#if __GNUC__
-  #if __x86_64__ || __ppc64__
-    #define ARCH_64
-  #else
-    #define ARCH_32
-  #endif
-#endif
-
 /*
  * A useful set of macros that we can customize for different
  * architectures as simply as possible.
@@ -827,7 +811,7 @@ VOID FlushBuffer(BOOL addKeyframe, const CONTEXT *ctx, THREADID threadid, BOOL n
     }
 
 
-
+    dbg_printf("End FlushBuffer\n");
     LLOG("End flushing buffer.\n");
 
 }
@@ -1214,7 +1198,7 @@ VOID AppendBuffer(ADDRINT addr,
 
         // Now, fill in the buffer with information
 
-	assert (g_bufidx < BUFFER_SIZE);
+        assert (g_bufidx < BUFFER_SIZE);
 
         g_buffer[g_bufidx].addr = addr;
         g_buffer[g_bufidx].tid = tid;
@@ -2261,7 +2245,7 @@ VOID SyscallEntry(THREADID tid, CONTEXT *ctx, SYSCALL_STANDARD std, VOID *v)
 
     ThreadInfo_t *ti = NULL;
     SyscallInfo_t si;
-
+    
     /*
      * Synchronization note: We assume there is only one system call per
      * thread, and thus the thread local syscall stack does not need any
@@ -2288,6 +2272,7 @@ VOID SyscallEntry(THREADID tid, CONTEXT *ctx, SYSCALL_STANDARD std, VOID *v)
     for (int i = 0; i < MAX_SYSCALL_ARGS; i++)
         {
             if (i < PLAT_SYSCALL_ARGS) {
+                dbg_printf("Syscall argument %d: 0x%lx\n", i, PIN_GetSyscallArgument(ctx, std, i));
                 si.sf.mutable_syscall_frame()->mutable_argument_list()->add_elem(PIN_GetSyscallArgument(ctx, std, i));
             }
         }
@@ -2305,11 +2290,10 @@ VOID SyscallEntry(THREADID tid, CONTEXT *ctx, SYSCALL_STANDARD std, VOID *v)
     if (LogAllSyscalls.Value()) {
         g_twnew->add(si.sf);
     }
-
+    
     if (tracker->taintPreSC(si.sf.mutable_syscall_frame()->number(), (const uint64_t *) (si.sf.syscall_frame().argument_list().elem().data()), si.state)) {
         // Do we need to do anything here? ...
     }
-
     ti->scStack.push(si);
 
     //e:

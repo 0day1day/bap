@@ -10,11 +10,29 @@
 #include <set>
 #include <vector>
 #include <string.h>
+#include <unistd.h>
+#include <asm/unistd.h>
 #include "pin_misc.h"
 #include "trace.container.hpp"
 
 // Size of temporary buffers
 #define BUFSIZE 128
+
+// Determine architecture
+#if _WIN32 || _WIN64
+  #if _WIN64
+    #define ARCH_64
+  #else
+    #define ARCH_32
+  #endif
+#endif
+#if __GNUC__
+  #if __x86_64__ || __ppc64__
+    #define ARCH_64
+  #else
+    #define ARCH_32
+  #endif
+#endif
 
 // TODO: we need a type for the mapping to variables/registers
 typedef uint32_t var;

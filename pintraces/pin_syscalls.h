@@ -7,6 +7,7 @@
 // FIXME: use the ones from /usr/include/asm/unistd.h
 
 #define __NR_nosyscall            0     
+/*
 #define __NR_read			3
 #define __NR_open			5
 #define __NR_close			6
@@ -15,6 +16,7 @@
 #define __NR_mmap		 90
 #define __NR_socketcall	102
 #define __NR_mmap2		192
+*/
 
 // Windows system calls @ http://code.google.com/p/miscellaneouz/source/browse/trunk/winsyscalls?spec=svn26&r=26
 // These numbers are for Windows 7

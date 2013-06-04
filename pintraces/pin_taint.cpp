@@ -4,12 +4,11 @@
 #include "winsyscalls.h"
 #include "trace.container.hpp"
 #ifndef _WIN32
-#include <unistd.h>
 #endif
 #include <cassert>
 #include <sstream>
 
-//#define DEBUG
+#define DEBUG
 #ifdef DEBUG
   #define dbg_printf(...) printf(__VA_ARGS__)
 #else
@@ -486,7 +485,7 @@ std::vector<frame> TaintTracker::taintEnv(char **env)
 /** This function is called right before a system call. */
 bool TaintTracker::taintPreSC(uint32_t callno, const uint64_t *args, /* out */ uint32_t &state)
 {
-  dbg_printf("taintPreSC callno=%d args=%s\n", callno, (char *)args);
+  dbg_printf("taintPreSC callno=%d arg0=0x%016lx arg1=0x%016lx arg2=0x%016lx\n", callno, args[0], args[1], args[2]);
   //cout << "Syscall no: " << callno << endl << "Args:" ;
   //for ( int i = 0 ; i < MAX_SYSCALL_ARGS ; i ++ )
   //  cout << hex << " " << args[i] ;
@@ -504,10 +503,14 @@ bool TaintTracker::taintPreSC(uint32_t callno, const uint64_t *args, /* out */ u
 #ifndef _WIN32 /* unix */
       case __NR_open:
       {
-        PIN_SafeCopy((void *)filename, (void *)args[0],128); 
-        
+        dbg_printf("Copying (len=%lu)...\n", strlen((char *)args[0]));
+        assert(PIN_SafeCopy((void *)filename, (void *)args[0], 128));
+        dbg_printf("Succeeded.\n");
+
         // Search for each tainted filename in filename
+        dbg_printf("Searching. filename=%s\n", filename);
         string cppfilename(filename);
+        dbg_printf("Made cppfilename\n");
         for (std::set<string>::iterator i = taint_files.begin();
              i != taint_files.end();
              i++) {
@@ -527,10 +530,12 @@ bool TaintTracker::taintPreSC(uint32_t callno, const uint64_t *args, /* out */ u
         break;
         // TODO: do we care about the offset?
       case __NR_mmap:
+#ifdef ARCH_32
       case __NR_mmap2:
+#endif
         if (fds.find(args[4]) != fds.end()) {
           cerr << "mmapping " << args[0] << endl;
-          state = __NR_mmap2;
+          state = __NR_mmap;
         }
         break;
       case __NR_read: 
@@ -539,6 +544,7 @@ bool TaintTracker::taintPreSC(uint32_t callno, const uint64_t *args, /* out */ u
           reading_tainted = true;
         }
         break;
+#ifdef ARCH_32
       case __NR_socketcall:
         // TODO: do we need to distinguish between sockets?
         if (taint_net) {
@@ -547,6 +553,7 @@ bool TaintTracker::taintPreSC(uint32_t callno, const uint64_t *args, /* out */ u
             reading_tainted = true;
         }
         break;
+#endif
       case __NR_execve:
         break;
       case __NR_lseek:
@@ -662,6 +669,7 @@ FrameOption_t TaintTracker::taintPostSC(const uint32_t bytes,
                                      uint32_t &length,
                                      const uint32_t state)
 {
+  dbg_printf("taintPostSC state=%d\n", state);
   //for ( int i = 0 ; i < MAX_SYSCALL_ARGS ; i ++ )
   //cout << hex << " " << args[i] ;
   //cout << endl ;
@@ -670,6 +678,7 @@ FrameOption_t TaintTracker::taintPostSC(const uint32_t bytes,
   
   switch (state) {
 #ifndef _WIN32 /* unix */
+  #ifdef ARCH_32
       case __NR_socketcall:
         switch (args[0]) {
             case _A1_recv:
@@ -700,6 +709,7 @@ FrameOption_t TaintTracker::taintPostSC(const uint32_t bytes,
               break;
         }
         break;
+  #endif
       case __NR_open:
         // "bytes" contains the file descriptor
         if (bytes != (uint32_t)(UNIX_FAILURE)) { /* -1 == error */
@@ -716,7 +726,9 @@ FrameOption_t TaintTracker::taintPostSC(const uint32_t bytes,
         }
         break;
       case __NR_mmap:
+#ifdef ARCH_32
       case __NR_mmap2:
+#endif
       {
         addr = (ADDRINT)bytes;
         fd = args[5];
@@ -735,7 +747,7 @@ FrameOption_t TaintTracker::taintPostSC(const uint32_t bytes,
         length = bytes;
         cerr << "Tainting " 
              << length 
-             << " bytes from read at " << addr
+             << " bytes from read at " << addr << ", fd=" << args[0]
              << endl;
 
         return introMemTaintFromFd(fd, addr, length);
