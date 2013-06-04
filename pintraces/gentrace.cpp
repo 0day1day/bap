@@ -299,7 +299,7 @@ enum RPassType { P_VALUE, P_REF, P_CONTEXT, P_FPX87 };
  * Given a register, decide how to pass it.
  */
 static RPassType howPass(REG r) {
-    dbg_printf("howPass r=%d (%s)\n", r, pin_register_name(r).c_str());
+    dbg_printf("howPass r=%s\n", pin_register_name(r).c_str());
 
     if(REG_is_fr_for_get_context(r))
       return P_CONTEXT;
@@ -493,7 +493,7 @@ ThreadInfo_t* NewThreadInfo(void) {
 
 /** Given a REG, return the number of bits in the reg */
 static uint32_t GetBitsOfReg(REG r) {
-    dbg_printf("GetBitsOfReg r=%d\n", r);
+    dbg_printf("GetBitsOfReg r=%s\n", pin_register_name(r).c_str());
     if (REG_is_gr8(r)) return 8;
     if (REG_is_gr16(r)) return 16;
     if (REG_is_gr32(r)) return 32;
@@ -1144,11 +1144,11 @@ VOID AppendBuffer(ADDRINT addr,
 
         values[i].type.size = va_arg(va, uint32_t);
         values[i].loc = va_arg(va, ADDRINT);
-        values[i].value.dword[0] = va_arg(va, uint32_t);
+        values[i].value.qword[0] = va_arg(va, ADDRINT);
         values[i].usage = va_arg(va, uint32_t);
         if (tracker->isMem(values[i].type)) {
             /* Add memory byte offset */
-            values[i].loc += values[i].value.dword[0];
+            values[i].loc += values[i].value.qword[0];
         }
     }
 
@@ -1252,15 +1252,18 @@ VOID AppendBuffer(ADDRINT addr,
                 /* Find how we should access the register value */
                 switch(howPass(r)) {
                 case P_CONTEXT:
-                    g_buffer[g_bufidx].valspecs[i].value.dword[0] =
+                    g_buffer[g_bufidx].valspecs[i].value.qword[0] =
                         PIN_GetContextReg(ctx, r);
                     break;
 
                 case P_REF:
-                    pr = (LEVEL_VM::PIN_REGISTER*) values[i].value.dword[0];
+                    dbg_printf("in AppendBuffer: getting register value.\n");
+                    pr = (LEVEL_VM::PIN_REGISTER*) values[i].value.qword[0];
+                    cerr << "pr: " << pr << endl;
                     memcpy(&(g_buffer[g_bufidx].valspecs[i].value),
                            pr,
                            sizeof(LEVEL_VM::PIN_REGISTER));
+                    dbg_printf("in AppendBuffer: got register value.\n");
                     break;
 
                 case P_FPX87:
