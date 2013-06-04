@@ -58,7 +58,7 @@
   #define STACK_OFFSET 8
   #define MAX_ADDRESS "0xffffffffffffffff"
   #define MEM_ACCESS qword
-#elif ARCH_32
+#elif defined(ARCH_32)
   #define BFD_ARCH bfd_arch_i386
   #define BFD_MACH bfd_mach_i386_i386
   #define STACK_OFFSET 4
