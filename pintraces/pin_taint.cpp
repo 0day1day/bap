@@ -9,6 +9,13 @@
 #include <cassert>
 #include <sstream>
 
+//#define DEBUG
+#ifdef DEBUG
+  #define dbg_printf(...) printf(__VA_ARGS__)
+#else
+  #define dbg_printf(...)
+#endif
+
 #ifdef _WIN32
 /**
  * Getting WDK header files to include is a nightmare.  If you need to
@@ -479,6 +486,7 @@ std::vector<frame> TaintTracker::taintEnv(char **env)
 /** This function is called right before a system call. */
 bool TaintTracker::taintPreSC(uint32_t callno, const uint64_t *args, /* out */ uint32_t &state)
 {
+  dbg_printf("taintPreSC callno=%d args=%s\n", callno, (char *)args);
   //cout << "Syscall no: " << callno << endl << "Args:" ;
   //for ( int i = 0 ; i < MAX_SYSCALL_ARGS ; i ++ )
   //  cout << hex << " " << args[i] ;
@@ -496,9 +504,8 @@ bool TaintTracker::taintPreSC(uint32_t callno, const uint64_t *args, /* out */ u
 #ifndef _WIN32 /* unix */
       case __NR_open:
       {
-        // FIXME: use PIN_SafeCopy
-        strncpy(filename, (char *)args[0],128); 
-
+        PIN_SafeCopy((void *)filename, (void *)args[0],128); 
+        
         // Search for each tainted filename in filename
         string cppfilename(filename);
         for (std::set<string>::iterator i = taint_files.begin();
