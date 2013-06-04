@@ -6,7 +6,8 @@
 /***************** Syscalls ***************/
 // FIXME: use the ones from /usr/include/asm/unistd.h
 
-#define __NR_nosyscall            0     
+#define __NR_nosyscall  -1
+
 /*
 #define __NR_read			3
 #define __NR_open			5

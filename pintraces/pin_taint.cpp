@@ -8,7 +8,7 @@
 #include <cassert>
 #include <sstream>
 
-#define DEBUG
+//#define DEBUG
 #ifdef DEBUG
   #define dbg_printf(...) printf(__VA_ARGS__)
 #else
@@ -257,6 +257,7 @@ FrameOption_t TaintTracker::introMemTaint(ADDRINT addr, uint32_t length, const c
 // Reads length bytes from source at offset, putting the bytes at
 // addr. Also adds length to the offset of the resource.
 FrameOption_t TaintTracker::introMemTaintFromFd(uint32_t fd, ADDRINT addr, uint32_t length) {
+  dbg_printf("introMemTaintFromFd fd=%d addr=0x%016lx length=%x\n", fd, addr, length);
   assert(fds.find(fd) != fds.end());
   FrameOption_t tfs = introMemTaint(addr, length, fds[fd].name.c_str(), fds[fd].offset);
   fds[fd].offset += length;

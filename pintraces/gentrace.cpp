@@ -24,7 +24,7 @@
 #include "pin_taint.h"
 #include "pin_misc.h"
 
-#define DEBUG
+//#define DEBUG
 #ifdef DEBUG
   #define dbg_printf(...) printf(__VA_ARGS__)
 #else
