@@ -51,7 +51,7 @@ auto_ptr<string> GetNarrowOfWide(wchar_t *in) {
   for (unsigned int i = 0; i < wcslen(in); i++) {
     out->push_back(
       use_facet<ctype<wchar_t> >(std::locale("")).narrow(in[i], '?')
-		   );
+                   );
   }
 
   return out;
@@ -422,7 +422,7 @@ std::vector<frame> TaintTracker::taintEnv(char *env, wchar_t *wenv)
   //     uint32_t addr = (uint32_t)env+equal+1;
   //     cerr << "Tainting environment variable: " << var << " @" << (int)addr << " " << len << " bytes" << endl;
   //     for (uint32_t j = 0 ; j < len ; j++) {
-  // 	setTaint(memory, (addr+j), taintnum++);
+  //    setTaint(memory, (addr+j), taintnum++);
   //     }
   //     TaintFrame frm;
   //     frm.id = ENV_ID;
@@ -443,11 +443,11 @@ std::vector<frame> TaintTracker::taintEnv(char *env, wchar_t *wenv)
       
       if (taint_env.find(var) != taint_env.end()) {
         uint32_t numChars = wcslen(wenv) - var.size();
-	uint32_t numBytes = numChars * sizeof(wchar_t);
+        uint32_t numBytes = numChars * sizeof(wchar_t);
         ADDRINT addr = (ADDRINT) (wenv+equal+1);
         cerr << "Tainting environment variable: " << var << " @" << (unsigned long)addr << " " << numChars << " bytes" << endl;
-	FrameOption_t fo = introMemTaint(addr, numBytes, "Environment Variable", -1);
-	if (fo.b) { fv.push_back(fo.f); }
+        FrameOption_t fo = introMemTaint(addr, numBytes, "Environment Variable", -1);
+        if (fo.b) { fv.push_back(fo.f); }
       }
     }
   }
@@ -499,20 +499,20 @@ bool TaintTracker::taintPreSC(uint32_t callno, const uint64_t *args, /* out */ u
         // FIXME: use PIN_SafeCopy
         strncpy(filename, (char *)args[0],128); 
 
-	// Search for each tainted filename in filename
-	string cppfilename(filename);
-	for (std::set<string>::iterator i = taint_files.begin();
-	     i != taint_files.end();
-	     i++) {
-	  if (cppfilename.find(*i) != string::npos) {
-	    state = __NR_open;
-	  }
-	}
-	if (state == __NR_open) {
-	  cerr << "Opening tainted file: " << cppfilename << endl;
-	} else {
-	  cerr << "Not opening " << cppfilename << endl;
-	}
+        // Search for each tainted filename in filename
+        string cppfilename(filename);
+        for (std::set<string>::iterator i = taint_files.begin();
+             i != taint_files.end();
+             i++) {
+          if (cppfilename.find(*i) != string::npos) {
+            state = __NR_open;
+          }
+        }
+        if (state == __NR_open) {
+          cerr << "Opening tainted file: " << cppfilename << endl;
+        } else {
+          cerr << "Not opening " << cppfilename << endl;
+        }
       }
         break;
       case __NR_close:
@@ -567,31 +567,31 @@ bool TaintTracker::taintPreSC(uint32_t callno, const uint64_t *args, /* out */ u
       convertedChars = 0;
       wcstombs_s(&convertedChars, tempstr, origsize, fname, BUFSIZE-1);
       if (convertedChars < origsize) {
-	cerr << "Warning: Could not convert all characters" << endl;
+        cerr << "Warning: Could not convert all characters" << endl;
       }
       
       // Search for each tainted filename in tempstr
       string tempcppstr(tempstr);
       for (std::set<string>::iterator i = taint_files.begin();
-	   i != taint_files.end();
-	   i++) {
-	if (tempcppstr.find(*i) != string::npos) {
-	  state = __NR_createfilewin;
-	}
+           i != taint_files.end();
+           i++) {
+        if (tempcppstr.find(*i) != string::npos) {
+          state = __NR_createfilewin;
+        }
       }
       if (state == __NR_createfilewin) {
-	cerr << "Opening tainted file: " << tempcppstr << endl;
+        cerr << "Opening tainted file: " << tempcppstr << endl;
       } else {
-	cerr << "Not opening " << tempcppstr << endl;
+        cerr << "Not opening " << tempcppstr << endl;
       }
       
       break;
     }
   case __NR_readfilewin:        
       if (fds.find(args[0]) != fds.end()) {
-	reading_tainted = true;
-	cerr << "found a t-read " << "len " << args[6] << " off " << args[7] << endl;
-	state = __NR_readfilewin;
+        reading_tainted = true;
+        cerr << "found a t-read " << "len " << args[6] << " off " << args[7] << endl;
+        state = __NR_readfilewin;
       }
       break;    
   case __NR_setinfofilewin:
@@ -601,7 +601,7 @@ bool TaintTracker::taintPreSC(uint32_t callno, const uint64_t *args, /* out */ u
     break;
   case __NR_closewin:
     if (fds.find(args[0]) != fds.end()) {
-	state = __NR_closewin;
+        state = __NR_closewin;
       }
     break;
 
@@ -619,14 +619,14 @@ bool TaintTracker::taintPreSC(uint32_t callno, const uint64_t *args, /* out */ u
     //   convertedChars = 0;
     //   wcstombs_s(&convertedChars, tempstr, origsize, fname, BUFSIZE-1);
     //   if (convertedChars < origsize) {
-    // 	cerr << "Warning: Could not convert all characters" << endl;
+    //  cerr << "Warning: Could not convert all characters" << endl;
     //   }
       
     //   if (taint_files.find(string(tempstr)) != taint_files.end()) {
-    // 	cerr << "Opening tainted file: " << string(tempstr) << endl;
-    // 	state = __NR_createsectionwin;
+    //  cerr << "Opening tainted file: " << string(tempstr) << endl;
+    //  state = __NR_createsectionwin;
     //   } else {
-    // 	cerr << "Not opening " << string(tempstr) << endl;
+    //  cerr << "Not opening " << string(tempstr) << endl;
     //   }
     // }
     break;
@@ -653,7 +653,7 @@ FrameOption_t TaintTracker::taintPostSC(const uint32_t bytes,
                                      const uint64_t *args,
                                      ADDRINT &addr,
                                      uint32_t &length,
-				     const uint32_t state)
+                                     const uint32_t state)
 {
   //for ( int i = 0 ; i < MAX_SYSCALL_ARGS ; i ++ )
   //cout << hex << " " << args[i] ;
@@ -748,30 +748,30 @@ FrameOption_t TaintTracker::taintPostSC(const uint32_t bytes,
         if (bytes == STATUS_SUCCESS) {
           WINDOWS::PHANDLE p = reinterpret_cast<WINDOWS::PHANDLE> (args[0]);
           uint32_t fd = reinterpret_cast<uint32_t> (*p);
-	  char tempstr[BUFSIZE];
-	  WINDOWS::POBJECT_ATTRIBUTES pattr;
-	  //errno_t e;
-	  WINDOWS::PWSTR fname;
-	  size_t origsize;
-	  size_t convertedChars;
+          char tempstr[BUFSIZE];
+          WINDOWS::POBJECT_ATTRIBUTES pattr;
+          //errno_t e;
+          WINDOWS::PWSTR fname;
+          size_t origsize;
+          size_t convertedChars;
           cerr << "Tainting file descriptor " << fd << endl;
 
-	  pattr = reinterpret_cast<WINDOWS::POBJECT_ATTRIBUTES> (args[2]);
-	  assert(pattr);
-	  assert(pattr->ObjectName);
-	  fname = pattr->ObjectName->Buffer;
-	  origsize = wcslen(fname) + 1;
-	  convertedChars = 0;
-	  wcstombs_s(&convertedChars, tempstr, origsize, fname, BUFSIZE-1);
-	  if (convertedChars < origsize) {
-	    cerr << "Warning: Could not convert all characters" << endl;
-	  }
+          pattr = reinterpret_cast<WINDOWS::POBJECT_ATTRIBUTES> (args[2]);
+          assert(pattr);
+          assert(pattr->ObjectName);
+          fname = pattr->ObjectName->Buffer;
+          origsize = wcslen(fname) + 1;
+          convertedChars = 0;
+          wcstombs_s(&convertedChars, tempstr, origsize, fname, BUFSIZE-1);
+          if (convertedChars < origsize) {
+            cerr << "Warning: Could not convert all characters" << endl;
+          }
 
-	  string fnamestr = string("file ") + string(tempstr);
+          string fnamestr = string("file ") + string(tempstr);
 
-	  cerr << "opened file " << fnamestr << endl;
-	  fdInfo_t fdi(fnamestr, 0);
-	  fds[fd] = fdi;
+          cerr << "opened file " << fnamestr << endl;
+          fdInfo_t fdi(fnamestr, 0);
+          fds[fd] = fdi;
         }
         break;
       case __NR_readfilewin:
@@ -796,10 +796,10 @@ FrameOption_t TaintTracker::taintPostSC(const uint32_t bytes,
       uint32_t c = args[4];
       uint32_t fd = args[0];
       if (c == WINDOWS::FilePositionInformation) {
-	/* Someone is setting the file position. */
-	WINDOWS::PFILE_POSITION_INFORMATION pi = (WINDOWS::PFILE_POSITION_INFORMATION)(args[2]);
-	fds[fd].offset = pi->CurrentByteOffset.QuadPart;
-	cerr << "updated offset to " << fds[fd].offset << endl;
+        /* Someone is setting the file position. */
+        WINDOWS::PFILE_POSITION_INFORMATION pi = (WINDOWS::PFILE_POSITION_INFORMATION)(args[2]);
+        fds[fd].offset = pi->CurrentByteOffset.QuadPart;
+        cerr << "updated offset to " << fds[fd].offset << endl;
       }
     }
     break;
@@ -825,7 +825,7 @@ FrameOption_t TaintTracker::taintPostSC(const uint32_t bytes,
       }
       case __NR_mapviewofsectionwin:
         if (bytes == STATUS_SUCCESS) {
-	  /* XXX: Determine offset into file. */
+          /* XXX: Determine offset into file. */
           length = *(reinterpret_cast<uint32_t *> (args[6]));  /// XXX: possibly wrong
           addr = *(reinterpret_cast<ADDRINT *> (args[2])); /// XXX: possibly wrong
           assert(addr);
@@ -852,7 +852,7 @@ void TaintTracker::setTaintContext(context &delta)
   for (uint32_t i = 0 ; i < count ; i++) {
       if (isReg(values[i].type)) {
           if ((tag = getRegTaint(delta, values[i].loc)) != NOTAINT) {
-	// cerr << "register: " << REG_StringShort((REG)values[i].loc) << " is tainted" << endl;
+        // cerr << "register: " << REG_StringShort((REG)values[i].loc) << " is tainted" << endl;
               values[i].taint = tag;
           }
       } else if (isValid(values[i].type)) {
@@ -879,21 +879,21 @@ void TaintTracker::addTaintToWritten(context &delta, uint32_t tag)
   for (uint32_t i = 0 ; i < count ; i++) {
     if ((values[i].usage & WR) == WR)  {
       if (isReg(values[i].type)) {
-	loc = REG_FullRegName((REG)values[i].loc);
-	setTaint(delta,loc,tag);
-	values[i].taint = getRegTaint(delta, loc);
-	//cerr << "new " << REG_StringShort((REG)values[i].loc) 
-	//     << " taint: " << values[i].taint << endl;
+        loc = REG_FullRegName((REG)values[i].loc);
+        setTaint(delta,loc,tag);
+        values[i].taint = getRegTaint(delta, loc);
+        //cerr << "new " << REG_StringShort((REG)values[i].loc) 
+        //     << " taint: " << values[i].taint << endl;
       } else if (isMem(values[i].type)) {
-	//cerr << hex << "writing " << values[i].loc << " = " << tag << endl;
-	loc = values[i].loc;
-	uint32_t size = getSize(values[i].type);
-	for(uint32_t j = 0 ; j < size ; j++) {
-	  //cerr << " Tainting memory " << loc + j << endl;
-	  setTaint(memory,loc+j,tag);
-	}
-	values[i].taint = getTaint(memory,loc);
-	//cerr << "mem taint: " << values[i].taint << endl;
+        //cerr << hex << "writing " << values[i].loc << " = " << tag << endl;
+        loc = values[i].loc;
+        uint32_t size = getSize(values[i].type);
+        for(uint32_t j = 0 ; j < size ; j++) {
+          //cerr << " Tainting memory " << loc + j << endl;
+          setTaint(memory,loc+j,tag);
+        }
+        values[i].taint = getTaint(memory,loc);
+        //cerr << "mem taint: " << values[i].taint << endl;
       } 
     }
   }
@@ -917,13 +917,13 @@ bool TaintTracker::hasTaint(context &delta)
   for (uint32_t i = 0 ; i < count ; i++) {
     if (isReg(values[i].type)) {
       if (getRegTaint(delta, values[i].loc) != NOTAINT) {
-	//cerr << "Tainted: " << REG_StringShort((REG)values[i].loc) << endl;
-	return true;
+        //cerr << "Tainted: " << REG_StringShort((REG)values[i].loc) << endl;
+        return true;
       }
     } else if (isValid(values[i].type)) {
       if (getTaint(memory,values[i].loc) != NOTAINT) {
-	//cerr << "Tainted Memory: " << values[i].loc << endl;
-	return true;
+        //cerr << "Tainted Memory: " << values[i].loc << endl;
+        return true;
       }
     }
   }
