@@ -242,7 +242,7 @@ let asmprogram_to_bap ?(init_ro=false) p =
 (* Returns a single ASM instruction (as a list IL statements) from a
    sequence of bytes. *)
 let byte_insn_to_bap arch mach addr bytes =
-  let prog = Libasmir.byte_insn_to_asmp arch addr bytes in
+  let prog = Libasmir.byte_insn_to_asmp arch mach addr bytes in
   let get_exec a = bytes.(Int64.to_int (Int64.sub a addr)) in
   let (pr, n) = asm_addr_to_bap {asmp=prog; arch; mach; secs=[]; get_exec; get_readable=get_exec} addr in
   Libasmir.asmir_close prog;
@@ -251,7 +251,7 @@ let byte_insn_to_bap arch mach addr bytes =
 (* Transforms a byte sequence (byte array), to a list of lists of IL
    statements *)
 let byte_sequence_to_bap bytes arch mach addr =
-  let prog = Libasmir.byte_insn_to_asmp arch addr bytes in
+  let prog = Libasmir.byte_insn_to_asmp arch mach addr bytes in
   let len = Array.length bytes in
   let end_addr = Int64.add addr (Int64.of_int len) in
   let get_exec a = bytes.(Int64.to_int (Int64.sub a addr)) in
