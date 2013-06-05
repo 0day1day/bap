@@ -37,8 +37,8 @@
  * architectures as simply as possible.
  */
 #ifdef ARCH_64
-  #define BFD_ARCH bfd_arch_ia64
-  #define BFD_MACH bfd_mach_ia64_elf64
+  #define BFD_ARCH bfd_arch_i386
+  #define BFD_MACH bfd_mach_x86_64
   #define STACK_OFFSET 8
   #define MAX_ADDRESS "0xffffffffffffffff"
   #define MEM_ACCESS qword
@@ -542,6 +542,11 @@ static uint32_t GetBitsOfReg(REG r) {
  * (E.g., REG_INST_PTR can be 64 or 32 based on the architecture)
  */
 #if defined(ARCH_64)
+    case REG_EIP:
+    case REG_EFLAGS:
+        return 32;
+        break;
+
     case REG_INST_PTR:
     case REG_GFLAGS:
         return 64;
@@ -1556,7 +1561,7 @@ VOID InstrBlock(BBL bbl)
                 REG fullr = REG_FullRegName(r);
                 if (fullr != REG_INVALID() && fullr != r) {
                   /* We know the fuller register, so just use that! */
-                    //	      cerr << "partial " << REG_StringShort(r) << " full " << REG_StringShort(fullr) << endl;
+                    //        cerr << "partial " << REG_StringShort(r) << " full " << REG_StringShort(fullr) << endl;
                     opndvals[valcount].reg = fullr;
                     opndvals[valcount].type.type = REGISTER;
                     opndvals[valcount].type.size = GetBitsOfReg(fullr);
@@ -2245,7 +2250,7 @@ VOID SyscallEntry(THREADID tid, CONTEXT *ctx, SYSCALL_STANDARD std, VOID *v)
 
     ThreadInfo_t *ti = NULL;
     SyscallInfo_t si;
-    
+
     /*
      * Synchronization note: We assume there is only one system call per
      * thread, and thus the thread local syscall stack does not need any
@@ -2290,7 +2295,7 @@ VOID SyscallEntry(THREADID tid, CONTEXT *ctx, SYSCALL_STANDARD std, VOID *v)
     if (LogAllSyscalls.Value()) {
         g_twnew->add(si.sf);
     }
-    
+
     if (tracker->taintPreSC(si.sf.mutable_syscall_frame()->number(), (const uint64_t *) (si.sf.syscall_frame().argument_list().elem().data()), si.state)) {
         // Do we need to do anything here? ...
     }
@@ -2376,12 +2381,12 @@ VOID ExceptionHandler(THREADID threadid, CONTEXT_CHANGE_REASON reason, const CON
 
     dbg_printf("ExceptionHandler tid=%d info=0x%x v=%p\n", threadid, info, v);
     /*
-      CONTEXT_CHANGE_REASON_FATALSIGNAL 	 Receipt of fatal Unix signal.
-      CONTEXT_CHANGE_REASON_SIGNAL 	 Receipt of handled Unix signal.
-      CONTEXT_CHANGE_REASON_SIGRETURN 	 Return from Unix signal handler.
-      CONTEXT_CHANGE_REASON_APC 	 Receipt of Windows APC.
-      CONTEXT_CHANGE_REASON_EXCEPTION 	 Receipt of Windows exception.
-      CONTEXT_CHANGE_REASON_CALLBACK 	 Receipt of Windows call-back.
+      CONTEXT_CHANGE_REASON_FATALSIGNAL          Receipt of fatal Unix signal.
+      CONTEXT_CHANGE_REASON_SIGNAL       Receipt of handled Unix signal.
+      CONTEXT_CHANGE_REASON_SIGRETURN    Return from Unix signal handler.
+      CONTEXT_CHANGE_REASON_APC          Receipt of Windows APC.
+      CONTEXT_CHANGE_REASON_EXCEPTION    Receipt of Windows exception.
+      CONTEXT_CHANGE_REASON_CALLBACK     Receipt of Windows call-back.
     */
 
     /*
