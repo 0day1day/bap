@@ -53,7 +53,7 @@ bfdp asmir_get_bfd(asm_program_t p);
 // returns a special asm_program which contains only the given instruction
 // takes a char array for historical reasons
 asm_program_t
-byte_insn_to_asmp(enum bfd_architecture arch, address_t addr,
+byte_insn_to_asmp(enum bfd_architecture arch, unsigned long mach, address_t addr,
 		  [size_is(len)] char *bb_bytes, int len);
 
 // LLVM needs functions from llvm.cpp to be linked to the ocaml

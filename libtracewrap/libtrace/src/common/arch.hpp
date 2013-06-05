@@ -78,7 +78,7 @@ enum bfd_architecture
 #define bfd_mach_sparc_64bit_p(mach) \
   ((mach) >= bfd_mach_sparc_v9 && (mach) != bfd_mach_sparc_v8plusb)
   bfd_arch_spu,       /* PowerPC SPU */
-#define bfd_mach_spu           256 
+#define bfd_mach_spu           256
   bfd_arch_mips,      /* MIPS Rxxxx */
 #define bfd_mach_mips3000              3000
 #define bfd_mach_mips3900              3900
@@ -122,6 +122,7 @@ enum bfd_architecture
   bfd_arch_l1om,   /* Intel L1OM */
 #define bfd_mach_l1om 66
 #define bfd_mach_l1om_intel_syntax 67
+  bfd_arch_k1om,
   bfd_arch_we32k,     /* AT&T WE32xxx */
   bfd_arch_tahoe,     /* CCI/Harris Tahoe */
   bfd_arch_i860,      /* Intel 860 */
@@ -323,7 +324,7 @@ enum bfd_architecture
   bfd_arch_s390,      /* IBM s390 */
 #define bfd_mach_s390_31       31
 #define bfd_mach_s390_64       64
-  bfd_arch_score,     /* Sunplus score */ 
+  bfd_arch_score,     /* Sunplus score */
 #define bfd_mach_score3         3
 #define bfd_mach_score7         7
   bfd_arch_openrisc,  /* OpenRISC */
@@ -360,6 +361,8 @@ enum bfd_architecture
   bfd_arch_lm32,      /* Lattice Mico32 */
 #define bfd_mach_lm32      1
   bfd_arch_microblaze,/* Xilinx MicroBlaze. */
+  bfd_arch_tilepro,
+  bfd_arch_tilegx,
   bfd_arch_last
   };
 

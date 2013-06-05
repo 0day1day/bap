@@ -24,11 +24,11 @@ exception Memory_error;;
 
 type arch = Libbfd.bfd_architecture
 type asmprogram = {asmp : Libasmir.asm_program_t;
-		   arch : arch;
+                   arch : arch;
                    mach : int;
-		   secs : section_ptr list;
+                   secs : section_ptr list;
                    (** Get executable code bytes *)
-		   get_exec : int64 -> char;
+                   get_exec : int64 -> char;
                    (** Get any readable bytes. *)
                    get_readable : int64 -> char;
  }
@@ -146,7 +146,7 @@ let section_contents ?(which=codeonly) prog secs =
     let (-) = Int64.sub in
     let rec f a = function [] -> raise Memory_error
       | (s,arr)::_ when a - s >= 0L && a - s < Int64.of_int(BArray.dim arr)  ->
-	  arr.{Int64.to_int(a-s)}
+          arr.{Int64.to_int(a-s)}
       | _::b -> f a b
     in
     f a bits
@@ -218,11 +218,11 @@ let asmprogram_to_bap_range ?(init_ro = false) p st en =
     | Some(ir, n) ->
       if n >= en then flatten (List.rev (ir::l))
       else
-	f (ir::l) n
+        f (ir::l) n
     | None ->
       (* If we fail, hopefully it is because there were some random
-    	 bytes at the end of the section that we tried to
-    	 disassemble *)
+         bytes at the end of the section that we tried to
+         disassemble *)
       wprintf "Failed to read instruction byte while disassembling at address %#Lx; end of section at %#Lx" s en;
       flatten (List.rev l)
   in
@@ -235,8 +235,8 @@ let asmprogram_section_to_bap p s =
 (** Translate an entire Libasmir.asm_program_t into a BAP program *)
 let asmprogram_to_bap ?(init_ro=false) p =
   let irs = List.map
-	(fun s ->
-	  if is_code s then asmprogram_section_to_bap p s else []) p.secs in
+        (fun s ->
+          if is_code s then asmprogram_section_to_bap p s else []) p.secs in
   flatten irs
 
 (* Returns a single ASM instruction (as a list IL statements) from a
