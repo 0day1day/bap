@@ -114,10 +114,10 @@ enum bfd_architecture
 #define bfd_mach_mipsisa64             64
 #define bfd_mach_mipsisa64r2           65
   bfd_arch_i386,      /* Intel 386 */
-#define bfd_mach_i386_i386 1
+#define bfd_mach_i386_i386 4
 #define bfd_mach_i386_i8086 2
 #define bfd_mach_i386_i386_intel_syntax 3
-#define bfd_mach_x86_64 64
+#define bfd_mach_x86_64 8
 #define bfd_mach_x86_64_intel_syntax 65
   bfd_arch_l1om,   /* Intel L1OM */
 #define bfd_mach_l1om 66
