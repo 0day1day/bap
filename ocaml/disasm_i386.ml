@@ -2606,16 +2606,15 @@ let parse_instr m g addr =
     | 0xc6
     | 0xc7 -> let t = if b1 = 0xc6 then r8 else prefix.opsize in
 	      let (e, rm, na) = parse_modrmext_addr na in
-	      let (i,na) = 
-		if b1 = 0xc6
-                then parse_immb na
-                else let it = if prefix.opsize_override then r16 else r32 in
-                     parse_immz it na
-	      in
+              let it = match b1 with
+                | 0xc6 -> r8
+                | 0xc7 when prefix.opsize_override -> r16
+                | 0xc7 -> r32
+                | _ -> failwith "impossible"
+              in
+	      let (i,na) = parse_immz it na in
 	      (match e with (* Grp 11 *)
-	      | 0 -> if t = r64
-                     then (Mov(t, rm, sign_ext r32 i r64, None), na)
-                     else (Mov(t, rm, i, None), na)
+	      | 0 -> (Mov(t, rm, sign_ext it i t, None), na)
 	      | _ -> disfailwith (Printf.sprintf "Invalid opcode: %02x/%d" b1 e)
 	      )
     | 0xc9 -> (Leave prefix.opsize, na)
