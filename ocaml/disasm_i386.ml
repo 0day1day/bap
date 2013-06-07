@@ -2607,7 +2607,7 @@ let parse_instr m g addr =
     | 0xc7 -> let t = if b1 = 0xc6 then r8 else prefix.opsize in
 	      let (e, rm, na) = parse_modrmext_addr na in
 	      let (i,na) = 
-		if b1 = 0xc6 then parse_immb na else parse_immz t na 
+		if b1 = 0xc6 then parse_immb na else parse_immz r32 na 
 	      in
 	      (match e with (* Grp 11 *)
 	      | 0 -> (Mov(t, rm, i, None), na)
