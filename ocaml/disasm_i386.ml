@@ -2613,7 +2613,9 @@ let parse_instr m g addr =
                      parse_immz it na
 	      in
 	      (match e with (* Grp 11 *)
-	      | 0 -> (Mov(t, rm, i, None), na)
+	      | 0 -> if t = r64
+                     then (Mov(t, rm, sign_ext r32 i r64, None), na)
+                     else (Mov(t, rm, i, None), na)
 	      | _ -> disfailwith (Printf.sprintf "Invalid opcode: %02x/%d" b1 e)
 	      )
     | 0xc9 -> (Leave prefix.opsize, na)
