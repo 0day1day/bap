@@ -114,15 +114,14 @@ enum bfd_architecture
 #define bfd_mach_mipsisa64             64
 #define bfd_mach_mipsisa64r2           65
   bfd_arch_i386,      /* Intel 386 */
-#define bfd_mach_i386_i386 4
+#define bfd_mach_i386_i386 1
 #define bfd_mach_i386_i8086 2
 #define bfd_mach_i386_i386_intel_syntax 3
-#define bfd_mach_x86_64 8
+#define bfd_mach_x86_64 64
 #define bfd_mach_x86_64_intel_syntax 65
   bfd_arch_l1om,   /* Intel L1OM */
 #define bfd_mach_l1om 66
 #define bfd_mach_l1om_intel_syntax 67
-  bfd_arch_k1om,
   bfd_arch_we32k,     /* AT&T WE32xxx */
   bfd_arch_tahoe,     /* CCI/Harris Tahoe */
   bfd_arch_i860,      /* Intel 860 */
@@ -361,8 +360,6 @@ enum bfd_architecture
   bfd_arch_lm32,      /* Lattice Mico32 */
 #define bfd_mach_lm32      1
   bfd_arch_microblaze,/* Xilinx MicroBlaze. */
-  bfd_arch_tilepro,
-  bfd_arch_tilegx,
   bfd_arch_last
   };
 

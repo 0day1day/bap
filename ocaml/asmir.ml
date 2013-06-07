@@ -196,6 +196,10 @@ let asm_addr_to_bap {asmp=prog; arch; mach; get_exec} addr =
      in
      Disasm_i386.ToIR.add_labels addr ir,
      Int64.add addr (Int64.of_int (Libasmir.asmir_get_instr_length prog addr))
+  | e ->
+      DV.dprintf "Failing instruction: %s\n" (Libasmir.asmir_string_of_insn prog
+      addr);
+      raise e
   in
   let ir = match ir with
     | Label(l, [])::rest ->
@@ -420,6 +424,17 @@ module SerializedTrace = struct
       in
       add_operands (get_stmts f) (get_attrs f)
     in
+    (* A function to translate between system and common architectures and machines *)
+    (* XXX: Currently since the machine codes in the Arch.hpp file are preprocessed
+     * macros, I have to hardcode the values in. After things start working I'll
+     * come back to fix that *)
+    let translate_architecture arch mach =
+      match arch, mach with
+      | Arch.Bfd_arch_i386, 1 -> Bfd_arch_i386, mACH_i386_i386
+      | Arch.Bfd_arch_i386, 64 -> Bfd_arch_i386, mACH_i386_x86_64
+      | _, _ -> failwith "translate_architecture: unsupported architecture"
+    in
+    (* Testing *)
     let out = ref [] in
     let counter = ref 0L in
     let checkctr () =
@@ -430,8 +445,9 @@ module SerializedTrace = struct
     let blocksize = match n with | Some x -> x | None -> !trace_blocksize in
     while not r#end_of_trace && checkctr () do
       let frames = r#get_frames blocksize in
-    (* XXX: Remove use of Obj.magic in an elegant way... *)
-      out := List.rev_append (List.flatten (List.map (raise_frame (Obj.magic r#get_arch) (Int64.to_int r#get_machine)) frames)) !out;
+      let arch, mach = translate_architecture r#get_arch (Int64.to_int r#get_machine)
+      in
+      out := List.rev_append (List.flatten (List.map (raise_frame arch mach) frames)) !out;
       counter := Int64.add !counter (Int64.of_int (List.length frames));
     done;
 
