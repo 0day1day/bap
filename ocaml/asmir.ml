@@ -425,13 +425,10 @@ module SerializedTrace = struct
       add_operands (get_stmts f) (get_attrs f)
     in
     (* A function to translate between system and common architectures and machines *)
-    (* XXX: Currently since the machine codes in the Arch.hpp file are preprocessed
-     * macros, I have to hardcode the values in. After things start working I'll
-     * come back to fix that *)
     let translate_architecture arch mach =
       match arch, mach with
-      | Arch.Bfd_arch_i386, 1 -> Bfd_arch_i386, mACH_i386_i386
-      | Arch.Bfd_arch_i386, 64 -> Bfd_arch_i386, mACH_i386_x86_64
+      | Arch.Bfd_arch_i386, x when x = Arch.mach_i386_i386 -> Bfd_arch_i386, mACH_i386_i386
+      | Arch.Bfd_arch_i386, x when x = Arch.mach_x86_64 -> Bfd_arch_i386, mACH_i386_x86_64
       | _, _ -> failwith "translate_architecture: unsupported architecture"
     in
     (* Testing *)

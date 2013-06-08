@@ -1,1 +1,4 @@
 #include "../common/arch.hpp"
+
+const int mach_i386_i386 = bfd_mach_i386_i386;
+const int mach_x86_64 = bfd_mach_x86_64;
