@@ -1578,12 +1578,14 @@ let rec to_ir m addr next ss pref =
   | Hlt ->
     [Halt(rax_e, [])]
   | Rdtsc ->
+      let t = type_of_mode m in
       [
-        move rax (Unknown ("rdtsc", r32));
-        move rdx (Unknown ("rdtsc", r32));
+        move rax (Unknown ("rdtsc", t));
+        move rdx (Unknown ("rdtsc", t));
       ]
   | Cpuid ->
-      let undef reg = move reg (Unknown ("cpuid", r32)) in
+      let t = type_of_mode m in
+      let undef reg = move reg (Unknown ("cpuid", t)) in
       List.map undef [rax; rbx; rcx; rdx]
   | Stmxcsr (dst) ->
       let dst = match dst with
