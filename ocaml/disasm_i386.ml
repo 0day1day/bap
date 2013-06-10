@@ -2524,7 +2524,10 @@ let parse_instr m g addr =
     | 0x80 | 0x81 | 0x82 | 0x83 -> 
       let (r, rm, na) = parse_modrmext_addr na in
       let (o2, na) =
-	if b1 = 0x81 then parse_immz prefix.opsize na
+	if b1 = 0x81 then 
+             let it = if prefix.opsize_override then r16 else r32 in 
+             let (o, na) = parse_immz it na
+             in ((sign_ext it o prefix.opsize), na) 
 	else let (o,na) = parse_simmb na
 	     in ((sign_ext r8 o prefix.opsize), na)
       in
@@ -2781,6 +2784,12 @@ let parse_instr m g addr =
 	  | _ -> disfailwith (Printf.sprintf "impossible opcode: %02x" b1)
 	in
 	let t = if (b1 & 1) = 0  then r8 else prefix.opsize in
+        (* handle sign extended immediate cases *)
+        let it = match b1 & 7 with
+          | 5 when prefix.opsize_override -> r16
+          | 5 -> r32
+          | _ -> t
+        in
 	let (o1, o2, na) = match b1 & 7 with
 	  | 0 | 1 -> let r, rm, na = parse_modrm_addr na in
 		     (rm, r, na)
@@ -2788,8 +2797,8 @@ let parse_instr m g addr =
 		     (r, rm, na)
 	  | 4 -> let i, na = parse_immb na in
 		 (o_rax, i, na)
-	  | 5 -> let i, na = parse_immz t na in
-		 (o_rax, i, na)
+	  | 5 -> let i, na = parse_immz it na in
+		 (o_rax, sign_ext it i t, na)
 	  | _ -> disfailwith (Printf.sprintf "impossible opcode: %02x" b1)
 	in
 	(ins(t, o1, o2), na)
