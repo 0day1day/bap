@@ -13,6 +13,7 @@ let usage = "Usage: "^Sys.argv.(0)^" <input options> [options]\n\
 
 let out = ref None
 let exec = ref false
+let opts = ref true
 let memimpl = ref Llvm_codegen.FuncMulti
 
 let speclist =
@@ -22,6 +23,8 @@ let speclist =
       "<mode> Use memory implementation mode.  Choose from Real, Func, or FuncMulti.")
   :: ("-exec", Arg.Set exec,
       "Execute the generated code. (DANGEROUS)")
+  :: ("-noopt", Arg.Clear opts,
+      "Do not use LLVM optimizations.")
   :: Input.speclist
 
 let anon x =
@@ -47,7 +50,7 @@ let cfg = Prune_unreachable.prune_unreachable_ast cfg;;
 (*   ) prog *)
 
 let () =
-  let codegen = new codegen !memimpl in
+  let codegen = new codegen ~opts:!opts !memimpl in
   let f = codegen#convert_cfg cfg in
   (* codegen#dump; *)
   (if !exec then
