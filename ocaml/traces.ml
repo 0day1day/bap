@@ -1208,10 +1208,11 @@ let run_block ?(next_label = None) ?(transformf = (fun s _ -> [s])) state memv t
        HACK: This is a pretty ugly hack.
     *)
     if Syscall_models.x86_is_system_call stmt then
-      let eax = evalf (Var Disasm_i386.R32.eax) in
-      let stmts = (match eax with
+      let m = Disasm_i386.X8664 in (* FIXME: set this appropriately rather than hardcoding *)
+      let rax = evalf (Var (Syscall_models.syscall_reg m)) in
+      let stmts = (match rax with
         | Int(i, _) ->
-          Syscall_models.linux_syscall_to_il (int_of_big_int i)
+          Syscall_models.linux_syscall_to_il m (int_of_big_int i)
         | _ -> failwith "Unexpected evaluation problem") in
       (* Hack: Remember the next pc; we will clobber this *)
       let newpc = Int64.succ state.pc in
@@ -1245,6 +1246,7 @@ let run_block ?(next_label = None) ?(transformf = (fun s _ -> [s])) state memv t
       eval_block state
     with
       |	Failure s as e ->
+          Printexc.print_backtrace stderr; flush stderr;
 	  pwarn ("block evaluation failed :(\nReason: "^s) ;
 	  List.iter (fun s -> pdebug (Pp.ast_stmt_to_string s)) block ;
 	  (*if !consistency_check then ( *)
