@@ -72,15 +72,15 @@ switch (id) {
     case REG_R14: return string("R_R14");
     case REG_R15: return string("R_R15");
 
-    case REG_SEG_CS: return string("CS");
-    case REG_SEG_SS: return string("SS");
-    case REG_SEG_DS: return string("DS");
-    case REG_SEG_ES: return string("ES");
-    case REG_SEG_FS: return string("FS");
-    case REG_SEG_GS: return string("GS");
+    case REG_SEG_CS: return string("R_CS");
+    case REG_SEG_SS: return string("R_SS");
+    case REG_SEG_DS: return string("R_DS");
+    case REG_SEG_ES: return string("R_ES");
+    case REG_SEG_FS: return string("R_FS");
+    case REG_SEG_GS: return string("R_GS");
 
-    case REG_RFLAGS: return string("RFLAGS");
-    case REG_RIP: return string("RIP");
+    case REG_RFLAGS: return string("R_RFLAGS");
+    case REG_RIP: return string("R_RIP");
 #else
     // Context registers in the IA-32 architecture
     case REG_EDI:  return string("R_EDI");
@@ -113,7 +113,7 @@ switch (id) {
     //case REG_SEG_BASE:
     //case REG_SEG_CS:
     //case REG_SEG_BASE:
-    case REG_SEG_SS:  return string("SS");
+    case REG_SEG_SS:  return string("R_SS");
     //case REG_SEG_DS:
     //case REG_SEG_ES:
     //case REG_SEG_FS:
@@ -121,7 +121,7 @@ switch (id) {
     //case REG_SEG_LAST:
     //case REG_SEG_GS:
 
-    case REG_EFLAGS:  return string("EFLAGS");
+    case REG_EFLAGS:  return string("R_EFLAGS");
     //case REG_GFLAGS:
     //case REG_EFLAGS:
 
@@ -175,7 +175,7 @@ switch (id) {
     case REG_EDX: return string("R_EDX");
     case REG_ECX: return string("R_ECX");
     case REG_EAX: return string("R_EAX");
-    case REG_EFLAGS: return string("EFLAGS");
+    case REG_EFLAGS: return string("R_EFLAGS");
     case REG_EIP: return string("R_EIP");
     case REG_R8B: return string("R_R8B");
     case REG_R8W: return string("R_R8W");
@@ -248,21 +248,21 @@ switch (id) {
 #if defined(TARGET_IA32E)
     // additional xmm registers in the Intel(R) 64 architecture
     case REG_XMM8:
-      return string("XMM8");
+      return string("R_XMM8");
     case REG_XMM9:
-      return string("XMM9");
+      return string("R_XMM9");
     case REG_XMM10:
-      return string("XMM10");
+      return string("R_XMM10");
     case REG_XMM11:
-      return string("XMM11");
+      return string("R_XMM11");
     case REG_XMM12:
-      return string("XMM12");
+      return string("R_XMM12");
     case REG_XMM13:
-      return string("XMM13");
+      return string("R_XMM13");
     case REG_XMM14:
-      return string("XMM14");
+      return string("R_XMM14");
     case REG_XMM15:
-      return string("XMM15");
+      return string("R_XMM15");
 #endif
       /*
     case REG_YMM_BASE:

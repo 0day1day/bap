@@ -25,7 +25,7 @@ let compute_segment_bases = ref true
 
 
    The x86 instruction format is as follows:
-   Instuction Prefixexs: 0-4bytes (1 byte per prefix)
+   Instruction Prefixes: 0-4bytes (1 byte per prefix)
    Optional Rex Prefix: 1 byte
    Opcode: 1 - 3 bytes.
    ModR/M: 1 optional byte
@@ -325,7 +325,7 @@ and rax = nmv "R_EAX" r32 "R_RAX" r64
 and rbx = nmv "R_EBX" r32 "R_RBX" r64
 and rcx = nmv "R_ECX" r32 "R_RCX" r64
 and rdx = nmv "R_EDX" r32 "R_RDX" r64
-and rflags = nmv "EFLAGS" r32 "RFLAGS" r64 (* XXX why is eflags in here? *)
+and rflags = nmv "R_EFLAGS" r32 "R_RFLAGS" r64 (* XXX why is eflags in here? *)
   (* condition flag bits *)
 and cf = nv "R_CF" r1
 and pf = nv "R_PF" r1
@@ -333,7 +333,6 @@ and af = nv "R_AF" r1
 and zf = nv "R_ZF" r1
 and sf = nv "R_SF" r1
 and oF = nv "R_OF" r1
-
 and df = nv "R_DF" r1
 
 (* segment registers and bases *)
@@ -354,9 +353,10 @@ and fpu_ctrl = nv "R_FPU_CONTROL" r16
 and mxcsr = nv "R_MXCSR" r32
 
 (* r8 -> r15 *)
-let nums = Array.init 8 (fun i -> nmv "ERROR" (Reg 0) (Printf.sprintf "R_%d" (i+8)) r64)
+let nums = Array.init 8 (fun i -> nmv "ERROR" (Reg 0) (Printf.sprintf "R_R%d" (i+8)) r64)
 
 let xmms = Array.init 8 (fun i -> nv (Printf.sprintf "R_XMM%d" i) xmm_t)
+let xmms_x86_64 = Array.init 8 (fun i -> nmv "ERROR" (Reg 0) (Printf.sprintf "R_XMM%d" (i+8)) xmm_t)
 let xmm0 = xmms.(0)
 
 (* floating point registers *)
@@ -366,7 +366,8 @@ let mvs {v64; v32} = [v64; v32]
 
 let regs : var list =
   cf::pf::af::zf::sf::oF::df::cs::ds::es::fs::gs::ss::fpu_ctrl::mxcsr::
-  List.flatten (List.map (fun {v64; v32} -> [v64; v32]) (rbp::rsp::rsi::rdi::rip::rax::rbx::rcx::rdx::rflags::fs_base::gs_base::Array.to_list nums))
+  List.flatten (List.map (fun {v64; v32} -> [v64; v32])
+  (rbp::rsp::rsi::rdi::rip::rax::rbx::rcx::rdx::rflags::fs_base::gs_base::(Array.to_list nums)@(Array.to_list xmms_x86_64)))
   @ List.map (fun (n,t) -> Var.newvar n t)
     [
 
@@ -416,7 +417,6 @@ and o_gs = Oseg 5
 (* and edx_e = Var edx *)
 
 let mem = nmv "mem" (TMem r32) "mem" (TMem r64)
-
 
 (* 32-bit registers *)
 module R32 = struct

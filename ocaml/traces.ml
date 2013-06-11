@@ -968,7 +968,7 @@ let check_delta state =
 	    let traceval_str = Pp.ast_exp_to_string traceval in
 	    let evalval_str = Pp.ast_exp_to_string evalval in
 	    wprintf "Difference between %sBAP and trace values for [*%s* Trace=%s Eval=%s]" s dsavarname traceval_str evalval_str;
-	    wprintf "This is due to one of the following statments:\n%s"  badstmt;
+	    wprintf "This is due to one of the following statements:\n%s"  badstmt;
 	  )
       (* If we can't find concrete value, it's probably just a BAP 
 	 temporary *)
