@@ -253,8 +253,10 @@ let badregs = Hashtbl.create 32
 let () =
   List.iter (fun r -> Hashtbl.add badregs r ())
     (
-      "EFLAGS"
+      "R_EFLAGS"
+      ::"R_RFLAGS"
       ::"R_EIP"
+      ::"R_RIP"
       ::"R_FS"
       ::"R_LDT"
       ::"R_GDT"
