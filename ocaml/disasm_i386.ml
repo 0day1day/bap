@@ -759,8 +759,11 @@ and calla = [StrAttr "call"]
 let compute_sf result = cast_high r1 result
 let compute_zf t result = Int(bi0, t) ==* result
 let compute_pf t r =
+  let acc = nt "acc" t in
+  let var_acc = Var acc in
   (* extra parens do not change semantics but do make it pretty print nicer *)
-  exp_not (cast_low r1 ((((((((r >>* it 7 t) ^* (r >>* it 6 t)) ^* (r >>* it 5 t)) ^* (r >>* it 4 t)) ^* (r >>* it 3 t)) ^* (r >>* it 2 t)) ^* (r >>* it 1 t)) ^* r))
+  exp_not (cast_low r1
+             (Let(acc, (r >>* it 4 t) ^* r, Let(acc, (var_acc >>* it 2 t) ^* var_acc, (var_acc >>* it 1 t) ^* var_acc))))
 
 let set_sf r = move sf (compute_sf r)
 let set_zf t r = move zf (compute_zf t r)
