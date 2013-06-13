@@ -1,5 +1,4 @@
-AM_CXXFLAGS = -I../pb -I.. -I@LIBTRACE_DIR@/src/common -I@LIBTRACE_DIR@/protobuf/src
-AM_CXXFLAGS += -m32
+AM_CPPFLAGS = -I../pb -I.. -I@LIBTRACE_DIR@/src/common -I@LIBTRACE_DIR@/protobuf/src
 
 utils_LDADD = ../libtrace.a @LIBTRACE_DIR@/protobuf/src/.libs/libprotobuf.a -lpthread
 
