@@ -35,6 +35,7 @@ let optimize_cfg ?(usedc=true) ?(usesccvn=true) cfg post =
 let get_functions ?unroll ?names p =
   let ranges = Func_boundary.get_function_ranges p in
   let do_function (n,s,e) =
+    dprintf "do function %s" n;
     let inc = match names with
       | Some l -> List.mem n l
       | None -> true
@@ -47,6 +48,8 @@ let get_functions ?unroll ?names p =
           | Some num ->
             let cfg = Cfg_ast.of_prog ir in
             let cfg = Prune_unreachable.prune_unreachable_ast cfg in
+            if Cfg.AST.G.mem_vertex cfg (Cfg.AST.G.V.create Cfg.BB_Indirect)
+            then failwith "Refusing to unroll loops for function with indirect jump";
             let cfg = Unroll.unroll_loops ~count:num cfg in
             let cfg = Hacks.remove_cycles cfg in
             let cfg = Prune_unreachable.prune_unreachable_ast cfg in
