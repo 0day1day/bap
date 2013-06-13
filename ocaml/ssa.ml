@@ -55,7 +55,7 @@ let val_true = Int(unit_big_int, Ast.reg_1)
 let val_of_exp = function
   | Lab s -> Some(Name s)
   | Int(i, t) ->
-      Some(Addr(int64_of_big_int (Arithmetic.to_big_int (i,t))))
+      Some(Addr(Arithmetic.to_big_int (i,t)))
   | _ -> None
 
 (******************************************************************************)

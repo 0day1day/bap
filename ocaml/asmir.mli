@@ -53,6 +53,8 @@ val tr_bap_blocks_t :
 val decls_for_arch : arch -> Ast.var list
 val gamma_for_arch : arch -> varctx
 
+val big_int_to_bfd : Big_int_Z.big_int -> Libbfd.address_t
+
 val get_asmprogram_arch : asmprogram -> arch
 val get_asmprogram_mach : asmprogram -> machine_t
 
@@ -61,11 +63,11 @@ val x86_regs : Var.t list
 
 val all_regs : Var.t list
 
-val open_program : ?base:address_t -> string -> asmprogram
+val open_program : ?base:Type.addr -> string -> asmprogram
 val asmprogram_to_bap : ?init_ro:bool -> asmprogram -> Ast.program
-val asm_addr_to_bap : (*varctx ->*) asmprogram -> address_t -> Ast.program * address_t
+val asm_addr_to_bap : (*varctx ->*) asmprogram -> Type.addr -> Ast.program * Type.addr
 
-val asmprogram_to_bap_range : ?init_ro:bool -> asmprogram -> address_t -> address_t  -> Ast.program
+val asmprogram_to_bap_range : ?init_ro:bool -> asmprogram -> Type.addr -> Type.addr  -> Ast.program
 
 (** Load entire trace into memory at once.  If pin is true, loads a
     PinTrace.  If pin is false, loads an old, TEMU-based trace format. *)
@@ -86,25 +88,25 @@ val get_flavour : asmprogram -> bfd_flavour
 
 val get_all_asections : asmprogram -> section_ptr array
 
-val get_section_startaddr : asmprogram -> string -> address_t
-val get_section_endaddr : asmprogram -> string -> address_t
+val get_section_startaddr : asmprogram -> string -> Type.addr
+val get_section_endaddr : asmprogram -> string -> Type.addr
 
 (** Lowest address of program in memory *)
-val get_base_address : asmprogram -> address_t
+val get_base_address : asmprogram -> Type.addr
 (** Start address of program *)
-val get_start_addr : asmprogram -> address_t
+val get_start_addr : asmprogram -> Type.addr
 
-val get_asm_instr_string : asmprogram -> address_t -> string
-val get_asm_instr_string_range : asmprogram -> address_t -> address_t -> string
+val get_asm_instr_string : asmprogram -> Type.addr -> string
+val get_asm_instr_string_range : asmprogram -> Type.addr -> Type.addr -> string
 
 val is_load : section_ptr -> bool
 val is_code : section_ptr -> bool
 
 val byte_insn_to_bap :
-  bfd_architecture -> machine_t -> address_t -> char array -> Ast.program * int64
+  bfd_architecture -> machine_t -> Type.addr -> char array -> Ast.program * Type.addr
 
 val byte_sequence_to_bap :
-  char array -> bfd_architecture -> machine_t -> address_t -> Ast.program list
+  char array -> bfd_architecture -> machine_t -> Type.addr -> Ast.program list
 
 (* val set_print_warning : bool -> unit *)
 
@@ -115,16 +117,16 @@ val byte_sequence_to_bap :
 (** [get_exec_mem_contents p] returns a function [f] such that [f
     addr] returns the executable byte in memory at [addr] if one exists.
     If no such byte exists, @raises {!Memory_error}. *)
-val get_exec_mem_contents : asmprogram -> int64 -> char
+val get_exec_mem_contents : asmprogram -> Type.addr -> char
 
 (** [get_exec_mem_contents_list p] returns a list of [(addr, byte)]
     tuples indicating the executable memory at [addr] is [byte]. *)
-val get_exec_mem_contents_list : asmprogram -> (address_t * char) list
+val get_exec_mem_contents_list : asmprogram -> (Type.addr * char) list
 
 (** [get_readable_mem_contents] is like {!get_exec_mem_contents} but
     for any readable memory. *)
-val get_readable_mem_contents : asmprogram -> int64 -> char
+val get_readable_mem_contents : asmprogram -> Type.addr -> char
 
 (** [get_readable_mem_contents_list p] is like
     {!get_exec_mem_contents_list} but for any readable memory. *)
-val get_readable_mem_contents_list : asmprogram -> (address_t * char) list
+val get_readable_mem_contents_list : asmprogram -> (Type.addr * char) list

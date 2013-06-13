@@ -54,14 +54,14 @@ type program = stmt list
     target of a [Jmp]. *)
 let exp_of_lab = function
   | Name s -> Lab s
-  | Addr a -> Int(big_int_of_int64 a, Reg 64)
+  | Addr a -> Int(a, Reg 64)
 
 (** If possible, make a label that would be refered to by the given
     expression. *)
 let lab_of_exp = function
   | Lab s -> Some(Name s)
   | Int(i, t) ->
-    Some(Addr(int64_of_big_int (Arithmetic.to_big_int (i,t))))
+    Some(Addr(Arithmetic.to_big_int (i,t)))
   | _ -> None
     
 

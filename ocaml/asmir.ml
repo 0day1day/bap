@@ -10,6 +10,7 @@
 open Asmir_consts
 open Ast
 open Big_int_Z
+open Big_int_convenience
 open BatListFull
 open Frame_piqi
 open Libasmir
@@ -28,9 +29,9 @@ type asmprogram = {asmp : Libasmir.asm_program_t;
                    mach : int;
                    secs : section_ptr list;
                    (** Get executable code bytes *)
-                   get_exec : int64 -> char;
+                   get_exec : addr -> char;
                    (** Get any readable bytes. *)
-                   get_readable : int64 -> char;
+                   get_readable : addr -> char;
  }
 
 
@@ -91,6 +92,7 @@ let gamma_for_arch = function
   | Bfd_arch_arm  -> gamma_create x86_mem arm_regs
   | _ -> failwith "gamma_for_arch: unsupported arch"
 
+let big_int_to_bfd = int64_of_big_int (* FIXME: make this handle the upper half of addr space *)
 
 let get_asmprogram_arch {arch} = arch
 let get_asmprogram_mach {mach} = mach
@@ -133,7 +135,7 @@ let section_memory_helper ?(which=codeonly) prog secs =
     if which s then
       (* if Int64.logand Libbfd.sEC_LOAD flags <> 0L then *)
       let (ok, a) = Libbfd.bfd_get_section_contents bfd s 0L size in
-      if ok <> 0 then (vma, a)::l else (dprintf "failed."; l)
+      if ok <> 0 then (big_int_of_int64 vma, a)::l else (dprintf "failed."; l)
     else l
   in
   let bits = List.fold_left sc [] secs in
@@ -142,11 +144,9 @@ let section_memory_helper ?(which=codeonly) prog secs =
 let section_contents ?(which=codeonly) prog secs =
   let bits = section_memory_helper ~which prog secs in
   let get a =
-    (* let open Int64 in *)
-    let (-) = Int64.sub in
     let rec f a = function [] -> raise Memory_error
-      | (s,arr)::_ when a - s >= 0L && a - s < Int64.of_int(BArray.dim arr)  ->
-          arr.{Int64.to_int(a-s)}
+      | (s,arr)::_ when a -% s >= 0L && a -% s <% big_int_of_int(BArray.dim arr)  ->
+          arr.{int_of_big_int (a-s)}
       | _::b -> f a b
     in
     f a bits
@@ -155,10 +155,9 @@ let section_contents ?(which=codeonly) prog secs =
 
 let section_contents_list ?(which=codeonly) prog secs =
   let bits = section_memory_helper ~which prog secs in
-  let (+) = Int64.add in
   let al l (base,arr) =
     (* [base, ..., base + len(arr)) *)
-    foldn (fun l n -> (base + (Int64.of_int n), arr.{n})::l) l ((BArray.dim arr) - 1)
+    foldn (fun l n -> (base +% (big_int_of_int n), arr.{n})::l) l ((BArray.dim arr) - 1)
   in
   List.fold_left al [] bits
 
@@ -166,7 +165,7 @@ let section_contents_list ?(which=codeonly) prog secs =
 let open_program ?base filename =
   let base = match base with
     | None -> -1L
-    | Some(x) -> x
+    | Some(x) -> big_int_to_bfd x 
   in
   let prog = Libasmir.asmir_open_file filename base in
     (* tell the GC how to free resources associated with prog *)
@@ -185,25 +184,26 @@ let get_asm = function
 let asm_addr_to_bap {asmp=prog; arch; mach; get_exec} addr =
   let (ir, na) = try
      let v = Disasm.disasm_instr arch mach get_exec addr in
-     DV.dprintf "Disassembled %Lx directly" addr;
+     DV.dprintf "Disassembled %s directly" (~%addr);
      v
    with Disasm_i386.Disasm_i386_exception s ->
-     DTest.dprintf "BAP unknown disasm_instr %Lx: %s" addr s;
-     DTest.dprintf "Faulting instruction: %s" (Libasmir.asmir_string_of_insn prog addr);
-     DV.dprintf "disasm_instr %Lx: %s" addr s;
+     DTest.dprintf "BAP unknown disasm_instr %s: %s" (~%addr) s;
+     DTest.dprintf "Faulting instruction: %s" 
+        (Libasmir.asmir_string_of_insn prog (big_int_to_bfd addr));
+     DV.dprintf "disasm_instr %s: %s" (~%addr) s;
      let ir =
-       Special(Printf.sprintf "Unknown instruction at %Lx: %s " addr s, [])::[]
+       Special(Printf.sprintf "Unknown instruction at %s: %s " (~%addr) s, [])::[]
      in
      Disasm_i386.ToIR.add_labels addr ir,
-     Int64.add addr (Int64.of_int (Libasmir.asmir_get_instr_length prog addr))
+     addr +% (big_int_of_int (Libasmir.asmir_get_instr_length prog (big_int_to_bfd addr)))
   | e ->
       DV.dprintf "Failing instruction: %s\n" (Libasmir.asmir_string_of_insn prog
-      addr);
+      (big_int_to_bfd addr));
       raise e
   in
   let ir = match ir with
     | Label(l, [])::rest ->
-      Label(l, [Asm(Libasmir.asmir_string_of_insn prog addr)])::rest
+      Label(l, [Asm(Libasmir.asmir_string_of_insn prog (big_int_to_bfd addr))])::rest
     | _ -> ir
   in (ir, na)
 
@@ -220,45 +220,46 @@ let asmprogram_to_bap_range ?(init_ro = false) p st en =
       with Memory_error -> None in
     match t with
     | Some(ir, n) ->
-      if n >= en then flatten (List.rev (ir::l))
+      if n >=% en then flatten (List.rev (ir::l))
       else
         f (ir::l) n
     | None ->
       (* If we fail, hopefully it is because there were some random
          bytes at the end of the section that we tried to
          disassemble *)
-      wprintf "Failed to read instruction byte while disassembling at address %#Lx; end of section at %#Lx" s en;
+      wprintf "Failed to read instruction byte while disassembling at address 0x%s; end of section at 0x%s" (~%s) (~%en);
       flatten (List.rev l)
   in
   f [] st
 
 let asmprogram_section_to_bap p s =
   let size = bfd_section_size s and vma = bfd_section_vma s in
-  asmprogram_to_bap_range p vma (Int64.add vma size)
+  asmprogram_to_bap_range p vma ((bi64 vma) +% (bi64 size))
 
 (** Translate an entire Libasmir.asm_program_t into a BAP program *)
 let asmprogram_to_bap ?(init_ro=false) p =
   let irs = List.map
         (fun s ->
-          if is_code s then asmprogram_section_to_bap p s else []) p.secs in
+          if is_code s then asmprogram_section_to_bap p s else []) p.secs 
+  in
   flatten irs
 
 (* Returns a single ASM instruction (as a list IL statements) from a
    sequence of bytes. *)
 let byte_insn_to_bap arch mach addr bytes =
-  let prog = Libasmir.byte_insn_to_asmp arch mach addr bytes in
-  let get_exec a = bytes.(Int64.to_int (Int64.sub a addr)) in
+  let prog = Libasmir.byte_insn_to_asmp arch mach (big_int_to_bfd addr) bytes in
+  let get_exec a = bytes.(int_of_big_int (a -% addr)) in
   let (pr, n) = asm_addr_to_bap {asmp=prog; arch; mach; secs=[]; get_exec; get_readable=get_exec} addr in
   Libasmir.asmir_close prog;
-  pr, Int64.sub n addr
+  (pr, n -% addr)
 
 (* Transforms a byte sequence (byte array), to a list of lists of IL
    statements *)
 let byte_sequence_to_bap bytes arch mach addr =
-  let prog = Libasmir.byte_insn_to_asmp arch mach addr bytes in
+  let prog = Libasmir.byte_insn_to_asmp arch mach (big_int_to_bfd addr) bytes in
   let len = Array.length bytes in
-  let end_addr = Int64.add addr (Int64.of_int len) in
-  let get_exec a = bytes.(Int64.to_int (Int64.sub a addr)) in
+  let end_addr = addr +% (big_int_of_int len) in
+  let get_exec a = bytes.(int_of_big_int (a -% addr)) in
   let rec read_all acc cur_addr =
     if cur_addr >= end_addr then List.rev acc
     else
@@ -358,7 +359,7 @@ module SerializedTrace = struct
           Context({name=n;
                    mem=false;
                    t=Reg b;
-                   index=0L;
+                   index=(big_int_of_int 0);
                    value=Util.big_int_of_binstring ~e:`Little v;
                    usage=convert_usage use;
                    taint=convert_taint t})
@@ -401,12 +402,12 @@ module SerializedTrace = struct
           | `syscall_frame({Syscall_frame.number=callno;
                             Syscall_frame.address=addr;
                             Syscall_frame.thread_id=tid}) ->
-            [Special(Printf.sprintf "Syscall number %Ld at %#Lx by thread %Ld" callno addr tid, [StrAttr "TraceKeep"]); Comment("All blocks must have two statements", [])]
+            [Special(Printf.sprintf "Syscall number %Ld at 0x%s by thread %Ld" callno (~%addr) tid, [StrAttr "TraceKeep"]); Comment("All blocks must have two statements", [])]
           | `exception_frame({Exception_frame.exception_number=exceptno;
                               Exception_frame.thread_id=Some tid;
                               Exception_frame.from_addr=Some from_addr;
                               Exception_frame.to_addr=Some to_addr}) ->
-            [Special(Printf.sprintf "Exception number %Ld by thread %Ld at %#Lx to %#Lx" exceptno tid from_addr to_addr, []);
+            [Special(Printf.sprintf "Exception number %Ld by thread %Ld at 0x%s to 0x%s" exceptno tid (~%from_addr) (~%to_addr), []);
              Comment("All blocks must have two statements", [])]
           | `exception_frame({Exception_frame.exception_number=exceptno}) ->
             [Special(Printf.sprintf "Exception number %Ld" exceptno, []);
@@ -416,7 +417,7 @@ module SerializedTrace = struct
           | `modload_frame({Modload_frame.module_name=name;
                             Modload_frame.low_address=lowaddr;
                             Modload_frame.high_address=highaddr}) ->
-            [Special(Printf.sprintf "Loaded module '%s' at %#Lx to %#Lx" name lowaddr highaddr, []); Comment("All blocks must have two statements", [])]
+            [Special(Printf.sprintf "Loaded module '%s' at 0x%s to 0x%s" name (~%lowaddr) (~%highaddr), []); Comment("All blocks must have two statements", [])]
           | `key_frame _ ->
       (* Implement key frame later *)
             []
@@ -490,19 +491,19 @@ let find_symbol {asmp=p} name =
 let get_flavour p = bfd_flavour (Libasmir.asmir_get_bfd p.asmp)
 
 let get_section_startaddr p sectionname =
-  Libasmir.asmir_get_sec_startaddr p.asmp sectionname
+  big_int_of_int64 (Libasmir.asmir_get_sec_startaddr p.asmp sectionname)
 
 let get_section_endaddr p sectionname =
-  Libasmir.asmir_get_sec_endaddr p.asmp sectionname
+  big_int_of_int64 (Libasmir.asmir_get_sec_endaddr p.asmp sectionname)
 
 let get_base_address p =
-  Libasmir.asmir_get_base_address p.asmp
+  big_int_of_int64 (Libasmir.asmir_get_base_address p.asmp)
 
 let get_start_addr p =
-  Libasmir.asmir_get_start_addr p.asmp
+  big_int_of_int64 (Libasmir.asmir_get_start_addr p.asmp)
 
 let get_asm_instr_string p s =
-  Libasmir.asmir_string_of_insn p.asmp s
+  Libasmir.asmir_string_of_insn p.asmp (big_int_to_bfd s)
 
 let get_asm_instr_string_range p s e =
   let s = ref s in
@@ -512,9 +513,9 @@ let get_asm_instr_string_range p s e =
 
       str := !str ^ "; " ^ (get_asm_instr_string p !s);
 
-      let len = Int64.of_int (Libasmir.asmir_get_instr_length p.asmp !s) in
-      if len = -1L then raise Exit;
-      s := Int64.add !s len
+      let len = big_int_of_int (Libasmir.asmir_get_instr_length p.asmp (big_int_to_bfd !s)) in
+      if len = bi64 -1L then raise Exit;
+      s := !s +% len
     done;
   with Exit -> ());
   !str

@@ -2,6 +2,7 @@ module V = Var
 open Ast
 open Stmt_piqi
 open Type
+open Big_int_convenience
 
 let casttype_to_piqi : Type.cast_type -> Stmt_piqi.cast_type = function
   | CAST_UNSIGNED -> `cast_unsigned
@@ -41,6 +42,10 @@ let rec type_to_piqi : Type.typ -> Stmt_piqi.typ = function
 
 let var_to_piqi (V.V(id, n, t)) : Stmt_piqi.var =
   {Var.name=n; Var.id=id; Var.typ = type_to_piqi t}
+
+(* Since big_ints can be arbitrarily long, we serialize them as strings. *)
+let bigint_to_piqi : Big_int_Z.big_int -> Stmt_piqi.bigint =
+  Big_int_Z.string_of_big_int
 
 let rec exp_to_piqi : Ast.exp -> Stmt_piqi.exp = function
   | Load(m, i, e, t) ->
@@ -111,7 +116,7 @@ let taint_to_piqi : Type.taint_type -> Stmt_piqi.taint_info = function
 
 let context_to_piqi {name; mem; t; index; value; usage; taint} : Stmt_piqi.context =
   let oi = if mem then
-      `mem_operand({Mem_operand.address=index})
+      `mem_operand({Mem_operand.address=bigint_to_piqi index})
     else
       `reg_operand({Reg_operand.name=name})
   in
@@ -123,7 +128,7 @@ let context_to_piqi {name; mem; t; index; value; usage; taint} : Stmt_piqi.conte
 
 let attribute_to_piqi : Type.attribute -> Stmt_piqi.attribute = function
   | Asm s -> `asm s
-  | Address a -> `address a
+  | Address a -> `address (bigint_to_piqi a)
   | Liveout -> `liveout ({Liveout._dummy=()})
   | Synthetic -> `synthetic ({Synthetic._dummy=()})
   | ThreadId i -> `thread_id (Int64.of_int i)
@@ -135,7 +140,7 @@ let attributes_to_piqi = List.map attribute_to_piqi
 
 let label_to_piqi : Type.label -> Stmt_piqi.label = function
   | Name n -> `name n
-  | Addr a -> `addr a
+  | Addr a -> `addr (bigint_to_piqi a)
 
 let stmt_to_piqi : Ast.stmt -> Stmt_piqi.stmt = function
   | Move(v, e, attrs) ->

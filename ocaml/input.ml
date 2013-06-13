@@ -1,4 +1,5 @@
 open BatListFull
+open Big_int_convenience
 
 let init_ro = ref false
 let inputs = ref []
@@ -9,9 +10,14 @@ and pintrace = ref false
 let toint64 s =
   try Int64.of_string s
   with Failure "int_of_string" -> raise(Arg.Bad("invalid int64: "^s))
- 
+
+let tobigint s =
+  try Big_int_Z.big_int_of_string s
+  with Failure _ -> raise(Arg.Bad("invalid big_int: "^s))
+
 let setint64 r s =  r := toint64 s
 
+let setbigint r s = r := tobigint s
 
 let stream_speclist =
   (* let addinput i = streaminputs := i :: !streaminputs in *)
@@ -42,9 +48,9 @@ let speclist =
      "<file> Convert a binary to the IL");
     ("-binrange",
      Arg.Tuple(let f = ref ""
-               and s = ref 0L in
-               [Arg.Set_string f; Arg.String(setint64 s);
-                Arg.String(fun e->addinput(`Binrange(!f, !s, toint64 e)))]),
+               and s = ref (bi 0) in
+               [Arg.Set_string f; Arg.String(setbigint s);
+                Arg.String(fun e->addinput(`Binrange(!f, !s, tobigint e)))]),
      "<file> <start> <end> Convert the given range of a binary to the IL");
     ("-binrecurse",
      Arg.String(fun s -> addinput (`Binrecurse s)),
@@ -52,7 +58,7 @@ let speclist =
     ("-binrecurseat",
      Arg.Tuple(let f = ref "" in
                [Arg.Set_string f;
-                Arg.String (fun s -> addinput (`Binrecurseat (!f, toint64 s)))]),
+                Arg.String (fun s -> addinput (`Binrecurseat (!f, tobigint s)))]),
      "<file> <start> Lift binary to the IL using a recursive descent algorithm starting at <start>.");
     ("-il",
      Arg.String(fun s -> addinput (`Il s)),

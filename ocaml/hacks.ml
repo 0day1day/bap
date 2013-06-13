@@ -4,6 +4,7 @@ open Ast
 open Ast_convenience
 open Ast_visitor
 open BatListFull
+open Big_int_convenience
 open Type
 open Util
 
@@ -159,7 +160,7 @@ let uniqueify_labels p =
   let find_new_label l =
     let strl = match l with
       | Name(s) -> s
-      | Addr(a) -> Printf.sprintf "addr_%Lx" a
+      | Addr(a) -> Printf.sprintf "addr_%s" (~%a)
     in
     let n =
       try (Hashtbl.find lh strl)+1

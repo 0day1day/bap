@@ -117,7 +117,7 @@ object (self)
 
   method attr = function
     | Asm s -> pp "@asm \""; pp s; pp "\""
-    | Address a -> printf "@address \"0x%Lx\"" a;
+    | Address a -> printf "@address \"0x%s\"" (~%a);
     | Liveout -> pp "@set \"liveout\""
     | StrAttr s -> pp "@str \""; pp s; pc '\"'
     | Context {name=s; mem=mem; value=v; index=i; t=Reg bits; usage=u; taint=Taint t} -> 
@@ -126,7 +126,7 @@ object (self)
       in
       let ts = string_of_int t in
       (*if t = Taint then "tainted" else "untainted" in*)
-      let ind = if mem then "[0x"^(Int64.format "%Lx" i)^"]" else "" in
+      let ind = if mem then "[0x"^(~%i)^"]" else "" in
       pp "@context "; pc '"'; pp (s^ind); pc '"'; pp (" = 0x"^(Util.big_int_to_hex v)^ ", " ^ ts
 			                              ^", u"
 			                              ^ (string_of_int bits)
@@ -142,7 +142,7 @@ object (self)
 
   method label = function
     | Name s -> pp "label "; pp s
-    | Addr x -> printf "addr 0x%Lx" x
+    | Addr x -> printf "addr 0x%s" (~%x)
 
   method int i t =
     let (is, i) = Arithmetic.to_sbig_int (i,t), Arithmetic.to_big_int (i,t) in
@@ -437,7 +437,7 @@ object (self)
     | Ssa.Label(l,a) ->
 	(match l with
 	 | Name s -> pp "label "; pp s
-	 | Addr x -> printf "addr 0x%Lx" x
+	 | Addr x -> printf "addr 0x%s" (~%x)
 	);
 	self#attrs a
     | Ssa.Halt(v,a) ->

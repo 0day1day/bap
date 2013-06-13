@@ -2015,7 +2015,7 @@ let rec to_ir mode addr next ss pref =
 let add_labels ?(asm) a ir =
   let attr = match asm with None -> [] | Some s -> [Asm(s)] in
   Label(Addr a, attr)
-  ::Label(Name(Printf.sprintf "pc_0x%Lx" a),[])
+  ::Label(Name(Printf.sprintf "pc_0x%s" (~%a)),[])
   ::ir
 
 end (* ToIR *)
@@ -2189,7 +2189,7 @@ let cc_to_exp i =
   if (i & 1) = 0 then cc else exp_not cc
 
 let parse_instr mode g addr =
-  let s = Int64.succ in
+  let s = succ_big_int in
 
   let get_prefix c =
     let i = Char.code c in
@@ -2245,11 +2245,11 @@ let parse_instr mode g addr =
     | _ -> None
   in*)
   let parse_int nbits a =
-    let r a n = (bi (Char.code (g (Int64.add a (Int64.of_int n))))) <<% (8*n) in
+    let r a n = (bi (Char.code (g (a +% (big_int_of_int n))))) <<% (8*n) in
     let nbytes = nbits/8 in
     let bytes = map (fun n -> r a n) (0 -- (nbytes-1)) in
     let i = reduce or_big_int bytes in
-    (i, Int64.add a (Int64.of_int nbytes))
+    (i, a +% (big_int_of_int nbytes))
   in
   let parse_int8 = parse_int 8 in
   let parse_int16 = parse_int 16 in
@@ -2271,7 +2271,7 @@ let parse_instr mode g addr =
   and parse_disp32 = parse_sint32
   and parse_disp64 = parse_sint64
   in
-  let parse_disp:(Type.typ -> int64 -> big_int * int64) = function
+  let parse_disp:(Type.typ -> big_int -> big_int * big_int) = function
     | Reg 8 ->  parse_disp8
     | Reg 16 -> parse_disp16
     | Reg 32 -> parse_disp32
