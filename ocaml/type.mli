@@ -3,8 +3,8 @@
     @author Ivan Jager
 *)
 
-(** Addresses are 64-bit integers *)
-type addr = int64
+(** Addresses are big_ints *)
+type addr = Big_int_Z.big_int
 
 (** Labels are program locations that can be jumped to. *)
 type label = 
