@@ -62,6 +62,7 @@ type mode = X86 | X8664
 let type_of_mode = function
   | X86 -> Reg 32
   | X8664 -> Reg 64
+let width_of_mode mode = Typecheck.bits_of_width (type_of_mode mode)
 
 type order = Low | High
 
@@ -78,7 +79,7 @@ type jumptarget =
   | Jabs of operand
   | Jrel of int64 * int64 (* next ins address, offset *)
 
-(* See section 4.1 of the Intel® 64 and IA-32 modeitectures Software
+(* See section 4.1 of the Intel® 64 and IA-32 Architectures Software
    Developer’s Manual, Volumes 2A & 2B: Instruction Set Reference
    (order numbers 253666 and 253667) *)
 module Pcmpstr = struct
@@ -1430,11 +1431,7 @@ let rec to_ir mode addr next ss pref =
     and s_f = match st with LSHIFT -> (<<*) | RSHIFT -> (>>*) 
       | ARSHIFT -> (>>>*) | _ -> disfailwith "invalid shift type"
     and dste = op2e s dst in
-    let count_mask = 
-      match mode with
-      | X86 -> it 31 s
-      | X8664 -> if s = r64 then it 63 s 
-                 else it 31 s in
+    let count_mask = it ((width_of_mode mode) - 1) s in
     let count = (op2e s shift) &* count_mask in
     let ifzero = ite r1 (Var origCOUNT ==* (it 0 s))
     and new_of = match st with
@@ -1468,11 +1465,7 @@ let rec to_ir mode addr next ss pref =
       let e_dst = op2e s dst in
       let e_fill = op2e s fill in
       (* Check for 64-bit operand *)
-      let count_mask = 
-        match mode with
-        | X86 -> it 31 s
-        | X8664 -> if s = r64 then it 63 s 
-                   else it 31 s in
+      let count_mask = it ((width_of_mode mode) - 1) s in
       let e_count = (op2e s count) &* count_mask in
       let size = it (bits_of_width s) s in
       let new_cf =  match st with
