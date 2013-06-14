@@ -36,7 +36,7 @@ let find_error g =
   try
     g, C.find_vertex g BB_Error
   with Not_found ->
-    create g BB_Error [Label(Name "BB_Error", []); Assert(exp_false, [])]
+    create g BB_Error [Label(Name("BB_Error"), [SpecialBlock]); Assert(exp_false, [])]
 
 let find_exit g =
   try
@@ -124,20 +124,25 @@ let of_prog ?(special_error = true) p =
       in
       (c, [], true, None)
     in
+    let h l =
+      add_indirect_edge_to l;
+      let c,v = add_new_bb c cur addpred in
+      (c, [s], true, Some v)
+    in
     match s with
     | Jmp _ | CJmp _ | Halt _ ->
-	g ()
+      g ()
     | Special _ when special_error ->
-	g ()
+      g ()
     | Special _ (* specials are not error *) ->
-	(c, s::cur, onlylabs, addpred)
+      (c, s::cur, onlylabs, addpred)
+    | Label(l, attrs) when List.mem SpecialBlock attrs ->
+      h l
     | Label(l,_) when onlylabs ->
-	add_indirect_edge_to l;
-	(c, s::cur, true, addpred)
+      add_indirect_edge_to l;
+      (c, s::cur, true, addpred)
     | Label(l,_) ->
-	add_indirect_edge_to l;
-	let c,v = add_new_bb c cur addpred in
-	(c, [s], true, Some v)
+      h l
     | Assert(e,_) when e === exp_false ->
       g()
     | Move _ | Assert _ | Assume _ ->
@@ -186,7 +191,7 @@ let to_prog c =
     try BH.find hrevstmts b
     with Not_found ->
       let s = match C.G.V.label b with
-        | BB _ -> List.rev (C.get_stmts c b)
+        | BB _ | BB_Error -> List.rev (C.get_stmts c b)
         (* Don't include special node contents *)
         | _ -> []
       in
