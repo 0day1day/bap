@@ -2,6 +2,7 @@ let usage = "Usage: "^Sys.argv.(0)^" <input options> [transformations and output
              Evaluate BAP IL programs. "
 
 open Ast
+open Big_int_convenience
 
 type ast = Ast.program
 type astcfg = Cfg.AST.G.t
@@ -82,7 +83,7 @@ let speclist =
      Arg.Unit (fun () -> add(AnalysisAst cexecute)),
      "Concretely execute the IL from the beginning of the program")
   ::("-eval-at", 
-     Arg.String (fun s -> add(AnalysisAst (cexecute_at (Int64.of_string s)))),
+     Arg.String (fun s -> add(AnalysisAst (cexecute_at (Big_int_Z.big_int_of_string s)))),
      "<pc> Concretely execute the IL from pc")
   ::("-jiteval",
      Arg.Unit (fun () -> add(AnalysisAst jitexecute)),

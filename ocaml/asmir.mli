@@ -53,10 +53,9 @@ val tr_bap_blocks_t :
 val decls_for_arch : arch -> Ast.var list
 val gamma_for_arch : arch -> varctx
 
-val big_int_to_bfd : Big_int_Z.big_int -> Libbfd.address_t
-
 val get_asmprogram_arch : asmprogram -> arch
 val get_asmprogram_mach : asmprogram -> machine_t
+val get_asmprogram_mode : asmprogram -> Disasm_i386.mode
 
 val x86_mem : Var.t
 val x86_regs : Var.t list

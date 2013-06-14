@@ -876,7 +876,7 @@ struct
       try AddrMap.find (normalize i t) m
       with Not_found ->
         (* Well, this isn't good... Just make something up *)
-        wprintf "Unknown memory value during eval: addr %Lx" (~%i);
+        wprintf "Unknown memory value during eval: addr %s" (~%i);
         Int(bi0, reg_8)
       )
 
@@ -918,14 +918,15 @@ let check_delta state =
     !foundone
   in
   let check_mem cm addr v =
+    let addr64 = addr_to_int64 addr in
     if v.tnt || !checkall then (
       let tracebyte = get_int v.exp in
       try
-        match AddrMap.find addr cm with
+        match AddrMap.find addr64 cm with
         | Int(v, t) -> let evalbyte = fst (Arithmetic.to_val t v) in
                        let issymb = Hashtbl.mem global.symbolic addr in
                        if (tracebyte <>% evalbyte) && (not issymb)
-                       then wprintf "Consistency error: Tainted memory value (address %Lx, value %s) present in trace does not match value %s in concrete evaluator" addr (~% tracebyte) (~% evalbyte)
+                       then wprintf "Consistency error: Tainted memory value (address %Lx, value %s) present in trace does not match value %s in concrete evaluator" addr64 (~% tracebyte) (~% evalbyte)
         | e when contains_unknown e -> ()
         | e -> failwith (Printf.sprintf "Expected Int or expression containing an unknown but got %s" (Pp.ast_exp_to_string e))
       with Not_found ->
@@ -933,7 +934,7 @@ let check_delta state =
            dump, so we should not report an error unless the value is
            tainted. *)
         if v.tnt then
-          wprintf "Consistency error: Tainted memory value (address %Lx, value %s) present in trace but missing in concrete evaluator" addr (~% tracebyte)
+          wprintf "Consistency error: Tainted memory value (address %Lx, value %s) present in trace but missing in concrete evaluator" addr64 (~% tracebyte)
     )
   in
   let check_var var evalval =
@@ -1015,7 +1016,7 @@ let get_symbolic_seeds mode memv = function
         (fun (accl,accr) {index=index; taint=Taint taint; value=value} ->
            let sym_var = sym_lookup taint in
              pdebug ("Introducing symbolic: "
-                     ^(Printf.sprintf "%Lx" index)
+                     ^(Printf.sprintf "%s" (~% index))
                      ^" -> "
                      ^(Pp.ast_exp_to_string sym_var));
              add_symbolic index sym_var ;
@@ -1108,7 +1109,7 @@ let rec get_next_label blocks =
         | [] -> None
 
 (** Running each block separately *)
-let run_block ?(next_label = None) ?(transformf = (fun s _ -> [s])) state memv thread_map block =  
+let run_block mode ?(next_label = None) ?(transformf = (fun s _ -> [s])) state memv thread_map block =  
   (* Search for metadata.  It will either be a comment with endseed or a label
       with a context attribute.  If found update_concrete on that stmt, and if 
       it was a label set addr to that; execute the block.  If it's not found
@@ -1138,7 +1139,7 @@ let run_block ?(next_label = None) ?(transformf = (fun s _ -> [s])) state memv t
      | Not_found -> List.hd block)
   in
   let block = List.filter (fun b -> if b == addr then false else true) block in
-  let input_seeds, input_seeds_concrete = get_symbolic_seeds memv addr in
+  let input_seeds, input_seeds_concrete = get_symbolic_seeds mode memv addr in
   pdebug ("Running block: " ^ (string_of_int !counter) ^ " " 
           ^ (Pp.ast_stmt_to_string addr));
   counter := !counter + 1;
@@ -1185,7 +1186,7 @@ let run_block ?(next_label = None) ?(transformf = (fun s _ -> [s])) state memv t
 
   (* Assign concrete values to regs/memory *)
   let block =
-    let assigns = assign_vars memv (lookup_thread_map thread_map tid) false in
+    let assigns = assign_vars mode memv (lookup_thread_map thread_map tid) false in
     (* List.iter *)
     (*   (fun stmt -> dprintf "assign stmt: %s" (Pp.ast_stmt_to_string stmt)) assigns;       *)
     assigns @ input_seeds_concrete @ block
@@ -1219,7 +1220,7 @@ let run_block ?(next_label = None) ?(transformf = (fun s _ -> [s])) state memv t
           Syscall_models.linux_syscall_to_il m (int_of_big_int i)
         | _ -> failwith "Unexpected evaluation problem") in
       (* Hack: Remember the next pc; we will clobber this *)
-      let newpc = succ_big_int state.pc in
+      let newpc = Int64.succ state.pc in
       let newstate = List.fold_left
         (fun state stmt ->
           let isspecial = match stmt with Special _ -> true | _ -> false in
@@ -1243,7 +1244,7 @@ let run_block ?(next_label = None) ?(transformf = (fun s _ -> [s])) state memv t
     | TraceConcrete.AssertFailed _ as _e -> 
           wprintf "failed assertion: %s" (Pp.ast_stmt_to_string stmt);
           (* raise e; *)
-          let new_pc = succ_big_int state.pc in
+          let new_pc = Int64.succ state.pc in
           eval_block {state with pc=new_pc}
   in
     try
@@ -1259,9 +1260,9 @@ let run_block ?(next_label = None) ?(transformf = (fun s _ -> [s])) state memv t
           ((addr,false)::(List.tl !executed)) *)
       | TraceConcrete.UnknownLabel lab ->
         (match next_label, lab with
-        | Some(l), Addr x when x <> l && !checkall ->
+        | Some(l), Addr x when x <>% l && !checkall ->
           let s =
-            Printf.sprintf "Unknown label address (0x%Lx) does not equal the next label (0x%Lx)" x l in
+            Printf.sprintf "Unknown label address (0x%s) does not equal the next label (0x%s)" (~% x) (~% l) in
           pwarn (s ^ "\nCurrent block is: " ^ (Pp.ast_stmt_to_string addr))
         | _ -> ()
         );
@@ -1296,7 +1297,7 @@ let run_block ?(next_label = None) ?(transformf = (fun s _ -> [s])) state memv t
         (addr::List.rev (List.tl !executed))
 
 
-let run_blocks blocks memv length =
+let run_blocks mode blocks memv length =
   counter := 1 ;
   Status.init "Concrete Run" length ;
   let state = TraceConcrete.create_state () in
@@ -1315,7 +1316,7 @@ let run_blocks blocks memv length =
         | _ ->
           let l = get_next_label remaining in 
           let block = explicit_thread_stmts block thread_map in
-          run_block ~next_label:l ~transformf:trace_transform_stmt state memv thread_map block)
+          run_block mode ~next_label:l ~transformf:trace_transform_stmt state memv thread_map block)
       in
       (
         (* If we are doing a consistency check, saving the concretized
@@ -1399,7 +1400,7 @@ let to_dsa p =
 
 (** Perform concolic execution on the trace and
     output a set of constraints *)
-let concrete trace = 
+let concrete mode trace = 
   dsa_rev_map := None;
   let trace = Memory2array.coerce_prog trace in
   let trace = remove_specials trace in
@@ -1408,7 +1409,7 @@ let concrete trace =
   let blocks = trace_to_blocks trace in
   (*pdebug ("blocks: " ^ (string_of_int (List.length blocks)));*)
   let length = List.length blocks in
-  let actual_trace = run_blocks blocks memv length in
+  let actual_trace = run_blocks mode blocks memv length in
     actual_trace
 
 (* Normal concrete execution *)
@@ -1475,7 +1476,7 @@ let concrete_rerun file stmts =
      TaintConcrete.Halted(v, ctx) -> Printf.printf "Halted successfully\n"
    | TaintConcrete.AssertFailed ctx ->
        let stmt = TaintConcrete.inst_fetch ctx.sigma ctx.pc in
-       Printf.printf "Assertion failure at %s: %s\n" (~%ctx.pc) (Pp.ast_stmt_to_string stmt) ;
+       Printf.printf "Assertion failure at %Lx: %s\n" ctx.pc (Pp.ast_stmt_to_string stmt) ;
        clean_delta ctx.delta ;
        TaintConcrete.print_values ctx.delta;
        (* TaintConcrete.print_mem ctx.TaintConcrete.delta *)
@@ -1543,7 +1544,7 @@ struct
         let delta' = MemL.remove_var delta v in (* shouldn't matter because of dsa, but remove any old version anyway *)
         (delta', Form.add_to_formula pred constr Rename)
     in
-    {ctx with delta=delta'; pred=pred'; pc=succ_big_int pc}
+    {ctx with delta=delta'; pred=pred'; pc=Int64.succ pc}
 end
 
 (** Modules that convert user_init data to a FlexibleFormula's init
@@ -1570,15 +1571,15 @@ sig
   val symbolic_run : user_init -> stmt list -> state
   (* Symbolically execute some blocks of a trace for streaming *)
   val symbolic_run_blocks : state -> stmt list -> state
-  val generate_formula : user_init -> stmt list -> output
+  val generate_formula : Disasm_i386.mode -> user_init -> stmt list -> output
   val output_formula : state -> output
 
   (******************* Formula Debugging  **********************)
-  val formula_valid_to_invalid : ?min:int -> stmt list -> unit
-  val trace_valid_to_invalid : stmt list -> unit
+  val formula_valid_to_invalid : Disasm_i386.mode -> ?min:int -> stmt list -> unit
+  val trace_valid_to_invalid : Disasm_i386.mode -> stmt list -> unit
 
   (****************  Exploit String Generation  ****************)
-  val output_exploit : user_init -> stmt list -> unit
+  val output_exploit : Disasm_i386.mode -> user_init -> stmt list -> unit
 end
 
 
@@ -1664,8 +1665,8 @@ struct
   (*************************************************************)
   (********************  Formula Generation  *******************)
   (*************************************************************)
-  let generate_formula i trace =
-    let trace = concrete trace in
+  let generate_formula mode i trace =
+    let trace = concrete mode trace in
     (* If we leave DCE on, it will screw up the consistency check. *)
     let trace = match !consistency_check || (not !dce) with
       | true -> trace
@@ -1693,12 +1694,12 @@ struct
   (*************************************************************)
   (* Binary search over the concretized IL to check where things go
      wrong. *)
-  let formula_valid_to_invalid ?(min=1) trace =
+  let formula_valid_to_invalid mode ?(min=1) trace =
     let sym_and_output trace fname =
       let finalstate = symbolic_run (fname,Smtexec.STP.si) trace in
       Form.output_formula finalstate.symstate.pred;
     in
-    let trace = concrete trace in
+    let trace = concrete mode trace in
     (* If we leave DCE on, it will screw up the consistency check. *)
     let trace = match !consistency_check with
       | false -> trace_dce trace
@@ -1735,7 +1736,7 @@ struct
 
   (* Binary search over the trace IL to see where things go
      wrong. *)
-  let trace_valid_to_invalid trace =
+  let trace_valid_to_invalid mode trace =
     let open Smtexec in
     let length = List.length trace in
     let rec bsearch l u =
@@ -1745,7 +1746,7 @@ struct
         let middle = (l + u) / 2 in
         let trace = BatList.take middle trace in
         try
-          ignore (generate_formula ("temp",STP.si) trace) ;
+          ignore (generate_formula mode ("temp",STP.si) trace) ;
           match STP.si#solve_formula_file ~getmodel:true "temp" with
             | Invalid _ -> Printf.printf "going higher\n";
                 bsearch middle u
@@ -1761,8 +1762,8 @@ struct
                bsearch l (u-1))
     in
     let (l,u) = bsearch 1 length in
-    ignore (generate_formula ("form_val",Smtexec.STP.si) (BatList.take l trace)) ;
-    ignore (generate_formula ("form_inv",Smtexec.STP.si) (BatList.take u trace))
+    ignore (generate_formula mode ("form_val",Smtexec.STP.si) (BatList.take l trace)) ;
+    ignore (generate_formula mode ("form_inv",Smtexec.STP.si) (BatList.take u trace))
 
 
 (*************************************************************)
@@ -1814,8 +1815,8 @@ struct
     print "Exploit string was written out to file \"%s\"\n" outfile ;
     flush stdout
 
-  let output_exploit (file,s) trace =
-    generate_formula (formula_storage,s) trace;
+  let output_exploit mode (file,s) trace =
+    generate_formula mode (formula_storage,s) trace;
     match s#solve_formula_file ~getmodel:true formula_storage with
     | Smtexec.Invalid m -> parse_answer_to m file
     | _ -> parse_answer_to None file
@@ -1970,26 +1971,26 @@ let string_to_bytes payload =
     List.rev !bytes
 
 (* Add an arbitrary payload over the return address *)
-let add_payload mode ?(offset=0L) payload trace =
+let add_payload mode ?(offset=bi0) payload trace =
   let payload = string_to_bytes payload in
   let _, index, trace = get_last_load_exp trace in
   let start = BinOp(PLUS, index, Int(offset, memtype mode)) in
   let assertions = inject_payload_gen mode start payload trace in
     BatList.append trace assertions
 
-let add_payload_after mode ?(offset=4L) payload trace =
+let add_payload_after mode ?(offset=bi4) payload trace =
   let payload = string_to_bytes payload in
   let trace, assertions = inject_payload mode offset payload trace in
     BatList.append trace assertions
 
-let add_payload_from_file mode ?(offset=0L) file trace =
+let add_payload_from_file mode ?(offset=bi0) file trace =
   let payload = bytes_from_file file in
   let _, index, trace = get_last_load_exp trace in
   let start = BinOp(PLUS, index, Int(offset, memtype mode)) in
   let assertions = inject_payload_gen mode start payload trace in
     BatList.append trace assertions
 
-let add_payload_from_file_after mode ?(offset=4L) file trace =
+let add_payload_from_file_after mode ?(offset=bi4) file trace =
   let payload = bytes_from_file file in
   let trace, assertions = inject_payload mode offset payload trace in
     BatList.append trace assertions
@@ -2007,7 +2008,7 @@ let inject_shellcode mode nops trace =
   let _, assertion = hijack_control target_addr trace in
   let payload = string_to_bytes payload in
   let _, trace = get_last_jmp_exp trace in
-  let trace, shell = inject_payload mode 4L payload trace in
+  let trace, shell = inject_payload mode bi4 payload trace in
     BatList.append trace (shell @ [assertion])
 
 (** Use pivot to create exploit *)

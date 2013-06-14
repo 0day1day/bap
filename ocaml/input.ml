@@ -66,7 +66,6 @@ let speclist =
   ] @ trace_speclist
 
 
-
 let get_program () =
   if !inputs = [] then raise(Arg.Bad "No input specified");
   let get_one (oldp,oldscope) = function
@@ -96,6 +95,29 @@ let get_program () =
   with e ->
     Printf.eprintf "Exception %s occurred while lifting\n" (Printexc.to_string e);
     raise e
+
+(* Determine the architecture mode of the given program *)
+let get_program_mode () =
+  (* XXX: Assume that all inputs are the same arch (is this correct?) *)
+  match !inputs with
+  | [] -> raise(Arg.Bad "No input specified");
+  | `Il f ::_ -> 
+    raise(Arg.Bad "Couldn't get architecture mode (input is IL)")
+  | `Bin f :: _ -> 
+    Asmir.get_asmprogram_mode (Asmir.open_program f)
+  | `Binrange (f, _, _) :: _ -> 
+    Asmir.get_asmprogram_mode (Asmir.open_program f)
+  | `Binrecurse f :: _ -> 
+    Asmir.get_asmprogram_mode (Asmir.open_program f)
+  | `Binrecurseat (f, _) :: _ -> 
+    Asmir.get_asmprogram_mode (Asmir.open_program f)
+  | `Trace f :: _ ->
+   (let r = new Trace_container.reader f in
+    match r#get_arch, (Int64.to_int r#get_machine) with
+    | Arch.Bfd_arch_i386, x when x = Arch.mach_i386_i386 -> Disasm_i386.X86
+    | Arch.Bfd_arch_i386, x when x = Arch.mach_x86_64 -> Disasm_i386.X8664
+    | _, _ -> raise(Arg.Bad "unsupported architecture")
+   )
 
 let get_stream_program () = match !streaminputs with
   | None -> raise(Arg.Bad "No input specified")

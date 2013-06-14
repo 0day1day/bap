@@ -184,7 +184,8 @@
 
 .alias [
        .name address
-       .type bigint
+       .type int64
+       .ocaml-type "Big_int_convenience.address"
 ]
 
 .record [

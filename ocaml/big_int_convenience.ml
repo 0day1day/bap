@@ -16,6 +16,15 @@ module BIH = Hashtbl.Make(HashType)
 module BIS = Set.Make(OrderedType)
 module BIM = Map.Make(OrderedType)
 
+(* For big_int addresses *)
+let addr_to_int64 = int64_of_big_int (* FIXME: make this handle the upper half of addr space *)
+let addr_of_int64 = big_int_of_int64
+
+(* declarations for piqi to convert between big_int and int64 *)
+type address = Big_int_Z.big_int
+let address_to_int64 : address -> int64 = addr_to_int64
+let address_of_int64 : int64 -> address = addr_of_int64
+
 let bi0 = big_int_of_int 0x0
 let bi1 = big_int_of_int 0x1
 let bi2 = big_int_of_int 0x2

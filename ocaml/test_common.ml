@@ -8,7 +8,7 @@ open Pcre
 open Type
 open BatListFull
 
-exception RangeNotFound of int64 * int64
+exception RangeNotFound of Type.addr * Type.addr
 
 let leave_files = ref false;;
 let speclist = ["-leave-files", Arg.Set leave_files, 
@@ -211,8 +211,8 @@ let rec summarize_results res =
   | [] -> None
   | r::rs -> summarize r; summarize_results rs;;
 
-let backwards_taint prog =
-  let prog = Traces.concrete prog in
+let backwards_taint mode prog =
+  let prog = Traces.concrete mode prog in
 
   (* Flatten memory *)
   let prog = Flatten_mem.flatten_mem_program prog in

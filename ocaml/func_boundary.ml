@@ -1,6 +1,7 @@
 open Asmir
 open Ast
 open Type
+open Big_int_convenience
 
 module D = Debug.Make(struct let name = "Func_boundary" and default=`NoDebug end)
 open D
@@ -9,8 +10,8 @@ open D
 (* This function checks to see if the sequence of assembly insructions
    at start_addr ends at end_addr. *)
 let rec liftable_asm_addr_to_bap p start_addr end_addr =
-  if start_addr > end_addr then false
-  else if start_addr = end_addr then true
+  if start_addr >% end_addr then false
+  else if start_addr ==% end_addr then true
   else
     let (_, next) = Asmir.asm_addr_to_bap p start_addr in
     liftable_asm_addr_to_bap p next end_addr
@@ -44,7 +45,7 @@ let check_mnemonics ir str =
 let rec backward p bl i e_index last_startaddress =
   let end_addr = fst (List.nth bl e_index) in
   let start_addr = fst (List.nth bl (e_index-i)) in
-  if start_addr <= last_startaddress then None
+  if start_addr <=% last_startaddress then None
   else if i = e_index then Some start_addr
   else
     (* let _ = dprintf "look from %Lx to %Lx, last startaddress %Lx" start_addr end_addr last_startaddress in *)
@@ -69,7 +70,7 @@ let start_addresses p =
     match l with
     (*prolog : 55 89 e5: push %ebp, mov %esp %ebp*)
     | (addr1, 0x55)::(addr2, 0x89)::(addr3, 0xe5)::rest ->
-      let _ = dprintf "hit push ebp at address %Lx" addr1 in
+      let _ = dprintf "hit push ebp at address %s" (~%addr1) in
       let entrance = backward p bytelist 1 index last_startaddress in
       (match entrance with
         | Some addr -> addr :: f rest (index + 3) addr
@@ -78,7 +79,7 @@ let start_addresses p =
     (* another prolog: 83 ec or 81 ec : sub xxx %esp*)
     | (addr1, 0x81) :: (addr2, 0xec) :: rest
     | (addr1, 0x83) :: (addr2, 0xec) :: rest ->
-       let _ = dprintf "hit sub esp at address %Lx" addr1 in
+       let _ = dprintf "hit sub esp at address %s" (~%addr1) in
        let entrance = backward p bytelist 1 index last_startaddress in 
        (match entrance with
          | Some addr -> addr :: f rest (index + 2) addr 
@@ -107,8 +108,8 @@ let start_addresses p =
     | first :: rest -> f rest (index + 1) last_startaddress 
     | [] -> [] 
   in
-  let start_address_list = f bytelist 0 Int64.zero in
-  let _ = List.iter (fun addr -> dprintf "%Lx" addr) start_address_list in
+  let start_address_list = f bytelist 0 bi0 in
+  let _ = List.iter (fun addr -> dprintf "%s" (~%addr)) start_address_list in
   start_address_list
 
 let get_function_ranges p =
@@ -148,11 +149,11 @@ let get_function_ranges p =
       (* XXX: Ugly hack: we only use the end address for the last symbol *)
       let end_address = match List.rev (get_exec_mem_contents_list p) with
         | (a, _)::_ -> a
-        | _ -> -1L
+        | _ -> addr_of_int64 (-1L)
       in
       List.map (fun a ->
         incr n;
-        (a, end_address, "unknown_"^(string_of_int !n))) (start_addresses p)
+        (addr_to_int64 a, addr_to_int64 end_address, "unknown_"^(string_of_int !n))) (start_addresses p)
   in
   let starts = Array.of_list starts in
   (* FIXME: probably should do unsigned comparison *)
@@ -163,13 +164,13 @@ let get_function_ranges p =
 	 try let (s,_,_) = starts.(i+1) in s
 	 with Invalid_argument "index out of bounds" -> e
        in
-       (name,s,e') (* section_end doesn't work *)
+       (name, addr_of_int64 s, addr_of_int64 e') (* section_end doesn't work *)
     ) starts
   in
   let unfiltered = Array.to_list ranges in
   (* filter out functions that start at 0 *)
   List.filter (function
-		 |(s,0L,_) -> false
+		 |(s,e,_) when e ==% bi0 -> false
 		 |("_init",_,_) -> false
 		 | _ -> true)
     unfiltered

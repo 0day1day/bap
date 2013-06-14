@@ -6,6 +6,7 @@ let _ = Piqirun_ext.init_piqi piqi
 
 let _string_piqtype = Piqirun_ext.find_piqtype "string"
 let _int_piqtype = Piqirun_ext.find_piqtype "int"
+let _int64_piqtype = Piqirun_ext.find_piqtype "int64"
 let _uint64_piqtype = Piqirun_ext.find_piqtype "uint64"
 let _bool_piqtype = Piqirun_ext.find_piqtype "bool"
 let _program_piqtype = Piqirun_ext.find_piqtype "stmt/program"
@@ -62,6 +63,7 @@ let _concat_piqtype = Piqirun_ext.find_piqtype "stmt/concat"
 
 let parse_string ?opts x (format :Piqirun_ext.input_format) = let x_pb = Piqirun_ext.convert _string_piqtype format `pb x ?opts in let buf = Piqirun.init_from_string x_pb in Stmt_piqi.parse_string buf
 let parse_int ?opts x (format :Piqirun_ext.input_format) = let x_pb = Piqirun_ext.convert _int_piqtype format `pb x ?opts in let buf = Piqirun.init_from_string x_pb in Stmt_piqi.parse_int buf
+let parse_int64 ?opts x (format :Piqirun_ext.input_format) = let x_pb = Piqirun_ext.convert _int64_piqtype format `pb x ?opts in let buf = Piqirun.init_from_string x_pb in Stmt_piqi.parse_int64 buf
 let parse_uint64 ?opts x (format :Piqirun_ext.input_format) = let x_pb = Piqirun_ext.convert _uint64_piqtype format `pb x ?opts in let buf = Piqirun.init_from_string x_pb in Stmt_piqi.parse_uint64 buf
 let parse_bool ?opts x (format :Piqirun_ext.input_format) = let x_pb = Piqirun_ext.convert _bool_piqtype format `pb x ?opts in let buf = Piqirun.init_from_string x_pb in Stmt_piqi.parse_bool buf
 let parse_program ?opts x (format :Piqirun_ext.input_format) = let x_pb = Piqirun_ext.convert _program_piqtype format `pb x ?opts in let buf = Piqirun.init_from_string x_pb in Stmt_piqi.parse_program buf
@@ -118,6 +120,7 @@ let parse_concat ?opts x (format :Piqirun_ext.input_format) = let x_pb = Piqirun
 
 let gen_string ?opts x (format :Piqirun_ext.output_format) = let buf =  Stmt_piqi.gen_string x in let x_pb = Piqirun.to_string buf in Piqirun_ext.convert _string_piqtype `pb format x_pb ?opts
 let gen_int ?opts x (format :Piqirun_ext.output_format) = let buf =  Stmt_piqi.gen_int x in let x_pb = Piqirun.to_string buf in Piqirun_ext.convert _int_piqtype `pb format x_pb ?opts
+let gen_int64 ?opts x (format :Piqirun_ext.output_format) = let buf =  Stmt_piqi.gen_int64 x in let x_pb = Piqirun.to_string buf in Piqirun_ext.convert _int64_piqtype `pb format x_pb ?opts
 let gen_uint64 ?opts x (format :Piqirun_ext.output_format) = let buf =  Stmt_piqi.gen_uint64 x in let x_pb = Piqirun.to_string buf in Piqirun_ext.convert _uint64_piqtype `pb format x_pb ?opts
 let gen_bool ?opts x (format :Piqirun_ext.output_format) = let buf =  Stmt_piqi.gen_bool x in let x_pb = Piqirun.to_string buf in Piqirun_ext.convert _bool_piqtype `pb format x_pb ?opts
 let gen_program ?opts x (format :Piqirun_ext.output_format) = let buf =  Stmt_piqi.gen_program x in let x_pb = Piqirun.to_string buf in Piqirun_ext.convert _program_piqtype `pb format x_pb ?opts
@@ -176,6 +179,8 @@ let print_string x = Pervasives.print_endline (gen_string x `piq)
  let prerr_string x = Pervasives.prerr_endline (gen_string x `piq)
 let print_int x = Pervasives.print_endline (gen_int x `piq)
  let prerr_int x = Pervasives.prerr_endline (gen_int x `piq)
+let print_int64 x = Pervasives.print_endline (gen_int64 x `piq)
+ let prerr_int64 x = Pervasives.prerr_endline (gen_int64 x `piq)
 let print_uint64 x = Pervasives.print_endline (gen_uint64 x `piq)
  let prerr_uint64 x = Pervasives.prerr_endline (gen_uint64 x `piq)
 let print_bool x = Pervasives.print_endline (gen_bool x `piq)

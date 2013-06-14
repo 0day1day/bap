@@ -1,3 +1,4 @@
+open Big_int_convenience
 
 let usage = "Usage: "^Sys.argv.(0)^" <elf file> (<output prefix> | -r) [<function names>]\n\
              Disassemble functions from a binary."
@@ -38,7 +39,7 @@ let ranges = Func_boundary.get_function_ranges p
 
 let doit ranges = match !rangeonly with
   | true ->
-      List.iter (fun (n,s,e) -> Printf.printf "%s\t0x%Lx 0x%Lx\n" n s e) ranges
+      List.iter (fun (n,s,e) -> Printf.printf "%s\t0x%s 0x%s\n" n (~%s) (~%e)) ranges
   | false ->
     let names = match !names with
       | [] -> None

@@ -77,7 +77,7 @@ type operand =
 
 type jumptarget =
   | Jabs of operand
-  | Jrel of int64 * int64 (* next ins address, offset *)
+  | Jrel of Type.addr * Type.addr (* next ins address, offset *)
 
 (* See section 4.1 of the Intel® 64 and IA-32 Architectures Software
    Developer’s Manual, Volumes 2A & 2B: Instruction Set Reference
@@ -172,7 +172,7 @@ type opcode =
   | Movsx of typ * operand * typ * operand (* dsttyp, dst, srctyp, src *)
   | Movdq of typ * typ * operand * typ * operand * bool * string (* move type, dst type, dst op, src type, src op, aligned, name *)
   | Lea of typ * operand * Ast.exp
-  | Call of operand * int64 (* int64 is RA *)
+  | Call of operand * Type.addr (* addr is RA *)
   | Shift of binop_type * typ * operand * operand
   | Shiftd of binop_type * typ * operand * operand * operand
   | Rotate of binop_type * typ * operand * operand * bool (* left or right, type, src/dest op, shift op, use carry flag *)
@@ -807,8 +807,6 @@ let compute_jump_target mode s =
   function
   | Jabs o -> op2e_s mode s t o
   | Jrel (na,offset) ->
-    let na = biconst64 na in
-    let offset = biconst64 offset in
     let i,t = Arithmetic.binop PLUS (na,t) (offset,t) in
     Int(i,t)
 let jump_target = compute_jump_target
@@ -824,21 +822,21 @@ let string_incr mode t v =
     move v (Var v +* (df_to_offset mode df_e ** i (bytes_of_width t)))
 
 let rep_wrap ?check_zf ~mode ~addr ~next stmts =
-  let mi = int64_of_mode mode in
+  let bi = big_int_of_mode mode in
   let endstmt = match check_zf with
-    | None -> Jmp(mi addr, [])
+    | None -> Jmp(bi addr, [])
     | Some x when x = repz ->
-      CJmp(zf_e, mi addr, mi next, [])
+      CJmp(zf_e, bi addr, bi next, [])
     | Some x when x = repnz ->
-      CJmp(zf_e, mi next, mi addr, [])
+      CJmp(zf_e, bi next, bi addr, [])
     | _ -> failwith "invalid value for ?check_zf"
   in
   let rcx = gv mode rcx in
   let rcx_e = Var rcx in
-  cjmp (rcx_e ==* mi 0L) (mi next)
+  cjmp (rcx_e ==* bi (bi0)) (bi next)
   @ stmts
-  @ move rcx (rcx_e -* mi 1L)
-  :: cjmp (rcx_e ==* mi 0L) (mi next)
+  @ move rcx (rcx_e -* bi (bi1))
+  :: cjmp (rcx_e ==* bi (bi0)) (bi next)
   @ [endstmt]
 
 let reta = [StrAttr "ret"]
@@ -907,7 +905,7 @@ let rec to_ir mode addr next ss pref =
   and assn = assn_s mode ss
   and assn_dbl = assn_dbl_s mode ss
   and mi = int_of_mode mode
-  and mi64 = int64_of_mode mode
+  (* and mi64 = int64_of_mode mode *) (* unused *)
   and mt = type_of_mode mode
   and fs_base = gv mode fs_base
   and _fs_base_e = ge mode fs_base
@@ -1413,13 +1411,13 @@ let rec to_ir mode addr next ss pref =
     (match o1 with
     | Oimm _ ->
       [move rsp (rsp_e -* mi (bytes_of_width mt));
-       store_s mode None mt rsp_e (mi64 ra);
+       store_s mode None mt rsp_e (b64 ra);
        Jmp(target, calla)]
     | _ ->
       let t = nt "target" mt in
       [move t target;
        move rsp (rsp_e -* mi (bytes_of_width mt));
-       store_s mode None mt rsp_e (mi64 ra);
+       store_s mode None mt rsp_e (b64 ra);
        Jmp(Var t, calla)])
   | Jump(o) ->
     [Jmp(jump_target mode ss o, [])]
@@ -2067,7 +2065,7 @@ module ToStr = struct
 
   let j2str = function
     | Jabs o -> opr o
-    | Jrel (_, offset) -> Printf.sprintf "+=%Ld" offset
+    | Jrel (_, offset) -> Printf.sprintf "+=%s" (~%offset)
 
   let op2str = function
     | Bswap(_, op) -> Printf.sprintf "bswap %s" (opr op)
@@ -2397,7 +2395,7 @@ let parse_instr mode g addr =
         | X86 ->
           let (disp, na) = parse_disp32 na in (r, Oaddr(b32 disp), na)
         | X8664 ->
-          let (disp, na) = parse_disp32 na in (r, Oaddr(b64 disp +* l64 ia), na))
+          let (disp, na) = parse_disp32 na in (r, Oaddr(b64 disp +* b64 ia), na))
       | n -> (r, Oaddr(bits2rege rm), na)
     )
     | 1 | 2 ->
@@ -2528,7 +2526,7 @@ let parse_instr mode g addr =
     | 0x70 | 0x71 | 0x72 | 0x73 | 0x74 | 0x75 | 0x76 | 0x77 | 0x78 | 0x79
     | 0x7a | 0x7b | 0x7c | 0x7d | 0x7e | 0x7f -> 
       let (i,na) = parse_disp8 na in
-      (Jcc(Jabs(Oimm(i +% (bi64 na))), cc_to_exp b1), na)
+      (Jcc(Jabs(Oimm(i +% na)), cc_to_exp b1), na)
     | 0x80 | 0x81 | 0x82 | 0x83 -> 
       let (r, rm, na) = parse_modrmext_addr na in
       let (o2, na) =
@@ -2674,12 +2672,12 @@ let parse_instr mode g addr =
 
     | 0xe8 -> let t = expanded_jump_type prefix.opsize in
               let (i,na) = parse_disp t na in
-              (Call(Oimm(i +% (bi64 na)), na), na)
+              (Call(Oimm(i +% na), na), na)
     | 0xe9 -> let t = expanded_jump_type prefix.opsize in
               let (i,na) = parse_disp t na in
-              (Jump(Jabs(Oimm(i +% (bi64 na)))), na)
+              (Jump(Jabs(Oimm(i +% na))), na)
     | 0xeb -> let (i,na) = parse_disp8 na in
-              (Jump(Jabs(Oimm(i +% (bi64 na)))), na)
+              (Jump(Jabs(Oimm(i +% na))), na)
     | 0xc0 | 0xc1
     | 0xd0 | 0xd1 | 0xd2
     | 0xd3 -> let (r, rm, na) = parse_modrmext_addr na in
@@ -2710,7 +2708,6 @@ let parse_instr mode g addr =
     | 0xe3 ->
       let rcx_e = ge mode rcx in
       let (i,na) = parse_disp8 na in
-      let i = Big_int_Z.int64_of_big_int i in
       (Jcc(Jrel(na, i), rcx_e ==* mi 0), na)
     | 0xf4 -> (Hlt, na)
     | 0xf6
@@ -2986,7 +2983,7 @@ let parse_instr mode g addr =
       | 0x8a | 0x8b | 0x8c | 0x8d | 0x8e | 0x8f ->
         let t = expanded_jump_type prefix.opsize in
         let (i,na) = parse_disp t na in
-        (Jcc(Jabs(Oimm(i +% (bi64 na))), cc_to_exp b2), na)
+        (Jcc(Jabs(Oimm(i +% na)), cc_to_exp b2), na)
       (* add other opcodes for setcc here *)
       | 0x90 | 0x91 | 0x92 | 0x93 | 0x94 | 0x95 | 0x96 | 0x97 | 0x98 | 0x99
       | 0x9a | 0x9b | 0x9c | 0x9d | 0x9e | 0x9f ->

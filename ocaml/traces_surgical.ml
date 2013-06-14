@@ -151,19 +151,19 @@ let get_symbolic_seeds2 memv = function
 	   let newvarname = "symb_" ^ (string_of_int taint) in
 	   let sym_var = Var (Var.newvar newvarname reg_8) in
 	     pdebug ("Introducing symbolic: " 
-		     ^(Printf.sprintf "%Lx" index)
+		     ^(Printf.sprintf "%s" (~% index))
 		     ^" -> "
 		     ^(Pp.ast_exp_to_string sym_var));
 	     add_symbolic index sym_var ;
 	     (* symbolic variable *)
-	     let mem = newvar index reg_8 in
+	     let mem = newvar (addr_to_int64 index) reg_8 in
 	     let move = Move(mem, sym_var, []) in
 	     move::acc				       
 	) [] (filter_taint atts)
   | _ -> []
 
 (** Running each block separately *)
-let run_and_subst_block state memv thread_map block = 
+let run_and_subst_block mode state memv thread_map block = 
   let addr, block = hd_tl block in
   let input_seeds = get_symbolic_seeds2 memv addr in
   pdebug ("Running block: " ^ (string_of_int !counter) ^ " " ^ (Pp.ast_stmt_to_string addr));
@@ -181,7 +181,7 @@ let run_and_subst_block state memv thread_map block =
 
   (* Assign concrete values to regs/memory *)
   let block, extra =
-    let assigns = assign_vars memv (lookup_thread_map thread_map (get_tid block)) false in
+    let assigns = assign_vars mode memv (lookup_thread_map thread_map (get_tid block)) false in
     (* List.iter *)
     (*   (fun stmt -> dprintf "assign stmt: %s" (Pp.ast_stmt_to_string stmt)) assigns;	 *)
     assigns @ block, List.length assigns
@@ -241,14 +241,14 @@ let run_and_subst_block state memv thread_map block =
       | TraceConcrete.Halted _ -> 
 	  (addr::info::List.rev (List.tl !executed))
 
-let run_and_subst_blocks blocks memv thread_map length =
+let run_and_subst_blocks mode blocks memv thread_map length =
   counter := 1 ;
   Status.init "Concrete Substitution Run" length ;
   let state = TraceConcrete.create_state () in
   let rev_trace = List.fold_left 
     (fun acc block -> 
        Status.inc() ;   
-       List.rev_append (run_and_subst_block state memv thread_map block) acc
+       List.rev_append (run_and_subst_block mode state memv thread_map block) acc
     ) [] blocks
   in
   Status.stop () ;
@@ -305,7 +305,7 @@ let dicer =
   in
     slicer
 
-let concrete_substitution trace = 
+let concrete_substitution mode trace = 
   dsa_rev_map := None;
   (*let trace = Memory2array.coerce_prog trace in*)
   let no_specials = remove_specials trace in
@@ -316,11 +316,11 @@ let concrete_substitution trace =
   let blocks = trace_to_blocks no_specials in
   (*pdebug ("blocks: " ^ (string_of_int (List.length blocks)));*)
   let length = List.length blocks in
-  let actual_trace = run_and_subst_blocks blocks memv thread_map length in
+  let actual_trace = run_and_subst_blocks mode blocks memv thread_map length in
     actual_trace
 
-let check_slice trace = 
-  let actual_trace = concrete_substitution trace in
+let check_slice mode trace = 
+  let actual_trace = concrete_substitution mode trace in
   let accurate_trace = dicer (NameSet.singleton "ra") [] (List.rev actual_trace) in
     accurate_trace
 

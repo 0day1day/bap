@@ -12,7 +12,9 @@ let prog,scope =
     Arg.usage speclist (s^"\n"^usage);
     exit 1
 
-let input_location = Test_common.backwards_taint prog;;
+let mode = Input.get_program_mode()
+
+let input_location = Test_common.backwards_taint mode prog;;
 
 (* Print out the input locations *)
 Traces_backtaint.print_locset input_location;;
