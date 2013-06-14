@@ -100,7 +100,9 @@ let get_program () =
 let get_program_mode () =
   (* XXX: Assume that all inputs are the same arch (is this correct?) *)
   match !inputs with
-  | [] -> raise(Arg.Bad "No input specified");
+  | [] -> Disasm_i386.X8664 (* HACK: mode is required to define speclists in some utilities
+                               so we can't print usage on lack of input if we error here.  
+                               get_program will catch this eventuality. *)
   | `Il f ::_ -> 
     raise(Arg.Bad "Couldn't get architecture mode (input is IL)")
   | `Bin f :: _ -> 

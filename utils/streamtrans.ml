@@ -44,8 +44,6 @@ let prints f =
     pp#ast_program block;
     block)
 
-let mode = Input.get_program_mode()
-
 let speclist =
   ("-print", Arg.String(fun f -> add(TransformAst(prints f))),
    "<file> Print each statement in the trace to file.")
@@ -60,12 +58,12 @@ let speclist =
     )
   ::("-trace-concrete",
      Arg.Bool(fun b ->
-       add(TransformAst(Traces_stream.concrete mode b))
+       add(TransformAst(Traces_stream.concrete (Input.get_program_mode()) b))
      ),
      "<pass> Concretely execute, and optionally pass on concretized IL.")
   ::("-trace-formula",
      Arg.String(fun f ->
-       let stream, final = Traces_stream.generate_formula mode f !Solver.solver in
+       let stream, final = Traces_stream.generate_formula (Input.get_program_mode()) f !Solver.solver in
        add(AnalysisAst stream);
        addfinal(final)
      ),

@@ -177,7 +177,7 @@ let add c =
 let uadd c =
   Arg.Unit(fun()-> add c)
 
-let mode = Input.get_program_mode()
+let mode = Input.get_program_mode
 
 let speclist =
   ("-pp-ast", Arg.String(fun f -> add(AnalysisAst(output_ast f))),
@@ -258,15 +258,15 @@ let speclist =
   ::("-trace-cut", Arg.Int(fun i -> add(TransformAst(BatList.take i))),
      "<n>  Get the first <n> instructions of the trace")
   ::("-trace-concrete",
-     uadd(TransformAst (Traces.concrete mode)),
+     uadd(TransformAst (Traces.concrete (mode()))),
      "Execute the trace concretely and obtain a straightline trace"
     )
   ::("-trace-concrete-subst",
-     uadd(TransformAst (Traces_surgical.concrete_substitution mode)),
+     uadd(TransformAst (Traces_surgical.concrete_substitution (mode()))),
      "Execute the trace concretely and obtain a straightline trace"
     )
   ::("-trace-slice",
-     uadd(TransformAst (Traces_surgical.check_slice mode)),
+     uadd(TransformAst (Traces_surgical.check_slice (mode()))),
      "Slice a trace based on the overwritten return address"
     )
   ::("-trace-reconcrete",
@@ -282,14 +282,14 @@ let speclist =
      "Start debugging at item n."
     )
   ::("-trace-debug",
-     uadd(AnalysisAst (Traces.TraceSymbolic.trace_valid_to_invalid mode)),
+     uadd(AnalysisAst (Traces.TraceSymbolic.trace_valid_to_invalid (mode()))),
      "Formula debugging. Prints to files form_val and form_inv"
     )
   ::("-trace-conc-debug",
      Arg.Unit
        (fun () ->
 	  let f = Traces.TraceSymbolic.formula_valid_to_invalid ~min:!startdebug in
-	  add(AnalysisAst (f mode))
+	  add(AnalysisAst (f (mode())))
        ),
      "Formula debugging. Prints to files form_val and form_inv. Concretizes BEFORE debugging; useful for finding which assertion doesn't work."
     )
@@ -297,31 +297,31 @@ let speclist =
      uadd(TransformAst to_dsa),
      "Convert to DSA form.")
    ::("-trace-target",
-     Arg.String (fun i -> add(TransformAst(Traces.control_flow mode i))),
+     Arg.String (fun i -> add(TransformAst(Traces.control_flow (mode()) i))),
      "<addr> Provide the target address <addr>"
     )
    ::("-trace-symbolic-target",
-     uadd(TransformAst (Traces.limited_control mode)),
+     uadd(TransformAst (Traces.limited_control (mode()))),
      "Use a symbolic jump target (to determine the amount of control we have)"
     )
    ::("-trace-payload",
-     Arg.String (fun p -> add(TransformAst(Traces.add_payload mode p))),
+     Arg.String (fun p -> add(TransformAst(Traces.add_payload (mode()) p))),
      "<binstring> Provide a payload to be inserted at the return address (BEWARE of null bytes)"
     )
    ::("-trace-payload-file",
-     Arg.String (fun p -> add(TransformAst(Traces.add_payload_from_file mode p))),
+     Arg.String (fun p -> add(TransformAst(Traces.add_payload_from_file (mode()) p))),
      "<binfile> Provide a payload to be inserted at the return address"
     )
    ::("-trace-payload-after-file",
-     Arg.String (fun p -> add(TransformAst(Traces.add_payload_from_file_after mode ~offset:(bi4) p))),
+     Arg.String (fun p -> add(TransformAst(Traces.add_payload_from_file_after (mode()) ~offset:(bi4) p))),
      "<binfile> Provide a payload to be inserted past the return address"
     )
    ::("-trace-payload-after",
-     Arg.String (fun p -> add(TransformAst(Traces.add_payload_after mode ~offset:(bi4) p))),
+     Arg.String (fun p -> add(TransformAst(Traces.add_payload_after (mode()) ~offset:(bi4) p))),
      "<binstring> Provide a payload to be inserted past the return address (BEWARE of null bytes)"
     )
    ::("-trace-shell",
-     Arg.Int (fun off -> add(TransformAst(Traces.inject_shellcode mode off))),
+     Arg.Int (fun off -> add(TransformAst(Traces.inject_shellcode (mode()) off))),
      "<nopsled> Insert shellcode with a nopsled of the given size"
     )
   ::("-trace-pivot",
@@ -331,7 +331,7 @@ let speclist =
        [
    	 Arg.String (fun a -> gaddr := Big_int_Z.big_int_of_string a);
   	 Arg.String (fun a -> maddr := Big_int_Z.big_int_of_string a);
-  	 Arg.String (fun a -> add(TransformAst(Traces.add_pivot mode !gaddr !maddr a)));
+  	 Arg.String (fun a -> add(TransformAst(Traces.add_pivot (mode()) !gaddr !maddr a)));
        ]),
      "<gaddress> <maddress> <payload string> Use pivot at gaddress to transfer control to payload at maddress."
     )
@@ -342,7 +342,7 @@ let speclist =
        [
    	 Arg.String (fun a -> gaddr := Big_int_Z.big_int_of_string a);
   	 Arg.String (fun a -> maddr := Big_int_Z.big_int_of_string a);
-  	 Arg.String (fun a -> add(TransformAst(Traces.add_pivot_file mode !gaddr !maddr a)));
+  	 Arg.String (fun a -> add(TransformAst(Traces.add_pivot_file (mode()) !gaddr !maddr a)));
        ]),
      "<gaddress> <maddress> <payload string> Use pivot at gaddress to transfer control to payload at maddress."
     )
@@ -355,7 +355,7 @@ let speclist =
   	 Arg.String (fun a -> gaddr := Big_int_Z.big_int_of_string a);
   	 Arg.String (fun a -> maddr := Big_int_Z.big_int_of_string a);
 	 Arg.String (fun a -> sehaddr := Big_int_Z.big_int_of_string a);
-  	 Arg.String (fun a -> add(TransformAst(Traces.add_seh_pivot mode !gaddr !sehaddr !maddr a)));
+  	 Arg.String (fun a -> add(TransformAst(Traces.add_seh_pivot (mode()) !gaddr !sehaddr !maddr a)));
        ]),
      "<gaddress> <maddress> <sehaddress> <payload string> Use pivot at gaddress to transfer control (by overwriting SEH handler at sehaddress) to payload at maddress."
     )
@@ -368,18 +368,18 @@ let speclist =
   	 Arg.String (fun a -> gaddr := Big_int_Z.big_int_of_string a);
   	 Arg.String (fun a -> maddr := Big_int_Z.big_int_of_string a);
 	 Arg.String (fun a -> sehaddr := Big_int_Z.big_int_of_string a);
-  	 Arg.String (fun a -> add(TransformAst(Traces.add_seh_pivot_file mode !gaddr !sehaddr !maddr a)));
+  	 Arg.String (fun a -> add(TransformAst(Traces.add_seh_pivot_file (mode()) !gaddr !sehaddr !maddr a)));
        ]),
      "<gaddress> <maddress> <sehaddress> <payload file> Use pivot at gaddress to transfer control (by overwriting SEH handler at sehaddress) to payload at maddress."
     )
   ::("-trace-formula",
-     Arg.String(fun f -> add(AnalysisAst(Traces.TraceSymbolic.generate_formula mode (f,!Solver.solver)))),
+     Arg.String(fun f -> add(AnalysisAst(Traces.TraceSymbolic.generate_formula (mode()) (f,!Solver.solver)))),
      "<file> Output a trace formula to <file>"
     )
   ::("-trace-solver", Arg.String Solver.set_solver,
      ("Use the specified solver for traces. Choices: " ^ Solver.solvers))
   ::("-trace-exploit",
-     Arg.String(fun f -> add(AnalysisAst(Traces.TraceSymbolic.output_exploit mode (f,!Solver.solver)))),
+     Arg.String(fun f -> add(AnalysisAst(Traces.TraceSymbolic.output_exploit (mode()) (f,!Solver.solver)))),
      "<file> Output the exploit string to <file>"
     )
   ::("-trace-assignments",
