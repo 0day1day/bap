@@ -313,7 +313,7 @@ let to_prog c =
       match C.G.V.label v with | BB _ -> true | BB_Entry -> true | BB_Exit -> true | _ -> false
     in
     match List.filter special revnodes with
-    | x::y::_ when C.G.V.label x = BB_Exit -> dprintf "ok %s,%s" (C.v2s y) (C.v2s x); Some (y, x)
+    | x::y::_ when C.G.V.label x = BB_Exit -> Some (y, x)
     | _ -> None
   in
   (* add jumps for edges that need them *)
