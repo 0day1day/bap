@@ -100,7 +100,7 @@ let get_program () =
 let get_program_mode () =
   (* XXX: Assume that all inputs are the same arch (is this correct?) *)
   match !inputs with
-  | [] -> Disasm_i386.X8664 (* HACK: mode is required to define speclists in some utilities
+  | [] -> Disasm_i386.X8664 (* NOTE: mode is required to define speclists in some utilities
                                so we can't print usage on lack of input if we error here.  
                                get_program will catch this eventuality. *)
   | `Il f ::_ -> 
@@ -126,5 +126,15 @@ let get_stream_program () = match !streaminputs with
   | Some(`Tracestream f) -> 
     Asmir.serialized_bap_stream_from_trace_file !streamrate f
 
+let get_stream_program_mode () = 
+  match !streaminputs with
+  | None -> Disasm_i386.X8664
+  | Some(`Tracestream f) -> 
+   (let r = new Trace_container.reader f in
+    match r#get_arch, (Int64.to_int r#get_machine) with
+    | Arch.Bfd_arch_i386, x when x = Arch.mach_i386_i386 -> Disasm_i386.X86
+    | Arch.Bfd_arch_i386, x when x = Arch.mach_x86_64 -> Disasm_i386.X8664
+    | _, _ -> raise(Arg.Bad "unsupported architecture")
+   )
 
 (*  with fixme -> raise(Arg.Bad "Could not open input file")*)

@@ -58,12 +58,12 @@ let speclist =
     )
   ::("-trace-concrete",
      Arg.Bool(fun b ->
-       add(TransformAst(Traces_stream.concrete (Input.get_program_mode()) b))
+       add(TransformAst(Traces_stream.concrete (Input.get_stream_program_mode()) b))
      ),
      "<pass> Concretely execute, and optionally pass on concretized IL.")
   ::("-trace-formula",
      Arg.String(fun f ->
-       let stream, final = Traces_stream.generate_formula (Input.get_program_mode()) f !Solver.solver in
+       let stream, final = Traces_stream.generate_formula (Input.get_stream_program_mode()) f !Solver.solver in
        add(AnalysisAst stream);
        addfinal(final)
      ),

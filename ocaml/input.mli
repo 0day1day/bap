@@ -25,6 +25,8 @@ val get_program_mode : unit -> Disasm_i386.mode
 
 val get_stream_program : unit -> (Ast.program) Stream.t
 
+val get_stream_program_mode : unit -> Disasm_i386.mode
+
 val init_ro : bool ref
 
 (* Rate to stream frames at *)

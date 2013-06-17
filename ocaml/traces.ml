@@ -1213,11 +1213,10 @@ let run_block mode ?(next_label = None) ?(transformf = (fun s _ -> [s])) state m
        HACK: This is a pretty ugly hack.
     *)
     if Syscall_models.x86_is_system_call stmt then
-      let m = Disasm_i386.X8664 in (* FIXME: set this appropriately rather than hardcoding *)
-      let rax = evalf (Var (Syscall_models.syscall_reg m)) in
+      let rax = evalf (Var (Syscall_models.syscall_reg mode)) in
       let stmts = (match rax with
         | Int(i, _) ->
-          Syscall_models.linux_syscall_to_il m (int_of_big_int i)
+          Syscall_models.linux_syscall_to_il mode (int_of_big_int i)
         | _ -> failwith "Unexpected evaluation problem") in
       (* Hack: Remember the next pc; we will clobber this *)
       let newpc = Int64.succ state.pc in

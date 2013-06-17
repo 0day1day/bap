@@ -16,15 +16,6 @@ module BIH = Hashtbl.Make(HashType)
 module BIS = Set.Make(OrderedType)
 module BIM = Map.Make(OrderedType)
 
-(* For big_int addresses *)
-let addr_to_int64 = int64_of_big_int (* FIXME: make this handle the upper half of addr space *)
-let addr_of_int64 = big_int_of_int64
-
-(* declarations for piqi to convert between big_int and int64 *)
-type address = Big_int_Z.big_int
-let address_to_int64 : address -> int64 = addr_to_int64
-let address_of_int64 : int64 -> address = addr_of_int64
-
 let bi0 = big_int_of_int 0x0
 let bi1 = big_int_of_int 0x1
 let bi2 = big_int_of_int 0x2
@@ -130,3 +121,26 @@ let bi_is_one bi = bi1 ==% bi
 
 (** bi_is_minusone bi returns true iff bi = -1 *)
 let bi_is_minusone bi = bim1 ==% bi
+
+
+(** For big_int addresses *)
+let uintmax64 = big_int_of_string "0xffffffffffffffff"
+let sintmax64 = big_int_of_int64 Int64.max_int
+
+(* Conversion between int64 and big_int addresses that properly handles signedness
+   (map the upper half of the address space to negative int64s) *)
+let addr_to_int64 a =
+  if a >% sintmax64
+  then int64_of_big_int (a -% (uintmax64 +% bi1))
+  else int64_of_big_int a
+
+let addr_of_int64 a =
+  if a < 0L
+  then (big_int_of_int64 a) +% (uintmax64 +% bi1)
+  else big_int_of_int64 a
+
+(* declarations for piqi to convert between big_int and int64 *)
+type address = Big_int_Z.big_int
+
+let address_to_int64 : address -> int64 = addr_to_int64
+let address_of_int64 : int64 -> address = addr_of_int64

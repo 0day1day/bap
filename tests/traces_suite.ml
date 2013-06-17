@@ -34,19 +34,19 @@ module MakeTraceTest(TraceSymbolic:Traces.TraceSymbolic) = struct
     let prog = Asmir.serialized_bap_from_trace_file pin_out in
     typecheck prog;
     Traces.consistency_check := true;
-    ignore(Traces.concrete prog);
+    ignore(Traces.concrete Disasm_i386.X86 prog);
     Traces.consistency_check := false;
-    let t1 = Traces.add_payload "test" prog in
+    let t1 = Traces.add_payload Disasm_i386.X86 "test" prog in
     (* We should not get an exception because this should be satisfiable *)
-    ignore(Traces.TraceSymbolic.output_exploit (exploit_file,Smtexec.STP.si) t1);
-    let t2 = Traces.add_payload "\x00" prog in
+    ignore(Traces.TraceSymbolic.output_exploit Disasm_i386.X86 (exploit_file,Smtexec.STP.si) t1);
+    let t2 = Traces.add_payload Disasm_i386.X86 "\x00" prog in
     (* Null bytes are not allowed, so we should get an exception *)
     (* We need to cleanup traces in between runs, or we'll get an
        error. *)
     Traces.cleanup();
     let unsat =
       try
-        Traces.TraceSymbolic.output_exploit (exploit_file,Smtexec.STP.si) t2;
+        Traces.TraceSymbolic.output_exploit Disasm_i386.X86 (exploit_file,Smtexec.STP.si) t2;
         false
       with Failure "Formula was unsatisfiable"
       | Failure "No model found" -> true
@@ -58,7 +58,7 @@ let pin_stream_trace_test solver pin_out =
   skip_if (not (solver#in_path ())) (solver#solvername ^ " not on path");
   let open Traces.TraceSymbolicStream in
   let stream = Asmir.serialized_bap_stream_from_trace_file !Input.streamrate pin_out in
-  let streamf, finalf = Traces_stream.generate_formula formula_storage solver in
+  let streamf, finalf = Traces_stream.generate_formula Disasm_i386.X86 formula_storage solver in
   Stream.iter streamf stream;
   finalf ();
   match solver#solve_formula_file ~getmodel:true formula_storage with
@@ -75,7 +75,7 @@ let backwards_taint_test pin_out =
   Traces.cleanup();
   let prog = Asmir.serialized_bap_from_trace_file pin_out in
   typecheck prog;
-  let input_locations = Test_common.backwards_taint prog in
+  let input_locations = Test_common.backwards_taint Disasm_i386.X86 prog in
   (* The buffer is eight bytes large, so make sure all bytes are
      coming from after that.  This isn't exact, since copying eight bytes
      at a time (XMM register) could make us off by seven bytes, but that
