@@ -128,7 +128,7 @@ let varval_to_exp = function
   | ConcreteMem (m,v) -> symb_to_exp (conc2symb m v)
 
 (* Normalize a memory address, setting high bits to 0. *)
-let normalize i t = int64_of_big_int (Arithmetic.to_big_int (i,t))
+let normalize i t = addr_to_int64 (Arithmetic.to_big_int (i,t))
 
 module type MemLookup =
 sig

@@ -236,6 +236,7 @@ type opcode =
   | Interrupt of operand
   | Interrupt3 (* Trap to debugger *)
   | Sysenter
+  | Syscall
 
 (* prefix names *)
 let pref_lock = 0xf0
@@ -1994,7 +1995,7 @@ let rec to_ir mode addr next ss pref =
     [Special("int3", [])]
   | Interrupt(Oimm i) ->
     [Special(Printf.sprintf "int 0x%s" (Util.big_int_to_hex i), [])]
-  | Sysenter ->
+  | Sysenter | Syscall ->
     [Special("syscall", [])]
   (* Match everything exhaustively *)
   | Leave _ ->  unimplemented "to_ir: Leave"
@@ -2162,6 +2163,7 @@ module ToStr = struct
     | Interrupt(o) -> Printf.sprintf "int %s" (opr o)
     | Interrupt3 -> "int3"
     | Sysenter -> "sysenter"
+    | Syscall -> "syscall"
     | Pbinop(_,_,opstr,d,s) -> Printf.sprintf "%s %s, %s" opstr (opr d) (opr s)
     | Ppackedbinop(_,_,_,opstr,d,s) -> Printf.sprintf "%s %s, %s" opstr (opr d) (opr s)
 
@@ -2509,6 +2511,9 @@ let parse_instr mode g addr =
       (Push(prefix.bopsize, Oreg(rm_extend lor (b1 & 7))), na)
     | 0x58 | 0x59 | 0x5a | 0x5b | 0x5c | 0x5d | 0x5e | 0x5f ->
       (Pop(prefix.bopsize, Oreg(rm_extend lor (b1 & 7))), na)
+    | 0x63 -> let (r, rm, na) = parse_modrm_addr na in
+              let t = if prefix.opsize_override then r64 else r32 in
+              (Mov(t, rm, sign_ext r32 r t, None), na)
     | 0x68 | 0x6a  ->
       let (o, na) = 
         (* SWXXX Sign extend these? *)
@@ -2812,6 +2817,7 @@ let parse_instr mode g addr =
     | 0x0f -> (
       let b2 = Char.code (g na) and na = s na in
       match b2 with (* Table A-3 *)
+      | 0x05 -> (Syscall, na)
       | 0x1f ->
         (* Even though we don't use the operand to nop, we need to
            parse it to get the next address *)
