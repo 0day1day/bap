@@ -522,7 +522,7 @@ bool TaintTracker::taintPreSC(uint32_t callno, const uint64_t *args, /* out */ u
       case __NR_mmap:
       case __NR_mmap2:
         if (fds.find(args[4]) != fds.end()) {
-          cerr << "mmapping " << args[0] << endl;
+          cerr << "mmapping " << args[5] << endl;
           state = __NR_mmap2;
         }
         break;
@@ -712,13 +712,18 @@ FrameOption_t TaintTracker::taintPostSC(const uint32_t bytes,
       case __NR_mmap2:
       {
         addr = bytes;
-        fd = args[5];
+        fd = args[4];
         length = args[1];
-        uint32_t offset = args[6];
+        off_t offset;
+        assert (PIN_SafeCopy(&offset, (void*) args[5], sizeof(off_t)) == sizeof(off_t));
         cerr << "Tainting " 
              << length 
-             << "bytes from mmap" << endl;
-        return introMemTaint(addr, length, fds[fd].name.c_str(), (int64_t)offset);
+             << " bytes from mmap of fd "
+             << fd
+             << " at offset "
+             << offset
+             << endl;
+        return introMemTaint(addr, length, fds[fd].name.c_str(), offset);
         break;
       }
       case __NR_read:

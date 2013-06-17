@@ -60,9 +60,9 @@ static const RegMem_t INVALIDREGMEM = { NONE, 8 };// Size of temporary buffers
 #define MAX_SYSCALL_ARGS 9
   /** Number to record on this platform */
 #ifdef _WIN32
-#define PLAT_SYSCALL_ARGS MAX_SYSCALL_ARGS
+#define PLAT_SYSCALL_ARGS 9
 #else
-#define PLAT_SYSCALL_ARGS 5
+#define PLAT_SYSCALL_ARGS 6
 #endif
 
 #define REG_BASE 0x1
