@@ -79,16 +79,33 @@ let gamma_unextend = Hashtbl.remove
 
 let x86_regs = Asmir_vars.x86_regs
 let x86_mem = Asmir_vars.x86_mem
+let x64_regs = Asmir_vars.x64_regs
+let x64_mem = Asmir_vars.x64_mem
 let arm_regs = Asmir_vars.arm_regs
-let all_regs = Asmir_vars.all_regs
+let x86_all_regs = Asmir_vars.x86_all_regs
+let x64_all_regs = Asmir_vars.x64_all_regs
 
-let decls_for_arch = function
-  | Bfd_arch_i386 -> x86_mem::x86_regs
+let all_regs = function
+  | Disasm_i386.X86 -> x86_all_regs
+  | Disasm_i386.X8664 -> x64_all_regs
+
+let mem_of_mode = function
+  | Disasm_i386.X86 -> x86_mem
+  | Disasm_i386.X8664 -> x64_mem
+
+let decls_for_arch mode arch = match arch with
+  | Bfd_arch_i386 -> (match mode with
+    | Disasm_i386.X86 -> x86_mem::x86_regs
+    | Disasm_i386.X8664 -> x64_mem::x64_regs
+    )
   | Bfd_arch_arm  -> x86_mem::arm_regs
   | _ -> failwith "decls_for_arch: unsupported arch"
 
-let gamma_for_arch = function
-  | Bfd_arch_i386 -> gamma_create x86_mem x86_regs
+let gamma_for_arch mode arch = match arch with
+  | Bfd_arch_i386 -> (match mode with
+    | Disasm_i386.X86 -> gamma_create x86_mem x86_regs
+    | Disasm_i386.X8664 -> gamma_create x64_mem x64_regs
+    )
   | Bfd_arch_arm  -> gamma_create x86_mem arm_regs
   | _ -> failwith "gamma_for_arch: unsupported arch"
 

@@ -359,25 +359,18 @@ and mxcsr = nv "R_MXCSR" r32
 let nums = Array.init 8 (fun i -> nmv "ERROR" (Reg 0) (Printf.sprintf "R_R%d" (i+8)) r64)
 
 let xmms = Array.init 8 (fun i -> nv (Printf.sprintf "R_XMM%d" i) xmm_t)
-let xmms_x86_64 = Array.init 8 (fun i -> nmv "ERROR" (Reg 0) (Printf.sprintf "R_XMM%d" (i+8)) xmm_t)
+let xmms_x86_64 = Array.init 8 (fun i -> nv(Printf.sprintf "R_XMM%d" (i+8)) xmm_t)
 let xmm0 = xmms.(0)
 
-let ymms = Array.init 8 (fun i -> nmv "ERROR" (Reg 0) (Printf.sprintf "R_YMM%d" i) ymm_t)
+let ymms = Array.init 8 (fun i -> nv (Printf.sprintf "R_YMM%d" i) ymm_t)
 
 (* floating point registers *)
 let st = Array.init 8 (fun i -> nv (Printf.sprintf "R_ST%d" i) st_t)
 
 let mvs {v64; v32} = [v64; v32]
 
-let regs : var list =
-  cf::pf::af::zf::sf::oF::df::cs::ds::es::fs::gs::ss::fpu_ctrl::mxcsr::
-  List.flatten (List.map (fun {v64; v32} -> [v64; v32])
-  (rbp::rsp::rsi::rdi::rip::rax::rbx::rcx::rdx::rflags::fs_base::gs_base::(Array.to_list nums)
-  @(Array.to_list xmms_x86_64)
-  @(Array.to_list ymms)))
-  @ List.map (fun (n,t) -> Var.newvar n t)
-    [
-
+let misc_regs = 
+  [
   (* VEX left-overs from calc'ing condition flags *)
   ("R_CC_OP", r32);
   ("R_CC_DEP1", r32);
@@ -389,15 +382,34 @@ let regs : var list =
   ("R_ACFLAG", r32);
   ("R_EMWARN", r32);
   ("R_IP_AT_SYSCALL", r32);
-
+  
   (* floating point *)
   ("R_FTOP", r32);
   ("R_FPROUND", r32);
   ("R_FC3210", r32);
+  ]
 
-    ]
-    @ Array.to_list xmms
-    @ Array.to_list st   (* floating point *)
+let regs_x86 : var list =
+  cf::pf::af::zf::sf::oF::df::cs::ds::es::fs::gs::ss::fpu_ctrl::mxcsr::
+  List.map (fun {v64; v32} -> v32)
+    (rbp::rsp::rsi::rdi::rip::rax::rbx::rcx::rdx::rflags::fs_base::gs_base::[])
+  @ List.map (fun (n,t) -> Var.newvar n t) misc_regs
+  @ Array.to_list xmms
+  @ Array.to_list st   (* floating point *)
+
+let regs_x86_64 : var list =
+  cf::pf::af::zf::sf::oF::df::cs::ds::es::fs::gs::ss::fpu_ctrl::mxcsr::
+  List.map (fun {v64; v32} -> v64)
+    (rbp::rsp::rsi::rdi::rip::rax::rbx::rcx::rdx::rflags::fs_base::gs_base::(Array.to_list nums))
+  @ List.map (fun (n,t) -> Var.newvar n t) misc_regs
+  @ Array.to_list xmms
+  @ Array.to_list xmms_x86_64
+  @ Array.to_list ymms
+  @ Array.to_list st   (* floating point *)
+
+let regs_of_mode = function
+  | X86 -> regs_x86
+  | X8664 -> regs_x86_64
 
 let o_rax = Oreg 0
 and o_rcx = Oreg 1
@@ -964,7 +976,7 @@ let rec to_ir mode addr next ss pref =
       load_stmt::
       rsp_stmts@
       [Jmp(Var temp, reta)]
-  | Mov(t, dst, src, condition) when pref = [] || pref = [pref_addrsize] ->
+  | Mov(t, dst, src, condition) when pref = [] || pref = [pref_addrsize] || List.mem pref_fs pref ->
     let c_src = (match condition with 
       | None -> op2e t src
       | Some(c) -> ite t c (op2e t src) (op2e t dst))

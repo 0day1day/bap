@@ -5,7 +5,7 @@ open D
 let concrete_stream mode mem_hash concrete_state thread_map block return =
   let open Traces in
   let block = Memory2array.coerce_prog_state mem_hash block in
-  let memv = Memory2array.coerce_rvar_state mem_hash Asmir.x86_mem in
+  let memv = Memory2array.coerce_rvar_state mem_hash (Asmir.mem_of_mode mode) in
   let block = explicit_thread_stmts block thread_map in
   if return then
     run_block mode ~transformf:trace_transform_stmt concrete_state memv thread_map block
@@ -19,7 +19,7 @@ let concrete mode return =
     let concrete_state = Traces.TraceConcrete.create_state () in
     let thread_map = Traces.create_thread_map_state () in
     (* HACK to make sure default memory has a map to normalized memory *)
-    ignore(Memory2array.coerce_rvar_state mem_hash Asmir.x86_mem);
+    ignore(Memory2array.coerce_rvar_state mem_hash (Asmir.mem_of_mode mode));
     (fun block -> concrete_stream mode mem_hash concrete_state thread_map block return)
 
 module MakeStreamSymbolic (TraceSymbolic:Traces.TraceSymbolic with type user_init = Traces.standard_user_init with type output = unit) =
@@ -44,7 +44,7 @@ struct
     let concrete_state = Traces.TraceConcrete.create_state () in
     let thread_map = Traces.create_thread_map_state () in
     (* HACK to make sure default memory has a map to normalized memory *)
-    ignore(Memory2array.coerce_rvar_state mem_hash Asmir.x86_mem);
+    ignore(Memory2array.coerce_rvar_state mem_hash (Asmir.mem_of_mode mode));
     (* Streaming function *)
     (fun block ->
       let block = generate_formula_setup mode mem_hash concrete_state thread_map block in
@@ -56,7 +56,7 @@ struct
           TraceSymbolic.create_state (filename,solver)
       in
       last_state :=
-        Some (TraceSymbolic.symbolic_run_blocks state block)),
+        Some (TraceSymbolic.symbolic_run_blocks mode state block)),
 
     (* Output formula *)
     (fun () ->

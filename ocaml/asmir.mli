@@ -50,8 +50,10 @@ val tr_bap_blocks_t :
 *)
 
 
-val decls_for_arch : arch -> Ast.var list
-val gamma_for_arch : arch -> varctx
+val decls_for_arch : Disasm_i386.mode -> arch -> Ast.var list
+val gamma_for_arch : Disasm_i386.mode -> arch -> varctx
+
+val mem_of_mode : Disasm_i386.mode -> Var.t
 
 val get_asmprogram_arch : asmprogram -> arch
 val get_asmprogram_mach : asmprogram -> machine_t
@@ -59,8 +61,12 @@ val get_asmprogram_mode : asmprogram -> Disasm_i386.mode
 
 val x86_mem : Var.t
 val x86_regs : Var.t list
+val x64_mem : Var.t
+val x64_regs : Var.t list
+val x86_all_regs : Var.t list
+val x64_all_regs : Var.t list
 
-val all_regs : Var.t list
+val all_regs : Disasm_i386.mode -> Var.t list
 
 val open_program : ?base:Type.addr -> string -> asmprogram
 val asmprogram_to_bap : ?init_ro:bool -> asmprogram -> Ast.program

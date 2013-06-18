@@ -109,12 +109,12 @@ let global =
 (* Some wrappers to interface with the above datastructures *)
 
 (** Create a lookup for our variables *)
-let gamma = Asmir.gamma_for_arch Asmir.arch_i386
+let gamma mode = Asmir.gamma_for_arch mode Asmir.arch_i386
 
 (** Convert name of a register to a var for that register *)
-let name_to_var name =
+let name_to_var mode name =
   try
-    Some(Asmir.gamma_lookup gamma name)
+    Some(Asmir.gamma_lookup (gamma mode) name)
   with Failure _ ->
     if (name <> "Unknown") then wprintf "Did not find %s in gamma" name;
     None
@@ -297,9 +297,9 @@ let print_vars () =
 
     @param h Mapping of vars to dsa vars
 *)
-let assert_vars h =
+let assert_vars mode h =
   let addone k v a =
-    match name_to_var k with
+    match name_to_var mode k with
     | Some(realv) ->
         (match taint_val (Var.name realv) with
         | Some(true) ->
@@ -328,7 +328,7 @@ let assign_vars mode memv thread_map_lookup symbolic =
     | false -> []
   in
   let addone k v a =
-    match name_to_var k with
+    match name_to_var mode k with
     | Some(realv) ->
         let realv = thread_map_lookup realv in
         (* SWXXX Add another option for type of trace, if it is concrete, only
@@ -1567,9 +1567,9 @@ sig
 
   val create_state : user_init -> state
   (* Symbolically execute an entire trace at once *)
-  val symbolic_run : user_init -> stmt list -> state
+  val symbolic_run : Disasm_i386.mode -> user_init -> stmt list -> state
   (* Symbolically execute some blocks of a trace for streaming *)
-  val symbolic_run_blocks : state -> stmt list -> state
+  val symbolic_run_blocks : Disasm_i386.mode -> state -> stmt list -> state
   val generate_formula : Disasm_i386.mode -> user_init -> stmt list -> output
   val output_formula : state -> output
 
@@ -1600,14 +1600,14 @@ struct
                         h=VH.create 1000;
                         rh=VH.create 10000}
 
-  let symbolic_run_block ({h; rh; symstate} as state) stmt =
+  let symbolic_run_block mode ({h; rh; symstate} as state) stmt =
     let to_dsa stmt = to_dsa_stmt stmt h rh in
     let stmts = ref [] in
     (* dprintf "Dsa'ified stmt: %s" (Pp.ast_stmt_to_string stmt); *)
     Status.inc() ;
     let hasconc = update_concrete stmt in
     if hasconc && !consistency_check then (
-      stmts := !stmts @ [assert_vars h]
+      stmts := !stmts @ [assert_vars mode h]
     );
     stmts := List.map to_dsa (BatList.append !stmts [stmt]);
     dprintf "Evaluating stmt %s" (Pp.ast_stmt_to_string stmt);
@@ -1629,9 +1629,9 @@ struct
       ) symstate !stmts in
     {state with symstate}
 
-  let symbolic_run_blocks state trace =
+  let symbolic_run_blocks mode state trace =
     try
-      let state = List.fold_left symbolic_run_block state trace in
+      let state = List.fold_left (symbolic_run_block mode) state trace in
       state
     with
       | Failure fail as e ->
@@ -1646,7 +1646,7 @@ struct
           (*state.pred*)
           raise e
 
-  let symbolic_run userinit trace =
+  let symbolic_run mode userinit trace =
     Status.init "Symbolic Run" (List.length trace) ;
     let trace = append_halt trace in
     (*  VH.clear TaintSymbolic.dsa_map; *)
@@ -1656,7 +1656,7 @@ struct
     (* Find the memory variable *)
     let memv = find_memv trace in
     dprintf "Memory variable: %s" (Var.name memv);
-    let formula = symbolic_run_blocks state trace in
+    let formula = symbolic_run_blocks mode state trace in
     Status.stop () ;
     dsa_rev_map := None;
     formula
@@ -1671,7 +1671,7 @@ struct
       | true -> trace
       | false -> trace_dce trace
     in
-    let finalstate = symbolic_run i trace in
+    let finalstate = symbolic_run mode i trace in
     Form.output_formula finalstate.symstate.pred
 
   let output_formula state = Form.output_formula state.symstate.pred
@@ -1695,7 +1695,7 @@ struct
      wrong. *)
   let formula_valid_to_invalid mode ?(min=1) trace =
     let sym_and_output trace fname =
-      let finalstate = symbolic_run (fname,Smtexec.STP.si) trace in
+      let finalstate = symbolic_run mode (fname,Smtexec.STP.si) trace in
       Form.output_formula finalstate.symstate.pred;
     in
     let trace = concrete mode trace in
