@@ -300,6 +300,7 @@ let addr_t = r32
 let r64 = Ast.reg_64
 let r128 = Reg 128
 let xmm_t = Reg 128
+let ymm_t = Reg 256
 let st_t = Reg 80
 
 (** Only use this for registers, not temporaries *)
@@ -361,6 +362,8 @@ let xmms = Array.init 8 (fun i -> nv (Printf.sprintf "R_XMM%d" i) xmm_t)
 let xmms_x86_64 = Array.init 8 (fun i -> nmv "ERROR" (Reg 0) (Printf.sprintf "R_XMM%d" (i+8)) xmm_t)
 let xmm0 = xmms.(0)
 
+let ymms = Array.init 8 (fun i -> nmv "ERROR" (Reg 0) (Printf.sprintf "R_YMM%d" i) ymm_t)
+
 (* floating point registers *)
 let st = Array.init 8 (fun i -> nv (Printf.sprintf "R_ST%d" i) st_t)
 
@@ -369,7 +372,9 @@ let mvs {v64; v32} = [v64; v32]
 let regs : var list =
   cf::pf::af::zf::sf::oF::df::cs::ds::es::fs::gs::ss::fpu_ctrl::mxcsr::
   List.flatten (List.map (fun {v64; v32} -> [v64; v32])
-  (rbp::rsp::rsi::rdi::rip::rax::rbx::rcx::rdx::rflags::fs_base::gs_base::(Array.to_list nums)@(Array.to_list xmms_x86_64)))
+  (rbp::rsp::rsi::rdi::rip::rax::rbx::rcx::rdx::rflags::fs_base::gs_base::(Array.to_list nums)
+  @(Array.to_list xmms_x86_64)
+  @(Array.to_list ymms)))
   @ List.map (fun (n,t) -> Var.newvar n t)
     [
 
@@ -2511,9 +2516,13 @@ let parse_instr mode g addr =
       (Push(prefix.bopsize, Oreg(rm_extend lor (b1 & 7))), na)
     | 0x58 | 0x59 | 0x5a | 0x5b | 0x5c | 0x5d | 0x5e | 0x5f ->
       (Pop(prefix.bopsize, Oreg(rm_extend lor (b1 & 7))), na)
-    | 0x63 -> let (r, rm, na) = parse_modrm_addr na in
-              let t = if prefix.opsize_override then r64 else r32 in
-              (Mov(t, rm, sign_ext r32 r t, None), na)
+    | 0x63 when mode = X8664 -> 
+      let (r, rm, na) = parse_modrm_addr na in
+      let t = match prefix.rex with
+        | Some {rex_w=true} -> r64
+        | _ -> r32 
+      in
+      (Movsx(t, rm, r32, r), na)
     | 0x68 | 0x6a  ->
       let (o, na) = 
         (* SWXXX Sign extend these? *)
@@ -2817,7 +2826,7 @@ let parse_instr mode g addr =
     | 0x0f -> (
       let b2 = Char.code (g na) and na = s na in
       match b2 with (* Table A-3 *)
-      | 0x05 -> (Syscall, na)
+      | 0x05 when mode = X8664 -> (Syscall, na)
       | 0x1f ->
         (* Even though we don't use the operand to nop, we need to
            parse it to get the next address *)
