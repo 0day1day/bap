@@ -1248,11 +1248,10 @@ VOID AppendBuffer(ADDRINT addr,
                 case P_REF:
                     dbg_printf("in AppendBuffer: getting register value.\n");
                     pr = (LEVEL_VM::PIN_REGISTER*) values[i].value.MEM_ACCESS[0];
-                    cerr << "pr: " << pr << endl;
                     memcpy(&(g_buffer[g_bufidx].valspecs[i].value),
                            pr,
                            sizeof(LEVEL_VM::PIN_REGISTER));
-                    dbg_printf("in AppendBuffer: got register value.\n");
+                    dbg_printf("in AppendBuffer: got register value %#Lx.\n", pr);
                     break;
 
                 case P_FPX87:
