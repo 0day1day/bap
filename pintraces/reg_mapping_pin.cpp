@@ -264,32 +264,49 @@ switch (id) {
     case REG_XMM15:
       return string("R_XMM15");
 #endif
-      /*
-    case REG_YMM_BASE:
-    case REG_YMM0 = case REG_YMM_BASE:
+
+    case REG_YMM0:
+      return string("R_YMM0");
     case REG_YMM1:
+      return string("R_YMM1");
     case REG_YMM2:
+      return string("R_YMM2");
     case REG_YMM3:
+      return string("R_YMM3");
     case REG_YMM4:
+      return string("R_YMM4");
     case REG_YMM5:
+      return string("R_YMM5");
     case REG_YMM6:
+      return string("R_YMM6");
     case REG_YMM7:
+      return string("R_YMM7");
+
 
 #if defined(TARGET_IA32E)
     // additional ymm registers in the Intel(R) 64 architecture
     case REG_YMM8:
+      return string("R_YMM8");
     case REG_YMM9:
+      return string("R_YMM9");
     case REG_YMM10:
+      return string("R_YMM10");
     case REG_YMM11:
+      return string("R_YMM11");
     case REG_YMM12:
+      return string("R_YMM12");
     case REG_YMM13:
+      return string("R_YMM13");
     case REG_YMM14:
+      return string("R_YMM14");
     case REG_YMM15:
-    case REG_YMM_LAST = case REG_YMM15:
+      return string("R_YMM15");
+
 #else
-    case REG_YMM_LAST = case REG_YMM7:
+    case REG_YMM_LAST:
+      return string("R_YMM7");
 #endif
-      */
+
  case REG_MXCSR:
      return string("R_MXCSR");
         /*
