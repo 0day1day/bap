@@ -369,43 +369,23 @@ let st = Array.init 8 (fun i -> nv (Printf.sprintf "R_ST%d" i) st_t)
 
 let mvs {v64; v32} = [v64; v32]
 
-let misc_regs = 
-  [
-  (* VEX left-overs from calc'ing condition flags *)
-  ("R_CC_OP", r32);
-  ("R_CC_DEP1", r32);
-  ("R_CC_DEP2", r32);
-  ("R_CC_NDEP", r32);
+let shared_regs =
+  cf::pf::af::zf::sf::oF::df::cs::ds::es::fs::gs::ss::fpu_ctrl::mxcsr::[]
+  @ Array.to_list xmms
+  @ Array.to_list st
 
-  (* status flags/misc *)
-  ("R_IDFLAG", r32);
-  ("R_ACFLAG", r32);
-  ("R_EMWARN", r32);
-  ("R_IP_AT_SYSCALL", r32);
-  
-  (* floating point *)
-  ("R_FTOP", r32);
-  ("R_FPROUND", r32);
-  ("R_FC3210", r32);
-  ]
+let shared_multi_regs =
+  rbp::rsp::rsi::rdi::rip::rax::rbx::rcx::rdx::rflags::fs_base::gs_base::[]
 
 let regs_x86 : var list =
-  cf::pf::af::zf::sf::oF::df::cs::ds::es::fs::gs::ss::fpu_ctrl::mxcsr::
-  List.map (fun {v64; v32} -> v32)
-    (rbp::rsp::rsi::rdi::rip::rax::rbx::rcx::rdx::rflags::fs_base::gs_base::[])
-  @ List.map (fun (n,t) -> Var.newvar n t) misc_regs
-  @ Array.to_list xmms
-  @ Array.to_list st   (* floating point *)
+  shared_regs
+  @ List.map (fun {v64; v32} -> v32) shared_multi_regs
 
 let regs_x86_64 : var list =
-  cf::pf::af::zf::sf::oF::df::cs::ds::es::fs::gs::ss::fpu_ctrl::mxcsr::
-  List.map (fun {v64; v32} -> v64)
-    (rbp::rsp::rsi::rdi::rip::rax::rbx::rcx::rdx::rflags::fs_base::gs_base::(Array.to_list nums))
-  @ List.map (fun (n,t) -> Var.newvar n t) misc_regs
-  @ Array.to_list xmms
+  shared_regs
+  @ List.map (fun {v64; v32} -> v64) (shared_multi_regs @ (Array.to_list nums))
   @ Array.to_list xmms_x86_64
   @ Array.to_list ymms
-  @ Array.to_list st   (* floating point *)
 
 let regs_of_mode = function
   | X86 -> regs_x86
