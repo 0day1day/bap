@@ -57,7 +57,7 @@ let pin_path = (*ref "../pin/";;*)
   let path = try Sys.getenv("PIN_HOME") with Not_found -> "../pin/" in
   ref path;;
 let pin = "pin";;
-let gentrace_path = "../pintraces/obj-ia32/";;
+let gentrace_path = "../pintraces/obj-intel64/";;
 let gentrace = "gentrace.so";;
 let pin_out_suffix = "-bap-pin-test.out";;
 
