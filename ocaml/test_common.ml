@@ -108,7 +108,6 @@ let rec find_call prog =
     | _ -> find_call ps;;
 
 
-(* Return list of statments between start_addr and end_addr *)
 let inject_stmt prog start_addr asm stmt = 
   let rec inject_stmt_k stmts starta asm_str inj_stmt k =
     match stmts with
@@ -170,7 +169,7 @@ let check_functions msg ranges names =
 
 let typecheck p = Typecheck.typecheck_prog p;;
 
-(* Return list of statments between start_addr and end_addr *)
+(* Return list of statements between start_addr and end_addr *)
 let find_prog_chunk prog start_addr end_addr = 
   let rec find_prog_chunk_k prog starta enda k =
     match prog, starta with
