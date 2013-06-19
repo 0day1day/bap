@@ -1,4 +1,4 @@
-AM_CXXFLAGS = -I../pb -I.. -I@LIBTRACE_DIR@/src/common -I@LIBTRACE_DIR@/protobuf/src
+AM_CPPFLAGS = -I../pb -I.. -I@LIBTRACE_DIR@/src/common -I@LIBTRACE_DIR@/protobuf/src
 # We need protobuf as a 64 bit library to use gentrace as a 64 bit pintool.
 # AM_CXXFLAGS += -m32
 

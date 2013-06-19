@@ -16,6 +16,7 @@ let mk_attr lab string =
   | "set" when string = "liveout" -> Liveout
   | "set" when string = "initro" -> InitRO
   | "set" when string = "synthetic" -> Synthetic
+  | "set" when string = "specialblock" -> SpecialBlock
   | "str" | "attr" -> StrAttr string
   | "tid" -> ThreadId(int_of_string string)
   | _ -> err ("Unknown attribute @"^lab)

@@ -12,9 +12,9 @@
     - [bbn] postdominates all other basic blocks in [seq].
 *)
 
-val coalesce_ast : Cfg.AST.G.t -> Cfg.AST.G.t
+val coalesce_ast : ?nocoalesce : Cfg.AST.G.V.t list -> Cfg.AST.G.t -> Cfg.AST.G.t
 (** coalesce_ast [cfg] returns a new AST CFG in which sequential basic
     blocks in [cfg] are coalesced into a single basic block. *)
-val coalesce_ssa : Cfg.SSA.G.t -> Cfg.SSA.G.t
+val coalesce_ssa : ?nocoalesce : Cfg.SSA.G.V.t list -> Cfg.SSA.G.t -> Cfg.SSA.G.t
 (** coalesce_ssa [cfg] returns a new SSA CFG in which sequential basic
     blocks in [cfg] are coalesced into a single basic block. *)

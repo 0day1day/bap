@@ -8,7 +8,8 @@ open D
 
 module type CFG' = sig
   include CFG
-  val is_safe_to_coalesce: lang -> bool (* Is the BB safe to coalesce to the start of another BB? True for BBs consisting only of labels, comments, etc. *)
+  val is_safe_coalesce_dst : G.t -> G.V.t -> bool (* Is it safe to coalesce other BBs after this BB? *)
+  val is_safe_coalesce_src: G.t -> G.V.t -> bool (* Is the BB safe to coalesce to the start of another BB? True for BBs consisting only of labels, comments, etc. *)
 end
 
 module MakeCoalesce (C: CFG') =
@@ -25,7 +26,7 @@ struct
   *    b) n2 has n1 as its only predecessor
   *       OR all nodes before n1 have safe stmts (comments, labels, etc.)
   *)
-  let coalesce cfg =
+  let coalesce ?(nocoalesce=[]) cfg =
    let module CC = Checks.MakeConnectedCheck(C) in
    let () = CC.connected_check cfg "coalesce" in
    let entry_node = C.find_vertex cfg BB_Entry in
@@ -38,15 +39,16 @@ struct
        let worklist, graph =
         (* we start with a node init *)
          let rec immediate_succs ?(safe=true) acc node =
-           let stmts = C.get_stmts graph node in
-           let node_safe = C.is_safe_to_coalesce stmts in
-           let safe = safe && node_safe in
+           let node_safe = C.is_safe_coalesce_src graph node in
+           let allowed = List.mem node nocoalesce = false in
+           let safe = safe && node_safe && allowed in
            match G.succ graph node with
            | [successor] when not (List.mem successor acc)
                && not (isspecial successor) ->
              (match G.pred graph successor with
              | [] -> failwith "node's successor has no predecessor"
-             | [_] when not (isspecial successor) ->
+             | [_] when not (isspecial successor) &&
+                 not (List.mem successor nocoalesce) ->
                immediate_succs ~safe (successor::acc) successor
              | multiplepreds when safe ->
                (* node's successor has multiple predecessors.
@@ -64,7 +66,11 @@ struct
         (* let's get the immediate successor nodes that follow the node.
            In this context, immediate means: n1 -> n2 -> n3 -> (n4|n5)
            should return [n3; n2; n1] *)
-        let successors = immediate_succs [] init in
+        let successors =
+          if C.is_safe_coalesce_dst graph init
+          then immediate_succs [] init
+          else []
+        in
         if successors <> [] then (
           (* Now let's coalesce them cleverly *)
           dprintf "Coalescing %s +%s" (C.v2s init) (List.fold_left (fun s v -> s ^ " " ^ (C.v2s v)) "" successors);
@@ -79,8 +85,11 @@ struct
           let successors_of_successors_e = G.succ_e graph (List.hd successors) in
           let newsuccessors = G.succ graph (List.hd successors) in
           let add_edge graph edge =
-            dprintf "Adding edge from %s to %s" (C.v2s init) (C.v2s (C.G.E.dst edge));
-            let newedge = C.G.E.create init (C.G.E.label edge) (C.G.E.dst edge) in
+            (* self loop *)
+            let dest = C.G.E.dst edge in
+            let newdest = if List.mem dest successors then init else dest in
+            dprintf "Adding edge from %s to %s" (C.v2s init) (C.v2s newdest);
+            let newedge = C.G.E.create init (C.G.E.label edge) newdest in
             C.add_edge_e graph newedge
           in
           let graph = List.fold_left add_edge graph successors_of_successors_e in
@@ -136,7 +145,8 @@ struct
       let rs = Ast.Comment(str, []) in
       List.rev (rs::tl)
     | _ -> p
-  let is_safe_to_coalesce p =
+  let is_safe_coalesce_src g v =
+    let p = get_stmts g v in
     let is_safe_to_coalesce_stmt = function
       | Ast.Comment _
       | Ast.Label _ -> true
@@ -144,6 +154,9 @@ struct
     in
     let p = remove_redundant_jump p in
     List.for_all is_safe_to_coalesce_stmt p
+  let is_safe_coalesce_dst g v = match G.V.label v with
+    | BB _ -> true
+    | _ -> false
 end
 
 module SSA' =
@@ -156,7 +169,8 @@ struct
       let rs = Ssa.Comment(str, []) in
       List.rev (rs::tl)
     | _ -> p
-  let is_safe_to_coalesce p =
+  let is_safe_coalesce_src g v =
+    let p = get_stmts g v in
     let is_safe_to_coalesce_stmt = function
       | Ssa.Comment _
       | Ssa.Label _ -> true
@@ -164,6 +178,9 @@ struct
     in
     let p = remove_redundant_jump p in
     List.for_all is_safe_to_coalesce_stmt p
+  let is_safe_coalesce_dst g v = match G.V.label v with
+    | BB _ -> true
+    | _ -> false
 end
 
 module AST_Coalesce = MakeCoalesce(AST')

@@ -589,7 +589,7 @@ let lookup_thread_map map threadIDopt (Var.V(_,_,t) as avar) =
 
 (** Rename variables so they are unique to the thread they are found in *)
 let explicit_thread_stmts stmts thread_map =
-  (* check if tid is in first or second statment.  If it isn't, use None and
+  (* check if tid is in first or second statement.  If it isn't, use None and
      don't change any variables *)
   let tid = ref (get_tid stmts)
   in
@@ -969,12 +969,12 @@ let check_delta state =
               with Not_found ->
                 (* This is a little weird if this happens... *)
                 "special{"^(Pp.ast_stmt_to_string !last_special)^"}"
-            in
-            let traceval_str = Pp.ast_exp_to_string traceval in
-            let evalval_str = Pp.ast_exp_to_string evalval in
-            wprintf "Difference between %sBAP and trace values for [*%s* Trace=%s Eval=%s]" s dsavarname traceval_str evalval_str;
-            wprintf "This is due to one of the following statements:\n%s"  badstmt;
-          )
+	    in
+	    let traceval_str = Pp.ast_exp_to_string traceval in
+	    let evalval_str = Pp.ast_exp_to_string evalval in
+	    wprintf "Difference between %sBAP and trace values for [*%s* Trace=%s Eval=%s]" s dsavarname traceval_str evalval_str;
+	    wprintf "This is due to one of the following statements:\n%s"  badstmt;
+	  )
       (* If we can't find concrete value, it's probably just a BAP 
          temporary *)
       | _ -> ())

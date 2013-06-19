@@ -108,7 +108,6 @@ let rec find_call prog =
     | _ -> find_call ps;;
 
 
-(* Return list of statements between start_addr and end_addr *)
 let inject_stmt prog start_addr asm stmt = 
   let rec inject_stmt_k stmts starta asm_str inj_stmt k =
     match stmts with
