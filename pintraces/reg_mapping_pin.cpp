@@ -302,9 +302,6 @@ switch (id) {
     case REG_YMM15:
       return string("R_YMM15");
 
-#else
-    case REG_YMM_LAST:
-      return string("R_YMM7");
 #endif
 
  case REG_MXCSR:

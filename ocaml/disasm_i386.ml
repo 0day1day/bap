@@ -71,6 +71,7 @@ type direction = Forward | Backward
 type operand =
   | Oreg of int
   | Oxmm of int
+  | Oymm of int 
   | Oseg of int
   | Oaddr of Ast.exp
   | Oimm of big_int
@@ -299,6 +300,7 @@ let r32 = Ast.reg_32
 let addr_t = r32
 let r64 = Ast.reg_64
 let r128 = Reg 128
+let r256 = Reg 256
 let xmm_t = Reg 128
 let ymm_t = Reg 256
 let st_t = Reg 80
@@ -617,6 +619,8 @@ let bits2genreg = function
 
 let bits2xmm b = xmms.(b)
 
+let bits2ymm b = ymms.(b)
+
 and reg2bits r =
   let (i,_) = BatList.findi (fun _ x -> x == r) [rax; rcx; rdx; rbx; rsp; rbp; rsi; rdi] in
   i
@@ -637,6 +641,8 @@ let bits2xmme b = Var(bits2xmm b)
 
 let bits2xmm64e b =
   cast_low r64 (bits2xmme b)
+
+let bits2ymme b = Var(bits2ymm b)
 
 let bits2reg64e mode b =
   ge mode (bits2genreg b)
@@ -716,6 +722,8 @@ let op2e_s mode ss t = function
   | Oxmm r when t = r128 -> bits2xmme r
   | Oxmm r when t = r64 -> bits2xmme r
   | Oxmm r -> disfailwith "invalid xmm size"
+  | Oymm r when t = r256 -> bits2ymme r
+  | Oymm r -> disfailwith "invalid ymm size"
   | Oreg r when t = r64 -> bits2reg64e mode r
   | Oreg r when t = r32 -> bits2reg32e mode r
   | Oreg r when t = r16 -> bits2reg16e mode r
@@ -754,6 +762,10 @@ let assn_s mode s t v e =
     let v = bits2xmm r in
     sub_assn t v e
   | Oxmm r, _ -> disfailwith "unknown xmm type"
+  | Oymm r, Reg 256 ->
+    let v = bits2ymm r in
+    sub_assn t v e
+  | Oymm r, _ -> disfailwith "unknown ymm type"
   | Oreg r, Reg (64|32|16) ->
     let v = gv mode (bits2genreg r) in
     sub_assn t v e
@@ -1014,6 +1026,7 @@ let rec to_ir mode addr next ss pref =
   | Movdq(t, td, d, ts, s, align, _name) ->
     let (s, al) = match s with
       | Oxmm _ -> op2e ts s, []
+      | Oymm _ -> op2e ts s, []
       | Oaddr a -> op2e ts s, [a]
       | Oreg _ | Oimm _ | Oseg _ -> disfailwith "invalid"
     in
@@ -1031,6 +1044,7 @@ let rec to_ir mode addr next ss pref =
     in
     let (d, al) = match d with
       | Oxmm i -> assn td d s, al
+      | Oymm i -> assn td d s, al
       | Oaddr a -> assn td d s, a::al
       | Oreg _ | Oimm _ | Oseg _ -> disfailwith "invalid"
     in
@@ -1085,6 +1099,7 @@ let rec to_ir mode addr next ss pref =
     let elebits = bits_of_width elet in
     let src = match src with
       | Oxmm i -> op2e t src
+      | Oymm i -> op2e t src
       | Oaddr a -> load t a
       | Oreg _ | Oimm _ | Oseg _ -> disfailwith "invalid"
     in
@@ -1545,7 +1560,7 @@ let rec to_ir mode addr next ss pref =
             let byte = load r8 (a +* (offset >>* (it 3 t))) in
             let shift = (cast_low r8 offset) &* (it 7 r8) in
             byte, shift
-        | Oxmm _ | Oseg _ | Oimm _ -> disfailwith "Invalid bt operand"
+        | Oxmm _ | Oymm _ | Oseg _ | Oimm _ -> disfailwith "Invalid bt operand"
       in
       [
         move cf (cast_low r1 (value >>* shift));
@@ -2044,6 +2059,8 @@ module ToStr = struct
         | v -> unimplemented (Printf.sprintf "Don't know what oreg %i is." v)
 
   let oxmm2str i = "xmm"^(string_of_int i)
+  
+  let oymm2str i = "ymm"^(string_of_int i)
 
   let sreg2str = function
     | 0 -> "es"
@@ -2057,6 +2074,7 @@ module ToStr = struct
   let opr = function
     | Oreg v -> oreg2str v
     | Oxmm v -> oxmm2str v
+    | Oymm v -> oymm2str v
     | Oseg v -> sreg2str v
     | Oimm i -> Printf.sprintf "$0x%s" (Util.big_int_to_hex i)
     | Oaddr a -> Pp.ast_exp_to_string a
