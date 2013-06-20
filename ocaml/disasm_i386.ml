@@ -263,6 +263,17 @@ type rex = {
                    field, or opcode reg field *)
 }
 
+type vex = {
+  vex_nr : bool; (* inverted rex_r bit *)
+  vex_nx : bool option; (* inverted rex_x bit *)
+  vex_nb : bool option; (* inverted rex_b bit *)
+  vex_map_select : int option; (* Specifies the opcode map to use (we don't use this) *)
+  vex_we : bool option; (* For int instructions, equivalent to rex.w. For non-int instructions, opcode extension bit. *)
+  vex_v : int; (* additional instruction operand (XMM or YMM register) *)
+  vex_l : bool; (* 0 = 128-bit operands (xmm), 1 = 256-bit vector operands (ymm) *)
+  vex_pp : int; (* Specifies mandatory prefix (0=none, 1=pref_opsize 2=repz 3=repnz) *)
+}
+
 type prefix = {
   addrsize : typ;
   opsize   : typ; (* General operand size *)
@@ -274,6 +285,7 @@ type prefix = {
   addrsize_override : bool;
   opsize_override : bool;
   rex : rex option;
+  vex : vex option;
   r_extend : int; (* extended r bit *)
   rm_extend : int; (* extended rm bit or sib base *)
   sib_extend : int; (* extended sib index bit *)
@@ -2241,7 +2253,41 @@ let parse_instr mode g addr =
       rex_b = i land 0x1 = 0x1;
     }
   in
-
+  let get_vex a =
+    if mode = X86 then None, a else
+    match Char.code (g a) with
+    (* 3-byte prefix *)
+    | 0xc4 | 0x8f -> 
+      let a = (s a) in
+      let b1, a = Char.code (g a), (s a) in
+      let b2, a = Char.code (g a), (s a) in
+      Some {
+        vex_nr = b1 land 0x80 = 0x80;
+        vex_nx = Some (b1 land 0x40 = 0x40);
+        vex_nb = Some (b1 land 0x20 = 0x20);
+        vex_map_select = Some (b1 land 0x1f);
+        vex_we = Some (b2 land 0x80 = 0x80);
+        vex_v = (b2 land 0x78) >> 3;
+        vex_l = b2 land 0x4 = 0x4;
+        vex_pp = b2 land 0x3;
+      }, a
+    (* 2-byte prefix *)
+    | 0xc5 -> 
+      let a = (s a) in
+      let b1, a = Char.code (g a), (s a) in
+      Some {
+        vex_nr = b1 land 0x80 = 0x80;
+        vex_nx = None;
+        vex_nb = None;
+        vex_map_select = None;
+        vex_we = None;
+        vex_v = (b1 land 0x78) >> 3;
+        vex_l = b1 land 0x4 = 0x4;
+        vex_pp = b1 land 0x3;
+      }, a
+    | _ -> None, a
+  in
+      
 (*  let int2prefix ?(jmp=false) = function
     | 0xf0 -> Some Lock
     | 0xf2 -> Some Repnz
@@ -3125,6 +3171,7 @@ let parse_instr mode g addr =
 
   in
   let rex, pref, a = get_prefixes addr in
+  let vex, a = get_vex a in
   let rex = BatOption.map parse_rex rex in
   (* Opsize for regular instructions, MMX/SSE2 instructions
 
@@ -3162,6 +3209,7 @@ let parse_instr mode g addr =
       addrsize_override = List.mem pref_addrsize pref;
       opsize_override = List.mem pref_opsize pref;
       rex;
+      vex;
       r_extend;
       rm_extend;
       sib_extend;
