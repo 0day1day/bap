@@ -2118,7 +2118,7 @@ module ToStr = struct
     | Movzx(dt,dst,st,src) -> Printf.sprintf "movzx %s, %s" (opr ~t:dt dst) (opr ~t:st src)
     | Movsx(dt,dst,st,src) -> Printf.sprintf "movsx %s, %s" (opr ~t:dt dst) (opr ~t:st src)
     | Movdq(_t,td,d,ts,s,align,name) ->
-      Printf.sprintf "%s %s, %s" name (opr ~td d) (opr ~ts s)
+      Printf.sprintf "%s %s, %s" name (opr ~t:td d) (opr ~t:ts s)
     | Palignr(t,dst,src,imm) -> Printf.sprintf "palignr %s, %s, %s" (opr ~t dst) (opr ~t src) (opr imm)
     | Punpck(dt,_,o,d,s) ->
       let o = match o with | High -> "h" | Low -> "l" in
@@ -2532,7 +2532,7 @@ let parse_instr mode g addr =
      them to Ovec if necessary.*)
   let parse_modrm_vec rex vex at ia a =
     let b, r, modb, rm, na = parse_modrmbits_vec vex a in
-    let (r, rm, na) = parse_modrmint_vec vex at ia a b r modb rm na in
+    let (r, rm, na) = parse_modrmint_vec rex vex at ia a b r modb rm na in
     (Oreg r, rm, na)
   in
   let _ = parse_modrm_vec in (* XXX: shut the compiler up temporarily *)
