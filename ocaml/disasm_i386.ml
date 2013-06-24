@@ -2112,24 +2112,24 @@ module ToStr = struct
       | Some (_,src) -> Printf.sprintf "ret %s" (opr src)
       | None -> "ret")
     | Nop -> "nop"
-    | Mov(t,d,s,None) -> Printf.sprintf "mov %s, %s" (opr ~t:t d) (opr ~t:t s)
-    | Mov(t,d,s,Some(_)) -> Printf.sprintf "cmov %s, %s" (opr ~t:t d) (opr ~t:t s)
+    | Mov(t,d,s,None) -> Printf.sprintf "mov %s, %s" (opr ~t d) (opr ~t s)
+    | Mov(t,d,s,Some(_)) -> Printf.sprintf "cmov %s, %s" (opr ~t d) (opr ~t s)
     | Movs(t) -> "movs"
     | Movzx(dt,dst,st,src) -> Printf.sprintf "movzx %s, %s" (opr ~t:dt dst) (opr ~t:st src)
     | Movsx(dt,dst,st,src) -> Printf.sprintf "movsx %s, %s" (opr ~t:dt dst) (opr ~t:st src)
     | Movdq(_t,td,d,ts,s,align,name) ->
-      Printf.sprintf "%s %s, %s" name (opr ~t:td d) (opr ~t:ts s)
-    | Palignr(t,dst,src,imm) -> Printf.sprintf "palignr %s, %s, %s" (opr ~t:t dst) (opr ~t:t src) (opr imm)
+      Printf.sprintf "%s %s, %s" name (opr ~td d) (opr ~ts s)
+    | Palignr(t,dst,src,imm) -> Printf.sprintf "palignr %s, %s, %s" (opr ~t dst) (opr ~t src) (opr imm)
     | Punpck(dt,_,o,d,s) ->
       let o = match o with | High -> "h" | Low -> "l" in
       Printf.sprintf "punpck%s %s, %s" o (opr ~t:dt d) (opr ~t:dt s)
-    | Pcmpstr(t,dst,src,imm,_,_) -> Printf.sprintf "pcmpstr %s, %s, %s" (opr ~t:t dst) (opr ~t:t src) (opr imm)
+    | Pcmpstr(t,dst,src,imm,_,_) -> Printf.sprintf "pcmpstr %s, %s, %s" (opr ~t dst) (opr ~t src) (opr imm)
     | Pshufd(dst,src,imm) -> Printf.sprintf "pshufd %s, %s, %s" (opr ~t:r128 dst) (opr ~t:r128 src) (opr imm)
-    | Pshufb(t,dst,src) -> Printf.sprintf "pshufb %s, %s" (opr ~t:t dst) (opr ~t:t src)
-    | Pcmp(t,elet,_,str,dst,src) -> Printf.sprintf "%s %s, %s" str (opr ~t:t dst) (opr ~t:t src)
-    | Pmov(t,_,_,dst,src,_,name) -> Printf.sprintf "%s %s, %s" name (opr ~t:t dst) (opr ~t:t src)
-    | Pmovmskb(t,dst,src) -> Printf.sprintf "pmovmskb %s, %s" (opr ~t:t dst) (opr ~t:t src)
-    | Lea(t,r,a) -> Printf.sprintf "lea %s, %s" (opr ~t:t r) (opr (Oaddr a))
+    | Pshufb(t,dst,src) -> Printf.sprintf "pshufb %s, %s" (opr ~t dst) (opr ~t src)
+    | Pcmp(t,elet,_,str,dst,src) -> Printf.sprintf "%s %s, %s" str (opr ~t dst) (opr ~t src)
+    | Pmov(t,_,_,dst,src,_,name) -> Printf.sprintf "%s %s, %s" name (opr ~t dst) (opr ~t src)
+    | Pmovmskb(t,dst,src) -> Printf.sprintf "pmovmskb %s, %s" (opr ~t dst) (opr ~t src)
+    | Lea(t,r,a) -> Printf.sprintf "lea %s, %s" (opr ~t r) (opr (Oaddr a))
     | Call(a, ra) -> Printf.sprintf "call %s" (opr a)
     | Shift _ -> "shift"
     | Shiftd _ -> "shiftd"
@@ -2138,7 +2138,7 @@ module ToStr = struct
         | LSHIFT -> if (use_cf) then "rcl" else "rol"
         | RSHIFT -> if (use_cf) then "rcr" else "ror"
         | _ -> disfailwith "impossible" in
-      Printf.sprintf "%s %s, %s" base (opr ~t:t src) (opr shift)
+      Printf.sprintf "%s %s, %s" base (opr ~t src) (opr shift)
     | Hlt -> "hlt"
     | Rdtsc -> "rdtsc"
     | Cpuid -> "cpuid"
@@ -2150,59 +2150,59 @@ module ToStr = struct
     | Fst (o,b) -> (match b with 
       | true -> Printf.sprintf "fstp %s" (opr o)
       | false -> Printf.sprintf "fst %s" (opr o))
-    | Inc (t, o) -> Printf.sprintf "inc %s" (opr ~t:t o)
-    | Dec (t, o) -> Printf.sprintf "dec %s" (opr ~t:t o)
+    | Inc (t, o) -> Printf.sprintf "inc %s" (opr ~t o)
+    | Dec (t, o) -> Printf.sprintf "dec %s" (opr ~t o)
     | Jump a -> Printf.sprintf "jmp %s" (j2str a)
-    | Bt(t,d,s) -> Printf.sprintf "bt %s, %s" (opr ~t:t d) (opr ~t:t s)
-    | Bs(t,d,s,dir) -> Printf.sprintf "bs%s %s, %s" (opr ~t:t d) (opr ~t:t s) (match dir with Forward -> "f" | Backward -> "r")
+    | Bt(t,d,s) -> Printf.sprintf "bt %s, %s" (opr ~t d) (opr ~t s)
+    | Bs(t,d,s,dir) -> Printf.sprintf "bs%s %s, %s" (opr ~t d) (opr ~t s) (match dir with Forward -> "f" | Backward -> "r")
     | Jcc _ -> "jcc"
     | Setcc _ -> "setcc"
     | Cmps _ -> "cmps"
     | Scas _ -> "scas"
     | Stos _ -> "stos"
-    | Push(t,o) -> Printf.sprintf "push %s" (opr ~t:t o)
-    | Pop(t,o) -> Printf.sprintf "pop %s" (opr ~t:t o)
+    | Push(t,o) -> Printf.sprintf "push %s" (opr ~t o)
+    | Pop(t,o) -> Printf.sprintf "pop %s" (opr ~t o)
     | Pushf _ -> "pushf"
     | Popf _ -> "popf"
     | Sahf -> "sahf"
     | Lahf -> "lahf"
-    | Add(t,d,s) -> Printf.sprintf "add %s, %s" (opr ~t:t d) (opr ~t:t s)
-    | Adc(t,d,s) -> Printf.sprintf "adc %s, %s" (opr ~t:t d) (opr ~t:t s)
-    | Sub(t,d,s) -> Printf.sprintf "sub %s, %s" (opr ~t:t d) (opr ~t:t s)
-    | Sbb(t,d,s) -> Printf.sprintf "sbb %s, %s" (opr ~t:t d) (opr ~t:t s)
-    | Cmp(t,d,s) -> Printf.sprintf "cmp %s, %s" (opr ~t:t d) (opr ~t:t s)
-    | Cmpxchg(t,d,s) -> Printf.sprintf "cmpxchg %s, %s" (opr ~t:t d) (opr ~t:t s)
+    | Add(t,d,s) -> Printf.sprintf "add %s, %s" (opr ~t d) (opr ~t s)
+    | Adc(t,d,s) -> Printf.sprintf "adc %s, %s" (opr ~t d) (opr ~t s)
+    | Sub(t,d,s) -> Printf.sprintf "sub %s, %s" (opr ~t d) (opr ~t s)
+    | Sbb(t,d,s) -> Printf.sprintf "sbb %s, %s" (opr ~t d) (opr ~t s)
+    | Cmp(t,d,s) -> Printf.sprintf "cmp %s, %s" (opr ~t d) (opr ~t s)
+    | Cmpxchg(t,d,s) -> Printf.sprintf "cmpxchg %s, %s" (opr ~t d) (opr ~t s)
     | Cmpxchg8b(o) -> Printf.sprintf "cmpxchg8b %s" (opr o)
-    | Xadd(t,d,s) -> Printf.sprintf "xadd %s, %s" (opr ~t:t d) (opr ~t:t s)
-    | Xchg(t,d,s) -> Printf.sprintf "xchg %s, %s" (opr ~t:t d) (opr ~t:t s)
-    | And(t,d,s) -> Printf.sprintf "and %s, %s" (opr ~t:t d) (opr ~t:t s)
-    | Or(t,d,s) -> Printf.sprintf "or %s, %s" (opr ~t:t d) (opr ~t:t s)
-    | Xor(t,d,s) -> Printf.sprintf "xor %s, %s" (opr ~t:t d) (opr ~t:t s)
-    | Test(t,d,s) -> Printf.sprintf "test %s, %s" (opr ~t:t d) (opr ~t:t s)
-    | Ptest(t,d,s) -> Printf.sprintf "ptest %s, %s" (opr ~t:t d) (opr ~t:t s)
-    | Not(t,o) -> Printf.sprintf "not %s" (opr ~t:t o)
-    | Neg(t,o) -> Printf.sprintf "neg %s" (opr ~t:t o)
+    | Xadd(t,d,s) -> Printf.sprintf "xadd %s, %s" (opr ~t d) (opr ~t s)
+    | Xchg(t,d,s) -> Printf.sprintf "xchg %s, %s" (opr ~t d) (opr ~t s)
+    | And(t,d,s) -> Printf.sprintf "and %s, %s" (opr ~t d) (opr ~t s)
+    | Or(t,d,s) -> Printf.sprintf "or %s, %s" (opr ~t d) (opr ~t s)
+    | Xor(t,d,s) -> Printf.sprintf "xor %s, %s" (opr ~t d) (opr ~t s)
+    | Test(t,d,s) -> Printf.sprintf "test %s, %s" (opr ~t d) (opr ~t s)
+    | Ptest(t,d,s) -> Printf.sprintf "ptest %s, %s" (opr ~t d) (opr ~t s)
+    | Not(t,o) -> Printf.sprintf "not %s" (opr ~t o)
+    | Neg(t,o) -> Printf.sprintf "neg %s" (opr ~t o)
     | Mul (t, src) -> 
-      Printf.sprintf "mul %s" (opr ~t:t src)
+      Printf.sprintf "mul %s" (opr ~t src)
     | Imul (t, (b,dst), src1, src2) -> 
       (match b with
       | true ->
         Printf.sprintf 
-          "imul %s"  (opr ~t:t src2)
+          "imul %s"  (opr ~t src2)
       | false ->
-        Printf.sprintf "imul %s, %s, %s" (opr ~t:t dst) (opr ~t:t src1) (opr ~t:t src2))
+        Printf.sprintf "imul %s, %s, %s" (opr ~t dst) (opr ~t src1) (opr ~t src2))
     | Div(t, src) ->
-      Printf.sprintf "div %s" (opr ~t:t src)
+      Printf.sprintf "div %s" (opr ~t src)
     | Idiv(t, src) ->
-      Printf.sprintf "idiv %s" (opr ~t:t src)
+      Printf.sprintf "idiv %s" (opr ~t src)
     | Cld -> "cld"
     | Leave _ -> "leave"
     | Interrupt(o) -> Printf.sprintf "int %s" (opr o)
     | Interrupt3 -> "int3"
     | Sysenter -> "sysenter"
     | Syscall -> "syscall"
-    | Pbinop(t,_,opstr,d,s) -> Printf.sprintf "%s %s, %s" opstr (opr ~t:t d) (opr ~t:t s)
-    | Ppackedbinop(t,_,_,opstr,d,s) -> Printf.sprintf "%s %s, %s" opstr (opr ~t:t d) (opr ~t:t s)
+    | Pbinop(t,_,opstr,d,s) -> Printf.sprintf "%s %s, %s" opstr (opr ~t d) (opr ~t s)
+    | Ppackedbinop(t,_,_,opstr,d,s) -> Printf.sprintf "%s %s, %s" opstr (opr ~t d) (opr ~t s)
 
   let to_string mode pref op =
     disfailwith "fallback to libdisasm"
@@ -2496,28 +2496,31 @@ let parse_instr mode g addr =
     let (r, rm, na) = parse_modrm3264ext rex at ia a in
     (Oseg r, rm, na)
   in
-  let parse_modrmint_vec vex at ia a b r modb rm na = 
-    (* Create a REX prefix from the VEX to hand to parse_modrm3264int *)
+  let parse_modrmint_vec rex vex at ia a b r modb rm na = 
+    (* Create a REX prefix from the VEX to hand to parse_modrm3264int, if necessary *)
     let bopt = function Some a -> a | None -> false in
-    let rex = match vex with
+    let nbopt = function Some a -> not a | None -> false in
+    let rex = match rex with
+    | Some _ -> rex
+    | None -> 
+      (match vex with
       | Some {vex_nr; vex_nx; vex_nb; vex_we} -> 
         Some {
           rex_r=not vex_nr;
-          rex_x=not (bopt vex_nx);
-          rex_b=not (bopt vex_nb); 
+          rex_x=nbopt vex_nx;
+          rex_b=nbopt vex_nb; 
           rex_w=bopt vex_we;
         }
-      | None -> None
+      | None -> None)
     in 
     parse_modrm3264int rex at ia a b r modb rm na
   in
-
   let parse_modrmbits_vec vex a =
     let e b = (if b then 1 else 0) << 3 in
     let b, r, modb, rm, na = parse_modrmbits a in
-    let bopt = function Some a -> a | None -> false in
+    let nbopt = function Some a -> not a | None -> false in
     let vex_r, vex_x, vex_b = match vex with
-      | Some {vex_nr; vex_nx; vex_nb} -> not vex_nr, not (bopt vex_nx), not (bopt vex_nb)
+      | Some {vex_nr; vex_nx; vex_nb} -> not vex_nr, nbopt vex_nx, nbopt vex_nb
       | None -> false, false, false
     in
     let r = e vex_r lor r in
@@ -2527,7 +2530,7 @@ let parse_instr mode g addr =
   (* Parse register operands when the dest is a vector (MMX,XMM,YMM).
      We'll just pass register arguments back as Oreg, and the caller will change
      them to Ovec if necessary.*)
-  let parse_modrm_vec vex at ia a =
+  let parse_modrm_vec rex vex at ia a =
     let b, r, modb, rm, na = parse_modrmbits_vec vex a in
     let (r, rm, na) = parse_modrmint_vec vex at ia a b r modb rm na in
     (Oreg r, rm, na)
