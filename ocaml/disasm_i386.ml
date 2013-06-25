@@ -2080,10 +2080,12 @@ module ToStr = struct
       
   let ovec2str i t = 
     match t with
-    | r64 -> "mm"^(string_of_int i)
- (* | r128 -> "xmm"^(string_of_int i)
-    | r256 -> "ymm"^(string_of_int i) *) (* XXX: Only commented to stop compile errors while getting SIMD regs working *)
-
+    | Reg 64 -> "mm"^(string_of_int i)
+    | Reg 128 -> "xmm"^(string_of_int i)
+    | Reg 256 -> "ymm"^(string_of_int i)
+    | Reg n -> unimplemented (Printf.sprintf "Unrecognized SIMD register size: %d" n)   
+    | _ -> unimplemented (Printf.sprintf "Not a valid SIMD register: #%d" i)
+  
   let sreg2str = function
     | 0 -> "es"
     | 1 -> "cs"
@@ -2574,6 +2576,7 @@ let parse_instr mode g addr =
     | Reg 16 -> parse_imm16 a
     | Reg 32 -> parse_imm32 a
     | Reg 64 -> parse_imm64 a
+    | Reg n -> disfailwith ("parse_immz unsupported size: "^(string_of_int n))
     | _ -> disfailwith "parse_immz unsupported size"
   in
   let parse_immv = parse_immz in
@@ -2684,7 +2687,7 @@ let parse_instr mode g addr =
     | 0x8b -> let (r, rm, na) = parse_modrm_addr na in
               (Mov(prefix.opsize, r, rm, None), na)
     | 0x8c -> let (r, rm, na) = parse_modrmseg_addr na in
-              (Mov(r16, rm, r, None), na)
+              (Mov(prefix.opsize, rm, r, None), na)
     | 0x8d -> let (r, rm, na) = parse_modrm_addr na in
               (match rm with
               | Oaddr a -> (Lea(prefix.opsize, r, a), na)
@@ -2715,8 +2718,9 @@ let parse_instr mode g addr =
     | 0xaf -> (Scas prefix.opsize, na)
     | 0xa8 -> let (i, na) = parse_imm8 na in
               (Test(r8, o_rax, i), na)
-    | 0xa9 -> let (i,na) = parse_immz prefix.opsize na in
-              (Test(prefix.opsize, o_rax, i), na)
+    | 0xa9 -> let it = if prefix.opsize = r64 then r32 else prefix.opsize in
+              let (i,na) = parse_immz it na in
+              (Test(prefix.opsize, o_rax, (sign_ext it i prefix.opsize)), na)
     | 0xaa -> (Stos r8, na)
     | 0xab -> (Stos prefix.opsize, na)
     | 0xb0 | 0xb1 | 0xb2 | 0xb3 | 0xb4 | 0xb5 | 0xb6
@@ -2831,13 +2835,14 @@ let parse_instr mode g addr =
     | 0xf4 -> (Hlt, na)
     | 0xf6
     | 0xf7 -> let t = if b1 = 0xf6 then r8 else prefix.opsize in
+              let it = if t = r64 then r32 else t in
               let (r, rm, na) = parse_modrmext_addr na in
               (match r with (* Grp 3 *)
                | 0 ->
                  let (imm, na) = 
-                   if (b1 = 0xf7) then parse_immz t na else parse_immb na
+                   if (b1 = 0xf7) then parse_immz it na else parse_immb na
                  in 
-                 (Test(t, rm, imm), na)
+                 (Test(t, rm, (sign_ext it imm t)), na)
                | 2 -> (Not(t, rm), na)
                | 3 -> (Neg(t, rm), na)
                | 4 -> 
@@ -2909,11 +2914,7 @@ let parse_instr mode g addr =
         in
         let t = if (b1 & 1) = 0  then r8 else prefix.opsize in
         (* handle sign extended immediate cases *)
-        let it = match b1 & 7 with
-          | 5 when prefix.opsize_override -> r16
-          | 5 -> r32
-          | _ -> t
-        in
+        let it = if t = r64 then r32 else t in
         let (o1, o2, na) = match b1 & 7 with
           | 0 | 1 -> let r, rm, na = parse_modrm_addr na in
                      (rm, r, na)
