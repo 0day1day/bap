@@ -797,7 +797,8 @@ let op_dbl = function
   | Reg 8 -> [r16, o_rax]
   | Reg 16 -> [r16, o_rdx; r16, o_rax]
   | Reg 32 -> [r32, o_rdx; r32, o_rax]
-  | _ -> disfailwith "op_dbl only defined for Reg 8, 16, and 32"
+  | Reg 64 -> [r64, o_rdx; r64, o_rax]
+  | _ -> disfailwith "op_dbl only defined for Reg 8, 16, 32, and 64"
 
 (* Return an expression for a double-width operand, as used by the div
    instruction. *)
@@ -2698,6 +2699,13 @@ let parse_instr mode g addr =
     | 0x91 | 0x92 | 0x93 | 0x94 | 0x95 | 0x96 | 0x97 ->
       let reg = Oreg (rm_extend lor (b1 & 7)) in
       (Xchg(prefix.opsize, o_rax, reg), na)
+    | 0x98 -> let srct = match prefix.opsize with
+              | Reg 16 -> r8
+              | Reg 32 -> r16
+              | Reg 64 -> r32
+              | _ -> disfailwith "invalid opsize for CBW/CWDE/CWQE"
+              in
+              (Movsx(prefix.opsize, o_rax, srct, o_rax), na)
     | 0x9c -> (Pushf(prefix.opsize), na)
     | 0x9d -> (Popf(prefix.opsize), na)
     | 0x9e -> (Sahf, na)
@@ -2744,7 +2752,7 @@ let parse_instr mode g addr =
                 | 0xc7 -> r32
                 | _ -> failwith "impossible"
               in
-              let (i,na) = parse_immz it na in
+              let (i,na) = if it = r8 then parse_immb na else parse_immz it na in
               (match e with (* Grp 11 *)
               | 0 -> (Mov(t, rm, sign_ext it i t, None), na)
               | _ -> disfailwith (Printf.sprintf "Invalid opcode: %02x/%d" b1 e)
@@ -3235,6 +3243,12 @@ let parse_instr mode g addr =
     | Some {rex_w=true} -> r64 (* See Table 3-4: Effective Operand-
                                   and Address-Size Attributes in 64-Bit Mode *)
     | Some {rex_w=false} | None -> opsize
+  in
+  let opsize = match vex with
+    | Some {vex_we=Some true} -> r64
+    | Some {vex_we=Some false; vex_l=false} -> r128
+    | Some {vex_we=Some false; vex_l=true} -> r256
+    | _ -> opsize
   in
   let addrsize = match mode with
     | X86 -> if List.mem pref_addrsize pref then r16 else r32
