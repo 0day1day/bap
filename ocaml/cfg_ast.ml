@@ -111,6 +111,7 @@ let of_prog ?(special_error = true) p =
      addpred: Some v when v should fall through to the next bb
   *)
   let f (c, cur,onlylabs, addpred) s =
+    (* Start a new node after s *)
     let g () =
       let (c,v) = add_new_bb c (s::cur) addpred in
       let for_later ?lab t = Hashtbl.add postponed_edges v (lab,t) in
@@ -124,6 +125,7 @@ let of_prog ?(special_error = true) p =
       in
       (c, [], true, None)
     in
+    (* Start a new node including s *)
     let h l =
       add_indirect_edge_to l;
       let c,v = add_new_bb c cur addpred in
