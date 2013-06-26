@@ -733,7 +733,11 @@ let op2e_s mode ss t = function
   | Ovec r when t = r256 -> bits2ymme r
   | Ovec r when t = r128 -> bits2xmme r
   | Ovec r when t = r64 -> bits2xmm64e r
-  | Ovec r -> disfailwith "invalid SIMD register size"
+  | Ovec r -> let i = match t with
+              | Reg n -> ": "^(string_of_int n)
+              | _ -> ""
+              in
+              disfailwith ("invalid SIMD register size"^i)
   | Oreg r when t = r64 -> bits2reg64e mode r
   | Oreg r when t = r32 -> bits2reg32e mode r
   | Oreg r when t = r16 -> bits2reg16e mode r
@@ -2591,6 +2595,7 @@ let parse_instr mode g addr =
     (Oimm i, na)
   in
   let parse_immz t a = match t with
+    | Reg 8 -> parse_imm8 a
     | Reg 16 -> parse_imm16 a
     | Reg 32 -> parse_imm32 a
     | Reg 64 -> parse_imm64 a
