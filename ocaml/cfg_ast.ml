@@ -317,7 +317,7 @@ let to_prog c =
      to avoid a jump to the exit if one is not needed. *)
   let exit_edge = 
     let special v =
-      match C.G.V.label v with | BB _ -> true | BB_Entry -> true | BB_Exit -> true | _ -> false
+      match C.G.V.label v with | BB_Indirect -> false | _ -> true
     in
     match List.filter special revnodes with
     | x::y::_ when C.G.V.label x = BB_Exit -> Some (y, x)
