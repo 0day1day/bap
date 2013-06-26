@@ -170,7 +170,7 @@ type opcode =
   | Movs of typ
   | Movzx of typ * operand * typ * operand (* dsttyp, dst, srctyp, src *)
   | Movsx of typ * operand * typ * operand (* dsttyp, dst, srctyp, src *)
-  | Movdq of typ * typ * operand * typ * operand * bool * string (* move type, dst type, dst op, src type, src op, aligned, name *)
+  | Movdq of typ * typ * operand * typ * operand * operand option * bool * string (* move type, dst type, dst op, src type, src op, optional extra VEX src op, aligned, name *)
   | Lea of typ * operand * Ast.exp
   | Call of operand * Type.addr (* addr is RA *)
   | Shift of binop_type * typ * operand * operand
@@ -732,7 +732,7 @@ let storem mode t a e =
 let op2e_s mode ss t = function
   | Ovec r when t = r256 -> bits2ymme r
   | Ovec r when t = r128 -> bits2xmme r
-  | Ovec r when t = r64 -> bits2xmme r
+  | Ovec r when t = r64 -> bits2xmm64e r
   | Ovec r -> disfailwith "invalid SIMD register size"
   | Oreg r when t = r64 -> bits2reg64e mode r
   | Oreg r when t = r32 -> bits2reg32e mode r
@@ -956,9 +956,9 @@ let rec to_ir mode addr next ss pref =
   | Nop -> []
   | Bswap(t, op) ->
     let e = match t with
-      | Reg 32 ->
+      | Reg 32 | Reg 64 ->
         reverse_bytes (op2e t op)
-      | _ -> disfailwith "bswap: Expected 32 bit type"
+      | _ -> disfailwith "bswap: Expected 32 or 64 bit type"
     in
     [assn t op e]
   | Retn (op, far_ret) when pref = [] || pref = [repz]  || pref = [repnz]->
@@ -1033,13 +1033,19 @@ let rec to_ir mode addr next ss pref =
     [assn t dst (cast_unsigned t (op2e ts src))]
   | Movsx(t, dst, ts, src) when pref = [] ->
     [assn t dst (cast_signed t (op2e ts src))]
-  | Movdq(t, td, d, ts, s, align, _name) ->
+  | Movdq(t, td, d, ts, s, vs, align, _name) ->
     let (s, al) = match s with
       | Ovec _ -> op2e ts s, []
       | Oaddr a -> op2e ts s, [a]
       | Oreg _ | Oimm _ | Oseg _ -> disfailwith "invalid"
     in
     let b = bits_of_width in
+    (* If an optional second source operand was given, this is a vmovlp_ insn,
+       so concatenate vs with s. (vs = xmm, s = mem64 in this case) *)
+    let s = match vs with
+      | None -> s
+      | Some upper -> Ast_convenience.concat (op2e ts upper) s
+    in
     let s =
       if b ts < b t then cast_unsigned t s
       else if b ts > b t then cast_low t s
@@ -2120,8 +2126,10 @@ module ToStr = struct
     | Movs(t) -> "movs"
     | Movzx(dt,dst,st,src) -> Printf.sprintf "movzx %s, %s" (opr ~t:dt dst) (opr ~t:st src)
     | Movsx(dt,dst,st,src) -> Printf.sprintf "movsx %s, %s" (opr ~t:dt dst) (opr ~t:st src)
-    | Movdq(_t,td,d,ts,s,align,name) ->
-      Printf.sprintf "%s %s, %s" name (opr ~t:td d) (opr ~t:ts s)
+    | Movdq(_t,td,d,ts,s,vs,align,name) ->
+      (match vs with 
+      | None ->  Printf.sprintf "%s %s, %s" name (opr ~t:td d) (opr ~t:ts s)
+      | Some s2 -> Printf.sprintf "%s %s, %s, %s" name (opr ~t:td d) (opr ~t:r128 s2) (opr ~t:ts s))
     | Palignr(t,dst,src,imm) -> Printf.sprintf "palignr %s, %s, %s" (opr ~t dst) (opr ~t src) (opr imm)
     | Punpck(dt,_,o,d,s) ->
       let o = match o with | High -> "h" | Low -> "l" in
@@ -2504,17 +2512,17 @@ let parse_instr mode g addr =
     let bopt = function Some a -> a | None -> false in
     let nbopt = function Some a -> not a | None -> false in
     let rex = match rex with
-    | Some _ -> rex
-    | None -> 
-      (match vex with
-      | Some {vex_nr; vex_nx; vex_nb; vex_we} -> 
-        Some {
-          rex_r=not vex_nr;
-          rex_x=nbopt vex_nx;
-          rex_b=nbopt vex_nb; 
-          rex_w=bopt vex_we;
-        }
-      | None -> None)
+      | Some _ -> rex
+      | None -> 
+        (match vex with
+        | Some {vex_nr; vex_nx; vex_nb; vex_we} -> 
+          Some {
+            rex_r=not vex_nr;
+            rex_x=nbopt vex_nx;
+            rex_b=nbopt vex_nb; 
+            rex_w=bopt vex_we;
+          }
+        | None -> None)
     in 
     parse_modrm3264int rex at ia a b r modb rm na
   in
@@ -2530,15 +2538,24 @@ let parse_instr mode g addr =
     let rm = e vex_b lor rm in
     b, r, modb, rm, na
   in
+  (* Get the extra vvvv operand from the VEX prefix *)
+  let get_vex_opr vex = match vex with
+    | None -> None
+    | Some {vex_v} -> Some (Ovec ((lnot vex_v) land 0xf))
+  in
   (* Parse register operands when the dest is a vector (MMX,XMM,YMM).
      We'll just pass register arguments back as Oreg, and the caller will change
      them to Ovec if necessary.*)
-  let parse_modrm_vec rex vex at ia a =
+  let parse_modrm_addr_vec rex vex at ia a =
     let b, r, modb, rm, na = parse_modrmbits_vec vex a in
     let (r, rm, na) = parse_modrmint_vec rex vex at ia a b r modb rm na in
     (Oreg r, rm, na)
   in
-  let _ = parse_modrm_vec in (* XXX: shut the compiler up temporarily *)
+  (* Force an operand to be a vector register if it's a register operand. *)
+  let tovec op = match op with
+    | Oreg r -> Ovec r
+    | _ -> op
+  in
   (* let parse_modrm64ext a rex = *)
   (*   let b, r, modb, rm, rex_x, na = parse_modrmbits64 a rex in *)
   (*   parse_modrm32int a b r modb rm na *)
@@ -2609,6 +2626,7 @@ let parse_instr mode g addr =
       | Reg 64 -> parse_disp64, parse_modrm3264 rex addrsize a, parse_modrm3264seg rex addrsize a, parse_modrm3264ext rex addrsize a
       | t -> failwith "Bad address type"
     in 
+    let parse_modrm_vec = parse_modrm_addr_vec rex vex addrsize a in
     let mi = int_of_mode mode in
     let _mi64 = int64_of_mode mode in
     let mbi = big_int_of_mode mode in
@@ -2949,33 +2967,48 @@ let parse_instr mode g addr =
         (* XXX: Clean up prefixes.  This will probably require some
            effort studying the manual. We probably don't do the right
            thing on weird cases (too many prefixes set). *)
-        let t, name, align, tsrc, tdest = match b2 with
+        let r, rm, na = parse_modrm_vec na in
+        let rv = get_vex_opr prefix.vex in
+        let t, name, align, tsrc, tdest, r, rm, rv = match b2 with
+          | 0x12 when not (rv = None) -> 
+            r128, "movlps", false, r64, r128, tovec r, tovec rm, rv
           | 0x12 | 0x13 when prefix.opsize_override ->
-            r128, "movlpd", false, r64, r64
+            r128, "movlpd", false, r64, r64, tovec r, tovec rm, None
           | 0x12 | 0x13 when not prefix.opsize_override ->
-            r128, "movlps", false, r64, r64
+            r128, "movlps", false, r64, r64, tovec r, tovec rm, None
           | 0x28 | 0x29 when prefix.opsize_override ->
-            r128, "movapd", true, r128, r128
+            let mvt = match prefix.vex with None -> r128 | _ -> prefix.opsize in
+            mvt, "movapd", true, mvt, mvt, tovec r, tovec rm, None
           | 0x28 | 0x29 when not prefix.opsize_override -> 
-            r128, "movaps", true, r128, r128
-          | 0x6f | 0x7f when prefix.repeat -> r128, "movdqu", false, r128, r128
+            let mvt = match prefix.vex with None -> r128 | _ -> prefix.opsize in
+            mvt, "movaps", true, mvt, mvt, tovec r, tovec rm, None
+          | 0x6f | 0x7f when prefix.repeat -> 
+            let mvt = match prefix.vex with None -> r128 | _ -> prefix.opsize in
+            mvt, "movdqu", false, mvt, mvt, tovec r, tovec rm, None
           | 0x6f | 0x7f when prefix.opsize_override -> 
-            r128, "movdqa", true, r128, r128
-          | 0x6e -> r32, "movd", false, r32, prefix.mopsize
-          | 0x7e -> r32, "movd", false, prefix.mopsize, r32
-          | 0x6f | 0x7f when pref=[] -> r64, "movq", false, r64, r64
-          | 0xd6 when prefix.opsize_override -> r64, "movq", false, r64, r64
+            let mvt = match prefix.vex with None -> r128 | _ -> prefix.opsize in
+            mvt, "movdqa", true, mvt, mvt, tovec r, tovec rm, None
+          | 0x6e -> 
+            let mvt = match prefix.opsize with Reg 64 -> r64 | _ -> r32 in
+            mvt, "movd", false, mvt, prefix.mopsize, r, tovec rm, None
+          | 0x7e -> 
+            let mvt = match prefix.opsize with Reg 64 -> r64 | _ -> r32 in
+            mvt, "movd", false, prefix.mopsize, mvt, tovec r, rm, None
+          | 0x6f | 0x7f when pref=[] -> 
+            r64, "movq", false, r64, r64, tovec r, tovec rm, None
+          | 0xd6 when prefix.opsize_override -> 
+            r64, "movq", false, r64, r64, tovec r, tovec rm, None
           | _ -> unimplemented
             (Printf.sprintf "mov opcode case missing: %02x" b2)
         in
-        let r, rm, na = parse_modrm_addr na in
+        let name = match prefix.vex with None -> name | Some _ -> ("v"^name) in
         let s, d = match b2 with
           | 0x12 | 0x6f | 0x6e | 0x28 -> rm, r
           | 0x13 | 0x7f | 0x7e | 0x29 | 0xd6 -> r, rm
           | _ -> disfailwith 
             (Printf.sprintf "impossible mov(a/d) condition: %02x" b2)
         in
-        (Movdq(t, tdest, d, tsrc, s, align, name), na)
+        (Movdq(t, tdest, d, tsrc, s, rv, align, name), na)
       | 0x31 -> (Rdtsc, na)
       | 0x34 -> (Sysenter, na)
       | 0x38 ->
@@ -3229,6 +3262,13 @@ let parse_instr mode g addr =
   in
   let rex, pref, a = get_prefixes addr in
   let vex, a = get_vex a in
+  (* Append VEX implied mandatory prefixes *)
+  let pref = match vex with
+    | Some {vex_pp=1} -> 0x66 :: pref
+    | Some {vex_pp=2} -> 0xf3 :: pref
+    | Some {vex_pp=3} -> 0xf2 :: pref
+    | _ -> pref
+  in
   let rex = BatOption.map parse_rex rex in
   (* Opsize for regular instructions, MMX/SSE2 instructions
 
