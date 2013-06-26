@@ -114,7 +114,7 @@ AS_IF([test x$HAVE_LLVM_AC = xyes],
 AC_SUBST(HAVE_LLVM_AC)
 
 
-AS_IF([test "x$HAVE_LLVM_AC" = "xtrue"],
+AS_IF([test "x$HAVE_LLVM_AC" = "xyes"],
       [LLVM_PPFLAGS="-D WITH_LLVM"],
       [])
 AC_SUBST(LLVM_PPFLAGS)

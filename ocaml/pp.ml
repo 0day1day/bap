@@ -140,6 +140,7 @@ object (self)
     | Pos _ -> () (* ignore position attrs *)
     | InitRO -> pp "@set \"initro\""
     | Synthetic -> pp "@set \"synthetic\""
+    | SpecialBlock -> pp "@set \"specialblock\""
 
   method label = function
     | Name s -> pp "label "; pp s
@@ -511,6 +512,7 @@ let ssa_exp_to_string = pp2string (fun p -> p#ssa_exp)
 let ssa_stmt_to_string = pp2string (fun p -> p#ssa_stmt)
 let ast_exp_to_string = pp2string (fun p -> p#ast_exp ~prec:0)
 let ast_stmt_to_string = pp2string (fun p -> p#ast_stmt)
+let ast_prog_to_string p = BatString.join "\n" (List.map ast_stmt_to_string p)
 
 (* These functions store variable names in the specified ctx
    argument. The ctx can be created by [make_varctx]

@@ -25,7 +25,7 @@ type ctx = {
   vars: llvalue VH.t;
   letvars: llvalue VH.t;
   mutable allocbb: llbasicblock option
-           }
+}
 
 let new_ctx () = { globalvars = VH.create 100;
                    vars=VH.create 100;
@@ -485,7 +485,7 @@ object(self)
       let stmts = CA.get_stmts cfg bb in
       add_labels bb stmts;
       let cfstmt, straightline_stmts = match List.rev stmts with
-        | (Halt _ as j::tl) | (Jmp _ as j::tl) | (CJmp _ as j::tl) -> Some(j), tl
+        | (Halt _ as j::tl) | (Jmp _ as j::tl) | (CJmp _ as j::tl) -> Some(j), List.rev tl
         | _ -> None, stmts
       in
 

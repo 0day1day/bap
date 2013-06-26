@@ -11,7 +11,7 @@ open Cfg
 open BatListFull
 
 module C = Cfg.AST
-module D = Debug.Make(struct let name = "CFG_AST" and default=`NoDebug end)
+module D = Debug.Make(struct let name = "Cfg_ast" and default=`NoDebug end)
 open D
 
 type unresolved_edge = C.G.V.t * C.G.E.label * Ast.exp
@@ -36,7 +36,7 @@ let find_error g =
   try
     g, C.find_vertex g BB_Error
   with Not_found ->
-    create g BB_Error [Label(Name "BB_Error", []); Assert(exp_false, [])]
+    create g BB_Error [Label(Name("BB_Error"), [SpecialBlock]); Assert(exp_false, [])]
 
 let find_exit g =
   try
@@ -105,6 +105,7 @@ let f ~special_error (indirectt, nodes, edges, c, cur,onlylabs, addpred) s =
     | Addr _ -> true
     | Name _ -> indirectt
   in
+  (* Start a new node after s *)
   let g () =
     let (c,v) = add_new_bb indirectt c (s::cur) addpred in
     let for_later ?lab t = (v,lab,t) in
@@ -124,6 +125,12 @@ let f ~special_error (indirectt, nodes, edges, c, cur,onlylabs, addpred) s =
     in
     (false, v::nodes, edges, c, [], true, None)
   in
+  (* Start a new node including s *)
+  let h l =
+    let indirectt = indirect_edge_to indirectt l in
+    let c,v = add_new_bb indirectt c cur addpred in
+    (indirectt, v::nodes, edges, c, [s], true, Some v)
+  in
   match s with
   | Jmp _ | CJmp _ | Halt _ ->
     g ()
@@ -131,6 +138,8 @@ let f ~special_error (indirectt, nodes, edges, c, cur,onlylabs, addpred) s =
     g ()
   | Special _ (* specials are not error *) ->
     (indirectt, nodes, edges, c, s::cur, onlylabs, addpred)
+  | Label(l, attrs) when List.mem SpecialBlock attrs ->
+    h l
   | Label(l,_) when onlylabs ->
     let indirectt = indirect_edge_to indirectt l in
     (indirectt, nodes, edges, c, s::cur, true, addpred)
@@ -199,6 +208,7 @@ let add_prog ?(special_error = true) c p =
 *)
 let to_prog c =
   let size = C.G.nb_vertex c in
+  let c = C.remove_vertex c (C.G.V.create BB_Indirect) in
   let module BH = Hashtbl.Make(C.G.V) in
   let tails = BH.create size (* maps head vertex to the tail of the trace *)
     (* maps vertex to succ it was joined with, forming a trace *)
@@ -207,7 +217,11 @@ let to_prog c =
   let get_revstmts b =
     try BH.find hrevstmts b
     with Not_found ->
-      let s = List.rev (C.get_stmts c b) in
+      let s = match C.G.V.label b with
+        | BB _ | BB_Error -> List.rev (C.get_stmts c b)
+        (* Don't include special node contents *)
+        | _ -> []
+      in
       BH.add hrevstmts b s;
       s
   in
@@ -216,14 +230,14 @@ let to_prog c =
   let rec grow_trace cond head =
       match bh_find_option tails head with
       | None ->
-	  () (* must have already been joined previously*)
+	  () (* must have already been joined previously *)
       | Some tail ->
 	  assert(not(BH.mem joined tail));
 	  let rec find_succ = function
 	    | [] -> ()
 	    | suc::rest ->
 		match bh_find_option tails suc with
-		| Some succtail when cond tail suc &&
+		| Some succtail when cond head tail suc &&
                                      suc <> head ->
                   assert (succtail <> head);
                   assert (suc <> head);
@@ -285,22 +299,18 @@ let to_prog c =
 		     ^ v2s src ^ " points to"^dests)
   in
   (* join traces without jumps *)
-  grow_traces (fun b suc -> normal b && joinable suc && not(has_jump b));
+  grow_traces (fun _ b suc -> normal b && normal suc && not(has_jump b));
   (* join other traces (if we cared, we could remove some jumps later) *)
-  grow_traces (fun b suc -> normal b && joinable suc);
-  (* join the entry node, NOT with the trace containing the exit *)
+  grow_traces (fun _ b suc -> normal b && normal suc);
+  (* join the entry node *)
   grow_trace
-    (fun b suc ->
-       let suctail = BH.find tails suc in
-       C.G.V.label suctail <> BB_Exit
-    )
+    (fun h t suc -> (normal t || C.G.V.label t = BB_Entry) && normal suc)
     (C.G.V.create BB_Entry);
-  (* add jumps for edges that need them *)
-  C.G.iter_vertex 
-    (fun b -> 
-       C.G.iter_succ (fun s -> if not(BH.mem joined b) then ensure_jump b s) c b
-    )
-    c;
+  (* now join traces with exit, but do NOT join with the entry trace.
+     the entry trace must be printed first, but the exit trace must be
+     printed last. *)
+  grow_traces (fun h t suc -> normal h && normal t && joinable suc);
+  (* Make sure the exit trace is last *)
   let revordered_heads, exittrace =
     BH.fold
       (fun h t (rh,et) ->
@@ -325,6 +335,25 @@ let to_prog c =
     in
     List.fold_right head_to_revnodes revordered_heads []
   in
+  (* Because the entry trace must go first, and the exit trace must go
+     last, they are not joined, since it's not always possible for
+     these to happen at the same time.  Sometimes it is possible,
+     though, and here we identify the predecessor trace of the exit,
+     to avoid a jump to the exit if one is not needed. *)
+  let exit_edge = 
+    let special v =
+      match C.G.V.label v with | BB _ -> true | BB_Entry -> true | BB_Exit -> true | _ -> false
+    in
+    match List.filter special revnodes with
+    | x::y::_ when C.G.V.label x = BB_Exit -> Some (y, x)
+    | _ -> None
+  in
+  (* add jumps for edges that need them *)
+  C.G.iter_vertex 
+    (fun b -> 
+       C.G.iter_succ (fun s -> if not(BH.mem joined b) && Some(b, s) <> exit_edge then ensure_jump b s) c b
+    )
+    c;
   let add_stmts stmts b =
     dprintf "to_prog: Adding statements for %s" (v2s b);
     let stmts = List.rev_append (get_revstmts b) stmts in
