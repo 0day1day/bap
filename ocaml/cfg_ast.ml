@@ -175,6 +175,10 @@ let of_prog ?(special_error = true) p =
     C.add_edge_e c (C.G.E.create v lab tgt)
   in
   let c = Hashtbl.fold make_edge postponed_edges c in
+  (* Remove indirect if unused *)
+  let c = if C.G.in_degree c indirect = 0 then C.remove_vertex c indirect else c in
+  (* Remove error if unused *)
+  let c = if C.G.in_degree c error = 0 then C.remove_vertex c error else c in
   (* FIXME: Colescing *)
   c
 
