@@ -65,7 +65,6 @@ let speclist =
      "<file> Read input from an IL file.");
   ] @ trace_speclist
 
-
 let get_program () =
   if !inputs = [] then raise(Arg.Bad "No input specified");
   let get_one (oldp,oldscope) = function

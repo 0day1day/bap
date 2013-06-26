@@ -2728,7 +2728,7 @@ let parse_instr mode g addr =
               (Test(r8, o_rax, i), na)
     | 0xa9 -> let it = if prefix.opsize = r64 then r32 else prefix.opsize in
               let (i,na) = parse_immz it na in
-              (Test(prefix.opsize, o_rax, (sign_ext it i prefix.opsize)), na)
+              (Test(prefix.opsize, o_rax, sign_ext it i prefix.opsize), na)
     | 0xaa -> (Stos r8, na)
     | 0xab -> (Stos prefix.opsize, na)
     | 0xb0 | 0xb1 | 0xb2 | 0xb3 | 0xb4 | 0xb5 | 0xb6
@@ -2752,7 +2752,7 @@ let parse_instr mode g addr =
                 | 0xc7 -> r32
                 | _ -> failwith "impossible"
               in
-              let (i,na) = if it = r8 then parse_immb na else parse_immz it na in
+              let (i,na) = parse_immz it na in
               (match e with (* Grp 11 *)
               | 0 -> (Mov(t, rm, sign_ext it i t, None), na)
               | _ -> disfailwith (Printf.sprintf "Invalid opcode: %02x/%d" b1 e)
@@ -2847,10 +2847,8 @@ let parse_instr mode g addr =
               let (r, rm, na) = parse_modrmext_addr na in
               (match r with (* Grp 3 *)
                | 0 ->
-                 let (imm, na) = 
-                   if (b1 = 0xf7) then parse_immz it na else parse_immb na
-                 in 
-                 (Test(t, rm, (sign_ext it imm t)), na)
+                 let (imm, na) = parse_immz it na in
+                 (Test(t, rm, sign_ext it imm t), na)
                | 2 -> (Not(t, rm), na)
                | 3 -> (Neg(t, rm), na)
                | 4 -> 
@@ -3244,11 +3242,15 @@ let parse_instr mode g addr =
                                   and Address-Size Attributes in 64-Bit Mode *)
     | Some {rex_w=false} | None -> opsize
   in
+  (* XXX: I am not sure about this *)
   let opsize = match vex with
     | Some {vex_we=Some true} -> r64
-    | Some {vex_we=Some false; vex_l=false} -> r128
-    | Some {vex_we=Some false; vex_l=true} -> r256
     | _ -> opsize
+  in
+  let mopsize = match vex with
+    | Some {vex_l=false} -> r128
+    | Some {vex_l=true} -> r256
+    | None -> mopsize
   in
   let addrsize = match mode with
     | X86 -> if List.mem pref_addrsize pref then r16 else r32
