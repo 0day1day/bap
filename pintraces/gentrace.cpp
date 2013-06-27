@@ -573,7 +573,7 @@ static uint32_t GetBitsOfReg(REG r) {
     case REG_YMM15:
         return 256;
         break;
-   
+
 #elif defined(ARCH_32)
     case REG_INST_PTR:
     case REG_GFLAGS:

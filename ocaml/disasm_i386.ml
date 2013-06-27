@@ -384,7 +384,6 @@ let mvs {v64; v32} = [v64; v32]
 
 let shared_regs =
   cf::pf::af::zf::sf::oF::df::cs::ds::es::fs::gs::ss::fpu_ctrl::mxcsr::[]
-  @ Array.to_list ymms
   @ Array.to_list st
 
 let shared_multi_regs =
@@ -393,6 +392,7 @@ let shared_multi_regs =
 let regs_x86 : var list =
   shared_regs
   @ List.map (fun {v64; v32} -> v32) shared_multi_regs
+  @ Array.to_list (Array.sub ymms 0 8)
 
 let regs_x86_64 : var list =
   shared_regs
@@ -1044,8 +1044,9 @@ let rec to_ir mode addr next ss pref =
   | Movdq(t, td, d, ts, s, vs, align, _name) ->
     let (s, al) = match s with
       | Ovec _ -> op2e ts s, []
+      | Oreg _ -> op2e ts s, []
       | Oaddr a -> op2e ts s, [a]
-      | Oreg _ | Oimm _ | Oseg _ -> disfailwith "invalid"
+      | Oimm _ | Oseg _ -> disfailwith "Right here invalid"
     in
     let b = bits_of_width in
     (* If an optional second source operand was given, this is a vmovlp_ insn,
@@ -1066,9 +1067,10 @@ let rec to_ir mode addr next ss pref =
       else s
     in
     let (d, al) = match d with
-      | Ovec i -> assn td d s, al
+      | Ovec _ -> assn td d s, al
+      | Oreg _ -> assn td d s, al
       | Oaddr a -> assn td d s, a::al
-      | Oreg _ | Oimm _ | Oseg _ -> disfailwith "invalid"
+      | Oimm _ | Oseg _ -> disfailwith "Or here invalid"
     in
     let al =
       if align then
@@ -1153,7 +1155,7 @@ let rec to_ir mode addr next ss pref =
   | Pmovmskb (t,dst,src) ->
       let nbytes = bytes_of_width t in
       let src = match src with
-        | Oreg i -> op2e t src
+        | Ovec i -> op2e t src
         | _ -> disfailwith "invalid operand"
       in
       let get_bit i = Extract(biconst (i*8-1), biconst (i*8-1), src) in
@@ -3000,7 +3002,7 @@ let parse_instr mode g addr =
             mvt, "movdqa", true, mvt, mvt, tovec r, tovec rm, None
           | 0x6e -> 
             let mvt = match prefix.opsize with Reg 64 -> r64 | _ -> r32 in
-            mvt, "movd", false, mvt, prefix.mopsize, r, tovec rm, None
+            mvt, "movd", false, mvt, prefix.mopsize, tovec r, rm, None
           | 0x7e -> 
             let mvt = match prefix.opsize with Reg 64 -> r64 | _ -> r32 in
             mvt, "movd", false, prefix.mopsize, mvt, tovec r, rm, None
@@ -3027,7 +3029,7 @@ let parse_instr mode g addr =
         (match b3 with
         | 0x00 ->
           let d, s, na = parse_modrm_addr na in
-          (Pshufb(prefix.mopsize, d, s), na)
+          (Pshufb(prefix.mopsize, tovec d, tovec s), na)
         | 0x17 when prefix.opsize_override ->
           let d, s, na = parse_modrm_addr na in
           (Ptest(r128, d, s), na)
@@ -3122,30 +3124,30 @@ let parse_instr mode g addr =
           | _ -> disfailwith "impossible"
         in
         let (r, rm, na) = parse_modrm_addr na in
-        (Punpck(prefix.mopsize, elemt, order, r, rm), na)
+        (Punpck(prefix.mopsize, elemt, order, tovec r, tovec rm), na)
       | 0x64 | 0x65 | 0x66 | 0x74 | 0x75 | 0x76  as o ->
         let r, rm, na = parse_modrm_addr na in
         let elet = match o & 0x6 with | 0x4 -> r8 | 0x5 -> r16 | 0x6 -> r32 | _ ->
           disfailwith "impossible" in
         let bop, bstr = match o & 0x70 with | 0x70 -> EQ, "pcmpeq" | 0x60 -> SLT, "pcmpgt"
           | _ -> disfailwith "impossible" in
-        (Pcmp(prefix.mopsize, elet, bop, bstr, r, rm), na)
+        (Pcmp(prefix.mopsize, elet, bop, bstr, tovec r, tovec rm), na)
       | 0x70 when prefix.opsize = r16 ->
         let r, rm, na = parse_modrm_addr na in
         let i, na = parse_imm8 na in
-        (Pshufd(r, rm, i), na)
+        (Pshufd(tovec r, tovec rm, i), na)
       | 0x71 | 0x72 | 0x73 ->
         let t = prefix.mopsize in
         let r, rm, na = parse_modrm_addr na in
         let i, na = parse_imm8 na in
         let open BatInt64.Infix in
-            let fbop, str, et, i = match b2, r, i with
-              | _, Oreg 2, _ -> binop RSHIFT, "psrl", lowbits2elemt b2, i
-              | _, Oreg 6, _ -> binop LSHIFT, "psll", lowbits2elemt b2, i
-              | _, Oreg 4, _ -> binop ARSHIFT, "psra", lowbits2elemt b2, i
+            let fbop, str, et, i, rm = match b2, r, i with
+              | _, Oreg 2, _ -> binop RSHIFT, "psrl", lowbits2elemt b2, i, rm
+              | _, Oreg 6, _ -> binop LSHIFT, "psll", lowbits2elemt b2, i, rm
+              | _, Oreg 4, _ -> binop ARSHIFT, "psra", lowbits2elemt b2, i, rm
           (* The shift amount of next two elements are multipled by eight *)
-              | 0x73, Oreg 3, Oimm i when prefix.opsize_override -> binop RSHIFT, "psrldq", reg_128, Oimm (i *% bi8)
-              | 0x73, Oreg 7, Oimm i when prefix.opsize_override -> binop LSHIFT, "pslldq", reg_128, Oimm (i *% bi8)
+              | 0x73, Oreg 3, Oimm i when prefix.opsize_override -> binop RSHIFT, "psrldq", reg_128, Oimm (i *% bi8), tovec rm
+              | 0x73, Oreg 7, Oimm i when prefix.opsize_override -> binop LSHIFT, "pslldq", reg_128, Oimm (i *% bi8), tovec rm
               | _, Oreg i, _ -> disfailwith (Printf.sprintf "invalid psrl/psll encoding b2=%#x r=%#x" b2 i)
               | _ -> disfailwith "impossible"
             in
@@ -3242,7 +3244,7 @@ let parse_instr mode g addr =
         (Pbinop(prefix.mopsize, AND, "pand", r, rm), na)
       | 0xd7 ->
         let r, rm, na = parse_modrm_addr na in
-        (Pmovmskb(prefix.mopsize, r, rm), na)
+        (Pmovmskb(prefix.mopsize, tovec r, tovec rm), na)
       | 0xe0 | 0xe3 ->
         (* pavg *)
         let r, rm, na = parse_modrm_addr na in
@@ -3263,7 +3265,11 @@ let parse_instr mode g addr =
         (Pbinop(prefix.mopsize, OR, "por", r, rm), na)
       | 0xef ->
         let d, s, na = parse_modrm_addr na in
-        (Pbinop(prefix.mopsize, XOR, "pxor", d,s), na)
+        (Pbinop(prefix.mopsize, XOR, "pxor", tovec d, tovec s), na)
+      | 0xf8 ->
+        let r, rm, na = parse_modrm_addr na in
+        (Pbinop(prefix.mopsize, MINUS, "psubb", tovec rm, tovec r), na)
+
       | _ -> unimplemented 
         (Printf.sprintf "unsupported opcode: %02x %02x" b1 b2)
     )
