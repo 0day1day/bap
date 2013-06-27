@@ -508,12 +508,12 @@ let find_memv trace =
 (*  REG MAPPING: TODO -> move this in a separate file   *)
 (********************************************************)
 
-let regs = Hashtbl.create 32
+let regs = Hashtbl.create 64
 
 (* FIXME: make this properly case for different architectures *)
 let () =
   List.iter (fun (k,v) -> Hashtbl.add regs k v)
-    [
+   ([
       ("R_AL",("R_RAX",0,reg_64));
       ("R_BL",("R_RBX",0,reg_64));
       ("R_CL",("R_RCX",0,reg_64));
@@ -532,7 +532,22 @@ let () =
       ("R_SI",("R_RSI",0,reg_64));
       ("R_DI",("R_RDI",0,reg_64));
       ("R_SP",("R_RSP",0,reg_64));
-    ]
+      
+      ("R_EAX",("R_RAX",0,reg_64));
+      ("R_EBX",("R_RBX",0,reg_64));
+      ("R_ECX",("R_RCX",0,reg_64));
+      ("R_EDX",("R_RDX",0,reg_64));
+      ("R_EBP",("R_RBP",0,reg_64));
+      ("R_ESI",("R_RSI",0,reg_64));
+      ("R_EDI",("R_RDI",0,reg_64));
+      ("R_ESP",("R_RSP",0,reg_64));
+
+    ] @ Array.to_list (Array.init 16 (fun i -> (Printf.sprintf "R_XMM%d" i,(Printf.sprintf "R_YMM%d" i,0,reg_256))))
+      @ Array.to_list (Array.init 16 (fun i -> (Printf.sprintf "R_MM%d" i,(Printf.sprintf "R_YMM%d" i,0,reg_256))))
+      @ Array.to_list (Array.init 8 (fun i -> (Printf.sprintf "R_R%dB" (i+8),(Printf.sprintf "R_R%d" (i+8),0,reg_64))))
+      @ Array.to_list (Array.init 8 (fun i -> (Printf.sprintf "R_R%dW" (i+8),(Printf.sprintf "R_R%d" (i+8),0,reg_64))))
+      @ Array.to_list (Array.init 8 (fun i -> (Printf.sprintf "R_R%dD" (i+8),(Printf.sprintf "R_R%d" (i+8),0,reg_64)))))
+
 
 (********************************************************)
 

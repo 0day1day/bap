@@ -71,6 +71,7 @@ and reg_16 = Reg 16
 and reg_32 = Reg 32
 and reg_64 = Reg 64
 and reg_128 = Reg 128
+and reg_256 = Reg 256
 
 (** False constant. (If convenient, refer to this rather than building your own.) *)
 let exp_false = Int(bi0, reg_1)

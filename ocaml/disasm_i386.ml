@@ -170,7 +170,7 @@ type opcode =
   | Movs of typ
   | Movzx of typ * operand * typ * operand (* dsttyp, dst, srctyp, src *)
   | Movsx of typ * operand * typ * operand (* dsttyp, dst, srctyp, src *)
-  | Movdq of typ * typ * operand * typ * operand * operand option * bool * string (* move type, dst type, dst op, src type, src op, optional extra VEX src op, aligned, name *)
+  | Movdq of typ * typ * operand * typ * operand * operand option * bool * string (* move type, dst type, dst op, src type, src op, optional VEX src, aligned, name *)
   | Lea of typ * operand * Ast.exp
   | Call of operand * Type.addr (* addr is RA *)
   | Shift of binop_type * typ * operand * operand
@@ -222,16 +222,16 @@ type opcode =
   | Fldcw of operand
   | Fld of operand
   | Fst of (operand * bool)
-  | Punpck of (typ * typ * order * operand * operand) (* dest size, element size, low/high elements, dest, src *)
-  | Ppackedbinop of (typ * typ * binopf * string * operand * operand) (* Perform a generic packed binary operation. dest size, element size, binop, assembly string, dest, src *)
-  | Pbinop of (typ * binop_type * string * operand * operand)
+  | Punpck of (typ * typ * order * operand * operand * operand option) (* dest size, element size, low/high elements, dest, src, optional VEX src *)
+  | Ppackedbinop of (typ * typ * binopf * string * operand * operand * operand option) (* Perform a generic packed binary operation. dest size, element size, binop, assembly string, dest, src, optional VEX src *)
+  | Pbinop of (typ * binop_type * string * operand * operand * operand option)
   | Pmov of (typ * typ * typ * operand * operand * cast_type * string) (* Packed move. dest size, dest elt size, src elt size, dest, src, ext(signed/zero), name *)
   | Pmovmskb of (typ * operand * operand)
-  | Pcmp of (typ * typ * binop_type * string * operand * operand)
-  | Palignr of (typ * operand * operand * operand)
+  | Pcmp of (typ * typ * binop_type * string * operand * operand * operand option)
+  | Palignr of (typ * operand * operand * operand option * operand)
   | Pcmpstr of (typ * operand * operand * operand * Pcmpstr.imm8cb * Pcmpstr.pcmpinfo)
-  | Pshufb of typ * operand * operand
-  | Pshufd of operand * operand * operand
+  | Pshufb of typ * operand * operand * operand option
+  | Pshufd of typ * operand * operand * operand option * operand
   | Leave of typ
   | Interrupt of operand
   | Interrupt3 (* Trap to debugger *)
@@ -1046,7 +1046,7 @@ let rec to_ir mode addr next ss pref =
       | Ovec _ -> op2e ts s, []
       | Oreg _ -> op2e ts s, []
       | Oaddr a -> op2e ts s, [a]
-      | Oimm _ | Oseg _ -> disfailwith "Right here invalid"
+      | Oimm _ | Oseg _ -> disfailwith "invalid source operand for movdq"
     in
     let b = bits_of_width in
     (* If an optional second source operand was given, this is a vmovlp_ insn,
@@ -1070,7 +1070,7 @@ let rec to_ir mode addr next ss pref =
       | Ovec _ -> assn td d s, al
       | Oreg _ -> assn td d s, al
       | Oaddr a -> assn td d s, a::al
-      | Oimm _ | Oseg _ -> disfailwith "Or here invalid"
+      | Oimm _ | Oseg _ -> disfailwith "invalid dest operand for movdq"
     in
     let al =
       if align then
@@ -1078,7 +1078,7 @@ let rec to_ir mode addr next ss pref =
       else []
     in
     d::al
-  | Punpck(t, et, o, d, s) ->
+  | Punpck(t, et, o, d, s, vs) ->
     let nelem = match t, et with
       | Reg n, Reg n' -> n / n'
       | _ -> disfailwith "invalid"
@@ -1096,10 +1096,14 @@ let rec to_ir mode addr next ss pref =
       BatList.enum [extract_element et (Var st) i; extract_element et (Var dt) i]
     in
     let e = concat_explist (BatEnum.flatten (map mape ((nelem_per_src-1)---0))) in
+    let dest = match vs with
+      | None -> d
+      | Some vdst -> vdst
+    in
     [move st se;
      move dt de;
-     assn t d e]
-  | Ppackedbinop(t, et, fbop, _, d, s) ->
+     assn t dest e]
+  | Ppackedbinop(t, et, fbop, _, d, s, vs) ->
     let nelem = match t, et with
       | Reg n, Reg n' -> n / n'
       | _ -> disfailwith "invalid"
@@ -1115,10 +1119,14 @@ let rec to_ir mode addr next ss pref =
       fbop (getelement d i) (getelement s i)
     in
     let e = concat_explist (map f ((nelem-1)---0)) in
-    [assn t d e]
-  | Pbinop(t, bop, s, o1, o2) ->
-    [assn t o1 (binop bop (op2e t o1) (op2e t o2))]
-  | Pcmp (t,elet,bop,_,dst,src) ->
+    (match vs with
+    | None -> [assn t d e]
+    | Some vdst -> [assn t vdst e])
+  | Pbinop(t, bop, s, o1, o2, vop) ->
+    (match vop with
+    | None -> [assn t o1 (binop bop (op2e t o1) (op2e t o2))]
+    | Some vdst -> [assn t vdst (binop bop (op2e t o1) (op2e t o2))])
+  | Pcmp (t,elet,bop,_,dst,src,vsrc) ->
     let ncmps = (bits_of_width t) / (bits_of_width elet) in
     let elebits = bits_of_width elet in
     let src = match src with
@@ -1138,7 +1146,9 @@ let rec to_ir mode addr next ss pref =
       let temps = List.rev temps in
         (* could also be done with shifts *)
       let store_back = List.fold_left (fun acc i -> Concat(acc,i)) (List.hd temps) (List.tl temps) in
-      cmps @ [assn t dst store_back]
+      cmps @ (match vsrc with
+              | None -> [assn t dst store_back]
+              | Some vdst -> [assn t vdst store_back])
   | Pmov (t, dstet, srcet, dst, src, ext, _) ->
     let nelem = match t, dstet with
       | Reg n, Reg n' -> n / n'
@@ -1166,7 +1176,7 @@ let rec to_ir mode addr next ss pref =
       let padt = Reg(32 - nbytes) in
       let or_together_bits = List.fold_left (fun acc i -> Concat(acc,i)) (it 0 padt) all_bits in
       [assn r32 dst or_together_bits]
-  | Palignr (t,dst,src,imm) ->
+  | Palignr (t,dst,src,vsrc,imm) ->
       let dst_e = op2e t dst in
       let src_e = op2e t src in
       let imm = op2e t imm in
@@ -1174,14 +1184,17 @@ let rec to_ir mode addr next ss pref =
       let t_concat = Typecheck.infer_ast concat in
       let shift = concat >>* (cast_unsigned t_concat (imm <<* (it 3 t))) in
       let high, low = match t with
+        | Reg 256 -> biconst 255, bi0
         | Reg 128 -> biconst 127, bi0
         | Reg 64 -> biconst 63, bi0
-        | _ -> disfailwith "impossible: used non 64/128-bit operand in palignr"
+        | _ -> disfailwith "impossible: used non 64/128/256-bit operand in palignr"
       in
       let result = Extract (high, low, shift) in
       let addresses = List.fold_left (fun acc -> function Oaddr a -> a::acc | _ -> acc) [] [src;dst] in
       List.map (fun addr -> Assert( (addr &* i32 15) ==* i32 0, [])) addresses
-      @ [assn t dst result]
+      @ (match vsrc with
+        | None -> [assn t dst result]
+        | Some vdst -> [assn t vdst result])
   | Pcmpstr(t,xmm1,xmm2m128,imm,imm8cb,pcmpinfo) ->
     (* All bytes and bits are numbered with zero being the least
        significant. This includes strings! *)
@@ -1397,28 +1410,32 @@ let rec to_ir mode addr next ss pref =
     :: move af (it 0 r1)
     :: move pf (it 0 r1)
     :: []
-  | Pshufd (dst, src, imm) ->
-    let t = r128 in (* pshufd is only defined for 128-bits *)
+  | Pshufd (t, dst, src, vsrc, imm) ->
     let src_e = op2e t src in
     let imm_e = op2e t imm in
     (* XXX: This would be more straight-forward if implemented using
        map, instead of fold *)
     let get_dword ndword =
-      let high = 2 * ndword + 1 in
-      let low = 2 * ndword in
+      let high = 2 * (ndword mod 4) + 1 in
+      let low = 2 * (ndword mod 4) in
       let index = cast_unsigned t (extract high low imm_e) in
+      (* Use the same pattern for the top half of a ymm register *)
+      let index = if t = Reg 256 && ndword > 3 then index +* Int(bi4,t) else index in
       extract_element_symbolic reg_32 src_e index
     in
-    let dwords = concat_explist (map get_dword (3---0)) in
-    [assn t dst dwords]
-  | Pshufb (t, dst, src) ->
+    let topdword = match t with Reg 128 -> 3 | _ -> 7 in
+    let dwords = concat_explist (map get_dword (topdword---0)) in
+    (match vsrc with
+    | None -> [assn t dst dwords]
+    | Some vdst -> [assn t vdst dwords])
+  | Pshufb (t, dst, src, vsrc) ->
     let order_e = op2e t src in
     let dst_e = op2e t dst in
     let get_bit i =
       let highbit = extract ((i*8)+7) ((i*8)+7) order_e in
       let index = match t with
         | Reg 64 -> extract ((i*8)+2) ((i*8)+0) order_e (* 3 bits *)
-        | Reg 128 -> extract ((i*8)+3) ((i*8)+0) order_e (* 4 bits *)
+        | Reg 128 | Reg 256 -> extract ((i*8)+3) ((i*8)+0) order_e (* 4 bits *)
         | _ -> disfailwith "invalid size for pshufb"
       in
       let index = cast_unsigned t index in
@@ -1427,7 +1444,9 @@ let rec to_ir mode addr next ss pref =
     in
     let n = (Typecheck.bits_of_width t) / 8 in
     let e = concat_explist (map get_bit ((n-1)---0)) in
-    [assn t dst e]
+    (match vsrc with
+    | None -> [assn t dst e]
+    | Some vdst -> [assn t vdst e])
   | Lea(t, r, a) when pref = [] ->
     (* See Table 3-64 *)
     let a = match Typecheck.infer_ast a, t with
@@ -2141,14 +2160,28 @@ module ToStr = struct
       (match vs with 
       | None ->  Printf.sprintf "%s %s, %s" name (opr ~t:td d) (opr ~t:ts s)
       | Some s2 -> Printf.sprintf "%s %s, %s, %s" name (opr ~t:td d) (opr ~t:r128 s2) (opr ~t:ts s))
-    | Palignr(t,dst,src,imm) -> Printf.sprintf "palignr %s, %s, %s" (opr ~t dst) (opr ~t src) (opr imm)
-    | Punpck(dt,_,o,d,s) ->
+    | Palignr(t,dst,src,vsrc,imm) -> 
+      (match vsrc with
+      | None -> Printf.sprintf "palignr %s, %s, %s" (opr ~t dst) (opr ~t src) (opr imm)
+      | Some vs -> Printf.sprintf "palignr %s, %s, %s, %s" (opr ~t vs) (opr ~t dst) (opr ~t src) (opr imm))
+    | Punpck(dt,_,o,d,s,vsrc) ->
       let o = match o with | High -> "h" | Low -> "l" in
-      Printf.sprintf "punpck%s %s, %s" o (opr ~t:dt d) (opr ~t:dt s)
+      (match vsrc with
+      | None -> Printf.sprintf "punpck%s %s, %s" o (opr ~t:dt d) (opr ~t:dt s)
+      | Some vs -> Printf.sprintf "punpck%s %s, %s, %s" o (opr ~t:dt vs) (opr ~t:dt d) (opr ~t:dt s))
     | Pcmpstr(t,dst,src,imm,_,_) -> Printf.sprintf "pcmpstr %s, %s, %s" (opr ~t dst) (opr ~t src) (opr imm)
-    | Pshufd(dst,src,imm) -> Printf.sprintf "pshufd %s, %s, %s" (opr ~t:r128 dst) (opr ~t:r128 src) (opr imm)
-    | Pshufb(t,dst,src) -> Printf.sprintf "pshufb %s, %s" (opr ~t dst) (opr ~t src)
-    | Pcmp(t,elet,_,str,dst,src) -> Printf.sprintf "%s %s, %s" str (opr ~t dst) (opr ~t src)
+    | Pshufd(t,dst,src,vsrc,imm) ->
+      (match vsrc with
+      | None -> Printf.sprintf "pshufd %s, %s, %s" (opr ~t dst) (opr ~t src) (opr imm)
+      | Some vs -> Printf.sprintf "pshufd %s, %s, %s, %s" (opr ~t vs) (opr ~t dst) (opr ~t src) (opr imm))
+    | Pshufb(t,dst,src,vsrc) ->
+      (match vsrc with
+      | None -> Printf.sprintf "pshufb %s, %s" (opr ~t dst) (opr ~t src)
+      | Some vs -> Printf.sprintf "pshufb %s, %s, %s" (opr ~t vs) (opr ~t dst) (opr ~t src))
+    | Pcmp(t,elet,_,str,dst,src,vsrc) ->
+      (match vsrc with
+      | None -> Printf.sprintf "%s %s, %s" str (opr ~t dst) (opr ~t src)
+      | Some vs -> Printf.sprintf "%s %s, %s, %s" str (opr ~t vs) (opr ~t dst) (opr ~t src))
     | Pmov(t,_,_,dst,src,_,name) -> Printf.sprintf "%s %s, %s" name (opr ~t dst) (opr ~t src)
     | Pmovmskb(t,dst,src) -> Printf.sprintf "pmovmskb %s, %s" (opr ~t dst) (opr ~t src)
     | Lea(t,r,a) -> Printf.sprintf "lea %s, %s" (opr ~t r) (opr (Oaddr a))
@@ -2223,8 +2256,14 @@ module ToStr = struct
     | Interrupt3 -> "int3"
     | Sysenter -> "sysenter"
     | Syscall -> "syscall"
-    | Pbinop(t,_,opstr,d,s) -> Printf.sprintf "%s %s, %s" opstr (opr ~t d) (opr ~t s)
-    | Ppackedbinop(t,_,_,opstr,d,s) -> Printf.sprintf "%s %s, %s" opstr (opr ~t d) (opr ~t s)
+    | Pbinop(t,_,opstr,d,s,vsrc) -> 
+      (match vsrc with
+        | None -> Printf.sprintf "%s %s, %s" opstr (opr ~t d) (opr ~t s)
+        | Some vs -> Printf.sprintf "%s %s, %s, %s" opstr (opr ~t vs) (opr ~t d) (opr ~t s))
+    | Ppackedbinop(t,_,_,opstr,d,s,vsrc) -> 
+      (match vsrc with
+        | None -> Printf.sprintf "%s %s, %s" opstr (opr ~t d) (opr ~t s)
+        | Some vs -> Printf.sprintf "%s %s, %s, %s" opstr (opr ~t vs) (opr ~t d) (opr ~t s))
 
   let to_string mode pref op =
     disfailwith "fallback to libdisasm"
@@ -3002,10 +3041,10 @@ let parse_instr mode g addr =
             mvt, "movdqa", true, mvt, mvt, tovec r, tovec rm, None
           | 0x6e -> 
             let mvt = match prefix.opsize with Reg 64 -> r64 | _ -> r32 in
-            mvt, "movd", false, mvt, prefix.mopsize, tovec r, rm, None
+            mvt, "movd", false, mvt, mvt, r, tovec rm, None
           | 0x7e -> 
             let mvt = match prefix.opsize with Reg 64 -> r64 | _ -> r32 in
-            mvt, "movd", false, prefix.mopsize, mvt, tovec r, rm, None
+            mvt, "movd", false, mvt, mvt, tovec r, rm, None
           | 0x6f | 0x7f when pref=[] -> 
             r64, "movq", false, r64, r64, tovec r, tovec rm, None
           | 0xd6 when prefix.opsize_override -> 
@@ -3028,18 +3067,24 @@ let parse_instr mode g addr =
         let b3 = Char.code (g na) and na = s na in
         (match b3 with
         | 0x00 ->
-          let d, s, na = parse_modrm_addr na in
-          (Pshufb(prefix.mopsize, tovec d, tovec s), na)
+          let d, s, na = parse_modrm_vec na in
+          let rv = get_vex_opr prefix.vex in
+          let d, s = tovec d, tovec s in
+          (Pshufb(prefix.mopsize, d, s, rv), na)
         | 0x17 when prefix.opsize_override ->
-          let d, s, na = parse_modrm_addr na in
-          (Ptest(r128, d, s), na)
+          let d, s, na = parse_modrm_vec na in
+          let d, s = tovec d, tovec s in
+          (Ptest(prefix.mopsize, d, s), na)
         | 0x29 when prefix.opsize_override ->
-          let r, rm, na = parse_modrm_addr na in
-          (Pcmp(reg_128, reg_64, EQ, "pcmpeq", r, rm), na)
+          let r, rm, na = parse_modrm_vec na in
+          let rv = get_vex_opr prefix.vex in
+          let r, rm = tovec r, tovec rm in
+          (Pcmp(prefix.mopsize, reg_64, EQ, "pcmpeq", r, rm, rv), na)
         | 0x20 | 0x21 | 0x22 | 0x23 | 0x24 | 0x25
         | 0x30 | 0x31 | 0x32 | 0x33 | 0x34 | 0x35 when prefix.opsize_override ->
           (* pmovsx and pmovzx *)
-          let r, rm, na = parse_modrm_addr na in
+          let r, rm, na = parse_modrm_vec na in
+          let r, rm = tovec r, tovec rm in
           (* determine sign/zero extension *)
           let ext, name = match (b3 & 0xf0) with
             | 0x20 -> CAST_SIGNED, "pmovsx"
@@ -3058,32 +3103,41 @@ let parse_instr mode g addr =
           in
           (Pmov(prefix.mopsize, dstet, srcet, r, rm, ext, fullname), na)
         | 0x37 when prefix.opsize_override ->
-          let r, rm, na = parse_modrm_addr na in
-          (Pcmp(reg_128, reg_64, SLT, "pcmpgt", r, rm), na)
+          let r, rm, na = parse_modrm_vec na in
+          let rv = get_vex_opr prefix.vex in
+          let r, rm = tovec r, tovec rm in
+          (Pcmp(prefix.mopsize, reg_64, SLT, "pcmpgt", r, rm, rv), na)
         | 0x38 | 0x39 when prefix.opsize_override ->
-          let r, rm, na = parse_modrm_addr na in
+          let r, rm, na = parse_modrm_vec na in
+          let rv = get_vex_opr prefix.vex in
+          let r, rm = tovec r, tovec rm in
           let et = match b3 with
             | 0x38 -> reg_8 | 0x39 -> reg_32
             | _ -> disfailwith "invalid"
           in
-          (Ppackedbinop(prefix.mopsize, et, Ast_convenience.min_symbolic ~signed:true, "pmins", r, rm), na)
+          (Ppackedbinop(prefix.mopsize, et, Ast_convenience.min_symbolic ~signed:true, "pmins", r, rm, rv), na)
         | 0x3a | 0x3b when prefix.opsize_override ->
-          let r, rm, na = parse_modrm_addr na in
+          let r, rm, na = parse_modrm_vec na in
+          let rv = get_vex_opr prefix.vex in
+          let r, rm = tovec r, tovec rm in
           let et = match b3 with
             | 0x3a -> reg_16 | 0x3b -> reg_32
             | _ -> disfailwith "invalid"
           in
-          (Ppackedbinop(prefix.mopsize, et, Ast_convenience.min_symbolic ~signed:false, "pminu", r, rm), na)
+          (Ppackedbinop(prefix.mopsize, et, Ast_convenience.min_symbolic ~signed:false, "pminu", r, rm, rv), na)
         | _ -> disfailwith (Printf.sprintf "opcode unsupported: 0f 38 %02x" b3))
       | 0x3a ->
         let b3 = Char.code (g na) and na = s na in
         (match b3 with
         | 0x0f ->
-          let (r, rm, na) = parse_modrm_addr na in
+          let (r, rm, na) = parse_modrm_vec na in
           let (i, na) = parse_imm8 na in
-          (Palignr(prefix.mopsize, r, rm, i), na)
+          let rv = get_vex_opr prefix.vex in
+          let r, rm = tovec r, tovec rm in
+          (Palignr(prefix.mopsize, r, rm, rv, i), na)
         | 0x60 | 0x61 | 0x62 | 0x63 ->
-          let (r, rm, na) = parse_modrm_addr na in
+          let (r, rm, na) = parse_modrm_vec na in
+          let r, rm = tovec r, tovec rm in
           let (i, na) = parse_imm8 na in
           (match i with
 
@@ -3123,35 +3177,43 @@ let parse_instr mode g addr =
           | 0x6c | 0x6d -> reg_64
           | _ -> disfailwith "impossible"
         in
-        let (r, rm, na) = parse_modrm_addr na in
-        (Punpck(prefix.mopsize, elemt, order, tovec r, tovec rm), na)
+        let (r, rm, na) = parse_modrm_vec na in
+        let rv = get_vex_opr prefix.vex in
+        let r, rm = tovec r, tovec rm in
+        (Punpck(prefix.mopsize, elemt, order, r, rm, rv), na)
       | 0x64 | 0x65 | 0x66 | 0x74 | 0x75 | 0x76  as o ->
-        let r, rm, na = parse_modrm_addr na in
+        let r, rm, na = parse_modrm_vec na in
+        let rv = get_vex_opr prefix.vex in
+        let r, rm = tovec r, tovec rm in
         let elet = match o & 0x6 with | 0x4 -> r8 | 0x5 -> r16 | 0x6 -> r32 | _ ->
           disfailwith "impossible" in
         let bop, bstr = match o & 0x70 with | 0x70 -> EQ, "pcmpeq" | 0x60 -> SLT, "pcmpgt"
           | _ -> disfailwith "impossible" in
-        (Pcmp(prefix.mopsize, elet, bop, bstr, tovec r, tovec rm), na)
+        (Pcmp(prefix.mopsize, elet, bop, bstr, r, rm, rv), na)
       | 0x70 when prefix.opsize = r16 ->
-        let r, rm, na = parse_modrm_addr na in
+        let r, rm, na = parse_modrm_vec na in
+        let rv = get_vex_opr prefix.vex in
+        let r, rm = tovec r, tovec rm in
         let i, na = parse_imm8 na in
-        (Pshufd(tovec r, tovec rm, i), na)
+        (Pshufd(prefix.mopsize, r, rm, rv, i), na)
       | 0x71 | 0x72 | 0x73 ->
         let t = prefix.mopsize in
-        let r, rm, na = parse_modrm_addr na in
+        let r, rm, na = parse_modrm_vec na in
+        let rv = get_vex_opr prefix.vex in
+        let r, rm = tovec r, tovec rm in
         let i, na = parse_imm8 na in
         let open BatInt64.Infix in
-            let fbop, str, et, i, rm = match b2, r, i with
-              | _, Oreg 2, _ -> binop RSHIFT, "psrl", lowbits2elemt b2, i, rm
-              | _, Oreg 6, _ -> binop LSHIFT, "psll", lowbits2elemt b2, i, rm
-              | _, Oreg 4, _ -> binop ARSHIFT, "psra", lowbits2elemt b2, i, rm
+            let fbop, str, et, i = match b2, r, i with
+              | _, Ovec 2, _ -> binop RSHIFT, "psrl", lowbits2elemt b2, i
+              | _, Ovec 6, _ -> binop LSHIFT, "psll", lowbits2elemt b2, i
+              | _, Ovec 4, _ -> binop ARSHIFT, "psra", lowbits2elemt b2, i
           (* The shift amount of next two elements are multipled by eight *)
-              | 0x73, Oreg 3, Oimm i when prefix.opsize_override -> binop RSHIFT, "psrldq", reg_128, Oimm (i *% bi8), tovec rm
-              | 0x73, Oreg 7, Oimm i when prefix.opsize_override -> binop LSHIFT, "pslldq", reg_128, Oimm (i *% bi8), tovec rm
+              | 0x73, Ovec 3, Oimm i when prefix.opsize_override -> binop RSHIFT, "psrldq", t, Oimm (i *% bi8)
+              | 0x73, Ovec 7, Oimm i when prefix.opsize_override -> binop LSHIFT, "pslldq", t, Oimm (i *% bi8)
               | _, Oreg i, _ -> disfailwith (Printf.sprintf "invalid psrl/psll encoding b2=%#x r=%#x" b2 i)
               | _ -> disfailwith "impossible"
             in
-            (Ppackedbinop(t, et, fbop, str, rm, i), na)
+            (Ppackedbinop(t, et, fbop, str, rm, i, rv), na)
       | 0x80 | 0x81 | 0x82 | 0x83 | 0x84 | 0x85 | 0x86 | 0x87 | 0x88 | 0x89
       | 0x8a | 0x8b | 0x8c | 0x8d | 0x8e | 0x8f ->
         let t = expanded_jump_type prefix.opsize in
@@ -3227,7 +3289,9 @@ let parse_instr mode g addr =
         (Bswap(prefix.opsize, Oreg(rm_extend lor (b2 & 7))), na)
       | 0xd1 | 0xd2 | 0xd3 | 0xe1 | 0xe2 | 0xf1 | 0xf2 | 0xf3 ->
         let t = prefix.mopsize in
-        let r, rm, na = parse_modrm_addr na in
+        let r, rm, na = parse_modrm_vec na in
+        let r, rm = tovec r, tovec rm in
+        let rv = get_vex_opr prefix.vex in
         let et = lowbits2elemt b2 in
         let fbop, str = match b2 & 0xf0 with
           | 0xd0 -> binop RSHIFT, "psrl"
@@ -3235,19 +3299,26 @@ let parse_instr mode g addr =
           | 0xf0 -> binop LSHIFT, "psll"
           | _ -> disfailwith "invalid"
         in
-        (Ppackedbinop(t, et, fbop, str, r, rm), na)
+        (Ppackedbinop(t, et, fbop, str, r, rm, rv), na)
       | 0xda ->
-        let r, rm, na = parse_modrm_addr na in
-        (Ppackedbinop(prefix.mopsize, reg_8, Ast_convenience.min_symbolic ~signed:false, "pminub", r, rm), na)
+        let r, rm, na = parse_modrm_vec na in
+        let r, rm = tovec r, tovec rm in
+        let rv = get_vex_opr prefix.vex in
+        (Ppackedbinop(prefix.mopsize, reg_8, Ast_convenience.min_symbolic ~signed:false, "pminub", r, rm, rv), na)
       | 0xdb ->
-        let r, rm, na = parse_modrm_addr na in
-        (Pbinop(prefix.mopsize, AND, "pand", r, rm), na)
+        let r, rm, na = parse_modrm_vec na in
+        let r, rm = tovec r, tovec rm in
+        let rv = get_vex_opr prefix.vex in
+        (Pbinop(prefix.mopsize, AND, "pand", r, rm, rv), na)
       | 0xd7 ->
-        let r, rm, na = parse_modrm_addr na in
-        (Pmovmskb(prefix.mopsize, tovec r, tovec rm), na)
+        let r, rm, na = parse_modrm_vec na in
+        let r, rm = r, tovec rm in
+        (Pmovmskb(prefix.mopsize, r, rm), na)
       | 0xe0 | 0xe3 ->
         (* pavg *)
-        let r, rm, na = parse_modrm_addr na in
+        let r, rm, na = parse_modrm_vec na in
+        let r, rm = tovec r, tovec rm in
+        let rv = get_vex_opr prefix.vex in
         (* determine whether we're using bytes or words *)
         let et = match b2 & 0x0f with
           | 0x00 -> reg_8
@@ -3256,20 +3327,22 @@ let parse_instr mode g addr =
         in
         let one = it 1 et in
         let average x y = ((x +* y) +* one) >>* one in
-        (Ppackedbinop(prefix.mopsize, et, average, "pavg", r, rm), na)
+        (Ppackedbinop(prefix.mopsize, et, average, "pavg", r, rm, rv), na)
       | 0xea ->
-        let r, rm, na = parse_modrm_addr na in
-        (Ppackedbinop(prefix.mopsize, reg_16, Ast_convenience.min_symbolic ~signed:true, "pmins", r, rm), na)
+        let r, rm, na = parse_modrm_vec na in
+        let r, rm = tovec r, tovec rm in
+        let rv = get_vex_opr prefix.vex in
+        (Ppackedbinop(prefix.mopsize, reg_16, Ast_convenience.min_symbolic ~signed:true, "pmins", r, rm, rv), na)
       | 0xeb ->
-        let r, rm, na = parse_modrm_addr na in
-        (Pbinop(prefix.mopsize, OR, "por", r, rm), na)
+        let r, rm, na = parse_modrm_vec na in
+        let r, rm = tovec r, tovec rm in
+        let rv = get_vex_opr prefix.vex in
+        (Pbinop(prefix.mopsize, OR, "por", r, rm, rv), na)
       | 0xef ->
-        let d, s, na = parse_modrm_addr na in
-        (Pbinop(prefix.mopsize, XOR, "pxor", tovec d, tovec s), na)
-      | 0xf8 ->
-        let r, rm, na = parse_modrm_addr na in
-        (Pbinop(prefix.mopsize, MINUS, "psubb", tovec rm, tovec r), na)
-
+        let r, rm, na = parse_modrm_vec na in
+        let r, rm = tovec r, tovec rm in
+        let rv = get_vex_opr prefix.vex in
+        (Pbinop(prefix.mopsize, XOR, "pxor", r, rm, rv), na)
       | _ -> unimplemented 
         (Printf.sprintf "unsupported opcode: %02x %02x" b1 b2)
     )
