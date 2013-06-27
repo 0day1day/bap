@@ -371,11 +371,11 @@ and mxcsr = nv "R_MXCSR" r32
 (* r8 -> r15 *)
 let nums = Array.init 8 (fun i -> nmv "ERROR" (Reg 0) (Printf.sprintf "R_R%d" (i+8)) r64)
 
+(*
 let xmms = Array.init 8 (fun i -> nv (Printf.sprintf "R_XMM%d" i) xmm_t)
-let xmms_x86_64 = Array.init 8 (fun i -> nv(Printf.sprintf "R_XMM%d" (i+8)) xmm_t)
-let xmm0 = xmms.(0)
+*)
 
-let ymms = Array.init 8 (fun i -> nv (Printf.sprintf "R_YMM%d" i) ymm_t)
+let ymms = Array.init 16 (fun i -> nv (Printf.sprintf "R_YMM%d" i) ymm_t)
 
 (* floating point registers *)
 let st = Array.init 8 (fun i -> nv (Printf.sprintf "R_ST%d" i) st_t)
@@ -384,7 +384,7 @@ let mvs {v64; v32} = [v64; v32]
 
 let shared_regs =
   cf::pf::af::zf::sf::oF::df::cs::ds::es::fs::gs::ss::fpu_ctrl::mxcsr::[]
-  @ Array.to_list xmms
+  @ Array.to_list ymms
   @ Array.to_list st
 
 let shared_multi_regs =
@@ -397,7 +397,6 @@ let regs_x86 : var list =
 let regs_x86_64 : var list =
   shared_regs
   @ List.map (fun {v64; v32} -> v64) (shared_multi_regs @ (Array.to_list nums))
-  @ Array.to_list xmms_x86_64
   @ Array.to_list ymms
 
 let regs_of_mode = function
@@ -628,10 +627,6 @@ let bits2genreg = function
   | i when i >= 8 && i <= 15 -> nums.(i-8)
   | _ -> failwith "bits2genreg takes 4 bits"
 
-let bits2xmm b = xmms.(b)
-
-let bits2ymm b = ymms.(b)
-
 and reg2bits r =
   let (i,_) = BatList.findi (fun _ x -> x == r) [rax; rcx; rdx; rbx; rsp; rbp; rsi; rdi] in
   i
@@ -648,12 +643,26 @@ let bits2segreg = function
 
 let bits2segrege b = Var(bits2segreg b)
 
-let bits2xmme b = Var(bits2xmm b)
-
-let bits2xmm64e b =
-  cast_low r64 (bits2xmme b)
+let bits2ymm b = ymms.(b)
 
 let bits2ymme b = Var(bits2ymm b)
+
+let bits2ymm128e b =
+  cast_low r128 (bits2ymme b)
+
+let bits2ymm64e b =
+  cast_low r64 (bits2ymme b)
+
+let bits2ymm32e b =
+  cast_low r32 (bits2ymme b)
+
+let bits2xmm = bits2ymm128e
+
+let bits2xmm64e = bits2ymm64e
+
+let bits2xmm32e = bits2ymm32e
+
+let xmm0 = ymms.(0)
 
 let bits2reg64e mode b =
   ge mode (bits2genreg b)
@@ -731,13 +740,11 @@ let storem mode t a e =
 
 let op2e_s mode ss t = function
   | Ovec r when t = r256 -> bits2ymme r
-  | Ovec r when t = r128 -> bits2xmme r
-  | Ovec r when t = r64 -> bits2xmm64e r
-  | Ovec r -> let i = match t with
-              | Reg n -> ": "^(string_of_int n)
-              | _ -> ""
-              in
-              disfailwith ("invalid SIMD register size"^i)
+  | Ovec r when t = r128 -> bits2ymm128e r
+  | Ovec r when t = r64 -> bits2ymm64e r
+  | Ovec r when t = r32 -> bits2ymm32e r
+  | Ovec r -> let i = match t with | Reg n -> ": "^(string_of_int n) | _ -> ""
+              in disfailwith ("invalid SIMD register size for op2e"^i)
   | Oreg r when t = r64 -> bits2reg64e mode r
   | Oreg r when t = r32 -> bits2reg32e mode r
   | Oreg r when t = r16 -> bits2reg16e mode r
@@ -772,13 +779,10 @@ let assn_s mode s t v e =
     move v final_e
   in
   match v, t with
-  | Ovec r, Reg (128|64) ->
-    let v = bits2xmm r in
+  | Ovec r, Reg (256|128|64|32) ->
+    let v = bits2ymm r in 
     sub_assn t v e
-  | Ovec r, Reg 256 ->
-    let v = bits2ymm r in
-    sub_assn t v e
-  | Ovec r, _ -> disfailwith "unknown SIMD register type"
+  | Ovec r, _ -> disfailwith "invalid SIMD register size for assignment"
   | Oreg r, Reg (64|32|16) ->
     let v = gv mode (bits2genreg r) in
     sub_assn t v e
@@ -1382,6 +1386,7 @@ let rec to_ir mode addr next ss pref =
       move int_res_2 (validvector ^* Var int_res_1))
     :: (match pcmpinfo with
     | {out=Index} -> move rcx (sb (Var int_res_2))
+    (* FIXME: ymms should be used instead of xmms here *)
     | {out=Mask} -> move xmm0 (mask (Var int_res_2)))
     :: move cf (Var int_res_2 <>* it 0 r16)
     :: move zf (contains_null xmm2m128_e)
