@@ -264,10 +264,10 @@ type rex = {
 
 type vex = {
   vex_nr : bool; (* inverted rex_r bit *)
-  vex_nx : bool option; (* inverted rex_x bit *)
-  vex_nb : bool option; (* inverted rex_b bit *)
-  vex_map_select : int option; (* Specifies the opcode map to use (we don't use this) *)
-  vex_we : bool option; (* For int instructions, equivalent to rex.w. For non-int instructions, opcode extension bit. *)
+  vex_nx : bool; (* inverted rex_x bit *)
+  vex_nb : bool; (* inverted rex_b bit *)
+  vex_map_select : int; (* Specifies the opcode map to use (we don't use this) *)
+  vex_we : bool; (* For int instructions, equivalent to rex.w. For non-int instructions, opcode extension bit. *)
   vex_v : int; (* additional instruction operand (XMM or YMM register) *)
   vex_l : bool; (* 0 = 128-bit operands (xmm), 1 = 256-bit vector operands (ymm) *)
   vex_pp : int; (* Specifies mandatory prefix (0=none, 1=pref_opsize 2=repz 3=repnz) *)
@@ -1074,7 +1074,7 @@ let rec to_ir mode addr next ss pref =
     in
     let al =
       if align then
-        List.map (fun a -> Assert( (a &* i32 15) ==* i32 0, [])) (al)
+        List.map (fun a -> Assert( (a &* (int_of_mode mode) 15) ==* (int_of_mode mode) 0, [])) (al)
       else []
     in
     d::al
@@ -2334,10 +2334,10 @@ let parse_instr mode g addr =
       let b2, a = Char.code (g a), (s a) in
       Some {
         vex_nr = b1 land 0x80 = 0x80;
-        vex_nx = Some (b1 land 0x40 = 0x40);
-        vex_nb = Some (b1 land 0x20 = 0x20);
-        vex_map_select = Some (b1 land 0x1f);
-        vex_we = Some (b2 land 0x80 = 0x80);
+        vex_nx = b1 land 0x40 = 0x40;
+        vex_nb = b1 land 0x20 = 0x20;
+        vex_map_select = b1 land 0x1f;
+        vex_we = b2 land 0x80 = 0x80;
         vex_v = (b2 land 0x78) >> 3;
         vex_l = b2 land 0x4 = 0x4;
         vex_pp = b2 land 0x3;
@@ -2348,10 +2348,10 @@ let parse_instr mode g addr =
       let b1, a = Char.code (g a), (s a) in
       Some {
         vex_nr = b1 land 0x80 = 0x80;
-        vex_nx = None;
-        vex_nb = None;
-        vex_map_select = None;
-        vex_we = None;
+        vex_nx = true;
+        vex_nb = true;
+        vex_map_select = 1;
+        vex_we = false;
         vex_v = (b1 land 0x78) >> 3;
         vex_l = b1 land 0x4 = 0x4;
         vex_pp = b1 land 0x3;
@@ -2559,8 +2559,6 @@ let parse_instr mode g addr =
   in
   let parse_modrmint_vec rex vex at ia a b r modb rm na = 
     (* Create a REX prefix from the VEX to hand to parse_modrm3264int, if necessary *)
-    let bopt = function Some a -> a | None -> false in
-    let nbopt = function Some a -> not a | None -> false in
     let rex = match rex with
       | Some _ -> rex
       | None -> 
@@ -2568,9 +2566,9 @@ let parse_instr mode g addr =
         | Some {vex_nr; vex_nx; vex_nb; vex_we} -> 
           Some {
             rex_r=not vex_nr;
-            rex_x=nbopt vex_nx;
-            rex_b=nbopt vex_nb; 
-            rex_w=bopt vex_we;
+            rex_x=not vex_nx;
+            rex_b=not vex_nb; 
+            rex_w=vex_we;
           }
         | None -> None)
     in 
@@ -2579,9 +2577,8 @@ let parse_instr mode g addr =
   let parse_modrmbits_vec vex a =
     let e b = (if b then 1 else 0) << 3 in
     let b, r, modb, rm, na = parse_modrmbits a in
-    let nbopt = function Some a -> not a | None -> false in
     let vex_r, vex_x, vex_b = match vex with
-      | Some {vex_nr; vex_nx; vex_nb} -> not vex_nr, nbopt vex_nx, nbopt vex_nb
+      | Some {vex_nr; vex_nx; vex_nb} -> not vex_nr, not vex_nx, not vex_nb
       | None -> false, false, false
     in
     let r = e vex_r lor r in
@@ -3374,7 +3371,7 @@ let parse_instr mode g addr =
   in
   (* XXX: I am not sure about this *)
   let opsize = match vex with
-    | Some {vex_we=Some true} -> r64
+    | Some {vex_we=true} -> r64
     | _ -> opsize
   in
   let mopsize = match vex with
@@ -3391,7 +3388,10 @@ let parse_instr mode g addr =
     match rex with
     | Some {rex_r; rex_b; rex_x} ->
       e rex_r, e rex_b, e rex_x
-    | None -> 0, 0, 0
+    | None -> 
+      (match vex with
+      | Some {vex_nr; vex_nb; vex_nx;} -> e (not vex_nr), e (not vex_nb), e (not vex_nx)
+      | None -> 0, 0, 0)
   in
 
   let prefix =
