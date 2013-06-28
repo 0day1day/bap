@@ -763,9 +763,14 @@ let assn_s mode s t v e =
     let assnbits = Typecheck.bits_of_width t in
 
     (* Add the upper preserved bits, if any *)
+    (* Zero-extend 32-bit assignments to 64-bit registers. *)
     let ubh = (bits-1) and ubl = (assnbits+off) in
-    if ubh > ubl then
-      concat_exps := extract ubh ubl (Var v)::!concat_exps;
+    let _ = match ubh, ubl with
+      | 63, 32 -> 
+        concat_exps := Int(bi0, r32)::!concat_exps;
+      | _ ->
+        if ubh > ubl then concat_exps := extract ubh ubl (Var v)::!concat_exps; 
+    in
 
     (* Add e *)
     concat_exps := e::!concat_exps;
