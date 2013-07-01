@@ -93,15 +93,13 @@ let structural_analysis c =
     if debug() then dprintf "compacting %s from %s"  (node2s n) (nodes2s nset);
     let nleft = ref (List.length nset)
     and last = ref 0 in
-    Array.iter 
-      (fun v ->
-	 if !nleft > 0 && List.mem v nset then (
-	   if !nleft = 1 then (post.(!last) <- n; post_ctr := !last; incr last);
-	   decr nleft )
-	 else
-	   (post.(!last) <- v; incr last)
-      )
-      post;
+    Array.iter(fun v ->
+         if !nleft > 0 && List.mem v nset then (
+           if !nleft = 1 then (post.(!last) <- n; post_ctr := !last; incr last);
+           decr nleft )
+         else
+           (post.(!last) <- v; incr last)
+    ) post;
   in
   let replace g node nodeset =
     let update_edge s d =
@@ -114,15 +112,15 @@ let structural_analysis c =
     G.add_vertex g node;
     List.iter
       (fun v->
-	 let succs = G.succ g v and preds = G.pred g v in
-	 List.iter (update_edge v) succs;
-	 List.iter (fun p -> update_edge p v) preds;
+         let succs = G.succ g v and preds = G.pred g v in
+         List.iter (update_edge v) succs;
+         List.iter (fun p -> update_edge p v) preds;
       ) nodeset;
     compact g node nodeset;
     let rm rmn =
       (* dprintf "Removing %s" (node2s rmn); *)
       (* If we are going to remove the entry node, set the entry node
-	 to the new coalesced node. *)
+	    to the new coalesced node. *)
       if rmn = !entry then
       	entry := node;
       G.remove_vertex g rmn
@@ -144,44 +142,47 @@ let structural_analysis c =
     (* Check for a Block containing node *)
     let rec succchain n nset =
       match G.succ g n with
-      | [s] -> (match G.pred g s with
-		| [_] -> succchain s (s::nset)
-		| _ -> List.rev nset)
-      | _ -> List.rev nset
+        | [s] -> (
+          match G.pred g s with
+          | [_] -> succchain s (s::nset)
+          | _ -> List.rev nset)
+        | _ -> List.rev nset
     in
     let rec predchain n nset =
       match G.pred g n with
-      | [p] -> (match G.succ g p with
-		  [_] -> predchain p (p::nset)
-		| _ -> nset)
+      | [p] -> (
+        match G.succ g p with
+          | [_] -> predchain p (p::nset)
+          | _ -> nset)
       | _ -> nset
     in
     (* dprintf "Succ %s" (node2s node); *)
     match G.succ g node with
     | [_] | [] ->
-	let nset = predchain node (succchain node [node]) in
-	(match nset with
-	 | _::_::_ -> Some(Block, nset)
-	 | _ -> None )
+      let nset = predchain node (succchain node [node]) in
+      (match nset with
+       | _::_::_ -> Some(Block, nset)
+       | _ -> None )
     | [m;n] -> (* Check for IfThenElse *)
-	(match G.succ g m, G.succ g n with
-	 | [s], [s'] when s = s' ->
-	     (match G.pred g m, G.pred g n with
-	      | [_], [_] -> Some(IfThenElse, [node;m;n])
-	      | _ -> failwith "structural_analysis: unimplemeted: Proper?" ) (* if the successors of an if-then-else have other parents *)
-	 | [s],_ when s = n && G.pred g m = [node] ->
-	     Some(IfThen, [node; m])
-	 | _,[s] when s = m && G.pred g n = [node] ->
-	     Some(IfThen, [node; n])
-	 | _ ->
-	     None
-	       (* dprintf "acyclic_region: was checking %s" (node2s node);
-	     printg g;
-	     failwith "unimplemeted Proper." *)
-	)
+      (match G.succ g m, G.succ g n with
+       | [s], [s'] when s = s' ->
+           (match G.pred g m, G.pred g n with
+            | [_], [_] -> Some(IfThenElse, [node;m;n])
+            | _ -> failwith "structural_analysis: unimplemeted: Proper?" ) (* if the successors of an if-then-else have other parents *)
+       | [s],_ when s = n && G.pred g m = [node] ->
+           Some(IfThen, [node; m])
+       | _,[s] when s = m && G.pred g n = [node] ->
+           Some(IfThen, [node; n])
+       | _ ->
+           None
+             (* dprintf "acyclic_region: was checking %s" (node2s node);
+           printg g;
+           failwith "unimplemeted Proper." *)
+      )
     | _ ->	
-	failwith("structural_analysis: indirect jumps unsupported yet: "^node2s node)
+      failwith("structural_analysis: indirect jumps unsupported yet: "^node2s node)
   in
+
   let minimize_improper g node nset =
     printg g;
     failwith "structural_analysis: minimize_improper unimplemented"
@@ -190,20 +191,20 @@ let structural_analysis c =
     dprintf "cyclic_region: checking %s. nset: %s" (node2s node) (nodes2s nset);
     match nset with
     | [_] ->
-        dprintf "Successors: %s" (nodes2s (G.succ g node));
-	if List.mem node (G.succ g node) then
-	  Some(SelfLoop, nset)
-	else (dprintf "cyclic_region: Node %s not in a cycle" (node2s node); None)
+      dprintf "Successors: %s" (nodes2s (G.succ g node));
+      if List.mem node (G.succ g node) then
+        Some(SelfLoop, nset)
+      else (dprintf "cyclic_region: Node %s not in a cycle" (node2s node); None)
     | x::y::_ ->
-	let pc = PC.create g in
-	if List.exists (fun m -> not(PC.check_path pc node m) ) nset then
-	  Some(Improper, minimize_improper g node nset)
-	else
-	  let m = if x <> node then x else y in
-	  if List.length (G.succ g node) = 2 && List.length(G.succ g m) = 1
-	    && List.length (G.pred g node) = 2 && List.length(G.pred g m) = 1
-	  then Some(WhileLoop, nset)
-	  else Some(NaturalLoop, nset)
+      let pc = PC.create g in
+      if List.exists (fun m -> not(PC.check_path pc node m) ) nset then
+        Some(Improper, minimize_improper g node nset)
+      else
+        let m = if x <> node then x else y in
+        if List.length (G.succ g node) = 2 && List.length(G.succ g m) = 1
+          && List.length (G.pred g node) = 2 && List.length(G.pred g m) = 1
+        then Some(WhileLoop, nset)
+        else Some(NaturalLoop, nset)
     | [] -> failwith "structural_analysis: cyclic_region_type: nset cannot be empty"
   in
   let get_reachunder g n =
@@ -230,36 +231,36 @@ let structural_analysis c =
       dprintf "Checking %s" (node2s n);
       match acyclic_region_type g n with
       | Some(rtype, nodeset) ->
-	  let p = reduce g rtype nodeset in
-	  if List.mem !entry nodeset then
-	    entry := p;
-	  if List.mem !exit nodeset then
-	    exit := p;
-	  progress := true;
+        let p = reduce g rtype nodeset in
+        if List.mem !entry nodeset then
+          entry := p;
+        if List.mem !exit nodeset then
+          exit := p;
+        progress := true;
       | None ->
           dprintf "acyclic_region_type returned None";
-	  let reachunder = get_reachunder g n in
-	  match cyclic_region_type g n reachunder with
-	  | Some(rtype, reachunder) ->
-	      let p = reduce g rtype reachunder in
-	      if List.mem !entry reachunder then
-		entry := p;
-	      if List.mem !exit reachunder then
-		exit := p;
-	      progress := true;
-	  | None ->
-	      incr post_ctr
+      let reachunder = get_reachunder g n in
+      match cyclic_region_type g n reachunder with
+      | Some(rtype, reachunder) ->
+        let p = reduce g rtype reachunder in
+        if List.mem !entry reachunder then 
+          entry := p;
+        if List.mem !exit reachunder then
+          exit := p;
+        progress := true;
+      | None ->
+          incr post_ctr
     done;
-    if G.nb_vertex g > 1 then
-      (dprintf "Ended iteration with %d nodes" (G.nb_vertex g);
-       if !progress then doit()
-       else (
-	 printg g;
-	 wprintf "Stopped making progress. Implement Proper/Improper intervals to fix this.";
-	 let p = reduce g Proper (G.fold_vertex (fun x y-> x::y) g []) in
-	 entry := p;
+    if G.nb_vertex g > 1 then(
+      dprintf "Ended iteration with %d nodes" (G.nb_vertex g);
+      if !progress then doit()
+      else (
+        printg g;
+        wprintf "Stopped making progress. Implement Proper/Improper intervals to fix this.";
+        let p = reduce g Proper (G.fold_vertex (fun x y-> x::y) g []) in
+        entry := p;
        )
-      )
+    )
   in
   doit();
   !entry

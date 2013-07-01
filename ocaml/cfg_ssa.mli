@@ -11,10 +11,13 @@ val v2s : Cfg.SSA.G.V.t -> string
 val of_astcfg : ?tac:bool -> Cfg.AST.G.t -> Cfg.SSA.G.t
 
 val of_ast : ?tac:bool -> Ast.program -> Cfg.SSA.G.t
+(** Translates a AST program into an SSA CFG. *)
 
 val to_astcfg : ?remove_temps:bool -> ?dsa:bool -> Cfg.SSA.G.t -> Cfg.AST.G.t
+(** Convert a SSA CFG to an AST CFG. *)
 
 val to_ast : ?remove_temps:bool -> Cfg.SSA.G.t -> Ast.program
+(** Convert a SSA CFG to an AST program. *)
 
 
 type translation_results = {
@@ -24,4 +27,12 @@ type translation_results = {
 }  
 
 val trans_cfg : ?tac:bool -> Cfg.AST.G.t -> translation_results
+(** Translates a CFG into SSA form.
 
+    Returns the new SSA CFG and two
+    maps. One from SSA variables to the variables they originally came
+    from, and the other from the original variables to what they map
+    to at the end of the exit node. Both functions act like the
+    identity function for variables that don't map to anything. (Eg,
+    for temporary variables introduced by SSA, or variables that
+    weren't assigned.)  *)

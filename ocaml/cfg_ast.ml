@@ -203,7 +203,7 @@ let add_prog ?(special_error = true) c p =
       Some v, c, (v::nodes)
     | [] -> match addpred with
       | None -> None, c, nodes
-      | Some v -> failwith "add_prog: I do not think this is posible"
+      | Some v -> failwith "add_prog: I do not think this is possible"
   in
   c, postponed_edges, List.rev nodes, fallthrough
 

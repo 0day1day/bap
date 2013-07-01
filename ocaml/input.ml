@@ -93,7 +93,7 @@ let get_program () =
     raise e
 
 let get_stream_program () = match !streaminputs with
-  | None -> raise(Arg.Bad "No input specified")
+  | None -> raise(Arg.Bad "No streaming input specified")
   | Some(`Tracestream f) -> 
     Asmir.serialized_bap_stream_from_trace_file !streamrate f
 

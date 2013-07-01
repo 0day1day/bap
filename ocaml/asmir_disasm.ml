@@ -223,7 +223,7 @@ module Make(D:DISASM)(F:FUNCID) = struct
              We need to add internal edges here so we can actually do
              analysis on the CFG (for example, concretely executing to
              see if there is a call).
-        *)
+          *)
           let c', edges = List.fold_left
             (fun (c,unresolved_edges) ((s,l,e) as edge) ->
               match lab_of_exp e with
@@ -241,7 +241,7 @@ module Make(D:DISASM)(F:FUNCID) = struct
           let c', edges = match F.find_calls c' bbs edges F.State.init with
             | [], _ -> c', edges
             | call_edges, _ ->
-            (* We found edges corresponding to calls *)
+              (* We found edges corresponding to calls *)
               let others = Util.list_difference edges call_edges in
               let fallthrough = List.map (fun (s,l,e) -> (s,l, exp_of_lab (Addr next))) call_edges in
               let dumb_translate_call cfg (s,l,e) =
@@ -291,10 +291,10 @@ module Make(D:DISASM)(F:FUNCID) = struct
           let c,error = Cfg_ast.find_error c in
           CA.add_edge_e c (CA.G.E.create s l error)
       in
-    (* Side effects: Adds to worklist *)
+      (* Side effects: Adds to worklist *)
       let process_edge (c,state) ((s,l,t) as e) =
         dprintf "Looking at edge from %s to %s" (Cfg_ast.v2s s) (Pp.ast_exp_to_string t);
-        let resolved_addrs,state' = D.get_succs p c e state in
+        let resolved_addrs, state' = D.get_succs p c e state in
         match resolved_addrs with
         | Addrs addrs ->
           dprintf "%d Addrs" (List.length addrs);

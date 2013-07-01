@@ -3,6 +3,9 @@
     @author Ivan Jager
 *)
 
+(** The timeout exception, which is raised by [timeout]. *)
+exception Timeout
+
 (** The identity function *)
 val id : 'a -> 'a
 

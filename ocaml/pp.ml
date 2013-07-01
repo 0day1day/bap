@@ -80,13 +80,13 @@ let var_to_string ?ctx (Var.V(id,name,t) as v) =
     try VH.find vars v
     with Not_found ->
       let rec trystring (s, `F next) =
-	if Hashtbl.mem names s then
-	  trystring (next s)
-	else (
-	  let s' = s ^":"^ typ_to_string t in
-	  VH.add vars v s';
-	  Hashtbl.add names s ();
-	  s')
+        if Hashtbl.mem names s then
+          trystring (next s)
+        else (
+          let s' = s ^":"^ typ_to_string t in
+          VH.add vars v s';
+          Hashtbl.add names s ();
+        s')
       in
       let rec more x = (x^"_", `F more) in
       trystring (name, `F (fun _ -> (name ^ "_" ^ string_of_int id, `F more)))

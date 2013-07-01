@@ -236,10 +236,10 @@ let do_aggressive_dce ?(globals = []) graph =
               let src = C.G.E.src e in
               let stmts = C.get_stmts graph src in
               match List.rev stmts with
-              | (CJmp _)::_ -> (src, (List.length stmts)-1) :: l
+              | (CJmp _ | Jmp _)::_ -> (src, (List.length stmts)-1) :: l
               | _ when C.G.V.label src = Cfg.BB_Entry -> l (* Everything is dependent on BB_Entry *)
-              | [] -> failwith (Printf.sprintf "Expected control-dependency to be a CJmp in %s (%s)!" (Cfg_ssa.v2s bb) (Cfg_ssa.v2s src))
-              | s::_ -> failwith (Printf.sprintf "Expected control-dependency to be a CJmp in %s (%s) %s!" (Cfg_ssa.v2s bb) (Cfg_ssa.v2s src) (Pp.ssa_stmt_to_string s))
+              | [] -> failwith (Printf.sprintf "Expected control-dependency to be a Jmp/CJmp in %s (%s)!" (Cfg_ssa.v2s bb) (Cfg_ssa.v2s src))
+              | s::_ -> failwith (Printf.sprintf "Expected control-dependency to be a Jmp/CJmp in %s (%s) %s!" (Cfg_ssa.v2s bb) (Cfg_ssa.v2s src) (Pp.ssa_stmt_to_string s))
             ) cdg bb []
         in Cfg.BH.add cdh (C.G.V.label bb) d;
         d)
@@ -338,7 +338,7 @@ let do_aggressive_dce ?(globals = []) graph =
       let graph = match revnewstmts with
         | CJmp (_, t1, t2, attrs) as s::others when not (site_is_live (bb, (List.length revnewstmts)-1)) ->
           has_changed := true;
-          dprintf "Dead cjmp: %s" (Pp.ssa_stmt_to_string s);
+          dprintf "Dead cjmp at %s: %s" (Cfg_ssa.v2s bb) (Pp.ssa_stmt_to_string s);
           (* Which edge do we remove? Try removing one and see if we
              can still reach BB_Exit. *)
           let truee = List.find (fun e ->

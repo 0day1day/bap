@@ -615,7 +615,7 @@ let timeout_option ~secs ~f =
 let timeout ~secs ~f =
   let f = timeout_option ~secs ~f in
   (fun ~x ->
-    match f x with | Some x -> x | None -> raise Timeout)
+    match f ~x with | Some x -> x | None -> raise Timeout)
 
 let rec print_separated_list ps sep lst = 
   let rec doit acc = function

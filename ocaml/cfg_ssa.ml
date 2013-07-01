@@ -208,17 +208,10 @@ type translation_results = {
   to_ssavar: Var.t -> Var.t; (* Maps AST vars to SSA at end of exit node. *)
 }  
 
-(** Translates a CFG into SSA form.
-    Returns the new SSA CFG and two maps. One from SSA variables to the
-    variables they originally came from, and the other from the original
-    variables to what they map to at the end of the exit node. Both raise
-    Not_found for variables that don't map to anything. (Eg, for temporary
-    variables introduced by SSA, or variables that weren't assigned.)
- *)
 let rec trans_cfg ?tac cfg =
   pdebug "Translating to SSA";
   (* if debug && not(Ast_cfg.well_defined cfg) then
-    raise(TypeError "Ssa.trans_cfg: given cfg not well defined");*)
+     raise(TypeError "Ssa.trans_cfg: given cfg not well defined");*)
 
   let cfg = Prune_unreachable.prune_unreachable_ast (CA.copy cfg) in
   pdebug "Creating new cfg";
@@ -399,14 +392,14 @@ let rec trans_cfg ?tac cfg =
       ssa ssa
   in
   dprintf "Done translating to SSA";
-  {cfg=ssa; to_astvar=VH.find to_oldvar; to_ssavar=VH.find exitctx}
+  let to_astvar v = try VH.find to_oldvar v with Not_found -> v in
+  let to_ssavar v = try VH.find exitctx v with Not_found -> v in
+  {cfg=ssa; to_astvar; to_ssavar}
 
-(** Translates a CFG into SSA form. *)
 let of_astcfg ?tac cfg =
   let {cfg=ssa} = trans_cfg ?tac cfg in
   ssa
 
-(** Translates an AST program into an SSA CFG. *)
 let of_ast ?tac p = 
   of_astcfg ?tac (Cfg_ast.of_prog p)
 

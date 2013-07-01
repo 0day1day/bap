@@ -277,7 +277,9 @@ struct
   let default = []
   let join sl1 sl2 = match List.rev sl1 with
     | Ast.Jmp (e, _) :: sl1' when Ast.lab_of_exp e <> None -> List.append (List.rev sl1') sl2
-    | Ast.Jmp _ :: _ -> failwith "join: Joining BB with indirect jump not possible"
+    | (Ast.Jmp _ as jmp) :: sl1' ->
+      let s = Ast.Comment(Printf.sprintf "join: Removed resolved jump to single target: %s" (Pp.ast_stmt_to_string jmp), [Synthetic]) in
+      BatList.append (List.rev (s::sl1')) sl2
     | _ -> BatList.append sl1 sl2
   let iter_labels f =
     List.iter (function Ast.Label(l, _) -> f l  | _ -> () )
@@ -292,7 +294,9 @@ struct
   let default = []
   let join sl1 sl2 = match List.rev sl1 with
     | Ssa.Jmp (e, _) :: sl1' when Ssa.val_of_exp e <> None -> List.append (List.rev sl1') sl2
-    | Ssa.Jmp _ :: _ -> failwith "join: Joining BB with indirect not possible"
+    | (Ssa.Jmp _ as jmp) :: sl1' ->
+      let s = Ssa.Comment(Printf.sprintf "join: Removed resolved jump to single target: %s" (Pp.ssa_stmt_to_string jmp), [Synthetic]) in
+      BatList.append (List.rev (s::sl1')) sl2
     | _ -> BatList.append sl1 sl2
   let iter_labels f =
     (* optimization: assume labels are at the beginning *)
