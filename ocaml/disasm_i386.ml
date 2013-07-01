@@ -1642,7 +1642,9 @@ let rec to_ir mode addr next ss pref =
   | Hlt ->
     [Halt(rax_e, [])]
   | Rdtsc ->
-      let t = type_of_mode mode in
+      (* It says behavior is to clear the higher bits *)
+      (* let t = type_of_mode mode in *)
+      let t = r32 in
       [
         move rax (Unknown ("rdtsc", t));
         move rdx (Unknown ("rdtsc", t));
@@ -2698,9 +2700,9 @@ let parse_instr mode g addr =
       let (r, rm, na) = parse_modrm_addr na in
       let t = match prefix.rex with
         | Some {rex_w=true} -> r64
-        | _ -> r32 
+        | _ -> disfailwith "movsxd shouldn't be used without REX.W"
       in
-      (Movsx(t, rm, r32, r), na)
+      (Movsx(t, r, r32, rm), na)
     | 0x68 | 0x6a  ->
       let (o, na) = 
         (* SWXXX Sign extend these? *)
@@ -2723,10 +2725,15 @@ let parse_instr mode g addr =
       let (r, rm, na) = parse_modrmext_addr na in
       let (o2, na) =
         if b1 = 0x81 then 
+(*             if prefix.opsize = r64 then
+               let (o, na) = parse_immz r32 na in
+                 ((sign_ext r32 o prefix.opsize), na)
+             else
+               parse_immz prefix.opsize na *)
              let it = if prefix.opsize = r64 then r32 else prefix.opsize in
              let (o, na) = parse_immz it na
              in ((sign_ext it o prefix.opsize), na)
-        else let (o,na) = parse_simmb na
+        else let (o, na) = parse_simmb na
              in ((sign_ext r8 o prefix.opsize), na)
       in
       let opsize = if b1 land 1 = 0 then r8 else prefix.opsize in
