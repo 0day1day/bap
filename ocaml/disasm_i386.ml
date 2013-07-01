@@ -2533,7 +2533,7 @@ let parse_instr mode g addr =
         | X86 ->
           let (disp, na) = parse_disp32 na in (r, Oaddr(b32 disp), na)
         | X8664 ->
-          let (disp, na) = parse_disp32 na in (r, Oaddr(b64 disp +* b64 ia), na))
+          let (disp, na) = parse_disp32 na in (r, Oaddr(b64 disp +* b64 na), na))
       | n -> (r, Oaddr(bits2rege rm), na)
     )
     | 1 | 2 ->
