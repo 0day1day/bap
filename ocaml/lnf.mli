@@ -1,8 +1,4 @@
-(** Steensgard's loop nesting algorithm
-
-    See Steensgaard, B. (1993). Sequentializing Program Dependence
-    Graphs for Irreducible Programs (No. MSR-TR-93-14).
-*)
+(** Loop nesting forest definitions *)
 
 module type G =
 sig
