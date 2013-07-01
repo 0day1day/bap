@@ -4,4 +4,4 @@
 export BAP_PROJ_OCAMLDIR=$(BAP_DIR)/../ocaml-proj
 
 export PROJSOURCES = \
-	$(BAP_PROJ_OCAMLDIR)/test.ml
+	$(BAP_PROJ_OCAMLDIR)/testlib.ml
