@@ -69,9 +69,9 @@ let rec infer_ast_internal check e =
     if check then (
       match infer_ast_internal true e with
       | Reg(oldn) ->
-	if (ns <= 0) then terror("Extract must extract at least one bit");
-	if l <% bi0 then terror("Lower bit index must be at least 0");
-	if h >% (big_int_of_int oldn) -% bi1 then terror("Upper bit index must be at most one less than the size of the original register")
+        if (ns <= 0) then terror("Extract must extract at least one bit");
+        if l <% bi0 then terror("Lower bit index must be at least 0");
+        if h >% (big_int_of_int oldn) -% bi1 then terror("Upper bit index must be at most one less than the size of the original register")
       | _ -> terror ("Extract expects Reg type")
     );
     nt
@@ -79,7 +79,7 @@ let rec infer_ast_internal check e =
     let lt, rt = infer_ast_internal check le, infer_ast_internal check re in
     let nt = match lt, rt with
       | Reg(lb), Reg(rb) ->
-	Reg(lb+rb)
+        Reg(lb+rb)
       | _ -> terror "Concat expects Reg type"
     in
     nt

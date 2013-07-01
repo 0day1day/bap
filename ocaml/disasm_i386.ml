@@ -786,7 +786,7 @@ let assn_s mode s t v e =
   (* Zero-extend 32-bit assignments to 64-bit registers. *)
   | Oreg r, Reg 32 when mode = X8664 ->
     let v = gv mode (bits2genreg r) in
-    sub_assn t v (cast_unsigned r64 e)
+    sub_assn r64 v (cast_unsigned r64 e)
   | Oreg r, Reg (64|32|16) ->
     let v = gv mode (bits2genreg r) in
     sub_assn t v e
@@ -2827,7 +2827,7 @@ let parse_instr mode g addr =
               | 0 -> (Mov(t, rm, sign_ext it i t, None), na)
               | _ -> disfailwith (Printf.sprintf "Invalid opcode: %02x/%d" b1 e)
               )
-    | 0xc9 -> (Leave prefix.opsize, na)
+    | 0xc9 -> (Leave (type_of_mode mode), na)
     | 0xcc -> (Interrupt3, na)
     | 0xcd -> let (i,na) = parse_imm8 na in
               (Interrupt(i), na)
