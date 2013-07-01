@@ -2604,7 +2604,7 @@ let parse_instr mode g addr =
   (* wrapper: convert parsed operands to Ovec *)
   let parse_modrm3264_tovec rex vex at ia a =
     let r, rm, na = parse_modrm3264 rex vex at ia a in
-    (tovec r, tovec rm, na)
+    (tovec r, tovec rm, get_vex_opr vex, na)
   in
   (* let parse_modrm64ext a rex = *)
   (*   let b, r, modb, rm, rex_x, na = parse_modrmbits64 a rex in *)
@@ -3067,20 +3067,18 @@ let parse_instr mode g addr =
         let b3 = Char.code (g na) and na = s na in
         (match b3 with
         | 0x00 ->
-          let d, s, na = parse_modrm_vec na in
-          let rv = get_vex_opr prefix.vex in
+          let d, s, rv, na = parse_modrm_vec na in
           (Pshufb(prefix.mopsize, d, s, rv), na)
         | 0x17 when prefix.opsize_override ->
-          let d, s, na = parse_modrm_vec na in
+          let d, s, _, na = parse_modrm_vec na in
           (Ptest(prefix.mopsize, d, s), na)
         | 0x29 when prefix.opsize_override ->
-          let r, rm, na = parse_modrm_vec na in
-          let rv = get_vex_opr prefix.vex in
+          let r, rm, rv, na = parse_modrm_vec na in
           (Pcmp(prefix.mopsize, reg_64, EQ, "pcmpeq", r, rm, rv), na)
         | 0x20 | 0x21 | 0x22 | 0x23 | 0x24 | 0x25
         | 0x30 | 0x31 | 0x32 | 0x33 | 0x34 | 0x35 when prefix.opsize_override ->
           (* pmovsx and pmovzx *)
-          let r, rm, na = parse_modrm_vec na in
+          let r, rm, _, na = parse_modrm_vec na in
           (* determine sign/zero extension *)
           let ext, name = match (b3 & 0xf0) with
             | 0x20 -> CAST_SIGNED, "pmovsx"
@@ -3099,21 +3097,17 @@ let parse_instr mode g addr =
           in
           (Pmov(prefix.mopsize, dstet, srcet, r, rm, ext, fullname), na)
         | 0x37 when prefix.opsize_override ->
-          let r, rm, na = parse_modrm_vec na in
-          let rv = get_vex_opr prefix.vex in
+          let r, rm, rv, na = parse_modrm_vec na in
           (Pcmp(prefix.mopsize, reg_64, SLT, "pcmpgt", r, rm, rv), na)
         | 0x38 | 0x39 when prefix.opsize_override ->
-          let r, rm, na = parse_modrm_vec na in
-          let rv = get_vex_opr prefix.vex in
-          let r, rm = tovec r, tovec rm in
+          let r, rm, rv, na = parse_modrm_vec na in
           let et = match b3 with
             | 0x38 -> reg_8 | 0x39 -> reg_32
             | _ -> disfailwith "invalid"
           in
           (Ppackedbinop(prefix.mopsize, et, Ast_convenience.min_symbolic ~signed:true, "pmins", r, rm, rv), na)
         | 0x3a | 0x3b when prefix.opsize_override ->
-          let r, rm, na = parse_modrm_vec na in
-          let rv = get_vex_opr prefix.vex in
+          let r, rm, rv, na = parse_modrm_vec na in
           let et = match b3 with
             | 0x3a -> reg_16 | 0x3b -> reg_32
             | _ -> disfailwith "invalid"
@@ -3124,13 +3118,12 @@ let parse_instr mode g addr =
         let b3 = Char.code (g na) and na = s na in
         (match b3 with
         | 0x0f ->
-          let (r, rm, na) = parse_modrm_vec na in
-          let (i, na) = parse_imm8 na in
-          let rv = get_vex_opr prefix.vex in
+          let r, rm, rv, na = parse_modrm_vec na in
+          let i, na = parse_imm8 na in
           (Palignr(prefix.mopsize, r, rm, rv, i), na)
         | 0x60 | 0x61 | 0x62 | 0x63 ->
-          let (r, rm, na) = parse_modrm_vec na in
-          let (i, na) = parse_imm8 na in
+          let r, rm, _, na = parse_modrm_vec na in
+          let i, na = parse_imm8 na in
           (match i with
 
           (* Note: We only implement the case for unsigned
@@ -3169,26 +3162,22 @@ let parse_instr mode g addr =
           | 0x6c | 0x6d -> reg_64
           | _ -> disfailwith "impossible"
         in
-        let (r, rm, na) = parse_modrm_vec na in
-        let rv = get_vex_opr prefix.vex in
+        let r, rm, rv, na = parse_modrm_vec na in
         (Punpck(prefix.mopsize, elemt, order, r, rm, rv), na)
       | 0x64 | 0x65 | 0x66 | 0x74 | 0x75 | 0x76  as o ->
-        let r, rm, na = parse_modrm_vec na in
-        let rv = get_vex_opr prefix.vex in
+        let r, rm, rv, na = parse_modrm_vec na in
         let elet = match o & 0x6 with | 0x4 -> r8 | 0x5 -> r16 | 0x6 -> r32 | _ ->
           disfailwith "impossible" in
         let bop, bstr = match o & 0x70 with | 0x70 -> EQ, "pcmpeq" | 0x60 -> SLT, "pcmpgt"
           | _ -> disfailwith "impossible" in
         (Pcmp(prefix.mopsize, elet, bop, bstr, r, rm, rv), na)
       | 0x70 when prefix.opsize = r16 ->
-        let r, rm, na = parse_modrm_vec na in
-        let rv = get_vex_opr prefix.vex in
+        let r, rm, rv, na = parse_modrm_vec na in
         let i, na = parse_imm8 na in
         (Pshufd(prefix.mopsize, r, rm, rv, i), na)
       | 0x71 | 0x72 | 0x73 ->
         let t = prefix.mopsize in
-        let r, rm, na = parse_modrm_vec na in
-        let rv = get_vex_opr prefix.vex in
+        let r, rm, rv, na = parse_modrm_vec na in
         let i, na = parse_imm8 na in
         let open BatInt64.Infix in
             let fbop, str, et, i = match b2, r, i with
@@ -3277,8 +3266,7 @@ let parse_instr mode g addr =
         (Bswap(prefix.opsize, Oreg(rm_extend lor (b2 & 7))), na)
       | 0xd1 | 0xd2 | 0xd3 | 0xe1 | 0xe2 | 0xf1 | 0xf2 | 0xf3 ->
         let t = prefix.mopsize in
-        let r, rm, na = parse_modrm_vec na in
-        let rv = get_vex_opr prefix.vex in
+        let r, rm, rv, na = parse_modrm_vec na in
         let et = lowbits2elemt b2 in
         let fbop, str = match b2 & 0xf0 with
           | 0xd0 -> binop RSHIFT, "psrl"
@@ -3288,12 +3276,10 @@ let parse_instr mode g addr =
         in
         (Ppackedbinop(t, et, fbop, str, r, rm, rv), na)
       | 0xda ->
-        let r, rm, na = parse_modrm_vec na in
-        let rv = get_vex_opr prefix.vex in
+        let r, rm, rv, na = parse_modrm_vec na in
         (Ppackedbinop(prefix.mopsize, reg_8, Ast_convenience.min_symbolic ~signed:false, "pminub", r, rm, rv), na)
       | 0xdb ->
-        let r, rm, na = parse_modrm_vec na in
-        let rv = get_vex_opr prefix.vex in
+        let r, rm, rv, na = parse_modrm_vec na in
         (Pbinop(prefix.mopsize, AND, "pand", r, rm, rv), na)
       | 0xd7 ->
         let r, rm, na = parse_modrm_addr na in
@@ -3301,8 +3287,7 @@ let parse_instr mode g addr =
         (Pmovmskb(prefix.mopsize, r, rm), na)
       | 0xe0 | 0xe3 ->
         (* pavg *)
-        let r, rm, na = parse_modrm_vec na in
-        let rv = get_vex_opr prefix.vex in
+        let r, rm, rv, na = parse_modrm_vec na in
         (* determine whether we're using bytes or words *)
         let et = match b2 & 0x0f with
           | 0x00 -> reg_8
@@ -3313,20 +3298,16 @@ let parse_instr mode g addr =
         let average x y = ((x +* y) +* one) >>* one in
         (Ppackedbinop(prefix.mopsize, et, average, "pavg", r, rm, rv), na)
       | 0xea ->
-        let r, rm, na = parse_modrm_vec na in
-        let rv = get_vex_opr prefix.vex in
+        let r, rm, rv, na = parse_modrm_vec na in
         (Ppackedbinop(prefix.mopsize, reg_16, Ast_convenience.min_symbolic ~signed:true, "pmins", r, rm, rv), na)
       | 0xeb ->
-        let r, rm, na = parse_modrm_vec na in
-        let rv = get_vex_opr prefix.vex in
+        let r, rm, rv, na = parse_modrm_vec na in
         (Pbinop(prefix.mopsize, OR, "por", r, rm, rv), na)
       | 0xef ->
-        let r, rm, na = parse_modrm_vec na in
-        let rv = get_vex_opr prefix.vex in
+        let r, rm, rv, na = parse_modrm_vec na in
         (Pbinop(prefix.mopsize, XOR, "pxor", r, rm, rv), na)
       | 0xf8 | 0xf9 | 0xfa | 0xfb -> 
-        let r, rm, na = parse_modrm_vec na in
-        let rv = get_vex_opr prefix.vex in
+        let r, rm, rv, na = parse_modrm_vec na in
         let eltsize = match b2 & 7 with
           | 0 -> r8
           | 1 -> r16
