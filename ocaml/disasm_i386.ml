@@ -3345,6 +3345,18 @@ let parse_instr mode g addr =
         let r, rm = tovec r, tovec rm in
         let rv = get_vex_opr prefix.vex in
         (Pbinop(prefix.mopsize, XOR, "pxor", r, rm, rv), na)
+      | 0xf8 | 0xf9 | 0xfa | 0xfb -> 
+        let r, rm, na = parse_modrm_vec na in
+        let r, rm = tovec r, tovec rm in
+        let rv = get_vex_opr prefix.vex in
+        let eltsize = match b2 & 7 with
+          | 0 -> r8
+          | 1 -> r16
+          | 2 -> r32
+          | 3 -> r64
+          | _ -> disfailwith "impossible"
+        in
+        (Ppackedbinop(prefix.mopsize, eltsize, binop MINUS, "psub", r, rm, rv), na)
       | _ -> unimplemented 
         (Printf.sprintf "unsupported opcode: %02x %02x" b1 b2)
     )
