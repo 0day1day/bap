@@ -1642,13 +1642,12 @@ let rec to_ir mode addr next ss pref =
   | Hlt ->
     [Halt(rax_e, [])]
   | Rdtsc ->
-      (* It says behavior is to clear the higher bits *)
-      (* let t = type_of_mode mode in *)
-      let t = r32 in
-      [
-        move rax (Unknown ("rdtsc", t));
-        move rdx (Unknown ("rdtsc", t));
-      ]
+    (* Higher order bits are cleared in rax/rdx *)
+    let e = cast_unsigned (type_of_mode mode) (Unknown("rdtsc", r32)) in
+    [
+      move rax e;
+      move rdx e;
+    ]
   | Cpuid ->
       let t = type_of_mode mode in
       let undef reg = move reg (Unknown ("cpuid", t)) in
