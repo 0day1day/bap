@@ -2546,22 +2546,6 @@ let parse_instr mode g addr =
     | 3 -> (r, Oreg rm, na)
     | _ -> disfailwith "Impossible"
   in
-  let parse_modrm3264ext rex at ia a =
-    let b, r, modb, rm, na = parse_modrmbits64 rex a in
-    parse_modrm3264int rex at ia a b r modb rm na
-  in
-  let parse_modrm3264 rex at ia a =
-    let (r, rm, na) = parse_modrm3264ext rex at ia a in
-    (Oreg r, rm, na)
-(*  and parse_modrmxmm a =
-    let (r, rm, na) = parse_modrm32ext a in
-    let rm = match rm with Oreg r -> Oreg (reg2xmm r) | _ -> rm in
-    (Oreg(bits2xmm r), rm, na) *)
-  in
-  let parse_modrm3264seg rex at ia a =
-    let (r, rm, na) = parse_modrm3264ext rex at ia a in
-    (Oseg r, rm, na)
-  in
   let parse_modrmint_vec rex vex at ia a b r modb rm na = 
     (* Create a REX prefix from the VEX to hand to parse_modrm3264int, if necessary *)
     let rex = match rex with
@@ -2590,23 +2574,38 @@ let parse_instr mode g addr =
     let rm = e vex_b lor rm in
     b, r, modb, rm, na
   in
+  let parse_modrm3264ext rex at ia a =
+    let b, r, modb, rm, na = parse_modrmbits64 rex a in
+    parse_modrm3264int rex at ia a b r modb rm na
+  in
+  let parse_modrm3264 rex vex at ia a =
+    match vex with
+    | None ->
+      let (r, rm, na) = parse_modrm3264ext rex at ia a in
+      (Oreg r, rm, na)
+    | Some _ ->
+      let b, r, modb, rm, na = parse_modrmbits_vec vex a in
+      let (r, rm, na) = parse_modrmint_vec rex vex at ia a b r modb rm na in
+      (Oreg r, rm, na)
+  in
+  let parse_modrm3264seg rex at ia a =
+    let (r, rm, na) = parse_modrm3264ext rex at ia a in
+    (Oseg r, rm, na)
+  in
   (* Get the extra vvvv operand from the VEX prefix *)
   let get_vex_opr vex = match vex with
     | None -> None
     | Some {vex_v} -> Some (Ovec ((lnot vex_v) land 0xf))
   in
-  (* Parse register operands when the dest is a vector (MMX,XMM,YMM).
-     We'll just pass register arguments back as Oreg, and the caller will change
-     them to Ovec if necessary.*)
-  let parse_modrm_addr_vec rex vex at ia a =
-    let b, r, modb, rm, na = parse_modrmbits_vec vex a in
-    let (r, rm, na) = parse_modrmint_vec rex vex at ia a b r modb rm na in
-    (Oreg r, rm, na)
-  in
   (* Force an operand to be a vector register if it's a register operand. *)
   let tovec op = match op with
     | Oreg r -> Ovec r
     | _ -> op
+  in
+  (* wrapper: convert parsed operands to Ovec *)
+  let parse_modrm3264_tovec rex vex at ia a =
+    let r, rm, na = parse_modrm3264 rex vex at ia a in
+    (tovec r, tovec rm, na)
   in
   (* let parse_modrm64ext a rex = *)
   (*   let b, r, modb, rm, rex_x, na = parse_modrmbits64 a rex in *)
@@ -2675,11 +2674,11 @@ let parse_instr mode g addr =
     let parse_disp_addr, parse_modrm_addr, parse_modrmseg_addr, parse_modrmext_addr = match addrsize with
       | Reg 16 ->
         parse_disp16, parse_modrm16 rex, parse_modrm16seg rex, parse_modrm16ext rex
-      | Reg 32 -> parse_disp32, parse_modrm3264 rex addrsize a, parse_modrm3264seg rex addrsize a, parse_modrm3264ext rex addrsize a
-      | Reg 64 -> parse_disp64, parse_modrm3264 rex addrsize a, parse_modrm3264seg rex addrsize a, parse_modrm3264ext rex addrsize a
+      | Reg 32 -> parse_disp32, parse_modrm3264 rex vex addrsize a, parse_modrm3264seg rex addrsize a, parse_modrm3264ext rex addrsize a
+      | Reg 64 -> parse_disp64, parse_modrm3264 rex vex addrsize a, parse_modrm3264seg rex addrsize a, parse_modrm3264ext rex addrsize a
       | t -> failwith "Bad address type"
     in 
-    let parse_modrm_vec = parse_modrm_addr_vec rex vex addrsize a in
+    let parse_modrm_vec = parse_modrm3264_tovec rex vex addrsize a in
     let mi = int_of_mode mode in
     let _mi64 = int64_of_mode mode in
     let mbi = big_int_of_mode mode in
@@ -3020,7 +3019,7 @@ let parse_instr mode g addr =
         (* XXX: Clean up prefixes.  This will probably require some
            effort studying the manual. We probably don't do the right
            thing on weird cases (too many prefixes set). *)
-        let r, rm, na = parse_modrm_vec na in
+        let r, rm, na = parse_modrm_addr na in
         let rv = get_vex_opr prefix.vex in
         let t, name, align, tsrc, tdest, r, rm, rv = match b2 with
           | 0x12 when not (rv = None) -> 
@@ -3071,22 +3070,18 @@ let parse_instr mode g addr =
         | 0x00 ->
           let d, s, na = parse_modrm_vec na in
           let rv = get_vex_opr prefix.vex in
-          let d, s = tovec d, tovec s in
           (Pshufb(prefix.mopsize, d, s, rv), na)
         | 0x17 when prefix.opsize_override ->
           let d, s, na = parse_modrm_vec na in
-          let d, s = tovec d, tovec s in
           (Ptest(prefix.mopsize, d, s), na)
         | 0x29 when prefix.opsize_override ->
           let r, rm, na = parse_modrm_vec na in
           let rv = get_vex_opr prefix.vex in
-          let r, rm = tovec r, tovec rm in
           (Pcmp(prefix.mopsize, reg_64, EQ, "pcmpeq", r, rm, rv), na)
         | 0x20 | 0x21 | 0x22 | 0x23 | 0x24 | 0x25
         | 0x30 | 0x31 | 0x32 | 0x33 | 0x34 | 0x35 when prefix.opsize_override ->
           (* pmovsx and pmovzx *)
           let r, rm, na = parse_modrm_vec na in
-          let r, rm = tovec r, tovec rm in
           (* determine sign/zero extension *)
           let ext, name = match (b3 & 0xf0) with
             | 0x20 -> CAST_SIGNED, "pmovsx"
@@ -3107,7 +3102,6 @@ let parse_instr mode g addr =
         | 0x37 when prefix.opsize_override ->
           let r, rm, na = parse_modrm_vec na in
           let rv = get_vex_opr prefix.vex in
-          let r, rm = tovec r, tovec rm in
           (Pcmp(prefix.mopsize, reg_64, SLT, "pcmpgt", r, rm, rv), na)
         | 0x38 | 0x39 when prefix.opsize_override ->
           let r, rm, na = parse_modrm_vec na in
@@ -3121,7 +3115,6 @@ let parse_instr mode g addr =
         | 0x3a | 0x3b when prefix.opsize_override ->
           let r, rm, na = parse_modrm_vec na in
           let rv = get_vex_opr prefix.vex in
-          let r, rm = tovec r, tovec rm in
           let et = match b3 with
             | 0x3a -> reg_16 | 0x3b -> reg_32
             | _ -> disfailwith "invalid"
@@ -3135,11 +3128,9 @@ let parse_instr mode g addr =
           let (r, rm, na) = parse_modrm_vec na in
           let (i, na) = parse_imm8 na in
           let rv = get_vex_opr prefix.vex in
-          let r, rm = tovec r, tovec rm in
           (Palignr(prefix.mopsize, r, rm, rv, i), na)
         | 0x60 | 0x61 | 0x62 | 0x63 ->
           let (r, rm, na) = parse_modrm_vec na in
-          let r, rm = tovec r, tovec rm in
           let (i, na) = parse_imm8 na in
           (match i with
 
@@ -3181,12 +3172,10 @@ let parse_instr mode g addr =
         in
         let (r, rm, na) = parse_modrm_vec na in
         let rv = get_vex_opr prefix.vex in
-        let r, rm = tovec r, tovec rm in
         (Punpck(prefix.mopsize, elemt, order, r, rm, rv), na)
       | 0x64 | 0x65 | 0x66 | 0x74 | 0x75 | 0x76  as o ->
         let r, rm, na = parse_modrm_vec na in
         let rv = get_vex_opr prefix.vex in
-        let r, rm = tovec r, tovec rm in
         let elet = match o & 0x6 with | 0x4 -> r8 | 0x5 -> r16 | 0x6 -> r32 | _ ->
           disfailwith "impossible" in
         let bop, bstr = match o & 0x70 with | 0x70 -> EQ, "pcmpeq" | 0x60 -> SLT, "pcmpgt"
@@ -3195,14 +3184,12 @@ let parse_instr mode g addr =
       | 0x70 when prefix.opsize = r16 ->
         let r, rm, na = parse_modrm_vec na in
         let rv = get_vex_opr prefix.vex in
-        let r, rm = tovec r, tovec rm in
         let i, na = parse_imm8 na in
         (Pshufd(prefix.mopsize, r, rm, rv, i), na)
       | 0x71 | 0x72 | 0x73 ->
         let t = prefix.mopsize in
         let r, rm, na = parse_modrm_vec na in
         let rv = get_vex_opr prefix.vex in
-        let r, rm = tovec r, tovec rm in
         let i, na = parse_imm8 na in
         let open BatInt64.Infix in
             let fbop, str, et, i = match b2, r, i with
@@ -3292,7 +3279,6 @@ let parse_instr mode g addr =
       | 0xd1 | 0xd2 | 0xd3 | 0xe1 | 0xe2 | 0xf1 | 0xf2 | 0xf3 ->
         let t = prefix.mopsize in
         let r, rm, na = parse_modrm_vec na in
-        let r, rm = tovec r, tovec rm in
         let rv = get_vex_opr prefix.vex in
         let et = lowbits2elemt b2 in
         let fbop, str = match b2 & 0xf0 with
@@ -3304,22 +3290,19 @@ let parse_instr mode g addr =
         (Ppackedbinop(t, et, fbop, str, r, rm, rv), na)
       | 0xda ->
         let r, rm, na = parse_modrm_vec na in
-        let r, rm = tovec r, tovec rm in
         let rv = get_vex_opr prefix.vex in
         (Ppackedbinop(prefix.mopsize, reg_8, Ast_convenience.min_symbolic ~signed:false, "pminub", r, rm, rv), na)
       | 0xdb ->
         let r, rm, na = parse_modrm_vec na in
-        let r, rm = tovec r, tovec rm in
         let rv = get_vex_opr prefix.vex in
         (Pbinop(prefix.mopsize, AND, "pand", r, rm, rv), na)
       | 0xd7 ->
-        let r, rm, na = parse_modrm_vec na in
+        let r, rm, na = parse_modrm_addr na in
         let r, rm = r, tovec rm in
         (Pmovmskb(prefix.mopsize, r, rm), na)
       | 0xe0 | 0xe3 ->
         (* pavg *)
         let r, rm, na = parse_modrm_vec na in
-        let r, rm = tovec r, tovec rm in
         let rv = get_vex_opr prefix.vex in
         (* determine whether we're using bytes or words *)
         let et = match b2 & 0x0f with
@@ -3332,22 +3315,18 @@ let parse_instr mode g addr =
         (Ppackedbinop(prefix.mopsize, et, average, "pavg", r, rm, rv), na)
       | 0xea ->
         let r, rm, na = parse_modrm_vec na in
-        let r, rm = tovec r, tovec rm in
         let rv = get_vex_opr prefix.vex in
         (Ppackedbinop(prefix.mopsize, reg_16, Ast_convenience.min_symbolic ~signed:true, "pmins", r, rm, rv), na)
       | 0xeb ->
         let r, rm, na = parse_modrm_vec na in
-        let r, rm = tovec r, tovec rm in
         let rv = get_vex_opr prefix.vex in
         (Pbinop(prefix.mopsize, OR, "por", r, rm, rv), na)
       | 0xef ->
         let r, rm, na = parse_modrm_vec na in
-        let r, rm = tovec r, tovec rm in
         let rv = get_vex_opr prefix.vex in
         (Pbinop(prefix.mopsize, XOR, "pxor", r, rm, rv), na)
       | 0xf8 | 0xf9 | 0xfa | 0xfb -> 
         let r, rm, na = parse_modrm_vec na in
-        let r, rm = tovec r, tovec rm in
         let rv = get_vex_opr prefix.vex in
         let eltsize = match b2 & 7 with
           | 0 -> r8
