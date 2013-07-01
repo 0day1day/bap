@@ -2535,7 +2535,7 @@ let parse_instr mode g addr =
         | X86 ->
           let (disp, na) = parse_disp32 na in (r, Oaddr(b32 disp), na)
         | X8664 ->
-          let (disp, na) = parse_disp32 na in (r, Oaddr(b64 disp +* b64 na), na))
+          let (disp, na) = parse_disp32 na in (r, Oaddr(b64 disp +* b64 ia), na))
       | n -> (r, Oaddr(bits2rege rm), na)
     )
     | 1 | 2 ->
@@ -3025,37 +3025,31 @@ let parse_instr mode g addr =
         (* XXX: Clean up prefixes.  This will probably require some
            effort studying the manual. We probably don't do the right
            thing on weird cases (too many prefixes set). *)
-        let r, rm, na = parse_modrm_addr na in
-        let rv = get_vex_opr prefix.vex in
-        let t, name, align, tsrc, tdest, r, rm, rv = match b2 with
+        let r, rm, rv, na = parse_modrm_vec na in
+        let t, name, align, tsrc, tdest = match b2 with
           | 0x12 when rv <> None ->
-            r128, "movlps", false, r64, r128, tovec r, tovec rm, rv
+            r128, "movlps", false, r64, r128
           | 0x12 | 0x13 when prefix.opsize_override ->
-            r128, "movlpd", false, r64, r64, tovec r, tovec rm, None
+            r128, "movlpd", false, r64, r64
           | 0x12 | 0x13 when not prefix.opsize_override ->
-            r128, "movlps", false, r64, r64, tovec r, tovec rm, None
+            r128, "movlps", false, r64, r64
           | 0x28 | 0x29 when prefix.opsize_override ->
-            let mvt = match prefix.vex with None -> r128 | _ -> prefix.opsize in
-            mvt, "movapd", true, mvt, mvt, tovec r, tovec rm, None
-          | 0x28 | 0x29 when not prefix.opsize_override -> 
-            let mvt = match prefix.vex with None -> r128 | _ -> prefix.opsize in
-            mvt, "movaps", true, mvt, mvt, tovec r, tovec rm, None
+            prefix.mopsize, "movapd", true, prefix.mopsize, prefix.mopsize
+          | 0x6e | 0x7e ->
+            let dt = match prefix.rex with
+              | Some {rex_w=true} -> r64
+              | Some {rex_w=false} -> r32
+              | None -> prefix.opsize
+            in
+            prefix.mopsize, "movd", false, prefix.mopsize, dt
           | 0x6f | 0x7f when prefix.repeat -> 
-            let mvt = match prefix.vex with None -> r128 | _ -> prefix.opsize in
-            mvt, "movdqu", false, mvt, mvt, tovec r, tovec rm, None
+            prefix.mopsize, "movdqu", false, prefix.mopsize, prefix.mopsize
           | 0x6f | 0x7f when prefix.opsize_override -> 
-            let mvt = match prefix.vex with None -> r128 | _ -> prefix.opsize in
-            mvt, "movdqa", true, mvt, mvt, tovec r, tovec rm, None
-          | 0x6e -> 
-            let mvt = match prefix.opsize with Reg 64 -> r64 | _ -> r32 in
-            mvt, "movd", false, mvt, mvt, r, tovec rm, None
-          | 0x7e -> 
-            let mvt = match prefix.opsize with Reg 64 -> r64 | _ -> r32 in
-            mvt, "movd", false, mvt, mvt, tovec r, rm, None
+            prefix.mopsize, "movdqa", true, prefix.mopsize, prefix.mopsize
           | 0x6f | 0x7f when pref=[] -> 
-            r64, "movq", false, r64, r64, tovec r, tovec rm, None
+            r64, "movq", false, r64, r64
           | 0xd6 when prefix.opsize_override -> 
-            r64, "movq", false, r64, r64, tovec r, tovec rm, None
+            r64, "movq", false, r64, r64
           | _ -> unimplemented
             (Printf.sprintf "mov opcode case missing: %02x" b2)
         in
