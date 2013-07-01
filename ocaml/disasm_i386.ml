@@ -2723,9 +2723,9 @@ let parse_instr mode g addr =
       let (r, rm, na) = parse_modrmext_addr na in
       let (o2, na) =
         if b1 = 0x81 then 
-             let it = if prefix.opsize_override then r16 else r32 in 
+             let it = if prefix.opsize = r64 then r32 else prefix.opsize in
              let (o, na) = parse_immz it na
-             in ((sign_ext it o prefix.opsize), na) 
+             in ((sign_ext it o prefix.opsize), na)
         else let (o,na) = parse_simmb na
              in ((sign_ext r8 o prefix.opsize), na)
       in
