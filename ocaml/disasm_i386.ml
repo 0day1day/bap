@@ -673,8 +673,8 @@ let bits2reg32e mode b =
 let bits2reg16e mode b =
   cast_low r16 (bits2reg32e mode b)
 
-let bits2reg8e mode b =
-  if b < 4 then
+let bits2reg8e mode ?(has_rex=false) b =
+  if b < 4 || has_rex then
     cast_low r8 (bits2reg32e mode b)
   else
     cast_high r8 (cast_low r16 (bits2reg32e mode (b land 3)))
@@ -738,7 +738,7 @@ let store_s mode s t a e =
 let storem mode t a e =
   move mode (Store(Var mode, a, e, little_endian, t))
 
-let op2e_s mode ss t = function
+let op2e_s mode ss has_rex t = function
   | Ovec r when t = r256 -> bits2ymme r
   | Ovec r when t = r128 -> bits2ymm128e r
   | Ovec r when t = r64 -> bits2ymm64e r
@@ -748,14 +748,14 @@ let op2e_s mode ss t = function
   | Oreg r when t = r64 -> bits2reg64e mode r
   | Oreg r when t = r32 -> bits2reg32e mode r
   | Oreg r when t = r16 -> bits2reg16e mode r
-  | Oreg r when t = r8 -> bits2reg8e mode r
+  | Oreg r when t = r8 -> bits2reg8e mode ~has_rex r
   | Oreg r -> unimplemented "unknown register"
   | Oseg r when t = r16 -> bits2segrege r
   | Oseg r -> disfailwith "Segment register when t is not r16"
   | Oaddr e -> load_s mode ss t e
   | Oimm i -> Int(Arithmetic.to_big_int (i,t), t)
 
-let assn_s mode s t v e =
+let assn_s mode s has_rex t v e =
   (* Assign to some bits of v, starting at bit off, while preserving the other bits *)
   let sub_assn ?(off=0) t v e =
     let concat_exps = ref [] in
@@ -790,7 +790,7 @@ let assn_s mode s t v e =
   | Oreg r, Reg (64|32|16) ->
     let v = gv mode (bits2genreg r) in
     sub_assn t v e
-  | Oreg r, Reg 8 when r < 4 ->
+  | Oreg r, Reg 8 when r < 4 || (mode = X8664 && has_rex) ->
     let v = gv mode (bits2genreg r) in
     sub_assn t v e
   | Oreg r, Reg 8 ->
@@ -814,8 +814,8 @@ let op_dbl = function
 
 (* Return an expression for a double-width operand, as used by the div
    instruction. *)
-let op2e_dbl_s mode ss t =
-  let cf (ct, o) = op2e_s mode ss ct o in
+let op2e_dbl_s mode ss has_rex t =
+  let cf (ct, o) = op2e_s mode ss has_rex ct o in
   let ol = List.map cf (op_dbl t) in
   List.fold_left
     (fun bige little -> bige ++* little)
@@ -823,21 +823,21 @@ let op2e_dbl_s mode ss t =
     (List.tl ol)
 
 (* Double width assignments, as used by multiplication *)
-let assn_dbl_s mode s t e = match op_dbl t with
-  | (t,o) :: [] -> [assn_s mode s t o e], op2e_s mode s t o
+let assn_dbl_s mode s has_rex t e = match op_dbl t with
+  | (t,o) :: [] -> [assn_s mode s has_rex t o e], op2e_s mode s has_rex t o
   | l ->
     let tmp = nt "t" (Reg (Typecheck.bits_of_width t * 2)) in
     let f (stmts, off) (ct, o) = 
       let newoff = off + Typecheck.bits_of_width ct in
-      assn_s mode s ct o (extract (newoff-1) off (Var tmp))::stmts, newoff
+      assn_s mode s has_rex ct o (extract (newoff-1) off (Var tmp))::stmts, newoff
     in
     List.rev (fst (List.fold_left f ([move tmp e], 0) (List.rev l))), Var tmp
 
 (* A function for computing the target of jumps. *)
-let compute_jump_target mode s =
+let compute_jump_target mode s has_rex =
   let t = type_of_mode mode in
   function
-  | Jabs o -> op2e_s mode s t o
+  | Jabs o -> op2e_s mode s has_rex t o
   | Jrel (na,offset) ->
     let i,t = Arithmetic.binop PLUS (na,t) (offset,t) in
     Int(i,t)
@@ -929,13 +929,13 @@ let set_flags_sub t s1 s2 r =
   ::set_aopszf_sub t s1 s2 r
 
 
-let rec to_ir mode addr next ss pref =
+let rec to_ir mode addr next ss pref has_rex =
   let load = load_s mode ss (* Need to change this if we want seg_ds <> None *)
-  and op2e = op2e_s mode ss
-  and op2e_dbl = op2e_dbl_s mode ss
+  and op2e = op2e_s mode ss has_rex
+  and op2e_dbl = op2e_dbl_s mode ss has_rex
   and store = store_s mode ss
-  and assn = assn_s mode ss
-  and assn_dbl = assn_dbl_s mode ss
+  and assn = assn_s mode ss has_rex
+  and assn_dbl = assn_dbl_s mode ss has_rex
   and mi = int_of_mode mode
   (* and mi64 = int64_of_mode mode *) (* unused *)
   and mt = type_of_mode mode
@@ -1480,9 +1480,9 @@ let rec to_ir mode addr next ss pref =
        store_s mode None mt rsp_e (b64 ra);
        Jmp(Var t, calla)])
   | Jump(o) ->
-    [Jmp(jump_target mode ss o, [])]
+    [Jmp(jump_target mode ss has_rex o, [])]
   | Jcc(o, c) ->
-    cjmp c (jump_target mode ss o)
+    cjmp c (jump_target mode ss has_rex o)
   | Setcc(t, o1, c) ->
     [assn t o1 (cast_unsigned t c)]
   | Shift(st, s, dst, shift) ->
@@ -1692,7 +1692,7 @@ let rec to_ir mode addr next ss pref =
     let src1 = nt "src1" t and src2 = nt "src2" t and tmpres = nt "tmp" t in
     let stmts =
       move src1 (op2e t (Oaddr rsi_e))
-      :: move src2 (op2e_s mode seg_es t (Oaddr rdi_e))
+      :: move src2 (op2e_s mode seg_es has_rex t (Oaddr rdi_e))
       :: move tmpres (Var src1 -* Var src2)
       :: string_incr mode t rsi
       :: string_incr mode t rdi
@@ -1708,7 +1708,7 @@ let rec to_ir mode addr next ss pref =
     let src1 = nt "src1" t and src2 = nt "src2" t and tmpres = nt "tmp" t in
     let stmts =
       move src1 (cast_low t (Var rax))
-      :: move src2 (op2e_s mode seg_es t (Oaddr rdi_e))
+      :: move src2 (op2e_s mode seg_es has_rex t (Oaddr rdi_e))
       :: move tmpres (Var src1 -* Var src2)
       :: string_incr mode t rdi
       :: set_flags_sub t (Var src1) (Var src2) (Var tmpres)
@@ -2050,7 +2050,7 @@ let rec to_ir mode addr next ss pref =
     [Move(df, exp_false, [])]
   | Leave t when pref = [] -> (* #UD if Lock prefix is used *)
     Move(rsp, rbp_e, [])
-    ::to_ir mode addr next ss pref (Pop(t, o_rbp))
+    ::to_ir mode addr next ss pref has_rex (Pop(t, o_rbp))
   | Interrupt3 ->
     [Special("int3", [])]
   | Interrupt(Oimm i) ->
@@ -2534,7 +2534,7 @@ let parse_instr mode g addr =
         | X86 ->
           let (disp, na) = parse_disp32 na in (r, Oaddr(b32 disp), na)
         | X8664 ->
-          let (disp, na) = parse_disp32 na in (r, Oaddr(b64 disp +* b64 ia), na))
+          let (disp, na) = parse_disp32 na in (r, Oaddr(b64 disp +* b64 na), na))
       | n -> (r, Oaddr(bits2rege rm), na)
     )
     | 1 | 2 ->
@@ -3388,7 +3388,7 @@ let parse_instr mode g addr =
     }
   in
   let op, a = get_opcode pref prefix a in
-  (pref, op, a)
+  (pref, prefix, op, a)
 
 let parse_prefixes mode pref op =
   (* FIXME: how to deal with conflicting prefixes? *)
@@ -3407,9 +3407,10 @@ let parse_prefixes mode pref op =
   f None [] pref
 
 let disasm_instr mode g addr =
-  let (pref, op, na) = parse_instr mode g addr in
+  let (pref, prefix, op, na) = parse_instr mode g addr in
+  let has_rex = prefix.rex <> None in
   let (ss, pref) =  parse_prefixes mode pref op in
-  let ir = ToIR.to_ir mode addr na ss pref op in
+  let ir = ToIR.to_ir mode addr na ss pref has_rex op in
   let asm =
     try Some(ToStr.to_string mode pref op) with Disasm_i386_exception _ -> None
   in
