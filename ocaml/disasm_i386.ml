@@ -1567,7 +1567,11 @@ let rec to_ir mode addr next ss pref has_rex =
     if use_cf then unimplemented "rotate use_vf";
     let origCOUNT = nt "origCOUNT" s in
     let e_dst = op2e s dst in
-    let e_shift = op2e s shift &* it 31 s in
+    let shift_val = match s with
+      | Reg 64 -> 63
+      | _ -> 31
+    in
+    let e_shift = op2e s shift &* it shift_val s in
     let size = it (bits_of_width s) s in
     let new_cf = match rt with
       | LSHIFT -> cast_low r1 e_dst
@@ -2699,7 +2703,7 @@ let parse_instr mode g addr =
       let (r, rm, na) = parse_modrm_addr na in
       let t = match prefix.rex with
         | Some {rex_w=true} -> r64
-        | _ -> disfailwith "movsxd shouldn't be used without REX.W"
+        | _ -> r32
       in
       (Movsx(t, r, r32, rm), na)
     | 0x68 | 0x6a  ->
@@ -3037,10 +3041,14 @@ let parse_instr mode g addr =
           | 0x6e | 0x7e ->
             let dt = match prefix.rex with
               | Some {rex_w=true} -> r64
-              | Some {rex_w=false} -> r32
-              | None -> prefix.opsize
+              | Some {rex_w=false} | None -> r32
             in
-            prefix.mopsize, "movd", false, prefix.mopsize, dt
+            let tsrc, tdest = match b2 with 
+              | 0x6e -> dt, prefix.mopsize
+              | 0x7e -> prefix.mopsize, dt
+              | _ -> disfailwith "impossible"
+            in
+            dt, "movd", false, tsrc, tdest
           | 0x6f | 0x7f when prefix.repeat -> 
             prefix.mopsize, "movdqu", false, prefix.mopsize, prefix.mopsize
           | 0x6f | 0x7f when prefix.opsize_override -> 
