@@ -111,6 +111,7 @@ let of_prog ?(special_error = true) p =
      addpred: Some v when v should fall through to the next bb
   *)
   let f (c, cur,onlylabs, addpred) s =
+    (* Start a new node after s *)
     let g () =
       let (c,v) = add_new_bb c (s::cur) addpred in
       let for_later ?lab t = Hashtbl.add postponed_edges v (lab,t) in
@@ -124,6 +125,7 @@ let of_prog ?(special_error = true) p =
       in
       (c, [], true, None)
     in
+    (* Start a new node including s *)
     let h l =
       add_indirect_edge_to l;
       let c,v = add_new_bb c cur addpred in
@@ -173,6 +175,10 @@ let of_prog ?(special_error = true) p =
     C.add_edge_e c (C.G.E.create v lab tgt)
   in
   let c = Hashtbl.fold make_edge postponed_edges c in
+  (* Remove indirect if unused *)
+  let c = if C.G.in_degree c indirect = 0 then C.remove_vertex c indirect else c in
+  (* Remove error if unused *)
+  let c = if C.G.in_degree c error = 0 then C.remove_vertex c error else c in
   (* FIXME: Colescing *)
   c
 
@@ -315,7 +321,7 @@ let to_prog c =
      to avoid a jump to the exit if one is not needed. *)
   let exit_edge = 
     let special v =
-      match C.G.V.label v with | BB _ -> true | BB_Entry -> true | BB_Exit -> true | _ -> false
+      match C.G.V.label v with | BB_Indirect -> false | _ -> true
     in
     match List.filter special revnodes with
     | x::y::_ when C.G.V.label x = BB_Exit -> Some (y, x)

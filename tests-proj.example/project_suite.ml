@@ -1,7 +1,7 @@
 open OUnit
 
 (* Function in ocaml-proj *)
-let sample_test = Test.testf
+let sample_test () = print_endline (Testlib.testf ());;
 
 let tests = [
   "sample_test" >:: sample_test

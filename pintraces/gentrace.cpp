@@ -790,21 +790,21 @@ VOID FlushBuffer(BOOL addKeyframe, const CONTEXT *ctx, THREADID threadid, BOOL n
 
         frame f;
         tagged_value_list *tol = f.mutable_key_frame()->mutable_tagged_value_lists()->add_elem();
-        AddRegister(tol, ctx, REG_GAX, threadid);
-        AddRegister(tol, ctx, REG_GBX, threadid);
-        AddRegister(tol, ctx, REG_GCX, threadid);
-        AddRegister(tol, ctx, REG_GDX, threadid);
-        AddRegister(tol, ctx, REG_GSI, threadid);
-        AddRegister(tol, ctx, REG_GDI, threadid);
-        AddRegister(tol, ctx, REG_STACK_PTR, threadid);
-        AddRegister(tol, ctx, REG_GBP, threadid);
-        AddRegister(tol, ctx, REG_GFLAGS, threadid);
-        AddRegister(tol, ctx, REG_SEG_CS, threadid);
-        AddRegister(tol, ctx, REG_SEG_DS, threadid);
-        AddRegister(tol, ctx, REG_SEG_SS, threadid);
-        AddRegister(tol, ctx, REG_SEG_ES, threadid);
-        AddRegister(tol, ctx, REG_SEG_FS, threadid);
-        AddRegister(tol, ctx, REG_SEG_GS, threadid);
+        AddRegister(tol, ctx, LEVEL_BASE::REG_GAX, threadid);
+        AddRegister(tol, ctx, LEVEL_BASE::REG_GBX, threadid);
+        AddRegister(tol, ctx, LEVEL_BASE::REG_GCX, threadid);
+        AddRegister(tol, ctx, LEVEL_BASE::REG_GDX, threadid);
+        AddRegister(tol, ctx, LEVEL_BASE::REG_GSI, threadid);
+        AddRegister(tol, ctx, LEVEL_BASE::REG_GDI, threadid);
+        AddRegister(tol, ctx, LEVEL_BASE::REG_STACK_PTR, threadid);
+        AddRegister(tol, ctx, LEVEL_BASE::REG_GBP, threadid);
+        AddRegister(tol, ctx, LEVEL_BASE::REG_GFLAGS, threadid);
+        AddRegister(tol, ctx, LEVEL_BASE::REG_SEG_CS, threadid);
+        AddRegister(tol, ctx, LEVEL_BASE::REG_SEG_DS, threadid);
+        AddRegister(tol, ctx, LEVEL_BASE::REG_SEG_SS, threadid);
+        AddRegister(tol, ctx, LEVEL_BASE::REG_SEG_ES, threadid);
+        AddRegister(tol, ctx, LEVEL_BASE::REG_SEG_FS, threadid);
+        AddRegister(tol, ctx, LEVEL_BASE::REG_SEG_GS, threadid);
 
         g_twnew->add(f);
 
@@ -1886,9 +1886,9 @@ VOID ThreadStart(THREADID threadid, CONTEXT *ctx, INT32 flags, VOID *v)
     if (firstthread) {
         firstthread = false;
 #ifndef _WIN32 /* unix */
-        int argc = *(int*)(PIN_GetContextReg(ctx, REG_STACK_PTR));
-        char **argv = (char**) (PIN_GetContextReg(ctx, REG_STACK_PTR) + STACK_OFFSET);
-        char **env = (char**) (PIN_GetContextReg(ctx, REG_STACK_PTR)+(argc+1) * STACK_OFFSET);
+           int argc = *(int*)(PIN_GetContextReg(ctx, LEVEL_BASE::REG_STACK_PTR));
+        char **argv = (char**) (PIN_GetContextReg(ctx, LEVEL_BASE::REG_STACK_PTR) + STACK_OFFSET);
+        char **env = (char**) (PIN_GetContextReg(ctx, LEVEL_BASE::REG_STACK_PTR)+(argc+1) * STACK_OFFSET);
         std::vector<frame> frms = tracker->taintArgs(argc, argv);
         g_twnew->add<std::vector<frame> > (frms);
         frms = tracker->taintEnv(env);

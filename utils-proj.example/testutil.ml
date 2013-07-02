@@ -1,1 +1,1 @@
-print_string (Test.testf ()) ;;
+print_string (Testlib.testf ()) ;;
