@@ -3040,17 +3040,30 @@ let parse_instr mode g addr =
             r128, n, false, r64, td
           | 0x28 | 0x29 when prefix.opsize_override ->
             prefix.mopsize, "movapd", true, prefix.mopsize, prefix.mopsize
-          | 0x6e | 0x7e ->
-            let dt, n = match prefix.rex with
+          | 0x6e ->
+            let ts, n = match prefix.rex with
               | Some {rex_w=true} -> r64, "movq"
               | Some {rex_w=false} | None -> r32, "movd"
             in
-            let tsrc, tdest = match b2 with 
-              | 0x6e -> dt, prefix.mopsize
-              | 0x7e -> prefix.mopsize, dt
-              | _ -> disfailwith "impossible"
+            (* Need to clear certain high bits depending on prefixes *)
+            let td = match prefix.vex, prefix.opsize_override with
+              | Some _, _ -> r256
+              | None, true -> r128
+              | None, false -> r64
             in
-            dt, n, false, tsrc, tdest
+            ts, n, false, ts, td
+          | 0x7e ->
+            let ts, n = match prefix.rex with
+              | Some {rex_w=true} -> r64, "movq"
+              | Some {rex_w=false} | None -> r32, "movd"
+            in
+            (* Need to clear certain high bits depending on prefixes *)
+            let td = match prefix.repeat, prefix.vex with
+              | true, Some _ -> r256
+              | true, None -> r128
+              | false, _ -> ts
+            in
+            ts, n, false, ts, td
           | 0x6f | 0x7f ->
             let n, st = match prefix.opsize_override, prefix.repeat with
               | true, _ -> "movdqa", r128
@@ -3058,8 +3071,15 @@ let parse_instr mode g addr =
               | false, false -> "movq", r64
             in
             st, n, prefix.opsize_override, st, st
+          | 0xd6 when prefix.repeat ->
+            r64, "movq2dq", false, r64, r128
           | 0xd6 when prefix.opsize_override -> 
-            r64, "movq", false, r128, r64
+            let ts = match r with
+              | Oreg _ -> r64
+              | Ovec _ -> prefix.mopsize
+              | _ -> disfailwith "impossible movq operand"
+            in
+            r64, "movq", false, r64, ts
           | _ -> unimplemented
             (Printf.sprintf "mov opcode case missing: %02x" b2)
         in
