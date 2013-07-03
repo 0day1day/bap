@@ -2713,7 +2713,11 @@ let parse_instr mode g addr =
         (* SWXXX Sign extend these? *)
         if b1=0x68 then parse_immz prefix.opsize na else parse_immb na 
       in
-      (Push(prefix.opsize, o), na)
+      let size = match mode with
+        | X86 -> prefix.opsize
+        | X8664 -> r64
+      in
+      (Push(size, o), na)
     | 0x69 | 0x6b ->
       let (r, rm, na) = parse_modrm_addr na in
       let ((o, na), ot) = 
@@ -2982,7 +2986,11 @@ let parse_instr mode g addr =
                 | 4 -> (Jump (Jabs rm), na)
                 | 5 -> unimplemented (* jmpf *)
                   (Printf.sprintf "unsupported opcode: %02x/%d" b1 r)
-                | 6 -> (Push(prefix.opsize, rm), na)
+                | 6 -> let size = match mode with
+                         | X86 -> prefix.opsize
+                         | X8664 -> r64
+                       in
+                       (Push(size, rm), na)
                 | _ -> disfailwith 
                   (Printf.sprintf "impossible opcode: %02x/%d" b1 r)
               )
