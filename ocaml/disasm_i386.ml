@@ -2527,7 +2527,7 @@ let parse_instr mode g addr =
       | _ -> failwith "parse_modrm3264int: invalid address type"
     in
     match modb & 7 with (* MOD *)
-    | 0 -> (match rm & 7 with
+    | 0 -> (match rm & 7 with (* rm & 7 ignores the extended rex bit *)
       | 4 -> let (sib, na) = parse_sib rex modb na in (r, Oaddr sib, na)
       | 5 ->
         (* See Table 2-7. RIP-Relative Addressing.
@@ -2544,7 +2544,8 @@ let parse_instr mode g addr =
     )
     | 1 | 2 ->
       let (base, na) =
-        if 4 = rm then parse_sib rex modb na else (bits2rege rm, na) in
+        (* rm & 7 ignores the extended rex bit *)
+        if 4 = (rm & 7) then parse_sib rex modb na else (bits2rege rm, na) in
       let (disp, na) =
         if modb = 1 then parse_disp8 na else (*2*) parse_disp32 na in
       (r, Oaddr(base +* bm disp), na)
