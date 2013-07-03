@@ -2608,6 +2608,10 @@ let parse_instr mode g addr =
     | Oreg r -> Ovec r
     | _ -> op
   in
+  let toreg op = match op with
+    | Ovec r -> Oreg r
+    | _ -> op
+  in
   (* wrapper: convert parsed operands to Ovec *)
   let parse_modrm3264_tovec rex vex at ia a =
     let r, rm, na = parse_modrm3264 rex vex at ia a in
@@ -3050,30 +3054,17 @@ let parse_instr mode g addr =
             r128, n, false, r64, td
           | 0x28 | 0x29 when prefix.opsize_override ->
             prefix.mopsize, "movapd", true, prefix.mopsize, prefix.mopsize
-          | 0x6e ->
-            let ts, n = match prefix.rex with
-              | Some {rex_w=true} -> r64, "movq"
-              | Some {rex_w=false} | None -> r32, "movd"
-            in
+          | 0x6e | 0x7e ->
+            let n = if prefix.opsize = r64 then "movq" else "movd" in
             (* Need to clear certain high bits depending on prefixes *)
-            let td = match prefix.vex, prefix.opsize_override with
-              | Some _, _ -> r256
-              | None, true -> r128
-              | None, false -> r64
+            let td = match prefix.vex with
+              | Some _ -> r256
+              | _ -> (match b2 with
+                | 0x6e -> prefix.mopsize
+                | 0x7e -> if prefix.repeat then r128 else prefix.opsize
+                | _ -> disfailwith "impossible")
             in
-            ts, n, false, ts, td
-          | 0x7e ->
-            let ts, n = match prefix.rex with
-              | Some {rex_w=true} -> r64, "movq"
-              | Some {rex_w=false} | None -> r32, "movd"
-            in
-            (* Need to clear certain high bits depending on prefixes *)
-            let td = match prefix.repeat, prefix.vex with
-              | true, Some _ -> r256
-              | true, None -> r128
-              | false, _ -> ts
-            in
-            ts, n, false, ts, td
+            prefix.opsize, n, false, prefix.opsize, td
           | 0x6f | 0x7f ->
             let n, st = match prefix.opsize_override, prefix.repeat with
               | true, _ -> "movdqa", r128
@@ -3095,8 +3086,10 @@ let parse_instr mode g addr =
         in
         let name = match prefix.vex with None -> name | Some _ -> ("v"^name) in
         let s, d = match b2 with
-          | 0x12 | 0x6f | 0x6e | 0x28 -> rm, r
-          | 0x13 | 0x7f | 0x7e | 0x29 | 0xd6 -> r, rm
+          | 0x12 | 0x6f | 0x28 -> rm, r
+          | 0x13 | 0x7f | 0x29 | 0xd6 -> r, rm
+          | 0x6e -> toreg rm, r
+          | 0x7e -> r, toreg rm
           | _ -> disfailwith 
             (Printf.sprintf "impossible mov(a/d) condition: %02x" b2)
         in
