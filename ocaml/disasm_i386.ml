@@ -1252,11 +1252,11 @@ let rec to_ir mode addr next ss pref has_rex =
        is_valid variables using explicit string length. *)
     let build_explicit_valid_xmm_i is_valid_xmm_i sizee =
       (* Max size is nelem *)
-      let sizev = nt "sz" reg_32 in
-      let sizee = exp_ite (binop LT (it nelem reg_32) sizee) (it nelem reg_32) sizee in
+      let sizev = nt "sz" r64 in
+      let sizee = exp_ite (binop LT (it nelem r64) sizee) (it nelem r64) sizee in
       let f acc i =
         (* Current element is valid *)
-        let curr_valid = binop LT (it i reg_32) (Var sizev) in
+        let curr_valid = binop LT (it i r64) (Var sizev) in
         Let(is_valid_xmm_i i, curr_valid, acc)
       in (fun e -> Let(sizev, sizee, fold f e (nelem-1---0)))
     in
@@ -1362,10 +1362,10 @@ let rec to_ir mode addr next ss pref has_rex =
     (* For pcmpistri/pcmpestri *)
     let sb e =
       fold (fun acc i ->
-        ite r32 (exp_true ==* extract i i e)
-          (it i r32)
+        ite r64 (exp_true ==* extract i i e)
+          (it i r64)
           acc
-        ) (it nelem r32)
+        ) (it nelem r64)
         (match imm8cb with
         | {outselectsig=LSB} -> (nelem-1)---0
         | {outselectsig=MSB} -> 0--(nelem-1))
