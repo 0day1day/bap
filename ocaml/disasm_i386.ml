@@ -1208,6 +1208,7 @@ let rec to_ir mode addr next ss pref has_rex =
        string. *)
     let xmm1_e = op2e t xmm1 in
     let xmm2m128_e = op2e t xmm2m128 in
+    let regm = type_of_mode mode in
 
     let open Pcmpstr in
     let comment = match imm8cb with
@@ -1252,11 +1253,11 @@ let rec to_ir mode addr next ss pref has_rex =
        is_valid variables using explicit string length. *)
     let build_explicit_valid_xmm_i is_valid_xmm_i sizee =
       (* Max size is nelem *)
-      let sizev = nt "sz" r64 in
-      let sizee = exp_ite (binop LT (it nelem r64) sizee) (it nelem r64) sizee in
+      let sizev = nt "sz" regm in
+      let sizee = exp_ite (binop LT (it nelem regm) sizee) (it nelem regm) sizee in
       let f acc i =
         (* Current element is valid *)
-        let curr_valid = binop LT (it i r64) (Var sizev) in
+        let curr_valid = binop LT (it i regm) (Var sizev) in
         Let(is_valid_xmm_i i, curr_valid, acc)
       in (fun e -> Let(sizev, sizee, fold f e (nelem-1---0)))
     in
@@ -1362,10 +1363,10 @@ let rec to_ir mode addr next ss pref has_rex =
     (* For pcmpistri/pcmpestri *)
     let sb e =
       fold (fun acc i ->
-        ite r64 (exp_true ==* extract i i e)
-          (it i r64)
+        ite regm (exp_true ==* extract i i e)
+          (it i regm)
           acc
-        ) (it nelem r64)
+        ) (it nelem regm)
         (match imm8cb with
         | {outselectsig=LSB} -> (nelem-1)---0
         | {outselectsig=MSB} -> 0--(nelem-1))
