@@ -1076,9 +1076,10 @@ let rec to_ir mode addr next ss pref has_rex =
       | Oaddr a -> assn td d s, a::al
       | Oimm _ | Oseg _ -> disfailwith "invalid dest operand for movdq"
     in
+    let im = int_of_mode mode in
     let al =
       if align then
-        List.map (fun a -> Assert( (a &* (int_of_mode mode) 15) ==* (int_of_mode mode) 0, [])) (al)
+        List.map (fun a -> Assert( (a &* im 15) ==* im 0, [])) (al)
       else []
     in
     d::al
@@ -1194,8 +1195,9 @@ let rec to_ir mode addr next ss pref has_rex =
         | _ -> disfailwith "impossible: used non 64/128/256-bit operand in palignr"
       in
       let result = Extract (high, low, shift) in
+      let im = int_of_mode mode in
       let addresses = List.fold_left (fun acc -> function Oaddr a -> a::acc | _ -> acc) [] [src;dst] in
-      List.map (fun addr -> Assert( (addr &* i32 15) ==* i32 0, [])) addresses
+      List.map (fun addr -> Assert( (addr &* im 15) ==* im 0, [])) addresses
       @ (match vsrc with
         | None -> [assn t dst result]
         | Some vdst -> [assn t vdst result])
