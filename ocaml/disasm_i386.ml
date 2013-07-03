@@ -1493,7 +1493,7 @@ let rec to_ir mode addr next ss pref has_rex =
     and s_f = match st with LSHIFT -> (<<*) | RSHIFT -> (>>*) 
       | ARSHIFT -> (>>>*) | _ -> disfailwith "invalid shift type"
     and dste = op2e s dst in
-    let count_mask = it ((width_of_mode mode) - 1) s in
+    let count_mask = it ((bits_of_width s) - 1) s in
     let count = (op2e s shift) &* count_mask in
     let ifzero = ite r1 (Var origCOUNT ==* (it 0 s))
     and new_of = match st with
