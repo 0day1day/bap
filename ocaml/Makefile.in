@@ -155,10 +155,10 @@ export RESULTDEPS = $(LIBASMIR)/src/libasmir.a $(LIBTRACE)/libtrace.cmxa
 export LIBDIRS = $(LIBASMIR)/src
 export LIBDIRS += $(SOLVER_LIBDIRS) $(LIBTRACE)
 
-OCAMLLDFLAGS = -thread # just for make top
-OCAMLFLAGS = -thread -warn-error Aelz -annot $(PROJOCAMLFLAGS) # -for-pack Bap #-w A
+export OCAMLLDFLAGS = -thread # just for make top
+export OCAMLFLAGS = -thread -warn-error Aelz -annot $(PROJOCAMLFLAGS) # -for-pack Bap #-w A
 # merge everything but descriptions.
-OCAMLDOCFLAGS = -m avlsoper -sort
+export OCAMLDOCFLAGS = -m avlsoper -sort
 
 all: dcl ncl
 
