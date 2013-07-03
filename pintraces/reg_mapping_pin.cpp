@@ -401,9 +401,7 @@ switch (id) {
     case REG_MACHINE_LAST = case REG_FPST_LAST:
 
     case REG_STATUS_FLAGS:
-*/
-    case REG_DF_FLAG: return string("R_DF");
-/*
+    case REG_DF_FLAG: return string("R_DFLAG");
     case REG_AGGcase REGATE_BASE:
     case REG_FPST_ALL = case REG_AGGcase REGATE_BASE:
     case REG_AGGcase REGATE_LAST = case REG_FPST_ALL:

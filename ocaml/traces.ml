@@ -429,11 +429,13 @@ let clean_delta delta =
   in
   VH.iter clean_var delta
 
+(*
 (* This is a total HACK due to VEX's handling of the direction flag *)
 let direction_flag eflags =
   match num_to_bit (and_big_int eflags (biconst 0x400)) with
     | bi when bi_is_zero bi -> bi1
     | _ -> (big_int_of_int64 0xFFFFFFFFL)
+*)
 
 (* Unfortunately we need to special-case the EFLAGS registers
    since PIN does not provide us with separate registers for
@@ -461,7 +463,7 @@ let add_eflags eflags usage taint =
     taint;
   add_var
     "R_DF"
-    (Int(direction_flag eflags, reg_32))
+    (Int(num_to_bit (and_big_int eflags (biconst 0x400)), reg_1))
     usage
     false;
   add_var
