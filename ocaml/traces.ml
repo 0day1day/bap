@@ -460,7 +460,7 @@ let add_eflags eflags usage taint =
     usage
     taint;
   add_var
-    "R_DFLAG"
+    "R_DF"
     (Int(direction_flag eflags, reg_32))
     usage
     false;
@@ -655,10 +655,10 @@ let add_to_conc {name=name; mem=mem; index=index; value=value;
       in
       let bits = Arithmetic.to_big_int (shift_left_big_int value shift,typ) in
       let fullvalue = Int(bits,typ) in
-        (add_new_var fullname fullvalue usage taint ;
+      (add_new_var fullname fullvalue usage taint ;
 
-         (* Special case EFLAGS *)
-         if name = "EFLAGS" then add_eflags value usage taint)
+      (* Special case EFLAGS *)
+      if name = "R_EFLAGS" || name = "R_RFLAGS" then add_eflags value usage taint)
 
 (* Updating the lookup tables with the concrete values *)
 let update_concrete s =
