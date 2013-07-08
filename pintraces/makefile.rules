@@ -75,12 +75,18 @@ LIB_ROOTS :=
 
 ROOT = $(realpath ..)
 
-TRACEFORMATDIR = $(ROOT)/libtracewrap/libtrace/src/cpp
-TRACEFORMATCOMMON = $(ROOT)/libtracewrap/libtrace/src/common
+ifeq ($(TARGET),intel64)
+	LIBTRACEDIR=$(ROOT)/libtracewrap/libtrace
+else
+	LIBTRACEDIR=$(ROOT)/libtracewrap/libtrace32
+endif
+
+TRACEFORMATDIR = $(LIBTRACEDIR)/src/cpp
+TRACEFORMATCOMMON = $(LIBTRACEDIR)/src/common
 TRACEFORMATPBDIR = $(TRACEFORMATDIR)/pb
 LIBTRACE = $(TRACEFORMATDIR)/libtrace.a
 
-PROTOBUFDIR = $(ROOT)/libtracewrap/libtrace/protobuf/src
+PROTOBUFDIR = $(LIBTRACEDIR)/protobuf/src
 
 ifeq ($(COMPILER),gcc)
 	TOOL_CXXFLAGS += -Wno-error

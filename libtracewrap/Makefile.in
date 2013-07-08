@@ -5,9 +5,12 @@
 default: all
 
 %:
+	(cp -r libtrace ./libtrace32)
 	$(MAKE) CONFIGURED
 	$(MAKE) -C libtrace $@
+	$(MAKE) -C libtrace32 $@
 
 CONFIGURED: libtrace/Makefile.am libtrace/configure.ac
 	(cd libtrace && INCDIRS="@INCDIRS@" CPPFLAGS="@CPPFLAGS@" ./configure --with-batteries=@BAP_DIR@/batteries/_build/src)
+	(cd libtrace32 && INCDIRS="@INCDIRS@" CPPFLAGS="@CPPFLAGS@ -m32" CXXFLAGS="-m32" LDFLAGS="@LDFLAGS@ -m32" ./configure --with-batteries=@BAP_DIR@/batteries/_build/src)
 	touch CONFIGURED

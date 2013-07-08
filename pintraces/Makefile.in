@@ -2,6 +2,7 @@
 default: all
 
 %:
-	make -f Makefile.pin PIN_ROOT=@PIN_ROOT@ TARGET=intel64 $@
+	(make -f Makefile.pin PIN_ROOT=@PIN_ROOT@ TARGET=intel64 $@)
+	(make -f Makefile.pin PIN_ROOT=@PIN_ROOT@ TARGET=ia32 $@)
 
 tags:
