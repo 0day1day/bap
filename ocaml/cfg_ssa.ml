@@ -306,7 +306,7 @@ let rec trans_cfg ?tac cfg =
               C.add_edge_e ssa newe
             ) ssa b ssa, stmts'
         | Ast.Jmp (e, _) as jmp::tl ->
-          let revstmts = List.rev (stmts2ssa ctx ?tac tl) in
+          let revstmts = List.rev (stmts2ssa ctx ?tac (List.rev tl)) in
           let ssa, revstmts = C.G.fold_succ_e
             (fun e (ssa, revstmts) ->
               let ssa = C.remove_edge_e ssa e in
