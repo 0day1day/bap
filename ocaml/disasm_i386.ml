@@ -2520,7 +2520,7 @@ let parse_instr mode g addr =
     (Oseg r, rm, na)
   in
   (* 32 and 64-bit addressing *)
-  let parse_modrm3264int rex at ia a b r modb rm na =
+  let parse_modrm3264int rex at ia a b r modb rm naoffset na =
     (* ISR 2.1.5 Table 2-2 *)
     let bm = big_int_of_mode mode in
     let bits2rege = match at with
@@ -2541,7 +2541,11 @@ let parse_instr mode g addr =
         | X86 ->
           let (disp, na) = parse_disp32 na in (r, Oaddr(b32 disp), na)
         | X8664 ->
-          let (disp, na) = parse_disp32 na in (r, Oaddr(b64 disp +* b64 na), na))
+          let immoff = match naoffset with
+            | Some (Reg nbits) -> i64 (nbits / 8)
+            | _ -> i64 0
+          in
+          let (disp, na) = parse_disp32 na in (r, Oaddr(b64 disp +* b64 na +* immoff), na))
       | n -> (r, Oaddr(bits2rege rm), na)
     )
     | 1 | 2 ->
@@ -2569,7 +2573,7 @@ let parse_instr mode g addr =
           }
         | None -> None)
     in 
-    parse_modrm3264int rex at ia a b r modb rm na
+    parse_modrm3264int rex at ia a b r modb rm None na
   in
   let parse_modrmbits_vec vex a =
     let e b = (if b then 1 else 0) << 3 in
@@ -2582,14 +2586,14 @@ let parse_instr mode g addr =
     let rm = e vex_b lor rm in
     b, r, modb, rm, na
   in
-  let parse_modrm3264ext rex at ia a =
+  let parse_modrm3264ext rex at ia immoff a =
     let b, r, modb, rm, na = parse_modrmbits64 rex a in
-    parse_modrm3264int rex at ia a b r modb rm na
+    parse_modrm3264int rex at ia a b r modb rm immoff na 
   in
   let parse_modrm3264 rex vex at ia a =
     match vex with
     | None ->
-      let (r, rm, na) = parse_modrm3264ext rex at ia a in
+      let (r, rm, na) = parse_modrm3264ext rex at ia None  a in
       (Oreg r, rm, na)
     | Some _ ->
       let b, r, modb, rm, na = parse_modrmbits_vec vex a in
@@ -2597,7 +2601,7 @@ let parse_instr mode g addr =
       (Oreg r, rm, na)
   in
   let parse_modrm3264seg rex at ia a =
-    let (r, rm, na) = parse_modrm3264ext rex at ia a in
+    let (r, rm, na) = parse_modrm3264ext rex at ia None a in
     (Oseg r, rm, na)
   in
   (* Get the extra vvvv operand from the VEX prefix *)
@@ -2683,13 +2687,17 @@ let parse_instr mode g addr =
     | X8664 -> r32
   in
   let get_opcode pref ({rex; vex; rm_extend; addrsize} as prefix) a =
-    let parse_disp_addr, parse_modrm_addr, parse_modrmseg_addr, parse_modrmext_addr = match addrsize with
-      | Reg 16 ->
-        parse_disp16, parse_modrm16 rex, parse_modrm16seg rex, parse_modrm16ext rex
-      | Reg 32 -> parse_disp32, parse_modrm3264 rex vex addrsize a, parse_modrm3264seg rex addrsize a, parse_modrm3264ext rex addrsize a
-      | Reg 64 -> parse_disp64, parse_modrm3264 rex vex addrsize a, parse_modrm3264seg rex addrsize a, parse_modrm3264ext rex addrsize a
+    let parse_disp_addr, parse_modrm_addr, parse_modrmseg_addr = match addrsize with
+      | Reg 16 -> parse_disp16, parse_modrm16 rex, parse_modrm16seg rex
+      | Reg 32 -> parse_disp32, parse_modrm3264 rex vex addrsize a, parse_modrm3264seg rex addrsize a
+      | Reg 64 -> parse_disp64, parse_modrm3264 rex vex addrsize a, parse_modrm3264seg rex addrsize a
       | t -> failwith "Bad address type"
     in 
+    let parse_modrmext_addr immoff na = match addrsize with
+      | Reg 16 -> parse_modrm16ext rex na
+      | Reg (32|64) -> parse_modrm3264ext rex addrsize a immoff na
+      | t -> failwith "Bad address type"
+    in
     let parse_modrm_vec = parse_modrm3264_tovec rex vex addrsize a in
     let mi = int_of_mode mode in
     let _mi64 = int64_of_mode mode in
@@ -2737,20 +2745,13 @@ let parse_instr mode g addr =
       let (i,na) = parse_disp8 na in
       (Jcc(Jabs(Oimm(i +% na)), cc_to_exp b1), na)
     | 0x80 | 0x81 | 0x82 | 0x83 -> 
-      let (r, rm, na) = parse_modrmext_addr na in
-      let (o2, na) =
-        if b1 = 0x81 then 
-(*             if prefix.opsize = r64 then
-               let (o, na) = parse_immz r32 na in
-                 ((sign_ext r32 o prefix.opsize), na)
-             else
-               parse_immz prefix.opsize na *)
-             let it = if prefix.opsize = r64 then r32 else prefix.opsize in
-             let (o, na) = parse_immz it na
-             in ((sign_ext it o prefix.opsize), na)
-        else let (o, na) = parse_simmb na
-             in ((sign_ext r8 o prefix.opsize), na)
+      let it = match b1 with
+        | 0x81 -> if prefix.opsize = r64 then r32 else prefix.opsize
+        | _ -> r8
       in
+      let (r, rm, na) = parse_modrmext_addr (Some it) na in
+      let (o, na) = parse_immz it na in
+      let (o2, na) = ((sign_ext it o prefix.opsize), na) in
       let opsize = if b1 land 1 = 0 then r8 else prefix.opsize in
       (match r with (* Grp 1 *)
       | 0 -> (Add(opsize, rm, o2), na)
@@ -2837,7 +2838,7 @@ let parse_instr mode g addr =
            (Retn(Some(mt, imm), far_ret), na)
     | 0xc6
     | 0xc7 -> let t = if b1 = 0xc6 then r8 else prefix.opsize in
-              let (e, rm, na) = parse_modrmext_addr na in
+              let (e, rm, na) = parse_modrmext_addr None na in
               let it = match b1 with
                 | 0xc6 -> r8
                 | 0xc7 when prefix.opsize_override -> r16
@@ -2859,7 +2860,7 @@ let parse_instr mode g addr =
        byte does not specify a memory address. *)
     | 0xd8 | 0xd9 | 0xda | 0xdb | 0xdc | 0xdd | 0xde | 0xdf ->
       let b2, _ = parse_int8 na in
-      let (r, rm, na) = parse_modrmext_addr na in
+      let (r, rm, na) = parse_modrmext_addr None na in
       (match r, rm with
       | 2, Oaddr _ -> 
         (match b1 with 
@@ -2903,7 +2904,7 @@ let parse_instr mode g addr =
               (Jump(Jabs(Oimm(i +% na))), na)
     | 0xc0 | 0xc1
     | 0xd0 | 0xd1 | 0xd2
-    | 0xd3 -> let (r, rm, na) = parse_modrmext_addr na in
+    | 0xd3 -> let (r, rm, na) = parse_modrmext_addr None na in
               let opsize = if (b1 & 1) = 0 then r8 else prefix.opsize in
               let (amt, na) = match b1 & 0xfe with
                 | 0xc0 -> parse_imm8 na
@@ -2936,7 +2937,7 @@ let parse_instr mode g addr =
     | 0xf6
     | 0xf7 -> let t = if b1 = 0xf6 then r8 else prefix.opsize in
               let it = if t = r64 then r32 else t in
-              let (r, rm, na) = parse_modrmext_addr na in
+              let (r, rm, na) = parse_modrmext_addr None na in
               (match r with (* Grp 3 *)
                | 0 ->
                  let (imm, na) = parse_immz it na in
@@ -2975,14 +2976,14 @@ let parse_instr mode g addr =
                  disfailwith (Printf.sprintf "impossible opcode: %02x/%d" b1 r)
               )
     | 0xfc -> (Cld, na)
-    | 0xfe -> let (r, rm, na) = parse_modrmext_addr na in
+    | 0xfe -> let (r, rm, na) = parse_modrmext_addr None na in
               (match r with (* Grp 4 *)
                 | 0 -> (Inc(r8, rm), na)
                 | 1 -> (Dec(r8, rm), na)
                 | _ -> disfailwith 
                   (Printf.sprintf "impossible opcode: %02x/%d" b1 r)
               )
-    | 0xff -> let (r, rm, na) = parse_modrmext_addr na in
+    | 0xff -> let (r, rm, na) = parse_modrmext_addr None na in
               (match r with (* Grp 5 *)
                 | 0 -> (Inc(prefix.opsize, rm), na)
                 | 1 -> (Dec(prefix.opsize, rm), na)
@@ -3263,7 +3264,7 @@ let parse_instr mode g addr =
         let (r, rm, na) = parse_modrm_addr na in
         (Shiftd(RSHIFT, prefix.opsize, rm, r, o_rcx), na)
       | 0xae ->
-        let (r, rm, na) = parse_modrmext_addr na in
+        let (r, rm, na) = parse_modrmext_addr None na in
         (match r with
         | 2 -> (Ldmxcsr rm, na) (* ldmxcsr *)
         | 3 -> (Stmxcsr rm, na) (* stmxcsr *)
@@ -3292,7 +3293,7 @@ let parse_instr mode g addr =
         let r, rm, na = parse_modrm_addr na in
         (Xadd(prefix.opsize, r, rm), na)
       | 0xc7 ->
-        let r, rm, na = parse_modrmext_addr na in
+        let r, rm, na = parse_modrmext_addr None na in
         (match r with
         | 1 -> (Cmpxchg8b(rm), na)
         | _ -> unimplemented 
