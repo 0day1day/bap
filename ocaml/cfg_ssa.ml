@@ -26,31 +26,32 @@ let v2s n = bbid_to_string (C.G.V.label n)
 (* A translation context (for translating to SSA) *)
 module Ctx =
 struct
-  type t = var VH.t * var VH.t * (var*var) Stack.t Stack.t
-  let create() = (VH.create 570, VH.create 570, Stack.create())
-  let lookup (vh,_,_) var =
+  type t = var VH.t * aststmtloc VH.t * var VH.t * (var*var) Stack.t Stack.t
+  let create() = (VH.create 570, VH.create 570, VH.create 570, Stack.create())
+  let lookup (vh,_,_,_) var =
     try VH.find vh var
     with Not_found -> var
-      
-  let extend (vh,to_oldvar,stacks) v v' =
+
+  let extend (vh,to_oldloc,to_oldvar,stacks) v v' loc =
     Stack.push (v,v') (Stack.top stacks);
     VH.add vh v v';
-    VH.add to_oldvar v' v
+    VH.add to_oldvar v' v;
+    BatOption.may (VH.add to_oldloc v') loc
 
   (* Called to add a let variable to the context *)
-  let letextend (vh,to_oldvar,_) v v' =
+  let letextend (vh,_,_,_) v v' =
     VH.add vh v v'
       (* FIXME: We didn't used to add these to to_oldvar, do we want to now? *)
       (* VH.add to_oldvar v' v *)
 
   (* Called to remove a let variable from the context *)
-  let letunextend (vh,_,_) v =
+  let letunextend (vh,_,_,_) v =
     VH.remove vh v
 
-  let push (_,_,stacks) =
+  let push (_,_,_,stacks) =
     Stack.push (Stack.create()) stacks
 
-  let pop (vh,_,stacks) =
+  let pop (vh,_,_,stacks) =
     let myvars = Stack.pop stacks in
     Stack.iter (fun (v,_) -> VH.remove vh v) myvars
 end
@@ -135,7 +136,7 @@ and exp2ssa ctx ~(revstmts:stmt list) ?(tac=true) ?(attrs=[]) ?(name=ssa_temp_na
 
 
 (* @return a reversed list of SSA stmts *)
-let rec stmt2ssa ctx ?tac ~(revstmts: stmt list) s =
+let rec stmt2ssa ctx ?tac ~(revstmts: stmt list) loc s =
   let exp2ssa = exp2ssa ctx ?tac in
   let exp2ssaexp = exp2ssaexp ctx ?tac in
   match s with
@@ -150,7 +151,7 @@ let rec stmt2ssa ctx ?tac ~(revstmts: stmt list) s =
     | Ast.Move(v, e2, a) ->
 	let (revstmts, e) = exp2ssaexp ~revstmts e2 in
 	let nv = Var.renewvar v in
-	Ctx.extend ctx v nv;
+	Ctx.extend ctx v nv (Some loc);
 	Move(nv, e, a)::revstmts
     | Ast.Label(label,a) ->
 	Label(label,a) :: revstmts
@@ -170,8 +171,8 @@ let rec stmt2ssa ctx ?tac ~(revstmts: stmt list) s =
 	
 
 (* Translates a list of Ast statements that get executed sequentially to SSA. *)
-let stmts2ssa ctx ?tac ss =
-  let revstmts = List.fold_left (fun rs s -> stmt2ssa ctx ?tac ~revstmts:rs s) [] ss in
+let stmts2ssa ctx ?tac bb ss =
+  let revstmts,_ = List.fold_left (fun (rs,n) s -> stmt2ssa ctx ?tac ~revstmts:rs (bb,n) s, n+1) ([],0) ss in
     List.rev revstmts
 
 
@@ -204,9 +205,10 @@ let defsites cfg =
 
 type translation_results = {
   cfg : Cfg.SSA.G.t;
-  to_astvar: Var.t -> Var.t; (* Maps SSA vars back to the variable they came from *)
-  to_ssavar: Var.t -> Var.t; (* Maps AST vars to SSA at end of exit node. *)
-}  
+  to_ssavar: Var.t -> Var.t;
+  to_astvar: Var.t -> Var.t;
+  to_astloc: Var.t -> Cfg.aststmtloc;
+}
 
 let rec trans_cfg ?tac cfg =
   pdebug "Translating to SSA";
@@ -263,7 +265,7 @@ let rec trans_cfg ?tac cfg =
     Hashtbl.find_all h
   in
   let exitctx = VH.create 57 in (* context at end of exit node *)
-  let (vh_ctx,to_oldvar,stacks) as ctx = Ctx.create() in
+  let (vh_ctx,to_oldloc,to_oldvar,stacks) as ctx = Ctx.create() in
   let lookup = Ctx.lookup ctx in
   let extend = Ctx.extend ctx in
   let rec rename_block ssa b =
@@ -279,7 +281,7 @@ let rec trans_cfg ?tac cfg =
 	  let (v'',vs) = Hashtbl.find phis (bbid,v) in
 	  assert(v'' == v);
 	  Hashtbl.replace phis (bbid,v) (v',vs);
-	  extend v v'
+	  extend v v' None (* phis have no ast location *)
 	)
 	(blockphis bbid)
     in
@@ -289,7 +291,7 @@ let rec trans_cfg ?tac cfg =
       dprintf "translating stmts";
       let ssa, stmts' = match List.rev stmts with
         | Ast.CJmp _::_ ->
-          let stmts' = stmts2ssa ctx ?tac stmts in
+          let stmts' = stmts2ssa ctx ?tac cfgb stmts in
           let v = match List.rev stmts' with
             | Ssa.CJmp (v, _, _, _)::_ -> v
             | _ -> failwith "impossible"
@@ -306,7 +308,7 @@ let rec trans_cfg ?tac cfg =
               C.add_edge_e ssa newe
             ) ssa b ssa, stmts'
         | Ast.Jmp (e, _) as jmp::tl ->
-          let revstmts = List.rev (stmts2ssa ctx ?tac (List.rev tl)) in
+          let revstmts = List.rev (stmts2ssa ctx ?tac cfgb (List.rev tl)) in
           let ssa, revstmts = C.G.fold_succ_e
             (fun e (ssa, revstmts) ->
               let ssa = C.remove_edge_e ssa e in
@@ -322,9 +324,9 @@ let rec trans_cfg ?tac cfg =
               C.add_edge_e ssa newe, revstmts
             ) ssa b (ssa, revstmts)
           in
-          let revstmts = stmt2ssa ctx ?tac ~revstmts jmp in
+          let revstmts = stmt2ssa ctx ?tac ~revstmts (cfgb, List.length tl) jmp in
           ssa, List.rev revstmts
-        | _ -> let stmts' = stmts2ssa ctx ?tac stmts in ssa, stmts'
+        | _ -> let stmts' = stmts2ssa ctx ?tac cfgb stmts in ssa, stmts'
       in
       C.set_stmts ssa b stmts'
     in
@@ -392,9 +394,10 @@ let rec trans_cfg ?tac cfg =
       ssa ssa
   in
   dprintf "Done translating to SSA";
-  let to_astvar v = try VH.find to_oldvar v with Not_found -> v in
   let to_ssavar v = try VH.find exitctx v with Not_found -> v in
-  {cfg=ssa; to_astvar; to_ssavar}
+  let to_astvar v = try VH.find to_oldvar v with Not_found -> v in
+  let to_astloc = VH.find to_oldloc in
+  {cfg=ssa; to_ssavar; to_astvar; to_astloc}
 
 let of_astcfg ?tac cfg =
   let {cfg=ssa} = trans_cfg ?tac cfg in
