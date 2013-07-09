@@ -109,13 +109,13 @@ module VSA_SPEC = struct
       (* let cfg = Coalesce.coalesce_ast ~nocoalesce:[v] cfg in
       Cfg_pp.AstStmtsDot.output_graph (open_out "vsa.dot") cfg; *)
       dprintf "Starting VSA now";
-      let df_in, df_out = Vsa.vsa ~nmeets:50 ~opts:{Vsa.AlmostVSA.DFP.O.initial_mem=Asmir.get_readable_mem_contents_list asmp} cfg in
+      let df_in, df_out = Vsa_ast.vsa ~nmeets:50 ~opts:{Vsa_ast.AlmostVSA.DFP.O.initial_mem=Asmir.get_readable_mem_contents_list asmp} cfg in
 
       let add_indirect () =
         if debug () then (
           Cfg.AST.G.iter_vertex (fun v ->
             Printf.eprintf "VSA @%s" (Cfg_ast.v2s v);
-            Vsa.AbsEnv.pp prerr_string (BatOption.get (df_out (Vsa.last_loc g v)));
+            Vsa_ast.AbsEnv.pp prerr_string (BatOption.get (df_out (Vsa_ast.last_loc g v)));
             dprintf "\n\n"
           ) cfg
         );
@@ -125,11 +125,11 @@ module VSA_SPEC = struct
       in
 
       let fallback () =
-        let vs = Vsa.AlmostVSA.DFP.exp2vs (BatOption.get (df_out (Vsa.last_loc g v))) e in
-        dprintf "VSA resolved %s to %s" (Pp.ast_exp_to_string e) (Vsa.VS.to_string vs);
-        (match Vsa.VS.concrete ~max:1024 vs with
+        let vs = Vsa_ast.AlmostVSA.DFP.exp2vs (BatOption.get (df_out (Vsa_ast.last_loc g v))) e in
+        dprintf "VSA resolved %s to %s" (Pp.ast_exp_to_string e) (Vsa_ast.VS.to_string vs);
+        (match Vsa_ast.VS.concrete ~max:1024 vs with
         | Some x -> dprintf "VSA finished"; Addrs (List.map (fun a -> Addr a) x), ()
-        | None -> wprintf "VSA disassembly failed to resolve %s/%s to a specific concrete set" (Pp.ast_exp_to_string e) (Vsa.VS.to_string vs);
+        | None -> wprintf "VSA disassembly failed to resolve %s/%s to a specific concrete set" (Pp.ast_exp_to_string e) (Vsa_ast.VS.to_string vs);
           add_indirect ())
       in
 
@@ -149,10 +149,10 @@ module VSA_SPEC = struct
         (* The variable copy propagates to a memory load.
            Perfect.  This is looking like a jump table lookup. *)
         let l = BatOption.get (df_in loc) in
-        let exp2vs = Vsa.AlmostVSA.DFP.exp2vs l in
+        let exp2vs = Vsa_ast.AlmostVSA.DFP.exp2vs l in
         let vs = exp2vs e in
-        dprintf "VSA resolved memory index %s to %s" (Pp.ast_exp_to_string e) (Vsa.VS.to_string (Vsa.AlmostVSA.DFP.exp2vs l e));
-        (match Vsa.VS.concrete ~max:1024 vs with
+        dprintf "VSA resolved memory index %s to %s" (Pp.ast_exp_to_string e) (Vsa_ast.VS.to_string (Vsa_ast.AlmostVSA.DFP.exp2vs l e));
+        (match Vsa_ast.VS.concrete ~max:1024 vs with
         | Some l -> dprintf "VSA finished";
                (* We got some concrete values for the index.  Now
                   let's do an abstract load for each index, and try to
@@ -160,10 +160,10 @@ module VSA_SPEC = struct
           let reads = List.map (fun a ->
             let a = bi64 a in
             let vs = exp2vs (Load(m, Int(a, Typecheck.infer_ast e), endian, t)) in
-            let conc = Vsa.VS.concrete ~max:1024 vs in
+            let conc = Vsa_ast.VS.concrete ~max:1024 vs in
             BatOption.get conc) l in
           Addrs (List.map (fun a -> Addr a) (List.flatten reads)), ()
-        | None -> wprintf "VSA disassembly failed to resolve %s/%s to a specific concrete set" (Pp.ast_exp_to_string e) (Vsa.VS.to_string vs);
+        | None -> wprintf "VSA disassembly failed to resolve %s/%s to a specific concrete set" (Pp.ast_exp_to_string e) (Vsa_ast.VS.to_string vs);
           add_indirect ())
       in
 
@@ -182,7 +182,7 @@ module VSA_SPEC = struct
            | _ -> fallback ()
          with Not_found | BatOption.No_value -> fallback ())
       | Load(m, e, endian, t) ->
-        special_memory (Vsa.last_loc g v) m e endian t
+        special_memory (Vsa_ast.last_loc g v) m e endian t
       | _ -> fallback ())
     (* Rely on recursive descent for easy stuff *)
     | o, () -> o, ()

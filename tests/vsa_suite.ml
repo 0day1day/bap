@@ -1,5 +1,5 @@
 open OUnit
-module VM = Vsa.VM
+module VM = Vsa_ast.VM
 
 let nmeets = 50
 
@@ -8,29 +8,29 @@ let simple_test filename var v () =
   let cfg = Cfg_ast.of_prog p in
   let cfg = Prune_unreachable.prune_unreachable_ast cfg in
   let cfg = Ast_cond_simplify.simplifycond_cfg cfg in
-  let _df_in, df_out = Vsa.vsa ~nmeets cfg in
+  let _df_in, df_out = Vsa_ast.vsa ~nmeets cfg in
   let exiT = Cfg.AST.G.V.create Cfg.BB_Exit in
-  let l = df_out (Vsa.last_loc cfg exiT) in
+  let l = df_out (Vsa_ast.last_loc cfg exiT) in
   let l = BatOption.get l in
   let v' = VM.find var l in
-  assert_equal ~msg:(Printf.sprintf "Value set %s for %s was different than expected value %s" (Vsa.AbsEnv.value_to_string v') (Pp.var_to_string var) (Vsa.AbsEnv.value_to_string v)) v v'
+  assert_equal ~msg:(Printf.sprintf "Value set %s for %s was different than expected value %s" (Vsa_ast.AbsEnv.value_to_string v') (Pp.var_to_string var) (Vsa_ast.AbsEnv.value_to_string v)) v v'
 
 let suite = "Vsa" >:::
   [
-    "a_test" >:: simple_test "asm/vsa-a.o" Disasm_i386.ecx (`Scalar [(Vsa.VS.global, (32,0L,1L,1L))]);
-    "a_test2" >:: simple_test "asm/vsa-a2.o" Disasm_i386.ecx (`Scalar [(Vsa.VS.global, (32,0L,20L,20L))]);
-    "ae_test" >:: simple_test "asm/vsa-ae.o" Disasm_i386.ecx (`Scalar [(Vsa.VS.global, (32,0L,1L,1L))]);
-    "ae_test2" >:: simple_test "asm/vsa-ae2.o" Disasm_i386.ecx (`Scalar [(Vsa.VS.global, (32,0L,19L,19L))]);
-    "b_test" >:: simple_test "asm/vsa-b.o" Disasm_i386.ecx (`Scalar [(Vsa.VS.global, (32,0L,20L,20L))]);
-    "be_test" >:: simple_test "asm/vsa-be.o" Disasm_i386.ecx (`Scalar [(Vsa.VS.global, (32,0L,21L,21L))]);
-    "e_test" >:: simple_test "asm/vsa-e.o" Disasm_i386.ecx (`Scalar [(Vsa.VS.global, (32,0L,1L,1L))]);
+    "a_test" >:: simple_test "asm/vsa-a.o" Disasm_i386.ecx (`Scalar [(Vsa_ast.VS.global, (32,0L,1L,1L))]);
+    "a_test2" >:: simple_test "asm/vsa-a2.o" Disasm_i386.ecx (`Scalar [(Vsa_ast.VS.global, (32,0L,20L,20L))]);
+    "ae_test" >:: simple_test "asm/vsa-ae.o" Disasm_i386.ecx (`Scalar [(Vsa_ast.VS.global, (32,0L,1L,1L))]);
+    "ae_test2" >:: simple_test "asm/vsa-ae2.o" Disasm_i386.ecx (`Scalar [(Vsa_ast.VS.global, (32,0L,19L,19L))]);
+    "b_test" >:: simple_test "asm/vsa-b.o" Disasm_i386.ecx (`Scalar [(Vsa_ast.VS.global, (32,0L,20L,20L))]);
+    "be_test" >:: simple_test "asm/vsa-be.o" Disasm_i386.ecx (`Scalar [(Vsa_ast.VS.global, (32,0L,21L,21L))]);
+    "e_test" >:: simple_test "asm/vsa-e.o" Disasm_i386.ecx (`Scalar [(Vsa_ast.VS.global, (32,0L,1L,1L))]);
     (* We don't get exact results here, because the information
        propagates through a NEQ constraint, which we cannot represent in
        a SI *)
-    "e_test2" >:: simple_test "asm/vsa-e2.o" Disasm_i386.ecx (`Scalar [(Vsa.VS.global, (32,1L,20L,21L))]);
-    "g_test" >:: simple_test "asm/vsa-g.o" Disasm_i386.ecx (`Scalar [(Vsa.VS.global, (32,0L,1L,1L))]);
-    "ge_test" >:: simple_test "asm/vsa-ge.o" Disasm_i386.ecx (`Scalar [(Vsa.VS.global, (32,0L,1L,1L))]);
-    "l_test" >:: simple_test "asm/vsa-l.o" Disasm_i386.ecx (`Scalar [(Vsa.VS.global, (32,0L,20L,20L))]);
-    "le_test" >:: simple_test "asm/vsa-le.o" Disasm_i386.ecx (`Scalar [(Vsa.VS.global, (32,0L,21L,21L))]);
-    "ne_test" >:: simple_test "asm/vsa-ne.o" Disasm_i386.ecx (`Scalar [(Vsa.VS.global, (32,0L,20L,20L))]);
+    "e_test2" >:: simple_test "asm/vsa-e2.o" Disasm_i386.ecx (`Scalar [(Vsa_ast.VS.global, (32,1L,20L,21L))]);
+    "g_test" >:: simple_test "asm/vsa-g.o" Disasm_i386.ecx (`Scalar [(Vsa_ast.VS.global, (32,0L,1L,1L))]);
+    "ge_test" >:: simple_test "asm/vsa-ge.o" Disasm_i386.ecx (`Scalar [(Vsa_ast.VS.global, (32,0L,1L,1L))]);
+    "l_test" >:: simple_test "asm/vsa-l.o" Disasm_i386.ecx (`Scalar [(Vsa_ast.VS.global, (32,0L,20L,20L))]);
+    "le_test" >:: simple_test "asm/vsa-le.o" Disasm_i386.ecx (`Scalar [(Vsa_ast.VS.global, (32,0L,21L,21L))]);
+    "ne_test" >:: simple_test "asm/vsa-ne.o" Disasm_i386.ecx (`Scalar [(Vsa_ast.VS.global, (32,0L,20L,20L))]);
   ]

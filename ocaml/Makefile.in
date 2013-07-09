@@ -99,7 +99,7 @@ export SOURCES = \
 	asmir_consts.ml \
 	asmir.mli asmir.ml \
 	hacks.ml \
-	vsa.ml \
+	vsa_ast.ml \
 	coalesce.mli coalesce.ml \
 	asmir_disasm.mli asmir_disasm.ml \
 	func_boundary.mli func_boundary.ml \
