@@ -36,8 +36,6 @@ export OCAMLPATH = $(PIQIBUILDDIR)
 
 export OCAMLFLAGS = -thread -warn-error Aelz -annot
 
-OCAMLFLAGS = -thread -warn-error Aelz -annot
-
 # Include sources from ../ocaml in the automatically generated dependencies.
 export SOURCE_DIRS_IN = $(BAP_OCAMLDIR) $(BAP_PROJ_OCAMLDIR)
 
