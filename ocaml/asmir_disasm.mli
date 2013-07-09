@@ -43,8 +43,3 @@ val recursive_descent_at : Asmir.asmprogram -> addr -> Cfg.AST.G.t
 
 val vsa : Asmir.asmprogram -> Cfg.AST.G.t
 val vsa_at : Asmir.asmprogram -> addr -> Cfg.AST.G.t
-
-type fp = Cfg.aststmtloc -> Vsa.AlmostVSA.DFP.L.t
-val vsa_full : Asmir.asmprogram -> Cfg.AST.G.t * (fp * fp)
-val vsa_at_full : Asmir.asmprogram -> addr -> Cfg.AST.G.t * (fp * fp)
-
