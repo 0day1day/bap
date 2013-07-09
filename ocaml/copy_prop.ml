@@ -54,8 +54,7 @@ module CPSpecSSA = struct
     let l = match l with | L.Map m -> m | L.Top -> failwith (Printf.sprintf "Expected Map, not Top at %s" (Cfg_ssa.v2s _bb)) in
     L.Map (match stmt with
     | s when stop_at s ->
-      l
-      (* VM.empty *)
+      VM.empty
     | Move(v, Phi _, _) ->
       VM.add v L.Bottom l
     | Move(v,e,_) ->
@@ -112,8 +111,7 @@ module CPSpecAST = struct
     let l = match l with | L.Map m -> m | L.Top -> failwith (Printf.sprintf "Expected Map, not Top at %s" (Cfg_ast.v2s _bb)) in
     L.Map (match stmt with
     | s when stop_at s ->
-      l
-      (* VM.empty *)
+      VM.empty
     | Ast.Move(v,e,_) ->
       (* dprintf "seeing %s" (Pp.ast_stmt_to_string s); *)
       VM.add v (L.Middle (loc, e)) l

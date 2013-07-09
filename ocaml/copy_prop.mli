@@ -4,7 +4,7 @@
     [m,lookup]. m maps all variables with known copy propagations to
     their copy propagated expression.  [lookup e] will perform copy
     propagation on all variables in [e]. Copy propagation will not
-    propagate results over a move statement [s] if the optional
+    propagate any lattice values over a statement [s] if the optional
     funtion [stop_at] is specified and [stop_at s = false]. *)
 val copyprop_ssa : ?stop_at:(Ssa.stmt -> bool) -> Cfg.SSA.G.t -> Ssa.exp Var.VarMap.t * (Ssa.exp -> Ssa.exp)
 
