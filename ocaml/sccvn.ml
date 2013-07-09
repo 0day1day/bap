@@ -159,7 +159,7 @@ let defsite cfg =
 
 let add_const =
   let name = "fake var for constant"
-  and typ = Array(TMem Ast.reg_1, TMem Ast.reg_1) (* BS type *) in
+  and typ = Array(TMem reg_1, TMem reg_1) (* BS type *) in
   (fun info c ->
      let eid = Const c in
      let h = match c with

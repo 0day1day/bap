@@ -5,6 +5,7 @@
 *)
 
 open Ast
+open Type
 
 (**
 

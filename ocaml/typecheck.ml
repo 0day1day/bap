@@ -166,7 +166,7 @@ let rec infer_ssa = function
   | Ssa.Unknown(_,t)
     -> t
   | Ssa.BinOp((EQ|NEQ|LT|LE|SLT|SLE),_,_)
-    -> Ast.reg_1
+    -> reg_1
   | Ssa.Ite(_,v,_)
   | Ssa.BinOp(_,v,_)
   | Ssa.Store(v,_,_,_,_)

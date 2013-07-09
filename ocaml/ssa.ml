@@ -50,8 +50,8 @@ type stmt =
   | Comment of string * attrs (** A comment to be ignored *)
   (* | Special of string * attrs (** A "special" statement. (does magic) *) *)
 
-let val_false = Int(zero_big_int, Ast.reg_1)
-let val_true = Int(unit_big_int, Ast.reg_1)
+let val_false = Int(zero_big_int, reg_1)
+let val_true = Int(unit_big_int, reg_1)
 
 (** If possible, make a label that would be refered to by the given
     expression. *)

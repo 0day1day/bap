@@ -108,7 +108,6 @@ let (wp, foralls) =
   if !usedc || !usesccvn then
     let () = print_endline "Applying optimizations..." in
     let {Cfg_ssa.cfg=ssacfg; to_ssavar=tossa} = Cfg_ssa.trans_cfg cfg in
-    let () = Pp.output_varnums := true in
     let post = rename_astexp tossa post in
     let freevars = Formulap.freevars post in
     let ssacfg = Ssa_simp.simp_cfg ~liveout:freevars ~usedc:!usedc ~usesccvn:!usesccvn ssacfg in

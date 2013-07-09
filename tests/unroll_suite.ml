@@ -3,6 +3,7 @@ open Big_int_convenience
 module C = Cfg.AST
 open OUnit
 open Utils_common
+open Type
 
 let basic_nested () =
   let p = Asmir.open_program "C/unroll" in

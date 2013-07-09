@@ -298,6 +298,7 @@ let rec bap_get_block_from_f f =
       match f () with
       | [] -> false
       | trace ->
+        Printexc.print Typecheck.typecheck_prog trace;
         let blocks = trace_to_blocks trace in
         List.iter (fun x -> Queue.push x block_q) blocks;
         true

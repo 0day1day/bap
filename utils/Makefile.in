@@ -36,6 +36,8 @@ export LIBS = zarith batteries objsize oUnit graph pcre libtrace $(PROJLIBS) bap
 export INCDIRS = $(BAP_OCAMLDIR) $(BAP_OCAMLDIR)/piqi $(BIGINT) $(BATT) $(OUNIT) $(PCRE) $(OCAMLGRAPH) $(OBJSIZE) $(LIBTRACE) $(PROJINCDIRS)
 export OCAMLPATH = $(PIQIBUILDDIR)
 
+export OCAMLFLAGS = -thread -warn-error Aelz -annot
+
 # -rdynamic lets LLVM JIT see dynamic symbols
 export LDFLAGS = -rdynamic
 
