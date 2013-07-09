@@ -55,6 +55,7 @@ export SOURCES = \
 	piqi/stmt_piqi.ml piqi/stmt_piqi_ext.ml \
 	piqi/ast_piqi.mli piqi/ast_piqi.ml \
 	ast_convenience.ml \
+	ssa_convenience.ml \
 	cfg.mli cfg.ml \
 	cfgDataflow.mli cfgDataflow.ml \
 	ast_visitor.mli ast_visitor.ml \
