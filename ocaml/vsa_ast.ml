@@ -1279,22 +1279,36 @@ module AbsEnv = struct
     if x == y then true
     else VM.equal (value_equal) x y
 
+  let do_find_vs_int ae v =
+    match VM.find v ae with
+    | `Scalar vs -> vs
+    | _ -> failwith "type mismatch"
+
   let do_find_vs ae v =
-    try match VM.find v ae with
-      | `Scalar vs -> vs
-      | _ -> failwith "type mismatch" (*VS.top (bits_of_width (Var.typ v))*)
+    try do_find_vs_int ae v
     with Not_found -> VS.top (bits_of_width (Var.typ v))
+
+  let do_find_vs_opt ae v =
+    try Some(do_find_vs_int ae v )
+    with Not_found -> None
 
   (* let astval2vs ae = function *)
   (*   | Int(i,t) -> VS.of_bap_int (int64_of_big_int i) t *)
   (*   | Lab _ -> raise(Unimplemented "No VS for labels (should be a constant)") *)
   (*   | Var v -> do_find_vs ae v *)
 
-  let do_find_ae ae v =
-    try match VM.find v ae with
+  let do_find_ae_int ae v =
+    match VM.find v ae with
       | `Array ae -> ae
-      | _ -> failwith "Wanted to find abstract environment but found scalar. Not sure why this would happen"
-    with  Not_found -> MemStore.top
+      | _ -> failwith "type mismatch"
+
+  let do_find_ae ae v =
+    try do_find_ae_int ae v
+    with Not_found -> MemStore.top
+
+  let do_find_ae_opt ae v =
+    try Some(do_find_ae_int ae v)
+    with Not_found -> None
 end  (* module AE *)
 
 
