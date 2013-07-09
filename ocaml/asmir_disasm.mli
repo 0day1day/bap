@@ -38,7 +38,13 @@ sig
   val disasm : Asmir.asmprogram -> Cfg.AST.G.t * D.State.t
 end
 
-val recursive_descent : Asmir.asmprogram -> Cfg.AST.G.t * unit
-val recursive_descent_at : Asmir.asmprogram -> addr -> Cfg.AST.G.t * unit
-val vsa : Asmir.asmprogram -> Cfg.AST.G.t * unit
-val vsa_at : Asmir.asmprogram -> addr -> Cfg.AST.G.t * unit
+val recursive_descent : Asmir.asmprogram -> Cfg.AST.G.t
+val recursive_descent_at : Asmir.asmprogram -> addr -> Cfg.AST.G.t
+
+val vsa : Asmir.asmprogram -> Cfg.AST.G.t
+val vsa_at : Asmir.asmprogram -> addr -> Cfg.AST.G.t
+
+type fp = Cfg.aststmtloc -> Vsa.AlmostVSA.DFP.L.t
+val vsa_full : Asmir.asmprogram -> Cfg.AST.G.t * (fp * fp)
+val vsa_at_full : Asmir.asmprogram -> addr -> Cfg.AST.G.t * (fp * fp)
+

@@ -93,11 +93,13 @@ end
 
 module VSA_SPEC = struct
   module State = struct
-    type t = unit
-    let init = ()
+    type fp = Cfg.aststmtloc -> Vsa.AlmostVSA.DFP.L.t
+    type t = fp * fp
+    let f _ = failwith "placeholder"
+    let init : t = f, f
   end
 
-  let get_succs asmp g (v,l,e) () =
+  let get_succs asmp g (v,l,e) state =
     match RECURSIVE_DESCENT_SPEC.get_succs_int ~no_indirect:false asmp g (v,l,e) () with
     | Indirect, () ->
       (* Do VSA stuff *)
@@ -121,14 +123,14 @@ module VSA_SPEC = struct
         );
         if no_indirect
         then failwith "VSA disassembly failed to resolve an indirect jump to a specific concrete set"
-        else Indirect, ()
+        else Indirect, (df_in, df_out)
       in
 
       let fallback () =
         let vs = Vsa.AlmostVSA.DFP.exp2vs (BatOption.get (df_out (Vsa.last_loc g v))) e in
         dprintf "VSA resolved %s to %s" (Pp.ast_exp_to_string e) (Vsa.VS.to_string vs);
         (match Vsa.VS.concrete ~max:1024 vs with
-        | Some x -> dprintf "VSA finished"; Addrs (List.map (fun a -> Addr a) x), ()
+        | Some x -> dprintf "VSA finished"; Addrs (List.map (fun a -> Addr a) x), (df_in, df_out)
         | None -> wprintf "VSA disassembly failed to resolve %s/%s to a specific concrete set" (Pp.ast_exp_to_string e) (Vsa.VS.to_string vs);
           add_indirect ())
       in
@@ -162,7 +164,7 @@ module VSA_SPEC = struct
             let vs = exp2vs (Load(m, Int(a, Typecheck.infer_ast e), endian, t)) in
             let conc = Vsa.VS.concrete ~max:1024 vs in
             BatOption.get conc) l in
-          Addrs (List.map (fun a -> Addr a) (List.flatten reads)), ()
+          Addrs (List.map (fun a -> Addr a) (List.flatten reads)), (df_in, df_out)
         | None -> wprintf "VSA disassembly failed to resolve %s/%s to a specific concrete set" (Pp.ast_exp_to_string e) (Vsa.VS.to_string vs);
           add_indirect ())
       in
@@ -185,7 +187,7 @@ module VSA_SPEC = struct
         special_memory (Vsa.last_loc g v) m e endian t
       | _ -> fallback ())
     (* Rely on recursive descent for easy stuff *)
-    | o, () -> o, ()
+    | o, () -> o, state
 
   let fixpoint = true
 end
@@ -347,15 +349,21 @@ end
 let recursive_descent =
   let module RECURSIVE_DESCENT = Make(RECURSIVE_DESCENT_SPEC)(FUNCFINDER_DUMB) in
   RECURSIVE_DESCENT.disasm
+let recursive_descent a = fst(recursive_descent a)
 
 let recursive_descent_at =
   let module RECURSIVE_DESCENT = Make(RECURSIVE_DESCENT_SPEC)(FUNCFINDER_DUMB) in
   RECURSIVE_DESCENT.disasm_at
+let recursive_descent_at a b = fst(recursive_descent_at a b)
 
-let vsa =
+type fp = Cfg.aststmtloc -> Vsa.AlmostVSA.DFP.L.t
+let vsa_full =
   let module VSA = Make(VSA_SPEC)(FUNCFINDER_DUMB) in
   VSA.disasm
 
-let vsa_at =
+let vsa_at_full =
   let module VSA = Make(VSA_SPEC)(FUNCFINDER_DUMB) in
   VSA.disasm_at
+
+let vsa a = fst(vsa_full a)
+let vsa_at a b = fst(vsa_at_full a b)

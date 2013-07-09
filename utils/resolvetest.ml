@@ -48,7 +48,7 @@ let lift_func (n,s,e) =
   if go then (
     Printf.printf "Lifting %s\n" n;
     flush stdout;
-    let cfg,_ = Asmir_disasm.vsa_at asmp s in
+    let cfg = !recoverf asmp s in
     let cfg = Hacks.ast_remove_indirect cfg in
     let cfg = Ast_cond_simplify.simplifycond_cfg cfg in
     Cfg_pp.AstStmtsDot.output_graph (open_out ("resolve"^n^".dot")) cfg;

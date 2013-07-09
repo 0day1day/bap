@@ -248,7 +248,7 @@ let post_process cfg =
 let end_address_at p addr scheme =
   (* XXX: This should be an option type *)
   let maxaddress = ref Int64.zero in
-    let cfg, _ = 
+    let cfg =
       match scheme with
       | RECURSIVE_DESCENT -> Asmir_disasm.recursive_descent_at p addr
       | VSA ->
