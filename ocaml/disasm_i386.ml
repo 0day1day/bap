@@ -2937,7 +2937,7 @@ let parse_instr mode g addr =
     | 0xf6
     | 0xf7 -> let t = if b1 = 0xf6 then r8 else prefix.opsize in
               let it = if t = r64 then r32 else t in
-              let (r, rm, na) = parse_modrmext_addr None na in
+              let (r, rm, na) = parse_modrmext_addr (Some it) na in
               (match r with (* Grp 3 *)
                | 0 ->
                  let (imm, na) = parse_immz it na in
