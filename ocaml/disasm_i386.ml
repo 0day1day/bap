@@ -267,15 +267,15 @@ let ite t b e1 e2 =
   exp_ite ~t b e1 e2
 
 (* register widths *)
-let r1 = Ast.reg_1
+let r1 = reg_1
 let r4 = Reg 4
-let r8 = Ast.reg_8
-let r16 = Ast.reg_16
-let r32 = Ast.reg_32
+let r8 = reg_8
+let r16 = reg_16
+let r32 = reg_32
 let addr_t = r32
-let r64 = Ast.reg_64
-let r128 = Reg 128
-let xmm_t = Reg 128
+let r64 = reg_64
+let r128 = reg_128
+let xmm_t = r128
 let st_t = Reg 80
 
 (** Only use this for registers, not temporaries *)

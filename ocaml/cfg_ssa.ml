@@ -66,7 +66,7 @@ let type_of_exp = function
   | Unknown(_,t)
     -> t
   | BinOp((EQ|NEQ|LT|LE|SLT|SLE),_,_)
-    -> Ast.reg_1
+    -> reg_1
   | Ite(_,v,_)
   | BinOp(_,v,_)
   | Store(v,_,_,_,_)

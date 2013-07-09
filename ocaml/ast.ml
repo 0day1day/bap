@@ -63,14 +63,6 @@ let lab_of_exp = function
   | Int(i, t) ->
     Some(Addr(int64_of_big_int (Arithmetic.to_big_int (i,t))))
   | _ -> None
-    
-
-let reg_1 = Reg 1
-and reg_8 = Reg 8
-and reg_16 = Reg 16
-and reg_32 = Reg 32
-and reg_64 = Reg 64
-and reg_128 = Reg 128
 
 (** False constant. (If convenient, refer to this rather than building your own.) *)
 let exp_false = Int(bi0, reg_1)
@@ -102,21 +94,24 @@ let num_exp = function
   | Let _ -> 11
   | Unknown _ -> 12
 
-  (* Returns elist, tlist, btlist, utlist, vlist, slist, ilist, clist *)
-  let getargs = function
-    | Load(e1,e2,e3,t1) -> [e1;e2;e3], [t1], [], [], [], [], [], []
-    | Store(e1,e2,e3,e4,t1) -> [e1;e2;e3;e4], [t1], [], [], [], [], [], []
-    | Ite(e1,e2,e3) -> [e1;e2;e3], [], [], [], [], [], [], []
-    | Extract(h,l,e) -> [e], [], [], [], [], [], [h;l], []
-    | Concat(le, re) -> [le;re], [], [], [], [], [], [], []
-    | BinOp(bt,e1,e2) -> [e1;e2], [], [bt], [], [], [], [], []
-    | UnOp(ut,e1) -> [e1], [], [], [ut], [], [], [], []
-    | Var(v1) -> [], [], [], [], [v1], [], [], []
-    | Lab(s1) -> [], [], [], [], [], [s1], [], []
-    | Int(i1,t1) -> [], [t1], [], [], [], [], [i1], []
-    | Cast(c1,t1,e1) -> [e1], [t1], [], [], [], [], [], [c1]
-    | Let(v1,e1,e2) -> [e1;e2], [], [], [], [v1], [], [], []
-    | Unknown(s1,t1) -> [], [t1], [], [], [], [s1], [], []
+(* Returns elist, tlist, btlist, utlist, vlist, slist, ilist, clist *)
+let getargs = function
+  | Load(e1,e2,e3,t1) -> [e1;e2;e3], [t1], [], [], [], [], [], []
+  | Store(e1,e2,e3,e4,t1) -> [e1;e2;e3;e4], [t1], [], [], [], [], [], []
+  | Ite(e1,e2,e3) -> [e1;e2;e3], [], [], [], [], [], [], []
+  | Extract(h,l,e) -> [e], [], [], [], [], [], [h;l], []
+  | Concat(le, re) -> [le;re], [], [], [], [], [], [], []
+  | BinOp(bt,e1,e2) -> [e1;e2], [], [bt], [], [], [], [], []
+  | UnOp(ut,e1) -> [e1], [], [], [ut], [], [], [], []
+  | Var(v1) -> [], [], [], [], [v1], [], [], []
+  | Lab(s1) -> [], [], [], [], [], [s1], [], []
+  | Int(i1,t1) -> [], [t1], [], [], [], [], [i1], []
+  | Cast(c1,t1,e1) -> [e1], [t1], [], [], [], [], [], [c1]
+  | Let(v1,e1,e2) -> [e1;e2], [], [], [], [v1], [], [], []
+  | Unknown(s1,t1) -> [], [t1], [], [], [], [s1], [], []
+
+let subexps e = let x, _, _, _, _, _, _, _ = getargs e in
+                x
 
 (*
 (** quick_exp_eq e1 e2 returns true if and only if the subexpressions
