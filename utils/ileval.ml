@@ -116,7 +116,7 @@ let () = Arg.parse speclist anon usage
 let pipeline = List.rev !pipeline
 
 let prog =
-  try let p,s = Input.get_program() in
+  try let p,s,_ = Input.get_program() in
       (* Save scope for expression parsing *)
       scope := s;
       p

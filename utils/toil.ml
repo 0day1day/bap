@@ -40,8 +40,8 @@ let anon x = raise(Arg.Bad("Unexpected argument: '"^x^"'"))
 let () = Arg.parse speclist anon usage
 
 
-let prog =
-  try fst (Input.get_program())
+let prog,_,_ =
+  try Input.get_program()
   with Arg.Bad s ->
     Arg.usage speclist (s^"\n"^usage);
     exit 1

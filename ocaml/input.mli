@@ -18,14 +18,9 @@ val stream_speclist : (key * spec * doc) list
 val trace_speclist : (key * spec * doc) list
 
 (** Get the program as specified by the commandline. *)
-val get_program : unit -> Ast.program * Scope.t
+val get_program : unit -> Ast.program * Scope.t * Disasm_i386.mode option
 
-(** Get the program architecture mode (x86/x64) *)
-val get_program_mode : unit -> Disasm_i386.mode
-
-val get_stream_program : unit -> (Ast.program) Stream.t
-
-val get_stream_program_mode : unit -> Disasm_i386.mode
+val get_stream_program : unit -> (Ast.program) Stream.t * Disasm_i386.mode option
 
 val init_ro : bool ref
 

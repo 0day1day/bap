@@ -90,7 +90,7 @@ let () = Arg.parse speclist anon usage
 
 let m2a_state = Memory2array.create_state ()
 
-let prog,scope =
+let prog,scope,_ =
   try Input.get_program()
   with Arg.Bad s ->
     Arg.usage speclist (s^"\n"^usage);

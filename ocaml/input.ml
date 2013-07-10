@@ -67,72 +67,58 @@ let speclist =
 
 let get_program () =
   if !inputs = [] then raise(Arg.Bad "No input specified");
-  let get_one (oldp,oldscope) = function
+  let get_one (oldp,oldscope,_) = function
     | `Il f ->
       let newp, newscope = Parser.program_from_file ~scope:oldscope f in
-      List.append newp oldp, newscope
+      List.append newp oldp, newscope, (Some Disasm_i386.X8664) (* XXX: This shouldn't be hardcoded, but requires modification
+                                                                        of the IL to indicate architecture *)
     | `Bin f ->
       let p = Asmir.open_program f in
-      List.append (Asmir.asmprogram_to_bap ~init_ro:!init_ro p) oldp, oldscope
+      let mode = Asmir.get_asmprogram_mode p in
+      List.append (Asmir.asmprogram_to_bap ~init_ro:!init_ro p) oldp, oldscope, Some mode
     | `Binrange (f, s, e) ->
       let p = Asmir.open_program f in
-      List.append (Asmir.asmprogram_to_bap_range ~init_ro:!init_ro p s e) oldp, oldscope
+      let mode = Asmir.get_asmprogram_mode p in
+      List.append (Asmir.asmprogram_to_bap_range ~init_ro:!init_ro p s e) oldp, oldscope, Some mode
     | `Binrecurse f ->
       let p = Asmir.open_program f in
-      List.append (fst (Asmir_rdisasm.rdisasm p)) oldp, oldscope
+      let mode = Asmir.get_asmprogram_mode p in
+      List.append (fst (Asmir_rdisasm.rdisasm p)) oldp, oldscope, Some mode
     | `Binrecurseat (f, s) ->
       let p = Asmir.open_program f in
-      List.append (fst (Asmir_rdisasm.rdisasm_at p [s])) oldp, oldscope
+      let mode = Asmir.get_asmprogram_mode p in
+      List.append (fst (Asmir_rdisasm.rdisasm_at p [s])) oldp, oldscope, Some mode
     | `Trace f ->
-      List.append (Asmir.serialized_bap_from_trace_file f) oldp, oldscope
+      let mode =
+        let r = new Trace_container.reader f in
+        match r#get_arch, (Int64.to_int r#get_machine) with
+          | Arch.Bfd_arch_i386, x when x = Arch.mach_i386_i386 -> Disasm_i386.X86
+          | Arch.Bfd_arch_i386, x when x = Arch.mach_x86_64 -> Disasm_i386.X8664
+          | _, _ -> raise(Arg.Bad "unsupported architecture")
+      in
+      List.append (Asmir.serialized_bap_from_trace_file f) oldp, oldscope, Some mode
   in
   try
-    let p,scope = List.fold_left get_one ([], Grammar_private_scope.default_scope ()) (List.rev !inputs) in
+    let p,scope,mode = List.fold_left get_one ([], Grammar_private_scope.default_scope (), None) (List.rev !inputs) in
     (* Always typecheck input programs. *)
     Printexc.print Typecheck.typecheck_prog p;
-    p,scope
+    p,scope,mode
   with e ->
     Printf.eprintf "Exception %s occurred while lifting\n" (Printexc.to_string e);
     raise e
 
-(* Determine the architecture mode of the given program *)
-let get_program_mode () =
-  (* XXX: Assume that all inputs are the same arch (is this correct?) *)
-  match !inputs with
-  | [] -> Disasm_i386.X8664 (* NOTE: mode is required to define speclists in some utilities
-                               so we can't print usage on lack of input if we error here.  
-                               get_program will catch this eventuality. *)
-  | `Il f ::_ -> Disasm_i386.X8664 (* FIXME: How do we get the mode from IL? *)
-  | `Bin f :: _ -> 
-    Asmir.get_asmprogram_mode (Asmir.open_program f)
-  | `Binrange (f, _, _) :: _ -> 
-    Asmir.get_asmprogram_mode (Asmir.open_program f)
-  | `Binrecurse f :: _ -> 
-    Asmir.get_asmprogram_mode (Asmir.open_program f)
-  | `Binrecurseat (f, _) :: _ -> 
-    Asmir.get_asmprogram_mode (Asmir.open_program f)
-  | `Trace f :: _ ->
-   (let r = new Trace_container.reader f in
-    match r#get_arch, (Int64.to_int r#get_machine) with
-    | Arch.Bfd_arch_i386, x when x = Arch.mach_i386_i386 -> Disasm_i386.X86
-    | Arch.Bfd_arch_i386, x when x = Arch.mach_x86_64 -> Disasm_i386.X8664
-    | _, _ -> raise(Arg.Bad "unsupported architecture")
-   )
-
 let get_stream_program () = match !streaminputs with
   | None -> raise(Arg.Bad "No input specified")
-  | Some(`Tracestream f) -> 
-    Asmir.serialized_bap_stream_from_trace_file !streamrate f
+  | Some(`Tracestream f) ->
+    let mode = 
+      let r = new Trace_container.reader f in
+      match r#get_arch, (Int64.to_int r#get_machine) with
+        | Arch.Bfd_arch_i386, x when x = Arch.mach_i386_i386 -> Disasm_i386.X86
+        | Arch.Bfd_arch_i386, x when x = Arch.mach_x86_64 -> Disasm_i386.X8664
+        | _, _ -> raise(Arg.Bad "unsupported architecture")
+    in
+    Asmir.serialized_bap_stream_from_trace_file !streamrate f, Some mode
 
-let get_stream_program_mode () = 
-  match !streaminputs with
-  | None -> Disasm_i386.X8664
-  | Some(`Tracestream f) -> 
-   (let r = new Trace_container.reader f in
-    match r#get_arch, (Int64.to_int r#get_machine) with
-    | Arch.Bfd_arch_i386, x when x = Arch.mach_i386_i386 -> Disasm_i386.X86
-    | Arch.Bfd_arch_i386, x when x = Arch.mach_x86_64 -> Disasm_i386.X8664
-    | _, _ -> raise(Arg.Bad "unsupported architecture")
-   )
+   
 
 (*  with fixme -> raise(Arg.Bad "Could not open input file")*)

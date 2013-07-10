@@ -44,6 +44,13 @@ let prints f =
     pp#ast_program block;
     block)
 
+let mode = ref None
+
+let get_mode () =
+  match !mode with
+  | Some m -> m
+  | None -> raise (Invalid_argument "Tried to get program architecture when none exists")
+
 let speclist =
   ("-print", Arg.String(fun f -> add(TransformAst(prints f))),
    "<file> Print each statement in the trace to file.")
@@ -58,12 +65,12 @@ let speclist =
     )
   ::("-trace-concrete",
      Arg.Bool(fun b ->
-       add(TransformAst(Traces_stream.concrete (Input.get_stream_program_mode()) b))
+       add(TransformAst(Traces_stream.concrete (get_mode()) b))
      ),
      "<pass> Concretely execute, and optionally pass on concretized IL.")
   ::("-trace-formula",
      Arg.String(fun f ->
-       let stream, final = Traces_stream.generate_formula (Input.get_stream_program_mode()) f !Solver.solver in
+       let stream, final = Traces_stream.generate_formula (get_mode()) f !Solver.solver in
        add(AnalysisAst stream);
        addfinal(final)
      ),
@@ -79,10 +86,13 @@ let pipeline = List.rev !pipeline
 let final = List.rev !final
 
 let prog =
-  try Input.get_stream_program ()
-  with Arg.Bad s ->
-    Arg.usage speclist (s^"\n"^usage);
-    exit 1
+  let p, m =
+    try Input.get_stream_program ()
+    with Arg.Bad s ->
+      Arg.usage speclist (s^"\n"^usage);
+      exit 1
+  in
+  mode := m; p
 
 let rec apply_cmd prog = function
   | TransformAst f -> (
