@@ -156,12 +156,12 @@ AC_SUBST(BAP_DIR)
 BAP_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 # Set options for 32/64-bit libtrace compilation
+AC_CANONICAL_HOST
 AC_SUBST(LIBTRACE_X64)
-if test "$(uname -m)" == "x86_64"; then
-  LIBTRACE_X64="true"
-else
-  LIBTRACE_X64=""
-fi
+case "${host}" in
+i[[3456]]86*) LIBTRACE_X64="" ;;
+x86_64*) LIBTRACE_X64="true" ;;
+esac
 
 # Checks for header files.
 AC_HEADER_STDC
