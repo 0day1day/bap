@@ -2,7 +2,9 @@
 default: all
 
 %:
+ifeq ("@LIBTRACE_X64@","true")
 	(make -f Makefile.pin PIN_ROOT=@PIN_ROOT@ TARGET=intel64 $@)
+endif
 	(make -f Makefile.pin PIN_ROOT=@PIN_ROOT@ TARGET=ia32 $@)
 
 tags:

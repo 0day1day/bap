@@ -155,6 +155,14 @@ ASMIR_DIR="`pwd`/libasmir"
 AC_SUBST(BAP_DIR)
 BAP_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
+# Set options for 32/64-bit libtrace compilation
+AC_SUBST(LIBTRACE_X64)
+if test "$(uname -m)" == "x86_64"; then
+  LIBTRACE_X64="true"
+else
+  LIBTRACE_X64=""
+fi
+
 # Checks for header files.
 AC_HEADER_STDC
 AC_CHECK_HEADERS([fcntl.h stdint.h stdlib.h string.h unistd.h], ,
