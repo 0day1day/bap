@@ -70,8 +70,7 @@ let get_program () =
   let get_one (oldp,oldscope,_) = function
     | `Il f ->
       let newp, newscope = Parser.program_from_file ~scope:oldscope f in
-      List.append newp oldp, newscope, (Some Disasm_i386.X8664) (* XXX: This shouldn't be hardcoded, but requires modification
-                                                                        of the IL to indicate architecture *)
+      List.append newp oldp, newscope, None
     | `Bin f ->
       let p = Asmir.open_program f in
       let mode = Asmir.get_asmprogram_mode p in
