@@ -68,11 +68,6 @@ else
    touch solvers/makefile.inc
 fi
 
-# Add -DAMD64 when needed
-if test "$(uname -m)" == "x86_64";
-   then export CFLAGS="$CFLAGS -DAMD64";
-fi
-
 # Check for PIN
 PIN_ROOT=${PIN_ROOT:=$(pwd)/pin}
 AC_CHECK_FILE([$PIN_ROOT],
