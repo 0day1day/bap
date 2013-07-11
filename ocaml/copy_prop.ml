@@ -128,7 +128,9 @@ let copyprop_ssa ?(stop_before=(fun _ -> false)) ?(stop_after=(fun _ -> false)) 
           (try
              match VM.find v l with
              | CPSpecSSA.L.Middle e ->
-               if stop_before e then SkipChildren else ChangeToAndDoChildren e
+               if stop_before e then SkipChildren
+               else if stop_after e then ChangeTo e
+               else ChangeToAndDoChildren e
              | _ -> SkipChildren
            with Not_found -> SkipChildren)
         | _ -> DoChildren
@@ -199,10 +201,11 @@ let copyprop_ast ?(stop_before=(fun _ -> false)) ?(stop_after=(fun _ -> false)) 
                    (* No cycle: The definitions do not include a previously visited location *)
                    && LS.is_empty (LS.inter vdefs visitedlocs)
                   ) (vars_in e) in
-               if can_copy & not (stop_before e)
-               then
-                 ChangeTo (propagate dfin origloc (LS.add (UD.LocationType.Loc newloc) visitedlocs) newloc e)
-               else SkipChildren
+               if can_copy then (
+                 if not (stop_before e)
+                 then ChangeTo (propagate dfin origloc (LS.add (UD.LocationType.Loc newloc) visitedlocs) newloc e)
+                 else ChangeTo e
+               ) else SkipChildren
              | _ -> SkipChildren
            with Not_found -> SkipChildren)
         | _ -> DoChildren
