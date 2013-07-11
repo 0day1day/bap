@@ -32,6 +32,7 @@ tests/asm/nop
 tests/bap_test_suite
 utils/Makefile
 utils/backtaint
+utils/codegen
 utils/formula
 utils/get_functions
 utils/identify_loops
@@ -184,3 +185,5 @@ libtracewrap/libtrace/src/ocaml/utils/readtrace
 libtracewrap/libtrace/protobuf/src/google/protobuf/compiler/cpp/cpp_test_bad_identifiers.pb.cc
 libtracewrap/libtrace/protobuf/src/google/protobuf/compiler/cpp/cpp_test_bad_identifiers.pb.h
 libtracewrap/libtrace/protobuf/src/google/protobuf/unittest*.pb.cc
+libtracewrap/libtrace/protobuf/configure.lineno
+
