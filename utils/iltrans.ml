@@ -450,13 +450,10 @@ let () = Arg.parse speclist anon usage
 let pipeline = List.rev !pipeline
 
 let prog, scope, mode =
-  let p, s, m =
-    try (Input.get_program())
-    with Arg.Bad s ->
-      Arg.usage speclist (s^"\n"^usage);
-      exit 1
-  in
-  p, s, m
+  try Input.get_program ()
+  with Arg.Bad s ->
+    Arg.usage speclist (s^"\n"^usage);
+    exit 1
 
 let rec apply_cmd prog = function
   | AnalysisAst f -> (
