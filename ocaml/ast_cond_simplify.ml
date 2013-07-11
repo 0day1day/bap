@@ -105,7 +105,7 @@ let simplify_exp = reverse_visit simplify_flat
 let simplifycond_cfg g =
   (* Don't copy propagate over memory, since most programs do
      comparisons on registers. *)
-  let stop_at =
+  let stop_before =
     function
       | Load _ | Store _ -> true
       | _ -> false
@@ -119,7 +119,7 @@ let simplifycond_cfg g =
     (* | Label (_, attrs) -> List.exists is_cmp_attr attrs *)
     (* | s -> false *)
   in
-  let cp = Copy_prop.copyprop_ast ~stop_at g in
+  let cp = Copy_prop.copyprop_ast ~stop_before g in
   C.G.fold_vertex (fun v g ->
     let stmts = C.get_stmts g v in
     match List.rev stmts with

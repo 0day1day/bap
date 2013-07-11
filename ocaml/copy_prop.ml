@@ -116,19 +116,19 @@ end
 
 module CPSSA = CfgDataflow.Make(CPSpecSSA)
 
-let copyprop_ssa ?(stop_at=(fun _ -> false)) g =
+let copyprop_ssa ?(stop_before=(fun _ -> false)) ?(stop_after=(fun _ -> false)) g =
   let _, dfout =
     CPSSA.worklist_iterate g in
   let propagate l v =
     let vis = object(self)
       inherit Ssa_visitor.nop
       method visit_exp = function
-        | e when stop_at e -> SkipChildren
+        | e when stop_after e -> SkipChildren
         | Ssa.Var v ->
           (try
              match VM.find v l with
              | CPSpecSSA.L.Middle e ->
-               ChangeToAndDoChildren e
+               if stop_before e then SkipChildren else ChangeToAndDoChildren e
              | _ -> SkipChildren
            with Not_found -> SkipChildren)
         | _ -> DoChildren
@@ -153,7 +153,7 @@ let copyprop_ssa ?(stop_at=(fun _ -> false)) g =
 
 module CPAST = CfgDataflow.Make(CPSpecAST)
 
-let copyprop_ast ?(stop_at=(fun _ -> false)) g =
+let copyprop_ast ?(stop_before=(fun _ -> false)) ?(stop_after=(fun _ -> false)) g =
   let dfin, _ = CPAST.worklist_iterate_stmt g in
   let get_map = function
     | CPSpecAST.L.Map m -> m
@@ -179,7 +179,7 @@ let copyprop_ast ?(stop_at=(fun _ -> false)) g =
       inherit Ast_visitor.nop
       method visit_exp = function
         (* Stop propagating *)
-        | e when stop_at e -> SkipChildren
+        | e when stop_after e -> SkipChildren
         | Ast.Var v ->
           (try
              match VM.find v l with
@@ -190,7 +190,7 @@ let copyprop_ast ?(stop_at=(fun _ -> false)) g =
                   location *)
                (* Make sure all variables referenced in e are the same
                   definitions at the original location *)
-               if VS.for_all
+               let can_copy = VS.for_all
                  (fun use ->
                    let vdefs = defs origloc use in
                    let vdefs' = defs newloc use in
@@ -198,7 +198,8 @@ let copyprop_ast ?(stop_at=(fun _ -> false)) g =
                    vdefs = vdefs'
                    (* No cycle: The definitions do not include a previously visited location *)
                    && LS.is_empty (LS.inter vdefs visitedlocs)
-                  ) (vars_in e)
+                  ) (vars_in e) in
+               if can_copy & not (stop_before e)
                then
                  ChangeTo (propagate dfin origloc (LS.add (UD.LocationType.Loc newloc) visitedlocs) newloc e)
                else SkipChildren
