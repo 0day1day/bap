@@ -75,10 +75,14 @@ LIB_ROOTS :=
 
 ROOT = $(realpath ..)
 
-ifeq ($(TARGET),intel64)
-	LIBTRACEDIR=$(ROOT)/libtracewrap/libtrace
-else
-	LIBTRACEDIR=$(ROOT)/libtracewrap/libtrace32
+# use plain libtrace if we're in 64-bit mode and compiling 64-bit gentrace,
+# or if we're in 32-bit mode.
+LIBTRACEDIR=$(ROOT)/libtracewrap/libtrace
+
+ifeq ($(LIBTRACE_X64),true)
+ifeq ($(TARGET),ia32)
+  LIBTRACEDIR=$(ROOT)/libtracewrap/libtrace32
+endif
 endif
 
 TRACEFORMATDIR = $(LIBTRACEDIR)/src/cpp

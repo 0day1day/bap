@@ -3,8 +3,8 @@ default: all
 
 %:
 ifeq ("@LIBTRACE_X64@","true")
-	(make -f Makefile.pin PIN_ROOT=@PIN_ROOT@ TARGET=intel64 $@)
+	(make -f Makefile.pin PIN_ROOT=@PIN_ROOT@ TARGET=intel64 LIBTRACE_X64="@LIBTRACE_X64@" $@)
 endif
-	(make -f Makefile.pin PIN_ROOT=@PIN_ROOT@ TARGET=ia32 $@)
+	(make -f Makefile.pin PIN_ROOT=@PIN_ROOT@ TARGET=ia32 LIBTRACE_X64="@LIBTRACE_X64@" $@)
 
 tags:
