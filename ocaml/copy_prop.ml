@@ -97,16 +97,11 @@ module CPSpecAST = struct
       | _, _ -> false
   end
   module CFG = Cfg.AST
-  module O = struct
-    type t = Ast.stmt -> bool
-    let default _ = false
-  end
+  module O = GraphDataflow.NOOPTIONS
 
-  let stmt_transfer_function stop_at g ((_bb,_) as loc) stmt l =
+  let stmt_transfer_function () g ((_bb,_) as loc) stmt l =
     let l = match l with | L.Map m -> m | L.Top -> failwith (Printf.sprintf "Expected Map, not Top at %s" (Cfg_ast.v2s _bb)) in
     L.Map (match stmt with
-    | s when stop_at s ->
-      VM.empty
     | Ast.Move(v,e,_) ->
       (* dprintf "seeing %s" (Pp.ast_stmt_to_string s); *)
       VM.add v (L.Middle (loc, e)) l
@@ -121,13 +116,14 @@ end
 
 module CPSSA = CfgDataflow.Make(CPSpecSSA)
 
-let copyprop_ssa g =
+let copyprop_ssa ?(stop_at=(fun _ -> false)) g =
   let _, dfout =
     CPSSA.worklist_iterate g in
   let propagate l v =
     let vis = object(self)
       inherit Ssa_visitor.nop
       method visit_exp = function
+        | e when stop_at e -> SkipChildren
         | Ssa.Var v ->
           (try
              match VM.find v l with
@@ -157,8 +153,8 @@ let copyprop_ssa g =
 
 module CPAST = CfgDataflow.Make(CPSpecAST)
 
-let copyprop_ast ?stop_at g =
-  let dfin, _ = CPAST.worklist_iterate_stmt ?opts:stop_at g in
+let copyprop_ast ?(stop_at=(fun _ -> false)) g =
+  let dfin, _ = CPAST.worklist_iterate_stmt g in
   let get_map = function
     | CPSpecAST.L.Map m -> m
     | _ -> failwith "Expected to find a map: BB_Exit probably unreachable"
@@ -182,6 +178,8 @@ let copyprop_ast ?stop_at g =
     let vis = object(self)
       inherit Ast_visitor.nop
       method visit_exp = function
+        (* Stop propagating *)
+        | e when stop_at e -> SkipChildren
         | Ast.Var v ->
           (try
              match VM.find v l with
