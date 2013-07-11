@@ -159,8 +159,8 @@ BAP_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 AC_CANONICAL_HOST
 AC_SUBST(LIBTRACE_X64)
 case "${host}" in
-i[[3456]]86*) LIBTRACE_X64="" ;;
 x86_64*) LIBTRACE_X64="true" ;;
+*) LIBTRACE_X64="false" ;;
 esac
 
 # Checks for header files.
