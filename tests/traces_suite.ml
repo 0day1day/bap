@@ -36,17 +36,17 @@ module MakeTraceTest(TraceSymbolic:Traces.TraceSymbolic) = struct
     Traces.consistency_check := true;
     ignore(Traces.concrete Disasm_i386.X86 prog);
     Traces.consistency_check := false;
-    let t1 = Traces.add_payload Disasm_i386.X86 "test" prog in
+    let t1 = Traces.add_payload "test" Disasm_i386.X86 prog in
     (* We should not get an exception because this should be satisfiable *)
-    ignore(Traces.TraceSymbolic.output_exploit Disasm_i386.X86 (exploit_file,Smtexec.STP.si) t1);
-    let t2 = Traces.add_payload Disasm_i386.X86 "\x00" prog in
+    ignore(Traces.TraceSymbolic.output_exploit (exploit_file,Smtexec.STP.si) Disasm_i386.X86 t1);
+    let t2 = Traces.add_payload "\x00" Disasm_i386.X86 prog in
     (* Null bytes are not allowed, so we should get an exception *)
     (* We need to cleanup traces in between runs, or we'll get an
        error. *)
     Traces.cleanup();
     let unsat =
       try
-        Traces.TraceSymbolic.output_exploit Disasm_i386.X86 (exploit_file,Smtexec.STP.si) t2;
+        Traces.TraceSymbolic.output_exploit (exploit_file,Smtexec.STP.si) Disasm_i386.X86 t2;
         false
       with Failure "Formula was unsatisfiable"
       | Failure "No model found" -> true
@@ -58,8 +58,8 @@ let pin_stream_trace_test solver pin_out =
   skip_if (not (solver#in_path ())) (solver#solvername ^ " not on path");
   let open Traces.TraceSymbolicStream in
   let stream = Asmir.serialized_bap_stream_from_trace_file !Input.streamrate pin_out in
-  let streamf, finalf = Traces_stream.generate_formula Disasm_i386.X86 formula_storage solver in
-  Stream.iter streamf stream;
+  let streamf, finalf = Traces_stream.generate_formula formula_storage solver in
+  Stream.iter (streamf Disasm_i386.X86) stream;
   finalf ();
   match solver#solve_formula_file ~getmodel:true formula_storage with
   | Smtexec.Invalid m ->

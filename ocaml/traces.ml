@@ -1594,10 +1594,10 @@ sig
 
   val create_state : user_init -> state
   (* Symbolically execute an entire trace at once *)
-  val symbolic_run : Disasm_i386.mode -> user_init -> stmt list -> state
+  val symbolic_run : user_init -> Disasm_i386.mode -> stmt list -> state
   (* Symbolically execute some blocks of a trace for streaming *)
-  val symbolic_run_blocks : Disasm_i386.mode -> state -> stmt list -> state
-  val generate_formula : Disasm_i386.mode -> user_init -> stmt list -> output
+  val symbolic_run_blocks : state -> Disasm_i386.mode -> stmt list -> state
+  val generate_formula : user_init -> Disasm_i386.mode -> stmt list -> output
   val output_formula : state -> output
 
   (******************* Formula Debugging  **********************)
@@ -1605,7 +1605,7 @@ sig
   val trace_valid_to_invalid : Disasm_i386.mode -> stmt list -> unit
 
   (****************  Exploit String Generation  ****************)
-  val output_exploit : Disasm_i386.mode -> user_init -> stmt list -> unit
+  val output_exploit : user_init -> Disasm_i386.mode -> stmt list -> unit
 end
 
 
@@ -1656,7 +1656,7 @@ struct
       ) symstate !stmts in
     {state with symstate}
 
-  let symbolic_run_blocks mode state trace =
+  let symbolic_run_blocks state mode trace =
     try
       let state = List.fold_left (symbolic_run_block mode) state trace in
       state
@@ -1673,7 +1673,7 @@ struct
           (*state.pred*)
           raise e
 
-  let symbolic_run mode userinit trace =
+  let symbolic_run userinit mode trace =
     Status.init "Symbolic Run" (List.length trace) ;
     let trace = append_halt trace in
     (*  VH.clear TaintSymbolic.dsa_map; *)
@@ -1683,7 +1683,7 @@ struct
     (* Find the memory variable *)
     let memv = find_memv trace in
     dprintf "Memory variable: %s" (Var.name memv);
-    let formula = symbolic_run_blocks mode state trace in
+    let formula = symbolic_run_blocks state mode trace in
     Status.stop () ;
     dsa_rev_map := None;
     formula
@@ -1691,14 +1691,14 @@ struct
   (*************************************************************)
   (********************  Formula Generation  *******************)
   (*************************************************************)
-  let generate_formula mode i trace =
+  let generate_formula i mode trace =
     let trace = concrete mode trace in
     (* If we leave DCE on, it will screw up the consistency check. *)
     let trace = match !consistency_check || (not !dce) with
       | true -> trace
       | false -> trace_dce trace
     in
-    let finalstate = symbolic_run mode i trace in
+    let finalstate = symbolic_run i mode trace in
     Form.output_formula finalstate.symstate.pred
 
   let output_formula state = Form.output_formula state.symstate.pred
@@ -1722,7 +1722,7 @@ struct
      wrong. *)
   let formula_valid_to_invalid mode ?(min=1) trace =
     let sym_and_output trace fname =
-      let finalstate = symbolic_run mode (fname,Smtexec.STP.si) trace in
+      let finalstate = symbolic_run (fname,Smtexec.STP.si) mode trace in
       Form.output_formula finalstate.symstate.pred;
     in
     let trace = concrete mode trace in
@@ -1772,7 +1772,7 @@ struct
         let middle = (l + u) / 2 in
         let trace = BatList.take middle trace in
         try
-          ignore (generate_formula mode ("temp",STP.si) trace) ;
+          ignore (generate_formula ("temp",STP.si) mode trace) ;
           match STP.si#solve_formula_file ~getmodel:true "temp" with
             | Invalid _ -> Printf.printf "going higher\n";
                 bsearch middle u
@@ -1788,8 +1788,8 @@ struct
                bsearch l (u-1))
     in
     let (l,u) = bsearch 1 length in
-    ignore (generate_formula mode ("form_val",Smtexec.STP.si) (BatList.take l trace)) ;
-    ignore (generate_formula mode ("form_inv",Smtexec.STP.si) (BatList.take u trace))
+    ignore (generate_formula ("form_val",Smtexec.STP.si) mode (BatList.take l trace)) ;
+    ignore (generate_formula ("form_inv",Smtexec.STP.si) mode (BatList.take u trace))
 
 
 (*************************************************************)
@@ -1841,8 +1841,8 @@ struct
     print "Exploit string was written out to file \"%s\"\n" outfile ;
     flush stdout
 
-  let output_exploit mode (file,s) trace =
-    generate_formula mode (formula_storage,s) trace;
+  let output_exploit (file,s) mode trace =
+    generate_formula (formula_storage,s) mode trace;
     match s#solve_formula_file ~getmodel:true formula_storage with
     | Smtexec.Invalid m -> parse_answer_to m file
     | _ -> parse_answer_to None file
@@ -1926,7 +1926,7 @@ let hijack_control target trace =
   trace, Ast.Assert(ret_constraint, atts)
 
 (* Setting the return address to an arbitrary value *)
-let control_flow mode addr trace =
+let control_flow addr mode trace =
   let target = big_int_of_string addr in
   let target = Int(target, memtype mode) in
   let trace, assertion = hijack_control target trace in
@@ -1997,26 +1997,26 @@ let string_to_bytes payload =
     List.rev !bytes
 
 (* Add an arbitrary payload over the return address *)
-let add_payload mode ?(offset=bi0) payload trace =
+let add_payload ?(offset=bi0) payload mode trace =
   let payload = string_to_bytes payload in
   let _, index, trace = get_last_load_exp trace in
   let start = BinOp(PLUS, index, Int(offset, memtype mode)) in
   let assertions = inject_payload_gen mode start payload trace in
     BatList.append trace assertions
 
-let add_payload_after mode ?(offset=bi4) payload trace =
+let add_payload_after ?(offset=bi4) payload mode trace =
   let payload = string_to_bytes payload in
   let trace, assertions = inject_payload mode offset payload trace in
     BatList.append trace assertions
 
-let add_payload_from_file mode ?(offset=bi0) file trace =
+let add_payload_from_file ?(offset=bi0) file mode trace =
   let payload = bytes_from_file file in
   let _, index, trace = get_last_load_exp trace in
   let start = BinOp(PLUS, index, Int(offset, memtype mode)) in
   let assertions = inject_payload_gen mode start payload trace in
     BatList.append trace assertions
 
-let add_payload_from_file_after mode ?(offset=bi4) file trace =
+let add_payload_from_file_after ?(offset=bi4) file mode trace =
   let payload = bytes_from_file file in
   let trace, assertions = inject_payload mode offset payload trace in
     BatList.append trace assertions
@@ -2024,7 +2024,7 @@ let add_payload_from_file_after mode ?(offset=bi4) file trace =
 exception Found_load of Ast.exp
 
 (* Performing shellcode injection *)
-let inject_shellcode mode nops trace =
+let inject_shellcode nops mode trace =
   let payload = (nopsled nops) ^ winshellcode in
   (* Find the expression of the last loaded value *)
   let _,target_addr,_ = get_last_load_exp trace in
@@ -2038,7 +2038,7 @@ let inject_shellcode mode nops trace =
     BatList.append trace (shell @ [assertion])
 
 (** Use pivot to create exploit *)
-let add_pivot mode gaddr maddr payload trace =
+let add_pivot gaddr maddr payload mode trace =
   let gaddrexp = Int(gaddr, memtype mode) in
   let trace, assertion = hijack_control gaddrexp trace in
   (* Concatenate the assertion and the gadget IL *)
@@ -2047,7 +2047,7 @@ let add_pivot mode gaddr maddr payload trace =
   BatList.append trace passerts
 
 (** Use pivot to create exploit *)
-let add_pivot_file mode gaddr maddr payloadfile trace =
+let add_pivot_file gaddr maddr payloadfile mode trace =
   let gaddrexp = Int(gaddr, memtype mode) in
   let trace, assertion = hijack_control gaddrexp trace in
   (* Concatenate the assertion and the gadget IL *)
@@ -2056,7 +2056,7 @@ let add_pivot_file mode gaddr maddr payloadfile trace =
   BatList.append trace passerts
 
 (** Transfer control by overwriting sehaddr with gaddr. *)
-let add_seh_pivot mode gaddr sehaddr paddr payload trace =
+let add_seh_pivot gaddr sehaddr paddr payload mode trace =
   let mem = Var(find_memv trace) in
   let gaddrexp = Int(gaddr, memtype mode) in
   let sehexp = Load(mem, Int(sehaddr, memtype mode), exp_false, memtype mode) in
@@ -2068,7 +2068,7 @@ let add_seh_pivot mode gaddr sehaddr paddr payload trace =
   BatList.append trace passerts
 
 (** Transfer control by overwriting sehaddr with gaddr. *)
-let add_seh_pivot_file mode gaddr sehaddr paddr payloadfile trace =
+let add_seh_pivot_file gaddr sehaddr paddr payloadfile mode trace =
   let mem = Var(find_memv trace) in
   let gaddrexp = Int(gaddr, memtype mode) in
   let sehexp = Load(mem, Int(sehaddr, memtype mode), exp_false, memtype mode) in

@@ -12,11 +12,8 @@ let prog,scope,mode =
     Arg.usage speclist (s^"\n"^usage);
     exit 1
 
-let get_mode = function
-  | Some m -> m
-  | None -> raise (Invalid_argument "Tried to get program architecture for IL")
 
-let input_location = Test_common.backwards_taint (get_mode mode) prog;;
+let input_location = Test_common.backwards_taint (Input.get_mode mode) prog;;
 
 (* Print out the input locations *)
 Traces_backtaint.print_locset input_location;;

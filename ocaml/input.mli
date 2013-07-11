@@ -26,3 +26,7 @@ val init_ro : bool ref
 
 (* Rate to stream frames at *)
 val streamrate : int64 ref
+
+(** [get_mode (Some x)] returns [x], and [get_mode None] raises an
+    informational exception. *)
+val get_mode : Disasm_i386.mode option -> Disasm_i386.mode

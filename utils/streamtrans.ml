@@ -18,9 +18,11 @@ type ast = Ast.program
 type prog =
   | Ast of ast
 
-type cmd = 
-  | TransformAst of (ast -> ast)
+type cmd =
   | AnalysisAst of (ast -> unit)
+  | AnalysisModeAst of (Disasm_i386.mode -> ast -> unit)
+  | TransformAst of (ast -> ast)
+  | TransformModeAst of (Disasm_i386.mode -> ast -> ast)
 
 let pipeline = ref [];;
 
@@ -40,16 +42,8 @@ let prints f =
   let oc = open_out f in
   let pp = new Pp.pp_oc oc in
   (fun block ->
-    (* List.iter (fun s -> pp#ast_stmt s) block; *)
     pp#ast_program block;
     block)
-
-let mode = ref None
-
-let get_mode () =
-  match !mode with
-  | Some m -> m
-  | None -> raise (Invalid_argument "Tried to get program architecture when none exists")
 
 let speclist =
   ("-print", Arg.String(fun f -> add(TransformAst(prints f))),
@@ -65,13 +59,13 @@ let speclist =
     )
   ::("-trace-concrete",
      Arg.Bool(fun b ->
-       add(TransformAst(Traces_stream.concrete (get_mode()) b))
+       add(TransformModeAst(Traces_stream.concrete b))
      ),
      "<pass> Concretely execute, and optionally pass on concretized IL.")
   ::("-trace-formula",
      Arg.String(fun f ->
-       let stream, final = Traces_stream.generate_formula (get_mode()) f !Solver.solver in
-       add(AnalysisAst stream);
+       let stream, final = Traces_stream.generate_formula f !Solver.solver in
+       add(AnalysisModeAst stream);
        addfinal(final)
      ),
      "<file> Generate and output a trace formula to <file>.")
@@ -85,24 +79,31 @@ let () = Arg.parse speclist anon usage
 let pipeline = List.rev !pipeline
 let final = List.rev !final
 
-let prog =
-  let p, m =
-    try Input.get_stream_program ()
-    with Arg.Bad s ->
-      Arg.usage speclist (s^"\n"^usage);
-      exit 1
-  in
-  mode := m; p
+let prog, mode =
+  try Input.get_stream_program ()
+  with Arg.Bad s ->
+    Arg.usage speclist (s^"\n"^usage);
+    exit 1
+;;
+
+let apply_mode = function
+  | AnalysisModeAst f -> AnalysisAst (f (Input.get_mode mode))
+  | TransformModeAst f -> TransformAst (f (Input.get_mode mode))
+  | (AnalysisAst _ | TransformAst _) as x -> x
+
+let pipeline = List.map apply_mode pipeline;;
 
 let rec apply_cmd prog = function
-  | TransformAst f -> (
-    match prog with
-    | Ast p -> Ast(f p)
-  )
   | AnalysisAst f -> (
     match prog with
     | Ast p as p' -> f p; p'
   )
+  | TransformAst f -> (
+    match prog with
+    | Ast p -> Ast(f p)
+  )
+  | AnalysisModeAst _ | TransformModeAst _ ->
+    failwith "impossible"
 ;;
 
 Stream.iter

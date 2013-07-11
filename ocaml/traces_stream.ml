@@ -2,7 +2,7 @@ module D = Debug.Make(struct let name = "Traces_stream" and default=`Debug end)
 open D
 
 (* Concrete execution of a streamed trace block *)
-let concrete_stream mode mem_hash concrete_state thread_map block return =
+let concrete_stream mem_hash concrete_state thread_map mode block return =
   let open Traces in
   let block = Memory2array.coerce_prog_state mem_hash block in
   let memv = Memory2array.coerce_rvar_state mem_hash (Asmir.mem_of_mode mode) in
@@ -14,20 +14,20 @@ let concrete_stream mode mem_hash concrete_state thread_map block return =
     []
   )
 
-let concrete mode return =
+let concrete return mode =
     let mem_hash = Memory2array.create_state () in
     let concrete_state = Traces.TraceConcrete.create_state () in
     let thread_map = Traces.create_thread_map_state () in
     (* HACK to make sure default memory has a map to normalized memory *)
     ignore(Memory2array.coerce_rvar_state mem_hash (Asmir.mem_of_mode mode));
-    (fun block -> concrete_stream mode mem_hash concrete_state thread_map block return)
+    (fun block -> concrete_stream mem_hash concrete_state thread_map mode block return)
 
 module MakeStreamSymbolic (TraceSymbolic:Traces.TraceSymbolic with type user_init = Traces.standard_user_init with type output = unit) =
 struct
 
-  let generate_formula_setup mode mem_hash concrete_state thread_map block =
+  let generate_formula_setup mem_hash concrete_state thread_map mode block =
     let block =
-      concrete_stream mode mem_hash concrete_state thread_map block true
+      concrete_stream mem_hash concrete_state thread_map mode block true
     in
     let block = Traces.remove_specials block in
     let block = Hacks.replace_unknowns block in
@@ -38,25 +38,27 @@ struct
      global.  It would be more elegant to have a general utility for
      keeping stack in streamtrans.ml, but I'm not sure how to do
      that. *)
-  let generate_formula mode filename solver =
+  let generate_formula filename solver =
     let last_state = ref None in
     let mem_hash = Memory2array.create_state () in
     let concrete_state = Traces.TraceConcrete.create_state () in
     let thread_map = Traces.create_thread_map_state () in
-    (* HACK to make sure default memory has a map to normalized memory *)
-    ignore(Memory2array.coerce_rvar_state mem_hash (Asmir.mem_of_mode mode));
-    (* Streaming function *)
-    (fun block ->
-      let block = generate_formula_setup mode mem_hash concrete_state thread_map block in
-      let state = match !last_state with
-        | Some s -> s
-        (* If this is the first block, make a new state *)
-        | None ->
-          (* Do we need to set dsa_rev_map? *)
-          TraceSymbolic.create_state (filename,solver)
-      in
-      last_state :=
-        Some (TraceSymbolic.symbolic_run_blocks mode state block)),
+
+    (fun mode ->
+      (* HACK to make sure default memory has a map to normalized memory *)
+      ignore(Memory2array.coerce_rvar_state mem_hash (Asmir.mem_of_mode mode));
+      (* Streaming function *)
+      (fun block ->
+        let block = generate_formula_setup mem_hash concrete_state thread_map mode block in
+        let state = match !last_state with
+          | Some s -> s
+          | None ->
+            (* If this is the first block, make a new state *)
+            (* XXX Do we need to set dsa_rev_map? *)
+            TraceSymbolic.create_state (filename,solver)
+        in
+        last_state :=
+          Some (TraceSymbolic.symbolic_run_blocks state mode block))),
 
     (* Output formula *)
     (fun () ->

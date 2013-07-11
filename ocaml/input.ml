@@ -118,6 +118,6 @@ let get_stream_program () = match !streaminputs with
     in
     Asmir.serialized_bap_stream_from_trace_file !streamrate f, Some mode
 
-   
-
-(*  with fixme -> raise(Arg.Bad "Could not open input file")*)
+let get_mode = function
+  | Some m -> m
+  | None -> raise (Invalid_argument "Tried to get program architecture for IL")
