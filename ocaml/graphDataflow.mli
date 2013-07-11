@@ -80,7 +80,7 @@ module type OPTIONS = sig
 end
 
 (** A No-op options module *)
-module NOOPTIONS : OPTIONS
+module NOOPTIONS : OPTIONS with type t = unit
 
 (** A dataflow problem is defined by a lattice over a graph. *)
 module type DATAFLOW =

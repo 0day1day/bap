@@ -45,16 +45,11 @@ module CPSpecSSA = struct
       | _, _ -> false
   end
   module CFG = Cfg.SSA
-  module O = struct
-    type t = Ssa.stmt -> bool
-    let default _ = false
-  end
+  module O = GraphDataflow.NOOPTIONS
 
-  let stmt_transfer_function stop_at g (_bb,_) stmt l =
+  let stmt_transfer_function () _g (_bb,_) stmt l =
     let l = match l with | L.Map m -> m | L.Top -> failwith (Printf.sprintf "Expected Map, not Top at %s" (Cfg_ssa.v2s _bb)) in
     L.Map (match stmt with
-    | s when stop_at s ->
-      VM.empty
     | Move(v, Phi _, _) ->
       VM.add v L.Bottom l
     | Move(v,e,_) ->
@@ -126,9 +121,9 @@ end
 
 module CPSSA = CfgDataflow.Make(CPSpecSSA)
 
-let copyprop_ssa ?stop_at g =
+let copyprop_ssa g =
   let _, dfout =
-    CPSSA.worklist_iterate ?opts:stop_at g in
+    CPSSA.worklist_iterate g in
   let propagate l v =
     let vis = object(self)
       inherit Ssa_visitor.nop
