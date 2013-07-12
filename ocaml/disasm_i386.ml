@@ -600,19 +600,19 @@ let subregs_find =
   VH.find_all h
 
 (* effective addresses for 16-bit addressing *)
-let eaddr16 = function
+let eaddr16 =
+  let cast = cast_low r16 in
+  function
   (* R/M byte *)
-  | 0 -> (Var ebx) +* (Var esi)
-  | 1 -> (Var ebx) +* (Var edi)
-  | 2 -> (Var ebp) +* (Var esi)
-  | 3 -> (Var ebp) +* (Var edi)
-  | 4 -> Var esi
-  | 5 -> Var edi
-  | 6 -> Var ebp
-  | 7 -> Var ebx
+  | 0 -> cast (Var ebx) +* cast (Var esi)
+  | 1 -> cast (Var ebx) +* cast (Var edi)
+  | 2 -> cast (Var ebp) +* cast (Var esi)
+  | 3 -> cast (Var ebp) +* cast (Var edi)
+  | 4 -> cast (Var esi)
+  | 5 -> cast (Var edi)
+  | 6 -> cast (Var ebp)
+  | 7 -> cast (Var ebx)
   | _ -> disfailwith "eaddr16 takes only 0-7"
-
-let eaddr16e b = cast_low r16 (eaddr16 b)
 
 let ah_e = bits2reg8e 4
 let ch_e = bits2reg8e 5
@@ -2178,15 +2178,15 @@ let parse_instr g addr =
     let b, r, m, rm, na = parse_modrmbits a in
     match m with (* MOD *)
     | 0 -> (match rm with
-      | 6 -> let (disp, na) = parse_disp16 na in (r, Oaddr(l16 disp), na)
-      | n when n < 8 -> (r, Oaddr(eaddr16 rm), na)
+      | 6 -> let (disp, na) = parse_disp16 na in (r, Oaddr(lt disp addr_t), na)
+      | n when n < 8 -> (r, Oaddr(cast_unsigned addr_t (eaddr16 rm)), na)
       | _ -> disfailwith "Impossible"
     )
     | 1 | 2 ->
       let (base, na) = eaddr16 rm, na in
       let (disp, na) = 
         if m = 1 then parse_disp8 na else (*2*) parse_disp16 na in
-      (r, Oaddr(base +* l16 disp), na)
+      (r, Oaddr(cast_unsigned addr_t (base +* l16 disp)), na)
     | 3 -> (r, Oreg rm, na)
     | _ -> disfailwith "Impossible"
   in
