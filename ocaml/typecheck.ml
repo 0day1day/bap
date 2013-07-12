@@ -223,5 +223,20 @@ let typecheck_stmt =
     | Special _ ->
       ()
 
-let typecheck_prog =
-  List.iter typecheck_stmt
+let typecheck_prog prog =
+  let last_label = ref None in
+  let is_asm = function
+    | Asm _ -> true
+    | _ -> false
+  in
+  let ts = function
+    | Label (_, attrs) as s when List.exists is_asm attrs -> last_label := Some s
+    | _ -> ()
+  in
+  List.iter (fun stmt -> ts stmt;
+    try typecheck_stmt stmt
+    with TypeError s ->
+      match !last_label with
+      | Some ls ->
+        raise (TypeError (s^"\nat "^Pp.ast_stmt_to_string ls))
+      | None -> raise (TypeError s)) prog
