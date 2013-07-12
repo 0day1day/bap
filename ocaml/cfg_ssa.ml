@@ -12,7 +12,7 @@ open Cfg
 open Type
 open BatListFull
 
-module D = Debug.Make(struct let name = "SSA" and default=`NoDebug end)
+module D = Debug.Make(struct let name = "Cfg_ssa" and default=`NoDebug end)
 open D
 
 module VH = Var.VarHash
