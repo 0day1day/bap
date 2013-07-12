@@ -1294,14 +1294,14 @@ let rec to_ir mode addr next ss pref has_rex =
 
     let get_intres1_bit index = match imm8cb with
       | {agg=EqualAny} ->
-        (* Is xmm1[index] at xmm2[j]? *)
+        (* Is xmm2[index] at xmm1[j]? *)
         let check_char acc j =
-          let eq = (get_xmm1 index) ==* (get_xmm2 j) in
-          let valid = is_valid_xmm2_e j in
+          let eq = (get_xmm2 index) ==* (get_xmm1 j) in
+          let valid = is_valid_xmm1_e j in
           ite r1 (eq &* valid) exp_true acc
         in
-        binop AND (is_valid_xmm1_e index)
-          (* Is xmm1[index] included in xmm2[j] for any j? *)
+        binop AND (is_valid_xmm2_e index)
+          (* Is xmm2[index] included in xmm1[j] for any j? *)
           (fold check_char exp_false (nelem-1---0))
       | {agg=Ranges} ->
         (* Is there an even j such that xmm1[j] <= xmm2[index] <=
