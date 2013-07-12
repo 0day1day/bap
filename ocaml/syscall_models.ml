@@ -19,13 +19,14 @@ let x86_is_system_call = function
   | _ -> false
 
 let syscall_reg = function
-  | Disasm_i386.X86 -> Disasm_i386.R32.eax
-  | Disasm_i386.X8664 -> Disasm_i386.R64.rax
+  | Type.X86_32 -> Disasm_i386.R32.eax
+  | Type.X86_64 -> Disasm_i386.R64.rax
+  | _ -> failwith "syscall_reg: unsupported architecture"
 
 (* System call names - fill in as needed *)
-let linux_get_name m syscall =
-  match m with
-  | Disasm_i386.X86 -> 
+let linux_get_name arch syscall =
+  match arch with
+  | Type.X86_32 -> 
     (match syscall with
     | 1 -> "exit"
     | 3 -> "read"
@@ -56,7 +57,7 @@ let linux_get_name m syscall =
     | 270 -> "tgkill"
     | n -> "unknown syscall #" ^ string_of_int n
     )
-  | Disasm_i386.X8664 -> 
+  | Type.X86_64 -> 
     (match syscall with
     | 0 -> "read"
     | 1 -> "write"
@@ -86,12 +87,12 @@ let linux_get_name m syscall =
     | 234 -> "tgkill"
     | n -> "unknown syscall #" ^ string_of_int n
     )
-
+  | _ -> failwith "linux_get_name: unsupported architecture"
 
 (* Fill in system call models as needed *)
-let linux_get_model m syscall = 
-  match m with
-  | Disasm_i386.X86 -> 
+let linux_get_model arch syscall = 
+  match arch with
+  | Type.X86_32 -> 
     (match syscall with 
     | 1 ->
         (* exit *)
@@ -105,7 +106,7 @@ let linux_get_model m syscall =
     | _ ->
        None
     )
-  | Disasm_i386.X8664 -> 
+  | Type.X86_64 -> 
     (match syscall with
     | 60 ->
         (* exit *)
@@ -119,15 +120,21 @@ let linux_get_model m syscall =
     | _ ->
        None
     )
+  | _ -> failwith "linux_get_name: unsupported architecture"
  
 
-let linux_syscall_to_il m rax =
-  match linux_get_model m rax with
+let linux_syscall_to_il arch rax =
+  match linux_get_model arch rax with
     | Some model ->
-      Comment((linux_get_name m rax) ^ " model", [])
+      Comment((linux_get_name arch rax) ^ " model", [])
       :: model
     | None ->
-        let sys_name = linux_get_name m rax in
+        let sys_name = linux_get_name arch rax in
+        let mode = match arch with
+          | Type.X86_32 -> Disasm_i386.X86
+          | Type.X86_64 -> Disasm_i386.X8664
+          | _ -> failwith "linux_syscall_to_il: unsupported architecture"
+        in
         Special (sys_name, [])
-        :: Move(syscall_reg m, Unknown("System call output", Disasm_i386.type_of_mode m), [])
+        :: Move(syscall_reg arch, Unknown("System call output", Disasm_i386.type_of_mode mode), [])
         :: []

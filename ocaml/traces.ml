@@ -63,8 +63,9 @@ let allow_symbolic_indices = ref false
 let padding = ref true
 
 let memtype = function
-  | Disasm_i386.X86 -> reg_32
-  | Disasm_i386.X8664 -> reg_64
+  | Type.X86_32 -> reg_32
+  | Type.X86_64 -> reg_64
+  | _ -> failwith "memtype: unsupported architecture"
 
 let endtrace = "This is the final trace block"
 
@@ -109,12 +110,12 @@ let global =
 (* Some wrappers to interface with the above datastructures *)
 
 (** Create a lookup for our variables *)
-let gamma mode = Asmir.gamma_for_arch mode Asmir.arch_i386
+let gamma arch = Asmir.gamma_for_arch arch
 
 (** Convert name of a register to a var for that register *)
-let name_to_var mode name =
+let name_to_var arch name =
   try
-    Some(Asmir.gamma_lookup (gamma mode) name)
+    Some(Asmir.gamma_lookup (gamma arch) name)
   with Failure _ ->
     if (name <> "Unknown") then wprintf "Did not find %s in gamma" name;
     None
@@ -297,9 +298,9 @@ let print_vars () =
 
     @param h Mapping of vars to dsa vars
 *)
-let assert_vars mode h =
+let assert_vars arch h =
   let addone k v a =
-    match name_to_var mode k with
+    match name_to_var arch k with
     | Some(realv) ->
         (match taint_val (Var.name realv) with
         | Some(true) ->
@@ -322,13 +323,13 @@ let assert_vars mode h =
     when concretely executing.  When symbolic mode is enabled, only
     non-tainted operands will be assigned.
 *)
-let assign_vars mode memv thread_map_lookup symbolic =
+let assign_vars arch memv thread_map_lookup symbolic =
   let getattrs = function
     | true -> [tassignattr]
     | false -> []
   in
   let addone k v a =
-    match name_to_var mode k with
+    match name_to_var arch k with
     | Some(realv) ->
         let realv = thread_map_lookup realv in
         (* SWXXX Add another option for type of trace, if it is concrete, only
@@ -350,7 +351,7 @@ let assign_vars mode memv thread_map_lookup symbolic =
     match symbolic, v.tnt with
     | true, false (* Symbolic *)
     | false, _ (* Concrete *) ->
-        Move(memv, Store(Var(memv), Int(k, memtype mode), v.exp, exp_false, reg_8),
+        Move(memv, Store(Var(memv), Int(k, memtype arch), v.exp, exp_false, reg_8),
              getattrs v.tnt)::a
     | true, true -> a
   in
@@ -1019,7 +1020,7 @@ let check_delta state =
 
 let counter = ref 1
 
-let get_symbolic_seeds mode memv = function
+let get_symbolic_seeds arch memv = function
   (* | Ast.Label (Name s,atts) when is_seed_label s -> *)
   (*     List.fold_left *)
   (*    (fun acc {index=index; taint=Taint taint} -> *)
@@ -1049,9 +1050,9 @@ let get_symbolic_seeds mode memv = function
              add_symbolic index sym_var ;
              (* symbolic variable *)
              let mem = Var(memv) in
-             let store = Store(mem, Int(index, memtype mode),
+             let store = Store(mem, Int(index, memtype arch),
                                sym_var, exp_false, reg_8) in
-             let store_concrete = Store(mem, Int(index, memtype mode),
+             let store_concrete = Store(mem, Int(index, memtype arch),
                                         Int(value, reg_8), exp_false, reg_8) in
              (* let constr = BinOp (EQ, mem, store) in *)
              (*   ignore (LetBind.add_to_formula exp_true constr Rename) *)
@@ -1136,7 +1137,7 @@ let rec get_next_label blocks =
         | [] -> None
 
 (** Running each block separately *)
-let run_block mode ?(next_label = None) ?(transformf = (fun s _ -> [s])) state memv thread_map block =  
+let run_block arch ?(next_label = None) ?(transformf = (fun s _ -> [s])) state memv thread_map block =  
   (* Search for metadata.  It will either be a comment with endseed or a label
       with a context attribute.  If found update_concrete on that stmt, and if 
       it was a label set addr to that; execute the block.  If it's not found
@@ -1166,7 +1167,7 @@ let run_block mode ?(next_label = None) ?(transformf = (fun s _ -> [s])) state m
      | Not_found -> List.hd block)
   in
   let block = List.filter (fun b -> if b == addr then false else true) block in
-  let input_seeds, input_seeds_concrete = get_symbolic_seeds mode memv addr in
+  let input_seeds, input_seeds_concrete = get_symbolic_seeds arch memv addr in
   pdebug ("Running block: " ^ (string_of_int !counter) ^ " " 
           ^ (Pp.ast_stmt_to_string addr));
   counter := !counter + 1;
@@ -1213,7 +1214,7 @@ let run_block mode ?(next_label = None) ?(transformf = (fun s _ -> [s])) state m
 
   (* Assign concrete values to regs/memory *)
   let block =
-    let assigns = assign_vars mode memv (lookup_thread_map thread_map tid) false in
+    let assigns = assign_vars arch memv (lookup_thread_map thread_map tid) false in
     (* List.iter *)
     (*   (fun stmt -> dprintf "assign stmt: %s" (Pp.ast_stmt_to_string stmt)) assigns;       *)
     assigns @ input_seeds_concrete @ block
@@ -1240,10 +1241,10 @@ let run_block mode ?(next_label = None) ?(transformf = (fun s _ -> [s])) state m
        HACK: This is a pretty ugly hack.
     *)
     if Syscall_models.x86_is_system_call stmt then
-      let rax = evalf (Var (Syscall_models.syscall_reg mode)) in
+      let rax = evalf (Var (Syscall_models.syscall_reg arch)) in
       let stmts = (match rax with
         | Int(i, _) ->
-          Syscall_models.linux_syscall_to_il mode (int_of_big_int i)
+          Syscall_models.linux_syscall_to_il arch (int_of_big_int i)
         | _ -> failwith "Unexpected evaluation problem") in
       (* Hack: Remember the next pc; we will clobber this *)
       let newpc = Int64.succ state.pc in
@@ -1323,7 +1324,7 @@ let run_block mode ?(next_label = None) ?(transformf = (fun s _ -> [s])) state m
         (addr::List.rev (List.tl !executed))
 
 
-let run_blocks mode blocks memv length =
+let run_blocks arch blocks memv length =
   counter := 1 ;
   Status.init "Concrete Run" length ;
   let state = TraceConcrete.create_state () in
@@ -1342,7 +1343,7 @@ let run_blocks mode blocks memv length =
         | _ ->
           let l = get_next_label remaining in 
           let block = explicit_thread_stmts block thread_map in
-          run_block mode ~next_label:l ~transformf:trace_transform_stmt state memv thread_map block)
+          run_block arch ~next_label:l ~transformf:trace_transform_stmt state memv thread_map block)
       in
       (
         (* If we are doing a consistency check, saving the concretized
@@ -1426,7 +1427,7 @@ let to_dsa p =
 
 (** Perform concolic execution on the trace and
     output a set of constraints *)
-let concrete mode trace = 
+let concrete arch trace = 
   dsa_rev_map := None;
   let trace = Memory2array.coerce_prog trace in
   let trace = remove_specials trace in
@@ -1435,7 +1436,7 @@ let concrete mode trace =
   let blocks = trace_to_blocks trace in
   (*pdebug ("blocks: " ^ (string_of_int (List.length blocks)));*)
   let length = List.length blocks in
-  let actual_trace = run_blocks mode blocks memv length in
+  let actual_trace = run_blocks arch blocks memv length in
     actual_trace
 
 (* Normal concrete execution *)
@@ -1594,18 +1595,18 @@ sig
 
   val create_state : user_init -> state
   (* Symbolically execute an entire trace at once *)
-  val symbolic_run : user_init -> Disasm_i386.mode -> stmt list -> state
+  val symbolic_run : user_init -> Type.arch -> stmt list -> state
   (* Symbolically execute some blocks of a trace for streaming *)
-  val symbolic_run_blocks : state -> Disasm_i386.mode -> stmt list -> state
-  val generate_formula : user_init -> Disasm_i386.mode -> stmt list -> output
+  val symbolic_run_blocks : state -> Type.arch -> stmt list -> state
+  val generate_formula : user_init -> Type.arch -> stmt list -> output
   val output_formula : state -> output
 
   (******************* Formula Debugging  **********************)
-  val formula_valid_to_invalid : Disasm_i386.mode -> ?min:int -> stmt list -> unit
-  val trace_valid_to_invalid : Disasm_i386.mode -> stmt list -> unit
+  val formula_valid_to_invalid : Type.arch -> ?min:int -> stmt list -> unit
+  val trace_valid_to_invalid : Type.arch -> stmt list -> unit
 
   (****************  Exploit String Generation  ****************)
-  val output_exploit : user_init -> Disasm_i386.mode -> stmt list -> unit
+  val output_exploit : user_init -> Type.arch -> stmt list -> unit
 end
 
 
@@ -1627,14 +1628,14 @@ struct
                         h=VH.create 1000;
                         rh=VH.create 10000}
 
-  let symbolic_run_block mode ({h; rh; symstate} as state) stmt =
+  let symbolic_run_block arch ({h; rh; symstate} as state) stmt =
     let to_dsa stmt = to_dsa_stmt stmt h rh in
     let stmts = ref [] in
     (* dprintf "Dsa'ified stmt: %s" (Pp.ast_stmt_to_string stmt); *)
     Status.inc() ;
     let hasconc = update_concrete stmt in
     if hasconc && !consistency_check then (
-      stmts := !stmts @ [assert_vars mode h]
+      stmts := !stmts @ [assert_vars arch h]
     );
     stmts := List.map to_dsa (BatList.append !stmts [stmt]);
     dprintf "Evaluating stmt %s" (Pp.ast_stmt_to_string stmt);
@@ -1656,9 +1657,9 @@ struct
       ) symstate !stmts in
     {state with symstate}
 
-  let symbolic_run_blocks state mode trace =
+  let symbolic_run_blocks state arch trace =
     try
-      let state = List.fold_left (symbolic_run_block mode) state trace in
+      let state = List.fold_left (symbolic_run_block arch) state trace in
       state
     with
       | Failure fail as e ->
@@ -1673,7 +1674,7 @@ struct
           (*state.pred*)
           raise e
 
-  let symbolic_run userinit mode trace =
+  let symbolic_run userinit arch trace =
     Status.init "Symbolic Run" (List.length trace) ;
     let trace = append_halt trace in
     (*  VH.clear TaintSymbolic.dsa_map; *)
@@ -1683,7 +1684,7 @@ struct
     (* Find the memory variable *)
     let memv = find_memv trace in
     dprintf "Memory variable: %s" (Var.name memv);
-    let formula = symbolic_run_blocks state mode trace in
+    let formula = symbolic_run_blocks state arch trace in
     Status.stop () ;
     dsa_rev_map := None;
     formula
@@ -1691,14 +1692,14 @@ struct
   (*************************************************************)
   (********************  Formula Generation  *******************)
   (*************************************************************)
-  let generate_formula i mode trace =
-    let trace = concrete mode trace in
+  let generate_formula i arch trace =
+    let trace = concrete arch trace in
     (* If we leave DCE on, it will screw up the consistency check. *)
     let trace = match !consistency_check || (not !dce) with
       | true -> trace
       | false -> trace_dce trace
     in
-    let finalstate = symbolic_run i mode trace in
+    let finalstate = symbolic_run i arch trace in
     Form.output_formula finalstate.symstate.pred
 
   let output_formula state = Form.output_formula state.symstate.pred
@@ -1720,12 +1721,12 @@ struct
   (*************************************************************)
   (* Binary search over the concretized IL to check where things go
      wrong. *)
-  let formula_valid_to_invalid mode ?(min=1) trace =
+  let formula_valid_to_invalid arch ?(min=1) trace =
     let sym_and_output trace fname =
-      let finalstate = symbolic_run (fname,Smtexec.STP.si) mode trace in
+      let finalstate = symbolic_run (fname,Smtexec.STP.si) arch trace in
       Form.output_formula finalstate.symstate.pred;
     in
-    let trace = concrete mode trace in
+    let trace = concrete arch trace in
     (* If we leave DCE on, it will screw up the consistency check. *)
     let trace = match !consistency_check with
       | false -> trace_dce trace
@@ -1762,7 +1763,7 @@ struct
 
   (* Binary search over the trace IL to see where things go
      wrong. *)
-  let trace_valid_to_invalid mode trace =
+  let trace_valid_to_invalid arch trace =
     let open Smtexec in
     let length = List.length trace in
     let rec bsearch l u =
@@ -1772,7 +1773,7 @@ struct
         let middle = (l + u) / 2 in
         let trace = BatList.take middle trace in
         try
-          ignore (generate_formula ("temp",STP.si) mode trace) ;
+          ignore (generate_formula ("temp",STP.si) arch trace) ;
           match STP.si#solve_formula_file ~getmodel:true "temp" with
             | Invalid _ -> Printf.printf "going higher\n";
                 bsearch middle u
@@ -1788,8 +1789,8 @@ struct
                bsearch l (u-1))
     in
     let (l,u) = bsearch 1 length in
-    ignore (generate_formula ("form_val",Smtexec.STP.si) mode (BatList.take l trace)) ;
-    ignore (generate_formula ("form_inv",Smtexec.STP.si) mode (BatList.take u trace))
+    ignore (generate_formula ("form_val",Smtexec.STP.si) arch (BatList.take l trace)) ;
+    ignore (generate_formula ("form_inv",Smtexec.STP.si) arch (BatList.take u trace))
 
 
 (*************************************************************)
@@ -1841,8 +1842,8 @@ struct
     print "Exploit string was written out to file \"%s\"\n" outfile ;
     flush stdout
 
-  let output_exploit (file,s) mode trace =
-    generate_formula (formula_storage,s) mode trace;
+  let output_exploit (file,s) arch trace =
+    generate_formula (formula_storage,s) arch trace;
     match s#solve_formula_file ~getmodel:true formula_storage with
     | Smtexec.Invalid m -> parse_answer_to m file
     | _ -> parse_answer_to None file
@@ -1926,16 +1927,16 @@ let hijack_control target trace =
   trace, Ast.Assert(ret_constraint, atts)
 
 (* Setting the return address to an arbitrary value *)
-let control_flow addr mode trace =
+let control_flow addr arch trace =
   let target = big_int_of_string addr in
-  let target = Int(target, memtype mode) in
+  let target = Int(target, memtype arch) in
   let trace, assertion = hijack_control target trace in
     BatList.append trace [assertion]
 
 (* Making the final jump target a symbolic variable. This
    should be useful for enumerating all possible jump targets *)
-let limited_control mode trace =
-  let target = Var (Var.newvar "s_jump_target" (memtype mode)) in
+let limited_control arch trace =
+  let target = Var (Var.newvar "s_jump_target" (memtype arch)) in
   let trace, assertion = hijack_control target trace in
     BatList.append trace [assertion]
 
@@ -1955,14 +1956,14 @@ let get_last_load_exp stmts =
 
     XXX: Consolidate other payload functions to use this one.
 *)
-let inject_payload_gen mode addr payload trace =
+let inject_payload_gen arch addr payload trace =
   (* XXX: This is probably inefficient. *)
   let mem = Var(find_memv trace) in
   let payload = List.map big_int_of_int payload in
   let _,assertions =
     List.fold_left
       (fun (i,acc) value ->
-         let index = Ast.BinOp(PLUS, addr, Int(i, memtype mode)) in
+         let index = Ast.BinOp(PLUS, addr, Int(i, memtype arch)) in
          let load = Ast.Load(mem, index, exp_false, reg_8) in
          let constr = Ast.BinOp(EQ, load, Int(value, reg_8)) in
          (succ_big_int i, (Ast.Assert(constr, [])::acc))
@@ -1972,7 +1973,7 @@ let inject_payload_gen mode addr payload trace =
 
 
 (* Injecting a payload at an offset past the return address *)
-let inject_payload mode start payload trace =
+let inject_payload arch start payload trace =
   (* TODO: A simple dataflow is missing here *)
   let mem, ind, trace = get_last_load_exp trace in
   dprintf "Injecting shellcode at index: %s" (Pp.ast_exp_to_string ind);
@@ -1981,7 +1982,7 @@ let inject_payload mode start payload trace =
   let _,assertions =
     List.fold_left
       (fun (i,acc) value ->
-         let index = Ast.BinOp(PLUS, ind, Int(i, memtype mode)) in
+         let index = Ast.BinOp(PLUS, ind, Int(i, memtype arch)) in
          let load = Ast.Load(mem, index, exp_false, reg_8) in
          let constr = Ast.BinOp(EQ, load, Int(value, reg_8)) in
            (succ_big_int i, (Ast.Assert(constr, [])::acc))
@@ -1997,86 +1998,86 @@ let string_to_bytes payload =
     List.rev !bytes
 
 (* Add an arbitrary payload over the return address *)
-let add_payload ?(offset=bi0) payload mode trace =
+let add_payload ?(offset=bi0) payload arch trace =
   let payload = string_to_bytes payload in
   let _, index, trace = get_last_load_exp trace in
-  let start = BinOp(PLUS, index, Int(offset, memtype mode)) in
-  let assertions = inject_payload_gen mode start payload trace in
+  let start = BinOp(PLUS, index, Int(offset, memtype arch)) in
+  let assertions = inject_payload_gen arch start payload trace in
     BatList.append trace assertions
 
-let add_payload_after ?(offset=bi4) payload mode trace =
+let add_payload_after ?(offset=bi4) payload arch trace =
   let payload = string_to_bytes payload in
-  let trace, assertions = inject_payload mode offset payload trace in
+  let trace, assertions = inject_payload arch offset payload trace in
     BatList.append trace assertions
 
-let add_payload_from_file ?(offset=bi0) file mode trace =
+let add_payload_from_file ?(offset=bi0) file arch trace =
   let payload = bytes_from_file file in
   let _, index, trace = get_last_load_exp trace in
-  let start = BinOp(PLUS, index, Int(offset, memtype mode)) in
-  let assertions = inject_payload_gen mode start payload trace in
+  let start = BinOp(PLUS, index, Int(offset, memtype arch)) in
+  let assertions = inject_payload_gen arch start payload trace in
     BatList.append trace assertions
 
-let add_payload_from_file_after ?(offset=bi4) file mode trace =
+let add_payload_from_file_after ?(offset=bi4) file arch trace =
   let payload = bytes_from_file file in
-  let trace, assertions = inject_payload mode offset payload trace in
+  let trace, assertions = inject_payload arch offset payload trace in
     BatList.append trace assertions
 
 exception Found_load of Ast.exp
 
 (* Performing shellcode injection *)
-let inject_shellcode nops mode trace =
+let inject_shellcode nops arch trace =
   let payload = (nopsled nops) ^ winshellcode in
   (* Find the expression of the last loaded value *)
   let _,target_addr,_ = get_last_load_exp trace in
-  let target_addr = BinOp(PLUS, target_addr, Int(bi4, memtype mode)) in
+  let target_addr = BinOp(PLUS, target_addr, Int(bi4, memtype arch)) in
   (* let target_addr = Int64.add target_addr pin_offset in *)
   (* let target_addr = Int(target_addr, reg_32) in *)
   let _, assertion = hijack_control target_addr trace in
   let payload = string_to_bytes payload in
   let _, trace = get_last_jmp_exp trace in
-  let trace, shell = inject_payload mode bi4 payload trace in
+  let trace, shell = inject_payload arch bi4 payload trace in
     BatList.append trace (shell @ [assertion])
 
 (** Use pivot to create exploit *)
-let add_pivot gaddr maddr payload mode trace =
-  let gaddrexp = Int(gaddr, memtype mode) in
+let add_pivot gaddr maddr payload arch trace =
+  let gaddrexp = Int(gaddr, memtype arch) in
   let trace, assertion = hijack_control gaddrexp trace in
   (* Concatenate the assertion and the gadget IL *)
   let trace = BatList.append trace [assertion] in
-  let passerts = inject_payload_gen mode (Int(maddr, memtype mode)) (string_to_bytes payload) trace in
+  let passerts = inject_payload_gen arch (Int(maddr, memtype arch)) (string_to_bytes payload) trace in
   BatList.append trace passerts
 
 (** Use pivot to create exploit *)
-let add_pivot_file gaddr maddr payloadfile mode trace =
-  let gaddrexp = Int(gaddr, memtype mode) in
+let add_pivot_file gaddr maddr payloadfile arch trace =
+  let gaddrexp = Int(gaddr, memtype arch) in
   let trace, assertion = hijack_control gaddrexp trace in
   (* Concatenate the assertion and the gadget IL *)
   let trace = BatList.append trace [assertion] in
-  let passerts = inject_payload_gen mode (Int(maddr, memtype mode)) (bytes_from_file payloadfile) trace in
+  let passerts = inject_payload_gen arch (Int(maddr, memtype arch)) (bytes_from_file payloadfile) trace in
   BatList.append trace passerts
 
 (** Transfer control by overwriting sehaddr with gaddr. *)
-let add_seh_pivot gaddr sehaddr paddr payload mode trace =
+let add_seh_pivot gaddr sehaddr paddr payload arch trace =
   let mem = Var(find_memv trace) in
-  let gaddrexp = Int(gaddr, memtype mode) in
-  let sehexp = Load(mem, Int(sehaddr, memtype mode), exp_false, memtype mode) in
+  let gaddrexp = Int(gaddr, memtype arch) in
+  let sehexp = Load(mem, Int(sehaddr, memtype arch), exp_false, memtype arch) in
   let endtrace = Ast.Comment (endtrace, []) in
   let assertion = Ast.Assert(BinOp(EQ, gaddrexp, sehexp), []) in
   (* Concatenate the assertion and the gadget IL *)
   let trace = BatList.append trace [endtrace; assertion] in
-  let passerts = inject_payload_gen mode (Int(paddr, memtype mode)) (string_to_bytes payload) trace in
+  let passerts = inject_payload_gen arch (Int(paddr, memtype arch)) (string_to_bytes payload) trace in
   BatList.append trace passerts
 
 (** Transfer control by overwriting sehaddr with gaddr. *)
-let add_seh_pivot_file gaddr sehaddr paddr payloadfile mode trace =
+let add_seh_pivot_file gaddr sehaddr paddr payloadfile arch trace =
   let mem = Var(find_memv trace) in
-  let gaddrexp = Int(gaddr, memtype mode) in
-  let sehexp = Load(mem, Int(sehaddr, memtype mode), exp_false, memtype mode) in
+  let gaddrexp = Int(gaddr, memtype arch) in
+  let sehexp = Load(mem, Int(sehaddr, memtype arch), exp_false, memtype arch) in
   let endtrace = Ast.Comment (endtrace, []) in
   let assertion = Ast.Assert(BinOp(EQ, gaddrexp, sehexp), []) in
   (* Concatenate the assertion and the gadget IL *)
   let trace = BatList.append trace [endtrace; assertion] in
-  let passerts = inject_payload_gen mode (Int(paddr, memtype mode)) (bytes_from_file payloadfile) trace in
+  let passerts = inject_payload_gen arch (Int(paddr, memtype arch)) (bytes_from_file payloadfile) trace in
   BatList.append trace passerts
 
 

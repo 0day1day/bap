@@ -73,35 +73,30 @@ let get_program () =
       List.append newp oldp, newscope, None
     | `Bin f ->
       let p = Asmir.open_program f in
-      let mode = Asmir.get_asmprogram_mode p in
-      List.append (Asmir.asmprogram_to_bap ~init_ro:!init_ro p) oldp, oldscope, Some mode
+      let arch = Asmir.get_asmprogram_arch p in
+      List.append (Asmir.asmprogram_to_bap ~init_ro:!init_ro p) oldp, oldscope, Some arch
     | `Binrange (f, s, e) ->
       let p = Asmir.open_program f in
-      let mode = Asmir.get_asmprogram_mode p in
-      List.append (Asmir.asmprogram_to_bap_range ~init_ro:!init_ro p s e) oldp, oldscope, Some mode
+      let arch = Asmir.get_asmprogram_arch p in
+      List.append (Asmir.asmprogram_to_bap_range ~init_ro:!init_ro p s e) oldp, oldscope, Some arch
     | `Binrecurse f ->
       let p = Asmir.open_program f in
-      let mode = Asmir.get_asmprogram_mode p in
-      List.append (fst (Asmir_rdisasm.rdisasm p)) oldp, oldscope, Some mode
+      let arch = Asmir.get_asmprogram_arch p in
+      List.append (fst (Asmir_rdisasm.rdisasm p)) oldp, oldscope, Some arch
     | `Binrecurseat (f, s) ->
       let p = Asmir.open_program f in
-      let mode = Asmir.get_asmprogram_mode p in
-      List.append (fst (Asmir_rdisasm.rdisasm_at p [s])) oldp, oldscope, Some mode
+      let arch = Asmir.get_asmprogram_arch p in
+      List.append (fst (Asmir_rdisasm.rdisasm_at p [s])) oldp, oldscope, Some arch
     | `Trace f ->
-      let mode =
-        let r = new Trace_container.reader f in
-        match r#get_arch, (Int64.to_int r#get_machine) with
-          | Arch.Bfd_arch_i386, x when x = Arch.mach_i386_i386 -> Disasm_i386.X86
-          | Arch.Bfd_arch_i386, x when x = Arch.mach_x86_64 -> Disasm_i386.X8664
-          | _, _ -> raise(Arg.Bad "unsupported architecture")
-      in
-      List.append (Asmir.serialized_bap_from_trace_file f) oldp, oldscope, Some mode
+      let r = new Trace_container.reader f in
+      let arch = Asmir.translate_arch r#get_arch (Int64.to_int r#get_machine) in
+      List.append (Asmir.serialized_bap_from_trace_file f) oldp, oldscope, Some arch
   in
   try
-    let p,scope,mode = List.fold_left get_one ([], Grammar_private_scope.default_scope (), None) (List.rev !inputs) in
+    let p,scope,arch = List.fold_left get_one ([], Grammar_private_scope.default_scope (), None) (List.rev !inputs) in
     (* Always typecheck input programs. *)
     Printexc.print Typecheck.typecheck_prog p;
-    p,scope,mode
+    p,scope,arch
   with e ->
     Printf.eprintf "Exception %s occurred while lifting\n" (Printexc.to_string e);
     raise e
@@ -109,15 +104,10 @@ let get_program () =
 let get_stream_program () = match !streaminputs with
   | None -> raise(Arg.Bad "No input specified")
   | Some(`Tracestream f) ->
-    let mode = 
-      let r = new Trace_container.reader f in
-      match r#get_arch, (Int64.to_int r#get_machine) with
-        | Arch.Bfd_arch_i386, x when x = Arch.mach_i386_i386 -> Disasm_i386.X86
-        | Arch.Bfd_arch_i386, x when x = Arch.mach_x86_64 -> Disasm_i386.X8664
-        | _, _ -> raise(Arg.Bad "unsupported architecture")
-    in
-    Asmir.serialized_bap_stream_from_trace_file !streamrate f, Some mode
+    let r = new Trace_container.reader f in
+    let arch = Asmir.translate_arch r#get_arch (Int64.to_int r#get_machine) in
+    Asmir.serialized_bap_stream_from_trace_file !streamrate f, Some arch
 
-let get_mode = function
-  | Some m -> m
+let get_arch = function
+  | Some a -> a
   | None -> raise (Invalid_argument "Tried to get program architecture for IL")

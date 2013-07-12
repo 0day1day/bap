@@ -23,10 +23,8 @@ module BArray = Bigarray.Array1
 exception Disassembly_error;;
 exception Memory_error;;
 
-type arch = Libbfd.bfd_architecture
 type asmprogram = {asmp : Libasmir.asm_program_t;
                    arch : arch;
-                   mach : int;
                    secs : section_ptr list;
                    (** Get executable code bytes *)
                    get_exec : addr -> char;
@@ -35,8 +33,8 @@ type asmprogram = {asmp : Libasmir.asm_program_t;
  }
 
 
-let arch_i386 = Bfd_arch_i386
-let arch_arm  = Bfd_arch_arm
+let arch_i386 = X86_32
+let arch_arm  = ARM_32
 (*more to come later when we support them*)
 
 (** How many blocks to obtain when reading a FULL trace (not streaming) *)
@@ -86,38 +84,55 @@ let x86_all_regs = Asmir_vars.x86_all_regs
 let x64_all_regs = Asmir_vars.x64_all_regs
 
 let all_regs = function
-  | Disasm_i386.X86 -> x86_all_regs
-  | Disasm_i386.X8664 -> x64_all_regs
+  | X86_32 -> x86_all_regs
+  | X86_64 -> x64_all_regs
+  | ARM_32 -> x86_all_regs
 
-let mem_of_mode = function
-  | Disasm_i386.X86 -> x86_mem
-  | Disasm_i386.X8664 -> x64_mem
+let mem_of_arch = function
+  | X86_32 -> x86_mem
+  | X86_64 -> x64_mem
+  | ARM_32 -> x86_mem
 
-let decls_for_arch mode arch = match arch with
-  | Bfd_arch_i386 -> (match mode with
-    | Disasm_i386.X86 -> x86_mem::x86_regs
-    | Disasm_i386.X8664 -> x64_mem::x64_regs
-    )
-  | Bfd_arch_arm  -> x86_mem::arm_regs
-  | _ -> failwith "decls_for_arch: unsupported arch"
+let decls_for_arch = function
+  | X86_32 -> x86_mem::x86_regs
+  | X86_64 -> x64_mem::x64_regs
+  | ARM_32  -> x86_mem::arm_regs
 
-let gamma_for_arch mode arch = match arch with
-  | Bfd_arch_i386 -> (match mode with
-    | Disasm_i386.X86 -> gamma_create x86_mem x86_regs
-    | Disasm_i386.X8664 -> gamma_create x64_mem x64_regs
-    )
-  | Bfd_arch_arm  -> gamma_create x86_mem arm_regs
-  | _ -> failwith "gamma_for_arch: unsupported arch"
+let gamma_for_arch = function
+  | X86_32 -> gamma_create x86_mem x86_regs
+  | X86_64 -> gamma_create x64_mem x64_regs
+  | ARM_32 -> gamma_create x86_mem arm_regs
+
+let arch_to_bfd_mach = function
+  | X86_32 -> Libbfd.mACH_i386_i386
+  | X86_64 -> Libbfd.mACH_i386_x86_64
+  | _ -> failwith "arch_to_bfd_mach: unsupported architecture"
+
+let arch_to_bfd_arch = function
+  | X86_32 -> Libbfd.Bfd_arch_i386
+  | X86_64 -> Libbfd.Bfd_arch_i386
+  | ARM_32 -> Libbfd.Bfd_arch_arm
+
+let bfd_arch_to_trace_arch = function
+  | Libbfd.Bfd_arch_i386 -> Arch.Bfd_arch_i386
+  | Libbfd.Bfd_arch_arm -> Arch.Bfd_arch_arm
+  | _ -> failwith "bfd_arch_to_trace_arch: unsupported architecture"
+
+let arch_to_mode = function
+  | X86_32 -> Disasm_i386.X86
+  | X86_64 -> Disasm_i386.X8664
+  | _ -> failwith "arch_to_mode: unsupported architecture"
+
+(* A function to translate between system and common architectures and machines *)
+let translate_arch arch mach =
+  match arch, mach with
+  | Arch.Bfd_arch_i386, x when x = Arch.mach_i386_i386 -> X86_32
+  | Arch.Bfd_arch_i386, x when x = Arch.mach_x86_64 -> X86_64
+  | _, _ -> failwith "translate_arch: unsupported architecture"
 
 let frompiqi = Big_int_convenience.addr_of_int64
 
 let get_asmprogram_arch {arch} = arch
-let get_asmprogram_mach {mach} = mach
-let get_asmprogram_mode {arch; mach} = 
-  match arch with
-  | Libbfd.Bfd_arch_i386 when mach=Libbfd.mACH_i386_i386 -> Disasm_i386.X86
-  | Libbfd.Bfd_arch_i386 when mach=Libbfd.mACH_i386_x86_64 -> Disasm_i386.X8664
-  | _ -> failwith "get_asmprogram_mode: unsupported architecture"
 
 let get_all_sections p =
   let arr,err = Libasmir.asmir_get_all_sections p in
@@ -195,7 +210,12 @@ let open_program ?base filename =
   let secs = Array.to_list (get_all_sections prog)  in
   let get_exec = section_contents prog secs in
   let get_readable = section_contents ~which:loaded prog secs in 
- {asmp=prog; arch=Libasmir.asmir_get_asmp_arch prog; mach=Libasmir.asmir_get_asmp_mach prog; secs=secs; get_exec=get_exec; get_readable=get_readable}
+  let arch =
+    let a = bfd_arch_to_trace_arch (Libasmir.asmir_get_asmp_arch prog) in
+    let m = Libasmir.asmir_get_asmp_mach prog in
+    translate_arch a m
+  in
+ {asmp=prog; arch=arch; secs=secs; get_exec=get_exec; get_readable=get_readable}
 
 
 let get_asm = function
@@ -203,9 +223,9 @@ let get_asm = function
   | _ -> ""
 
 (** Translate only one address of a  Libasmir.asm_program_t to BAP *)
-let asm_addr_to_bap {asmp=prog; arch; mach; get_exec} addr =
+let asm_addr_to_bap {asmp=prog; arch; get_exec} addr =
   let (ir, na) = try
-     let v = Disasm.disasm_instr arch mach get_exec addr in
+     let v = Disasm.disasm_instr (arch_to_mode arch) get_exec addr in
      DV.dprintf "Disassembled %s directly" (~%addr);
      v
    with Disasm_i386.Disasm_i386_exception s ->
@@ -270,24 +290,26 @@ let asmprogram_to_bap ?(init_ro=false) p =
 
 (* Returns a single ASM instruction (as a list IL statements) from a
    sequence of bytes. *)
-let byte_insn_to_bap arch mach addr bytes =
-  let prog = Libasmir.byte_insn_to_asmp arch mach (addr_to_int64 addr) bytes in
+let byte_insn_to_bap arch addr bytes =
+  let bfdarch, bfdmach = arch_to_bfd_arch arch, arch_to_bfd_mach arch in
+  let prog = Libasmir.byte_insn_to_asmp bfdarch bfdmach (addr_to_int64 addr) bytes in
   let get_exec a = bytes.(int_of_big_int (a -% addr)) in
-  let (pr, n) = asm_addr_to_bap {asmp=prog; arch; mach; secs=[]; get_exec; get_readable=get_exec} addr in
+  let (pr, n) = asm_addr_to_bap {asmp=prog; arch; secs=[]; get_exec; get_readable=get_exec} addr in
   Libasmir.asmir_close prog;
   (pr, n -% addr)
 
 (* Transforms a byte sequence (byte array), to a list of lists of IL
    statements *)
-let byte_sequence_to_bap bytes arch mach addr =
-  let prog = Libasmir.byte_insn_to_asmp arch mach (addr_to_int64 addr) bytes in
+let byte_sequence_to_bap bytes arch addr =
+  let bfdarch, bfdmach = arch_to_bfd_arch arch, arch_to_bfd_mach arch in
+  let prog = Libasmir.byte_insn_to_asmp bfdarch bfdmach (addr_to_int64 addr) bytes in
   let len = Array.length bytes in
   let end_addr = addr +% (big_int_of_int len) in
   let get_exec a = bytes.(int_of_big_int (a -% addr)) in
   let rec read_all acc cur_addr =
     if cur_addr >= end_addr then List.rev acc
     else
-      let prog, next = asm_addr_to_bap {asmp=prog; arch; mach; secs=[]; get_exec; get_readable=get_exec} cur_addr in
+      let prog, next = asm_addr_to_bap {asmp=prog; arch; secs=[]; get_exec; get_readable=get_exec} cur_addr in
       read_all (prog::acc) next
   in
   let il = read_all [] addr in
@@ -416,13 +438,13 @@ module SerializedTrace = struct
         | `key_frame _ -> []
         | `metadata_frame _ -> []
     in
-    let raise_frame arch mach f =
+    let raise_frame arch f =
       let get_stmts =
         function
           | `std_frame(f) ->
             (* Convert string to byte array *)
             let a = Array.of_list (BatString.to_list f.Std_frame.rawbytes) in
-            let stmts, _ = byte_insn_to_bap arch mach (frompiqi f.Std_frame.address) a in
+            let stmts, _ = byte_insn_to_bap arch (frompiqi f.Std_frame.address) a in
             stmts
           | `syscall_frame({Syscall_frame.number=callno;
                             Syscall_frame.address=addr;
@@ -450,13 +472,6 @@ module SerializedTrace = struct
       in
       add_operands (get_stmts f) (get_attrs f)
     in
-    (* A function to translate between system and common architectures and machines *)
-    let translate_architecture arch mach =
-      match arch, mach with
-      | Arch.Bfd_arch_i386, x when x = Arch.mach_i386_i386 -> Bfd_arch_i386, mACH_i386_i386
-      | Arch.Bfd_arch_i386, x when x = Arch.mach_x86_64 -> Bfd_arch_i386, mACH_i386_x86_64
-      | _, _ -> failwith "translate_architecture: unsupported architecture"
-    in
     (* Testing *)
     let out = ref [] in
     let counter = ref 0L in
@@ -468,9 +483,9 @@ module SerializedTrace = struct
     let blocksize = match n with | Some x -> x | None -> !trace_blocksize in
     while not r#end_of_trace && checkctr () do
       let frames = r#get_frames blocksize in
-      let arch, mach = translate_architecture r#get_arch (Int64.to_int r#get_machine)
+      let arch = translate_arch r#get_arch (Int64.to_int r#get_machine)
       in
-      out := List.rev_append (List.flatten (List.map (raise_frame arch mach) frames)) !out;
+      out := List.rev_append (List.flatten (List.map (raise_frame arch) frames)) !out;
       counter := Int64.add !counter (Int64.of_int (List.length frames));
     done;
 

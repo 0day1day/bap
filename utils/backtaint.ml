@@ -6,14 +6,14 @@ let speclist = Input.trace_speclist
 let anon x = raise(Arg.Bad("Unexpected argument: '"^x^"'"))
 let () = Arg.parse speclist anon usage
 
-let prog,scope,mode =
+let prog,scope,arch =
   try Input.get_program ()
   with Arg.Bad s ->
     Arg.usage speclist (s^"\n"^usage);
     exit 1
 
 
-let input_location = Test_common.backwards_taint (Input.get_mode mode) prog;;
+let input_location = Test_common.backwards_taint (Input.get_arch arch) prog;;
 
 (* Print out the input locations *)
 Traces_backtaint.print_locset input_location;;

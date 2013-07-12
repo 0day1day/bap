@@ -20,9 +20,9 @@ type prog =
 
 type cmd =
   | AnalysisAst of (ast -> unit)
-  | AnalysisModeAst of (Disasm_i386.mode -> ast -> unit)
+  | AnalysisModeAst of (Type.arch -> ast -> unit)
   | TransformAst of (ast -> ast)
-  | TransformModeAst of (Disasm_i386.mode -> ast -> ast)
+  | TransformModeAst of (Type.arch -> ast -> ast)
 
 let pipeline = ref [];;
 
@@ -79,19 +79,19 @@ let () = Arg.parse speclist anon usage
 let pipeline = List.rev !pipeline
 let final = List.rev !final
 
-let prog, mode =
+let prog, arch =
   try Input.get_stream_program ()
   with Arg.Bad s ->
     Arg.usage speclist (s^"\n"^usage);
     exit 1
 ;;
 
-let apply_mode = function
-  | AnalysisModeAst f -> AnalysisAst (f (Input.get_mode mode))
-  | TransformModeAst f -> TransformAst (f (Input.get_mode mode))
+let apply_arch = function
+  | AnalysisModeAst f -> AnalysisAst (f (Input.get_arch arch))
+  | TransformModeAst f -> TransformAst (f (Input.get_arch arch))
   | (AnalysisAst _ | TransformAst _) as x -> x
 
-let pipeline = List.map apply_mode pipeline;;
+let pipeline = List.map apply_arch pipeline;;
 
 let rec apply_cmd prog = function
   | AnalysisAst f -> (

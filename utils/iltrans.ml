@@ -15,11 +15,11 @@ type prog =
 
 type cmd =
   | AnalysisAst of (ast -> unit)
-  | AnalysisModeAst of (Disasm_i386.mode -> ast -> unit)
+  | AnalysisModeAst of (Type.arch -> ast -> unit)
   | AnalysisAstCfg of (astcfg -> unit)
   | AnalysisSsa of (ssa -> unit)
   | TransformAst of (ast -> ast)
-  | TransformModeAst of (Disasm_i386.mode -> ast -> ast)
+  | TransformModeAst of (Type.arch -> ast -> ast)
   | TransformAstCfg of (astcfg -> astcfg)
   | TransformSsa of (ssa -> ssa)
   | ToCfg
@@ -449,7 +449,7 @@ let () = Arg.parse speclist anon usage
 
 let pipeline = List.rev !pipeline
 
-let prog, scope, mode =
+let prog, scope, arch =
   try Input.get_program ()
   with Arg.Bad s ->
     Arg.usage speclist (s^"\n"^usage);
@@ -463,7 +463,7 @@ let rec apply_cmd prog = function
   )
   | AnalysisModeAst f -> (
     match prog with
-    | Ast p as p' -> f (Input.get_mode mode) p; p'
+    | Ast p as p' -> f (Input.get_arch arch) p; p'
     | _ -> failwith "need explicit translation to AST"
   )
   | AnalysisAstCfg f -> (
@@ -483,7 +483,7 @@ let rec apply_cmd prog = function
   )
   | TransformModeAst f -> (
     match prog with
-    | Ast p -> Ast(f (Input.get_mode mode) p)
+    | Ast p -> Ast(f (Input.get_arch arch) p)
     | _ -> failwith "need explicit translation to AST"
   )
   | TransformAstCfg f -> (

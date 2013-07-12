@@ -15,7 +15,7 @@ open D
 let ra_final = Var.newvar "ra_final" reg_32
 and ra0 = Var.newvar "ra0" Ast.reg_32
 and (mem,sp,r_of) =
-  let d = Asmir.decls_for_arch Disasm_i386.X86 Asmir.arch_i386 in
+  let d = Asmir.decls_for_arch Type.X86_32 in
   (List.hd d,
    List.find (fun v -> Var.name v = "R_ESP") d,
    List.find (fun v -> Var.name v = "R_OF") d

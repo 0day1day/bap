@@ -19,9 +19,8 @@ exception Disassembly_error
 
 type asmprogram
 
-type arch
-val arch_i386 : arch
-val arch_arm : arch
+val arch_i386 : Type.arch
+val arch_arm : Type.arch
 
 type varctx
 
@@ -50,14 +49,12 @@ val tr_bap_blocks_t :
 *)
 
 
-val decls_for_arch : Disasm_i386.mode -> arch -> Ast.var list
-val gamma_for_arch : Disasm_i386.mode -> arch -> varctx
+val decls_for_arch : Type.arch -> Ast.var list
+val gamma_for_arch : Type.arch -> varctx
 
-val mem_of_mode : Disasm_i386.mode -> Var.t
+val mem_of_arch : Type.arch -> Var.t
 
-val get_asmprogram_arch : asmprogram -> arch
-val get_asmprogram_mach : asmprogram -> machine_t
-val get_asmprogram_mode : asmprogram -> Disasm_i386.mode
+val get_asmprogram_arch : asmprogram -> Type.arch
 
 val x86_mem : Var.t
 val x86_regs : Var.t list
@@ -66,7 +63,13 @@ val x64_regs : Var.t list
 val x86_all_regs : Var.t list
 val x64_all_regs : Var.t list
 
-val all_regs : Disasm_i386.mode -> Var.t list
+val all_regs : Type.arch -> Var.t list
+
+val arch_to_bfd_mach : Type.arch -> Libbfd.machine_t
+val arch_to_bfd_arch : Type.arch -> Libbfd.bfd_architecture
+val arch_to_mode : Type.arch -> Disasm_i386.mode
+
+val translate_arch : Arch.bfd_architecture -> Libbfd.machine_t -> Type.arch
 
 val open_program : ?base:Type.addr -> string -> asmprogram
 val asmprogram_to_bap : ?init_ro:bool -> asmprogram -> Ast.program
@@ -107,11 +110,9 @@ val get_asm_instr_string_range : asmprogram -> Type.addr -> Type.addr -> string
 val is_load : section_ptr -> bool
 val is_code : section_ptr -> bool
 
-val byte_insn_to_bap :
-  bfd_architecture -> machine_t -> Type.addr -> char array -> Ast.program * Type.addr
+val byte_insn_to_bap : Type.arch -> Type.addr -> char array -> Ast.program * Type.addr
 
-val byte_sequence_to_bap :
-  char array -> bfd_architecture -> machine_t -> Type.addr -> Ast.program list
+val byte_sequence_to_bap : char array -> Type.arch -> Type.addr -> Ast.program list
 
 (* val set_print_warning : bool -> unit *)
 
