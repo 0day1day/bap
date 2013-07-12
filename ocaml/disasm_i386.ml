@@ -2701,19 +2701,27 @@ let parse_instr g addr =
       | 0x4a | 0x4b | 0x4c | 0x4d | 0x4e | 0x4f ->
         let (r, rm, na) = parse_modrm32 na in
         (Mov(prefix.opsize, r, rm, Some(cc_to_exp b2)), na)
-      | 0x60 | 0x61 | 0x62 | 0x68 | 0x69 | 0x6a | 0x6c | 0x6d ->
+      | 0x60 | 0x61 | 0x62 | 0x68 | 0x69 | 0x6a ->
         let order = match b2 with
-          | 0x60 | 0x61 | 0x62 | 0x6c -> Low
-          | 0x68 | 0x69 | 0x70 | 0x6d -> High
+          | 0x60 | 0x61 | 0x62 -> Low
+          | 0x68 | 0x69 | 0x70 -> High
           | _ -> disfailwith "impossible"
         in
         let elemt = match b2 with
           | 0x60 | 0x68 -> reg_8
           | 0x61 | 0x69 -> reg_16
           | 0x62 | 0x6a -> reg_32
-          | 0x6c | 0x6d -> reg_64
           | _ -> disfailwith "impossible"
         in
+        let (r, rm, na) = parse_modrm32 na in
+        (Punpck(prefix.mopsize, elemt, order, r, rm), na)
+      | 0x6c | 0x6d when prefix.opsize_override ->
+        let order = match b2 with
+          | 0x6c -> Low
+          | 0x6d -> High
+          | _ -> disfailwith "impossible"
+        in
+        let elemt = reg_64 in
         let (r, rm, na) = parse_modrm32 na in
         (Punpck(prefix.mopsize, elemt, order, r, rm), na)
       | 0x64 | 0x65 | 0x66 | 0x74 | 0x75 | 0x76  as o ->
