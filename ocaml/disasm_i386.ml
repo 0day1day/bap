@@ -552,7 +552,7 @@ let bits2segreg = function
   | 3 -> ds
   | 4 -> fs
   | 5 -> gs
-  | 6 | 7 -> failwith "bits2segreg: reserved"
+  | 6 | 7 -> disfailwith "bits2segreg: reserved"
   | _ -> failwith "bits2regseg: invalid"
 
 let bits2segrege b = Var(bits2segreg b)
