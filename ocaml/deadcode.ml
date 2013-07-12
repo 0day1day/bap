@@ -207,12 +207,19 @@ let do_aggressive_dce ?(globals = []) graph =
             assert(not (VH.mem var_to_defsite lv));
             VH.add var_to_defsite lv site;
             if List.mem lv globals then mark_site_as_initially_live site
+
+          (* This module only removes Move statements and CJmps.
+             Any other statement type must be marked as being
+             live or we could miss its dependencies! *)
           | Assert _
-          (* Comments don't execute *)
-          (* | Comment _ *)
-          | Halt _ ->
+          | Halt _
+          | Comment _
+          | Assume _
+          | Label _
+          | Jmp _ ->
+
             mark_site_as_initially_live site
-          | _ -> ());
+          | CJmp _ -> ());
 
           (* Mark as liveout if liveout attr is present *)
           if List.mem Type.Liveout (get_attrs s) then
@@ -257,8 +264,8 @@ let do_aggressive_dce ?(globals = []) graph =
       end in
       ignore(Ssa_visitor.stmt_accept vis (gets site));
       let deps = !uses @ (control_deps bb) in
-      (* dprintf "deps for %s" (Pp.ssa_stmt_to_string s); *)
-      (* List.iter (fun (_,s) -> dprintf "%s" (Pp.ssa_stmt_to_string s)) deps; *)
+      (* dprintf "deps for %s" (Pp.ssa_stmt_to_string (gets site)); *)
+      (* List.iter (fun site -> dprintf "%s" (Pp.ssa_stmt_to_string (gets site))) deps; *)
       deps
     in
     C.G.iter_vertex

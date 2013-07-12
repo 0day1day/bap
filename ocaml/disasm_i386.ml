@@ -552,7 +552,7 @@ let bits2segreg = function
   | 3 -> ds
   | 4 -> fs
   | 5 -> gs
-  | 6 | 7 -> failwith "bits2segreg: reserved"
+  | 6 | 7 -> disfailwith "bits2segreg: reserved"
   | _ -> failwith "bits2regseg: invalid"
 
 let bits2segrege b = Var(bits2segreg b)
@@ -600,19 +600,19 @@ let subregs_find =
   VH.find_all h
 
 (* effective addresses for 16-bit addressing *)
-let eaddr16 = function
+let eaddr16 =
+  let cast = cast_low r16 in
+  function
   (* R/M byte *)
-  | 0 -> (Var ebx) +* (Var esi)
-  | 1 -> (Var ebx) +* (Var edi)
-  | 2 -> (Var ebp) +* (Var esi)
-  | 3 -> (Var ebp) +* (Var edi)
-  | 4 -> Var esi
-  | 5 -> Var edi
-  | 6 -> Var ebp
-  | 7 -> Var ebx
+  | 0 -> cast (Var ebx) +* cast (Var esi)
+  | 1 -> cast (Var ebx) +* cast (Var edi)
+  | 2 -> cast (Var ebp) +* cast (Var esi)
+  | 3 -> cast (Var ebp) +* cast (Var edi)
+  | 4 -> cast (Var esi)
+  | 5 -> cast (Var edi)
+  | 6 -> cast (Var ebp)
+  | 7 -> cast (Var ebx)
   | _ -> disfailwith "eaddr16 takes only 0-7"
-
-let eaddr16e b = cast_low r16 (eaddr16 b)
 
 let ah_e = bits2reg8e 4
 let ch_e = bits2reg8e 5
@@ -2178,15 +2178,15 @@ let parse_instr g addr =
     let b, r, m, rm, na = parse_modrmbits a in
     match m with (* MOD *)
     | 0 -> (match rm with
-      | 6 -> let (disp, na) = parse_disp16 na in (r, Oaddr(l16 disp), na)
-      | n when n < 8 -> (r, Oaddr(eaddr16 rm), na)
+      | 6 -> let (disp, na) = parse_disp16 na in (r, Oaddr(lt disp addr_t), na)
+      | n when n < 8 -> (r, Oaddr(cast_unsigned addr_t (eaddr16 rm)), na)
       | _ -> disfailwith "Impossible"
     )
     | 1 | 2 ->
       let (base, na) = eaddr16 rm, na in
       let (disp, na) = 
         if m = 1 then parse_disp8 na else (*2*) parse_disp16 na in
-      (r, Oaddr(base +* l16 disp), na)
+      (r, Oaddr(cast_unsigned addr_t (base +* l16 disp)), na)
     | 3 -> (r, Oreg rm, na)
     | _ -> disfailwith "Impossible"
   in
@@ -2701,19 +2701,27 @@ let parse_instr g addr =
       | 0x4a | 0x4b | 0x4c | 0x4d | 0x4e | 0x4f ->
         let (r, rm, na) = parse_modrm32 na in
         (Mov(prefix.opsize, r, rm, Some(cc_to_exp b2)), na)
-      | 0x60 | 0x61 | 0x62 | 0x68 | 0x69 | 0x6a | 0x6c | 0x6d ->
+      | 0x60 | 0x61 | 0x62 | 0x68 | 0x69 | 0x6a ->
         let order = match b2 with
-          | 0x60 | 0x61 | 0x62 | 0x6c -> Low
-          | 0x68 | 0x69 | 0x70 | 0x6d -> High
+          | 0x60 | 0x61 | 0x62 -> Low
+          | 0x68 | 0x69 | 0x70 -> High
           | _ -> disfailwith "impossible"
         in
         let elemt = match b2 with
           | 0x60 | 0x68 -> reg_8
           | 0x61 | 0x69 -> reg_16
           | 0x62 | 0x6a -> reg_32
-          | 0x6c | 0x6d -> reg_64
           | _ -> disfailwith "impossible"
         in
+        let (r, rm, na) = parse_modrm32 na in
+        (Punpck(prefix.mopsize, elemt, order, r, rm), na)
+      | 0x6c | 0x6d when prefix.opsize_override ->
+        let order = match b2 with
+          | 0x6c -> Low
+          | 0x6d -> High
+          | _ -> disfailwith "impossible"
+        in
+        let elemt = reg_64 in
         let (r, rm, na) = parse_modrm32 na in
         (Punpck(prefix.mopsize, elemt, order, r, rm), na)
       | 0x64 | 0x65 | 0x66 | 0x74 | 0x75 | 0x76  as o ->

@@ -6,6 +6,8 @@ and streaminputs = ref None
 and streamrate = ref 10000L (* Unless specified grab this many frames at a time *)
 and pintrace = ref false
 
+let typecheck = ref true
+
 let toint64 s =
   try Int64.of_string s
   with Failure "int_of_string" -> raise(Arg.Bad("invalid int64: "^s))
@@ -86,7 +88,7 @@ let get_program () =
     let p,scope = List.fold_left get_one ([], Grammar_private_scope.default_scope ()) (List.rev !inputs) in
       (* (try Printexc.print Typecheck.typecheck_prog p with _ -> ()); *)
       (* Always typecheck input programs. *)
-    Printexc.print Typecheck.typecheck_prog p;
+    if !typecheck then Printexc.print Typecheck.typecheck_prog p;
     p,scope
   with e ->
     Printf.eprintf "Exception %s occurred while lifting\n" (Printexc.to_string e);
