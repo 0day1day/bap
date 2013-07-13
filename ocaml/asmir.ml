@@ -34,6 +34,7 @@ type asmprogram = {asmp : Libasmir.asm_program_t;
 
 
 let arch_i386 = X86_32
+let arch_x8664 = X86_64
 let arch_arm  = ARM_32
 (*more to come later when we support them*)
 

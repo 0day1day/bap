@@ -20,6 +20,7 @@ exception Disassembly_error
 type asmprogram
 
 val arch_i386 : Type.arch
+val arch_x8664 : Type.arch
 val arch_arm : Type.arch
 
 type varctx
