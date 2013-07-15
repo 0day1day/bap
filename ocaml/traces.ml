@@ -65,7 +65,6 @@ let padding = ref true
 let memtype = function
   | Type.X86_32 -> reg_32
   | Type.X86_64 -> reg_64
-  | _ -> failwith "memtype: unsupported architecture"
 
 let endtrace = "This is the final trace block"
 

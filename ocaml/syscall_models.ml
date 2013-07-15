@@ -21,7 +21,6 @@ let x86_is_system_call = function
 let syscall_reg = function
   | Type.X86_32 -> Disasm_i386.R32.eax
   | Type.X86_64 -> Disasm_i386.R64.rax
-  | _ -> failwith "syscall_reg: unsupported architecture"
 
 (* System call names - fill in as needed *)
 let linux_get_name arch syscall =
@@ -87,7 +86,6 @@ let linux_get_name arch syscall =
     | 234 -> "tgkill"
     | n -> "unknown syscall #" ^ string_of_int n
     )
-  | _ -> failwith "linux_get_name: unsupported architecture"
 
 (* Fill in system call models as needed *)
 let linux_get_model arch syscall = 
@@ -120,8 +118,6 @@ let linux_get_model arch syscall =
     | _ ->
        None
     )
-  | _ -> failwith "linux_get_name: unsupported architecture"
- 
 
 let linux_syscall_to_il arch rax =
   match linux_get_model arch rax with
@@ -133,7 +129,6 @@ let linux_syscall_to_il arch rax =
         let mode = match arch with
           | Type.X86_32 -> Disasm_i386.X86
           | Type.X86_64 -> Disasm_i386.X8664
-          | _ -> failwith "linux_syscall_to_il: unsupported architecture"
         in
         Special (sys_name, [])
         :: Move(syscall_reg arch, Unknown("System call output", Disasm_i386.type_of_mode mode), [])

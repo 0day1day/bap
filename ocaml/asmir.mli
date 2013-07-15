@@ -21,7 +21,6 @@ type asmprogram
 
 val arch_i386 : Type.arch
 val arch_x8664 : Type.arch
-val arch_arm : Type.arch
 
 type varctx
 
@@ -66,11 +65,11 @@ val x64_all_regs : Var.t list
 
 val all_regs : Type.arch -> Var.t list
 
-val arch_to_bfd_mach : Type.arch -> Libbfd.machine_t
-val arch_to_bfd_arch : Type.arch -> Libbfd.bfd_architecture
-val arch_to_mode : Type.arch -> Disasm_i386.mode
+(** Convert a BAP architecture to a BFD architecture and machine *)
+val arch_to_bfd : Type.arch -> Libbfd.bfd_architecture * Libbfd.machine_t
 
-val translate_arch : Arch.bfd_architecture -> Libbfd.machine_t -> Type.arch
+(** Translate libtrace architecture to BAP architecture *)
+val translate_trace_arch : Arch.bfd_architecture -> Arch.machine_t -> Type.arch
 
 val open_program : ?base:Type.addr -> string -> asmprogram
 val asmprogram_to_bap : ?init_ro:bool -> asmprogram -> Ast.program
