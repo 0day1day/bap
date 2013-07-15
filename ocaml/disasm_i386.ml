@@ -1474,13 +1474,13 @@ let rec to_ir mode addr next ss pref has_rex =
     (match o1 with
     | Oimm _ ->
       [move rsp (rsp_e -* mi (bytes_of_width mt));
-       store_s mode None mt rsp_e (b64 ra);
+       store_s mode None mt rsp_e (big_int_of_mode mode ra);
        Jmp(target, calla)]
     | _ ->
       let t = nt "target" mt in
       [move t target;
        move rsp (rsp_e -* mi (bytes_of_width mt));
-       store_s mode None mt rsp_e (b64 ra);
+       store_s mode None mt rsp_e (big_int_of_mode mode ra);
        Jmp(Var t, calla)])
   | Jump(o) ->
     [Jmp(jump_target mode ss has_rex o, [])]

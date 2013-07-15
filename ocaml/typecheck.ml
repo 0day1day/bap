@@ -158,35 +158,40 @@ let typecheck_expression e = ignore(infer_ast_internal true e)
 
    XXX: Formal type checking rules!
 *)
-let typecheck_stmt =
+let typecheck_stmt stmt =
   let infer_te = infer_ast_internal true in
-  function
-    | Move(v, e, _) as s ->
-      let vt = Var.typ v in
-      let et = infer_te e in
-      check_same ~s vt et
-    | Jmp(e, _) ->
-      let et = infer_te e in
-      check_reg et
-    | CJmp(ce, t1, t2, _) ->
-      let et = infer_te ce in
-      let t1t = infer_te t1 in
-      let t2t = infer_te t2 in
-      check_bool et;
-      check_reg t1t;
-      check_reg t2t
-    | Halt(e, _) ->
-      let et = infer_te e in
-      (* Can we return a memory? Does this make sense? *)
-      check_reg et
-    | Assert(e, _)
-    | Assume(e, _) ->
-      let et = infer_te e in
-      check_bool et
-    | Label _
-    | Comment _
-    | Special _ ->
-      ()
+  try
+    match stmt with
+      | Move(v, e, _) as s ->
+        let vt = Var.typ v in
+        let et = infer_te e in
+        check_same ~s vt et
+      | Jmp(e, _) ->
+        let et = infer_te e in
+        check_reg et
+      | CJmp(ce, t1, t2, _) ->
+        let et = infer_te ce in
+        let t1t = infer_te t1 in
+        let t2t = infer_te t2 in
+        check_bool et;
+        check_reg t1t;
+        check_reg t2t
+      | Halt(e, _) ->
+        let et = infer_te e in
+        (* Can we return a memory? Does this make sense? *)
+        check_reg et
+      | Assert(e, _)
+      | Assume(e, _) ->
+        let et = infer_te e in
+        check_bool et
+      | Label _
+      | Comment _
+      | Special _ ->
+        ()
+  with TypeError e ->
+    Printf.eprintf "TypeError while checking stmt: %s\n" (Pp.ast_stmt_to_string stmt);
+    flush stderr;
+    raise (TypeError e)
 
 let typecheck_prog =
   List.iter typecheck_stmt
