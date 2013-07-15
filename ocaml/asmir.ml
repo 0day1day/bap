@@ -63,7 +63,8 @@ let gamma_create mem decls : varctx =
   let h = Hashtbl.create 57 in
   List.iter (fun (Var.V(_,nm,_) as var) -> Hashtbl.add h nm var) decls;
   Hashtbl.add h "$mem" mem;
-  Hashtbl.add h "mem" mem;
+  Hashtbl.add h "mem32" mem;
+  Hashtbl.add h "mem64" mem;
   h
 
 let gamma_lookup (g:varctx) s =
@@ -353,8 +354,12 @@ let rec bap_get_block_from_f f =
 (** The new protobuffers/piqi serialized trace format. *)
 module SerializedTrace = struct
 
-  let new_bap_from_trace_frames ?n r =
+  let new_bap_from_trace_frames ?n arch r =
     print_mem_usage();
+    let mem_name = match arch with
+      | X86_32 -> "mem32"
+      | X86_64 -> "mem64"
+    in
     let get_attrs =
       let convert_taint = function
         | `no_taint -> Taint 0
@@ -373,7 +378,7 @@ module SerializedTrace = struct
            Operand_info.operand_usage=use;
            Operand_info.taint_info=t;
            Operand_info.value=v} ->
-          Context({name="mem";
+          Context({name=mem_name;
                    mem=true;
                    t=Reg b;
                    index=(frompiqi a);
@@ -401,7 +406,7 @@ module SerializedTrace = struct
             | Some x -> Util.big_int_of_binstring ~e:`Little x
             | None -> Big_int_convenience.bi0
           in
-          Context({name="mem";
+          Context({name=mem_name;
                    mem=true;
                    t=Reg 8;
                    index=(frompiqi a);
@@ -479,13 +484,15 @@ module SerializedTrace = struct
   (** New trace file format: Read entire trace at once *)
   let new_bap_from_trace_file filename =
     let r = new Trace_container.reader filename in
-    new_bap_from_trace_frames r, trace_arch r
+    let arch = trace_arch r in
+    new_bap_from_trace_frames arch r, arch
 
   (** New trace format: Create a streamer *)
   let new_bap_stream_from_trace_file rate filename =
     let r = new Trace_container.reader filename in
-    let f () = new_bap_from_trace_frames ~n:rate r in
-    Stream.from (bap_get_block_from_f f), trace_arch r
+    let arch = trace_arch r in
+    let f () = new_bap_from_trace_frames ~n:rate arch r in
+    Stream.from (bap_get_block_from_f f), arch
 
 end
 
