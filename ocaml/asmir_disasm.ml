@@ -161,7 +161,9 @@ module VSA_SPEC = struct
             let a = bi64 a in
             let vs = exp2vs (Load(m, Int(a, Typecheck.infer_ast e), endian, t)) in
             let conc = Vsa_ast.VS.concrete ~max:1024 vs in
-            BatOption.get conc) l in
+            match conc with
+            | Some l -> l
+            | None -> failwith (Printf.sprintf "Unable to read from jump table at %s" (~% a))) l in
           Addrs (List.map (fun a -> Addr a) (List.flatten reads)), ()
         | None -> wprintf "VSA disassembly failed to resolve %s/%s to a specific concrete set" (Pp.ast_exp_to_string e) (Vsa_ast.VS.to_string vs);
           add_indirect ())
