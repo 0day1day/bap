@@ -118,6 +118,10 @@ let frompiqi = Big_int_convenience.addr_of_int64
 
 let get_asmprogram_arch {arch} = arch
 
+let get_trace_file_arch f =
+  let r = new Trace_container.reader f in
+  translate_trace_arch r#get_arch (Int64.to_int r#get_machine)
+
 let get_all_sections p =
   let arr,err = Libasmir.asmir_get_all_sections p in
   if err <= 0 then failwith "get_all_sections";

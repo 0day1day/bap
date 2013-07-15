@@ -17,10 +17,11 @@ let concrete_eval_setup _ =
   let ranges = Func_boundary.get_function_ranges prog in
   let (start_addr,_) = find_funs ranges ["main"; "_main"] in
   let ir = Asmir.asmprogram_to_bap prog in
+  let arch = Asmir.get_asmprogram_arch prog in
   let outir = inject_stmt ir start_addr "ret" halt_stmt in 
   pp#ast_program outir;
   pp#close;
-  (ranges, start_addr);;
+  (ranges, start_addr, arch);;
 
 
 (** Open the file test.il and run two concrete executions.  The first verifies
@@ -28,13 +29,19 @@ let concrete_eval_setup _ =
     concrete execution changes the value on the stack to 43 (i), starts
     the execution at the "call <g>" assembly instruction in main, and verifies
 	that the result is -1. *)
-let concrete_eval_test (ranges, s) = 
+let concrete_eval_test (ranges, s, arch) = 
   (* i represents the change on the stack to the "wrong" value for function g *)
+  let memtype, sp = match arch with
+    | Type.X86_32 -> "u32", "R_ESP"
+    | Type.X86_64 -> "u64", "R_RSP"
+    | _ -> failwith "unsupported architecture"
+  in
+  Printf.printf "Using memtype: %s\n" memtype; flush stdout;
   let i =
-    let a,_ = Parser.exp_from_string "R_ESP:u32" in
-    let e,_ = Parser.exp_from_string "43:u32" in
+    let a,_ = Parser.exp_from_string (sp ^ ":" ^ memtype) in
+    let e,_ = Parser.exp_from_string ("43:" ^ memtype) in
     let t = Typecheck.infer_ast e in
-    let m = match Parser.exp_from_string "mem:?u32" with
+    let m = match Parser.exp_from_string ("mem:?" ^ memtype) with
       | Var(v), _ -> v
       | _ -> assert false
     in
@@ -48,7 +55,8 @@ let concrete_eval_test (ranges, s) =
   let main_prog = Test_common.find_prog_chunk prog start_addr end_addr in
   let s = find_call main_prog in
   let ctx2 = Symbeval.concretely_execute ~s ~i prog in
-  let eax2 = Arithmetic.to_big_int(bim1,Type.Reg(32)) in
+  let regtype = Disasm_i386.type_of_mode (Disasm.arch_to_x86_mode arch) in
+  let eax2 = Arithmetic.to_big_int(bim1, regtype) in
   let msg = "from check_functions" in
   typecheck prog;
   (try check_functions msg ranges ["main"; "g"]

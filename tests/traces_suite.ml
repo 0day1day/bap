@@ -31,22 +31,23 @@ let pin_trace_setup _ =
 
 module MakeTraceTest(TraceSymbolic:Traces.TraceSymbolic) = struct
   let pin_trace_test pin_out =
+    let arch = Asmir.get_trace_file_arch pin_out in
     let prog = Asmir.serialized_bap_from_trace_file pin_out in
     typecheck prog;
     Traces.consistency_check := true;
-    ignore(Traces.concrete Type.X86_32 prog);
+    ignore(Traces.concrete arch prog);
     Traces.consistency_check := false;
-    let t1 = Traces.add_payload "test" Type.X86_32 prog in
+    let t1 = Traces.add_payload "test" arch prog in
     (* We should not get an exception because this should be satisfiable *)
-    ignore(Traces.TraceSymbolic.output_exploit (exploit_file,Smtexec.STP.si) Type.X86_32 t1);
-    let t2 = Traces.add_payload "\x00" Type.X86_32 prog in
+    ignore(Traces.TraceSymbolic.output_exploit (exploit_file,Smtexec.STP.si) arch t1);
+    let t2 = Traces.add_payload "\x00" arch prog in
     (* Null bytes are not allowed, so we should get an exception *)
     (* We need to cleanup traces in between runs, or we'll get an
        error. *)
     Traces.cleanup();
     let unsat =
       try
-        Traces.TraceSymbolic.output_exploit (exploit_file,Smtexec.STP.si) Type.X86_32 t2;
+        Traces.TraceSymbolic.output_exploit (exploit_file,Smtexec.STP.si) arch t2;
         false
       with Failure "Formula was unsatisfiable"
       | Failure "No model found" -> true
@@ -57,9 +58,10 @@ end
 let pin_stream_trace_test solver pin_out =
   skip_if (not (solver#in_path ())) (solver#solvername ^ " not on path");
   let open Traces.TraceSymbolicStream in
+  let arch = Asmir.get_trace_file_arch pin_out in
   let stream = Asmir.serialized_bap_stream_from_trace_file !Input.streamrate pin_out in
   let streamf, finalf = Traces_stream.generate_formula formula_storage solver in
-  Stream.iter (streamf Type.X86_32) stream;
+  Stream.iter (streamf arch) stream;
   finalf ();
   match solver#solve_formula_file ~getmodel:true formula_storage with
   | Smtexec.Invalid m ->
@@ -73,9 +75,10 @@ let pin_stream_trace_test solver pin_out =
 
 let backwards_taint_test pin_out =
   Traces.cleanup();
+  let arch = Asmir.get_trace_file_arch pin_out in
   let prog = Asmir.serialized_bap_from_trace_file pin_out in
   typecheck prog;
-  let input_locations = Test_common.backwards_taint Type.X86_32 prog in
+  let input_locations = Test_common.backwards_taint arch prog in
   (* The buffer is eight bytes large, so make sure all bytes are
      coming from after that.  This isn't exact, since copying eight bytes
      at a time (XMM register) could make us off by seven bytes, but that

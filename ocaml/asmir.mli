@@ -55,6 +55,7 @@ val gamma_for_arch : Type.arch -> varctx
 val mem_of_arch : Type.arch -> Var.t
 
 val get_asmprogram_arch : asmprogram -> Type.arch
+val get_trace_file_arch : string -> Type.arch
 
 val x86_mem : Var.t
 val x86_regs : Var.t list
