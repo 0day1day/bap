@@ -9,6 +9,8 @@ let arg = ref 0;;
 let binname = ref None;;
 let fnames = ref None;;
 let timeout = ref 30;;
+let total = ref 0;;
+let succ = ref 0;;
 let recoverf = ref Asmir_disasm.vsa_at
 
 let speclist =
@@ -47,6 +49,7 @@ let lift_func (n,s,e) =
   in
   if go then (
     Printf.printf "Lifting %s\n" n;
+    incr total;
     flush stdout;
     let cfg = !recoverf asmp s in
     let cfg = Hacks.ast_remove_indirect cfg in
@@ -55,7 +58,8 @@ let lift_func (n,s,e) =
     Cfg_pp.SsaStmtsDot.output_graph (open_out ("resolvessa"^n^".dot")) (Cfg_ssa.of_astcfg cfg);
     let pp = new Pp.pp_oc (open_out ("resolve"^n^".il")) in
     pp#ast_program (Cfg_ast.to_prog cfg);
-    pp#close
+    pp#close;
+    incr succ
   )
 let lift_func =
   Util.timeout ~secs:!timeout ~f:lift_func
@@ -65,4 +69,6 @@ let lift_func ((n,_,_) as x) =
     Printf.printf "Lifting %s failed: %s\n" n (Printexc.to_string e)
 
 let funcs = List.iter lift_func funcs;;
+
+Printf.printf "%d out of %d functions recovered (%.2f%%)\n" !succ !total (((float_of_int !succ) *. 100.0) /. (float_of_int !total));;
 
