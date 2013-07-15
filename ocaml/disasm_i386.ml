@@ -352,8 +352,8 @@ and oF = nv "R_OF" r1
 and df = nv "R_DF" r1
 
 (* segment registers and bases *)
-and fs_base = nmv "R_FS_BASE_32" r32 "R_FS_BASE_32" r64
-and gs_base = nmv "R_GS_BASE_32" r32 "R_GS_BASE_32" r64
+and fs_base = nmv "R_FS_BASE_32" r32 "R_FS_BASE_64" r64
+and gs_base = nmv "R_GS_BASE_32" r32 "R_GS_BASE_64" r64
 
 and cs = nv "R_CS" r16
 and ds = nv "R_DS" r16
