@@ -127,13 +127,17 @@ let arch_to_mode = function
 (* A function to translate between system and common architectures and machines *)
 let translate_arch arch mach =
   match arch, mach with
-  | Arch.Bfd_arch_i386, x when x = Arch.mach_i386_i386 -> X86_32
-  | Arch.Bfd_arch_i386, x when x = Arch.mach_x86_64 -> X86_64
+  | Arch.Bfd_arch_i386, x when x = Libbfd.mACH_i386_i386 -> X86_32
+  | Arch.Bfd_arch_i386, x when x = Libbfd.mACH_i386_x86_64 -> X86_64
   | _, _ -> failwith "translate_arch: unsupported architecture"
 
 let frompiqi = Big_int_convenience.addr_of_int64
 
 let get_asmprogram_arch {arch} = arch
+
+let get_trace_file_arch f =
+  let r = new Trace_container.reader f in
+  Asmir.translate_arch r#get_arch (Int64.to_int r#get_machine)
 
 let get_all_sections p =
   let arr,err = Libasmir.asmir_get_all_sections p in
