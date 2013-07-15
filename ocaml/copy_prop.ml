@@ -119,6 +119,18 @@ module CPSSA = CfgDataflow.Make(CPSpecSSA)
 let copyprop_ssa ?(stop_before=(fun _ -> false)) ?(stop_after=(fun _ -> false)) g =
   let _, dfout =
     CPSSA.worklist_iterate g in
+  let has_bad e =
+    let vis = object(self)
+      inherit Ssa_visitor.nop
+      method visit_exp e =
+        if stop_before e
+        then raise Exit
+        else DoChildren
+    end
+    in
+    try ignore(Ssa_visitor.exp_accept vis e); false
+    with Exit -> true
+  in
   let propagate l v =
     let vis = object(self)
       inherit Ssa_visitor.nop
@@ -128,8 +140,7 @@ let copyprop_ssa ?(stop_before=(fun _ -> false)) ?(stop_after=(fun _ -> false)) 
           (try
              match VM.find v l with
              | CPSpecSSA.L.Middle e ->
-               if stop_before e then SkipChildren
-               else if stop_after e then ChangeTo e
+               if has_bad e then SkipChildren
                else ChangeToAndDoChildren e
              | _ -> SkipChildren
            with Not_found -> SkipChildren)
@@ -175,6 +186,18 @@ let copyprop_ast ?(stop_before=(fun _ -> false)) ?(stop_after=(fun _ -> false)) 
   in
   let module UD = Depgraphs.UseDef_AST in
   let module LS = UD.LS in
+  let has_bad e =
+    let vis = object(self)
+      inherit Ast_visitor.nop
+      method visit_exp e =
+        if stop_before e
+        then raise Exit
+        else DoChildren
+    end
+    in
+    try ignore(Ast_visitor.exp_accept vis e); false
+    with Exit -> true
+  in
   let rec propagate dfin origloc visitedlocs loc e =
     let l = get_map (dfin loc) in
     let vis = object(self)
@@ -202,9 +225,9 @@ let copyprop_ast ?(stop_before=(fun _ -> false)) ?(stop_after=(fun _ -> false)) 
                    && LS.is_empty (LS.inter vdefs visitedlocs)
                   ) (vars_in e) in
                if can_copy then (
-                 if not (stop_before e)
+                 if not (has_bad e)
                  then ChangeTo (propagate dfin origloc (LS.add (UD.LocationType.Loc newloc) visitedlocs) newloc e)
-                 else ChangeTo e
+                 else SkipChildren
                ) else SkipChildren
              | _ -> SkipChildren
            with Not_found -> SkipChildren)
