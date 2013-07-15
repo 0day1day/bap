@@ -137,7 +137,7 @@ let get_asmprogram_arch {arch} = arch
 
 let get_trace_file_arch f =
   let r = new Trace_container.reader f in
-  Asmir.translate_arch r#get_arch (Int64.to_int r#get_machine)
+  translate_arch r#get_arch (Int64.to_int r#get_machine)
 
 let get_all_sections p =
   let arr,err = Libasmir.asmir_get_all_sections p in
