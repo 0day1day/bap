@@ -34,7 +34,6 @@ let concrete_eval_test (ranges, s, arch) =
   let memtype, sp = match arch with
     | Type.X86_32 -> "u32", "R_ESP"
     | Type.X86_64 -> "u64", "R_RSP"
-    | _ -> failwith "unsupported architecture"
   in
   Printf.printf "Using memtype: %s\n" memtype; flush stdout;
   let i =

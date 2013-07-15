@@ -31,8 +31,7 @@ let pin_trace_setup _ =
 
 module MakeTraceTest(TraceSymbolic:Traces.TraceSymbolic) = struct
   let pin_trace_test pin_out =
-    let arch = Asmir.get_trace_file_arch pin_out in
-    let prog = Asmir.serialized_bap_from_trace_file pin_out in
+    let prog, arch = Asmir.serialized_bap_from_trace_file pin_out in
     typecheck prog;
     Traces.consistency_check := true;
     ignore(Traces.concrete arch prog);
@@ -58,8 +57,7 @@ end
 let pin_stream_trace_test solver pin_out =
   skip_if (not (solver#in_path ())) (solver#solvername ^ " not on path");
   let open Traces.TraceSymbolicStream in
-  let arch = Asmir.get_trace_file_arch pin_out in
-  let stream = Asmir.serialized_bap_stream_from_trace_file !Input.streamrate pin_out in
+  let stream, arch = Asmir.serialized_bap_stream_from_trace_file !Input.streamrate pin_out in
   let streamf, finalf = Traces_stream.generate_formula formula_storage solver in
   Stream.iter (streamf arch) stream;
   finalf ();
@@ -75,8 +73,7 @@ let pin_stream_trace_test solver pin_out =
 
 let backwards_taint_test pin_out =
   Traces.cleanup();
-  let arch = Asmir.get_trace_file_arch pin_out in
-  let prog = Asmir.serialized_bap_from_trace_file pin_out in
+  let prog, arch = Asmir.serialized_bap_from_trace_file pin_out in
   typecheck prog;
   let input_locations = Test_common.backwards_taint arch prog in
   (* The buffer is eight bytes large, so make sure all bytes are

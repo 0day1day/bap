@@ -88,8 +88,8 @@ let get_program () =
       let arch = Asmir.get_asmprogram_arch p in
       List.append (fst (Asmir_rdisasm.rdisasm_at p [s])) oldp, oldscope, Some arch
     | `Trace f ->
-      let arch = Asmir.get_trace_file_arch f in
-      List.append (Asmir.serialized_bap_from_trace_file f) oldp, oldscope, Some arch
+      let prog, arch = Asmir.serialized_bap_from_trace_file f in
+      List.append prog oldp, oldscope, Some arch
   in
   try
     let p,scope,arch = List.fold_left get_one ([], Grammar_private_scope.default_scope (), None) (List.rev !inputs) in
@@ -103,8 +103,8 @@ let get_program () =
 let get_stream_program () = match !streaminputs with
   | None -> raise(Arg.Bad "No input specified")
   | Some(`Tracestream f) ->
-    let arch = Asmir.get_trace_file_arch f in
-    Asmir.serialized_bap_stream_from_trace_file !streamrate f, Some arch
+    let stream, arch = Asmir.serialized_bap_stream_from_trace_file !streamrate f in
+    stream, Some arch
 
 let get_arch = function
   | Some a -> a

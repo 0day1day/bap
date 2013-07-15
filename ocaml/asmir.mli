@@ -55,7 +55,6 @@ val gamma_for_arch : Type.arch -> varctx
 val mem_of_arch : Type.arch -> Var.t
 
 val get_asmprogram_arch : asmprogram -> Type.arch
-val get_trace_file_arch : string -> Type.arch
 
 val x86_mem : Var.t
 val x86_regs : Var.t list
@@ -82,12 +81,11 @@ val asmprogram_to_bap_range : ?init_ro:bool -> asmprogram -> Type.addr -> Type.a
     PinTrace.  If pin is false, loads an old, TEMU-based trace format. *)
 (* val bap_from_trace_file : ?atts:bool -> ?pin:bool -> string -> Ast.program *)
 (** Load entire trace into memory from the new SerializedTrace format. *)
-val serialized_bap_from_trace_file : string -> Ast.program
+val serialized_bap_from_trace_file : string -> Ast.program * Type.arch
 
 (** Open a PinTrace/TEMU-based trace in streaming format depending on the value of [pin]. *)
-(* val bap_stream_from_trace_file : ?atts:bool -> ?rate:int64 -> ?pin:bool -> string -> (Ast.stmt list) Stream.t *)
 (** Open a SerializedTrace trace in streaming format. *)
-val serialized_bap_stream_from_trace_file : int64 -> string -> (Ast.stmt list) Stream.t
+val serialized_bap_stream_from_trace_file : int64 -> string -> (Ast.stmt list) Stream.t * Type.arch
 
 val get_symbols : ?all:bool -> asmprogram -> asymbol array
 val get_dynamic_symbols : asmprogram -> asymbol array

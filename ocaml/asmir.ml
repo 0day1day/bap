@@ -103,24 +103,20 @@ let arch_to_bfd = function
   | X86_32 -> Libbfd.Bfd_arch_i386, Libbfd.mACH_i386_i386
   | X86_64 -> Libbfd.Bfd_arch_i386, Libbfd.mACH_i386_x86_64
 
-let bfd_arch_to_trace_arch = function
-  | Libbfd.Bfd_arch_i386 -> Arch.Bfd_arch_i386
-  | Libbfd.Bfd_arch_arm -> Arch.Bfd_arch_arm
-  | _ -> failwith "bfd_arch_to_trace_arch: unsupported architecture"
+let bfd_to_trace arch mach = match arch, mach with
+  | Libbfd.Bfd_arch_i386, x when x = Libbfd.mACH_i386_i386 -> Arch.Bfd_arch_i386, Arch.mach_i386_i386
+  | Libbfd.Bfd_arch_i386, x when x = Libbfd.mACH_i386_x86_64 -> Arch.Bfd_arch_i386, Arch.mach_x86_64
+  | _ -> failwith "bfd_to_trace: unsupported architecture"
 
 let translate_trace_arch arch mach =
   match arch, mach with
   | Arch.Bfd_arch_i386, x when x = Arch.mach_i386_i386 -> X86_32
   | Arch.Bfd_arch_i386, x when x = Arch.mach_x86_64 -> X86_64
-  | _, _ -> failwith "translate_arch: unsupported architecture"
+  | _, _ -> failwith "translate_trace_arch: unsupported architecture"
 
 let frompiqi = Big_int_convenience.addr_of_int64
 
 let get_asmprogram_arch {arch} = arch
-
-let get_trace_file_arch f =
-  let r = new Trace_container.reader f in
-  translate_trace_arch r#get_arch (Int64.to_int r#get_machine)
 
 let get_all_sections p =
   let arr,err = Libasmir.asmir_get_all_sections p in
@@ -197,12 +193,9 @@ let open_program ?base filename =
   Gc.finalise Libasmir.asmir_close prog;
   let secs = Array.to_list (get_all_sections prog)  in
   let get_exec = section_contents prog secs in
-  let get_readable = section_contents ~which:loaded prog secs in 
-  let arch =
-    let a = bfd_arch_to_trace_arch (Libasmir.asmir_get_asmp_arch prog) in
-    let m = Libasmir.asmir_get_asmp_mach prog in
-    translate_trace_arch a m
-  in
+  let get_readable = section_contents ~which:loaded prog secs in
+  let arch, mach = bfd_to_trace (Libasmir.asmir_get_asmp_arch prog) (Libasmir.asmir_get_asmp_mach prog) in
+  let arch = translate_trace_arch arch mach in
  {asmp=prog; arch=arch; secs=secs; get_exec=get_exec; get_readable=get_readable}
 
 
@@ -479,16 +472,19 @@ module SerializedTrace = struct
 
     List.rev !out
 
-(** New trace file format: Read entire trace at once *)
+  let trace_arch r =
+    translate_trace_arch r#get_arch (Int64.to_int r#get_machine)
+
+  (** New trace file format: Read entire trace at once *)
   let new_bap_from_trace_file filename =
     let r = new Trace_container.reader filename in
-    new_bap_from_trace_frames r
+    new_bap_from_trace_frames r, trace_arch r
 
-(** New trace format: Create a streamer *)
+  (** New trace format: Create a streamer *)
   let new_bap_stream_from_trace_file rate filename =
     let r = new Trace_container.reader filename in
     let f () = new_bap_from_trace_frames ~n:rate r in
-    Stream.from (bap_get_block_from_f f)
+    Stream.from (bap_get_block_from_f f), trace_arch r
 
 end
 
