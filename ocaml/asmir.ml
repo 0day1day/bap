@@ -82,6 +82,7 @@ let x64_mem = Asmir_vars.x64_mem
 let arm_regs = Asmir_vars.arm_regs
 let x86_all_regs = Asmir_vars.x86_all_regs
 let x64_all_regs = Asmir_vars.x64_all_regs
+let multiarch_all_regs = Asmir_vars.multiarch_all_regs
 
 let all_regs = function
   | X86_32 -> x86_all_regs

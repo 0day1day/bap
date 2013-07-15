@@ -17,7 +17,7 @@ and ra0 = Var.newvar "ra0" Ast.reg_32
 and (mem,sp,r_of) =
   let d = Asmir.decls_for_arch Type.X86_32 in
   (List.hd d,
-   List.find (fun v -> Var.name v = "R_ESP") d,
+   List.find (fun v -> Var.name v = "R_ESP_32") d,
    List.find (fun v -> Var.name v = "R_OF") d
   )
 

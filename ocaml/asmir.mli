@@ -62,6 +62,7 @@ val x64_mem : Var.t
 val x64_regs : Var.t list
 val x86_all_regs : Var.t list
 val x64_all_regs : Var.t list
+val multiarch_all_regs : Var.t list
 
 val all_regs : Type.arch -> Var.t list
 

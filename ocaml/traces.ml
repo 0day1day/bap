@@ -506,59 +506,11 @@ let find_memv trace =
   | _::_ -> failwith "More than one mem var"
 
 
-(********************************************************)
-(*  REG MAPPING: TODO -> move this in a separate file   *)
-(********************************************************)
+(* Register mapping *)
 
-let regs = Hashtbl.create 72
+let regs = Hashtbl.create 108
 
-(* FIXME: make this properly case for different architectures *)
-let () =
-  List.iter (fun (k,v) -> Hashtbl.add regs k v)
-   ([
-      ("R_AL",("R_RAX",0,reg_64));
-      ("R_BL",("R_RBX",0,reg_64));
-      ("R_CL",("R_RCX",0,reg_64));
-      ("R_DL",("R_RDX",0,reg_64));
-
-      ("R_AH",("R_RAX",8,reg_64));
-      ("R_BH",("R_RBX",8,reg_64));
-      ("R_CH",("R_RCX",8,reg_64));
-      ("R_DH",("R_RDX",8,reg_64));
-      
-      ("R_DIL",("R_RDI",0,reg_64));
-      ("R_SIL",("R_RSI",0,reg_64));
-      ("R_BPL",("R_RBP",0,reg_64));
-      ("R_SPL",("R_RSP",0,reg_64));
-
-      ("R_DI",("R_RDI",0,reg_64));
-      ("R_SI",("R_RSI",0,reg_64));
-      ("R_BP",("R_RBP",0,reg_64));
-      ("R_SP",("R_RSP",0,reg_64));
-      
-      ("R_AX",("R_RAX",0,reg_64));
-      ("R_BX",("R_RBX",0,reg_64));
-      ("R_CX",("R_RCX",0,reg_64));
-      ("R_DX",("R_RDX",0,reg_64));
-      ("R_BP",("R_RBP",0,reg_64));
-      ("R_SI",("R_RSI",0,reg_64));
-      ("R_DI",("R_RDI",0,reg_64));
-      ("R_SP",("R_RSP",0,reg_64));
-      
-      ("R_EAX",("R_RAX",0,reg_64));
-      ("R_EBX",("R_RBX",0,reg_64));
-      ("R_ECX",("R_RCX",0,reg_64));
-      ("R_EDX",("R_RDX",0,reg_64));
-      ("R_EBP",("R_RBP",0,reg_64));
-      ("R_ESI",("R_RSI",0,reg_64));
-      ("R_EDI",("R_RDI",0,reg_64));
-      ("R_ESP",("R_RSP",0,reg_64));
-
-    ] @ Array.to_list (Array.init 16 (fun i -> (Printf.sprintf "R_XMM%d" i,(Printf.sprintf "R_YMM%d" i,0,reg_256))))
-      @ Array.to_list (Array.init 16 (fun i -> (Printf.sprintf "R_MM%d" i,(Printf.sprintf "R_YMM%d" i,0,reg_256))))
-      @ Array.to_list (Array.init 8 (fun i -> (Printf.sprintf "R_R%dL" (i+8),(Printf.sprintf "R_R%d" (i+8),0,reg_64))))
-      @ Array.to_list (Array.init 8 (fun i -> (Printf.sprintf "R_R%dW" (i+8),(Printf.sprintf "R_R%d" (i+8),0,reg_64))))
-      @ Array.to_list (Array.init 8 (fun i -> (Printf.sprintf "R_R%dD" (i+8),(Printf.sprintf "R_R%d" (i+8),0,reg_64)))))
+let () = List.iter (fun (k,v) -> Hashtbl.add regs k v) Asmir_vars.subregs
 
 
 (********************************************************)

@@ -2,9 +2,7 @@
 
 open Grammar_scope
 
-(* HACK: this really really should not be hardcoded but works for testing purposes. 
-         maybe use a ref and set from Input?          *)
-let default_scope () = create_scope_from_decls Asmir.x64_all_regs
+let default_scope () = create_scope_from_decls Asmir_vars.multiarch_all_regs
 let cur_scope : Scope.t ref = ref (default_scope ())
 
 let get_scope () = !cur_scope

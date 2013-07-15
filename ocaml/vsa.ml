@@ -38,7 +38,7 @@ let fwd_transfer_stmt_to_block f g node latice =
   List.fold_left (fun l n -> f n l) latice (Cfg.SSA.get_stmts g node)
 
 (* FIXME: find a better way to get the stack pointer (and do the right thing for x86/x64) *)
-let sp = List.find (fun (Var.V(_,n,_)) -> n = "R_ESP") (Asmir.decls_for_arch Type.X86_32)
+let sp = List.find (fun (Var.V(_,n,_)) -> n = "R_ESP_32") (Asmir.decls_for_arch Type.X86_32)
 
 
 (** Strided Intervals *)

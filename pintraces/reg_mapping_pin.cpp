@@ -83,28 +83,29 @@ switch (id) {
     case REG_RIP: return string("R_RIP");
 #else
     // Context registers in the IA-32 architecture
-    case REG_EDI:  return string("R_EDI");
+    // Given _32 suffix to differentiate from subregs in 64-bit mode.
+    case REG_EDI:  return string("R_EDI_32");
     //case REG_GDI:
     //case REG_EDI:
-    case REG_ESI:  return string("R_ESI");
+    case REG_ESI:  return string("R_ESI_32");
     //case REG_GSI:
     //case REG_ESI:
-    case REG_EBP:  return string("R_EBP");
+    case REG_EBP:  return string("R_EBP_32");
     //case REG_GBP:
     //case REG_EBP:
-    case REG_ESP:  return string("R_ESP");
+    case REG_ESP:  return string("R_ESP_32");
     //case REG_STACK_PTR:
     //case REG_ESP:
-    case REG_EBX:  return string("R_EBX");
+    case REG_EBX:  return string("R_EBX_32");
     //case REG_GBX:
     //case REG_EBX:
-    case REG_EDX:  return string("R_EDX");
+    case REG_EDX:  return string("R_EDX_32");
     //case REG_GDX:
     //case REG_EDX:
-    case REG_ECX:  return string("R_ECX");
+    case REG_ECX:  return string("R_ECX_32");
     //case REG_GCX:
     //case REG_ECX:
-    case REG_EAX: return string("R_EAX");
+    case REG_EAX: return string("R_EAX_32");
     //case REG_GAX:
     //case REG_EAX:
     //case REG_GR_LAST:
@@ -136,47 +137,51 @@ switch (id) {
     //case REG_PHYSICAL_CONTEXT_END:
     //case REG_INST_PTR:
 
-    // partial registers common to both the IA-32 and Intel(R) 64 architectures.
-    case REG_AL:  return string("R_AL");
-    case REG_AH:  return string("R_AH");
-    case REG_AX:  return string("R_AX");
-
-    case REG_CL:  return string("R_CL");
-    case REG_CH:  return string("R_CH");
-    case REG_CX:  return string("R_CX");
-
-    case REG_DL:  return string("R_DL");
-    case REG_DH:  return string("R_DH");
-    case REG_DX:  return string("R_DX");
-
-    case REG_BL:  return string("R_BL");
-    case REG_BH:
-    case REG_BX:  return string("R_BX");
-
-    case REG_BP:  return string("R_BP");
-    case REG_SI:  return string("R_SI");
-    case REG_DI:  return string("R_DI");
-
     //case REG_SP:
     //case REG_FLAGS:
     //case REG_IP:
 
 #if defined(TARGET_IA32E)
+    // partial registers common to both the IA-32 and Intel(R) 64 architectures.
+    // Here given special names so we can differentiate between subregisters
+    // of 32-bit and 64-bit registers.
+    case REG_AL:  return string("R_AL_64");
+    case REG_AH:  return string("R_AH_64");
+    case REG_AX:  return string("R_AX_64");
+
+    case REG_CL:  return string("R_CL_64");
+    case REG_CH:  return string("R_CH_64");
+    case REG_CX:  return string("R_CX_64");
+
+    case REG_DL:  return string("R_DL_64");
+    case REG_DH:  return string("R_DH_64");
+    case REG_DX:  return string("R_DX_64");
+
+    case REG_BL:  return string("R_BL_64");
+    case REG_BH:  return string("R_BH_64");
+    case REG_BX:  return string("R_BX_64");
+
+    case REG_BP:  return string("R_BP_64");
+    case REG_SI:  return string("R_SI_64");
+    case REG_DI:  return string("R_DI_64");
+
     // partial registers in the Intel(R) 64 architecture
-    case REG_EDI: return string("R_EDI");
+    case REG_EDI: return string("R_EDI_64");
     case REG_DIL: return string("R_DIL");
-    case REG_ESI: return string("R_ESI");
+    case REG_ESI: return string("R_ESI_64");
     case REG_SIL: return string("R_SIL");
-    case REG_EBP: return string("R_EBP");
+    case REG_EBP: return string("R_EBP_64");
     case REG_BPL: return string("R_BPL");
-    case REG_ESP: return string("R_ESP");
+    case REG_ESP: return string("R_ESP_64");
     case REG_SPL: return string("R_SPL");
-    case REG_EBX: return string("R_EBX");
-    case REG_EDX: return string("R_EDX");
-    case REG_ECX: return string("R_ECX");
-    case REG_EAX: return string("R_EAX");
+    case REG_EBX: return string("R_EBX_64");
+    case REG_EDX: return string("R_EDX_64");
+    case REG_ECX: return string("R_ECX_64");
+    case REG_EAX: return string("R_EAX_64");
+
     case REG_EFLAGS: return string("R_EFLAGS");
     case REG_EIP: return string("R_EIP");
+
     case REG_R8B: return string("R_R8B");
     case REG_R8W: return string("R_R8W");
     case REG_R8D: return string("R_R8D");
@@ -201,6 +206,28 @@ switch (id) {
     case REG_R15B: return string("R_R15B");
     case REG_R15W: return string("R_R15W");
     case REG_R15D: return string("R_R15D");
+#else
+    // partial registers common to both the IA-32 and Intel(R) 64 architectures.
+    // Given 32-bit suffix to differentiate from 64-bit subregisters.
+    case REG_AL:  return string("R_AL_32");
+    case REG_AH:  return string("R_AH_32");
+    case REG_AX:  return string("R_AX_32");
+
+    case REG_CL:  return string("R_CL_32");
+    case REG_CH:  return string("R_CH_32");
+    case REG_CX:  return string("R_CX_32");
+
+    case REG_DL:  return string("R_DL_32");
+    case REG_DH:  return string("R_DH_32");
+    case REG_DX:  return string("R_DX_32");
+
+    case REG_BL:  return string("R_BL_32");
+    case REG_BH:  return string("R_BH_32");
+    case REG_BX:  return string("R_BX_32");
+
+    case REG_BP:  return string("R_BP_32");
+    case REG_SI:  return string("R_SI_32");
+    case REG_DI:  return string("R_DI_32");
 #endif
 
 /*
@@ -552,9 +579,14 @@ switch (id) {
     // Virtual registers reg holding memory addresses pointed by GS/FS registers
     // These registers are visible for tool writers
     */
-    case REG_SEG_GS_BASE: return string("R_GS_BASE"); ///< Base address for GS segment
-    case REG_SEG_FS_BASE: return string("R_FS_BASE");///< Base address for FS segment
-      /*
+#if defined(TARGET_IA32E)
+    case REG_SEG_GS_BASE: return string("R_GS_BASE_64"); ///< Base address for GS segment
+    case REG_SEG_FS_BASE: return string("R_FS_BASE_64");///< Base address for FS segment
+#else
+    case REG_SEG_GS_BASE: return string("R_GS_BASE_32"); ///< Base address for GS segment
+    case REG_SEG_FS_BASE: return string("R_FS_BASE_32");///< Base address for FS segment
+#endif
+    /*
     // ISA-independent Pin virtual regs needed for instrumentation
     // These are pin registers visible to the pintool writers.
     case REG_INST_BASE:

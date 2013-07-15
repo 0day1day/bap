@@ -332,15 +332,15 @@ let ge mode mv = Var (gv mode mv)
 
 (* registers *)
 
-let rbp = nmv "R_EBP" r32 "R_RBP" r64
-and rsp = nmv "R_ESP" r32 "R_RSP" r64
-and rsi = nmv "R_ESI" r32 "R_RSI" r64
-and rdi = nmv "R_EDI" r32 "R_RDI" r64
+let rbp = nmv "R_EBP_32" r32 "R_RBP" r64
+and rsp = nmv "R_ESP_32" r32 "R_RSP" r64
+and rsi = nmv "R_ESI_32" r32 "R_RSI" r64
+and rdi = nmv "R_EDI_32" r32 "R_RDI" r64
 and rip = nmv "R_EIP" r32 "R_RIP" r64 (* XXX why is eip in here? *)
-and rax = nmv "R_EAX" r32 "R_RAX" r64
-and rbx = nmv "R_EBX" r32 "R_RBX" r64
-and rcx = nmv "R_ECX" r32 "R_RCX" r64
-and rdx = nmv "R_EDX" r32 "R_RDX" r64
+and rax = nmv "R_EAX_32" r32 "R_RAX" r64
+and rbx = nmv "R_EBX_32" r32 "R_RBX" r64
+and rcx = nmv "R_ECX_32" r32 "R_RCX" r64
+and rdx = nmv "R_EDX_32" r32 "R_RDX" r64
 and rflags = nmv "R_EFLAGS" r32 "R_RFLAGS" r64 (* XXX why is eflags in here? *)
   (* condition flag bits *)
 and cf = nv "R_CF" r1
@@ -352,8 +352,8 @@ and oF = nv "R_OF" r1
 and df = nv "R_DF" r1
 
 (* segment registers and bases *)
-and fs_base = nmv "R_FS_BASE" r32 "R_FS_BASE" r64
-and gs_base = nmv "R_GS_BASE" r32 "R_GS_BASE" r64
+and fs_base = nmv "R_FS_BASE_32" r32 "R_FS_BASE_32" r64
+and gs_base = nmv "R_GS_BASE_32" r32 "R_GS_BASE_32" r64
 
 and cs = nv "R_CS" r16
 and ds = nv "R_DS" r16
@@ -397,6 +397,12 @@ let regs_x86 : var list =
 let regs_x86_64 : var list =
   shared_regs
   @ List.map (fun {v64; v32} -> v64) (shared_multi_regs @ (Array.to_list nums))
+  @ Array.to_list ymms
+
+let regs_full : var list =
+  shared_regs
+  @ List.flatten (List.map (fun {v64; v32} -> [v32; v64]) shared_multi_regs)
+  @ List.map (fun {v64; v32} -> v64) (Array.to_list nums)
   @ Array.to_list ymms
 
 let regs_of_mode = function
@@ -681,24 +687,6 @@ let bits2reg8e mode ?(has_rex=false) b =
 
 let reg2xmm r =
   bits2xmm (reg2bits r)
-
-(* These aren't used by Disasm_i386, but might be useful to external
-   users. *)
-let subregs mode =
-  let hi r = (reg2bits r) + 4 in
-  (rax, "R_AL", bits2reg8e mode (reg2bits rax))
-  :: (rcx, "R_CL", bits2reg8e mode (reg2bits rcx))
-  :: (rdx, "R_DL", bits2reg8e mode (reg2bits rdx))
-  :: (rbx, "R_BL", bits2reg8e mode (reg2bits rbx))
-  :: (rax, "R_AH", bits2reg8e mode (hi rax))
-  :: (rcx, "R_CH", bits2reg8e mode (hi rcx))
-  :: (rdx, "R_DH", bits2reg8e mode (hi rdx))
-  :: (rbx, "R_BH", bits2reg8e mode (hi rbx))
-  :: (rax, "R_AX", bits2reg16e mode (reg2bits rax))
-  :: (rcx, "R_CX", bits2reg16e mode (reg2bits rcx))
-  :: (rdx, "R_DX", bits2reg16e mode (reg2bits rdx))
-  :: (rbx, "R_BX", bits2reg16e mode (reg2bits rbx))
-  :: []
 
 (* effective addresses for 16-bit addressing *)
 let eaddr16 mode =
