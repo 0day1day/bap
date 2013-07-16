@@ -65,14 +65,6 @@ end
 (*   let vertex_attributes (g:'a) (v:'b) = try !f g v with Not_found -> [] *)
 (* end *)
 
-let edge_labels f pexp e =
-  match f e with
-  | Some (_, e) -> [`Label (pexp e)]
-  | None -> []
-
-let edge_labels_ssa = edge_labels CS.G.E.label Pp.ssa_exp_to_string
-let edge_labels_ast = edge_labels CA.G.E.label Pp.ast_exp_to_string
-
 module type Cfg =
 sig
   type exp
@@ -84,7 +76,7 @@ end
     a CFG. *)
 module MakeCfgPrinter
   (G:Cfg)
-  (Printer:sig val print: G.t -> G.V.t -> string end)
+  (Printer:sig val print: G.t -> (G.V.t -> string) * (G.E.t -> string) end)
   (Attributor:sig val vertex_attributes: G.t -> G.V.t -> Graph.Graphviz.DotAttributes.vertex list ;;
                   val edge_attributes: G.t -> G.E.t -> Graph.Graphviz.DotAttributes.edge list end)
   : (DOTTYG with type t = G.t and type V.t = G.V.t * G.t and type E.t =  G.E.t * G.t)
@@ -116,20 +108,24 @@ struct
 
   include DefAttrs
 
-  let printer = ref (fun _ -> failwith "Uninitialized printer")
+  let vprinter = ref (fun _ -> failwith "Uninitialized vertex printer")
+  let eprinter = ref (fun _ -> failwith "Uninitialized edge printer")
 
   let graph_attributes g =
     (* Use this as an initialization routine *)
-    printer := Printer.print g;
-    []
+    match Printer.print g with
+    | (vp, ep) ->
+      vprinter := vp;
+      eprinter := ep;
+      []
 
   let vertex_name (v,g) = Cfg.bbid_to_string (G.V.label v)
 
   let vertex_attributes (v,g) =
     (* FIXME: The Dot module really should be the one doing the escaping here *)
-    `Label (String.escaped(!printer v)) :: Attributor.vertex_attributes g v
+    `Label (String.escaped(!vprinter v)) :: Attributor.vertex_attributes g v
 
-  let edge_attributes ((e,g) as e') = (edge_labels E.label G.exp_to_string e') @ Attributor.edge_attributes g e
+  let edge_attributes (e,g) = (`Label (String.escaped(!eprinter e))) :: Attributor.edge_attributes g e
 
 end
 
@@ -150,9 +146,17 @@ struct
     Format.pp_print_flush ft ();
     let o = Buffer.contents buf in
     Buffer.clear buf;
-    o)
-
-  let edge_attributes = edge_labels_ssa
+    o),
+    (fun e ->
+      match CS.G.E.label e with
+      | Some (_, e) ->
+        pp#ssa_exp e;
+        Format.pp_print_flush ft ();
+        let o = Buffer.contents buf in
+        Buffer.clear buf;
+        o
+      | None -> ""
+    )
 end
 
 module PrintAstStmts =
@@ -170,9 +174,17 @@ struct
     Format.pp_print_flush ft ();
     let o = Buffer.contents buf in
     Buffer.clear buf;
-    o)
-
-  let edge_attributes = edge_labels_ast
+    o),
+    (fun e ->
+      match CA.G.E.label e with
+      | Some (_, e) ->
+        pp#ast_exp e;
+        Format.pp_print_flush ft ();
+        let o = Buffer.contents buf in
+        Buffer.clear buf;
+        o
+      | None -> ""
+    )
 end
 
 module PrintAstAsms =
@@ -184,7 +196,8 @@ struct
     if olds = "" then news
     else olds ^ "\n" ^ news
 
-  let print g b =
+  let print g =
+    (fun b ->
     let open Type in
     let stmts = CA.get_stmts g b in
     let out = List.fold_left (fun s stmt -> match stmt with
@@ -201,9 +214,13 @@ struct
     | _ -> s) "" stmts in
     match out with
     | "" -> Cfg.bbid_to_string(CA.G.V.label b)
-    | _ -> out
-
-  let edge_attributes = edge_labels_ast
+    | _ -> out),
+    (fun e ->
+      match CA.G.E.label e with
+      | Some (b, e) ->
+        string_of_bool b
+      | None -> ""
+    )
 end
 
 module CSG = struct
@@ -230,7 +247,6 @@ struct
   include CS.G
   include DefAttrs
   let vertex_name v = Cfg.bbid_to_string(CS.G.V.label v)
-  let edge_attributes = edge_labels_ssa
 end
 module SsaBBidDot = Graph.Graphviz.Dot(SsaBBidPrinter)
 
@@ -239,7 +255,6 @@ struct
   include CA.G
   include DefAttrs
   let vertex_name v = Cfg.bbid_to_string(CA.G.V.label v)
-  let edge_attributes = edge_labels_ast
 end
 module AstBBidDot = Graph.Graphviz.Dot(AstBBidPrinter)
 
