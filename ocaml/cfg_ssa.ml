@@ -314,8 +314,13 @@ let rec trans_cfg ?tac cfg =
               let ssa = C.remove_edge_e ssa e in
               let new_lab, revstmts = match CA.G.E.label (es2a e) with
                 | Some(a, Ast.BinOp(EQ, e1, e2)) ->
-                  let revstmts, e1' = exp2ssa ~revstmts ctx e1 in
-                  let revstmts, e2' = exp2ssa ~revstmts ctx e2 in
+                  (* XXX: When tac holds, we might introduce a bunch
+                     of redundant temporaries here. We could translate
+                     based on Jmp e, but then we would lose any rewritten
+                     edge conditions. I think the redundancy is not a big
+                     deal; optimizations will easily take care of them. *)
+                  let revstmts, e1' = exp2ssa ~revstmts ?tac ctx e1 in
+                  let revstmts, e2' = exp2ssa ~revstmts ?tac ctx e2 in
                   Some(a, Ssa.BinOp(EQ, e1', e2')), revstmts
                 | Some _ -> failwith "unknown edge condition format"
                 | None -> None, revstmts
