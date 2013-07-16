@@ -27,7 +27,12 @@ let v2s n = bbid_to_string (C.G.V.label n)
 module Ctx =
 struct
   type t = var VH.t * aststmtloc VH.t * var VH.t * (var*var) Stack.t Stack.t
+
   let create() = (VH.create 570, VH.create 570, VH.create 570, Stack.create())
+
+  let copy (vh,to_oldloc,to_oldvar,stacks) =
+    VH.copy vh, VH.copy to_oldloc, VH.copy to_oldvar, Stack.copy stacks
+
   let lookup (vh,_,_,_) var =
     try VH.find vh var
     with Not_found -> var
@@ -136,43 +141,50 @@ and exp2ssa ctx ~(revstmts:stmt list) ?(tac=true) ?(attrs=[]) ?(name=ssa_temp_na
 
 
 (* @return a reversed list of SSA stmts *)
-let rec stmt2ssa ctx ?tac ~(revstmts: stmt list) loc s =
-  let exp2ssa = exp2ssa ctx ?tac in
-  let exp2ssaexp = exp2ssaexp ctx ?tac in
-  match s with
+let rec stmt2ssa ctx ctxmap ?tac ~(revstmts: stmt list) loc s =
+  let f () =
+    let exp2ssa = exp2ssa ctx ?tac in
+    let exp2ssaexp = exp2ssaexp ctx ?tac in
+    match s with
       Ast.Jmp(e1, a) ->
 	let (revstmts,v1) = exp2ssa ~revstmts e1 in
-	  Jmp(v1, a) :: revstmts
+	Jmp(v1, a) :: revstmts
     | Ast.CJmp(e1,e2,e3,a) ->
-	let (revstmts,v1) = exp2ssa ~revstmts e1 in
-	let (revstmts,v2) = exp2ssa ~revstmts e2 in
-	let (revstmts,v3) = exp2ssa ~revstmts e3 in
-	  CJmp(v1,v2,v3,a) :: revstmts
+      let (revstmts,v1) = exp2ssa ~revstmts e1 in
+      let (revstmts,v2) = exp2ssa ~revstmts e2 in
+      let (revstmts,v3) = exp2ssa ~revstmts e3 in
+      CJmp(v1,v2,v3,a) :: revstmts
     | Ast.Move(v, e2, a) ->
-	let (revstmts, e) = exp2ssaexp ~revstmts e2 in
-	let nv = Var.renewvar v in
-	Ctx.extend ctx v nv (Some loc);
-	Move(nv, e, a)::revstmts
+      let (revstmts, e) = exp2ssaexp ~revstmts e2 in
+      let nv = Var.renewvar v in
+      Ctx.extend ctx v nv (Some loc);
+      Move(nv, e, a)::revstmts
     | Ast.Label(label,a) ->
-	Label(label,a) :: revstmts
+      Label(label,a) :: revstmts
     | Ast.Comment(s,a) ->
-	Comment(s,a)::revstmts
+      Comment(s,a)::revstmts
     | Ast.Special(s,_) -> 
-	raise (Invalid_argument("SSA: Impossible to handle specials. They should be replaced with their semantics. Special: "^s))
+      raise (Invalid_argument("SSA: Impossible to handle specials. They should be replaced with their semantics. Special: "^s))
     | Ast.Assert(e,a) ->
-	let (revstmts,v) = exp2ssa ~revstmts e in
-	  Assert(v,a)::revstmts
+      let (revstmts,v) = exp2ssa ~revstmts e in
+      Assert(v,a)::revstmts
     | Ast.Assume(e,a) ->
-	let (revstmts,v) = exp2ssa ~revstmts e in
-	  Assume(v,a)::revstmts
+      let (revstmts,v) = exp2ssa ~revstmts e in
+      Assume(v,a)::revstmts
     | Ast.Halt(e,a) ->
-	let (revstmts,v) = exp2ssa ~revstmts e in 
-	  Halt(v,a)::revstmts
-	
+      let (revstmts,v) = exp2ssa ~revstmts e in 
+      Halt(v,a)::revstmts
+  in
+  let o = f () in
+  Hashtbl.add ctxmap loc (Ctx.copy ctx);
+  o
 
 (* Translates a list of Ast statements that get executed sequentially to SSA. *)
-let stmts2ssa ctx ?tac bb ss =
-  let revstmts,_ = List.fold_left (fun (rs,n) s -> stmt2ssa ctx ?tac ~revstmts:rs (bb,n) s, n+1) ([],0) ss in
+let stmts2ssa ctx ctxmap ?tac bb ss =
+  let revstmts,_ =
+    List.fold_left
+      (fun (rs,n) s ->
+        stmt2ssa ctx ctxmap ?tac ~revstmts:rs (bb,n) s, n+1) ([],0) ss in
     List.rev revstmts
 
 
@@ -205,6 +217,7 @@ let defsites cfg =
 
 type translation_results = {
   cfg : Cfg.SSA.G.t;
+  to_ssaexp: Cfg.aststmtloc -> Ast.exp -> Ssa.exp;
   to_ssavar: Var.t -> Var.t;
   to_astvar: Var.t -> Var.t;
   to_astloc: Var.t -> Cfg.aststmtloc;
@@ -265,6 +278,7 @@ let rec trans_cfg ?tac cfg =
     Hashtbl.find_all h
   in
   let exitctx = VH.create 57 in (* context at end of exit node *)
+  let ctxmap = Hashtbl.create 1000 in (* context at various locations *)
   let (vh_ctx,to_oldloc,to_oldvar,stacks) as ctx = Ctx.create() in
   let lookup = Ctx.lookup ctx in
   let extend = Ctx.extend ctx in
@@ -291,7 +305,7 @@ let rec trans_cfg ?tac cfg =
       dprintf "translating stmts";
       let ssa, stmts' = match List.rev stmts with
         | Ast.CJmp _::_ ->
-          let stmts' = stmts2ssa ctx ?tac cfgb stmts in
+          let stmts' = stmts2ssa ctx ctxmap ?tac cfgb stmts in
           let v = match List.rev stmts' with
             | Ssa.CJmp (v, _, _, _)::_ -> v
             | _ -> failwith "impossible"
@@ -308,7 +322,7 @@ let rec trans_cfg ?tac cfg =
               C.add_edge_e ssa newe
             ) ssa b ssa, stmts'
         | Ast.Jmp (e, _) as jmp::tl ->
-          let revstmts = List.rev (stmts2ssa ctx ?tac cfgb (List.rev tl)) in
+          let revstmts = List.rev (stmts2ssa ctx ctxmap ?tac cfgb (List.rev tl)) in
           let ssa, revstmts = C.G.fold_succ_e
             (fun e (ssa, revstmts) ->
               let ssa = C.remove_edge_e ssa e in
@@ -329,9 +343,9 @@ let rec trans_cfg ?tac cfg =
               C.add_edge_e ssa newe, revstmts
             ) ssa b (ssa, revstmts)
           in
-          let revstmts = stmt2ssa ctx ?tac ~revstmts (cfgb, List.length tl) jmp in
+          let revstmts = stmt2ssa ctx ctxmap ?tac ~revstmts (cfgb, List.length tl) jmp in
           ssa, List.rev revstmts
-        | _ -> let stmts' = stmts2ssa ctx ?tac cfgb stmts in ssa, stmts'
+        | _ -> let stmts' = stmts2ssa ctx ctxmap ?tac cfgb stmts in ssa, stmts'
       in
       C.set_stmts ssa b stmts'
     in
@@ -399,10 +413,16 @@ let rec trans_cfg ?tac cfg =
       ssa ssa
   in
   dprintf "Done translating to SSA";
+  let to_ssaexp loc e =
+    let ctx = Hashtbl.find ctxmap loc in
+    match exp2ssaexp (Ctx.copy ctx) ~revstmts:[] ?tac e with
+    | [], e -> e
+    | s, _ -> failwith (Printf.sprintf "to_ssaexp: Unable to convert %s to SSA without modifying the program" (Pp.ast_exp_to_string e))
+  in
   let to_ssavar v = try VH.find exitctx v with Not_found -> v in
   let to_astvar v = try VH.find to_oldvar v with Not_found -> v in
   let to_astloc = VH.find to_oldloc in
-  {cfg=ssa; to_ssavar; to_astvar; to_astloc}
+  {cfg=ssa; to_ssaexp; to_ssavar; to_astvar; to_astloc}
 
 let of_astcfg ?tac cfg =
   let {cfg=ssa} = trans_cfg ?tac cfg in

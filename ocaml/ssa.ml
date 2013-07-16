@@ -125,6 +125,8 @@ let quick_exp_eq e1 e2 =
     structurally equivalent. *)
 let rec full_exp_eq e1 e2 = e1 = e2
 
+let (===) = full_exp_eq
+
 let num_stmt = function
   | Move _ -> 0
   | Jmp _ -> 1

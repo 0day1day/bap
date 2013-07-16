@@ -271,3 +271,15 @@ let bberror_assume_false graph =
   let graph = List.fold_left reroute graph preds in
   let graph = C.add_edge graph assume exit in
   graph
+
+(** Add edges from all sinks (other than BB_Exit) to BB_Exit *)
+let add_sink_exit cfg =
+  let g,exiT = Cfg_ast.find_exit cfg in
+  C.G.fold_vertex (fun v g ->
+    if C.G.out_degree g v = 0 &&
+      not (C.G.V.equal v exiT)
+    then
+      let e = C.G.E.create v None exiT in
+      C.add_edge_e g e
+    else g
+  ) g g

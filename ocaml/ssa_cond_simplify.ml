@@ -8,10 +8,10 @@
 
 *)
 
-open Ast
+open Ssa
 open Big_int_convenience
-module C=Cfg.AST
-module D=Debug.Make(struct let name="Ast_cond_simplify" and default=`NoDebug end)
+module C=Cfg.SSA
+module D=Debug.Make(struct let name="Ssa_cond_simplify" and default=`NoDebug end)
 open D
 open Type
 
@@ -25,9 +25,8 @@ let rec reverse_visit f e =
     | Concat(e1,e2) -> Concat(g e1, g e2)
     | BinOp(bt,e1,e2) -> BinOp(bt, g e1, g e2)
     | UnOp(ut,e) -> UnOp(ut, g e)
-    | (Var _ | Lab _ | Int _ | Unknown _) as e -> e
+    | (Var _ | Phi _ | Lab _ | Int _ | Unknown _) as e -> e
     | Cast(ct,t,e) -> Cast(ct, t, g e)
-    | Let(v,e,e') -> Let(v, g e, g e')
   in
   let e' = f e in
   (* If we changed e, use f on it again *)
@@ -96,13 +95,13 @@ let simplify_flat e =
   if debug () then
     let e' = simplify_flat e in
     if e <> e' then
-      dprintf "Simplified %s to %s" (Pp.ast_exp_to_string e) (Pp.ast_exp_to_string e');
+      dprintf "Simplified %s to %s" (Pp.ssa_exp_to_string e) (Pp.ssa_exp_to_string e');
     e'
   else simplify_flat e
 
 let simplify_exp = reverse_visit simplify_flat
 
-let simplifycond_cfg g =
+let simplifycond_ssa g =
   (* Don't copy propagate over memory, since most programs do
      comparisons on registers. *)
   let stop_before =
@@ -115,14 +114,13 @@ let simplifycond_cfg g =
       | Load _ -> true
       | _ -> false
   in
-  let cp = Copy_prop.copyprop_ast ~stop_before ~stop_after g in
+  let _, copyprop = Copy_prop.copyprop_ssa ~stop_before ~stop_after g in
   C.G.fold_vertex (fun v g ->
     let stmts = C.get_stmts g v in
     match List.rev stmts with
     | CJmp(e, tt, tf, a)::tl ->
-      let _, copyprop, _ = cp (v, List.length tl) in
       let e' = simplify_exp (copyprop e) in
-      dprintf "e: %s (copyprop e): %s e': %s" (Pp.ast_exp_to_string e) (Pp.ast_exp_to_string (copyprop e)) (Pp.ast_exp_to_string e');
+      dprintf "e: %s (copyprop e): %s e': %s" (Pp.ssa_exp_to_string e) (Pp.ssa_exp_to_string (copyprop e)) (Pp.ssa_exp_to_string e');
       (* Update statement *)
       let s = CJmp(e', tt, tf, a)::tl in
       let g = C.set_stmts g v (List.rev s) in

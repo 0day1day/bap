@@ -21,6 +21,7 @@ val to_ast : ?remove_temps:bool -> Cfg.SSA.G.t -> Ast.program
 
 type translation_results = {
   cfg : Cfg.SSA.G.t;
+  to_ssaexp: Cfg.aststmtloc -> Ast.exp -> Ssa.exp; (** Maps CFG location and expression to equivalent SSA expression *)
   to_ssavar: Var.t -> Var.t; (** Maps AST vars to SSA at end of exit node. *)
   to_astvar: Var.t -> Var.t; (** Maps SSA vars back to the variable they came from *)
   to_astloc: Var.t -> Cfg.aststmtloc; (** Maps non-phi SSA vars to the location of the AST definition *)
