@@ -738,6 +738,7 @@ let op2e_s mode ss has_rex t = function
   | Oreg r when t = r16 -> bits2reg16e mode r
   | Oreg r when t = r8 -> bits2reg8e mode ~has_rex r
   | Oreg r -> unimplemented "unknown register"
+  | Oseg r when t = r64 -> cast_unsigned t (bits2segreg r)
   | Oseg r when t = r16 -> bits2segrege r
   | Oseg r -> disfailwith "Segment register when t is not r16"
   | Oaddr e -> load_s mode ss t e
@@ -2565,8 +2566,8 @@ let parse_instr mode g addr =
     | 0x8b -> let (r, rm, na) = parse_modrm_addr None na in
               (Mov(prefix.opsize, r, rm, None), na)
     | 0x8c -> let (r, rm, na) = parse_modrmseg_addr None na in
-              (* XXX: I don't think this is right when rex is clear *)
-              (Mov(prefix.opsize, rm, r, None), na)
+              let extend = r64 if prefix.opsize = r64 else r16
+              (Mov(extend, rm, r, None), na)
     | 0x8d -> let (r, rm, na) = parse_modrm_addr None na in
               (match rm with
               | Oaddr a -> (Lea(prefix.opsize, r, a), na)
