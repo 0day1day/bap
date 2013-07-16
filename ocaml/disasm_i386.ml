@@ -2566,7 +2566,7 @@ let parse_instr mode g addr =
     | 0x8b -> let (r, rm, na) = parse_modrm_addr None na in
               (Mov(prefix.opsize, r, rm, None), na)
     | 0x8c -> let (r, rm, na) = parse_modrmseg_addr None na in
-              let extend = r64 if prefix.opsize = r64 else r16
+              let extend = if prefix.opsize = r64 then r64 else r16
               (Mov(extend, rm, r, None), na)
     | 0x8d -> let (r, rm, na) = parse_modrm_addr None na in
               (match rm with
