@@ -92,6 +92,15 @@ let simplify_flat = function
   | BinOp(LT|LE|EQ as bop, Int(i, t), Cast(CAST_UNSIGNED, t2, e)) when i <% (bi1 <<% (Typecheck.bits_of_width (Typecheck.infer_ssa e))) ->
     let nt = Typecheck.infer_ssa e in
     BinOp(bop, Int(i, nt), e)
+  (* Mixed unsigned/signed. Not sure why compiler would generate this. *)
+  | BinOp(LT|LE as bop, Int(i, t), Cast(CAST_SIGNED, t2, e)) when i <% (bi1 <<% (Typecheck.bits_of_width (Typecheck.infer_ssa e))) && i <% (bi1 <<% (Typecheck.bits_of_width t2 - 1)) ->
+    let nt = Typecheck.infer_ssa e in
+    BinOp(bop, Int(i, nt), e)
+  | Cast(CAST_LOW, t2, Cast(CAST_UNSIGNED, t, e)) when Typecheck.bits_of_width t >= Typecheck.bits_of_width t2 ->
+    Cast(CAST_UNSIGNED, t2, e)
+  (* noop cast *)
+  | Cast(_, t2, e) when t2 = Typecheck.infer_ssa e ->
+    e
   | e -> e
 
 let simplify_flat e =

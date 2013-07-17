@@ -90,6 +90,19 @@ let simplify_flat = function
                                  Int(i3, _t3)))))) when e1 = e2 && e2 = e3 && e3 = e4 && i1 = i2 && i2 = i3 ->
     (* Not as intuitive: signed less than comparison *)
     BinOp(SLT, e1, Int(i1, t1))
+  | BinOp(LT|LE|EQ as bop, Int(i, t), Cast(CAST_UNSIGNED, t2, e)) when i <% (bi1 <<% (Typecheck.bits_of_width (Typecheck.infer_ast e))) ->
+    let nt = Typecheck.infer_ast e in
+    BinOp(bop, Int(i, nt), e)
+  (* Mixed unsigned/signed. Not sure why compiler would generate this. *)
+  | BinOp(LT|LE as bop, Int(i, t), Cast(CAST_SIGNED, t2, e)) when i <% (bi1 <<% (Typecheck.bits_of_width (Typecheck.infer_ast e))) && i <% (bi1 <<% (Typecheck.bits_of_width t2 - 1)) ->
+    let nt = Typecheck.infer_ast e in
+    BinOp(bop, Int(i, nt), e)
+
+  | Cast(CAST_LOW, t2, Cast(CAST_UNSIGNED, t, e)) when Typecheck.bits_of_width t >= Typecheck.bits_of_width t2 ->
+    Cast(CAST_UNSIGNED, t2, e)
+  (* noop cast *)
+  | Cast(_, t2, e) when t2 = Typecheck.infer_ast e ->
+    e
   | e -> e
 
 let simplify_flat e =
