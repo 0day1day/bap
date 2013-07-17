@@ -1208,36 +1208,40 @@ module MemStore = struct
     if x == y then true
     else M1.equal (M2.equal (=)) x y
 
-  let merge_region f x y =
+  let merge_region ~inclusive ~f x y =
     if M2.equal (=) x y then x
     else
-      M2.merge (fun a v1 v2 -> match v1, v2 with
-      | Some v1, Some v2 ->
+      M2.merge (fun a v1 v2 -> match v1, v2, inclusive with
+      | Some v1, Some v2, _ ->
         (* Note: Value sets are not guaranteed to be the same width *)
-        (try Some (f v1 v2)
+        (try Some(f v1 v2)
          with Invalid_argument "bitwidth" -> None)
-      | Some _, None
-      | None, Some _ (*-> Some v*)
-      | None, None -> None) x y
+      | (Some _ as s), None, true
+      | None, (Some _ as s), true -> s
+      | Some _, None, false
+      | None, Some _, false -> None
+      | None, None, _ -> None) x y
 
-  let merge_mem f =
-    M1.merge (fun r v1 v2 -> match v1, v2 with
-    | Some v1, Some v2 -> Some (merge_region f v1 v2)
-    | Some _, None
-    | None, Some _ (* -> Some v*)
-    | None, None -> None)
+  let merge_mem ~inclusive ~f =
+    M1.merge (fun r v1 v2 -> match v1, v2, inclusive with
+    | Some v1, Some v2, _ -> Some (merge_region ~inclusive ~f v1 v2)
+    | (Some _ as s), None, true
+    | None, (Some _ as s), true -> s
+    | Some _, None, false
+    | None, Some _, false -> None
+    | None, None, _ -> None)
 
   let intersection (x:t) (y:t) =
     if equal x y then x
-    else merge_mem VS.intersection x y
+    else merge_mem ~inclusive:true ~f:VS.intersection x y
 
   let union (x:t) (y:t) =
     if equal x y then x
-    else widen_mem (merge_mem VS.union x y)
+    else merge_mem ~inclusive:false ~f:VS.union x y
 
   let widen (x:t) (y:t) =
     if equal x y then x
-    else merge_mem VS.widen x y
+    else merge_mem ~inclusive:true ~f:VS.widen x y
 
 end
 
