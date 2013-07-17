@@ -266,7 +266,7 @@ type vex = {
   vex_nr : bool; (* inverted rex_r bit *)
   vex_nx : bool; (* inverted rex_x bit *)
   vex_nb : bool; (* inverted rex_b bit *)
-  vex_map_select : int; (* Specifies the opcode map to use (we don't use this) *)
+  vex_map_select : int; (* Specifies the opcode map to use *)
   vex_we : bool; (* For int instructions, equivalent to rex.w. For non-int instructions, opcode extension bit. *)
   vex_v : int; (* additional instruction operand (XMM or YMM register) *)
   vex_l : bool; (* 0 = 128-bit operands (xmm), 1 = 256-bit vector operands (ymm) *)
@@ -1128,7 +1128,7 @@ let rec to_ir mode addr next ss pref has_rex =
   | Pbinop(t, bop, s, o1, o2, vop) ->
     (match vop with
     | None -> [assn t o1 (binop bop (op2e t o1) (op2e t o2))]
-    | Some vdst -> [assn t vdst (binop bop (op2e t o1) (op2e t o2))])
+    | Some vdst -> [assn t o1 (binop bop (op2e t o2) (op2e t vdst))])
   | Pcmp (t,elet,bop,_,dst,src,vsrc) ->
     let ncmps = (bits_of_width t) / (bits_of_width elet) in
     let elebits = bits_of_width elet in
@@ -2496,8 +2496,8 @@ let parse_instr mode g addr =
     let _mi64 = int64_of_mode mode in
     let mbi = big_int_of_mode mode in
     let mt = type_of_mode mode in
-    let b1 = Char.code (g a)
-    and na = s a in
+    (* Add in the first implied vex prefix *)
+    let b1, na = if vex <> None then 0x0f, a else Char.code (g a), s a in
     match b1 with (* Table A-2 *)
         (*** 00 to 3d are near the end ***)
     | 0x40 | 0x41 | 0x42 | 0x43 | 0x44 | 0x45 | 0x46 | 0x47 ->
@@ -2828,7 +2828,13 @@ let parse_instr mode g addr =
       )
     (* Two byte opcodes *)
     | 0x0f -> (
-      let b2 = Char.code (g na) and na = s na in
+      (* Add in the second implied vex prefix *)
+      let b2, na = match vex with
+        | Some {vex_map_select=2} -> 0x38, na
+        | Some {vex_map_select=3} -> 0x3a, na
+        | Some {vex_map_select=1} | None -> Char.code (g na), s na
+        | Some {vex_map_select} -> disfailwith (Printf.sprintf "reserved mmmmmm vex value: %d" vex_map_select)
+      in
       match b2 with (* Table A-3 *)
 (*      | 0x0 xgetbv *)
       | 0x05 when mode = X8664 -> (Syscall, na)
@@ -2892,6 +2898,11 @@ let parse_instr mode g addr =
             (Printf.sprintf "mov opcode case missing: %02x" b2)
         in
         let name = match prefix.vex with None -> name | Some _ -> ("v"^name) in
+        (* Certain vmov instructions don't encode an extra operand *)
+        let rv = match b2 with
+          | 0x6f | 0x7f -> None
+          | _ -> rv
+        in
         let s, d = match b2 with
           | 0x10 | 0x12 | 0x16 | 0x6f | 0x28 -> rm, r
           | 0x11 | 0x13 | 0x17 | 0x7f | 0x29 | 0xd6 -> r, rm
