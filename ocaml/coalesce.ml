@@ -44,6 +44,7 @@ struct
            let safe = safe && node_safe && allowed in
            match G.succ graph node with
            | [successor] when not (List.mem successor acc)
+               && not (List.mem successor nocoalesce)
                && not (isspecial successor) ->
              (match G.pred graph successor with
              | [] -> failwith "node's successor has no predecessor"
