@@ -863,49 +863,53 @@ struct
     else x = y
 
   let union x y =
-    let k = width x in
-    if not (k = width y) then raise (Invalid_argument "bitwidth");
-    if x = top k || y = top k then top k else
-      let h = Hashtbl.create (List.length x + List.length y) in
-      let add (r,si) =
-        try Hashtbl.replace h r (SI.union (Hashtbl.find h r) si)
-        with Not_found ->
-          Hashtbl.add h r si
-      in
-      List.iter add x;
-      List.iter add y;
-      Hashtbl.fold (fun k v r -> (k,v)::r) h []
+    if equal x y then x
+    else
+      let k = width x in
+      if not (k = width y) then raise (Invalid_argument "bitwidth");
+      if x = top k || y = top k then top k else
+        let h = Hashtbl.create (List.length x + List.length y) in
+        let add (r,si) =
+          try Hashtbl.replace h r (SI.union (Hashtbl.find h r) si)
+          with Not_found ->
+            Hashtbl.add h r si
+        in
+        List.iter add x;
+        List.iter add y;
+        Hashtbl.fold (fun k v r -> (k,v)::r) h []
 
   let intersection x y =
-    let k = width x in
-    if not (k = width y) then raise (Invalid_argument "bitwidth");
-    if x = top k then y
-    else if y = top k then x
-    else let hx = Hashtbl.create (List.length x) in
-         let add (r,si) =
-           Hashtbl.add hx r si
-         in
-         List.iter add x;
-         let o = List.fold_left
-           (fun l (r,si) ->
-             try (r, SI.intersection si (Hashtbl.find hx r))::l
-             with Not_found -> l)
-           [] y in
-         if o = [] then empty k else o
+    if equal x y then x
+    else let k = width x in
+         if not (k = width y) then raise (Invalid_argument "bitwidth");
+         if x = top k then y
+         else if y = top k then x
+         else let hx = Hashtbl.create (List.length x) in
+              let add (r,si) =
+                Hashtbl.add hx r si
+              in
+              List.iter add x;
+              let o = List.fold_left
+                (fun l (r,si) ->
+                  try (r, SI.intersection si (Hashtbl.find hx r))::l
+                  with Not_found -> l)
+                [] y in
+              if o = [] then empty k else o
 
   let widen x y =
-    let k = width x in
-    if debug () then (assert (k = width y));
-    if x = top k || y = top k then top k else
-    let h = Hashtbl.create (List.length x + List.length y) in
-    let add (r,si) =
-      try Hashtbl.replace h r (SI.widen (Hashtbl.find h r) si)
-      with Not_found ->
-        Hashtbl.add h r si
-    in
-      List.iter add x;
-      List.iter add y;
-      Hashtbl.fold (fun k v r -> (k,v)::r) h []
+    if equal x y then x
+    else let k = width x in
+         if debug () then (assert (k = width y));
+         if x = top k || y = top k then top k else
+           let h = Hashtbl.create (List.length x + List.length y) in
+           let add (r,si) =
+             try Hashtbl.replace h r (SI.widen (Hashtbl.find h r) si)
+             with Not_found ->
+               Hashtbl.add h r si
+           in
+           List.iter add x;
+           List.iter add y;
+           Hashtbl.fold (fun k v r -> (k,v)::r) h []
 
   let fold f vs init =
     (* if vs = top addr_bits then wprintf "VS.fold is very slow for Top"; *)
