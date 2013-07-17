@@ -89,6 +89,9 @@ let simplify_flat = function
                                  Int(i3, _t3)))))) when e1 = e2 && e2 = e3 && e3 = e4 && i1 = i2 && i2 = i3 ->
     (* Not as intuitive: signed less than comparison *)
     BinOp(SLT, e1, Int(i1, t1))
+  | BinOp(LT|LE|EQ as bop, Int(i, t), Cast(CAST_UNSIGNED, t2, e)) when i <% (bi1 <<% (Typecheck.bits_of_width (Typecheck.infer_ssa e))) ->
+    let nt = Typecheck.infer_ssa e in
+    BinOp(bop, Int(i, nt), e)
   | e -> e
 
 let simplify_flat e =
