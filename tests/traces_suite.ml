@@ -2,6 +2,7 @@ open OUnit
 open Pcre
 open Test_common
 open Traces_backtaint
+open Type
 
 let bof = "C/bof1";;
 let taint_file = "tainted_file";;
@@ -15,13 +16,18 @@ let create_input_file _ =
   close_out out;;
 
 
-let pin_trace_setup _ =
+let pin_trace_setup arch () =
+  let gentrace_path, bof = match arch with
+    | X86_32 -> gentrace_path_32, bof
+    | X86_64 -> gentrace_path_64, bof^"_64"
+  in
+  check_file bof;
   let args =
-	["-t"; (gentrace_path^gentrace); "-taint-files"; taint_file;
-	 "-o"; tag^pin_out_suffix; "--"; bof; taint_file ] in
+  ["-t"; (gentrace_path^gentrace); "-taint-files"; taint_file;
+   "-o"; tag^pin_out_suffix; "--"; bof; taint_file ] in
   let exit_code = Unix.WEXITED(0) in
   Traces.cleanup();
-  check_pin_setup();
+  check_pin_setup arch;
   (* check_file (pin_path^pin); *)
   (* check_file (gentrace_path^gentrace); *)
   check_stp_path();
@@ -108,15 +114,18 @@ let fold_solvers (s,f) =
     s^"_"^solver#solvername >:: f solver
   ) (Util.get_hash_values Smtexec.solvers)
 
-let suite = "Traces" >:::
+let suite arch =
+  let pin_trace_setup = pin_trace_setup arch in
+  let suffix = match arch with X86_32 -> "_32" | X86_64 -> "_64" in
+  "Traces" >:::
   [
     (* We record the same trace multiple times, which is kind of dumb *)
-    "backwards_taint_test" >::
+    "backwards_taint_test"^suffix >::
       bracket pin_trace_setup backwards_taint_test pin_trace_cleanup;
-    "pin_trace_test" >::
+    "pin_trace_test"^suffix >::
       (let module M = MakeTraceTest(Traces.TraceSymbolic) in
        bracket pin_trace_setup M.pin_trace_test pin_trace_cleanup);
-    "pin_trace_letbind_test" >::
+    "pin_trace_letbind_test"^suffix >::
       (let module M = MakeTraceTest(Traces.TraceSymbolicStream) in
        bracket pin_trace_setup M.pin_trace_test pin_trace_cleanup);
   ] @
