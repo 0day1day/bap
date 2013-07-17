@@ -19,7 +19,7 @@ let speclist =
   :: ("-rdescent", Arg.Unit (fun () -> recoverf := Asmir_disasm.recursive_descent_at),
       "Use recursive descent based CFG recovery.")
   :: ("-timeout", Arg.Set_int timeout,
-      "<seconds> Set the per-functiom timeout.")
+      "<seconds> Set the per-function timeout.")
   :: []
 
 let anon x =
