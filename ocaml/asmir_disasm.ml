@@ -109,22 +109,20 @@ module VSA_SPEC = struct
       let cfg = Hacks.add_sink_exit cfg in
       let {Cfg_ssa.cfg=ssacfg; to_ssaexp} = Cfg_ssa.trans_cfg ~tac:false cfg in
       let ssacfg = Ssa_cond_simplify.simplifycond_ssa ssacfg in
-      (* let ssacfg = Coalesce.coalesce_ssa ~nocoalesce:[ssav] ssacfg in *)
-      (* Cfg_pp.SsaStmtsDot.output_graph (open_out "vsa.dot") ssacfg; *)
+      let ssav = CS.find_vertex ssacfg (CA.G.V.label v) in
+      (* let ssacfg' = Coalesce.coalesce_ssa ~nocoalesce:[ssav] ssacfg in *)
+      (* Cfg_pp.SsaStmtsDot.output_graph (open_out "vsa.dot") ssacfg'; *)
       let ssae = to_ssaexp (Vsa_ast.last_loc cfg v) e in
       dprintf "ssae: %s" (Pp.ssa_exp_to_string ssae);
-      let ssav = CS.find_vertex ssacfg (CA.G.V.label v) in
       let ssaloc = Vsa_ssa.last_loc ssacfg ssav in
       dprintf "Starting VSA now";
       let df_in, df_out = Vsa_ssa.vsa ~nmeets:50 ~opts:{Vsa_ssa.AlmostVSA.DFP.O.initial_mem=Asmir.get_readable_mem_contents_list asmp} ssacfg in
 
       let add_indirect () =
         if debug () then (
-          Cfg.SSA.G.iter_vertex (fun v ->
-            Printf.eprintf "VSA @%s" (Cfg_ssa.v2s ssav);
-            Vsa_ssa.AbsEnv.pp prerr_string (BatOption.get (df_out (Vsa_ssa.last_loc ssacfg v)));
-            dprintf "\n\n"
-          ) ssacfg
+          Printf.eprintf "VSA @%s" (Cfg_ssa.v2s ssav);
+          Vsa_ssa.AbsEnv.pp prerr_string (BatOption.get (df_out (Vsa_ssa.last_loc ssacfg ssav)));
+          dprintf "\n\n"
         );
         if no_indirect
         then failwith "VSA disassembly failed to resolve an indirect jump to a specific concrete set"
@@ -132,6 +130,7 @@ module VSA_SPEC = struct
       in
 
       let fallback () =
+        dprintf "fallback";
         let vs = Vsa_ssa.AlmostVSA.DFP.exp2vs (BatOption.get (df_out (Vsa_ssa.last_loc ssacfg ssav))) ssae in
         dprintf "VSA resolved %s to %s" (Pp.ast_exp_to_string e) (Vsa_ssa.VS.to_string vs);
         (match Vsa_ssa.VS.concrete ~max:1024 vs with
@@ -155,6 +154,7 @@ module VSA_SPEC = struct
       let special_memory m e endian t =
         (* The variable copy propagates to a memory load.
            Perfect.  This is looking like a jump table lookup. *)
+        dprintf "special_memory %s" (Pp.ssa_exp_to_string e);
         let l = BatOption.get (df_in ssaloc) in
         let exp2vs = Vsa_ssa.AlmostVSA.DFP.exp2vs l in
         let vs = exp2vs e in
@@ -176,26 +176,16 @@ module VSA_SPEC = struct
           add_indirect ())
       in
 
-      (match ssae with
-      | Ssa.Var var ->
-        (* Ok, we matched a variable.  Let's see what copy propagation
-           says. *)
-        let stop_before = function
-          | Ssa.Store _ -> true
-          | _ -> false
-        in
-        let stop_after = function
-          | Ssa.Load _ -> true
-          | _ -> false
-        in
-        let m, _ = Copy_prop.copyprop_ssa ~stop_before ~stop_after ssacfg in
-        (try
-           let e' = Var.VarMap.find var m in
-           match e' with
-           | Ssa.Load(m, e, endian, t) ->
-             special_memory m e endian t
-           | _ -> fallback ()
-         with Not_found | BatOption.No_value -> fallback ())
+      let stop_before = function
+        | Ssa.Store _ -> true
+        | _ -> false
+      in
+      let stop_after = function
+        | Ssa.Load _ -> true
+        | _ -> false
+      in
+      let m, p = Copy_prop.copyprop_ssa ~stop_before ~stop_after ssacfg in
+      (match p ssae with
       | Ssa.Load(m, e, endian, t) ->
         special_memory m e endian t
       | _ -> fallback ())
