@@ -12,7 +12,18 @@ open Type
 (* Call/ret behavior *)
 (* Reprocess indirect jumps *)
 
-let no_indirect = true
+(* Raise an exception instead of adding an indirect edge *)
+let no_indirect = ref true
+
+(* If VSA fails to read the value of a jump table, try to read the
+   value at BB_Entry.  This hack is important in practice because a
+   function that writes to an input pointer could conservatively write to
+   any memory location (including the jump table).
+
+   XXX: Eventually we should confine this hack to only look at
+   read-only memory.
+*)
+let vsa_mem_hack = ref true
 
 type succs = | Addrs of label list
              | Error
@@ -45,9 +56,9 @@ module FUNCFINDER_DUMB = struct
     | _ -> false
   let check_last f c nodes unresolved_edges () =
     List.filter (fun (v,_,_) -> let stmts = CA.get_stmts c v in
-                          match List.rev stmts with
-                          | last::_ -> f last
-                          | [] -> false) unresolved_edges, ()
+                                match List.rev stmts with
+                                | last::_ -> f last
+                                | [] -> false) unresolved_edges, ()
   let find_calls = check_last is_call_stmt
   let find_rets = check_last is_ret_stmt
 end
@@ -66,7 +77,7 @@ module RECURSIVE_DESCENT_SPEC = struct
     type t = unit
     let init = ()
   end
-  let get_succs_int ?(no_indirect=no_indirect) _asmp g (v,l,e) () =
+  let get_succs_int no_indirect _asmp g (v,l,e) () =
     let o = match List.rev (CA.get_stmts g v), l with
       | last::_, None when FUNCFINDER_DUMB.is_ret_stmt last ->
         Exit
@@ -87,7 +98,7 @@ module RECURSIVE_DESCENT_SPEC = struct
       | [], _ -> Addrs []
     in
     o, ()
-  let get_succs asmp g e () = get_succs_int asmp g e ()
+  let get_succs asmp g e () = get_succs_int !no_indirect asmp g e ()
 
   let fixpoint = false
 end
@@ -99,7 +110,7 @@ module VSA_SPEC = struct
   end
 
   let get_succs asmp g (v,l,e) () =
-    match RECURSIVE_DESCENT_SPEC.get_succs_int ~no_indirect:false asmp g (v,l,e) () with
+    match RECURSIVE_DESCENT_SPEC.get_succs_int false asmp g (v,l,e) () with
     | Indirect, () ->
       (* Do VSA stuff *)
       dprintf "Resolving %s with VSA" (Pp.ast_exp_to_string e);
@@ -124,7 +135,7 @@ module VSA_SPEC = struct
           Vsa_ssa.AbsEnv.pp prerr_string (BatOption.get (df_out (Vsa_ssa.last_loc ssacfg ssav)));
           dprintf "\n\n"
         );
-        if no_indirect
+        if !no_indirect
         then failwith "VSA disassembly failed to resolve an indirect jump to a specific concrete set"
         else Indirect, ()
       in
@@ -161,22 +172,36 @@ module VSA_SPEC = struct
         dprintf "VSA resolved memory index %s to %s" (Pp.ssa_exp_to_string e) (Vsa_ssa.VS.to_string (Vsa_ssa.AlmostVSA.DFP.exp2vs l e));
         (match Vsa_ssa.VS.concrete ~max:1024 vs with
         | Some l -> dprintf "VSA finished";
-               (* We got some concrete values for the index.  Now
-                  let's do an abstract load for each index, and try to
-                  get concrete numbers for that. *)
-          (try
+          (* We got some concrete values for the index.  Now
+             let's do an abstract load for each index, and try to
+             get concrete numbers for that. *)
+
+          let do_read meme loc =
             let reads = List.map (fun a ->
               let a = bi64 a in
-              let vs = exp2vs (Ssa.Load(m, Ssa.Int(a, Typecheck.infer_ssa e), endian, t)) in
+              let exp2vs = Vsa_ssa.AlmostVSA.DFP.exp2vs (BatOption.get (df_in loc)) in
+              let exp = Ssa.Load(meme, Ssa.Int(a, Typecheck.infer_ssa e), endian, t) in
+              let vs = exp2vs exp in
               dprintf "memory %s" (Vsa_ssa.VS.to_string vs);
               let conc = Vsa_ssa.VS.concrete ~max:1024 vs in
               match conc with
               | Some l -> l
-              | None -> failwith (Printf.sprintf "Unable to read from jump table at %s" (~% a))) l in
+              | None ->
+                failwith (Printf.sprintf "Unable to read from jump table at %s" (~% a))
+            ) l
+            in
             Addrs (List.map (fun a -> Addr a) (List.flatten reads)), ()
-          with Failure s ->
-            wprintf "%s" s;
-            add_indirect ())
+          in
+          (try do_read m ssaloc with
+          | e when !vsa_mem_hack ->
+             (* Hack: We couldn't read the jump table, so try again at
+                BB_Entry.  The underlying assumption is that the memory
+                should be read only, so it couldn't have changed. *)
+            dprintf "VSA mem hack";
+            do_read (Ssa.Var Disasm_i386.mem) (CS.G.V.create Cfg.BB_Entry, 0)
+          | e ->
+            add_indirect ()
+          )
         | None -> wprintf "VSA disassembly failed to resolve %s/%s to a specific concrete set" (Pp.ssa_exp_to_string e) (Vsa_ssa.VS.to_string vs);
           add_indirect ())
       in
