@@ -2558,7 +2558,7 @@ let parse_instr mode g addr =
       | 6 -> (Xor(opsize, rm, o2), na)
       | 7 -> (Cmp(opsize, rm, o2), na)
       | _ -> disfailwith  
-        (Printf.sprintf "impossible opcode: %02x/%d" b1 r)
+        (Printf.sprintf "impossible Grp 1 opcode: %02x/%d" b1 r)
       )
     | 0x84
     | 0x85 -> let (r, rm, na) = parse_modrm_addr None na in
@@ -2858,12 +2858,12 @@ let parse_instr mode g addr =
             in
             let td = if rv <> None then r256 else r64 in
             td, n, false, r64, td, ord
-          | 0x28 | 0x29 -> (* DONE *)
+          | 0x28 | 0x29 ->
             let n = if prefix.opsize_override then "movapd" else "movaps" in
             let ts, td = if prefix.vex <> None then prefix.mopsize, r256 else r128, r128 in
             let td = if b2 = 0x29 then ts else td in
             td, n, true, ts, td, None
-          | 0x6e | 0x7e -> (* DONE *)
+          | 0x6e | 0x7e ->
             let n = if prefix.opsize = r64 then "movq" else "movd" in
             (* Need to clear certain high bits depending on prefixes *)
             let td = match prefix.vex with
@@ -2874,7 +2874,7 @@ let parse_instr mode g addr =
                 | _ -> disfailwith "impossible")
             in
             prefix.opsize, n, false, prefix.opsize, td, None
-          | 0x6f | 0x7f -> (* DONE *)
+          | 0x6f | 0x7f ->
             let ts, td = if prefix.vex <> None then prefix.mopsize, r256 else r128, r128 in
             let td = if b2 = 0x7f then ts else td in
             let n, ts, td = match prefix.opsize_override, prefix.repeat with
@@ -2893,8 +2893,8 @@ let parse_instr mode g addr =
         in
         let name = match prefix.vex with None -> name | Some _ -> ("v"^name) in
         let s, d = match b2 with
-          | 0x12 | 0x16 | 0x6f | 0x28 -> rm, r
-          | 0x13 | 0x17 | 0x7f | 0x29 | 0xd6 -> r, rm
+          | 0x10 | 0x12 | 0x16 | 0x6f | 0x28 -> rm, r
+          | 0x11 | 0x13 | 0x17 | 0x7f | 0x29 | 0xd6 -> r, rm
           | 0x6e -> toreg rm, r
           | 0x7e -> r, toreg rm
           | _ -> disfailwith 
@@ -3078,6 +3078,10 @@ let parse_instr mode g addr =
       | 0xb7 -> let st = if b2 = 0xb6 then r8 else r16 in
                 let r, rm, na = parse_modrm_addr None na in
                 (Movzx(prefix.opsize, r, st, rm), na)
+(*      | 0xb8 with prefix.repeat -> 
+        let bitvector = Array.to_list (Array.init (bits_of_width prefix.opsize) 
+        (fun i -> (it i prefix.opsize) &* (it 1 prefix.opsize))) in
+        [assn t dst (cast_signed t (op2e ts src))] *)
       | 0xbc | 0xbd ->
         let dir = match b2 with | 0xbc -> Forward | 0xbd -> Backward | _ -> failwith "impossible" in
         let r, rm, na = parse_modrm_addr None na in
@@ -3157,7 +3161,7 @@ let parse_instr mode g addr =
       | _ -> unimplemented 
         (Printf.sprintf "unsupported opcode: %02x %02x" b1 b2)
     )
-    | n -> unimplemented (Printf.sprintf "unsupported opcode: %02x" n)
+    | n -> unimplemented (Printf.sprintf "unsupported single opcode: %02x" n)
 
   in
   let rex, pref, a = get_prefixes addr in
