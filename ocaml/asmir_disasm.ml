@@ -110,13 +110,13 @@ module VSA_SPEC = struct
       let {Cfg_ssa.cfg=ssacfg; to_ssaexp} = Cfg_ssa.trans_cfg ~tac:false cfg in
       let ssacfg = Ssa_cond_simplify.simplifycond_ssa ssacfg in
       let ssav = CS.find_vertex ssacfg (CA.G.V.label v) in
-      (* let ssacfg' = Coalesce.coalesce_ssa ~nocoalesce:[ssav] ssacfg in *)
-      (* Cfg_pp.SsaStmtsDot.output_graph (open_out "vsa.dot") ssacfg'; *)
+      let ssacfg = Coalesce.coalesce_ssa ~nocoalesce:[ssav] ssacfg in
+      (* Cfg_pp.SsaStmtsDot.output_graph (open_out "vsa.dot") ssacfg; *)
       let ssae = to_ssaexp (Vsa_ast.last_loc cfg v) e in
       dprintf "ssae: %s" (Pp.ssa_exp_to_string ssae);
       let ssaloc = Vsa_ssa.last_loc ssacfg ssav in
       dprintf "Starting VSA now";
-      let df_in, df_out = Vsa_ssa.vsa ~nmeets:50 ~opts:{Vsa_ssa.AlmostVSA.DFP.O.initial_mem=Asmir.get_readable_mem_contents_list asmp} ssacfg in
+      let df_in, df_out = Vsa_ssa.vsa ~nmeets:5 ~opts:{Vsa_ssa.AlmostVSA.DFP.O.initial_mem=Asmir.get_readable_mem_contents_list asmp} ssacfg in
 
       let add_indirect () =
         if debug () then (
@@ -154,7 +154,7 @@ module VSA_SPEC = struct
       let special_memory m e endian t =
         (* The variable copy propagates to a memory load.
            Perfect.  This is looking like a jump table lookup. *)
-        dprintf "special_memory %s" (Pp.ssa_exp_to_string e);
+        dprintf "special_memory %s %s" (Pp.ssa_exp_to_string m) (Pp.ssa_exp_to_string e);
         let l = BatOption.get (df_in ssaloc) in
         let exp2vs = Vsa_ssa.AlmostVSA.DFP.exp2vs l in
         let vs = exp2vs e in
@@ -164,14 +164,19 @@ module VSA_SPEC = struct
                (* We got some concrete values for the index.  Now
                   let's do an abstract load for each index, and try to
                   get concrete numbers for that. *)
-          let reads = List.map (fun a ->
-            let a = bi64 a in
-            let vs = exp2vs (Ssa.Load(m, Ssa.Int(a, Typecheck.infer_ssa e), endian, t)) in
-            let conc = Vsa_ssa.VS.concrete ~max:1024 vs in
-            match conc with
-            | Some l -> l
-            | None -> failwith (Printf.sprintf "Unable to read from jump table at %s" (~% a))) l in
-          Addrs (List.map (fun a -> Addr a) (List.flatten reads)), ()
+          (try
+            let reads = List.map (fun a ->
+              let a = bi64 a in
+              let vs = exp2vs (Ssa.Load(m, Ssa.Int(a, Typecheck.infer_ssa e), endian, t)) in
+              dprintf "memory %s" (Vsa_ssa.VS.to_string vs);
+              let conc = Vsa_ssa.VS.concrete ~max:1024 vs in
+              match conc with
+              | Some l -> l
+              | None -> failwith (Printf.sprintf "Unable to read from jump table at %s" (~% a))) l in
+            Addrs (List.map (fun a -> Addr a) (List.flatten reads)), ()
+          with Failure s ->
+            wprintf "%s" s;
+            add_indirect ())
         | None -> wprintf "VSA disassembly failed to resolve %s/%s to a specific concrete set" (Pp.ssa_exp_to_string e) (Vsa_ssa.VS.to_string vs);
           add_indirect ())
       in
