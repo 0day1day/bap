@@ -1341,17 +1341,13 @@ struct
                   | Some (`Array a), Some (`Array b) -> Some(`Array(MemStore.union a b))
                   | Some (`Scalar _), Some (`Array _)
                   | Some (`Array _), Some (`Scalar _) -> failwith "Tried to meet scalar and array"
-                  | (Some (`Scalar a) as sa), None
-                  | None, (Some (`Scalar a) as sa) ->
+                  | (Some _ as sa), None
+                  | None, (Some _ as sa) ->
                     (* Defined on one side; undefined on the other -> top
                        for ast vsa.  For ssa vsa, this just means the
                        definition always comes from one particular
                        predecessor, and we can take the defined value,
                        because any merging happens at phi. *)
-                    sa
-                  | (Some (`Array a) as sa), None
-                  | None, (Some (`Array a) as sa) ->
-                    (* Same as above *)
                     sa
                   | None, None -> None) x y)
       let widen (x:t) (y:t) =
@@ -1367,14 +1363,14 @@ struct
                   | Some (`Array a), Some (`Array b) -> dprintf "widening %s" (Pp.var_to_string k); Some(`Array(MemStore.widen a b))
                   | Some (`Scalar _), Some (`Array _)
                   | Some (`Array _), Some (`Scalar _) -> failwith "Tried to widen scalar and array"
-                  | Some (`Scalar a), None
-                  | None, Some (`Scalar a) ->
-                    (* Defined on one side; top on the other -> top *)
-                    Some (`Scalar (VS.top (VS.width a)))
-                  | Some (`Array a), None
-                  | None, Some (`Array a) ->
-                    (* Defined on one side; top on the other -> top *)
-                    Some (`Array MemStore.top)
+                  | (Some _ as sa), None
+                  | None, (Some _ as sa) ->
+                    (* Defined on one side; undefined on the other -> top
+                       for ast vsa.  For ssa vsa, this just means the
+                       definition always comes from one particular
+                       predecessor, and we can take the defined value,
+                       because any merging happens at phi. *)
+                    sa
                   | None, None -> None) x y)
 
 (*      let widen x y =
