@@ -1,4 +1,4 @@
 
 CSRC=$(wildcard *.c)
 CEXECS = $(CSRC:%.c=%)
-
+CEXECS_64 = $(CEXECS:%=%_64)

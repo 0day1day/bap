@@ -57,7 +57,8 @@ let pin_path = (*ref "../pin/";;*)
   let path = try Sys.getenv("PIN_HOME") with Not_found -> "../pin/" in
   ref path;;
 let pin = "pin";;
-let gentrace_path = "../pintraces/obj-intel64/";;
+let gentrace_path_64 = "../pintraces/obj-intel64/";;
+let gentrace_path_32 = "../pintraces/obj-ia32/";;
 let gentrace = "gentrace.so";;
 let pin_out_suffix = "-bap-pin-test.out";;
 
@@ -69,7 +70,7 @@ let rec find_pin_out files tag =
   | f::fs -> if (pmatch ~pat:(tag^pin_out_suffix) f) then f else find_pin_out fs tag;;
 
 
-let check_pin_setup _ =
+let check_pin_setup arch =
   (* Only do this if we are running in an x64 environment *)
   let cat_arg = "/proc/sys/kernel/yama/ptrace_scope" in
   let foutput char_stream = 
@@ -87,7 +88,9 @@ let check_pin_setup _ =
   let env_pin_path = try Sys.getenv "PIN_HOME" with _ -> "" in
   if (env_pin_path <> "") then pin_path := env_pin_path;
   check_file(!pin_path^pin);
-  check_file(gentrace_path^gentrace);
+  match arch with
+    | X86_32 -> check_file(gentrace_path_32^gentrace)
+    | X86_64 -> check_file(gentrace_path_64^gentrace);
 ;;
 
 
