@@ -27,9 +27,9 @@ open Util
 open Type
 open Ssa
 
-module D = Debug.Make(struct let name = "Vsa" and default=`NoDebug end)
+module D = Debug.Make(struct let name = "Vsa_ssa" and default=`NoDebug end)
 open D
-module DV = Debug.Make(struct let name = "VsaVerbose" and default=`NoDebug end)
+module DV = Debug.Make(struct let name = "VsaVerbose_ssa" and default=`NoDebug end)
 
 (* Treat unsigned comparisons the same as signed: should be okay as
    long as overflow does not occur. Should be false for soundness. *)
