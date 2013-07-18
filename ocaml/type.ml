@@ -89,20 +89,20 @@ type context =
  }
 
 (** Attributes are extra information contained in a [stmt]. *)
-type attribute = 
-  | Pos of pos  (** The position of a statement in the source file *)
-  | Asm of string (** Assembly representation of the following IL code *)
-  | Address of addr (** The address corresponding to lifted IL. *)
-  | Liveout (** Statement should be considered live by deadcode elimination *)
-  | StrAttr of string (** Generic printable and parseable attribute *)
-  | Context of context         (** Information about the
-                                   instruction operands from a
-                                   trace. *)
-  | ThreadId of int (** Executed by a specific thread *)
-  | ExnAttr of exn (** Generic extensible attribute, but no parsing *)
-  | InitRO (** The memory in this assignment is stored in the binary *)
-  | Synthetic (** Operation was added by an analysis *)
-  | SpecialBlock (** Start of a special block *)
+type attribute =
+  | Pos of pos
+  | Asm of string
+  | Address of addr
+  | Liveout
+  | StrAttr of string
+  | Context of context
+  | ThreadId of int
+  | ExnAttr of exn
+  | InitRO
+  | Synthetic
+  | SpecialBlock
+  | TaintIntro of int * string * int
+
 type attributes = attribute list
 
 (** Visitors are a systematic method for exploring and changing
