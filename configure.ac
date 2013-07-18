@@ -155,7 +155,8 @@ ASMIR_DIR="`pwd`/libasmir"
 AC_SUBST(BAP_DIR)
 BAP_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-# Set options for 32/64-bit libtrace compilation
+# Set options for 32/64-bit compilation
+# XXX: Rename me
 AC_CANONICAL_HOST
 AC_SUBST(LIBTRACE_X64)
 case "${host}" in

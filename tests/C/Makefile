@@ -1,5 +1,6 @@
 include Makefile.defs
 
+# XXX: Use exported variable from configure.ac (LIBTRACE_X64)
 ARCH = $(shell getconf LONG_BIT)
 
 CFLAGS = -fno-stack-protector
