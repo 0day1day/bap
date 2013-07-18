@@ -9,12 +9,13 @@ let resolve_program_test p =
   let f (n,s,e) = ignore(Asmir_disasm.vsa_at asmp s) in
   List.iter f funcs
 
-let run_test s () =
+let run_resolve_test s () =
   resolve_program_test s
 
 let suite = "Asmir" >:::
   [
     "open_program_test" >:: open_program_test;
-    "resolve_test" >:: run_test "C/recover-hard";
-    "resolve_test_opt" >:: run_test "C/recover-hard-opt";
+    "resolve_test" >:: run_resolve_test "C/recover-hard";
+    "resolve_test_opt" >:: run_resolve_test "C/recover-hard-opt";
+    "resolve_test_pointer" >:: run_resolve_test "C/recover-hard-pointer";
   ]
