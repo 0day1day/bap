@@ -101,6 +101,7 @@ let backwards_taint stmts locset =
 	 interesting too. *)
       if (LocSet.mem (Loc.V l) !vars &&
 	    Typecheck.is_integer_type (Var.typ l)) then (
+        dprintf "interesting: %s" (Pp.ast_stmt_to_string stmt);
         vars := (LocSet.remove (Loc.V l) !vars);
         let old_vars = !vars in
         vars := add_referenced vars e;
@@ -110,8 +111,9 @@ let backwards_taint stmts locset =
 	(* Alternatively, if there is a write to an interesting memory
 	   location, then we should also add any referenced
 	   locations. *)
-        let flag,mems = interesting_mem_write vars e in
+        let flag, mems = interesting_mem_write vars e in
         if flag then (
+          dprintf "interesting: %s" (Pp.ast_stmt_to_string stmt);
           vars := LocSet.diff !vars mems;
           let old_vars = !vars in
           vars := add_referenced vars e;
@@ -125,6 +127,7 @@ let backwards_taint stmts locset =
     if LocSet.cardinal !vars = 0 then failwith (Printf.sprintf "Empty taint set at %s" (Pp.ast_stmt_to_string stmt))
 
   ) rev_stmts;
+  if debug() then print_locset !vars;
   !vars
 
 (* Convert expression to a locset *)
