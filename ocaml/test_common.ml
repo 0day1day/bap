@@ -91,10 +91,29 @@ let check_pin_setup arch =
   let env_pin_path = try Sys.getenv "PIN_HOME" with _ -> "" in
   if (env_pin_path <> "") then pin_path := env_pin_path;
   check_file(!pin_path^pin);
-  match arch with
-    | X86_32 -> check_file(gentrace_path_32^gentrace)
-    | X86_64 -> check_file(gentrace_path_64^gentrace);
+  let gentrace_path = gentrace_path_of_arch arch in
+  check_file(gentrace_path^gentrace)
 ;;
+
+(** Get architecture of binary *)
+let get_arch b =
+  let p = Asmir.open_program b in
+  Asmir.get_asmprogram_arch p
+
+let run_trace ?(tag="generic") arch bin args pin_args =
+  check_file bin;
+  let gentrace_path = gentrace_path_of_arch arch in
+  let args =
+    ["-t"; (gentrace_path^gentrace);
+     "-o"; tag^pin_out_suffix]
+    @ pin_args
+    @ ["--"; bin]
+    @ args in
+  let exit_code = Unix.WEXITED(0) in
+  Traces.cleanup();
+  check_pin_setup arch;
+  assert_command ~exit_code (!pin_path^pin) args;
+  find_pin_out (Array.to_list (Sys.readdir "./")) tag;;
 
 
 (** Common functions across multiple tests **)

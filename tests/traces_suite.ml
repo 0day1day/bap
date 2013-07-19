@@ -18,23 +18,12 @@ let create_input_file _ =
 
 
 let pin_trace_setup arch () =
-  let gentrace_path, bof = match arch with
-    | X86_32 -> gentrace_path_32, bof
-    | X86_64 -> gentrace_path_64, bof^"_64"
+  let bof = match arch with
+    | X86_32 -> bof
+    | X86_64 -> bof^"_64"
   in
-  check_file bof;
-  let args =
-  ["-t"; (gentrace_path^gentrace); "-taint-files"; taint_file;
-   "-o"; tag^pin_out_suffix; "--"; bof; taint_file ] in
-  let exit_code = Unix.WEXITED(0) in
-  Traces.cleanup();
-  check_pin_setup arch;
-  (* check_file (pin_path^pin); *)
-  (* check_file (gentrace_path^gentrace); *)
-  check_stp_path();
   create_input_file();
-  assert_command ~exit_code (!pin_path^pin) args;
-  find_pin_out (Array.to_list (Sys.readdir "./")) tag;;
+  run_trace ~tag arch bof [taint_file] ["-taint-files"; taint_file]
 
 module MakeTraceTest(TraceSymbolic:Traces.TraceSymbolic) = struct
   let pin_trace_test pin_out =
