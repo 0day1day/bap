@@ -87,12 +87,9 @@ let check_pin_setup arch =
   (* Check if ptrace_scope has been turned off *)
   if (Sys.file_exists cat_arg) 
   then assert_command ~foutput ~verbose:true "cat" [cat_arg] else ();
-  (* Check environment variable for path to pin *)
-  let env_pin_path = try Sys.getenv "PIN_HOME" with _ -> "" in
-  if (env_pin_path <> "") then pin_path := env_pin_path;
   check_file(!pin_path^pin);
   let gentrace_path = gentrace_path_of_arch arch in
-  check_file(gentrace_path^gentrace)
+  check_file(!pin_path^gentrace_path^gentrace)
 ;;
 
 (** Get architecture of binary *)
@@ -109,7 +106,7 @@ let run_trace ?arch ?(tag="generic") ?(pin_args=[]) ?(pintool_args=[]) bin args 
   let gentrace_path = gentrace_path_of_arch arch in
   let args =
     pin_args
-    @ ["-t"; (gentrace_path^gentrace);
+    @ ["-t"; (!pin_path^gentrace_path^gentrace);
        "-o"; tag^pin_out_suffix]
     @ pintool_args
     @ ["--"; bin]
