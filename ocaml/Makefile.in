@@ -7,6 +7,10 @@ export OCAML_COMPAT='c'
 
 export BAP_DIR=$(CURDIR)/..
 
+# Ignore warning about duplicate arch files.
+# The arch file in libtrace is part of the trace pack.
+export OCAMLFIND_IGNORE_DUPS_IN=$(CURDIR)
+
 # We can't use $(CPP) here because the default (cc -E) won't work on
 # .idl files.
 export CAMLIDLFLAGS = -prepro cpp
@@ -44,6 +48,7 @@ export SOURCES = \
 	djgraph.mli djgraph.ml \
 	graphDataflow.mli graphDataflow.ml \
 	type.mli type.ml \
+	arch.mli arch.ml \
 	var.mli var.ml \
 	arithmetic.ml \
 	ast.ml \

@@ -2,10 +2,11 @@ let usage = "Usage: "^Sys.argv.(0)^" <input options> [transformations and output
              Transform BAP IL programs. "
 
 (* XXX: How can we allow each element in the pipeline to maintain its
-   own stage between blocks?  The problem is each element might need a
+   own state between blocks?  The problem is each element might need a
    different type.  If we could have polymorphic arrays/lists, that would
    work.  *)
 
+open Arch
 open BatListFull
 open Utils_common
 
@@ -20,9 +21,9 @@ type prog =
 
 type cmd =
   | AnalysisAst of (ast -> unit)
-  | AnalysisModeAst of (Type.arch -> ast -> unit)
+  | AnalysisModeAst of (arch -> ast -> unit)
   | TransformAst of (ast -> ast)
-  | TransformModeAst of (Type.arch -> ast -> ast)
+  | TransformModeAst of (arch -> ast -> ast)
 
 let pipeline = ref [];;
 

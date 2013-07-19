@@ -11,11 +11,6 @@ type label =
   | Name of string (** For named labels*)
   | Addr of addr (** For addresses. Cast REG_type as unsigned when comparing. *)
 
-(** Supported BAP architectures *)
-type arch =
-  | X86_32
-  | X86_64
-
 (** The IR type of a BAP expression *)
 type typ =
   | Reg of int (** an N-bit bitvector (use 1 for booleans). *)

@@ -1,8 +1,6 @@
 (** General disassembly stuff *)
 
-(* open Asmir *)
-open Type
-exception Unimplemented
+open Arch
 
 let arch_to_x86_mode = function
   | X86_32 -> Disasm_i386.X86

@@ -1,3 +1,4 @@
+open Arch
 open OUnit
 open Pcre
 open Test_common

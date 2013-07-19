@@ -1,9 +1,10 @@
-open OUnit
-open Pcre
+open Arch
 open Ast
-open Test_common
 open Big_int
 open Big_int_convenience
+open OUnit
+open Pcre
+open Test_common
 
 let test_file = "C/test";;
 let il_file = "C/test.il";;
@@ -32,8 +33,8 @@ let concrete_eval_setup _ =
 let concrete_eval_test (ranges, s, arch) = 
   (* i represents the change on the stack to the "wrong" value for function g *)
   let memtype, sp = match arch with
-    | Type.X86_32 -> "u32", "R_ESP"
-    | Type.X86_64 -> "u64", "R_RSP"
+    | X86_32 -> "u32", "R_ESP"
+    | X86_64 -> "u64", "R_RSP"
   in
   let i =
     let a,_ = Parser.exp_from_string (sp ^ ":" ^ memtype) in

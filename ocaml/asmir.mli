@@ -11,6 +11,7 @@
    some variables I added. --aij
 *)
 
+open Arch
 open Libbfd
 open Libasmir
 
@@ -19,8 +20,8 @@ exception Disassembly_error
 
 type asmprogram
 
-val arch_i386 : Type.arch
-val arch_x8664 : Type.arch
+val arch_i386 : arch
+val arch_x8664 : arch
 
 type varctx
 
@@ -49,12 +50,12 @@ val tr_bap_blocks_t :
 *)
 
 
-val decls_for_arch : Type.arch -> Ast.var list
-val gamma_for_arch : Type.arch -> varctx
+val decls_for_arch : arch -> Ast.var list
+val gamma_for_arch : arch -> varctx
 
-val mem_of_arch : Type.arch -> Var.t
+val mem_of_arch : arch -> Var.t
 
-val get_asmprogram_arch : asmprogram -> Type.arch
+val get_asmprogram_arch : asmprogram -> arch
 
 val x86_mem : Var.t
 val x86_regs : Var.t list
@@ -64,13 +65,13 @@ val x86_all_regs : Var.t list
 val x64_all_regs : Var.t list
 val multiarch_all_regs : Var.t list
 
-val all_regs : Type.arch -> Var.t list
+val all_regs : arch -> Var.t list
 
 (** Convert a BAP architecture to a BFD architecture and machine *)
-val arch_to_bfd : Type.arch -> Libbfd.bfd_architecture * Libbfd.machine_t
+val arch_to_bfd : arch -> Libbfd.bfd_architecture * Libbfd.machine_t
 
 (** Translate libtrace architecture to BAP architecture *)
-val translate_trace_arch : Trace.Arch.bfd_architecture -> Trace.Arch.machine_t -> Type.arch
+val translate_trace_arch : Trace.Arch.bfd_architecture -> Trace.Arch.machine_t -> arch
 
 val open_program : ?base:Type.addr -> string -> asmprogram
 val asmprogram_to_bap : ?init_ro:bool -> asmprogram -> Ast.program
@@ -82,11 +83,11 @@ val asmprogram_to_bap_range : ?init_ro:bool -> asmprogram -> Type.addr -> Type.a
     PinTrace.  If pin is false, loads an old, TEMU-based trace format. *)
 (* val bap_from_trace_file : ?atts:bool -> ?pin:bool -> string -> Ast.program *)
 (** Load entire trace into memory from the new SerializedTrace format. *)
-val serialized_bap_from_trace_file : string -> Ast.program * Type.arch
+val serialized_bap_from_trace_file : string -> Ast.program * arch
 
 (** Open a PinTrace/TEMU-based trace in streaming format depending on the value of [pin]. *)
 (** Open a SerializedTrace trace in streaming format. *)
-val serialized_bap_stream_from_trace_file : int64 -> string -> (Ast.stmt list) Stream.t * Type.arch
+val serialized_bap_stream_from_trace_file : int64 -> string -> (Ast.stmt list) Stream.t * arch
 
 val get_symbols : ?all:bool -> asmprogram -> asymbol array
 val get_dynamic_symbols : asmprogram -> asymbol array
@@ -110,9 +111,9 @@ val get_asm_instr_string_range : asmprogram -> Type.addr -> Type.addr -> string
 val is_load : section_ptr -> bool
 val is_code : section_ptr -> bool
 
-val byte_insn_to_bap : Type.arch -> Type.addr -> char array -> Ast.program * Type.addr
+val byte_insn_to_bap : arch -> Type.addr -> char array -> Ast.program * Type.addr
 
-val byte_sequence_to_bap : char array -> Type.arch -> Type.addr -> Ast.program list
+val byte_sequence_to_bap : char array -> arch -> Type.addr -> Ast.program list
 
 (* val set_print_warning : bool -> unit *)
 

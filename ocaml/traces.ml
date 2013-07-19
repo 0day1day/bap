@@ -1,5 +1,6 @@
 (** A module to perform trace analysis *)
 
+open Arch
 open Ast
 open Ast_convenience
 open BatListFull
@@ -63,8 +64,8 @@ let allow_symbolic_indices = ref false
 let padding = ref true
 
 let memtype = function
-  | Type.X86_32 -> reg_32
-  | Type.X86_64 -> reg_64
+  | X86_32 -> reg_32
+  | X86_64 -> reg_64
 
 let endtrace = "This is the final trace block"
 
@@ -1546,18 +1547,18 @@ sig
 
   val create_state : user_init -> state
   (* Symbolically execute an entire trace at once *)
-  val symbolic_run : user_init -> Type.arch -> stmt list -> state
+  val symbolic_run : user_init -> arch -> stmt list -> state
   (* Symbolically execute some blocks of a trace for streaming *)
-  val symbolic_run_blocks : state -> Type.arch -> stmt list -> state
-  val generate_formula : user_init -> Type.arch -> stmt list -> output
+  val symbolic_run_blocks : state -> arch -> stmt list -> state
+  val generate_formula : user_init -> arch -> stmt list -> output
   val output_formula : state -> output
 
   (******************* Formula Debugging  **********************)
-  val formula_valid_to_invalid : Type.arch -> ?min:int -> stmt list -> unit
-  val trace_valid_to_invalid : Type.arch -> stmt list -> unit
+  val formula_valid_to_invalid : arch -> ?min:int -> stmt list -> unit
+  val trace_valid_to_invalid : arch -> stmt list -> unit
 
   (****************  Exploit String Generation  ****************)
-  val output_exploit : user_init -> Type.arch -> stmt list -> unit
+  val output_exploit : user_init -> arch -> stmt list -> unit
 end
 
 

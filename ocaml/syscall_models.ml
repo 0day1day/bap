@@ -4,6 +4,7 @@
 
 *)
 
+open Arch
 open Ast
 
 (**
@@ -19,13 +20,13 @@ let x86_is_system_call = function
   | _ -> false
 
 let syscall_reg = function
-  | Type.X86_32 -> Disasm_i386.R32.eax
-  | Type.X86_64 -> Disasm_i386.R64.rax
+  | X86_32 -> Disasm_i386.R32.eax
+  | X86_64 -> Disasm_i386.R64.rax
 
 (* System call names - fill in as needed *)
 let linux_get_name arch syscall =
   match arch with
-  | Type.X86_32 -> 
+  | X86_32 -> 
     (match syscall with
     | 1 -> "exit"
     | 3 -> "read"
@@ -56,7 +57,7 @@ let linux_get_name arch syscall =
     | 270 -> "tgkill"
     | n -> "unknown syscall #" ^ string_of_int n
     )
-  | Type.X86_64 -> 
+  | X86_64 -> 
     (match syscall with
     | 0 -> "read"
     | 1 -> "write"
@@ -90,7 +91,7 @@ let linux_get_name arch syscall =
 (* Fill in system call models as needed *)
 let linux_get_model arch syscall = 
   match arch with
-  | Type.X86_32 -> 
+  | X86_32 -> 
     (match syscall with 
     | 1 ->
         (* exit *)
@@ -104,7 +105,7 @@ let linux_get_model arch syscall =
     | _ ->
        None
     )
-  | Type.X86_64 -> 
+  | X86_64 -> 
     (match syscall with
     | 60 ->
         (* exit *)
@@ -125,11 +126,11 @@ let linux_syscall_to_il arch rax =
       Comment((linux_get_name arch rax) ^ " model", [])
       :: model
     | None ->
-        let sys_name = linux_get_name arch rax in
-        let mode = match arch with
-          | Type.X86_32 -> Disasm_i386.X86
-          | Type.X86_64 -> Disasm_i386.X8664
-        in
-        Special (sys_name, [])
-        :: Move(syscall_reg arch, Unknown("System call output", Disasm_i386.type_of_mode mode), [])
-        :: []
+      let sys_name = linux_get_name arch rax in
+      let mode = match arch with
+        | X86_32 -> Disasm_i386.X86
+        | X86_64 -> Disasm_i386.X8664
+      in
+      Special (sys_name, [])
+      :: Move(syscall_reg arch, Unknown("System call output", Disasm_i386.type_of_mode mode), [])
+      :: []

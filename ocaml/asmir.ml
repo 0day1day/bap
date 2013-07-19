@@ -7,6 +7,7 @@
     @author Ivan Jager
 *)
 
+open Arch
 open Asmir_consts
 open Ast
 open Big_int_Z

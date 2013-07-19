@@ -1,5 +1,6 @@
 (** Functions used by BAP library and tests *)
 
+open Arch
 open Ast
 open Big_int_Z
 open Big_int_convenience
@@ -71,7 +72,6 @@ let rec find_pin_out files tag =
 
 
 let check_pin_setup arch =
-  (* Only do this if we are running in an x64 environment *)
   let cat_arg = "/proc/sys/kernel/yama/ptrace_scope" in
   let foutput char_stream = 
     (match (Stream.next char_stream) with

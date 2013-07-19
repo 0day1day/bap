@@ -1,6 +1,7 @@
 let usage = "Usage: "^Sys.argv.(0)^" <input options> [transformations and outputs]\n\
              Transform BAP IL programs. "
 
+open Arch
 open Utils_common
 open Big_int_convenience
 
@@ -15,11 +16,11 @@ type prog =
 
 type cmd =
   | AnalysisAst of (ast -> unit)
-  | AnalysisModeAst of (Type.arch -> ast -> unit)
+  | AnalysisModeAst of (arch -> ast -> unit)
   | AnalysisAstCfg of (astcfg -> unit)
   | AnalysisSsa of (ssa -> unit)
   | TransformAst of (ast -> ast)
-  | TransformModeAst of (Type.arch -> ast -> ast)
+  | TransformModeAst of (arch -> ast -> ast)
   | TransformAstCfg of (astcfg -> astcfg)
   | TransformSsa of (ssa -> ssa)
   | ToCfg
