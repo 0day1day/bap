@@ -97,7 +97,7 @@ let check_pin_setup arch =
 ;;
 
 
-(** Common functions across multipule tests **)
+(** Common functions across multiple tests **)
 let rec find_funs ?(msg="") ranges names = match ranges with
   | [] -> assert_failure ("Could not find functions "^msg)
   | (n,s,e)::rs -> if (List.mem n names) then (s,e) else find_funs ~msg rs names;;
