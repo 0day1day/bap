@@ -60,6 +60,9 @@ let pin_path = (*ref "../pin/";;*)
 let pin = "pin";;
 let gentrace_path_64 = "../pintraces/obj-intel64/";;
 let gentrace_path_32 = "../pintraces/obj-ia32/";;
+let gentrace_path_of_arch = function
+  | X86_32 -> gentrace_path_32
+  | X86_64 -> gentrace_path_64
 let gentrace = "gentrace.so";;
 let pin_out_suffix = "-bap-pin-test.out";;
 
