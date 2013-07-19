@@ -55,7 +55,7 @@ let check_stp_path =
 
 (** pin helpers **)
 let pin_path = (*ref "../pin/";;*)
-  let path = try Sys.getenv("PIN_HOME") with Not_found -> "../pin/" in
+  let path = try Sys.getenv("PIN_HOME") with Not_found -> Sys.getcwd ()^"/../pin/" in
   ref path;;
 let pin = "pin";;
 let gentrace_path_64 = "../pintraces/obj-intel64/";;
