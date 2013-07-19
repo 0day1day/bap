@@ -23,7 +23,8 @@ let pin_trace_setup arch () =
     | X86_64 -> bof^"_64"
   in
   create_input_file();
-  run_trace ~tag arch bof [taint_file] ["-taint-files"; taint_file]
+  let pintool_args = ["-taint-files"; taint_file] in
+  run_trace ~tag ~arch ~pintool_args bof [taint_file]
 
 module MakeTraceTest(TraceSymbolic:Traces.TraceSymbolic) = struct
   let pin_trace_test pin_out =

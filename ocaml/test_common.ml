@@ -100,13 +100,18 @@ let get_arch b =
   let p = Asmir.open_program b in
   Asmir.get_asmprogram_arch p
 
-let run_trace ?(tag="generic") arch bin args pin_args =
+let run_trace ?arch ?(tag="generic") ?(pin_args=[]) ?(pintool_args=[]) bin args =
   check_file bin;
+  let arch = match arch with
+    | None -> get_arch bin
+    | Some arch -> arch
+  in
   let gentrace_path = gentrace_path_of_arch arch in
   let args =
-    ["-t"; (gentrace_path^gentrace);
-     "-o"; tag^pin_out_suffix]
-    @ pin_args
+    pin_args
+    @ ["-t"; (gentrace_path^gentrace);
+       "-o"; tag^pin_out_suffix]
+    @ pintool_args
     @ ["--"; bin]
     @ args in
   let exit_code = Unix.WEXITED(0) in
