@@ -79,7 +79,7 @@ ROOT = $(realpath ..)
 # or if we're in 32-bit mode.
 LIBTRACEDIR=$(ROOT)/libtracewrap/libtrace
 
-ifeq ($(LIBTRACE_X64),true)
+ifeq ($(ARCH_X64),true)
 ifeq ($(TARGET),ia32)
   LIBTRACEDIR=$(ROOT)/libtracewrap/libtrace32
 endif
