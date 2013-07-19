@@ -1,5 +1,5 @@
-open Trace_container
-open Frame_piqi_ext
+open Trace.Trace_container
+open Trace.Frame_piqi_ext
 
 let copy_all r w =
 

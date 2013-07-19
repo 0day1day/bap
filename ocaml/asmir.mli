@@ -1,5 +1,5 @@
 (** High level interface to libasmir.
-    
+
     The functions in this file should be used instead of calling Libasmir functions
     directly. These functions should be easier to use, and, unlike the Libasmir
     ones, will handle garbage collection.
@@ -70,7 +70,7 @@ val all_regs : Type.arch -> Var.t list
 val arch_to_bfd : Type.arch -> Libbfd.bfd_architecture * Libbfd.machine_t
 
 (** Translate libtrace architecture to BAP architecture *)
-val translate_trace_arch : Arch.bfd_architecture -> Arch.machine_t -> Type.arch
+val translate_trace_arch : Trace.Arch.bfd_architecture -> Trace.Arch.machine_t -> Type.arch
 
 val open_program : ?base:Type.addr -> string -> asmprogram
 val asmprogram_to_bap : ?init_ro:bool -> asmprogram -> Ast.program

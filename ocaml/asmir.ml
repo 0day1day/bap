@@ -12,7 +12,7 @@ open Ast
 open Big_int_Z
 open Big_int_convenience
 open BatListFull
-open Frame_piqi
+open Trace.Frame_piqi
 open Libasmir
 open Libbfd
 open Type
@@ -106,14 +106,14 @@ let arch_to_bfd = function
   | X86_64 -> Libbfd.Bfd_arch_i386, Libbfd.mACH_i386_x86_64
 
 let bfd_to_trace arch mach = match arch, mach with
-  | Libbfd.Bfd_arch_i386, x when x = Libbfd.mACH_i386_i386 -> Arch.Bfd_arch_i386, Arch.mach_i386_i386
-  | Libbfd.Bfd_arch_i386, x when x = Libbfd.mACH_i386_x86_64 -> Arch.Bfd_arch_i386, Arch.mach_x86_64
+  | Libbfd.Bfd_arch_i386, x when x = Libbfd.mACH_i386_i386 -> Trace.Arch.Bfd_arch_i386, Trace.Arch.mach_i386_i386
+  | Libbfd.Bfd_arch_i386, x when x = Libbfd.mACH_i386_x86_64 -> Trace.Arch.Bfd_arch_i386, Trace.Arch.mach_x86_64
   | _ -> failwith "bfd_to_trace: unsupported architecture"
 
 let translate_trace_arch arch mach =
   match arch, mach with
-  | Arch.Bfd_arch_i386, x when x = Arch.mach_i386_i386 -> X86_32
-  | Arch.Bfd_arch_i386, x when x = Arch.mach_x86_64 -> X86_64
+  | Trace.Arch.Bfd_arch_i386, x when x = Trace.Arch.mach_i386_i386 -> X86_32
+  | Trace.Arch.Bfd_arch_i386, x when x = Trace.Arch.mach_x86_64 -> X86_64
   | _, _ -> failwith "translate_trace_arch: unsupported architecture"
 
 let frompiqi = Big_int_convenience.addr_of_int64
@@ -483,13 +483,13 @@ module SerializedTrace = struct
 
   (** New trace file format: Read entire trace at once *)
   let new_bap_from_trace_file filename =
-    let r = new Trace_container.reader filename in
+    let r = new Trace.Trace_container.reader filename in
     let arch = trace_arch r in
     new_bap_from_trace_frames arch r, arch
 
   (** New trace format: Create a streamer *)
   let new_bap_stream_from_trace_file rate filename =
-    let r = new Trace_container.reader filename in
+    let r = new Trace.Trace_container.reader filename in
     let arch = trace_arch r in
     let f () = new_bap_from_trace_frames ~n:rate arch r in
     Stream.from (bap_get_block_from_f f), arch

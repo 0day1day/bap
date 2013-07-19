@@ -11,6 +11,8 @@ export OCAMLPATH = $(PIQIBUILDDIR)
 # .idl files.
 export CAMLIDLFLAGS = -prepro cpp
 
+export LIB_PACK_NAME = trace
+
 INCDIRS += @INCDIRS@
 
 PACKS = piqi.lib
