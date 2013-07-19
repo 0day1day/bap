@@ -158,10 +158,10 @@ BAP_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 # Set options for 32/64-bit compilation
 # XXX: Rename me
 AC_CANONICAL_HOST
-AC_SUBST(LIBTRACE_X64)
+AC_SUBST(ARCH_X64)
 case "${host}" in
-x86_64*) LIBTRACE_X64="true" ;;
-*) LIBTRACE_X64="false" ;;
+x86_64*) ARCH_X64="true" ;;
+*) ARCH_X64="false" ;;
 esac
 
 # Checks for header files.
@@ -193,9 +193,10 @@ AC_CONFIG_FILES([Makefile
                  libasmir/src/Makefile
                  libtracewrap/Makefile
                  pintraces/Makefile
-		 ocaml/Makefile
+                 ocaml/Makefile
                  utils/Makefile
-                 tests/Makefile])
+                 tests/Makefile
+                 tests/C/Makefile])
 AC_OUTPUT
 
 # Configure ocamlgraph

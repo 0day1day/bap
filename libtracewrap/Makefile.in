@@ -4,7 +4,7 @@
 .PHONY: default
 default: all
 
-MAKE32 = "@LIBTRACE_X64@"
+MAKE32 = "@ARCH_X64@"
 
 %:
 ifeq ($(MAKE32),"true")
