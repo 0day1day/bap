@@ -754,7 +754,6 @@ let assn_s mode s has_rex t v e =
     let assnbits = Typecheck.bits_of_width t in
 
     (* Add the upper preserved bits, if any *)
-    (* Zero-extend 32-bit assignments to 64-bit registers. *)
     let ubh = (bits-1) and ubl = (assnbits+off) in
     if ubh > ubl then concat_exps := extract ubh ubl (Var v)::!concat_exps;
 
@@ -771,7 +770,7 @@ let assn_s mode s has_rex t v e =
   in
   match v, t with
   | Ovec r, Reg (256|128|64|32) ->
-    let v = bits2ymm r in 
+    let v = bits2ymm r in
     sub_assn t v e
   | Ovec r, _ -> disfailwith "invalid SIMD register size for assignment"
   (* Zero-extend 32-bit assignments to 64-bit registers. *)
