@@ -258,11 +258,7 @@ struct
     if isvalid then
       Valid
     else if isinvalid then (
-      Invalid (if getmodel then
-          (let m = parse_model solvername stdout in
-           print_model m;
-           m) else None)
-
+      Invalid (if getmodel then parse_model solvername stdout else None)
     ) else if fail then (
       dprintf "output: %s\nerror: %s" stdout stderr;
       SmtError ("SMT solver failed: " ^ stderr)
@@ -298,11 +294,7 @@ struct
     ) else if isunsat then
         Valid
       else if issat then (
-        Invalid (if getmodel
-          then let m = parse_model solvername stdout in
-               print_model m;
-               m
-          else None)
+        Invalid (if getmodel then parse_model solvername stdout else None)
       ) else
         failwith "Something weird happened."
   let parse_result = parse_result_builder solvername
@@ -427,11 +419,7 @@ struct
     ) else if isunsat then
         Valid
       else if issat then (
-        Invalid (if getmodel
-          then let m = parse_model solvername stdout in
-               print_model m;
-               m
-          else None)
+        Invalid (if getmodel then parse_model solvername stdout else None)
       ) else
         failwith "Something weird happened."
   let parse_result = parse_result_builder solvername
