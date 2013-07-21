@@ -236,8 +236,8 @@ let parse_model solver s =
     None
 
 let print_model = function
-  | Some(l) -> Printf.printf "Model:\n"; List.iter (fun (v,i) -> Printf.printf "%s -> %s\n" v (~% i)) l
-  | None -> Printf.printf "No model found\n"
+  | Some(l) -> dprintf "Model:"; List.iter (fun (v,i) -> dprintf "%s -> %s" v (~% i)) l
+  | None -> dprintf "No model found"
 
 module STP_INFO =
 struct
