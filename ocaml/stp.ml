@@ -7,7 +7,7 @@ open Big_int_convenience
 open Type
 open Typecheck
 
-module D = Debug.Make(struct let name = "Stp" and default=`Debug end)
+module D = Debug.Make(struct let name = "Stp" and default=`NoDebug end)
 open D
 
 
