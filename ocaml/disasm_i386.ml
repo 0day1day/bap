@@ -1066,23 +1066,23 @@ let rec to_ir mode addr next ss pref has_rex has_vex =
        Otherwise, the bits are preserved. *)
     let padding hi lo =
       if has_vex then it 0 (Reg (hi - lo))
-      else extract hi lo (op2e tdst dst)
+      else extract (hi - 1) lo (op2e tdst dst)
     in
     (* If the source is offset from 0, extract the element from source 1 *)
     let s1 = match off_src1 with
       | None | Some 0 -> op2e telt src1
-      | Some off -> extract ((bits_of_width telt) + off) off (op2e tsrc1 src1)
+      | Some off -> extract ((bits_of_width telt) + off - 1) off (op2e tsrc1 src1)
     in
     let stmt = match src2 with
       | None ->
-        (match off_src1 with
-        | None | Some 0 -> assn tdst dst s1
-        | Some off -> assn tdst dst (concat s1 (extract off 0 (op2e tdst dst))))
+        (match off_dst1 with
+        | None | Some 0 -> assn telt dst s1
+        | Some off -> assn tdst dst (concat s1 (extract (off - 1) 0 (op2e tdst dst))))
       | Some (tsrc2, src2, off_src2, off_dst2) ->
         (* Extract second source element with offset *)
         let s2 = match off_src2 with
           | None | Some 0 -> op2e telt src2
-          | Some off -> extract ((bits_of_width telt) + off) off (op2e tsrc2 src2)
+          | Some off -> extract ((bits_of_width telt) + off - 1) off (op2e tsrc2 src2)
         in
         let off_dst1 = match off_dst1 with None | Some 0 -> 0 | Some n -> n in
         let off_dst2 = match off_dst2 with None | Some 0 -> 0 | Some n -> n in
