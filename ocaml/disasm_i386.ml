@@ -173,7 +173,7 @@ type opcode =
   | Movdq of typ * operand * operand * bool (* move type, dst op, src op, aligned *)
    (* dest type, dest, element type, src1 type, src1, src1 src offset, src1 dest offset, 
                    optional src2 type, optional src2, src2 src offset, src2 dest offset *)
-  | Movoffset of typ * operand * typ * typ * operand * int option  * int option * typ option * operand option * int option * int option
+  | Movoffset of (typ * operand) * typ * (typ * operand * int option  * int option) * (typ * operand * int option * int option) option
   | Lea of typ * operand * Ast.exp
   | Call of operand * Type.addr (* addr is RA *)
   | Shift of binop_type * typ * operand * operand
@@ -1059,7 +1059,7 @@ let rec to_ir mode addr next ss pref has_rex has_vex =
       else []
     in
     d::al
-  | Movoffset(tdst, dst, telt, tsrc1, src1, off_src1, off_dst1, tsrc2, src2, off_src2, off_dst2) ->
+  | Movoffset((tdst, dst), telt, (tsrc1, src1, off_src1, off_dst1), src2) ->
     let concat = Ast_convenience.concat in
     let extract = Ast_convenience.extract in
     (* If a vex prefix is present, then exra space is filled with 0.
@@ -1070,7 +1070,7 @@ let rec to_ir mode addr next ss pref has_rex has_vex =
     in
     (* If the source is offset from 0, extract the element from source 1 *)
     let s1 = match off_src1 with
-      | None | Some 0 -> op2e telt src1 
+      | None | Some 0 -> op2e telt src1
       | Some off -> extract ((bits_of_width telt) + off) off (op2e tsrc1 src1)
     in
     let stmt = match src2 with
@@ -1078,14 +1078,10 @@ let rec to_ir mode addr next ss pref has_rex has_vex =
         (match off_src1 with
         | None | Some 0 -> assn tdst dst s1
         | Some off -> assn tdst dst (concat s1 (extract off 0 (op2e tdst dst))))
-      | Some src2 ->
-        let tsrc2 = match tsrc2 with 
-          | Some ts2 -> ts2 
-          | _ -> disfailwith "invalid operands for Movoffset"
-        in
+      | Some (tsrc2, src2, off_src2, off_dst2) ->
         (* Extract second source element with offset *)
         let s2 = match off_src2 with
-          | None | Some 0 -> op2e telt src2 
+          | None | Some 0 -> op2e telt src2
           | Some off -> extract ((bits_of_width telt) + off) off (op2e tsrc2 src2)
         in
         let off_dst1 = match off_dst1 with None | Some 0 -> 0 | Some n -> n in
@@ -1096,7 +1092,7 @@ let rec to_ir mode addr next ss pref has_rex has_vex =
           else s2, s1, off_dst2, off_dst1
         in
         (* Build the expression with appropriate offsets. *)
-        let elist = 
+        let elist =
           padding (bits_of_width tdst) (offhi + (bits_of_width telt))
           :: srchi
           :: padding offhi (offlo + (bits_of_width telt))
@@ -2872,7 +2868,7 @@ let parse_instr mode g addr =
       | 0x12 | 0x13 | 0x16 | 0x17 (* MOVLPS, MOVLPD, MOVHPS, MOVHPD, MOVHLPS, MOVHLPD, MOVLHPS, MOVLHPD *)
       | (0x10 | 0x11) when (prefix.repeat || prefix.nrepeat) ->
         let r, rm, rv, na = parse_modrm_vec None na in
-        let tdst, dst, telt, tsrc1, src1, off_src1, off_dst1, tsrc2, src2, off_src2, off_dst2 = 
+        let tdst, dst, telt, tsrc1, src1, off_src1, off_dst1, src2 =
           match b2 with
           | 0x10 | 0x11 -> disfailwith "MOVSS/MOVSD unimplemented"
           | (0x12 | 0x16) when rv <> None ->
@@ -2886,7 +2882,8 @@ let parse_instr mode g addr =
               | Some r -> r
               | None -> disfailwith "impossible"
             in
-            r128, r, r64, r128, rv, offs1, offd1, Some r128, Some rm, offs2, offd2
+            let src2 = Some (r128, rm, offs2, offd2) in
+            r128, r, r64, r128, rv, offs1, offd1, src2
           | 0x12 | 0x13 | 0x16 | 0x17 ->
             let offset = match b2 with
               | 0x12 | 0x13 -> None
@@ -2900,10 +2897,10 @@ let parse_instr mode g addr =
               | _ -> disfailwith "impossible"
             in
             let ts = match s with Ovec _ -> r128 | _ -> r64 in
-            r128, d, r64, ts, s, offs, offd, None, None, None, None
+            r128, d, r64, ts, s, offs, offd, None
           | _ -> disfailwith "impossible"
         in
-        (Movoffset(tdst, dst, telt, tsrc1, src1, off_src1, off_dst1, tsrc2, src2, off_src2, off_dst2), na)
+        (Movoffset((tdst, dst), telt, (tsrc1, src1, off_src1, off_dst1), src2), na)
       | 0x10 | 0x11 |  0x28 | 0x29 | 0x6e | 0x7e | 0x6f | 0x7f | 0xd6 ->
       (* REGULAR MOVDQ *)
         let r, rm, _, na = parse_modrm_vec None na in
