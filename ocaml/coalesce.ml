@@ -69,6 +69,7 @@ struct
            should return [n3; n2; n1] *)
         let successors =
           if C.is_safe_coalesce_dst graph init
+            && List.mem init nocoalesce = false
           then immediate_succs [] init
           else []
         in
