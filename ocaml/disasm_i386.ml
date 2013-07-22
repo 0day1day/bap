@@ -1041,7 +1041,7 @@ let rec to_ir mode addr next ss pref has_rex has_vex =
     [assn t dst (cast_unsigned t (op2e ts src))]
   | Movsx(t, dst, ts, src) when pref = [] ->
     [assn t dst (cast_signed t (op2e ts src))]
-  | Movdq(t, d, s, align) ->
+  | Movdq(t, s, d, align) ->
     let (s, al) = match s with
       | Ovec _ | Oreg _-> op2e t s, []
       | Oaddr a -> op2e t s, [a]
