@@ -6,7 +6,7 @@ open Type
 let duplicate () =
   let x = Var.newvar "x" reg_1 in
   let y = Var.newvar "y" reg_1 in
-  let z = Var.newvar "z" reg_1 in
+  (* let z = Var.newvar "z" reg_1 in *)
   let e = Var.newvar "e" reg_1 in
   let l1,l2,le = newlab (), newlab (), newlab () in
   let p = [
@@ -18,11 +18,12 @@ let duplicate () =
     Move(x, exp_false, []);
     Ast.Label(le, []);
     Move(y, Var x, []);
-    Move(z, Var y, [Liveout]);
+    Assert(Var y, []);
+    (* Move(z, Var y, [Liveout]); *)
   ] in
   let ssacfg = Cfg_ssa.of_ast p in
   let ssacfg = Ssa_simp.simp_cfg ssacfg in
-  Cfg_pp.SsaStmtsDot.output_graph stdout ssacfg;
+  (* Cfg_pp.SsaStmtsDot.output_graph stdout ssacfg; *)
   let num_assigns = ref 0 in
   let v = object(self)
     inherit Ssa_visitor.nop
