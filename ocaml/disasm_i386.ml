@@ -1048,7 +1048,9 @@ let rec to_ir mode addr next ss pref has_rex has_vex =
       | Oimm _ | Oseg _ -> disfailwith "invalid source operand for movdq"
     in
     let (d, al) = match d with
-      | Ovec _ | Oreg _ -> assn t d s, al
+      (* Behavior is to clear the xmm bits *)
+      | Ovec _ -> assn r128 d (cast_unsigned r128 s), al
+      | Oreg _ -> assn t d s, al
       | Oaddr a -> assn t d s, a::al
       | Oimm _ | Oseg _ -> disfailwith "invalid dest operand for movdq"
     in
