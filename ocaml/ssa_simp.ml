@@ -25,6 +25,6 @@ let simp_cfg ?(liveout=[]) ?(usedc=true) ?(usesccvn=true) ?(usemisc=true) cfg =
   !cfgref
 
 let simp_astcfg ?(liveout=[]) ?usedc ?usesccvn ?usemisc g =
-  let {cfg; to_ssavar} = Cfg_ssa.trans_cfg g in
-  let cfg = simp_cfg ?usedc ?usesccvn ?usemisc ~liveout:(List.map to_ssavar liveout) cfg in
-  Cfg_ssa.to_astcfg cfg
+  let {ssacfg; to_ssavar} = Cfg_ssa.trans_cfg g in
+  let ssacfg = simp_cfg ?usedc ?usesccvn ?usemisc ~liveout:(List.map to_ssavar liveout) ssacfg in
+  Cfg_ssa.to_astcfg ssacfg

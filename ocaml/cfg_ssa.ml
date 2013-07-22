@@ -215,8 +215,8 @@ let defsites cfg =
     (* FIXME: maybe avoiding find_all will make it faster *)
 
 
-type translation_results = {
-  cfg : Cfg.SSA.G.t;
+type cfg_translation_results = {
+  ssacfg : Cfg.SSA.G.t;
   to_ssaexp: Cfg.aststmtloc -> Ast.exp -> Ssa.exp;
   to_ssavar: Var.t -> Var.t;
   to_astvar: Var.t -> Var.t;
@@ -225,8 +225,6 @@ type translation_results = {
 
 let rec trans_cfg ?tac cfg =
   pdebug "Translating to SSA";
-  (* if debug && not(Ast_cfg.well_defined cfg) then
-     raise(TypeError "Ssa.trans_cfg: given cfg not well defined");*)
 
   let cfg = Prune_unreachable.prune_unreachable_ast (CA.copy cfg) in
   pdebug "Creating new cfg";
@@ -422,10 +420,10 @@ let rec trans_cfg ?tac cfg =
   let to_ssavar v = try VH.find exitctx v with Not_found -> v in
   let to_astvar v = try VH.find to_oldvar v with Not_found -> v in
   let to_astloc = VH.find to_oldloc in
-  {cfg=ssa; to_ssaexp; to_ssavar; to_astvar; to_astloc}
+  {ssacfg=ssa; to_ssaexp; to_ssavar; to_astvar; to_astloc}
 
 let of_astcfg ?tac cfg =
-  let {cfg=ssa} = trans_cfg ?tac cfg in
+  let {ssacfg=ssa} = trans_cfg ?tac cfg in
   ssa
 
 let of_ast ?tac p = 
@@ -783,10 +781,20 @@ let cfg2ast tm cfg =
   let astcfg, _, _ = Cfg.map_ssa2ast (stmts2ast tm) (fun e -> exp2ast tm e) cfg in
   astcfg
 
-(** Convert an SSA CFG to an AST CFG. *)
-let to_astcfg ?(remove_temps=true) ?(dsa=false) c =
+type ssa_translation_results = {
+  cfg : Cfg.AST.G.t;
+  to_astexp: Ssa.exp -> Ast.exp; (** Maps SSA expressions to AST expressions. *)
+}
+
+let trans_ssacfg ?(remove_temps=true) ?(dsa=false) c =
   let tm = if remove_temps then create_tm c else VH.create 1 in
-  cfg2ast tm (rm_phis ~dsa c)
+  {cfg=cfg2ast tm (rm_phis ~dsa c);
+   to_astexp=exp2ast tm}
+
+(** Convert an SSA CFG to an AST CFG. *)
+let to_astcfg ?remove_temps ?dsa c =
+  match trans_ssacfg ?remove_temps ?dsa c with
+  | {cfg} -> cfg
 
 (** Convert an SSA CFG to an AST program. *)
 let to_ast ?(remove_temps=true) c =

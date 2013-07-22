@@ -407,7 +407,7 @@ let passified_of_ssa ?entry ?exit ?mode cfg =
 
 
 let passified_of_astcfg ?entry ?exit ?mode cfg =
-  let {Cfg_ssa.cfg=ssa; to_ssavar=tossa} = Cfg_ssa.trans_cfg cfg in
+  let {Cfg_ssa.ssacfg=ssa; to_ssavar=tossa} = Cfg_ssa.trans_cfg cfg in
   let convert = function
     | Some v -> Some(C.find_vertex ssa (CA.G.V.label v))
     | None -> None
