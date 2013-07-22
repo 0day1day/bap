@@ -171,9 +171,9 @@ type opcode =
   | Movzx of typ * operand * typ * operand (* dsttyp, dst, srctyp, src *)
   | Movsx of typ * operand * typ * operand (* dsttyp, dst, srctyp, src *)
   | Movdq of typ * operand * operand * bool (* move type, dst op, src op, aligned *)
-   (* dest type, dest, element type, src1 type, src1, src1 src offset, src1 dest offset, 
-                   optional src2 type, optional src2, src2 src offset, src2 dest offset *)
   | Movoffset of (typ * operand) * typ * (typ * operand * int option  * int option) * (typ * operand * int option * int option) option
+   (* dest type, dest, element type, src1 type, src1, src1 src offset, src1 dest offset,
+      optional src2 type, optional src2, src2 src offset, src2 dest offset *)
   | Lea of typ * operand * Ast.exp
   | Call of operand * Type.addr (* addr is RA *)
   | Shift of binop_type * typ * operand * operand
