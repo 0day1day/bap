@@ -2861,12 +2861,12 @@ let parse_instr mode g addr =
            parse it to get the next address *)
         let _, _, na = parse_modrm_addr None na in
         (Nop, na)
+      | 0x10 | 0x11 when (prefix.repeat || prefix.nrepeat) -> 
+        disfailwith "MOVSS/MOVSD unimplemented"
       | 0x12 | 0x13 | 0x16 | 0x17 -> (* MOVLPS, MOVLPD, MOVHPS, MOVHPD, MOVHLPS, MOVHLPD, MOVLHPS, MOVLHPD *)
-(*      | (0x10 | 0x11) when (prefix.repeat || prefix.nrepeat) -> *)
         let r, rm, rv, na = parse_modrm_vec None na in
         let tdst, dst, telt, tsrc1, src1, off_src1, off_dst1, src2 =
           match b2 with
-          | 0x10 | 0x11 -> disfailwith "MOVSS/MOVSD unimplemented"
           | (0x12 | 0x16) when rv <> None ->
             let offs1, offs2, offd1, offd2 = match b2, rm with
               | 0x12, Ovec _ -> Some 64, Some 64, Some 64, Some 0
