@@ -897,7 +897,7 @@ let check_delta state =
      with Exit -> ());
     !foundone
   in
-  let check_mem cm addr v =
+  let check_mem mem_var cm cmv addr v =
     let addr64 = addr_to_int64 addr in
     if v.tnt || !checkall then (
       let tracebyte = get_int v.exp in
@@ -905,8 +905,12 @@ let check_delta state =
         match AddrMap.find addr64 cm with
         | Int(v, t) -> let evalbyte = fst (Arithmetic.to_val t v) in
                        let issymb = Hashtbl.mem global.symbolic addr in
-                       if (tracebyte <>% evalbyte) && (not issymb)
-                       then wprintf "Consistency error: Tainted memory value (address %Lx, value %s) present in trace does not match value %s in concrete evaluator" addr64 (~% tracebyte) (~% evalbyte)
+                       if (tracebyte <>% evalbyte) && (not issymb) then 
+                       let newmem = TraceConcrete.update_mem (ConcreteMem(cm, cmv)) 
+                                    (Int(addr, Reg 64)) (Int(tracebyte, t)) exp_false 
+                       in
+                       VH.replace state.delta mem_var newmem;
+                       wprintf "Consistency error: Tainted memory value (address %Lx, value %s) present in trace does not match value %s in concrete evaluator" addr64 (~% tracebyte) (~% evalbyte);
         | e when contains_unknown e -> ()
         | e -> failwith (Printf.sprintf "Expected Int or expression containing an unknown but got %s" (Pp.ast_exp_to_string e))
       with Not_found ->
@@ -954,6 +958,8 @@ let check_delta state =
 	    let evalval_str = Pp.ast_exp_to_string evalval in
 	    wprintf "Difference between %sBAP and trace values for [*%s* Trace=%s Eval=%s]" s dsavarname traceval_str evalval_str;
 	    wprintf "This is due to one of the following statements:\n%s"  badstmt;
+      (* Replace the incorrect value with the correct one from the trace *)
+      VH.replace state.delta var (Symbolic traceval);
 	  )
       (* If we can't find concrete value, it's probably just a BAP 
          temporary *)
@@ -961,11 +967,11 @@ let check_delta state =
     ) (* probably a temporary *)
     | TMem _
     | Array _ ->
-        let cmem = match evalval with
-          | ConcreteMem(cm, _) -> cm
+        let cmem, cmv = match evalval with
+          | ConcreteMem(cm, v) -> cm, v
           | Symbolic(e) -> failwith (Printf.sprintf "Concrete execution only: %s=%s" (Var.name var) (Pp.ast_exp_to_string e))
         in
-        Hashtbl.iter (check_mem cmem) global.memory
+        Hashtbl.iter (check_mem var cmem cmv) global.memory
 
   in
   VH.iter check_var state.delta
