@@ -70,6 +70,7 @@ define PROJ_baptest
 	sreedhar_suite.ml \
 	unroll_suite.ml \
 	vsa_suite.ml \
+	opts_suite.ml \
 	bap_suite.ml
 	DOC_FILES=$(SOURCES)
 endef
