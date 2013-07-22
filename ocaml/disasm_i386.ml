@@ -170,7 +170,7 @@ type opcode =
   | Movs of typ
   | Movzx of typ * operand * typ * operand (* dsttyp, dst, srctyp, src *)
   | Movsx of typ * operand * typ * operand (* dsttyp, dst, srctyp, src *)
-  | Movdq of typ * operand * operand * bool (* move type, dst op, src op, aligned *)
+  | Movdq of typ * operand * typ * operand * bool (* dst type, dst op, src type, src op, aligned *)
   | Movoffset of (typ * operand) * typ * (typ * operand * int option  * int option) * (typ * operand * int option * int option) option
    (* dest type, dest, element type, src1 type, src1, src1 src offset, src1 dest offset,
       optional src2 type, optional src2, src2 src offset, src2 dest offset *)
@@ -1041,17 +1041,17 @@ let rec to_ir mode addr next ss pref has_rex has_vex =
     [assn t dst (cast_unsigned t (op2e ts src))]
   | Movsx(t, dst, ts, src) when pref = [] ->
     [assn t dst (cast_signed t (op2e ts src))]
-  | Movdq(t, s, d, align) ->
+  | Movdq(ts, s, td, d, align) ->
     let (s, al) = match s with
-      | Ovec _ | Oreg _-> op2e t s, []
-      | Oaddr a -> op2e t s, [a]
+      | Ovec _ | Oreg _-> op2e ts s, []
+      | Oaddr a -> op2e ts s, [a]
       | Oimm _ | Oseg _ -> disfailwith "invalid source operand for movdq"
     in
     let (d, al) = match d with
       (* Behavior is to clear the xmm bits *)
-      | Ovec _ -> assn r128 d (cast_unsigned r128 s), al
-      | Oreg _ -> assn t d s, al
-      | Oaddr a -> assn t d s, a::al
+      | Ovec _ -> assn td d (cast_unsigned td s), al
+      | Oreg _ -> assn td d s, al
+      | Oaddr a -> assn td d s, a::al
       | Oimm _ | Oseg _ -> disfailwith "invalid dest operand for movdq"
     in
     let im = int_of_mode mode in
@@ -1161,9 +1161,13 @@ let rec to_ir mode addr next ss pref has_rex has_vex =
       | Oaddr a -> load t a
       | Oreg _ | Oimm _ | Oseg _ -> disfailwith "invalid"
     in
+    let dst, vsrc = match vsrc with 
+      | None -> dst, dst
+      | Some vsrc -> dst, vsrc
+    in
     let compare_region i =
       let byte1 = Extract(biconst (i*elebits-1), biconst ((i-1)*elebits), src) in
-      let byte2 = Extract(biconst (i*elebits-1), biconst ((i-1)*elebits), op2e t dst) in
+      let byte2 = Extract(biconst (i*elebits-1), biconst ((i-1)*elebits), op2e t vsrc) in
       let tmp = nt ("t" ^ string_of_int i) elet in
       Var tmp, move tmp (Ite(binop bop byte1 byte2, lt (-1L) elet, lt 0L elet))
     in
@@ -1173,9 +1177,7 @@ let rec to_ir mode addr next ss pref has_rex has_vex =
       let temps = List.rev temps in
         (* could also be done with shifts *)
       let store_back = List.fold_left (fun acc i -> Concat(acc,i)) (List.hd temps) (List.tl temps) in
-      cmps @ (match vsrc with
-              | None -> [assn t dst store_back]
-              | Some vdst -> [assn t vdst store_back])
+      cmps @ [assn t dst store_back]
   | Pmov (t, dstet, srcet, dst, src, ext, _) ->
     let nelem = match t, dstet with
       | Reg n, Reg n' -> n / n'
@@ -2902,7 +2904,7 @@ let parse_instr mode g addr =
       | 0x10 | 0x11 | 0x28 | 0x29 | 0x6e | 0x7e | 0x6f | 0x7f | 0xd6 ->
       (* REGULAR MOVDQ *)
         let r, rm, _, na = parse_modrm_vec None na in
-        let src, dst, t, align = match b2 with
+        let src, dst, tsrc, tdst, align = match b2 with
           | 0x10 | 0x11 | 0x28 | 0x29 -> (* MOVUPS, MOVUPD, MOVAPS, MOVAPD *)
             let s, d = match b2 with 
               | 0x10 | 0x28 -> rm, r 
@@ -2914,17 +2916,17 @@ let parse_instr mode g addr =
               | 0x28 | 0x29 -> true
               | _ -> disfailwith "impossible"
             in
-            s, d, prefix.mopsize, align
+            s, d, prefix.mopsize, prefix.mopsize, align
           | 0x6e | 0x7e -> (* MOVD, MOVQ *)
-            let s, d = match b2 with
-              | 0x6e -> toreg rm, r
-              | 0x7e when prefix.repeat -> rm, r
-              | 0x7e -> r, toreg rm
+            let t = if prefix.opsize = r64 then r64 else r32 in
+            let s, d, ts, td = match b2 with
+              | 0x6e -> toreg rm, r, t, r128
+              | 0x7e when prefix.repeat -> rm, r, t, t
+              | 0x7e -> r, toreg rm, t, t
               | _ -> disfailwith "impossible"
             in
             (* Prefix.opsize is 16 when there's an opsize_override *)
-            let t = if prefix.opsize = r64 then r64 else r32 in
-            s, d, t, false
+            s, d, ts, td, false
           | 0x6f | 0x7f -> (* MOVQ, MOVDQA, MOVDQU *)
             let s, d = match b2 with
               | 0x6f -> rm, r
@@ -2933,13 +2935,13 @@ let parse_instr mode g addr =
             in
             let size = if prefix.repeat && prefix.vex = None then r128 else prefix.mopsize in
             let align = if prefix.repeat then true else false in
-            s, d, size, align
+            s, d, size, size, align
           | 0xd6 -> (* MOVQ *)
-            r, rm, r64, false
+            r, rm, r64, r64, false
           | _ -> unimplemented
             (Printf.sprintf "mov opcode case missing: %02x" b2)
         in
-        (Movdq(t, src, dst, align), na)
+        (Movdq(tsrc, src, tdst, dst, align), na)
       | 0x31 -> (Rdtsc, na)
       | 0x34 -> (Sysenter, na)
       | 0x38 ->
@@ -3185,7 +3187,7 @@ let parse_instr mode g addr =
         (Pbinop(prefix.mopsize, XOR, "pxor", r, rm, rv), na)
       | 0xf0 ->
         let r, rm, _, na = parse_modrm_vec None na in
-        (Movdq(prefix.mopsize, rm, r, false), na)
+        (Movdq(prefix.mopsize, rm, prefix.mopsize, r, false), na)
       | 0xf8 | 0xf9 | 0xfa | 0xfb ->
         let r, rm, rv, na = parse_modrm_vec None na in
         let eltsize = match b2 & 7 with
