@@ -2532,11 +2532,7 @@ let parse_instr mode g addr =
       (Pop(prefix.bopsize, Oreg(rm_extend lor (b1 & 7))), na)
     | 0x63 when mode = X8664 -> 
       let (r, rm, na) = parse_modrm_addr None na in
-      let t = match prefix.rex with
-        | Some {rex_w=true} -> r64
-        | _ -> r32
-      in
-      (Movsx(t, r, r32, rm), na)
+      (Movsx(prefix.opsize, r, r32, rm), na)
     | 0x68 | 0x6a  ->
       let (o, na) = 
         (* SWXXX Sign extend these? *)
@@ -2865,8 +2861,8 @@ let parse_instr mode g addr =
            parse it to get the next address *)
         let _, _, na = parse_modrm_addr None na in
         (Nop, na)
-      | 0x12 | 0x13 | 0x16 | 0x17 (* MOVLPS, MOVLPD, MOVHPS, MOVHPD, MOVHLPS, MOVHLPD, MOVLHPS, MOVLHPD *)
-      | (0x10 | 0x11) when (prefix.repeat || prefix.nrepeat) ->
+      | 0x12 | 0x13 | 0x16 | 0x17 -> (* MOVLPS, MOVLPD, MOVHPS, MOVHPD, MOVHLPS, MOVHLPD, MOVLHPS, MOVLHPD *)
+(*      | (0x10 | 0x11) when (prefix.repeat || prefix.nrepeat) -> *)
         let r, rm, rv, na = parse_modrm_vec None na in
         let tdst, dst, telt, tsrc1, src1, off_src1, off_dst1, src2 =
           match b2 with
@@ -2901,7 +2897,7 @@ let parse_instr mode g addr =
           | _ -> disfailwith "impossible"
         in
         (Movoffset((tdst, dst), telt, (tsrc1, src1, off_src1, off_dst1), src2), na)
-      | 0x10 | 0x11 |  0x28 | 0x29 | 0x6e | 0x7e | 0x6f | 0x7f | 0xd6 ->
+      | 0x10 | 0x11 | 0x28 | 0x29 | 0x6e | 0x7e | 0x6f | 0x7f | 0xd6 ->
       (* REGULAR MOVDQ *)
         let r, rm, _, na = parse_modrm_vec None na in
         let src, dst, t, align = match b2 with
@@ -2924,7 +2920,9 @@ let parse_instr mode g addr =
               | 0x7e -> r, toreg rm
               | _ -> disfailwith "impossible"
             in
-            s, d, prefix.opsize, false
+            (* Prefix.opsize is 16 when there's an opsize_override *)
+            let t = if prefix.opsize = r64 then r64 else r32 in
+            s, d, t, false
           | 0x6f | 0x7f -> (* MOVQ, MOVDQA, MOVDQU *)
             let s, d = match b2 with
               | 0x6f -> rm, r
