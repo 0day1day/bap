@@ -3032,6 +3032,10 @@ let parse_instr mode g addr =
       | 0x4a | 0x4b | 0x4c | 0x4d | 0x4e | 0x4f ->
         let (r, rm, na) = parse_modrm_addr None na in
         (Mov(prefix.opsize, r, rm, Some(cc_to_exp b2)), na)
+      | 0x57 -> 
+        let r, rm, rv, na = parse_modrm_vec None na in
+        let t = if prefix.mopsize = r256 then r256 else r128 in
+        (Ppackedbinop(t, prefix.opsize, binop XOR, "xorp", r, rm, rv), na)
       | 0x60 | 0x61 | 0x62 | 0x68 | 0x69 | 0x6a | 0x6c | 0x6d ->
         let order = match b2 with
           | 0x60 | 0x61 | 0x62 | 0x6c -> Low
@@ -3172,6 +3176,9 @@ let parse_instr mode g addr =
         let r, rm, na = parse_modrm_addr None na in
         let r, rm = r, tovec rm in
         (Pmovmskb(prefix.mopsize, r, rm), na)
+      | 0xde ->
+        let r, rm, rv, na = parse_modrm_vec None na in
+        (Ppackedbinop(prefix.mopsize, reg_8, Ast_convenience.max_symbolic ~signed:false, "pmaxub", r, rm, rv), na)
       | 0xe0 | 0xe3 ->
         (* pavg *)
         let r, rm, rv, na = parse_modrm_vec None na in

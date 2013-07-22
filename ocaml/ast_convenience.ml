@@ -287,6 +287,10 @@ let min_symbolic ~signed e1 e2 =
   let bop = if signed then SLT else LT in
   exp_ite (binop bop e1 e2) e1 e2
 
+let max_symbolic ~signed e1 e2 =
+  let bop = if signed then SLT else LT in
+  exp_ite (unop NOT (binop bop e1 e2)) e1 e2
+
 (* Extract the nth least significant element of type t from e,
    starting with zero. n is a non-negative integer. *)
 let extract_element t e n =
