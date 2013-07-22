@@ -119,11 +119,11 @@ module CPSSA = CfgDataflow.Make(CPSpecSSA)
 let copyprop_ssa ?(stop_before=(fun _ -> false)) ?(stop_after=(fun _ -> false)) g =
   let _, dfout =
     CPSSA.worklist_iterate g in
-  let has_bad e =
+  let has f e =
     let vis = object(self)
       inherit Ssa_visitor.nop
       method visit_exp e =
-        if stop_before e
+        if f e
         then raise Exit
         else DoChildren
     end
@@ -134,13 +134,14 @@ let copyprop_ssa ?(stop_before=(fun _ -> false)) ?(stop_after=(fun _ -> false)) 
   let propagate l v =
     let vis = object(self)
       inherit Ssa_visitor.nop
-      method visit_exp = function
-        | e when stop_after e -> SkipChildren
+      method visit_exp e = dprintf "visit_exp %s" (Pp.ssa_exp_to_string e); match e with (*function*)
         | Ssa.Var v ->
           (try
              match VM.find v l with
              | CPSpecSSA.L.Middle e ->
-               if has_bad e then SkipChildren
+               dprintf "%s to %s" (Pp.var_to_string v) (Pp.ssa_exp_to_string e);
+               if has stop_before e then SkipChildren
+               else if has stop_after e then ChangeTo e
                else ChangeToAndDoChildren e
              | _ -> SkipChildren
            with Not_found -> SkipChildren)
@@ -186,11 +187,11 @@ let copyprop_ast ?(stop_before=(fun _ -> false)) ?(stop_after=(fun _ -> false)) 
   in
   let module UD = Depgraphs.UseDef_AST in
   let module LS = UD.LS in
-  let has_bad e =
+  let has f e =
     let vis = object(self)
       inherit Ast_visitor.nop
       method visit_exp e =
-        if stop_before e
+        if f e
         then raise Exit
         else DoChildren
     end
@@ -204,7 +205,6 @@ let copyprop_ast ?(stop_before=(fun _ -> false)) ?(stop_after=(fun _ -> false)) 
       inherit Ast_visitor.nop
       method visit_exp = function
         (* Stop propagating *)
-        | e when stop_after e -> SkipChildren
         | Ast.Var v ->
           (try
              match VM.find v l with
@@ -225,9 +225,9 @@ let copyprop_ast ?(stop_before=(fun _ -> false)) ?(stop_after=(fun _ -> false)) 
                    && LS.is_empty (LS.inter vdefs visitedlocs)
                   ) (vars_in e) in
                if can_copy then (
-                 if not (has_bad e)
-                 then ChangeTo (propagate dfin origloc (LS.add (UD.LocationType.Loc newloc) visitedlocs) newloc e)
-                 else SkipChildren
+                 if has stop_before e then SkipChildren
+                 else if has stop_after e then ChangeTo e
+                 else ChangeTo (propagate dfin origloc (LS.add (UD.LocationType.Loc newloc) visitedlocs) newloc e)
                ) else SkipChildren
              | _ -> SkipChildren
            with Not_found -> SkipChildren)
