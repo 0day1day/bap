@@ -146,7 +146,11 @@ match !stpout with
     Printf.fprintf stderr "Solving\n"; flush stderr;
     let r = (!Solver.solver)#solve_formula_file ?timeout:!timeout ~getmodel:true !stpoutname in
     Printf.fprintf stderr "Solve result: %s\n" (Smtexec.result_to_string r);
-    match r with | Smtexec.SmtError _ -> failwith "Solver error" | _ -> ()
+    match r with
+    | Smtexec.Invalid m ->
+      Smtexec.print_model m
+    | Smtexec.SmtError _ -> failwith "Solver error"
+    | _ -> ()
   )
 
 ;;
