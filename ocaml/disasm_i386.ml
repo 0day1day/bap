@@ -192,6 +192,7 @@ type opcode =
   | Pop of typ * operand
   | Pushf of typ
   | Popf of typ
+  | Popcnt of typ * operand * operand (* size, src, dest *)
   | Sahf
   | Lahf
   | Add of (typ * operand * operand)
@@ -1808,6 +1809,14 @@ let rec to_ir mode addr next ss pref has_rex has_vex =
     move tmp (load_s mode seg_ss t rsp_e)
     :: move rsp (rsp_e +* mi (bytes_of_width t))
     :: List.flatten (List.map2 (fun f e -> f e) assnsf extractlist)
+  | Popcnt(t, s, d) ->
+    let width = bits_of_width t in
+    let bits = Ast_convenience.extract (width - 1) 0 (op2e t s) in
+    let bitvector = Array.to_list (Array.init width (fun i -> (bits >>* (it i t)) &* (it 1 t))) in
+    let count = List.fold_left (+*) (it 0 t) bitvector in
+    assn t d count
+    :: set_zf t count
+    :: List.map (fun r -> move r (it 0 r1)) [cf; oF; sf; af; pf]
   | Sahf ->
     let assnsf = assns_lflags_to_bap in
     let tah = nt "AH" r8 in
@@ -3119,10 +3128,9 @@ let parse_instr mode g addr =
       | 0xb7 -> let st = if b2 = 0xb6 then r8 else r16 in
                 let r, rm, na = parse_modrm_addr None na in
                 (Movzx(prefix.opsize, r, st, rm), na)
-(*      | 0xb8 with prefix.repeat -> 
-        let bitvector = Array.to_list (Array.init (bits_of_width prefix.opsize) 
-        (fun i -> (it i prefix.opsize) &* (it 1 prefix.opsize))) in
-        [assn t dst (cast_signed t (op2e ts src))] *)
+      | 0xb8 when prefix.repeat -> 
+        let r, rm, na = parse_modrm_addr None na in
+        (Popcnt (prefix.opsize, rm, r), na)
       | 0xbc | 0xbd ->
         let dir = match b2 with | 0xbc -> Forward | 0xbd -> Backward | _ -> failwith "impossible" in
         let r, rm, na = parse_modrm_addr None na in
