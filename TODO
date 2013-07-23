@@ -18,3 +18,9 @@ Other:
 
 Bigger projects:
 * Add support for AMD64 binaries. (almost done)
+
+Branch specific:
+* Depgraphs.ml: Make a separate graph type for depgraphs.ml with
+   Lang.exp = unit
+* Cfg.mli: How can we make expressions more structured?
+* Should we add edge conditions to the visitor?
