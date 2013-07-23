@@ -82,64 +82,64 @@ let (==!) = vn_eq
 let (<=!) vn1 vn2 = vn_compare vn1 vn2 <= 0
 let (<>!) v1 v2 = not (vn_eq v1 v2)
 
-let expid_eq e1 e2 =
-  (* values, vns, bops, uops, types, cts, vars, big ints *)
-  let getnum = function
-    | Const _ -> 1
-    | It _ -> 2
-    | Ex _ -> 3
-    | Con _ -> 4
-    | Bin _ -> 5
-    | Un _ -> 6
-    | Cst _ -> 7
-    | Unique _ -> 8
-    | Ld _ -> 9
-    | St _ -> 10
-    | Ph _ -> 11
-  in
-  let getargs = function
-    | Const(v) -> [v], [], [], [], [], [], [], []
-    | It(vn1,vn2,vn3) -> [], [vn1;vn2;vn3], [], [], [], [], [], []
-    | Ex(bi1,bi2,vn1) -> [], [vn1], [], [], [], [], [], [bi1;bi2]
-    | Con(vn1,vn2) -> [], [vn1;vn2], [], [], [], [], [], []
-    | Bin(bop, vn1, vn2) -> [], [vn1; vn2], [bop], [], [], [], [], []
-    | Un(uop, vn) -> [], [vn], [], [uop], [], [], [], []
-    | Cst(ct, t, vn) -> [], [vn], [], [], [t], [ct], [], []
-    | Unique(var) -> [], [], [], [], [], [], [var], []
-    | Ld(vn1, vn2, vn3, t) -> [], [vn1; vn2; vn3], [], [], [t], [], [], []
-    | St(vn1, vn2, vn3, vn4, t) -> [], [vn1; vn2; vn3; vn4], [], [], [t], [], [], []
-    | Ph(vnlist) -> [], vnlist, [], [], [], [], [], []
-  in
-  if (getnum e1) <> (getnum e2) then false
-  else (
-    let l1,l2,l3,l4,l5,l6,l7,l8 = getargs e1 in
-    let r1,r2,r3,r4,r5,r6,r7,r8 = getargs e2 in
-    let phil = (List.length l2) == (List.length r2) in
-    let b1 = List.for_all2 (==) l1 r1 in
-    let b2 = if phil then List.for_all2 (==) l2 r2 else false in
-    let b3 = List.for_all2 (=) l3 r3 in
-    let b4 = List.for_all2 (=) l4 r4 in
-    let b5 = List.for_all2 (=) l5 r5 in
-    let b6 = List.for_all2 (=) l6 r6 in
-    let b7 = List.for_all2 (=) l7 r7 in
-    let b8 = List.for_all2 (==%) l8 r8 in
-    if b1 && b2 && b3 && b4 && b5 && b6 && b7 && b8 then
-      true
-    else if b3 && b4 && b5 && b6 && b7 && b8 then
-      (* e1 and e2 are not physically equal.  But maybe the
-         subexpressions are structurally, but not physically,
-         equal. *)
-      List.for_all2 Ssa.full_value_eq l1 r1
-      && if phil then List.for_all2 vn_eq l2 r2 else false
-    else
-      false)
+(* let expid_eq e1 e2 = *)
+(*   (\* values, vns, bops, uops, types, cts, vars, big ints *\) *)
+(*   let getnum = function *)
+(*     | Const _ -> 1 *)
+(*     | It _ -> 2 *)
+(*     | Ex _ -> 3 *)
+(*     | Con _ -> 4 *)
+(*     | Bin _ -> 5 *)
+(*     | Un _ -> 6 *)
+(*     | Cst _ -> 7 *)
+(*     | Unique _ -> 8 *)
+(*     | Ld _ -> 9 *)
+(*     | St _ -> 10 *)
+(*     | Ph _ -> 11 *)
+(*   in *)
+(*   let getargs = function *)
+(*     | Const(v) -> [v], [], [], [], [], [], [], [] *)
+(*     | It(vn1,vn2,vn3) -> [], [vn1;vn2;vn3], [], [], [], [], [], [] *)
+(*     | Ex(bi1,bi2,vn1) -> [], [vn1], [], [], [], [], [], [bi1;bi2] *)
+(*     | Con(vn1,vn2) -> [], [vn1;vn2], [], [], [], [], [], [] *)
+(*     | Bin(bop, vn1, vn2) -> [], [vn1; vn2], [bop], [], [], [], [], [] *)
+(*     | Un(uop, vn) -> [], [vn], [], [uop], [], [], [], [] *)
+(*     | Cst(ct, t, vn) -> [], [vn], [], [], [t], [ct], [], [] *)
+(*     | Unique(var) -> [], [], [], [], [], [], [var], [] *)
+(*     | Ld(vn1, vn2, vn3, t) -> [], [vn1; vn2; vn3], [], [], [t], [], [], [] *)
+(*     | St(vn1, vn2, vn3, vn4, t) -> [], [vn1; vn2; vn3; vn4], [], [], [t], [], [], [] *)
+(*     | Ph(vnlist) -> [], vnlist, [], [], [], [], [], [] *)
+(*   in *)
+(*   if (getnum e1) <> (getnum e2) then false *)
+(*   else ( *)
+(*     let l1,l2,l3,l4,l5,l6,l7,l8 = getargs e1 in *)
+(*     let r1,r2,r3,r4,r5,r6,r7,r8 = getargs e2 in *)
+(*     let phil = (List.length l2) == (List.length r2) in *)
+(*     let b1 = List.for_all2 (==) l1 r1 in *)
+(*     let b2 = if phil then List.for_all2 (==) l2 r2 else false in *)
+(*     let b3 = List.for_all2 (=) l3 r3 in *)
+(*     let b4 = List.for_all2 (=) l4 r4 in *)
+(*     let b5 = List.for_all2 (=) l5 r5 in *)
+(*     let b6 = List.for_all2 (=) l6 r6 in *)
+(*     let b7 = List.for_all2 (=) l7 r7 in *)
+(*     let b8 = List.for_all2 (==%) l8 r8 in *)
+(*     if b1 && b2 && b3 && b4 && b5 && b6 && b7 && b8 then *)
+(*       true *)
+(*     else if b3 && b4 && b5 && b6 && b7 && b8 then *)
+(*       (\* e1 and e2 are not physically equal.  But maybe the *)
+(*          subexpressions are structurally, but not physically, *)
+(*          equal. *\) *)
+(*       List.for_all2 Ssa.full_value_eq l1 r1 *)
+(*       && if phil then List.for_all2 vn_eq l2 r2 else false *)
+(*     else *)
+(*       false) *)
 
 module EH =
   Hashtbl.Make(struct
-                 type t = expid
-                 let equal = expid_eq
-                 and hash = Hashtbl.hash
-               end)
+    type t = expid
+    let equal = (=)
+    and hash = Hashtbl.hash
+  end)
 
 type rpoinfo = { (* private to the SCCVN module *)
   vn_h : vn VH.t; (* maps vars to value numbers *)

@@ -17,8 +17,9 @@ let short_tests = [
   Unroll_suite.suite;
   Steensgard_suite.suite;
   Havlak_suite.suite;
-(*  Reduced_havlak_suite.suite; *)
+  (* Reduced_havlak_suite.suite; *)
   Sreedhar_suite.suite;
+  Opts_suite.suite;
 ];;
 
 let bap_tests = ("BAP" >::: short_tests);;
