@@ -897,31 +897,39 @@ let check_delta state =
      with Exit -> ());
     !foundone
   in
-  let check_mem mem_var cm cmv addr v =
+  let check_mem mem_var cm addr v delta =
     let addr64 = addr_to_int64 addr in
     if v.tnt || !checkall then (
       let tracebyte = get_int v.exp in
+      let fix_state () =
+        let mem = TraceConcrete.lookup_var delta mem_var in
+        let newmem =
+          TraceConcrete.update_mem mem
+            (Int(addr, Reg 64)) (Int(tracebyte, reg_8)) exp_false
+        in
+        TraceConcrete.update_var delta mem_var newmem
+      in
       try
         match AddrMap.find addr64 cm with
         | Int(v, t) -> let evalbyte = fst (Arithmetic.to_val t v) in
                        let issymb = Hashtbl.mem global.symbolic addr in
-                       if (tracebyte <>% evalbyte) && (not issymb) then 
-                       let newmem = TraceConcrete.update_mem (ConcreteMem(cm, cmv)) 
-                                    (Int(addr, Reg 64)) (Int(tracebyte, t)) exp_false 
-                       in
-                       VH.replace state.delta mem_var newmem;
-                       wprintf "Consistency error: Tainted memory value (address %Lx, value %s) present in trace does not match value %s in concrete evaluator" addr64 (~% tracebyte) (~% evalbyte);
-        | e when contains_unknown e -> ()
+                       if (tracebyte <>% evalbyte) && (not issymb) then (
+                         wprintf "Consistency error: Tainted memory value (address %Lx, value %s) present in trace does not match value %s in concrete evaluator" addr64 (~% tracebyte) (~% evalbyte);
+                         fix_state ())
+                       else delta
+        | e when contains_unknown e -> delta
         | e -> failwith (Printf.sprintf "Expected Int or expression containing an unknown but got %s" (Pp.ast_exp_to_string e))
       with Not_found ->
         (* Even if checkall is enabled, we don't get an initial memory
            dump, so we should not report an error unless the value is
            tainted. *)
-        if v.tnt then
-          wprintf "Consistency error: Tainted memory value (address %Lx, value %s) present in trace but missing in concrete evaluator" addr64 (~% tracebyte)
-    )
+        if v.tnt then (
+          wprintf "Consistency error: Tainted memory value (address %Lx, value %s) present in trace but missing in concrete evaluator" addr64 (~% tracebyte);
+          fix_state ())
+        else delta
+    ) else delta
   in
-  let check_var var evalval =
+  let check_var var evalval delta =
     match Var.typ var with
     | Reg _ -> (
       let dsavarname = dsa_orig_name var in
@@ -929,21 +937,22 @@ let check_delta state =
       let evalval = symbtoexp evalval in
       let tainted = dsa_taint_val var in
       (match dsavarname, traceval, tainted with
-      | Some(dsavarname), Some(traceval), Some(tainted) -> 
+      | Some dsavarname, Some traceval, Some tainted ->
         DV.dprintf "Doing check on %s %b %b" dsavarname (tainted || !checkall) (not (isbad var));
         let s = if (!checkall) then "" else "tainted " in
-        if (not (full_exp_eq traceval evalval) && (tainted || !checkall) 
-            && not (isbad var)) then 
+        if (not (full_exp_eq traceval evalval) && (tainted || !checkall)
+            && not (isbad var)) then
           (* The trace value and evaluator's value differ.  The
              only time this is okay is if the evaluated expression
              contains an unknown. *)
-          if contains_unknown evalval then
-            dprintf "Unknown encountered in %s: %s" dsavarname (Pp.ast_exp_to_string evalval)
-          else (
+          if contains_unknown evalval then (
+            dprintf "Unknown encountered in %s: %s" dsavarname (Pp.ast_exp_to_string evalval);
+            delta
+          ) else (
             let badstmt =
               try
-                let {assignstmt=assignstmt; assigned_time=assigned_time} = 
-                  VH.find reg_to_stmt var 
+                let {assignstmt=assignstmt; assigned_time=assigned_time} =
+                  VH.find reg_to_stmt var
                 in
                 let s = "{"^(Pp.ast_stmt_to_string assignstmt)^"}\n" in
                 if assigned_time <= !last_time then
@@ -958,23 +967,24 @@ let check_delta state =
 	    let evalval_str = Pp.ast_exp_to_string evalval in
 	    wprintf "Difference between %sBAP and trace values for [*%s* Trace=%s Eval=%s]" s dsavarname traceval_str evalval_str;
 	    wprintf "This is due to one of the following statements:\n%s"  badstmt;
-      (* Replace the incorrect value with the correct one from the trace *)
-      VH.replace state.delta var (Symbolic traceval);
-	  )
-      (* If we can't find concrete value, it's probably just a BAP 
+            (* Replace the incorrect value with the correct one from the trace *)
+            TraceConcrete.update_var delta var (Symbolic traceval)
+	  ) else delta (* everything is fine *)
+      | _ -> delta
+      (* If we can't find concrete value, it's probably just a BAP
          temporary *)
-      | _ -> ())
-    ) (* probably a temporary *)
+      )
+    )
     | TMem _
     | Array _ ->
-        let cmem, cmv = match evalval with
-          | ConcreteMem(cm, v) -> cm, v
+        let cmem = match evalval with
+          | ConcreteMem(cm, v) -> cm
           | Symbolic(e) -> failwith (Printf.sprintf "Concrete execution only: %s=%s" (Var.name var) (Pp.ast_exp_to_string e))
         in
-        Hashtbl.iter (check_mem var cmem cmv) global.memory
+        Hashtbl.fold (check_mem var cmem) global.memory delta
 
   in
-  VH.iter check_var state.delta
+  VH.fold check_var state.delta state.delta
 
 let counter = ref 1
 
@@ -1137,7 +1147,7 @@ let run_block arch ?(next_label = None) ?(transformf = (fun s _ -> [s])) state m
   ) else (
     (* remove temps *)
     clean_delta state.delta;
-    check_delta state;
+    state.delta <- check_delta state;
     (* TraceConcrete.print_values state.delta;  *)
     (* TraceConcrete.print_mem state.delta;  *)
     (* dprintf "Reg size: %d Mem size: %d" (TraceConcrete.num_values state.delta) (TraceConcrete.num_mem_locs state.delta);*)
