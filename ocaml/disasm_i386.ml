@@ -172,8 +172,8 @@ type opcode =
   | Movsx of typ * operand * typ * operand (* dsttyp, dst, srctyp, src *)
   | Movdq of typ * operand * typ * operand * bool (* dst type, dst op, src type, src op, aligned *)
   | Movoffset of (typ * operand) * (typ * typ * operand * int option  * int option) * (typ * typ * operand * int option * int option) option
-   (* dest type, dest, element1 type, src1 type, src1, src1 src offset, src1 dest offset,
-      optional element2 type, optional src2 type, optional src2, src2 src offset, src2 dest offset *)
+   (* dest type, dest, src1 length, src1 type, src1, src1 src offset, src1 dest offset,
+      optional src2 length, optional src2 type, optional src2, src2 src offset, src2 dest offset *)
   | Lea of typ * operand * Ast.exp
   | Call of operand * Type.addr (* addr is RA *)
   | Shift of binop_type * typ * operand * operand
@@ -1061,7 +1061,7 @@ let rec to_ir mode addr next ss pref has_rex has_vex =
       else []
     in
     d::al
-  | Movoffset((tdst, dst), (telt1, tsrc1, src1, off_src1, off_dst1), src2) ->
+  | Movoffset((tdst, dst), (src1_len, tsrc1, src1, off_src1, off_dst1), src2) ->
     let concat = Ast_convenience.concat in
     let extract = Ast_convenience.extract in
     (* If a vex prefix is present, then exra space is filled with 0.
@@ -1073,32 +1073,32 @@ let rec to_ir mode addr next ss pref has_rex has_vex =
     in
     (* If the source is offset from 0, extract the element from source 1 *)
     let s1 = match off_src1 with
-      | None | Some 0 -> op2e telt1 src1
-      | Some off -> extract ((bits_of_width telt1) + off - 1) off (op2e tsrc1 src1)
+      | None | Some 0 -> op2e src1_len src1
+      | Some off -> extract ((bits_of_width src1_len) + off - 1) off (op2e tsrc1 src1)
     in
     let stmt = match src2 with
       | None ->
         (match off_dst1 with
-        | None | Some 0 -> assn telt1 dst s1
+        | None | Some 0 -> assn src1_len dst s1
         | Some off -> assn tdst dst (concat s1 (extract (off - 1) 0 (op2e tdst dst))))
-      | Some (telt2, tsrc2, src2, off_src2, off_dst2) ->
+      | Some (src2_len, tsrc2, src2, off_src2, off_dst2) ->
         (* Extract second source element with offset *)
         let s2 = match off_src2 with
-          | None | Some 0 -> op2e telt2 src2
-          | Some off -> extract ((bits_of_width telt2) + off - 1) off (op2e tsrc2 src2)
+          | None | Some 0 -> op2e src2_len src2
+          | Some off -> extract ((bits_of_width src2_len) + off - 1) off (op2e tsrc2 src2)
         in
         let off_dst1 = match off_dst1 with None | Some 0 -> 0 | Some n -> n in
         let off_dst2 = match off_dst2 with None | Some 0 -> 0 | Some n -> n in
-        let srclo, srchi, offlo, offhi, tl, th =
+        let srclo, srchi, offlo, offhi, lenlo, lenhi =
           if off_src1 < off_src2 
-          then s1, s2, off_dst1, off_dst2, telt1, telt2
-          else s2, s1, off_dst2, off_dst1, telt2, telt1
+          then s1, s2, off_dst1, off_dst2, src1_len, src2_len
+          else s2, s1, off_dst2, off_dst1, src2_len, src1_len
         in
         (* Build the expression with appropriate offsets. *)
         let elist = List.flatten
-          [ padding (bits_of_width tdst) (offhi + (bits_of_width th))
+          [ padding (bits_of_width tdst) (offhi + (bits_of_width lenhi))
           ; [srchi]
-          ; padding offhi (offlo + (bits_of_width tl))
+          ; padding offhi (offlo + (bits_of_width lenlo))
           ; [srclo]
           ; padding offlo 0
           ]
