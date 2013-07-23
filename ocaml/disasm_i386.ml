@@ -171,9 +171,9 @@ type opcode =
   | Movzx of typ * operand * typ * operand (* dsttyp, dst, srctyp, src *)
   | Movsx of typ * operand * typ * operand (* dsttyp, dst, srctyp, src *)
   | Movdq of typ * operand * typ * operand * bool (* dst type, dst op, src type, src op, aligned *)
-  | Movoffset of (typ * operand) * typ * (typ * operand * int option  * int option) * (typ * operand * int option * int option) option
-   (* dest type, dest, element type, src1 type, src1, src1 src offset, src1 dest offset,
-      optional src2 type, optional src2, src2 src offset, src2 dest offset *)
+  | Movoffset of (typ * operand) * (typ * typ * operand * int option  * int option) * (typ * typ * operand * int option * int option) option
+   (* dest type, dest, element1 type, src1 type, src1, src1 src offset, src1 dest offset,
+      optional element2 type, optional src2 type, optional src2, src2 src offset, src2 dest offset *)
   | Lea of typ * operand * Ast.exp
   | Call of operand * Type.addr (* addr is RA *)
   | Shift of binop_type * typ * operand * operand
@@ -1061,7 +1061,7 @@ let rec to_ir mode addr next ss pref has_rex has_vex =
       else []
     in
     d::al
-  | Movoffset((tdst, dst), telt, (tsrc1, src1, off_src1, off_dst1), src2) ->
+  | Movoffset((tdst, dst), (telt1, tsrc1, src1, off_src1, off_dst1), src2) ->
     let concat = Ast_convenience.concat in
     let extract = Ast_convenience.extract in
     (* If a vex prefix is present, then exra space is filled with 0.
@@ -1073,32 +1073,32 @@ let rec to_ir mode addr next ss pref has_rex has_vex =
     in
     (* If the source is offset from 0, extract the element from source 1 *)
     let s1 = match off_src1 with
-      | None | Some 0 -> op2e telt src1
-      | Some off -> extract ((bits_of_width telt) + off - 1) off (op2e tsrc1 src1)
+      | None | Some 0 -> op2e telt1 src1
+      | Some off -> extract ((bits_of_width telt1) + off - 1) off (op2e tsrc1 src1)
     in
     let stmt = match src2 with
       | None ->
         (match off_dst1 with
-        | None | Some 0 -> assn telt dst s1
+        | None | Some 0 -> assn telt1 dst s1
         | Some off -> assn tdst dst (concat s1 (extract (off - 1) 0 (op2e tdst dst))))
-      | Some (tsrc2, src2, off_src2, off_dst2) ->
+      | Some (telt2, tsrc2, src2, off_src2, off_dst2) ->
         (* Extract second source element with offset *)
         let s2 = match off_src2 with
-          | None | Some 0 -> op2e telt src2
-          | Some off -> extract ((bits_of_width telt) + off - 1) off (op2e tsrc2 src2)
+          | None | Some 0 -> op2e telt2 src2
+          | Some off -> extract ((bits_of_width telt2) + off - 1) off (op2e tsrc2 src2)
         in
         let off_dst1 = match off_dst1 with None | Some 0 -> 0 | Some n -> n in
         let off_dst2 = match off_dst2 with None | Some 0 -> 0 | Some n -> n in
-        let srclo, srchi, offlo, offhi =
+        let srclo, srchi, offlo, offhi, tl, th =
           if off_src1 < off_src2 
-          then s1, s2, off_dst1, off_dst2
-          else s2, s1, off_dst2, off_dst1
+          then s1, s2, off_dst1, off_dst2, telt1, telt2
+          else s2, s1, off_dst2, off_dst1, telt2, telt1
         in
         (* Build the expression with appropriate offsets. *)
         let elist = List.flatten
-          [ padding (bits_of_width tdst) (offhi + (bits_of_width telt))
+          [ padding (bits_of_width tdst) (offhi + (bits_of_width th))
           ; [srchi]
-          ; padding offhi (offlo + (bits_of_width telt))
+          ; padding offhi (offlo + (bits_of_width tl))
           ; [srclo]
           ; padding offlo 0
           ]
@@ -2874,8 +2874,20 @@ let parse_instr mode g addr =
            parse it to get the next address *)
         let _, _, na = parse_modrm_addr None na in
         (Nop, na)
-      | 0x10 | 0x11 when (prefix.repeat || prefix.nrepeat) -> 
-        disfailwith "MOVSS/MOVSD unimplemented"
+      | 0x10 | 0x11 when (prefix.repeat || prefix.nrepeat) -> (* MOVSS, MOVSD *)
+        let r, rm, rv, na = parse_modrm_vec None na in
+        let t = if prefix.repeat then r32 else r64 in
+        let d, s, td = if b2 = 0x10 then r, rm, r128 else rm, r, t in
+        (match rm, rv with
+          | Ovec _, Some rv ->
+            let nt = match t with Reg r -> r | _ -> disfailwith "impossible" in
+            (Movoffset((r128, d), (Reg (128 - nt), r128, rv, Some nt, Some nt), 
+              Some (t, t, s, None, Some 0)), na)
+          | Ovec _, None ->
+            (Movdq(t, s, t, d, false), na)
+          | Oaddr _, _ ->
+            (Movdq(td, s, t, d, false), na)
+          | _ -> disfailwith "impossible")
       | 0x12 | 0x13 | 0x16 | 0x17 -> (* MOVLPS, MOVLPD, MOVHPS, MOVHPD, MOVHLPS, MOVHLPD, MOVLHPS, MOVLHPD *)
         let r, rm, rv, na = parse_modrm_vec None na in
         let tdst, dst, telt, tsrc1, src1, off_src1, off_dst1, src2 =
@@ -2891,7 +2903,7 @@ let parse_instr mode g addr =
               | Some r -> r
               | None -> disfailwith "impossible"
             in
-            let src2 = Some (r128, rm, offs2, offd2) in
+            let src2 = Some (r64, r128, rm, offs2, offd2) in
             r128, r, r64, r128, rv, offs1, offd1, src2
           | 0x12 | 0x13 | 0x16 | 0x17 ->
             let offset = match b2 with
@@ -2909,7 +2921,7 @@ let parse_instr mode g addr =
             r128, d, r64, ts, s, offs, offd, None
           | _ -> disfailwith "impossible"
         in
-        (Movoffset((tdst, dst), telt, (tsrc1, src1, off_src1, off_dst1), src2), na)
+        (Movoffset((tdst, dst), (telt, tsrc1, src1, off_src1, off_dst1), src2), na)
       | 0x10 | 0x11 | 0x28 | 0x29 | 0x6e | 0x7e | 0x6f | 0x7f | 0xd6 ->
       (* REGULAR MOVDQ *)
         let r, rm, _, na = parse_modrm_vec None na in
@@ -2934,7 +2946,6 @@ let parse_instr mode g addr =
               | 0x7e -> r, toreg rm, t, t
               | _ -> disfailwith "impossible"
             in
-            (* Prefix.opsize is 16 when there's an opsize_override *)
             s, d, ts, td, false
           | 0x6f | 0x7f -> (* MOVQ, MOVDQA, MOVDQU *)
             let s, d = match b2 with
