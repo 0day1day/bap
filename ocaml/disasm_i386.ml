@@ -814,10 +814,9 @@ let op_dbl = function
 let op2e_dbl_s mode ss has_rex t =
   let cf (ct, o) = op2e_s mode ss has_rex ct o in
   let ol = List.map cf (op_dbl t) in
-  List.fold_left
+  BatList.reduce
     (fun bige little -> bige ++* little)
-    (List.hd ol)
-    (List.tl ol)
+    ol
 
 (* Double width assignments, as used by multiplication *)
 let assn_dbl_s mode s has_rex has_vex t e = match op_dbl t with
@@ -1811,11 +1810,11 @@ let rec to_ir mode addr next ss pref has_rex has_vex =
     :: List.flatten (List.map2 (fun f e -> f e) assnsf extractlist)
   | Popcnt(t, s, d) ->
     let width = bits_of_width t in
-    let bits = Ast_convenience.extract (width - 1) 0 (op2e t s) in
-    let bitvector = Array.to_list (Array.init width (fun i -> (bits >>* (it i t)) &* (it 1 t))) in
-    let count = List.fold_left (+*) (it 0 t) bitvector in
-    assn t d count
-    :: set_zf t count
+    let bits = op2e t s in
+    let bitvector = Array.to_list (Array.init width (fun i -> ite t (extract i i bits) (it 1 t) (it 0 t))) in
+    let count = BatList.reduce (+*) bitvector in
+    set_zf t bits
+    :: assn t d count
     :: List.map (fun r -> move r (it 0 r1)) [cf; oF; sf; af; pf]
   | Sahf ->
     let assnsf = assns_lflags_to_bap in
