@@ -370,47 +370,52 @@ let do_aggressive_dce ?(globals = []) graph =
     *)
       let graph = match revnewstmts with
         | CJmp (_, t1, t2, attrs) as s::others when not (site_is_live (bb, (List.length revnewstmts)-1)) ->
-          has_changed := true;
-          dprintf "Dead cjmp at %s: %s" (Cfg_ssa.v2s bb) (Pp.ssa_stmt_to_string s);
+          (try
+            dprintf "Dead cjmp at %s: %s" (Cfg_ssa.v2s bb) (Pp.ssa_stmt_to_string s);
           (* Which edge do we remove? Try removing one and see if we
              can still reach BB_Exit. *)
-          let truee = List.find (fun e ->
-            match C.G.E.label e with
-            | Some(true, _) -> true 
-            | _ -> false)
-            (C.G.succ_e graph bb)
-          in
-          let falsee = List.find (fun e ->
-            match C.G.E.label e with
-            | Some(false, _) -> true
-            | _ -> false)
-            (C.G.succ_e graph bb)
-          in
+            let truee = List.find (fun e ->
+              match C.G.E.label e with
+              | Some(true, _) -> true 
+              | _ -> false)
+              (C.G.succ_e graph bb)
+            in
+            let falsee = List.find (fun e ->
+              match C.G.E.label e with
+              | Some(false, _) -> true
+              | _ -> false)
+              (C.G.succ_e graph bb)
+            in
           (* Remove true edge, check for reachability *)
-          let use_true, graph =
-            let graph = C.remove_edge_e graph truee in
-            if check_path graph bb (C.G.V.create Cfg.BB_Exit) then
-              false, graph
-            else
+            let use_true, graph =
+              let graph = C.remove_edge_e graph truee in
+              if check_path graph bb (C.G.V.create Cfg.BB_Exit) then
+                false, graph
+              else
               (* Add true edge back, remove false edge *)
-              let graph = C.add_edge_e graph truee in
-              let graph = C.remove_edge_e graph falsee in
-              let () = assert (check_path graph bb (C.G.V.create Cfg.BB_Exit)) in
-              true, graph
-          in
+                let graph = C.add_edge_e graph truee in
+                let graph = C.remove_edge_e graph falsee in
+                let () = assert (check_path graph bb (C.G.V.create Cfg.BB_Exit)) in
+                true, graph
+            in
           (* Replace CJmp with Jmp to t1 *)
-          let newstmts = List.rev
-            (Jmp ((if use_true then t1 else t2), attrs)::others) in
-          let graph = C.set_stmts graph bb newstmts in
+            let newstmts = List.rev
+              (Jmp ((if use_true then t1 else t2), attrs)::others) in
+            let graph = C.set_stmts graph bb newstmts in
           (* Now fix the edges *)
-          let newdst = if use_true then C.G.E.dst truee else C.G.E.dst falsee in
-          let new_edge = C.G.E.create bb None newdst in
+            let newdst = if use_true then C.G.E.dst truee else C.G.E.dst falsee in
+            let new_edge = C.G.E.create bb None newdst in
           (* Remove all existing edges *)
-          let graph = C.G.fold_succ_e
-            (fun e graph -> C.remove_edge_e graph e) graph bb graph in
+            let graph = C.G.fold_succ_e
+              (fun e graph -> C.remove_edge_e graph e) graph bb graph in
           (* Add the new, unlabeled edge *)
-          let graph = C.add_edge_e graph new_edge in
-          graph
+            let graph = C.add_edge_e graph new_edge in
+            has_changed := true;
+            graph
+          with Not_found ->
+            (* There might be an unresolved edge from a 'je'
+               instruction or similar which could cause this to fail. *)
+            graph)
         | _ -> C.set_stmts graph bb (List.rev revnewstmts)
       in
       graph
