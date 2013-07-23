@@ -156,15 +156,16 @@ let copyprop_ssa ?(stop_before=(fun _ -> false)) ?(stop_after=(fun _ -> false)) 
     | _ -> failwith "Expected to find a map: BB_Exit probably unreachable"
   in
   let cm =
-    VM.fold (fun k v newmap ->
-      (match v with
-      | CPSpecSSA.L.Middle x ->
-        let ssae = propagate l x in
+    lazy
+      (VM.fold (fun k v newmap ->
+        (match v with
+        | CPSpecSSA.L.Middle x ->
+          let ssae = propagate l x in
         (* dprintf "%s maps to %s" (Pp.var_to_string k) (Pp.ssa_exp_to_string ssae); *)
-        VM.add k ssae newmap
-      | _ ->
-        newmap)
-    ) l VM.empty
+          VM.add k ssae newmap
+        | _ ->
+          newmap)
+       ) l VM.empty)
   in
   let rm =
     VM.filter_map (fun k v -> match v with

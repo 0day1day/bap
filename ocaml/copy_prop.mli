@@ -11,7 +11,7 @@
     [stop_after e'] holds e' will be in the final propagated
     expression, but propagation will not occur on subexpressions of
     [e']. *)
-val copyprop_ssa : ?stop_before:(Ssa.exp -> bool) -> ?stop_after:(Ssa.exp -> bool) -> Cfg.SSA.G.t -> Ssa.exp Var.VarMap.t * Ssa.exp Var.VarMap.t * (Ssa.exp -> Ssa.exp)
+val copyprop_ssa : ?stop_before:(Ssa.exp -> bool) -> ?stop_after:(Ssa.exp -> bool) -> Cfg.SSA.G.t -> Ssa.exp Var.VarMap.t lazy_t * Ssa.exp Var.VarMap.t * (Ssa.exp -> Ssa.exp)
 
 (** Same as {!copyprop_ssa} but for AST CFGs. Note that analysis
     results for AST CFGs are not global, and so the analysis returns
