@@ -223,6 +223,7 @@ let asm_addr_to_bap {asmp=prog; arch; get_exec} addr =
      Disasm_i386.ToIR.add_labels addr ir,
      addr +% (big_int_of_int (Libasmir.asmir_get_instr_length prog (addr_to_int64 addr)))
   | e ->
+      Printexc.print_backtrace stderr; flush stderr;
       DV.dprintf "Failing instruction: %s\n" (Libasmir.asmir_string_of_insn prog
       (addr_to_int64 addr));
       raise e
