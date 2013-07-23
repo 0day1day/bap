@@ -65,11 +65,7 @@ let val_of_exp = function
 (*                 Equality of SSA expressions and statements                 *)
 (******************************************************************************)
 
-let full_value_eq v1 v2 = match v1,v2 with
-  | Int(i1, t1), Int(i2, t2) -> (i1 ==% i2) && (t1 = t2)
-  | Int _, _ -> false
-  | _, Int _ -> false
-  | a, b -> a = b
+let full_value_eq v1 v2 = v1 = v2
 let quick_value_eq = full_value_eq
 
 let num_exp = function
