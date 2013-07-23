@@ -1067,8 +1067,9 @@ let rec to_ir mode addr next ss pref has_rex has_vex =
     (* If a vex prefix is present, then exra space is filled with 0.
        Otherwise, the bits are preserved. *)
     let padding hi lo =
-      if has_vex then it 0 (Reg (hi - lo))
-      else extract (hi - 1) lo (op2e tdst dst)
+      if hi <= lo then []
+      else if has_vex then [it 0 (Reg (hi - lo))]
+      else [extract (hi - 1) lo (op2e tdst dst)]
     in
     (* If the source is offset from 0, extract the element from source 1 *)
     let s1 = match off_src1 with
@@ -1094,13 +1095,13 @@ let rec to_ir mode addr next ss pref has_rex has_vex =
           else s2, s1, off_dst2, off_dst1
         in
         (* Build the expression with appropriate offsets. *)
-        let elist =
-          padding (bits_of_width tdst) (offhi + (bits_of_width telt))
-          :: srchi
-          :: padding offhi (offlo + (bits_of_width telt))
-          :: srclo
-          :: padding offlo 0
-          :: []
+        let elist = List.flatten
+          [ padding (bits_of_width tdst) (offhi + (bits_of_width telt))
+          ; [srchi]
+          ; padding offhi (offlo + (bits_of_width telt))
+          ; [srclo]
+          ; padding offlo 0
+          ]
         in
         assn tdst dst (Ast_convenience.concat_explist (BatList.enum elist))
     in
