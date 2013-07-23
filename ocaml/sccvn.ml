@@ -43,7 +43,7 @@ module VH = Var.VarHash
 module C = Cfg.SSA
 module G = C.G
 
-module D = Debug.Make(struct let name = "SCCVN" and default=`NoDebug end)
+module D = Debug.Make(struct let name = "Sccvn" and default=`NoDebug end)
 open D
 
 module Dom = Dominator.Make(G)
@@ -482,7 +482,7 @@ let replacer ?(opt=true) cfg =
                ChangeTo v'
            | None -> SkipChildren
           )
-      | _  -> SkipChildren
+      | _  -> DoChildren
 
     method visit_stmt = function
       | Ssa.Move(_, (Var _ | Lab _ | Int _), _) -> (* visit_exp will handle this *)
