@@ -14,6 +14,8 @@ module C=Cfg.SSA
 module D=Debug.Make(struct let name="Ssa_cond_simplify" and default=`NoDebug end)
 open D
 open Type
+module VM=Var.VarMap
+module VS=Var.VarSet
 
 let rec reverse_visit f e =
   let g = reverse_visit f in
@@ -113,26 +115,32 @@ let simplify_flat e =
 
 let simplify_exp = reverse_visit simplify_flat
 
-let simplifycond_ssa g =
-  (* Don't copy propagate over memory, since most programs do
-     comparisons on registers. *)
+let simplifycond_ssa ?goodvars g =
+  (* Only propagate things that will help us match patterns.  If we
+     propagate too much, our conditions won't match the appropriate
+     definitions in the program. *)
   let stop_before =
     function
+      | Load _ -> true
       | Store _ -> true
       | _ -> false
   in
-  let stop_after =
-    function
-      | Load _ -> true
-      | _ -> false
+  let stop_after = match goodvars with
+    | Some goodvars ->
+      (function
+        | Var v when VS.mem v goodvars -> true
+        | _ -> false)
+    | None -> (fun _ -> false)
   in
   let _, _, copyprop = Copy_prop.copyprop_ssa ~stop_before ~stop_after g in
+
   C.G.fold_vertex (fun v g ->
     let stmts = C.get_stmts g v in
     match List.rev stmts with
     | CJmp(e, tt, tf, a)::tl ->
-      let e' = simplify_exp (copyprop e) in
-      dprintf "e: %s (copyprop e): %s e': %s" (Pp.ssa_exp_to_string e) (Pp.ssa_exp_to_string (copyprop e)) (Pp.ssa_exp_to_string e');
+      let cpe = copyprop e in
+      let e' = simplify_exp cpe in
+      dprintf "e: %s (copyprop e): %s e': %s" (Pp.ssa_exp_to_string e) (Pp.ssa_exp_to_string cpe) (Pp.ssa_exp_to_string e');
       (* Update statement *)
       let s = CJmp(e', tt, tf, a)::tl in
       let g = C.set_stmts g v (List.rev s) in
@@ -150,3 +158,37 @@ let simplifycond_ssa g =
       ) g v g
     | _ -> g
   ) g g
+
+let simplifycond_target_ssa targete g =
+  let stop_before =
+    function
+      | Load _ -> true
+      | Store _ -> true
+      | _ -> false
+  in
+  let stop_after =
+    function
+      | _ -> false
+  in
+  let _, m, _ = Copy_prop.copyprop_ssa ~stop_before ~stop_after g in
+
+  (* Get a list of variables that comprise the acyclic portion of
+     targete *)
+  let goodvars =
+    let s = ref VS.empty in
+    let add v = s := VS.add v !s in
+    let v = object(self)
+      inherit Ssa_visitor.nop
+      method visit_exp = function
+        | Var v ->
+          add v;
+          (try ChangeToAndDoChildren (VM.find v m)
+          with Not_found -> SkipChildren)
+        | _ -> DoChildren
+    end in
+    ignore(Ssa_visitor.exp_accept v targete);
+    !s
+  in
+  simplifycond_ssa ~goodvars g
+
+let simplifycond_ssa x = simplifycond_ssa x
