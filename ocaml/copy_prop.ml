@@ -155,15 +155,24 @@ let copyprop_ssa ?(stop_before=(fun _ -> false)) ?(stop_after=(fun _ -> false)) 
     | CPSpecSSA.L.Map m -> m
     | _ -> failwith "Expected to find a map: BB_Exit probably unreachable"
   in
-  VM.fold (fun k v newmap ->
-    (match v with
-    | CPSpecSSA.L.Middle x ->
-      let ssae = propagate l x in
-      (* dprintf "%s maps to %s" (Pp.var_to_string k) (Pp.ssa_exp_to_string ssae); *)
-      VM.add k ssae newmap
-    | _ ->
-      newmap)
-  ) l VM.empty, propagate l
+  let cm =
+    VM.fold (fun k v newmap ->
+      (match v with
+      | CPSpecSSA.L.Middle x ->
+        let ssae = propagate l x in
+        (* dprintf "%s maps to %s" (Pp.var_to_string k) (Pp.ssa_exp_to_string ssae); *)
+        VM.add k ssae newmap
+      | _ ->
+        newmap)
+    ) l VM.empty
+  in
+  let rm =
+    VM.filter_map (fun k v -> match v with
+      | CPSpecSSA.L.Middle x -> Some x
+      | CPSpecSSA.L.Bottom -> None
+    ) l
+  in
+  cm, rm, propagate l
 
 module CPAST = CfgDataflow.Make(CPSpecAST)
 
@@ -248,10 +257,10 @@ let copyprop_ast ?(stop_before=(fun _ -> false)) ?(stop_after=(fun _ -> false)) 
         newmap)
     ) l VM.empty,
 
-    propagate dfin loc (LS.singleton (UD.LocationType.Loc loc)) loc,
-
     (* Export converted lattice value *)
     VM.filter_map (fun _ v -> match v with
       | CPSpecAST.L.Middle (loc, e) -> Some(loc, e)
-      | CPSpecAST.L.Bottom -> None) l
+      | CPSpecAST.L.Bottom -> None) l,
+
+    propagate dfin loc (LS.singleton (UD.LocationType.Loc loc)) loc
   )

@@ -126,7 +126,7 @@ let simplifycond_ssa g =
       | Load _ -> true
       | _ -> false
   in
-  let _, copyprop = Copy_prop.copyprop_ssa ~stop_before ~stop_after g in
+  let _, _, copyprop = Copy_prop.copyprop_ssa ~stop_before ~stop_after g in
   C.G.fold_vertex (fun v g ->
     let stmts = C.get_stmts g v in
     match List.rev stmts with
