@@ -3203,7 +3203,8 @@ let parse_instr mode g addr =
         (Pbinop(prefix.mopsize, binop XOR, "pxor", r, rm, rv), na)
       | 0xf0 ->
         let r, rm, _, na = parse_modrm_vec None na in
-        (Movdq(prefix.mopsize, rm, prefix.mopsize, r, false), na)
+        let t = if prefix.mopsize = r256 then r256 else r128 in
+        (Movdq(t, rm, t, r, false), na)
       | 0xf8 | 0xf9 | 0xfa | 0xfb ->
         let r, rm, rv, na = parse_modrm_vec None na in
         let eltsize = match b2 & 7 with
