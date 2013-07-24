@@ -43,6 +43,17 @@ let def_uses s =
   ignore (Ssa_visitor.stmt_accept vis s);
   (lv, !uses, liveout)
 
+(* return uses in e.  used for edge conditions *)
+let uses e =
+  let uses = ref [] in
+  let vis =  object(self)
+    inherit Ssa_visitor.nop
+    method visit_rvar v = uses := v :: !uses;
+      DoChildren
+  end
+  in
+  ignore (Ssa_visitor.exp_accept vis e);
+  !uses
 
 (* in SSA, a variable is live at its definition site iff its list of
    uses is not empty. Therefore, calculating live variables is really
@@ -72,7 +83,7 @@ let do_dce ?(globals=[]) graph =
 	 (fun s ->
 	    let site = (bb, s) in
             let defs, deps, liveout = def_uses s in
-            
+
             (* iterate over defs, updating maps *)
             List.iter
               (fun defd_var ->
@@ -83,13 +94,28 @@ let do_dce ?(globals=[]) graph =
                  ignore(usecount defd_var); (* Add 0 if needed *)
               )
               defs;
-            
+
             (* update usecounts mapping *)
             List.iter (fun v -> incr (usecount v)) deps;
 	    (* increment liveout vars by one, so they are never dead *)
             List.iter (fun v -> incr (usecount v)) liveout;
 	 )
          stmts
+    )
+    graph;
+
+  (* also mark vars in edge conditions as live
+
+     XXX: should we do this in the visitor?
+  *)
+  C.G.iter_edges_e
+    (fun e ->
+
+      match C.G.E.label e with
+      | None -> ()
+      | Some (_, e) ->
+        let uses_e = uses e in
+        List.iter (fun v -> incr (usecount v)) uses_e
     )
     graph;
 
