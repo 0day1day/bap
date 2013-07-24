@@ -16,7 +16,7 @@ module VH=Var.VarHash
 module D = Debug.Make(struct let name = "Disasm_i386" and default=`NoDebug end)
 open D
 
-let compute_segment_bases = ref true
+let compute_segment_bases = ref false
 
 (* Note: In general, the function g is the get memory function.  The
    variable na refers to the next address or next instruction.
