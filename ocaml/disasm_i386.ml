@@ -2923,7 +2923,8 @@ let parse_instr mode g addr =
               | 0x28 | 0x29 -> true
               | _ -> disfailwith "impossible"
             in
-            s, d, prefix.mopsize, prefix.mopsize, align
+            let t = if prefix.mopsize = r256 then r256 else r128 in
+            s, d, t, t, align
           | 0x6e | 0x7e -> (* MOVD, MOVQ *)
             let t = if prefix.opsize = r64 then r64 else r32 in
             let s, d, ts, td = match b2 with
