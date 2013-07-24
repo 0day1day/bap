@@ -229,6 +229,7 @@ type opcode =
   | Cld
   | Rdtsc
   | Cpuid
+  | Xgetbv
   | Stmxcsr of operand
   | Ldmxcsr of operand
   | Fnstcw of operand
@@ -237,7 +238,7 @@ type opcode =
   | Fst of (operand * bool)
   | Punpck of (typ * typ * order * operand * operand * operand option) (* dest size, element size, low/high elements, dest, src, optional VEX src *)
   | Ppackedbinop of (typ * typ * binopf * string * operand * operand * operand option) (* Perform a generic packed binary operation. dest size, element size, binop, assembly string, dest, src, optional VEX src *)
-  | Pbinop of (typ * binop_type * string * operand * operand * operand option)
+  | Pbinop of (typ * binopf * string * operand * operand * operand option)
   | Pmov of (typ * typ * typ * operand * operand * cast_type * string) (* Packed move. dest size, dest elt size, src elt size, dest, src, ext(signed/zero), name *)
   | Pmovmskb of (typ * operand * operand)
   | Pcmp of (typ * typ * binop_type * string * operand * operand * operand option)
@@ -1131,10 +1132,10 @@ let rec to_ir mode addr next ss pref has_rex has_vex =
     (match vs with
     | None -> [assn t d e]
     | Some vdst -> [assn t vdst e])
-  | Pbinop(t, bop, s, o1, o2, vop) ->
+  | Pbinop(t, fbop, s, o1, o2, vop) ->
     (match vop with
-    | None -> [assn t o1 (binop bop (op2e t o1) (op2e t o2))]
-    | Some vop -> [assn t o1 (binop bop (op2e t vop) (op2e t o2))])
+    | None -> [assn t o1 (fbop (op2e t o1) (op2e t o2))]
+    | Some vop -> [assn t o1 (fbop (op2e t vop) (op2e t o2))])
   | Pcmp (t,elet,bop,_,dst,src,vsrc) ->
     let ncmps = (bits_of_width t) / (bits_of_width elet) in
     let elebits = bits_of_width elet in
@@ -1665,6 +1666,10 @@ let rec to_ir mode addr next ss pref has_rex has_vex =
       let t = type_of_mode mode in
       let undef reg = move reg (Unknown ("cpuid", t)) in
       List.map undef [rax; rbx; rcx; rdx]
+  | Xgetbv ->
+    let e = cast_unsigned (type_of_mode mode) (Unknown ("xgetbv", r32)) in
+    let undef reg = move reg e in
+    List.map undef [rax; rdx]
   | Stmxcsr (dst) ->
       let dst = match dst with
         | Oaddr addr -> addr
@@ -2848,7 +2853,11 @@ let parse_instr mode g addr =
         | Some {vex_map_select} -> disfailwith (Printf.sprintf "reserved mmmmmm vex value: %d" vex_map_select)
       in
       match b2 with (* Table A-3 *)
-(*      | 0x0 xgetbv *)
+      | 0x01 -> 
+        let b3, nna = Char.code (g na), (s na) in
+        (match b3 with
+          | 0xd0 -> (Xgetbv, nna)
+          | _ -> disfailwith (Printf.sprintf "unsupported opcode %02x %02x %02x" b1 b2 b3))
       | 0x05 when mode = X8664 -> (Syscall, na)
       | 0x1f ->
         (* Even though we don't use the operand to nop, we need to
@@ -3165,7 +3174,7 @@ let parse_instr mode g addr =
         (Ppackedbinop(prefix.mopsize, reg_8, Ast_convenience.min_symbolic ~signed:false, "pminub", r, rm, rv), na)
       | 0xdb ->
         let r, rm, rv, na = parse_modrm_vec None na in
-        (Pbinop(prefix.mopsize, AND, "pand", r, rm, rv), na)
+        (Pbinop(prefix.mopsize, binop AND, "pand", r, rm, rv), na)
       | 0xd7 ->
         let r, rm, na = parse_modrm_addr None na in
         let r, rm = r, tovec rm in
@@ -3173,13 +3182,17 @@ let parse_instr mode g addr =
       | 0xde ->
         let r, rm, rv, na = parse_modrm_vec None na in
         (Ppackedbinop(prefix.mopsize, reg_8, Ast_convenience.max_symbolic ~signed:false, "pmaxub", r, rm, rv), na)
+      | 0xdf ->
+        let r, rm, rv, na = parse_modrm_vec None na in
+        let andn x y = binop AND (unop NOT x) y in
+        (Pbinop(prefix.mopsize, andn, "pandn", r, rm, rv), na)
       | 0xe0 | 0xe3 ->
         (* pavg *)
         let r, rm, rv, na = parse_modrm_vec None na in
         (* determine whether we're using bytes or words *)
         let et = match b2 & 0x0f with
-          | 0x00 -> reg_8
-          | 0x03 -> reg_16
+          | 0x00 -> r8
+          | 0x03 -> r16
           | _ -> disfailwith "invalid"
         in
         let one = it 1 et in
@@ -3190,10 +3203,10 @@ let parse_instr mode g addr =
         (Ppackedbinop(prefix.mopsize, reg_16, Ast_convenience.min_symbolic ~signed:true, "pmins", r, rm, rv), na)
       | 0xeb ->
         let r, rm, rv, na = parse_modrm_vec None na in
-        (Pbinop(prefix.mopsize, OR, "por", r, rm, rv), na)
+        (Pbinop(prefix.mopsize, binop OR, "por", r, rm, rv), na)
       | 0xef ->
         let r, rm, rv, na = parse_modrm_vec None na in
-        (Pbinop(prefix.mopsize, XOR, "pxor", r, rm, rv), na)
+        (Pbinop(prefix.mopsize, binop XOR, "pxor", r, rm, rv), na)
       | 0xf0 ->
         let r, rm, _, na = parse_modrm_vec None na in
         (Movdq(prefix.mopsize, rm, prefix.mopsize, r, false), na)
