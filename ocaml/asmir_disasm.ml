@@ -66,8 +66,9 @@ end
 
 module type DISASM = sig
   module State : STATE
-  val get_succs : Asmir.asmprogram -> Cfg.AST.G.t -> Cfg.AST.G.V.t * Cfg.AST.G.E.label * Ast.exp -> State.t -> succs * State.t
-  (** Function that returns the successors of a node *)
+  val get_succs : Asmir.asmprogram -> Cfg.AST.G.t -> Cfg_ast.unresolved_edge list -> State.t -> (Cfg_ast.unresolved_edge * succs) list * State.t
+  (** Function that returns the successors of one or more nodes in the
+      unresolved list. *)
 
   val fixpoint : bool
   (** Should [get_succs] be called until a fixpoint is reached? *)
@@ -78,7 +79,11 @@ module RECURSIVE_DESCENT_SPEC = struct
     type t = unit
     let init = ()
   end
-  let get_succs_int no_indirect _asmp g (v,l,e) () =
+  let get_succs_int no_indirect _asmp g edges () =
+    let v,l,e,edge = match edges with
+      | ((v,l,e) as edge)::_ -> v,l,e,edge
+      | _ -> failwith "empty worklist"
+    in
     let o = match List.rev (CA.get_stmts g v), l with
       | last::_, None when FUNCFINDER_DUMB.is_ret_stmt last ->
         Exit
@@ -98,7 +103,7 @@ module RECURSIVE_DESCENT_SPEC = struct
       | _::_, Some _ -> failwith "error"
       | [], _ -> Addrs []
     in
-    o, ()
+    [edge, o], ()
   let get_succs asmp g e () = get_succs_int !no_indirect asmp g e ()
 
   let fixpoint = false
@@ -115,9 +120,17 @@ module VSA_SPEC = struct
     | Ssa.Jmp(e, _)::_ -> e
     | _ -> failwith "jumpe: Unable to find jump"
 
-  let get_succs asmp g (v,l,e) () =
-    match RECURSIVE_DESCENT_SPEC.get_succs_int false asmp g (v,l,e) () with
-    | Indirect, () ->
+  let get_succs asmp g edges () =
+    let rdresolved, rdunresolved =
+      let rd, () = RECURSIVE_DESCENT_SPEC.get_succs_int false asmp g edges () in
+    List.partition (function (_,Indirect) -> false | _ -> true) rd
+    in
+    (* If RD resolves any edges, return these.  We want to make as
+       much progress as possible before running VSA. *)
+    match rdresolved, rdunresolved with
+    | _::_, _ ->
+      rdresolved, ()
+    | [], ((v,l,e) as edge, _)::_ ->
       (* Do VSA stuff *)
       dprintf "Resolving %s with VSA" (Pp.ast_exp_to_string e);
       if l <> None then failwith "VSA-enabled lifting currently assumes that conditional jumps are not indirect";
@@ -197,7 +210,7 @@ module VSA_SPEC = struct
         Copy_prop.copyprop_ssa ~stop_before ~stop_after ssacfg
       in
 
-      let add_indirect () =
+      let add_indirect edge =
         if debug () then (
           Printf.eprintf "VSA @%s" (Cfg_ssa.v2s ssav);
           Vsa_ssa.AbsEnv.pp prerr_string (BatOption.get (df_out (Vsa_ssa.last_loc ssacfg ssav)));
@@ -205,17 +218,18 @@ module VSA_SPEC = struct
         );
         if !no_indirect
         then failwith "VSA disassembly failed to resolve an indirect jump to a specific concrete set"
-        else Indirect, ()
+        else [edge, Indirect], ()
       in
 
-      let fallback () =
+      let fallback edge =
         dprintf "fallback";
         let vs = Vsa_ssa.AlmostVSA.DFP.exp2vs (BatOption.get (df_out (Vsa_ssa.last_loc ssacfg ssav))) ssae in
         dprintf "VSA resolved %s to %s" (Pp.ast_exp_to_string e) (Vsa_ssa.VS.to_string vs);
         (match Vsa_ssa.VS.concrete ~max:1024 vs with
-        | Some x -> dprintf "VSA finished"; Addrs (List.map (fun a -> Addr a) x), ()
+        | Some x -> dprintf "VSA finished";
+          [edge, Addrs (List.map (fun a -> Addr a) x)], ()
         | None -> wprintf "VSA disassembly failed to resolve %s/%s to a specific concrete set" (Pp.ast_exp_to_string e) (Vsa_ssa.VS.to_string vs);
-          add_indirect ())
+          add_indirect edge)
       in
 
       (* Value sets are very good at representing the addresses that
@@ -259,7 +273,7 @@ module VSA_SPEC = struct
                 failwith (Printf.sprintf "Unable to read from jump table at %s" (~% a))
             ) l
             in
-            Addrs (List.map (fun a -> Addr a) (List.flatten reads)), ()
+            [edge, Addrs (List.map (fun a -> Addr a) (List.flatten reads))], ()
           in
           (try do_read m ssaloc with
           | e when !vsa_mem_hack ->
@@ -269,10 +283,10 @@ module VSA_SPEC = struct
             dprintf "VSA mem hack";
             do_read (Ssa.Var Disasm_i386.mem) (CS.G.V.create Cfg.BB_Entry, 0)
           | e ->
-            add_indirect ()
+            add_indirect edge
           )
         | None -> wprintf "VSA disassembly failed to resolve %s/%s to a specific concrete set" (Pp.ssa_exp_to_string indexe) (Vsa_ssa.VS.to_string vs);
-          add_indirect ())
+          add_indirect edge)
       in
 
       (match ssae with
@@ -280,13 +294,12 @@ module VSA_SPEC = struct
         (try match VM.find v m with
         | Ssa.Load(m, e, endian, t) ->
           special_memory m e endian t
-        | _ -> fallback ()
-         with Not_found -> fallback ())
+        | _ -> fallback edge
+         with Not_found -> fallback edge)
       (* | Ssa.Load(m, e, endian, t) -> *)
       (*   special_memory m e endian t *)
-      | _ -> fallback ())
-    (* Rely on recursive descent for easy stuff *)
-    | o, () -> o, ()
+      | _ -> fallback edge)
+    | [], [] -> failwith "empty worklist"
 
   let fixpoint = true
 end
@@ -395,21 +408,24 @@ module Make(D:DISASM)(F:FUNCID) = struct
       (* Side effects: Adds to worklist *)
       let process_edge (c,state) ((s,l,t) as e) =
         dprintf "Looking at edge from %s to %s" (Cfg_ast.v2s s) (Pp.ast_exp_to_string t);
-        let resolved_addrs, state' = D.get_succs p c e state in
-        match resolved_addrs with
-        | Addrs addrs ->
-          dprintf "%d Addrs" (List.length addrs);
-          let addcond = List.length addrs > 1 in
-          List.fold_left (add_resolved_edge addcond e) c addrs, state'
-        | Error | Exit | Indirect ->
-          dprintf "Special";
-          let c', dest = match resolved_addrs with
-            | Error -> Cfg_ast.find_error c
-            | Exit -> Cfg_ast.find_exit c
-            | Indirect -> Cfg_ast.find_indirect c
-            | _ -> failwith "impossible"
-          in
-          CA.add_edge_e c' (CA.G.E.create s l dest), state'
+        let resolved_edges, state' = D.get_succs p c [e] state in
+        let resolve_edge c (e,resolved_addrs) =
+          match resolved_addrs with
+          | Addrs addrs ->
+            dprintf "%d Addrs" (List.length addrs);
+            let addcond = List.length addrs > 1 in
+            List.fold_left (add_resolved_edge addcond e) c addrs
+          | Error | Exit | Indirect ->
+            dprintf "Special";
+            let c', dest = match resolved_addrs with
+              | Error -> Cfg_ast.find_error c
+              | Exit -> Cfg_ast.find_exit c
+              | Indirect -> Cfg_ast.find_indirect c
+              | _ -> failwith "impossible"
+            in
+            CA.add_edge_e c' (CA.G.E.create s l dest)
+        in
+        List.fold_left resolve_edge c resolved_edges, state'
       in
       (* Main loop *)
       while not (Worklist.is_empty q) do
