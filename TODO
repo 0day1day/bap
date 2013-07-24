@@ -24,3 +24,6 @@ Branch specific:
    Lang.exp = unit
 * Cfg.mli: How can we make expressions more structured?
 * Should we add edge conditions to the visitor?
+* Allow recovery algorithm to choose edges to process.  Use this to
+   process all non-indirect jumps first.  Then process as many
+   indirect jumps at the same time to reduce the number of VSA calls.
