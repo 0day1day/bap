@@ -959,11 +959,11 @@ let rec to_ir mode addr next ss pref has_rex has_vex =
   and rdi_e = ge mode rdi
   and rax = gv mode rax
   and rax_e = ge mode rax
-  and rbx = gv mode rbx
+  and _rbx = gv mode rbx
   and _rbx_e = ge mode rbx
   and rcx = gv mode rcx
   and _rcx_e = ge mode rcx
-  and rdx = gv mode rdx
+  and _rdx = gv mode rdx
   and rdx_e = ge mode rdx
   and ah_e = ah_e mode
   and _ch_e = ch_e mode
@@ -1656,20 +1656,14 @@ let rec to_ir mode addr next ss pref has_rex has_vex =
   | Hlt ->
     [Halt(rax_e, [])]
   | Rdtsc ->
-    (* Higher order bits are cleared in rax/rdx *)
-    let e = cast_unsigned (type_of_mode mode) (Unknown("rdtsc", r32)) in
-    [
-      move rax e;
-      move rdx e;
-    ]
+    let undef reg = assn r32 reg (Unknown ("rdtsc", r32)) in
+    List.map undef [o_rax; o_rdx]
   | Cpuid ->
-      let t = type_of_mode mode in
-      let undef reg = move reg (Unknown ("cpuid", t)) in
-      List.map undef [rax; rbx; rcx; rdx]
+    let undef reg = assn r32 reg (Unknown ("cpuid", r32)) in
+    List.map undef [o_rax; o_rbx; o_rcx; o_rdx]
   | Xgetbv ->
-    let e = cast_unsigned (type_of_mode mode) (Unknown ("xgetbv", r32)) in
-    let undef reg = move reg e in
-    List.map undef [rax; rdx]
+    let undef reg = assn r32 reg (Unknown ("xgetbv", r32)) in
+    List.map undef [o_rax; o_rdx]
   | Stmxcsr (dst) ->
       let dst = match dst with
         | Oaddr addr -> addr
