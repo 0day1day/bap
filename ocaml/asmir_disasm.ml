@@ -316,7 +316,7 @@ module Make(D:DISASM)(F:FUNCID) = struct
        used to implement propagate_edge. *)
     let edgeh = Hashtbl.create 1000 in
 
-    let iteration init_worklist (c,state) =
+    let iteration (init_worklist : Cfg_ast.unresolved_edge list) (c,state) =
       let c = ref c in
       let state = ref state in
       let q = Worklist.create () in
@@ -376,7 +376,7 @@ module Make(D:DISASM)(F:FUNCID) = struct
           in
 
           Hashtbl.replace edgeh a (bbs, edges, next);
-          Worklist.add (bbs, edges, next) q;
+          Worklist.add_list edges q;
           c', CA.find_label c' (Addr a)
       in
       (* addcond: Add condition to edge?
@@ -406,10 +406,10 @@ module Make(D:DISASM)(F:FUNCID) = struct
           CA.add_edge_e c (CA.G.E.create s l error)
       in
       (* Side effects: Adds to worklist *)
-      let process_edge (c,state) ((s,l,t) as e) =
-        dprintf "Looking at edge from %s to %s" (Cfg_ast.v2s s) (Pp.ast_exp_to_string t);
-        let resolved_edges, state' = D.get_succs p c [e] state in
-        let resolve_edge c (e,resolved_addrs) =
+      let process_edges (c,state) edges =
+        if debug () then List.iter (fun (s,l,t) -> dprintf "Looking at edge from %s to %s" (Cfg_ast.v2s s) (Pp.ast_exp_to_string t)) edges;
+        let resolved_edges, state' = D.get_succs p c edges state in
+        let resolve_edge c ((s,l,t) as e,resolved_addrs) =
           match resolved_addrs with
           | Addrs addrs ->
             dprintf "%d Addrs" (List.length addrs);
@@ -425,19 +425,23 @@ module Make(D:DISASM)(F:FUNCID) = struct
             in
             CA.add_edge_e c' (CA.G.E.create s l dest)
         in
-        List.fold_left resolve_edge c resolved_edges, state'
+        List.map fst resolved_edges,
+        List.fold_left resolve_edge c resolved_edges,
+        state'
       in
       (* Main loop *)
       while not (Worklist.is_empty q) do
-        let (bbs, unresolved_edges, succ) = Worklist.pop q in
-        let c',state' = List.fold_left process_edge (!c,!state) unresolved_edges in
+        let unresolved_edges = Worklist.all q in
+        let resolved_edges,c',state' = process_edges (!c,!state) unresolved_edges in
+        if List.length resolved_edges = 0 then failwith "no progress";
+        Worklist.filter (fun e -> not (List.mem e resolved_edges)) q;
         c := c';
         state := state'
       done;
 
       !c, !state
     in
-    let c, state = iteration [(entry::[], (entry,None,exp_of_lab (Addr addr))::[], addr)] (c,D.State.init) in
+    let c, state = iteration [(entry,None,exp_of_lab (Addr addr))] (c,D.State.init) in
 
     if D.fixpoint = false then c, state
     else
@@ -448,7 +452,7 @@ module Make(D:DISASM)(F:FUNCID) = struct
       while !continue && !iter < 5 do
         dprintf "Running cfg recovery until fixpoint: iteration %d" !iter;
         let origc = !c in
-        let worklist = Hashtbl.fold (fun k v a -> v::a) edgeh [] in
+        let worklist = List.flatten (Hashtbl.fold (fun k (_,e,_) a -> e::a) edgeh []) in
         let c',state' = iteration worklist (!c,!state) in
         c := c';
         state := state';
