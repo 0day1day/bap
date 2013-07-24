@@ -549,6 +549,8 @@ static uint32_t GetBitsOfReg(REG r) {
 
     case REG_INST_PTR:
     case REG_GFLAGS:
+    case REG_SEG_GS_BASE:
+    case REG_SEG_FS_BASE:
         return 64;
         break;
 
@@ -577,6 +579,8 @@ static uint32_t GetBitsOfReg(REG r) {
 #elif defined(ARCH_32)
     case REG_INST_PTR:
     case REG_GFLAGS:
+    case REG_SEG_GS_BASE:
+    case REG_SEG_FS_BASE:
         return 32;
         break;
 #endif
@@ -1766,7 +1770,7 @@ VOID InstrBlock(BBL bbl)
 
                 IARGLIST_AddArguments(arglist_helper,
                                       IARG_ADDRINT, (ADDRINT)REGISTER,
-                                      IARG_UINT32, 64, // Register size in bits
+                                      IARG_UINT32, GetBitsOfReg(addreg), // Register size in bits
                                       IARG_UINT32, addreg,
                                       //IARG_MEMORYWRITE_SIZE,
                                       IARG_PTR, 0,
