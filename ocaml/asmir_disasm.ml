@@ -185,6 +185,18 @@ module VSA_SPEC = struct
       dprintf "Starting VSA now";
       let df_in, df_out = Vsa_ssa.vsa ~nmeets:0 ~opts:{Vsa_ssa.AlmostVSA.DFP.O.initial_mem=Asmir.get_readable_mem_contents_list asmp} ssacfg in
 
+      let _, m, cp =
+        let stop_before = function
+          | Ssa.Load _ | Ssa.Store _ -> true
+          | _ -> false
+        in
+        let stop_after = function
+          | Ssa.Load _ -> true
+          | _ -> false
+        in
+        Copy_prop.copyprop_ssa ~stop_before ~stop_after ssacfg
+      in
+
       let add_indirect () =
         if debug () then (
           Printf.eprintf "VSA @%s" (Cfg_ssa.v2s ssav);
@@ -218,14 +230,15 @@ module VSA_SPEC = struct
          do, except that it will also convert M[e] to a value set
          before it returns, which introduced imprecision. *)
 
-      let special_memory m e endian t =
+      let special_memory m indexe endian t =
         (* The variable copy propagates to a memory load.
            Perfect.  This is looking like a jump table lookup. *)
-        dprintf "special_memory %s %s" (Pp.ssa_exp_to_string m) (Pp.ssa_exp_to_string e);
+
+        dprintf "special_memory %s %s cp %s" (Pp.ssa_exp_to_string m) (Pp.ssa_exp_to_string indexe) (Pp.ssa_exp_to_string (cp indexe));
         let l = BatOption.get (df_in ssaloc) in
         let exp2vs = Vsa_ssa.AlmostVSA.DFP.exp2vs l in
-        let vs = exp2vs e in
-        dprintf "VSA resolved memory index %s to %s" (Pp.ssa_exp_to_string e) (Vsa_ssa.VS.to_string (Vsa_ssa.AlmostVSA.DFP.exp2vs l e));
+        let vs = exp2vs indexe in
+        dprintf "VSA resolved memory index %s to %s" (Pp.ssa_exp_to_string indexe) (Vsa_ssa.VS.to_string (Vsa_ssa.AlmostVSA.DFP.exp2vs l indexe));
         (match Vsa_ssa.VS.concrete ~max:1024 vs with
         | Some l -> dprintf "VSA finished";
           (* We got some concrete values for the index.  Now
@@ -236,7 +249,7 @@ module VSA_SPEC = struct
             let reads = List.map (fun a ->
               let a = bi64 a in
               let exp2vs = Vsa_ssa.AlmostVSA.DFP.exp2vs (BatOption.get (df_in loc)) in
-              let exp = Ssa.Load(meme, Ssa.Int(a, Typecheck.infer_ssa e), endian, t) in
+              let exp = Ssa.Load(meme, Ssa.Int(a, Typecheck.infer_ssa indexe), endian, t) in
               let vs = exp2vs exp in
               dprintf "memory %s %s" (Pp.ssa_exp_to_string exp) (Vsa_ssa.VS.to_string vs);
               let conc = Vsa_ssa.VS.concrete ~max:1024 vs in
@@ -250,26 +263,18 @@ module VSA_SPEC = struct
           in
           (try do_read m ssaloc with
           | e when !vsa_mem_hack ->
-             (* Hack: We couldn't read the jump table, so try again at
-                BB_Entry.  The underlying assumption is that the memory
-                should be read only, so it couldn't have changed. *)
+            (* Hack: We couldn't read the jump table, so try again at
+               BB_Entry.  The underlying assumption is that the memory
+               should be read only, so it couldn't have changed. *)
             dprintf "VSA mem hack";
             do_read (Ssa.Var Disasm_i386.mem) (CS.G.V.create Cfg.BB_Entry, 0)
           | e ->
             add_indirect ()
           )
-        | None -> wprintf "VSA disassembly failed to resolve %s/%s to a specific concrete set" (Pp.ssa_exp_to_string e) (Vsa_ssa.VS.to_string vs);
+        | None -> wprintf "VSA disassembly failed to resolve %s/%s to a specific concrete set" (Pp.ssa_exp_to_string indexe) (Vsa_ssa.VS.to_string vs);
           add_indirect ())
       in
 
-      let stop_before = function
-        | Ssa.Load _ | Ssa.Store _ -> true
-        | _ -> false
-      in
-      let stop_after = function
-        | _ -> false
-      in
-      let _, m, _ = Copy_prop.copyprop_ssa ~stop_before ~stop_after ssacfg in
       (match ssae with
       | Ssa.Var v ->
         (try match VM.find v m with
