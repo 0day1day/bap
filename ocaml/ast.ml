@@ -297,7 +297,7 @@ match s with
 | _ -> false
 
 let is_syscall = function
-  | Special(("syscall"|"int 80"), _) -> true
+  | Special(("syscall"|"int 0x80"), _) -> true
   | _ -> false
 
 let full_stmts_eq s1 s2 =
