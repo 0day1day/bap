@@ -319,21 +319,20 @@ let rec trans_cfg ?tac cfg =
               let newe = C.G.E.create (C.G.E.src e) new_lab (C.G.E.dst e) in
               C.add_edge_e ssa newe
             ) ssa b ssa, stmts'
-        | Ast.Jmp (e, _) as jmp::tl ->
+        | Ast.Jmp (je, _) as jmp::tl ->
           let revstmts = List.rev (stmts2ssa ctx ctxmap ?tac cfgb (List.rev tl)) in
+          let revstmts, e' = exp2ssa ~revstmts ?tac ctx je in
           let ssa, revstmts = C.G.fold_succ_e
             (fun e (ssa, revstmts) ->
               let ssa = C.remove_edge_e ssa e in
               let new_lab, revstmts = match CA.G.E.label (es2a e) with
                 | Some(a, Ast.BinOp(EQ, e1, e2)) ->
-                  (* XXX: When tac holds, we might introduce a bunch
-                     of redundant temporaries here. We could translate
-                     based on Jmp e, but then we would lose any rewritten
-                     edge conditions. I think the redundancy is not a big
-                     deal; optimizations will easily take care of them. *)
-                  let revstmts, e1' = exp2ssa ~revstmts ?tac ctx e1 in
+                  (* We assume that e and e1 are the same here. We may
+                     want to relax this eventually. *)
+                  if e1 <> je then
+                    failwith (Printf.sprintf "Unexpected different expressions: %s %s" (Pp.ast_exp_to_string je) (Pp.ast_exp_to_string e1));
                   let revstmts, e2' = exp2ssa ~revstmts ?tac ctx e2 in
-                  Some(a, Ssa.BinOp(EQ, e1', e2')), revstmts
+                  Some(a, Ssa.BinOp(EQ, e', e2')), revstmts
                 | Some _ -> failwith "unknown edge condition format"
                 | None -> None, revstmts
               in
@@ -704,7 +703,7 @@ type tm = Ssa.exp VH.t
    bindings indicate a single reference, and false bindings indicate
    more than one reference.  Temporaries are only added to the final
    map when there is one (or zero) reference.  *)
-let rec create_tm c =
+let create_tm c =
   let tm = VH.create 5700 
   and refd = VH.create 5700 in
   let vis = object
@@ -733,10 +732,62 @@ let rec create_tm c =
   C.G.iter_vertex
     (fun b -> ignore(Ssa_visitor.stmts_accept vis (C.get_stmts c b)))
     c;
+  C.G.iter_edges_e
+    (fun e -> match C.G.E.label e with
+    | Some (_, e) -> ignore(Ssa_visitor.exp_accept vis e)
+    | None -> ()
+    ) c;
   tm
 
 
-and exp2ast tm e =
+module Test = struct
+let rec exp2ssa tm e =
+  let e2s = exp2ssa tm in
+  match e with
+    | Int(i,t) -> Int(i,t)
+    | Lab s -> Lab s
+    | Var l -> (try e2s (VH.find tm l) with Not_found -> Var l)
+    | Ite(c,v1,v2) -> Ite(e2s c, e2s v1, e2s v2)
+    | Extract(h,l,v) -> Extract(h, l, e2s v)
+    | Concat(lv,rv) -> Concat(e2s lv, e2s rv)
+    | BinOp(bo,v1,v2) -> BinOp(bo, e2s v1, e2s v2)
+    | UnOp(uo, v) -> UnOp(uo, e2s v)
+    | Cast(ct,t,v) -> Cast(ct, t, e2s v)
+    | Unknown(s,t) -> Unknown(s,t)
+    | Load(arr,idx,e, t) -> Load(e2s arr, e2s idx, e2s e, t)
+    | Store(a,i,v, e, t) -> Store(e2s a, e2s i, e2s v, e2s e, t)
+    | Phi l -> Phi l
+
+let stmt2ssa tm e =
+  let e2s = exp2ssa tm in
+  match e with
+    | Jmp(t,a) -> Jmp(e2s t, a)
+    | CJmp(c,tt,tf,a) -> CJmp(e2s c, e2s tt, e2s tf, a)
+    | Label(l,a) -> Label(l,a)
+    | Comment(s,a) -> Comment(s,a)
+    | Assert(t,a) -> Assert(e2s t, a)
+    | Assume(t,a) -> Assume(e2s t, a)
+    | Halt(t,a) -> Halt(e2s t, a)
+    | Move(l,e,a) -> Move(l, e2s e, a)
+
+let stmts2ssa tm stmts =
+  let is_trash = function
+    | Move(l,_,a) when List.mem Liveout a -> false
+    | Move(l,_,_) when VH.mem tm l -> true
+    | _ -> false
+  in
+  List.fold_right
+    (fun s ssa -> if is_trash s then ssa else stmt2ssa tm s :: ssa)
+    stmts []
+
+let cfg2ssa tm g =
+  C.G.fold_vertex (fun v g ->
+    let stmts = C.get_stmts g v in
+    C.set_stmts g v (stmts2ssa tm stmts)
+  ) g g
+end
+
+let rec exp2ast tm e =
   let e2a = exp2ast tm in
   match e with
     | Int(i,t) -> Ast.Int(i,t)
@@ -799,3 +850,5 @@ let to_astcfg ?remove_temps ?dsa c =
 (** Convert an SSA CFG to an AST program. *)
 let to_ast ?(remove_temps=true) c =
   Cfg_ast.to_prog (to_astcfg ~remove_temps c)
+
+let undo_tac_ssacfg c = Test.cfg2ssa (create_tm c) c

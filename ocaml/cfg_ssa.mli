@@ -48,3 +48,6 @@ type ssa_translation_results = {
 
 val trans_ssacfg : ?remove_temps:bool -> ?dsa:bool -> Cfg.SSA.G.t -> ssa_translation_results
 (** Translates a SSA CFG to an AST CFG. *)
+
+val undo_tac_ssacfg : Cfg.SSA.G.t -> Cfg.SSA.G.t
+(** Undo three address code transformation. *)

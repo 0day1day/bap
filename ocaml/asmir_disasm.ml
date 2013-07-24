@@ -6,6 +6,7 @@ module CS = Cfg.SSA
 module D = Debug.Make(struct let name = "Asmir_disasm" and default=`NoDebug end)
 open D
 open Type
+module VM = Var.VarMap
 
 (* XXX: Handle conditional function calls *)
 (* VSA dataflow reuse *)
@@ -109,6 +110,11 @@ module VSA_SPEC = struct
     let init = ()
   end
 
+  let jumpe g v =
+    match List.rev (CS.get_stmts g v) with
+    | Ssa.Jmp(e, _)::_ -> e
+    | _ -> failwith "jumpe: Unable to find jump"
+
   let get_succs asmp g (v,l,e) () =
     match RECURSIVE_DESCENT_SPEC.get_succs_int false asmp g (v,l,e) () with
     | Indirect, () ->
@@ -118,16 +124,66 @@ module VSA_SPEC = struct
       let cfg = Hacks.ast_exit_indirect (CA.copy g) in
       let cfg = Prune_unreachable.prune_unreachable_ast cfg in
       let cfg = Hacks.add_sink_exit cfg in
-      let {Cfg_ssa.cfg=ssacfg; to_ssaexp} = Cfg_ssa.trans_cfg ~tac:false cfg in
-      let ssacfg = Ssa_cond_simplify.simplifycond_ssa ssacfg in
+      (* Cfg_pp.AstStmtsDot.output_graph (open_out "vsacfg.dot") cfg; *)
+
+      (* Start by converting to SSA three address code. *)
+      let ssacfg = Cfg_ssa.of_astcfg ~tac:true cfg in
+      (* Cfg_pp.SsaStmtsDot.output_graph (open_out "vsapre.dot") ssacfg; *)
+
+      (* Do an initial optimization pass.  This is important so that
+         simplifycond_ssa can recognize syntactically equal
+         computations. *)
+      let ssacfg = Ssa_simp.simp_cfg ssacfg in
+
+      (* Simplify the SSA conditions so they can be parsed by VSA *)
       let ssav = CS.find_vertex ssacfg (CA.G.V.label v) in
+      dprintf "ssav %s" (Cfg_ssa.v2s ssav);
+      let ssae = jumpe ssacfg ssav in
+      let ssacfg = Ssa_cond_simplify.simplifycond_target_ssa ssae ssacfg in
+      (* Cfg_pp.SsaStmtsDot.output_graph (open_out "vsacond.dot") ssacfg; *)
+
+      (* Redo TAC so that we can simplify the SSA conditions. This
+         should ensure that all variables are their canonical form.  This
+         is important so that the edge conditions are consistent with the
+         rest of the program. *)
+      let ssacfg = Cfg_ssa.do_tac_ssacfg ssacfg in
+      (* Cfg_pp.SsaStmtsDot.output_graph (open_out "vsatac.dot") ssacfg; *)
+
+      (* Simplify. *)
+      let ssacfg = Ssa_simp.simp_cfg ssacfg in
+      (* Cfg_pp.SsaStmtsDot.output_graph (open_out "vsasimp.dot") ssacfg; *)
+
+      (* Now our edge conditions look like (Var temp).  We need to use
+         shadow copy propagation to convert them to something like (EAX
+         < 10). *)
+
+      (* XXX: Should this go elsewhere? *)
+      let fix_edges g =
+        let _, m, _ = Copy_prop.copyprop_ssa g in
+        CS.G.fold_edges_e
+          (fun e g ->
+            match CS.G.E.label e with
+            | None -> g
+            | Some(b, Ssa.BinOp(EQ, Ssa.Var v, e2)) ->
+              (try let cond = Some(b, Ssa.BinOp(EQ, VM.find v m, e2)) in
+                  let src = CS.G.E.src e in
+                  let dst = CS.G.E.dst e in
+                  let e' = CS.G.E.create src cond dst in
+                  CS.add_edge_e (CS.remove_edge_e g e) e'
+              with Not_found -> g)
+            | Some(_, e) -> (* Sometimes we might see a constant like true/false *) g
+          ) g g
+      in
+
+      let ssacfg = fix_edges ssacfg in
+
       let ssacfg = Coalesce.coalesce_ssa ~nocoalesce:[ssav] ssacfg in
       (* Cfg_pp.SsaStmtsDot.output_graph (open_out "vsa.dot") ssacfg; *)
-      let ssae = to_ssaexp (Vsa_ast.last_loc cfg v) e in
+      let ssae = jumpe ssacfg ssav in
       dprintf "ssae: %s" (Pp.ssa_exp_to_string ssae);
       let ssaloc = Vsa_ssa.last_loc ssacfg ssav in
       dprintf "Starting VSA now";
-      let df_in, df_out = Vsa_ssa.vsa ~nmeets:5 ~opts:{Vsa_ssa.AlmostVSA.DFP.O.initial_mem=Asmir.get_readable_mem_contents_list asmp} ssacfg in
+      let df_in, df_out = Vsa_ssa.vsa ~nmeets:0 ~opts:{Vsa_ssa.AlmostVSA.DFP.O.initial_mem=Asmir.get_readable_mem_contents_list asmp} ssacfg in
 
       let add_indirect () =
         if debug () then (
@@ -182,7 +238,7 @@ module VSA_SPEC = struct
               let exp2vs = Vsa_ssa.AlmostVSA.DFP.exp2vs (BatOption.get (df_in loc)) in
               let exp = Ssa.Load(meme, Ssa.Int(a, Typecheck.infer_ssa e), endian, t) in
               let vs = exp2vs exp in
-              dprintf "memory %s" (Vsa_ssa.VS.to_string vs);
+              dprintf "memory %s %s" (Pp.ssa_exp_to_string exp) (Vsa_ssa.VS.to_string vs);
               let conc = Vsa_ssa.VS.concrete ~max:1024 vs in
               match conc with
               | Some l -> l
@@ -207,17 +263,22 @@ module VSA_SPEC = struct
       in
 
       let stop_before = function
-        | Ssa.Store _ -> true
+        | Ssa.Load _ | Ssa.Store _ -> true
         | _ -> false
       in
       let stop_after = function
-        | Ssa.Load _ -> true
         | _ -> false
       in
-      let m, p = Copy_prop.copyprop_ssa ~stop_before ~stop_after ssacfg in
-      (match p ssae with
-      | Ssa.Load(m, e, endian, t) ->
-        special_memory m e endian t
+      let _, m, _ = Copy_prop.copyprop_ssa ~stop_before ~stop_after ssacfg in
+      (match ssae with
+      | Ssa.Var v ->
+        (try match VM.find v m with
+        | Ssa.Load(m, e, endian, t) ->
+          special_memory m e endian t
+        | _ -> fallback ()
+         with Not_found -> fallback ())
+      (* | Ssa.Load(m, e, endian, t) -> *)
+      (*   special_memory m e endian t *)
       | _ -> fallback ())
     (* Rely on recursive descent for easy stuff *)
     | o, () -> o, ()
