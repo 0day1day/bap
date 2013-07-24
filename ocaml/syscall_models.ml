@@ -15,9 +15,7 @@ open Ast
 
 *)
 
-let x86_is_system_call = function
-  | Special(("int 80"|"syscall"), _) -> true
-  | _ -> false
+let x86_is_system_call = is_syscall
 
 let syscall_reg = function
   | X86_32 -> Disasm_i386.R32.eax
