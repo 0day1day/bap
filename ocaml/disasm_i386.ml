@@ -2929,7 +2929,7 @@ let parse_instr mode g addr =
             let t = if prefix.opsize = r64 then r64 else r32 in
             let s, d, ts, td = match b2 with
               | 0x6e -> toreg rm, r, t, r128
-              | 0x7e when prefix.repeat -> rm, r, r64, prefix.mopsize
+              | 0x7e when prefix.repeat -> rm, r, r64, r128
               | 0x7e -> r, toreg rm, t, t
               | _ -> disfailwith "impossible"
             in
