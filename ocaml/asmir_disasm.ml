@@ -108,10 +108,15 @@ module RECURSIVE_DESCENT_SPEC = struct
   let fixpoint = false
 end
 
+type vsainfo = {origssa: CS.G.t;
+                optssa: CS.G.t;
+                vsa_in: Cfg.ssastmtloc -> Vsa_ssa.AlmostVSA.DFP.L.t;
+                vsa_out: Cfg.ssastmtloc -> Vsa_ssa.AlmostVSA.DFP.L.t;}
+
 module VSA_SPEC = struct
   module State = struct
-    type t = unit
-    let init = ()
+    type t = vsainfo option
+    let init = None
   end
 
   let jumpe g v =
@@ -119,7 +124,7 @@ module VSA_SPEC = struct
     | Ssa.Jmp(e, _)::_ -> e
     | _ -> failwith "jumpe: Unable to find jump"
 
-  let get_succs asmp g edges () =
+  let get_succs asmp g edges st =
     let rdresolved, rdunresolved =
       let rd, () = RECURSIVE_DESCENT_SPEC.get_succs_int false asmp g edges () in
     List.partition (function (_,Indirect) -> false | _ -> true) rd
@@ -128,7 +133,7 @@ module VSA_SPEC = struct
        much progress as possible before running VSA. *)
     match rdresolved, rdunresolved with
     | _::_, _ ->
-      rdresolved, ()
+      rdresolved, st
     | [], ((_::_) as indirect_edges) ->
 
       let edges = List.map (fun (e,x) -> assert (x = Indirect); e) indirect_edges in
@@ -140,6 +145,7 @@ module VSA_SPEC = struct
 
       (* Start by converting to SSA three address code. *)
       let ssacfg = Cfg_ssa.of_astcfg ~tac:true cfg in
+      let origssacfg = ssacfg in
       (* Cfg_pp.SsaStmtsDot.output_graph (open_out "vsapre.dot") ssacfg; *)
 
       (* Do an initial optimization pass.  This is important so that
@@ -317,7 +323,12 @@ module VSA_SPEC = struct
 
       (* There are a bunch of edges to resolve. For now we assume we
          can resolve all of them at once. *)
-      List.map resolve_edge edges, ()
+      List.map resolve_edge edges,
+      let open State in
+      Some {origssa=origssacfg;
+            optssa=ssacfg;
+            vsa_in=df_in;
+            vsa_out=df_out;}
 
     | [], [] -> failwith "empty worklist"
 
@@ -495,12 +506,16 @@ let recursive_descent_at =
   RECURSIVE_DESCENT.disasm_at
 let recursive_descent_at a b = fst(recursive_descent_at a b)
 
-let vsa =
+let vsa_full a =
   let module VSA = Make(VSA_SPEC)(FUNCFINDER_DUMB) in
-  VSA.disasm
-let vsa a = fst(vsa a)
+  match VSA.disasm a with
+  | x, Some y -> x, y
+  | _ -> failwith "vsa_full: Expected Some but got None"
+let vsa a = fst(vsa_full a)
 
-let vsa_at =
+let vsa_at_full a b =
   let module VSA = Make(VSA_SPEC)(FUNCFINDER_DUMB) in
-  VSA.disasm_at
-let vsa_at a b = fst(vsa_at a b)
+  match VSA.disasm_at a b with
+  | x, Some y -> x, y
+  | _ -> failwith "vsa_at_full: Expected Some but got None"
+let vsa_at a b = fst(vsa_at_full a b)
