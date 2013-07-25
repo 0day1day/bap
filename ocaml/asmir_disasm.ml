@@ -80,30 +80,29 @@ module RECURSIVE_DESCENT_SPEC = struct
     let init = ()
   end
   let get_succs_int no_indirect _asmp g edges () =
-    let v,l,e,edge = match edges with
-      | ((v,l,e) as edge)::_ -> v,l,e,edge
-      | _ -> failwith "empty worklist"
+    let resolve_edge ((v,l,e) as edge) =
+      let o = match List.rev (CA.get_stmts g v), l with
+        | last::_, None when FUNCFINDER_DUMB.is_ret_stmt last ->
+          Exit
+        | CJmp _::_, Some _ ->
+          (match lab_of_exp e with
+          | Some l -> Addrs [l]
+          | None -> Indirect)
+        | CJmp _::_, _ -> failwith "error"
+        (* Fallthrough/Jmp *)
+        | _::_, None ->
+          (match lab_of_exp e with
+          | Some l -> Addrs [l]
+          | None ->
+            if no_indirect
+            then failwith "Indirect jump encountered by recursive descent"
+            else Indirect)
+        | _::_, Some _ -> failwith "error"
+        | [], _ -> Addrs []
+      in
+      (edge, o)
     in
-    let o = match List.rev (CA.get_stmts g v), l with
-      | last::_, None when FUNCFINDER_DUMB.is_ret_stmt last ->
-        Exit
-      | CJmp _::_, Some _ ->
-        (match lab_of_exp e with
-        | Some l -> Addrs [l]
-        | None -> Indirect)
-      | CJmp _::_, _ -> failwith "error"
-      (* Fallthrough/Jmp *)
-      | _::_, None ->
-        (match lab_of_exp e with
-        | Some l -> Addrs [l]
-        | None ->
-          if no_indirect
-          then failwith "Indirect jump encountered by recursive descent"
-          else Indirect)
-      | _::_, Some _ -> failwith "error"
-      | [], _ -> Addrs []
-    in
-    [edge, o], ()
+    List.map resolve_edge edges, ()
   let get_succs asmp g e () = get_succs_int !no_indirect asmp g e ()
 
   let fixpoint = false
