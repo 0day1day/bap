@@ -2871,7 +2871,7 @@ let parse_instr mode g addr =
           | Ovec _, None ->
             (Movdq(t, s, t, d, false), na)
           | Oaddr _, _ ->
-            (Movdq(td, s, t, d, false), na)
+            (Movdq(t, s, td, d, false), na)
           | _ -> disfailwith "impossible")
       | 0x12 | 0x13 | 0x16 | 0x17 -> (* MOVLPS, MOVLPD, MOVHPS, MOVHPD, MOVHLPS, MOVHLPD, MOVLHPS, MOVLHPD *)
         let r, rm, rv, na = parse_modrm_vec None na in
