@@ -200,6 +200,9 @@ module VSA_SPEC = struct
       let ssacfg = Coalesce.coalesce_ssa ~nocoalesce:ssavs ssacfg in
       (* Cfg_pp.SsaStmtsDot.output_graph (open_out "vsa.dot") ssacfg; *)
 
+      dprintf "Starting VSA now";
+      let df_in, df_out = Vsa_ssa.vsa ~nmeets:0 ~opts:{Vsa_ssa.AlmostVSA.DFP.O.initial_mem=Asmir.get_readable_mem_contents_list asmp} ssacfg in
+
       let resolve_edge ((v,l,e) as edge) =
 
         (* Do VSA stuff *)
@@ -208,8 +211,6 @@ module VSA_SPEC = struct
         let (_, ssav, ssae) = get_ssaev edge in
         dprintf "ssae: %s" (Pp.ssa_exp_to_string ssae);
         let ssaloc = Vsa_ssa.last_loc ssacfg ssav in
-        dprintf "Starting VSA now";
-        let df_in, df_out = Vsa_ssa.vsa ~nmeets:0 ~opts:{Vsa_ssa.AlmostVSA.DFP.O.initial_mem=Asmir.get_readable_mem_contents_list asmp} ssacfg in
 
         let _, m, cp =
           let stop_before = function
