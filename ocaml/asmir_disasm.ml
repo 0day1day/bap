@@ -130,10 +130,10 @@ module VSA_SPEC = struct
     match rdresolved, rdunresolved with
     | _::_, _ ->
       rdresolved, ()
-    | [], ((v,l,e) as edge, _)::_ ->
-      (* Do VSA stuff *)
-      dprintf "Resolving %s with VSA" (Pp.ast_exp_to_string e);
-      if l <> None then failwith "VSA-enabled lifting currently assumes that conditional jumps are not indirect";
+    | [], ((_::_) as indirect_edges) ->
+
+      let edges = List.map (fun (e,x) -> assert (x = Indirect); e) indirect_edges in
+
       let cfg = Hacks.ast_exit_indirect (CA.copy g) in
       let cfg = Prune_unreachable.prune_unreachable_ast cfg in
       let cfg = Hacks.add_sink_exit cfg in
@@ -149,10 +149,18 @@ module VSA_SPEC = struct
       let ssacfg = Ssa_simp.simp_cfg ssacfg in
 
       (* Simplify the SSA conditions so they can be parsed by VSA *)
-      let ssav = CS.find_vertex ssacfg (CA.G.V.label v) in
-      dprintf "ssav %s" (Cfg_ssa.v2s ssav);
-      let ssae = jumpe ssacfg ssav in
-      let ssacfg = Ssa_cond_simplify.simplifycond_target_ssa ssae ssacfg in
+
+      (* Get ssa expression and vertices *)
+      let get_ssaev ((v,_,_) as edge) =
+        let ssav = CS.find_vertex ssacfg (CA.G.V.label v) in
+        let ssae = jumpe ssacfg ssav in
+        (edge, ssav, ssae)
+      in
+      let ssaves = List.map get_ssaev edges in
+      let ssavs = List.map (function (_,v,_) -> v) ssaves in
+      let ssaes = List.map (function (_,_,e) -> e) ssaves in
+      if debug () then List.iter (fun (_,ssav,ssae) -> dprintf "ssavs %s %s" (Cfg_ssa.v2s ssav) (Pp.ssa_exp_to_string ssae)) ssaves;
+      let ssacfg = Ssa_cond_simplify.simplifycond_targets_ssa ssaes ssacfg in
       (* Cfg_pp.SsaStmtsDot.output_graph (open_out "vsacond.dot") ssacfg; *)
 
       (* Redo TAC so that we can simplify the SSA conditions. This
@@ -179,126 +187,138 @@ module VSA_SPEC = struct
             | None -> g
             | Some(b, Ssa.BinOp(EQ, Ssa.Var v, e2)) ->
               (try let cond = Some(b, Ssa.BinOp(EQ, VM.find v m, e2)) in
-                  let src = CS.G.E.src e in
-                  let dst = CS.G.E.dst e in
-                  let e' = CS.G.E.create src cond dst in
-                  CS.add_edge_e (CS.remove_edge_e g e) e'
-              with Not_found -> g)
+                   let src = CS.G.E.src e in
+                   let dst = CS.G.E.dst e in
+                   let e' = CS.G.E.create src cond dst in
+                   CS.add_edge_e (CS.remove_edge_e g e) e'
+               with Not_found -> g)
             | Some(_, e) -> (* Sometimes we might see a constant like true/false *) g
           ) g g
       in
 
       let ssacfg = fix_edges ssacfg in
 
-      let ssacfg = Coalesce.coalesce_ssa ~nocoalesce:[ssav] ssacfg in
+      let ssacfg = Coalesce.coalesce_ssa ~nocoalesce:ssavs ssacfg in
       (* Cfg_pp.SsaStmtsDot.output_graph (open_out "vsa.dot") ssacfg; *)
-      let ssae = jumpe ssacfg ssav in
-      dprintf "ssae: %s" (Pp.ssa_exp_to_string ssae);
-      let ssaloc = Vsa_ssa.last_loc ssacfg ssav in
-      dprintf "Starting VSA now";
-      let df_in, df_out = Vsa_ssa.vsa ~nmeets:0 ~opts:{Vsa_ssa.AlmostVSA.DFP.O.initial_mem=Asmir.get_readable_mem_contents_list asmp} ssacfg in
 
-      let _, m, cp =
-        let stop_before = function
-          | Ssa.Load _ | Ssa.Store _ -> true
-          | _ -> false
-        in
-        let stop_after = function
-          | Ssa.Load _ -> true
-          | _ -> false
-        in
-        Copy_prop.copyprop_ssa ~stop_before ~stop_after ssacfg
-      in
+      let resolve_edge ((v,l,e) as edge) =
 
-      let add_indirect edge =
-        if debug () then (
-          Printf.eprintf "VSA @%s" (Cfg_ssa.v2s ssav);
-          Vsa_ssa.AbsEnv.pp prerr_string (BatOption.get (df_out (Vsa_ssa.last_loc ssacfg ssav)));
-          dprintf "\n\n"
-        );
-        if !no_indirect
-        then failwith "VSA disassembly failed to resolve an indirect jump to a specific concrete set"
-        else [edge, Indirect], ()
-      in
+        (* Do VSA stuff *)
+        dprintf "Resolving %s with VSA" (Pp.ast_exp_to_string e);
+        if l <> None then failwith "VSA-enabled lifting currently assumes that conditional jumps are not indirect";
+        let (_, ssav, ssae) = get_ssaev edge in
+        dprintf "ssae: %s" (Pp.ssa_exp_to_string ssae);
+        let ssaloc = Vsa_ssa.last_loc ssacfg ssav in
+        dprintf "Starting VSA now";
+        let df_in, df_out = Vsa_ssa.vsa ~nmeets:0 ~opts:{Vsa_ssa.AlmostVSA.DFP.O.initial_mem=Asmir.get_readable_mem_contents_list asmp} ssacfg in
 
-      let fallback edge =
-        dprintf "fallback";
-        let vs = Vsa_ssa.AlmostVSA.DFP.exp2vs (BatOption.get (df_out (Vsa_ssa.last_loc ssacfg ssav))) ssae in
-        dprintf "VSA resolved %s to %s" (Pp.ast_exp_to_string e) (Vsa_ssa.VS.to_string vs);
-        (match Vsa_ssa.VS.concrete ~max:1024 vs with
-        | Some x -> dprintf "VSA finished";
-          [edge, Addrs (List.map (fun a -> Addr a) x)], ()
-        | None -> wprintf "VSA disassembly failed to resolve %s/%s to a specific concrete set" (Pp.ast_exp_to_string e) (Vsa_ssa.VS.to_string vs);
-          add_indirect edge)
-      in
-
-      (* Value sets are very good at representing the addresses that
-         point to the elements in a jump table.  For instance,
-         jump_table + 4*index is a value set.  However, there is no
-         guarantee that the address stored *in* the jump table,
-         i.e. M[jump_table + 4*index] are aligned.  To ameliaorate
-         this fact, we can apply copy propagation to the jump
-         expression, to see if we get something like [Jump Load(e)].
-         If we do, we can enumerate the addresses in [e], and then put
-         the values [M[e]] in a set.  This is basically what VSA will
-         do, except that it will also convert M[e] to a value set
-         before it returns, which introduced imprecision. *)
-
-      let special_memory m indexe endian t =
-        (* The variable copy propagates to a memory load.
-           Perfect.  This is looking like a jump table lookup. *)
-
-        dprintf "special_memory %s %s cp %s" (Pp.ssa_exp_to_string m) (Pp.ssa_exp_to_string indexe) (Pp.ssa_exp_to_string (cp indexe));
-        let l = BatOption.get (df_in ssaloc) in
-        let exp2vs = Vsa_ssa.AlmostVSA.DFP.exp2vs l in
-        let vs = exp2vs indexe in
-        dprintf "VSA resolved memory index %s to %s" (Pp.ssa_exp_to_string indexe) (Vsa_ssa.VS.to_string (Vsa_ssa.AlmostVSA.DFP.exp2vs l indexe));
-        (match Vsa_ssa.VS.concrete ~max:1024 vs with
-        | Some l -> dprintf "VSA finished";
-          (* We got some concrete values for the index.  Now
-             let's do an abstract load for each index, and try to
-             get concrete numbers for that. *)
-
-          let do_read meme loc =
-            let reads = List.map (fun a ->
-              let a = bi64 a in
-              let exp2vs = Vsa_ssa.AlmostVSA.DFP.exp2vs (BatOption.get (df_in loc)) in
-              let exp = Ssa.Load(meme, Ssa.Int(a, Typecheck.infer_ssa indexe), endian, t) in
-              let vs = exp2vs exp in
-              dprintf "memory %s %s" (Pp.ssa_exp_to_string exp) (Vsa_ssa.VS.to_string vs);
-              let conc = Vsa_ssa.VS.concrete ~max:1024 vs in
-              match conc with
-              | Some l -> l
-              | None ->
-                failwith (Printf.sprintf "Unable to read from jump table at %s" (~% a))
-            ) l
-            in
-            [edge, Addrs (List.map (fun a -> Addr a) (List.flatten reads))], ()
+        let _, m, cp =
+          let stop_before = function
+            | Ssa.Load _ | Ssa.Store _ -> true
+            | _ -> false
           in
-          (try do_read m ssaloc with
-          | e when !vsa_mem_hack ->
-            (* Hack: We couldn't read the jump table, so try again at
-               BB_Entry.  The underlying assumption is that the memory
-               should be read only, so it couldn't have changed. *)
-            dprintf "VSA mem hack";
-            do_read (Ssa.Var Disasm_i386.mem) (CS.G.V.create Cfg.BB_Entry, 0)
-          | e ->
-            add_indirect edge
-          )
-        | None -> wprintf "VSA disassembly failed to resolve %s/%s to a specific concrete set" (Pp.ssa_exp_to_string indexe) (Vsa_ssa.VS.to_string vs);
-          add_indirect edge)
+          let stop_after = function
+            | Ssa.Load _ -> true
+            | _ -> false
+          in
+          Copy_prop.copyprop_ssa ~stop_before ~stop_after ssacfg
+        in
+
+        let add_indirect edge =
+          if debug () then (
+            Printf.eprintf "VSA @%s" (Cfg_ssa.v2s ssav);
+            Vsa_ssa.AbsEnv.pp prerr_string (BatOption.get (df_out (Vsa_ssa.last_loc ssacfg ssav)));
+            dprintf "\n\n"
+          );
+          if !no_indirect
+          then failwith "VSA disassembly failed to resolve an indirect jump to a specific concrete set"
+          else (edge, Indirect)
+        in
+
+        let fallback edge =
+          dprintf "fallback";
+          let vs = Vsa_ssa.AlmostVSA.DFP.exp2vs (BatOption.get (df_out (Vsa_ssa.last_loc ssacfg ssav))) ssae in
+          dprintf "VSA resolved %s to %s" (Pp.ast_exp_to_string e) (Vsa_ssa.VS.to_string vs);
+          (match Vsa_ssa.VS.concrete ~max:1024 vs with
+          | Some x -> dprintf "VSA finished";
+            (edge, Addrs (List.map (fun a -> Addr a) x))
+          | None -> wprintf "VSA disassembly failed to resolve %s/%s to a specific concrete set" (Pp.ast_exp_to_string e) (Vsa_ssa.VS.to_string vs);
+            add_indirect edge)
+        in
+
+        (* Value sets are very good at representing the addresses that
+           point to the elements in a jump table.  For instance,
+           jump_table + 4*index is a value set.  However, there is no
+           guarantee that the address stored *in* the jump table,
+           i.e. M[jump_table + 4*index] are aligned.  To ameliaorate
+           this fact, we can apply copy propagation to the jump
+           expression, to see if we get something like [Jump Load(e)].
+           If we do, we can enumerate the addresses in [e], and then put
+           the values [M[e]] in a set.  This is basically what VSA will
+           do, except that it will also convert M[e] to a value set
+           before it returns, which introduced imprecision. *)
+
+        let special_memory m indexe endian t =
+          (* The variable copy propagates to a memory load.
+             Perfect.  This is looking like a jump table lookup. *)
+
+          dprintf "special_memory %s %s cp %s" (Pp.ssa_exp_to_string m) (Pp.ssa_exp_to_string indexe) (Pp.ssa_exp_to_string (cp indexe));
+          let l = BatOption.get (df_in ssaloc) in
+          let exp2vs = Vsa_ssa.AlmostVSA.DFP.exp2vs l in
+          let vs = exp2vs indexe in
+          dprintf "VSA resolved memory index %s to %s" (Pp.ssa_exp_to_string indexe) (Vsa_ssa.VS.to_string (Vsa_ssa.AlmostVSA.DFP.exp2vs l indexe));
+          (match Vsa_ssa.VS.concrete ~max:1024 vs with
+          | Some l -> dprintf "VSA finished";
+            (* We got some concrete values for the index.  Now
+               let's do an abstract load for each index, and try to
+               get concrete numbers for that. *)
+
+            let do_read meme loc =
+              let reads = List.map (fun a ->
+                let a = bi64 a in
+                let exp2vs = Vsa_ssa.AlmostVSA.DFP.exp2vs (BatOption.get (df_in loc)) in
+                let exp = Ssa.Load(meme, Ssa.Int(a, Typecheck.infer_ssa indexe), endian, t) in
+                let vs = exp2vs exp in
+                dprintf "memory %s %s" (Pp.ssa_exp_to_string exp) (Vsa_ssa.VS.to_string vs);
+                let conc = Vsa_ssa.VS.concrete ~max:1024 vs in
+                match conc with
+                | Some l -> l
+                | None ->
+                  failwith (Printf.sprintf "Unable to read from jump table at %s" (~% a))
+              ) l
+              in
+              (edge, Addrs (List.map (fun a -> Addr a) (List.flatten reads)))
+            in
+            (try do_read m ssaloc with
+            | e when !vsa_mem_hack ->
+              (* Hack: We couldn't read the jump table, so try again at
+                 BB_Entry.  The underlying assumption is that the memory
+                 should be read only, so it couldn't have changed. *)
+              dprintf "VSA mem hack";
+              do_read (Ssa.Var Disasm_i386.mem) (CS.G.V.create Cfg.BB_Entry, 0)
+            | e ->
+              add_indirect edge
+            )
+          | None -> wprintf "VSA disassembly failed to resolve %s/%s to a specific concrete set" (Pp.ssa_exp_to_string indexe) (Vsa_ssa.VS.to_string vs);
+            add_indirect edge)
+        in
+
+        (match ssae with
+        | Ssa.Var v ->
+          (try match VM.find v m with
+          | Ssa.Load(m, e, endian, t) ->
+            special_memory m e endian t
+          | _ -> fallback edge
+           with Not_found -> fallback edge)
+        (* | Ssa.Load(m, e, endian, t) -> *)
+        (*   special_memory m e endian t *)
+        | _ -> fallback edge)
       in
 
-      (match ssae with
-      | Ssa.Var v ->
-        (try match VM.find v m with
-        | Ssa.Load(m, e, endian, t) ->
-          special_memory m e endian t
-        | _ -> fallback edge
-         with Not_found -> fallback edge)
-      (* | Ssa.Load(m, e, endian, t) -> *)
-      (*   special_memory m e endian t *)
-      | _ -> fallback edge)
+      (* There are a bunch of edges to resolve. For now we assume we
+         can resolve all of them at once. *)
+      List.map resolve_edge edges, ()
+
     | [], [] -> failwith "empty worklist"
 
   let fixpoint = true

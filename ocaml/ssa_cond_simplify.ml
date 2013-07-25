@@ -159,7 +159,7 @@ let simplifycond_ssa ?goodvars g =
     | _ -> g
   ) g g
 
-let simplifycond_target_ssa targete g =
+let simplifycond_targets_ssa targetes g =
   let stop_before =
     function
       | Load _ -> true
@@ -186,7 +186,7 @@ let simplifycond_target_ssa targete g =
           with Not_found -> SkipChildren)
         | _ -> DoChildren
     end in
-    ignore(Ssa_visitor.exp_accept v targete);
+    List.iter (fun e -> ignore(Ssa_visitor.exp_accept v e)) targetes;
     !s
   in
   simplifycond_ssa ~goodvars g
