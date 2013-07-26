@@ -55,7 +55,7 @@ let val_true = Int(unit_big_int, reg_1)
 
 (** If possible, make a label that would be refered to by the given
     expression. *)
-let val_of_exp = function
+let lab_of_exp = function
   | Lab s -> Some(Name s)
   | Int(i, t) ->
       Some(Addr(int64_of_big_int (Arithmetic.to_big_int (i,t))))

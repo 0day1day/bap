@@ -166,7 +166,7 @@ struct
   include SSA
   let remove_redundant_jump p =
     match List.rev p with
-    | Ssa.Jmp (e, _) as s::tl  when Ssa.val_of_exp e <> None ->
+    | Ssa.Jmp (e, _) as s::tl  when Ssa.lab_of_exp e <> None ->
       let str = "Removed redundant jump: " ^ (Pp.ssa_stmt_to_string s) in
       let rs = Ssa.Comment(str, []) in
       List.rev (rs::tl)
