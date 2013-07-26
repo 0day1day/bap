@@ -14,8 +14,12 @@ type result = Valid (** The formula was valid or unsatisfiable. *)
               | Invalid of model (** The formula was invalid or satisfiable. *)
               | SmtError of string (** The solver failed.  Possible reasons for this include the formula having invalid syntax and the solver running out of memory. *)
               | Timeout (** The solver took too long to solve the formula. *)
+
 val result_to_string : result -> string
-  (** Convert a result to a string *)
+(** Convert a result to a string *)
+
+val print_model : model -> unit
+(** Print a model to [stdout]. *)
 
 (** A hack so that we can subtype solver instances. If ocaml <3.11 had
     first order modules, we wouldn't need this. *)

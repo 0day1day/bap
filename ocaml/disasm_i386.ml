@@ -317,17 +317,16 @@ let ite t b e1 e2 =
   exp_ite ~t b e1 e2
 
 (* register widths *)
-let r1 = Ast.reg_1
+let r1 = reg_1
 let r4 = Reg 4
-let r8 = Ast.reg_8
-let r16 = Ast.reg_16
-let r32 = Ast.reg_32
-let addr_t = r32
-let r64 = Ast.reg_64
-let r128 = Reg 128
-let r256 = Reg 256
-let xmm_t = Reg 128
-let ymm_t = Reg 256
+let r8 = reg_8
+let r16 = reg_16
+let r32 = reg_32
+let r64 = reg_64
+let r128 = reg_128
+let r256 = reg_256
+let xmm_t = r128
+let ymm_t = r256
 let st_t = Reg 80
 
 (** Only use this for registers, not temporaries *)
@@ -2118,7 +2117,9 @@ let cc_to_exp i =
 
 let parse_instr mode g addr =
   let s = succ_big_int in
-
+  let bm = big_int_of_mode mode in
+  let im = int_of_mode mode in
+  let tm = type_of_mode mode in
   let get_prefix c =
     let i = Char.code c in
     match i with
@@ -2270,8 +2271,6 @@ let parse_instr mode g addr =
       | None -> false, false
     in
     let b = Char.code (g a) in
-    let bm = big_int_of_mode mode in
-    let im = int_of_mode mode in
     let bits2rege = match mode with
       | X86 -> bits2reg32e
       | X8664 -> bits2reg64e
@@ -2314,8 +2313,8 @@ let parse_instr mode g addr =
     (* ISR 2.1.5 Table 2-1 *)
     match modb & 7 with (* MOD *)
     | 0 -> (match rm & 7 with
-      | 6 -> let (disp, na) = parse_disp16 na in (r, Oaddr(b16 disp), na)
-      | n when n < 8 -> (r, Oaddr(eaddr16 mode rm), na)
+      | 6 -> let (disp, na) = parse_disp16 na in (r, Oaddr(bm disp), na)
+      | n when n < 8 -> (r, Oaddr(cast_unsigned tm (eaddr16 mode rm)), na)
       | _ -> disfailwith "Impossible"
     )
     | 1 | 2 ->
@@ -2323,7 +2322,7 @@ let parse_instr mode g addr =
       let (disp, na) =
         if (modb & 7) = 1 then parse_disp8 na else (*2*) parse_disp16 na
       in
-      (r, Oaddr(base +* b16 disp), na)
+      (r, Oaddr(cast_unsigned tm (base +* b16 disp)), na)
     | 3 -> (r, Oreg rm, na)
     | _ -> disfailwith "Impossible"
   in
@@ -3034,19 +3033,27 @@ let parse_instr mode g addr =
         let r, rm, rv, na = parse_modrm_vec None na in
         let t = if prefix.mopsize = r256 then r256 else r128 in
         (Ppackedbinop(t, prefix.opsize, binop XOR, "xorp", r, rm, rv), na)
-      | 0x60 | 0x61 | 0x62 | 0x68 | 0x69 | 0x6a | 0x6c | 0x6d ->
+      | 0x60 | 0x61 | 0x62 | 0x68 | 0x69 | 0x6a ->
         let order = match b2 with
-          | 0x60 | 0x61 | 0x62 | 0x6c -> Low
-          | 0x68 | 0x69 | 0x70 | 0x6d -> High
+          | 0x60 | 0x61 | 0x62 -> Low
+          | 0x68 | 0x69 | 0x70 -> High
           | _ -> disfailwith "impossible"
         in
         let elemt = match b2 with
           | 0x60 | 0x68 -> reg_8
           | 0x61 | 0x69 -> reg_16
           | 0x62 | 0x6a -> reg_32
-          | 0x6c | 0x6d -> reg_64
           | _ -> disfailwith "impossible"
         in
+        let r, rm, rv, na = parse_modrm_vec None na in
+        (Punpck(prefix.mopsize, elemt, order, r, rm, rv), na)
+      | 0x6c | 0x6d when prefix.opsize_override ->
+        let order = match b2 with
+          | 0x6c -> Low
+          | 0x6d -> High
+          | _ -> disfailwith "impossible"
+        in
+        let elemt = reg_64 in
         let r, rm, rv, na = parse_modrm_vec None na in
         (Punpck(prefix.mopsize, elemt, order, r, rm, rv), na)
       | 0x64 | 0x65 | 0x66 | 0x74 | 0x75 | 0x76  as o ->

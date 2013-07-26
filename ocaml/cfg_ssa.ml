@@ -12,7 +12,7 @@ open Cfg
 open Type
 open BatListFull
 
-module D = Debug.Make(struct let name = "SSA" and default=`NoDebug end)
+module D = Debug.Make(struct let name = "Cfg_ssa" and default=`NoDebug end)
 open D
 
 module VH = Var.VarHash
@@ -66,7 +66,7 @@ let type_of_exp = function
   | Unknown(_,t)
     -> t
   | BinOp((EQ|NEQ|LT|LE|SLT|SLE),_,_)
-    -> Ast.reg_1
+    -> reg_1
   | Ite(_,v,_)
   | BinOp(_,v,_)
   | Store(v,_,_,_,_)

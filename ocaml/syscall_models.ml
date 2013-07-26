@@ -6,6 +6,7 @@
 
 open Arch
 open Ast
+open Type
 
 (**
 

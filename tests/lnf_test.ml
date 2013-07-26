@@ -2,13 +2,13 @@ open BatPervasives
 open OUnit
 open Lnf
 
-module I = struct                                                                  
-  type t = int                                                                     
-  let compare : t -> t -> int = Pervasives.compare                                 
-  let hash = Hashtbl.hash                                                          
-  let equal = (=)                                                                  
-  let default = 0                                                                  
-end 
+module I = struct
+  type t = int
+  let compare : t -> t -> int = Pervasives.compare
+  let hash = Hashtbl.hash
+  let equal = (=)
+  let default = 0
+end
 
 module G = struct
   include Graph.Builder.I(Graph.Imperative.Digraph.ConcreteLabeled(I)(I))
@@ -26,11 +26,11 @@ type test = G.G.V.t * (vertex_spec list) * G.G.V.t lnf
  *
  * build_graph spec Constructs the input graph from the provided specification.
  *)
-let build_graph vertex_spec_list = 
+let build_graph vertex_spec_list =
   let g = G.G.create () in
   let rec add_edges (src,dl) = match dl with
     | [] -> ()
-    | dst::vl -> (G.add_edge g src dst; add_edges (src,vl)) in
+    | dst::vl -> ignore(G.add_edge g src dst); add_edges (src,vl) in
   List.iter add_edges vertex_spec_list; g;;
 
 (*

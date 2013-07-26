@@ -35,6 +35,8 @@ export LIBS = zarith batteries oUnit pcre objsize graph libtrace $(PROJLIBS) bap
 export INCDIRS = $(BAP_OCAMLDIR) $(BIGINT) $(BATT) $(OUNIT) $(PCRE) $(OCAMLGRAPH) $(OBJSIZE) $(LIBTRACE) $(PROJINCDIRS)
 export OCAMLPATH = $(PIQIBUILDDIR)
 
+export OCAMLFLAGS = -thread -warn-error Aelz -annot
+
 # Include sources from ../ocaml in the automatically generated dependencies.
 export SOURCE_DIRS_IN = $(BAP_OCAMLDIR) $(BAP_PROJ_OCAMLDIR)
 
@@ -68,6 +70,7 @@ define PROJ_baptest
 	reduced_havlak_suite.ml \
 	sreedhar_suite.ml \
 	unroll_suite.ml \
+	opts_suite.ml \
 	bap_suite.ml
 	DOC_FILES=$(SOURCES)
 endef

@@ -14,7 +14,7 @@ module D = Debug.Make(struct let name = "Hacks" and default=`NoDebug end)
 open D
 
 let ra_final = Var.newvar "ra_final" reg_32
-and ra0 = Var.newvar "ra0" Ast.reg_32
+and ra0 = Var.newvar "ra0" reg_32
 and (mem,sp,r_of) =
   let d = Asmir.decls_for_arch X86_32 in
   (List.hd d,

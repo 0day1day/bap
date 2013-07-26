@@ -108,7 +108,6 @@ let (wp, foralls) =
   if !usedc || !usesccvn then
     let () = print_endline "Applying optimizations..." in
     let {Cfg_ssa.cfg=ssacfg; to_ssavar=tossa} = Cfg_ssa.trans_cfg cfg in
-    let () = Pp.output_varnums := true in
     let post = rename_astexp tossa post in
     let freevars = Formulap.freevars post in
     let ssacfg = Ssa_simp.simp_cfg ~liveout:freevars ~usedc:!usedc ~usesccvn:!usesccvn ssacfg in
@@ -147,7 +146,11 @@ match !stpout with
     Printf.fprintf stderr "Solving\n"; flush stderr;
     let r = (!Solver.solver)#solve_formula_file ?timeout:!timeout ~getmodel:true !stpoutname in
     Printf.fprintf stderr "Solve result: %s\n" (Smtexec.result_to_string r);
-    match r with | Smtexec.SmtError _ -> failwith "Solver error" | _ -> ()
+    match r with
+    | Smtexec.Invalid m ->
+      Smtexec.print_model m
+    | Smtexec.SmtError _ -> failwith "Solver error"
+    | _ -> ()
   )
 
 ;;

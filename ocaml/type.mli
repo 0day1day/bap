@@ -1,5 +1,5 @@
 (** Type declarations for BAP.
-    
+
     @author Ivan Jager
 *)
 
@@ -16,6 +16,14 @@ type typ =
   | Reg of int (** an N-bit bitvector (use 1 for booleans). *)
   | TMem of typ (** Memory of given index type *)
   | Array of typ * typ (** Array of index type, element type. *)
+
+val reg_1 : typ
+val reg_8 : typ
+val reg_16 : typ
+val reg_32 : typ
+val reg_64 : typ
+val reg_128 : typ
+val reg_256 : typ
 
 (** [Array] memories can only be updated or accessed in terms of
     their element type, which is usually [Reg 8].  [TMem] memories

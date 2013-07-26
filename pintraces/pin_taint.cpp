@@ -684,14 +684,12 @@ FrameOption_t TaintTracker::taintPostSC(const uint32_t bytes,
         switch (args[0]) {
             case _A1_recv:
               addr = ((ADDRINT *)args[1])[1];
-              fd = args[0];
+              fd = ((uint32_t*) args[1])[0];
               length = bytes;
               cerr << "Tainting " 
-                   << bytes 
-                   << " bytes from socket" << endl;
+                   << bytes
+                   << " bytes from socket " << fd << endl;
               return introMemTaintFromFd(fd, addr, length);
-              //return true;
-      
             case _A1_accept:
               if (bytes != (uint32_t)UNIX_FAILURE) {
                 cerr << "Accepting an incoming connection" << endl;

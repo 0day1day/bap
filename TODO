@@ -1,5 +1,5 @@
 Missing features:
-* CFG Recovery
+* CFG Recovery (work in progress)
 
 Disassembly stuff:
 * Include symbols in disassembly
@@ -14,6 +14,4 @@ Design issues:
 Other:
 * Fix up documentation.
 * Write more .mli files.
-
-Bigger projects:
-* Add support for AMD64 binaries (almost there).
+* Redo the patched VEX thing properly. (using a vendor branch)
