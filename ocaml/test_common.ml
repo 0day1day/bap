@@ -104,6 +104,8 @@ let run_trace ?arch ?(tag="generic") ?(pin_args=[]) ?(pintool_args=[]) bin args 
     | Some arch -> arch
   in
   let gentrace_path = gentrace_path_of_arch arch in
+  (* Use sh -c "prog arg1 arg2 ..." so we can use redirections in args *)
+  let concatargs a b = a ^ " " ^ b in
   let args =
     pin_args
     @ ["-t"; (!pin_path^gentrace_path^gentrace);
@@ -111,10 +113,12 @@ let run_trace ?arch ?(tag="generic") ?(pin_args=[]) ?(pintool_args=[]) bin args 
     @ pintool_args
     @ ["--"; bin]
     @ args in
+  let sh_args = ["-c" ; !pin_path ^ pin ^ (List.fold_left concatargs "" args)] in
+  Printf.eprintf "sh_args: %s\n" (List.nth sh_args 1); flush stderr;
   let exit_code = Unix.WEXITED(0) in
   Traces.cleanup();
   check_pin_setup arch;
-  assert_command ~exit_code (!pin_path^pin) args;
+  assert_command ~exit_code "sh" sh_args;
   find_pin_out (Array.to_list (Sys.readdir "./")) tag;;
 
 
