@@ -265,3 +265,20 @@ let copyprop_ast ?(stop_before=(fun _ -> false)) ?(stop_after=(fun _ -> false)) 
 
     propagate dfin loc (LS.singleton (UD.LocationType.Loc loc)) loc
   )
+
+let get_vars ?stop_before ?stop_after g es =
+  let _, m, _ = copyprop_ssa ?stop_before ?stop_after g in
+
+  let s = ref VS.empty in
+  let add v = s := VS.add v !s in
+  let v = object(self)
+    inherit Ssa_visitor.nop
+    method visit_exp = function
+      | Var v ->
+        add v;
+        (try ChangeToAndDoChildren (VM.find v m)
+         with Not_found -> SkipChildren)
+      | _ -> DoChildren
+  end in
+  List.iter (fun e -> ignore(Ssa_visitor.exp_accept v e)) es;
+  !s

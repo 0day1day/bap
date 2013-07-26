@@ -166,29 +166,7 @@ let simplifycond_targets_ssa targetes g =
       | Store _ -> true
       | _ -> false
   in
-  let stop_after =
-    function
-      | _ -> false
-  in
-  let _, m, _ = Copy_prop.copyprop_ssa ~stop_before ~stop_after g in
-
-  (* Get a list of variables that comprise the acyclic portion of
-     targete *)
-  let goodvars =
-    let s = ref VS.empty in
-    let add v = s := VS.add v !s in
-    let v = object(self)
-      inherit Ssa_visitor.nop
-      method visit_exp = function
-        | Var v ->
-          add v;
-          (try ChangeToAndDoChildren (VM.find v m)
-          with Not_found -> SkipChildren)
-        | _ -> DoChildren
-    end in
-    List.iter (fun e -> ignore(Ssa_visitor.exp_accept v e)) targetes;
-    !s
-  in
+  let goodvars = Copy_prop.get_vars ~stop_before g targetes in
   simplifycond_ssa ~goodvars g
 
 let simplifycond_ssa x = simplifycond_ssa x

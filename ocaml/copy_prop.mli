@@ -19,3 +19,8 @@ val copyprop_ssa : ?stop_before:(Ssa.exp -> bool) -> ?stop_after:(Ssa.exp -> boo
     returned is a map from variables to their constant expression, if
     one exists, and the location of the assignment. *)
 val copyprop_ast : ?stop_before:(Ast.exp -> bool) -> ?stop_after:(Ast.exp -> bool) -> Cfg.AST.G.t -> (Cfg.aststmtloc -> Ast.exp Var.VarMap.t * (Cfg.aststmtloc * Ast.exp) Var.VarMap.t * (Ast.exp -> Ast.exp))
+
+(** [get_vars g l] uses copy propagation to return a set of variables
+    used in the computation of any expression in [l] in the graph
+    [g]. *)
+val get_vars : ?stop_before:(Ssa.exp -> bool) -> ?stop_after:(Ssa.exp -> bool) -> Cfg.SSA.G.t -> Ssa.exp list -> Var.VarSet.t
