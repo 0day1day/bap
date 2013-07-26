@@ -42,13 +42,13 @@ end
 val recursive_descent : Asmir.asmprogram -> Cfg.AST.G.t
 val recursive_descent_at : Asmir.asmprogram -> addr -> Cfg.AST.G.t
 
-type vsainfo = {origssa: Cfg.SSA.G.t;
-                optssa: Cfg.SSA.G.t;
-                vsa_in: Cfg.ssastmtloc -> Vsa_ssa.AlmostVSA.DFP.L.t;
-                vsa_out: Cfg.ssastmtloc -> Vsa_ssa.AlmostVSA.DFP.L.t;}
+type vsaresult = {origssa: Cfg.SSA.G.t;
+                  optssa: Cfg.SSA.G.t;
+                  vsa_in: Cfg.ssastmtloc -> Vsa_ssa.AlmostVSA.DFP.L.t;
+                  vsa_out: Cfg.ssastmtloc -> Vsa_ssa.AlmostVSA.DFP.L.t;}
 
-val vsa_full : Asmir.asmprogram -> Cfg.AST.G.t * vsainfo
-val vsa_at_full : Asmir.asmprogram -> addr -> Cfg.AST.G.t * vsainfo
+val vsa_full : Asmir.asmprogram -> Cfg.AST.G.t * vsaresult
+val vsa_at_full : Asmir.asmprogram -> addr -> Cfg.AST.G.t * vsaresult
 
 
 val vsa : Asmir.asmprogram -> Cfg.AST.G.t

@@ -108,14 +108,14 @@ module RECURSIVE_DESCENT_SPEC = struct
   let fixpoint = false
 end
 
-type vsainfo = {origssa: CS.G.t;
+type vsaresult = {origssa: CS.G.t;
                 optssa: CS.G.t;
                 vsa_in: Cfg.ssastmtloc -> Vsa_ssa.AlmostVSA.DFP.L.t;
                 vsa_out: Cfg.ssastmtloc -> Vsa_ssa.AlmostVSA.DFP.L.t;}
 
 module VSA_SPEC = struct
   module State = struct
-    type t = vsainfo option
+    type t = vsaresult option
     let init = None
   end
 

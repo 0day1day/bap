@@ -106,6 +106,7 @@ export SOURCES = \
 	asmir_disasm.mli asmir_disasm.ml \
 	func_boundary.mli func_boundary.ml \
 	asmir_rdisasm.mli asmir_rdisasm.ml \
+	switch_condition.mli switch_condition.ml \
 	grammar_private_scope.ml \
 	grammar.mly lexer.mll \
 	parser.ml \
