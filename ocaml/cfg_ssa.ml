@@ -64,7 +64,7 @@ end
 let type_of_exp = Typecheck.infer_ssa
 
 (* share the strings in the variable names we create, to save memory *)
-let ssa_temp_name = "temp"
+let ssa_temp_name = "T_temp"
 
 (* @return a reversed list of SSA stmts and an exp that is equivalent to
    the Ast expression *)
