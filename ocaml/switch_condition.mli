@@ -6,5 +6,8 @@
  *)
 
 (** Adds switch conditions to a SSA graph.  Takes the information
-    returned by the VSA CFG recovery analysis as input. *)
-val add_switch_conditions : Asmir_disasm.vsaresult -> Cfg.SSA.G.t
+    returned by the VSA CFG recovery analysis as input. Returns a
+    modified CFG when successful.  Success is currently defined to
+    mean that edges from all indirect jumps can be rewritten (except
+    those for returns). *)
+val add_switch_conditions : Asmir_disasm.vsaresult -> Cfg.SSA.G.t option
