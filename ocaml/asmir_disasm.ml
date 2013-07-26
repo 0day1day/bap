@@ -444,7 +444,7 @@ module Make(D:DISASM)(F:FUNCID) = struct
           match resolved_addrs with
           | Addrs addrs ->
             dprintf "%d Addrs" (List.length addrs);
-            let addcond = List.length addrs > 1 in
+            let addcond = Ast.lab_of_exp t = None in
             List.fold_left (add_resolved_edge addcond e) c addrs
           | Error | Exit | Indirect ->
             dprintf "Special";
