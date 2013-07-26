@@ -59,19 +59,19 @@ let lift_func (n,s,e) =
     Printf.printf "Lifting %s\n" n;
     incr total;
     flush stdout;
-    let cfg, vsainfo = match !recoverf asmp s with
+    let cfg, vsaresult = match !recoverf asmp s with
       | Rd cfg -> cfg, None
-      | Vsa (cfg, Some vsainfo) -> cfg, Some vsainfo
+      | Vsa (cfg, Some vsaresult) -> cfg, Some vsaresult
       | Vsa (cfg, None) -> cfg, None
     in
     let cfg = Hacks.ast_remove_indirect cfg in
     let cfg = Ast_cond_simplify.simplifycond_cfg cfg in
     Cfg_pp.AstStmtsDot.output_graph (open_out ("resolve"^n^".dot")) cfg;
     Cfg_pp.SsaStmtsDot.output_graph (open_out ("resolvessa"^n^".dot")) (Cfg_ssa.of_astcfg cfg);
-    BatOption.may (fun vsainfo ->
-      let ssacfg = Switch_condition.add_switch_conditions vsainfo in
-      Cfg_pp.SsaStmtsDot.output_graph (open_out ("resolvessaswitch"^n^".dot")) ssacfg)
-      vsainfo;
+    BatOption.may (fun vsaresult ->
+      let ssacfg = Switch_condition.add_switch_conditions vsaresult in
+      Cfg_pp.SsaStmtsDot.output_graph (open_out ("resolvessaswitch"^n^".dot")) (BatOption.get ssacfg))
+      vsaresult;
     let pp = new Pp.pp_oc (open_out ("resolve"^n^".il")) in
     pp#ast_program (Cfg_ast.to_prog cfg);
     pp#close;
