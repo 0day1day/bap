@@ -14,7 +14,6 @@ Design issues:
 Other:
 * Fix up documentation.
 * Write more .mli files.
-* Redo the patched VEX thing properly. (using a vendor branch)
 
 Bigger projects:
 * Add support for AMD64 binaries. (almost done)
