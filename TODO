@@ -14,4 +14,3 @@ Design issues:
 Other:
 * Fix up documentation.
 * Write more .mli files.
-* Redo the patched VEX thing properly. (using a vendor branch)

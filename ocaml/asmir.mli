@@ -79,13 +79,9 @@ val asm_addr_to_bap : (*varctx ->*) asmprogram -> Type.addr -> Ast.program * Typ
 
 val asmprogram_to_bap_range : ?init_ro:bool -> asmprogram -> Type.addr -> Type.addr  -> Ast.program
 
-(** Load entire trace into memory at once.  If pin is true, loads a
-    PinTrace.  If pin is false, loads an old, TEMU-based trace format. *)
-(* val bap_from_trace_file : ?atts:bool -> ?pin:bool -> string -> Ast.program *)
 (** Load entire trace into memory from the new SerializedTrace format. *)
 val serialized_bap_from_trace_file : string -> Ast.program * arch
 
-(** Open a PinTrace/TEMU-based trace in streaming format depending on the value of [pin]. *)
 (** Open a SerializedTrace trace in streaming format. *)
 val serialized_bap_stream_from_trace_file : int64 -> string -> (Ast.stmt list) Stream.t * arch
 
