@@ -25,21 +25,21 @@ let get_env_options varname defvalue =
       let modules = Sys.getenv varname in
       let len = String.length modules in
       let lookup name =
-	let rec f spos =
-	  let npos =
-	    try String.index_from modules spos ':'
-	    with Not_found -> len
-	  in
-	  if npos = spos then true else
-	    let (sub, res) =
-	      if String.get modules spos = '!'
-	      then (String.sub modules (spos+1) (npos-spos-1), false)
-	      else (String.sub modules spos (npos-spos), true)
-	    in
-	    if sub = "" || sub = name then res
-	    else if npos < len then f (npos+1) else defvalue
-	in
-	f 0
+        let rec f spos =
+          let npos =
+            try String.index_from modules spos ':'
+            with Not_found -> len
+          in
+          if npos = spos then true else
+            let (sub, res) =
+              if String.get modules spos = '!'
+              then (String.sub modules (spos+1) (npos-spos-1), false)
+              else (String.sub modules spos (npos-spos), true)
+            in
+            if sub = "" || sub = name then res
+            else if npos < len then f (npos+1) else defvalue
+        in
+        f 0
       in
       lookup
     with Not_found ->
@@ -94,12 +94,12 @@ let ptime =
     | "iso" | "ISO" -> ptime_iso
     | "none" | "None" -> ptime_none
     | "elapsed" ->
-	let t0 = Unix.gettimeofday () in
-	(fun () ->
-	   Printf.ksprintf debug_string "[%f]" ((Unix.gettimeofday ()) -. t0) )
+        let t0 = Unix.gettimeofday () in
+        (fun () ->
+           Printf.ksprintf debug_string "[%f]" ((Unix.gettimeofday ()) -. t0) )
     | s ->
-	prerr_endline("Warning: Unknown BAP_DEBUG_TIMESTAMPS value ("^s^")");
-	ptime_unix
+        prerr_endline("Warning: Unknown BAP_DEBUG_TIMESTAMPS value ("^s^")");
+        ptime_unix
   with Not_found ->
     ptime_none
 

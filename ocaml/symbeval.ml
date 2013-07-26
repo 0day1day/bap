@@ -95,7 +95,7 @@ let concrete_val_tuple = function
   | Symbolic (Int (v,t)) -> (v,t)
   | Symbolic e ->
       failwith ("expression cannot be evaluated concretely:\n"
-		^(Pp.ast_exp_to_string e))
+                ^(Pp.ast_exp_to_string e))
   | _ -> failwith "tried to perform memory operations"
 
 (* Context functions (lookup, update etc) *)
@@ -120,8 +120,8 @@ let conc2symb memory v =
   let init = Var v in
   pdebug "The point of no return" ;
   Symbolic (AddrMap.fold
-	      (fun k v m -> Store (m,Int(big_int_of_int64 k,reg_32),v,exp_false,reg_8))
-	      memory init)
+              (fun k v m -> Store (m,Int(big_int_of_int64 k,reg_32),v,exp_false,reg_8))
+              memory init)
 
 let varval_to_exp = function
   | Symbolic e -> e
@@ -229,19 +229,19 @@ struct
     try Hashtbl.find lambda lab
     with Not_found ->
       match lab with
-	| Name _ (*-> failwith ("jump to inexistent label "^s)*)
-	| Addr _ -> 
-	    (* I'd like to print a warning here, but traces rely on this
-	       behavior, so it prints a lot of warnings if we leave it
-	       on. *)
-	    (* wprintf "Unknown label: %s" (Pp.label_to_string lab); *)
-	    raise (UnknownLabel lab) (*failwith ("jump to inexistent label "^
-					 (Printf.sprintf "%Lx" x)) *)
+        | Name _ (*-> failwith ("jump to inexistent label "^s)*)
+        | Addr _ -> 
+            (* I'd like to print a warning here, but traces rely on this
+               behavior, so it prints a lot of warnings if we leave it
+               on. *)
+            (* wprintf "Unknown label: %s" (Pp.label_to_string lab); *)
+            raise (UnknownLabel lab) (*failwith ("jump to inexistent label "^
+                                         (Printf.sprintf "%Lx" x)) *)
 
   let lookup_var        = MemL.lookup_var
-  let update_var	= MemL.update_var
+  let update_var        = MemL.update_var
   let update_mem        = MemL.update_mem
-  let remove_var	= MemL.remove_var
+  let remove_var        = MemL.remove_var
   let lookup_mem        = MemL.lookup_mem
   let assign            = Assign.assign
   let copy              = MemL.copy
@@ -294,95 +294,95 @@ struct
        the same property. *)
     let eval = function
       | Var v ->
-	  (* This can clearly result in a large symbolic
-	     result. Should we leave Vars? *)
-	  lookup_var delta v
+          (* This can clearly result in a large symbolic
+             result. Should we leave Vars? *)
+          lookup_var delta v
       | Int _ as value ->
-	  Symbolic value
+          Symbolic value
       | Lab _ as labl ->
-	  Symbolic labl
+          Symbolic labl
       | Ite(cond,e1,e2) ->
-	  let v1 = eval_expr delta e1
-	  and v2 = eval_expr delta e2 in
-	  (match eval_expr delta cond with
-	   | v when is_symbolic v ->
-	       Symbolic(Ite(symb_to_exp v, symb_to_exp v1, symb_to_exp v2))
-	   | v when is_true_val v ->
-	       Symbolic(symb_to_exp v1)
-	   | v when is_false_val v ->
-	       Symbolic(symb_to_exp v2)
-	   | _ ->
-	       failwith "not possible"
-	  )
+          let v1 = eval_expr delta e1
+          and v2 = eval_expr delta e2 in
+          (match eval_expr delta cond with
+           | v when is_symbolic v ->
+               Symbolic(Ite(symb_to_exp v, symb_to_exp v1, symb_to_exp v2))
+           | v when is_true_val v ->
+               Symbolic(symb_to_exp v1)
+           | v when is_false_val v ->
+               Symbolic(symb_to_exp v2)
+           | _ ->
+               failwith "not possible"
+          )
       | Extract(h,l,e) ->
-	  let v = eval_expr delta e in
-	  if is_symbolic v then (
-	    Symbolic(Extract(h,l,symb_to_exp v))
-	  ) else (
-	    let (v,t) = Arithmetic.extract h l (concrete_val_tuple v) in
-	    Symbolic(Int(v,t))
-	  )
+          let v = eval_expr delta e in
+          if is_symbolic v then (
+            Symbolic(Extract(h,l,symb_to_exp v))
+          ) else (
+            let (v,t) = Arithmetic.extract h l (concrete_val_tuple v) in
+            Symbolic(Int(v,t))
+          )
       | Concat(le,re) ->
-	  let lv = eval_expr delta le
-	  and rv = eval_expr delta re in
-	  if is_symbolic lv || is_symbolic rv then (
-	    Symbolic(Concat(symb_to_exp lv, symb_to_exp rv))
-	  ) else (
-	    let lv = concrete_val_tuple lv in
-	    let rv = concrete_val_tuple rv in
-	    let (v,t) = Arithmetic.concat lv rv in
-	    Symbolic(Int(v,t))
-	  )
+          let lv = eval_expr delta le
+          and rv = eval_expr delta re in
+          if is_symbolic lv || is_symbolic rv then (
+            Symbolic(Concat(symb_to_exp lv, symb_to_exp rv))
+          ) else (
+            let lv = concrete_val_tuple lv in
+            let rv = concrete_val_tuple rv in
+            let (v,t) = Arithmetic.concat lv rv in
+            Symbolic(Int(v,t))
+          )
       | BinOp (op,e1,e2) ->
-	  (* In the worst case, we will just combine two symbolic
-	     expressions. *)
-	  let v1 = eval_expr delta e1
-	  and v2 = eval_expr delta e2 in
+          (* In the worst case, we will just combine two symbolic
+             expressions. *)
+          let v1 = eval_expr delta e1
+          and v2 = eval_expr delta e2 in
           (match v1, v2 with
           | Symbolic (Int e1'), Symbolic (Int e2') ->
               (* We have two concrete scalars *)
-	      let (v,t) = (Arithmetic.binop op e1' e2') in
-	      Symbolic (Int(v,t))
+              let (v,t) = (Arithmetic.binop op e1' e2') in
+              Symbolic (Int(v,t))
           | ConcreteMem m1, ConcreteMem m2 ->
               (* We have two concrete memories. Note that this can
                  only return bool. *)
               Symbolic (Int (mem_binop op m1 m2))
           | _ ->
               (* Something is symbolic *)
-	      let e1' = symb_to_exp v1
-	      and e2' = symb_to_exp v2 in
-	      Symbolic (BinOp (op, e1', e2')))
+              let e1' = symb_to_exp v1
+              and e2' = symb_to_exp v2 in
+              Symbolic (BinOp (op, e1', e2')))
       | UnOp (op,e) ->
-	  (* In the worst case, we will have a symbolic expression. *)
-	  let v = eval_expr delta e in
-	    if is_symbolic v then
-	      Symbolic(UnOp(op, symb_to_exp v))
-	    else
-	      let e' = concrete_val_tuple v in
-	      let (v,t) = Arithmetic.unop op e' in
-		Symbolic (Int (v,t))
+          (* In the worst case, we will have a symbolic expression. *)
+          let v = eval_expr delta e in
+            if is_symbolic v then
+              Symbolic(UnOp(op, symb_to_exp v))
+            else
+              let e' = concrete_val_tuple v in
+              let (v,t) = Arithmetic.unop op e' in
+                Symbolic (Int (v,t))
       | Cast (ct,t,e) ->
-	  (* In the worst case, we will have a symbolic expression. *)
-	  let v = eval_expr delta e in
-	    if is_symbolic v then
-	      let e' = symb_to_exp v in
-		Symbolic(Cast(ct, t, e'))
-	    else
-	      let e' = concrete_val_tuple v in
-	      let (n',t') = Arithmetic.cast ct e' t in
-		Symbolic (Int (n',t'))
+          (* In the worst case, we will have a symbolic expression. *)
+          let v = eval_expr delta e in
+            if is_symbolic v then
+              let e' = symb_to_exp v in
+                Symbolic(Cast(ct, t, e'))
+            else
+              let e' = concrete_val_tuple v in
+              let (n',t') = Arithmetic.cast ct e' t in
+                Symbolic (Int (n',t'))
       | Let (var,e1,e2) ->
-	(* Consider let v=e in e+e+e+e+e+e+e+e+e+e+e+e+e+e+e. If e
-	   is not concrete, this could lead to a huge blowup.
+        (* Consider let v=e in e+e+e+e+e+e+e+e+e+e+e+e+e+e+e. If e
+           is not concrete, this could lead to a huge blowup.
 
            Thus, we have an option, eval_symb_let, that when unset,
            stops us from doing substitution in this case.  *)
 
-	  let v1 = eval_expr delta e1 in
+          let v1 = eval_expr delta e1 in
           if eval_symb_let then
-	    let delta' = copy delta in (* FIXME: avoid copying *)
-	    let delta' = update_var delta' var v1 in
-	    let v2 = eval_expr delta' e2 in
+            let delta' = copy delta in (* FIXME: avoid copying *)
+            let delta' = update_var delta' var v1 in
+            let v2 = eval_expr delta' e2 in
             v2
           else (
           (* Partial evaluation is difficult.  If v1 is symbolic, we
@@ -405,65 +405,65 @@ struct
           *)
 
             if is_symbolic v1 then
-	      let delta' = copy delta in (* FIXME: avoid copying *)
+              let delta' = copy delta in (* FIXME: avoid copying *)
               (* Remove so we don't expand references to var in delta *)
-	      let delta' = remove_var delta' var in
-	      let v2 = eval_expr delta' e2 in
+              let delta' = remove_var delta' var in
+              let v2 = eval_expr delta' e2 in
               let v1' = varval_to_exp v1 in
               let v2' = varval_to_exp v2 in
               Symbolic(Let(var, v1', v2'))
             else (* v1 is concrete, do substitution *)
-	      let delta' = copy delta in (* FIXME: avoid copying *)
-	      let delta' = update_var delta' var v1 in
-	      let v2 = eval_expr delta' e2 in
+              let delta' = copy delta in (* FIXME: avoid copying *)
+              let delta' = update_var delta' var v1 in
+              let v2 = eval_expr delta' e2 in
               match v2 with
               | Symbolic v2' ->
-	        let fvars = Formulap.freevars v2' in
-	        let isvar = (fun v -> not (Var.equal v var)) in
-	        if List.for_all isvar fvars then
-		  (* var is not free! We can get rid of the Let. *)
+                let fvars = Formulap.freevars v2' in
+                let isvar = (fun v -> not (Var.equal v var)) in
+                if List.for_all isvar fvars then
+                  (* var is not free! We can get rid of the Let. *)
                   v2
-	        else
-		(* var is free in e2; we need to add the binding back *)
+                else
+                (* var is free in e2; we need to add the binding back *)
                   let v1' = varval_to_exp v1 in
-		  Symbolic(Let(var, v1', v2'))
+                  Symbolic(Let(var, v1', v2'))
               | ConcreteMem _ -> v2)
       | Load (mem,ind,endian,t) ->
-	(match t with
-	| Reg 8 ->
-		 (* This doesn't introduce any blowup on its own. *)
-		 let mem = eval_expr delta mem
-		 and ind = eval_expr delta ind
-		 and endian = eval_expr delta endian in
-		 let mem_arr = symb_to_exp ind
-		 and endian_exp = symb_to_exp endian in
-		   Symbolic (lookup_mem mem mem_arr endian_exp)
-	     | Reg _ ->  (* we only care about 32bit *)
-		 (* Splitting introduces blowup.  Can we avoid it? *)
-		 eval_expr delta (Memory2array.split_loads mem ind t endian)
-	     | Array _ ->
-		 failwith ("loading array currently unsupported" 
+        (match t with
+        | Reg 8 ->
+                 (* This doesn't introduce any blowup on its own. *)
+                 let mem = eval_expr delta mem
+                 and ind = eval_expr delta ind
+                 and endian = eval_expr delta endian in
+                 let mem_arr = symb_to_exp ind
+                 and endian_exp = symb_to_exp endian in
+                   Symbolic (lookup_mem mem mem_arr endian_exp)
+             | Reg _ ->  (* we only care about 32bit *)
+                 (* Splitting introduces blowup.  Can we avoid it? *)
+                 eval_expr delta (Memory2array.split_loads mem ind t endian)
+             | Array _ ->
+                 failwith ("loading array currently unsupported" 
                            ^ (Pp.typ_to_string t))
-	     | _ -> failwith "not a loadable type"
-	  )
+             | _ -> failwith "not a loadable type"
+          )
       | Store (mem,ind,value,endian,t) ->
-	  let index = symb_to_exp (eval_expr delta ind)
-	  and value = symb_to_exp (eval_expr delta value)
-	  and endian = symb_to_exp (eval_expr delta endian) in
-	    (match t with
-	       | Reg 8 ->
-		   (* No blowup here. *)
-		   let mem = eval_expr delta mem in
-		     update_mem mem index value endian
-	       | Reg _ ->
-		   (* Splitting blowup, but I don't know how to avoid this. *)
-		   eval_expr delta
-		     (Memory2array.split_writes mem index t endian value)
-	       | Array _ ->
-		   failwith "storing array currently unsupported"
-	       | _ ->
-		   failwith "not a storable type"
-	    )
+          let index = symb_to_exp (eval_expr delta ind)
+          and value = symb_to_exp (eval_expr delta value)
+          and endian = symb_to_exp (eval_expr delta endian) in
+            (match t with
+               | Reg 8 ->
+                   (* No blowup here. *)
+                   let mem = eval_expr delta mem in
+                     update_mem mem index value endian
+               | Reg _ ->
+                   (* Splitting blowup, but I don't know how to avoid this. *)
+                   eval_expr delta
+                     (Memory2array.split_writes mem index t endian value)
+               | Array _ ->
+                   failwith "storing array currently unsupported"
+               | _ ->
+                   failwith "not a storable type"
+            )
       | Unknown _ as u -> Symbolic u (*failwith "unknown value encountered"*)
     in
       eval expr
@@ -476,49 +476,49 @@ struct
   let rec eval_stmt ({pred=pred; delta=delta; lambda=lambda; pc=pc} as ctx) stmt =
     let get_label e =
       let v = eval_expr delta e in
-	match lab_of_exp (symb_to_exp v) with
-	  | None -> failwith ("not a valid label "
+        match lab_of_exp (symb_to_exp v) with
+          | None -> failwith ("not a valid label "
                               ^(Pp.ast_exp_to_string (symb_to_exp v)))
-	  | Some lab -> label_decode lambda lab
+          | Some lab -> label_decode lambda lab
     in
     let next_pc = Int64.succ pc in
     let eval = function
       | Move (v,e,_) ->
-	  let ev = eval_expr delta e in
-	  [assign v ev ctx]
+          let ev = eval_expr delta e in
+          [assign v ev ctx]
       | Halt (e, _) ->
-	  let e = eval_expr delta e in
-	    raise (Halted(Some e, ctx))
+          let e = eval_expr delta e in
+            raise (Halted(Some e, ctx))
       | Jmp (e,_) ->
           [{ctx with pc=get_label e}] ;
       | CJmp (cond,e1,e2,_) ->
           (match eval_expr delta cond with
              | v when is_symbolic v ->
-		 (* update the path predicate *)
-		 let constr = symb_to_exp v in
-		 let pred1' = add_constraint pred constr Equal in
-		 let neg_constr = UnOp (NOT,constr) in
-		 let pred2' = add_constraint pred neg_constr Equal in
-		   (* return two new possible states *)
-		   [{ctx with pred=pred1'; pc=get_label e1};
-		    {ctx with pred=pred2'; delta=copy delta; pc=get_label e2}]
+                 (* update the path predicate *)
+                 let constr = symb_to_exp v in
+                 let pred1' = add_constraint pred constr Equal in
+                 let neg_constr = UnOp (NOT,constr) in
+                 let pred2' = add_constraint pred neg_constr Equal in
+                   (* return two new possible states *)
+                   [{ctx with pred=pred1'; pc=get_label e1};
+                    {ctx with pred=pred2'; delta=copy delta; pc=get_label e2}]
              | v when is_true_val v ->
-		 [{ctx with pc=get_label e1}]
+                 [{ctx with pc=get_label e1}]
              | v when is_false_val v ->
-		 [{ctx with pc=get_label e2}]
+                 [{ctx with pc=get_label e2}]
              | v -> failwith ("not a boolean condition: " 
                               ^ (Pp.ast_exp_to_string (symb_to_exp v)))
           )
       | Assert (e,_) ->
           (match eval_expr delta e with
              | v when is_symbolic v ->
-	       let constr = symb_to_exp v in
-	       let pred' = add_constraint pred constr Equal in
-	       (*pdebug("Adding assertion: " ^ (Pp.ast_exp_to_string pred')) ;*)
-	       [{ctx with pred=pred'; pc=next_pc}]
+               let constr = symb_to_exp v in
+               let pred' = add_constraint pred constr Equal in
+               (*pdebug("Adding assertion: " ^ (Pp.ast_exp_to_string pred')) ;*)
+               [{ctx with pred=pred'; pc=next_pc}]
              | v when is_false_val v ->
                let pred = add_constraint pred exp_false Equal in
-	       raise (AssertFailed({ctx with pred = pred}))
+               raise (AssertFailed({ctx with pred = pred}))
              | _ -> [{ctx with pc=next_pc}]
           )
       | Assume (e,_) ->
@@ -593,17 +593,17 @@ struct
   let num_mem_locs delta =
     (** Number of bindings in map
 
-	XXX: This is inefficient; switch to BatMaps which support cardinality
+        XXX: This is inefficient; switch to BatMaps which support cardinality
     *)
     let map_length m =
       AddrMap.fold (fun _ _ c -> c+1) m 0
     in
     VH.fold
       (fun k v count  ->
-	 match k,v with
-	   | var, ConcreteMem(mem,_) ->
+         match k,v with
+           | var, ConcreteMem(mem,_) ->
              count + (map_length mem)
-	   | _ -> count
+           | _ -> count
       ) delta 0
 
   let find_var = VH.find
@@ -633,17 +633,17 @@ struct
   let num_mem_locs delta =
     (** Number of bindings in map
 
-	XXX: This is inefficient; switch to BatMaps which support cardinality
+        XXX: This is inefficient; switch to BatMaps which support cardinality
     *)
     let map_length m =
       AddrMap.fold (fun _ _ c -> c+1) m 0
     in
     VM.fold
       (fun k v count  ->
-	 match k,v with
-	   | var, ConcreteMem(mem,_) ->
+         match k,v with
+           | var, ConcreteMem(mem,_) ->
              count + (map_length mem)
-	   | _ -> count
+           | _ -> count
       ) delta 0
 
   let find_var a b =
@@ -682,10 +682,10 @@ struct
     F.fold
       delta
       (fun k v () ->
-  	 match k,v with
-  	   | var,Symbolic e ->
+         match k,v with
+           | var,Symbolic e ->
                print_endline ((Pp.var_to_string var) ^ " = " ^ (Pp.ast_exp_to_string e))
-  	   | _ -> ()
+           | _ -> ()
       ) ()
 
   let print_mem delta =
@@ -693,29 +693,29 @@ struct
     F.fold
       delta
       (fun k v () ->
-  	 match k,v with
-  	   | var, ConcreteMem(mem,_) ->
+         match k,v with
+           | var, ConcreteMem(mem,_) ->
                print_endline ("memory " ^ (Var.name var)) ;
                AddrMap.iter
-  		 (fun i v ->
-  		    print_endline((Printf.sprintf "%Lx" i)
-  			   ^ " -> " ^ (Pp.ast_exp_to_string v))
-  		 )
-  		 mem
-  	   | _ -> ()
+                 (fun i v ->
+                    print_endline((Printf.sprintf "%Lx" i)
+                           ^ " -> " ^ (Pp.ast_exp_to_string v))
+                 )
+                 mem
+           | _ -> ()
       ) ()
 
   let print_var delta name =
     F.fold
       delta
       (fun var exp () ->
-  	 match exp with
-  	   | Symbolic e ->
-  	       let varname = Var.name var in
-  		 if varname = name then
-  		   print_endline (varname ^ " = "
-  			   ^ (Pp.ast_exp_to_string e))
-  	   | _ -> ()
+         match exp with
+           | Symbolic e ->
+               let varname = Var.name var in
+                 if varname = name then
+                   print_endline (varname ^ " = "
+                           ^ (Pp.ast_exp_to_string e))
+           | _ -> ()
       ) ()
 end
 
@@ -728,32 +728,32 @@ struct
     try find_var delta var
     with Not_found ->
       match Var.typ var with
-	| TMem _
-	| Array _ ->
-	    empty_mem var
-	| Reg _ ->
-	    Symbolic(Var var)
+        | TMem _
+        | Array _ ->
+            empty_mem var
+        | Reg _ ->
+            Symbolic(Var var)
 
   let rec update_mem mu pos value endian =
     (*pdebug "Update mem" ;*)
     match mu with
       | Symbolic m -> Symbolic (Store(m,pos,value,endian,reg_8))
       | ConcreteMem (m,v) ->
-	  match pos with
-	    | Int(p,t) ->
-		ConcreteMem(AddrMap.add (normalize p t) value m, v)
-	    | _ -> update_mem (conc2symb m v) pos value endian
+          match pos with
+            | Int(p,t) ->
+                ConcreteMem(AddrMap.add (normalize p t) value m, v)
+            | _ -> update_mem (conc2symb m v) pos value endian
 
   let rec lookup_mem mu index endian =
     (*pdebug "Lookup mem" ;*)
     match mu, index with
       | ConcreteMem(m,v), Int(i,t) ->
-	  (try AddrMap.find (normalize i t) m
-	   with Not_found ->
-	     Load(Var v, index, endian, reg_8)
-	       (* FIXME: handle endian and type? *)
-	  )
-	    (* perhaps we should introduce a symbolic variable *)
+          (try AddrMap.find (normalize i t) m
+           with Not_found ->
+             Load(Var v, index, endian, reg_8)
+               (* FIXME: handle endian and type? *)
+          )
+            (* perhaps we should introduce a symbolic variable *)
       | Symbolic mem, _ -> Load (mem,index,endian,reg_8)
       | ConcreteMem(m,v),_ -> lookup_mem (conc2symb m v) index endian
 
@@ -772,27 +772,27 @@ struct
     try find_var delta var
     with Not_found ->
       match Var.typ var with
-	| TMem _
-	| Array _ ->
-	    empty_mem var
-	| Reg n as t ->
-	    Symbolic(Int(bi0, t))
+        | TMem _
+        | Array _ ->
+            empty_mem var
+        | Reg n as t ->
+            Symbolic(Int(bi0, t))
 
   let rec update_mem mu pos value endian =
     (*pdebug "Update mem" ;*)
     match mu, pos with
       | ConcreteMem (m,v), Int(p,t) ->
-	  ConcreteMem(AddrMap.add (normalize p t) value m, v)
+          ConcreteMem(AddrMap.add (normalize p t) value m, v)
       | _ -> failwith "Symbolic memory in concrete evaluation"
 
   let rec lookup_mem mu index endian =
     (*pdebug "Lookup mem" ;*)
     match mu, index with
       | ConcreteMem(m,v), Int(i,t) ->
-	  (try AddrMap.find (normalize i t) m
-	   with Not_found ->
+          (try AddrMap.find (normalize i t) m
+           with Not_found ->
              failwith (Printf.sprintf "Uninitialized memory found at %s" (Pp.ast_exp_to_string index))
-	  )
+          )
       | _ -> failwith "Symbolic memory or address in concrete evaluation"
 
   include BuildMemLPrinters(BE)
@@ -888,9 +888,9 @@ struct
   let add_to_formula fbuild expression typ =
     (match expression, typ with
      | _, Equal ->
-	 (fun newe -> fbuild (BinOp(AND, expression, newe)))
+         (fun newe -> fbuild (BinOp(AND, expression, newe)))
      | BinOp(EQ, Var v, value), Rename ->
-	 (fun newe -> fbuild (Let(v, value, newe)))
+         (fun newe -> fbuild (Let(v, value, newe)))
      | _ -> failwith "internal error: adding malformed constraint to formula"
     )
 
@@ -1014,7 +1014,7 @@ struct
         Var.VarSet.iter formula_printer#predeclare_free_var fp;
         Var.VarSet.iter free_var_printer#predeclare_free_var fp;
         record.free_vars <- Var.VarSet.union record.free_vars fp;
-	formula_printer#let_begin v value;
+        formula_printer#let_begin v value;
         Stack.push (fun () -> formula_printer#let_end v) close_funs;
         {record with close_funs=close_funs}
       | _ -> failwith "internal error: adding malformed constraint to formula"
@@ -1060,11 +1060,11 @@ let concretely_execute ?s ?(i=[]) p =
   let ctx = Concrete.build_default_context p () in
   (* Evaluate initialization statements *)
   let ctx = List.fold_left (fun ctx s ->
-			      dprintf "Init %s" (Pp.ast_stmt_to_string s);
-			      match Concrete.eval_stmt ctx s with
-			      | nctx::[] -> nctx
-			      | _ -> failwith "Expected one context"
-			   ) ctx i
+                              dprintf "Init %s" (Pp.ast_stmt_to_string s);
+                              match Concrete.eval_stmt ctx s with
+                              | nctx::[] -> nctx
+                              | _ -> failwith "Expected one context"
+                           ) ctx i
   in
   let ctx = match s with
     | Some(s) -> {ctx with pc = Concrete.label_decode ctx.lambda (Addr s)}

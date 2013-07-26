@@ -25,7 +25,7 @@ object
         visited first, so that this can be used to add the assigned
         variable to your context.
 
-	FIXME: would be nice to be able to add stmts... We may change this. *)
+        FIXME: would be nice to be able to add stmts... We may change this. *)
 
   method visit_value : value -> value visit_action
   (** Called when visiting a SSA value *)

@@ -962,14 +962,14 @@ let check_delta state =
               with Not_found ->
                 (* This is a little weird if this happens... *)
                 "special{"^(Pp.ast_stmt_to_string !last_special)^"}"
-	    in
-	    let traceval_str = Pp.ast_exp_to_string traceval in
-	    let evalval_str = Pp.ast_exp_to_string evalval in
-	    wprintf "Difference between %sBAP and trace values for [*%s* Trace=%s Eval=%s]" s dsavarname traceval_str evalval_str;
-	    wprintf "This is due to one of the following statements:\n%s"  badstmt;
+            in
+            let traceval_str = Pp.ast_exp_to_string traceval in
+            let evalval_str = Pp.ast_exp_to_string evalval in
+            wprintf "Difference between %sBAP and trace values for [*%s* Trace=%s Eval=%s]" s dsavarname traceval_str evalval_str;
+            wprintf "This is due to one of the following statements:\n%s"  badstmt;
             (* Replace the incorrect value with the correct one from the trace *)
             TraceConcrete.update_var delta var (Symbolic traceval)
-	  ) else delta (* everything is fine *)
+          ) else delta (* everything is fine *)
       | _ -> delta
       (* If we can't find concrete value, it's probably just a BAP
          temporary *)

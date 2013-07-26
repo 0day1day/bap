@@ -13,11 +13,11 @@ let cfg_jumpelim graph =
     (fun bb graph ->
       let stmts = C.get_stmts graph bb in
       if List.length stmts > 0 then (
-	let revstmts = List.rev stmts in
-	let laststmt = List.hd revstmts in
-	match laststmt with
-	| CJmp(cond, l1, l2, attr)
-	    when full_value_eq cond val_true or full_value_eq cond val_false ->
+        let revstmts = List.rev stmts in
+        let laststmt = List.hd revstmts in
+        match laststmt with
+        | CJmp(cond, l1, l2, attr)
+            when full_value_eq cond val_true or full_value_eq cond val_false ->
           (try
              let bool = cond = val_true in
              let edges = C.G.succ_e graph bb in
@@ -30,15 +30,15 @@ let cfg_jumpelim graph =
                | _ -> failwith "Expected a cjmp to have two outgoing edges"
              in
 
-	     let graph = C.remove_edge_e graph toremove in
+             let graph = C.remove_edge_e graph toremove in
              let graph = C.remove_edge_e graph lastedge in
              let graph = C.add_edge graph bb dst in
-	     let revnewstmts = Jmp(l1, attr)::(List.tl revstmts) in
-	     let newstmts = List.rev revnewstmts in
+             let revnewstmts = Jmp(l1, attr)::(List.tl revstmts) in
+             let newstmts = List.rev revnewstmts in
              changed := true;
-	     C.set_stmts graph bb newstmts
+             C.set_stmts graph bb newstmts
            with Not_found -> graph)
-	| _ -> graph)
+        | _ -> graph)
       else graph
     )
     graph graph in

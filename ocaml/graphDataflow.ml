@@ -62,43 +62,43 @@ struct
     let f_t = D.transfer_function g in 
     let succ,pred = match D.dir with
       | Forward ->
-	  (D.G.succ g, D.G.pred g) 
+          (D.G.succ g, D.G.pred g) 
       | Backward ->
-	  (D.G.pred g, D.G.succ g)
+          (D.G.pred g, D.G.succ g)
     in
     let htin = H.create (List.length nodes) in
     let dfin = H.find htin in (* function to be returned *)
     let htout = H.create (List.length nodes) in
     let dfout n =
       try
-	H.find htout n
+        H.find htout n
       with Not_found ->
-	let out = (f_t n (dfin n)) in
-	H.add htout n out;
-	out
+        let out = (f_t n (dfin n)) in
+        H.add htout n out;
+        out
     in
     List.iter (fun n -> H.add htin n D.L.top) nodes;
     H.replace htin (D.s0 g) (init g);
     let rec do_work = function
       | [] -> ()
       | b::worklist ->  
-	  let inset = (dfin b) in 
-	  let outset = (f_t b inset) in 
-	  H.replace htout b outset;
-	  let affected_elems =
-	    List.filter 
-	      (fun s ->
-		 let oldin = dfin s in
-		 let newin = D.L.meet oldin (outset) in
-		 if D.L.equal oldin newin
-		 then false
-		 else let () = H.replace htin s newin in true
-	      )
-	      (succ b)
-	  in
-	  let newwklist = worklist@list_difference affected_elems worklist
-	  in
-	  do_work newwklist
+          let inset = (dfin b) in 
+          let outset = (f_t b inset) in 
+          H.replace htout b outset;
+          let affected_elems =
+            List.filter 
+              (fun s ->
+                 let oldin = dfin s in
+                 let newin = D.L.meet oldin (outset) in
+                 if D.L.equal oldin newin
+                 then false
+                 else let () = H.replace htin s newin in true
+              )
+              (succ b)
+          in
+          let newwklist = worklist@list_difference affected_elems worklist
+          in
+          do_work newwklist
     in
     do_work [D.s0 g];
     (dfin, dfout)

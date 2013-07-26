@@ -116,8 +116,8 @@ type 'a visit_action =
   | DoChildren      (** Continue exploring children of the current node. Changes to children will propagate up. *)
   | ChangeTo of 'a  (** Replace the current object with the specified one. *)
   | ChangeToAndDoChildren of 'a (** Replace the current object with
-				    the given one, and visit children
-				    of the {b replacement} object. *)
+                                    the given one, and visit children
+                                    of the {b replacement} object. *)
 
 (** Specifies whether generated VCs will be evaluated for
     satisfiability or validity. Alternatively, quantifiers can be

@@ -111,7 +111,7 @@ struct
     and highbit = highbit k
     in
       if (u |% v) &% highbit = highbit then
-	top k
+        top k
       else (uint64_gcd s1 s2, extend k lb', extend k ub')
 
   let add = renormbin add
@@ -127,7 +127,7 @@ struct
       top k
 
   let neg = if debug() then renormun neg else neg
-	
+
   (** Subtractionf of strided intervals *)
   let sub k a b =
     add k a (neg k b)
@@ -136,36 +136,36 @@ struct
   let minor k a b c d =
     let rec loop m =
       let cont() = loop (I.shift_right_logical m 1) in
-	if m = 0L then a |% c
-	else if bnot a &% c &% m <> 0L then
-	  let temp = (a |% m ) &% I.neg m in
-	    if int64_ucompare temp b <= 0 then
-	      temp |% c
-	    else cont()
-	else if a &% bnot c &% m  <> 0L then
-	  let temp = (c +% m) &% I.neg m in
-	    if int64_ucompare temp d <= 0 then
-	      temp  |% a
-	    else cont()
-	else
-	  cont()
+        if m = 0L then a |% c
+        else if bnot a &% c &% m <> 0L then
+          let temp = (a |% m ) &% I.neg m in
+            if int64_ucompare temp b <= 0 then
+              temp |% c
+            else cont()
+        else if a &% bnot c &% m  <> 0L then
+          let temp = (c +% m) &% I.neg m in
+            if int64_ucompare temp d <= 0 then
+              temp  |% a
+            else cont()
+        else
+          cont()
     in
       loop (highbit k)
 
   let maxor k a b c d =
     let rec loop m =
       let cont() = loop (I.shift_right_logical m 1) in
-	if m = 0L then b |% d
-	else if b &% d &% m <> 0L then
-	  let temp1 = (b -% m) |% (m -% 1L) in
-	  let temp2 = (d -% m) |% (m -% 1L) in
-	    if int64_ucompare temp1 a >= 0 then
-	      temp1 |% d
-	    else if int64_ucompare temp2 c >= 0 then
-	      temp2 |% b
-	    else cont()
-	else
-	  cont()
+        if m = 0L then b |% d
+        else if b &% d &% m <> 0L then
+          let temp1 = (b -% m) |% (m -% 1L) in
+          let temp2 = (d -% m) |% (m -% 1L) in
+            if int64_ucompare temp1 a >= 0 then
+              temp1 |% d
+            else if int64_ucompare temp2 c >= 0 then
+              temp2 |% b
+            else cont()
+        else
+          cont()
     in
       loop (highbit k)
 
@@ -188,17 +188,17 @@ struct
       | (true, true, false, false)
       | (false, false, true, true)
       | (false, false, false, false) ->
-	  (minor k lb1 ub1 lb2 ub2, maxor k lb1 ub1 lb2 ub2)
+          (minor k lb1 ub1 lb2 ub2, maxor k lb1 ub1 lb2 ub2)
       | (true, true, true, false) ->
-	  (lb1, -1L)
+          (lb1, -1L)
       | (true, false, true, true) ->
-	  (lb2, -1L)
+          (lb2, -1L)
       | (true, false, true, false) ->
-	  (min lb1 lb2, maxor k 0L ub1 0L ub2)
+          (min lb1 lb2, maxor k 0L ub1 0L ub2)
       | (true, false, false, false) ->
-	  (minor k lb1 (-1L) lb2 ub2, maxor k 0L ub1 lb2 ub2)
+          (minor k lb1 (-1L) lb2 ub2, maxor k 0L ub1 lb2 ub2)
       | (false, false, true, false) ->
-	  (minor k lb1 ub1 lb2 (-1L), maxor k lb1 ub1 lb2 ub2)
+          (minor k lb1 ub1 lb2 (-1L), maxor k lb1 ub1 lb2 ub2)
       | _ -> failwith "Impossible: check_reduced prevents this"
     in
     let highmask = bnot(s' -% 1L) in
@@ -231,23 +231,23 @@ struct
       (1L,0L, int64_umin b d)
 
   let modulus = renormbin modulus
-	
+        
 (* shifting by more than k or by negative values
  * will be the same as shifting by k. *)
   let toshifts k =
     let f x = if x > Int64.of_int k || x < 0L then k else Int64.to_int x in
       function
-	| (0L,x,y) ->
-	    assert(x=y);
-	    let s = f x in  (s,s)
-	| (_s,x,y) ->
-	    if x < 0L then
-	      if y >= 0L then
-		(* FIXME: using stride information could be useful here *)
-		(0, k)
-	      else (k,k)
-	    else (* x >= 0L *)
-	      (f x, f y)
+        | (0L,x,y) ->
+            assert(x=y);
+            let s = f x in  (s,s)
+        | (_s,x,y) ->
+            if x < 0L then
+              if y >= 0L then
+                (* FIXME: using stride information could be useful here *)
+                (0, k)
+              else (k,k)
+            else (* x >= 0L *)
+              (f x, f y)
 
   let mk_rshift shifter k ((s1,a,b) as x) y =
     check_reduced2 k x y;
@@ -285,25 +285,25 @@ struct
       let s' = uint64_gcd s1 s2 in
       let r1 = int64_urem a s'
       and r2 = int64_urem c s' in
-	if r1 = r2 then
-	  maybe
-	else
-	  no
+        if r1 = r2 then
+          maybe
+        else
+          no
 
   let union (s1,a,b) (s2,c,d) =
     let s' = uint64_gcd s1 s2 in
       if s' = 0L then
-	if a = b && c = d then
-	  let u = max a c
-	  and l = min a c in
-	    (u -% l, l, u)
-	else failwith "union: strided interval not in reduced form"
+        if a = b && c = d then
+          let u = max a c
+          and l = min a c in
+            (u -% l, l, u)
+        else failwith "union: strided interval not in reduced form"
       else 
-	let r1 = I.rem a s' (* not right when s' is negative. *)
-	and r2 = I.rem c s' in
-	  if s' > 0L && r1 = r2 then
-	    (s', min a c, max b d)
-	  else (1L, min a c, max b d)
+        let r1 = I.rem a s' (* not right when s' is negative. *)
+        and r2 = I.rem c s' in
+          if s' > 0L && r1 = r2 then
+            (s', min a c, max b d)
+          else (1L, min a c, max b d)
 
   let union x y =
     let (a,b,c) as res = union x y in
@@ -328,16 +328,16 @@ struct
       let top = VM.empty
       let equal = VM.equal (=)
       let meet x y =
-	VM.fold
-	  (fun k v res ->
-	     try
-	       let v' = VM.find k y in
-	       let si = SI.union v v' in
-		 VM.add k si res
-	     with Not_found ->
-	       VM.add k v res
-	  )
-	  x y
+        VM.fold
+          (fun k v res ->
+             try
+               let v' = VM.find k y in
+               let si = SI.union v v' in
+                 VM.add k si res
+             with Not_found ->
+               VM.add k v res
+          )
+          x y
     end
     let s0 _ = G.V.create Cfg.BB_Entry
     let init g = L.top
@@ -363,7 +363,7 @@ struct
       | LE
       | SLT
       | SLE
-	  -> failwith "unimplemented binop"
+          -> failwith "unimplemented binop"
 
     let unop_to_si_function = function
       | NEG -> SI.neg
@@ -376,94 +376,94 @@ struct
 
     let rec transfer_stmt s l =
       match s with
-	| Assert(Var _, _)  (* FIXME: Do we want to say v is true? *)
-	| Assert _ | Assume _ | Jmp _ | CJmp _ | Label _ | Comment _
-	| Halt _ ->
-	    l
-	| Move(v, e, _) ->
-	    try
-	      let top v = SI.top (bits_of_width(Var.typ v)) in
-	      let find v = VM.find v l in
-	      let do_find v =  try find v with Not_found -> top v  in
-	      let val2si = function
-		| Int(i,t) -> SI.of_bap_int (int64_of_big_int i) t
-		| Lab _ -> raise(Unimplemented "No SI for labels (should be a constant)")
-		| Var v -> do_find v
-	      in
-		try
-		  let new_si = match e with
-		    | Val x ->
-			val2si x
-		    | BinOp(op, x, y) ->
-			let f = binop_to_si_function op in
-			let k = bits_of_val x in
-			let r = f k (val2si x) (val2si y) in
-			  SI.check_reduced k r;
-			  r
-		    | UnOp(op, x) ->
-			let f = unop_to_si_function op in
-			let k = bits_of_val x in
-			let r = f k (val2si x) in
-			  SI.check_reduced k r;
-			  r
-		    | Phi(x::xs) ->
-			List.fold_left
-			  (fun i y -> SI.union i (do_find y))
-			  (do_find x) xs
-		    | Phi [] ->
-			failwith "Encountered empty Phi expression"
+        | Assert(Var _, _)  (* FIXME: Do we want to say v is true? *)
+        | Assert _ | Assume _ | Jmp _ | CJmp _ | Label _ | Comment _
+        | Halt _ ->
+            l
+        | Move(v, e, _) ->
+            try
+              let top v = SI.top (bits_of_width(Var.typ v)) in
+              let find v = VM.find v l in
+              let do_find v =  try find v with Not_found -> top v  in
+              let val2si = function
+                | Int(i,t) -> SI.of_bap_int (int64_of_big_int i) t
+                | Lab _ -> raise(Unimplemented "No SI for labels (should be a constant)")
+                | Var v -> do_find v
+              in
+                try
+                  let new_si = match e with
+                    | Val x ->
+                        val2si x
+                    | BinOp(op, x, y) ->
+                        let f = binop_to_si_function op in
+                        let k = bits_of_val x in
+                        let r = f k (val2si x) (val2si y) in
+                          SI.check_reduced k r;
+                          r
+                    | UnOp(op, x) ->
+                        let f = unop_to_si_function op in
+                        let k = bits_of_val x in
+                        let r = f k (val2si x) in
+                          SI.check_reduced k r;
+                          r
+                    | Phi(x::xs) ->
+                        List.fold_left
+                          (fun i y -> SI.union i (do_find y))
+                          (do_find x) xs
+                    | Phi [] ->
+                        failwith "Encountered empty Phi expression"
 
 (* This tries to preserve strides for loop variables, but takes too long, and
    wasn't working.
-		    | Phi xs ->
-			let res = List.fold_left
-			  (fun res y ->
-			     try let l = find y in
-			       match res with None -> Some l
-				 | Some l' -> Some(SI.union l l')
-			     with Not_found -> res
-			  )
-			  None xs
-			in
-			  (match res with
-			     | Some l -> l
-			     | None -> raise Not_found
-			  )
+                    | Phi xs ->
+                        let res = List.fold_left
+                          (fun res y ->
+                             try let l = find y in
+                               match res with None -> Some l
+                                 | Some l' -> Some(SI.union l l')
+                             with Not_found -> res
+                          )
+                          None xs
+                        in
+                          (match res with
+                             | Some l -> l
+                             | None -> raise Not_found
+                          )
 *)
-		    | Cast(CAST_SIGNED, _, vl) ->
-			val2si vl
+                    | Cast(CAST_SIGNED, _, vl) ->
+                        val2si vl
 (* This can result in non-reduced SIs currently 
-		    | Cast(CAST_UNSIGNED, t, vl) ->
-			let k = bits_of_val vl
-			and k' = bits_of_width t
-			and (s,a,b) as si = val2si vl in
-			let d = 64-k in
-			let f x = I.shift_right_logical(I.shift_left x d) d in
-			  if k <> 64 && k <> k' then
-			    (s, f a, f b)
-			  else si
+                    | Cast(CAST_UNSIGNED, t, vl) ->
+                        let k = bits_of_val vl
+                        and k' = bits_of_width t
+                        and (s,a,b) as si = val2si vl in
+                        let d = 64-k in
+                        let f x = I.shift_right_logical(I.shift_left x d) d in
+                          if k <> 64 && k <> k' then
+                            (s, f a, f b)
+                          else si
 *)
-		    | Cast(CAST_HIGH, t, vl) ->
-			let k = bits_of_val vl
-			and k' = bits_of_width t
-			and (s,a,b) as si = val2si vl in
-			let f x = I.shift_right x (k' - k) in
-			  if k' <> k then
-			    (s, f a, f b)
-			  else si
-		    | Cast(CAST_LOW, t, vl) ->
-			raise(Unimplemented "FIXME")
-		    | _ ->
-			raise(Unimplemented "unimplemented expression type")
-		  in
-		    if try VM.find v l <> new_si with Not_found -> true then (
-		      dprintf "adding %s = %s" (Pp.var_to_string v) (SI.to_string new_si);
-		      VM.add v new_si l )
-		    else l
-		with Unimplemented _ | Invalid_argument _ ->
-		  VM.add v (top v) l
-	    with Invalid_argument _ | Not_found ->
-	      l
+                    | Cast(CAST_HIGH, t, vl) ->
+                        let k = bits_of_val vl
+                        and k' = bits_of_width t
+                        and (s,a,b) as si = val2si vl in
+                        let f x = I.shift_right x (k' - k) in
+                          if k' <> k then
+                            (s, f a, f b)
+                          else si
+                    | Cast(CAST_LOW, t, vl) ->
+                        raise(Unimplemented "FIXME")
+                    | _ ->
+                        raise(Unimplemented "unimplemented expression type")
+                  in
+                    if try VM.find v l <> new_si with Not_found -> true then (
+                      dprintf "adding %s = %s" (Pp.var_to_string v) (SI.to_string new_si);
+                      VM.add v new_si l )
+                    else l
+                with Unimplemented _ | Invalid_argument _ ->
+                  VM.add v (top v) l
+            with Invalid_argument _ | Not_found ->
+              l
 
     let transfer_function = fwd_transfer_stmt_to_block transfer_stmt
 
@@ -484,7 +484,7 @@ struct
 
   type t = address list
       (* [] = (top, top, top,...), otherwise, any region not in the list
-	 maps to bottom. *)
+         maps to bottom. *)
 
   let global = Var.newvar "internal only" (Reg 64) (* value doesn't really matter, so long as it's unique *)
 
@@ -498,11 +498,11 @@ struct
   let pp p = function
     | [] -> p "VS.top"
     | x::xs ->
-	p "(";
-	pp_address p x;
-	List.iter (fun x -> p ", "; pp_address p x) xs;
-	p ")"
-	
+        p "(";
+        pp_address p x;
+        List.iter (fun x -> p ", "; pp_address p x) xs;
+        p ")"
+        
 
   let kind = function
     | [] -> `Top
@@ -520,28 +520,28 @@ struct
 
   let add k x y = match (x,y) with
     | ([r2,si2],[r1,si1]) when r1 == global ->
-	[(r2, SI.add k si1 si2)]
+        [(r2, SI.add k si1 si2)]
     | ([r,si1], xs) | (xs, [r,si1]) when r == global ->
-	List.map (fun (r,si) -> (r, SI.add k si1 si)) xs
+        List.map (fun (r,si) -> (r, SI.add k si1 si)) xs
     | _ -> top
 
   let sub k x = function
     | [r,si] when r == global ->
-	List.map (fun (r,si') -> (r, SI.sub k si' si)) x
+        List.map (fun (r,si') -> (r, SI.sub k si' si)) x
     | _ -> top
 
-	
+        
   let makeother f id annihilator  k x y = match (x,y) with
     | ([r1,si1], [r2,si2]) when r1 == global && r1 == r2 ->
-	[(r1, f k si1 si2)]
+        [(r1, f k si1 si2)]
     | ([_] as vsg, vs) when vsg = id ->
-	vs
+        vs
     | (vs, ([_] as vsg))  when vsg = id ->
-	vs
+        vs
     | ([_] as vsg, _)  when Some vsg = annihilator ->
-	BatOption.get annihilator
+        BatOption.get annihilator
     | (_,([_] as vsg))  when Some vsg = annihilator ->
-	BatOption.get annihilator
+        BatOption.get annihilator
     | _ -> top
 
   let logand = makeother SI.logand minus_one (Some zero)
@@ -557,19 +557,19 @@ struct
   (** Slightly unconservative equality checking. *)
   let eq k x y = match (x,y) with
      | ([r1,si1], [r2,si2]) when r1 == r2 ->
-	 [(global, SI.eq k si1 si2)]
+         [(global, SI.eq k si1 si2)]
      | ([], _) | (_,[]) -> maybe
      | _ ->
-	 if List.exists (fun(r,s)-> List.exists (fun(r2,s2)-> r == r2 && SI.eq k s s2 <> SI.no) y) x
-	 then maybe
-	 else no
+         if List.exists (fun(r,s)-> List.exists (fun(r2,s2)-> r == r2 && SI.eq k s s2 <> SI.no) y) x
+         then maybe
+         else no
 
   let union x y =
     let h = Hashtbl.create (List.length x + List.length y) in
     let add (r,si) =
       try Hashtbl.replace h r (SI.union si (Hashtbl.find h r))
       with Not_found ->
-	Hashtbl.add h r si
+        Hashtbl.add h r si
     in
       List.iter add x;
       List.iter add y;
@@ -595,20 +595,20 @@ struct
       let top = VM.empty
       let equal = VM.equal (=)
       let meet x y =
-	VM.fold
-	  (fun k v res ->
-	     try
-	       let v' = VM.find k y in
-	       let vs = VS.union v v' in
-		 VM.add k vs res
-	     with Not_found ->
-	       VM.add k v res
-	  )
-	  x y
+        VM.fold
+          (fun k v res ->
+             try
+               let v' = VM.find k y in
+               let vs = VS.union v v' in
+                 VM.add k vs res
+             with Not_found ->
+               VM.add k v res
+          )
+          x y
     end
     let s0 _ = G.V.create Cfg.BB_Entry
     let init g =
-	VM.add sp [(sp, SI.zero)] L.top (* stack region *)
+        VM.add sp [(sp, SI.zero)] L.top (* stack region *)
 
     let dir = GraphDataflow.Forward
 
@@ -632,54 +632,54 @@ struct
       | LE
       | SLT
       | SLE
-	  -> raise(Unimplemented "unimplemented binop")
+          -> raise(Unimplemented "unimplemented binop")
 
     let unop_to_vs_function _ = (raise(Unimplemented "unop") : int -> VS.t -> VS.t)
 
 
     let rec transfer_stmt s l =
       match s with
-	| Assert(Var _, _)  (* FIXME: Do we want to say v is true? *)
-	| Assert _ | Assume _ | Jmp _ | CJmp _ | Label _ | Comment _
-	| Halt _ ->
-	    l
-	| Move(v, e, _) ->
-	    try
-	      let find v = VM.find v l in
-	      let do_find v =  try find v with Not_found -> VS.top in
-	      let val2vs = function
-		| Int(i,t) -> VS.of_bap_int (int64_of_big_int i) t
-		| Lab _ -> raise(Unimplemented "No VS for labels (should be a constant)")
-		| Var v -> do_find v
-	      in
-		try
-		  let new_vs = match e with
-		    | Val x ->
-			val2vs x
-		    | BinOp(op, x, y) ->
-			let f = binop_to_vs_function op in
-			let k = SimpleVSA.DFP.bits_of_val x in
-			  f k (val2vs x) (val2vs y)
-		    | UnOp(op, x) ->
-			let f = unop_to_vs_function op in
-			let k = SimpleVSA.DFP.bits_of_val x in
-			  f k (val2vs x)
-		    | Phi(x::xs) ->
-			List.fold_left
-			  (fun i y -> VS.union i (do_find y))
-			  (do_find x) xs
-		    | Phi [] ->
-			failwith "Encountered empty Phi expression"
-		    | Cast _ ->
-			raise(Unimplemented "FIXME")
-		    | _ ->
-			raise(Unimplemented "unimplemented expression type")
-		  in
-		    VM.add v new_vs l
-		with Unimplemented _ | Invalid_argument _ ->
-		  VM.add v VS.top l
-	    with Invalid_argument _ | Not_found ->
-	      l
+        | Assert(Var _, _)  (* FIXME: Do we want to say v is true? *)
+        | Assert _ | Assume _ | Jmp _ | CJmp _ | Label _ | Comment _
+        | Halt _ ->
+            l
+        | Move(v, e, _) ->
+            try
+              let find v = VM.find v l in
+              let do_find v =  try find v with Not_found -> VS.top in
+              let val2vs = function
+                | Int(i,t) -> VS.of_bap_int (int64_of_big_int i) t
+                | Lab _ -> raise(Unimplemented "No VS for labels (should be a constant)")
+                | Var v -> do_find v
+              in
+                try
+                  let new_vs = match e with
+                    | Val x ->
+                        val2vs x
+                    | BinOp(op, x, y) ->
+                        let f = binop_to_vs_function op in
+                        let k = SimpleVSA.DFP.bits_of_val x in
+                          f k (val2vs x) (val2vs y)
+                    | UnOp(op, x) ->
+                        let f = unop_to_vs_function op in
+                        let k = SimpleVSA.DFP.bits_of_val x in
+                          f k (val2vs x)
+                    | Phi(x::xs) ->
+                        List.fold_left
+                          (fun i y -> VS.union i (do_find y))
+                          (do_find x) xs
+                    | Phi [] ->
+                        failwith "Encountered empty Phi expression"
+                    | Cast _ ->
+                        raise(Unimplemented "FIXME")
+                    | _ ->
+                        raise(Unimplemented "unimplemented expression type")
+                  in
+                    VM.add v new_vs l
+                with Unimplemented _ | Invalid_argument _ ->
+                  VM.add v VS.top l
+            with Invalid_argument _ | Not_found ->
+              l
 
     let transfer_function = fwd_transfer_stmt_to_block transfer_stmt
 
@@ -712,27 +712,27 @@ module AllocEnv = struct
   let read ae = function
     | [] -> VS.top
     | addrs -> (* FIXME: maybe shortcut this *)
-	let res =
-	  VS.fold
-	    (fun v a ->  match a with
-	       | None -> Some (read_concrete ae v)
-	       | Some a -> Some(VS.union (read_concrete ae v) a))
-	    addrs None
-	in
-	  match res with
-	    | Some x -> x
-	    | None -> failwith "AllocEnv.read impossible address"
+        let res =
+          VS.fold
+            (fun v a ->  match a with
+               | None -> Some (read_concrete ae v)
+               | Some a -> Some(VS.union (read_concrete ae v) a))
+            addrs None
+        in
+          match res with
+            | Some x -> x
+            | None -> failwith "AllocEnv.read impossible address"
 
   let write_concrete_strong ae (r,i) vl =
     if vl = VS.top then
       try
-	let m2 = M1.find r ae in
-	let m2' = M2.remove i m2 in
-	  if M2.is_empty m2' then M1.remove r ae else M1.add r m2' ae
+        let m2 = M1.find r ae in
+        let m2' = M2.remove i m2 in
+          if M2.is_empty m2' then M1.remove r ae else M1.add r m2' ae
       with Not_found -> ae
     else
       let m2 = try M1.find r ae with Not_found -> M2.empty in
-	M1.add r (M2.add i vl m2) ae
+        M1.add r (M2.add i vl m2) ae
 
   let write_concrete_weak ae addr vl =
     write_concrete_strong ae addr (VS.union vl (read_concrete ae addr))
@@ -741,13 +741,13 @@ module AllocEnv = struct
     if addr = VS.top then
       if vl = VS.top then top
       else
-	fold (fun k v a -> write_concrete_strong a k (VS.union vl v)) ae ae
+        fold (fun k v a -> write_concrete_strong a k (VS.union vl v)) ae ae
     else
       match addr with
-	| [(r, (0L,x,y))] when x = y ->
-	   write_concrete_strong ae (r,x) vl
-	| _ ->
-	    VS.fold (fun v a -> write_concrete_weak a v vl) addr ae
+        | [(r, (0L,x,y))] when x = y ->
+           write_concrete_strong ae (r,x) vl
+        | _ ->
+            VS.fold (fun v a -> write_concrete_weak a v vl) addr ae
 
 
   let union (x:t) (y:t) =
@@ -794,7 +794,7 @@ module AbsEnv = struct
       | _ -> AllocEnv.top
     with  Not_found -> AllocEnv.top
       
-	
+        
 end  (* module AE *)
 
 
@@ -812,25 +812,25 @@ struct
       let top = AbsEnv.empty
       let equal = AbsEnv.equal
       let meet (x:t) (y:t) =
-	  VM.fold
-	    (fun k v res ->
-	       try
-		 let v' = VM.find k y in
-		 let vs = match v, v' with
-		   | (`Scalar a, `Scalar b) -> `Scalar(VS.union a b)
-		   | (`Array a, `Array b) -> `Array(AllocEnv.union a b)
-		   | _ -> failwith "Tried to meet scalar and array"
-		 in
-		   VM.add k vs res
-	       with Not_found ->
-		 VM.add k v res
-	    )
-	    x y
+          VM.fold
+            (fun k v res ->
+               try
+                 let v' = VM.find k y in
+                 let vs = match v, v' with
+                   | (`Scalar a, `Scalar b) -> `Scalar(VS.union a b)
+                   | (`Array a, `Array b) -> `Array(AllocEnv.union a b)
+                   | _ -> failwith "Tried to meet scalar and array"
+                 in
+                   VM.add k vs res
+               with Not_found ->
+                 VM.add k v res
+            )
+            x y
     end
     let s0 _ = G.V.create Cfg.BB_Entry
       
     (** Creates a lattice element that maps each of the given variables to
-	it's own region. (For use as an inital value in the dataflow problem.)
+        it's own region. (For use as an inital value in the dataflow problem.)
     *)
     let init_vars vars =
       List.fold_left (fun vm x -> VM.add x (`Scalar [(x, SI.zero)]) vm) L.top vars
@@ -843,90 +843,90 @@ struct
 
     let rec transfer_stmt s l =
       match s with
-	| Assert(Var _, _)  (* FIXME: Do we want to say v is true? *)
-	| Assert _ | Assume _ | Jmp _ | CJmp _ | Label _ | Comment _
-	| Halt _ ->
-	    l
-	| Move(v, e, _) ->
-	    try
-	      let find v = VM.find v l in
-	      let do_find v =
-		try match find v with
-		  | `Scalar vs -> vs
-		  | _ -> VS.top
-		with Not_found -> VS.top
-	      in
-	      let val2vs = function
-		| Int(i,t)->
-		      VS.of_bap_int (int64_of_big_int i) t
-		| Lab _ -> raise(Unimplemented "No VS for labels (should be a constant)")
-		| Var v -> do_find v
-	      in
-	      let do_find_ae v =
-		try match VM.find v l with
-		  | `Array ae -> ae
-		  | _ -> AllocEnv.top
-		with  Not_found -> AllocEnv.top
-	      in
-	      match Var.typ v with
-	      | Reg _ -> (
-		  try
-		    let new_vs = match e with
-		      | Val x ->
-			  val2vs x
-		      | BinOp(op, x, y) ->
-			  let f = RegionVSA.DFP.binop_to_vs_function op in
-			  let k = SimpleVSA.DFP.bits_of_val x in
-			    f k (val2vs x) (val2vs y)
-		      | UnOp(op, x) ->
-			  let f = RegionVSA.DFP.unop_to_vs_function op in
-			  let k = SimpleVSA.DFP.bits_of_val x in
-			    f k (val2vs x)
-		      | Phi(x::xs) ->
-			  List.fold_left
-			    (fun i y -> VS.union i (do_find y))
-			    (do_find x) xs
-		      | Phi [] ->
-			  failwith "Encountered empty Phi expression"
-		      | Load(Var m, i, _e, _t) ->
-			  (* FIXME: assumes deendianized.
-			     ie: _e and _t should be the same for all loads and
-			     stores of m. *)
-			  AllocEnv.read (do_find_ae m) (val2vs i)
-		      | Cast _ ->
-			  raise(Unimplemented "FIXME")
-		      | _ ->
-			  raise(Unimplemented "unimplemented expression type")
-		    in
-		      VM.add v (`Scalar new_vs) l
-		  with Unimplemented _ | Invalid_argument _ ->
-		    VM.add v (`Scalar VS.top) l
-		)
-	      | TMem _ | Array _ -> (
-		  try
-		    let new_ae = match e with
-		      | Val(Var x) ->
-			  do_find_ae x
-		      | Store(Var m,i,v,_e,_t) ->
-			  (* FIXME: assumes deendianized.
-			     ie: _e and _t should be the same for all loads and
-			     stores of m. *)
-			  AllocEnv.write (do_find_ae m) (val2vs i) (val2vs v)
-		      | Phi(x::xs) ->
-			  List.fold_left
-			    (fun i y -> AllocEnv.union i (do_find_ae y))
-			    (do_find_ae x) xs
-		      | Phi [] ->
-			  failwith "Encountered empty Phi expression"
-		      | _ ->
-			  raise(Unimplemented "unimplemented memory expression type")
-		    in
-		      VM.add v (`Array new_ae) l
-		  with Unimplemented _ | Invalid_argument _ ->
-		    VM.add v (`Array AllocEnv.top) l
-		)
-	    with Invalid_argument _ | Not_found ->
-	      l
+        | Assert(Var _, _)  (* FIXME: Do we want to say v is true? *)
+        | Assert _ | Assume _ | Jmp _ | CJmp _ | Label _ | Comment _
+        | Halt _ ->
+            l
+        | Move(v, e, _) ->
+            try
+              let find v = VM.find v l in
+              let do_find v =
+                try match find v with
+                  | `Scalar vs -> vs
+                  | _ -> VS.top
+                with Not_found -> VS.top
+              in
+              let val2vs = function
+                | Int(i,t)->
+                      VS.of_bap_int (int64_of_big_int i) t
+                | Lab _ -> raise(Unimplemented "No VS for labels (should be a constant)")
+                | Var v -> do_find v
+              in
+              let do_find_ae v =
+                try match VM.find v l with
+                  | `Array ae -> ae
+                  | _ -> AllocEnv.top
+                with  Not_found -> AllocEnv.top
+              in
+              match Var.typ v with
+              | Reg _ -> (
+                  try
+                    let new_vs = match e with
+                      | Val x ->
+                          val2vs x
+                      | BinOp(op, x, y) ->
+                          let f = RegionVSA.DFP.binop_to_vs_function op in
+                          let k = SimpleVSA.DFP.bits_of_val x in
+                            f k (val2vs x) (val2vs y)
+                      | UnOp(op, x) ->
+                          let f = RegionVSA.DFP.unop_to_vs_function op in
+                          let k = SimpleVSA.DFP.bits_of_val x in
+                            f k (val2vs x)
+                      | Phi(x::xs) ->
+                          List.fold_left
+                            (fun i y -> VS.union i (do_find y))
+                            (do_find x) xs
+                      | Phi [] ->
+                          failwith "Encountered empty Phi expression"
+                      | Load(Var m, i, _e, _t) ->
+                          (* FIXME: assumes deendianized.
+                             ie: _e and _t should be the same for all loads and
+                             stores of m. *)
+                          AllocEnv.read (do_find_ae m) (val2vs i)
+                      | Cast _ ->
+                          raise(Unimplemented "FIXME")
+                      | _ ->
+                          raise(Unimplemented "unimplemented expression type")
+                    in
+                      VM.add v (`Scalar new_vs) l
+                  with Unimplemented _ | Invalid_argument _ ->
+                    VM.add v (`Scalar VS.top) l
+                )
+              | TMem _ | Array _ -> (
+                  try
+                    let new_ae = match e with
+                      | Val(Var x) ->
+                          do_find_ae x
+                      | Store(Var m,i,v,_e,_t) ->
+                          (* FIXME: assumes deendianized.
+                             ie: _e and _t should be the same for all loads and
+                             stores of m. *)
+                          AllocEnv.write (do_find_ae m) (val2vs i) (val2vs v)
+                      | Phi(x::xs) ->
+                          List.fold_left
+                            (fun i y -> AllocEnv.union i (do_find_ae y))
+                            (do_find_ae x) xs
+                      | Phi [] ->
+                          failwith "Encountered empty Phi expression"
+                      | _ ->
+                          raise(Unimplemented "unimplemented memory expression type")
+                    in
+                      VM.add v (`Array new_ae) l
+                  with Unimplemented _ | Invalid_argument _ ->
+                    VM.add v (`Array AllocEnv.top) l
+                )
+            with Invalid_argument _ | Not_found ->
+              l
 
     let transfer_function = fwd_transfer_stmt_to_block transfer_stmt
 

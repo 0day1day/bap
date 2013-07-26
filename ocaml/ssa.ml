@@ -36,7 +36,7 @@ type attrs = Type.attributes
 
 type stmt =
   | Move of var * exp * attrs  (** Assign the value on the right to the
-				      var on the left *)
+                                      var on the left *)
   | Jmp of value * attrs (** Jump to a label/address *)
   | CJmp of value * value * value * attrs
       (** Conditional jump. If e1 is true, jumps to e2, otherwise jumps to e3 *)
@@ -177,7 +177,7 @@ let quick_stmt_eq s1 s2 =
       true
     else if b1 & b2 & b3 & b4 & b5 then
       (* s1 and s2 are not physically equal.  But maybe their
-	 subexpressions are physically equal. *)
+         subexpressions are physically equal. *)
       List.for_all2 quick_exp_eq l6 r6
     else
       false

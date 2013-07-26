@@ -214,12 +214,12 @@ expr:
 | IF expr THEN expr ELSE expr      
       { Ite($2, $4, $6) }
 | letstart IN expr   { Scope.pop (get_scope());
-		       let (x,y) = $1 in
-		       Let(x,y, $3) } 
+                       let (x,y) = $1 in
+                       Let(x,y, $3) } 
 | EXTRACT COLON INT COLON INT COLON LSQUARE expr RSQUARE { Extract($3, $5, $8) }
 | CONCAT COLON LSQUARE expr RSQUARE LSQUARE expr RSQUARE { Concat($4, $7) }
 | ID COLON typ LPAREN expr RPAREN  
-    { Cast(casttype_of_string $1, $3, $5) }	  
+    { Cast(casttype_of_string $1, $3, $5) }
 | TRUE               { exp_true } 
 | FALSE              { exp_false }
 | INT COLON typ      { Int($1, $3) } 

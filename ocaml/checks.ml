@@ -44,9 +44,9 @@ module MakeAcyclicCheck(C:Cfg.CFG) = struct
       and setcolor v c = H.replace h v c in
       let rec walk v edges=
         let walk_edge e edges =
-	  let d = C.G.E.dst e in
-	  if color d = `White then walk d edges
-	  else if color d = `Gray then e::edges
+          let d = C.G.E.dst e in
+          if color d = `White then walk d edges
+          else if color d = `Gray then e::edges
           else edges
         in
         setcolor v `Gray;

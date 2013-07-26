@@ -47,7 +47,7 @@ let add_referenced vars e =
         vars := LocSet.add (Loc.V v) !vars;
         ignore(Ast_visitor.exp_accept self e2);
         (* XXX: This doesn't handle shadowing Lets properly, e.g., let v
-	   = 5 in let v = 4 in v *)
+           = 5 in let v = 4 in v *)
         vars := LocSet.remove (Loc.V v) !vars;
         SkipChildren
       | Load (_,Int(addr,_),_,_) ->
@@ -58,8 +58,8 @@ let add_referenced vars e =
       | _ -> DoChildren
     method visit_rvar r =
       if not (LocSet.mem (Loc.V r) !vars) then
-	if Typecheck.is_integer_type (Var.typ r) then
-	  vars := LocSet.add (Loc.V r) !vars;
+        if Typecheck.is_integer_type (Var.typ r) then
+          vars := LocSet.add (Loc.V r) !vars;
       DoChildren
   end
   in
@@ -98,9 +98,9 @@ let backwards_taint stmts locset =
     (match stmt with
     | Move(l, e, _) ->
       (* If l is interesting, then any location referenced in e is
-	 interesting too. *)
+         interesting too. *)
       if (LocSet.mem (Loc.V l) !vars &&
-	    Typecheck.is_integer_type (Var.typ l)) then (
+            Typecheck.is_integer_type (Var.typ l)) then (
         dprintf "interesting: %s" (Pp.ast_stmt_to_string stmt);
         vars := (LocSet.remove (Loc.V l) !vars);
         let old_vars = !vars in
@@ -108,9 +108,9 @@ let backwards_taint stmts locset =
         if !vars = old_vars then
           Printf.printf "Leaf instruction: %s\n" (Pp.ast_stmt_to_string stmt)
       ) else (
-	(* Alternatively, if there is a write to an interesting memory
-	   location, then we should also add any referenced
-	   locations. *)
+        (* Alternatively, if there is a write to an interesting memory
+           location, then we should also add any referenced
+           locations. *)
         let flag, mems = interesting_mem_write vars e in
         if flag then (
           dprintf "interesting: %s" (Pp.ast_stmt_to_string stmt);

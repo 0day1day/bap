@@ -13,7 +13,7 @@ exception RangeNotFound of Type.addr * Type.addr
 
 let leave_files = ref false;;
 let speclist = ["-leave-files", Arg.Set leave_files, 
-				"Don't remove files after test";];;
+                "Don't remove files after test";];;
 
 
 (** General system functions **)
@@ -28,7 +28,7 @@ let mkdir_and_ignore path = try Unix.mkdir path 0o640 with _ -> ();;
 let rm_and_ignore path =
   if(!leave_files) then () 
   else ((try if (Sys.is_directory(path)) then Unix.rmdir path with _ -> ());
-		try Sys.remove path with _ -> ());;
+        try Sys.remove path with _ -> ());;
 
 
 let rec rm_and_ignore_list paths =
@@ -81,7 +81,7 @@ let check_pin_setup arch =
     | '0' -> ()
     | _ -> skip_if true
       (cat_arg^
-	 " must contain 0 for pin to work.  As root, please execute $ echo 0 > "
+         " must contain 0 for pin to work.  As root, please execute $ echo 0 > "
        ^cat_arg))
   in
   (* Check if ptrace_scope has been turned off *)
@@ -142,25 +142,25 @@ let inject_stmt prog start_addr asm stmt =
       assert_failure ("Could not find asmembly instruction "^asm_str^" in main")
     | s::[] -> 
       assert_failure ("Could not find asmembly instruction "^asm_str^" in main")
-	(* Match for the addr and label at the same time *)
+    (* Match for the addr and label at the same time *)
     | s::l::ss -> 
       match starta with
       | Some(a) -> (match s with
-	| Ast.Label(Type.Addr(addr),attrs) -> 
-	  if (addr = a) then inject_stmt_k ss None asm_str inj_stmt (l::s::k)
-	  else inject_stmt_k ss starta asm_str inj_stmt (l::s::k)
-	| _ -> inject_stmt_k (l::ss) starta asm_str inj_stmt (s::k)
+        | Ast.Label(Type.Addr(addr),attrs) -> 
+          if (addr = a) then inject_stmt_k ss None asm_str inj_stmt (l::s::k)
+          else inject_stmt_k ss starta asm_str inj_stmt (l::s::k)
+        | _ -> inject_stmt_k (l::ss) starta asm_str inj_stmt (s::k)
       )
-	  (* We are inside the desired block; find asm_str and inject inj_stmt *)
+          (* We are inside the desired block; find asm_str and inject inj_stmt *)
       | None -> (match s with
-	| Ast.Label(Type.Addr(addr),attrs) -> 
-	  (match attrs with
-	  | [Type.Asm(asm)] ->
-	    if (pmatch ~pat:asm_str asm) then (List.rev k)@(s::l::inj_stmt::ss)
-	    else inject_stmt_k ss starta asm_str inj_stmt (l::s::k)
-	  | _ -> inject_stmt_k ss starta asm_str inj_stmt (l::s::k)
-	  )
-	| _ -> inject_stmt_k (l::ss) starta asm_str inj_stmt (s::k)
+        | Ast.Label(Type.Addr(addr),attrs) -> 
+          (match attrs with
+          | [Type.Asm(asm)] ->
+            if (pmatch ~pat:asm_str asm) then (List.rev k)@(s::l::inj_stmt::ss)
+            else inject_stmt_k ss starta asm_str inj_stmt (l::s::k)
+          | _ -> inject_stmt_k ss starta asm_str inj_stmt (l::s::k)
+          )
+        | _ -> inject_stmt_k (l::ss) starta asm_str inj_stmt (s::k)
       )
   in
   inject_stmt_k prog (Some(start_addr)) asm stmt [];;
@@ -174,9 +174,9 @@ let check_bigint_answer e correct =
   | Int(int,_) -> if (int <>% correct)
     then 
       assert_failure 
-	("Final value in EAX " ^ (string_of_big_int int) 
-	 ^ " does not equal correct value "
-	 ^ (string_of_big_int correct))
+        ("Final value in EAX " ^ (string_of_big_int int) 
+         ^ " does not equal correct value "
+         ^ (string_of_big_int correct))
     else ()
   | _ -> assert_failure ("Final value in EAX is not an Ast.Int!");;
 
@@ -186,7 +186,7 @@ let check_eax ctx eax =
     (fun k v ->
       match v with
       | Symbeval.Symbolic e when k = Disasm_i386.R32.eax ->
-	check_bigint_answer e eax
+        check_bigint_answer e eax
       | _ -> ()
     ) ctx.Symbeval.delta;;
 
@@ -206,10 +206,10 @@ let find_prog_chunk prog start_addr end_addr =
     | p::ps, Some a ->
       (match p with
       | Ast.Label(Addr(addr),attrs) when addr = a -> 
-	(* If this is the start address we are looking for begin recording 
-	   with accumulator k.  Set starta to None so that we know we are in
-	   the desired range *)
-	find_prog_chunk_k ps None enda (p::k)
+        (* If this is the start address we are looking for begin recording 
+           with accumulator k.  Set starta to None so that we know we are in
+           the desired range *)
+        find_prog_chunk_k ps None enda (p::k)
       | _ -> find_prog_chunk_k ps starta enda k)
     | p::ps, None ->
       (* Indicates we are inside desired block; return through end_addr *)
@@ -223,13 +223,13 @@ let find_prog_chunk prog start_addr end_addr =
 let summarize r =
   match r with 
   | RError(p,s) ->
-	Format.printf "Error: %s\n" ((string_of_path p) ^ "\n  " ^ s)
+        Format.printf "Error: %s\n" ((string_of_path p) ^ "\n  " ^ s)
   | RFailure (p,s) ->
-	Format.printf "Failure: %s\n" ((string_of_path p) ^ "\n  " ^ s)
+        Format.printf "Failure: %s\n" ((string_of_path p) ^ "\n  " ^ s)
   | RSkip (p,s) -> 
-	Format.printf "Skiped: %s\n" ((string_of_path p) ^ "\n  " ^ s)
+        Format.printf "Skiped: %s\n" ((string_of_path p) ^ "\n  " ^ s)
   | RTodo (p,s) -> 
-	Format.printf "Todo: %s\n" ((string_of_path p) ^ "\n  " ^ s)
+        Format.printf "Todo: %s\n" ((string_of_path p) ^ "\n  " ^ s)
   | RSuccess p -> ();;
 
 let rec summarize_results res =

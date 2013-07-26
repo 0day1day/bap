@@ -81,7 +81,7 @@ struct
     let idom = D.compute_idom cfg exit_node in
     let vertices =  C.G.fold_vertex (fun v g -> C.add_vertex g v) cfg (C.empty ()) in
       C.G.fold_vertex
-	(fun v g ->
+        (fun v g ->
           (* When we reverse a graph, non-terminating parts of the
              graph will become unreachable.  Unfortunately, the
              dominator algorithms we use largely assume all nodes are
@@ -89,11 +89,11 @@ struct
              falsely marking them as control dependencies. We abuse
              [idom] here to check for reachability.  *)
           let is_reachable = try ignore(idom v); true with Not_found -> false in
-	  if C.G.in_degree cfg v > 0 && is_reachable
-	  then List.fold_left (fun g v' -> C.add_edge g v' v) g (df v)
-	  else g (* can't compute DF for lonely nodes *)
-	)
-	cfg vertices
+          if C.G.in_degree cfg v > 0 && is_reachable
+          then List.fold_left (fun g v' -> C.add_edge g v' v) g (df v)
+          else g (* can't compute DF for lonely nodes *)
+        )
+        cfg vertices
 
 end
 
@@ -124,9 +124,9 @@ struct
                          let compare = Pervasives.compare
                         end)
   module SS = Set.Make (struct
-			  type t = SSA.G.V.t * int
-			  let compare = Pervasives.compare
-			end)
+                          type t = SSA.G.V.t * int
+                          let compare = Pervasives.compare
+                        end)
 
   (* [compute_dd cfg] the tuple vars,fd,fu. vars is the set of
       variables used by the graph.  fd is a hashtbl from vars to the
@@ -139,33 +139,33 @@ struct
     let vars = ref VS.empty in 
     let update_def_uses s (loc:SSA.G.V.t * int) =
       let () = 
-	match s with
-	  | Ssa.Move (lv, _, _) -> VH.add defs lv loc
-	  | _ -> ()
+        match s with
+          | Ssa.Move (lv, _, _) -> VH.add defs lv loc
+          | _ -> ()
       in
       let stmt_uses = ref VS.empty in 
       let vis =  object(self)
-	inherit Ssa_visitor.nop
-	method visit_rvar v = stmt_uses := VS.add v !stmt_uses; DoChildren
-	method visit_value v = 
-	  match v with
-	      Ssa.Var(v') -> vars := VS.add v' !vars; DoChildren
-	    | _ -> DoChildren
+        inherit Ssa_visitor.nop
+        method visit_rvar v = stmt_uses := VS.add v !stmt_uses; DoChildren
+        method visit_value v = 
+          match v with
+              Ssa.Var(v') -> vars := VS.add v' !vars; DoChildren
+            | _ -> DoChildren
       end
       in
-	ignore (Ssa_visitor.stmt_accept vis s);
-	VS.iter (fun v -> 
-		   let prev = try VH.find uses v with Not_found -> [] in 
-		     VH.replace uses v (loc::prev)
-		) !stmt_uses
+        ignore (Ssa_visitor.stmt_accept vis s);
+        VS.iter (fun v -> 
+                   let prev = try VH.find uses v with Not_found -> [] in 
+                     VH.replace uses v (loc::prev)
+                ) !stmt_uses
     in
       SSA.G.iter_vertex 
-	(fun v ->
-	   ignore(List.fold_left 
-		    (fun idx s -> update_def_uses s (v,idx); idx+1)
-		    0 (SSA.get_stmts cfg v)
-		 )
-	) cfg;
+        (fun v ->
+           ignore(List.fold_left 
+                    (fun idx s -> update_def_uses s (v,idx); idx+1)
+                    0 (SSA.get_stmts cfg v)
+                 )
+        ) cfg;
       (!vars,defs,uses)
 
   (* Computing the ddg and a hashtbl containing the data dependencies *)
@@ -175,12 +175,12 @@ struct
     let ddg = SSA.copy cfg in 
     let entryv = SSA.find_vertex ddg BB_Entry in 
       (* fd and fu implement assumption all vars are defined on entry
-	 and used on exit *)
+         and used on exit *)
     let fd v = (entryv,0) :: (try VH.find_all defs v with Not_found -> [])
     in 
     let cfg_to_ddg_vertex ddg cfg_vertex : SSA.G.V.t = 
       let lbl = SSA.G.V.label cfg_vertex in 
-	SSA.find_vertex ddg lbl
+        SSA.find_vertex ddg lbl
     in
     (* dropping all up to the nth list elements *)
     let rec drop n l = 
@@ -201,12 +201,12 @@ struct
         let stop = ref false in
         let id = ref lin in
         let vis = object(self)
-  	  inherit Ssa_visitor.nop
+          inherit Ssa_visitor.nop
           method visit_avar v = 
             if v = var
             then (stop := true ; SkipChildren)
             else DoChildren
-	  method visit_rvar v = 
+          method visit_rvar v = 
             if v = var
             then (Hashtbl.add ud (Var var,node,!id) (Var var,init,line) ;
                   edges := GE.add (node,init) !edges ; 
@@ -248,11 +248,11 @@ struct
         ) vars ; 
       (* Remove all the pre-existing CFG edges from the DDG *)
       let ddg = SSA.G.fold_edges 
-	(fun src dst cfg' -> 
-	    let s = SSA.find_vertex cfg' (SSA.G.V.label src) in 
-	    let d = SSA.find_vertex cfg' (SSA.G.V.label dst) in 
-	      SSA.remove_edge cfg' s d
-	) cfg ddg
+        (fun src dst cfg' -> 
+            let s = SSA.find_vertex cfg' (SSA.G.V.label src) in 
+            let d = SSA.find_vertex cfg' (SSA.G.V.label dst) in 
+              SSA.remove_edge cfg' s d
+        ) cfg ddg
       in
       (* Add the computed data dependencies to the DDG *)
       let ddg =
@@ -276,29 +276,29 @@ struct
       (* the following 2 statements copy only the cfg verticies  *)
     let ddg = SSA.copy cfg in 
     let ddg = SSA.G.fold_edges 
-	(fun src dst cfg' -> 
-	    let s = SSA.find_vertex cfg' (SSA.G.V.label src) in 
-	    let d = SSA.find_vertex cfg' (SSA.G.V.label dst) in 
-	      SSA.remove_edge cfg' s d
-	) cfg ddg
+        (fun src dst cfg' -> 
+            let s = SSA.find_vertex cfg' (SSA.G.V.label src) in 
+            let d = SSA.find_vertex cfg' (SSA.G.V.label dst) in 
+              SSA.remove_edge cfg' s d
+        ) cfg ddg
     in
     let entryv = SSA.find_vertex ddg BB_Entry in 
       (* fd and fu implement assumption all vars are defined on entry
-	 and used on exit *)
+         and used on exit *)
     let fd v = try VH.find defs v with Not_found -> (entryv,0) in 
     let cfg_to_ddg_vertex ddg cfg_vertex : SSA.G.V.t = 
       let lbl = SSA.G.V.label cfg_vertex in 
-	SSA.find_vertex ddg lbl
+        SSA.find_vertex ddg lbl
     in
       VH.fold
-	(fun var uselst ddg -> 
-	   let (cfg_dv,_) = fd var in 
-	   let ddg_dv = cfg_to_ddg_vertex ddg cfg_dv in
-	     List.fold_left 
-	       (fun ddg (cfg_uv,_) -> 
-		  SSA.add_edge ddg 
-		    (cfg_to_ddg_vertex ddg cfg_uv) ddg_dv) ddg uselst 
-	) uses ddg 
+        (fun var uselst ddg -> 
+           let (cfg_dv,_) = fd var in 
+           let ddg_dv = cfg_to_ddg_vertex ddg cfg_dv in
+             List.fold_left 
+               (fun ddg (cfg_uv,_) -> 
+                  SSA.add_edge ddg 
+                    (cfg_to_ddg_vertex ddg cfg_uv) ddg_dv) ddg uselst 
+        ) uses ddg 
 
 
   (* convert a cfg whose nodes contain any number of SSA stmts, to a
@@ -310,28 +310,28 @@ struct
     let translate_block old_v g : SSA.G.t= 
       let v = (SSA.find_vertex g (SSA.G.V.label old_v)) in 
       match (SSA.get_stmts g v)  with
-	  [] -> g
-	| s::[] -> g (* the first element in the list gets the original
-			block id. Thus, we need to do nothing. *)
-	| s::ss -> 
-	    let origsucclst = SSA.G.succ g v in 
-	    let g' = List.fold_left 
-	      (fun g' dst -> SSA.remove_edge g' v dst) g origsucclst 
-	    in 
-	    let v',g' = 
-	      List.fold_left 
-		(fun (pred,g') s ->
-		   let g',v' = SSA.create_vertex g' [s] in 
-		   let () = dprintf "Created vertex %s for %s"
-		     (bbid_to_string (SSA.G.V.label v'))
-		     (Pp.ssa_stmt_to_string s) in 
-		   let g' = SSA.add_edge g' pred v' in 
-		     (v',g')
-		) (v,g') ss 
-	    in
-	    let g' = SSA.set_stmts g' v [s] in 
-	      List.fold_left
-		(fun g' dst -> SSA.add_edge g' v' dst) g'  origsucclst
+          [] -> g
+        | s::[] -> g (* the first element in the list gets the original
+                        block id. Thus, we need to do nothing. *)
+        | s::ss -> 
+            let origsucclst = SSA.G.succ g v in 
+            let g' = List.fold_left 
+              (fun g' dst -> SSA.remove_edge g' v dst) g origsucclst 
+            in 
+            let v',g' = 
+              List.fold_left 
+                (fun (pred,g') s ->
+                   let g',v' = SSA.create_vertex g' [s] in 
+                   let () = dprintf "Created vertex %s for %s"
+                     (bbid_to_string (SSA.G.V.label v'))
+                     (Pp.ssa_stmt_to_string s) in 
+                   let g' = SSA.add_edge g' pred v' in 
+                     (v',g')
+                ) (v,g') ss 
+            in
+            let g' = SSA.set_stmts g' v [s] in 
+              List.fold_left
+                (fun g' dst -> SSA.add_edge g' v' dst) g'  origsucclst
     in
     let g = SSA.copy  cfg in 
       SSA.G.fold_vertex translate_block cfg g
@@ -348,9 +348,9 @@ struct
   module VH = Var.VarHash
   module VS = Var.VarSet
   module SS = Set.Make (struct
-			  type t = AST.G.V.t * int
-			  let compare = Pervasives.compare
-			end)
+                          type t = AST.G.V.t * int
+                          let compare = Pervasives.compare
+                        end)
   module GS = Set.Make (struct 
                          type t = AST.G.V.t 
                          let compare = Pervasives.compare
@@ -369,28 +369,28 @@ struct
     let update_def_uses s (loc:AST.G.V.t * int) =
       let stmt_uses = ref VS.empty in 
       let vis = object(self)
-	inherit Ast_visitor.nop
+        inherit Ast_visitor.nop
         method visit_avar v = VH.add defs v loc ; DoChildren
-	method visit_rvar v = stmt_uses := VS.add v !stmt_uses; DoChildren
-	method visit_exp v = 
-	  match v with
-	      Ast.Var(v') -> vars := VS.add v' !vars; DoChildren
-	    | _ -> DoChildren
+        method visit_rvar v = stmt_uses := VS.add v !stmt_uses; DoChildren
+        method visit_exp v = 
+          match v with
+              Ast.Var(v') -> vars := VS.add v' !vars; DoChildren
+            | _ -> DoChildren
       end
       in
-	ignore (Ast_visitor.stmt_accept vis s);
-	VS.iter (fun v -> 
-		   let prev = try VH.find uses v with Not_found -> [] in 
-		     VH.replace uses v (loc::prev)
-		) !stmt_uses
+        ignore (Ast_visitor.stmt_accept vis s);
+        VS.iter (fun v -> 
+                   let prev = try VH.find uses v with Not_found -> [] in 
+                     VH.replace uses v (loc::prev)
+                ) !stmt_uses
     in
       AST.G.iter_vertex 
-	(fun v ->
-	   ignore(List.fold_left 
-		    (fun idx s -> update_def_uses s (v,idx); idx+1)
-		    0 (AST.get_stmts cfg v)
-		 )
-	) cfg;
+        (fun v ->
+           ignore(List.fold_left 
+                    (fun idx s -> update_def_uses s (v,idx); idx+1)
+                    0 (AST.get_stmts cfg v)
+                 )
+        ) cfg;
       (!vars,defs,uses)
 
   (* Computing the ddg and a hashtbl containing the data dependencies *)
@@ -400,12 +400,12 @@ struct
     let ddg = AST.copy cfg in 
     let entryv = AST.find_vertex ddg BB_Entry in 
       (* fd and fu implement assumption all vars are defined on entry
-	 and used on exit *)
+         and used on exit *)
     let fd v = (entryv,0) :: (try VH.find_all defs v with Not_found -> [])
     in 
     let cfg_to_ddg_vertex ddg cfg_vertex : AST.G.V.t = 
       let lbl = AST.G.V.label cfg_vertex in 
-	AST.find_vertex ddg lbl
+        AST.find_vertex ddg lbl
     in
     (* dropping all up to the nth list elements *)
     let rec drop n l = 
@@ -426,12 +426,12 @@ struct
         let stop = ref false in
         let id = ref lin in
         let vis = object(self)
-  	  inherit Ast_visitor.nop
+          inherit Ast_visitor.nop
           method visit_avar v = 
             if v = var
             then (stop := true ; SkipChildren)
             else DoChildren
-	  method visit_rvar v = 
+          method visit_rvar v = 
             if v = var
             then (Hashtbl.add ud (Var var,node,!id) (Var var,init,line) ;
                   edges := GE.add (node,init) !edges ; 
@@ -473,11 +473,11 @@ struct
         ) vars ; 
       (* Remove all the pre-existing CFG edges from the DDG *)
       let ddg = AST.G.fold_edges 
-	(fun src dst cfg' -> 
-	    let s = AST.find_vertex cfg' (AST.G.V.label src) in 
-	    let d = AST.find_vertex cfg' (AST.G.V.label dst) in 
-	      AST.remove_edge cfg' s d
-	) cfg ddg
+        (fun src dst cfg' -> 
+            let s = AST.find_vertex cfg' (AST.G.V.label src) in 
+            let d = AST.find_vertex cfg' (AST.G.V.label dst) in 
+              AST.remove_edge cfg' s d
+        ) cfg ddg
       in
       (* Add the computed data dependencies to the DDG *)
       let ddg =
@@ -559,7 +559,7 @@ struct
   struct
     
     type t = 
-	(* Missing definitions are implicitly assumed to be top *)
+        (* Missing definitions are implicitly assumed to be top *)
       | Undefined (* There is proof that of an undefined definition *)
       | Loc of location (* Location of a definition *)
     
@@ -569,9 +569,9 @@ struct
       match loc with
       | Undefined -> "Undefined"
       | Loc(bb,line) ->
-	  let bbs = (Cfg.bbid_to_string (C.G.V.label bb))
-	  in Printf.sprintf "(%s,%d)" bbs line
-	       
+          let bbs = (Cfg.bbid_to_string (C.G.V.label bb))
+          in Printf.sprintf "(%s,%d)" bbs line
+               
   end
   module LS = Set.Make(LocationType)
 
@@ -596,31 +596,31 @@ struct
 
     let to_string l =
       VM.fold
-	(fun k v s ->
-	   let defs =
-	     LS.fold
-	       (fun loc s ->
-		  s ^ " " ^ LocationType.to_string loc
-	       ) v "" in
+        (fun k v s ->
+           let defs =
+             LS.fold
+               (fun loc s ->
+                  s ^ " " ^ LocationType.to_string loc
+               ) v "" in
 
-	     s ^ (Printf.sprintf "Use: %s -> Def: [%s]\n"
-		    (Pp.var_to_string k) defs)
-	       
-	) l ""
+             s ^ (Printf.sprintf "Use: %s -> Def: [%s]\n"
+                    (Pp.var_to_string k) defs)
+               
+        ) l ""
 
     let top = VM.empty
     and meet x y = 
       let m' = VM.fold
-	(fun k v m ->
-	   (* Add k,v to m *)
-	   add_map m k v
-	) x y
+        (fun k v m ->
+           (* Add k,v to m *)
+           add_map m k v
+        ) x y
       in
       m'
     and equal m1 m2 = 
       let e = VM.equal
-	(fun a b ->
-	   LS.equal a b) m1 m2
+        (fun a b ->
+           LS.equal a b) m1 m2
       in
       e
     let is_directed = true
@@ -636,12 +636,12 @@ struct
       let lref = ref l in
       let line = ref 0 in
       let v = object(self)
-	inherit Ast_visitor.nop
-    	method visit_rvar v =
-	  let s = LS.empty in
-	  let s = LS.add (LocationType.Loc (bb,!line)) s in
-	  lref := VM.add v s !lref;
-	  DoChildren
+        inherit Ast_visitor.nop
+        method visit_rvar v =
+          let s = LS.empty in
+          let s = LS.add (LocationType.Loc (bb,!line)) s in
+          lref := VM.add v s !lref;
+          DoChildren
         method visit_avar v =
           lref := VM.add v (LS.singleton LocationType.Undefined) !lref;
           DoChildren
@@ -649,10 +649,10 @@ struct
       in
       let stmts = Cfg.AST.get_stmts g bb in
       List.iter
-	(fun stmt ->
-	   ignore(Ast_visitor.stmt_accept v stmt);
-	   line := !line + 1
-	) stmts;
+        (fun stmt ->
+           ignore(Ast_visitor.stmt_accept v stmt);
+           line := !line + 1
+        ) stmts;
       !lref
     
     let s0 _ = Cfg.AST.G.V.create Cfg.BB_Exit
@@ -660,30 +660,30 @@ struct
     (* Set each variable to undefined at the starting point *)
     let init (g:G.t) = 
       let defs p =
-	let vars = ref VS.empty in
-	let visitor = object(self)
-	  inherit Ast_visitor.nop
-	    (* Add each variable to vars *)
-	  method visit_avar v =
-	    vars := VS.add v !vars;
-	    (* 	Printf.printf "Def: We are adding %s_%d\n" (Var.name v) (Var.id v); *)
-	    DoChildren
-	  method visit_rvar v =
-	    vars := VS.add v !vars;
-	    (* 	Printf.printf "Def: We are adding %s_%d\n" (Var.name v) (Var.id v); *)
-	    DoChildren
-	end 
-	in
-	ignore(Ast_visitor.cfg_accept visitor p);
-	!vars
+        let vars = ref VS.empty in
+        let visitor = object(self)
+          inherit Ast_visitor.nop
+            (* Add each variable to vars *)
+          method visit_avar v =
+            vars := VS.add v !vars;
+            (*  Printf.printf "Def: We are adding %s_%d\n" (Var.name v) (Var.id v); *)
+            DoChildren
+          method visit_rvar v =
+            vars := VS.add v !vars;
+            (*  Printf.printf "Def: We are adding %s_%d\n" (Var.name v) (Var.id v); *)
+            DoChildren
+        end 
+        in
+        ignore(Ast_visitor.cfg_accept visitor p);
+        !vars
       in
       let m = VM.empty in
       VS.fold
-	(fun v m' ->
-	   let s = LS.empty in
-	   let s = LS.add LocationType.Undefined s in
-	   VM.add v s m'
-	) (defs g) m
+        (fun v m' ->
+           let s = LS.empty in
+           let s = LS.add LocationType.Undefined s in
+           VM.add v s m'
+        ) (defs g) m
 
     let dir = GraphDataflow.Backward
   end
@@ -698,20 +698,20 @@ struct
       let lref = ref l in
       let line = ref 0 in
       let v = object(self)
-	inherit Ast_visitor.nop
-    	method visit_avar v =
-	  let s = LS.empty in
-	  let s = LS.add (LocationType.Loc (bb,!line)) s in
-	  lref := VM.add v s !lref;
-	  DoChildren
+        inherit Ast_visitor.nop
+        method visit_avar v =
+          let s = LS.empty in
+          let s = LS.add (LocationType.Loc (bb,!line)) s in
+          lref := VM.add v s !lref;
+          DoChildren
       end
       in
       let stmts = Cfg.AST.get_stmts g bb in
       List.iter
-	(fun stmt ->
-	   ignore(Ast_visitor.stmt_accept v stmt);
-	   line := !line + 1
-	) stmts;
+        (fun stmt ->
+           ignore(Ast_visitor.stmt_accept v stmt);
+           line := !line + 1
+        ) stmts;
       !lref
     
     let s0 _ = Cfg.AST.G.V.create Cfg.BB_Entry
@@ -719,30 +719,30 @@ struct
     (* Set each variable to undefined at the starting point *)
     let init (g:G.t) = 
       let defs p =
-	let vars = ref VS.empty in
-	let visitor = object(self)
-	  inherit Ast_visitor.nop
-	    (* Add each variable to vars *)
-	  method visit_avar v =
-	    vars := VS.add v !vars;
-	    (* 	Printf.printf "Def: We are adding %s_%d\n" (Var.name v) (Var.id v); *)
-	    DoChildren
-	  method visit_rvar v =
-	    vars := VS.add v !vars;
-	    (* 	Printf.printf "Def: We are adding %s_%d\n" (Var.name v) (Var.id v); *)
-	    DoChildren
-	end 
-	in
-	ignore(Ast_visitor.cfg_accept visitor p);
-	!vars
+        let vars = ref VS.empty in
+        let visitor = object(self)
+          inherit Ast_visitor.nop
+            (* Add each variable to vars *)
+          method visit_avar v =
+            vars := VS.add v !vars;
+            (*  Printf.printf "Def: We are adding %s_%d\n" (Var.name v) (Var.id v); *)
+            DoChildren
+          method visit_rvar v =
+            vars := VS.add v !vars;
+            (*  Printf.printf "Def: We are adding %s_%d\n" (Var.name v) (Var.id v); *)
+            DoChildren
+        end 
+        in
+        ignore(Ast_visitor.cfg_accept visitor p);
+        !vars
       in
       let m = VM.empty in
       VS.fold
-	(fun v m' ->
-	   let s = LS.empty in
-	   let s = LS.add LocationType.Undefined s in
-	   VM.add v s m'
-	) (defs g) m
+        (fun v m' ->
+           let s = LS.empty in
+           let s = LS.add LocationType.Undefined s in
+           VM.add v s m'
+        ) (defs g) m
 
     let dir = GraphDataflow.Forward
   end
@@ -758,37 +758,37 @@ struct
     let h = Hashtbl.create 1000 in
     Cfg.AST.G.iter_vertex
       (fun bb ->
-	 let (m:UseDefSpec.L.t) = dfin bb in
-	 let stmts = Cfg.AST.get_stmts p bb in
-	 let lref = ref m in
-	 let line = ref 0 in
-	 let v = object(self)
-	   inherit Ast_visitor.nop
-    	   method visit_avar v =
-	     let s = LS.empty in
-	     let s = LS.add (LocationType.Loc (bb,!line)) s in
-	     lref := VM.add v s !lref;
-	     DoChildren
-	 end
-	 in
-	 List.iter
-	   (fun stmt ->
-	      (* Add the defs before this line *)
-	      Hashtbl.add h (bb,!line) !lref;
-	      ignore(Ast_visitor.stmt_accept v stmt);
-	      line := !line + 1
-	   ) stmts
+         let (m:UseDefSpec.L.t) = dfin bb in
+         let stmts = Cfg.AST.get_stmts p bb in
+         let lref = ref m in
+         let line = ref 0 in
+         let v = object(self)
+           inherit Ast_visitor.nop
+           method visit_avar v =
+             let s = LS.empty in
+             let s = LS.add (LocationType.Loc (bb,!line)) s in
+             lref := VM.add v s !lref;
+             DoChildren
+         end
+         in
+         List.iter
+           (fun stmt ->
+              (* Add the defs before this line *)
+              Hashtbl.add h (bb,!line) !lref;
+              ignore(Ast_visitor.stmt_accept v stmt);
+              line := !line + 1
+           ) stmts
       ) p;
     let find (bb,line) var =
       let m = Hashtbl.find h (bb,line) in
       try
-	VM.find var m
+        VM.find var m
       with Not_found -> 
-	(* What should we do if we don't find a value?  This probably
-	   means there was a disconnected graph and the information never
-	   propagated... *)
-	wprintf "Reached variable reference for %s with no definitions (including undefined!) This probably means this location is unreachable. Returning an empty set" (Pp.var_to_string var);
-	LS.empty
+        (* What should we do if we don't find a value?  This probably
+           means there was a disconnected graph and the information never
+           propagated... *)
+        wprintf "Reached variable reference for %s with no definitions (including undefined!) This probably means this location is unreachable. Returning an empty set" (Pp.var_to_string var);
+        LS.empty
     in
     h, find
 
@@ -801,39 +801,39 @@ struct
     let h = Hashtbl.create 1000 in
     Cfg.AST.G.iter_vertex
       (fun bb ->
-	let (m:UseDefSpec.L.t) = dfin bb in
-	let stmts = Cfg.AST.get_stmts p bb in
-	let lref = ref m in
-	let line = ref ((List.length stmts) - 1) in
-	let v = object(self)
-	  inherit Ast_visitor.nop
-    	  method visit_rvar v =
-	    let s = LS.empty in
-	    let s = LS.add (LocationType.Loc (bb,!line)) s in
-	    lref := VM.add v s !lref;
-	    DoChildren
+        let (m:UseDefSpec.L.t) = dfin bb in
+        let stmts = Cfg.AST.get_stmts p bb in
+        let lref = ref m in
+        let line = ref ((List.length stmts) - 1) in
+        let v = object(self)
+          inherit Ast_visitor.nop
+          method visit_rvar v =
+            let s = LS.empty in
+            let s = LS.add (LocationType.Loc (bb,!line)) s in
+            lref := VM.add v s !lref;
+            DoChildren
           method visit_avar v =
             lref := VM.add v (LS.singleton LocationType.Undefined) !lref;
             DoChildren
-	end
-	in
-	List.iter
-	  (fun stmt ->
-	    (* Add the uses before this line *)
+        end
+        in
+        List.iter
+          (fun stmt ->
+            (* Add the uses before this line *)
             (match stmt with
             | Ast.Move(v, _, _) ->
-	      Hashtbl.add h (bb,!line) !lref;
+              Hashtbl.add h (bb,!line) !lref;
             | _ -> ());
-	    ignore(Ast_visitor.stmt_accept v stmt);
-	    line := !line - 1
-	   ) (List.rev stmts)
+            ignore(Ast_visitor.stmt_accept v stmt);
+            line := !line - 1
+           ) (List.rev stmts)
       ) p;
     let find (bb,line) var =
       let m = Hashtbl.find h (bb,line) in
       try
-	VM.find var m
+        VM.find var m
       with Not_found -> 
-	LS.empty
+        LS.empty
     in
     h, find
 end
@@ -867,33 +867,33 @@ struct
     let v = object(self)
       inherit Ast_visitor.nop
       method visit_rvar v =
-	(* See if v is undefined here *)
-	let defs = deflookup (!bbr,!line) v in
-	
-	(* If some definition is undefined, then put var in maybeud *)
-	if LS.mem UseDef_AST.LocationType.Undefined defs then
-	  begin
-	    VH.add maybeud v (!bbr,!line);
-	    
-	    (* This is the only definition! Put int alwaysud *)
-	    if LS.cardinal defs = 1 then
-	      VH.add alwaysud v (!bbr, !line);	    
-	    
-	  end;
-	
-	DoChildren
+        (* See if v is undefined here *)
+        let defs = deflookup (!bbr,!line) v in
+        
+        (* If some definition is undefined, then put var in maybeud *)
+        if LS.mem UseDef_AST.LocationType.Undefined defs then
+          begin
+            VH.add maybeud v (!bbr,!line);
+            
+            (* This is the only definition! Put int alwaysud *)
+            if LS.cardinal defs = 1 then
+              VH.add alwaysud v (!bbr, !line);      
+            
+          end;
+        
+        DoChildren
     end
     in
     Cfg.AST.G.iter_vertex
       (fun bb ->
-	 let stmts = Cfg.AST.get_stmts p bb in
-	 line := 0;
-	 bbr := bb;
-	 List.iter
-	   (fun stmt ->
-	      ignore(Ast_visitor.stmt_accept v stmt);
-	      line := !line + 1;
-	   ) stmts
+         let stmts = Cfg.AST.get_stmts p bb in
+         line := 0;
+         bbr := bb;
+         List.iter
+           (fun stmt ->
+              ignore(Ast_visitor.stmt_accept v stmt);
+              line := !line + 1;
+           ) stmts
       ) p;
 
     alwaysud, maybeud
@@ -903,9 +903,9 @@ struct
   let undefinedvars p =
     let htos h =
       VH.fold
-	(fun k v acc ->
-	   VS.add k acc
-	) h VS.empty
+        (fun k v acc ->
+           VS.add k acc
+        ) h VS.empty
     in
     let alwaysh,maybeh = undefined p in
     htos alwaysh, htos maybeh
@@ -916,16 +916,16 @@ struct
     let refvars = ref VS.empty in
     let visitor = object(self)
       inherit Ast_visitor.nop
-	(* Add each variable to definedvars *)
+        (* Add each variable to definedvars *)
       method visit_avar v =
-	definedvars := VS.add v !definedvars;
-	(* 	Printf.printf "Def: We are adding %s_%d\n" (Var.name v) (Var.id v); *)
-	DoChildren
-	  
+        definedvars := VS.add v !definedvars;
+        (*      Printf.printf "Def: We are adding %s_%d\n" (Var.name v) (Var.id v); *)
+        DoChildren
+          
       method visit_rvar v =
-	refvars := VS.add v !refvars;
-	(* 	Printf.printf "Ref: We are adding %s_%d\n" (Var.name v) (Var.id v); *)
-	DoChildren
+        refvars := VS.add v !refvars;
+        (*      Printf.printf "Ref: We are adding %s_%d\n" (Var.name v) (Var.id v); *)
+        DoChildren
     end 
     in
     ignore(Ast_visitor.cfg_accept visitor p);
@@ -936,16 +936,16 @@ struct
     let vars = ref VS.empty in
     let visitor = object(self)
       inherit Ast_visitor.nop
-	(* Add each variable to definedvars *)
+        (* Add each variable to definedvars *)
       method visit_avar v =
-	vars := VS.add v !vars;
-	(* 	Printf.printf "Def: We are adding %s_%d\n" (Var.name v) (Var.id v); *)
-	DoChildren
-	  
+        vars := VS.add v !vars;
+        (*      Printf.printf "Def: We are adding %s_%d\n" (Var.name v) (Var.id v); *)
+        DoChildren
+          
       method visit_rvar v =
-	vars := VS.add v !vars;
-	(* 	Printf.printf "Ref: We are adding %s_%d\n" (Var.name v) (Var.id v); *)
-	DoChildren
+        vars := VS.add v !vars;
+        (*      Printf.printf "Ref: We are adding %s_%d\n" (Var.name v) (Var.id v); *)
+        DoChildren
     end 
     in
     ignore(Ast_visitor.cfg_accept visitor p);
@@ -965,16 +965,16 @@ struct
     let refvars = ref VS.empty in
     let visitor = object(self)
       inherit Ssa_visitor.nop
-	(* Add each variable to definedvars *)
+        (* Add each variable to definedvars *)
       method visit_avar v =
-	definedvars := VS.add v !definedvars;
-	(* 	Printf.printf "Def: We are adding %s_%d\n" (Var.name v) (Var.id v); *)
-	DoChildren
-	  
+        definedvars := VS.add v !definedvars;
+        (*      Printf.printf "Def: We are adding %s_%d\n" (Var.name v) (Var.id v); *)
+        DoChildren
+          
       method visit_rvar v =
-	refvars := VS.add v !refvars;
-	(* 	Printf.printf "Ref: We are adding %s_%d\n" (Var.name v) (Var.id v); *)
-	DoChildren
+        refvars := VS.add v !refvars;
+        (*      Printf.printf "Ref: We are adding %s_%d\n" (Var.name v) (Var.id v); *)
+        DoChildren
     end 
     in
     ignore(Ssa_visitor.prog_accept visitor p);

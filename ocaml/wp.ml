@@ -21,15 +21,15 @@ let wp ?(simp=Util.id) (p:Gcl.t) (q:exp) : exp =
     match s with
     | Skip -> k q
     | Assume e ->
-	k (simp(exp_implies e q))
+        k (simp(exp_implies e q))
     | Choice(s1, s2) ->
-	wp q s1 (fun x -> wp q s2 (fun y -> k(simp(exp_and x y ))))
+        wp q s1 (fun x -> wp q s2 (fun y -> k(simp(exp_and x y ))))
     | Seq(s1, s2) ->
-	wp q s2 (fun x -> wp x s1 k)
+        wp q s2 (fun x -> wp x s1 k)
     | Assign(t, e) ->
-	k(simp(Let(t, e, q)))
+        k(simp(Let(t, e, q)))
     | Assert e ->
-	k (simp(exp_and e q))
+        k (simp(exp_and e q))
   in
   wp q p  (fun x->x)
 
@@ -167,47 +167,47 @@ let efficient_wp ?(simp=Util.id) (p:Gcl.t) =
       let remember q = Hashtbl.add wlp_f_ctx s q; k q in
       match s with
       | Skip ->
-	  remember exp_false
+          remember exp_false
       | Assume e
       | Assert e ->
-	  remember (exp_not e)
+          remember (exp_not e)
       | Choice(s1, s2) ->
-	  wlp_f s1 (fun q1 -> wlp_f s2
-		      (fun q2 ->
-			 let q = simp(exp_and q1 q2 ) in
-			 remember q
-		      ))
+          wlp_f s1 (fun q1 -> wlp_f s2
+                      (fun q2 ->
+                         let q = simp(exp_and q1 q2 ) in
+                         remember q
+                      ))
       | Seq(s1, s2) ->
-	  wlp_f s1 (fun q1 -> wlp_f s2
-		      (fun q2 ->
-			 let q = simp(exp_or q1 q2 ) in
-			 remember q
-		      ))
+          wlp_f s1 (fun q1 -> wlp_f s2
+                      (fun q2 ->
+                         let q = simp(exp_or q1 q2 ) in
+                         remember q
+                      ))
       | Assign _ ->
-	  raise (Invalid_argument("efficient_wp requires an assignment-free program"))
+          raise (Invalid_argument("efficient_wp requires an assignment-free program"))
   in
   let rec wp_t s k : exp =
     match s with
     | Skip
     | Assume _ ->
-	k exp_true
+        k exp_true
     | Assert e ->
-	k e
+        k e
     | Choice(s1,s2) ->
-	wp_t s1 (fun q1 -> wp_t s2 (fun q2 -> k(simp(exp_and q1 q2))))
-(*	  (* by the book^Wthesis *)
+        wp_t s1 (fun q1 -> wp_t s2 (fun q2 -> k(simp(exp_and q1 q2))))
+(*        (* by the book^Wthesis *)
     | Seq(s1, s2) ->
-	wp_t s2 (fun q1 -> wp_t s1
-		   (fun q2 -> wlp_f s1
-		      (fun q3 -> k(simp(exp_and q1 (exp_or q2 q3)))) ))
+        wp_t s2 (fun q1 -> wp_t s1
+                   (fun q2 -> wlp_f s1
+                      (fun q3 -> k(simp(exp_and q1 (exp_or q2 q3)))) ))
 *)
-	  (* by my own derivation *)
+          (* by my own derivation *)
     | Seq(s1, s2) ->
-	wp_t s1 (fun q1 -> wp_t s2
-		   (fun q2 -> wlp_f s1
-		      (fun q3 -> k(simp(exp_and q1 (exp_or q2 q3)))) ))
+        wp_t s1 (fun q1 -> wp_t s2
+                   (fun q2 -> wlp_f s1
+                      (fun q3 -> k(simp(exp_and q1 (exp_or q2 q3)))) ))
     | Assign _ ->
-	invalid_arg "efficient_wp requires an assignment-free program"
+        invalid_arg "efficient_wp requires an assignment-free program"
   in
   let q0 = wlp_f p (fun x -> x) in
   let qpr = wp_t p (fun x -> x) in
@@ -246,10 +246,10 @@ let rm_useless_vars vs n w =
   let counter =
     object(self)
       inherit Ast_visitor.nop
-	(* FIXME: worry about Let? *)
+        (* FIXME: worry about Let? *)
       method visit_rvar r =
-	inc r;
-	DoChildren
+        inc r;
+        DoChildren
     end
   in
   ignore(Ast_visitor.exp_accept counter n);
@@ -261,9 +261,9 @@ let rm_useless_vars vs n w =
     object(self)
       inherit Ast_visitor.nop
       method visit_exp = function
-	| Var v when to_remove v ->
-	    ChangeToAndDoChildren(VH.find h v)
-	| _ -> DoChildren
+        | Var v when to_remove v ->
+            ChangeToAndDoChildren(VH.find h v)
+        | _ -> DoChildren
     end
   in
   let n = Ast_visitor.exp_accept subst n
@@ -278,10 +278,10 @@ let assignments_to_exp = function
   | v::vs ->
       let p2e (v,e) = BinOp(EQ, Var v, e) in
       let rec h e = function
-	| a::rest ->
-	    if true then h (exp_and e (p2e a)) rest
-	    else h (exp_and (p2e a) e) rest
-	| [] -> e
+        | a::rest ->
+            if true then h (exp_and e (p2e a)) rest
+            else h (exp_and (p2e a) e) rest
+        | [] -> e
       in
       h (p2e v) vs
 let assignments_to_exp_opt = function
@@ -305,10 +305,10 @@ let dwp_g ?(simp=Util.id) ?(k=1) f (p:Gcl.t) =
     let rec g' v ns ws fn fw =
       match (ns,ws) with
       | (n::ns, w::ws) ->
-	let (v,n) = variableify k v n in
-	g' v ns ws (exp_and n fn) (exp_or w (exp_and n fw))
+        let (v,n) = variableify k v n in
+        g' v ns ws (exp_and n fn) (exp_or w (exp_and n fw))
       | ([],[]) ->
-	(v, fn, fw)
+        (v, fn, fw)
       | _ -> failwith "n and w are supposed to have the same length"
     in
     match (n,w) with
@@ -411,17 +411,17 @@ let flanagansaxe ?(simp=Util.id) ?(less_duplication=true) ?(k=1) (mode:formula_m
   let rec nw v = function
     | Assume e -> (e, exp_false, v)
     | Assert e ->
-	let (v,e) = if less_duplication then variableify k v e else (v,e) in
-	(e, exp_not e, v)
+        let (v,e) = if less_duplication then variableify k v e else (v,e) in
+        (e, exp_not e, v)
     | Choice(a,b) ->
-	let (na,wa,v) = nw v a in
-	let (nb,wb,v) = nw v b in
-	(exp_or na nb, exp_or wa wb, v)
+        let (na,wa,v) = nw v a in
+        let (nb,wb,v) = nw v b in
+        (exp_or na nb, exp_or wa wb, v)
     | Seq(a,b) ->
-	let (na,wa,v) = nw v a in
-	let (v,na) = variableify k v na in
-	let (nb,wb,v) = nw v b in
-	(exp_and na nb, exp_or wa (exp_and na wb), v)
+        let (na,wa,v) = nw v a in
+        let (v,na) = variableify k v na in
+        let (nb,wb,v) = nw v b in
+        (exp_and na nb, exp_or wa (exp_and na wb), v)
     | Assign _ -> failwith "gcl should be passified"
     | Skip -> (exp_true, exp_false, v)
   in

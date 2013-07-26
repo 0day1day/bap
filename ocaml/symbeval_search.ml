@@ -69,20 +69,20 @@ struct
     match S.pop_next q with
     | None -> predicates
     | Some ((st,d),q) ->
-	let (newstates, predicates) =
-	  try (Symbolic.eval st, predicates) with
-	  | Symbolic.Halted(v,s) ->
-	      let q = symb_to_exp (Symbolic.eval_expr s.delta post) in
+        let (newstates, predicates) =
+          try (Symbolic.eval st, predicates) with
+          | Symbolic.Halted(v,s) ->
+              let q = symb_to_exp (Symbolic.eval_expr s.delta post) in
               let pred = Symbolic.Form.add_to_formula s.pred q Equal in
-	      ([], pred :: predicates)
+              ([], pred :: predicates)
           | Symbolic.AssumptionFailed {pred=pred} ->
               ([], pred :: predicates)
-	  | Symbolic.AssertFailed {pc=pc} ->
-	      wprintf "failed assertion at %Ld\n" pc;
-	      ([], predicates)  (* try other branches *)
-	in
-	let q = S.add_next_states q st d newstates in
-	search post predicates q
+          | Symbolic.AssertFailed {pc=pc} ->
+              wprintf "failed assertion at %Ld\n" pc;
+              ([], predicates)  (* try other branches *)
+        in
+        let q = S.add_next_states q st d newstates in
+        search post predicates q
 
   let eval_ast_program initdata prog post =
     let ctx = Symbolic.init prog () in
@@ -110,9 +110,9 @@ module Q = struct
   let dequeue = function
     | (v::a, b) -> (v, (a,b))
     | ([], b) ->
-	match List.rev b with
-	| v::a -> (v, (a,[]))
-	| [] -> raise Queue.Empty
+        match List.rev b with
+        | v::a -> (v, (a,[]))
+        | [] -> raise Queue.Empty
 
   let dequeue_o q =
     try Some(dequeue q) with Queue.Empty -> None
@@ -151,9 +151,9 @@ module MaxdepthBFS = MakeSearch(
     let pop_next = Q.dequeue_o
     let add_next_states q st i newstates =
       if i > 0 then
-	List.fold_left (fun q c -> Q.enqueue q (c, i-1)) q newstates
+        List.fold_left (fun q c -> Q.enqueue q (c, i-1)) q newstates
       else
-	q
+        q
   end)
 module MaxdepthBFSNaive = MaxdepthBFS(NaiveSymb)
 module MaxdepthBFSFast = MaxdepthBFS(FastSymb)
@@ -192,8 +192,8 @@ module MaxdepthDFS = MakeSearch(
     let add_next_states q st i newstates =
       if i <= 0 then q
       else
-	let ni = i-1 in
-	List.fold_left (fun q s -> (s,ni)::q) q newstates
+        let ni = i-1 in
+        List.fold_left (fun q s -> (s,ni)::q) q newstates
   end)
 module MaxdepthDFSNaive = MaxdepthDFS(NaiveSymb)
 module MaxdepthDFSFast = MaxdepthDFS(FastSymb)
@@ -219,14 +219,14 @@ module MaxrepeatDFS = MakeSearch(
       | [] -> l
       | [st] -> ((st,m)::q, i)
       | newstates ->
-	  let addedge nst =
-	    let edge = (st.pc, nst.pc) in
-	    let count = try EdgeMap.find edge m with Not_found -> 0 in
-	    if count >= i then None
-	    else Some(nst, EdgeMap.add edge (count+1) m)
-	  in
-	  let newstates = BatList.filter_map addedge newstates in
-	  (newstates@q, i)
+          let addedge nst =
+            let edge = (st.pc, nst.pc) in
+            let count = try EdgeMap.find edge m with Not_found -> 0 in
+            if count >= i then None
+            else Some(nst, EdgeMap.add edge (count+1) m)
+          in
+          let newstates = BatList.filter_map addedge newstates in
+          (newstates@q, i)
   end)
 module MaxrepeatDFSNaive = MaxrepeatDFS(NaiveSymb)
 module MaxrepeatDFSFast = MaxrepeatDFS(FastSymb)

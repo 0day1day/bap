@@ -50,45 +50,45 @@ let id x = x
 let rec exp_accept visitor = 
   let vischil = function
     | Ite(cond, v1, v2) ->
-	let vc' = value_accept visitor cond in 
-	let v1' = value_accept visitor v1 in 
-	let v2' = value_accept visitor v2 in 
-	Ite(vc', v1', v2')
+        let vc' = value_accept visitor cond in 
+        let v1' = value_accept visitor v1 in 
+        let v2' = value_accept visitor v2 in 
+        Ite(vc', v1', v2')
     | Extract(h, l, v) ->
-	let v' = value_accept visitor v in
-	Extract(h, l, v')
+        let v' = value_accept visitor v in
+        Extract(h, l, v')
     | Concat(lv, rv) ->
-	let lv' = value_accept visitor lv in
-	let rv' = value_accept visitor rv in
-	Concat(lv', rv')
+        let lv' = value_accept visitor lv in
+        let rv' = value_accept visitor rv in
+        Concat(lv', rv')
     | BinOp(bop, v1, v2) -> 
-	let v1' = value_accept visitor v1 in 
-	let v2' = value_accept visitor v2 in 
-	BinOp(bop, v1', v2')
+        let v1' = value_accept visitor v1 in 
+        let v2' = value_accept visitor v2 in 
+        BinOp(bop, v1', v2')
     | UnOp(up, v) -> 
-	let v' = value_accept visitor v in 
-	UnOp(up, v')
+        let v' = value_accept visitor v in 
+        UnOp(up, v')
     | Val(v) -> 
-	let v' = value_accept visitor v in 
-	Val(v')
+        let v' = value_accept visitor v in 
+        Val(v')
     | Cast(ct, t, v) ->
-	let v' = value_accept visitor v in 
-	Cast(ct,t,v')
+        let v' = value_accept visitor v in 
+        Cast(ct,t,v')
     | Unknown _ as exp -> exp
     | Load(v1,v2,v3, t) -> 
-	let v1' = value_accept visitor v1 in 
-	let v2' = value_accept visitor v2 in 
-	let v3' = value_accept visitor v3 in 
-	Load(v1',v2',v3', t)
+        let v1' = value_accept visitor v1 in 
+        let v2' = value_accept visitor v2 in 
+        let v3' = value_accept visitor v3 in 
+        Load(v1',v2',v3', t)
     | Store(v1,v2,v3,v4, t) ->
-	let v1' = value_accept visitor v1 in 
-	let v2' = value_accept visitor v2 in 
-	let v3' = value_accept visitor v3 in 
-	let v4' = value_accept visitor v4 in 
-	Store(v1',v2',v3',v4',t)
+        let v1' = value_accept visitor v1 in 
+        let v2' = value_accept visitor v2 in 
+        let v3' = value_accept visitor v3 in 
+        let v4' = value_accept visitor v4 in 
+        Store(v1',v2',v3',v4',t)
     | Phi(vl) ->
-	let vl' = List.map (rvar_accept visitor) vl in  
-	Phi(vl')
+        let vl' = List.map (rvar_accept visitor) vl in  
+        Phi(vl')
   in
   action (wrapexp vischil) (visitor#visit_exp)
 
@@ -110,14 +110,14 @@ and stmt_accept visitor =
       (* TODO: attributes? *)
     | Jmp(l, a) -> Jmp(value_accept visitor l, a) 
     | CJmp(c, l1, l2, a) -> 
-	let c' = value_accept visitor c in
-	let l1' = value_accept visitor l1 in
-	let l2' = value_accept visitor l2 in
-	CJmp(c', l1', l2', a)
+        let c' = value_accept visitor c in
+        let l1' = value_accept visitor l1 in
+        let l2' = value_accept visitor l2 in
+        CJmp(c', l1', l2', a)
     | Move(lv, e, a) ->
-	let e = exp_accept visitor e in
-	let lv = avar_accept visitor lv in
-	Move(lv, e, a)
+        let e = exp_accept visitor e in
+        let lv = avar_accept visitor lv in
+        Move(lv, e, a)
     | Label _ as s -> s
     | Comment _ as s-> s
     | Assert(e,a) -> Assert(value_accept visitor e, a)

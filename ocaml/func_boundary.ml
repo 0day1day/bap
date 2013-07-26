@@ -20,11 +20,11 @@ let check_mnemonics ir str =
   List.exists (fun s -> match s with
     | Label (label, attrs) ->
       List.exists (fun attr ->
-	match attr with
-	| Asm s ->
+        match attr with
+        | Asm s ->
           (try (String.sub s 0 (String.length str)) = str
            with Invalid_argument _ -> false)
-	| _ -> false
+        | _ -> false
       ) attrs
     | _ -> false
   )
@@ -52,11 +52,11 @@ let rec backward p bl i e_index last_startaddress =
     try (
       let (ir, n) = Asmir.asm_addr_to_bap p start_addr in
       if (liftable_asm_addr_to_bap p n end_addr) && ((check_mnemonics ir "ret") || (check_mnemonics ir "nop") || (check_mnemonics ir "jmp") || (check_mnemonics ir "call")) then (
-	(* Judge if next function is frame_dummy*)
-	let (n_ir, nn) = Asmir.asm_addr_to_bap p n in
-	let (nn_ir, nnn) = Asmir.asm_addr_to_bap p nn in
-	if (check_mnemonics n_ir "lea") && (check_mnemonics nn_ir "lea") then Some nnn
-	else Some n 
+        (* Judge if next function is frame_dummy*)
+        let (n_ir, nn) = Asmir.asm_addr_to_bap p n in
+        let (nn_ir, nnn) = Asmir.asm_addr_to_bap p nn in
+        if (check_mnemonics n_ir "lea") && (check_mnemonics nn_ir "lea") then Some nnn
+        else Some n 
       )
       else backward p bl (i+1) e_index last_startaddress
     )
@@ -126,7 +126,7 @@ let get_function_ranges p =
           (fun s -> s.bfd_symbol_flags land bsf_function <> 0)
         | Bfd_target_mach_o_flavour ->
           (fun s -> dprintf "Symbol %s, flags=%#x" s.bfd_symbol_name s.bfd_symbol_flags;
-	    s.bfd_symbol_flags land bsf_global <> 0)
+            s.bfd_symbol_flags land bsf_global <> 0)
         | _ ->
           wprintf "Unknown file format flavour.  Assuming it has a function flag for symbols, which may be incorrect.";
           (fun s -> s.bfd_symbol_flags land bsf_function <> 0)
@@ -161,8 +161,8 @@ let get_function_ranges p =
   let ranges = Array.mapi
     (fun i (s,e,name) ->
        let e' =
-	 try let (s,_,_) = starts.(i+1) in s
-	 with Invalid_argument "index out of bounds" -> e
+         try let (s,_,_) = starts.(i+1) in s
+         with Invalid_argument "index out of bounds" -> e
        in
        (name, addr_of_int64 s, addr_of_int64 e') (* section_end doesn't work *)
     ) starts
@@ -170,7 +170,7 @@ let get_function_ranges p =
   let unfiltered = Array.to_list ranges in
   (* filter out functions that start at 0 *)
   List.filter (function
-		 |(s,e,_) when e ==% bi0 -> false
-		 |("_init",_,_) -> false
-		 | _ -> true)
+                 |(s,e,_) when e ==% bi0 -> false
+                 |("_init",_,_) -> false
+                 | _ -> true)
     unfiltered
