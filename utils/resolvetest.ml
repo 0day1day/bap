@@ -11,12 +11,20 @@ let fnames = ref None;;
 let timeout = ref 30;;
 let total = ref 0;;
 let succ = ref 0;;
-let recoverf = ref Asmir_disasm.vsa_at
+
+type result =
+  | Vsa of (Cfg.AST.G.t * Asmir_disasm.vsaresult option)
+  | Rd of Cfg.AST.G.t
+
+let vsa a b = Vsa(Asmir_disasm.vsa_at_full a b)
+let rd a b = Rd(Asmir_disasm.recursive_descent_at a b)
+
+let recoverf = ref vsa
 
 let speclist =
-  ("-vsa", Arg.Unit (fun () -> recoverf := Asmir_disasm.vsa_at),
+  ("-vsa", Arg.Unit (fun () -> recoverf := vsa),
    "Use VSA based CFG recovery (default).")
-  :: ("-rdescent", Arg.Unit (fun () -> recoverf := Asmir_disasm.recursive_descent_at),
+  :: ("-rdescent", Arg.Unit (fun () -> recoverf := rd),
       "Use recursive descent based CFG recovery.")
   :: ("-timeout", Arg.Set_int timeout,
       "<seconds> Set the per-function timeout.")
@@ -51,11 +59,19 @@ let lift_func (n,s,e) =
     Printf.printf "Lifting %s\n" n;
     incr total;
     flush stdout;
-    let cfg = !recoverf asmp s in
+    let cfg, vsainfo = match !recoverf asmp s with
+      | Rd cfg -> cfg, None
+      | Vsa (cfg, Some vsainfo) -> cfg, Some vsainfo
+      | Vsa (cfg, None) -> cfg, None
+    in
     let cfg = Hacks.ast_remove_indirect cfg in
     let cfg = Ast_cond_simplify.simplifycond_cfg cfg in
     Cfg_pp.AstStmtsDot.output_graph (open_out ("resolve"^n^".dot")) cfg;
     Cfg_pp.SsaStmtsDot.output_graph (open_out ("resolvessa"^n^".dot")) (Cfg_ssa.of_astcfg cfg);
+    BatOption.may (fun vsainfo ->
+      let ssacfg = Switch_condition.add_switch_conditions vsainfo in
+      Cfg_pp.SsaStmtsDot.output_graph (open_out ("resolvessaswitch"^n^".dot")) ssacfg)
+      vsainfo;
     let pp = new Pp.pp_oc (open_out ("resolve"^n^".il")) in
     pp#ast_program (Cfg_ast.to_prog cfg);
     pp#close;

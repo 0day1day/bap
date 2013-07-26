@@ -506,16 +506,12 @@ let recursive_descent_at =
   RECURSIVE_DESCENT.disasm_at
 let recursive_descent_at a b = fst(recursive_descent_at a b)
 
-let vsa_full a =
+let vsa_full =
   let module VSA = Make(VSA_SPEC)(FUNCFINDER_DUMB) in
-  match VSA.disasm a with
-  | x, Some y -> x, y
-  | _ -> failwith "vsa_full: Expected Some but got None"
+  VSA.disasm
 let vsa a = fst(vsa_full a)
 
-let vsa_at_full a b =
+let vsa_at_full =
   let module VSA = Make(VSA_SPEC)(FUNCFINDER_DUMB) in
-  match VSA.disasm_at a b with
-  | x, Some y -> x, y
-  | _ -> failwith "vsa_at_full: Expected Some but got None"
+  VSA.disasm_at
 let vsa_at a b = fst(vsa_at_full a b)
