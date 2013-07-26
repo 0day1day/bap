@@ -10,6 +10,10 @@ module VS = Var.VarSet
 
 let add_switch_conditions {origssa; optssa; vsa_in} =
 
+  let stop_before = function
+    | Ssa.Load _ | Ssa.Store _ -> true
+    | _ -> false
+  in
   let _, m, cp = Copy_prop.copyprop_ssa ~stop_before optssa in
 
   let find_leaf e =
