@@ -283,3 +283,25 @@ let add_sink_exit cfg =
       C.add_edge_e g e
     else g
   ) g g
+
+(** Replace occurences of needle with replacement in haystack *)
+let ast_replacer ?(eq=(==)) ~needle ~haystack ~replacement =
+  let v = object(self)
+    inherit Ast_visitor.nop
+    method visit_exp e =
+      if eq e needle
+      then ChangeTo replacement
+      else DoChildren
+  end in
+  Ast_visitor.exp_accept v haystack
+
+(** Replace occurences of needle with replacement in haystack *)
+let ssa_replacer ?(eq=(==)) ~needle ~haystack ~replacement =
+  let v = object(self)
+    inherit Ssa_visitor.nop
+    method visit_exp e =
+      if eq e needle
+      then ChangeTo replacement
+      else DoChildren
+  end in
+  Ssa_visitor.exp_accept v haystack
