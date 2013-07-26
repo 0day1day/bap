@@ -120,10 +120,7 @@ let simplifycond_ssa ?goodvars g =
      propagate too much, our conditions won't match the appropriate
      definitions in the program. *)
   let stop_before =
-    function
-      | Load _ -> true
-      | Store _ -> true
-      | _ -> false
+    function | Load _ | Store _ -> true | _ -> false
   in
   let stop_after = match goodvars with
     | Some goodvars ->
@@ -161,10 +158,7 @@ let simplifycond_ssa ?goodvars g =
 
 let simplifycond_targets_ssa targetes g =
   let stop_before =
-    function
-      | Load _ -> true
-      | Store _ -> true
-      | _ -> false
+    function | Load _ | Store _ -> true | _ -> false
   in
   let goodvars = Copy_prop.get_vars ~stop_before g targetes in
   simplifycond_ssa ~goodvars g
