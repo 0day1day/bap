@@ -45,7 +45,9 @@ let prints f =
     block)
 
 let speclist =
-  ("-print", Arg.String(fun f -> add(TransformAst(prints f))),
+  ("-pp-ast", Arg.String(fun f ->
+    add(TransformAst(prints f));
+   ),
    "<file> Print each statement in the trace to file.")
   ::("-trace-check",
      Arg.Set Traces.consistency_check,
@@ -57,10 +59,11 @@ let speclist =
      "Perform extra consistency checks possible when all instructions are logged"
     )
   ::("-trace-concrete",
-     Arg.Bool(fun b ->
-       add(TransformAst(Traces_stream.concrete b))
-     ),
-     "<pass> Concretely execute, and optionally pass on concretized IL.")
+     uadd(TransformAst(Traces_stream.concrete true)),
+     "Concretely execute, and passes on concretized IL to next analysis.")
+  ::("-trace-concrete-drop",
+     uadd(TransformAst(Traces_stream.concrete false)),
+     "Concretely execute and do not pass on concretized IL to next analysis.")
   ::("-trace-formula",
      Arg.String(fun f ->
        let stream, final = Traces_stream.generate_formula f !Solver.solver in

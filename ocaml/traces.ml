@@ -1134,9 +1134,9 @@ let run_block ?(next_label = None) ?(transformf = (fun s _ -> [s])) state memv t
      | Not_found -> List.hd block)
   in
   let block = List.filter (fun b -> if b == addr then false else true) block in
-  let input_seeds, input_seeds_concrete = get_symbolic_seeds memv addr in
   pdebug ("Running block: " ^ (string_of_int !counter) ^ " " 
 	  ^ (Pp.ast_stmt_to_string addr));
+  let input_seeds, input_seeds_concrete = get_symbolic_seeds memv addr in
   counter := !counter + 1;
   let () = ignore(update_concrete addr) in
   if not !consistency_check then (
