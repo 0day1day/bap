@@ -173,13 +173,10 @@ let defuse p =
   let module VM = Var.VarMap in
   let h,_ = UD.defuse p in
   Hashtbl.iter
-    (fun (bb,i) varmap ->
-      Printf.printf "At location %s %d:\n" (Cfg_ast.v2s bb) i;
-      VM.iter
-        (fun v defset ->
-          let defs = BatList.reduce (fun s s2 -> s^" "^s2) (List.map UD.LocationType.to_string (UD.LS.elements defset)) in
-          Printf.printf "def %s -> use %s\n" (Pp.var_to_string v) defs
-        ) varmap;
+    (fun (bb,i) defset ->
+      Printf.printf "The location %s %d is used by:\n" (Cfg_ast.v2s bb) i;
+      let defs = BatList.reduce (fun s s2 -> s^" "^s2) (List.map UD.LocationType.to_string (UD.LS.elements defset)) in
+      Printf.printf "%s" defs;
       Printf.printf "\n"
     ) h
 
@@ -521,5 +518,3 @@ let rec apply_cmd prog = function
 ;;
 
 List.fold_left apply_cmd (Ast prog) pipeline
-
-
