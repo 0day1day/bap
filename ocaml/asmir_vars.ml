@@ -9,6 +9,11 @@ let full_regs = Disasm_i386.regs_full
 let x86_mem = Disasm_i386.R32.mem
 let x64_mem = Disasm_i386.R64.mem
 
+let mem_of_type = function
+  | Type.Reg 32 -> x86_mem
+  | Type.Reg 64 -> x64_mem
+  | t -> failwith (Printf.sprintf "Unable to find memory for address type %s" (Pp.typ_to_string t))
+
 let arm_regs =
   List.map (fun n -> Var.newvar n (Reg 32))
     [ "R0";
