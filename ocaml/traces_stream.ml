@@ -6,7 +6,6 @@ let concrete_stream mem_hash concrete_state thread_map block return =
   let open Traces in
   let block = Memory2array.coerce_prog_state mem_hash block in
   let memv = Memory2array.coerce_rvar_state mem_hash Asmir.x86_mem in
-  let block = remove_specials block in
   let block = explicit_thread_stmts block thread_map in
   if return then
     run_block ~transformf:trace_transform_stmt concrete_state memv thread_map block
@@ -30,6 +29,7 @@ struct
     let block =
       concrete_stream mem_hash concrete_state thread_map block true
     in
+    let block = Traces.remove_specials block in
     let block = Hacks.replace_unknowns block in
     block
 
