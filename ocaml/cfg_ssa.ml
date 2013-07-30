@@ -1,4 +1,4 @@
-(* 
+(*
     Static Single Assignment translation
 
     @author Ivan Jager
@@ -70,7 +70,7 @@ let ssa_temp_name = "T_temp"
    the Ast expression *)
 let rec exp2ssa (ctx:Ctx.t) ~(revstmts:stmt list) ?(attrs=[]) e : stmt list * exp =
   let exp2ssa = exp2ssa ctx ~attrs in
-  match e with 
+  match e with
   | Ast.Ite(b, e1, e2) ->
       let (revstmts, vb) = exp2ssa ~revstmts b in
       let (revstmts, v1) = exp2ssa ~revstmts e1 in
@@ -83,7 +83,7 @@ let rec exp2ssa (ctx:Ctx.t) ~(revstmts:stmt list) ?(attrs=[]) e : stmt list * ex
       let (revstmts, lv) = exp2ssa ~revstmts le in
       let (revstmts, rv) = exp2ssa ~revstmts re in
       (revstmts, Concat(lv, rv))
-  | Ast.BinOp(op, e1, e2) -> 
+  | Ast.BinOp(op, e1, e2) ->
       let (revstmts, v1) = exp2ssa ~revstmts e1 in
       let (revstmts, v2) = exp2ssa ~revstmts e2 in
       (revstmts, BinOp(op,v1,v2))
@@ -94,7 +94,7 @@ let rec exp2ssa (ctx:Ctx.t) ~(revstmts:stmt list) ?(attrs=[]) e : stmt list * ex
       (revstmts, Int(i,t))
   | Ast.Lab s ->
       (revstmts, Lab s)
-  | Ast.Var name -> 
+  | Ast.Var name ->
       (revstmts, Var(Ctx.lookup ctx name))
   | Ast.Load(arr,idx,endian, t) ->
       let (revstmts,arr) = exp2ssa ~revstmts arr in
@@ -144,7 +144,7 @@ let rec stmt2ssa ctx ctxmap ~(revstmts: stmt list) loc s =
       Label(label,a) :: revstmts
     | Ast.Comment(s,a) ->
       Comment(s,a)::revstmts
-    | Ast.Special(s,_) -> 
+    | Ast.Special(s,_) ->
       raise (Invalid_argument("SSA: Impossible to handle specials. They should be replaced with their semantics. Special: "^s))
     | Ast.Assert(e,a) ->
       let (revstmts,v) = exp2ssa ~revstmts e in
@@ -153,7 +153,7 @@ let rec stmt2ssa ctx ctxmap ~(revstmts: stmt list) loc s =
       let (revstmts,v) = exp2ssa ~revstmts e in
       Assume(v,a)::revstmts
     | Ast.Halt(e,a) ->
-      let (revstmts,v) = exp2ssa ~revstmts e in 
+      let (revstmts,v) = exp2ssa ~revstmts e in
       Halt(v,a)::revstmts
   in
   let o = f () in
@@ -171,7 +171,7 @@ let stmts2ssa ctx ctxmap ?tac bb ss =
 module ToTac = struct
   let rec exp2tacexp ~(revstmts:stmt list) ?(attrs=[]) e : stmt list * exp =
     let exp2tac = exp2tac ~attrs in
-    match e with 
+    match e with
     | Ite(b, e1, e2) ->
       let (revstmts, vb) = exp2tac ~revstmts b in
       let (revstmts, v1) = exp2tac ~revstmts e1 in
@@ -184,7 +184,7 @@ module ToTac = struct
       let (revstmts, lv) = exp2tac ~revstmts le in
       let (revstmts, rv) = exp2tac ~revstmts re in
       (revstmts, Concat(lv, rv))
-    | BinOp(op, e1, e2) -> 
+    | BinOp(op, e1, e2) ->
       let (revstmts, v1) = exp2tac ~revstmts e1 in
       let (revstmts, v2) = exp2tac ~revstmts e2 in
       (revstmts, BinOp(op,v1,v2))
@@ -255,7 +255,7 @@ module ToTac = struct
       let (revstmts,v) = exp2tac ~revstmts e in
       Assume(v,a)::revstmts
     | Halt(e,a) ->
-      let (revstmts,v) = exp2tac ~revstmts e in 
+      let (revstmts,v) = exp2tac ~revstmts e in
       Halt(v,a)::revstmts
 
   let stmts2tac ss =
@@ -303,7 +303,7 @@ let defsites cfg =
     List.iter f stmts;
     !res
   in
-  CA.G.iter_vertex 
+  CA.G.iter_vertex
     (fun b ->
        let id = CA.G.V.label b in
        let vars = list_unique  (defs (CA.get_stmts cfg b)) in
@@ -528,7 +528,7 @@ let of_astcfg ?tac cfg =
   let {ssacfg=ssa} = trans_cfg ?tac cfg in
   ssa
 
-let of_ast ?tac p = 
+let of_ast ?tac p =
   of_astcfg ?tac (Cfg_ast.of_prog p)
 
 
@@ -679,7 +679,7 @@ let rm_phis ?(dsa=false) ?(attrs=[]) cfg =
     (* note that since stmts are reversed, we can prepend
        instead of appending. We must still be careful to not put
        assignments after a jump. *)
-    let move = Move(l, Var p, attrs) in
+    let move = Move(l, Var p, (StrAttr "MoveFromPhi")::attrs) in
     C.set_stmts cfg b
       (match C.get_stmts cfg b with
        | (Jmp _ as j)::stmts
@@ -770,7 +770,7 @@ let rm_phis ?(dsa=false) ?(attrs=[]) cfg =
       (* assign the variable the phi assigns at the end of each of it's
 	 predecessors *)
       List.fold_left
-	(fun cfg ((l, vars) as p) -> 
+	(fun cfg ((l, vars) as p) ->
 	   dprintf "rm_phis: adding assignments for %s" (Pp.var_to_string l);
           (* dprintf "There are %d preds" (List.length (C.G.pred cfg (VH.find assn l))); *)
 	   List.fold_left (dsa_push p) cfg (C.G.pred cfg (VH.find assn l))
@@ -807,7 +807,7 @@ type tm = Ssa.exp VH.t
    more than one reference.  Temporaries are only added to the final
    map when there is one (or zero) reference.  *)
 let create_tm c =
-  let tm = VH.create 5700 
+  let tm = VH.create 5700
   and refd = VH.create 5700 in
   let vis = object
     inherit Ssa_visitor.nop
@@ -825,7 +825,7 @@ let create_tm c =
       | Move(v,e,_) ->
 	  (* FIXME: should we check whether we introduced this var? *)
           (* FIX: we introduced it if it is named "temp" *)
-	  if (try VH.find refd v with Not_found -> true) 
+	  if (try VH.find refd v with Not_found -> true)
               && (Var.name v == ssa_temp_name)
 	  then VH.add tm v e;
 	  DoChildren
