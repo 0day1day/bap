@@ -175,7 +175,11 @@ let defuse p =
   Hashtbl.iter
     (fun (bb,i) defset ->
       Printf.printf "The location %s %d is used by:\n" (Cfg_ast.v2s bb) i;
-      let defs = BatList.reduce (fun s s2 -> s^" "^s2) (List.map UD.LocationType.to_string (UD.LS.elements defset)) in
+      let elements = UD.LS.elements defset in
+      let defs = match elements with
+        | [] -> "none"
+        | _ -> BatList.reduce (fun s s2 -> s^" "^s2) (List.map UD.LocationType.to_string elements)
+      in
       Printf.printf "%s" defs;
       Printf.printf "\n"
     ) h

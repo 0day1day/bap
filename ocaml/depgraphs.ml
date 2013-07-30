@@ -631,37 +631,32 @@ struct
   module DefUseSpec(*:GraphDataflow.DATAFLOW*) =
   struct
 
-    module G = Cfg.AST.G
+    module CFG = Cfg.AST
     module L = UseDefL
     module O = GraphDataflow.NOOPTIONS
 
-    let node_transfer_function _opts (g:G.t) (bb:G.V.t) (l:L.t) =
+    let stmt_transfer_function _opts g (bb,n) stmt l =
       let lref = ref l in
-      let line = ref 0 in
       let v = object(self)
-	inherit Ast_visitor.nop
+        inherit Ast_visitor.nop
     	method visit_rvar v =
-	  let s = LS.empty in
-	  let s = LS.add (LocationType.Loc (bb,!line)) s in
+	  let s = VM.find v l in
+	  let s = LS.add (LocationType.Loc (bb,n)) s in
 	  lref := VM.add v s !lref;
 	  DoChildren
         method visit_avar v =
-          lref := VM.add v (LS.singleton LocationType.Undefined) !lref;
+          lref := VM.add v LS.empty !lref;
           DoChildren
       end
       in
-      let stmts = Cfg.AST.get_stmts g bb in
-      List.iter
-	(fun stmt ->
-	   ignore(Ast_visitor.stmt_accept v stmt);
-	   line := !line + 1
-	) stmts;
+      ignore(Ast_visitor.stmt_accept v stmt);
       !lref
-    let edge_transfer_function _ _ _ l = l
+
+    let edge_transfer_function _ _ _ _ l = l
     let s0 _ _ = Cfg.AST.G.V.create Cfg.BB_Exit
 
     (* Set each variable to undefined at the starting point *)
-    let init _ (g:G.t) =
+    let init _ g =
       let defs p =
 	let vars = ref VS.empty in
 	let visitor = object(self)
@@ -683,9 +678,7 @@ struct
       let m = VM.empty in
       VS.fold
 	(fun v m' ->
-	   let s = LS.empty in
-	   let s = LS.add LocationType.Undefined s in
-	   VM.add v s m'
+	   VM.add v LS.empty m'
 	) (defs g) m
 
     let dir _ = GraphDataflow.Backward
@@ -802,37 +795,21 @@ struct
      the uses of the definition (if any) at that location 2) a
      function that returns the uses for a (variable, location) pair *)
   let defuse p =
-    let module DEFUSEDF = GraphDataflow.Make(DefUseSpec) in
-    let dfin,_ = DEFUSEDF.worklist_iterate p in
+    let module DEFUSEDF = CfgDataflow.Make(DefUseSpec) in
+    let dfin,_ = DEFUSEDF.worklist_iterate_stmt p in
     let h = Hashtbl.create 1000 in
     Cfg.AST.G.iter_vertex
       (fun bb ->
-	let (m:UseDefSpec.L.t) = dfin bb in
 	let stmts = Cfg.AST.get_stmts p bb in
-	let lref = ref m in
-	let line = ref ((List.length stmts) - 1) in
-	let v = object(self)
-	  inherit Ast_visitor.nop
-    	  method visit_rvar v =
-	    let s = LS.empty in
-	    let s = LS.add (LocationType.Loc (bb,!line)) s in
-	    lref := VM.add v s !lref;
-	    DoChildren
-          method visit_avar v =
-            lref := VM.add v (LS.singleton LocationType.Undefined) !lref;
-            DoChildren
-	end
-	in
-	List.iter
-	  (fun stmt ->
-	    (* Add the uses before this line *)
+        ignore(List.fold_left
+          (fun n stmt ->
+            let l = dfin (bb,n) in
             (match stmt with
             | Ast.Move(v, _, _) ->
-	      Hashtbl.add h (bb,!line) (Var.VarMap.find v !lref);
+              Hashtbl.add h (bb,n) (Var.VarMap.find v l)
             | _ -> ());
-	    ignore(Ast_visitor.stmt_accept v stmt);
-	    line := !line - 1
-	   ) (List.rev stmts)
+            n+1
+          ) 0 stmts)
       ) p;
     let find = Hashtbl.find h in
     h, find
