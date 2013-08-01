@@ -4,16 +4,17 @@
 \input{chap-formalism/operational-semantics-table}
 
 The operational semantics for \bil are shown in
-Table~\ref{vine:taboperational}.  The abstract machine configuration
-is given by the tuple $(\Pi, \Delta, p, s)$ where $\Pi$ is the list of
-statements, $\Delta$ is the variable context, $p$ is the statement
-pointer, and $s$ is the current statement.  We write $\Delta' =
-\Delta[x \leftarrow v]$ to indicate that $\Delta'$ is the same as
-$\Delta$ except that variable $x$ is updated with value $v$.  For
-simplicity, we use $\Delta$ both as a scalar and a memory
-context. When ambiguous, such as in the {\sc store} rule, we indicate
-the type of the variable in $\Delta$ in parentheses. We write $\Pi[p]$
-to indicate the statement given by address $p$.
+Tables~\ref{bap:taboperstmts} and \ref{bap:taboperexps}.  The abstract
+machine configuration is given by the tuple $(\Pi, \Delta, p, s)$
+where $\Pi$ is the list of statements, $\Delta$ is the variable
+context, $p$ is the statement pointer, and $s$ is the current
+statement.  We write $\Delta' = \Delta[x \leftarrow v]$ to indicate
+that $\Delta'$ is the same as $\Delta$ except that variable $x$ is
+updated with value $v$.  For simplicity, we use $\Delta$ both as a
+scalar and a memory context. When ambiguous, such as in the {\sc
+  store} rule, we indicate the type of the variable in $\Delta$ in
+parentheses. We write $\Pi[p]$ to indicate the statement given by
+address $p$.
 
 The operational semantics can be read as follows.  Each step of the
 execution is associated with a machine configuration $M = (\Pi,
