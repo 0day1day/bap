@@ -549,7 +549,7 @@ end
 module UseDef_AST =
 struct
 
-  module D = Debug.Make(struct let name = "UseDef_AST" and default=`Debug end)
+  module D = Debug.Make(struct let name = "UseDef_AST" and default=`NoDebug end)
   open D
   module C = Cfg.AST
   module VM = Var.VarMap
@@ -795,9 +795,11 @@ struct
      the uses of the definition (if any) at that location 2) a
      function that returns the uses for a (variable, location) pair *)
   let defuse p =
+    dprintf "tnohusetauoh";
     let module DEFUSEDF = CfgDataflow.Make(DefUseSpec) in
     let dfin,_ = DEFUSEDF.worklist_iterate_stmt p in
     let h = Hashtbl.create 1000 in
+    dprintf "starting iteration";
     Cfg.AST.G.iter_vertex
       (fun bb ->
 	let stmts = Cfg.AST.get_stmts p bb in
@@ -811,6 +813,7 @@ struct
             n+1
           ) 0 stmts)
       ) p;
+    dprintf "iteration done";
     let find = Hashtbl.find h in
     h, find
 end
