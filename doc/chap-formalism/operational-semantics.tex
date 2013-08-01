@@ -18,15 +18,15 @@ address $p$.
 
 The operational semantics can be read as follows.  Each step of the
 execution is associated with a machine configuration $M = (\Pi,
-\Delta, p, i)$.  A transition is given by $M \leadsto M'$ where the
+\Delta, p, s)$.  A transition is given by $M \leadsto M'$ where the
 current configuration $M$ matches the left side of $\leadsto$ in the
 conclusion (below the horizontal bar), resulting in a state $M'$ to
 the right.  The transformation from $M$ to $M'$ is given by the rule
 premise (above the horizontal bar). 
 
 {\it Note:} \bap and \bil do not analyze dynamically generated
-code. Thus, in a machine state transition $(\Pi, \Delta, p, i)
-\rightarrow (\Pi', \Delta, p, i)$, $\Pi = \Pi'$ always. Since $\Pi$
+code. Thus, in a machine state transition $(\Pi, \Delta, p, s)
+\rightarrow (\Pi', \Delta, p, s)$, $\Pi = \Pi'$ always. Since $\Pi$
 (the list of statements) never changes, we omit $\Pi$ from the rules
 for brevity. One could add support for dynamically generated code by
 adding rules for updating $\Pi$. 
