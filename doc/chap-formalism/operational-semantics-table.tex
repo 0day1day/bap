@@ -4,12 +4,12 @@
 \begin{table}
 {\bf Contexts}\\
 \begin{tabular}{lllp{4in}}
-  {\it Instruction} & $\Pi$ & $n$ $\mapsto$ \emphkind{instr} &
-  Maps an instruction address to an instruction.\\
+  {\it Statement} & $\Pi$ & $n$ $\mapsto$ \emphkind{instr} &
+  Maps an statement address to an statement.\\
   {\it Variable} & $\Delta$ &  $id \mapsto \emphkind{var}$  &Maps
   a variable ID to its value.\\
   {\it Labels} & $\Lambda$ & $\emphkind{label\_kind} \mapsto n$ & Maps
-  a label to the address of the corresponding {\tt label} instruction number.
+  a label to the address of the corresponding {\tt label} statement number.
 \end{tabular}\\
 \newline
 {\bf Notation}\\
@@ -19,26 +19,27 @@
   evaluation rules.\\
   $\Delta' = \Delta[x \leftarrow v]$ & $\Delta'$ is the same as
   $\Delta$ except extended to map $x$  to $v$.\\
-  $\Pi \vdash p:i$ & $\Pi$ maps instruction address $p$ to instruction
-  $i$. If $p \notin \Pi$, the machine gets stuck.\\
-  $\Lambda \vdash v:p$ & $\Lambda$ maps instruction label $v$ to instruction
+  $\Pi \vdash p:s$ & $\Pi$ maps statement address $p$ to statement
+  $s$. If $p \notin \Pi$, the machine gets stuck.\\
+  $\Lambda \vdash v:p$ & $\Lambda$ maps statement label $v$ to statement
   address $p$. If $v \notin \Lambda$, then machine gets stuck. In
-  addition, a well-formed machine should have $\Pi \vdash p : i$
-  where $i = \texttt{label $v$}$, otherwise the machine is stuck.\\
+  addition, a well-formed machine should have $\Pi \vdash p : s$
+  where $s = \texttt{label $v$}$, otherwise the machine is stuck.\\
 %   $(\Pi, \Delta, p, \iota)$ & An abstract machine configuration.
 %   $\Pi$ and $\Delta$ are contexts define above, $p$ is the program
-%   counter, and $\iota$ is the current instruction.\\  
-  $(\Delta, p, i) \leadsto (\Delta', p', i')$ &  An
+%   counter, and $\iota$ is the current statement.\\  
+  $(\Delta, p, s) \leadsto (\Delta', p', s')$ &  An
   execution step. $p$ and $p'$ are
-  the pre and post step program counters, $i$ and $i'$ are the pre and
-  post step  instructions, and $\Delta$ and $\Delta'$ are the pre and post
+  the pre and post step program counters, $s$ and $s'$ are the pre and
+  post step  statements, and $\Delta$ and $\Delta'$ are the pre and post
   step variable contexts. Note $\Lambda$ and $\Pi$ are currently static, thus
   for brevity not included in the execution context.\\
 \end{tabular}
-\caption{Operational semantics notation.}
+\caption{Operational Semantics Notation.}
 \end{table}
+
 \begin{table}
-{\bf Instructions}
+{\bf Statements}
 \begin{small}
 \[
 \begin{array}{cc}
@@ -46,12 +47,12 @@
     { % conclusion
       \Delta, p, \text{x := $e$} 
       \leadsto 
-      \Delta', p+1, i
+      \Delta', p+1, s
     }
     { % premise
       \Delta \vdash e \Downarrow v 
       & \Delta' = \Delta[x \leftarrow v]
-      & \Pi \vdash p+1:i
+      & \Pi \vdash p+1:s
     } &
   \infer[\textsc{Jmp}]
   { % conclusion
@@ -68,10 +69,10 @@
   { % conclusion
     \Delta, p, \texttt{label $\ell$} 
     \leadsto
-    \Delta, p+1, i
+    \Delta, p+1, s
   }
   { % premise
-      \Pi[p+1] = i
+      \Pi \vdash p+1:s
   } &
   \infer[\textsc{halt}]
   { % conclusion
@@ -87,11 +88,11 @@
   { % conclusion
     \Delta, p, \texttt{assert}(e)
     \leadsto
-    \Delta, p+1, i
+    \Delta, p+1, s
   } 
   { % premise
     \Delta \vdash e \Downarrow 1 &
-    \Pi[p+1] = i
+    \Pi \vdash p+1:s
   } &
   \infer[\textsc{assert-f}]
   { % conclusion
@@ -136,7 +137,11 @@
 \end{array}
 \]
 \end{small}
+\caption{Operational Semantics of Statements.}
+\label{bap:taboperstmts}
+\end{table}
 
+\begin{table}
 {\bf Expressions}\\
 \begin{small}
 \[
@@ -307,8 +312,8 @@
 \end{array}
 \]
 \end{small}
-\caption{Operational Semantics.}
-\label{vine:taboperational}
+\caption{Operational Semantics of Expressions.}
+\label{bap:taboperationalexp}
 \end{table}
 
 %\renewcommand{\baselinestretch}{1.66}\normalsize
