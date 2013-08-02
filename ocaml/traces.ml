@@ -544,8 +544,9 @@ let rec get_tid stmts =
   (* If symbolic bytes are introduced, this should be a memory only operation
      and doesn't really have a thread ID, so set the thread ID to 0 *)
   match stmts with
-  | (Ast.Comment (c, _))::rest when (is_seed_label c) -> Some 0
-  | _ ->  get_tid_from_atts (get_attrs (List.hd stmts))
+  | Ast.Comment (c, _)::rest when (is_seed_label c) -> Some 0
+  | stmt::_ -> get_tid_from_atts (get_attrs stmt)
+  | [] -> None
 
 (** Support muti-threaded traces by seperating variables per threadId *)
 module ThreadVar = struct
