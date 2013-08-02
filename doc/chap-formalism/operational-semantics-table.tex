@@ -40,105 +40,107 @@
 \end{table}
 
 \begin{table}
-\centerbox{%
 {\bf Statements\\}
 \begin{small}
-\[
-\begin{array}{cc}
-  \infer[\textsc{Assign}]
+\begin{adjustwidth}{-1cm}{-1cm}
+\begin{mathpar}
+  \inferrule*[right=Assign]
+    { % premise
+      \Delta \vdash e \Downarrow v 
+      \\ \Delta' = \Delta[x \leftarrow v]
+      \\ \Pi \vdash p+1:s
+    }
     { % conclusion
       \Delta, p, \text{x := $e$} 
       \leadsto 
       \Delta', p+1, s
     }
-    { % premise
-      \Delta \vdash e \Downarrow v 
-      & \Delta' = \Delta[x \leftarrow v]
-      & \Pi \vdash p+1:s
-    } &
-  \infer[\textsc{Jmp}]
+
+  \inferrule*[right=Jmp]
+  { % premise
+    \Delta \vdash \ell \Downarrow v
+    \\ \Lambda \vdash v : p'
+    \\ \Pi \vdash p' : \texttt{label $v$}
+  }
   { % conclusion
     \Delta, p, \texttt{jmp($\ell$)} 
     \leadsto 
     \Delta, p', \texttt{label $v$}
   }
+  \\
+  \inferrule*[right=Label]
   { % premise
-    \Delta \vdash \ell \Downarrow v
-    & \Lambda \vdash v : p'
-    & \Pi \vdash p' : \texttt{label $v$}
-  }\\[10pt]
-  \infer[\textsc{label}]
+      \Pi \vdash p+1:s
+  }
   { % conclusion
     \Delta, p, \texttt{label $\ell$} 
     \leadsto
     \Delta, p+1, s
   }
-  { % premise
-      \Pi \vdash p+1:s
-  } &
-  \infer[\textsc{halt}]
+
+  \inferrule*[right=Halt]
+  {
+     \Delta \vdash e \Downarrow v
+  }
   { % conclusion
     \Delta, p, \texttt{halt $e$} 
     \leadsto
     \text{terminate with  $v$}
 %    \Pi, \Delta, p+1, \texttt{halt $v$}
   }
-  {
-     \Delta \vdash e \Downarrow v
-  }\\[10pt]
-  \infer[\textsc{assert-t}]
+  \\
+  \inferrule*[right=Assert-t]
+  { % premise
+    \Delta \vdash e \Downarrow 1
+    \\ \Pi \vdash p+1:s
+  }
   { % conclusion
-    \Delta, p, \texttt{assert}(e)
+    \Delta, p, \texttt{assert $e$}
     \leadsto
     \Delta, p+1, s
-  } 
-  { % premise
-    \Delta \vdash e \Downarrow 1 &
-    \Pi \vdash p+1:s
-  } &
-  \infer[\textsc{assert-f}]
-  { % conclusion
-    \Delta, p, \texttt{assert}(e)
-    \leadsto
-    \text{terminate with  $\perp$}
   }
+
+  \inferrule*[right=Assert-f]
   { % premise
     \Delta \vdash e \Downarrow 0
   }
-\\
-\end{array}
-\]
-\[
-\begin{array}{c}
-  \infer[\textsc{CJmp-t}]
+  { % conclusion
+    \Delta, p, \texttt{assert $e$}
+    \leadsto
+    \text{terminate with $\perp$}
+  }
+
+  \inferrule*[right=CJmp-t]
+  { %premise
+    \Delta \vdash e \Downarrow 1
+    \\ \Delta \vdash \ell_T \Downarrow v
+    \\ \Lambda \vdash v: p'
+    \\ \Pi \vdash p' :  \texttt{label $v$}
+  }
   { %conclusion
     \Delta, p, \texttt{cjmp($e$, $\ell_T$, $\ell_F$)} 
     \leadsto
     \Delta, p',  \texttt{label $v$}
   }
+
+  \inferrule*[right=CJmp-f]
   { %premise
-    \Delta \vdash e \Downarrow 1
-    & \Delta \vdash \ell_T \Downarrow v
-    & \Lambda \vdash v: p'
-    & \Pi \vdash p' :  \texttt{label $v$}
-  }\\[10pt]
-  \infer[\textsc{CJmp-f}]
+    \Delta \vdash e \Downarrow 0
+    \\ \Delta \vdash \ell_F \Downarrow v
+    \\ \Lambda \vdash v: p'
+    \\ \Pi \vdash p' : \texttt{label $v$}
+  }
   { %conclusion
-    \Delta, p, \texttt{cjmp($e$, $\ell_T$, $\ell_F$)} 
+    \Delta, p, \texttt{cjmp($e$, $\ell_T$, $\ell_F$)}
     \leadsto
     \Delta, p', \texttt{label $v$}
   }
-  { %premise
-    \Delta \vdash e \Downarrow 0
-    & \Delta \vdash \ell_F \Downarrow v
-    & \Lambda \vdash v: p'
-    & \Pi \vdash p' : \texttt{label $v$}
-  } \\[10pt]
+
   \text{No rule for {\tt special}, when
-    $v \notin \Lambda$, and when  $p \notin \Pi$.}  
-\end{array}
-\]
-\end{small}}
+    $v \notin \Lambda$, or when $p \notin \Pi$.}
+\end{mathpar}
+\end{adjustwidth}
+\end{small}
 \caption{Operational Semantics of Statements.}
 \label{bap:taboperstmts}
 \end{table}
@@ -327,7 +329,6 @@
   }
 \end{mathpar}
 \end{small}
-%}
 \end{adjustwidth}
 \caption{Operational Semantics of Expressions.}
 \label{bap:taboperexps}
