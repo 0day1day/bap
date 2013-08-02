@@ -41,7 +41,7 @@
 
 \begin{table}
 \centerbox{%
-{\bf Statements}
+{\bf Statements\\}
 \begin{small}
 \[
 \begin{array}{cc}
@@ -144,177 +144,191 @@
 \end{table}
 
 \begin{table}
-\centerbox{%
+%\centerbox{%
+\begin{adjustwidth}{-2cm}{-2cm}
 {\bf Expressions}\\
 \begin{small}
-\[
-\begin{array}{cc}
-  \infer[\textsc{binop}]
+\begin{mathpar}
+
+  \inferrule*[right=Binop]
+  { % premise
+    \Delta \vdash e_1 \Downarrow v_1 
+    \\ \Delta \vdash e_2 \Downarrow v_2
+    \\ v = v_1 \Diamond_b v_2
+  }
   { % conclusion
     \Delta \vdash e_1 \Diamond_b e_2 \Downarrow v
   }
+
+  \inferrule*[right=Unop]
   { % premise
     \Delta \vdash e_1 \Downarrow v_1 
-    & \Delta \vdash e_2 \Downarrow v_2
-    & v = v_1 \Diamond_b v_2
-  } &
-  \infer[\textsc{unop}]
+    \\ v = \Diamond_u v_1
+  }
   { % conclusion
     \Delta \vdash \Diamond_u e_1 \Downarrow v
-  } 
-  { % premise
-    \Delta \vdash e_1 \Downarrow v_1 
-    & v = \Diamond_u v_1
-  }\\[10pt]
-\end{array}
-\]
-\[
-\begin{array}{ccc}
-  \infer[\textsc{Value}]
+  }
+
+  \inferrule*[right=Value]
+  { % premise (empty)
+  }
   { % conclusion
     \Delta \vdash v \Downarrow v
-  } 
-  { % premise (empty)
-  } &
-  \infer[\textsc{Var}]
+  }
+
+  \inferrule*[right=Var]
+  { % premise
+    \Delta \vdash x:v
+  }
   { % conclusion
     \Delta \vdash x \Downarrow v
   }
+
+  \inferrule*[right=Let]
   { % premise
-    \Delta \vdash x:v
-  } &
-  \infer[\textsc{let}]
+    \Delta \vdash e_1 \Downarrow v_1
+    \\ \Delta' = \Delta[x \leftarrow v_1]
+    \\ \Delta' \vdash e_2 \Downarrow v
+  }
   { % conclusion
     \Delta \vdash \texttt{let $x$ = $e_1$ in $e_2$} \Downarrow v
   }
+
+  \inferrule*[right=Load$_{\text{little}}$]
   { % premise
     \Delta \vdash e_1 \Downarrow v_1 
-    & \Delta' = \Delta[x \leftarrow v_1]
-    & \Delta' \vdash e_2 \Downarrow v
-  }\\
-\end{array}
-\]
-\[
-\begin{array}{c}
-  \infer[\textsc{Load$_{\text{little}}$}]
+    \\ \Delta \vdash e_2 \Downarrow v_2
+    \\ \Delta \vdash e_3 \Downarrow 0
+    \\ n = \text{\# bytes of $\tau_{\text{reg}}$}
+    \\ v = v_1[v_2..v_2+n] \text{ (little endian)}
+  }
   { % conclusion
     \Delta \vdash \texttt{load($e_1$, $e_2$, $e_3$, $\tau_{\text{reg}}$)} \Downarrow v
   }
+
+  \inferrule*[right=Load$_{\text{big}}$]
   { % premise
     \Delta \vdash e_1 \Downarrow v_1 
-    & \Delta \vdash e_2 \Downarrow v_2
-    & \Delta \vdash e_3 \Downarrow 0
-    & n = \text{\# bytes of $\tau_{\text{reg}}$}
-    & v = v_1[v_2..v_2+n] \text{ in little endian byte order}
-  } \\[10pt]
-  \infer[\textsc{Load$_{\text{big}}$}]
+    \\ \Delta \vdash e_2 \Downarrow v_2
+    \\ \Delta \vdash e_3 \Downarrow 1
+    \\ n = \text{\# bytes of $\tau_{\text{reg}}$}
+    \\ v = v_1[v_2..v_2+n] \text{ (big endian)}
+  }
   { % conclusion
     \Delta \vdash \texttt{load($e_1$, $e_2$, $e_3$, $\tau_{\text{reg}}$)} \Downarrow v
   }
+
+  \inferrule*[right=Load$_\text{array}$]
   { % premise
     \Delta \vdash e_1 \Downarrow v_1 
-    & \Delta \vdash e_2 \Downarrow v_2
-    & \Delta \vdash e_3 \Downarrow 1
-    & n = \text{\# bytes of $\tau_{\text{reg}}$}
-    & v = v_1[v_2..v_2+n] \text{ in big endian byte order}
-  } \\[10pt]
-  \infer[\textsc{Load$_\text{array}$}]
+    \\ \Delta \vdash e_2 \Downarrow v_2
+    \\ \Delta \vdash e_3 \Downarrow 0
+    \\ v = v_1[v_2]
+  }
   { % conclusion
     \Delta \vdash \texttt{load($e_1$, $e_2$, $e_3$, \texttt{array\_t})} \Downarrow v
   }
+
+  \inferrule*[right=Store$_{\text{little}}$]
   { % premise
     \Delta \vdash e_1 \Downarrow v_1 
-    & \Delta \vdash e_2 \Downarrow v_2
-    & \Delta \vdash e_3 \Downarrow 0
-    & v = v_1[v_2]
-  } \\[10pt]
-  \infer[\textsc{Store$_{\text{little}}$}]
+    \\ \Delta \vdash e_2 \Downarrow v_2
+    \\ \Delta \vdash e_3 \Downarrow v_3
+    \\ \Delta \vdash e_4 \Downarrow 0
+    \\ n = \text{\# bytes $\tau_{\text{reg}}$}
+    \\ v = v_1[v_2..v_2+n \leftarrow v_3] \text{ (little endian)}
+  }
   { % conclusion
     \Delta \vdash \texttt{store($e_1$, $e_2$, $e_3$, $e_4$, $\tau_{\text{reg}}$)}  \Downarrow v
   }
+
+  \inferrule*[right=Store$_{\text{big}}$]
   { % premise
     \Delta \vdash e_1 \Downarrow v_1 
-    & \Delta \vdash e_2 \Downarrow v_2
-    & \Delta \vdash e_3 \Downarrow v_3
-    & \Delta \vdash e_4 \Downarrow 0
-    & n = \text{\# bytes $\tau_{\text{reg}}$}
-    & v = v_1[v_2..v_2+n \leftarrow v_3] \text{ (little endian)}
-  }\\[10pt]
-  \infer[\textsc{Store$_{\text{big}}$}]
+    \\ \Delta \vdash e_2 \Downarrow v_2
+    \\ \Delta \vdash e_3 \Downarrow v_3
+    \\ \Delta \vdash e_4 \Downarrow 1
+    \\ n = \text{\# bytes $\tau_{\text{reg}}$}
+    \\ v = v_1[v_2..v_2+n \leftarrow v_3] \text{ (big endian)}
+  }
   { % conclusion
     \Delta \vdash \texttt{store($e_1$, $e_2$, $e_3$, $e_4$, $\tau_{\text{reg}}$)}  \Downarrow v
   }
+
+  \inferrule*[right=Store$_{\text{array}}$]
   { % premise
     \Delta \vdash e_1 \Downarrow v_1 
-    & \Delta \vdash e_2 \Downarrow v_2
-    & \Delta \vdash e_3 \Downarrow v_3
-    & \Delta \vdash e_4 \Downarrow 1
-    & n = \text{\# bytes $\tau_{\text{reg}}$}
-    & v = v_1[v_2..v_2+n \leftarrow v_3] \text{ (big endian)}
-  }\\[10pt]
-  \infer[\textsc{Store$_{\text{array}}$}]
+    \\ (e_1 : \texttt{array\_t})
+    \\ \Delta \vdash e_2 \Downarrow v_2
+    \\ \Delta \vdash e_3 \Downarrow v_3
+    \\ (e_4 \text{ ignored})
+    \\ v = v_1[v_2 \leftarrow v_3]
+  }
   { % conclusion
     \Delta \vdash \texttt{store($e_1$, $e_2$, $e_3$, $e_4$, \texttt{array\_t})}  \Downarrow v
   }
-  { % premise
-    \Delta \vdash e_1 \Downarrow v_1 
-    & (e_1 : \texttt{array\_t})
-    & \Delta \vdash e_2 \Downarrow v_2
-    & \Delta \vdash e_3 \Downarrow v_3
-    & (e_4 \text{ ignored})
-    & v = v_1[v_2 \leftarrow v_3]
+
+  \inferrule*[right=Cast$_u$]
+  { %premise
+   \Delta \vdash e \Downarrow v
+   \\ \text{zero extend $v$ to
+     $\tau_{\text{reg}}$ bits}
   }
-\end{array}\\
-\]
-\[
-\begin{array}{cc}
-  \infer[\textsc{cast$_u$}]{ %conclusion
+  { %conclusion
     \Delta \vdash \texttt{cast(unsigned, $\tau_{\text{reg}}$, $e$)}
     \Downarrow v
   }
+
+  \inferrule*[right=Cast$_s$]
   { %premise
-   \Delta \vdash e \Downarrow v & \text{zero extend $v$ to
-    $\tau_{\text{reg}}$ bits}
-  } &
-  \infer[\textsc{cast$_s$}]{ %conclusion
+   \Delta \vdash e \Downarrow v
+   \\ \text{sign extend $v$ to
+     $\tau_{\text{reg}}$ bits}
+  }
+  { %conclusion
     \Delta \vdash \texttt{cast(signed, $\tau_{\text{reg}}$, $e$)}
     \Downarrow v
   }
+
+  \inferrule*[right=Cast$_h$]
   { %premise
-   \Delta \vdash e \Downarrow v & \text{sign extend $v$ to
-    $\tau_{\text{reg}}$ bits}
-  }\\[10pt]
-    \infer[\textsc{cast$_h$}]{ %conclusion
+   \Delta \vdash e \Downarrow v
+   \\ \text{extract
+     $\tau_{\text{reg}}$  high bits of $v$}
+  }
+  { %conclusion
     \Delta \vdash \texttt{cast(high, $\tau_{\text{reg}}$, $e$)}
     \Downarrow v
   }
+
+  \inferrule*[right=Cast$_l$]
   { %premise
-   \Delta \vdash e \Downarrow v & \text{extract 
-    $\tau_{\text{reg}}$  high bits of $v$}
-  } &
-    \infer[\textsc{cast$_l$}]{ %conclusion
+   \Delta \vdash e \Downarrow v
+   \\ \text{extract
+     $\tau_{\text{reg}}$  low bits of $v$}
+  }
+  { %conclusion
     \Delta \vdash \texttt{cast(low, $\tau_{\text{reg}}$, $e$)}
     \Downarrow v
   }
-  { %premise
-   \Delta \vdash e \Downarrow v & \text{extract 
-    $\tau_{\text{reg}}$  low bits of $v$}
-  }\\[10pt]
-  \infer[\textsc{name}]
-  { % conclusion
-    \cdot \vdash \texttt{name}\text{(string)} : \text{string}
-  }
-  { % premise
-  } &
-  \infer[\textsc{unknown}]
-  { % conclusion
-    \cdot \vdash \texttt{unknown}(s) \Downarrow \perp
-  }
+
+  \inferrule*[right=Name]
   { % premise
   }
-\end{array}
-\]
-\end{small}}
+  { % conclusion
+    \Delta \vdash \texttt{name}\text{(string)} : \text{string}
+  }
+
+  \inferrule*[right=Unknown]
+  { % premise
+  }
+  { % conclusion
+    \Delta \vdash \texttt{unknown}(s) \Downarrow \perp
+  }
+\end{mathpar}
+\end{small}
+%}
+\end{adjustwidth}
 \caption{Operational Semantics of Expressions.}
 \label{bap:taboperexps}
 \end{table}
