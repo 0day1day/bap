@@ -15,6 +15,8 @@
 \usepackage{hyperref}
 \usepackage{proof}
 \usepackage{cite}
+\usepackage{changepage}
+\usepackage{varwidth}
 
 \newcommand{\doctitle}{The \bap Handbook}
 
@@ -35,6 +37,23 @@
 %\lfoot[{\small\scshape Lecture Notes}]{{\small\scshape Lecture Notes}}
 %\cfoot[]{}
 %\rfoot[{\small\scshape\date}]{{\small\scshape\date}}
+
+
+\newsavebox\mybox
+\newlength\boxwd
+
+\newcommand{\centerbox}[1]{%
+\begin{lrbox}{\mybox}
+\begin{varwidth}{\paperwidth}
+#1
+\end{varwidth}%
+\end{lrbox}%
+\settowidth\boxwd{\usebox\mybox}%
+\addtolength\boxwd{-\textwidth}%
+\begin{adjustwidth}{-0.5\boxwd}{-0.5\boxwd}
+\usebox\mybox
+\end{adjustwidth}%
+}
 
 \begin{document}
 

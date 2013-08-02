@@ -2,8 +2,9 @@
 %\renewcommand{\baselinestretch}{1.0}\normalsize
 
 \begin{table}
+\centerbox{%
 {\bf Contexts}\\
-\begin{tabular}{lllp{4in}}
+\begin{tabular}{lllp{3.5in}}
   {\it Statement} & $\Pi$ & $n$ $\mapsto$ \emphkind{instr} &
   Maps an statement address to an statement.\\
   {\it Variable} & $\Delta$ &  $id \mapsto \emphkind{var}$  &Maps
@@ -27,18 +28,19 @@
   where $s = \texttt{label $v$}$, otherwise the machine is stuck.\\
 %   $(\Pi, \Delta, p, \iota)$ & An abstract machine configuration.
 %   $\Pi$ and $\Delta$ are contexts define above, $p$ is the program
-%   counter, and $\iota$ is the current statement.\\  
+%   counter, and $\iota$ is the current statement.\\
   $(\Delta, p, s) \leadsto (\Delta', p', s')$ &  An
   execution step. $p$ and $p'$ are
   the pre and post step program counters, $s$ and $s'$ are the pre and
   post step  statements, and $\Delta$ and $\Delta'$ are the pre and post
   step variable contexts. Note $\Lambda$ and $\Pi$ are currently static, thus
   for brevity not included in the execution context.\\
-\end{tabular}
+\end{tabular}}
 \caption{Operational Semantics Notation.}
 \end{table}
 
 \begin{table}
+\centerbox{%
 {\bf Statements}
 \begin{small}
 \[
@@ -136,12 +138,13 @@
     $v \notin \Lambda$, and when  $p \notin \Pi$.}  
 \end{array}
 \]
-\end{small}
+\end{small}}
 \caption{Operational Semantics of Statements.}
 \label{bap:taboperstmts}
 \end{table}
 
 \begin{table}
+\centerbox{%
 {\bf Expressions}\\
 \begin{small}
 \[
@@ -311,7 +314,7 @@
   }
 \end{array}
 \]
-\end{small}
+\end{small}}
 \caption{Operational Semantics of Expressions.}
 \label{bap:taboperexps}
 \end{table}
