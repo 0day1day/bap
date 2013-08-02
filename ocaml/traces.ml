@@ -1121,8 +1121,8 @@ let run_block ?(next_label = None) ?(transformf = (fun s _ -> [s])) state memv t
   counter := !counter + 1;
 
   let block = match addr with
-    | None -> dprintf "Running block %d" !counter; block
-    | Some addr -> dprintf "Running block %d %s" !counter (Pp.ast_stmt_to_string addr);
+    | None -> dprintf "Running block: %d" !counter; block
+    | Some addr -> dprintf "Running block: %d %s" !counter (Pp.ast_stmt_to_string addr);
       List.filter (fun b -> if b == addr then false else true) block
   in
 
