@@ -6,12 +6,14 @@ let open_program_test () =
 let recover asmp (n,s,e) = ignore(Asmir_disasm.vsa_at asmp s)
 
 let recover_switch asmp (n,s,e) =
-  let _, vsaresult = Asmir_disasm.vsa_at_full asmp s in
+  let astcfg, vsaresult = Asmir_disasm.vsa_at_full asmp s in
   match vsaresult with
   | None -> ()
   | Some vsaresult ->
-    let ssacfg = Switch_condition.add_switch_conditions vsaresult in
-    assert_bool "CFG with switch conditions was recovered" (BatOption.is_some ssacfg)
+    let ssacfg = Switch_condition.add_switch_conditions_disasm vsaresult in
+    assert_bool "CFG with switch conditions was recovered (disasm interface)" (BatOption.is_some ssacfg);
+    let ssacfg = Switch_condition.add_switch_conditions_ssacfg asmp (Cfg_ssa.of_astcfg astcfg) in
+    assert_bool "CFG with switch conditions was recovered (ssacfg interface)" (BatOption.is_some ssacfg)
 
 let resolve_program_test f p =
   let asmp = Asmir.open_program p in

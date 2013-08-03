@@ -10,4 +10,8 @@
     modified CFG when successful.  Success is currently defined to
     mean that edges from all indirect jumps can be rewritten (except
     those for returns). *)
-val add_switch_conditions : Asmir_disasm.vsaresult -> Cfg.SSA.G.t option
+val add_switch_conditions_disasm : Asmir_disasm.vsaresult -> Cfg.SSA.G.t option
+
+(** Like [add_switch_conditions_disasm], but starts from an arbitrary
+    SSA CFG.  Re-runs VSA analysis. *)
+val add_switch_conditions_ssacfg : Asmir.asmprogram -> Cfg.SSA.G.t -> Cfg.SSA.G.t option

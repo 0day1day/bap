@@ -1711,6 +1711,8 @@ let prepare_ssa_indirect ?vs ssacfg =
   let ssacfg = fix_edges ssacfg in
 
   let ssacfg = Coalesce.coalesce_ssa ~nocoalesce:vs ssacfg in
+  (* Cfg_pp.SsaStmtsDot.output_graph (open_out "vsafinal.dot") ssacfg; *)
+
   ssacfg
 
 (* Main vsa interface *)

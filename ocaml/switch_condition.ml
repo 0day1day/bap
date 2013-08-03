@@ -129,5 +129,24 @@ let add_switch_conditions_int origssa optssa vsa_in =
     Some g
   with Not_found -> None
 
-let add_switch_conditions {optssa; origssa; vsa_in} =
+let add_switch_conditions_disasm {optssa; origssa; vsa_in} =
   add_switch_conditions_int origssa optssa vsa_in
+
+let add_switch_conditions_ssacfg asmp ssacfg =
+  let has_indirect v = match List.rev (CS.get_stmts ssacfg v) with
+    | Jmp(e, _)::_ when Ssa.lab_of_exp e <> None -> true
+    | _ -> false
+  in
+  let has_a_indirect = CS.G.fold_vertex (fun v b ->
+    if b then b
+    else has_indirect v
+  ) ssacfg false
+  in
+  if not has_a_indirect
+  (* Don't run VSA if there are no indirect jumps *)
+  then Some ssacfg
+  else
+    let optssa = Vsa_ssa.prepare_ssa_indirect ssacfg in
+    (* Cfg_pp.SsaStmtsDot.output_graph (open_out "switchcondition.dot") optssa; *)
+    let vsa_in, _ = Vsa_ssa.vsa ~nmeets:0 ~opts:{Vsa_ssa.AlmostVSA.DFP.O.initial_mem=Asmir.get_readable_mem_contents_list asmp} optssa in
+    add_switch_conditions_int ssacfg optssa vsa_in

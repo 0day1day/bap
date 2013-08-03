@@ -69,7 +69,7 @@ let lift_func (n,s,e) =
     Cfg_pp.AstStmtsDot.output_graph (open_out ("resolve"^n^".dot")) cfg;
     Cfg_pp.SsaStmtsDot.output_graph (open_out ("resolvessa"^n^".dot")) (Cfg_ssa.of_astcfg cfg);
     BatOption.may (fun vsaresult ->
-      let ssacfg = Switch_condition.add_switch_conditions vsaresult in
+      let ssacfg = Switch_condition.add_switch_conditions_disasm vsaresult in
       Cfg_pp.SsaStmtsDot.output_graph (open_out ("resolvessaswitch"^n^".dot")) (BatOption.get ssacfg))
       vsaresult;
     let pp = new Pp.pp_oc (open_out ("resolve"^n^".il")) in
