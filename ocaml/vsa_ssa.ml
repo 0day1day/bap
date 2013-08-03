@@ -23,6 +23,7 @@ module VM = Var.VarMap
 
 open Big_int_convenience
 open Big_int_Z
+module CS = Cfg.SSA
 open Util
 open Type
 open Ssa
@@ -1638,6 +1639,79 @@ struct
   module DF = CfgDataflow.MakeWide(DFP)
 
 end
+
+let prepare_ssa_indirect ?vs ssacfg =
+
+  let jumpe g v =
+    match List.rev (CS.get_stmts g v) with
+    | Ssa.Jmp(e, _)::_ -> e
+    | _ -> failwith "jumpe: Unable to find jump"
+  in
+
+  let vs = match vs with
+    | Some vs -> vs
+    | None ->
+      CS.G.fold_vertex (fun v l ->
+        match List.rev (CS.get_stmts ssacfg v) with
+        | Jmp(e, _)::_ when Ssa.lab_of_exp e = None -> v::l
+        | _ -> l
+      ) ssacfg []
+  in
+
+  (* Start by converting to SSA three address code. *)
+  let ssacfg = Cfg_ssa.do_tac_ssacfg ssacfg in
+  (* Cfg_pp.SsaStmtsDot.output_graph (open_out "vsapre.dot") ssacfg; *)
+
+  (* Do an initial optimization pass.  This is important so that
+     simplifycond_ssa can recognize syntactically equal
+     computations. *)
+  let ssacfg = Ssa_simp.simp_cfg ssacfg in
+
+  (* Simplify the SSA conditions so they can be parsed by VSA *)
+
+  (* Get ssa expression *)
+  let get_ssae = jumpe ssacfg in
+  let ssaes = List.map get_ssae vs in
+  let ssacfg = Ssa_cond_simplify.simplifycond_targets_ssa ssaes ssacfg in
+  (* Cfg_pp.SsaStmtsDot.output_graph (open_out "vsacond.dot") ssacfg; *)
+
+  (* Redo TAC so that we can simplify the SSA conditions. This
+     should ensure that all variables are their canonical form.  This
+     is important so that the edge conditions are consistent with the
+     rest of the program. *)
+  let ssacfg = Cfg_ssa.do_tac_ssacfg ssacfg in
+  (* Cfg_pp.SsaStmtsDot.output_graph (open_out "vsatac.dot") ssacfg; *)
+
+  (* Simplify. *)
+  let ssacfg = Ssa_simp.simp_cfg ssacfg in
+  (* Cfg_pp.SsaStmtsDot.output_graph (open_out "vsasimp.dot") ssacfg; *)
+
+  (* Now our edge conditions look like (Var temp).  We need to use
+     shadow copy propagation to convert them to something like (EAX
+     < 10). *)
+
+  (* XXX: Should this go elsewhere? *)
+  let fix_edges g =
+    let _, m, _ = Copy_prop.copyprop_ssa g in
+    CS.G.fold_edges_e
+      (fun e g ->
+        match CS.G.E.label e with
+        | None -> g
+        | Some(b, Ssa.BinOp(EQ, Ssa.Var v, e2)) ->
+          (try let cond = Some(b, Ssa.BinOp(EQ, VM.find v m, e2)) in
+               let src = CS.G.E.src e in
+               let dst = CS.G.E.dst e in
+               let e' = CS.G.E.create src cond dst in
+               CS.add_edge_e (CS.remove_edge_e g e) e'
+           with Not_found -> g)
+        | Some(_, e) -> (* Sometimes we might see a constant like true/false *) g
+      ) g g
+  in
+
+  let ssacfg = fix_edges ssacfg in
+
+  let ssacfg = Coalesce.coalesce_ssa ~nocoalesce:vs ssacfg in
+  ssacfg
 
 (* Main vsa interface *)
 let vsa ?nmeets ?opts g =

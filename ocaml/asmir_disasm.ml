@@ -146,64 +146,64 @@ module VSA_SPEC = struct
       (* Start by converting to SSA three address code. *)
       let ssacfg = Cfg_ssa.of_astcfg ~tac:true cfg in
       let origssacfg = ssacfg in
-      (* Cfg_pp.SsaStmtsDot.output_graph (open_out "vsapre.dot") ssacfg; *)
-
-      (* Do an initial optimization pass.  This is important so that
-         simplifycond_ssa can recognize syntactically equal
-         computations. *)
-      let ssacfg = Ssa_simp.simp_cfg ssacfg in
-
-      (* Simplify the SSA conditions so they can be parsed by VSA *)
-
-      (* Get ssa expression and vertices *)
-      let get_ssaev ((v,_,_) as edge) =
-        let ssav = CS.find_vertex ssacfg (CA.G.V.label v) in
-        let ssae = jumpe ssacfg ssav in
-        (edge, ssav, ssae)
-      in
-      let ssaves = List.map get_ssaev edges in
-      let ssavs = List.map (function (_,v,_) -> v) ssaves in
-      let ssaes = List.map (function (_,_,e) -> e) ssaves in
-      if debug () then List.iter (fun (_,ssav,ssae) -> dprintf "ssavs %s %s" (Cfg_ssa.v2s ssav) (Pp.ssa_exp_to_string ssae)) ssaves;
-      let ssacfg = Ssa_cond_simplify.simplifycond_targets_ssa ssaes ssacfg in
-      (* Cfg_pp.SsaStmtsDot.output_graph (open_out "vsacond.dot") ssacfg; *)
-
-      (* Redo TAC so that we can simplify the SSA conditions. This
-         should ensure that all variables are their canonical form.  This
-         is important so that the edge conditions are consistent with the
-         rest of the program. *)
-      let ssacfg = Cfg_ssa.do_tac_ssacfg ssacfg in
-      (* Cfg_pp.SsaStmtsDot.output_graph (open_out "vsatac.dot") ssacfg; *)
-
-      (* Simplify. *)
-      let ssacfg = Ssa_simp.simp_cfg ssacfg in
-      (* Cfg_pp.SsaStmtsDot.output_graph (open_out "vsasimp.dot") ssacfg; *)
-
-      (* Now our edge conditions look like (Var temp).  We need to use
-         shadow copy propagation to convert them to something like (EAX
-         < 10). *)
-
-      (* XXX: Should this go elsewhere? *)
-      let fix_edges g =
-        let _, m, _ = Copy_prop.copyprop_ssa g in
-        CS.G.fold_edges_e
-          (fun e g ->
-            match CS.G.E.label e with
-            | None -> g
-            | Some(b, Ssa.BinOp(EQ, Ssa.Var v, e2)) ->
-              (try let cond = Some(b, Ssa.BinOp(EQ, VM.find v m, e2)) in
-                   let src = CS.G.E.src e in
-                   let dst = CS.G.E.dst e in
-                   let e' = CS.G.E.create src cond dst in
-                   CS.add_edge_e (CS.remove_edge_e g e) e'
-               with Not_found -> g)
-            | Some(_, e) -> (* Sometimes we might see a constant like true/false *) g
-          ) g g
+      let ssacfg =
+        let vs = List.map (fun (v,_,_) -> CS.find_vertex ssacfg (CA.G.V.label v)) edges in
+        Vsa_ssa.prepare_ssa_indirect ~vs ssacfg
       in
 
-      let ssacfg = fix_edges ssacfg in
+      (* (\* Cfg_pp.SsaStmtsDot.output_graph (open_out "vsapre.dot") ssacfg; *\) *)
 
-      let ssacfg = Coalesce.coalesce_ssa ~nocoalesce:ssavs ssacfg in
+      (* (\* Do an initial optimization pass.  This is important so that *)
+      (*    simplifycond_ssa can recognize syntactically equal *)
+      (*    computations. *\) *)
+      (* let ssacfg = Ssa_simp.simp_cfg ssacfg in *)
+
+      (* (\* Simplify the SSA conditions so they can be parsed by VSA *\) *)
+
+      (* (\* Get ssa expression and vertices *\) *)
+      (* let ssaves = List.map get_ssaev edges in *)
+      (* let ssavs = List.map (function (_,v,_) -> v) ssaves in *)
+      (* let ssaes = List.map (function (_,_,e) -> e) ssaves in *)
+      (* if debug () then List.iter (fun (_,ssav,ssae) -> dprintf "ssavs %s %s" (Cfg_ssa.v2s ssav) (Pp.ssa_exp_to_string ssae)) ssaves; *)
+      (* let ssacfg = Ssa_cond_simplify.simplifycond_targets_ssa ssaes ssacfg in *)
+      (* (\* Cfg_pp.SsaStmtsDot.output_graph (open_out "vsacond.dot") ssacfg; *\) *)
+
+      (* (\* Redo TAC so that we can simplify the SSA conditions. This *)
+      (*    should ensure that all variables are their canonical form.  This *)
+      (*    is important so that the edge conditions are consistent with the *)
+      (*    rest of the program. *\) *)
+      (* let ssacfg = Cfg_ssa.do_tac_ssacfg ssacfg in *)
+      (* (\* Cfg_pp.SsaStmtsDot.output_graph (open_out "vsatac.dot") ssacfg; *\) *)
+
+      (* (\* Simplify. *\) *)
+      (* let ssacfg = Ssa_simp.simp_cfg ssacfg in *)
+      (* (\* Cfg_pp.SsaStmtsDot.output_graph (open_out "vsasimp.dot") ssacfg; *\) *)
+
+      (* (\* Now our edge conditions look like (Var temp).  We need to use *)
+      (*    shadow copy propagation to convert them to something like (EAX *)
+      (*    < 10). *\) *)
+
+      (* (\* XXX: Should this go elsewhere? *\) *)
+      (* let fix_edges g = *)
+      (*   let _, m, _ = Copy_prop.copyprop_ssa g in *)
+      (*   CS.G.fold_edges_e *)
+      (*     (fun e g -> *)
+      (*       match CS.G.E.label e with *)
+      (*       | None -> g *)
+      (*       | Some(b, Ssa.BinOp(EQ, Ssa.Var v, e2)) -> *)
+      (*         (try let cond = Some(b, Ssa.BinOp(EQ, VM.find v m, e2)) in *)
+      (*              let src = CS.G.E.src e in *)
+      (*              let dst = CS.G.E.dst e in *)
+      (*              let e' = CS.G.E.create src cond dst in *)
+      (*              CS.add_edge_e (CS.remove_edge_e g e) e' *)
+      (*          with Not_found -> g) *)
+      (*       | Some(_, e) -> (\* Sometimes we might see a constant like true/false *\) g *)
+      (*     ) g g *)
+      (* in *)
+
+      (* let ssacfg = fix_edges ssacfg in *)
+
+      (* let ssacfg = Coalesce.coalesce_ssa ~nocoalesce:ssavs ssacfg in *)
       (* Cfg_pp.SsaStmtsDot.output_graph (open_out "vsa.dot") ssacfg; *)
 
       dprintf "Starting VSA now";
@@ -214,6 +214,11 @@ module VSA_SPEC = struct
         (* Do VSA stuff *)
         dprintf "Resolving %s with VSA" (Pp.ast_exp_to_string e);
         if l <> None then failwith "VSA-enabled lifting currently assumes that conditional jumps are not indirect";
+        let get_ssaev ((v,_,_) as edge) =
+          let ssav = CS.find_vertex ssacfg (CA.G.V.label v) in
+          let ssae = jumpe ssacfg ssav in
+          (edge, ssav, ssae)
+        in
         let (_, ssav, ssae) = get_ssaev edge in
         dprintf "ssae: %s" (Pp.ssa_exp_to_string ssae);
         let ssaloc = Vsa_ssa.last_loc ssacfg ssav in
