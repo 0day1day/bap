@@ -8,7 +8,7 @@ open Type
 module VM = Var.VarMap
 module VS = Var.VarSet
 
-let add_switch_conditions {origssa; optssa; vsa_in} =
+let add_switch_conditions_int origssa optssa vsa_in =
 
   let stop_before = function
     | Ssa.Load _ | Ssa.Store _ -> true
@@ -128,3 +128,6 @@ let add_switch_conditions {origssa; optssa; vsa_in} =
     ) origssa origssa in
     Some g
   with Not_found -> None
+
+let add_switch_conditions {optssa; origssa; vsa_in} =
+  add_switch_conditions_int origssa optssa vsa_in
