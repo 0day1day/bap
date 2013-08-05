@@ -109,9 +109,9 @@ module RECURSIVE_DESCENT_SPEC = struct
 end
 
 type vsaresult = {origssa: CS.G.t;
-                optssa: CS.G.t;
-                vsa_in: Cfg.ssastmtloc -> Vsa_ssa.AlmostVSA.DFP.L.t;
-                vsa_out: Cfg.ssastmtloc -> Vsa_ssa.AlmostVSA.DFP.L.t;}
+                  optssa: CS.G.t;
+                  vsa_in: Cfg.ssastmtloc -> Vsa_ssa.AlmostVSA.DFP.L.t;
+                  vsa_out: Cfg.ssastmtloc -> Vsa_ssa.AlmostVSA.DFP.L.t;}
 
 module VSA_SPEC = struct
   module State = struct
@@ -122,7 +122,7 @@ module VSA_SPEC = struct
   let jumpe g v =
     match List.rev (CS.get_stmts g v) with
     | Ssa.Jmp(e, _)::_ -> e
-    | _ -> failwith "jumpe: Unable to find jump"
+    | _ -> failwith (Printf.sprintf "jumpe: Unable to find jump at %s" (Cfg_ssa.v2s v))
 
   let get_succs asmp g edges st =
     let rdresolved, rdunresolved =
@@ -387,28 +387,41 @@ module Make(D:DISASM)(F:FUNCID) = struct
             | None -> edges
           in
 
-          (* Rewrite any calls from this address *)
-          let c', edges = match F.find_calls c' bbs edges F.State.init with
-            | [], _ -> c', edges
-            | call_edges, _ ->
-              (* We found edges corresponding to calls *)
-              let others = Util.list_difference edges call_edges in
-              let fallthrough = List.map (fun (s,l,e) -> (s,l, exp_of_lab (Addr next))) call_edges in
-              let dumb_translate_call cfg (s,l,e) =
+          (* Rewrite any calls or rets from this address *)
+          let c', edges = match
+            F.find_calls c' bbs edges F.State.init,
+            F.find_rets c' bbs edges F.State.init
+            with
+            | ([], _), ([], _) -> c', edges
+            | (_::[] as call_edges, _), ([] as ret_edges, _)
+            | ([] as call_edges, _), (_::[] as ret_edges, _) ->
+              let special_edges, typ = match call_edges, ret_edges with
+                | x::_, [] -> call_edges, `Call
+                | [], x::_ -> ret_edges, `Ret
+                | _ -> failwith "impossible"
+              in
+              (* We found edges corresponding to calls or returns *)
+              let others = Util.list_difference edges special_edges in
+              let fallthrough = match typ with
+                | `Call -> List.map (fun (s,l,e) -> (s,l, exp_of_lab (Addr next))) special_edges
+                | `Ret -> []
+              in
+              let dumb_translate cfg (s,l,e) =
                 let revstmts = match List.rev (CA.get_stmts cfg s) with
                   | CJmp _::_ -> failwith "Conditional function calls are not implemented"
                   | Jmp _::tl as stmts -> List.map (function
                       | Label _ as s -> s
                       | Jmp(e, _) as s ->
-                        Comment(Printf.sprintf "Function call removed: %s" (Pp.ast_stmt_to_string s), [NamedStrAttr("calltarget", Pp.ast_exp_to_string e)])
+                        Comment(Printf.sprintf "Function call/ret removed: %s" (Pp.ast_stmt_to_string s), [NamedStrAttr("calltarget", Pp.ast_exp_to_string e)])
                       | s ->
-                        Comment(Printf.sprintf "Function call removed: %s" (Pp.ast_stmt_to_string s), [])) stmts
+                        Comment(Printf.sprintf "Function call/ret removed: %s" (Pp.ast_stmt_to_string s), [])) stmts
                   | _ -> failwith "Unable to rewrite function call"
                 in
                 CA.set_stmts cfg s (List.rev revstmts)
               in
-              let c' = List.fold_left dumb_translate_call c' call_edges in
+              let c' = List.fold_left dumb_translate c' special_edges in
               c', BatList.append others fallthrough
+            | _ -> failwith "both call and ret edges found"
           in
 
           Hashtbl.replace edgeh a (bbs, edges, next);
