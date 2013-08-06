@@ -118,9 +118,10 @@ let conc2symb memory v =
   pdebug "Concrete to symbolic" ;
   (* FIXME: a better symbolism for uninitialized memories *)
   let init = Var v in
+  let addrt = Typecheck.index_type_of (Var.typ v) in
   pdebug "The point of no return" ;
   Symbolic (AddrMap.fold
-              (fun k v m -> Store (m,Int(big_int_of_int64 k,reg_32),v,exp_false,reg_8))
+              (fun k v m -> Store (m,Int(big_int_of_int64 k,addrt),v,exp_false,reg_8))
               memory init)
 
 let varval_to_exp = function
@@ -219,7 +220,6 @@ struct
   exception AssumptionFailed of myctx
 
   let byte_type = reg_8
-  let index_type = reg_32
 
   (* Lookup functions for basic contexts *)
   let inst_fetch sigma pc =
@@ -431,21 +431,18 @@ struct
       | Load (mem,ind,endian,t) ->
         (match t with
         | Reg 8 ->
-                 (* This doesn't introduce any blowup on its own. *)
-                 let mem = eval_expr delta mem
-                 and ind = eval_expr delta ind
-                 and endian = eval_expr delta endian in
-                 let mem_arr = symb_to_exp ind
-                 and endian_exp = symb_to_exp endian in
-                   Symbolic (lookup_mem mem mem_arr endian_exp)
-             | Reg _ ->  (* we only care about 32bit *)
-                 (* Splitting introduces blowup.  Can we avoid it? *)
-                 eval_expr delta (Memory2array.split_loads mem ind t endian)
-             | Array _ ->
-                 failwith ("loading array currently unsupported" 
-                           ^ (Pp.typ_to_string t))
-             | _ -> failwith "not a loadable type"
-          )
+          (* This doesn't introduce any blowup on its own. *)
+          let mem = eval_expr delta mem
+          and ind = eval_expr delta ind
+          and endian = eval_expr delta endian in
+          let mem_arr = symb_to_exp ind
+          and endian_exp = symb_to_exp endian in
+          Symbolic (lookup_mem mem mem_arr endian_exp)
+        | Reg _ ->  (* we only care about 32bit *)
+          (* Splitting introduces blowup.  Can we avoid it? *)
+          eval_expr delta (Memory2array.split_loads mem ind t endian)
+        | _ -> failwith "not a loadable type"
+        )
       | Store (mem,ind,value,endian,t) ->
           let index = symb_to_exp (eval_expr delta ind)
           and value = symb_to_exp (eval_expr delta value)
@@ -751,9 +748,9 @@ struct
           (try AddrMap.find (normalize i t) m
            with Not_found ->
              Load(Var v, index, endian, reg_8)
-               (* FIXME: handle endian and type? *)
+          (* FIXME: handle endian and type? *)
           )
-            (* perhaps we should introduce a symbolic variable *)
+      (* perhaps we should introduce a symbolic variable *)
       | Symbolic mem, _ -> Load (mem,index,endian,reg_8)
       | ConcreteMem(m,v),_ -> lookup_mem (conc2symb m v) index endian
 
@@ -813,7 +810,7 @@ struct
       (try AddrMap.find (normalize i t) m
        with Not_found ->
          wprintf "Uninitialized memory found at %s" (Pp.ast_exp_to_string index);
-         Int(bi0, reg_32)
+         Int(bi0, reg_8)
       )
     | _ -> failwith "Symbolic memory or address in concrete evaluation"
 end
