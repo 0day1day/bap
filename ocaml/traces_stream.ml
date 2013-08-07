@@ -29,8 +29,8 @@ struct
     let block =
       concrete_stream mem_hash concrete_state thread_map arch block true
     in
-    let block = Traces.remove_specials block in
-    let block = Hacks.replace_unknowns block in
+    (* let block = Traces.remove_specials block in *)
+    (* let block = Hacks.replace_unknowns block in *)
     block
 
   (* XXX: The implementation of this function is a little weird.

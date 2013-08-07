@@ -1398,7 +1398,7 @@ let to_dsa p =
 let concrete arch trace = 
   dsa_rev_map := None;
   let trace = Memory2array.coerce_prog trace in
-  let trace = remove_specials trace in
+  (* let trace = remove_specials trace in *)
   (* let no_unknowns = remove_unknowns no_specials in *)
   let memv = find_memv trace in
   let blocks = trace_to_blocks trace in
@@ -1627,6 +1627,8 @@ struct
 
   let symbolic_run_blocks state arch trace =
     try
+      let trace = Hacks.replace_unknowns trace in
+      let trace = remove_specials trace in
       let state = List.fold_left (symbolic_run_block arch) state trace in
       state
     with
