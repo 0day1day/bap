@@ -405,7 +405,6 @@ module Make(D:DISASM)(F:FUNCID) = struct
               in
               (* We found edges corresponding to calls or returns *)
               let others = Util.list_difference edges special_edges in
-              dprintf "special %d others %d" (List.length special_edges) (List.length others);
               let fallthrough = match typ with
                 | `Call -> List.map (fun (s,l,e) -> (s,l, exp_of_lab (Addr next))) special_edges
                 | `Ret -> special_edges
