@@ -53,7 +53,10 @@ module FUNCFINDER_DUMB = struct
     | Jmp(_, [StrAttr "call"]) -> true
     | _ -> false
   let is_ret_stmt = function
-    | Jmp(_, [StrAttr "ret"]) -> true
+    | Jmp(_, attrs)
+    (* Check for a 'ret' instruction that has been translated into a
+       comment by dumb_translate below. *)
+    | Comment(_, attrs) when List.mem (StrAttr "ret") attrs -> true
     | _ -> false
   let check_last f c nodes unresolved_edges () =
     List.filter (fun (v,_,_) -> let stmts = CA.get_stmts c v in
@@ -402,17 +405,18 @@ module Make(D:DISASM)(F:FUNCID) = struct
               in
               (* We found edges corresponding to calls or returns *)
               let others = Util.list_difference edges special_edges in
+              dprintf "special %d others %d" (List.length special_edges) (List.length others);
               let fallthrough = match typ with
                 | `Call -> List.map (fun (s,l,e) -> (s,l, exp_of_lab (Addr next))) special_edges
-                | `Ret -> []
+                | `Ret -> special_edges
               in
               let dumb_translate cfg (s,l,e) =
                 let revstmts = match List.rev (CA.get_stmts cfg s) with
                   | CJmp _::_ -> failwith "Conditional function calls are not implemented"
                   | Jmp _::tl as stmts -> List.map (function
                       | Label _ as s -> s
-                      | Jmp(e, _) as s ->
-                        Comment(Printf.sprintf "Function call/ret removed: %s" (Pp.ast_stmt_to_string s), [NamedStrAttr("calltarget", Pp.ast_exp_to_string e)])
+                      | Jmp(e, attrs) as s ->
+                        Comment(Printf.sprintf "Function call/ret removed: %s" (Pp.ast_stmt_to_string s), NamedStrAttr("calltarget", Pp.ast_exp_to_string e)::attrs)
                       | s ->
                         Comment(Printf.sprintf "Function call/ret removed: %s" (Pp.ast_stmt_to_string s), [])) stmts
                   | _ -> failwith "Unable to rewrite function call"
