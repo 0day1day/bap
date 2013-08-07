@@ -521,7 +521,7 @@ object (self)
       | Int _ -> failwith "Ints may only have register types"
       | Ite(cond, e1, e2) ->
         lazy(
-          pp "(if_then_else";
+          pp "(ite";
           space ();
           self#ast_exp_bool cond;
           space ();
@@ -552,7 +552,7 @@ object (self)
           | None -> assert false
         in
         lazy(
-          pp "(if_then_else";
+          pp "(ite";
           space ();
           self#ast_exp_bool b;
           space ();
