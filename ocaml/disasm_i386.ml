@@ -2940,7 +2940,7 @@ let parse_instr mode g addr =
               | _ -> disfailwith "impossible"
             in
             let size = if prefix.repeat && prefix.vex = None then r128 else prefix.mopsize in
-            let align = if prefix.repeat then true else false in
+            let align = if prefix.opsize_override then true else false in
             s, d, size, size, align
           | 0xd6 -> (* MOVQ *)
             r, rm, r64, r64, false
