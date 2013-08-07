@@ -260,6 +260,7 @@ let () =
       ::"R_RFLAGS"
       ::"R_EIP"
       ::"R_RIP"
+      ::"R_GS"
       ::"R_FS"
       ::"R_LDTR"
       ::"R_GDTR"

@@ -72,13 +72,6 @@ switch (id) {
     case REG_R14: return string("R_R14");
     case REG_R15: return string("R_R15");
 
-    case REG_SEG_CS: return string("R_CS");
-    case REG_SEG_SS: return string("R_SS");
-    case REG_SEG_DS: return string("R_DS");
-    case REG_SEG_ES: return string("R_ES");
-    case REG_SEG_FS: return string("R_FS");
-    case REG_SEG_GS: return string("R_GS");
-
     case REG_RFLAGS: return string("R_RFLAGS");
     case REG_RIP: return string("R_RIP");
 #else
@@ -110,17 +103,6 @@ switch (id) {
     //case REG_EAX:
     //case REG_GR_LAST:
     //case REG_EAX:
-
-    //case REG_SEG_BASE:
-    //case REG_SEG_CS:
-    //case REG_SEG_BASE:
-    case REG_SEG_SS:  return string("R_SS");
-    //case REG_SEG_DS:
-    //case REG_SEG_ES:
-    //case REG_SEG_FS:
-    //case REG_SEG_GS:
-    //case REG_SEG_LAST:
-    //case REG_SEG_GS:
 
     case REG_EFLAGS:  return string("R_EFLAGS");
     //case REG_GFLAGS:
@@ -331,8 +313,14 @@ switch (id) {
 
 #endif
 
- case REG_MXCSR:
-     return string("R_MXCSR");
+    case REG_SEG_CS: return string("R_CS");
+    case REG_SEG_SS: return string("R_SS");
+    case REG_SEG_DS: return string("R_DS");
+    case REG_SEG_ES: return string("R_ES");
+    case REG_SEG_FS: return string("R_FS");
+    case REG_SEG_GS: return string("R_GS");
+
+    case REG_MXCSR: return string("R_MXCSR");
         /*
     case REG_DR_BASE:
     case REG_DR0 = case REG_DR_BASE:
