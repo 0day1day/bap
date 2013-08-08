@@ -531,8 +531,9 @@ let rec get_tid stmts =
   (* If symbolic bytes are introduced, this should be a memory only operation
      and doesn't really have a thread ID, so set the thread ID to 0 *)
   match stmts with
-  | (Ast.Comment (c, _))::rest when (is_seed_label c) -> Some 0
-  | _ ->  get_tid_from_atts (get_attrs (List.hd stmts))
+  | Ast.Comment (c, _)::rest when (is_seed_label c) -> Some 0
+  | stmt::_ -> get_tid_from_atts (get_attrs stmt)
+  | [] -> None
 
 (** Support muti-threaded traces by seperating variables per threadId *)
 module ThreadVar = struct
@@ -1113,136 +1114,130 @@ let run_block arch ?(next_label = None) ?(transformf = (fun s _ -> [s])) state m
       verify that all stmts are labels and comments.  Otherwise print a warning 
   *)
   let tid = get_tid block in
-  let addr = 
-    (try
-      List.find 
-        (fun s ->
-          (match s with
-          | Comment (s,atts) when is_seed_label s -> true
-          | Label (_,atts) ->
-            (try 
-              let _ = List.find 
-                (fun a -> match a with 
-                | Context _ -> true
-                | _ -> false) 
-                atts in
-              true
-            with Not_found -> false)
-          | _ -> false))
-        block  
-     with
-    (* SWXXX Verify everything in block is label or comment. 
-       Warn and ignore otherwise *) 
-     | Not_found -> List.hd block)
+  let is_context = function | Context _ -> true | _ -> false in
+  let addr =
+    match block with
+    | Comment (s,atts) as stmt::_ when is_seed_label s -> Some stmt
+    | Label (_,atts) as stmt::_ when List.exists is_context atts -> Some stmt
+    | _ -> dprintf "ignoring block %d" !counter; None
   in
-  let block = List.filter (fun b -> if b == addr then false else true) block in
-  let input_seeds, input_seeds_concrete = get_symbolic_seeds arch memv addr in
-  pdebug ("Running block: " ^ (string_of_int !counter) ^ " " 
-          ^ (Pp.ast_stmt_to_string addr));
   counter := !counter + 1;
-  let () = ignore(update_concrete addr) in
-  if not !consistency_check then (
-    (* If we are not doing a consistency check, there's no reason to
-       keep delta around. cleanup_delta completely clears delta *)
-    TraceConcrete.cleanup_delta state
-  ) else (
-    (* remove temps *)
+
+  let block = match addr with
+    | None -> dprintf "Running block: %d" !counter; block
+    | Some addr -> dprintf "Running block: %d %s" !counter (Pp.ast_stmt_to_string addr);
+      List.filter (fun b -> if b == addr then false else true) block
+  in
+
+  (* Call this function if we have a real block. A "fake" block is one
+     that consists of a bunch of trace specials. *)
+  let f block addr =
+
+    let input_seeds, input_seeds_concrete = get_symbolic_seeds arch memv addr in
+    let () = ignore(update_concrete addr) in
+
+    if not !consistency_check then (
+      (* If we are not doing a consistency check, there's no reason to
+         keep delta around. cleanup_delta completely clears delta *)
+      TraceConcrete.cleanup_delta state
+    ) else (
+      (* remove temps *)
+      clean_delta state.delta;
+      state.delta <- check_delta state;
+      (* TraceConcrete.print_values state.delta;  *)
+      (* TraceConcrete.print_mem state.delta;  *)
+      (* dprintf "Reg size: %d Mem size: %d" (TraceConcrete.num_values state.delta) (TraceConcrete.num_mem_locs state.delta);*)
+
+      (* Find the registers this block overwrites, and then mark this
+         instruction as being the most recent to write them. 
+
+         Note: This must come after check_delta
+      *)
+      let get_counter () =
+        let c = !current_time in
+        incr current_time;
+        c
+      in
+      List.iter
+        (function
+          | Move(v, _, _) ->
+            (* An explicit assignment *)
+	    if not (is_temp v) then 
+              VH.replace reg_to_stmt v {assignstmt=addr; assigned_time=get_counter ()}
+          | Special _ as s when Syscall_models.x86_is_system_call s ||
+              Disasm.is_decode_error s ->
+            (* A special could potentially overwrite all registers *)
+            last_time := get_counter();
+                last_special := addr;
+          | _ -> ())
+        block;
+    );
+
+    (* Don't execute specials now that we've potentially recorded them *)
+    let block = remove_specials block in
+
+    (* Assign concrete values to regs/memory *)
+    let block =
+      let assigns = assign_vars arch memv (lookup_thread_map thread_map tid) false in
+      (* List.iter *)
+      (*   (fun stmt -> dprintf "assign stmt: %s" (Pp.ast_stmt_to_string stmt)) assigns;       *)
+      assigns @ input_seeds_concrete @ block
+    in
+
+    let block = append_halt block in
+    TraceConcrete.initialize_prog state block;
     clean_delta state.delta;
-    state.delta <- check_delta state;
-    (* TraceConcrete.print_values state.delta;  *)
-    (* TraceConcrete.print_mem state.delta;  *)
-    (* dprintf "Reg size: %d Mem size: %d" (TraceConcrete.num_values state.delta) (TraceConcrete.num_mem_locs state.delta);*)
+    let executed = ref [] in
+    executed := BatList.append input_seeds !executed;
+    let rec eval_block state =
+      let stmt = TraceConcrete.inst_fetch state.sigma state.pc in
+      (* pdebug ("Executing: " ^ (Pp.ast_stmt_to_string stmt)); *)
+      (* Hashtbl.iter (fun k v -> pdebug (Printf.sprintf "%Lx -> %s" k (Pp.ast_exp_to_string v))) concrete_mem ; *)
+      let evalf e = match TraceConcrete.eval_expr state.delta e with
+        | Symbolic(e) -> e
+        | _ -> failwith "Expected symbolic"
+      in
+      executed := BatList.append (transformf stmt evalf) !executed ; 
+      (*print_endline (Pp.ast_stmt_to_string stmt) ;*)
 
-    (* Find the registers this block overwrites, and then mark this
-       instruction as being the most recent to write them. 
+      (* If we have a system call, run the model instead.
 
-       Note: This must come after check_delta
-    *)
-    let get_counter () =
-      let c = !current_time in
-      incr current_time;
-      c
+         HACK: This is a pretty ugly hack.
+      *)
+      if Syscall_models.x86_is_system_call stmt then
+        let rax = evalf (Var (Syscall_models.syscall_reg arch)) in
+        let stmts = (match rax with
+          | Int(i, _) ->
+            Syscall_models.linux_syscall_to_il arch (int_of_big_int i)
+          | _ -> failwith "Unexpected evaluation problem") in
+        (* Hack: Remember the next pc; we will clobber this *)
+        let newpc = Int64.succ state.pc in
+        let newstate = List.fold_left
+          (fun state stmt ->
+	    let isspecial = match stmt with Special _ -> true | _ -> false in
+            if isspecial then state else
+              match TraceConcrete.eval_stmt state stmt with
+              | x::[] -> x
+              | _ -> failwith "expected one state") state stmts in
+        eval_block {newstate with pc=newpc}
+      else
+        try
+          (match TraceConcrete.eval_stmt state stmt with
+	  | [newstate] ->
+	    (* let next = TraceConcrete.inst_fetch newstate.sigma newstate.pc in *)
+	    (*pdebug ("pc: " ^ (Int64.to_string newstate.pc)) ;*)
+	    eval_block newstate
+	  | _ ->
+	    failwith "multiple targets..."
+          )
+        with
+        (* Ignore failed assertions -- assuming that we introduced them *)
+        | TraceConcrete.AssertFailed _ as _e ->
+	  wprintf "failed assertion: %s" (Pp.ast_stmt_to_string stmt);
+	  (* raise e; *)
+	  let new_pc = Int64.succ state.pc in
+	  eval_block {state with pc=new_pc}
     in
-    List.iter
-      (function
-        | Move(v, _, _) ->
-          (* An explicit assignment *)
-          if not (is_temp v) then 
-            VH.replace reg_to_stmt v {assignstmt=addr; assigned_time=get_counter ()}
-        | Special _ as s when Syscall_models.x86_is_system_call s ||
-            Disasm.is_decode_error s ->
-          (* A special could potentially overwrite all registers *)
-          last_time := get_counter();
-          last_special := addr;
-        | _ -> ())
-      block;
-  );
-
-  (* Don't execute specials now that we've potentially recorded them *)
-  let block = remove_specials block in
-
-  (* Assign concrete values to regs/memory *)
-  let block =
-    let assigns = assign_vars arch memv (lookup_thread_map thread_map tid) false in
-    (* List.iter *)
-    (*   (fun stmt -> dprintf "assign stmt: %s" (Pp.ast_stmt_to_string stmt)) assigns;       *)
-    assigns @ input_seeds_concrete @ block
-  in
-
-  let block = append_halt block in
-  TraceConcrete.initialize_prog state block;
-  clean_delta state.delta;
-  let executed = ref [] in
-  executed := BatList.append input_seeds !executed;
-  let rec eval_block state =
-    let stmt = TraceConcrete.inst_fetch state.sigma state.pc in
-    (* pdebug ("Executing: " ^ (Pp.ast_stmt_to_string stmt)); *)
-       (* Hashtbl.iter (fun k v -> pdebug (Printf.sprintf "%Lx -> %s" k (Pp.ast_exp_to_string v))) concrete_mem ; *)
-    let evalf e = match TraceConcrete.eval_expr state.delta e with
-      | Symbolic(e) -> e
-      | _ -> failwith "Expected symbolic"
-    in
-    executed := BatList.append (transformf stmt evalf) !executed ; 
-    (*print_endline (Pp.ast_stmt_to_string stmt) ;*)
-
-    (* If we have a system call, run the model instead.
-
-       HACK: This is a pretty ugly hack.
-    *)
-    if Syscall_models.x86_is_system_call stmt then
-      let rax = evalf (Var (Syscall_models.syscall_reg arch)) in
-      let stmts = (match rax with
-        | Int(i, _) ->
-          Syscall_models.linux_syscall_to_il arch (int_of_big_int i)
-        | _ -> failwith "Unexpected evaluation problem") in
-      (* Hack: Remember the next pc; we will clobber this *)
-      let newpc = Int64.succ state.pc in
-      let newstate = List.fold_left
-        (fun state stmt ->
-          let isspecial = match stmt with Special _ -> true | _ -> false in
-          if isspecial then state else
-            match TraceConcrete.eval_stmt state stmt with
-            | x::[] -> x
-            | _ -> failwith "expected one state") state stmts in
-      eval_block {newstate with pc=newpc}
-    else
-      try 
-      (match TraceConcrete.eval_stmt state stmt with
-         | [newstate] ->
-             (* let next = TraceConcrete.inst_fetch newstate.sigma newstate.pc in *)
-               (*pdebug ("pc: " ^ (Int64.to_string newstate.pc)) ;*)
-               eval_block newstate
-         | _ ->
-            failwith "multiple targets..."
-      )
-    with
-    (* Ignore failed assertions -- assuming that we introduced them *)
-    | TraceConcrete.AssertFailed _ as _e -> 
-          wprintf "failed assertion: %s" (Pp.ast_stmt_to_string stmt);
-          (* raise e; *)
-          let new_pc = Int64.succ state.pc in
-          eval_block {state with pc=new_pc}
-  in
     try
       eval_block state
     with
@@ -1290,8 +1285,11 @@ let run_block arch ?(next_label = None) ?(transformf = (fun s _ -> [s])) state m
             Hashtbl.iter s ctx.sigma;
             
             | None -> ());*)
-        (addr::List.rev (List.tl !executed))
+        (addr::List.rev (List.tl !executed)) in
 
+  match addr with
+  | Some addr -> f block addr
+  | None -> []
 
 let run_blocks arch blocks memv length =
   counter := 1 ;

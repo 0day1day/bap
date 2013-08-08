@@ -1008,6 +1008,7 @@ struct
         in
         record.defined_vars <- Var.VarSet.add v record.defined_vars;
         let fp = Var.VarSet.diff fp record.defined_vars in
+        let fp = Var.VarSet.diff fp record.free_vars in
         Var.VarSet.iter formula_printer#predeclare_free_var fp;
         Var.VarSet.iter free_var_printer#predeclare_free_var fp;
         record.free_vars <- Var.VarSet.union record.free_vars fp;

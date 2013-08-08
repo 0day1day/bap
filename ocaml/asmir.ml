@@ -312,7 +312,7 @@ let rec bap_get_block_from_f f =
     let endtrace = "This is the final trace block" in
     let is_seed_label = (=) "ReadSyscall" in
     let rec to_blocks blocks current = function
-      | [] -> 
+      | [] ->
         List.rev ((List.rev current)::blocks)
       | (Ast.Label (Addr _, _) as l)::rest ->
         let block = List.rev current in
@@ -323,8 +323,7 @@ let rec bap_get_block_from_f f =
       | x::rest ->
         to_blocks blocks (x::current) rest
     in
-    let blocks = to_blocks [] [] trace in
-    List.filter (fun b -> List.length b > 1) blocks
+    to_blocks [] [] trace
   in
   let block_q = Queue.create () in
   (fun off ->

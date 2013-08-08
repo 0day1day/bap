@@ -75,7 +75,7 @@ readme as being user input.
 We will record a trace of a simple buffer overflow.  Run 
 
 \begin{verbatim}
-echo ``helloooooooooooooooooo'' > readme
+echo "helloooooooooooooooooo" > readme
 \end{verbatim}
 
  to create the input file.  Then run 
@@ -94,18 +94,35 @@ $BAPDIR/pin/pin -t  \
 
 The PIN tool will output
 many debugging messages; this is normal.  If the trace tool detected
-the buffer overflow, it will print ``stack smashing detected'' near
+the buffer overflow, it will print ``Stack smashing detected'' near
 the end of the logs.  At this point, there should be a trace file
 ending with suffix bpt in the current working directory.  In the
 following commands, we assume this file is named trace.bpt.
 
-To lift the trace data and print it, run 
+To lift the trace data and print it using \cmdline{iltrans} run:
 
 \begin{verbatim}
 iltrans -trace trace.bpt -pp-ast /dev/stdout
 \end{verbatim}
 
-The lifted trace data should look something like:
+\cmdline{iltrans} processes traces by lifting the entire trace into
+memory, and then performing the specified operation(s).
+Unfortunately, this makes it unsuitable for processing traces that do
+not fit in memory.  \cmdline{streamtrans} is an alternative utility
+for processing traces in a \emph{streaming} model.  Instead of lifting
+the entire trace at once, \cmdline{streamtrans} loads only a small
+part of it at a time.  The downside to \cmdline{streamtrans} is that
+many traces capabilities in BAP are implemented in \cmdline{iltrans}
+but not \cmdline{streamtrans}.
+
+To lift the trace data and print it using \cmdline{streamtrans} use:
+
+\begin{verbatim}
+streamtrans -tracestream trace.bpt -pp-ast /dev/stdout
+\end{verbatim}
+
+Regardless of the lifting tool, the lifted trace data should look
+something like:
 
 \begin{verbatim}
 addr 0x8048670 @asm "mov    0x804a034,%eax" @tid "0"
@@ -138,16 +155,40 @@ removes jumps and performs memory concretization, by executing
 \begin{verbatim}
 iltrans -trace trace.bpt -trace-concrete -pp-ast /dev/stdout
 \end{verbatim}
+or
+\begin{verbatim}
+streamtrans -tracestream trace.bpt -trace-concrete -pp-ast /dev/stdout
+\end{verbatim}
 
 Adding the -trace-check option before -trace-concrete causes BAP to
 compare its internal evaluator's notion of state with the actual
 values recorded in the trace.  It can be used to check for bugs in the
-IL.  Finally, running
+IL.  For example:
 
 \begin{verbatim}
+iltrans -trace trace.bpt -trace-check -trace-concrete
+\end{verbatim}
+or
+\begin{verbatim}
+streamtrans -tracestream trace.bpt -trace-check -trace-concrete-drop
+\end{verbatim}
+
+
+Finally, running
+%
+\begin{verbatim}
 iltrans -trace trace.bpt -trace-formula f
+\end{verbatim}
+or
+\begin{verbatim}
+streamtrans -tracestream trace.bpt -trace-formula f
 \end{verbatim}
 
 will symbolically execute the trace and output the generated verification
 condition to the file f. This can then be solved with stp to find satisfying
 answers to the trace.
+
+%%% Local Variables: 
+%%% mode: latex
+%%% TeX-master: "../main"
+%%% End: 
