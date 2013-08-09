@@ -3,6 +3,8 @@
 *.cma
 *.cmi
 *.cmo
+*.cmt
+*.cmti
 *.cmx
 *.cmxa
 *.dbg
@@ -27,6 +29,7 @@ _build
 aclocal.m4
 autom4te.cache/
 batteries/all
+compile
 config.log
 config.status
 configure
@@ -57,6 +60,7 @@ libtracewrap/libtrace/protobuf/Makefile
 libtracewrap/libtrace/protobuf/Makefile.in
 libtracewrap/libtrace/protobuf/TAGS
 libtracewrap/libtrace/protobuf/aclocal.m4
+libtracewrap/libtrace/protobuf/compile
 libtracewrap/libtrace/protobuf/config.guess
 libtracewrap/libtrace/protobuf/config.h
 libtracewrap/libtrace/protobuf/config.h.in
@@ -71,6 +75,14 @@ libtracewrap/libtrace/protobuf/gtest/autom4te.cache/
 libtracewrap/libtrace/protobuf/gtest/build-aux/
 libtracewrap/libtrace/protobuf/gtest/configure
 libtracewrap/libtrace/protobuf/gtest/libtool
+libtracewrap/libtrace/protobuf/gtest/msvc/gtest-md.vcproj-e
+libtracewrap/libtrace/protobuf/gtest/msvc/gtest.vcproj-e
+libtracewrap/libtrace/protobuf/gtest/msvc/gtest_main-md.vcproj-e
+libtracewrap/libtrace/protobuf/gtest/msvc/gtest_main.vcproj-e
+libtracewrap/libtrace/protobuf/gtest/msvc/gtest_prod_test-md.vcproj-e
+libtracewrap/libtrace/protobuf/gtest/msvc/gtest_prod_test.vcproj-e
+libtracewrap/libtrace/protobuf/gtest/msvc/gtest_unittest-md.vcproj-e
+libtracewrap/libtrace/protobuf/gtest/msvc/gtest_unittest.vcproj-e
 libtracewrap/libtrace/protobuf/gtest/scripts/gtest-config
 libtracewrap/libtrace/protobuf/install-sh
 libtracewrap/libtrace/protobuf/libtool
@@ -104,6 +116,7 @@ libtracewrap/libtrace/protobuf/src/google/protobuf/unittest_optimize_for.pb.h
 libtracewrap/libtrace/protobuf/src/protoc
 libtracewrap/libtrace/protobuf/src/unittest_proto_middleman
 libtracewrap/libtrace/protobuf/stamp-h1
+libtracewrap/libtrace/protobuf/test-driver
 libtracewrap/libtrace/src/Makefile
 libtracewrap/libtrace/src/Makefile.in
 libtracewrap/libtrace/src/TAGS
@@ -159,6 +172,7 @@ ocamlgraph-1.8/src/gml.ml
 ocamlgraph-1.8/src/version.ml
 ounit/api-ounit.docdir
 ounit/setup.data
+ounit/test.byte
 pintraces/Makefile
 solvers/makefile.inc
 tests/C/bof1
@@ -180,8 +194,10 @@ tests/vsasimp.dot
 utils/Makefile
 utils/backtaint
 utils/codegen
+utils/demo
 utils/formula
 utils/get_functions
+utils/identify_arborescence
 utils/identify_loops
 utils/ileval
 utils/iltrans
@@ -193,6 +209,7 @@ utils/topredicate
 zarith-1.0/Makefile.orig
 zarith-1.0/depend
 zarith-1.0/test
+zarith-1.0/tmp.out.dSYM/
 zarith-1.0/z.ml
 zarith-1.0/z.mli
 zarith-1.0/zarith.cmxs
