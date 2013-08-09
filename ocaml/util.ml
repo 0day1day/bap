@@ -420,8 +420,8 @@ let big_int_to_hex ?pad n =
     | None -> s
     | Some(l) -> 
         let p = l - String.length s in
-        (* assert (p >= 0); *)
-        if p >= 0 then (String.make p '0') ^ s else s
+        assert (p >= 0);
+        (String.make p '0') ^ s 
   in
   let (<=%) = le_big_int in
   let rec f = function
