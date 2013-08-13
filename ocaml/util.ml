@@ -32,7 +32,7 @@ let mapn f n =
   List.rev (foldn (fun l i -> f(n-i)::l) [] n)
   (* List.rev is needed to make side effects happen in the same order *)
 
-let keeplive e =
+let gc_keepalive e =
   let _ = id e in
   ()
 

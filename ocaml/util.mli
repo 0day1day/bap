@@ -27,10 +27,10 @@ val foldn64 : ?t:int64 -> ('a -> int64 -> 'a) -> 'a -> int64 -> 'a
 (** [mapn f n] is the same as [f 0; f 1; ...; f n] *)
 val mapn : (int -> 'a) -> int -> 'a list
 
-(** [keeplive e] keeps the objects reachable in [e] from being garbage
-    collected.  This function is needed because [ignore e] does not
-    serve this purpose. *)
-val keeplive : 'a -> unit
+(** [gc_keepalive e] keeps the objects reachable in [e] from being
+    garbage collected.  This function is needed because [ignore e]
+    does not serve this purpose. *)
+val gc_keepalive : 'a -> unit
 
 (** {3 List utility functions} *)
 
