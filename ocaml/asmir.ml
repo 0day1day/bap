@@ -457,11 +457,13 @@ let serialized_bap_from_trace_file = SerializedTrace.new_bap_from_trace_file
 let get_symbols ?(all=false) {asmp=p} =
   let f = if all then asmir_get_all_symbols else asmir_get_symbols in
   let (arr,err) = f p in
+  keeplive p;
   if err <= 0 then failwith "get_symbols";
   arr
 
 let get_dynamic_symbols {asmp=p} =
   let (arr,err) = asmir_get_dynsymbols p in
+  keeplive p;
   if err <= 0 then failwith "get_dynamic_symbols";
   arr
 
