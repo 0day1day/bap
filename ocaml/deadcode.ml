@@ -189,6 +189,12 @@ let do_dce ?(globals=[]) graph =
     the other is identical, they should both be dead (in SSA).
 *)
 let do_aggressive_dce ?(globals = []) graph =
+  
+  (* Make BB_Exit Live *)
+  let exitv = C.G.V.create Cfg.BB_Exit in
+  let exit_stmts = Ssa.Comment ("Live", [Type.Liveout])::(C.get_stmts graph exitv) in
+  let graph = C.set_stmts graph exitv exit_stmts in
+
   let gets (bb,snum) =
     let stmts = C.get_stmts graph bb in
     List.nth stmts snum
@@ -329,13 +335,6 @@ let do_aggressive_dce ?(globals = []) graph =
   (* Replace dead assignments with a comment.  Don't remove them,
      since this would change sites (e.g., removing statement number three
      would change the site of all statements after three *)
-  let check_path graph =
-    (* It would be nice if we could re-use the same path checker, but
-       we must modify the graph. *)
-    let module PC = Graph.Path.Check(Cfg.SSA.G) in
-    let pchecker = PC.create graph in
-    PC.check_path pchecker
-  in
   let graph = C.G.fold_vertex
     (fun bb graph ->
       let stmts = C.get_stmts graph bb in
@@ -363,66 +362,57 @@ let do_aggressive_dce ?(globals = []) graph =
                    [Live BB]
 
        If CJmp is dead, then there are no live statements that are
-       control-dependent on it.  So, we can change the CJmp to point
-       to the Dead BB which has a path to BB_Exit.  Since any live
+       control-dependent on it.  So, since BB_Exit is live, we cannot have
+       one branch able to reach it while the other cannot (as otherwise
+       the CJmp would be live). Thus we can change the CJmp to point to either
+       Dead BB which has a path to BB_Exit.  Since any live
        statement after the CJmp is not control-dependent on the CJmp,
        it will execute regardless of which branch is taken.
     *)
       let graph = match revnewstmts with
         | CJmp (_, t1, t2, attrs) as s::others when not (site_is_live (bb, (List.length revnewstmts)-1)) ->
           (try
-            dprintf "Dead cjmp at %s: %s" (Cfg_ssa.v2s bb) (Pp.ssa_stmt_to_string s);
-          (* Which edge do we remove? Try removing one and see if we
-             can still reach BB_Exit. *)
-            let truee = List.find (fun e ->
-              match C.G.E.label e with
-              | Some(true, _) -> true 
-              | _ -> false)
-              (C.G.succ_e graph bb)
-            in
-            let falsee = List.find (fun e ->
-              match C.G.E.label e with
-              | Some(false, _) -> true
-              | _ -> false)
-              (C.G.succ_e graph bb)
-            in
-          (* Remove true edge, check for reachability *)
-            let use_true, graph =
-              let graph = C.remove_edge_e graph truee in
-              if check_path graph bb (C.G.V.create Cfg.BB_Exit) then
-                false, graph
-              else
-              (* Add true edge back, remove false edge *)
-                let graph = C.add_edge_e graph truee in
-                let graph = C.remove_edge_e graph falsee in
-                let () = assert (check_path graph bb (C.G.V.create Cfg.BB_Exit)) in
-                true, graph
-            in
-          (* Replace CJmp with Jmp to t1 *)
-            let newstmts = List.rev
-              (Jmp ((if use_true then t1 else t2), attrs)::others) in
-            let graph = C.set_stmts graph bb newstmts in
-          (* Now fix the edges *)
-            let newdst = if use_true then C.G.E.dst truee else C.G.E.dst falsee in
-            let new_edge = C.G.E.create bb None newdst in
-          (* Remove all existing edges *)
-            let graph = C.G.fold_succ_e
-              (fun e graph -> C.remove_edge_e graph e) graph bb graph in
-          (* Add the new, unlabeled edge *)
-            let graph = C.add_edge_e graph new_edge in
-            has_changed := true;
-            graph
-          with Not_found ->
-            (* There might be an unresolved edge from a 'je'
-               instruction or similar which could cause this to fail. *)
-            graph)
+             dprintf "Dead cjmp at %s: %s" (Cfg_ssa.v2s bb) (Pp.ssa_stmt_to_string s);
+             let truee = List.find (fun e ->
+               match C.G.E.label e with
+               | Some(true, _) -> true 
+               | _ -> false)
+               (C.G.succ_e graph bb)
+             in
+             let falsee = List.find (fun e ->
+               match C.G.E.label e with
+               | Some(false, _) -> true
+               | _ -> false)
+               (C.G.succ_e graph bb)
+             in
+
+             (* We remove the true edge (this is arbitrary) *)
+             let graph = C.remove_edge_e graph truee in
+             
+             (* Replace CJmp with Jmp to t2 *)
+             let newstmts = List.rev (Jmp (t2, attrs)::others) in
+             let graph = C.set_stmts graph bb newstmts in
+             (* Now fix the edges *)
+             let newdst = C.G.E.dst falsee in
+             let new_edge = C.G.E.create bb None newdst in
+             (* Remove all existing edges *)
+             let graph = C.G.fold_succ_e
+               (fun e graph -> C.remove_edge_e graph e) graph bb graph in
+             (* Add the new, unlabeled edge *)
+             let graph = C.add_edge_e graph new_edge in
+             has_changed := true;
+             graph
+           with Not_found ->
+             (* There might be an unresolved edge from a 'je'
+                instruction or similar which could cause this to fail. *)
+             graph)
         | _ -> C.set_stmts graph bb (List.rev revnewstmts)
       in
       graph
-
+        
     )
     graph graph in
-
+  
   (* It's now safe to remove deadstmts *)
   let graph = if !has_changed then
       C.G.fold_vertex
