@@ -106,7 +106,7 @@ let vn2eid info = function
   | HInt(i,t) -> Const(Int(i,t))
   | Hash v -> VH.find info.vn2eid v
 
-let hash_to_string = function
+let vn_to_string = function
   | Top -> "T"
   | Hash v -> "<"^Pp.var_to_string v^">"
   | HInt(i,t) -> string_of_big_int i ^":"^ Pp.typ_to_string t
@@ -381,7 +381,7 @@ let rpo ~opt cfg =
          if oldvn <>! temp (*&& temp <> top*) then (
            assert(temp <>! top); (* FIXME: prove this is always true *)
            changed := true;
-           dprintf "Updating %s -> %s (was %s)" (Pp.var_to_string v) (hash_to_string temp) (hash_to_string oldvn);
+           dprintf "Updating %s (%s) -> %s (was %s)" (Pp.var_to_string v) (Pp.ssa_exp_to_string e) (vn_to_string temp) (vn_to_string oldvn);
            VH.replace info.vn_h v temp
          ) )
       moves;
@@ -397,7 +397,7 @@ let rpo ~opt cfg =
         (fun (v,_) ->
            let h = vn v in
            let v2s = Pp.var_to_string in
-           pdebug (v2s v^" = "^hash_to_string h^" "^List.fold_left (fun s v -> s^v2s v^" ") "[" (hash2equiv h) ^"]"))
+           pdebug (v2s v^" = "^vn_to_string h^" "^List.fold_left (fun s v -> s^v2s v^" ") "[" (hash2equiv h) ^"]"))
         moves
     )
   in*)
