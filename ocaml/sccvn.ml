@@ -65,6 +65,24 @@ type expid =
   | Unique of var (* for free variables and unknowns *)
   | Ph of vn list
 
+let vn_to_string = function
+  | Top -> "T"
+  | Hash v -> "<"^Pp.var_to_string v^">"
+  | HInt(i,t) -> string_of_big_int i ^":"^ Pp.typ_to_string t
+
+let expid_to_string = function
+  | Ld(v1, v2, v3, t) -> Printf.sprintf "Ld(%s, %s, %s, %s)" (vn_to_string v1) (vn_to_string v2) (vn_to_string v3) (Pp.typ_to_string t)
+  | St(v1, v2, v3, v4, t) -> Printf.sprintf "St(%s, %s, %s, %s, %s)" (vn_to_string v1) (vn_to_string v2) (vn_to_string v3) (vn_to_string v4) (Pp.typ_to_string t)
+  | Bin(bt, v1, v2) -> Printf.sprintf "Bin(%s, %s, %s)" (Pp.binop_to_string bt) (vn_to_string v1) (vn_to_string v2)
+  | Un(ut, v) -> Printf.sprintf "Un(%s, %s)" (Pp.unop_to_string ut) (vn_to_string v)
+  | Const e -> Printf.sprintf "Const(%s)" (Pp.ssa_exp_to_string e)
+  | Cst(ct, t, v) -> Printf.sprintf "Cst(%s, %s, %s)" (Pp.ct_to_string ct) (Pp.typ_to_string t) (vn_to_string v)
+  | It(v1, v2, v3) -> Printf.sprintf "It(%s, %s, %s)" (vn_to_string v1) (vn_to_string v2) (vn_to_string v3)
+  | Ex(bi1, bi2, v) -> Printf.sprintf "Ex(%s, %s, %s)" (~% bi1) (~% bi2) (vn_to_string v)
+  | Con(v1, v2) -> Printf.sprintf "Con(%s, %s)" (vn_to_string v1) (vn_to_string v2)
+  | Unique v -> Printf.sprintf "Unique(%s)" (Pp.var_to_string v)
+  | Ph(vns) -> Printf.sprintf "Ph(%s)" (BatString.join ", " (List.map vn_to_string vns))
+
 let vn_compare vn1 vn2 = match vn1,vn2 with
   | Top,Top -> 0
   | Hash(v1), Hash(v2) -> compare v1 v2
@@ -105,11 +123,6 @@ let vn2eid info = function
   | Top -> raise Not_found
   | HInt(i,t) -> Const(Int(i,t))
   | Hash v -> VH.find info.vn2eid v
-
-let vn_to_string = function
-  | Top -> "T"
-  | Hash v -> "<"^Pp.var_to_string v^">"
-  | HInt(i,t) -> string_of_big_int i ^":"^ Pp.typ_to_string t
 
 let meet a b = match (a,b) with
   | (Top, x)
