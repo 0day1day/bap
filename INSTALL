@@ -34,8 +34,10 @@ On x86_64 also add:
   $ sudo apt-get install gcc-multilib g++-multilib lib32z1-dev
 
 To build LLVM code generation, include:
-  $ sudo apt-get install libllvm-3.1-ocaml-dev
+  $ sudo apt-get install libllvm-3.1-ocaml-dev cppo
 We have only tested with llvm version 3.1, but other versions may work too.
+Specifically, cppo should provide support for revisions 3.2 and 3.3 now,
+but this is not widely tested.
 
 To compile the documentation, add:
   $ sudo aptitude install texlive-base texlive-latex-base \

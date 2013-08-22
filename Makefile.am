@@ -2,6 +2,8 @@
 # See http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=678577
 export OCAML_COMPAT='c'
 
+AUTOMAKE_OPTIONS = subdir-objects
+
 if HAVE_PIN
 PINTRACES=pintraces
 endif
