@@ -34,6 +34,10 @@ let mapn f n =
   List.rev (foldn (fun l i -> f(n-i)::l) [] n)
   (* List.rev is needed to make side effects happen in the same order *)
 
+let gc_keepalive e =
+  let _ = id e in
+  ()
+
 let rec list_mem ?(eq=(=)) ele = function
   | hd::tl ->
     if eq hd ele then true

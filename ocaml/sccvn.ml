@@ -124,6 +124,11 @@ let vn2eid info = function
   | HInt(i,t) -> Const(Int(i,t))
   | Hash v -> VH.find info.vn2eid v
 
+let hash_to_string = function
+  | Top -> "T"
+  | Hash v -> "<"^Pp.var_to_string v^">"
+  | HInt(i,t) -> string_of_big_int i ^":"^ Pp.typ_to_string t
+
 let meet a b = match (a,b) with
   | (Top, x)
   | (x, Top) ->

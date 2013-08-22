@@ -99,7 +99,7 @@ type and name) with the actual operation left unspecified as {\tt
 \subsection{Statements and Programs}
 
 A program in \bil is a sequence of statements.  There are 7 different
-kinds of instructions. The language has assignments, jumps,
+kinds of statements. The language has assignments, jumps,
 conditional jumps, and labels.  The target of all jumps and
 conditional jumps must be a valid label in our operational semantics,
 else the program terminates in the error state ($\perp$).  Note that a
@@ -118,7 +118,7 @@ kind of special, e.g., what system call.
 
 The semantics of {\tt special} are up to the analysis; its operational
 semantics are not defined (Chapter~\ref{vine:operational}).  We
-include {\tt special} as an instruction type to explicitly distinguish
+include {\tt special} as an statement type to explicitly distinguish
 calls that alter the soundness of an analysis. A typical approach to
 dealing with {\tt special} is to replace {\tt special} with an
 analysis-specific summary function written in the \bap IL that is

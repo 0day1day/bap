@@ -68,11 +68,11 @@ modeled in \bap.  The results of these tests are always available at
 \subsection{Size of Lifting IL for a Program}
 
 A single assembly instruction will typically be translated into
-several \bap instructions. Thus, the resulting \bap program will
-have more statements than the corresponding assembly.  For example and
+several \bap statements. Thus, the resulting \bap program will have
+more statements than the corresponding assembly.  For example and
 roughly speaking, x86 assembly instructions are raised to be about 7
-\bap instructions: 1 \bap instruction for the direct effect, and 6
-for updating processor-specific status flags.
+\bap statements: 1 \bap statement for the direct effect, and 6 for
+updating processor-specific status flags.
 
 In our experience, the constant-size factor in code size is worth the
 benefits of simplifying the semantics of assembly.  Assembly

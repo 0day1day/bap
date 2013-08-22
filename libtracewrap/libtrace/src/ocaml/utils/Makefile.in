@@ -46,4 +46,4 @@ tags:
 	-
 
 %:
-	$(MAKE) -f $(OCAMLMAKEFILE) subprojs SUBTARGET=$@
+	$(MAKE) -j1 -f $(OCAMLMAKEFILE) subprojs SUBTARGET=$@
