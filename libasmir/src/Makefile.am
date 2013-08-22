@@ -1,3 +1,5 @@
+AUTOMAKE_OPTIONS = subdir-objects
+
 RANLIB = @RANLIB@
 lib_LIBRARIES = libasmir.a
 AM_CFLAGS = -I../include -Itraces -fPIC -DGET_OPERANDS

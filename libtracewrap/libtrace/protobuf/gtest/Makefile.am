@@ -2,6 +2,8 @@
 
 # TODO(chandlerc@google.com): automate the generation of *.h from *.h.pump.
 
+AUTOMAKE_OPTIONS = subdir-objects
+
 # Nonstandard package files for distribution
 EXTRA_DIST = \
   CHANGES \
