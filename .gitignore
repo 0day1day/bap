@@ -184,6 +184,7 @@ libtracewrap/libtrace/protobuf/src/google/protobuf/compiler/cpp/cpp_test_bad_ide
 libtracewrap/libtrace/protobuf/src/google/protobuf/unittest*.pb.cc
 libtracewrap/libtrace/protobuf/configure.lineno
 pin/
+.vagrant
 compile
 libtracewrap/libtrace/protobuf/ar-lib
 libtracewrap/libtrace/protobuf/test-driver
