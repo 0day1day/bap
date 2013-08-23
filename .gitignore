@@ -15,6 +15,9 @@
 *.cmx
 *.cmxa
 *.dbg
+*.swp
+*.byte
+*.opt
 config.log
 config.status
 ._d
@@ -25,6 +28,8 @@ _build
 .depend
 .depend
 .deps
+.dirstamp
+m4/
 tests/C/bof1
 tests/C/taint_test
 tests/C/test
@@ -114,15 +119,11 @@ libtracewrap/libtrace/INSTALL
 libtracewrap/libtrace/Makefile
 libtracewrap/libtrace/Makefile.in
 libtracewrap/libtrace/TAGS
-libtracewrap/libtrace/aclocal.m4
-libtracewrap/libtrace/autom4te.cache/
 libtracewrap/libtrace/configure
 libtracewrap/libtrace/piqi/deps
 libtracewrap/libtrace/protobuf/Makefile
 libtracewrap/libtrace/protobuf/Makefile.in
 libtracewrap/libtrace/protobuf/TAGS
-libtracewrap/libtrace/protobuf/aclocal.m4
-libtracewrap/libtrace/protobuf/compile
 libtracewrap/libtrace/protobuf/config.guess
 libtracewrap/libtrace/protobuf/config.h
 libtracewrap/libtrace/protobuf/config.h.in
@@ -132,8 +133,6 @@ libtracewrap/libtrace/protobuf/configure.lineno
 libtracewrap/libtrace/protobuf/depcomp
 libtracewrap/libtrace/protobuf/gtest/Makefile
 libtracewrap/libtrace/protobuf/gtest/Makefile.in
-libtracewrap/libtrace/protobuf/gtest/aclocal.m4
-libtracewrap/libtrace/protobuf/gtest/autom4te.cache/
 libtracewrap/libtrace/protobuf/gtest/build-aux/
 libtracewrap/libtrace/protobuf/gtest/configure
 libtracewrap/libtrace/protobuf/gtest/libtool
@@ -149,11 +148,6 @@ libtracewrap/libtrace/protobuf/gtest/scripts/gtest-config
 libtracewrap/libtrace/protobuf/install-sh
 libtracewrap/libtrace/protobuf/libtool
 libtracewrap/libtrace/protobuf/ltmain.sh
-libtracewrap/libtrace/protobuf/m4/libtool.m4
-libtracewrap/libtrace/protobuf/m4/ltoptions.m4
-libtracewrap/libtrace/protobuf/m4/ltsugar.m4
-libtracewrap/libtrace/protobuf/m4/ltversion.m4
-libtracewrap/libtrace/protobuf/m4/lt~obsolete.m4
 libtracewrap/libtrace/protobuf/protobuf-lite.pc
 libtracewrap/libtrace/protobuf/protobuf.pc
 libtracewrap/libtrace/protobuf/src/.libs/
@@ -206,3 +200,7 @@ libtracewrap/libtrace/protobuf/src/google/protobuf/compiler/cpp/cpp_test_bad_ide
 libtracewrap/libtrace/protobuf/src/google/protobuf/unittest*.pb.cc
 libtracewrap/libtrace/protobuf/configure.lineno
 pin/
+.vagrant
+compile
+libtracewrap/libtrace/protobuf/ar-lib
+libtracewrap/libtrace/protobuf/test-driver
