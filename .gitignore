@@ -34,6 +34,10 @@ tests/C/bof1
 tests/C/taint_test
 tests/C/test
 tests/C/unroll
+tests/C/recover-hard
+tests/C/recover-hard-opt
+tests/C/recover-hard-pointer
+tests/C/switch
 tests/Makefile
 tests/asm/nop
 tests/bap_test_suite
@@ -49,6 +53,7 @@ utils/solvepredicate
 utils/streamtrans
 utils/toil
 utils/topredicate
+utils/resolvetest
 zarith-1.0/Makefile.orig
 zarith-1.0/depend
 zarith-1.0/test
@@ -80,6 +85,7 @@ ocaml/libbfd.h
 ocaml/libbfd.ml
 ocaml/libbfd.mli
 ocaml/libbfd_stubs.c
+ocaml/llvm.h
 ocaml/stp_grammar.ml
 ocaml/stp_grammar.mli
 ocaml/stp_lexer.ml
