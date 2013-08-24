@@ -94,9 +94,9 @@ respectively. Examples are shown in Figures~\ref{fig:cdg} and
 \ref{fig:ddg}.
 
 BAP also has built-in optimizations.  To apply them, simply use the
-\cmdline{-ssa-simp} iltrans flag.  If we apply this before producing
+\cmdline{-simp-ssa} iltrans flag.  If we apply this before producing
 the CFG, we can see the IL is greatly simplified: \cmdline{iltrans -il
-  basic.il -to-ssa -ssa-simp -pp-ssa out.dot}. This is shown in
+  basic.il -to-ssa -simp-ssa -pp-ssa out.dot}. This is shown in
 Figure~\ref{fig:cfgsimp}.
 
 \begin{figure}[!p]
