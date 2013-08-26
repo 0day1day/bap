@@ -313,7 +313,7 @@ let fwp_lazyconc_uwp ?(simp=or_simp) ?(k=1) ?(cf=true) mode ((cfg,ugclmap):Gcl.U
 
   Checks.acyclic_astcfg cfg "UWP";
   Checks.connected_astcfg cfg "UWP";
-  Checks.exit_check_astcfg ~allowed_exits:[Cfg.BB_Exit; Cfg.BB_Error] ~expected_exits:[Cfg.BB_Exit] cfg "UWP";
+  Checks.exit_astcfg ~allowed_exits:[Cfg.BB_Exit; Cfg.BB_Error] ~expected_exits:[Cfg.BB_Exit] cfg "UWP";
 
   (* We want executions that go to BB_Error to return false in the VC,
      so we must add an edge from Error to Exit. *)

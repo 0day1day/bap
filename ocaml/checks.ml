@@ -68,7 +68,6 @@ let acyclic_astcfg = let module AC = MakeAcyclicCheck(Cfg.AST) in AC.acyclic_che
 let acyclic_ssacfg = let module AC = MakeAcyclicCheck(Cfg.SSA) in AC.acyclic_check
 
 module MakeExitCheck(C:Cfg.CFG) = struct
-
   let exit_check ?(allowed_exits=[Cfg.BB_Exit; Cfg.BB_Error]) ?(expected_exits=[Cfg.BB_Exit]) g s =
     C.G.iter_vertex (fun v ->
       if C.G.out_degree g v = 0 && List.mem (C.G.V.label v) allowed_exits = false then
@@ -78,5 +77,5 @@ module MakeExitCheck(C:Cfg.CFG) = struct
   let exit_check ?allowed_exits ?expected_exits = wrapdebug (exit_check ?allowed_exits ?expected_exits)
 end
 
-let exit_check_astcfg = let module EC = MakeExitCheck(Cfg.AST) in EC.exit_check
-let exit_check_ssacfg = let module EC = MakeExitCheck(Cfg.SSA) in EC.exit_check
+let exit_astcfg = let module EC = MakeExitCheck(Cfg.AST) in EC.exit_check
+let exit_ssacfg = let module EC = MakeExitCheck(Cfg.SSA) in EC.exit_check
