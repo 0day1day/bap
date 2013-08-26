@@ -1,8 +1,7 @@
-#include "llvm.h"
+(*pp camlp4o pa_macro.cmo *)
+
 (**
    Experimental module for performing LLVM code generation.
-
-   $Id$
 
    See http://llvm.org/docs/tutorial/OCamlLangImpl3.html for tutorial.
 *)
@@ -63,8 +62,12 @@ class codegen ?(opts=true) memimpl =
   let the_fpm = PassManager.create_function the_module in
   (* Set up the optimizer pipeline.  Start with registering info about
    * how the target lays out data structures. *)
-  let () = Llvm_target.DATAMOD.add (ExecutionEngine.target_data execengine) the_fpm in
-
+  let () =
+    IFDEF LLVM_NEW_API THEN
+      Llvm_target.DataLayout.add (ExecutionEngine.target_data execengine) the_fpm
+    ELSE
+      Llvm_target.TargetData.add (ExecutionEngine.target_data execengine) the_fpm
+    END in
   let () = if opts then (
 
     (* Aggregate to scalar opts *)

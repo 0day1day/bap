@@ -84,8 +84,6 @@ ocaml/stp_lexer.ml
 ocaml/yices_grammar.ml
 ocaml/yices_grammar.mli
 ocaml/yices_lexer.ml
-ocaml/llvm_codegen.ml
-ocaml/llvm.h
 ounit/api-ounit.docdir
 ounit/setup.data
 pintraces/Makefile
