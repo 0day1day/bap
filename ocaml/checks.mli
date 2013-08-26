@@ -67,3 +67,23 @@ module MakeExitCheck :
           can be specified using [allowed_exits]. *)
       val exit_check : ?allowed_exits:(Cfg.bbid list) -> ?expected_exits:(Cfg.bbid list) -> C.G.t sanityf
     end
+
+(** [indirect_astcfg g s] raises an exception iff g contains
+    [BB_Indirect], the node corresponding to an unresolved indirect
+    jump. *)
+val indirect_astcfg : Cfg.AST.G.t sanityf
+
+(** [indirect_ssacfg g s] raises an exception iff g contains
+    [BB_Indirect], the node corresponding to an unresolved indirect
+    jump. *)
+val indirect_ssacfg : Cfg.SSA.G.t sanityf
+
+(** Build an indirect check for other graphs *)
+module MakeIndirectCheck :
+  functor (C : Cfg.CFG) ->
+    sig
+      (** [indirect_check g s] raises an exception iff g contains
+          [BB_Indirect], the node corresponding to an unresolved indirect
+          jump. *)
+      val indirect_check : C.G.t sanityf
+    end

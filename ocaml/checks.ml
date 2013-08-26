@@ -79,3 +79,16 @@ end
 
 let exit_astcfg = let module EC = MakeExitCheck(Cfg.AST) in EC.exit_check
 let exit_ssacfg = let module EC = MakeExitCheck(Cfg.SSA) in EC.exit_check
+
+module MakeIndirectCheck(C:Cfg.CFG) = struct
+  let indirect_check g s =
+    let ind = C.G.V.create Cfg.BB_Indirect in
+    if C.G.mem_vertex g ind then
+      match C.G.pred g ind with
+      | bb::_ ->
+        insane (Printf.sprintf "Analysis %s requires there to be no unresolved indirect jumps in the program, but there is at least one present from %s." s (Cfg.bbid_to_string (C.G.V.label bb)))
+      | _ -> ()
+end
+
+let indirect_astcfg = let module IC = MakeIndirectCheck(Cfg.AST) in IC.indirect_check
+let indirect_ssacfg = let module IC = MakeIndirectCheck(Cfg.SSA) in IC.indirect_check
