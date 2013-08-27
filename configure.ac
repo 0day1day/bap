@@ -190,13 +190,14 @@ AC_CONFIG_FILES([Makefile
                  utils/Makefile
                  tests/Makefile
                  ocaml/llvm.h])
-AC_OUTPUT
+# Configure ocamlgraph and zarith
 
-# Configure ocamlgraph
-(cd ocamlgraph && ./configure)
+AC_CONFIG_SUBDIRS([ocamlgraph])
 
 # Configure zarith
 (cd zarith && ./configure)
+
+AC_OUTPUT
 
 # Force libtracewrap to reconfigure
 rm -f libtracewrap/CONFIGURED
