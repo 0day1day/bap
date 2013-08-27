@@ -1,5 +1,5 @@
-(* 
- * ExtPrintf - Extended Printf module
+(*
+ * BatPrintf - Extended Printf module
  * Copyright (C) 2008 David Teller
  *
  * This library is free software; you can redistribute it and/or
@@ -22,24 +22,14 @@ open BatInnerIO
 
 (** Formatted output functions (also known as unparsing).
 
-    This module extends Stdlib's
-    {{:http://caml.inria.fr/pub/docs/manual-ocaml/libref/Printf.html}Printf}
-    module, go there for documentation on the rest of the functions
-    and types.
-
     @author Xavier Leroy
     @author Pierre Weiss
     @author David Teller
 *)
 
-  (**
-     {6 Important note}
+(**
+   {6 General overview}
 
-     This module is mostly deprecated by module {!Print}. In the future,
-     only module {!Print} will be updated and maintained.
-
-     {6 General overview}
-     
    The functions of this module produce output according to a
    {!Pervasives.format}, as described below. Some functions write to
    the standard output (i.e. the screen), some to error channels,
@@ -77,13 +67,13 @@ open BatInnerIO
    Note that [\n] (the newline character) and [\t] (the tabulation)
    are not specific to this module but rather part of the conventions
    on characters strings in OCaml.
-     
+
    Other directives and functions make this module extremely useful
    for printing, pretty-printing and translation of messages to
    the user's language. For more information, see the documentation
    of {!format} and the various functions.*)
 
-  
+
 
 (**
    {6 Formats}
@@ -92,7 +82,7 @@ open BatInnerIO
 type ('a, 'b, 'c) t = ('a, 'b, 'c) Pervasives.format
 (**
    The format to use for displaying the various arguments passed to the function.
-   
+
    Syntactically, the format is a character string which contains two types
    of objects: plain characters, which are simply copied, and directives,
    each of which causes the conversion and printing of arguments.
@@ -111,12 +101,12 @@ type ('a, 'b, 'c) t = ('a, 'b, 'c) Pervasives.format
      using uppercase letters.
    - [%o]: convert an integer argument to unsigned octal.
    - [%s]: insert a string argument.
-   - [%S]: insert a string argument in Caml syntax (double quotes, escapes).
+   - [%S]: insert a string argument in OCaml syntax (double quotes, escapes).
    - [%c]: insert a character argument.
-   - [%C]: insert a character argument in Caml syntax (single quotes, escapes).
+   - [%C]: insert a character argument in OCaml syntax (single quotes, escapes).
    - [%f]: convert a floating-point argument to decimal notation,
      in the style [dddd.ddd].
-   - [%F]: convert a floating-point argument to Caml syntax ([dddd.]
+   - [%F]: convert a floating-point argument to OCaml syntax ([dddd.]
      or [dddd.ddd] or [d.ddd e+-dd]).
    - [%e] or [%E]: convert a floating-point argument to decimal notation,
      in the style [d.ddd e+-dd] (mantissa and exponent).
@@ -203,98 +193,99 @@ type ('a, 'b, 'c) t = ('a, 'b, 'c) Pervasives.format
 (** {6 Common functions}*)
 
 val printf: ('b, 'a output, unit) t -> 'b
-  (**The usual [printf] function, prints to the standard output {!stdout}, i.e. normally
-     to the screen. If you are lost, this is probably the function you're looking for.*)
-  
+(**The usual [printf] function, prints to the standard output {!stdout}, i.e. normally
+   to the screen. If you are lost, this is probably the function you're looking for.*)
+
 val eprintf: ('b, 'a output, unit) t -> 'b
-  (**The usual [eprintf] function, prints to the standard error output {!stderr}, used
-     to display warnings and errors. Otherwise identical to {!printf}.*)
-  
+(**The usual [eprintf] function, prints to the standard error output {!stderr}, used
+   to display warnings and errors. Otherwise identical to {!printf}.*)
+
 val sprintf:  ('a, unit, string) t -> 'a
-  (** A function which doesn't print its result but returns it as a string. Useful
-      for building messages, for translation purposes or for display in a window,
-      for instance.
+(** A function which doesn't print its result but returns it as a string. Useful
+    for building messages, for translation purposes or for display in a window,
+    for instance.
 
-      While this function is quite convenient, don't abuse it to create very large
-      strings such as files, that's not its role. For this kind of usage, prefer
-      the more modular and usually faster {!fprintf}.
+    While this function is quite convenient, don't abuse it to create very large
+    strings such as files, that's not its role. For this kind of usage, prefer
+    the more modular and usually faster {!fprintf}.
 
-      Note that any function called with [%a] should return strings, i.e.
-      should have type [unit -> string].*)
-  
+    Note that any function called with [%a] should return strings, i.e.
+    should have type [unit -> string].*)
+
 val sprintf2: ('a, 'b output, unit, string) format4 -> 'a
-  (** A function which doesn't print its result but returns it as a string. Useful
-      for building messages, for translation purposes or for display in a window,
-      for instance.
+(** A function which doesn't print its result but returns it as a string. Useful
+    for building messages, for translation purposes or for display in a window,
+    for instance.
 
-      While this function is quite convenient, don't abuse it to create very large
-      strings such as files, that's not its role. For this kind of usage, prefer
-      the more modular and usually faster {!fprintf}.
-      Note that any function called with [%a] should be able to print its result,
-      i.e. should have type ['b output -> unit].*)
+    While this function is quite convenient, don't abuse it to create very large
+    strings such as files, that's not its role. For this kind of usage, prefer
+    the more modular and usually faster {!fprintf}.
+    Note that any function called with [%a] should be able to print its result,
+    i.e. should have type ['b output -> unit].*)
 
-  
+
 (** {6 General functions}*)
 
 val fprintf: 'a output -> ('b, 'a output, unit) t -> 'b
-  (**General function. This function prints to any output. Typically,
-     if you are attempting to build a large output such as a file,
-     this is probably the function you are looking for. If you are
-     writing a pretty-printer, this is probably the function you are
-     looking for. If you are you are looking for a function to use for
-     argument [%a] with {!printf}, {!eprintf}, {!sprintf2},
-     {!ifprintf}, {!bprintf2}, {!kfprintf}, {!ksprintf2}, {!kbprintf2}
-     or any other function with type [(_, _ output, unit) format] or
-     [(_, _ output, unit, _) format4], this is also probably the
-     function you are looking for.*)
+(**General function. This function prints to any output. Typically,
+   if you are attempting to build a large output such as a file,
+   this is probably the function you are looking for. If you are
+   writing a pretty-printer, this is probably the function you are
+   looking for. If you are you are looking for a function to use for
+   argument [%a] with {!printf}, {!eprintf}, {!sprintf2},
+   {!ifprintf}, {!bprintf2}, {!kfprintf}, {!ksprintf2}, {!kbprintf2}
+   or any other function with type [(_, _ output, unit) format] or
+   [(_, _ output, unit, _) format4], this is also probably the
+   function you are looking for.*)
 
 
 val ifprintf: _        -> ('b, 'a output, unit) t -> 'b
-  (**As {!fprintf} but doesn't actually print anything.
-     Sometimes useful for debugging.*)
-  
+(**As {!fprintf} but doesn't actually print anything.
+   Sometimes useful for debugging.*)
+
 val bprintf: Buffer.t  -> ('a, Buffer.t, unit) t -> 'a
-  (**As {!fprintf}, but with buffers instead of outputs.
-     In particular, any unparser called with [%a] should
-     write to a buffer rather than to an output*)
-  
+(**As {!fprintf}, but with buffers instead of outputs.
+   In particular, any unparser called with [%a] should
+   write to a buffer rather than to an output*)
+
 val bprintf2: Buffer.t  -> ('b, 'a output, unit) t -> 'b
-  (**As {!printf} but writes to a buffer instead
-     of printing to the output. By opposition to
-     {!bprintf}, only the result is changed with
-     respect to {!printf}, not the inner workings.*)
-  
+(**As {!printf} but writes to a buffer instead
+   of printing to the output. By opposition to
+   {!bprintf}, only the result is changed with
+   respect to {!printf}, not the inner workings.*)
+
 (**{6 Functions with continuations}*)
 
 val kfprintf : ('a output -> 'b) -> 'a output -> ('c, 'a output, unit, 'b) format4 -> 'c
-  (**Same as [fprintf], but instead of returning immediately, passes the [output] to its first
-     argument at the end of printing.*)
-  
+(**Same as [fprintf], but instead of returning immediately, passes the [output] to its first
+   argument at the end of printing.*)
+
 val ksprintf: (string -> 'a) -> ('b, unit, string, 'a) format4 -> 'b
-  (** Same as [sprintf] above, but instead of returning the string,
-      passes it to the first argument. *)
+(** Same as [sprintf] above, but instead of returning the string,
+    passes it to the first argument. *)
 val ksprintf2: (string -> 'b) -> ('c, 'a output, unit, 'b) format4 -> 'c
-  (** Same as [sprintf2] above, but instead of returning the string,
-      passes it to the first argument. *)
-  
+(** Same as [sprintf2] above, but instead of returning the string,
+    passes it to the first argument. *)
+
 val kbprintf : (Buffer.t -> 'a) ->
   Buffer.t -> ('b, Buffer.t, unit, 'a) format4 -> 'b
-  (** Same as [bprintf], but instead of returning immediately,
-      passes the buffer to its first argument at the end of printing. *)
+(** Same as [bprintf], but instead of returning immediately,
+    passes the buffer to its first argument at the end of printing. *)
+
 val kbprintf2 : (Buffer.t -> 'b) ->  Buffer.t -> ('c, 'a output, unit, 'b) format4 -> 'c
-  (** Same as [bprintf2], but instead of returning immediately,
-      passes the buffer to its first argument at the end of printing.*)
-  
+(** Same as [bprintf2], but instead of returning immediately,
+    passes the buffer to its first argument at the end of printing.*)
+
 val kprintf : (string -> 'a) -> ('b, unit, string, 'a) format4 -> 'b
-  (** @deprecated This is a deprecated synonym for [ksprintf]. *)
-  
+(** @deprecated This is a deprecated synonym for [ksprintf]. *)
+
 
 (**
    {6 About formats}
-   
+
    You only need to read this if you intend to create your new printf-like functions,
    which happens generally by toying with {!mkprintf}.
-   
+
 
    {7 Format4}
 
@@ -309,9 +300,9 @@ val kprintf : (string -> 'a) -> ('b, unit, string, 'a) format4 -> 'b
    - ['b] is the type of the first argument given to unparsers
    (i.e. functions introduced with [%a] or [%t])
    {ul
-   {- if your unparsers take a [unit] argument, ['b] should be 
+   {- if your unparsers take a [unit] argument, ['b] should be
    [unit]}
-   {- if your unparsers take a [string output], ['b] should be 
+   {- if your unparsers take a [string output], ['b] should be
    [string output]}
    {- ...}
    }
@@ -328,9 +319,75 @@ val kprintf : (string -> 'a) -> ('b, unit, string, 'a) format4 -> 'b
 
    {7 Format}
    [('a, 'b, 'c) format] or [('a, 'b, 'c) t] is just a shortcut for [('a, 'b, 'c, 'c) format4].
-   
+
    {7 Important}
    Note that {!Obj.magic} is involved behind this, so be careful.
 *)
 
+(**/**)
 
+(* For OCaml system internal use only. Don't call directly. *)
+
+module CamlinternalPr : sig
+
+  module Sformat : sig
+    type index;;
+
+    val index_of_int : int -> index;;
+    external int_of_index : index -> int = "%identity";;
+    external unsafe_index_of_int : int -> index = "%identity";;
+
+    val succ_index : index -> index;;
+
+    val sub : ('a, 'b, 'c, 'd, 'e, 'f) format6 -> index -> int -> string;;
+    val to_string : ('a, 'b, 'c, 'd, 'e, 'f) format6 -> string;;
+    external length : ('a, 'b, 'c, 'd, 'e, 'f) format6 -> int
+      = "%string_length";;
+    external get : ('a, 'b, 'c, 'd, 'e, 'f) format6 -> int -> char
+      = "%string_safe_get";;
+    external unsafe_to_string : ('a, 'b, 'c, 'd, 'e, 'f) format6 -> string
+      = "%identity";;
+    external unsafe_get : ('a, 'b, 'c, 'd, 'e, 'f) format6 -> int -> char
+      = "%string_unsafe_get";;
+
+  end;;
+
+  module Tformat : sig
+
+    type ac = {
+      mutable ac_rglr : int;
+      mutable ac_skip : int;
+      mutable ac_rdrs : int;
+    };;
+
+    val ac_of_format : ('a, 'b, 'c, 'd, 'e, 'f) format6 -> ac;;
+
+    val sub_format :
+      (('a, 'b, 'c, 'd, 'e, 'f) format6 -> int) ->
+      (('a, 'b, 'c, 'd, 'e, 'f) format6 -> int -> char -> int) ->
+      char ->
+      ('a, 'b, 'c, 'd, 'e, 'f) format6 ->
+      int ->
+      int
+
+    val summarize_format_type : ('a, 'b, 'c, 'd, 'e, 'f) format6 -> string
+
+    val scan_format : ('a, 'b, 'c, 'd, 'e, 'f) format6 ->
+      'g array ->
+      Sformat.index ->
+      int ->
+      (Sformat.index -> string -> int -> 'h) ->
+      (Sformat.index -> 'i -> 'j -> int -> 'h) ->
+      (Sformat.index -> 'k -> int -> 'h) ->
+      (Sformat.index -> int -> 'h) ->
+      (Sformat.index -> ('l, 'm, 'n, 'o, 'p, 'q) format6 -> int -> 'h) ->
+      'h
+
+    val kapr :
+      (('a, 'b, 'c, 'd, 'e, 'f) format6 -> Obj.t array -> 'g) ->
+      ('a, 'b, 'c, 'd, 'e, 'f) format6 ->
+      'g
+
+  end;;
+
+end;;

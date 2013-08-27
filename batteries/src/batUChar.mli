@@ -1,170 +1,81 @@
-(* $Id: uChar.mli,v 1.4 2004/09/04 16:07:38 yori Exp $ *)
-(* Copyright 2002, 2003 Yamagata Yoriyuki. distributed with LGPL *)
-(* TODO: Check -- this is actually part of a package distributed with LGPL + linking exception *)
+(** Unicode characters.
 
-(** Unicode (ISO-UCS) characters.
-    
-    This module implements Unicode (actually ISO-UCS) characters.  All
-    31-bit code points are allowed.
-
-    {b Note} For conversions to lower/upercase, see modules {!UTF8} and {!Rope}.
-
-    @author Yamagata Yoriyuki (Camomile module)
-    @author Edgar Friendly
-    @author David Teller
-
-    @documents UChar
+    This module implements Unicode characters.
 *)
 
-open BatCamomile.UChar
+(* Copyright (C) 2002, 2003, 2004, 2011 Yamagata Yoriyuki. *)
 
-val is_whitespace : t -> bool
-(** Determine if a character is a whitespace.
+(* This library is free software; you can redistribute it and/or *)
+(* modify it under the terms of the GNU Lesser General Public License *)
+(* as published by the Free Software Foundation; either version 2 of *)
+(* the License, or (at your option) any later version. *)
 
-    A character is a whitespace if it is either one of the ASCII
-    whitespaces (characters 9, 10, 12, 13, 26 and 32), or a part of
-    Unicode category [Z] (separators). *)
+(* As a special exception to the GNU Library General Public License, you *)
+(* may link, statically or dynamically, a "work that uses this library" *)
+(* with a publicly distributed version of this library to produce an *)
+(* executable file containing portions of this library, and distribute *)
+(* that executable file under terms of your choice, without any of the *)
+(* additional requirements listed in clause 6 of the GNU Library General *)
+(* Public License. By "a publicly distributed version of this library", *)
+(* we mean either the unmodified Library as distributed by the authors, *)
+(* or a modified version of this library that is distributed under the *)
+(* conditions defined in clause 3 of the GNU Library General Public *)
+(* License. This exception does not however invalidate any other reasons *)
+(* why the executable file might be covered by the GNU Library General *)
+(* Public License . *)
 
-val is_uppercase : t -> bool
-  (** Determine if a character is an uppercase character.*)
+(* This library is distributed in the hope that it will be useful, *)
+(* but WITHOUT ANY WARRANTY; without even the implied warranty of *)
+(* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU *)
+(* Lesser General Public License for more details. *)
 
-val is_lowercase : t -> bool
-(** Determine if a character is an lowercase character.*)
+(* You should have received a copy of the GNU Lesser General Public *)
+(* License along with this library; if not, write to the Free Software *)
+(* Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 *)
+(* USA *)
 
-val is_newline : t -> bool
-  (** Determine if a character is a newline.  Newline characters are
-      characters 10 ('\r'), 13 (\'n') and characters which are part of
-      Unicode category [`Zl] *)
+(* You can contact the authour by sending email to *)
+(* yori@users.sourceforge.net *)
 
-val lowercase : t -> t
-  (** Convert the given character to its equivalent lowercase
-      character. *)
+type t
 
-val uppercase : t -> t
-  (** Convert the given character to its equivalent uppercase
-      character. *)
+exception Out_of_range
 
-(**
-   {6 Conversion functions}
-*)
+(** [char_of u] returns the Latin-1 representation of [u].
+    If [u] can not be represented by Latin-1, raises Out_of_range *)
+val char_of : t -> char
 
-val to_char : t -> char
-  (** [to_char u] returns the Latin-1 representation of [u].  
+(** [of_char c] returns the Unicode character of the Latin-1 character [c] *)
+val of_char : char -> t
 
-      @raise Out_of_range if [u] can not be represented by Latin-1.*)
+(** [code u] returns the Unicode code number of [u]. *)
+external code : t -> int = "%identity"
 
-val of_digit: int -> t
-(** Return the character representing a given digit.
-    
-    @raise Invalid_argument "UChar.of_digit" if the
-    argument is outside the range 0--9*)
+(** [chr n] returns the Unicode character with the code number [n].
+    If n does not lay in the valid range of Unicode or designates a
+    surrogate charactor, raises Out_of_range *)
+val chr : int -> t
 
-(** Alias of [uint_code] *)
-val to_int : t   -> int
+(** Equality by code point comparison *)
+val eq : t -> t -> bool
 
+(** [compare u1 u2] returns,
+    a value > 0 if [u1] has a larger Unicode code number than [u2],
+    0 if [u1] and [u2] are the same Unicode character,
+    a value < 0 if [u1] has a smaller Unicode code number than [u2]. *)
+val compare : t -> t -> int
 
-(**
-   {6 Comparaison}
-*)
+(** Aliases of [type t] *)
+type uchar = t
 
-val icompare : t -> t -> int
-  (** Compare two unicode characters, case-insensitive. *)
+(** Alias of [code] *)
+val int_of : uchar -> int
 
-module IUChar : BatInterfaces.OrderedType with type t = t
+(** Alias of [chr] *)
+val of_int : int -> uchar
 
-(** {6 Detailed information}*)
+(**/**)
 
-(** Determine to which script this character belongs.*)
+val unsafe_chr : int -> t
 
-type script = 
- [ `Arabic
-       | `Armenian
-       | `Bengali
-       | `Bopomofo
-       | `Buhid
-       | `Canadian_Aboriginal
-       | `Cherokee
-       | `Common
-       | `Cyrillic
-       | `Deseret
-       | `Devanagari
-       | `Ethiopic
-       | `Georgian
-       | `Gothic
-       | `Greek
-       | `Gujarati
-       | `Gurmukhi
-       | `Han
-       | `Hangul
-       | `Hanunoo
-       | `Hebrew
-       | `Hiragana
-       | `Inherited
-       | `Kannada
-       | `Katakana
-       | `Khmer
-       | `Lao
-       | `Latin
-       | `Malayalam
-       | `Mongolian
-       | `Myanmar
-       | `Ogham
-       | `Old_Italic
-       | `Oriya
-       | `Runic
-       | `Sinhala
-       | `Syriac
-       | `Tagalog
-       | `Tagbanwa
-       | `Tamil
-       | `Telugu
-       | `Thaana
-       | `Thai
-       | `Tibetan
-       | `Yi ] 
-val script : t -> script
-
-type category =
-  [ `Lu         (** Letter, Uppercase *)
-  | `Ll         (** Letter, Lowercase *)
-  | `Lt         (** Letter, Titlecase *)
-  | `Mn         (** Mark, Non-Spacing *)
-  | `Mc         (** Mark, Spacing Combining *)
-  | `Me         (** Mark, Enclosing *)
-  | `Nd         (** Number, Decimal Digit *)
-  | `Nl         (** Number, Letter *)
-  | `No         (** Number, Other *)
-  | `Zs         (** Separator, Space *)
-  | `Zl         (** Separator, Line *)
-  | `Zp         (** Separator, Paragraph *)
-  | `Cc         (** Other, Control *)
-  | `Cf         (** Other, Format *)
-  | `Cs         (** Other, Surrogate *)
-  | `Co         (** Other, Private Use *)
-  | `Cn         (** Other, Not Assigned *)
-  | `Lm         (** Letter, Modifier *)
-  | `Lo         (** Letter, Other *)
-  | `Pc         (** Punctuation, Connector *)
-  | `Pd         (** Punctuation, Dash *)
-  | `Ps         (** Punctuation, Open *)
-  | `Pe         (** Punctuation, Close *)
-  | `Pi         (** Punctuation, Initial quote  *)
-  | `Pf         (** Punctuation, Final quote  *)
-  | `Po         (** Punctuation, Other *)
-  | `Sm         (** Symbol, Math *)
-  | `Sc         (** Symbol, Currency *)
-  | `Sk         (** Symbol, Modifier *)
-  | `So         (** Symbol, Other *) ]
-
-(**Determine to which category the character belongs.*)
-val category : t -> category
-
-(** {6 Boilerplate code}*)
-
-(** {7 Printing}*)
-val print: 'a BatInnerIO.output -> t -> unit
-val t_printer : t BatValue_printer.t
-
-
-
-
+  (**/**)

@@ -1,5 +1,5 @@
 (* open BatString -- overrides compare for some reason! *)
-open BatList
+open BatListFull
 open Big_int_Z
 
 let id = fun x -> x
@@ -129,7 +129,7 @@ let list_delete l e =
   in
     delete_aux [] l
 
-let list_compare = BatList.make_compare
+let list_compare = BatList.compare
 
 let list_cart_prod2 f l1 l2 =
   List.iter

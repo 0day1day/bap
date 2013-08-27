@@ -1,4 +1,7 @@
-<{batMutex,batRMutex}.{ml,mli}>: threads
-"syntax/pa_comprehension" or "syntax/pa_strings": include
 true: debug
-<batteries_help.*>: compiler-libs
+<{batMutex,batRMutex}.{ml,mli}>: threads
+<batteriesThread.*>: threads
+<batFingerTree.ml>: rectypes
+<{batMap,batVect,batFile,batPervasives,batParserCo,batSet,batLogger,batPathGen,batSplay}.ml>: warn_z
+<{batPervasives,batIMap,batLog}.ml>: warn_-9
+<batteriesHelp.*>: compiler-libs
