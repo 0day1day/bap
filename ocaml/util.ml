@@ -603,17 +603,6 @@ let rec print_separated_list ps sep lst =
   in
     doit "" lst
 
-let print_obj_info title value =
-  let module D = Debug.Make(struct let name = "UtilSize" and default=`NoDebug end) in
-  if D.debug() then
-    let i = Objsize.objsize value in
-    D.dprintf "%S : data_words=%i headers=%i depth=%i\n    \ 
-      bytes_without_headers=%i bytes_with_headers=%i"
-      title i.Objsize.data i.Objsize.headers i.Objsize.depth
-      (Objsize.size_without_headers i)
-      (Objsize.size_with_headers i);
-    D.dprintf "%S : total size in MB = %i" title ((Objsize.size_with_headers i) / 1048576)
-
 let syscall ?(env=[| |]) cmd =
   let check_exit_status =
     let warn = "warning: the process was" in

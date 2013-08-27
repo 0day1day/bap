@@ -16,7 +16,6 @@ export BATT=$(BAP_DIR)/batteries/_build/src
 export OUNIT=$(BAP_DIR)/ounit/_build/src
 export PCRE=$(BAP_DIR)/pcre-ocaml/lib
 export OCAMLGRAPH=$(BAP_DIR)/ocamlgraph-1.8
-export OBJSIZE=$(BAP_DIR)/objsize-0.16
 export LIBTRACE=$(BAP_DIR)/libtracewrap/libtrace/src/ocaml
 export PIQIBUILDDIR=$(BAP_DIR)/libtracewrap/libtrace/piqi/piqi/build/lib/ocaml
 
@@ -32,8 +31,8 @@ endif
 
 # ocamlfind packages required
 export PACKS = camlidl bigarray str num unix camomile piqi.lib $(LLVM_PACKS)
-export LIBS = zarith batteries objsize oUnit graph pcre libtrace $(PROJLIBS) bap
-export INCDIRS = $(BAP_OCAMLDIR) $(BAP_OCAMLDIR)/piqi $(BIGINT) $(BATT) $(OUNIT) $(PCRE) $(OCAMLGRAPH) $(OBJSIZE) $(LIBTRACE) $(PROJINCDIRS)
+export LIBS = zarith batteries oUnit graph pcre libtrace $(PROJLIBS) bap
+export INCDIRS = $(BAP_OCAMLDIR) $(BAP_OCAMLDIR)/piqi $(BIGINT) $(BATT) $(OUNIT) $(PCRE) $(OCAMLGRAPH) $(LIBTRACE) $(PROJINCDIRS)
 export OCAMLPATH = $(PIQIBUILDDIR)
 
 export OCAMLFLAGS = -thread -warn-error Aelz -annot
@@ -140,7 +139,7 @@ tags:
 
 # Print out command line to start ocamldebug
 debug: dc
-	@echo ocamldebug -I $(BIGINT) -I $(BAP_OCAMLDIR) -I $(BATT) -I $(OUNIT) -I $(PCRE) -I $(OBJSIZE) program
+	@echo ocamldebug -I $(BIGINT) -I $(BAP_OCAMLDIR) -I $(BATT) -I $(OUNIT) -I $(PCRE) program
 
 %:
 	make -f $(OCAMLMAKEFILE) subprojs SUBTARGET=$@
