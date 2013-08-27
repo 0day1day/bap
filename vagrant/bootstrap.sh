@@ -1,7 +1,15 @@
 #!/usr/bin/env bash
 
+set -x
+
+INSTALL=/vagrant/INSTALL
+
 apt-get update
-apt-get install -y ocaml-nox ocaml-native-compilers ocaml-findlib camlidl binutils-dev automake libcamomile-ocaml-dev otags libpcre3-dev camlp4-extra bison flex zlib1g-dev libgmp3-dev g++ libtool make cppo
+
+START=`awk '/^__BEGIN_REQUIRED__/ {print NR + 1; exit 0; }' $INSTALL`
+END=$((`awk '/^__END_REQUIRED__/ {print NR + 1; exit 0; }' $INSTALL` - $START - 1))
+
+tail -n+$START $INSTALL | head -n$END | sed 's/\$ //g' | bash
 
 echo 0 > /proc/sys/kernel/yama/ptrace_scope
 
