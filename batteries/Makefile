@@ -236,3 +236,6 @@ coverage/index.html: $(TESTDEPS) $(QTESTDIR)/all_tests.ml
 	$(OCAMLBUILD) coverage/index.html
 
 coverage: coverage/index.html
+
+.PHONY: tags
+tags:
