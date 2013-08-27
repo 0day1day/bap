@@ -10,7 +10,7 @@ endif
 
 
 BAPDIRS=libasmir ocaml utils tests $(PINTRACES)
-SUBDIRS=batteries zarith-1.0 ounit pcre-ocaml ocamlgraph libtracewrap $(BAPDIRS)
+SUBDIRS=batteries zarith ounit pcre-ocaml ocamlgraph libtracewrap $(BAPDIRS)
 
 test: all
 	$(MAKE) -C tests test

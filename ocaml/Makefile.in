@@ -13,7 +13,7 @@ export CAMLIDLFLAGS = -prepro cpp
 
 export OCAMLMAKEFILE=OCamlMakefile
 export LIBASMIR=../libasmir
-export BIGINT=$(BAP_DIR)/zarith-1.0
+export BIGINT=$(BAP_DIR)/zarith
 export BATT=$(BAP_DIR)/batteries/_build/src
 export OUNIT=$(BAP_DIR)/ounit/_build/src/
 export PCRE=$(BAP_DIR)/pcre-ocaml/lib

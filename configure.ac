@@ -196,7 +196,7 @@ AC_OUTPUT
 (cd ocamlgraph && ./configure)
 
 # Configure zarith
-(cd zarith-1.0 && ./configure)
+(cd zarith && ./configure)
 
 # Force libtracewrap to reconfigure
 rm -f libtracewrap/CONFIGURED

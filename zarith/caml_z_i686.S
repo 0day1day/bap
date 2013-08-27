@@ -31,6 +31,14 @@
 #define SYMB(x)  x
 #endif
 
+	
+        /* optional dot prefix for local labels */
+#ifdef Z_DOT_LABEL_PREFIX
+#define L(x) .L##x
+#else
+#define L(x)  L##x
+#endif
+	
         /* function prolog & epilog */
 
 #if defined(Z_ELF) || defined(Z_COFF)
@@ -84,15 +92,16 @@ SYMB(ml_as_z_##proc):
 
         /* neg */
         PROLOG(neg)
+L(negenter):
         mov     4(%esp), %eax
-        test    $1, %eax
-        jz      .Lneg
+        test    $1, %al
+        jz      L(neg)
         not     %eax
         add     $3, %eax
-        jo      .Lneg
+        jo      L(neg)
         OP
         ret
-.Lneg:
+L(neg):
         C_JMP(neg)
         EPILOG(neg)
 
@@ -100,17 +109,17 @@ SYMB(ml_as_z_##proc):
         /* abs */
         PROLOG(abs)
         mov     4(%esp), %eax
-        test    $1, %eax
-        jz      .Labs
+        test    $1, %al
+        jz      L(abs)
         test    %eax, %eax
-        jns     .Labs2
+        jns     L(abs2)
         not     %eax
         add     $3, %eax
-        jo      .Labs
-.Labs2:
+        jo      L(abs)
+L(abs2):
         OP
         ret
-.Labs:
+L(abs):
         C_JMP(abs)
         EPILOG(abs)
 
@@ -118,13 +127,13 @@ SYMB(ml_as_z_##proc):
         /* succ */
         PROLOG(succ)
         mov     4(%esp), %eax
-        test    $1, %eax
-        jz      .Lsucc
+        test    $1, %al
+        jz      L(succ)
         add     $2, %eax
-        jo      .Lsucc
+        jo      L(succ)
         OP
         ret
-.Lsucc:
+L(succ):
         C_JMP(succ)
         EPILOG(succ)
 
@@ -132,13 +141,13 @@ SYMB(ml_as_z_##proc):
         /* pred */
         PROLOG(pred)
         mov     4(%esp), %eax
-        test    $1, %eax
-        jz      .Lpred
+        test    $1, %al
+        jz      L(pred)
         sub     $2, %eax
-        jo      .Lpred
+        jo      L(pred)
         OP
         ret
-.Lpred:
+L(pred):
         C_JMP(pred)
         EPILOG(pred)
 
@@ -151,17 +160,17 @@ SYMB(ml_as_z_##proc):
         /* add */
         PROLOG(add)
         mov     4(%esp), %eax
-        test    $1, %eax
-        jz      .Ladd
+        test    $1, %al
+        jz      L(add)
         mov     8(%esp), %ecx
-        test    $1, %ecx
-        jz      .Ladd
+        test    $1, %cl
+        jz      L(add)
         dec     %eax
         add     %ecx, %eax
-        jo      .Ladd
+        jo      L(add)
         OP
         ret
-.Ladd:
+L(add):
         C_JMP(add)
         EPILOG(add)
 
@@ -169,17 +178,17 @@ SYMB(ml_as_z_##proc):
         /* sub */
         PROLOG(sub)
         mov     4(%esp), %eax
-        test    $1, %eax
-        jz      .Lsub
+        test    $1, %al
+        jz      L(sub)
         mov     8(%esp), %ecx
-        test    $1, %ecx
-        jz      .Lsub
+        test    $1, %cl
+        jz      L(sub)
         sub     %ecx, %eax
-        jo      .Lsub
+        jo      L(sub)
         inc     %eax
         OP
         ret
-.Lsub:
+L(sub):
         C_JMP(sub)
         EPILOG(sub)
 
@@ -187,50 +196,40 @@ SYMB(ml_as_z_##proc):
         /* mul */
         PROLOG(mul)
         mov     4(%esp), %eax
-        test    $1, %eax
-        jz      .Lmul
+        test    $1, %al
+        jz      L(mul)
         mov     8(%esp), %ecx
-        test    $1, %ecx
-        jz      .Lmul
+        sar     %ecx  /* sets CF to least significant bit */
+        jnc     L(mul)
         dec     %eax
-        sar     %ecx
         imul    %ecx, %eax
-        jo      .Lmul
+        jo      L(mul)
         inc     %eax
         OP
         ret
-.Lmul:
+L(mul):
         C_JMP(mul)
-        EPILOG(sub)
+        EPILOG(mul)
 
         
         /* div */
         PROLOG(div)
-        mov     4(%esp), %eax
-        test    $1, %eax
-        jz      .Ldiv
         mov     8(%esp), %ecx
-        test    $1, %ecx
-        jz      .Ldiv
         sar     %ecx
-        jz      .Ldiv   /* division by zero */
+        jnc     L(div)   /* not a 31-bit integer */
+        jz      L(div)   /* division by zero */
         cmp     $-1, %ecx
-        je      .Ldivneg
+	     /* division by -1, the only one that can overflow */
+        je      L(negenter)
+        mov     4(%esp), %eax
         sar     %eax
+        jnc     L(div)   /* not a 31-bit integer */
         cdq
         idiv    %ecx
-        sal     %eax
-        inc     %eax
+	lea	1(%eax, %eax), %eax
         OP
         ret
-.Ldivneg:
-        /* division by -1, the only one that can overflow */
-        not     %eax
-        add     $3, %eax
-        jo      .Ldiv
-        OP
-        ret
-.Ldiv:
+L(div):
         C_JMP(div)
         EPILOG(div)
 
@@ -238,28 +237,25 @@ SYMB(ml_as_z_##proc):
         /* rem */
         PROLOG(rem)
         mov     4(%esp), %eax
-        test    $1, %eax
-        jz      .Lrem
-        mov     8(%esp), %ecx
-        test    $1, %ecx
-        jz      .Lrem
-        sar     %ecx
-        jz      .Lrem   /* division by zero */
-        cmp     $-1, %ecx
-        je      .Lremneg
         sar     %eax
+        jnc     L(rem)   /* not a 31-bit integer */
+        mov     8(%esp), %ecx
+        sar     %ecx
+        jnc     L(rem)   /* not a 31-bit integer */
+        jz      L(rem)   /* division by zero */
+        cmp     $-1, %ecx
+        je      L(remneg)
         cdq
         idiv    %ecx
-        sal     %edx
-        lea     1(%edx), %eax
+	lea     1(%edx, %edx), %eax
         OP
         ret
-.Lremneg:
+L(remneg):
         /* division by -1 */
         mov     $1, %eax
         OP
         ret
-.Lrem:
+L(rem):
         C_JMP(rem)
         EPILOG(rem)
 
@@ -271,12 +267,12 @@ SYMB(ml_as_z_##proc):
         /* not */
         PROLOG(lognot)
         mov     4(%esp), %eax
-        test    $1, %eax
-        jz      .Llognot
+        test    $1, %al
+        jz      L(lognot)
         dec     %eax
         not     %eax
         ret
-.Llognot:
+L(lognot):
         C_JMP(lognot)
         EPILOG(lognot)
 
@@ -284,30 +280,30 @@ SYMB(ml_as_z_##proc):
         /* or */
         PROLOG(logor)
         mov     4(%esp), %eax
-        test    $1, %eax
-        jz      .Llogor
+        test    $1, %al
+        jz      L(logor)
         mov     8(%esp), %ecx
-        test    $1, %ecx
-        jz      .Llogor
+        test    $1, %cl
+        jz      L(logor)
         or      %ecx, %eax
         OP
         ret
-.Llogor:
+L(logor):
         C_JMP(logor)
         EPILOG(logor)
 
         /* and */
         PROLOG(logand)
         mov     4(%esp), %eax
-        test    $1, %eax
-        jz      .Llogand
+        test    $1, %al
+        jz      L(logand)
         mov     8(%esp), %ecx
-        test    $1, %ecx
-        jz      .Llogand
+        test    $1, %cl
+        jz      L(logand)
         and     %ecx, %eax
         OP
         ret
-.Llogand:
+L(logand):
         C_JMP(logand)
         EPILOG(logand)
 
@@ -315,16 +311,16 @@ SYMB(ml_as_z_##proc):
         /* xor */
         PROLOG(logxor)
         mov     4(%esp), %eax
-        test    $1, %eax
-        jz      .Llogxor
+        test    $1, %al
+        jz      L(logxor)
         mov     8(%esp), %ecx
-        test    $1, %ecx
-        jz      .Llogxor
+        test    $1, %cl
+        jz      L(logxor)
         xor     %ecx, %eax
         inc     %eax
         OP
         ret
-.Llogxor:
+L(logxor):
         C_JMP(logxor)
         EPILOG(logxor)
 
@@ -332,25 +328,23 @@ SYMB(ml_as_z_##proc):
         /* shift_left */
         PROLOG(shift_left)
         mov     4(%esp), %eax
-        test    $1, %eax
-        jz      .Lshift_left
+        test    $1, %al
+        jz      L(shift_left)
         mov     8(%esp), %ecx
-        test    $1, %ecx
-        jz      .Lshift_left
         sar     %ecx
         cmp     $31, %ecx
-        jae     .Lshift_left
+        jae     L(shift_left)
         dec     %eax
         sal     %cl, %eax
         mov     %eax, %edx
         sar     %cl, %edx
         inc     %edx
         cmp     4(%esp), %edx
-        jne     .Lshift_left /* overflow */
+        jne     L(shift_left) /* overflow */
         inc     %eax
         OP
         ret
-.Lshift_left:
+L(shift_left):
         C_JMP(shift_left)
         EPILOG(shift_left)
 
@@ -358,29 +352,28 @@ SYMB(ml_as_z_##proc):
         /* shift_right */
         PROLOG(shift_right)
         mov     4(%esp), %eax
-        test    $1, %eax
-        jz      .Lshift_right
+        test    $1, %al
+        jz      L(shift_right)
         mov     8(%esp), %ecx
-        test    $1, %ecx
-        jz      .Lshift_right
         sar     %ecx
+        js      L(shift_right)
         cmp     $31, %ecx
-        jae     .Lshift_right2
+        jae     L(shift_right2)
         sar     %cl, %eax
         or      $1, %eax
         OP
         ret
-.Lshift_right2:
+L(shift_right2):
         /* shift by 31 or more */
         test    %eax, %eax
-        js      .Lshift_right3
+        js      L(shift_right3)
         mov     $1, %eax
         OP
         ret
-.Lshift_right3:
+L(shift_right3):
         mov     $-1, %eax
         OP
         ret
-.Lshift_right:
+L(shift_right):
         C_JMP(shift_right)
         EPILOG(shift_right)

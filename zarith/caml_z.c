@@ -45,6 +45,9 @@ extern "C" {
 #include <caml/intext.h>
 #include <caml/callback.h>
 #include <caml/intext.h>
+#ifdef Z_OCAML_HASH
+#include <caml/hash.h>
+#endif
 
 #define inline __inline
 
@@ -490,7 +493,11 @@ CAMLprim value ml_z_of_float(value v)
 #endif
   Z_MARK_SLOW;
   if (isinf(x) || isnan(x)) ml_z_raise_overflow();
+#ifdef ARCH_ALIGN_INT64
+  memcpy(&y, v, 8);
+#else
   y = *((int64*)v);
+#endif
   exp = ((y >> 52) & 0x7ff) - 1023; /* exponent */
   if (exp < 0) return(Val_long(0));
   m = (y & 0x000fffffffffffffLL) | 0x0010000000000000LL; /* mantissa */
@@ -1335,13 +1342,9 @@ CAMLprim value ml_z_mul(value arg1, value arg2)
     /* fast path */
     intnat a1 = Long_val(arg1);
     intnat a2 = Long_val(arg2);
-    intnat v;
     if (!a1 || !a2) return Val_long(0);
-    v = a1 * a2;
     /* small argument case */
-    if (Z_FITS_HINT(arg1) && Z_FITS_HINT(arg2)) return Val_long(v);
-    /* small result case */
-    if (Z_FITS_INT(v) && a1==v/a2) return Val_long(v);
+    if (Z_FITS_HINT(arg1) && Z_FITS_HINT(arg2)) return Val_long(a1 * a2);
   }
 #endif
   /* mpn_ version */
@@ -2589,26 +2592,30 @@ int ml_z_custom_compare(value arg1, value arg2)
   return r;
 }
 
+#ifndef Z_OCAML_HASH
+#define caml_hash_mix_uint32(h,n) ((h) * 65599 + (n))
+#endif
 
 static intnat ml_z_custom_hash(value v)
 {
   Z_DECL(v);
   mp_size_t i;
-  intnat acc = 0;
+  uint32 acc = 0;
   Z_CHECK(v);
   Z_ARG(v);
   for (i = 0; i < size_v; i++) {
-    acc = acc * 65599 + ptr_v[i];
+    acc = caml_hash_mix_uint32(acc, (uint32)(ptr_v[i]));
 #ifdef ARCH_SIXTYFOUR
-    acc = acc * 65599 + (ptr_v[i] >> 32);
+    acc = caml_hash_mix_uint32(acc, ptr_v[i] >> 32);
 #endif
   }
-  if (sign_v) acc++;
-#ifdef ARCH_SIXTYFOUR
-  return acc & 0xffffffff;
-#else
-  return acc;
+#ifndef ARCH_SIXTYFOUR
+  /* To obtain the same hash value on 32- and 64-bit platforms */
+  if (size_v % 2 != 0)
+    acc = caml_hash_mix_uint32(acc, 0);
 #endif
+  if (sign_v) acc++;
+  return acc;
 }
 
 CAMLprim value ml_z_hash(value v)
@@ -2629,7 +2636,8 @@ static void ml_z_custom_serialize(value v,
   Z_DECL(v);
   Z_CHECK(v);
   Z_ARG(v);
-  if ((mp_size_t)(uint32) size_v != size_v) failwith("Z.serialize: number is too large");
+  if ((mp_size_t)(uint32) size_v != size_v) 
+    caml_failwith("Z.serialize: number is too large");
   nb = size_v * sizeof(mp_limb_t);
   caml_serialize_int_1(sign_v ? 1 : 0);
   caml_serialize_int_4(nb);
