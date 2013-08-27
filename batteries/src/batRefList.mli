@@ -22,8 +22,8 @@
 (** Reference on lists.
 
     RefList is a extended set of functions that manipulate list
-    references. 
-    
+    references.
+
 
     @author Nicolas Cannasse
     @author David Teller (Boilerplate code)
@@ -35,7 +35,7 @@ type 'a t (**The type of an empty ref list*)
 
 val empty : unit -> 'a t
 (** Returns a new empty ref list *)
-  
+
 val is_empty : 'a t -> bool
 (** Return [true] if a ref list is empty *)
 
@@ -53,7 +53,7 @@ val copy_list : dst:'a t -> src:'a list -> unit
 
 val copy_enum : dst:'a t -> src:'a BatEnum.t -> unit
 (** Makes a copy of a enum.
-    
+
     @param dst A reflist, whose contents will be forgotten. *)
 
 val of_list : 'a list -> 'a t
@@ -80,9 +80,8 @@ val add : 'a t -> 'a -> unit
 val push : 'a t -> 'a -> unit
 (** Adds an element at the head - O(1) *)
 
-val add_sort : ?cmp:('a -> 'a -> int) -> 'a t -> 'a -> unit
-(** Adds an element in a sorted list, using optional comparator
-    or 'compare' as default. *)
+val add_sort : cmp:('a -> 'a -> int) -> 'a t -> 'a -> unit
+(** Adds an element in a sorted list, using the given comparator. *)
 
 val first : 'a t -> 'a
 (** Returns the first element or
@@ -90,16 +89,16 @@ val first : 'a t -> 'a
 
 val last : 'a t -> 'a
 (** Returns the last element - O(n) or
-    raises Empty_list if the ref list is empty *)
+    raises [Empty_list] if the ref list is empty *)
 
 val pop : 'a t -> 'a
 (** Removes and returns the first element or
-   raises [Empty_list] if the ref list is empty *)
+    raises [Empty_list] if the ref list is empty *)
 
 val npop : 'a t -> int -> 'a list
 (** Removes and returns the n first elements or
-   raises [Empty_list] if the ref list does not
-   contain enough elements *)
+    raises [Empty_list] if the ref list does not
+    contain enough elements *)
 
 val hd : 'a t -> 'a
 (** same as [first] *)
@@ -115,12 +114,12 @@ val rev : 'a t -> unit
 (** {6 Functional Operations} *)
 
 val fold_left : ('a -> 'b -> 'a) -> 'a -> 'b t -> 'a
-  (** [List.fold_left f a (ref [b0; b1; ...; bn])] is
-      [f (... (f (f a b0) b1) ...) bn]. *)
-  
+(** [List.fold_left f a (ref [b0; b1; ...; bn])] is
+    [f (... (f (f a b0) b1) ...) bn]. *)
+
 val fold_right : ('a -> 'b -> 'b) -> 'a t -> 'b -> 'b
-  (** [List.fold_right f (ref [a0; a1; ...; an]) b] is
-      [f a0 (f a1 (... (f an b) ...))].  Tail-recursive. *)
+(** [List.fold_right f (ref [a0; a1; ...; an]) b] is
+    [f a0 (f a1 (... (f an b) ...))].  Tail-recursive. *)
 
 val iter : ('a -> unit) -> 'a t -> unit
 (** Apply the given function to all elements of the
@@ -162,9 +161,8 @@ val map_list : ('a -> 'b) -> 'a t -> 'b list
     and return the list constructed with
     the function returned values *)
 
-val sort : ?cmp:('a -> 'a -> int) -> 'a t -> unit
-(** Sort elements using the specified comparator
-    or compare as default comparator *)
+val sort : cmp:('a -> 'a -> int) -> 'a t -> unit
+(** Sort elements using the specified comparator *)
 
 val filter : ('a -> bool) -> 'a t -> unit
 (** Remove all elements that do not match the
@@ -199,26 +197,26 @@ val remove_all : 'a t -> 'a -> unit
 *)
 module Index : sig
 
-	val index_of : 'a t -> 'a -> int
-	(** Return the index (position : 0 starting) of an element in
+  val index_of : 'a t -> 'a -> int
+  (** Return the index (position : 0 starting) of an element in
 	    a ref list, using ( = ) for testing element equality
 	    raise [Not_found] if no element was found *)
 
-	val index : ('a -> bool) -> 'a t -> int
-	(** Return the index (position : 0 starting) of an element in
+  val index : ('a -> bool) -> 'a t -> int
+  (** Return the index (position : 0 starting) of an element in
 	    a ref list, using the specified comparator
 	    raise [Not_found] if no element was found *)
 
-	val at_index : 'a t -> int -> 'a
-	(** Return the element of ref list at the specified index
+  val at_index : 'a t -> int -> 'a
+  (** Return the element of ref list at the specified index
 	    raise [Invalid_index] if the index is outside [0 ; length-1] *)
 
-	val set : 'a t -> int -> 'a -> unit
-	(** Change the element at the specified index
+  val set : 'a t -> int -> 'a -> unit
+  (** Change the element at the specified index
 	    raise [Invalid_index] if the index is outside [0 ; length-1] *)
 
-	val remove_at : 'a t -> int -> unit
-	(** Remove the element at the specified index
-	    raise [Invalid_index] if the index is outside [0 ; length-1] *)
+  val remove_at : 'a t -> int -> unit
+    (** Remove the element at the specified index
+		    raise [Invalid_index] if the index is outside [0 ; length-1] *)
 
 end

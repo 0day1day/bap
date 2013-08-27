@@ -1557,6 +1557,24 @@ class taint_intro : public ::google::protobuf::Message {
   inline ::std::string* mutable_value();
   inline ::std::string* release_value();
   
+  // optional string source_name = 4;
+  inline bool has_source_name() const;
+  inline void clear_source_name();
+  static const int kSourceNameFieldNumber = 4;
+  inline const ::std::string& source_name() const;
+  inline void set_source_name(const ::std::string& value);
+  inline void set_source_name(const char* value);
+  inline void set_source_name(const char* value, size_t size);
+  inline ::std::string* mutable_source_name();
+  inline ::std::string* release_source_name();
+  
+  // optional uint64 offset = 5;
+  inline bool has_offset() const;
+  inline void clear_offset();
+  static const int kOffsetFieldNumber = 5;
+  inline ::google::protobuf::uint64 offset() const;
+  inline void set_offset(::google::protobuf::uint64 value);
+  
   // @@protoc_insertion_point(class_scope:taint_intro)
  private:
   inline void set_has_addr();
@@ -1565,15 +1583,21 @@ class taint_intro : public ::google::protobuf::Message {
   inline void clear_has_taint_id();
   inline void set_has_value();
   inline void clear_has_value();
+  inline void set_has_source_name();
+  inline void clear_has_source_name();
+  inline void set_has_offset();
+  inline void clear_has_offset();
   
   ::google::protobuf::UnknownFieldSet _unknown_fields_;
   
   ::google::protobuf::uint64 addr_;
   ::google::protobuf::uint64 taint_id_;
   ::std::string* value_;
+  ::std::string* source_name_;
+  ::google::protobuf::uint64 offset_;
   
   mutable int _cached_size_;
-  ::google::protobuf::uint32 _has_bits_[(3 + 31) / 32];
+  ::google::protobuf::uint32 _has_bits_[(5 + 31) / 32];
   
   friend void  protobuf_AddDesc_frame_2epiqi_2eproto();
   friend void protobuf_AssignDesc_frame_2epiqi_2eproto();
@@ -3459,6 +3483,86 @@ inline ::std::string* taint_intro::release_value() {
     value_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
     return temp;
   }
+}
+
+// optional string source_name = 4;
+inline bool taint_intro::has_source_name() const {
+  return (_has_bits_[0] & 0x00000008u) != 0;
+}
+inline void taint_intro::set_has_source_name() {
+  _has_bits_[0] |= 0x00000008u;
+}
+inline void taint_intro::clear_has_source_name() {
+  _has_bits_[0] &= ~0x00000008u;
+}
+inline void taint_intro::clear_source_name() {
+  if (source_name_ != &::google::protobuf::internal::kEmptyString) {
+    source_name_->clear();
+  }
+  clear_has_source_name();
+}
+inline const ::std::string& taint_intro::source_name() const {
+  return *source_name_;
+}
+inline void taint_intro::set_source_name(const ::std::string& value) {
+  set_has_source_name();
+  if (source_name_ == &::google::protobuf::internal::kEmptyString) {
+    source_name_ = new ::std::string;
+  }
+  source_name_->assign(value);
+}
+inline void taint_intro::set_source_name(const char* value) {
+  set_has_source_name();
+  if (source_name_ == &::google::protobuf::internal::kEmptyString) {
+    source_name_ = new ::std::string;
+  }
+  source_name_->assign(value);
+}
+inline void taint_intro::set_source_name(const char* value, size_t size) {
+  set_has_source_name();
+  if (source_name_ == &::google::protobuf::internal::kEmptyString) {
+    source_name_ = new ::std::string;
+  }
+  source_name_->assign(reinterpret_cast<const char*>(value), size);
+}
+inline ::std::string* taint_intro::mutable_source_name() {
+  set_has_source_name();
+  if (source_name_ == &::google::protobuf::internal::kEmptyString) {
+    source_name_ = new ::std::string;
+  }
+  return source_name_;
+}
+inline ::std::string* taint_intro::release_source_name() {
+  clear_has_source_name();
+  if (source_name_ == &::google::protobuf::internal::kEmptyString) {
+    return NULL;
+  } else {
+    ::std::string* temp = source_name_;
+    source_name_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
+    return temp;
+  }
+}
+
+// optional uint64 offset = 5;
+inline bool taint_intro::has_offset() const {
+  return (_has_bits_[0] & 0x00000010u) != 0;
+}
+inline void taint_intro::set_has_offset() {
+  _has_bits_[0] |= 0x00000010u;
+}
+inline void taint_intro::clear_has_offset() {
+  _has_bits_[0] &= ~0x00000010u;
+}
+inline void taint_intro::clear_offset() {
+  offset_ = GOOGLE_ULONGLONG(0);
+  clear_has_offset();
+}
+inline ::google::protobuf::uint64 taint_intro::offset() const {
+  return offset_;
+}
+inline void taint_intro::set_offset(::google::protobuf::uint64 value) {
+  set_has_offset();
+  offset_ = value;
 }
 
 // -------------------------------------------------------------------

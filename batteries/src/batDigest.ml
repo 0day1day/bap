@@ -1,5 +1,5 @@
 (*
- * ExtDigest - Additional functions for message digests
+ * BatDigest - Additional functions for message digests
  * Copyright (C) 1996 Xavier Leroy, INRIA Rocquencourt
  * Copyright (C) 2009 David Teller, LIFO, Universite d'Orleans
  *
@@ -19,48 +19,54 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *)
 
+include Digest
+
 open BatIO
 
 (*Imported from [Digest.input] -- the functions used take advantage of
   [BatIO.input] rather than [in_channel]*)
 let input inp =
   let digest = String.create 16 in
-  let _      = really_input inp digest 0 16 in
+  let _ = really_input inp digest 0 16 in
   digest
-
+(*$T
+  let digest = Digest.string "azerty" in \
+  input (BatIO.input_string digest) = digest
+*)
 
 let output = BatIO.nwrite
-
+let print oc t = BatIO.nwrite oc (to_hex t)
 
 let channel inp len = (*TODO: Make efficient*)
   if len >= 0 then
-    let buf = String.create len             in
-    let _   = BatIO.really_input inp buf 0 len in
-      Digest.string buf
+    let buf = String.create len in
+    let _  = BatIO.really_input inp buf 0 len in
+    Digest.string buf
   else Digest.channel (BatIO.to_input_channel inp) len
-
-(*** batdigest
+(*$T
+  let digest = Digest.string "azerty" in \
+  channel (BatIO.input_string ("azertyuiop")) 6 = digest
+*)
 
 (*1. Compute the digest of this file using Legacy.Digest*)
-
-let legacy_result () =
+(*2. Compute the digest of this file using Batteries.Digest*)
+(*3. Compare*)
+(*$R channel
+  let legacy_result () =
   let inp    = Pervasives.open_in_bin Sys.argv.(0) in
   let result = Legacy.Digest.channel inp (-1) in
     Pervasives.close_in inp;
     result
-in
-(*2. Compute the digest of this file using Batteries.Digest*)
-
-let batteries_result () =
+  in
+  let batteries_result () =
   let inp    = BatFile.open_in Sys.argv.(0) in
-  let result = BatDigest.channel inp (-1)   in
+  let result = channel inp (-1)   in
     BatIO.close_in inp;
     result
-in
-(*3. Compare*)
+  in
   assert_equal ~printer:(Printf.sprintf "%S")
     (legacy_result ()) (batteries_result ())
-**)
+*)
 
 let from_hex s =
   if String.length s <> 32 then raise (Invalid_argument "Digest.from_hex");

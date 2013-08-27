@@ -192,10 +192,10 @@ AC_CONFIG_FILES([Makefile
 AC_OUTPUT
 
 # Configure ocamlgraph
-(cd ocamlgraph-1.8 && ./configure)
+(cd ocamlgraph && ./configure)
 
 # Configure zarith
-(cd zarith-1.0 && ./configure)
+(cd zarith && ./configure)
 
 # Force libtracewrap to reconfigure
 rm -f libtracewrap/CONFIGURED

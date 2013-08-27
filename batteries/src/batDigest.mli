@@ -1,5 +1,5 @@
 (*
- * ExtDigest - Additional functions for MD5 message digests
+ * BatDigest - Additional functions for MD5 message digests
  * Copyright (C) 1996 Xavier Leroy, INRIA Rocquencourt
  * Copyright (C) 2009 David Teller, LIFO, Universite d'Orleans
  *
@@ -22,54 +22,65 @@
 
 (** MD5 message digest.
 
-   This module provides functions to compute 128-bit ``digests'' of
-   arbitrary-length strings or files. The digests are of cryptographic
-   quality: it is very hard, given a digest, to forge a string having
-   that digest. The algorithm used is MD5.
-
-    This module extends Stdlib's
-    {{:http://caml.inria.fr/pub/docs/manual-ocaml/libref/Digest.html}Digest}
-    module, go there for documentation on the rest of the functions
-    and types.
+    This module provides functions to compute 128-bit ``digests'' of
+    arbitrary-length strings or files. The digests are of cryptographic
+    quality: it is very hard, given a digest, to forge a string having
+    that digest. The algorithm used is MD5.
 
     @author Xavier Leroy (Base module)
     @author David Rajchenbach-Teller
 *)
 open BatIO
-open Digest
+
+type t = string
+(** The type of digests: 16-character strings. *)
+
+val string : string -> t
+(** Return the digest of the given string. *)
+
+val substring : string -> int -> int -> t
+(** [Digest.substring s ofs len] returns the digest of the substring
+    of [s] starting at character number [ofs] and containing [len]
+    characters. *)
+
+val file : string -> t
+(** Return the digest of the file whose name is given. *)
+
+val to_hex : t -> string
+(** Return the printable hexadecimal representation of the given digest. *)
 
 val from_hex : string -> t
 (** Convert a hexadecimal representation back into the corresponding digest.
-   Raise [Invalid_argument] if the argument is not exactly 32 hexadecimal
-   characters.
-   @since 4.00.0 *)
+    @raise Invalid_argument if the argument is not exactly 32 hexadecimal
+    characters.
+    @since 4.00.0 *)
 
-val channel : input -> int -> t
+val channel : input -> int -> Digest.t
 (** If [len] is nonnegative, [Digest.channel ic len] reads [len]
-   characters from channel [ic] and returns their digest, or raises
-   [End_of_file] if end-of-file is reached before [len] characters
-   are read.  If [len] is negative, [Digest.channel ic len] reads
-   all characters from [ic] until end-of-file is reached and return
-   their digest.
+    characters from channel [ic] and returns their digest, or
+    @raise End_of_file if end-of-file is reached before [len] characters
+    are read.  If [len] is negative, [Digest.channel ic len] reads
+    all characters from [ic] until end-of-file is reached and return
+    their digest.
 
     {b Note} This version of [channel] is currently very inefficient
     if [len] < 0 and requires copying the whole input to a temporary
     file.
 *)
 
-
 val output : 'a output -> t -> unit
 (** Write a digest on the given output. *)
 
-val input : input -> t
+val print : 'a output -> Digest.t -> unit
+(** Write a digest on the given output in hexadecimal. *)
+
+val input : input -> Digest.t
 (** Read a digest from the given input. *)
 
-(** {6 Boilerplate code}*)
-
 val compare : t -> t -> int
-(** The comparison function for 16-character digest, with the same
-    specification as {!Pervasives.compare} and the implementation
-    shared with {!String.compare}. Along with the type [t], this
-    function [compare] allows the module [Digest] to be passed as
-    argument to the functors {!Set.Make} and {!Map.Make}.
-    @since 4.00.0 *)
+  (** The comparison function for 16-character digest, with the same
+      specification as {!Pervasives.compare} and the implementation
+      shared with {!String.compare}. Along with the type [t], this
+      function [compare] allows the module [Digest] to be passed as
+      argument to the functors {!Set.Make} and {!Map.Make}.
+      @since 4.00.0 *)

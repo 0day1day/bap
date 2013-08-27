@@ -1,8 +1,8 @@
-(* 
- * ExtOO - Extended operations on objects
+(*
+ * BatOO - Extended operations on objects
  * Copyright (C) 1996 Jerome Vouillon, INRIA
  *               2008 David Teller, LIFO, Universite d'Orleans
- * 
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
@@ -19,22 +19,19 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *)
 
-(** Operations on objects 
+(** Operations on objects
 
-    @documents Oo
     @author Jerome Vouillon (Base module)
     @author David Teller (integration to Batteries)
 *)
-module Oo :
-sig
 
 val copy : (< .. > as 'a) -> 'a
-  (** [Oo.copy o] returns a copy of object [o], that is a fresh
-      object with the same methods and instance variables as [o]  *)
-  
+(** [Oo.copy o] returns a copy of object [o], that is a fresh
+    object with the same methods and instance variables as [o]  *)
+
 external id : < .. > -> int = "%field1"
-  (** Return an integer identifying this object, unique for
-      the current execution of the program. *)
+(** Return an integer identifying this object, unique for
+    the current execution of the program. *)
 
 (**/**)
 (** For internal use (CamlIDL) *)
@@ -47,14 +44,14 @@ val public_method_label : string -> CamlinternalOO.tag(**As {!Internal.public_me
 module Internal:
 sig
 
-(** Run-time support for objects and classes.
-    All functions in this module are for system use only, not for the
-    casual user. 
+  (** Run-time support for objects and classes.
+      All functions in this module are for system use only, not for the
+      casual user.
 
-    @documents CamlinternalOO
-*)
+      @documents CamlinternalOO
+  *)
 
-(** {6 Classes} *)
+  (** {6 Classes} *)
 
   type tag     = CamlinternalOO.tag
   type label   = CamlinternalOO.label
@@ -94,9 +91,9 @@ sig
   val dummy_class :
     string * int * int ->
     (t * (table -> Obj.t -> t) * (Obj.t -> t) * Obj.t)
-      
+
   (** {6 Objects} *)
-      
+
   val copy : (< .. > as 'a) -> 'a
   val create_object : table -> obj
   val create_object_opt : obj -> table -> obj
@@ -108,14 +105,14 @@ sig
   external sendself : obj -> label -> t = "%sendself"
   external get_public_method : obj -> tag -> closure
     = "caml_get_public_method" "noalloc"
-    
+
   (** {6 Table cache} *)
-    
+
   type tables = CamlinternalOO.tables
   val lookup_tables : tables -> closure array -> tables
 
   (** {6 Builtins to reduce code size} *)
-    
+
   (*
     val get_const : t -> closure
     val get_var : int -> closure
@@ -142,54 +139,52 @@ sig
     val send_env : tag -> int -> int -> int -> closure
     val send_meth : tag -> label -> int -> closure
   *)
-    
+
   type impl  = CamlinternalOO.impl =
       GetConst
-	       | GetVar
-	       | GetEnv
-	       | GetMeth
-	       | SetVar
-	       | AppConst
-	       | AppVar
-	       | AppEnv
-	       | AppMeth
-	       | AppConstConst
-	       | AppConstVar
-	       | AppConstEnv
-	       | AppConstMeth
-	       | AppVarConst
-	       | AppEnvConst
-	       | AppMethConst
-	       | MethAppConst
-	       | MethAppVar
-	       | MethAppEnv
-	       | MethAppMeth
-	       | SendConst
-	       | SendVar
-	       | SendEnv
-	       | SendMeth
-	       | Closure of closure
-		   
+    | GetVar
+    | GetEnv
+    | GetMeth
+    | SetVar
+    | AppConst
+    | AppVar
+    | AppEnv
+    | AppMeth
+    | AppConstConst
+    | AppConstVar
+    | AppConstEnv
+    | AppConstMeth
+    | AppVarConst
+    | AppEnvConst
+    | AppMethConst
+    | MethAppConst
+    | MethAppVar
+    | MethAppEnv
+    | MethAppMeth
+    | SendConst
+    | SendVar
+    | SendEnv
+    | SendMeth
+    | Closure of closure
+
   (** {6 Parameters} *)
-		   
+
   (** currently disabled *)
   type params  = CamlinternalOO.params =
-      { mutable compact_table : bool;
-	mutable copy_parent : bool;
-	mutable clean_when_copying : bool;
-	mutable retry_count : int;
-	mutable bucket_small_size : int }
-	
+    { mutable compact_table : bool;
+      mutable copy_parent : bool;
+      mutable clean_when_copying : bool;
+      mutable retry_count : int;
+      mutable bucket_small_size : int }
+
   val params : params
-    
+
   (** {6 Statistics} *)
-    
+
   type stats  = CamlinternalOO.stats =
-      { classes : int;
-	methods : int;
-	inst_vars : int }
+    { classes : int;
+      methods : int;
+      inst_vars : int }
   val stats : unit -> stats
-    
-end
 
 end
