@@ -13,8 +13,10 @@
 *.cmx
 *.cmxa
 *.dbg
+config.guess
 config.log
 config.status
+config.sub
 ._d
 ._build
 _build
@@ -186,4 +188,5 @@ libtracewrap/libtrace/protobuf/src/google/protobuf/compiler/cpp/cpp_test_bad_ide
 libtracewrap/libtrace/protobuf/src/google/protobuf/compiler/cpp/cpp_test_bad_identifiers.pb.h
 libtracewrap/libtrace/protobuf/src/google/protobuf/unittest*.pb.cc
 libtracewrap/libtrace/protobuf/configure.lineno
+libtracewrap/libtrace32
 pin/
