@@ -150,3 +150,5 @@ depend: $(AUTOGEN)
 include depend
 
 .PHONY: clean
+.PHONY: tags
+tags:
