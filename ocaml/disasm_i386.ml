@@ -1078,7 +1078,7 @@ let rec to_ir mode addr next ss pref has_rex has_vex =
       else if has_vex then [it 0 (Reg (hi - lo + 1))]
       else [extract hi lo (op2e tdst dst)]
     in
-    let offsets = List.sort ~cmp:(fun {offdstoffset=o1} {offdstoffset=o2} -> Pervasives.compare o1 o2) offsets in
+    let offsets = List.sort (fun {offdstoffset=o1} {offdstoffset=o2} -> Pervasives.compare o1 o2) offsets in
     let add_exp (elist,nextbit) {offlen; offtyp; offop; offsrcoffset; offdstoffset} =
       extract ((bits_of_width offlen) + offsrcoffset - 1) offsrcoffset (op2e offtyp offop)
       :: padding (offdstoffset - 1) nextbit

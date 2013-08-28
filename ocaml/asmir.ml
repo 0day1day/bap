@@ -415,7 +415,7 @@ module SerializedTrace = struct
                      index=frompiqi a;
                      value=v;
                      usage=WR;
-                     taint=Taint (Int64.to_int tid)})
+                     taint=Taint tid})
         in
         function
         (* New trace format has source information *)
