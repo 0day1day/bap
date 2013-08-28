@@ -1,7 +1,7 @@
 (*
  * Base64 - Base64 codec
  * Copyright (C) 2003 Nicolas Cannasse
- *                                    
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
@@ -22,7 +22,7 @@
 
     8-bit characters are encoded into 6-bit ones using ASCII lookup tables.
     Default tables maps 0..63 values on characters A-Z, a-z, 0-9, '+' and '/'
-    (in that order). 
+    (in that order).
 
     @documents Base64
 
@@ -41,7 +41,7 @@ exception Invalid_table
 type encoding_table = char array
 
 (** A decoding table maps chars 0..255 to the corresponding 0..63 value
- or -1 if the char is not accepted. *)
+    or -1 if the char is not accepted. *)
 type decoding_table = int array
 
 (** Encode a string into Base64. *)

@@ -1,5 +1,5 @@
 (* open BatString -- overrides compare for some reason! *)
-open BatList
+open BatListFull
 open Big_int_Z
 
 let id = fun x -> x
@@ -31,6 +31,10 @@ let rec foldn64 ?(t=0L) f i n =
 let mapn f n =
   List.rev (foldn (fun l i -> f(n-i)::l) [] n)
   (* List.rev is needed to make side effects happen in the same order *)
+
+let gc_keepalive e =
+  let _ = id e in
+  ()
 
 let rec list_mem ?(eq=(=)) ele = function
   | hd::tl ->
@@ -125,7 +129,7 @@ let list_delete l e =
   in
     delete_aux [] l
 
-let list_compare = BatList.make_compare
+let list_compare = BatList.compare
 
 let list_cart_prod2 f l1 l2 =
   List.iter
@@ -598,17 +602,6 @@ let rec print_separated_list ps sep lst =
         (doit acc (y::zs))
   in
     doit "" lst
-
-let print_obj_info title value =
-  let module D = Debug.Make(struct let name = "UtilSize" and default=`NoDebug end) in
-  if D.debug() then
-    let i = Objsize.objsize value in
-    D.dprintf "%S : data_words=%i headers=%i depth=%i\n    \ 
-      bytes_without_headers=%i bytes_with_headers=%i"
-      title i.Objsize.data i.Objsize.headers i.Objsize.depth
-      (Objsize.size_without_headers i)
-      (Objsize.size_with_headers i);
-    D.dprintf "%S : total size in MB = %i" title ((Objsize.size_with_headers i) / 1048576)
 
 let syscall ?(env=[| |]) cmd =
   let check_exit_status =

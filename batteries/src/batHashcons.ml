@@ -26,7 +26,7 @@
 
 module Pervasives = struct include Pervasives include BatPervasives end
 module Int = BatInt
-module Sys = struct include Sys include BatSys end
+module Sys = BatSys
 module Hashtbl = BatHashtbl
 module Array = struct include Array include BatArray end
 
@@ -52,6 +52,8 @@ sig
   val clear    : t -> unit
   val hashcons : t -> key -> key hobj
   val iter     : (key hobj -> unit) -> t -> unit
+  val fold     : (key hobj -> 'a -> 'a) -> t -> 'a -> 'a
+  val count    : t -> int
 end
 
 module MakeTable (HT : Hashtbl.HashedType) : Table with type key = HT.t =
@@ -82,8 +84,8 @@ struct
     let rec fold_bucket i b accu =
       if i >= Weak.length b then accu else
         match Weak.get b i with
-          | Some v -> fold_bucket (i + 1) b (f v accu)
-          | None -> fold_bucket (i + 1) b accu
+        | Some v -> fold_bucket (i + 1) b (f v accu)
+        | None -> fold_bucket (i + 1) b accu
     in
     Array.fold_right (fold_bucket 0) t.table init
 
@@ -91,8 +93,8 @@ struct
     let rec iter_bucket i b =
       if i >= Weak.length b then () else
         match Weak.get b i with
-          | Some v -> f v ; iter_bucket (i + 1) b
-          | None -> iter_bucket (i + 1) b
+        | Some v -> f v ; iter_bucket (i + 1) b
+        | None -> iter_bucket (i + 1) b
     in
     Array.iter (iter_bucket 0) t.table
 
@@ -124,7 +126,7 @@ struct
       if i >= sz then begin
         let newsz = Pervasives.min (sz + 3) (Sys.max_array_length - 1) in
         if newsz <= sz then
-	  failwith "Hashcons.Make: hash bucket cannot grow more" ;
+          failwith "Hashcons.Make: hash bucket cannot grow more" ;
         let newbucket = Weak.create newsz in
         Weak.blit bucket 0 newbucket 0 sz ;
         Weak.set newbucket i (Some d) ;
@@ -146,17 +148,17 @@ struct
     let sz = Weak.length bucket in
     let rec loop i =
       if i >= sz then begin
-	let hdata = { hcode = hcode ; tag = gentag () ; obj = d } in
-	add t hdata ;
-	hdata
+        let hdata = { hcode = hcode ; tag = gentag () ; obj = d } in
+        add t hdata ;
+        hdata
       end else begin
         match Weak.get_copy bucket i with
-          | Some v when HT.equal v.obj d ->
-	      begin match Weak.get bucket i with
-                | Some v -> v
-                | None -> loop (i + 1)
-              end
-          | _ -> loop (i + 1)
+        | Some v when HT.equal v.obj d ->
+          begin match Weak.get bucket i with
+            | Some v -> v
+            | None -> loop (i + 1)
+          end
+        | _ -> loop (i + 1)
       end
     in
     loop 0

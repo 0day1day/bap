@@ -1785,7 +1785,7 @@ struct
       let sort_aux (var1, _) (var2,_) =
         compare (var_to_num var1) (var_to_num var2)
       in
-      List.sort ~cmp:sort_aux
+      List.sort sort_aux
     in
     (* Padding unused symbolic bytes *)
     let pad_unused =

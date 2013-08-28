@@ -399,21 +399,36 @@ module SerializedTrace = struct
                    usage=convert_usage use;
                    taint=convert_taint t})
       in
-      let convert_taint_info = function
-        | {Taint_intro.addr=a;
-           Taint_intro.taint_id=tid;
-           Taint_intro.value=value} ->
-          let v = match value with
-            | Some x -> Util.big_int_of_binstring ~e:`Little x
-            | None -> Big_int_convenience.bi0
-          in
-          Context({name=mem_name;
-                   mem=true;
-                   t=Reg 8;
-                   index=(frompiqi a);
-                   value=v;
-                   usage=WR;
-                   taint=Taint (Int64.to_int tid)})
+      let convert_taint_info =
+        let convert_context = function
+          | {Taint_intro.addr=a;
+             Taint_intro.taint_id=tid;
+             Taint_intro.value=value} ->
+            let v = match value with
+              | Some x -> Util.big_int_of_binstring ~e:`Little x
+              | None -> Big_int_convenience.bi0
+            in
+            let tid = Int64.to_int tid in
+            Context({name=mem_name;
+                     mem=true;
+                     t=Reg 8;
+                     index=frompiqi a;
+                     value=v;
+                     usage=WR;
+                     taint=Taint (Int64.to_int tid)})
+        in
+        function
+        (* New trace format has source information *)
+        | {Taint_intro.taint_id=tid;
+           Taint_intro.source_name=Some src_name;
+           Taint_intro.offset=Some off} as ti ->
+          let tid = Int64.to_int tid in
+          let off = Int64.to_int off in
+          let ctx = convert_context ti in
+          let intro = TaintIntro(tid, src_name, off) in
+          [intro; ctx]
+        (* Older trace format does not have source information *)
+        | ti -> [convert_context ti]
       in
       let convert_thread_id x = Type.ThreadId (Int64.to_int x)
       in
@@ -421,7 +436,9 @@ module SerializedTrace = struct
         | `std_frame({Std_frame.operand_list=ol; Std_frame.thread_id=tid}) -> (convert_thread_id tid) :: List.map convert_operand_info ol
         | `syscall_frame _ -> []
         | `exception_frame _ -> []
-        | `taint_intro_frame({Taint_intro_frame.taint_intro_list=til}) -> List.map convert_taint_info til
+        | `taint_intro_frame({Taint_intro_frame.taint_intro_list=til}) -> 
+            let l = List.map convert_taint_info til in
+            List.flatten l
         | `modload_frame _ -> []
         | `key_frame _ -> []
         | `metadata_frame _ -> []
@@ -507,11 +524,21 @@ let serialized_bap_from_trace_file = SerializedTrace.new_bap_from_trace_file
 let get_symbols ?(all=false) {asmp=p} =
   let f = if all then asmir_get_all_symbols else asmir_get_symbols in
   let (arr,err) = f p in
+  (* Manually keep p live here. asmir_get_symbols uses memory pinned
+     to the bfd stored in p.  When p is garbage collected, this memory is
+     freed.  Unfortunately, this can happen while converting the symbols
+     to ocaml objects, which generally causes a segmentation fault. By
+     keeping p alive until at least after the function call, we can be
+     sure all objects have been converted to ocaml objects before we free
+     the bfd memory. *)
+  gc_keepalive p;
   if err <= 0 then failwith "get_symbols";
   arr
 
 let get_dynamic_symbols {asmp=p} =
   let (arr,err) = asmir_get_dynsymbols p in
+  (* See note about liveness in get_symbols *)
+  gc_keepalive p;
   if err <= 0 then failwith "get_dynamic_symbols";
   arr
 

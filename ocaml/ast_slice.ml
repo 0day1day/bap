@@ -8,21 +8,10 @@ open BatListFull
 module CHOP_AST =
 struct
 
- (* Test-printing of ASTs TODO:remove *)
  (* TODO: Create a new file only for chopping *)
 
  module Traverse = Graph.Traverse.Dfs(Cfg.AST.G)
 
-  let print_cfg cfg = 
-   let print_stmts v =
-    let stmts = AST.get_stmts cfg v in
-    List.iter
-     (fun s -> 
-       Printf.printf "%s\n" (Pp.ast_stmt_to_string s)
-     ) stmts
-   in
-   Traverse.prefix print_stmts cfg
-    
 (* Simple chopping implementation *)
 
 module SG =
@@ -138,7 +127,7 @@ let rewrite_missing_labels cfg =
   compute_cds cfg dds ;
   add_jmp_stmts cfg dds ;
   dds
-  
+
   (* Slicing the cfg *)
   let slice cfg node stmt =
    let deps = get_dds cfg in
@@ -169,11 +158,10 @@ let rewrite_missing_labels cfg =
       AST.set_stmts g v (List.rev newstmts)
     ) cfg cfg
    in
-   print_cfg tmp ;
    tmp
 
   (* Performing chopping from a source to a sink *)
- let chop cfg srcbb _srcn trgbb trgn = 
+  let chop cfg srcbb _srcn trgbb trgn = 
   let get_v num = 
    try AST.find_vertex cfg (BB num)
    with Not_found -> 
@@ -182,7 +170,7 @@ let rewrite_missing_labels cfg =
   let src = get_v srcbb 
   and trg = get_v trgbb in
   let scc = get_scc cfg src trg in
- (* Adding entry and exit nodes *)
+  (* Adding entry and exit nodes *)
   let entry = AST.find_vertex cfg BB_Entry 
   and exit = AST.find_vertex cfg BB_Exit in
   let scc = AST.add_vertex scc entry in

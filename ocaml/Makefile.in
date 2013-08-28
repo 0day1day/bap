@@ -17,12 +17,11 @@ export CAMLIDLFLAGS = -prepro cpp
 
 export OCAMLMAKEFILE=OCamlMakefile
 export LIBASMIR=../libasmir
-export BIGINT=$(BAP_DIR)/zarith-1.0
+export BIGINT=$(BAP_DIR)/zarith
 export BATT=$(BAP_DIR)/batteries/_build/src
 export OUNIT=$(BAP_DIR)/ounit/_build/src/
 export PCRE=$(BAP_DIR)/pcre-ocaml/lib
-export OCAMLGRAPH=$(BAP_DIR)/ocamlgraph-1.8
-export OBJSIZE=$(BAP_DIR)/objsize-0.16
+export OCAMLGRAPH=$(BAP_DIR)/ocamlgraph
 export LIBTRACE=$(BAP_DIR)/libtracewrap/libtrace/src/ocaml
 export PIQIBUILDDIR=$(BAP_DIR)/libtracewrap/libtrace/piqi/piqi/build/lib/ocaml
 
@@ -154,8 +153,8 @@ export CPPFLAGS = @CPPFLAGS@
 export LDFLAGS = $(LIBASMIR_LDFLAGS) $(SOLVER_LDFLAGS) @LDFLAGS@
 export OCAMLMKLIB_FLAGS = $(LDFLAGS)
 export PPFLAGS = $(SOLVER_PPFLAGS) @LLVM_PPFLAGS@
-export INCDIRS = $(BIGINT) $(BATT) $(OUNIT) $(PCRE) $(OCAMLGRAPH) $(OBJSIZE) $(LIBTRACE) $(LIBTRACE)/piqi $(PROJINCDIRS)
-export LIBS = zarith batteries objsize oUnit graph pcre libtrace $(PROJLIBS)
+export INCDIRS = $(BIGINT) $(BATT) $(OUNIT) $(PCRE) $(OCAMLGRAPH) $(LIBTRACE) $(LIBTRACE)/piqi $(PROJINCDIRS)
+export LIBS = zarith batteries oUnit graph pcre libtrace $(PROJLIBS)
 export RESULTDEPS = $(LIBASMIR)/src/libasmir.a $(LIBTRACE)/libtrace.cmxa
 export LIBDIRS = $(LIBASMIR)/src
 export LIBDIRS += $(SOLVER_LIBDIRS) $(LIBTRACE)

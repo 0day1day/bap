@@ -6,21 +6,10 @@ open Depgraphs
 module CHOP_SSA =
 struct
 
- (* Test-printing of ASTs TODO:remove *)
  (* TODO: Create a new file only for chopping *)
 
  module Traverse = Graph.Traverse.Dfs(Cfg.SSA.G)
 
-  let print_cfg cfg = 
-   let print_stmts v =
-    let stmts = SSA.get_stmts cfg v in
-    List.iter
-     (fun s -> 
-       Printf.printf "chopped: %s\n" (Pp.ssa_stmt_to_string s)
-     ) stmts
-   in
-   Traverse.prefix print_stmts cfg
-    
 (* Simple chopping implementation *)
 
 module SG =
@@ -132,10 +121,9 @@ module Comp = Graph.Components.Make(SG);;
       SSA.set_stmts g v (List.rev newstmts)
     ) cfg cfg
    in
-   print_cfg tmp ;
    tmp
 
-  (* Performing chopping from a source to a sink *)
+ (* Performing chopping from a source to a sink *)
  let chop cfg srcbb _srcn trgbb trgn = 
   let get_v num = 
    try SSA.find_vertex cfg (BB num)
@@ -145,7 +133,7 @@ module Comp = Graph.Components.Make(SG);;
   let src = get_v srcbb 
   and trg = get_v trgbb in
   let scc = get_scc cfg src trg in
- (* Adding entry and exit nodes *)
+  (* Adding entry and exit nodes *)
   let entry = SSA.find_vertex cfg BB_Entry 
   and exit = SSA.find_vertex cfg BB_Exit in
   let scc = SSA.add_vertex scc entry in

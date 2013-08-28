@@ -140,6 +140,10 @@ object (self)
     | InitRO -> pp "@set \"initro\""
     | Synthetic -> pp "@set \"synthetic\""
     | SpecialBlock -> pp "@set \"specialblock\""
+    | TaintIntro(tid, src_name, offset) ->
+      pp "@taint_intro "; pp (string_of_int tid); pp ", "; pc '"';
+      pp src_name; pp "\", "; pp (string_of_int offset)
+
 
   method label = function
     | Name s -> pp "label "; pp s

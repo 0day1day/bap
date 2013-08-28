@@ -26,20 +26,24 @@ Configure should report any dependencies you do not have.
 
 Run the following command to install required packages:
 
-  $ sudo apt-get install ocaml-nox ocaml-native-compilers ocaml-findlib    \
-    camlidl binutils-dev automake libcamomile-ocaml-dev otags libpcre3-dev \
-    camlp4-extra bison flex zlib1g-dev libgmp3-dev g++ libtool make
+# __BEGIN_REQUIRED__
+  sudo apt-get -y install ocaml-nox ocaml-native-compilers ocaml-findlib \
+  camlidl binutils-dev automake libcamomile-ocaml-dev otags libpcre3-dev \
+  camlp4-extra bison flex zlib1g-dev libgmp3-dev g++ libtool make
+# __END_REQUIRED__
 
 On x86_64 also add:
-  $ sudo apt-get install gcc-multilib g++-multilib lib32z1-dev
+  sudo apt-get install gcc-multilib g++-multilib lib32z1-dev
 
 To build LLVM code generation, include:
-  $ sudo apt-get install libllvm-3.1-ocaml-dev
+  $ sudo apt-get install libllvm-3.1-ocaml-dev cppo
 We have only tested with llvm version 3.1, but other versions may work too.
+Specifically, cppo should provide support for revisions 3.2 and 3.3 now,
+but this is not widely tested.
 
 To compile the documentation, add:
-  $ sudo aptitude install texlive-base texlive-latex-base \
-    texlive-latex-extra texlive-fonts-recommended
+  sudo aptitude install texlive-base texlive-latex-base \
+  texlive-latex-extra texlive-fonts-recommended
 
 On Debian squeeze, you must also install a new version of OCaml.
 Follow the instructions in "Bootstrapping using ocamlbrew" after
@@ -49,7 +53,7 @@ installing the appropriate packages above.
 
 To install ocaml 4.00.1 and opam using ocamlbrew:
 
-  $ curl -kL https://raw.github.com/hcarty/ocamlbrew/master/ocamlbrew-install | env OCAMLBREW_FLAGS="-r" bash
+  curl -kL https://raw.github.com/hcarty/ocamlbrew/master/ocamlbrew-install | env OCAMLBREW_FLAGS="-r" bash
 
 Follow the directions printed on the screen about adding 'source
 <...>' to your ~/.bashrc file to make ocaml available whenever you
@@ -59,11 +63,11 @@ ocaml available in your current session.
 At this point, running the following command should print version 3.12
 or newer, indicating you are using ocaml from ocamlbrew:
 
-  $ ocaml -version
+  ocaml -version
 
 Next, install the required ocaml packages using opam:
 
-  $ opam install ocamlfind camomile camlidl otags
+  opam install ocamlfind camomile camlidl otags
 
 If you are installing on Debian/Ubuntu and used the above apt-get
 command to install packages, you should be able to build bap normally
@@ -72,11 +76,11 @@ now (./autogen && ./configure && make).
 On any other system, you will need to use a special command line that
 tells bap where opam packages are:
 
-  $ ./autogen.sh (if building from SVN)
-  $ CPPFLAGS="-I/opt/local/include/ -I$(opam config var lib)/camlidl" \
-    INCDIRS="$(opam config var lib)/camlidl" \
-    LDFLAGS="-L/opt/local/lib -L/opt/local/lib/x86_64/" \
-    ./configure
+  ./autogen.sh (if building from SVN)
+  CPPFLAGS="-I/opt/local/include/ -I$(opam config var lib)/camlidl" \
+  INCDIRS="$(opam config var lib)/camlidl" \
+  LDFLAGS="-L/opt/local/lib -L/opt/local/lib/x86_64/" \
+  ./configure
 
 After this, run make normally.
 
@@ -84,10 +88,10 @@ After this, run make normally.
 
 Run the following command to install required packages:
 
-  $ sudo yum install ocaml ocaml-ocamlgraph ocaml-findlib  \
-   ocaml-camlidl-devel ocaml-ocamlgraph-devel ocaml-extlib \
-   ocaml-camomile-devel ocaml-camomile-data                \
-   ocaml-camlp4-devel automake binutils-devel gcc-c++
+  sudo yum install ocaml ocaml-ocamlgraph ocaml-findlib   \
+  ocaml-camlidl-devel ocaml-ocamlgraph-devel ocaml-extlib \
+  ocaml-camomile-devel ocaml-camomile-data                \
+  ocaml-camlp4-devel automake binutils-devel gcc-c++
 
 *** Installation for Mac OS X ***
 
@@ -95,37 +99,39 @@ Install macports from https://www.macports.org/install.php
 
 Install required packages using macports:
 
-  $ port install gmp autoconf automake libtool ocaml opam pcre
-  $ port install -s binutils configure.post_args=--enable-targets=i386-elf,i386-pe,x86_64-elf
+  port install gmp autoconf automake libtool ocaml opam pcre
+  port install -s binutils configure.post_args=--enable-targets=i386-elf,i386-pe,x86_64-elf
 
 Alternatively, install required packages using homebrew:
 
-  $ brew install gmp autoconf automake libtool ocaml opam pcre gettext binutils
+  brew install gmp autoconf automake libtool ocaml opam pcre gettext binutils
 
 Install required opam packages:
 
   If using opam for the first time:
-  $ opam init
+
+  opam init
+
   Make sure to copy the suggested line to your ~/.profile and execute it.
 
-  $ opam install ocamlfind camlidl camomile otags
+  opam install ocamlfind camlidl camomile otags
 
 And run configure.
 
-  $ ./autogen.sh (if building from SVN)
+  ./autogen.sh (if building from SVN)
 
 If using macports:
-  $ CPPFLAGS="-I/opt/local/include/ -I$(opam config var lib)/camlidl" \
-    INCDIRS="$(opam config var lib)/camlidl" \
-    LDFLAGS="-L/opt/local/lib -L/opt/local/lib/x86_64/" \
-    ./configure
+  CPPFLAGS="-I/opt/local/include/ -I$(opam config var lib)/camlidl" \
+  INCDIRS="$(opam config var lib)/camlidl" \
+  LDFLAGS="-L/opt/local/lib -L/opt/local/lib/x86_64/" \
+  ./configure
 
 If using homebrew:
-  $ CPPFLAGS="-I/usr/local/include/ -I$(opam config var lib)/camlidl" \
-    INCDIRS="$(opam config var lib)/camlidl" \
-    LDFLAGS="-L/usr/local/lib -L/usr/local/lib/x86_64/ \
-    -L/usr/local/opt/gettext/lib -lintl" \
-    ./configure
+  CPPFLAGS="-I/usr/local/include/ -I$(opam config var lib)/camlidl" \
+  INCDIRS="$(opam config var lib)/camlidl" \
+  LDFLAGS="-L/usr/local/lib -L/usr/local/lib/x86_64/ \
+  -L/usr/local/opt/gettext/lib -lintl" \
+  ./configure
 
 *** SMT Solvers ***
 

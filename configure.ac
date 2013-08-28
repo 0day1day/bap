@@ -15,6 +15,7 @@ AM_INIT_AUTOMAKE
 
 m4_include([./m4/ac_ocaml.m4])
 m4_include([./m4/ac_prog_latex.m4])
+m4_include([./m4/ax_compare_version.m4])
 
 # Checks for programs.
 AC_PROG_CXX
@@ -108,11 +109,17 @@ AS_IF([test x$HAVE_LLVM_AC = xyes],
       [AC_MSG_RESULT([$HAVE_LLVM_AC])])
 AC_SUBST(HAVE_LLVM_AC)
 
-
 AS_IF([test "x$HAVE_LLVM_AC" = "xyes"],
       [LLVM_PPFLAGS="-D WITH_LLVM"],
       [])
 AC_SUBST(LLVM_PPFLAGS)
+
+LLVM_VERSION=`ocamlfind query $LLVM_PACKAGE -format %v`
+
+AX_COMPARE_VERSION([$LLVM_VERSION], [ge], [3.2],
+      [LLVM_NEW_API=true],
+      [LLVM_NEW_API=false])
+AC_SUBST(LLVM_NEW_API)
 
 # Check for etags
 AS_IF([which etags >/dev/null 2>&1],
@@ -192,13 +199,15 @@ AC_CONFIG_FILES([Makefile
                  utils/Makefile
                  tests/Makefile
                  tests/C/Makefile])
-AC_OUTPUT
 
-# Configure ocamlgraph
-(cd ocamlgraph-1.8 && ./configure)
+# Configure ocamlgraph and zarith
+
+AC_CONFIG_SUBDIRS([ocamlgraph])
 
 # Configure zarith
-(cd zarith-1.0 && ./configure)
+(cd zarith && ./configure)
+
+AC_OUTPUT
 
 # Force libtracewrap to reconfigure
 rm -f libtracewrap/CONFIGURED

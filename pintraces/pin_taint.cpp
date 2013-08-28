@@ -239,9 +239,17 @@ FrameOption_t TaintTracker::introMemTaint(ADDRINT addr, uint32_t length, const c
       }
       /* Mark memory as tainted */
       setTaint(memory, addr+i, t);
+      // FIXME: This takes O(length) space. It could be O(1) if we store just
+      // the (t, addr, length, source_name, offset) tuple.
       taint_intro* tfi = fb.f.mutable_taint_intro_frame()->mutable_taint_intro_list()->add_elem();
       tfi->set_taint_id(t);
       tfi->set_addr(addr+i);
+      tfi->set_source_name(source);
+      int64_t off = offset;
+      if(offset >= 0){
+        off += i;
+      }
+      tfi->set_offset(off);
       uint8_t value;
       assert (PIN_SafeCopy((void*) &value, (void*) (addr+i), 1) == 1);
       tfi->set_value((void*) &value, 1);
@@ -377,10 +385,10 @@ std::vector<frame> TaintTracker::taintArgs(char *cmdA, wchar_t *cmdW)
     cerr << "Tainting multibyte command-line arguments: " << bytesA << " bytes @ " << (unsigned int)(cmdA) << endl;
     
     /* Taint multibyte command line */
-    fo = introMemTaint((uint32_t)cmdA, bytesA, "Tainted Arguments", -1);
+    fo = introMemTaint((uint32_t)cmdA, bytesA, "Arguments", -1);
     if (fo.b) { frms.push_back(fo.f); }
     cerr << "Tainting wide command-line arguments: " << bytesW << " bytes @ " << (unsigned int)(cmdW) << endl;
-    fo = introMemTaint((uint32_t)cmdW, bytesW, "Tainted Arguments", -1);
+    fo = introMemTaint((uint32_t)cmdW, bytesW, "Arguments", -1);
     if (fo.b) { frms.push_back(fo.f); }
   }
   return frms;

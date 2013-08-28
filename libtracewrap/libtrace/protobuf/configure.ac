@@ -29,7 +29,6 @@ AS_IF([test "x${ac_cv_env_CXXFLAGS_set}" = "x"],
 AC_CANONICAL_TARGET
 
 AM_INIT_AUTOMAKE
-
 AC_ARG_WITH([zlib],
   [AS_HELP_STRING([--with-zlib],
     [include classes for streaming compressed data in and out @<:@default=check@:>@])],
@@ -45,6 +44,7 @@ AC_PROG_CC
 AC_PROG_CXX
 AC_LANG([C++])
 ACX_USE_SYSTEM_EXTENSIONS
+AM_PROG_AR
 AM_CONDITIONAL(GCC, test "$GCC" = yes)   # let the Makefile know if we're gcc
 
 # test_util.cc takes forever to compile with GCC and optimization turned on.
@@ -88,13 +88,13 @@ AS_IF([test "$with_zlib" != no], [
   AC_MSG_CHECKING([zlib version])
 
   # First check the zlib header version.
-  AC_COMPILE_IFELSE(
-    AC_LANG_PROGRAM([[
+  AC_COMPILE_IFELSE([
+    AC_LANG_SOURCE([[
         #include <zlib.h>
         #if !defined(ZLIB_VERNUM) || (ZLIB_VERNUM < 0x1204)
         # error zlib version too old
         #endif
-        ]], []), [
+        ]], [])], [
     AC_MSG_RESULT([ok (1.2.0.4 or later)])
 
     # Also need to add -lz to the linker flags and make sure this succeeds.

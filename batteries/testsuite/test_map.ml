@@ -1,4 +1,4 @@
-open BatStd
+open BatPervasives
 module R = BatRandom
 module U = OUnit
 
@@ -14,18 +14,18 @@ let assert_equal_enums enum_1 enum_2 =
              print_enum (enum_1 ()) print_enum (enum_2 ()))
 
 let assert_equal_maps map_1 map_2 =
-  let enum_1 () = BatPMap.enum map_1 in
-  let enum_2 () = BatPMap.enum map_2 in
+  let enum_1 () = BatMap.enum map_1 in
+  let enum_2 () = BatMap.enum map_2 in
   assert_equal_enums enum_1 enum_2
 
 let test_traversal_order () =
   let init = R.State.make [|0|] in
   let keys = BatEnum.take 50 (R.State.enum_int init 10) in
-  let map  = BatPMap.of_enum (BatEnum.map (fun x -> (x,x)) keys) in
-  let enum_1 () = BatPMap.enum map
+  let map  = BatMap.of_enum (BatEnum.map (fun x -> (x,x)) keys) in
+  let enum_1 () = BatMap.enum map
   and enum_2 () =
     let list = BatRefList.empty () in
-      BatPMap.iter (fun k v -> BatRefList.push list (k, v)) map;
+      BatMap.iter (fun k v -> BatRefList.push list (k, v)) map;
       BatRefList.backwards list
   in
     match BatEnum.compare compare (enum_1 ()) (enum_2 ()) with
@@ -37,14 +37,14 @@ let test_traversal_order () =
 
 let gen_map state bound count =
   let keys = BatEnum.take count (R.State.enum_int state bound) in
-  BatPMap.of_enum (BatEnum.map (fun x -> (x,x)) keys)
+  BatMap.of_enum (BatEnum.map (fun x -> (x,x)) keys)
 
 let test_split () =
   let do_test map v =
-    let m1, vo, m2 = BatPMap.split v map in
-    assert_equal_maps m1 (BatPMap.filteri (fun k _ -> k < v) map);
-    assert_equal_maps m2 (BatPMap.filteri (fun k _ -> k > v) map);
-    U.assert_equal vo (if BatPMap.mem v map then Some v else None)
+    let m1, vo, m2 = BatMap.split v map in
+    assert_equal_maps m1 (BatMap.filter (fun k _ -> k < v) map);
+    assert_equal_maps m2 (BatMap.filter (fun k _ -> k > v) map);
+    U.assert_equal vo (if BatMap.mem v map then Some v else None)
   in
   let init = R.State.make [|0|] in
   for i = 0 to 50 do
@@ -92,20 +92,21 @@ module TestMap
     val max_binding : 'a m -> (key * 'a)
     val modify : key -> ('a -> 'a) -> 'a m -> 'a m
     val modify_def : 'a -> key -> ('a -> 'a) -> 'a m -> 'a m
+    val modify_opt : key -> ('a option -> 'a option) -> 'a m -> 'a m
 
     val extract : key -> 'a m -> 'a * 'a m
     val pop : 'a m -> (key * 'a) * 'a m
-    
+
     val fold : ('a -> 'b -> 'b) -> 'a m -> 'b -> 'b
     val foldi : (key -> 'a -> 'b -> 'b) -> 'a m -> 'b -> 'b
     val iter : ('a -> unit) -> 'a m -> unit
     val iteri : (key -> 'a -> unit) -> 'a m -> unit
     val map : ('a -> 'b) -> 'a m -> 'b m
     val mapi : (key -> 'a -> 'b) -> 'a m -> 'b m
-    val filter : ('a -> bool) -> 'a m -> 'a m
-    val filteri : (key -> 'a -> bool) -> 'a m -> 'a m
-    val filter_map : ('a -> 'b option) -> 'a m -> 'b m
-    val filteri_map : (key -> 'a -> 'b option) -> 'a m -> 'b m
+    val filterv : ('a -> bool) -> 'a m -> 'a m
+    val filter : (key -> 'a -> bool) -> 'a m -> 'a m
+    val filterv_map : ('a -> 'b option) -> 'a m -> 'b m
+    val filter_map : (key -> 'a -> 'b option) -> 'a m -> 'b m
 
     val bindings : 'a m -> (key * 'a) list
     val enum : 'a m -> (key * 'a) BatEnum.t
@@ -125,7 +126,7 @@ module TestMap
       -> 'a m -> 'b m -> 'c m
 
     val print :
-      ?first:string -> ?last:string -> ?sep:string ->
+      ?first:string -> ?last:string -> ?sep:string -> ?kvsep:string ->
       ('a BatInnerIO.output -> key -> unit) ->
       ('a BatInnerIO.output -> 'c -> unit) ->
       'a BatInnerIO.output -> 'c m -> unit
@@ -138,10 +139,10 @@ module TestMap
 
   let eq_li ?msg cmp_elt print_elt l1 l2 =
     let cmp t1 t2 =
-      let cmp = BatPair.compare ~c1:BatInt.compare ~c2:cmp_elt in
-      0 = BatList.make_compare cmp t1 t2 in
+      let cmp = BatTuple.Tuple2.compare ~cmp1:BatInt.compare ~cmp2:cmp_elt in
+      0 = BatList.compare cmp t1 t2 in
     let printer =
-      BatIO.to_string -| BatList.print <| BatPair.print BatInt.print print_elt in
+      BatIO.to_string @@ BatList.print @@ BatTuple.Tuple2.print BatInt.print print_elt in
     U.assert_equal ?msg ~cmp ~printer l1 l2
 
   let eq ?msg cmp_elt print_elt t1 t2 =
@@ -152,7 +153,7 @@ module TestMap
 
   let test_is_empty () =
     "empty is empty" @? M.is_empty M.empty;
-    "singleton is not empty" @? not (M.is_empty <| M.singleton 1 ());
+    "singleton is not empty" @? not (M.is_empty @@ M.singleton 1 ());
     ()
 
   let test_singleton () =
@@ -247,6 +248,28 @@ module TestMap
         (sum (M.modify_def 1 k ((+)1) t) = sum t + if M.mem k t then 1 else 2) in
     test 1 t;
     test 57 t;
+    "modify_def 0 1 (+1) empty -> singleton 1,0" @?
+      (let t = M.modify_def 0 1 succ M.empty in M.find 1 t = 1 && M.cardinal t = 1);
+    ()
+
+  let test_modify_opt () =
+    let sum t = M.fold (+) t 0 in
+    let t = il [(1, 2); (3, 4)] in
+    (* usage to modify values *)
+    let test1 k t =
+      "sum (modify_opt k (+1 or 2) t) = sum t + (mem k t ? 1 : 2)" @?
+        (sum (M.modify_opt k (function None -> Some 2 | Some x -> Some (x+1)) t) =
+         sum t + if M.mem k t then 1 else 2) in
+    test1 1 t;
+    test1 57 t;
+    (* usage to delete values *)
+    "modify_opt k (fun _ -> None) t -> remove k" @?
+      (M.modify_opt 3 (function Some _ -> None | None -> None) t |> M.mem 3 |> not);
+    "modify_opt k (fun _ -> None) (singleton k) -> empty" @?
+      (M.singleton 1 0 |> M.modify_opt 1 (fun _ -> None) |> M.is_empty);
+    (* usage to add values *)
+    "modify_opt k (fun None -> Some x) t -> add k" @?
+      (M.modify_opt 2 (function None -> Some 1 | _ -> assert false) t |> M.mem 2);
     ()
 
   let test_choose () =
@@ -261,8 +284,8 @@ module TestMap
     "extract 1 empty -> Not_found" @!
       (Not_found, fun () -> M.extract 1 M.empty);
     let t = il [(1,2); (3,4)] in
-    "not <| mem k <| snd <| extract k t" @?
-      (not -| M.mem 1 -| snd <| M.extract 1 t);
+    "not @@ mem k @@ snd @@ extract k t" @?
+      (M.extract 1 t |> snd |> M.mem 1 |> not);
     "extract k (add k v t) = (v, t)" @?
       (let (k, v) = (5, 6) in
        let (v', t') = M.extract k (M.add k v t) in
@@ -274,7 +297,7 @@ module TestMap
       (Not_found, fun () -> M.pop M.empty);
     let t = il [(1,2); (3,4)] in
     "not (mem (fst (fst (pop t))) (snd (pop t)))" @?
-      (not <| M.mem (fst -| fst <| M.pop t) (snd <| M.pop t));
+      (not @@ M.mem (M.pop t |> fst |> fst) (snd @@ M.pop t));
     "let ((k,v),t') = pop t in add k v t' = t" @?
       (let (k,v), t' = M.pop t in
        M.equal (=) (M.add k v t') t);
@@ -333,7 +356,7 @@ module TestMap
         | None, Some _ -> -1
         | Some _, None -> 1
         | Some a, Some b -> cmp a b in
-    let pair_compare2 cmp = BatPair.compare ~c1:cmp ~c2:cmp in
+    let pair_compare2 cmp = BatTuple.Tuple2.compare ~cmp1:cmp ~cmp2:cmp in
     eq ~msg:
       "merge (fun k a b -> Some (a, b)) [0,0; 1,1; 3,3] [1,-1; 2,-2; 3,-3; 4,-4
        = [0, (Some 0, None);
@@ -342,8 +365,8 @@ module TestMap
           3, (Some 3, Some -3);
           4, (None, Some -4)]"
       (pair_compare2 (option_compare BatInt.compare))
-      (BatPair.print2 (BatOption.print BatInt.print))
-      (M.merge (fun k a b -> Some (a, b)) t t')
+      (BatTuple.Tuple2.printn (BatOption.print BatInt.print))
+      (M.merge (fun _k a b -> Some (a, b)) t t')
       (il [0, (Some 0, None);
            1, (Some 1, Some ~-1);
            2, (None, Some ~-2);
@@ -407,7 +430,7 @@ module TestMap
       [
         M.enum, "enum";
         M.backwards, "backwards";
-        BatList.enum -| M.bindings, "enum bindings";
+        M.bindings %> BatList.enum, "enum bindings";
       ]
 
   let reindex (f : M.key -> 'a -> 'b) : 'a -> 'b =
@@ -432,11 +455,11 @@ module TestMap
        change...), and has already spotted instances of such issues.
     *)
 
-    let from_filteri_map f t =
-      li (M.filteri_map f t) in
-
     let from_filter_map f t =
-      li (M.filter_map (reindex f) t) in
+      li (M.filter_map f t) in
+
+    let from_filterv_map f t =
+      li (M.filterv_map (reindex f) t) in
 
     let of_foldi f k v acc =
       match f k v with
@@ -444,10 +467,10 @@ module TestMap
         | Some v' -> (k,v')::acc in
 
     let from_foldi f t =
-      List.rev <| M.foldi (of_foldi f) t [] in
+      List.rev @@ M.foldi (of_foldi f) t [] in
 
     let from_fold f t =
-      List.rev <| M.fold (reindex (of_foldi f)) t [] in
+      List.rev @@ M.fold (reindex (of_foldi f)) t [] in
 
     let of_iteri acc f k v =
       match f k v with
@@ -484,9 +507,9 @@ module TestMap
         t res;
       List.rev !acc in
 
-    let from_filteri f t =
+    let from_filter f t =
       t
-      |> M.filteri (fun k v -> f k v <> None)
+      |> M.filter (fun k v -> f k v <> None)
       |> M.mapi
           (fun k v ->
             match f k v with
@@ -494,9 +517,9 @@ module TestMap
               | Some v' -> v')
       |> li in
 
-    let from_filter f t =
+    let from_filterv f t =
       t
-      |> M.filter (reindex (fun k v -> f k v <> None))
+      |> M.filterv (reindex (fun k v -> f k v <> None))
       |> M.mapi
           (fun k v ->
             match f k v with
@@ -508,7 +531,7 @@ module TestMap
        sorting bugs *)
     let t = il [(4, 4); (5, 5); (3, 3); (0, 0); (6, 6); (2, 2); (1, 1)] in
 
-    (* the function which all filteri_map implementations will use *)
+    (* the function which all filter_map implementations will use *)
     let f k v =
       if k mod 2 = 0 then Some (v + 1)
       else None in
@@ -517,20 +540,20 @@ module TestMap
     let result = [(0, 1); (2, 3); (4, 5); (6, 7)] in
 
     List.iter
-      (fun (name, filteri_map_n) ->
+      (fun (name, filter_map_n) ->
         let msg = Printf.sprintf "iterators test : %s" name in
-        eq_li ~msg BatInt.compare BatInt.print result (filteri_map_n f t))
+        eq_li ~msg BatInt.compare BatInt.print result (filter_map_n f t))
       [
-        "filteri_map", from_filteri_map;
         "filter_map", from_filter_map;
+        "filterv_map", from_filterv_map;
         "foldi", from_foldi;
         "fold", from_fold;
         "iteri", from_iteri;
         "iter", from_iter;
         "mapi", from_mapi;
         "map", from_map;
-        "filteri", from_filteri;
         "filter", from_filter;
+        "filterv", from_filterv;
       ]
 
   let tests = [
@@ -545,6 +568,7 @@ module TestMap
     "test_max_binding" >:: test_max_binding;
     "test_modify" >:: test_modify;
     "test_modify_def" >:: test_modify_def;
+    "test_modify_opt" >:: test_modify_opt;
     "test_choose" >:: test_choose;
     "test_split" >:: test_split;
     "test_partition" >:: test_partition;
@@ -569,35 +593,20 @@ module M = struct
   let iter f = M.iter (fun _ -> f)
   let iteri = M.iter
 
-  let filter_map f = M.filter_map (fun _ -> f)
-  let filteri_map = M.filter_map
+  let filterv_map f = M.filter_map (fun _ -> f)
 end
 
 module P = struct
-  module M = BatPMap
+  module M = BatMap
   include M
 
   type key = int
   type 'a m = (key, 'a) M.t
 
-  let singleton k v = M.singleton ?cmp:None k v
-
-  let of_enum t = M.of_enum ?cmp:None t
-
   let iter f = M.iter (fun _ -> f)
   let iteri = M.iter
 
-  let filter_map f = M.filter_map (fun _ -> f)
-  let filteri_map = M.filter_map
-
-  let exists = M.exists_f
-
-  let equal eqv m1 m2 =
-    let as_in m k v =
-      match Exceptionless.find k m with
-        | None -> false
-        | Some v' -> eqv v v' in
-    for_all (as_in m1) m2 && for_all (as_in m2) m1
+  let filterv_map f = M.filter_map (fun _ -> f)
 end
 
 module S = struct
@@ -605,15 +614,14 @@ module S = struct
   include M
   type 'a m = 'a M.t
 
-  let filter_map f = M.filter_map (fun _ -> f)
-  let filteri_map = M.filter_map
+  let filterv_map f = M.filter_map (fun _ -> f)
 
   let iter f = M.iter (fun _ -> f)
   let iteri = M.iter
 
   let fold f = M.fold (fun _ -> f)
   let foldi = M.fold
-end  
+end
 
 module TM = TestMap(M)
 module TP = TestMap(P)
@@ -626,15 +634,15 @@ module TS = TestMap(S)
    - that the comparison function of the result map is as specified
 *)
 let heterogeneous_tests =
-  let module P = BatPMap in
+  let module P = BatMap.PMap in
   let li m = BatList.of_enum (P.enum m) in
 
   let (@=) msg (act, exp) =
     let cmp t1 t2 =
-      let cmp = BatPair.compare ~c1:BatInt.compare ~c2:BatInt.compare in
-      0 = BatList.make_compare cmp t1 t2 in
+      let cmp = BatTuple.Tuple2.compare ~cmp1:BatInt.compare ~cmp2:BatInt.compare in
+      0 = BatList.compare cmp t1 t2 in
     let printer =
-      BatIO.to_string -| BatList.print <| BatPair.print2 BatInt.print in
+      BatIO.to_string @@ BatList.print @@ BatTuple.Tuple2.printn BatInt.print in
     U.assert_equal ~msg ~cmp ~printer exp act in
 
   let compare_modulo p x y = BatInt.compare (x mod p) (y mod p) in
@@ -653,7 +661,7 @@ let heterogeneous_tests =
 
   let test_union () =
     (* We check that the result and all 'add' have been done modulo 7 :
-       - the 8,-8 binding of m13 is now placed in first (smallest) position 
+       - the 8,-8 binding of m13 is now placed in first (smallest) position
        - the 5,5 binding has been rewritten by the 12,-5 binding*)
     "union [2,2; 3,3; 5,5]/7 [4,-4; 8,-8; 12,-5]/13
      = [8,-8; 2,2; 3,3; 4,-4; 12,-5]/7" @=

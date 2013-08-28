@@ -1,3 +1,5 @@
+AC_CONFIG_MACRO_DIR([m4])
+
 m4_include(m4/acx_pthread.m4)
 
 # At this point, the Xcode project assumes the version string will be three

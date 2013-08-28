@@ -68,7 +68,6 @@ let acyclic_astcfg = let module AC = MakeAcyclicCheck(Cfg.AST) in AC.acyclic_che
 let acyclic_ssacfg = let module AC = MakeAcyclicCheck(Cfg.SSA) in AC.acyclic_check
 
 module MakeExitCheck(C:Cfg.CFG) = struct
-
   let exit_check ?(allowed_exits=[Cfg.BB_Exit; Cfg.BB_Error]) ?(expected_exits=[Cfg.BB_Exit]) g s =
     C.G.iter_vertex (fun v ->
       if C.G.out_degree g v = 0 && List.mem (C.G.V.label v) allowed_exits = false then
@@ -78,5 +77,18 @@ module MakeExitCheck(C:Cfg.CFG) = struct
   let exit_check ?allowed_exits ?expected_exits = wrapdebug (exit_check ?allowed_exits ?expected_exits)
 end
 
-let exit_check_astcfg = let module EC = MakeExitCheck(Cfg.AST) in EC.exit_check
-let exit_check_ssacfg = let module EC = MakeExitCheck(Cfg.SSA) in EC.exit_check
+let exit_astcfg = let module EC = MakeExitCheck(Cfg.AST) in EC.exit_check
+let exit_ssacfg = let module EC = MakeExitCheck(Cfg.SSA) in EC.exit_check
+
+module MakeIndirectCheck(C:Cfg.CFG) = struct
+  let indirect_check g s =
+    let ind = C.G.V.create Cfg.BB_Indirect in
+    if C.G.mem_vertex g ind then
+      match C.G.pred g ind with
+      | bb::_ ->
+        insane (Printf.sprintf "Analysis %s requires there to be no unresolved indirect jumps in the program, but there is at least one present from %s." s (Cfg.bbid_to_string (C.G.V.label bb)))
+      | _ -> ()
+end
+
+let indirect_astcfg = let module IC = MakeIndirectCheck(Cfg.AST) in IC.indirect_check
+let indirect_ssacfg = let module IC = MakeIndirectCheck(Cfg.SSA) in IC.indirect_check

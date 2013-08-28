@@ -299,6 +299,10 @@ ifndef CAMLIDL
 endif
 export CAMLIDL
 
+ifndef CPPO
+  CPPO := cppo
+endif
+
 ifndef CAMLIDLDLL
   CAMLIDLDLL := camlidldll
 endif
@@ -1108,6 +1112,9 @@ endif
 			$(CAMLIDL) $(MAYBE_IDL_HEADER) $(IDLFLAGS) \
 				$(CAMLIDLFLAGS) $<
 			$(QUIET)if [ $(NOIDLHEADER) ]; then touch $*.h; fi
+
+%.ml: %.ml.cppo
+			$(CPPO) $< > $@
 
 .c.$(EXT_OBJ):
 			$(OCAMLC) -c -cc "$(CC)" -ccopt "$(CFLAGS) \

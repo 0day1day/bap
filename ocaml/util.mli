@@ -27,6 +27,11 @@ val foldn64 : ?t:int64 -> ('a -> int64 -> 'a) -> 'a -> int64 -> 'a
 (** [mapn f n] is the same as [f 0; f 1; ...; f n] *)
 val mapn : (int -> 'a) -> int -> 'a list
 
+(** [gc_keepalive e] keeps the objects reachable in [e] from being
+    garbage collected.  This function is needed because [ignore e]
+    does not serve this purpose. *)
+val gc_keepalive : 'a -> unit
+
 (** {3 List utility functions} *)
 
 (** [list_mem] behaves like {!List.mem}, but element equality can be
@@ -281,11 +286,6 @@ end
     computing [printer e] for each element [e], and concatenating the
     results with [sep]. *)
 val print_separated_list : ('a -> string) -> string -> 'a list -> string
-
-(** [print_obj_info s obj] prints the size of object [obj] with string
-    [s] in the debug logs if the [UtilSize] module has debugging
-    enabled. *)
-val print_obj_info : string -> 'a -> unit
 
 (** If the [UtilMemUse] module has debugging enabled, prints
     information about the memory use of the process. *)
