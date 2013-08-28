@@ -42,7 +42,7 @@ widely tested.
 
 To compile the documentation, add:
   sudo aptitude install texlive-base texlive-latex-base \
-  texlive-latex-extra texlive-fonts-recommended
+  texlive-latex-extra texlive-fonts-recommended mathpartir
 
 On Debian squeeze, you must also install a new version of OCaml.
 Follow the instructions in "Bootstrapping using ocamlbrew" after
