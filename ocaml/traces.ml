@@ -569,19 +569,22 @@ let lookup_thread_map map threadIDopt (Var.V(_,_,t) as avar) =
     | Some(threadID), _ -> avar (* Ignore non register variables and temporaries *)
     | None, _ -> failwith "Can not lookup vars if no thread id exists!"
 
-(** Rename variables so they are unique to the thread they are found in *)
-let explicit_thread_stmts stmts thread_map =
+let explicit_thread_stmts_int tid stmts thread_map =
   (* check if tid is in first or second statement.  If it isn't, use None and
      don't change any variables *)
-  let tid = ref (get_tid stmts)
-  in
   let svis = object(self)
     inherit Ast_visitor.nop
-    method visit_avar v = ChangeTo(lookup_thread_map thread_map !tid v)
+    method visit_avar v = ChangeTo(lookup_thread_map thread_map tid v)
     method visit_rvar = self#visit_avar
   end
   in
   Ast_visitor.prog_accept svis stmts
+
+(** Rename variables so they are unique to the thread they are found in *)
+let explicit_thread_stmts stmts thread_map =
+  let tid = get_tid stmts in
+  explicit_thread_stmts_int tid stmts thread_map
+
 
 (* Store the concrete taint info in the global environment *)
 let add_to_conc {name=name; mem=mem; index=index; value=value;
@@ -1296,8 +1299,8 @@ let run_blocks arch blocks memv length =
   Status.init "Concrete Run" length ;
   let state = TraceConcrete.create_state () in
   let thread_map = create_thread_map_state () in
-  let (rev_trace,_) = List.fold_left 
-    (fun (acc,remaining) block -> 
+  let (_,rev_trace,_) = List.fold_left 
+    (fun (last_tid,acc,remaining) block -> 
       Status.inc();
       let hd, block_tail = hd_tl block in
       let concblock =
@@ -1306,6 +1309,9 @@ let run_blocks arch blocks memv length =
           (* If the block starts with the endtrace comment, then we
              shouldn't concretely execute it. It's probably a bunch of
              assertions. *)
+          let block = try explicit_thread_stmts_int last_tid block thread_map
+            with Failure _ -> wprintf "No thread id found"; block
+          in
           block
         | _ ->
           let l = get_next_label remaining in 
@@ -1313,6 +1319,9 @@ let run_blocks arch blocks memv length =
           run_block arch ~next_label:l ~transformf:trace_transform_stmt state memv thread_map block)
       in
       (
+        (* Save this threadid.  We'll use this when we get to the end
+           of the trace. *)
+        get_tid block,
         (* If we are doing a consistency check, saving the concretized
            blocks is just a waste of memory! *)
         (* new trace *) 
@@ -1322,7 +1331,7 @@ let run_blocks arch blocks memv length =
         | [] -> []
         | _::tl -> tl)
       ))
-    ([],List.tl blocks) blocks
+    (None,[],List.tl blocks) blocks
   in
   Status.stop () ;
   List.rev rev_trace
@@ -1896,8 +1905,7 @@ let hijack_control target trace =
   trace, Ast.Assert(ret_constraint, atts)
 
 (* Setting the return address to an arbitrary value *)
-let control_flow addr arch trace =
-  let target = big_int_of_string addr in
+let control_flow target arch trace =
   let target = Int(target, memtype arch) in
   let trace, assertion = hijack_control target trace in
     BatList.append trace [assertion]

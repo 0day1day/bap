@@ -304,7 +304,8 @@ let speclist =
      uadd(TransformAst to_dsa),
      "Convert to DSA form.")
    ::("-trace-target",
-     Arg.String (fun i -> add(TransformModeAst(Traces.control_flow i))),
+     Arg.String (fun addr -> add(TransformModeAst(
+       Traces.control_flow (Big_int_Z.big_int_of_string addr)))),
      "<addr> Provide the target address <addr>"
     )
    ::("-trace-symbolic-target",

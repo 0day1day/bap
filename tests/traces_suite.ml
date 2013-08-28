@@ -14,7 +14,7 @@ let tag = "pin_suite";;
 
 let create_input_file _ =
   let out = open_out taint_file in
-  output_string out "helloooooooooooooooooooooooo\n";
+  output_string out "helloooooooooooooooooooooooooooooooo\n";
   close_out out;;
 
 
@@ -36,7 +36,7 @@ module MakeTraceTest(TraceSymbolic:Traces.TraceSymbolic) = struct
     Traces.consistency_check := false;
     let t1 = Traces.add_payload bi0 "test" arch prog in
     (* We should not get an exception because this should be satisfiable *)
-    ignore(Traces.TraceSymbolic.output_exploit (exploit_file,Smtexec.STP.si) arch t1);
+    Traces.TraceSymbolic.output_exploit (exploit_file,Smtexec.STP.si) arch t1;
     let t2 = Traces.add_payload bi0 "\x00" arch prog in
     (* Null bytes are not allowed, so we should get an exception *)
     (* We need to cleanup traces in between runs, or we'll get an
@@ -103,6 +103,19 @@ let pin_trace_cleanup pin_out =
   Traces.cleanup()
 ;;
 
+let exploit_test trace =
+  let trace, arch = Asmir.serialized_bap_from_trace_file trace in
+  let t = Arch.type_of_arch arch in
+  let addr = Arithmetic.to_big_int (bim1, t) in
+  let trace = Traces.control_flow addr arch trace in
+  let trace = Traces.add_payload_after bi0 "hello" arch trace in
+  let () = Traces.TraceSymbolic.output_exploit (exploit_file,Smtexec.STP.si) arch trace in
+  let buf = String.create 1000 in
+  let ic = open_in exploit_file in
+  (try really_input ic buf 0 1000
+   with End_of_file -> ());
+  assert_bool "Exploit does not contain the correct string" (BatString.exists buf "\xff\xff\xff\xffhello")
+
 let fold_solvers (s,f) =
   List.map (fun solver ->
     s^"_"^solver#solvername >:: f solver
@@ -122,6 +135,8 @@ let suite arch =
     "pin_trace_letbind_test"^suffix >::
       (let module M = MakeTraceTest(Traces.TraceSymbolicStream) in
        bracket pin_trace_setup M.pin_trace_test pin_trace_cleanup);
+    "exploit_test"^suffix >::
+      bracket pin_trace_setup exploit_test pin_trace_cleanup;
   ] @
   fold_solvers ("pin_trace_stream_test",
                 (fun solver ->
