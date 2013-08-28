@@ -1,5 +1,0 @@
-#if @LLVM_NEW_API@
-  #define DATAMOD DataLayout
-#else
-  #define DATAMOD TargetData
-#endif
