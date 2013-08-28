@@ -10,4 +10,6 @@ val type_of_arch : arch -> Type.typ
 
 val bits_of_arch : arch -> int
 
+val bytes_of_arch : arch -> int
+
 val mode_of_arch : arch -> Disasm_i386.mode

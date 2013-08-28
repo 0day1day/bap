@@ -34,8 +34,8 @@ let startdebug = ref 1
 (* used for some trace exploit options *)
 let offset_helper f p =
   (fun arch ->
-    let bits = bi (Arch.bits_of_arch arch) in
-    f bits p arch)
+    let bytes = bi (Arch.bytes_of_arch arch) in
+    f bytes p arch)
 
 let output_ast f p =
   let oc = open_out f in
