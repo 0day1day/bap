@@ -31,6 +31,12 @@ type cmd =
 let pipeline = ref []
 let startdebug = ref 1
 
+(* used for some trace exploit options *)
+let offset_helper f p =
+  (fun arch ->
+    let bits = bi (Arch.bits_of_arch arch) in
+    f bits p arch)
+
 let output_ast f p =
   let oc = open_out f in
   let pp = new Pp.pp_oc oc in
@@ -306,19 +312,21 @@ let speclist =
      "Use a symbolic jump target (to determine the amount of control we have)"
     )
    ::("-trace-payload",
-     Arg.String (fun p -> add(TransformModeAst(Traces.add_payload p))),
+     Arg.String (fun p -> add(TransformModeAst(Traces.add_payload bi0 p))),
      "<binstring> Provide a payload to be inserted at the return address (BEWARE of null bytes)"
     )
    ::("-trace-payload-file",
-     Arg.String (fun p -> add(TransformModeAst(Traces.add_payload_from_file p))),
+     Arg.String (fun p -> add(TransformModeAst(Traces.add_payload_from_file bi0 p))),
      "<binfile> Provide a payload to be inserted at the return address"
     )
    ::("-trace-payload-after-file",
-     Arg.String (fun p -> add(TransformModeAst(Traces.add_payload_from_file_after ~offset:(bi4) p))),
-     "<binfile> Provide a payload to be inserted past the return address"
+     Arg.String (fun p ->
+       add(TransformModeAst(offset_helper Traces.add_payload_from_file_after p))),
+      "<binfile> Provide a payload to be inserted past the return address"
     )
    ::("-trace-payload-after",
-     Arg.String (fun p -> add(TransformModeAst(Traces.add_payload_after ~offset:(bi4) p))),
+     Arg.String (fun p ->
+       add(TransformModeAst(offset_helper Traces.add_payload_after p))),
      "<binstring> Provide a payload to be inserted past the return address (BEWARE of null bytes)"
     )
    ::("-trace-shell",

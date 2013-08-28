@@ -1944,7 +1944,7 @@ let inject_payload_gen arch addr payload trace =
 (* Injecting a payload at an offset past the return address *)
 let inject_payload arch start payload trace =
   (* TODO: A simple dataflow is missing here *)
-  let mem, ind, trace = get_last_load_exp trace in
+  let mem, ind, _ = get_last_load_exp trace in
   dprintf "Injecting shellcode at index: %s" (Pp.ast_exp_to_string ind);
    (* Let's convert to Int64 *)
   let payload = List.map big_int_of_int payload in
@@ -1967,26 +1967,26 @@ let string_to_bytes payload =
     List.rev !bytes
 
 (* Add an arbitrary payload over the return address *)
-let add_payload ?(offset=bi0) payload arch trace =
+let add_payload offset payload arch trace =
   let payload = string_to_bytes payload in
   let _, index, trace = get_last_load_exp trace in
   let start = BinOp(PLUS, index, Int(offset, memtype arch)) in
   let assertions = inject_payload_gen arch start payload trace in
     BatList.append trace assertions
 
-let add_payload_after ?(offset=bi4) payload arch trace =
+let add_payload_after offset payload arch trace =
   let payload = string_to_bytes payload in
   let trace, assertions = inject_payload arch offset payload trace in
     BatList.append trace assertions
 
-let add_payload_from_file ?(offset=bi0) file arch trace =
+let add_payload_from_file offset file arch trace =
   let payload = bytes_from_file file in
   let _, index, trace = get_last_load_exp trace in
   let start = BinOp(PLUS, index, Int(offset, memtype arch)) in
   let assertions = inject_payload_gen arch start payload trace in
     BatList.append trace assertions
 
-let add_payload_from_file_after ?(offset=bi4) file arch trace =
+let add_payload_from_file_after offset file arch trace =
   let payload = bytes_from_file file in
   let trace, assertions = inject_payload arch offset payload trace in
     BatList.append trace assertions

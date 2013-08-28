@@ -77,20 +77,14 @@ marks the file \cmdline{readme} as being tainted.
 We will record a trace of a simple buffer overflow.  Run 
 
 \begin{verbatim}
-echo "helloooooooooooooooooo" > readme
+echo "helloooooooooooooooooooooooooooooooooo" > readme
 \end{verbatim}
 
- to create the input file.  Then run 
-
-\begin{verbatim}
-make -C $BAPDIR/pintraces/examples/bof1/
-\end{verbatim}
-
-and
+ to create the input file.  Then run
 
 \begin{verbatim}
 $BAPDIR/utils/gentrace.bash -taint-files readme \
- -- $BAPDIR/pintraces/examples/bof1/bof1
+ -- $BAPDIR/tests/C/bof1 readme
 \end{verbatim}
 
 The PIN tool will output

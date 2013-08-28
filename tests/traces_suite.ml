@@ -1,4 +1,5 @@
 open Arch
+open Big_int_convenience
 open OUnit
 open Pcre
 open Test_common
@@ -33,10 +34,10 @@ module MakeTraceTest(TraceSymbolic:Traces.TraceSymbolic) = struct
     Traces.consistency_check := true;
     ignore(Traces.concrete arch prog);
     Traces.consistency_check := false;
-    let t1 = Traces.add_payload "test" arch prog in
+    let t1 = Traces.add_payload bi0 "test" arch prog in
     (* We should not get an exception because this should be satisfiable *)
     ignore(Traces.TraceSymbolic.output_exploit (exploit_file,Smtexec.STP.si) arch t1);
-    let t2 = Traces.add_payload "\x00" arch prog in
+    let t2 = Traces.add_payload bi0 "\x00" arch prog in
     (* Null bytes are not allowed, so we should get an exception *)
     (* We need to cleanup traces in between runs, or we'll get an
        error. *)
