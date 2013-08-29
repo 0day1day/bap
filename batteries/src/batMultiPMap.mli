@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *)
 
-(** 
+(**
     Polymorphic Multi-Map.
 
     This is a polymorphic multi-map, i.e. an association from 1 to many.
@@ -45,7 +45,7 @@ val add : 'a -> 'b -> ('a, 'b) t -> ('a, 'b) t
 (** [add x y m] returns a map containing the same bindings as
     [m], plus a binding of [x] to [y].*)
 
-val find : 'a -> ('a, 'b) t -> 'b BatPSet.t
+val find : 'a -> ('a, 'b) t -> 'b BatSet.PSet.t
 (** [find x m] returns the current binding of [x] in [m]*)
 
 val remove_all : 'a -> ('a, 'b) t -> ('a, 'b) t
@@ -63,47 +63,70 @@ val mem : 'a -> ('a, 'b) t -> bool
 (** [mem x m] returns [true] if [m] contains at least a binding for [x],
     and [false] otherwise. *)
 
-val iter : ('a -> 'b BatPSet.t-> unit) -> ('a, 'b) t -> unit
+val iter : ('a -> 'b BatSet.PSet.t-> unit) -> ('a, 'b) t -> unit
 (** [iter f m] applies [f] to all bindings in map [m].
     [f] receives the key as first argument, and the associated value
     as second argument. The order in which the bindings are passed to
     [f] is unspecified. Only current bindings are presented to [f]:
     bindings hidden by more recent bindings are not passed to [f]. *)
 
-val map : ('b BatPSet.t -> 'c BatPSet.t) -> (('b -> 'b -> int) -> ('c -> 'c -> int)) -> ('a, 'b) t -> ('a, 'c) t
+val map : ('b BatSet.PSet.t -> 'c BatSet.PSet.t) -> (('b -> 'b -> int) -> ('c -> 'c -> int)) -> ('a, 'b) t -> ('a, 'c) t
 (** [map f m] returns a map with same domain as [m], where the
     associated value [a] of all bindings of [m] has been
     replaced by the result of the application of [f] to [a].
     The order in which the associated values are passed to [f]
     is unspecified. *)
 
-val mapi : ('a -> 'b BatPSet.t -> 'c BatPSet.t) -> (('b -> 'b -> int) -> ('c -> 'c -> int)) -> ('a, 'b) t -> ('a, 'c) t
+val mapi : ('a -> 'b BatSet.PSet.t -> 'c BatSet.PSet.t) -> (('b -> 'b -> int) -> ('c -> 'c -> int)) -> ('a, 'b) t -> ('a, 'c) t
 (** Same as [map], but the function receives as arguments both the
     key and the associated value for each binding of the map. *)
 
-val fold : ('b BatPSet.t -> 'c -> 'c) -> ('a , 'b) t -> 'c -> 'c
+val fold : ('b BatSet.PSet.t -> 'c -> 'c) -> ('a , 'b) t -> 'c -> 'c
 (** [fold f m a] computes [(f kN dN ... (f k1 d1 (f k0 d0 a))...)],
     where [k0,k1..kN] are the keys of all bindings in [m],
     and [d0,d1..dN] are the associated data.
     The order in which the bindings are presented to [f] is
     unspecified. *)
 
-val foldi : ('a -> 'b BatPSet.t -> 'c -> 'c) -> ('a , 'b) t -> 'c -> 'c
+val foldi : ('a -> 'b BatSet.PSet.t -> 'c -> 'c) -> ('a , 'b) t -> 'c -> 'c
 (** Same as [fold], but the function receives as arguments both the
     key and the associated value for each binding of the map. *)
+
+val modify : 'a -> ('b BatSet.PSet.t -> 'b BatSet.PSet.t) -> ('a, 'b) t -> ('a, 'b) t
+(** [modify x f m] replaces the binding for [x] with [f] applied to
+    these values.
+
+    @since 2.1
+    @raise Not_found is [x] is unbound in [m] *)
+
+val modify_def :
+  'b BatSet.PSet.t -> 'a -> ('b BatSet.PSet.t -> 'b BatSet.PSet.t) ->
+  ('a, 'b) t -> ('a, 'b) t
+(** [modify_def dfl x f m] performs as [modify x f m] but it adds
+    [f dfl] in [m] instead of raising [Not_found] if [x] was unbound.
+
+    @since 2.1 *)
+
+val modify_opt:
+  'a -> ('b BatSet.PSet.t option -> 'b BatSet.PSet.t option) ->
+  ('a, 'b) t -> ('a, 'b) t
+(** [modify_opt x f m] allows to modify the bindings for [k] in [m]
+    or absence thereof.
+
+    @since 2.1 *)
 
 val enum : ('a, 'b) t -> ('a * 'b) BatEnum.t
 (** creates an enumeration for this map. *)
 
 val of_enum : ?keys:('a -> 'a -> int) -> ?data:('b -> 'b -> int) -> ('a * 'b) BatEnum.t -> ('a, 'b) t
 (** creates a map from an enumeration, using the specified function
-  for key comparison or [compare] by default. *)
+    for key comparison or [compare] by default. *)
 
 (** Infix operators over a {!BatMultiPMap} *)
 module Infix : sig
-  val (-->) : ('a, 'b) t -> 'a -> 'b BatPSet.t
-    (** [map-->key] returns the current binding of [key] in [map].
-        Equivalent to [find key map]. *)
+  val (-->) : ('a, 'b) t -> 'a -> 'b BatSet.PSet.t
+  (** [map-->key] returns the current binding of [key] in [map].
+      Equivalent to [find key map]. *)
 
   val (<--) : ('a, 'b) t -> 'a * 'b -> ('a, 'b) t
     (** [map<--(key, value)] returns a map containing the same bindings as
@@ -114,7 +137,8 @@ end
 (** {6 Boilerplate code}*)
 
 (** {7 Printing}*)
-  
-val print : ?first:string -> ?last:string -> ?sep:string -> ('a BatInnerIO.output -> 'b -> unit) -> 
-                                                            ('a BatInnerIO.output -> 'c -> unit) -> 
- 'a BatInnerIO.output -> ('b, 'c) t -> unit
+
+val print : ?first:string -> ?last:string -> ?sep:string -> ?kvsep:string ->
+  ('a BatInnerIO.output -> 'b -> unit) ->
+  ('a BatInnerIO.output -> 'c -> unit) ->
+  'a BatInnerIO.output -> ('b, 'c) t -> unit

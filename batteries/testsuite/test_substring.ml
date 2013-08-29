@@ -74,7 +74,7 @@ let test_takel =
     end;
   ];;
 
-let to_strings = to_string *** to_string
+let to_strings (x,y) = to_string x, to_string y
 
 let test_splitr =
   let printer (s1,s2) = Printf.sprintf "(%S,%S)" s1 s2 in
@@ -143,6 +143,59 @@ let test_slice =
     end;
   ];;
 
+let test_index_from =
+  let aeq = assert_equal ~printer:string_of_int in
+  [
+    begin "index from" >:: fun () ->
+      aeq (index_from (of_string "foobar") 2 'b')
+	(2+index (triml 2 (of_string "foobar")) 'b')
+    end;
+  ];;
+
+let test_rindex_from =
+  let aeq = assert_equal ~printer:string_of_int in
+  [
+    begin "rindex from" >:: fun () ->
+      aeq (rindex_from (of_string "foobar") 2 'b')
+	(rindex (trimr 2 (of_string "foobar")) 'b')
+    end;
+  ];;
+
+let test_is_prefix = 
+  let aeq = assert_equal ~printer:string_of_bool in
+  [
+    begin "is_prefix" >:: fun () ->
+      aeq (is_prefix "foo" (of_string "foobar")) true;
+      aeq (is_prefix "foj" (of_string "foobar")) false;
+      aeq (is_prefix "foobarz" (of_string "foobar")) false;
+      aeq (is_prefix "foobar" (of_string "foobar")) true;
+    end;
+  ];;
+
+let test_enum =
+  let ss = of_string "testing" in
+  let test_enum substring = ss |> to_string |> BatString.enum in
+  [
+    begin "enum" >:: fun () ->
+      assert_equal (ss |> enum |> BatString.of_enum) "testing";
+      assert_equal (size ss) (ss |> enum |> BatEnum.count) ~printer:string_of_int;
+      assert_equal (ss |> enum |> BatString.of_enum)
+                   (ss |> test_enum |> BatString.of_enum)
+    end
+  ]
+
+let test_iteri = 
+  let ss = of_string "test" in
+  let mark = ref false in
+  let r = ref [] in
+  ss |> iteri (fun i _ -> mark := true; r := i::(!r) );
+  [
+    begin "iteri" >:: fun () ->
+      assert_equal !mark true ~printer:string_of_bool;
+      assert_equal (List.rev !r) [0;1;2;3]
+    end
+  ]
+
 let tests = "Substring" >::: [
   "dropr" >::: test_dropr;
   "dropl" >::: test_dropl;
@@ -151,4 +204,8 @@ let tests = "Substring" >::: [
   "splitr" >::: test_splitr;
   "splitl" >::: test_splitl;
   "slice" >::: test_slice;
+  "index_from" >::: test_index_from;
+  "is_prefix" >::: test_is_prefix;
+  "enum" >::: test_enum;
+  "test_iteri" >::: test_iteri;
 ];;

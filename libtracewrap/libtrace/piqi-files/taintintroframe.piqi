@@ -45,4 +45,20 @@
                .optional
                .code 3
         ]
+
+        % Name of the taint source (file name, arguments, env. vars, etc)
+        .field [
+          .name source-name
+          .type string
+          .optional
+          .code 4
+          ]
+
+        % Offset in the taint source. 
+        .field [
+          .name offset
+          .optional
+          .type address
+          .code 5
+        ]
 ]

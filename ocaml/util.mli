@@ -299,11 +299,6 @@ val timeout_option : secs:int -> f:('a -> 'b) -> x:'a -> 'b option
     results with [sep]. *)
 val print_separated_list : ('a -> string) -> string -> 'a list -> string
 
-(** [print_obj_info s obj] prints the size of object [obj] with string
-    [s] in the debug logs if the [UtilSize] module has debugging
-    enabled. *)
-val print_obj_info : string -> 'a -> unit
-
 (** If the [UtilMemUse] module has debugging enabled, prints
     information about the memory use of the process. *)
 val print_mem_usage : unit -> unit

@@ -1,3 +1,0 @@
-version="0.16"
-archive(byte)="objsize.cma"
-archive(native)="objsize.cmxa"

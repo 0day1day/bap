@@ -104,6 +104,8 @@ type attribute =
   | InitRO (** The memory in this assignment is stored in the binary *)
   | Synthetic (** Operation was added by an analysis *)
   | SpecialBlock (** Start of a special block *)
+  | TaintIntro of int * string * int
+
 type attributes = attribute list
 
 (** Visitors are a systematic method for exploring and changing

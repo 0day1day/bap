@@ -361,21 +361,32 @@ module SerializedTrace = struct
                    usage=convert_usage use;
                    taint=convert_taint t})
       in
-      let convert_taint_info = function
-        | {Taint_intro.addr=a;
-           Taint_intro.taint_id=tid;
-           Taint_intro.value=value} ->
-          let v = match value with
-            | Some x -> Util.big_int_of_binstring ~e:`Little x
-            | None -> Big_int_convenience.bi0
-          in
-          Context({name="mem";
-                   mem=true;
-                   t=Reg 8;
-                   index=a;
-                   value=v;
-                   usage=WR;
-                   taint=Taint (Int64.to_int tid)})
+      let convert_taint_info =
+        let convert_context = function
+          | {Taint_intro.addr=a;
+             Taint_intro.taint_id=tid;
+             Taint_intro.value=value} ->
+            let v = match value with
+              | Some x -> Util.big_int_of_binstring ~e:`Little x
+              | None -> Big_int_convenience.bi0
+            in
+            let tid = Int64.to_int tid in
+            Context({name="mem"; mem=true; t=Reg 8; index=a; value=v;
+                     usage=WR;
+                     taint=Taint tid})
+        in
+        function
+        (* New trace format has source information *)
+        | {Taint_intro.taint_id=tid;
+           Taint_intro.source_name=Some src_name;
+           Taint_intro.offset=Some off} as ti ->
+          let tid = Int64.to_int tid in
+          let off = Int64.to_int off in
+          let ctx = convert_context ti in
+          let intro = TaintIntro(tid, src_name, off) in
+          [intro; ctx]
+        (* Older trace format does not have source information *)
+        | ti -> [convert_context ti]
       in
       let convert_thread_id x = Type.ThreadId (Int64.to_int x)
       in
@@ -383,7 +394,9 @@ module SerializedTrace = struct
         | `std_frame({Std_frame.operand_list=ol; Std_frame.thread_id=tid}) -> (convert_thread_id tid) :: List.map convert_operand_info ol
         | `syscall_frame _ -> []
         | `exception_frame _ -> []
-        | `taint_intro_frame({Taint_intro_frame.taint_intro_list=til}) -> List.map convert_taint_info til
+        | `taint_intro_frame({Taint_intro_frame.taint_intro_list=til}) -> 
+            let l = List.map convert_taint_info til in
+            List.flatten l
         | `modload_frame _ -> []
         | `key_frame _ -> []
         | `metadata_frame _ -> []

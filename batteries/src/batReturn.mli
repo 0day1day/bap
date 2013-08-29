@@ -20,27 +20,27 @@
 
 (**
    Local exceptions/labels/goto/return.
-   
+
    This module defines a mechanism akin to SML's exception generators
    or to a generalization of C's [return], i.e. the ability to define
    local {i labels}, which may be used for immediately terminating an
-   expression and returning a value. By opposition to usual OCaml 
+   expression and returning a value. By opposition to usual OCaml
    exceptions, this mechanism
    - allows polymorphic return values
    - makes accidental exception catching slightly harder (while a local
    exception can escape its scope, it cannot be caught again by accident
    from this module).
-      
+
    Example:
    {[
-   let find_in_array a e =
-    label (fun label ->
-    for i = 0 to Array.length a - 1 do
-      if Array.get a i = e then return label (Some i)
-    done;
-    None)
+     let find_in_array a e =
+       label (fun label ->
+         for i = 0 to Array.length a - 1 do
+           if Array.get a i = e then return label (Some i)
+         done;
+         None)
    ]}
-   
+
    @author David Teller
 
    @documents Return
@@ -48,7 +48,7 @@
 
 type 'a t
 (** A label which may be used to return values of type ['a]*)
-    
+
 val label : ('a t -> 'a) -> 'a
 (** [label f] creates a new label [x] and invokes
     [f x]. If, during the execution of [f], [return x v]
@@ -61,15 +61,15 @@ val label : ('a t -> 'a) -> 'a
     is a run-time error and causes termination
     of the program.*)
 val with_label  : ('a t -> 'a) -> 'a
-  (**as [label]*)
+(**as [label]*)
 
 val return : 'a t -> 'a -> _
-(** Return to a label. [return l v] returns
-    to the point where label [l] was obtained
-    and produces value [l].
+  (** Return to a label. [return l v] returns
+      to the point where label [l] was obtained
+      and produces value [l].
 
-    Calling [return l v] from outside the scope
-    of [l] (i.e. the call to function [label]
-    which produced [l]) is a run-time error
-    and causes termination of the program.*)
+      Calling [return l v] from outside the scope
+      of [l] (i.e. the call to function [label]
+      which produced [l]) is a run-time error
+      and causes termination of the program.*)
 

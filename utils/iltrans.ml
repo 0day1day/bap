@@ -243,7 +243,7 @@ let speclist =
          [Arg.Set_int srcbb ; Arg.Set_int srcn ;
           Arg.Set_int trgbb ; Arg.Set_int trgn ;
                uadd(TransformSsa(ssa_chop srcbb srcn trgbb trgn)) ]),
-     "<src-bbnum> <src-linenum> <trg-bbnum> <trg-linenum> Calculate the chop of an AST")
+     "<src-bbnum> <src-linenum> <trg-bbnum> <trg-linenum> Calculate the chop of an SSA")
   ::("-sccvn", uadd(TransformSsa sccvn),
      "Apply Strongly Connected Component based Value Numbering")
   ::("-deadcode", uadd(TransformSsa deadcode),
