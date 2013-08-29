@@ -117,7 +117,7 @@ AC_SUBST(LLVM_PPFLAGS)
 LLVM_VERSION=`ocamlfind query $LLVM_PACKAGE -format %v`
 
 AX_COMPARE_VERSION([$LLVM_VERSION], [ge], [3.2],
-      [LLVM_NEW_API=true],
+      [LLVM_NEW_API=true; LLVM_PPFLAGS="$LLVM_PPFLAGS -D LLVM_NEW_API"],
       [LLVM_NEW_API=false])
 AC_SUBST(LLVM_NEW_API)
 
@@ -188,8 +188,7 @@ AC_CONFIG_FILES([Makefile
                  pintraces/Makefile
                  ocaml/Makefile
                  utils/Makefile
-                 tests/Makefile
-                 ocaml/llvm.h])
+                 tests/Makefile])
 # Configure ocamlgraph and zarith
 
 AC_CONFIG_SUBDIRS([ocamlgraph])
