@@ -95,7 +95,7 @@ let backwards_taint_test pin_out =
 
 let backwards_taint_test x =
   try backwards_taint_test x
-  with _ -> skip_if true "Fix backwards_taint_test for x86-64 binaries"
+  with _ -> skip_if true "Fix backwards_taint_test. Issue #17"
 
 (* Note: This will leave the files pin.log and pintool.log by intention *)
 let pin_trace_cleanup pin_out =
