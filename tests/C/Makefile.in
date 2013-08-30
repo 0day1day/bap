@@ -8,7 +8,7 @@ CFLAGS = -fno-stack-protector
 all: $(CEXECS)
 
 recover-hard-opt: recover-hard.c
-	$(CC) $< -o $@ $(CFLAGS) -O3
+	$(CC) -m32 $< -o $@ $(CFLAGS) -O3
 
 $(CEXECS_SRC): $(CSRC)
 	gcc -m32 $@.c -o $@ $(CFLAGS)
