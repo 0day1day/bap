@@ -103,13 +103,11 @@ let cast_low = cast CAST_LOW
 let cast_high = cast CAST_HIGH
 let cast_signed = cast CAST_SIGNED
 let rec cast_unsigned tnew = function
-  | Int(i,t) -> let (i',t') = Arithmetic.cast CAST_UNSIGNED (i,t) tnew in
-                Int(i',t')
   | Cast(CAST_UNSIGNED, Reg t', e) when Arithmetic.bits_of_width tnew >= t' ->
     (* Recurse, since we might be able to simplify e further now *)
     cast_unsigned tnew e
   | e ->
-    Cast(CAST_UNSIGNED, tnew, e)
+    cast CAST_UNSIGNED tnew e
 
 let exp_int i bits = Int(i, Reg bits)
 let it i t = Int(biconst i, t)
