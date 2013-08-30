@@ -2,6 +2,7 @@ let usage = "Usage: "^Sys.argv.(0)^" <input options> [transformations and output
              Evaluate BAP IL programs. "
 
 open Ast
+open Big_int_convenience
 
 type ast = Ast.program
 type astcfg = Cfg.AST.G.t
@@ -65,15 +66,13 @@ let mapv v e =
 let mapmem a e =
   let a,ns = Parser.exp_from_string ~scope:!scope a in
   let e,ns = Parser.exp_from_string ~scope:ns e in
+
+  (* Get memory depending on the type of the address *)
+  let m = Asmir_vars.mem_of_type (Typecheck.infer_ast a) in
+
   let t = Typecheck.infer_ast e in
-  let m,ns = match Parser.exp_from_string ~scope:ns "mem:?u32" with
-    | Var(v), ns -> v, ns
-    | _ -> assert false
-  in
   scope := ns;
-  (* let s = Move(m, Store(Var(m), a, e, exp_false, t), []) in *)
   inits := (m, Store(Var(m), a, e, exp_false, t)) :: !inits
-  (* inits := s :: !inits *)
 
 let jitexecute p = Utils_common.jitexecute (List.rev !inits) p
 
@@ -82,7 +81,7 @@ let speclist =
      Arg.Unit (fun () -> add(AnalysisAst cexecute)),
      "Concretely execute the IL from the beginning of the program")
   ::("-eval-at", 
-     Arg.String (fun s -> add(AnalysisAst (cexecute_at (Int64.of_string s)))),
+     Arg.String (fun s -> add(AnalysisAst (cexecute_at (Big_int_Z.big_int_of_string s)))),
      "<pc> Concretely execute the IL from pc")
   ::("-jiteval",
      Arg.Unit (fun () -> add(AnalysisAst jitexecute)),
@@ -115,7 +114,7 @@ let () = Arg.parse speclist anon usage
 let pipeline = List.rev !pipeline
 
 let prog =
-  try let p,s = Input.get_program() in
+  try let p,s,_ = Input.get_program() in
       (* Save scope for expression parsing *)
       scope := s;
       p

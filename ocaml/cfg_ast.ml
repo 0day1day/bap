@@ -176,10 +176,10 @@ let of_prog ?(special_error = true) p =
     let tgt = match dst with
       | None -> indirect
       | Some l ->
-	  try (C.find_label c l)
-	  with Not_found ->
-	    wprintf "Jumping to unknown label: %s" (Pp.label_to_string l);
-	    error
+          try (C.find_label c l)
+          with Not_found ->
+            wprintf "Jumping to unknown label: %s" (Pp.label_to_string l);
+            error
       (* FIXME: should jumping to an unknown address be an error or indirect? *)
     in
     C.add_edge_e c (C.G.E.create v lab tgt)
@@ -234,26 +234,26 @@ let to_prog c =
   let rec grow_trace cond head =
       match bh_find_option tails head with
       | None ->
-	  () (* must have already been joined previously *)
+          () (* must have already been joined previously *)
       | Some tail ->
-	  assert(not(BH.mem joined tail));
-	  let rec find_succ = function
-	    | [] -> ()
-	    | suc::rest ->
-		match bh_find_option tails suc with
-		| Some succtail when cond head tail suc &&
+          assert(not(BH.mem joined tail));
+          let rec find_succ = function
+            | [] -> ()
+            | suc::rest ->
+                match bh_find_option tails suc with
+                | Some succtail when cond head tail suc &&
                                      suc <> head ->
                   assert (succtail <> head);
                   assert (suc <> head);
-		    dprintf "to_prog: joining %s .. %s with %s .. %s" (v2s head) (v2s tail) (v2s suc) (v2s succtail);
-		    BH.add joined tail suc;
-		    BH.replace tails head succtail;
-		    BH.remove tails suc;
-		    grow_trace cond head
-		| _ -> (* suc is part of another trace, or cond failed *)
-		    find_succ rest
-	  in
-	  find_succ (C.G.succ c tail)
+                    dprintf "to_prog: joining %s .. %s with %s .. %s" (v2s head) (v2s tail) (v2s suc) (v2s succtail);
+                    BH.add joined tail suc;
+                    BH.replace tails head succtail;
+                    BH.remove tails suc;
+                    grow_trace cond head
+                | _ -> (* suc is part of another trace, or cond failed *)
+                    find_succ rest
+          in
+          find_succ (C.G.succ c tail)
   in
   let grow_traces cond =
     let worklist = BH.fold (fun k _ w -> k::w) tails [] in
@@ -276,31 +276,31 @@ let to_prog c =
     try BH.find labs b
     with Not_found ->
       let rec find_label = function
-	| Label(l,_)::_ -> Some l
-	| Comment _ :: xs -> find_label xs
-	| _ -> None
+        | Label(l,_)::_ -> Some l
+        | Comment _ :: xs -> find_label xs
+        | _ -> None
       in
       match find_label (C.get_stmts c b) with
       | Some l ->
-	  BH.add labs b l;
-	  l
+          BH.add labs b l;
+          l
       | None ->
-	  let l = newlab () in
-	  BH.add newlabs b l;
-	  BH.add labs b l;
-	  l
+          let l = newlab () in
+          BH.add newlabs b l;
+          BH.add labs b l;
+          l
   in
   let ensure_jump src dst =
     if not(has_jump src)
     then match C.G.succ c src with
-	| [d] ->
-	    assert (C.G.V.equal dst d);
-	    let j = Jmp(exp_of_lab (get_label dst), []) in
-	    BH.replace hrevstmts src (j::get_revstmts src)
-	| l ->
+        | [d] ->
+            assert (C.G.V.equal dst d);
+            let j = Jmp(exp_of_lab (get_label dst), []) in
+            BH.replace hrevstmts src (j::get_revstmts src)
+        | l ->
           let dests = List.fold_left (fun s n -> s^" "^v2s n) "" l in
-	    failwith("Cfg_ast.to_prog: no jump at end of block with > 1 succ: "
-		     ^ v2s src ^ " points to"^dests)
+            failwith("Cfg_ast.to_prog: no jump at end of block with > 1 succ: "
+                     ^ v2s src ^ " points to"^dests)
   in
   (* join traces without jumps *)
   grow_traces (fun _ b suc -> normal b && normal suc && not(has_jump b));
@@ -318,18 +318,18 @@ let to_prog c =
   let revordered_heads, exittrace =
     BH.fold
       (fun h t (rh,et) ->
-	 if C.G.V.label h = BB_Entry then (rh,et)
-	 else if C.G.V.label t = BB_Exit then (rh, Some h)
-	 else (h::rh, et) )
+         if C.G.V.label h = BB_Entry then (rh,et)
+         else if C.G.V.label t = BB_Exit then (rh, Some h)
+         else (h::rh, et) )
       tails
       ([C.G.V.create BB_Entry], None)
   in
   let revordered_heads = match exittrace with
     | Some x -> x::revordered_heads
     | None ->
-	if C.G.mem_vertex c (C.G.V.create BB_Exit)
-	then failwith "brokenness: BB_Exit was missing"
-	else revordered_heads
+        if C.G.mem_vertex c (C.G.V.create BB_Exit)
+        then failwith "brokenness: BB_Exit was missing"
+        else revordered_heads
   in
   let revnodes =
     let rec head_to_revnodes h acc =

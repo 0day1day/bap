@@ -34,8 +34,10 @@ aclocal.m4
 autom4te.cache/
 batteries/all
 compile
+config.guess
 config.log
 config.status
+config.sub
 configure
 depcomp
 install-sh
@@ -56,11 +58,14 @@ libtracewrap/libtrace/INSTALL
 libtracewrap/libtrace/Makefile
 libtracewrap/libtrace/Makefile.in
 libtracewrap/libtrace/TAGS
+libtracewrap/libtrace/aclocal.m4
+libtracewrap/libtrace/autom4te.cache/
 libtracewrap/libtrace/configure
 libtracewrap/libtrace/piqi/deps
 libtracewrap/libtrace/protobuf/Makefile
 libtracewrap/libtrace/protobuf/Makefile.in
 libtracewrap/libtrace/protobuf/TAGS
+libtracewrap/libtrace/protobuf/aclocal.m4
 libtracewrap/libtrace/protobuf/ar-lib
 libtracewrap/libtrace/protobuf/config.guess
 libtracewrap/libtrace/protobuf/config.h
@@ -71,6 +76,8 @@ libtracewrap/libtrace/protobuf/configure.lineno
 libtracewrap/libtrace/protobuf/depcomp
 libtracewrap/libtrace/protobuf/gtest/Makefile
 libtracewrap/libtrace/protobuf/gtest/Makefile.in
+libtracewrap/libtrace/protobuf/gtest/aclocal.m4
+libtracewrap/libtrace/protobuf/gtest/autom4te.cache/
 libtracewrap/libtrace/protobuf/gtest/build-aux/
 libtracewrap/libtrace/protobuf/gtest/configure
 libtracewrap/libtrace/protobuf/gtest/libtool
@@ -86,6 +93,11 @@ libtracewrap/libtrace/protobuf/gtest/scripts/gtest-config
 libtracewrap/libtrace/protobuf/install-sh
 libtracewrap/libtrace/protobuf/libtool
 libtracewrap/libtrace/protobuf/ltmain.sh
+libtracewrap/libtrace/protobuf/m4/libtool.m4
+libtracewrap/libtrace/protobuf/m4/ltoptions.m4
+libtracewrap/libtrace/protobuf/m4/ltsugar.m4
+libtracewrap/libtrace/protobuf/m4/ltversion.m4
+libtracewrap/libtrace/protobuf/m4/lt~obsolete.m4
 libtracewrap/libtrace/protobuf/protobuf-lite.pc
 libtracewrap/libtrace/protobuf/protobuf.pc
 libtracewrap/libtrace/protobuf/src/.libs/
@@ -132,6 +144,7 @@ libtracewrap/libtrace/src/ocaml/arch_stubs.c
 libtracewrap/libtrace/src/ocaml/utils/Makefile
 libtracewrap/libtrace/src/ocaml/utils/copytrace
 libtracewrap/libtrace/src/ocaml/utils/readtrace
+libtracewrap/libtrace32
 m4/
 missing
 ocaml/Makefile

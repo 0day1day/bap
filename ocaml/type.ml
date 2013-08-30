@@ -1,10 +1,10 @@
 (** Type declarations for BAP.
-    
+
     @author Ivan Jager
 *)
 
-(** Addresses are 64-bit integers *)
-type addr = int64
+(** Addresses are big_ints *)
+type addr = Big_int_Z.big_int
 
 (** Labels are program locations that can be jumped to. *)
 type label = 
@@ -24,6 +24,7 @@ and reg_16 = Reg 16
 and reg_32 = Reg 32
 and reg_64 = Reg 64
 and reg_128 = Reg 128
+and reg_256 = Reg 256
 
 (** [Array] memories can only be updated or accessed in terms of
     their element type, which is usually [Reg 8].  [TMem] memories
@@ -118,8 +119,8 @@ type 'a visit_action =
   | DoChildren      (** Continue exploring children of the current node. Changes to children will propagate up. *)
   | ChangeTo of 'a  (** Replace the current object with the specified one. *)
   | ChangeToAndDoChildren of 'a (** Replace the current object with
-				    the given one, and visit children
-				    of the {b replacement} object. *)
+                                    the given one, and visit children
+                                    of the {b replacement} object. *)
 
 (** Specifies whether generated VCs will be evaluated for
     satisfiability or validity. Alternatively, quantifiers can be

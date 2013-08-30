@@ -1,3 +1,4 @@
+open Arch
 open OUnit
 open Test_common
 
@@ -9,7 +10,8 @@ let short_tests = [
   Disasm_i386_suite.suite;
   Asmir_suite.suite;
   Eval_suite.suite;
-  Traces_suite.suite;
+  Traces_suite.suite X86_32;
+  Traces_suite.suite X86_64;
   Predicate_suite.suite;
   Arithmetic_suite.suite;
   Dominator_suite.suite;

@@ -157,6 +157,15 @@ ASMIR_DIR="`pwd`/libasmir"
 AC_SUBST(BAP_DIR)
 BAP_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
+# Set options for 32/64-bit compilation
+# XXX: Rename me
+AC_CANONICAL_HOST
+AC_SUBST(ARCH_X64)
+case "${host}" in
+x86_64*) ARCH_X64="true" ;;
+*) ARCH_X64="false" ;;
+esac
+
 # Checks for header files.
 AC_HEADER_STDC
 AC_CHECK_HEADERS([fcntl.h stdint.h stdlib.h string.h unistd.h], ,
@@ -188,7 +197,9 @@ AC_CONFIG_FILES([Makefile
                  pintraces/Makefile
                  ocaml/Makefile
                  utils/Makefile
-                 tests/Makefile])
+                 tests/Makefile
+                 tests/C/Makefile])
+
 # Configure ocamlgraph and zarith
 
 AC_CONFIG_SUBDIRS([ocamlgraph])

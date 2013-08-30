@@ -80,8 +80,8 @@ let do_dce ?(globals=[]) graph =
     (fun bb ->
        let stmts = C.get_stmts graph bb in
        List.iter
-	 (fun s ->
-	    let site = (bb, s) in
+         (fun s ->
+            let site = (bb, s) in
             let defs, deps, liveout = def_uses s in
 
             (* iterate over defs, updating maps *)
@@ -97,9 +97,9 @@ let do_dce ?(globals=[]) graph =
 
             (* update usecounts mapping *)
             List.iter (fun v -> incr (usecount v)) deps;
-	    (* increment liveout vars by one, so they are never dead *)
+            (* increment liveout vars by one, so they are never dead *)
             List.iter (fun v -> incr (usecount v)) liveout;
-	 )
+         )
          stmts
     )
     graph;
@@ -162,11 +162,11 @@ let do_dce ?(globals=[]) graph =
   let graph =
     BH.fold
       (fun bb () graph->
-	 let stmts = C.get_stmts graph bb in
-	 let stmts' =
+         let stmts = C.get_stmts graph bb in
+         let stmts' =
            List.filter (fun s -> not (Hashtbl.mem dead_sites (bb,s))) stmts
        in
-	 C.set_stmts graph bb stmts'
+         C.set_stmts graph bb stmts'
     )
     blocks_to_update
     graph
@@ -232,8 +232,8 @@ let do_aggressive_dce ?(globals = []) graph =
     (fun bb ->
       let stmts = C.get_stmts graph bb in
       let _ = List.fold_left
-	(fun snum s ->
-	  let site = (bb, snum) in
+        (fun snum s ->
+          let site = (bb, snum) in
           (match s with
           | Move(lv, _, a) ->
             assert(not (VH.mem var_to_defsite lv));
@@ -259,7 +259,7 @@ let do_aggressive_dce ?(globals = []) graph =
 
           snum+1
 
-	)
+        )
         0 stmts in ()
     )
     graph;
@@ -304,12 +304,12 @@ let do_aggressive_dce ?(globals = []) graph =
       (fun bb ->
         let stmts = C.get_stmts graph bb in
         let _ = List.fold_left
-	  (fun snum s ->
-	    let site = (bb, snum) in
+          (fun snum s ->
+            let site = (bb, snum) in
             assert (not (Hashtbl.mem site_to_deps site));
             Hashtbl.add site_to_deps site (gen_deps site);
             snum+1
-	  )
+          )
           0 stmts in ()
       )
       graph

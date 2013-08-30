@@ -21,12 +21,12 @@ let error_setup () =
   let () = check () in
   let m2actx = Memory2array.create_state () in
   let prog = [
-    CJmp(BinOp(EQ, Var Disasm_i386.eax, Int(bi0, Reg 32)), Lab("L1"), Lab("L2"), []);
+    CJmp(BinOp(EQ, Var Disasm_i386.R32.eax, Int(bi0, Reg 32)), Lab("L1"), Lab("L2"), []);
     Ast.Label(Name("L1"), []);
-    Move(Disasm_i386.eax, Int(biconst 41, Reg 32), []);
+    Move(Disasm_i386.R32.eax, Int(biconst 41, Reg 32), []);
     Jmp(Lab("end"), []);
     Ast.Label(Name("L2"), []);
-    Move(Disasm_i386.eax, Int(biconst 42, Reg 32), []);
+    Move(Disasm_i386.R32.eax, Int(biconst 42, Reg 32), []);
     Assert(exp_false, []);
     Ast.Label(Name("end"), []);
   ] in
@@ -41,12 +41,12 @@ let basic_setup () =
   let () = check () in
   let m2actx = Memory2array.create_state () in
   let prog = [
-    CJmp(BinOp(EQ, Var Disasm_i386.eax, Int(bi0, Reg 32)), Lab("L1"), Lab("L2"), []);
+    CJmp(BinOp(EQ, Var Disasm_i386.R32.eax, Int(bi0, Reg 32)), Lab("L1"), Lab("L2"), []);
     Ast.Label(Name("L1"), []);
-    Move(Disasm_i386.eax, Int(biconst 41, Reg 32), []);
+    Move(Disasm_i386.R32.eax, Int(biconst 41, Reg 32), []);
     Jmp(Lab("end"), []);
     Ast.Label(Name("L2"), []);
-    Move(Disasm_i386.eax, Int(biconst 42, Reg 32), []);
+    Move(Disasm_i386.R32.eax, Int(biconst 42, Reg 32), []);
     Ast.Label(Name("end"), []);
   ] in
   typecheck prog;
@@ -58,13 +58,13 @@ let basic_validity_setup () =
   let () = check () in
   let m2actx = Memory2array.create_state () in
   let prog = [
-    CJmp(BinOp(EQ, Var Disasm_i386.eax, Int(bi1, Reg 32)), Lab("L1"), Lab("L2"), []);
+    CJmp(BinOp(EQ, Var Disasm_i386.R32.eax, Int(bi1, Reg 32)), Lab("L1"), Lab("L2"), []);
     CJmp(exp_false, Lab("L1"), Lab("L2"), []);
     Ast.Label(Name("L1"), []);
-    Move(Disasm_i386.ebx, Int(biconst 2, Reg 32), []);
+    Move(Disasm_i386.R32.ebx, Int(biconst 2, Reg 32), []);
     Jmp(Lab("end"), []);
     Ast.Label(Name("L2"), []);
-    Move(Disasm_i386.ebx, BinOp(TIMES, Var Disasm_i386.eax, Int(bi2, Reg 32)), []);
+    Move(Disasm_i386.R32.ebx, BinOp(TIMES, Var Disasm_i386.R32.eax, Int(bi2, Reg 32)), []);
     Ast.Label(Name("end"), []);
   ] in
   typecheck prog;
@@ -78,7 +78,7 @@ let assume_setup () =
   let () = check () in
   let m2actx = Memory2array.create_state () in
   let prog = [
-    CJmp(BinOp(EQ, Var Disasm_i386.eax, Int(bi0, reg_32)), Lab("L1"), Lab("L2"), []);
+    CJmp(BinOp(EQ, Var Disasm_i386.R32.eax, Int(bi0, reg_32)), Lab("L1"), Lab("L2"), []);
     Ast.Label(Name("L1"), []);
     Jmp(Lab("end"), []);
     Ast.Label(Name("L2"), []);
@@ -160,19 +160,19 @@ let suite = "Predicate" >:::
     fold_vcs ("predicate_basic_solve_test",
       (fun vc -> bracket
 	 basic_setup
-	 (sat_test "basic_solve" (BinOp(EQ, Var Disasm_i386.eax, Int(biconst 42, Reg 32))) (Smtexec.Invalid None) vc)
+	 (sat_test "basic_solve" (BinOp(EQ, Var Disasm_i386.R32.eax, Int(biconst 42, Reg 32))) (Smtexec.Invalid None) vc)
 	 predicate_stp_tear_down))
   @
     fold_vcs ("predicate_basic_unsolve_test",
       (fun vc -> bracket
          basic_setup
-         (sat_test "basic_unsolve"  (BinOp(EQ, Var Disasm_i386.eax, Int(biconst 2, Reg 32))) (Smtexec.Valid) vc)
+         (sat_test "basic_unsolve"  (BinOp(EQ, Var Disasm_i386.R32.eax, Int(biconst 2, Reg 32))) (Smtexec.Valid) vc)
          predicate_stp_tear_down))
   @
     fold_vcs ("predicate_basic_validity_test",
       (fun vc -> bracket
          basic_validity_setup
-         (valid_test "basic_validity_test"  (BinOp(EQ, Var Disasm_i386.ebx, BinOp(TIMES, Int(biconst 2, Reg 32), Var Disasm_i386.eax))) (Smtexec.Valid) vc)
+         (valid_test "basic_validity_test"  (BinOp(EQ, Var Disasm_i386.R32.ebx, BinOp(TIMES, Int(biconst 2, Reg 32), Var Disasm_i386.R32.eax))) (Smtexec.Valid) vc)
          predicate_stp_tear_down))
   @
     fold_vcs ("predicate_assume_validity_test",
@@ -184,23 +184,23 @@ let suite = "Predicate" >:::
     fold_vcs ("predicate_error_solve_test",
       (fun vc -> bracket
          error_setup
-         (sat_test "error_solve" (BinOp(EQ, Var Disasm_i386.eax, Int(biconst 41, Reg 32))) (Smtexec.Invalid None) vc)
+         (sat_test "error_solve" (BinOp(EQ, Var Disasm_i386.R32.eax, Int(biconst 41, Reg 32))) (Smtexec.Invalid None) vc)
          predicate_stp_tear_down))
   @
     fold_vcs ("predicate_error_unsolve_test",
       (fun vc -> bracket
          error_setup
-         (sat_test "error_unsolve"  (BinOp(EQ, Var Disasm_i386.eax, Int(biconst 42, Reg 32))) (Smtexec.Valid) vc)
+         (sat_test "error_unsolve"  (BinOp(EQ, Var Disasm_i386.R32.eax, Int(biconst 42, Reg 32))) (Smtexec.Valid) vc)
          predicate_stp_tear_down))
   @
     fold_vcs ("predicate_C_solve_test",
       (fun vc -> bracket
          c_setup
-         (sat_test "C_solve" (BinOp(EQ, Var Disasm_i386.eax, Int(biconst 42, Reg 32))) (Smtexec.Invalid None) vc)
+         (sat_test "C_solve" (BinOp(EQ, Var Disasm_i386.R32.eax, Int(biconst 42, Reg 32))) (Smtexec.Invalid None) vc)
          predicate_stp_tear_down))
   @
     fold_vcs ("predicate_C_unsolve_test",
       (fun vc -> bracket
          c_setup
-         (sat_test "C_unsolve" (BinOp(EQ, Var Disasm_i386.eax, Int(biconst 43, Reg 32))) (Smtexec.Valid) vc)
+         (sat_test "C_unsolve" (BinOp(EQ, Var Disasm_i386.R32.eax, Int(biconst 43, Reg 32))) (Smtexec.Valid) vc)
          predicate_stp_tear_down))

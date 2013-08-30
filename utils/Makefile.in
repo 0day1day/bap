@@ -4,6 +4,10 @@ export OCAML_COMPAT='c'
 
 export BAP_DIR=$(CURDIR)/..
 
+# Ignore warning about duplicate arch files.
+# The arch file in libtrace is part of the trace pack.
+export OCAMLFIND_IGNORE_DUPS_IN=$(BAP_DIR)/ocaml
+
 # Don't send request to build Makefile to OCamlMakefile!
 .PHONY: ../../utils-proj/Makefile
 -include ../../utils-proj/Makefile
@@ -25,9 +29,6 @@ ifeq (@HAVE_LLVM_AC@,yes)
 export CODEGEN = codegen
 export LLVM_PACKS = @LLVM_PACKAGE@ @LLVM_PACKAGE@.analysis @LLVM_PACKAGE@.executionengine @LLVM_PACKAGE@.target @LLVM_PACKAGE@.scalar_opts @LLVM_PACKAGE@.bitwriter
 endif
-
-# Stop annoying warnings about big_int duplication!
-#export OCAMLFIND_IGNORE_DUPS_IN=$(BAP_DIR)/bigint-3.12/otherlibs/num
 
 # ocamlfind packages required
 export PACKS = camlidl bigarray str num unix camomile piqi.lib $(LLVM_PACKS)
@@ -149,7 +150,7 @@ debug: dc
 	@echo ocamldebug -I $(BIGINT) -I $(BAP_OCAMLDIR) -I $(BATT) -I $(OUNIT) -I $(PCRE) program
 
 %:
-	make -f $(OCAMLMAKEFILE) subprojs SUBTARGET=$@
+	make -j1 -f $(OCAMLMAKEFILE) subprojs SUBTARGET=$@
 
 
 # You may also tell "make" at the command-line what kind of target to

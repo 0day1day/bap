@@ -107,10 +107,10 @@ let unroll_loop ?(count=8) ?(id=0) cfg head body =
          let stmts = C.get_stmts cfg node in
          let stmts =
            List.map (function
-		       | Label(Name l, a) -> Label(Name(renewlabel l i), a)
-		       | Label(Addr addr, a) -> Label(Name(Printf.sprintf "addr_%Lx_unroll_%d_%d" addr i id), a)
-		       | s -> s
-	            ) stmts
+                       | Label(Name l, a) -> Label(Name(renewlabel l i), a)
+                       | Label(Addr addr, a) -> Label(Name(Printf.sprintf "addr_%s_unroll_%d_%d" (Big_int_convenience.(~%) addr) i id), a)
+                       | s -> s
+                    ) stmts
          in
          let (cfg, node') = C.create_vertex cfg stmts in
          Hashtbl.add unrollednodes (C.G.V.label node, i) node';
@@ -150,7 +150,7 @@ let unroll_loop ?(count=8) ?(id=0) cfg head body =
                  let origdst = try Hashtbl.find backedges dst with Not_found -> dst in
                  ith_copy i origdst
                else
-		 ohead (* C.find_vertex cfg (Cfg.BB_Exit) *)
+                 ohead (* C.find_vertex cfg (Cfg.BB_Exit) *)
              in
              let edgelabel = C.G.E.label edge in
              let newedge = C.G.E.create src edgelabel newdst in
@@ -184,9 +184,9 @@ let unroll_loop ?(count=8) ?(id=0) cfg head body =
       let label = match lab_of_exp origlabel with Some x -> x | _ -> failwith "indirect" in
       if C.find_label cfg label == node then origlabel
       else
-	match C.get_stmts cfg node with
-	  | Label(label,_)::_ -> exp_of_lab label
-	  | stmt::_ -> failwith ("missing replacement label FIXME " ^ (Pp.ast_stmt_to_string stmt)) (* This could happen if l was an Addr *)
+        match C.get_stmts cfg node with
+          | Label(label,_)::_ -> exp_of_lab label
+          | stmt::_ -> failwith ("missing replacement label FIXME " ^ (Pp.ast_stmt_to_string stmt)) (* This could happen if l was an Addr *)
           | [] -> failwith "Empty node"
     in
     let revstmts = List.rev (C.get_stmts cfg vertex) in
@@ -201,16 +201,16 @@ let unroll_loop ?(count=8) ?(id=0) cfg head body =
 		(e2,e1)
 	    | _ ->
                 failwith ("Something is wrong with the edges or edge labels:"^(Pp.ast_stmt_to_string stmt))
-	  in
-	  let s1 = C.G.E.dst e1 and s2 = C.G.E.dst e2 in
+          in
+          let s1 = C.G.E.dst e1 and s2 = C.G.E.dst e2 in
           (*dprintf "Generating e1 and e2";*)
-	  let t1' = getlabel t1 s1 and t2' = getlabel t2 s2 in
+          let t1' = getlabel t1 s1 and t2' = getlabel t2 s2 in
           (*dprintf "Found: %s =?= %s" (Pp.ast_exp_to_string t1') (Pp.ast_exp_to_string t2');*)
           (*if (t1' = t2') then
             (let ss = C.get_stmts cfg s1 in dprintf "stmt: %s" (Pp.ast_stmt_to_string (List.hd ss));
              let ss = C.get_stmts cfg s2 in dprintf "stmt: %s" (Pp.ast_stmt_to_string (List.hd ss)));*)
-	  if t1' === t1 && t2' === t2 then revstmts
-	  else CJmp(c,t1',t2',attrs)::rest
+          if t1' === t1 && t2' === t2 then revstmts
+          else CJmp(c,t1',t2',attrs)::rest
       | Jmp _::rest
       | rest -> rest
     in

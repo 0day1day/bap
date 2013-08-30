@@ -297,8 +297,8 @@ let defsites cfg =
   let defs stmts =
     let res = ref [] in
     let f = function
-	| Ast.Move(v, _, _) ->  res := v :: !res; globals := v :: !globals
-	| _ -> ()
+        | Ast.Move(v, _, _) ->  res := v :: !res; globals := v :: !globals
+        | _ -> ()
     in
     List.iter f stmts;
     !res
@@ -349,19 +349,19 @@ let rec trans_cfg ?(tac=true) cfg =
     let rec do_work = function
       | [] -> ()
       | n::worklist ->
-	let worklist =
-	  List.fold_left
-	    (fun toadd y ->
-	      let y = C.G.V.label y in (* for now *)
-	      if not(Hashtbl.mem phis (y,v))
-	      then (Hashtbl.add phis (y,v) (v,[]);
-		    if List.mem y (defsites v) then toadd else y::toadd )
-	      else toadd
-	    )
-	    worklist
-	    (df (C.G.V.create n))
-	in
-	do_work worklist
+          let worklist =
+            List.fold_left
+              (fun toadd y ->
+                 let y = C.G.V.label y in (* for now *)
+                 if not(Hashtbl.mem phis (y,v))
+                 then (Hashtbl.add phis (y,v) (v,[]);
+                       if List.mem y (defsites v) then toadd else y::toadd )
+                 else toadd
+              )
+              worklist
+              (df (C.G.V.create n))
+          in
+            do_work worklist
     in
     do_work (defsites v)
   in
@@ -390,14 +390,14 @@ let rec trans_cfg ?(tac=true) cfg =
     let () =
       (* create variables for our phis *)
       List.iter
-	(fun v ->
-	  let v' = Var.renewvar v in
-	  let (v'',vs) = Hashtbl.find phis (bbid,v) in
-	  assert(v'' == v);
-	  Hashtbl.replace phis (bbid,v) (v',vs);
-	  extend v v' None (* phis have no ast location *)
-	)
-	(blockphis bbid)
+        (fun v ->
+           let v' = Var.renewvar v in
+           let (v'',vs) = Hashtbl.find phis (bbid,v) in
+             assert(v'' == v);
+             Hashtbl.replace phis (bbid,v) (v',vs);
+	   extend v v' None (* phis have no ast location *)
+        )
+        (blockphis bbid)
     in
     let ssa =
       (* rename variables *)
@@ -454,26 +454,26 @@ let rec trans_cfg ?(tac=true) cfg =
     let () =
       (* Update any phis in our successors *)
       List.iter
-	(fun s ->
-	  let s = C.G.V.label s in
-	  List.iter
-	    (fun v ->
-	      try
-		let (p,vs) = Hashtbl.find phis (s,v) in
+        (fun s ->
+           let s = C.G.V.label s in
+           List.iter
+             (fun v ->
+                try
+                  let (p,vs) = Hashtbl.find phis (s,v) in
                 (* Note that lookup v will return different results
                    for each predecessor. There is also no guarantee
                    that each predecessor will have a unique
                    definition. *)
-		let v' = lookup v in
+                  let v' = lookup v in
                 if List.mem v' vs then ()
                 else Hashtbl.replace phis (s,v) (p, v'::vs)
-	      with Not_found ->
-		failwith("phi for variable "^Pp.var_to_string v
-			 ^" not found in "^Cfg.bbid_to_string s)
-	    )
-	    (blockphis s)
-	)
-	(C.G.succ ssa b)
+                with Not_found ->
+                  failwith("phi for variable "^Pp.var_to_string v
+                           ^" not found in "^Cfg.bbid_to_string s)
+             )
+             (blockphis s)
+        )
+        (C.G.succ ssa b)
     in
     (* save context for exit node *)
     (if bbid = BB_Exit then (
@@ -494,20 +494,20 @@ let rec trans_cfg ?(tac=true) cfg =
     (* actually add all our phis to the CFG *)
     C.G.fold_vertex
       (fun b ssa ->
-	let bbid = C.G.V.label b in
-	let vars = blockphis bbid in
-	let (revlabs,stmts) = split_labels [] (C.get_stmts ssa b) in
-	let stmts =
-	  List.fold_left
-	    (fun s v ->
-	      let (p,vs) = Hashtbl.find phis (bbid,v) in
-	      assert(vs <> []);
-	      (* FIXME: do something reasonable with attributes *)
-	      Move(p,Phi(vs), [])::s )
-	    stmts
-	    vars
-	in
-	C.set_stmts ssa b (List.rev_append revlabs stmts)
+         let bbid = C.G.V.label b in
+         let vars = blockphis bbid in
+         let (revlabs,stmts) = split_labels [] (C.get_stmts ssa b) in
+         let stmts =
+           List.fold_left
+             (fun s v ->
+                let (p,vs) = Hashtbl.find phis (bbid,v) in
+                assert(vs <> []);
+                (* FIXME: do something reasonable with attributes *)
+                Move(p,Phi(vs), [])::s )
+             stmts
+             vars
+         in
+         C.set_stmts ssa b (List.rev_append revlabs stmts)
       )
       ssa ssa
   in
@@ -614,9 +614,9 @@ let split_edges c =
   let edges_to_split =
     C.G.fold_edges_e
       (fun e es ->
-	 if C.G.out_degree c (E.src e) > 1 && C.G.in_degree c (E.dst e) > 1
-	 then e::es
-	 else es
+         if C.G.out_degree c (E.src e) > 1 && C.G.in_degree c (E.dst e) > 1
+         then e::es
+         else es
       )
       c []
   in
@@ -638,11 +638,11 @@ let rm_phis ?(dsa=false) ?(attrs=[]) cfg =
   let () =
     C.G.iter_vertex
       (fun b ->
-	 List.iter
-	   (function
-	      | Move(v,_, _) -> VH.add assn v b
-	      | _->())
-	   (C.get_stmts cfg b)
+         List.iter
+           (function
+              | Move(v,_, _) -> VH.add assn v b
+              | _->())
+           (C.get_stmts cfg b)
       )
       cfg
   in
@@ -657,20 +657,20 @@ let rm_phis ?(dsa=false) ?(attrs=[]) cfg =
     (* FIXME: make this readable *)
     C.G.fold_vertex
       (fun b (cfg,phis) ->
-	 let (ps,revstmts) =
-	   List.fold_left
-	     (fun (ps,revstmts) -> function
-		| Move(l, Phi vs, _) ->
-		    dprintf "rm_phis: removing phi for %s"(Pp.var_to_string l);
-		    ((l,vs)::ps, revstmts)
-		| s ->
-		    (ps, s::revstmts)
-	     )
-	     (phis,[])
-	     (C.get_stmts cfg b)
-	 in
-	 (* Note that the statements in the block are now reversed *)
-	 (C.set_stmts cfg b revstmts, ps)
+         let (ps,revstmts) =
+           List.fold_left
+             (fun (ps,revstmts) -> function
+                | Move(l, Phi vs, _) ->
+                    dprintf "rm_phis: removing phi for %s"(Pp.var_to_string l);
+                    ((l,vs)::ps, revstmts)
+                | s ->
+                    (ps, s::revstmts)
+             )
+             (phis,[])
+             (C.get_stmts cfg b)
+         in
+         (* Note that the statements in the block are now reversed *)
+         (C.set_stmts cfg b revstmts, ps)
       )
       cfg
       (cfg, [])
@@ -685,9 +685,9 @@ let rm_phis ?(dsa=false) ?(attrs=[]) cfg =
        | (Jmp _ as j)::stmts
        | (CJmp _ as j)::stmts
        | (Halt _ as j)::stmts ->
-	   j::move::stmts
+           j::move::stmts
        | stmts ->
-	   move::stmts )
+           move::stmts )
   in
   let cfg =
     (* Documentation note:
@@ -739,12 +739,12 @@ let rm_phis ?(dsa=false) ?(attrs=[]) cfg =
 
         (* dprintf "dsa_push %s" (List.fold_left (fun s v -> s^" "^(Pp.var_to_string v)) "" vars); *)
 
-	(* let rec find_var bb = (\* walk up idom tree starting at bb *\) *)
+        (* let rec find_var bb = (\* walk up idom tree starting at bb *\) *)
         (*   (\* dprintf " at %s" (v2s bb); *\) *)
-	(*   try List.find (fun v -> bb = (VH.find assn v)) vars *)
-	(*   with Not_found -> find_var (idom bb) *)
-	(* in *)
-	(* let _v' = find_var bb in *)
+        (*   try List.find (fun v -> bb = (VH.find assn v)) vars *)
+        (*   with Not_found -> find_var (idom bb) *)
+        (* in *)
+        (* let _v' = find_var bb in *)
         (* let vbb = VH.find assn v in *)
         (* dprintf "%s assigned in bb %s, we are at %s" (Pp.var_to_string v) (v2s (VH.find assn v)) (v2s bb); *)
         (* A node can be its own predecessor, so we should also look
@@ -765,26 +765,26 @@ let rm_phis ?(dsa=false) ?(attrs=[]) cfg =
         in
         (* dprintf "Found it: %s" (Pp.var_to_string myv); *)
         (* assert(myv = v); *)
-	append_move bb l v cfg
+        append_move bb l v cfg
       in
       (* assign the variable the phi assigns at the end of each of it's
-	 predecessors *)
+         predecessors *)
       List.fold_left
-	(fun cfg ((l, vars) as p) ->
-	   dprintf "rm_phis: adding assignments for %s" (Pp.var_to_string l);
+        (fun cfg ((l, vars) as p) -> 
+           dprintf "rm_phis: adding assignments for %s" (Pp.var_to_string l);
           (* dprintf "There are %d preds" (List.length (C.G.pred cfg (VH.find assn l))); *)
-	   List.fold_left (dsa_push p) cfg (C.G.pred cfg (VH.find assn l))
-	)
-	cfg
-	phis
+           List.fold_left (dsa_push p) cfg (C.G.pred cfg (VH.find assn l))
+        )
+        cfg
+        phis
     )
     else (
     (* assign the variables the phi assigns at the end of each block a variable
        the phi references is assigned. *)
     List.fold_left
       (fun cfg (l, vars) ->
-	 dprintf "rm_phis: adding assignments for %s" (Pp.var_to_string l);
-	 List.fold_left (fun cfg p -> append_move (VH.find assn p) l p cfg) cfg vars
+         dprintf "rm_phis: adding assignments for %s" (Pp.var_to_string l);
+         List.fold_left (fun cfg p -> append_move (VH.find assn p) l p cfg) cfg vars
       )
       cfg
       phis
@@ -813,24 +813,24 @@ let create_tm c =
     inherit Ssa_visitor.nop
     method visit_rvar v =
       (try
-	 if VH.find refd v then (
-	   VH.remove tm v;
-	   VH.replace refd v false)
+         if VH.find refd v then (
+           VH.remove tm v;
+           VH.replace refd v false)
        with Not_found -> VH.add refd v true);
       DoChildren
 
     method visit_stmt = function
       | Move(_, Phi _, _) ->
-	  DoChildren
+          DoChildren
       | Move(v,e,_) ->
-	  (* FIXME: should we check whether we introduced this var? *)
+          (* FIXME: should we check whether we introduced this var? *)
           (* FIX: we introduced it if it is named "temp" *)
-	  if (try VH.find refd v with Not_found -> true)
+          if (try VH.find refd v with Not_found -> true) 
               && (Var.name v == ssa_temp_name)
-	  then VH.add tm v e;
-	  DoChildren
+          then VH.add tm v e;
+          DoChildren
       | _ ->
-	  DoChildren
+          DoChildren
   end in
   C.G.iter_vertex
     (fun b -> ignore(Ssa_visitor.stmts_accept vis (C.get_stmts c b)))

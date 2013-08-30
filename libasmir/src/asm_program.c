@@ -13,18 +13,18 @@
 
 /* This elf stuff is internal to BFD (TOO BAD) */
 
-#define SHT_PROGBITS	1		/* Program specific (private) data */
+#define SHT_PROGBITS    1               /* Program specific (private) data */
 #define PT_GNU_STACK  0x6474e551
 
 struct elf_internal_phdr {
-  unsigned long	p_type;			/* Identifies program segment type */
-  unsigned long	p_flags;		/* Segment flags */
-  bfd_vma	p_offset;		/* Segment file offset */
-  bfd_vma	p_vaddr;		/* Segment virtual address */
-  bfd_vma	p_paddr;		/* Segment physical address */
-  bfd_vma	p_filesz;		/* Segment size in file */
-  bfd_vma	p_memsz;		/* Segment size in memory */
-  bfd_vma	p_align;		/* Segment alignment, file & memory */
+  unsigned long p_type;                 /* Identifies program segment type */
+  unsigned long p_flags;                /* Segment flags */
+  bfd_vma       p_offset;               /* Segment file offset */
+  bfd_vma       p_vaddr;                /* Segment virtual address */
+  bfd_vma       p_paddr;                /* Segment physical address */
+  bfd_vma       p_filesz;               /* Segment size in file */
+  bfd_vma       p_memsz;                /* Segment size in memory */
+  bfd_vma       p_align;                /* Segment alignment, file & memory */
 };
 
 typedef struct elf_internal_phdr Elf_Internal_Phdr;
@@ -104,9 +104,9 @@ int asmir_get_instr_length(asm_program_t *prog, bfd_vma addr)
 
 static int
 my_read_memory (bfd_vma memaddr,
-		bfd_byte *myaddr,
-		unsigned int length,
-		struct disassemble_info *info)
+                bfd_byte *myaddr,
+                unsigned int length,
+                struct disassemble_info *info)
 {
   int ret = buffer_read_memory(memaddr,myaddr,length,info);
 
@@ -209,16 +209,16 @@ bfd_vma asmir_get_base_address(asm_program_t *prog) {
 
       for (i = 0; i < n; i++) {
         /*
-        fprintf(stderr, "VA: %#" BFD_VMA_FMT "x Align: %#" BFD_VMA_FMT "x Aligned: %#" BFD_VMA_FMT "x p_flags: %#" BFD_VMA_FMT "x p_type: %#"BFD_VMA_FMT "x\n", 
-            phdrs[i].p_vaddr, 
-            phdrs[i].p_align, 
-            phdrs[i].p_vaddr & (~(phdrs[i].p_align)), 
-            phdrs[i].p_flags, 
+        fprintf(stderr, "VA: %#" BFD_VMA_FMT "x Align: %#" BFD_VMA_FMT "x Aligned: %#" BFD_VMA_FMT "x p_flags: %#" BFD_VMA_FMT "x p_type: %#"BFD_VMA_FMT "x\n",
+            phdrs[i].p_vaddr,
+            phdrs[i].p_align,
+            phdrs[i].p_vaddr & (~(phdrs[i].p_align)),
+            phdrs[i].p_flags,
             phdrs[i].p_type);
         */
         bfd_vma aligned = phdrs[i].p_vaddr & (~(phdrs[i].p_align));
         /* STACK segment has vaddr=paddr=0. If we don't ignore it, imagebase=0*/
-        is_nice = (phdrs[i].p_flags & SHT_PROGBITS) && 
+        is_nice = (phdrs[i].p_flags & SHT_PROGBITS) &&
                 (phdrs[i].p_type != PT_GNU_STACK);
         if (is_nice && aligned < lowest) { lowest = aligned; }
       }
@@ -301,7 +301,7 @@ initialize_bfd(const char *filename)
     return NULL;
   }
 
-  abfd = bfd_openr(filename, target);
+  abfd = bfd_openr(filename, NULL);
   if(abfd == NULL) {
     fprintf(stderr, "initialize_bfd: cannot open %s\n", filename);
     return NULL;
@@ -371,12 +371,12 @@ char* asmir_string_of_insn(asm_program_t *prog, bfd_vma inst)
   prog->disasm_info.stream = &bits;
 
   bits.end = bits.str;
-  
+
   disas(inst, &prog->disasm_info);
 
   prog->disasm_info.fprintf_func = old_fprintf_func;
   prog->disasm_info.stream = oldstream;
-  
+
   return bits.str;
 }
 
@@ -385,26 +385,25 @@ enum bfd_architecture asmir_get_asmp_arch(asm_program_t *prog) {
   return bfd_get_arch(prog->abfd);
 }
 
+unsigned long asmir_get_asmp_mach(asm_program_t *prog) {
+  return bfd_get_mach(prog->abfd);
+}
 
 // from old translate.cpp fake_prog_for_arch()
 // Returns a fake asm_program_t for use when disassembling bits out of memory
-asm_program_t* asmir_new_asmp_for_arch(enum bfd_architecture arch)
+asm_program_t* asmir_new_asmp_for_arch(enum bfd_architecture arch, unsigned long mach)
 {
-  
-  int machine = 0; // TODO: pick based on arch
   asm_program_t *prog = malloc(sizeof(asm_program_t));
   assert(prog);
-  
+
   prog->abfd = bfd_openw("/dev/null", NULL);
   if (!prog->abfd) {
     bfd_perror("Unable to open fake bfd");
   }
-  
-  assert(prog->abfd);
-  bfd_set_arch_info(prog->abfd, bfd_lookup_arch(arch, machine));
 
-  //not in .h bfd_default_set_arch_mach(prog->abfd, arch, machine);
-  bfd_set_arch_info(prog->abfd, bfd_lookup_arch(arch, machine));
+  assert(prog->abfd);
+  bfd_set_arch_info(prog->abfd, bfd_lookup_arch(arch, mach));
+
   init_disasm_info(prog);
 
   // Use a special read memory function
@@ -416,16 +415,16 @@ asm_program_t* asmir_new_asmp_for_arch(enum bfd_architecture arch)
 /* Uses trace_read_memory, which assumes set_trace_bytes is used to update for each instruction. */
 asm_program_t* asmir_trace_asmp_for_arch(enum bfd_architecture arch)
 {
-  
+
   int machine = 0; // TODO: pick based on arch
   asm_program_t *prog = malloc(sizeof(asm_program_t));
   assert(prog);
-  
+
   prog->abfd = bfd_openw("/dev/null", NULL);
   if (!prog->abfd) {
     bfd_perror("Unable to open fake bfd");
   }
-  
+
   assert(prog->abfd);
   bfd_set_arch_info(prog->abfd, bfd_lookup_arch(arch, machine));
 
@@ -441,7 +440,7 @@ asm_program_t* asmir_trace_asmp_for_arch(enum bfd_architecture arch)
 
 /*
  * Get the starting memory address of the section named sectionname.
- */  
+ */
 bfd_vma asmir_get_sec_startaddr(asm_program_t *prog, const char *sectionname) {
   section_t* section;
   asection* asection;
@@ -472,7 +471,7 @@ bfd_vma asmir_get_sec_startaddr(asm_program_t *prog, const char *sectionname) {
 
 /*
  * Get the ending memory address of the section named sectionname.
- */  
+ */
 bfd_vma asmir_get_sec_endaddr(asm_program_t *prog, const char *sectionname) {
   section_t* section;
   asection* asection;
@@ -512,17 +511,17 @@ bfd_vma asmir_get_start_addr(asm_program_t *prog) {
  * Return a list of all sections
  *
  * XXX: Does not free memory
- */  
+ */
 asection** asmir_get_all_sections(asm_program_t *prog, long *out) {
   section_t* section;
   /* asection* asection; */
   asection** sectionarray;
   asection** sectionptr;
   *out = 0;
-  
+
   assert(prog);
   assert(out);
-  
+
   section = prog->segs;
 
   /* Traverse the linked list of sections to count how many there are */
@@ -533,7 +532,7 @@ asection** asmir_get_all_sections(asm_program_t *prog, long *out) {
 
   /* Now, allocate space for an array of pointers */
   sectionarray = bfd_alloc(prog->abfd, (*out * sizeof(asection*)));
-  if (sectionarray == 0) goto error;  
+  if (sectionarray == 0) goto error;
 
   /* Traverse the linked list again, and add the ptrs to each section
    * to the array. */
@@ -545,7 +544,7 @@ asection** asmir_get_all_sections(asm_program_t *prog, long *out) {
   }
 
   return sectionarray;
-  
+
   error:
 
   *out = 0;
@@ -553,16 +552,16 @@ asection** asmir_get_all_sections(asm_program_t *prog, long *out) {
 }
 
 asm_program_t*
-byte_insn_to_asmp(enum bfd_architecture arch, address_t addr, unsigned char *bb_bytes, unsigned int len)
+byte_insn_to_asmp(enum bfd_architecture arch, unsigned long mach, address_t addr, unsigned char *bb_bytes, unsigned int len)
 {
-  asm_program_t *prog = asmir_new_asmp_for_arch(arch);
+  asm_program_t *prog = asmir_new_asmp_for_arch(arch, mach);
   unsigned char *bytes = (unsigned char*)bfd_alloc(prog->abfd, len);
   assert(bytes);
   // copy the string, because the old one is freed when we return
   memcpy(bytes, bb_bytes, len);
   section_t *sec = (section_t*)bfd_alloc(prog->abfd, sizeof(section_t));
   assert(sec);
-  
+
   sec->start_addr = addr;
   sec->datasize = len;
   sec->end_addr = addr+len;

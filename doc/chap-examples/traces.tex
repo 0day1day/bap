@@ -52,44 +52,39 @@ the libtrace library.
 
 The PIN tool itself can be built by executing \cmdline{make} in the
 \cmdline{\$BAPDIR/pintraces} directory on both Windows and Linux.
-After compilation, the PIN tool should exist in
-\\ \cmdline{\$BAPDIR/pintraces/obj-ia32/gentrace.so} (or
-gentrace.dll on Windows).  In the rest of the chapter, we will assume
-Linux is being used; most interaction with the trace tool is the same.
+After compilation, the PIN tool for recording x86 programs should exist in \\
+\cmdline{\$BAPDIR/pintraces/obj-ia32/gentrace.so} (or
+\cmdline{gentrace.dll} on Windows).  If you are running on a x86-64
+host, you should also have a PIN tool for recording x86-64 programs in\\
+\cmdline{\$BAPDIR/pintraces/obj-intel64/gentrace.so}.  In the rest of
+the chapter, we will assume Linux is being used; most interaction with
+the trace tool is the same on Windows.
 
 \subsection{Recording a trace}
 
 To see the command line options to the trace tool, execute 
 
-\begin{verbatim} 
-$BAPDIR/pin/pin -t \
- $BAPDIR/pintraces/obj-ia32/gentrace.so -help -- /bin/ls
+\begin{verbatim}
+$BAPDIR/utils/gentrace.bash -help -- /bin/ls
 \end{verbatim}
 
 By default, the trace tool will only log instructions that are
-\emph{tainted}, i.e., those that depend on user input.  The options
-that begin with taint are used to mark various data
-as being user input.  For instance, -taint-files readme marks the file
-readme as being user input.
+\emph{tainted}, i.e., those that depend on user input.  The
+\cmdline{-taint-*} command line options are used to mark various
+inputs as being tainted.  For instance, \cmdline{-taint-files readme}
+marks the file \cmdline{readme} as being tainted.
 
 We will record a trace of a simple buffer overflow.  Run 
 
 \begin{verbatim}
-echo "helloooooooooooooooooo" > readme
+echo "helloooooooooooooooooooooooooooooooooo" > readme
 \end{verbatim}
 
- to create the input file.  Then run 
+ to create the input file.  Then run
 
 \begin{verbatim}
-make -C $BAPDIR/pintraces/examples/bof1/
-\end{verbatim}
-
-and
-
-\begin{verbatim}
-$BAPDIR/pin/pin -t  \
- $BAPDIR/pintraces/obj-ia32/gentrace.so -taint-files readme \
- -- $BAPDIR/pintraces/examples/bof1/bof1
+$BAPDIR/utils/gentrace.bash -taint-files readme \
+ -- $BAPDIR/tests/C/bof1 readme
 \end{verbatim}
 
 The PIN tool will output

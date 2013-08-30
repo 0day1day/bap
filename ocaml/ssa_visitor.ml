@@ -103,9 +103,9 @@ and stmt_accept visitor =
 	let l2' = exp_accept visitor l2 in
 	CJmp(c', l1', l2', a)
     | Move(lv, e, a) ->
-	let e = exp_accept visitor e in
-	let lv = avar_accept visitor lv in
-	Move(lv, e, a)
+        let e = exp_accept visitor e in
+        let lv = avar_accept visitor lv in
+        Move(lv, e, a)
     | Label _ as s -> s
     | Comment _ as s-> s
     | Assert(e,a) -> Assert(exp_accept visitor e, a)

@@ -89,7 +89,7 @@ class memory2array_visitor ?scope hash =
           let new_name = (Var.name avar)^"_array" in
           let new_type = Array (idxt, Reg bitwidth) in
           let make_new_var () = newvar new_name new_type in
-	  let newarrvar = match scope with
+          let newarrvar = match scope with
             | Some(scope) ->
               (try Scope.get_lval_if_defined scope new_name (Some new_type)
               with Not_found -> make_new_var ())
@@ -98,7 +98,7 @@ class memory2array_visitor ?scope hash =
           in
 
           (* Map in the m2a hash *)
-	  VarHash.add hash avar newarrvar;
+          VarHash.add hash avar newarrvar;
 
           (* Update the scope if defined *)
           (match scope with
@@ -115,7 +115,7 @@ class memory2array_visitor ?scope hash =
 
           | None -> ());
 
-	  newarrvar
+          newarrvar
       in
       array
     | _ -> failwith "get_array_var expects a TMem variable only"
@@ -126,9 +126,9 @@ object (self)
 
   method visit_avar avar =
     match Var.typ(avar) with
-    |	TMem(idxt) ->
+    |   TMem(idxt) ->
       ChangeToAndDoChildren (get_array_var avar)
-    |	_ ->
+    |   _ ->
       DoChildren
 
   method visit_rvar = self#visit_avar
@@ -137,26 +137,26 @@ object (self)
       (* Printf.printf "Visiting expression %s\n" (Pp.ast_exp_to_string exp); *)
       match exp with
       | Load(arr,idx,endian,t) -> ((* Printf.printf "Load %s\n" (Pp.ast_exp_to_string exp); *)
-	  let width = (getwidth t) in
-	  match width with
-	  | 1 -> (* Printf.printf "Cool\n"; *)
-	      DoChildren
-	  | _ -> (* Printf.printf "Need to split\n"; *)
-	    let arr = Ast_visitor.exp_accept self arr in
-	    let newexpr = split_loads arr idx t endian
-	    in
-	    (* Printf.printf "New Load %s\n" (Pp.ast_exp_to_string newexpr); *)
-	    (* djb: still need to descend into children *)
-	    ChangeToAndDoChildren newexpr)
+          let width = (getwidth t) in
+          match width with
+          | 1 -> (* Printf.printf "Cool\n"; *)
+              DoChildren
+          | _ -> (* Printf.printf "Need to split\n"; *)
+            let arr = Ast_visitor.exp_accept self arr in
+            let newexpr = split_loads arr idx t endian
+            in
+            (* Printf.printf "New Load %s\n" (Pp.ast_exp_to_string newexpr); *)
+            (* djb: still need to descend into children *)
+            ChangeToAndDoChildren newexpr)
       | Store(arr,idx,data,endian,t) -> ((* Printf.printf "Store %s %s %s Reg%d\n" (Pp.ast_exp_to_string arr) (Pp.ast_exp_to_string idx) (Pp.ast_exp_to_string data) (getwidth t); *)
           let width = (getwidth t) in
           match width with
           | 1 -> (* Printf.printf "Cool!\n"; *)
-	      DoChildren
+              DoChildren
           | _ -> (* Printf.printf "Need to split\n"; *)
-	      let arr = Ast_visitor.exp_accept self arr in
+              let arr = Ast_visitor.exp_accept self arr in
               let newexpr = split_writes arr idx t endian data in
-	      ChangeToAndDoChildren newexpr
+              ChangeToAndDoChildren newexpr
         )
       | _ -> DoChildren
   end

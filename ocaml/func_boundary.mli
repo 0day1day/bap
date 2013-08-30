@@ -21,7 +21,7 @@ val start_addresses : asmprogram -> addr list
 
     XXX: This function should not return a cfg.
 *)
-val end_address_at : asmprogram -> addr -> scheme_type -> (Cfg.AST.G.t * int64) option
+val end_address_at : asmprogram -> addr -> scheme_type -> (Cfg.AST.G.t * addr) option
 
 (** [get_function_ranges p] finds functions using the symbol table,
     and if that fails, uses [start_addresses] to identify funtions. *)

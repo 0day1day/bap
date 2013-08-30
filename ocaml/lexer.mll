@@ -23,9 +23,9 @@
  let new_line lexbuf = 
    let lcp = lexbuf.lex_curr_p in 
      lexbuf.lex_curr_p <- {lcp with
-			     pos_lnum = lcp.pos_lnum + 1;
-			     pos_bol = lcp.pos_cnum;
-			  }
+                             pos_lnum = lcp.pos_lnum + 1;
+                             pos_bol = lcp.pos_cnum;
+                          }
  ;;
 
  let incr_linenum lexbuf =
@@ -171,31 +171,31 @@ rule token = parse
   | '@'          { AT }
   | '?'          { QUESTION }
   | '"'          { reset_string_buffer ();
-	   	   scan_str lexbuf;
-		   let s = get_stored_string () in
-		      STRING(s)
-	         }
+                   scan_str lexbuf;
+                   let s = get_stored_string () in
+                      STRING(s)
+                 }
 
   | "/*"         { comment_start();
-		   blkcomment lexbuf;
-		   if !flag_keep_blkcomments then 
-		     COMMENT(get_stored_string())
-		   else
-		     token lexbuf 
-		 }
+                   blkcomment lexbuf;
+                   if !flag_keep_blkcomments then 
+                     COMMENT(get_stored_string())
+                   else
+                     token lexbuf 
+                 }
   | singlecomment { if !flag_keep_linecomments then
-		      let s = get lexbuf in 
-			(* -3 to remove the newline *)
-			COMMENT(String.sub s 2 ((String.length s) -3)) 
-		    else
-		      token lexbuf 
-		  } 
+                      let s = get lexbuf in 
+                        (* -3 to remove the newline *)
+                        COMMENT(String.sub s 2 ((String.length s) -3)) 
+                    else
+                      token lexbuf 
+                  } 
   | "#"           { cpptoken lexbuf }
   | id           { ID(get lexbuf) }
   | digit+ | hexinteger { 
       try INT(Util.big_int_of_string (get lexbuf))
       with Failure "int_of_string" -> 
-	raise(LexError "Error converting integer");
+        raise(LexError "Error converting integer");
     }
   | _ as s    { raise(LexError("line "^
                                (string_of_int lexbuf.lex_curr_p.pos_lnum)
@@ -210,7 +210,7 @@ and blkcomment = parse
 |  "*/"
     { if in_comment () && (exit_comment(); (*still_*)in_comment())
       then 
-	(store_string "*/"; blkcomment lexbuf)
+        (store_string "*/"; blkcomment lexbuf)
     }
 | nl           { incr_linenum lexbuf; store_string_char '\n'; blkcomment lexbuf }
 |  eof       { ignore(eof ()) } 
@@ -220,15 +220,15 @@ and scan_str = parse
   | ['"']   {  () }
   | '\\'  (bs_escapes as c)
             { store_string_char (char_for_backslash c);
-	      scan_str lexbuf 
-	    }
+              scan_str lexbuf 
+            }
   | eof      { raise(LexError "Unterminated string") }
   | _  as c   {  store_string_char c; scan_str lexbuf }
-			   
+                           
 and cpptoken = parse
   | digit+ { (* if !track_line_numbers then (
-	       fileoffset := (Pervasives.int_of_string (get lexbuf));
-	     );*)
+               fileoffset := (Pervasives.int_of_string (get lexbuf));
+             );*)
              cpptoken lexbuf
            }
   | fname { 

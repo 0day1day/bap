@@ -50,9 +50,9 @@ sig
 
   val dtrace : before:('a->unit) -> f:('a->'b) -> after:('b->unit) -> 'a -> 'b
     (** [dtrace before f after] will return [f()], but will call
-	[before] first and after calling [f] it will pass the result
-	to [after]. Also, while [f] is running, indentation for all
-	debugging functions will be increased.  *)
+        [before] first and after calling [f] it will pass the result
+        to [after]. Also, while [f] is running, indentation for all
+        debugging functions will be increased.  *)
 
   val pwarn : string -> unit
   (** Prints given string as a warning message. *)

@@ -255,7 +255,7 @@ module VSA_SPEC = struct
           dprintf "VSA resolved %s to %s" (Pp.ast_exp_to_string e) (Vsa_ssa.VS.to_string vs);
           (match Vsa_ssa.VS.concrete ~max:1024 vs with
           | Some x -> dprintf "VSA finished";
-            (edge, Addrs (List.map (fun a -> Addr a) x))
+            (edge, Addrs (List.map (fun a -> Addr (bi64 a)) x))
           | None -> wprintf "VSA disassembly failed to resolve %s/%s to a specific concrete set" (Pp.ast_exp_to_string e) (Vsa_ssa.VS.to_string vs);
             add_indirect edge)
         in
@@ -301,7 +301,7 @@ module VSA_SPEC = struct
                   failwith (Printf.sprintf "Unable to read from jump table at %s" (~% a))
               ) l
               in
-              (edge, Addrs (List.map (fun a -> Addr a) (List.flatten reads)))
+              (edge, Addrs (List.map (fun a -> Addr (bi64 a)) (List.flatten reads)))
             in
             (try do_read m ssaloc with
             | e when !vsa_mem_hack ->
@@ -309,7 +309,7 @@ module VSA_SPEC = struct
                  BB_Entry.  The underlying assumption is that the memory
                  should be read only, so it couldn't have changed. *)
               dprintf "VSA mem hack";
-              do_read (Ssa.Var Disasm_i386.mem) (CS.G.V.create Cfg.BB_Entry, 0)
+              do_read (Ssa.Var Disasm_i386.R32.mem) (CS.G.V.create Cfg.BB_Entry, 0)
             | e ->
               add_indirect edge
             )
@@ -362,7 +362,7 @@ module Make(D:DISASM)(F:FUNCID) = struct
       (* bbs of lifted insruction, unresolved outgoing edges from lifted instruction, successor address *)
       let () = Worklist.add_list init_worklist q in
       let raise_address c a =
-        dprintf "raise_address %#Lx" a;
+        dprintf "raise_address %s" (~% a);
         try c, CA.find_label c (Addr a)
         with Not_found ->
           let (prog, next) = Asmir.asm_addr_to_bap p a in
@@ -445,7 +445,7 @@ module Make(D:DISASM)(F:FUNCID) = struct
           let l' = match addcond, lbl with
             | true, Addr a ->
               if l <> None then failwith "add_resolved_edge: Indirect conditional jumps are unimplemented";
-              Some(true (* XXX: This is meaningless! *), binop EQ e (Int(bi64 a, Typecheck.infer_ast e)))
+              Some(true (* XXX: This is meaningless! *), binop EQ e (Int(a, Typecheck.infer_ast e)))
             | true, Name _ -> failwith "add_resolved_edge: It is not possible to resolve indirect jump to a named label"
             | false, _ -> l
           in

@@ -25,7 +25,7 @@ object
         visited first, so that this can be used to add the assigned
         variable to your context.
 
-	FIXME: would be nice to be able to add stmts... We may change this. *)
+        FIXME: would be nice to be able to add stmts... We may change this. *)
 
   method visit_rvar : var -> var visit_action
   (** Called when visiting a refenenced variable. (IE: inside an expression) *)

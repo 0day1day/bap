@@ -1,6 +1,3 @@
-Missing features:
-* CFG Recovery (work in progress)
-
 Disassembly stuff:
 * Include symbols in disassembly
 * Include section names in disassembly
@@ -14,12 +11,6 @@ Design issues:
 Other:
 * Fix up documentation.
 * Write more .mli files.
-* Redo the patched VEX thing properly. (using a vendor branch)
-
-Bigger projects:
-* Add support for AMD64 binaries. (almost done)
-
-Branch specific:
 * Depgraphs.ml: Make a separate graph type for depgraphs.ml with
    Lang.exp = unit
 * Cfg.mli: How can we make expressions more structured?

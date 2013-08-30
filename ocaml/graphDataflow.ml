@@ -87,10 +87,10 @@ struct
     let f_t = D.node_transfer_function opts g in
     let succ_e,pred_e,dst,src = match D.dir opts with
       | Forward ->
-	  (D.G.succ_e g, D.G.pred_e g,
+          (D.G.succ_e g, D.G.pred_e g,
            D.G.E.dst, D.G.E.src)
       | Backward ->
-	  (D.G.pred_e g, D.G.succ_e g,
+          (D.G.pred_e g, D.G.succ_e g,
            D.G.E.src, D.G.E.dst)
     in
     let htin = H.create (List.length nodes) in
@@ -98,11 +98,11 @@ struct
     let htout = H.create (List.length nodes) in
     let dfout n =
       try
-	H.find htout n
+        H.find htout n
       with Not_found ->
-	let out = (f_t n (dfin n)) in
-	H.add htout n out;
-	out
+        let out = (f_t n (dfin n)) in
+        H.add htout n out;
+        out
     in
     let visited = H.create (List.length nodes) in
     let backedge = Hashtbl.create (List.length nodes) in
@@ -126,12 +126,12 @@ struct
     let rec do_work = function
       | [] -> ()
       | b::worklist ->
-	  let inset = (dfin b) in
-	  let outset = (f_t b inset) in 
-	  H.replace htout b outset;
-	  let affected_edges =
-	    List.filter 
-	      (fun se ->
+          let inset = (dfin b) in
+          let outset = (f_t b inset) in 
+          H.replace htout b outset;
+          let affected_edges =
+            List.filter 
+              (fun se ->
                 let s = dst se in
                 (* Apply edge transfer function *)
                 let outset' = D.edge_transfer_function opts g se outset in
@@ -156,15 +156,15 @@ struct
                   in
                   let () = H.replace htin s newin in
                   true)
-	      (succ_e b)
-	  in
+              (succ_e b)
+          in
           let affected_elems = List.map dst affected_edges in
           (* Note we must mark b as visited after we look at the
              affected elements, because we look for back edges there. *)
           H.replace visited b ();
-	  let newwklist = worklist@list_difference affected_elems worklist
-	  in
-	  do_work newwklist
+          let newwklist = worklist@list_difference affected_elems worklist
+          in
+          do_work newwklist
     in
     do_work [D.s0 opts g];
     (dfin, dfout)

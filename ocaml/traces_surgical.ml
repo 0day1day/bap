@@ -124,14 +124,14 @@ let trace_transform_stmt2 stmt evalf =
   let com = Ast.Comment(s, []) in
   let s = match stmt with
     | (Ast.CJmp (e,tl,_,atts1)) when full_exp_eq (evalf e) exp_true ->
-    	[com; Ast.Assert(e,atts1)]
+        [com; Ast.Assert(e,atts1)]
     | (Ast.CJmp (e,_,fl,atts1)) when full_exp_eq (evalf e) exp_false ->
-    	[com; Ast.Assert(UnOp(NOT,e),atts1)]
+        [com; Ast.Assert(UnOp(NOT,e),atts1)]
     | Ast.CJmp _ -> failwith "Evaluation failure!"
     | (Ast.Jmp _) ->
-	[com]
-	  (* Removing assignment of tainted operands: symbolic
-	     execution does not need these *)
+        [com]
+          (* Removing assignment of tainted operands: symbolic
+             execution does not need these *)
     | Ast.Move (v, Store(mem, idx, value, _endian, t), _) ->
         let idx = concretize idx in
         let bytes = get_bytes t in
@@ -147,23 +147,23 @@ let trace_transform_stmt2 stmt evalf =
 let get_symbolic_seeds2 memv = function
   | Ast.Comment (s,atts) when is_seed_label s ->
       List.fold_left
-	(fun acc {index=index; taint=Taint taint} ->
-	   let newvarname = "symb_" ^ (string_of_int taint) in
-	   let sym_var = Var (Var.newvar newvarname reg_8) in
-	     pdebug ("Introducing symbolic: " 
-		     ^(Printf.sprintf "%Lx" index)
-		     ^" -> "
-		     ^(Pp.ast_exp_to_string sym_var));
-	     add_symbolic index sym_var ;
-	     (* symbolic variable *)
-	     let mem = newvar index reg_8 in
-	     let move = Move(mem, sym_var, []) in
-	     move::acc				       
-	) [] (filter_taint atts)
+        (fun acc {index=index; taint=Taint taint} ->
+           let newvarname = "symb_" ^ (string_of_int taint) in
+           let sym_var = Var (Var.newvar newvarname reg_8) in
+             pdebug ("Introducing symbolic: " 
+                     ^(Printf.sprintf "%s" (~% index))
+                     ^" -> "
+                     ^(Pp.ast_exp_to_string sym_var));
+             add_symbolic index sym_var ;
+             (* symbolic variable *)
+             let mem = newvar (addr_to_int64 index) reg_8 in
+             let move = Move(mem, sym_var, []) in
+             move::acc
+        ) [] (filter_taint atts)
   | _ -> []
 
 (** Running each block separately *)
-let run_and_subst_block state memv thread_map block = 
+let run_and_subst_block arch state memv thread_map block = 
   let addr, block = hd_tl block in
   let input_seeds = get_symbolic_seeds2 memv addr in
   pdebug ("Running block: " ^ (string_of_int !counter) ^ " " ^ (Pp.ast_stmt_to_string addr));
@@ -172,7 +172,7 @@ let run_and_subst_block state memv thread_map block =
   let _ = ignore(update_concrete addr) in
   if !consistency_check then (
     (* remove temps *)
-	(* SWXXX *)
+        (* SWXXX *)
     clean_delta state.delta;
     ignore(check_delta state);
     (* TraceConcrete.print_values state.delta; *)
@@ -181,9 +181,9 @@ let run_and_subst_block state memv thread_map block =
 
   (* Assign concrete values to regs/memory *)
   let block, extra =
-    let assigns = assign_vars memv (lookup_thread_map thread_map (get_tid block)) false in
+    let assigns = assign_vars arch memv (lookup_thread_map thread_map (get_tid block)) false in
     (* List.iter *)
-    (*   (fun stmt -> dprintf "assign stmt: %s" (Pp.ast_stmt_to_string stmt)) assigns;	 *)
+    (*   (fun stmt -> dprintf "assign stmt: %s" (Pp.ast_stmt_to_string stmt)) assigns;   *)
     assigns @ block, List.length assigns
   in
 
@@ -210,45 +210,45 @@ let run_and_subst_block state memv thread_map block =
 
     try 
       (match TraceConcrete.eval_stmt state stmt with
-	 | [newstate] ->
-	     let next = TraceConcrete.inst_fetch newstate.sigma newstate.pc in
-	       (*pdebug ("pc: " ^ (Int64.to_string newstate.pc)) ;*)
-	       eval_block newstate next
-	 | _ -> 
-	    failwith "multiple targets..."
+         | [newstate] ->
+             let next = TraceConcrete.inst_fetch newstate.sigma newstate.pc in
+               (*pdebug ("pc: " ^ (Int64.to_string newstate.pc)) ;*)
+               eval_block newstate next
+         | _ -> 
+            failwith "multiple targets..."
       )
     with
-	(* Ignore failed assertions -- assuming that we introduced them *)
+        (* Ignore failed assertions -- assuming that we introduced them *)
     | TraceConcrete.AssertFailed _ as _e -> 
-	  wprintf "failed assertion: %s" (Pp.ast_stmt_to_string stmt);
-	  (* raise e; *)
-	  let new_pc = Int64.succ state.pc in
-	  let next = TraceConcrete.inst_fetch state.sigma new_pc in
-	  eval_block {state with pc=new_pc} next
+          wprintf "failed assertion: %s" (Pp.ast_stmt_to_string stmt);
+          (* raise e; *)
+          let new_pc = Int64.succ state.pc in
+          let next = TraceConcrete.inst_fetch state.sigma new_pc in
+          eval_block {state with pc=new_pc} next
   in
     try
       eval_block state init
     with 
-      |	Failure s as e -> 
-	  pwarn ("block evaluation failed :(\nReason: "^s) ;
-	  List.iter (fun s -> pdebug (Pp.ast_stmt_to_string s)) block ;
-	  (*if !consistency_check then ( *)
-	    raise e
-	  (* ) else 
-	  ((addr,false)::(info,false)::(List.tl !executed)) *)
+      | Failure s as e -> 
+          pwarn ("block evaluation failed :(\nReason: "^s) ;
+          List.iter (fun s -> pdebug (Pp.ast_stmt_to_string s)) block ;
+          (*if !consistency_check then ( *)
+            raise e
+          (* ) else 
+          ((addr,false)::(info,false)::(List.tl !executed)) *)
       | TraceConcrete.UnknownLabel _ ->
-	  (addr::info::List.rev (!executed))
+          (addr::info::List.rev (!executed))
       | TraceConcrete.Halted _ -> 
-	  (addr::info::List.rev (List.tl !executed))
+          (addr::info::List.rev (List.tl !executed))
 
-let run_and_subst_blocks blocks memv thread_map length =
+let run_and_subst_blocks arch blocks memv thread_map length =
   counter := 1 ;
   Status.init "Concrete Substitution Run" length ;
   let state = TraceConcrete.create_state () in
   let rev_trace = List.fold_left 
     (fun acc block -> 
        Status.inc() ;   
-       List.rev_append (run_and_subst_block state memv thread_map block) acc
+       List.rev_append (run_and_subst_block arch state memv thread_map block) acc
     ) [] blocks
   in
   Status.stop () ;
@@ -268,12 +268,12 @@ let dicer =
     in
     let make_sets = function
       | Ast.Move(v, e, _) ->
-	  let name = Var.name v in
-	    if NameSet.mem name outset then
-	      (
-	        ignore (Ast_visitor.exp_accept vis e );
-	        delset := NameSet.add name !delset
-	      )
+          let name = Var.name v in
+            if NameSet.mem name outset then
+              (
+                ignore (Ast_visitor.exp_accept vis e );
+                delset := NameSet.add name !delset
+              )
       | Ast.Assert(e,_) ->
           ignore (Ast_visitor.exp_accept vis e)
       | _ -> ()
@@ -305,7 +305,7 @@ let dicer =
   in
     slicer
 
-let concrete_substitution trace = 
+let concrete_substitution arch trace = 
   dsa_rev_map := None;
   (*let trace = Memory2array.coerce_prog trace in*)
   let no_specials = remove_specials trace in
@@ -316,11 +316,11 @@ let concrete_substitution trace =
   let blocks = trace_to_blocks no_specials in
   (*pdebug ("blocks: " ^ (string_of_int (List.length blocks)));*)
   let length = List.length blocks in
-  let actual_trace = run_and_subst_blocks blocks memv thread_map length in
+  let actual_trace = run_and_subst_blocks arch blocks memv thread_map length in
     actual_trace
 
-let check_slice trace = 
-  let actual_trace = concrete_substitution trace in
+let check_slice arch trace = 
+  let actual_trace = concrete_substitution arch trace in
   let accurate_trace = dicer (NameSet.singleton "ra") [] (List.rev actual_trace) in
     accurate_trace
 
@@ -337,16 +337,16 @@ let slice varname trace =
   in
   let run_all acc = function 
     | Ast.Move(v, e, _) as s ->
-	let name = Var.name v in
-	  if NameSet.mem name !maps then
-	    (
-	      ignore( Ast_visitor.exp_accept vis e );
-	      maps := NameSet.remove name !maps ;
-	      s::acc
-	    )
-	  else acc
+        let name = Var.name v in
+          if NameSet.mem name !maps then
+            (
+              ignore( Ast_visitor.exp_accept vis e );
+              maps := NameSet.remove name !maps ;
+              s::acc
+            )
+          else acc
     | _ -> acc
   in
     List.fold_left run_all [] rev
-		   
-	    
+                   
+            

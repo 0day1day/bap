@@ -31,7 +31,7 @@ let anon x =
   raise (Arg.Bad("Expected only one anonymous argument"))
 let () = Arg.parse speclist anon usage
 
-let prog,scope =
+let prog,scope,_ =
   try Input.get_program()
   with Arg.Bad s ->
     Arg.usage speclist (s^"\n"^usage);

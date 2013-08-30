@@ -68,7 +68,7 @@ type varctx = string VH.t * (string,unit) Hashtbl.t
 let var_to_string ?ctx (Var.V(id,name,t) as v) =
   match ctx with
   | None ->
-	name ^ "_" ^ string_of_int id ^ ":" ^ typ_to_string t
+        name ^ "_" ^ string_of_int id ^ ":" ^ typ_to_string t
   | Some(vars,names) ->
     if debug() then (
       if (not !printed_varctx_warning) &&
@@ -86,7 +86,7 @@ let var_to_string ?ctx (Var.V(id,name,t) as v) =
           let s' = s ^":"^ typ_to_string t in
           VH.add vars v s';
           Hashtbl.add names s ();
-        s')
+          s')
       in
       let rec more x = (x^"_", `F more) in
       trystring (name, `F (fun _ -> (name ^ "_" ^ string_of_int id, `F more)))
@@ -117,7 +117,7 @@ object (self)
 
   method attr = function
     | Asm s -> pp "@asm \""; pp s; pp "\""
-    | Address a -> printf "@address \"0x%Lx\"" a;
+    | Address a -> printf "@address \"0x%s\"" (~%a);
     | Liveout -> pp "@set \"liveout\""
     | StrAttr s -> pp "@str \""; pp s; pc '\"'
     | NamedStrAttr (n, s) -> pp "@namedstr \""; pp n; pc '\"'; space (); pc '\"'; pp s; pc '\"'
@@ -127,10 +127,10 @@ object (self)
       in
       let ts = string_of_int t in
       (*if t = Taint then "tainted" else "untainted" in*)
-      let ind = if mem then "[0x"^(Int64.format "%Lx" i)^"]" else "" in
+      let ind = if mem then "[0x"^(~%i)^"]" else "" in
       pp "@context "; pc '"'; pp (s^ind); pc '"'; pp (" = 0x"^(Util.big_int_to_hex v)^ ", " ^ ts
-			                              ^", u"
-			                              ^ (string_of_int bits)
+                                                      ^", u"
+                                                      ^ (string_of_int bits)
                                                       ^", "
                                                       ^ustr)
     | Context _ ->
@@ -148,7 +148,7 @@ object (self)
 
   method label = function
     | Name s -> pp "label "; pp s
-    | Addr x -> printf "addr 0x%Lx" x
+    | Addr x -> printf "addr 0x%s" (~%x)
 
   method int i t =
     let (is, i) = Arithmetic.to_sbig_int (i,t), Arithmetic.to_big_int (i,t) in
@@ -200,140 +200,140 @@ object (self)
     opn 0;
     (match e with
      | Ast.Load(arr,idx,edn,t) ->
-	 lparen 110;
-	 self#ast_exp ~prec:110 arr;
-	 pp "["; self#ast_exp idx; comma(); self#ast_endian edn; pp "]";
-	 (* FIXME: check type of arr *)
-	 pp ":"; self#typ t;
-	 rparen 110
+         lparen 110;
+         self#ast_exp ~prec:110 arr;
+         pp "["; self#ast_exp idx; comma(); self#ast_endian edn; pp "]";
+         (* FIXME: check type of arr *)
+         pp ":"; self#typ t;
+         rparen 110
      | Ast.Store(arr,idx,vl, edn, t) ->
-	 lparen 10;
-	 self#ast_exp ~prec:10 arr;
-	 pp " with"; space();
-	 pp "["; self#ast_exp idx;
-	 comma(); self#ast_endian edn;
-	 pp "]:"; self#typ t;
-	 pp " ="; space();
-	 self#ast_exp ~prec:10 vl;
-	 rparen 10;
+         lparen 10;
+         self#ast_exp ~prec:10 arr;
+         pp " with"; space();
+         pp "["; self#ast_exp idx;
+         comma(); self#ast_endian edn;
+         pp "]:"; self#typ t;
+         pp " ="; space();
+         self#ast_exp ~prec:10 vl;
+         rparen 10;
      | Ast.Ite(c,x,y) ->
-	 lparen 7;
-	 pp "if";
-	 space ();
-	 self#ast_exp ~prec:7 c;
-	 space ();
-	 pp "then";
-	 space ();
-	 self#ast_exp ~prec:7 x;
-	 space ();
-	 pp "else";
-	 space ();
-	 self#ast_exp ~prec:7 y;	 
-	 rparen 7
+         lparen 7;
+         pp "if";
+         space ();
+         self#ast_exp ~prec:7 c;
+         space ();
+         pp "then";
+         space ();
+         self#ast_exp ~prec:7 x;
+         space ();
+         pp "else";
+         space ();
+         self#ast_exp ~prec:7 y;
+         rparen 7
      | Ast.Extract(h, l, e) ->
-	 pp "extract:";
-	 pp (string_of_big_int h);
-	 pc ':';
-	 pp (string_of_big_int l);
-	 pc ':';
-	 pc '[';
-	 self#ast_exp e;
-	 pc ']';
+         pp "extract:";
+         pp (string_of_big_int h);
+         pc ':';
+         pp (string_of_big_int l);
+         pc ':';
+         pc '[';
+         self#ast_exp e;
+         pc ']';
      | Ast.Concat(le, re) ->
-	 pp "concat:";
-	 pc '[';
+         pp "concat:";
+         pc '[';
          break ();
-	 self#ast_exp le;
-	 pp "][";
+         self#ast_exp le;
+         pp "][";
          break ();
-	 self#ast_exp re;
-	 pc ']'
+         self#ast_exp re;
+         pc ']'
      | Ast.BinOp(b,x,y) ->
-	 let p = binop_prec b in
-	 lparen p;
-	 self#ast_exp ~prec:p x;
-	 pp " "; pp (binop_to_string b); space();
-	 self#ast_exp ~prec:(p+1) y;
-	 rparen p
+         let p = binop_prec b in
+         lparen p;
+         self#ast_exp ~prec:p x;
+         pp " "; pp (binop_to_string b); space();
+         self#ast_exp ~prec:(p+1) y;
+         rparen p
      | Ast.UnOp(u, x) ->
-	 lparen 100;
-	 pp (unop_to_string u); self#ast_exp ~prec:100 x;
-	 rparen 100
+         lparen 100;
+         pp (unop_to_string u); self#ast_exp ~prec:100 x;
+         rparen 100
      | Ast.Var v ->
-	 self#var v
+         self#var v
      | Ast.Lab s ->
-	 (* FIXME: quote s? *)
-	 pp "\""; pp s; pp "\"";
+         (* FIXME: quote s? *)
+         pp "\""; pp s; pp "\"";
      | Ast.Int(i,t) ->
          self#int i t
      | Ast.Cast(ct,t,e) ->
-	 pp (ct_to_string ct);
-	 pp ":"; self#typ t;
-	 pp "("; self#ast_exp e; pp ")"
+         pp (ct_to_string ct);
+         pp ":"; self#typ t;
+         pp "("; self#ast_exp e; pp ")"
      | Ast.Let(v,e1,e2) ->
-	 lparen 5;
-	 pp "let "; self#var v; pp " :=";
-	 opn 2; space();
-	 self#ast_exp ~prec:5 e1; space(); 
-	 cls();
-	 pp "in"; space();
-	 self#ast_exp ~prec:5 e2;
-	 rparen 5
+         lparen 5;
+         pp "let "; self#var v; pp " :=";
+         opn 2; space();
+         self#ast_exp ~prec:5 e1; space(); 
+         cls();
+         pp "in"; space();
+         self#ast_exp ~prec:5 e2;
+         rparen 5
      | Ast.Unknown(s,t) ->
-	 pp "unknown \""; pp s; pp "\":"; self#typ t
+         pp "unknown \""; pp s; pp "\":"; self#typ t
     );
     cls();
 
   method ast_endian = function
     | Ast.Int(bi, Reg 1) when bi_is_zero bi ->
-	pp "e_little";
+        pp "e_little";
     | Ast.Int(bi, Reg 1) when bi_is_one bi ->
-	pp "e_big"
+        pp "e_big"
     | x -> self#ast_exp x
 
   method ast_stmt s =
     opn 2;
     (match s with
     | Ast.Move(v, e, a) ->
-	self#var v;
-	pp " ="; space();
-	self#ast_exp e;
-	self#attrs a
+        self#var v;
+        pp " ="; space();
+        self#ast_exp e;
+        self#attrs a
     | Ast.Jmp(e,a) ->
-	pp "jmp ";
-	self#ast_exp e;
-	self#attrs a;
+        pp "jmp ";
+        self#ast_exp e;
+        self#attrs a;
     | Ast.CJmp(c,t,f,a) ->
-	pp "cjmp"; space();
-	self#ast_exp c; comma();
-	self#ast_exp t; comma();
-	self#ast_exp f;
-	self#attrs a
+        pp "cjmp"; space();
+        self#ast_exp c; comma();
+        self#ast_exp t; comma();
+        self#ast_exp f;
+        self#attrs a
     | Ast.Label(l,a) ->
-	self#label l;
-	self#attrs a
+        self#label l;
+        self#attrs a
     | Ast.Halt(e,a) ->
-	pp "halt ";
-	self#ast_exp e;
-	self#attrs a
+        pp "halt ";
+        self#ast_exp e;
+        self#attrs a
     | Ast.Assert(e,a) ->
-	pp "assert ";
-	self#ast_exp e;
-	self#attrs a
+        pp "assert ";
+        self#ast_exp e;
+        self#attrs a
     | Ast.Assume(e,a) ->
-	pp "assume ";
-	self#ast_exp e;
-	self#attrs a
+        pp "assume ";
+        self#ast_exp e;
+        self#attrs a
     | Ast.Comment(s,a) ->
-	pp "/*";
-	pp s;
-	pp "*/";
-	self#attrs a
+        pp "/*";
+        pp s;
+        pp "*/";
+        self#attrs a
     | Ast.Special(s,a) ->
-	pp "special \"";
-	pp s;
-	pp "\"";
-	self#attrs a);
+        pp "special \"";
+        pp s;
+        pp "\"";
+        self#attrs a);
     cls();
 
   method ast_program p =
@@ -351,23 +351,23 @@ object (self)
     opn 0;
     (match e with
      | Ssa.Load(arr,idx,edn, t) ->
-	 self#ssa_exp arr;
-	 pp "["; self#ssa_exp idx; comma(); self#ssa_endian edn; pp "]";
-	 pp ":"; self#typ t;
+         self#ssa_exp arr;
+         pp "["; self#ssa_exp idx; comma(); self#ssa_endian edn; pp "]";
+         pp ":"; self#typ t;
      | Ssa.Store(arr,idx,vl, edn, t) ->
-	 self#ssa_exp arr;
-	 pp " with"; space();
-	 pp "["; self#ssa_exp idx;
-	 comma(); self#ssa_endian edn;
-	 pp "]:"; self#typ t;
-	 pp " ="; space();
-	 self#ssa_exp vl
+         self#ssa_exp arr;
+         pp " with"; space();
+         pp "["; self#ssa_exp idx;
+         comma(); self#ssa_endian edn;
+         pp "]:"; self#typ t;
+         pp " ="; space();
+         self#ssa_exp vl
      | Ssa.BinOp(b, x, y) ->
-	 self#ssa_exp x;
-	 pp " "; pp (binop_to_string b); space();
-	 self#ssa_exp y;
+         self#ssa_exp x;
+         pp " "; pp (binop_to_string b); space();
+         self#ssa_exp y;
      | Ssa.UnOp(u, x) ->
-	 pp (unop_to_string u); self#ssa_exp x;
+         pp (unop_to_string u); self#ssa_exp x;
      | Ssa.Var v ->
          self#var v
      | Ssa.Lab lab ->
@@ -376,43 +376,43 @@ object (self)
          self#int i t
      | Ssa.Cast(ct,t,v) ->
          pp (ct_to_string ct);
-	 pp ":"; self#typ t;
-	 pp "("; self#ssa_exp v; pp ")"
+         pp ":"; self#typ t;
+         pp "("; self#ssa_exp v; pp ")"
      | Ssa.Unknown(s,t) ->
-	 pp "unknown \""; pp s; pp "\":"; self#typ t
+         pp "unknown \""; pp s; pp "\":"; self#typ t
      | Ssa.Ite(c, x, y) ->
-	 pp "if";
-	 space ();
-	 self#ssa_exp c;
-	 space ();
-	 pp "then";
-	 space ();
-	 self#ssa_exp x;
-	 space ();
-	 pp "else";
-	 space ();
-	 self#ssa_exp y	 
+         pp "if";
+         space ();
+         self#ssa_exp c;
+         space ();
+         pp "then";
+         space ();
+         self#ssa_exp x;
+         space ();
+         pp "else";
+         space ();
+         self#ssa_exp y          
      | Ssa.Extract(h, l, e) ->
-	 pp "extract:";
-	 pp (string_of_big_int h);
-	 pc ':';
-	 pp (string_of_big_int l);
-	 pp ":[";
-	 self#ssa_exp e;
-	 pc ']';
+         pp "extract:";
+         pp (string_of_big_int h);
+         pc ':';
+         pp (string_of_big_int l);
+         pp ":[";
+         self#ssa_exp e;
+         pc ']';
      | Ssa.Concat(lv, rv) ->
-	 pp "concat:[";
-	 self#ssa_exp lv;
-	 pp "][";
-	 self#ssa_exp rv;
-	 pc ']'
+         pp "concat:[";
+         self#ssa_exp lv;
+         pp "][";
+         self#ssa_exp rv;
+         pc ']'
      | Ssa.Phi [] ->
          failwith "Cannot print empty phi expression"
      | Ssa.Phi(x::xs) ->
-	 pp "phi(";
-	 self#var x;
-	 List.iter (fun x -> pp ", "; self#var x) xs;
-	 pp ")"
+         pp "phi(";
+         self#var x;
+         List.iter (fun x -> pp ", "; self#var x) xs;
+         pp ")"
     );
     cls();
 
@@ -420,43 +420,43 @@ object (self)
     opn 2;
     (match s with
     | Ssa.Move(v,e,a) ->
-	self#var v;
-	pp " ="; space();
-	self#ssa_exp e;
-	self#attrs a
+        self#var v;
+        pp " ="; space();
+        self#ssa_exp e;
+        self#attrs a
     | Ssa.Jmp(v,a) ->
-	pp "jmp ";
-	self#ssa_exp v;
-	self#attrs a
+        pp "jmp ";
+        self#ssa_exp v;
+        self#attrs a
     | Ssa.CJmp(c,t,f,a) ->
-	pp "cjmp"; space();
-	self#ssa_exp c; comma();
-	self#ssa_exp t; comma();
-	self#ssa_exp f;
-	self#attrs a
+        pp "cjmp"; space();
+        self#ssa_exp c; comma();
+        self#ssa_exp t; comma();
+        self#ssa_exp f;
+        self#attrs a
     | Ssa.Label(l,a) ->
-	(match l with
-	 | Name s -> pp "label "; pp s
-	 | Addr x -> printf "addr 0x%Lx" x
-	);
-	self#attrs a
+        (match l with
+         | Name s -> pp "label "; pp s
+         | Addr x -> printf "addr 0x%s" (~% x)
+        );
+        self#attrs a
     | Ssa.Halt(v,a) ->
-	pp "halt ";
-	self#ssa_exp v;
-	self#attrs a
+        pp "halt ";
+        self#ssa_exp v;
+        self#attrs a
     | Ssa.Assert(v,a) ->
-	pp "assert ";
-	self#ssa_exp v;
-	self#attrs a
+        pp "assert ";
+        self#ssa_exp v;
+        self#attrs a
     | Ssa.Assume(v,a) ->
         pp "assume ";
         self#ssa_exp v;
         self#attrs a
     | Ssa.Comment(s,a) ->
-	pp "/*";
-	pp s;
-	pp "*/";
-	self#attrs a
+        pp "/*";
+        pp s;
+        pp "*/";
+        self#attrs a
     );
     cls()
 
@@ -467,7 +467,7 @@ object (self)
 
   method close =
     Format.pp_print_newline ft ();
- 
+
 end
 
 class pp_oc fd =

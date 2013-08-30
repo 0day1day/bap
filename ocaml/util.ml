@@ -55,11 +55,11 @@ let list_argmax ?(compare=compare) f = function
 
 let list_union a b =
   List.fold_left (fun acc x ->
-		    if List.mem x b then acc else x::acc) b a
+                    if List.mem x b then acc else x::acc) b a
 
 let list_intersection a b =
   List.rev(List.fold_left (fun acc x ->
-		    if List.mem x b then x::acc else acc) [] a)
+                    if List.mem x b then x::acc else acc) [] a)
 
 let list_does_intersect a b =
   List.exists (fun x -> List.mem x a) b
@@ -67,10 +67,10 @@ let list_does_intersect a b =
 
 let list_difference a b = 
     List.rev  (List.fold_left (fun acc x ->
-			      if List.mem x b then
-				acc
-			      else
-				x :: acc) [] a)
+                              if List.mem x b then
+                                acc
+                              else
+                                x :: acc) [] a)
 
 let list_subset a b =
   List.for_all (fun x -> List.mem x b) a
@@ -116,9 +116,9 @@ let list_remove l s r =
   let _,revl = List.fold_left
     (fun (i,l) e ->
        if i >= s && i < aftere then
-	 (i+1,l)
+         (i+1,l)
        else
-	 (i+1, e::l)
+         (i+1, e::l)
     ) (0,[]) l
   in
   List.rev revl
@@ -231,8 +231,8 @@ let list_directory ?(sort_files=true) dir_path =
 
 let trim_newline s = 
   if String.length s > 0 && String.get s ((String.length s) -1) = '\n'
-  then	String.sub s 0 ((String.length s)-2)
-  else	s
+  then  String.sub s 0 ((String.length s)-2)
+  else  s
 
 let union_find map items =
   let add_one res item =
@@ -242,8 +242,8 @@ let union_find map items =
     in
     let joined =
       List.fold_left
-	(fun (s,is) (s2,is2) -> (list_union s2 s, List.rev_append is2 is))
-	(set,[item]) joined
+        (fun (s,is) (s2,is2) -> (list_union s2 s, List.rev_append is2 is))
+        (set,[item]) joined
     in
     joined::indep
   in
@@ -257,7 +257,7 @@ let rec split_common_prefix ?(eq=(=)) la lb =
     | _, [] -> (List.rev acc, la, lb)
     | h1::t1, h2::t2 ->
       if eq h1 h2 then
-	split_common_prefix_h (h1::acc) t1 t2
+        split_common_prefix_h (h1::acc) t1 t2
       else (List.rev acc, la, lb)
   in
   split_common_prefix_h [] la lb
@@ -308,10 +308,10 @@ struct
   let hashtbl_eq ?(eq=(=)) h1 h2 =
     let subtbl h1 h2 =
       H.fold
-	(fun k v r ->
-	   try r && eq v (H.find h2 k)
-	   with Not_found -> false )
-	h1 true
+        (fun k v r ->
+           try r && eq v (H.find h2 k)
+           with Not_found -> false )
+        h1 true
     in
       subtbl h1 h2 && subtbl h2 h1
 
@@ -336,8 +336,8 @@ let hashtbl_eq ?(eq=(=)) h1 h2 =
   let subtbl h1 h2 =
     Hashtbl.fold
       (fun k v r ->
-	 try r && eq v (Hashtbl.find h2 k)
-	 with Not_found -> false )
+         try r && eq v (Hashtbl.find h2 k)
+         with Not_found -> false )
       h1 true
   in
     subtbl h1 h2 && subtbl h2 h1
@@ -383,9 +383,9 @@ let int64_to_binary ?pad n =
   let zeroextend s = match pad with
     | None -> s
     | Some(l) -> 
-	let p = l - String.length s in
-	assert (p >= 0);
-	(String.make p '0') ^ s 
+        let p = l - String.length s in
+        assert (p >= 0);
+        (String.make p '0') ^ s 
   in
   let rec f = function
     | 0L -> "0"
@@ -402,9 +402,9 @@ let big_int_to_binary ?pad n =
   let zeroextend s = match pad with
     | None -> s
     | Some(l) -> 
-	let p = l - String.length s in
-	assert (p >= 0);
-	(String.make p '0') ^ s 
+        let p = l - String.length s in
+        assert (p >= 0);
+        (String.make p '0') ^ s 
   in
   let rec f = function
     | bi when (eq_big_int bi zero_big_int) -> "0"
@@ -425,9 +425,9 @@ let big_int_to_hex ?pad n =
   let zeroextend s = match pad with
     | None -> s
     | Some(l) -> 
-	let p = l - String.length s in
-	assert (p >= 0);
-	(String.make p '0') ^ s 
+        let p = l - String.length s in
+        assert (p >= 0);
+        (String.make p '0') ^ s 
   in
   let (<=%) = le_big_int in
   let rec f = function
@@ -555,9 +555,9 @@ struct
     let deltat = Unix.gettimeofday () -. !lasttime in
     let deltay = !current - !last in
       if deltat == 0.0 || deltay == 0 then
-	-1.0
-	  else
-	(float_of_int deltay) /. deltat
+        -1.0
+          else
+        (float_of_int deltay) /. deltat
 
   let update () =
     let p = cpercent () in
@@ -585,14 +585,14 @@ struct
     if !total != 0 then (
       current := !current + 1 ;
       let percentage' = cpercent() in
-	if ((percentage' != !percentage) 
-	    (*|| ((Unix.gettimeofday() -. !lasttime) >= updatetime)*) ) then
-	  (update ()))
-	  
+        if ((percentage' != !percentage) 
+            (*|| ((Unix.gettimeofday() -. !lasttime) >= updatetime)*) ) then
+          (update ()))
+          
   let stop () =
     if (debug()) then 
-	  Printf.printf "%s: Done! (%f seconds)\n" !message 
-		(Unix.gettimeofday () -. !starttime) ;
+          Printf.printf "%s: Done! (%f seconds)\n" !message 
+                (Unix.gettimeofday () -. !starttime) ;
     flush stdout
 end
 
@@ -626,7 +626,7 @@ let rec print_separated_list ps sep lst =
     | [] -> acc^""
     | x::[] -> acc^(ps x)
     | x::y::zs -> let acc = (ps x)^sep in
-	(doit acc (y::zs))
+        (doit acc (y::zs))
   in
     doit "" lst
 
@@ -658,7 +658,7 @@ let syscall ?(env=[| |]) cmd =
 
 let print_mem_usage _ =
   let module D = 
-	Debug.Make(struct let name = "UtilMemUse" and default=`NoDebug end) 
+        Debug.Make(struct let name = "UtilMemUse" and default=`NoDebug end) 
   in
   if D.debug() then
     let pid = Unix.getpid() in

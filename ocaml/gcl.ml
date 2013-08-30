@@ -94,14 +94,14 @@ let rec of_rev_straightline ?mode ?(acc=Skip) trace =
     | Move(l,e,_) -> Seq(Assign(l,e), g)
     | CJmp _
     | Jmp _ ->
-	invalid_arg "found Jmp in straightline GCL"
+        invalid_arg "found Jmp in straightline GCL"
     | Comment _
     | Label _ ->
-	g
+        g
     | Halt _ ->
       invalid_arg "Found halt in straightline code"
     | Special _ ->
-	invalid_arg "Found special in straightline code"
+        invalid_arg "Found special in straightline code"
     | Ast.Assert(e, _) -> Seq(Assert e, g)
     | Ast.Assume(e, _) -> Seq(Assume e, g)
   in
@@ -253,9 +253,9 @@ let gclhelp_of_astcfg ?entry ?exit cfg =
   let rec find_cjmp = function
     | [] -> None
     | stmts ->
-	match list_last stmts with
-	| CJmp(c,t,f,_) -> Some(c,t,f)
-	| s -> None
+        match list_last stmts with
+        | CJmp(c,t,f,_) -> Some(c,t,f)
+        | s -> None
   in
   let find_target e =
     match lab_of_exp e with
@@ -266,27 +266,27 @@ let gclhelp_of_astcfg ?entry ?exit cfg =
   (* transfer function *)
   let f_t n = function
     | Cunchoice(bb1, bb2)::rest as exp ->
-	(match find_cjmp (CA.get_stmts cfg n) with
-	 | Some(cond,tt,ft) ->
-	     let (bbt,bbf) =
-	       match (find_first (CSeq(bb1::rest)), find_first (CSeq(bb2::rest)),
-	              find_target tt, find_target ft) with
-		 (b1,b2,bt,bf) when b1 = bt && b2 = bf -> (bb1,bb2)
-	       | (b1,b2,bt,bf) when b2 = bt && b1 = bf -> (bb2,bb1)
-	       | (b1,b2,bt,bf) ->
-		   failwith(Printf.sprintf "choice seems to not correspond to cjmp %s %s %s %s %s %s %s %s at %s. %s"
-			      (b_to_string b1) (b_to_string b2)
-			      (b_to_string bt) (b_to_string bf)
+        (match find_cjmp (CA.get_stmts cfg n) with
+         | Some(cond,tt,ft) ->
+             let (bbt,bbf) =
+               match (find_first (CSeq(bb1::rest)), find_first (CSeq(bb2::rest)),
+                      find_target tt, find_target ft) with
+                 (b1,b2,bt,bf) when b1 = bt && b2 = bf -> (bb1,bb2)
+               | (b1,b2,bt,bf) when b2 = bt && b1 = bf -> (bb2,bb1)
+               | (b1,b2,bt,bf) ->
+                   failwith(Printf.sprintf "choice seems to not correspond to cjmp %s %s %s %s %s %s %s %s at %s. %s"
+                              (b_to_string b1) (b_to_string b2)
+                              (b_to_string bt) (b_to_string bf)
                               (Pp.ast_exp_to_string tt) (Cfg_ast.v2s (find_target tt))
                               (Pp.ast_exp_to_string ft) (Cfg_ast.v2s (find_target ft))
-			      (b_to_string n)
+                              (b_to_string n)
                               (Pp.ast_stmt_to_string (List.hd (List.rev (CA.get_stmts cfg n)))))
-	     in
-	     CAssign n::CChoice(cond, bbt, bbf)::rest
-	 | None -> (* No CJmp found *)
-	     dprintf "Warning: CJmp expected but not found at end of %s." (b_to_string n);
-	     CAssign n::exp
-	)
+             in
+             CAssign n::CChoice(cond, bbt, bbf)::rest
+         | None -> (* No CJmp found *)
+             dprintf "Warning: CJmp expected but not found at end of %s." (b_to_string n);
+             CAssign n::exp
+        )
     | exp -> CAssign n::exp
   in
   let module BH = Hashtbl.Make(CA.G.V) in

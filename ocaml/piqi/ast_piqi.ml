@@ -2,6 +2,7 @@ module V = Var
 open Ast
 open Stmt_piqi
 open Type
+open Big_int_convenience
 
 let casttype_to_piqi : Type.cast_type -> Stmt_piqi.cast_type = function
   | CAST_UNSIGNED -> `cast_unsigned

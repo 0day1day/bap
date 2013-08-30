@@ -38,8 +38,16 @@ val typecheck_prog : Ast.stmt list -> unit
 
 val is_integer_type : Type.typ -> bool
 (** [is_integer_type t] returns true iff [t] is a register type. *)
+
 val is_mem_type : Type.typ -> bool
 (** [is_integer_type t] returns true iff [t] is of memory or array type. *)
+
+val index_type_of : Type.typ -> Type.typ
+(** [index_type_of t] returns the index type for memory loads and
+    stores in a memory of type [t].
+
+    @raise Invalid_arg if [t] is a non-memory type. *)
+
 val bits_of_width : Type.typ -> int
 (** [bits_of_width t] returns the number of bits in the register type
     [t].

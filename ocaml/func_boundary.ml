@@ -1,3 +1,5 @@
+open Big_int_convenience
+
 module D = Debug.Make(struct let name = "Func_boundary" and default=`NoDebug end)
 open D
 
@@ -8,10 +10,11 @@ type scheme_type =
 (* This function checks to see if the sequence of assembly instructions
    at start_addr ends at end_addr. *)
 let rec liftable_asm_addr_to_bap p start_addr end_addr =
-  start_addr <= end_addr 
-  && (start_addr = end_addr 
-     || (let (_, next) = Asmir.asm_addr_to_bap p start_addr in
-         liftable_asm_addr_to_bap p next end_addr))
+  if start_addr >% end_addr then false
+  else if start_addr ==% end_addr then true
+  else
+    let (_, next) = Asmir.asm_addr_to_bap p start_addr in
+    liftable_asm_addr_to_bap p next end_addr
 
 (* check if str appears inside ir *)
 let check_appears ir str =
@@ -27,8 +30,14 @@ let check_appears ir str =
   in
   List.exists label_asm_startswith_str ir
 
-(* This function checks to see if the instruction is to call get_pc_thunk. call get_pc_thunk cannot be function exit, so if this function returns true, we need to continue looking back. 
-  Note that l is a list of probable get_pc_thunk address. Some binary implements get_pc_thunk internally, so we may have a list of address after pattern filtering. The one called through instructions should be the actual one. We will mark the one and kick out others. This is the reason why list l should be mutable. *)
+(* This function checks to see if the instruction is to call
+   get_pc_thunk. call get_pc_thunk cannot be function exit, so if this
+   function returns true, we need to continue looking back.  Note that
+   l is a list of probable get_pc_thunk address. Some binary implements
+   get_pc_thunk internally, so we may have a list of address after
+   pattern filtering. The one called through instructions should be the
+   actual one. We will mark the one and kick out others. This is the
+   reason why list l should be mutable. *)
 let check_call_get_pc_thunk ir l =
   dprintf "check get_pc_thunk";
   let label_asm_callpcthunk = function
@@ -38,9 +47,10 @@ let check_call_get_pc_thunk ir l =
           dprintf "disassemble: %s" s;
           String.length s > 4 && String.sub s 0 4 = "call" 
           &&
-          (
-          let addr = Scanf.sscanf s "call 0x%Lx" (fun x -> x) in
-          List.exists (fun (a, v) -> if a = addr then (v := true; dprintf "address %Lx ensured" a); a = addr) !l )
+            (
+              let addr = Scanf.sscanf s "call 0x%Lx" (fun x -> x) in
+              let addr = bi64 addr in
+              List.exists (fun (a, v) -> if a = addr then (v := true; dprintf "address %s ensured" (~% a)); a = addr) !l )
         | _ -> false
       in List.exists asm_callpcthunk attrs
     | _ -> false
@@ -56,7 +66,7 @@ let get_pc_thunk_list addr_hex_list =
     | (addr, 0x8b) :: (_, 0x1c) :: (_, 0x24) :: (_, 0xc3) :: rest 
     (* __i686.get_pc_thunk.dx: 8b 1c 24 c3: mov (%esp) %edx, ret*)
     | (addr, 0x8b) :: (_, 0x14) :: (_, 0x24) :: (_, 0xc3) :: rest  ->
-      dprintf "add %Lx into get_pc_thunk address list" addr;
+      dprintf "add %s into get_pc_thunk address list" (~% addr);
       filter ((addr, ref false) :: acc) rest
     | _::rest -> filter acc rest
   in
@@ -73,7 +83,7 @@ let start_addresses p =
   dprintf "find candidate list...";
   let pcthunk_addr_v_list = ref (get_pc_thunk_list addr_hex_list) in
   (* if List.length pcthunk_addr_v_list = 1 then pc := List.hd pcthunk_addr_v_list; *)
-  List.iter (fun (x, _) -> dprintf "pc thunk candidate: %Lx" x) !pcthunk_addr_v_list;
+  List.iter (fun (x, _) -> dprintf "pc thunk candidate: %s" (~% x)) !pcthunk_addr_v_list;
 (* i: the number of bytes that look back,
    e_index: the index of byte that look back,
    last_start_addr: last function's start address, a weak minimum boundary for current function start address. *)
@@ -89,10 +99,10 @@ let start_addresses p =
     else 
       let start_addr = fst (List.nth addr_hex_list (e_index-i)) in
       if start_addr <= last_start_addr then None
-      else if Int64.sub end_addr start_addr > Int64.of_int 30 then None
+      else if end_addr -% start_addr > bi 30 then None
       else if i = e_index then Some start_addr
       else try
-        let _ = dprintf "look from %Lx to %Lx" start_addr end_addr in 
+        let _ = dprintf "look from %s to %s" (~% start_addr) (~% end_addr) in 
         (*if end_addr >= Int64.of_int 0x80da9f0 then *)
         (* let line = input_line stdin in
         dprintf "%s" line; *)
@@ -115,7 +125,7 @@ let start_addresses p =
     let jump_to rest len =
       let entrance = back 1 index last_start_addr in
       match entrance with
-        | Some addr -> (dprintf "%Lx is start address" addr; filter (addr::acc) rest (index + len) addr)
+        | Some addr -> (dprintf "%s is start address" (~% addr); filter (addr::acc) rest (index + len) addr)
         | _ -> filter acc rest (index + len) last_start_addr
     in
     (* let _ = match l with
@@ -131,47 +141,47 @@ let start_addresses p =
          807be01: 89 e5                 mov    %esp,%ebp
          Here 0x55 at 807bdf8 will be filtered with 89 e5 in 807be01. This should not be filtered, so we need a new condition: no 0x55 occured in 0x55 ... 0x89 0xe5
     *)
-    | (addr, 0x55)::(_, 0x89)::(_, 0xe5) :: rest -> (dprintf "%Lx hitts push ebp" addr; jump_to rest 3)
-    | (addr, 0x55)::(_, b1)::(_, 0x89)::(_, 0xe5) :: rest when b1 <> 0x55 -> (dprintf "%Lx hitts push ebp" addr; jump_to rest 4)
-    | (addr, 0x55)::(_, b1)::(_, b2)::(_, 0x89)::(_, 0xe5)::rest when exclue_0x55 [b1;b2]-> (dprintf "%Lx hitts push ebp" addr ;jump_to rest 5)
-    | (addr, 0x55)::(_, b1)::(_, b2)::(_, b3)::(_, 0x89)::(_, 0xe5)::rest when exclue_0x55 [b1;b2;b3]-> (dprintf "%Lx hitts push ebp" addr; jump_to rest 6)
-    | (addr, 0x55)::(_, b1)::(_, b2)::(_, b3)::(_, b4)::(_, 0x89)::(_, 0xe5)::rest when exclue_0x55 [b1;b2;b3;b4]-> (dprintf "%Lx hitts push ebp" addr; jump_to rest 7)
-    | (addr, 0x55)::(_, b1)::(_, b2)::(_, b3)::(_, b4)::(_, b5)::(_, 0x89)::(_, 0xe5)::rest when exclue_0x55 [b1;b2;b3;b4;b5]-> (dprintf "%Lx hitts push ebp" addr; jump_to rest 8)
-    | (addr, 0x55)::(_, b1)::(_, b2)::(_, b3)::(_, b4)::(_, b5)::(_, b6)::(_, 0x89)::(_, 0xe5)::rest when exclue_0x55 [b1;b2;b3;b4;b5;b6]-> (dprintf "%Lx hitts push ebp" addr; jump_to rest 9)
-    | (addr, 0x55)::(_, b1)::(_, b2)::(_, b3)::(_, b4)::(_, b5)::(_, b6)::(_, b7)::(_, b8)::(_, b9)::(_, b10)::(_, b11)::(_, 0x89)::(_, 0xe5)::rest when exclue_0x55 [b1;b2;b3;b4;b5;b6;b7;b8;b9;b10;b11] -> (dprintf "%Lx hitts push ebp" addr; jump_to rest 14)
+    | (addr, 0x55)::(_, 0x89)::(_, 0xe5) :: rest -> (dprintf "%s hitts push ebp" (~% addr); jump_to rest 3)
+    | (addr, 0x55)::(_, b1)::(_, 0x89)::(_, 0xe5) :: rest when b1 <> 0x55 -> (dprintf "%s hitts push ebp" (~% addr); jump_to rest 4)
+    | (addr, 0x55)::(_, b1)::(_, b2)::(_, 0x89)::(_, 0xe5)::rest when exclue_0x55 [b1;b2]-> (dprintf "%s hitts push ebp" (~% addr) ;jump_to rest 5)
+    | (addr, 0x55)::(_, b1)::(_, b2)::(_, b3)::(_, 0x89)::(_, 0xe5)::rest when exclue_0x55 [b1;b2;b3]-> (dprintf "%s hitts push ebp" (~% addr); jump_to rest 6)
+    | (addr, 0x55)::(_, b1)::(_, b2)::(_, b3)::(_, b4)::(_, 0x89)::(_, 0xe5)::rest when exclue_0x55 [b1;b2;b3;b4]-> (dprintf "%s hitts push ebp" (~% addr); jump_to rest 7)
+    | (addr, 0x55)::(_, b1)::(_, b2)::(_, b3)::(_, b4)::(_, b5)::(_, 0x89)::(_, 0xe5)::rest when exclue_0x55 [b1;b2;b3;b4;b5]-> (dprintf "%s hitts push ebp" (~% addr); jump_to rest 8)
+    | (addr, 0x55)::(_, b1)::(_, b2)::(_, b3)::(_, b4)::(_, b5)::(_, b6)::(_, 0x89)::(_, 0xe5)::rest when exclue_0x55 [b1;b2;b3;b4;b5;b6]-> (dprintf "%s hitts push ebp" (~% addr); jump_to rest 9)
+    | (addr, 0x55)::(_, b1)::(_, b2)::(_, b3)::(_, b4)::(_, b5)::(_, b6)::(_, b7)::(_, b8)::(_, b9)::(_, b10)::(_, b11)::(_, 0x89)::(_, 0xe5)::rest when exclue_0x55 [b1;b2;b3;b4;b5;b6;b7;b8;b9;b10;b11] -> (dprintf "%s hitts push ebp" (~% addr); jump_to rest 14)
     
     (* another prolog: 83 ec or 81 ec : sub xxx %esp*)
-    | (addr, 0x81) :: (_, 0xec) :: rest | (addr, 0x83) :: (_, 0xec) :: rest -> (dprintf "%Lx sub" addr; jump_to rest 2)
+    | (addr, 0x81) :: (_, 0xec) :: rest | (addr, 0x83) :: (_, 0xec) :: rest -> (dprintf "%s sub" (~% addr); jump_to rest 2)
    
     (* __libc_csu_fini, started with f3 c3: repz ret *)
     | (addr, 0xf3)::(_, 0xc3)::rest
     (* _start, started with 31 ed: xor %ebp %ebp, pop %esi *)
     | (addr, 0x31) :: (_, 0xed) :: rest ->
-      let _ = dprintf "add %Lx into start address list" addr in
+      let _ = dprintf "add %s into start address list" (~% addr) in
       filter (addr :: acc) rest (index + 2) addr
 
     (* __lib_csu_init, started with 55 57 56: push %ebp, push %edi, push %esi *)
     | (addr, 0x55) :: (_, 0x57) :: (_, 0x56) :: rest ->
-      let _ = dprintf "add %Lx into start address list" addr in
+      let _ = dprintf "add %s into start address list" (~% addr) in
       filter (addr :: acc) rest (index + 3) addr
 
     (* atexit, started with 53 e8 ec ff ff ff: push %bx, call __i686.get_pc_thunk.bx *)
     | (addr, 0x53) :: (_, 0xe8) :: (_, 0xec) :: (_, 0xff) :: (_, 0xff) :: (_, 0xff) :: rest ->
-      let _ = dprintf "add %Lx into start address list" addr in
+      let _ = dprintf "add %s into start address list" (~% addr) in
       filter (addr :: acc) rest (index + 6) addr
 
     | first :: rest -> filter acc rest (index + 1) last_start_addr 
     | [] -> List.rev acc
   in
   let start_address_list = 
-    let exclude_get_pc_list = filter [] addr_hex_list 0 Int64.zero in
+    let exclude_get_pc_list = filter [] addr_hex_list 0 bi0 in
     let pcthunk_addr_list = 
       if List.length !pcthunk_addr_v_list = 1 then [fst(List.hd !pcthunk_addr_v_list)] 
       else List.map (fst) (List.filter (fun (a, v) -> !v) !pcthunk_addr_v_list)
     in
     exclude_get_pc_list @ pcthunk_addr_list 
   in
-  List.iter (fun addr -> dprintf "%Lx" addr) start_address_list;
+  List.iter (fun addr -> dprintf "%s" (~% addr)) start_address_list;
   start_address_list
 
 (*This function is to get function boundaries for general binaries*)
@@ -198,8 +208,8 @@ let get_function_ranges p =
         (* did this fix it? --aij *)
         let sec = s.bfd_symbol_section in
         let vma = bfd_section_get_vma sec in
-        (Int64.add s.bfd_symbol_value vma,
-         Int64.add vma (bfd_section_get_size sec),
+        (bi64 (Int64.add s.bfd_symbol_value vma),
+         bi64 (Int64.add vma (bfd_section_get_size sec)),
          s.bfd_symbol_name)
       in
       let starts =
@@ -214,7 +224,7 @@ let get_function_ranges p =
       (* XXX: Ugly hack: we only use the end address for the last symbol *)
       let end_address = match List.rev (get_exec_mem_contents_list p) with
         | (a, _)::_ -> a
-        | _ -> -1L
+        | _ -> bim1
       in
       List.map (fun a -> incr n;
         (a, end_address, "unknown_"^(string_of_int !n)) ) (start_addresses p)
@@ -225,8 +235,8 @@ let get_function_ranges p =
   let ranges = Array.mapi
     (fun i (s,e,name) ->
        let e' =
-	 try let (s,_,_) = starts.(i+1) in s
-	 with Invalid_argument "index out of bounds" -> e
+         try let (s,_,_) = starts.(i+1) in s
+         with Invalid_argument "index out of bounds" -> e
        in
        (name,s,e') (* section_end doesn't work *)
     ) starts
@@ -234,9 +244,9 @@ let get_function_ranges p =
   let unfiltered = Array.to_list ranges in
   (* filter out functions that start at 0 *)
   List.filter (function
-		 |(s,0L,_) -> false
-		 |("_init",_,_) -> false
-		 | _ -> true)
+                 |(s,i,_) when i = bi0 -> false
+                 |("_init",_,_) -> false
+                 | _ -> true)
     unfiltered
 
 let post_process cfg =
@@ -247,7 +257,7 @@ let post_process cfg =
 
 let end_address_at p addr scheme =
   (* XXX: This should be an option type *)
-  let maxaddress = ref Int64.zero in
+  let maxaddress = ref bi0 in
     let cfg =
       match scheme with
       | RECURSIVE_DESCENT -> Asmir_disasm.recursive_descent_at p addr

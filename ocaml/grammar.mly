@@ -12,7 +12,7 @@ open Type
 let mk_attr lab string =
   match lab with
   | "asm" -> Asm string
-  | "address" -> Address(Int64.of_string string)
+  | "address" -> Address(Big_int_Z.big_int_of_string string)
   | "set" when string = "liveout" -> Liveout
   | "set" when string = "initro" -> InitRO
   | "set" when string = "synthetic" -> Synthetic
@@ -33,10 +33,9 @@ let mk_context =
       (* Memory value *)
       let index = Str.matched_group 1 name in
       let index = Big_int_Z.big_int_of_string index in
-      let index = Big_int_Z.int64_of_big_int index in
       {name=name; mem=true; t=typ; index=index; value=value; usage=usage; taint=taint}
     else
-      {name=name; mem=false; t=typ; index=0L; value=value; usage=usage; taint=taint}
+      {name=name; mem=false; t=typ; index=big_int_of_int 0; value=value; usage=usage; taint=taint}
   )
 
 let usage_of_string = function
@@ -138,7 +137,7 @@ stmt:
         | ASSERT expr attrs semi { Assert($2, $3) }
         | ASSUME expr attrs semi { Assume($2, $3) }
         | LABEL ID attrs { Label(Name $2, $3) }
-        | ADDR INT attrs { Label(Addr (int64_of_big_int $2), $3) }
+        | ADDR INT attrs { Label(Addr ($2), $3) }
         | COMMENT attrs { Comment($1, $2) }
 
 
@@ -221,12 +220,12 @@ expr:
 | IF expr THEN expr ELSE expr      
       { Ite($2, $4, $6) }
 | letstart IN expr   { Scope.pop (get_scope());
-		       let (x,y) = $1 in
-		       Let(x,y, $3) } 
+                       let (x,y) = $1 in
+                       Let(x,y, $3) } 
 | EXTRACT COLON INT COLON INT COLON LSQUARE expr RSQUARE { Extract($3, $5, $8) }
 | CONCAT COLON LSQUARE expr RSQUARE LSQUARE expr RSQUARE { Concat($4, $7) }
 | ID COLON typ LPAREN expr RPAREN  
-    { Cast(casttype_of_string $1, $3, $5) }	  
+    { Cast(casttype_of_string $1, $3, $5) }
 | TRUE               { exp_true } 
 | FALSE              { exp_false }
 | INT COLON typ      { Int($1, $3) } 

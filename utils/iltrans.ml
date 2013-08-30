@@ -1,7 +1,9 @@
 let usage = "Usage: "^Sys.argv.(0)^" <input options> [transformations and outputs]\n\
              Transform BAP IL programs. "
 
+open Arch
 open Utils_common
+open Big_int_convenience
 
 type ast = Ast.program
 type astcfg = Cfg.AST.G.t
@@ -14,9 +16,11 @@ type prog =
 
 type cmd =
   | AnalysisAst of (ast -> unit)
+  | AnalysisModeAst of (arch -> ast -> unit)
   | AnalysisAstCfg of (astcfg -> unit)
   | AnalysisSsa of (ssa -> unit)
   | TransformAst of (ast -> ast)
+  | TransformModeAst of (arch -> ast -> ast)
   | TransformAstCfg of (astcfg -> astcfg)
   | TransformSsa of (ssa -> ssa)
   | ToCfg
@@ -28,6 +32,12 @@ let pipeline = ref []
 let startdebug = ref 1
 
 let tac = ref true
+
+(* used for some trace exploit options *)
+let offset_helper f p =
+  (fun arch ->
+    let bytes = bi (Arch.bytes_of_arch arch) in
+    f bytes p arch)
 
 let output_ast f p =
   let oc = open_out f in
@@ -269,15 +279,15 @@ let speclist =
   ::("-trace-cut", Arg.Int(fun i -> add(TransformAst(BatList.take i))),
      "<n>  Get the first <n> instructions of the trace")
   ::("-trace-concrete",
-     uadd(TransformAst Traces.concrete),
+     uadd(TransformModeAst Traces.concrete),
      "Execute the trace concretely and obtain a straightline trace"
     )
   ::("-trace-concrete-subst",
-     uadd(TransformAst Traces_surgical.concrete_substitution),
+     uadd(TransformModeAst Traces_surgical.concrete_substitution),
      "Execute the trace concretely and obtain a straightline trace"
     )
   ::("-trace-slice",
-     uadd(TransformAst Traces_surgical.check_slice),
+     uadd(TransformModeAst Traces_surgical.check_slice),
      "Slice a trace based on the overwritten return address"
     )
   ::("-trace-reconcrete",
@@ -293,14 +303,14 @@ let speclist =
      "Start debugging at item n."
     )
   ::("-trace-debug",
-     uadd(AnalysisAst Traces.TraceSymbolic.trace_valid_to_invalid),
+     uadd(AnalysisModeAst Traces.TraceSymbolic.trace_valid_to_invalid ),
      "Formula debugging. Prints to files form_val and form_inv"
     )
   ::("-trace-conc-debug",
      Arg.Unit
        (fun () ->
 	  let f = Traces.TraceSymbolic.formula_valid_to_invalid ~min:!startdebug in
-	  add(AnalysisAst f)
+	  add(AnalysisModeAst f)
        ),
      "Formula debugging. Prints to files form_val and form_inv. Concretizes BEFORE debugging; useful for finding which assertion doesn't work."
     )
@@ -308,89 +318,92 @@ let speclist =
      uadd(TransformAst to_dsa),
      "Convert to DSA form.")
    ::("-trace-target",
-     Arg.String (fun i -> add(TransformAst(Traces.control_flow i))),
+     Arg.String (fun addr -> add(TransformModeAst(
+       Traces.control_flow (Big_int_Z.big_int_of_string addr)))),
      "<addr> Provide the target address <addr>"
     )
    ::("-trace-symbolic-target",
-     uadd(TransformAst Traces.limited_control),
+     uadd(TransformModeAst Traces.limited_control),
      "Use a symbolic jump target (to determine the amount of control we have)"
     )
    ::("-trace-payload",
-     Arg.String (fun p -> add(TransformAst(Traces.add_payload p))),
+     Arg.String (fun p -> add(TransformModeAst(Traces.add_payload bi0 p))),
      "<binstring> Provide a payload to be inserted at the return address (BEWARE of null bytes)"
     )
    ::("-trace-payload-file",
-     Arg.String (fun p -> add(TransformAst(Traces.add_payload_from_file p))),
+     Arg.String (fun p -> add(TransformModeAst(Traces.add_payload_from_file bi0 p))),
      "<binfile> Provide a payload to be inserted at the return address"
     )
    ::("-trace-payload-after-file",
-     Arg.String (fun p -> add(TransformAst(Traces.add_payload_from_file_after ~offset:4L p))),
-     "<binfile> Provide a payload to be inserted past the return address"
+     Arg.String (fun p ->
+       add(TransformModeAst(offset_helper Traces.add_payload_from_file_after p))),
+      "<binfile> Provide a payload to be inserted past the return address"
     )
    ::("-trace-payload-after",
-     Arg.String (fun p -> add(TransformAst(Traces.add_payload_after ~offset:4L p))),
+     Arg.String (fun p ->
+       add(TransformModeAst(offset_helper Traces.add_payload_after p))),
      "<binstring> Provide a payload to be inserted past the return address (BEWARE of null bytes)"
     )
    ::("-trace-shell",
-     Arg.Int (fun off -> add(TransformAst(Traces.inject_shellcode off))),
+     Arg.Int (fun off -> add(TransformModeAst(Traces.inject_shellcode off))),
      "<nopsled> Insert shellcode with a nopsled of the given size"
     )
   ::("-trace-pivot",
      Arg.Tuple(
-       let gaddr = ref 0L in
-       let maddr = ref 0L in
+       let gaddr = ref bi0 in
+       let maddr = ref bi0 in
        [
-   	 Arg.String (fun a -> gaddr := Int64.of_string a);
-  	 Arg.String (fun a -> maddr := Int64.of_string a);
-  	 Arg.String (fun a -> add(TransformAst(Traces.add_pivot !gaddr !maddr a)));
+   	 Arg.String (fun a -> gaddr := Big_int_Z.big_int_of_string a);
+  	 Arg.String (fun a -> maddr := Big_int_Z.big_int_of_string a);
+  	 Arg.String (fun a -> add(TransformModeAst(Traces.add_pivot !gaddr !maddr a)));
        ]),
      "<gaddress> <maddress> <payload string> Use pivot at gaddress to transfer control to payload at maddress."
     )
   ::("-trace-pivot-file",
      Arg.Tuple(
-       let gaddr = ref 0L in
-       let maddr = ref 0L in
+       let gaddr = ref bi0 in
+       let maddr = ref bi0 in
        [
-   	 Arg.String (fun a -> gaddr := Int64.of_string a);
-  	 Arg.String (fun a -> maddr := Int64.of_string a);
-  	 Arg.String (fun a -> add(TransformAst(Traces.add_pivot_file !gaddr !maddr a)));
+   	 Arg.String (fun a -> gaddr := Big_int_Z.big_int_of_string a);
+  	 Arg.String (fun a -> maddr := Big_int_Z.big_int_of_string a);
+  	 Arg.String (fun a -> add(TransformModeAst(Traces.add_pivot_file !gaddr !maddr a)));
        ]),
      "<gaddress> <maddress> <payload string> Use pivot at gaddress to transfer control to payload at maddress."
     )
   ::("-trace-seh-pivot",
      Arg.Tuple(
-       let gaddr = ref 0L in
-       let maddr = ref 0L in
-       let sehaddr = ref 0L in
+       let gaddr = ref bi0 in
+       let maddr = ref bi0 in
+       let sehaddr = ref bi0 in
        [
-  	 Arg.String (fun a -> gaddr := Int64.of_string a);
-  	 Arg.String (fun a -> maddr := Int64.of_string a);
-	 Arg.String (fun a -> sehaddr := Int64.of_string a);
-  	 Arg.String (fun a -> add(TransformAst(Traces.add_seh_pivot !gaddr !sehaddr !maddr a)));
+  	 Arg.String (fun a -> gaddr := Big_int_Z.big_int_of_string a);
+  	 Arg.String (fun a -> maddr := Big_int_Z.big_int_of_string a);
+	 Arg.String (fun a -> sehaddr := Big_int_Z.big_int_of_string a);
+  	 Arg.String (fun a -> add(TransformModeAst(Traces.add_seh_pivot !gaddr !sehaddr !maddr a)));
        ]),
      "<gaddress> <maddress> <sehaddress> <payload string> Use pivot at gaddress to transfer control (by overwriting SEH handler at sehaddress) to payload at maddress."
     )
   ::("-trace-seh-pivot-file",
      Arg.Tuple(
-       let gaddr = ref 0L in
-       let maddr = ref 0L in
-       let sehaddr = ref 0L in
+       let gaddr = ref bi0 in
+       let maddr = ref bi0 in
+       let sehaddr = ref bi0 in
        [
-  	 Arg.String (fun a -> gaddr := Int64.of_string a);
-  	 Arg.String (fun a -> maddr := Int64.of_string a);
-	 Arg.String (fun a -> sehaddr := Int64.of_string a);
-  	 Arg.String (fun a -> add(TransformAst(Traces.add_seh_pivot_file !gaddr !sehaddr !maddr a)));
+  	 Arg.String (fun a -> gaddr := Big_int_Z.big_int_of_string a);
+  	 Arg.String (fun a -> maddr := Big_int_Z.big_int_of_string a);
+	 Arg.String (fun a -> sehaddr := Big_int_Z.big_int_of_string a);
+  	 Arg.String (fun a -> add(TransformModeAst(Traces.add_seh_pivot_file !gaddr !sehaddr !maddr a)));
        ]),
      "<gaddress> <maddress> <sehaddress> <payload file> Use pivot at gaddress to transfer control (by overwriting SEH handler at sehaddress) to payload at maddress."
     )
   ::("-trace-formula",
-     Arg.String(fun f -> add(AnalysisAst(Traces.TraceSymbolic.generate_formula (f,!Solver.solver)))),
+     Arg.String(fun f -> add(AnalysisModeAst(Traces.TraceSymbolic.generate_formula (f,!Solver.solver)))),
      "<file> Output a trace formula to <file>"
     )
   ::("-trace-solver", Arg.String Solver.set_solver,
      ("Use the specified solver for traces. Choices: " ^ Solver.solvers))
   ::("-trace-exploit",
-     Arg.String(fun f -> add(AnalysisAst(Traces.TraceSymbolic.output_exploit (f,!Solver.solver)))),
+     Arg.String(fun f -> add(AnalysisModeAst(Traces.TraceSymbolic.output_exploit (f,!Solver.solver)))),
      "<file> Output the exploit string to <file>"
     )
   ::("-trace-assignments",
@@ -466,8 +479,8 @@ let () = Arg.parse speclist anon usage
 
 let pipeline = List.rev !pipeline
 
-let prog, scope =
-  try (Input.get_program())
+let prog, scope, arch =
+  try Input.get_program ()
   with Arg.Bad s ->
     Arg.usage speclist (s^"\n"^usage);
     exit 1
@@ -476,6 +489,11 @@ let rec apply_cmd prog = function
   | AnalysisAst f -> (
     match prog with
     | Ast p as p' -> f p; p'
+    | _ -> failwith "need explicit translation to AST"
+  )
+  | AnalysisModeAst f -> (
+    match prog with
+    | Ast p as p' -> f (Input.get_arch arch) p; p'
     | _ -> failwith "need explicit translation to AST"
   )
   | AnalysisAstCfg f -> (
@@ -491,6 +509,11 @@ let rec apply_cmd prog = function
   | TransformAst f -> (
     match prog with
     | Ast p -> Ast(f p)
+    | _ -> failwith "need explicit translation to AST"
+  )
+  | TransformModeAst f -> (
+    match prog with
+    | Ast p -> Ast(f (Input.get_arch arch) p)
     | _ -> failwith "need explicit translation to AST"
   )
   | TransformAstCfg f -> (

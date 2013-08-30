@@ -29,13 +29,13 @@ end
 
 let rtype2s = function
   | Block       -> "Block"
-  | IfThen	-> "IfThen"
-  | IfThenElse	-> "IfThenElse"
-  | Case	-> "Case"
-  | Proper	-> "Proper"
-  | SelfLoop	-> "SelfLoop"
-  | WhileLoop	-> "WhileLoop"
-  | NaturalLoop	-> "NaturalLoop"
+  | IfThen      -> "IfThen"
+  | IfThenElse  -> "IfThenElse"
+  | Case        -> "Case"
+  | Proper      -> "Proper"
+  | SelfLoop    -> "SelfLoop"
+  | WhileLoop   -> "WhileLoop"
+  | NaturalLoop -> "NaturalLoop"
   | Improper    -> "Improper"
 
 let rec node2s = function
@@ -93,19 +93,21 @@ let structural_analysis c =
     if debug() then dprintf "compacting %s from %s"  (node2s n) (nodes2s nset);
     let nleft = ref (List.length nset)
     and last = ref 0 in
-    Array.iter(fun v ->
+    Array.iter 
+      (fun v ->
          if !nleft > 0 && List.mem v nset then (
            if !nleft = 1 then (post.(!last) <- n; post_ctr := !last; incr last);
            decr nleft )
          else
            (post.(!last) <- v; incr last)
-    ) post;
+      )
+      post;
   in
   let replace g node nodeset =
     let update_edge s d =
       (* this adds some extra edges to nodes that will soon be removed *)
       (* The check is to avoid creating self loops. *)
-      if s != node then	G.add_edge g s node;
+      if s != node then G.add_edge g s node;
       if d != node then G.add_edge g node d
     in
     (* *)
@@ -120,9 +122,9 @@ let structural_analysis c =
     let rm rmn =
       (* dprintf "Removing %s" (node2s rmn); *)
       (* If we are going to remove the entry node, set the entry node
-	    to the new coalesced node. *)
+         to the new coalesced node. *)
       if rmn = !entry then
-      	entry := node;
+        entry := node;
       G.remove_vertex g rmn
     in
     List.iter rm nodeset;
@@ -142,18 +144,16 @@ let structural_analysis c =
     (* Check for a Block containing node *)
     let rec succchain n nset =
       match G.succ g n with
-        | [s] -> (
-          match G.pred g s with
-          | [_] -> succchain s (s::nset)
-          | _ -> List.rev nset)
-        | _ -> List.rev nset
+      | [s] -> (match G.pred g s with
+                | [_] -> succchain s (s::nset)
+                | _ -> List.rev nset)
+      | _ -> List.rev nset
     in
     let rec predchain n nset =
       match G.pred g n with
-      | [p] -> (
-        match G.succ g p with
-          | [_] -> predchain p (p::nset)
-          | _ -> nset)
+      | [p] -> (match G.succ g p with
+                  [_] -> predchain p (p::nset)
+                | _ -> nset)
       | _ -> nset
     in
     (* dprintf "Succ %s" (node2s node); *)
@@ -239,17 +239,17 @@ let structural_analysis c =
         progress := true;
       | None ->
           dprintf "acyclic_region_type returned None";
-      let reachunder = get_reachunder g n in
-      match cyclic_region_type g n reachunder with
-      | Some(rtype, reachunder) ->
-        let p = reduce g rtype reachunder in
-        if List.mem !entry reachunder then 
-          entry := p;
-        if List.mem !exit reachunder then
-          exit := p;
-        progress := true;
-      | None ->
-          incr post_ctr
+          let reachunder = get_reachunder g n in
+          match cyclic_region_type g n reachunder with
+          | Some(rtype, reachunder) ->
+              let p = reduce g rtype reachunder in
+              if List.mem !entry reachunder then
+                entry := p;
+              if List.mem !exit reachunder then
+                exit := p;
+              progress := true;
+          | None ->
+              incr post_ctr
     done;
     if G.nb_vertex g > 1 then(
       dprintf "Ended iteration with %d nodes" (G.nb_vertex g);

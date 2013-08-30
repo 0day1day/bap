@@ -202,7 +202,7 @@ struct
     let stmts = CA.get_stmts g b in
     let out = List.fold_left (fun s stmt -> match stmt with
     | Ast.Label(Addr a, attrs) ->
-      let addrstr = Printf.sprintf "%#Lx" a in
+      let addrstr = Printf.sprintf "0x%s" (Big_int_convenience.(~%) a) in
       let newasmsstr = 
         try let newasms = BatList.find_map
               (function

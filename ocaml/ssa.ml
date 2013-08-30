@@ -58,7 +58,7 @@ let val_true = Int(unit_big_int, reg_1)
 let lab_of_exp = function
   | Lab s -> Some(Name s)
   | Int(i, t) ->
-      Some(Addr(int64_of_big_int (Arithmetic.to_big_int (i,t))))
+      Some(Addr(Arithmetic.to_big_int (i,t)))
   | _ -> None
 
 (******************************************************************************)
@@ -162,7 +162,7 @@ let quick_stmt_eq s1 s2 =
       true
     else if b1 & b2 & b3 & b4 & b5 then
       (* s1 and s2 are not physically equal.  But maybe their
-	 subexpressions are physically equal. *)
+         subexpressions are physically equal. *)
       List.for_all2 quick_exp_eq l6 r6
     else
       false

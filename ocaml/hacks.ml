@@ -1,9 +1,11 @@
 (** Hacks *)
 
+open Arch
 open Ast
 open Ast_convenience
 open Ast_visitor
 open BatListFull
+open Big_int_convenience
 open Type
 open Util
 
@@ -14,9 +16,9 @@ open D
 let ra_final = Var.newvar "ra_final" reg_32
 and ra0 = Var.newvar "ra0" reg_32
 and (mem,sp,r_of) =
-  let d = Asmir.decls_for_arch Asmir.arch_i386 in
+  let d = Asmir.decls_for_arch X86_32 in
   (List.hd d,
-   List.find (fun v -> Var.name v = "R_ESP") d,
+   List.find (fun v -> Var.name v = "R_ESP_32") d,
    List.find (fun v -> Var.name v = "R_OF") d
   )
 
@@ -30,11 +32,11 @@ let ret_to_jmp ?(ra=ra_final) p =
     (fun i s -> match s with
       (* Old lifting of ret *)
      | Special("ret", _) ->
-	 a.(i) <- Jmp(Lab function_end, attrs);
-	 (match a.(i-1) with 
-	  | Jmp(t,at) -> a.(i-1) <- Move(ra, t, attrs@at)
-	  | _ -> failwith "expected Jmp before ret special"
-	 )
+         a.(i) <- Jmp(Lab function_end, attrs);
+         (match a.(i-1) with 
+          | Jmp(t,at) -> a.(i-1) <- Move(ra, t, attrs@at)
+          | _ -> failwith "expected Jmp before ret special"
+         )
      (* disasm_i386 lifting of ret *)
      | Jmp(t, attrs) when attrs = [StrAttr "ret"] ->
        a.(i) <- Jmp(Lab function_end, attrs)
@@ -49,7 +51,7 @@ let assert_noof p =
   let il = List.map
     (function
        | Move(v, e, a) as s when v == r_of ->
-	   [s; Assert(exp_not (Var v), attrs)]
+           [s; Assert(exp_not (Var v), attrs)]
        | s -> [s]
     ) p
   in
@@ -69,13 +71,13 @@ let remove_cycles cfg =
     let revstmts = List.rev (C.get_stmts cfg s) in
     let revstmts = match revstmts with
       | Jmp(t,_)::rest ->
-	  assert_false::rest
+          assert_false::rest
       | CJmp(c,t1,t2,attrs)::rest ->
-	(* e is the label we are REMOVING *)
-	(match l with
-	| Some (true, _) -> CJmp(c, Lab("BB_Error"), t2, a::attrs)
-	| Some (false, _) -> CJmp(c, t1, Lab("BB_Error"), a::attrs)
-	| None -> failwith "missing edge label from cjmp")
+        (* e is the label we are REMOVING *)
+        (match l with
+        | Some (true, _) -> CJmp(c, Lab("BB_Error"), t2, a::attrs)
+        | Some (false, _) -> CJmp(c, t1, Lab("BB_Error"), a::attrs)
+        | None -> failwith "missing edge label from cjmp")
           ::rest
       | rest -> assert_false::rest
     in
@@ -93,9 +95,9 @@ let remove_cycles cfg =
     and setcolor v c = H.replace h (C.G.V.label v) c in
     let rec walk v edges=
       let walk_edge e edges =
-	let d = C.G.E.dst e in
-	if color d = White then walk d edges
-	else if color d = Gray then e::edges
+        let d = C.G.E.dst e in
+        if color d = White then walk d edges
+        else if color d = Gray then e::edges
         else edges
       in
       setcolor v Gray;
@@ -122,10 +124,10 @@ let repair_node g n =
     let tgt = match dst with
       | None -> indirect
       | Some l ->
-	  try (C.find_label g l)
-	  with Not_found ->
-	    wprintf "Jumping to unknown label: %s" (Pp.label_to_string l);
-	    error
+          try (C.find_label g l)
+          with Not_found ->
+            wprintf "Jumping to unknown label: %s" (Pp.label_to_string l);
+            error
       (* FIXME: should jumping to an unknown address be an error or indirect? *)
     in
     C.add_edge_e g (C.G.E.create v lab tgt)
@@ -159,7 +161,7 @@ let uniqueify_labels p =
   let find_new_label l =
     let strl = match l with
       | Name(s) -> s
-      | Addr(a) -> Printf.sprintf "addr_%Lx" a
+      | Addr(a) -> Printf.sprintf "addr_%s" (~%a)
     in
     let n =
       try (Hashtbl.find lh strl)+1

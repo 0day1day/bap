@@ -61,7 +61,7 @@ let uint64_lcm x y =
 
 let bits_of_width = Typecheck.bits_of_width
 
-let sp = Disasm_i386.esp
+let sp = Disasm_i386.R32.esp
 
 (* FIXME *)
 let addr_bits = 32
@@ -1397,13 +1397,14 @@ struct
 
     let init_mem vm {O.initial_mem=initial_mem} =
       let write_mem m (a,v) =
-        DV.dprintf "Writing %#x to %#Lx" (Char.code v) a;
+        DV.dprintf "Writing %#x to %s" (Char.code v) (~% a);
         let v = Char.code v in
+        let a = Big_int_Z.int64_of_big_int a in
         let v = Int64.of_int v in
         MemStore.write 8 m (VS.single 32 a) (VS.single 8 v)
       in
       let m = List.fold_left write_mem (MemStore.top) initial_mem in
-      VM.add Disasm_i386.mem (`Array m) vm
+      VM.add Disasm_i386.R32.mem (`Array m) vm
 
     let init o g : L.t =
       let vm = init_vars [sp] in

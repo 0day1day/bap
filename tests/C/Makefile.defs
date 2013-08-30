@@ -1,3 +1,0 @@
-CSRC=$(wildcard *.c)
-CEXECS = $(CSRC:%.c=%) recover-hard-opt
-
