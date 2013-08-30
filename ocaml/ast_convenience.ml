@@ -96,6 +96,7 @@ let ( $/* ) a b = binop SDIVIDE a b
 let cast ct tnew = function
   | Int(i,t) -> let (i',t') = Arithmetic.cast ct (i,t) tnew in
                 Int(i',t')
+  | e when Typecheck.infer_ast e = tnew -> e
   | e -> Cast(ct, tnew, e)
 
 let cast_low = cast CAST_LOW
