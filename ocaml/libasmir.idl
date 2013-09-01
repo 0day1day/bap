@@ -36,7 +36,7 @@ asmir_get_dynsymbols(asm_program_t prog,
 asmir_get_all_sections(asm_program_t prog,
                        [out] long *num);
 
-asm_program_t asmir_open_file([string] char *filename, address_t base);
+asm_program_t asmir_open_file([string] char *filename, address_t base, [string,unique] char *target);
 void asmir_close(asm_program_t p);
 [string] char* asmir_string_of_insn(asm_program_t prog, address_t inst);
 enum bfd_architecture asmir_get_asmp_arch(asm_program_t prog);

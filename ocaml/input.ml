@@ -1,6 +1,7 @@
 open BatListFull
 open Big_int_convenience
 
+let bfd_target = ref None
 let init_ro = ref false
 let inputs = ref []
 and streaminputs = ref None
@@ -44,7 +45,10 @@ let trace_speclist =
 
 let speclist =
   [
-    ("-init-ro", Arg.Set (init_ro), "Access rodata.");
+    ("-init-ro", Arg.Set init_ro, "Access rodata.");
+    ("-bfd-target", Arg.String
+      (fun s -> bfd_target := Some s),
+     "Set BFD target architecture.");
     ("-bin",
      Arg.String(fun s -> addinput (`Bin s)),
      "<file> Convert a binary to the IL");
@@ -74,7 +78,7 @@ let get_program () =
       let newp, newscope = Parser.program_from_file ~scope:oldscope f in
       List.append newp oldp, newscope, None
     | `Bin f ->
-      let p = Asmir.open_program f in
+      let p = Asmir.open_program ?target:!bfd_target f in
       let arch = Asmir.get_asmprogram_arch p in
       List.append (Asmir.asmprogram_to_bap ~init_ro:!init_ro p) oldp, oldscope, Some arch
     | `Binrange (f, s, e) ->

@@ -33,7 +33,7 @@ extern Elf_Internal_Phdr * _bfd_elf_find_segment_containing_section(bfd * abfd, 
 /* End internal BFD elf stuff */
 
 static void initialize_sections(asm_program_t *p, bfd_vma base);
-static bfd* initialize_bfd(const char *filename);
+static bfd* initialize_bfd(const char *filename, const char *target);
 
 /* find the segment for memory address addr */
 static section_t* get_section_of(asm_program_t *prog, bfd_vma addr)
@@ -62,12 +62,12 @@ bfd_byte *asmir_get_ptr_to_instr(asm_program_t *prog, bfd_vma addr)
 
 
 asm_program_t *
-asmir_open_file(const char *filename, bfd_vma base)
+asmir_open_file(const char *filename, bfd_vma base, const char *target)
 {
   asm_program_t *prog = malloc(sizeof(asm_program_t));
   if (!prog)
     return NULL;
-  bfd *abfd = initialize_bfd(filename);
+  bfd *abfd = initialize_bfd(filename, target);
   if (!abfd) {
     free(prog);
     return NULL;
@@ -288,39 +288,48 @@ initialize_sections(asm_program_t *prog, bfd_vma base)
 
 
 static bfd *
-initialize_bfd(const char *filename)
+initialize_bfd(const char *filename, const char *target)
 {
   bfd * abfd;
-  char **matching;
-  char *target = "i686-pc-linux-gnu";
+  char ** matching;
 
   bfd_init();
 
-  if(!bfd_set_default_target(target)) {
+  if(!bfd_set_default_target("i686-pc-linux-gnu")) {
     fprintf(stderr, "initialize_bfd: couldn't set default bfd target\n");
     return NULL;
   }
 
-  abfd = bfd_openr(filename, NULL);
+  abfd = bfd_openr(filename, target);
   if(abfd == NULL) {
     fprintf(stderr, "initialize_bfd: cannot open %s\n", filename);
     return NULL;
   }
 
   if (bfd_check_format (abfd, bfd_archive)) {
-    fprintf(stderr, "initalize_bfd: archive files  not supported\n");
+    fprintf(stderr, "initalize_bfd: archive files not supported\n");
     bfd_close_all_done(abfd);
     return NULL;
   }
 
-  /* if(!bfd_check_format_matches(abfd, bfd_object, &matching)) { */
-  if( (!bfd_check_format_matches(abfd, bfd_object, &matching)) &&
-      (!bfd_check_format_matches(abfd, bfd_core, &matching)) ) {
-
-    fprintf(stderr, "initialize_bfd: bfd_check_format_matches failed\n");
+    if (bfd_check_format (abfd, bfd_core)) {
+    fprintf(stderr, "initalize_bfd: core files not supported\n");
     bfd_close_all_done(abfd);
     return NULL;
   }
+
+  if (!bfd_check_format_matches(abfd, bfd_object, &matching)) {
+    if (bfd_get_error() == bfd_error_file_ambiguously_recognized && matching) {
+      fprintf(stderr, "initialize_bfd: target ambiguous, select with -bfd-target:\n");
+      for (; *matching; matching++) {
+        fprintf(stderr, "   %s\n", *matching);
+      }
+    }
+    fprintf(stderr, "initialize_bfd: bfd_check_format_matches failed: %s\n", bfd_errmsg(bfd_get_error()));
+    bfd_close_all_done(abfd);
+    return NULL;
+  }
+
   return abfd;
 }
 
@@ -578,3 +587,4 @@ byte_insn_to_asmp(enum bfd_architecture arch, unsigned long mach, address_t addr
 
   return prog;
 }
+

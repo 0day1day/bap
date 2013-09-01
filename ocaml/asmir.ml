@@ -186,12 +186,12 @@ let section_contents_list ?(which=codeonly) prog secs =
   List.fold_left al [] bits
 
 (** Open a binary file for translation *)
-let open_program ?base filename =
+let open_program ?base ?target filename =
   let base = match base with
     | None -> -1L
     | Some(x) -> addr_to_int64 x 
   in
-  let prog = Libasmir.asmir_open_file filename base in
+  let prog = Libasmir.asmir_open_file filename base target in
     (* tell the GC how to free resources associated with prog *)
   Gc.finalise Libasmir.asmir_close prog;
   let secs = Array.to_list (get_all_sections prog)  in
