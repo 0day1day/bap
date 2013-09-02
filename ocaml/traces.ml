@@ -41,7 +41,7 @@ let checkall = ref false;;
 
 (** For each register, map it to an assignment and record the value of
     !current_time when the assignment happened. *)
-type stmt_info = { assignstmt: stmt; assigned_time: int }
+type stmt_info = { assignstmt: stmt; assigned_time: int; }
 
 (** Current time in executor (number of statements executed) *)
 let current_time = ref 0
@@ -54,7 +54,7 @@ let last_time = ref 0
 
 (** Map each register to the assembly instruction that set it. Useful
     for interpreting consistency failures. *)
-let reg_to_stmt : stmt_info VH.t = VH.create 20;;
+let reg_to_stmt = Hashtbl.create 20;;
 
 let dce = ref true;;
 
@@ -885,7 +885,7 @@ module TraceConcrete =
 (** Check all variables in delta to make sure they agree with operands
     loaded from a trace. We should be able to find bugs in BAP and the
     trace code using this. *)
-let check_delta state =
+let check_delta state tid =
   (* let dsa_concrete_val v = concrete_val (Var.name v) in *)
   (* let dsa_taint_val v = taint_val (Var.name v) in *)
   let contains_unknown e =
@@ -944,7 +944,7 @@ let check_delta state =
       (match dsavarname, traceval, tainted with
       | Some dsavarname, Some traceval, Some tainted ->
         DV.dprintf "Doing check on %s %b %b" dsavarname (tainted || !checkall) (not (isbad var));
-        let s = if (!checkall) then "" else "tainted " in
+        let s = if !checkall then "" else "tainted " in
         if (not (full_exp_eq traceval evalval) && (tainted || !checkall)
             && not (isbad var)) then
           (* The trace value and evaluator's value differ.  The
@@ -957,7 +957,7 @@ let check_delta state =
             let badstmt =
               try
                 let {assignstmt=assignstmt; assigned_time=assigned_time} =
-                  VH.find reg_to_stmt var
+                  Hashtbl.find reg_to_stmt (var,tid)
                 in
                 let s = "{"^(Pp.ast_stmt_to_string assignstmt)^"}\n" in
                 if assigned_time <= !last_time then
@@ -1146,7 +1146,7 @@ let run_block arch ?(next_label = None) ?(transformf = (fun s _ -> [s])) state m
     ) else (
       (* remove temps *)
       clean_delta state.delta;
-      state.delta <- check_delta state;
+      state.delta <- check_delta state tid;
       (* TraceConcrete.print_values state.delta;  *)
       (* TraceConcrete.print_mem state.delta;  *)
       (* dprintf "Reg size: %d Mem size: %d" (TraceConcrete.num_values state.delta) (TraceConcrete.num_mem_locs state.delta);*)
@@ -1165,12 +1165,12 @@ let run_block arch ?(next_label = None) ?(transformf = (fun s _ -> [s])) state m
         (function
           | Move(v, _, _) ->
             (* An explicit assignment *)
-	    if not (is_temp v) then 
-              VH.replace reg_to_stmt v {assignstmt=addr; assigned_time=get_counter ()}
+            if not (is_temp v) then
+              Hashtbl.replace reg_to_stmt (v,tid) {assignstmt=addr; assigned_time=get_counter ()}
           | Special _ as s when Syscall_models.x86_is_system_call s ||
               Disasm.is_decode_error s ->
-            (* A special could potentially overwrite all registers *)
-            last_time := get_counter();
+                (* A special could potentially overwrite all registers *)
+                last_time := get_counter();
                 last_special := addr;
           | _ -> ())
         block;
