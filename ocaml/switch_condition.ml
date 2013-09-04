@@ -33,8 +33,8 @@ let add_switch_conditions_int origssa optssa vsa_in =
     | _ -> None
   in
 
-  try
-    let g = CS.G.fold_vertex (fun v g ->
+  let g, allgood = CS.G.fold_vertex (fun v (g,allgood) ->
+    try
       match List.rev (CS.get_stmts g v) with
       | Jmp(e, _)::_ when Ssa.lab_of_exp e = None &
                      CS.G.succ g v <> [CS.G.V.create Cfg.BB_Exit] ->
@@ -122,12 +122,12 @@ let add_switch_conditions_int origssa optssa vsa_in =
           in
           let g = rewrite_jumps g v (leafe, cases) in
           dprintf "success at rewriting switch condition!";
-          g
+          g, allgood
         | None -> raise Not_found)
-      | _ -> g
-    ) origssa origssa in
-    Some g
-  with _ -> None
+      | _ -> g, allgood
+    with _ -> g, false
+    ) origssa (origssa,true) in
+    g, allgood
 
 let add_switch_conditions_disasm {optssa; origssa; vsa_in} =
   add_switch_conditions_int origssa optssa vsa_in
@@ -144,7 +144,7 @@ let add_switch_conditions_ssacfg asmp ssacfg =
   in
   if not has_a_indirect
   (* Don't run VSA if there are no indirect jumps *)
-  then Some ssacfg
+  then (ssacfg, true)
   else
     let optssa = Vsa_ssa.prepare_ssa_indirect ssacfg in
     (* Cfg_pp.SsaStmtsDot.output_graph (open_out "switchcondition.dot") optssa; *)

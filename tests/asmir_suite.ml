@@ -10,10 +10,10 @@ let recover_switch asmp (n,s,e) =
   match vsaresult with
   | None -> ()
   | Some vsaresult ->
-    let ssacfg = Switch_condition.add_switch_conditions_disasm vsaresult in
-    assert_bool "CFG with switch conditions was not recovered (disasm interface)" (BatOption.is_some ssacfg);
-    let ssacfg = Switch_condition.add_switch_conditions_ssacfg asmp (Cfg_ssa.of_astcfg astcfg) in
-    assert_bool "CFG with switch conditions was not recovered (ssacfg interface)" (BatOption.is_some ssacfg)
+    let ssacfg, allgood = Switch_condition.add_switch_conditions_disasm vsaresult in
+    assert_bool "CFG with switch conditions was not recovered (disasm interface)" allgood;
+    let ssacfg, allgood = Switch_condition.add_switch_conditions_ssacfg asmp (Cfg_ssa.of_astcfg astcfg) in
+    assert_bool "CFG with switch conditions was not recovered (ssacfg interface)" allgood
 
 let resolve_program_test f p =
   let asmp = Asmir.open_program p in

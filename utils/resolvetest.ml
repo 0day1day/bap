@@ -84,10 +84,12 @@ let lift_func (n,s,e) =
       Hacks.remove_cycles cfg) cfg !unroll in
     Cfg_pp.AstStmtsDot.output_graph (open_out (!prefix^n^".dot")) cfg;
     Cfg_pp.SsaStmtsDot.output_graph (open_out (!prefix^"ssa"^n^".dot")) (Cfg_ssa.of_astcfg cfg);
-    if !switch then BatOption.may (fun vsaresult ->
-      let ssacfg = Switch_condition.add_switch_conditions_disasm vsaresult in
-      BatOption.may (Cfg_pp.SsaStmtsDot.output_graph (open_out (!prefix^"ssaswitch"^n^".dot"))) ssacfg)
+    if !switch
+    then BatOption.may (fun vsaresult ->
+      let ssacfg, allgood = Switch_condition.add_switch_conditions_disasm vsaresult in
+      Cfg_pp.SsaStmtsDot.output_graph (open_out (!prefix^"ssaswitch"^n^".dot")) ssacfg)
       vsaresult;
+
     let pp = new Pp.pp_oc (open_out (!prefix^n^".il")) in
     pp#ast_program (Cfg_ast.to_prog cfg);
     pp#close;
