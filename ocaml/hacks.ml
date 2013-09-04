@@ -184,8 +184,15 @@ let uniqueify_labels p =
   Ast_visitor.prog_accept renamelabels p
 
 module Rm(C: Cfg.CFG) = struct
+  (* Often error is only reachable through indirect.  If this is the
+     case and we remove indirect, then remove error as well *)
+  let remove_error_if_disconnected g =
+    if C.G.in_degree g (C.G.V.create Cfg.BB_Error) = 0
+    then C.remove_vertex g (C.G.V.create Cfg.BB_Error)
+    else g
   let remove_indirect g =
-    C.remove_vertex g (C.G.V.create Cfg.BB_Indirect)
+    let g = C.remove_vertex g (C.G.V.create Cfg.BB_Indirect) in
+    remove_error_if_disconnected g
   let exit_indirect g =
     let exit = C.G.V.create Cfg.BB_Exit in
     if not (C.G.mem_vertex g exit) then failwith "exit_indirect: No BB_Exit";

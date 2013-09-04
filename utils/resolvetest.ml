@@ -13,6 +13,7 @@ let timeout = ref 30;;
 let total = ref 0;;
 let succ = ref 0;;
 let rangeonly = ref false;;
+let unroll = ref None;;
 
 type result =
   | Vsa of (Cfg.AST.G.t * Asmir_disasm.vsaresult option)
@@ -32,6 +33,8 @@ let speclist =
       "<seconds> Set the per-function timeout.")
   :: ("-r", Arg.Set rangeonly,
       "Print ranges rather than lifting functions.")
+  :: ("-unroll", Arg.Int (fun x -> unroll := Some x),
+      "Unroll loops n times and remove backedges.")
   :: []
 
 let anon x =
@@ -70,6 +73,9 @@ let lift_func (n,s,e) =
     in
     let cfg = Hacks.ast_remove_indirect cfg in
     let cfg = Ast_cond_simplify.simplifycond_cfg cfg in
+    let cfg = BatOption.map_default (fun n ->
+      let cfg = Unroll.unroll_loops ~count:n cfg in
+      Hacks.remove_cycles cfg) cfg !unroll in
     Cfg_pp.AstStmtsDot.output_graph (open_out ("resolve"^n^".dot")) cfg;
     Cfg_pp.SsaStmtsDot.output_graph (open_out ("resolvessa"^n^".dot")) (Cfg_ssa.of_astcfg cfg);
     BatOption.may (fun vsaresult ->
@@ -87,6 +93,7 @@ let lift_func ((n,_,_) as x) =
   try lift_func ~x
   with e ->
     Printf.printf "Lifting %s failed: %s\n" n (Printexc.to_string e);;
+
 
 if !rangeonly
 then List.iter (fun (n,s,e) ->
