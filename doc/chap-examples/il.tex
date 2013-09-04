@@ -133,9 +133,9 @@ Figure~\ref{fig:cfgsimp}.
 \end{figure}
 
 \begin{figure}[p]
-  \begin{center}
-    \includegraphics[height=.9\textheight]{chap-examples/ddg.pdf}
-  \end{center}
+  \centerbox{
+  \includegraphics[height=.9\textheight]{chap-examples/ddg.pdf}
+}
   \caption{Example DDG}
   \label{fig:ddg}
 \end{figure}
@@ -158,7 +158,11 @@ success.  We can do this by setting the goal variable to false at the
 beginning of the program, and setting it to true after the branch is
 taken.  Below is the modified IL that does this.
 
+\begin{centering}
+\begin{scriptsize}
 \verbatiminput{chap-examples/basic_mod.il}
+\end{scriptsize}
+\end{centering}
 
 To see if we take the jump, we can use topredicate with the post
 condition \cmdline{goal}: \cmdline{topredicate -q -il basic\_mod.il
