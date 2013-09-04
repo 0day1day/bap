@@ -14,6 +14,7 @@ let total = ref 0;;
 let succ = ref 0;;
 let rangeonly = ref false;;
 let unroll = ref None;;
+let prefix = ref "resolve";;
 
 type result =
   | Vsa of (Cfg.AST.G.t * Asmir_disasm.vsaresult option)
@@ -31,10 +32,12 @@ let speclist =
       "Use recursive descent based CFG recovery.")
   :: ("-timeout", Arg.Set_int timeout,
       "<seconds> Set the per-function timeout.")
+  :: ("-unroll", Arg.Int (fun x -> unroll := Some x),
+      "<n> Unroll loops n times and remove backedges.")
+  :: ("-prefix", Arg.Set_string prefix,
+      ("<name> Set prefix of output filenames to <name>. (Default: "^(!prefix)^")"))
   :: ("-r", Arg.Set rangeonly,
       "Print ranges rather than lifting functions.")
-  :: ("-unroll", Arg.Int (fun x -> unroll := Some x),
-      "Unroll loops n times and remove backedges.")
   :: []
 
 let anon x =
@@ -76,13 +79,13 @@ let lift_func (n,s,e) =
     let cfg = BatOption.map_default (fun n ->
       let cfg = Unroll.unroll_loops ~count:n cfg in
       Hacks.remove_cycles cfg) cfg !unroll in
-    Cfg_pp.AstStmtsDot.output_graph (open_out ("resolve"^n^".dot")) cfg;
-    Cfg_pp.SsaStmtsDot.output_graph (open_out ("resolvessa"^n^".dot")) (Cfg_ssa.of_astcfg cfg);
+    Cfg_pp.AstStmtsDot.output_graph (open_out (!prefix^n^".dot")) cfg;
+    Cfg_pp.SsaStmtsDot.output_graph (open_out (!prefix^"ssa"^n^".dot")) (Cfg_ssa.of_astcfg cfg);
     BatOption.may (fun vsaresult ->
       let ssacfg = Switch_condition.add_switch_conditions_disasm vsaresult in
-      Cfg_pp.SsaStmtsDot.output_graph (open_out ("resolvessaswitch"^n^".dot")) (BatOption.get ssacfg))
+      Cfg_pp.SsaStmtsDot.output_graph (open_out (!prefix^"ssaswitch"^n^".dot")) (BatOption.get ssacfg))
       vsaresult;
-    let pp = new Pp.pp_oc (open_out ("resolve"^n^".il")) in
+    let pp = new Pp.pp_oc (open_out (!prefix^n^".il")) in
     pp#ast_program (Cfg_ast.to_prog cfg);
     pp#close;
     incr succ
