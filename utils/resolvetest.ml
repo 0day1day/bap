@@ -1,9 +1,10 @@
 open Ast
+open Big_int_convenience
 open Type
 open Utils_common
 
-let usage = "Usage: "^Sys.argv.(0)^" <binary> [function list]\n\
-             Test program to resolve indirect jumps"
+let usage = "Usage: "^Sys.argv.(0)^" <binary> [<function list>]\n\
+             Lift functions from a binary."
 
 let arg = ref 0;;
 let binname = ref None;;
@@ -11,6 +12,7 @@ let fnames = ref None;;
 let timeout = ref 30;;
 let total = ref 0;;
 let succ = ref 0;;
+let rangeonly = ref false;;
 
 type result =
   | Vsa of (Cfg.AST.G.t * Asmir_disasm.vsaresult option)
@@ -28,6 +30,8 @@ let speclist =
       "Use recursive descent based CFG recovery.")
   :: ("-timeout", Arg.Set_int timeout,
       "<seconds> Set the per-function timeout.")
+  :: ("-r", Arg.Set rangeonly,
+      "Print ranges rather than lifting functions.")
   :: []
 
 let anon x =
@@ -82,9 +86,16 @@ let lift_func =
 let lift_func ((n,_,_) as x) =
   try lift_func ~x
   with e ->
-    Printf.printf "Lifting %s failed: %s\n" n (Printexc.to_string e)
+    Printf.printf "Lifting %s failed: %s\n" n (Printexc.to_string e);;
 
-let funcs = List.iter lift_func funcs;;
+if !rangeonly
+then List.iter (fun (n,s,e) ->
+  Printf.printf "%s\t0x%s 0x%s\n" n (~%s) (~%e)) funcs
+else (List.iter lift_func funcs;
+      Printf.printf "%d out of %d functions recovered (%.2f%%)\n" !succ !total (((float_of_int !succ) *. 100.0) /. (float_of_int !total)));;
 
-Printf.printf "%d out of %d functions recovered (%.2f%%)\n" !succ !total (((float_of_int !succ) *. 100.0) /. (float_of_int !total));;
+
+
+
+
 
