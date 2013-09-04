@@ -1,9 +1,4 @@
-(** Translations between AST programs and AST CFGs.
-
-
-    TODO: Coalescing; Use BB_Entry when making traces, but avoid joining that
-    trace with the trace containing BB_Exit.
-*)
+(** Translations between AST programs and AST CFGs. *)
 
 open Type
 open Ast
@@ -161,6 +156,7 @@ let of_prog ?(special_error = true) p =
   let (tmp, error) = find_error tmp in
   let (c, indirect) = find_indirect tmp in
   let c = C.add_edge c indirect error in (* indirect jumps could fail *)
+  let c = C.add_edge c indirect exit in (* indirect jumps could exit *)
 
   let (indirectt,_nodes,postponed_edges,c,last,_,addpred) = List.fold_left (f ~special_error) (false,[],[],c,[],true,Some entry) p in
   let c = match last with
