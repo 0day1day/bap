@@ -152,3 +152,5 @@ include depend
 .PHONY: clean
 .PHONY: tags
 tags:
+.PHONY: .NOTPARALLEL
+.NOTPARALLEL:
