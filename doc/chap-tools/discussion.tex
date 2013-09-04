@@ -31,22 +31,18 @@ correct with respect to the operational semantics of \bap.
 \subsection{Limitations of \bap}
 
 \begin{description}
-\item[Architectures] \bap only supports x86 right now.  We intend to
-  add support for x86-64 and ARM in the future.
+\item[Architectures] \bap only supports x86 and x86-64 right now.  We intend to
+  add support for ARM in the future.
 \item[Semantics] \bap is designed to enable program analysis of binary
   program states. Therefore, analyses that depend upon more than the
-  operational semantics of the instruction fall outside the scope of
-  \bap. For example, creating an analysis of the timing behavior of
-  binary programs falls outside the current scope of \bap.
+  operational semantics of the instruction, such as timing or non-deterministic behavior, fall outside the scope of
+  \bap. 
 \item[User-mode instructions] \bap only models user-mode level
   instructions.  Unhandled instructions will be lifted as {\tt
     special} statements or {\tt unknown} expressions.
 \item[Integer instructions] \bap only models instructions that
   manipulate integers.  In particular, \bap does not model floating
   point instructions.
-\item[Indirect jumps] \bap does not currently resolve indirect jumps,
-  or perform ``CFG recovery''.  We plan to add this in a future
-  release.
 \end{description}
 
 \subsection{Is Lifting Correct?}

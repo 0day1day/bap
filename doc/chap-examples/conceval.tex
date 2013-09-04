@@ -21,34 +21,30 @@ where to start and stop executing. Here is a possible disassembly of
 the main function.
 
 \begin{verbatim}
-08048267 <main>:
- 8048267:       55                      push   %ebp
- 8048268:       89 e5                   mov    %esp,%ebp
- 804826a:       83 ec 04                sub    $0x4,%esp
- 804826d:       c7 04 24 2a 00 00 00    movl   $0x2a,(%esp)
- 8048274:       e8 d7 ff ff ff          call   8048250 <g>
- 8048279:       c9                      leave  
- 804827a:       c3                      ret    
- 804827b:       90                      nop
- 804827c:       90                      nop
- 804827d:       90                      nop
- 804827e:       90                      nop
- 804827f:       90                      nop
+080483cb <main>:
+ 80483cb:       55                      push   %ebp
+ 80483cc:       89 e5                   mov    %esp,%ebp
+ 80483ce:       83 ec 04                sub    $0x4,%esp
+ 80483d1:       c7 04 24 2a 00 00 00    movl   $0x2a,(%esp)
+ 80483d8:       e8 d7 ff ff ff          call   80483b4 <g>
+ 80483dd:       c9                      leave  
+ 80483de:       c3                      ret    
+ 80483df:       90                      nop
 \end{verbatim}
 
 For this sample disassembly, we can begin execution at address
-0x8048267.  Likewise, we can halt execution at 0x804827a.  To make BAP
+0x80483cb.  Likewise, we can halt execution at 0x80483de.  To make BAP
 halt execution, we'll manually add a halt command to the lifted IL.
 For this example, you could search for the string
-\verb!addr 0x804827a! in test.il, which marks the beginning of the ret
-instruction in the lifted IL.  Inserting \verb!halt R_EAX:u32!  after
-the address and label statements will cause the evaluator to halt and
-return the value in eax.  For instance:
+\verb!addr 0x80483de! in test.il, which marks the beginning of the ret
+instruction in the lifted IL.  Inserting \verb!halt R_EAX_32:u32!
+after the address and label statements will cause the evaluator to
+halt and return the value in eax.  For instance:
 
 \begin{verbatim}
-addr 0x804827a @asm "ret    "
-label pc_0x804827a
-halt R_EAX:u32
+addr 0x80483de @asm "ret    "
+label pc_0x80483de
+halt R_EAX_32:u32
 \end{verbatim}
 
 Now, issue \cmdline{ileval -il test.il -eval-at mainaddr}, where
@@ -60,14 +56,19 @@ After halting, BAP will print the return value, which is
 eax. Unsurprisingly, the returned value of eax is 42.
 
 Now let's begin execution starting from the call instruction in main
-(0x8048250). This will allow us to modify the input to the function
+(0x80483d8). This will allow us to modify the input to the function
 g. The -init-var and -init-mem options allow the user to specify an
 initial value for a variable (register) or memory address
 respectively.  To replicate what we just did and use an input of 42,
 we can use the following the command \cmdline{ileval -il test.il
-  -init-mem R\_ESP:u32 42:u32 -eval-at 0x8048274}. Notice that this
+  -init-mem R\_ESP\_32:u32 42:u32 -eval-at 0x80483d8}. Notice that this
 begins execution at the call instruction instead of the beginning of
 main.  Unsurprisingly, eax has a final value of 42 again.  If we
 instead change the memory pointed to by esp to 43, by \cmdline{ileval
-  -il test.il -init-mem R\_ESP:u32 43:u32 -eval-at 0x8048274}, eax has
+  -il test.il -init-mem R\_ESP\_32:u32 43:u32 -eval-at 0x80483d8}, eax has
 a final value of -1.
+
+%%% Local Variables: 
+%%% mode: latex
+%%% TeX-master: "../main"
+%%% End: 

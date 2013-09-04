@@ -120,14 +120,14 @@ Regardless of the lifting tool, the lifted trace data should look
 something like:
 
 \begin{verbatim}
-addr 0x8048670 @asm "mov    0x804a034,%eax" @tid "0"
-  @context "R_EAX" = 0x68, 1, u32, wr
-  @context "mem[0x804a034]" = 0x5, 0, u8, rd
-  @context "mem[0x804a035]" = 0x0, 0, u8, rd
-  @context "mem[0x804a036]" = 0x0, 0, u8, rd
-  @context "mem[0x804a037]" = 0x0, 0, u8, rd
-label pc_0x8048670
-R_EAX:u32 = mem:?u32[0x804a034:u32, e_little]:u32
+addr 0x8048639 @asm "mov    0x804a038,%eax" @tid "0"
+  @context "R_EAX_32" = 0x68, 1, u32, wr
+  @context "mem32[0x804a038]" = 0x5, 0, u8, rd
+  @context "mem32[0x804a039]" = 0x0, 0, u8, rd
+  @context "mem32[0x804a03a]" = 0x0, 0, u8, rd
+  @context "mem32[0x804a03b]" = 0x0, 0, u8, rd
+label pc_0x8048639
+R_EAX_32:u32 = mem32:?u32[0x804a038:u32, e_little]:u32
 \end{verbatim}
 
 In addition to the lifted IL, there are several trace-specific
