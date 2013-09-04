@@ -10,6 +10,7 @@ Design issues:
 
 Features:
 * Function boundary identification for x86-64
+* Enable (re-)lifting of resolved indirect jumps in BIL
 
 Other:
 * Fix up documentation.
