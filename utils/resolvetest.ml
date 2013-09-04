@@ -83,7 +83,7 @@ let lift_func (n,s,e) =
     Cfg_pp.SsaStmtsDot.output_graph (open_out (!prefix^"ssa"^n^".dot")) (Cfg_ssa.of_astcfg cfg);
     BatOption.may (fun vsaresult ->
       let ssacfg = Switch_condition.add_switch_conditions_disasm vsaresult in
-      Cfg_pp.SsaStmtsDot.output_graph (open_out (!prefix^"ssaswitch"^n^".dot")) (BatOption.get ssacfg))
+      BatOption.may (Cfg_pp.SsaStmtsDot.output_graph (open_out (!prefix^"ssaswitch"^n^".dot"))) ssacfg)
       vsaresult;
     let pp = new Pp.pp_oc (open_out (!prefix^n^".il")) in
     pp#ast_program (Cfg_ast.to_prog cfg);
