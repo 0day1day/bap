@@ -14,6 +14,7 @@ let total = ref 0;;
 let succ = ref 0;;
 let rangeonly = ref false;;
 let unroll = ref None;;
+let switch = ref false;;
 let prefix = ref "resolve";;
 
 type result =
@@ -34,6 +35,8 @@ let speclist =
       "<seconds> Set the per-function timeout.")
   :: ("-unroll", Arg.Int (fun x -> unroll := Some x),
       "<n> Unroll loops n times and remove backedges.")
+  :: ("-switch", Arg.Set switch,
+      "Enable the recovery of switch conditions.")
   :: ("-prefix", Arg.Set_string prefix,
       ("<name> Set prefix of output filenames to <name>. (Default: "^(!prefix)^")"))
   :: ("-r", Arg.Set rangeonly,
@@ -81,7 +84,7 @@ let lift_func (n,s,e) =
       Hacks.remove_cycles cfg) cfg !unroll in
     Cfg_pp.AstStmtsDot.output_graph (open_out (!prefix^n^".dot")) cfg;
     Cfg_pp.SsaStmtsDot.output_graph (open_out (!prefix^"ssa"^n^".dot")) (Cfg_ssa.of_astcfg cfg);
-    BatOption.may (fun vsaresult ->
+    if !switch then BatOption.may (fun vsaresult ->
       let ssacfg = Switch_condition.add_switch_conditions_disasm vsaresult in
       BatOption.may (Cfg_pp.SsaStmtsDot.output_graph (open_out (!prefix^"ssaswitch"^n^".dot"))) ssacfg)
       vsaresult;
