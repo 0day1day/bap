@@ -44,8 +44,8 @@ val recursive_descent_at : Asmir.asmprogram -> addr -> Cfg.AST.G.t
 
 type vsaresult = {origssa: Cfg.SSA.G.t;
                   optssa: Cfg.SSA.G.t;
-                  vsa_in: Cfg.ssastmtloc -> Vsa_ssa.AlmostVSA.DFP.L.t;
-                  vsa_out: Cfg.ssastmtloc -> Vsa_ssa.AlmostVSA.DFP.L.t;}
+                  vsa_in: Cfg.ssastmtloc -> Vsa_ssa.AbsEnv.t option;
+                  vsa_out: Cfg.ssastmtloc -> Vsa_ssa.AbsEnv.t option;}
 
 val vsa_full : Asmir.asmprogram -> Cfg.AST.G.t * vsaresult option
 val vsa_at_full : Asmir.asmprogram -> addr -> Cfg.AST.G.t * vsaresult option

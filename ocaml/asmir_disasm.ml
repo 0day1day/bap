@@ -113,8 +113,8 @@ end
 
 type vsaresult = {origssa: CS.G.t;
                   optssa: CS.G.t;
-                  vsa_in: Cfg.ssastmtloc -> Vsa_ssa.AlmostVSA.DFP.L.t;
-                  vsa_out: Cfg.ssastmtloc -> Vsa_ssa.AlmostVSA.DFP.L.t;}
+                  vsa_in: Cfg.ssastmtloc -> Vsa_ssa.AbsEnv.t option;
+                  vsa_out: Cfg.ssastmtloc -> Vsa_ssa.AbsEnv.t option;}
 
 module VSA_SPEC = struct
   module State = struct
@@ -210,7 +210,7 @@ module VSA_SPEC = struct
       (* Cfg_pp.SsaStmtsDot.output_graph (open_out "vsa.dot") ssacfg; *)
 
       dprintf "Starting VSA now";
-      let df_in, df_out = Vsa_ssa.vsa ~nmeets:0 ~opts:{Vsa_ssa.AlmostVSA.DFP.O.initial_mem=Asmir.get_readable_mem_contents_list asmp} ssacfg in
+      let df_in, df_out = Vsa_ssa.vsa ~nmeets:0 ~opts:{Vsa_ssa.MemStore.initial_mem=Asmir.get_readable_mem_contents_list asmp} ssacfg in
 
       let resolve_edge ((v,l,e) as edge) =
 
@@ -251,7 +251,7 @@ module VSA_SPEC = struct
 
         let fallback edge =
           dprintf "fallback";
-          let vs = Vsa_ssa.AlmostVSA.DFP.exp2vs (BatOption.get (df_out (Vsa_ssa.last_loc ssacfg ssav))) ssae in
+          let vs = Vsa_ssa.exp2vs (BatOption.get (df_out (Vsa_ssa.last_loc ssacfg ssav))) ssae in
           dprintf "VSA resolved %s to %s" (Pp.ast_exp_to_string e) (Vsa_ssa.VS.to_string vs);
           (match Vsa_ssa.VS.concrete ~max:1024 vs with
           | Some x -> dprintf "VSA finished";
@@ -278,9 +278,9 @@ module VSA_SPEC = struct
 
           dprintf "special_memory %s %s cp %s" (Pp.ssa_exp_to_string m) (Pp.ssa_exp_to_string indexe) (Pp.ssa_exp_to_string (cp indexe));
           let l = BatOption.get (df_in ssaloc) in
-          let exp2vs = Vsa_ssa.AlmostVSA.DFP.exp2vs l in
+          let exp2vs = Vsa_ssa.exp2vs l in
           let vs = exp2vs indexe in
-          dprintf "VSA resolved memory index %s to %s" (Pp.ssa_exp_to_string indexe) (Vsa_ssa.VS.to_string (Vsa_ssa.AlmostVSA.DFP.exp2vs l indexe));
+          dprintf "VSA resolved memory index %s to %s" (Pp.ssa_exp_to_string indexe) (Vsa_ssa.VS.to_string (Vsa_ssa.exp2vs l indexe));
           (match Vsa_ssa.VS.concrete ~max:1024 vs with
           | Some l -> dprintf "VSA finished";
             (* We got some concrete values for the index.  Now
@@ -290,7 +290,7 @@ module VSA_SPEC = struct
             let do_read meme loc =
               let reads = List.map (fun a ->
                 let a = bi64 a in
-                let exp2vs = Vsa_ssa.AlmostVSA.DFP.exp2vs (BatOption.get (df_in loc)) in
+                let exp2vs = Vsa_ssa.exp2vs (BatOption.get (df_in loc)) in
                 let exp = Ssa.Load(meme, Ssa.Int(a, Typecheck.infer_ssa indexe), endian, t) in
                 let vs = exp2vs exp in
                 dprintf "memory %s %s" (Pp.ssa_exp_to_string exp) (Vsa_ssa.VS.to_string vs);

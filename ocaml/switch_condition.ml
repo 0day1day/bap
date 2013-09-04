@@ -59,7 +59,7 @@ let add_switch_conditions_int origssa optssa vsa_in =
 
       (* Now use VSA to see what the values of the leaf are *)
         let vsa = BatOption.get (vsa_in (Vsa_ssa.last_loc g v)) in
-        let vs = Vsa_ssa.AlmostVSA.DFP.exp2vs vsa leafe in
+        let vs = Vsa_ssa.exp2vs vsa leafe in
         dprintf "vs: %s" (Vsa_ssa.VS.to_string vs);
 
         (match Vsa_ssa.VS.concrete ~max:1024 vs with
@@ -71,7 +71,7 @@ let add_switch_conditions_int origssa optssa vsa_in =
               dprintf "newindexe: %s" (Pp.ssa_exp_to_string newindexe);
               let newloade = Load(m, newindexe, e, t) in
               dprintf "addr %Lx %s" x (Pp.ssa_exp_to_string newloade);
-              let vs' = Vsa_ssa.AlmostVSA.DFP.exp2vs vsa newloade in
+              let vs' = Vsa_ssa.exp2vs vsa newloade in
               let conc = Vsa_ssa.VS.concrete ~max:1 vs' in
               match conc with
               | Some (addr::[]) -> Some(bi64 addr, bi64 x)
@@ -148,5 +148,5 @@ let add_switch_conditions_ssacfg asmp ssacfg =
   else
     let optssa = Vsa_ssa.prepare_ssa_indirect ssacfg in
     (* Cfg_pp.SsaStmtsDot.output_graph (open_out "switchcondition.dot") optssa; *)
-    let vsa_in, _ = Vsa_ssa.vsa ~nmeets:0 ~opts:{Vsa_ssa.AlmostVSA.DFP.O.initial_mem=Asmir.get_readable_mem_contents_list asmp} optssa in
+    let vsa_in, _ = Vsa_ssa.vsa ~nmeets:0 ~opts:{Vsa_ssa.MemStore.initial_mem=Asmir.get_readable_mem_contents_list asmp} optssa in
     add_switch_conditions_int ssacfg optssa vsa_in

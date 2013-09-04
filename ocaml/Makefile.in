@@ -106,7 +106,7 @@ export SOURCES = \
 	hacks.ml \
 	coalesce.mli coalesce.ml \
 	vsa_ast.ml \
-	vsa_ssa.ml \
+	vsa_ssa.mli vsa_ssa.ml \
 	asmir_disasm.mli asmir_disasm.ml \
 	func_boundary.mli func_boundary.ml \
 	asmir_rdisasm.mli asmir_rdisasm.ml \
