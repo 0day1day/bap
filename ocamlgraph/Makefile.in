@@ -586,4 +586,7 @@ svnclean svn-clean:: dist-clean
 		$(VIEWER_DIR)/*.mli $(VIEWER_DIR)/*.ml \
 		$(DGRAPH_DIR)/*.mli $(DGRAPH_DIR)/*.ml > .depend
 
+.PHONY: .NOTPARALLEL
+.NOTPARALLEL:
+
 include .depend
