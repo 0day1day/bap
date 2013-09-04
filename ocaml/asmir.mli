@@ -73,7 +73,7 @@ val arch_to_bfd : arch -> Libbfd.bfd_architecture * Libbfd.machine_t
 (** Translate libtrace architecture to BAP architecture *)
 val translate_trace_arch : Trace.Arch.bfd_architecture -> Trace.Arch.machine_t -> arch
 
-val open_program : ?base:Type.addr -> string -> asmprogram
+val open_program : ?base:Type.addr -> ?target:string -> string -> asmprogram
 val asmprogram_to_bap : ?init_ro:bool -> asmprogram -> Ast.program
 val asm_addr_to_bap : (*varctx ->*) asmprogram -> Type.addr -> Ast.program * Type.addr
 

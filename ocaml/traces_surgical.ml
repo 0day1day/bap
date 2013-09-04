@@ -174,7 +174,7 @@ let run_and_subst_block arch state memv thread_map block =
     (* remove temps *)
         (* SWXXX *)
     clean_delta state.delta;
-    ignore(check_delta state);
+    ignore(check_delta state (get_tid block));
     (* TraceConcrete.print_values state.delta; *)
     (* TraceConcrete.print_mem state.delta; *)
   );

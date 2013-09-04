@@ -60,7 +60,7 @@ extern "C"
 #endif
 
 
-extern asm_program_t *asmir_open_file(const char *filename, bfd_vma addr);
+extern asm_program_t *asmir_open_file(const char *filename, bfd_vma addr, const char *target);
 extern asm_program_t* asmir_new_asmp_for_arch(enum bfd_architecture arch, unsigned long mach);
 extern asm_program_t* asmir_trace_asmp_for_arch(enum bfd_architecture arch);
 extern void asmir_close(asm_program_t *p);

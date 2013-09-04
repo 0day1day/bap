@@ -8,7 +8,7 @@ MAKE32 = "@ARCH_X64@"
 
 %:
 ifeq ($(MAKE32),"true")
-	test -d libtrace32 || cp -r libtrace ./libtrace32
+	test -d libtrace32 || cp -R libtrace ./libtrace32
 endif
 	$(MAKE) CONFIGURED
 	$(MAKE) -C libtrace $@
