@@ -127,7 +127,7 @@ let add_switch_conditions_int origssa optssa vsa_in =
       | _ -> g
     ) origssa origssa in
     Some g
-  with Not_found -> None
+  with _ -> None
 
 let add_switch_conditions_disasm {optssa; origssa; vsa_in} =
   add_switch_conditions_int origssa optssa vsa_in
