@@ -43,28 +43,6 @@ struct
   let edge_attributes _ = []
 end
 
-module DefAttributor =
-struct
-  let vertex_attributes _ _ = []
-  and edge_attributes _ _ = []
-end
-
-(* (\* FIXME: Instead of having two of these we should take the graph *)
-(*    module and type f accordingly *\) *)
-(* module FunSsaAttributor = *)
-(* struct *)
-(*   let f = ref (fun g v -> raise Not_found) *)
-(*   include DefAttributor *)
-(*   let vertex_attributes (g:'a) (v:'b) = try !f g v with Not_found -> [] *)
-(* end *)
-
-(* module FunAstAttributor = *)
-(* struct *)
-(*   let f = ref (fun g v -> raise Not_found) *)
-(*   include DefAttributor *)
-(*   let vertex_attributes (g:'a) (v:'b) = try !f g v with Not_found -> [] *)
-(* end *)
-
 module type Cfg =
 sig
   type exp
@@ -72,13 +50,25 @@ sig
   include Graph.Sig.G with type V.label = Cfg.bbid and type E.label = (bool * exp) option
 end
 
+module DefAttributor(G:Cfg) =
+struct
+  let vertex_attributes _ _ = []
+  and edge_attributes _ _ = []
+end
+
+module type Attributor =
+  functor (G:Cfg) ->
+    sig
+      val vertex_attributes: G.t -> G.V.t -> Graph.Graphviz.DotAttributes.vertex list
+      val edge_attributes: G.t -> G.E.t -> Graph.Graphviz.DotAttributes.edge list
+    end
+
 (** Makes a module suitable for use with Graph.Graphviz.Dot  for writting out
     a CFG. *)
 module MakeCfgPrinter
   (G:Cfg)
   (Printer:sig val print: G.t -> (G.V.t -> string) * (G.E.t -> string) end)
-  (Attributor:sig val vertex_attributes: G.t -> G.V.t -> Graph.Graphviz.DotAttributes.vertex list ;;
-                  val edge_attributes: G.t -> G.E.t -> Graph.Graphviz.DotAttributes.edge list end)
+  (Attributor:Attributor)
   : (DOTTYG with type t = G.t and type V.t = G.V.t * G.t and type E.t =  G.E.t * G.t)
   =
 struct
@@ -92,13 +82,15 @@ struct
     let compare x y = G.V.compare (fst x) (fst y)
   end
   module E =
-  struct 
+  struct
     type t = G.E.t * G.t
     type label = G.E.label
     let label (e,g) = G.E.label e
     let src (e,g) = (G.E.src e, g)
     let dst (e,g) = (G.E.dst e, g)
   end
+
+  module Attributor = Attributor(G)
 
   let iter_edges_e f g =
     G.iter_edges_e (fun e -> f (e,g)) g
