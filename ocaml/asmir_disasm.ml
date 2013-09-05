@@ -210,7 +210,8 @@ module VSA_SPEC = struct
       (* Cfg_pp.SsaStmtsDot.output_graph (open_out "vsa.dot") ssacfg; *)
 
       dprintf "Starting VSA now";
-      let df_in, df_out = Vsa_ssa.vsa ~nmeets:0 ~opts:{Vsa_ssa.MemStore.initial_mem=Asmir.get_readable_mem_contents_list asmp} ssacfg in
+      let opts = Vsa_ssa.build_default_prog_options asmp in
+      let df_in, df_out = Vsa_ssa.vsa ~nmeets:0 opts ssacfg in
 
       let resolve_edge ((v,l,e) as edge) =
 

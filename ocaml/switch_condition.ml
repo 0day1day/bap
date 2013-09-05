@@ -148,5 +148,7 @@ let add_switch_conditions_ssacfg asmp ssacfg =
   else
     let optssa = Vsa_ssa.prepare_ssa_indirect ssacfg in
     (* Cfg_pp.SsaStmtsDot.output_graph (open_out "switchcondition.dot") optssa; *)
-    let vsa_in, _ = Vsa_ssa.vsa ~nmeets:0 ~opts:{Vsa_ssa.MemStore.initial_mem=Asmir.get_readable_mem_contents_list asmp} optssa in
+    let opts = Vsa_ssa.build_default_prog_options asmp in
+
+    let vsa_in, _ = Vsa_ssa.vsa ~nmeets:0 opts optssa in
     add_switch_conditions_int ssacfg optssa vsa_in

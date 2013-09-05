@@ -16,13 +16,15 @@ let ast_test filename var v () =
   assert_equal ~msg:(Printf.sprintf "Value set %s for %s was different than expected value %s" (Vsa_ast.AbsEnv.value_to_string v') (Pp.var_to_string var) (Vsa_ast.AbsEnv.value_to_string v)) v v'
 
 let ssa_test filename var v () =
-  let p = Asmir.asmprogram_to_bap (Asmir.open_program filename) in
+  let asmp = Asmir.open_program filename in
+  let p = Asmir.asmprogram_to_bap asmp in
   let cfg = Cfg_ast.of_prog p in
   let cfg = Prune_unreachable.prune_unreachable_ast cfg in
   let cfg = Ast_cond_simplify.simplifycond_cfg cfg in
   let {Cfg_ssa.ssacfg=cfg; to_ssavar} = Cfg_ssa.trans_cfg ~tac:false cfg in
   let var = to_ssavar var in
-  let _df_in, df_out = Vsa_ssa.vsa ~nmeets cfg in
+  let opts = Vsa_ssa.build_default_prog_options asmp in
+  let _df_in, df_out = Vsa_ssa.vsa ~nmeets opts cfg in
   let exiT = Cfg.SSA.G.V.create Cfg.BB_Exit in
   let l = df_out (Vsa_ssa.last_loc cfg exiT) in
   let l = BatOption.get l in
