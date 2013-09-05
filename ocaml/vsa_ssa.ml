@@ -64,9 +64,6 @@ let bits_of_width = Typecheck.bits_of_width
 
 let sp = Disasm_i386.R32.esp
 
-(* FIXME *)
-let addr_bits = 32
-
 (** Strided Intervals *)
 module SI =
 struct
@@ -913,7 +910,6 @@ struct
            Hashtbl.fold (fun k v r -> (k,v)::r) h []
 
   let fold f vs init =
-    (* if vs = top addr_bits then wprintf "VS.fold is very slow for Top"; *)
     List.fold_left (fun a (r,si) -> SI.fold (fun v -> f (r,v)) si a) init vs
 
   let concrete ?max vs =
@@ -1180,7 +1176,8 @@ module MemStore = struct
     write_concrete_strong k ae addr (VS.widen vl (read_concrete k ae addr))
 
   let write k ae addr vl =
-    if addr = VS.top addr_bits then (
+    let width = VS.width addr in
+    if addr = VS.top width then (
       if vl = VS.top k then top
       else match !mem_max with
       | None -> fold (fun addr v a -> write_concrete_weak k a addr vl) ae ae
