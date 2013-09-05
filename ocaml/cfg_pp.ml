@@ -31,15 +31,20 @@ sig
   val edge_attributes : E.t -> Graph.Graphviz.DotAttributes.edge list
 end
 
+let red = 0xff0000
+let green = 0x00ff00
+let blue = 0x0000ff
+let fill = 0xf5f5f5
+let linenum_color = "#b8b8b8"
 
 (* Just for convenience *)
 module DefAttrs =
 struct
   let graph_attributes _ = []
-  let default_vertex_attributes _ = [`Shape `Box]
+  let default_vertex_attributes _ = [`Shape `Box; `Style `Filled; `Fillcolor fill]
   let vertex_attributes _ = []
   let get_subgraph _ = None
-  let default_edge_attributes _ = []
+  let default_edge_attributes _ = [`Color blue]
   let edge_attributes _ = []
 end
 
@@ -54,6 +59,16 @@ module DefAttributor(G:Cfg) =
 struct
   let vertex_attributes _ _ = []
   and edge_attributes _ _ = []
+end
+
+module EdgeColorAttributor(G:Cfg) =
+struct
+  let vertex_attributes _ _ = []
+  and edge_attributes _ e =
+    match Cfg.edge_direction (G.E.label e) with
+    | Some true -> [`Color green]
+    | Some false -> [`Color red]
+    | None -> []
 end
 
 module type Attributor =
@@ -222,7 +237,7 @@ module CSG = struct
   type exp = CS.exp
   let exp_to_string = Pp.ssa_exp_to_string
 end
-module SsaStmtsPrinter = MakeCfgPrinter (CSG) (PrintSsaStmts) (DefAttributor)
+module SsaStmtsPrinter = MakeCfgPrinter (CSG) (PrintSsaStmts) (EdgeColorAttributor)
 module SsaStmtsDot = Graph.Graphviz.Dot(SsaStmtsPrinter)
 
 module CAG = struct
@@ -230,10 +245,10 @@ module CAG = struct
   type exp = CA.exp
   let exp_to_string = Pp.ast_exp_to_string
 end
-module AstStmtsPrinter = MakeCfgPrinter (CAG) (PrintAstStmts) (DefAttributor)
+module AstStmtsPrinter = MakeCfgPrinter (CAG) (PrintAstStmts) (EdgeColorAttributor)
 module AstStmtsDot = Graph.Graphviz.Dot (AstStmtsPrinter)
 
-module AstAsmsPrinter = MakeCfgPrinter (CAG) (PrintAstAsms) (DefAttributor)
+module AstAsmsPrinter = MakeCfgPrinter (CAG) (PrintAstAsms) (EdgeColorAttributor)
 module AstAsmsDot = Graph.Graphviz.Dot (AstAsmsPrinter)
 
 module SsaBBidPrinter =
@@ -252,8 +267,8 @@ struct
 end
 module AstBBidDot = Graph.Graphviz.Dot(AstBBidPrinter)
 
-module SsaStmtsAttPrinter = MakeCfgPrinter (CSG) (PrintSsaStmts) (DefAttributor)
+module SsaStmtsAttPrinter = MakeCfgPrinter (CSG) (PrintSsaStmts) (EdgeColorAttributor)
 module SsaStmtsAttDot = Graph.Graphviz.Dot(SsaStmtsAttPrinter)
 
-module AstStmtsAttPrinter = MakeCfgPrinter (CAG) (PrintAstStmts) (DefAttributor)
+module AstStmtsAttPrinter = MakeCfgPrinter (CAG) (PrintAstStmts) (EdgeColorAttributor)
 module AstStmtsAttDot = Graph.Graphviz.Dot(AstStmtsAttPrinter)
