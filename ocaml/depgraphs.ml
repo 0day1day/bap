@@ -795,7 +795,6 @@ struct
      the uses of the definition (if any) at that location 2) a
      function that returns the uses for a (variable, location) pair *)
   let defuse p =
-    dprintf "tnohusetauoh";
     let module DEFUSEDF = CfgDataflow.Make(DefUseSpec) in
     let dfin,_ = DEFUSEDF.worklist_iterate_stmt p in
     let h = Hashtbl.create 1000 in
