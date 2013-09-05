@@ -30,6 +30,11 @@ let index_type_of = function
   | TMem it | Array (it, _) -> it
   | Reg _ -> invalid_arg "index_type_of"
 
+let value_type_of = function
+  | TMem _ -> Reg 8
+  | Array (_, vt) -> vt
+  | Reg _ -> invalid_arg "value_type_of"
+
 let bits_of_width = function
   | Reg n -> n
   | _ -> invalid_arg "bits_of_width"
