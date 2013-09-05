@@ -75,9 +75,9 @@ let remove_cycles cfg =
       | CJmp(c,t1,t2,attrs)::rest ->
         (* e is the label we are REMOVING *)
         (match l with
-        | Some (true, _) -> CJmp(c, Lab("BB_Error"), t2, a::attrs)
-        | Some (false, _) -> CJmp(c, t1, Lab("BB_Error"), a::attrs)
-        | None -> failwith "missing edge label from cjmp")
+        | Some (Some true, _) -> CJmp(c, Lab("BB_Error"), t2, a::attrs)
+        | Some (Some false, _) -> CJmp(c, t1, Lab("BB_Error"), a::attrs)
+        | _ -> failwith "missing edge label from cjmp")
           ::rest
       | rest -> assert_false::rest
     in
@@ -137,8 +137,8 @@ let repair_node g n =
   let stmts = C.get_stmts g n in
   match List.rev stmts with
   | Jmp(t, _)::_ -> make_edge g n t
-  | CJmp(e,t,f,_)::_ -> let g = make_edge g n ~lab:(true, e) t in
-                     make_edge g n ~lab:(false, Ast_convenience.unop NOT e) f
+  | CJmp(e,t,f,_)::_ -> let g = make_edge g n ~lab:(Some true, e) t in
+                        make_edge g n ~lab:(Some false, Ast_convenience.unop NOT e) f
   | Special _::_ -> C.add_edge g n error
   | Halt _::_ -> C.add_edge g n exit
   | _ -> (* It's probably fine.  That's why this is in hacks.ml. *) g

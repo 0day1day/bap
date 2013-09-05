@@ -22,8 +22,8 @@ let cfg_jumpelim graph =
              let bool = cond = val_true in
              let edges = C.G.succ_e graph bb in
              let toremove = List.find (fun e -> match C.G.E.label e with
-               | Some(b, _) -> b = bool
-               | None -> failwith "expected label on cjmp") edges in
+               | Some(Some b, _) -> b = bool
+               | _ -> failwith "expected label on cjmp") edges in
              let edges = List.filter (fun e -> e != toremove) edges in
 
             (* There should only be one edge remaining *)

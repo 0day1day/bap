@@ -22,7 +22,7 @@ let bbid_to_string = function
   | BB n         -> "BB_"^string_of_int n
 
 let edge_direction = function
-  | Some(b, _) -> Some b
+  | Some(b, _) -> b
   | None -> None
 
 module BBid =
@@ -51,7 +51,7 @@ sig
   type lang = stmt list
   type exp
 
-  include Graph.Builder.S with type G.V.label = bbid and type G.E.label = (bool * exp) option
+  include Graph.Builder.S with type G.V.label = bbid and type G.E.label = (bool option * exp) option
 
 
   val find_vertex : G.t -> G.V.label -> G.V.t
@@ -96,7 +96,7 @@ end
 
 module E(Lang: Language) =
 struct
-  type t = (bool * Lang.exp) option
+  type t = (bool option * Lang.exp) option
   let compare = compare
   let default = None
 end
@@ -322,7 +322,7 @@ sig
 
   include Graph.Builder.S
     with type G.V.label = bbid
-    and type G.E.label = (bool * exp) option
+    and type G.E.label = (bool option * exp) option
     and type G.t = (G'.t, lang BM.t, G'.V.t LM.t) pcfg
 
   val get_stmts  : G.t -> G.V.t -> lang
