@@ -48,7 +48,6 @@ export SOURCES = \
 	djgraph.mli djgraph.ml \
 	graphDataflow.mli graphDataflow.ml \
 	type.mli type.ml \
-	arch.mli arch.ml \
 	var.mli var.ml \
 	arithmetic.ml \
 	ast.ml \
@@ -90,6 +89,7 @@ export SOURCES = \
 	libbfd.idl \
 	libasmir.idl \
 	disasm_i386.ml \
+	arch.mli arch.ml \
 	disasm.ml \
 	$(LLVM_SRC) \
 	syscall_models.ml \

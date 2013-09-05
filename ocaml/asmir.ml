@@ -90,10 +90,6 @@ let all_regs = function
   | X86_32 -> x86_all_regs
   | X86_64 -> x64_all_regs
 
-let mem_of_arch = function
-  | X86_32 -> x86_mem
-  | X86_64 -> x64_mem
-
 let decls_for_arch = function
   | X86_32 -> x86_mem::x86_regs
   | X86_64 -> x64_mem::x64_regs

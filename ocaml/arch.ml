@@ -24,3 +24,11 @@ let bytes_of_arch a =
 let mode_of_arch = function
   | X86_32 -> Disasm_i386.X86
   | X86_64 -> Disasm_i386.X8664
+
+let mem_of_arch = function
+  | X86_32 -> Disasm_i386.R32.mem
+  | X86_64 -> Disasm_i386.R64.mem
+
+let sp_of_arch = function
+  | X86_32 -> Disasm_i386.R32.esp
+  | X86_64 -> Disasm_i386.R64.rsp

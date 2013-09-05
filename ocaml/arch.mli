@@ -13,3 +13,7 @@ val bits_of_arch : arch -> int
 val bytes_of_arch : arch -> int
 
 val mode_of_arch : arch -> Disasm_i386.mode
+
+val mem_of_arch : arch -> Var.t
+
+val sp_of_arch : arch -> Var.t

@@ -53,8 +53,6 @@ val tr_bap_blocks_t :
 val decls_for_arch : arch -> Ast.var list
 val gamma_for_arch : arch -> varctx
 
-val mem_of_arch : arch -> Var.t
-
 val get_asmprogram_arch : asmprogram -> arch
 
 val x86_mem : Var.t
