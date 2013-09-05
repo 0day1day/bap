@@ -61,6 +61,7 @@ let uint64_lcm x y =
   m /% (uint64_gcd x y)
 
 let bits_of_width = Typecheck.bits_of_width
+let bits_of_exp e = bits_of_width (Typecheck.infer_ssa e)
 
 let sp = Disasm_i386.R32.esp
 
@@ -563,158 +564,39 @@ struct
     else if is_empty si then init
     else fold f (k, s, a+%s ,b) (f a init)
 
+  let binop_to_si_function = function
+    | PLUS -> add ~allow_overflow:true
+    | MINUS -> sub
+    | AND -> logand
+    | OR -> logor
+    | XOR -> logxor
+    | MOD -> modulus
+    | RSHIFT -> rshift
+    | ARSHIFT -> arshift
+    | LSHIFT -> lshift
+    | EQ -> eq
+    | NEQ -> fun k x y -> lognot 1 (eq k x y)
+    | TIMES
+    | DIVIDE
+    | SDIVIDE
+    | SMOD
+    | LT
+    | LE
+    | SLT
+    | SLE
+      -> raise (Unimplemented "unimplemented binop")
+
+  let unop_to_si_function = function
+    | NEG -> neg
+    | NOT -> lognot
+
+  let cast_to_si_function = function
+    | CAST_UNSIGNED -> cast_unsigned
+    | CAST_SIGNED -> cast_signed
+    | CAST_LOW -> cast_low
+    | CAST_HIGH -> cast_high
+
 end (* module SI *)
-
-(* Very simplified version of VSA, with no bounding *)
-module SimpleVSA =
-struct
-  module DFP =
-  struct
-    module CFG = Cfg.SSA
-    module L =
-    struct
-      (* XXX: This is wrong *)
-      type t = SI.t VM.t
-      let top = VM.empty
-      let equal = VM.equal (=)
-      let meet =
-        VM.merge (fun k v1 v2 -> match v1, v2 with
-        | Some v1, Some v2 -> Some (SI.union v1 v2)
-        | Some v, None
-        | None, Some v -> Some v
-        | None, None -> None)
-      let widen =
-        VM.merge (fun k v1 v2 -> match v1, v2 with
-        | Some v1, Some v2 -> Some (SI.widen v1 v2)
-        | Some v, None
-        | None, Some v -> Some v
-        | None, None -> None)
-    end
-    module O = GraphDataflow.NOOPTIONS
-    let s0 _ _ = CFG.G.V.create Cfg.BB_Entry
-    let init _ g = L.top
-    let dir _ = GraphDataflow.Forward
-
-    let binop_to_si_function = function
-      | PLUS -> SI.add ~allow_overflow:true
-      | MINUS -> SI.sub
-      | AND -> SI.logand
-      | OR -> SI.logor
-      | XOR -> SI.logxor
-      | MOD -> SI.modulus
-      | RSHIFT -> SI.rshift
-      | ARSHIFT -> SI.arshift
-      | LSHIFT -> SI.lshift
-      | EQ -> SI.eq
-      | NEQ -> fun k x y -> SI.lognot 1 (SI.eq k x y)
-      | TIMES
-      | DIVIDE
-      | SDIVIDE
-      | SMOD
-      | LT
-      | LE
-      | SLT
-      | SLE
-          -> raise (Unimplemented "unimplemented binop")
-
-    let unop_to_si_function = function
-      | NEG -> SI.neg
-      | NOT -> SI.lognot
-
-    let cast_to_si_function = function
-      | CAST_UNSIGNED -> SI.cast_unsigned
-      | CAST_SIGNED -> SI.cast_signed
-      | CAST_LOW -> SI.cast_low
-      | CAST_HIGH -> SI.cast_high
-
-    let bits_of_exp e = bits_of_width (Typecheck.infer_ssa e)
-
-    let rec stmt_transfer_function _ _ _ s l =
-      match s with
-        | Assert(Var _, _)  (* FIXME: Do we want to say v is true? *)
-        | Assert _ | Assume _ | Jmp _ | CJmp _ | Label _ | Comment _
-        | Halt _ ->
-            l
-        | Move(v, e, _) ->
-            try
-              let top v = SI.top (bits_of_width(Var.typ v)) in
-              let find v = VM.find v l in
-              let do_find v =  try find v with Not_found -> top v in
-              let do_find_opt v = try Some(find v) with Not_found -> None in
-              let rec exp2si e =
-                try (match e with
-                | Int(i,t) -> SI.of_bap_int (int64_of_big_int i) t
-                | Lab _ -> raise(Unimplemented "No SI for labels (should be a constant)")
-                | Var v -> do_find v
-                | Phi vl -> BatList.reduce SI.union (BatList.filter_map do_find_opt vl)
-                | BinOp(op, x, y) ->
-                  let f = binop_to_si_function op in
-                  let k = bits_of_exp x in
-                  let r = f k (exp2si x) (exp2si y) in
-                  SI.check_reduced k r;
-                  r
-                | UnOp(op, x) ->
-                  let f = unop_to_si_function op in
-                  let k = bits_of_exp x in
-                  let r = f k (exp2si x) in
-                  SI.check_reduced k r;
-                  r
-                (* | Phi(x::xs) -> *)
-                (*   List.fold_left *)
-                (*     (fun i y -> SI.union i (do_find y)) *)
-                (*     (do_find x) xs *)
-                (* | Phi [] -> *)
-                (*   failwith "Encountered empty Phi expression" *)
-
-                    (* This tries to preserve strides for loop variables, but takes too long, and
-                       wasn't working.
-                       | Phi xs ->
-                       let res = List.fold_left
-                       (fun res y ->
-                       try let l = find y in
-                       match res with None -> Some l
-                       | Some l' -> Some(SI.union l l')
-                       with Not_found -> res
-                       )
-                       None xs
-                       in
-                       (match res with
-                       | Some l -> l
-                       | None -> raise Not_found
-                       )
-                    *)
-                | Cast(cast, t, vl) ->
-                  let f = cast_to_si_function cast in
-                  f (bits_of_width t) (exp2si vl)
-                | Concat (e1, e2) -> exp2si (Ssa_convenience.rm_concat e)
-                | Extract _ -> exp2si (Ssa_convenience.rm_extract e)
-                | Ite (c, e1, e2) ->
-                  let csi = exp2si c in
-                  if csi = SI.yes then exp2si e1
-                  else if csi = SI.no then exp2si e2
-                  else SI.union (exp2si e1) (exp2si e2)
-                | Unknown _ -> top v
-                | Store _ | Load _ -> raise (Unimplemented "Memory unimplemented in this version of VSA"))
-                with Unimplemented _ | Invalid_argument _ ->
-                  top v
-              in
-              let new_si = exp2si e in
-              if try VM.find v l <> new_si with Not_found -> true then (
-                dprintf "adding %s = %s" (Pp.var_to_string v) (SI.to_string new_si);
-                VM.add v new_si l )
-                else l
-            with Invalid_argument _ | Not_found ->
-              l
-
-    let edge_transfer_function _ _ _ _ = Util.id
-
-  end
-
-  module DF = CfgDataflow.MakeWide(DFP)
-
-end (* module SimpleVSA *)
-
-
 
 (** Value Sets *)
 module VS =
@@ -927,136 +809,42 @@ struct
 
   let numconcrete vs =
     fold (fun _ a -> a +% 1L) vs 0L
+
+  let binop_to_vs_function = function
+    | PLUS -> add
+    | MINUS -> sub
+    | AND -> logand
+    | OR -> logor
+    | XOR -> logxor
+    | EQ -> eq
+    | TIMES
+    | DIVIDE
+    | SDIVIDE
+    | MOD
+    | SMOD
+    | LSHIFT
+    | RSHIFT
+    | ARSHIFT
+    | NEQ
+    | LT
+    | LE
+    | SLT
+    | SLE as bop
+      -> si_to_vs_binop_function (SI.binop_to_si_function bop)
+
+  let unop_to_vs_function = function
+    | NEG
+    | NOT as unop
+      -> si_to_vs_unop_function (SI.unop_to_si_function unop)
+
+  let cast_to_vs_function = function
+    | CAST_UNSIGNED
+    | CAST_SIGNED
+    | CAST_HIGH
+    | CAST_LOW as ct
+      -> si_to_vs_cast_function (SI.cast_to_si_function ct)
+
 end
-
-
-
-(* Very simplified version of VSA, supporting regions *)
-module RegionVSA =
-struct
-  module DFP =
-  struct
-    module CFG = Cfg.SSA
-    module L =
-    struct
-      (* XXX: This is wrong *)
-      type t = VS.t VM.t
-      let top = VM.empty
-      let equal = VM.equal (=)
-      let meet x y =
-        VM.fold
-          (fun k v res ->
-             try
-               let v' = VM.find k y in
-               let vs = VS.union v v' in
-                 VM.add k vs res
-             with Not_found ->
-               VM.add k v res
-          )
-          x y
-      let widen x y =
-        VM.fold
-          (fun k v res ->
-             try
-               let v' = VM.find k y in
-               let vs = VS.widen v v' in
-                 VM.add k vs res
-             with Not_found ->
-               VM.add k v res
-          )
-          x y
-    end
-    module O = GraphDataflow.NOOPTIONS
-    let s0 _ _ = CFG.G.V.create Cfg.BB_Entry
-    let init _ g =
-        VM.add sp [(sp, SI.zero (bits_of_width (Var.typ sp)))] L.top (* stack region *)
-
-    let dir _ = GraphDataflow.Forward
-
-    let binop_to_vs_function = function
-      | PLUS -> VS.add
-      | MINUS -> VS.sub
-      | AND -> VS.logand
-      | OR -> VS.logor
-      | XOR -> VS.logxor
-      | EQ -> VS.eq
-      | TIMES
-      | DIVIDE
-      | SDIVIDE
-      | MOD
-      | SMOD
-      | LSHIFT
-      | RSHIFT
-      | ARSHIFT
-      | NEQ
-      | LT
-      | LE
-      | SLT
-      | SLE as bop
-        -> VS.si_to_vs_binop_function (SimpleVSA.DFP.binop_to_si_function bop)
-
-    let unop_to_vs_function = function
-      | NEG
-      | NOT as unop
-        -> VS.si_to_vs_unop_function (SimpleVSA.DFP.unop_to_si_function unop)
-
-    let cast_to_vs_function = function
-      | CAST_UNSIGNED
-      | CAST_SIGNED
-      | CAST_HIGH
-      | CAST_LOW as ct
-        -> VS.si_to_vs_cast_function (SimpleVSA.DFP.cast_to_si_function ct)
-
-
-    let rec stmt_transfer_function _ _ _ s l =
-      match s with
-        | Assert(Var _, _)  (* FIXME: Do we want to say v is true? *)
-        | Assert _ | Assume _ | Jmp _ | CJmp _ | Label _ | Comment _
-        | Halt _ ->
-            l
-        | Move(v, e, _) ->
-            try
-              let find v = VM.find v l in
-              let do_find v = try find v with Not_found -> VS.top (bits_of_width (Var.typ v)) in
-              let rec exp2vs e =
-                try (match e with
-                | Int(i,t) -> VS.of_bap_int (int64_of_big_int i) t
-                | Lab _ -> raise(Unimplemented "No VS for labels (should be a constant)")
-                | Var v -> do_find v
-                | BinOp(op, x, y) ->
-                  let f = binop_to_vs_function op in
-                  let k = SimpleVSA.DFP.bits_of_exp x in
-                  f k (exp2vs x) (exp2vs y)
-                | UnOp(op, x) ->
-                  let f = unop_to_vs_function op in
-                  let k = SimpleVSA.DFP.bits_of_exp x in
-                  f k (exp2vs x)
-                (* | Phi(x::xs) -> *)
-                (*   List.fold_left *)
-                (*     (fun i y -> VS.union i (do_find y)) *)
-                (*     (do_find x) xs *)
-                (* | Phi [] -> *)
-                (*   failwith "Encountered empty Phi expression" *)
-                | Cast (ct, t, x) ->
-                  let f = cast_to_vs_function ct in
-                  let k = Typecheck.bits_of_width t in
-                  f k (exp2vs x)
-                | _ ->
-                  raise(Unimplemented "unimplemented expression type"))
-                with Unimplemented _ | Invalid_argument _ -> VS.top (bits_of_width (Typecheck.infer_ssa e))
-              in
-              let new_vs = exp2vs e in
-              VM.add v new_vs l
-            with Invalid_argument _ | Not_found ->
-              l
-
-    let edge_transfer_function _ _ _ _ = Util.id
-
-  end
-  
-  module DF = CfgDataflow.MakeWide(DFP)
-
-end (* module RegionVSA *)
 
 (** Abstract Store *)
 module MemStore = struct
@@ -1433,19 +1221,13 @@ struct
           | Var v -> do_find l v
           | Phi vl -> BatList.reduce VS.union (BatList.filter_map (do_find_opt l) vl)
           | BinOp(op, x, y) ->
-            let f = RegionVSA.DFP.binop_to_vs_function op in
-            let k = SimpleVSA.DFP.bits_of_exp x in
+            let f = VS.binop_to_vs_function op in
+            let k = bits_of_exp x in
             f k (exp2vs ?o l x) (exp2vs ?o l y)
           | UnOp(op, x) ->
-            let f = RegionVSA.DFP.unop_to_vs_function op in
-            let k = SimpleVSA.DFP.bits_of_exp x in
+            let f = VS.unop_to_vs_function op in
+            let k = bits_of_exp x in
             f k (exp2vs ?o l x)
-                  (* | Phi(x::xs) -> *)
-                  (*   List.fold_left *)
-                  (*     (fun i y -> VS.union i (do_find l y)) *)
-                  (*     (do_find l x) xs *)
-                  (* | Phi [] -> *)
-                  (*   failwith "Encountered empty Phi expression" *)
           | Load(Var m, i, _e, t) ->
             (* FIXME: assumes deendianized.
                ie: _e and _t should be the same for all loads and
@@ -1453,7 +1235,7 @@ struct
             DV.dprintf "doing a read from %s" (VS.to_string (exp2vs ?o l i));
             MemStore.read (bits_of_width t) ?o (do_find_ae l m) (exp2vs ?o l i)
           | Cast (ct, t, x) ->
-            let f = RegionVSA.DFP.cast_to_vs_function ct in
+            let f = VS.cast_to_vs_function ct in
             let k = Typecheck.bits_of_width t in
             f k (exp2vs ?o l x)
           | Load _ | Concat _ | Extract _ | Ite _ | Unknown _ | Store _ ->
@@ -1466,9 +1248,9 @@ struct
           | Var v ->
             do_find_ae l v
           | Store(Var m,i,v,_e,t) ->
-                    (* FIXME: assumes deendianized.
-                       ie: _e and _t should be the same for all loads and
-                       stores of m. *)
+            (* FIXME: assumes deendianized.
+               ie: _e and _t should be the same for all loads and
+               stores of m. *)
             DV.dprintf "doing a write... to %s of %s." (VS.to_string (exp2vs ?o l i)) (VS.to_string (exp2vs ?o l v));
             (* dprintf "size %#Lx" (VS.numconcrete (exp2vs ?o l i)); *)
             MemStore.write (bits_of_width t)  (do_find_ae l m) (exp2vs ?o l i) (exp2vs ?o l v)
