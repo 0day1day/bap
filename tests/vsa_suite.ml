@@ -1,5 +1,5 @@
 open OUnit
-module VM = Vsa_ast.VM
+module VM = Var.VarMap
 
 let nmeets = 50
 

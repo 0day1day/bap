@@ -1069,8 +1069,9 @@ module MemStore = struct
   module M2 = BatMap.Make(struct type t = int64 let compare = Int64.compare end)
 
   (* VSA optional interface: specify a "real" memory read function *)
+  type options = { initial_mem : (addr * char) list }
   module O = struct
-    type t = { initial_mem : (addr * char) list }
+    type t = options
     let default = { initial_mem = [] }
   end
 
@@ -1395,7 +1396,7 @@ struct
     let init_vars vars =
       List.fold_left (fun vm x -> VM.add x (`Scalar [(x, SI.zero (bits_of_width (Var.typ x)))]) vm) AbsEnv.empty vars
 
-    let init_mem vm {O.initial_mem=initial_mem} =
+    let init_mem vm {MemStore.initial_mem} =
       let write_mem m (a,v) =
         DV.dprintf "Writing %#x to %s" (Char.code v) (~% a);
         let v = Char.code v in
@@ -1639,6 +1640,10 @@ struct
   module DF = CfgDataflow.MakeWide(DFP)
 
 end
+
+type options = MemStore.options
+
+let exp2vs = AlmostVSA.DFP.exp2vs ?o:None
 
 (* Main vsa interface *)
 let vsa ?nmeets ?opts g =

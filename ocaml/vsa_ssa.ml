@@ -1715,7 +1715,7 @@ let prepare_ssa_indirect ?vs ssacfg =
 
   ssacfg
 
-type options = AlmostVSA.DFP.O.t
+type options = MemStore.options
 
 let exp2vs = AlmostVSA.DFP.exp2vs ?o:None
 
