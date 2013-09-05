@@ -23,7 +23,6 @@ module MemStore :
   sig
     module M1 : Map.S with type key = Var.t
     module M2 : Map.S with type key = int64
-    type options = { initial_mem : (Type.addr * char) list }
     type t = VS.t M2.t M1.t
 end
 (** Memories *)
@@ -41,12 +40,15 @@ val exp2vs : AbsEnv.t -> Ast.exp -> VS.t
 (** Approximate an expression using value sets in an abstract
     environment *)
 
-type options = MemStore.options
+type options = { initial_mem : (Type.addr * char) list;
+                 sp : Var.t;
+                 mem : Var.t;
+               }
 (** VSA options *)
 
 val vsa :
   ?nmeets:int ->
-  ?opts:options ->
+  options ->
   Cfg.AST.G.t ->
   (Cfg.AST.G.V.t * int -> AbsEnv.t option) *
     (Cfg.AST.G.V.t * int -> AbsEnv.t option)
@@ -57,3 +59,9 @@ val last_loc :
   Cfg.AST.G.t ->
   Cfg.AST.G.V.t -> Cfg.AST.G.V.t * int
 (** Returns the last location in a basic block. *)
+
+val build_default_arch_options : Arch.arch -> options
+(** Build default options for arch*)
+
+val build_default_prog_options : Asmir.asmprogram -> options
+(** Build default options for program *)

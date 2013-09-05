@@ -31,6 +31,10 @@ module D = Debug.Make(struct let name = "Vsa_ast" and default=`NoDebug end)
 open D
 module DV = Debug.Make(struct let name = "VsaVerbose_ast" and default=`NoDebug end)
 
+(* A default stack pointer to put in options so that we can verify the
+   user actually changed it to a real one *)
+let default_sp = Var.newvar "default_sp" reg_1;;
+
 (* Treat unsigned comparisons the same as signed: should be okay as
    long as overflow does not occur. Should be false for soundness. *)
 let signedness_hack = ref true
@@ -61,8 +65,6 @@ let uint64_lcm x y =
 
 let bits_of_width = Typecheck.bits_of_width
 let bits_of_exp e = bits_of_width (Typecheck.infer_ast e)
-
-let sp = Disasm_i386.R32.esp
 
 (** Strided Intervals *)
 module SI =
@@ -637,13 +639,6 @@ struct
     pp p vs;
     Buffer.contents b
 
-  let kind = function
-    | [] -> failwith "empty value sets not allowed"
-    | [(r,si)] when r == global && si = SI.top 32 -> `Top
-    | [(r,_)] when r == global -> `VSglob
-    | [_] -> `VSsingle
-    | _ -> `VSarb
-
   let single k x = [(global, SI.single k x)]
   let of_bap_int i t = [(global, SI.of_bap_int i t)]
 
@@ -851,15 +846,9 @@ module MemStore = struct
   module M1 = BatMap.Make(struct type t = VS.region let compare = Var.compare end)
   module M2 = BatMap.Make(struct type t = int64 let compare = Int64.compare end)
 
-  (* VSA optional interface: specify a "real" memory read function *)
-  type options = { initial_mem : (addr * char) list }
-  module O = struct
-    type t = options
-    let default = { initial_mem = [] }
-  end
-
   (** This implementation may change... *)
   type t = VS.t M2.t M1.t
+
 
   let top = M1.empty
 
@@ -873,16 +862,6 @@ module MemStore = struct
       let region = if r == VS.global then "$" else Pp.var_to_string r in
       p (Printf.sprintf " %s[%#Lx] -> %s\n" region i (VS.to_string vs))) a ();
     p "End contents.\n"
-
-  (* let read_concrete_real ?o (r,i) =match o with *)
-  (*   | Some {O.get_mem=get_mem} when r = VS.global -> *)
-  (*     let prog_mem = BatList.filter_map get_mem [i;i+%1L;i+%2L;i+%3L] in *)
-  (*     if List.length prog_mem = 4 then *)
-  (*       (\* Ugh, fix this *\) *)
-  (*       let i64 = Arithmetic.bytes_to_int64 `Little prog_mem in *)
-  (*       VS.of_bap_int i64 reg_32 *)
-  (*     else VS.top *)
-  (*   | _ -> VS.top *)
 
   let rec read_concrete k ?o ae (r,i) =
     try
@@ -1100,8 +1079,10 @@ module AbsEnv = struct
     with Not_found -> None
 end  (* module AE *)
 
-
-
+type options = { initial_mem : (addr * char) list;
+                 sp : Var.t;
+                 mem : Var.t;
+               }
 
 (** This does most of VSA, except the loop handling and special dataflow *)
 module AlmostVSA =
@@ -1170,7 +1151,16 @@ struct
         print_string "\n";
         v *) 
     end
-    module O = MemStore.O
+    (* VSA optional interface: specify a "real" memory read function *)
+    module O = struct
+      type t = options
+      let default = { initial_mem = [];
+                      (* pick something that doesn't make sense so we
+                         can make sure the user changed it later *)
+                      sp = default_sp;
+                      mem = default_sp;
+                    }
+    end
 
     let s0 _ _ = CFG.G.V.create Cfg.BB_Entry
 
@@ -1180,18 +1170,26 @@ struct
     let init_vars vars =
       List.fold_left (fun vm x -> VM.add x (`Scalar [(x, SI.zero (bits_of_width (Var.typ x)))]) vm) AbsEnv.empty vars
 
-    let init_mem vm {MemStore.initial_mem} =
+    let init_mem vm {initial_mem; mem} =
       let write_mem m (a,v) =
         DV.dprintf "Writing %#x to %s" (Char.code v) (~% a);
         let v = Char.code v in
         let a = Big_int_Z.int64_of_big_int a in
         let v = Int64.of_int v in
-        MemStore.write 8 m (VS.single 32 a) (VS.single 8 v)
+        let index_bits = Typecheck.bits_of_width (Typecheck.index_type_of (Var.typ mem)) in
+        let value_bits = Typecheck.bits_of_width (Typecheck.value_type_of (Var.typ mem)) in
+        if value_bits <> 8
+        then failwith "VSA assumes memory is byte addressable";
+        MemStore.write 8 m (VS.single index_bits a) (VS.single 8 v)
       in
       let m = List.fold_left write_mem (MemStore.top) initial_mem in
-      VM.add Disasm_i386.R32.mem (`Array m) vm
+      if Var.equal mem default_sp
+      then failwith "Vsa: Non-default memory must be provided";
+      VM.add mem (`Array m) vm
 
-    let init o g : L.t =
+    let init ({sp} as o) g : L.t =
+      if Var.equal sp default_sp
+      then failwith "Vsa: Non-default stack pointer must be given";
       let vm = init_vars [sp] in
       Some(init_mem vm o)
 
@@ -1248,12 +1246,6 @@ struct
             DV.dprintf "doing a write... to %s of %s." (VS.to_string (exp2vs ?o l i)) (VS.to_string (exp2vs ?o l v));
             (* dprintf "size %#Lx" (VS.numconcrete (exp2vs ?o l i)); *)
             MemStore.write (bits_of_width t)  (do_find_ae l m) (exp2vs ?o l i) (exp2vs ?o l v)
-          (* | Phi(x::xs) -> *)
-          (*   List.fold_left *)
-          (*     (fun i y -> MemStore.union i (do_find_ae l y)) *)
-          (*     (do_find_ae l x) xs *)
-          (* | Phi [] -> *)
-          (*   failwith "Encountered empty Phi expression" *)
           | _ ->
             raise(Unimplemented "unimplemented memory expression type"))
           with Unimplemented _ | Invalid_argument _ -> MemStore.top
@@ -1419,13 +1411,23 @@ struct
 
 end
 
-type options = MemStore.options
-
 let exp2vs = AlmostVSA.DFP.exp2vs ?o:None
 
 (* Main vsa interface *)
-let vsa ?nmeets ?opts g =
+let vsa ?nmeets opts g =
   Checks.connected_astcfg g "VSA";
-  AlmostVSA.DF.worklist_iterate_widen_stmt ?nmeets ?opts g
+  AlmostVSA.DF.worklist_iterate_widen_stmt ?nmeets ~opts g
 
 let last_loc = AlmostVSA.DF.last_loc
+
+let build_default_arch_options arch =
+  {
+    initial_mem = [];
+    sp=Arch.sp_of_arch arch;
+    mem=Arch.mem_of_arch arch;
+  }
+
+let build_default_prog_options asmp =
+  let x = build_default_arch_options (Asmir.get_asmprogram_arch asmp) in
+  { x with initial_mem=Asmir.get_readable_mem_contents_list asmp
+  }

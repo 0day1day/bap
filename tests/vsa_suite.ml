@@ -4,11 +4,13 @@ module VM = Var.VarMap
 let nmeets = 50
 
 let ast_test filename var v () =
-  let p = Asmir.asmprogram_to_bap (Asmir.open_program filename) in
+  let asmp = Asmir.open_program filename in
+  let p = Asmir.asmprogram_to_bap asmp in
   let cfg = Cfg_ast.of_prog p in
   let cfg = Prune_unreachable.prune_unreachable_ast cfg in
   let cfg = Ast_cond_simplify.simplifycond_cfg cfg in
-  let _df_in, df_out = Vsa_ast.vsa ~nmeets cfg in
+  let opts = Vsa_ast.build_default_prog_options asmp in
+  let _df_in, df_out = Vsa_ast.vsa ~nmeets opts cfg in
   let exiT = Cfg.AST.G.V.create Cfg.BB_Exit in
   let l = df_out (Vsa_ast.last_loc cfg exiT) in
   let l = BatOption.get l in

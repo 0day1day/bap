@@ -18,6 +18,7 @@ type cmd =
   | AnalysisAst of (ast -> unit)
   | AnalysisModeAst of (arch -> ast -> unit)
   | AnalysisAstCfg of (astcfg -> unit)
+  | AnalysisModeAstCfg of (arch -> astcfg -> unit)
   | AnalysisSsa of (ssa -> unit)
   | TransformAst of (ast -> ast)
   | TransformModeAst of (arch -> ast -> ast)
@@ -147,10 +148,11 @@ let jumpelim p =
 let ast_coalesce = Coalesce.coalesce_ast
 let ssa_coalesce = Coalesce.coalesce_ssa
 
-let vsa_print g =
+let vsa_print a g =
   let g = Hacks.ast_remove_indirect g in
   let g = Ast_cond_simplify.simplifycond_cfg g in
-  let _df_in, df_out = Vsa_ast.vsa ~nmeets:50 g in
+  let opts = Vsa_ast.build_default_arch_options a in
+  let _df_in, df_out = Vsa_ast.vsa ~nmeets:50 opts g in
   Cfg.AST.G.iter_vertex (fun v ->
     Printf.printf "VSA @%s" (Cfg_ast.v2s v);
     Vsa_ast.AbsEnv.pp print_string (BatOption.get (df_out (Vsa_ast.last_loc g v)));
@@ -461,7 +463,7 @@ let speclist =
       "Add an \"assume false\" statement to BB_Error and add an edge to BB_Exit")
   :: ("-flatten-mem", uadd(TransformAst Flatten_mem.flatten_mem_program),
       "Flatten memory accesses")
-  :: ("-vsa", uadd(AnalysisAstCfg vsa_print),
+  :: ("-vsa", uadd(AnalysisModeAstCfg vsa_print),
       "Run value set analysis and print the results.")
   :: ("-simplify-conds", uadd(TransformAstCfg Ast_cond_simplify.simplifycond_cfg),
       "Simplify conditions")
@@ -499,6 +501,11 @@ let rec apply_cmd prog = function
   | AnalysisAstCfg f -> (
     match prog with
     | AstCfg p as p' -> f p; p'
+    | _ -> failwith "need explicit translation to AST CFG"
+  )
+  | AnalysisModeAstCfg f -> (
+    match prog with
+    | AstCfg p as p' -> f (Input.get_arch arch) p; p'
     | _ -> failwith "need explicit translation to AST CFG"
   )
   | AnalysisSsa f -> (
