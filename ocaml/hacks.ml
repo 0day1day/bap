@@ -187,7 +187,11 @@ module Rm(C: Cfg.CFG) = struct
   (* Often error is only reachable through indirect.  If this is the
      case and we remove indirect, then remove error as well *)
   let remove_error_if_disconnected g =
-    if C.G.in_degree g (C.G.V.create Cfg.BB_Error) = 0
+    let remove_error =
+      try C.G.in_degree g (C.G.V.create Cfg.BB_Error) = 0
+      with Invalid_argument _ (* not in graph *) -> false
+    in
+    if remove_error
     then C.remove_vertex g (C.G.V.create Cfg.BB_Error)
     else g
   let remove_indirect g =
