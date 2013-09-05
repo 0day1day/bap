@@ -12,7 +12,7 @@ sig
   module G : sig
     type t
     module V : Graph.Sig.COMPARABLE
-    module E : Graph.Sig.EDGE with type vertex = V.t and type label = (bool * exp) option
+    module E : Graph.Sig.EDGE with type vertex = V.t and type label = (bool option * exp) option
     val pred_e : t -> V.t -> E.t list
     val succ_e : t -> V.t -> E.t list
     val fold_vertex : (V.t -> 'a -> 'a) -> t -> 'a -> 'a

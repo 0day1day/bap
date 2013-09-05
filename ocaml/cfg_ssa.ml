@@ -414,9 +414,9 @@ let rec trans_cfg ?(tac=true) cfg =
             (fun e ssa ->
               let ssa = C.remove_edge_e ssa e in
               let new_lab = match C.G.E.label e with
-                | Some(true, _) -> Some(true, BinOp(EQ, v, val_true))
-                | Some(false, _) -> Some(false, BinOp(EQ, v, val_false))
-                | None -> failwith "Successor of a CJmp should have a label"
+                | Some(Some true, _) -> Some(Some true, BinOp(EQ, v, val_true))
+                | Some(Some false, _) -> Some(Some false, BinOp(EQ, v, val_false))
+                | _ -> failwith "Successor of a CJmp should have a label"
               in
               let newe = C.G.E.create (C.G.E.src e) new_lab (C.G.E.dst e) in
               C.add_edge_e ssa newe
@@ -598,9 +598,9 @@ let split_edges c =
     let newl = mklabel c in
     let el = E.label e in
     let (t1,t2,_) = match el with
-      | Some (true, _) -> (Lab newl, t2, t1)
-      | Some (false, _) -> (t1, Lab newl, t2)
-      | None -> failwith "Unlabeled edges from cjmp"
+      | Some (Some true, _) -> (Lab newl, t2, t1)
+      | Some (Some false, _) -> (t1, Lab newl, t2)
+      | _ -> failwith "Unlabeled edges from cjmp"
     in
     let revs = CJmp(cond, t1, t2, attrs) :: List.tl revs in
     let (c,v) = C.create_vertex c [Label(Name newl, [])] in

@@ -192,25 +192,25 @@ let unroll_loop ?(count=8) ?(id=0) cfg head body =
     let revstmts = List.rev (C.get_stmts cfg vertex) in
     let revstmts' = match revstmts with
       | (CJmp(c,t1,t2,attrs) as stmt)::rest ->
-	  let e1,e2 = match C.G.succ_e cfg vertex with
-	    | [e1;e2] when Cfg.edge_direction (C.G.E.label e1) = Some true &&
+          let e1,e2 = match C.G.succ_e cfg vertex with
+            | [e1;e2] when Cfg.edge_direction (C.G.E.label e1) = Some true &&
                         Cfg.edge_direction (C.G.E.label e2) = Some false ->
-		(e1,e2)
+                (e1,e2)
 	    | [e1;e2] when Cfg.edge_direction (C.G.E.label e2) = Some true &&
                         Cfg.edge_direction (C.G.E.label e1) = Some false ->
-		(e2,e1)
-	    | _ ->
+                (e2,e1)
+            | _ ->
                 failwith ("Something is wrong with the edges or edge labels:"^(Pp.ast_stmt_to_string stmt))
-	  in
-	  let s1 = C.G.E.dst e1 and s2 = C.G.E.dst e2 in
+          in
+          let s1 = C.G.E.dst e1 and s2 = C.G.E.dst e2 in
           (*dprintf "Generating e1 and e2";*)
-	  let t1' = getlabel t1 s1 and t2' = getlabel t2 s2 in
+          let t1' = getlabel t1 s1 and t2' = getlabel t2 s2 in
           (*dprintf "Found: %s =?= %s" (Pp.ast_exp_to_string t1') (Pp.ast_exp_to_string t2');*)
           (*if (t1' = t2') then
             (let ss = C.get_stmts cfg s1 in dprintf "stmt: %s" (Pp.ast_stmt_to_string (List.hd ss));
              let ss = C.get_stmts cfg s2 in dprintf "stmt: %s" (Pp.ast_stmt_to_string (List.hd ss)));*)
-	  if t1' === t1 && t2' === t2 then revstmts
-	  else CJmp(c,t1',t2',attrs)::rest
+          if t1' === t1 && t2' === t2 then revstmts
+          else CJmp(c,t1',t2',attrs)::rest
       | Jmp _::rest
       | rest -> rest
     in

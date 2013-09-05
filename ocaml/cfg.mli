@@ -19,7 +19,7 @@ type bbid =
 val bbid_to_string : bbid -> string
 
 (** Extract the direction taken from an edge *)
-val edge_direction : (bool * 'a) option -> bool option
+val edge_direction : (bool option * 'a) option -> bool option
 
 module BBid :
 sig
@@ -43,9 +43,13 @@ sig
   type lang = stmt list
   type exp
 
-  (* XXX: Should we force exp more structured? For instance, exp =
-     exp? *)
-  include Graph.Builder.S with type G.V.label = bbid and type G.E.label = (bool * exp) option
+  include Graph.Builder.S with type G.V.label = bbid and type G.E.label = (bool option * exp) option
+(** Edge labels:
+    None -> unconditional edge
+    Some(None, e) -> indirect edge
+    Some(true, e) -> conditional true edge
+    Some(false, e) -> conditional false edge
+*)
 
 
   (** Finds a vertex by a bbid *)

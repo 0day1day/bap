@@ -113,7 +113,7 @@ let f ~special_error (indirectt, nodes, edges, c, cur,onlylabs, addpred) s =
       | Jmp(t, _) -> for_later t::edges, c
       (* XXX: This does not structure expressions such that it is
          easy to tell if two expressions are inverted *)
-      | CJmp(e,t,f,_) -> for_later ~lab:(true, Ast_convenience.binop EQ e exp_true) t::for_later ~lab:(false, Ast_convenience.binop EQ e exp_false) f::edges, c
+      | CJmp(e,t,f,_) -> for_later ~lab:(Some true, Ast_convenience.binop EQ e exp_true) t::for_later ~lab:(Some false, Ast_convenience.binop EQ e exp_false) f::edges, c
       | Special _ -> let c, error = find_error c in
                      edges, C.add_edge c v error
       | Halt _ -> let c, exit = find_exit c in

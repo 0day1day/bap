@@ -375,13 +375,13 @@ let do_aggressive_dce ?(globals = []) graph =
              dprintf "Dead cjmp at %s: %s" (Cfg_ssa.v2s bb) (Pp.ssa_stmt_to_string s);
              let truee = List.find (fun e ->
                match C.G.E.label e with
-               | Some(true, _) -> true 
+               | Some(Some true, _) -> true 
                | _ -> false)
                (C.G.succ_e graph bb)
              in
              let falsee = List.find (fun e ->
                match C.G.E.label e with
-               | Some(false, _) -> true
+               | Some(Some false, _) -> true
                | _ -> false)
                (C.G.succ_e graph bb)
              in

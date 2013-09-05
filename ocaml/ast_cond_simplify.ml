@@ -145,9 +145,9 @@ let simplifycond_cfg g =
         let g = C.remove_edge_e g e in
         let dst = C.G.E.dst e in
         let newlabel = match C.G.E.label e with
-        | Some (true, _) -> Some(true, simplify_exp (BinOp(EQ, e', exp_true)))
-        | Some (false, _) -> Some(false, simplify_exp (BinOp(EQ, e', exp_false)))
-        | None -> failwith "Unexpected unlabeled edge found from CJmp" in
+        | Some (Some true, _) -> Some(Some true, simplify_exp (BinOp(EQ, e', exp_true)))
+        | Some (Some false, _) -> Some(Some false, simplify_exp (BinOp(EQ, e', exp_false)))
+        | _ -> failwith "Unexpected unlabeled edge found from CJmp" in
         let newe = C.G.E.create v newlabel dst in
         C.add_edge_e g newe
       ) g v g

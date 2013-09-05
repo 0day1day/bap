@@ -47,7 +47,7 @@ module type Cfg =
 sig
   type exp
   val exp_to_string : exp -> string
-  include Graph.Sig.G with type V.label = Cfg.bbid and type E.label = (bool * exp) option
+  include Graph.Sig.G with type V.label = Cfg.bbid and type E.label = (bool option * exp) option
 end
 
 module DefAttributor(G:Cfg) =
@@ -209,9 +209,11 @@ struct
     | _ -> out),
     (fun e ->
       match CA.G.E.label e with
-      | Some (b, e) ->
+      | Some (Some b, _) ->
         string_of_bool b
-      | None -> ""
+      | Some (None, e) ->
+        Pp.ast_exp_to_string e
+      | _ -> ""
     )
 end
 
