@@ -267,6 +267,9 @@ and pref_gs = 0x65
 and pref_opsize = 0x66
 and pref_addrsize = 0x67
 
+(* Prefixes that we can usually handle automatically *)
+let standard_prefs = [pref_opsize; pref_addrsize; hint_bnt; hint_bt; pref_cs; pref_ss; pref_ds; pref_es; pref_fs; pref_gs]
+
 (* See Table 2-4: REX Prefix Fields. *)
 type rex = {
   rex_w : bool; (* Bit 3: 1 = 64-bit operand size *)
@@ -995,7 +998,7 @@ let rec to_ir mode addr next ss pref has_rex has_vex =
       load_stmt::
       rsp_stmts@
       [Jmp(Var temp, reta)]
-  | Mov(t, dst, src, condition) when pref = [] || pref = [pref_addrsize] || List.mem pref_fs pref ->
+  | Mov(t, dst, src, condition) ->
     let c_src = (match condition with 
       | None -> op2e t src
       | Some(c) -> ite t c (op2e t src) (op2e t dst))
@@ -1041,14 +1044,14 @@ let rec to_ir mode addr next ss pref has_rex has_vex =
       in
       if pref = [] then
         stmts
-      else if pref = [repz] || pref = [repnz] then
+      else if List.mem repz pref || List.mem repnz pref then
         (* movs has only rep instruction others just considered to be rep *)
         rep_wrap ~mode ~addr ~next stmts
       else
         unimplemented "unsupported prefix for movs"
-  | Movzx(t, dst, ts, src) when pref = [] ->
+  | Movzx(t, dst, ts, src) ->
     [assn t dst (cast_unsigned t (op2e ts src))]
-  | Movsx(t, dst, ts, src) when pref = [] ->
+  | Movsx(t, dst, ts, src) ->
     [assn t dst (cast_signed t (op2e ts src))]
   | Movdq(ts, s, td, d, align) ->
     let (s, al) = match s with
@@ -2080,9 +2083,6 @@ let rec to_ir mode addr next ss pref has_rex has_vex =
   | Leave _ ->  unimplemented "to_ir: Leave"
   | Call _ ->  unimplemented "to_ir: Call"
   | Lea _ ->  unimplemented "to_ir: Lea"
-  | Movsx _ ->  unimplemented "to_ir: Movsx"
-  | Movzx _ ->  unimplemented "to_ir: Movzx"
-  | Mov _ ->  unimplemented "to_ir: Mov"
   | Movs _ ->  unimplemented "to_ir: Movs"
   | Cmps _ ->  unimplemented "to_ir: Cmps"
   | Scas _ ->  unimplemented "to_ir: Scas"
