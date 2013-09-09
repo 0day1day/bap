@@ -318,3 +318,8 @@ let ssa_replacer ?(eq=(==)) ~needle ~haystack ~replacement =
       else DoChildren
   end in
   Ssa_visitor.exp_accept v haystack
+
+let filter_specials =
+  List.filter (function
+    | Ast.Special _ -> false
+    | _ -> true)

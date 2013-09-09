@@ -278,6 +278,8 @@ let speclist =
      uadd(TransformSsa Depgraphs.DDG_SSA.stmtlist_to_single_stmt),
      "Create new graph where every node has at most 1 SSA statement"
     )
+  ::("-filter-specials", uadd(TransformAst Hacks.filter_specials),
+     "Remove specials from AST program.")
   ::("-trace-cut", Arg.Int(fun i -> add(TransformAst(BatList.take i))),
      "<n>  Get the first <n> instructions of the trace")
   ::("-trace-concrete",
