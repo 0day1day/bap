@@ -956,7 +956,7 @@ let check_delta state tid =
           ) else (
             let badstmt =
               try
-                let {assignstmt=assignstmt; assigned_time=assigned_time} =
+                let {assignstmt; assigned_time} =
                   Hashtbl.find reg_to_stmt (var,tid)
                 in
                 let s = "{"^(Pp.ast_stmt_to_string assignstmt)^"}\n" in
