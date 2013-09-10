@@ -117,7 +117,7 @@ type rpoinfo = { (* private to the SCCVN module *)
                        corresponds to hashtable in paper *)
 }
 
-let rec vn2eid info vn : expid = match vn with
+let rec vn2eid info = function
   | Top -> raise Not_found
   | HInt(i,t) -> Const(Int(i,t))
   | Hash v -> let vn = VH.find info.vn_h v in
@@ -361,7 +361,7 @@ let rpo ~opt cfg =
   in
 
   let reset_tables () = (* add all other uninitialized vars as unique *)
-    EH.reset info.eid2vn;
+    EH.clear info.eid2vn;
     let vis = object
       inherit Ssa_visitor.nop
       method visit_rvar x =
