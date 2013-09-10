@@ -44,6 +44,7 @@ struct
            let safe = safe && node_safe && allowed in
            match G.succ graph node with
            | [successor] when not (List.mem successor acc)
+               && not (List.mem successor nocoalesce)
                && not (isspecial successor) ->
              (match G.pred graph successor with
              | [] -> failwith "node's successor has no predecessor"
@@ -68,6 +69,7 @@ struct
            should return [n3; n2; n1] *)
         let successors =
           if C.is_safe_coalesce_dst graph init
+            && List.mem init nocoalesce = false
           then immediate_succs [] init
           else []
         in
@@ -164,7 +166,7 @@ struct
   include SSA
   let remove_redundant_jump p =
     match List.rev p with
-    | Ssa.Jmp (e, _) as s::tl  when Ssa.val_of_exp e <> None ->
+    | Ssa.Jmp (e, _) as s::tl  when Ssa.lab_of_exp e <> None ->
       let str = "Removed redundant jump: " ^ (Pp.ssa_stmt_to_string s) in
       let rs = Ssa.Comment(str, []) in
       List.rev (rs::tl)

@@ -42,7 +42,7 @@ widely tested.
 
 To compile the documentation, add:
   sudo aptitude install texlive-base texlive-latex-base \
-  texlive-latex-extra texlive-fonts-recommended
+  texlive-latex-extra texlive-fonts-recommended mathpartir
 
 On Debian squeeze, you must also install a new version of OCaml.
 Follow the instructions in "Bootstrapping using ocamlbrew" after
@@ -99,7 +99,7 @@ Install macports from https://www.macports.org/install.php
 Install required packages using macports:
 
   port install gmp autoconf automake libtool ocaml opam pcre
-  port install -s binutils configure.post_args=--enable-targets=i386-elf,i386-pe
+  port install -s binutils configure.post_args=--enable-targets=i386-elf,i386-pe,x86_64-darwin
 
 Alternatively, install required packages using homebrew:
 

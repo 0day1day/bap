@@ -51,46 +51,46 @@ let rec exp_accept visitor =
     | Int _ as i -> i
     | Lab _ as l -> l
     | Var v ->
-	Var(rvar_accept visitor v)
+        Var(rvar_accept visitor v)
     | Ite(b, v1, v2) ->
-	let b' = exp_accept visitor b in
-	let v1' = exp_accept visitor v1 in
-	let v2' = exp_accept visitor v2 in
-	Ite(b', v1', v2')
+        let b' = exp_accept visitor b in
+        let v1' = exp_accept visitor v1 in
+        let v2' = exp_accept visitor v2 in
+        Ite(b', v1', v2')
     | Extract(h, l, v) ->
-	let v' = exp_accept visitor v in
-	Extract(h, l, v')
+        let v' = exp_accept visitor v in
+        Extract(h, l, v')
     | Concat(vl, vr) ->
-	let vl' = exp_accept visitor vl in
-	let vr' = exp_accept visitor vr in
-	Concat(vl', vr')
+        let vl' = exp_accept visitor vl in
+        let vr' = exp_accept visitor vr in
+        Concat(vl', vr')
     | BinOp(bop, v1, v2) -> 
-	let v1' = exp_accept visitor v1 in 
-	let v2' = exp_accept visitor v2 in 
-	BinOp(bop, v1', v2')
+        let v1' = exp_accept visitor v1 in 
+        let v2' = exp_accept visitor v2 in 
+        BinOp(bop, v1', v2')
     | UnOp(up, v) -> 
-	let v' = exp_accept visitor v in 
-	UnOp(up, v')
+        let v' = exp_accept visitor v in 
+        UnOp(up, v')
     | Cast(ct, t, v) ->
-      let v' = exp_accept visitor v in
-      Cast(ct,t,v')
+        let v' = exp_accept visitor v in
+        Cast(ct,t,v')
     | Unknown _ as exp -> exp
     | Load(v1,v2,v3, t) ->
-      let v1' = exp_accept visitor v1 in
-      let v2' = exp_accept visitor v2 in
-      let v3' = exp_accept visitor v3 in
+        let v1' = exp_accept visitor v1 in
+        let v2' = exp_accept visitor v2 in
+        let v3' = exp_accept visitor v3 in
       Load(v1',v2',v3', t)
     | Store(v1,v2,v3,v4, t) ->
-      let v1' = exp_accept visitor v1 in
-      let v2' = exp_accept visitor v2 in
-      let v3' = exp_accept visitor v3 in
-      let v4' = exp_accept visitor v4 in
-      Store(v1',v2',v3',v4',t)
+        let v1' = exp_accept visitor v1 in
+        let v2' = exp_accept visitor v2 in
+        let v3' = exp_accept visitor v3 in
+        let v4' = exp_accept visitor v4 in
+        Store(v1',v2',v3',v4',t)
     | Let(v,e1,e2) ->
-      let (v',e1') = lbinding_accept visitor (v,e1) in
-      let e2' = exp_accept visitor e2 in
-      let v' = ulbinding_accept visitor v' in
-      Let(v', e1', e2')
+        let (v',e1') = lbinding_accept visitor (v,e1) in
+        let e2' = exp_accept visitor e2 in
+        let v' = ulbinding_accept visitor v' in
+        Let(v', e1', e2')
   in
   action (wrapexp vischil) visitor#visit_exp
 

@@ -12,9 +12,6 @@ class type t = object
   (** Called when visiting a statement *)
   method visit_stmt : stmt -> stmt visit_action
 
-  (** Called when visiting a value *)
-  method visit_value : value -> value visit_action
-
   (** Called when visiting a referenced variable. See also {!visit_avar}. *)
   method visit_rvar : var -> var visit_action
 
@@ -27,7 +24,6 @@ end
 
 class nop : t = object
   method visit_exp _   = DoChildren
-  method visit_value _ = DoChildren
   method visit_stmt _  = DoChildren
   method visit_avar _  = DoChildren
   method visit_rvar _  = DoChildren
@@ -43,49 +39,48 @@ let rec action vischil startvisit node=
 
 let wrapstmt f v = let v' = f v in if quick_stmt_eq v v' then v else v'
 let wrapexp f v = let v' = f v in if quick_exp_eq v v' then v else v'
-let wrapval f v = let v' = f v in if quick_value_eq v v' then v else v'
 
 let id x = x
 
 let rec exp_accept visitor = 
   let vischil = function
-    | Ite(cond, v1, v2) ->
-	let vc' = value_accept visitor cond in 
-	let v1' = value_accept visitor v1 in 
-	let v2' = value_accept visitor v2 in 
-	Ite(vc', v1', v2')
-    | Extract(h, l, v) ->
-	let v' = value_accept visitor v in
-	Extract(h, l, v')
-    | Concat(lv, rv) ->
-	let lv' = value_accept visitor lv in
-	let rv' = value_accept visitor rv in
-	Concat(lv', rv')
-    | BinOp(bop, v1, v2) -> 
-	let v1' = value_accept visitor v1 in 
-	let v2' = value_accept visitor v2 in 
-	BinOp(bop, v1', v2')
-    | UnOp(up, v) -> 
-	let v' = value_accept visitor v in 
-	UnOp(up, v')
-    | Val(v) -> 
-	let v' = value_accept visitor v in 
-	Val(v')
-    | Cast(ct, t, v) ->
-	let v' = value_accept visitor v in 
-	Cast(ct,t,v')
-    | Unknown _ as exp -> exp
     | Load(v1,v2,v3, t) -> 
-	let v1' = value_accept visitor v1 in 
-	let v2' = value_accept visitor v2 in 
-	let v3' = value_accept visitor v3 in 
+	let v1' = exp_accept visitor v1 in 
+	let v2' = exp_accept visitor v2 in 
+	let v3' = exp_accept visitor v3 in 
 	Load(v1',v2',v3', t)
     | Store(v1,v2,v3,v4, t) ->
-	let v1' = value_accept visitor v1 in 
-	let v2' = value_accept visitor v2 in 
-	let v3' = value_accept visitor v3 in 
-	let v4' = value_accept visitor v4 in 
+	let v1' = exp_accept visitor v1 in 
+	let v2' = exp_accept visitor v2 in 
+	let v3' = exp_accept visitor v3 in 
+	let v4' = exp_accept visitor v4 in 
 	Store(v1',v2',v3',v4',t)
+    | BinOp(bop, v1, v2) -> 
+	let v1' = exp_accept visitor v1 in 
+	let v2' = exp_accept visitor v2 in 
+	BinOp(bop, v1', v2')
+    | UnOp(up, v) -> 
+	let v' = exp_accept visitor v in 
+	UnOp(up, v')
+    | Var(v) -> Var(rvar_accept visitor v)
+    | Lab _ as exp -> exp
+    | Int _ as exp -> exp
+    | Cast(ct, t, v) ->
+	let v' = exp_accept visitor v in 
+	Cast(ct,t,v')
+    | Unknown _ as exp -> exp
+    | Ite(cond, v1, v2) ->
+	let vc' = exp_accept visitor cond in 
+	let v1' = exp_accept visitor v1 in 
+	let v2' = exp_accept visitor v2 in 
+	Ite(vc', v1', v2')
+    | Extract(h, l, v) ->
+	let v' = exp_accept visitor v in
+	Extract(h, l, v')
+    | Concat(lv, rv) ->
+	let lv' = exp_accept visitor lv in
+	let rv' = exp_accept visitor rv in
+	Concat(lv', rv')
     | Phi(vl) ->
 	let vl' = List.map (rvar_accept visitor) vl in  
 	Phi(vl')
@@ -98,31 +93,24 @@ and avar_accept visitor =
 and rvar_accept visitor = 
   action id (visitor#visit_rvar)
 
-and value_accept visitor =
-  let vischil = function
-    | Var var -> Var(rvar_accept visitor var)
-    | v -> v
-  in
-  action (wrapval vischil) (visitor#visit_value)
-
 and stmt_accept visitor = 
   let vischil = function 
       (* TODO: attributes? *)
-    | Jmp(l, a) -> Jmp(value_accept visitor l, a) 
+    | Jmp(l, a) -> Jmp(exp_accept visitor l, a) 
     | CJmp(c, l1, l2, a) -> 
-	let c' = value_accept visitor c in
-	let l1' = value_accept visitor l1 in
-	let l2' = value_accept visitor l2 in
+	let c' = exp_accept visitor c in
+	let l1' = exp_accept visitor l1 in
+	let l2' = exp_accept visitor l2 in
 	CJmp(c', l1', l2', a)
     | Move(lv, e, a) ->
-	let e = exp_accept visitor e in
-	let lv = avar_accept visitor lv in
-	Move(lv, e, a)
+        let e = exp_accept visitor e in
+        let lv = avar_accept visitor lv in
+        Move(lv, e, a)
     | Label _ as s -> s
     | Comment _ as s-> s
-    | Assert(e,a) -> Assert(value_accept visitor e, a)
-    | Assume(e,a) -> Assume(value_accept visitor e, a)
-    | Halt(e,a) -> Halt(value_accept visitor e, a)
+    | Assert(e,a) -> Assert(exp_accept visitor e, a)
+    | Assume(e,a) -> Assume(exp_accept visitor e, a)
+    | Halt(e,a) -> Halt(exp_accept visitor e, a)
   in
   action (wrapstmt vischil) (visitor#visit_stmt)
 

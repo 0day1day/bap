@@ -57,12 +57,12 @@ class pp ft =
     let rec oh bop e acc =
       match e with
       | BinOp(bop', e'1, e'2) when bop' = bop ->
-	oh bop e'1 (oh bop e'2 acc)
+        oh bop e'1 (oh bop e'2 acc)
       | _ -> e::acc
     in
     match e with
     | BinOp(bop, e1, e2) ->
-	oh bop e []
+        oh bop e []
     | _ -> failwith "opflatten expects a binop"
   in
 
@@ -199,10 +199,10 @@ object (self)
     self#declare_given_freevars fvs
 
   method typ = function
-    | Reg n ->	printf "BitVec[%u]" n
+    | Reg n ->  printf "BitVec[%u]" n
     | Array(Reg idx, Reg elmt) -> printf "Array[%u:%u] " idx elmt;
     | Array _ -> failwith "SMTLIB1 only supports Arrays with register indices and elements"
-    | TMem _ ->	failwith "TMem unsupported by SMTLIB1"
+    | TMem _ -> failwith "TMem unsupported by SMTLIB1"
 
   method decl_no_print (Var.V(_,_,t) as v) =
     let sort = match t with
@@ -245,14 +245,14 @@ object (self)
     let lazye = 
       (match e with
      | Int((i, Reg t) as p) ->
-	 let maskedval = Arithmetic.to_big_int p in
-	 (* pp "bv"; printf "%Lu" maskedval; pp "["; pi t; pp "]"; *)
-	 lazy(
+         let maskedval = Arithmetic.to_big_int p in
+         (* pp "bv"; printf "%Lu" maskedval; pp "["; pi t; pp "]"; *)
+         lazy(
            pp "bv"; pp (string_of_big_int maskedval); pp "["; pi t; pp "]"
          )
      | Int _ -> failwith "Ints may only have register types"
      | Var v ->
-	 let name,st = 
+         let name,st = 
            try (match VH.find ctx v with
                name,st -> name,st)
            with Not_found ->
@@ -261,213 +261,213 @@ object (self)
              self#decl_no_print v; 
              VH.find ctx v 
          in
-	 (match st with 
-	   | BitVec -> lazy (pp name)
-	   | Bool -> raise No_rule)
+         (match st with 
+           | BitVec -> lazy (pp name)
+           | Bool -> raise No_rule)
      | Ite(cond, e1, e2) ->
-	 let pe1 = lazy (self#ast_exp e1) in
-	 let pe2 = lazy (self#ast_exp e2) in
-	 lazy(
-	   pp "(ite";
-	   space ();
-	   self#ast_exp_bool cond;
-	   space ();
-	   Lazy.force pe1;
-	   space ();
-	   Lazy.force pe2;
-	   cut ();
-	   pc ')'
-	 )
+         let pe1 = lazy (self#ast_exp e1) in
+         let pe2 = lazy (self#ast_exp e2) in
+         lazy(
+           pp "(ite";
+           space ();
+           self#ast_exp_bool cond;
+           space ();
+           Lazy.force pe1;
+           space ();
+           Lazy.force pe2;
+           cut ();
+           pc ')'
+         )
      | UnOp(uop, e) ->
-	 let pe = lazy (self#ast_exp_bv e) in
-	 lazy(
-	   (match uop with
-	    | NEG -> pp "(bvneg"; space ();
-	    | NOT -> pp "(bvnot"; space ();
-	   );
-	   Lazy.force pe;
-	   pc ')'
-	 )
+         let pe = lazy (self#ast_exp_bv e) in
+         lazy(
+           (match uop with
+            | NEG -> pp "(bvneg"; space ();
+            | NOT -> pp "(bvnot"; space ();
+           );
+           Lazy.force pe;
+           pc ')'
+         )
      | BinOp(OR, _, _) when parse_concat e <> None ->
-     	 let el, er = match parse_concat e with
-     	   | Some(el, er) -> el, er
-     	   | None -> assert false
-     	 in
-	 let pel,per = lazy (self#ast_exp_bv el), lazy (self#ast_exp_bv er) in
-     	 lazy(
-	   pp "(concat";
-     	   space ();
-	   Lazy.force pel;
-     	   space ();
-	   Lazy.force per;
-     	   cut ();
-     	   pc ')'
-	 )
+         let el, er = match parse_concat e with
+           | Some(el, er) -> el, er
+           | None -> assert false
+         in
+         let pel,per = lazy (self#ast_exp_bv el), lazy (self#ast_exp_bv er) in
+         lazy(
+           pp "(concat";
+           space ();
+           Lazy.force pel;
+           space ();
+           Lazy.force per;
+           cut ();
+           pc ')'
+         )
      | BinOp((AND|OR), _, _) when parse_ite e <> None ->
-     	 let b, e1, e2 = match parse_ite e with
-     	   | Some(b, e1, e2) -> b, e1, e2
-     	   | None -> assert false
-     	 in
-	 let pb, pe1, pe2 = lazy (self#ast_exp_bool b), lazy (self#ast_exp e1), lazy (self#ast_exp e2) in
-	 lazy(
-     	   pp "(ite";
-     	   space ();
-	   Lazy.force pb;
-     	   space ();
-	   Lazy.force pe1;
-     	   space ();
-	   Lazy.force pe2;
-     	   cut ();
-     	   pc ')';
-	 )
+         let b, e1, e2 = match parse_ite e with
+           | Some(b, e1, e2) -> b, e1, e2
+           | None -> assert false
+         in
+         let pb, pe1, pe2 = lazy (self#ast_exp_bool b), lazy (self#ast_exp e1), lazy (self#ast_exp e2) in
+         lazy(
+           pp "(ite";
+           space ();
+           Lazy.force pb;
+           space ();
+           Lazy.force pe1;
+           space ();
+           Lazy.force pe2;
+           cut ();
+           pc ')';
+         )
      | BinOp((PLUS|MINUS|TIMES|DIVIDE|SDIVIDE|MOD|SMOD|AND|OR|XOR|LSHIFT|RSHIFT|ARSHIFT) as bop, e1, e2) as e ->
-	 let t = infer_ast e1 in
-	 let t' = infer_ast e2 in
-	 if t <> t' then
-	   wprintf "Type mismatch: %s" (Pp.ast_exp_to_string e);
-	 assert (t = t') ;
-	 let fname = match bop with
-	   (* | EQ -> "bvcomp" *) (* bvcomp doesn't work on memories! *)
-	   | PLUS -> "bvadd"
-	   | MINUS -> "bvsub"
-	   | TIMES -> "bvmul"
-	   | DIVIDE -> "bvudiv"
-	   | SDIVIDE -> "bvsdiv"
-	   | MOD -> "bvurem"
-	   | SMOD -> "bvsrem"
-	   | AND -> "bvand"
-	   | OR -> "bvor"
-	   | XOR -> "bvxor"
-	   | NEQ|EQ|LE|LT|SLT|SLE -> assert false
-	   | LSHIFT -> "bvshl"
-	   | RSHIFT -> "bvlshr"
-	   | ARSHIFT -> "bvashr"
-	 in
-	 let pe1, pe2 = lazy (self#ast_exp e1), lazy (self#ast_exp e2) in
-	 lazy(
-	   pc '('; pp fname; space (); Lazy.force pe1; space (); Lazy.force pe2; pc ')';
-	 )
+         let t = infer_ast e1 in
+         let t' = infer_ast e2 in
+         if t <> t' then
+           wprintf "Type mismatch: %s" (Pp.ast_exp_to_string e);
+         assert (t = t') ;
+         let fname = match bop with
+           (* | EQ -> "bvcomp" *) (* bvcomp doesn't work on memories! *)
+           | PLUS -> "bvadd"
+           | MINUS -> "bvsub"
+           | TIMES -> "bvmul"
+           | DIVIDE -> "bvudiv"
+           | SDIVIDE -> "bvsdiv"
+           | MOD -> "bvurem"
+           | SMOD -> "bvsrem"
+           | AND -> "bvand"
+           | OR -> "bvor"
+           | XOR -> "bvxor"
+           | NEQ|EQ|LE|LT|SLT|SLE -> assert false
+           | LSHIFT -> "bvshl"
+           | RSHIFT -> "bvlshr"
+           | ARSHIFT -> "bvashr"
+         in
+         let pe1, pe2 = lazy (self#ast_exp e1), lazy (self#ast_exp e2) in
+         lazy(
+           pc '('; pp fname; space (); Lazy.force pe1; space (); Lazy.force pe2; pc ')';
+         )
      | Cast(CAST_LOW, t, BinOp(RSHIFT, e', Int(i, t2))) when parse_extract e <> None ->
-     	 let hbit, lbit = match parse_extract e with
-     	   | Some(hbit, lbit) -> hbit, lbit
-     	   | None -> assert false
-     	 in
-	 let pe' = lazy (self#ast_exp_bv e') in
-	 lazy(
-  	   pp ("(extract["^string_of_big_int hbit^":"^string_of_big_int lbit^"]");
-     	   space ();
-	   Lazy.force pe';
-     	   cut ();
-     	   pc ')';
-	 )
+         let hbit, lbit = match parse_extract e with
+           | Some(hbit, lbit) -> hbit, lbit
+           | None -> assert false
+         in
+         let pe' = lazy (self#ast_exp_bv e') in
+         lazy(
+           pp ("(extract["^string_of_big_int hbit^":"^string_of_big_int lbit^"]");
+           space ();
+           Lazy.force pe';
+           cut ();
+           pc ')';
+         )
      | Cast((CAST_UNSIGNED|CAST_SIGNED) as ct, t, e1) when (infer_ast e1) = Reg(1) ->
-	 (* Optimization: 
-	    CAST(UNSIGNED, Reg n, bool_e) =
-	    ite bool_e 1[n] 0[n]
-	    CAST(SIGNED, Reg n, bool_e) =
-	    ite bool_e -1[n] 0[n]
-	 *)
-	 let t1 = infer_ast e1 in
-	 let (bitsnew, bitsold) = (bits_of_width t, bits_of_width t1) in
-	 let delta = bitsnew - bitsold in
-	 let textend, fextend = match ct with
-	   | CAST_UNSIGNED -> Int(bi1, t), Int(bi0, t)
-	   | CAST_SIGNED -> Int(bim1, t), Int(bi0, t)
-	   | _ -> assert false
-	 in
-	 assert (delta >= 0);
-	 let pe1,ptext,pfext = lazy (self#ast_exp_bool e1), lazy (self#ast_exp textend), lazy (self#ast_exp fextend) in
-	 (match delta with
-	 | 0 -> lazy (Lazy.force pe1)
-	 | _ -> 
-	     lazy(
-	       pp "(ite";
-	       space ();
-	       Lazy.force pe1;
-	       space ();
-	       Lazy.force ptext;
-	       space ();
-	       Lazy.force pfext;
-	       cut ();
-	       pc ')'
-	     )
-	 )	 	       
+         (* Optimization: 
+            CAST(UNSIGNED, Reg n, bool_e) =
+            ite bool_e 1[n] 0[n]
+            CAST(SIGNED, Reg n, bool_e) =
+            ite bool_e -1[n] 0[n]
+         *)
+         let t1 = infer_ast e1 in
+         let (bitsnew, bitsold) = (bits_of_width t, bits_of_width t1) in
+         let delta = bitsnew - bitsold in
+         let textend, fextend = match ct with
+           | CAST_UNSIGNED -> Int(bi1, t), Int(bi0, t)
+           | CAST_SIGNED -> Int(bim1, t), Int(bi0, t)
+           | _ -> assert false
+         in
+         assert (delta >= 0);
+         let pe1,ptext,pfext = lazy (self#ast_exp_bool e1), lazy (self#ast_exp textend), lazy (self#ast_exp fextend) in
+         (match delta with
+         | 0 -> lazy (Lazy.force pe1)
+         | _ -> 
+             lazy(
+               pp "(ite";
+               space ();
+               Lazy.force pe1;
+               space ();
+               Lazy.force ptext;
+               space ();
+               Lazy.force pfext;
+               cut ();
+               pc ')'
+             )
+         )                     
      | Cast((CAST_LOW|CAST_HIGH|CAST_UNSIGNED|CAST_SIGNED) as ct, t, e1) ->
-	  let t1 = infer_ast e1 in
-	  let (bitsnew, bitsold) = (bits_of_width t, bits_of_width t1) in
-	  let delta = bitsnew - bitsold in
-	  (match ct with
-	    | CAST_LOW | CAST_HIGH -> assert (delta <= 0);
-	    | CAST_UNSIGNED | CAST_SIGNED -> assert (delta >= 0));
-	  let (pre,post) = match ct with
-	    | _ when bitsnew = bitsold -> ("","")
-	    | CAST_LOW      -> ("(extract["^string_of_int(bitsnew-1)^":0]", ")")
-	    | CAST_HIGH     -> ("(extract["^string_of_int(bitsold-1)^":"^string_of_int(bitsold-bitsnew)^"]", ")")
-	    | CAST_UNSIGNED -> ("(zero_extend["^string_of_int(delta)^"]", ")")
-	    (* | CAST_UNSIGNED -> ("(concat bv0["^string_of_int(delta)^"] ", ")") *)
-	    | CAST_SIGNED -> ("(sign_extend["^string_of_int(delta)^"]", ")")
-	  in
-	  let pe1 = lazy (self#ast_exp_bv e1) in
-	  lazy(
-	    pp pre;
-	    space ();
-	    Lazy.force pe1;
-	    cut ();
-	    pp post
-	  )
+          let t1 = infer_ast e1 in
+          let (bitsnew, bitsold) = (bits_of_width t, bits_of_width t1) in
+          let delta = bitsnew - bitsold in
+          (match ct with
+            | CAST_LOW | CAST_HIGH -> assert (delta <= 0);
+            | CAST_UNSIGNED | CAST_SIGNED -> assert (delta >= 0));
+          let (pre,post) = match ct with
+            | _ when bitsnew = bitsold -> ("","")
+            | CAST_LOW      -> ("(extract["^string_of_int(bitsnew-1)^":0]", ")")
+            | CAST_HIGH     -> ("(extract["^string_of_int(bitsold-1)^":"^string_of_int(bitsold-bitsnew)^"]", ")")
+            | CAST_UNSIGNED -> ("(zero_extend["^string_of_int(delta)^"]", ")")
+            (* | CAST_UNSIGNED -> ("(concat bv0["^string_of_int(delta)^"] ", ")") *)
+            | CAST_SIGNED -> ("(sign_extend["^string_of_int(delta)^"]", ")")
+          in
+          let pe1 = lazy (self#ast_exp_bv e1) in
+          lazy(
+            pp pre;
+            space ();
+            Lazy.force pe1;
+            cut ();
+            pp post
+          )
      | Concat(le,re) ->
-	 let pe1 = lazy (self#ast_exp le) in
-	 let pe2 = lazy (self#ast_exp re) in
-	 lazy (
-	   pp "(concat ";
-	   Lazy.force pe1;
-	   space ();
-	   Lazy.force pe2;
-	   cut ();
-	   pc ')'
-	 )
+         let pe1 = lazy (self#ast_exp le) in
+         let pe2 = lazy (self#ast_exp re) in
+         lazy (
+           pp "(concat ";
+           Lazy.force pe1;
+           space ();
+           Lazy.force pe2;
+           cut ();
+           pc ')'
+         )
      | Extract(h,l,e) ->
-	 let pe = lazy (self#ast_exp e) in
-	 lazy(
-	   pp ("(extract["^string_of_big_int(h)^":"^string_of_big_int(l)^"]");
-	   space ();
-	   Lazy.force pe;
-	   cut ();
-	   pc ')'
-	 )
+         let pe = lazy (self#ast_exp e) in
+         lazy(
+           pp ("(extract["^string_of_big_int(h)^":"^string_of_big_int(l)^"]");
+           space ();
+           Lazy.force pe;
+           cut ();
+           pc ')'
+         )
      | Unknown(s,t) ->
-	  lazy (
-	    pp "unknown_"; pi unknown_counter; pp" ;"; pp s; force_newline();
-	    unknown_counter <- unknown_counter + 1;
-	  )
+          lazy (
+            pp "unknown_"; pi unknown_counter; pp" ;"; pp s; force_newline();
+            unknown_counter <- unknown_counter + 1;
+          )
       | Lab lab ->
-	  failwith ("SMTLIB: don't know how to handle label names: "
-		      ^ (Pp.ast_exp_to_string e))
+          failwith ("SMTLIB: don't know how to handle label names: "
+                      ^ (Pp.ast_exp_to_string e))
       | Let(v, e1, e2) -> self#letme v e1 e2 BitVec
       | Load(arr,idx,endian, t) ->
-	  (* FIXME check arr is array and not mem *)
-	  let parr, pidx = lazy (self#ast_exp arr), lazy (self#ast_exp idx) in
-	  lazy(
-	    pp "(select ";
-	    Lazy.force parr;
-	    space ();
-	    Lazy.force pidx;
-	    cut ();
-	    pc ')'
-	  )
+          (* FIXME check arr is array and not mem *)
+          let parr, pidx = lazy (self#ast_exp arr), lazy (self#ast_exp idx) in
+          lazy(
+            pp "(select ";
+            Lazy.force parr;
+            space ();
+            Lazy.force pidx;
+            cut ();
+            pc ')'
+          )
       | Store(arr,idx,vl, endian, t) ->
-	  (* FIXME check arr is array and not mem *)
-	  let parr, pidx, pvl = lazy (self#ast_exp arr), lazy (self#ast_exp idx), lazy (self#ast_exp vl) in
-	  lazy(
-	    pp "(store ";
-	    Lazy.force parr;
-	    space ();
-	    Lazy.force pidx;
-	    space ();
-	    Lazy.force pvl;
-	    cut ();
-	    pc ')'
-	  )
+          (* FIXME check arr is array and not mem *)
+          let parr, pidx, pvl = lazy (self#ast_exp arr), lazy (self#ast_exp idx), lazy (self#ast_exp vl) in
+          lazy(
+            pp "(store ";
+            Lazy.force parr;
+            space ();
+            Lazy.force pidx;
+            space ();
+            Lazy.force pvl;
+            cut ();
+            pc ')'
+          )
       | _ -> raise No_rule
       )
     in
@@ -487,7 +487,7 @@ object (self)
         with No_rule ->
           self#ast_exp_base ~check:false e
       ) else
-	self#ast_exp_base ~check:false e)
+        self#ast_exp_base ~check:false e)
 
   (** Evaluates an expression to a bitvector, preferring
       bitvectors over booleans. *)
@@ -506,74 +506,74 @@ object (self)
     let lazye =
       (match e with
       | Int((i, Reg t) as p) when t = 1 ->
-	let maskedval = Arithmetic.to_big_int p in
-	(match maskedval with
-	| bi when bi_is_zero bi -> lazy(pp "false")
-	| bi when bi_is_one bi -> lazy(pp "true")
-	| _ -> failwith "ast_exp_bool")
+        let maskedval = Arithmetic.to_big_int p in
+        (match maskedval with
+        | bi when bi_is_zero bi -> lazy(pp "false")
+        | bi when bi_is_one bi -> lazy(pp "true")
+        | _ -> failwith "ast_exp_bool")
       | Int((i, Reg t)) -> failwith "ast_exp_bool only takes reg_1 expressions"
       | Int _ -> failwith "Ints may only have register types"
       | Ite(cond, e1, e2) ->
-	lazy(
-	  pp "(if_then_else";
-	  space ();
-	  self#ast_exp_bool cond;
-	  space ();
-	  self#ast_exp_bool e1;
-	  space ();
-	  self#ast_exp_bool e2;
-	  cut ();
-	  pc ')'
-	)
+        lazy(
+          pp "(if_then_else";
+          space ();
+          self#ast_exp_bool cond;
+          space ();
+          self#ast_exp_bool e1;
+          space ();
+          self#ast_exp_bool e2;
+          cut ();
+          pc ')'
+        )
       | UnOp((NEG|NOT), o) ->
-	 (* neg and not are the same for one bit! *)
-	lazy(
-	  pp "(not";
-	  space ();
-	  self#ast_exp_bool o;
-	  cut ();
-	  pc ')'
-	)
+         (* neg and not are the same for one bit! *)
+        lazy(
+          pp "(not";
+          space ();
+          self#ast_exp_bool o;
+          cut ();
+          pc ')'
+        )
       | BinOp(NEQ, e1, e2) ->
         (* Rewrite NEQ in terms of EQ *)
         let newe = UnOp(NOT, BinOp(EQ, e1, e2)) in
         lazy(
-	  self#ast_exp_bool newe
+          self#ast_exp_bool newe
         )
       | BinOp((OR|AND), _, _) when parse_ite e <> None ->
-     	let b, e1, e2 = match parse_ite e with
-     	  | Some(b, e1, e2) -> b, e1, e2
-     	  | None -> assert false
-     	in
-	lazy(
-     	  pp "(if_then_else";
-     	  space ();
-     	  self#ast_exp_bool b;
-     	  space ();
-     	  self#ast_exp_bool e1;
-     	  space ();
-     	  self#ast_exp_bool e2;
-     	  cut ();
-     	  pc ')';
-	)
+        let b, e1, e2 = match parse_ite e with
+          | Some(b, e1, e2) -> b, e1, e2
+          | None -> assert false
+        in
+        lazy(
+          pp "(if_then_else";
+          space ();
+          self#ast_exp_bool b;
+          space ();
+          self#ast_exp_bool e1;
+          space ();
+          self#ast_exp_bool e2;
+          cut ();
+          pc ')';
+        )
       (* Short cuts for e = exp_true and e = exp_false *)
       | BinOp(EQ, e1, e2) when full_exp_eq e1 (Int(bi1, Reg(1))) ->
-     	lazy(self#ast_exp_bool e2)
+        lazy(self#ast_exp_bool e2)
       | BinOp(EQ, e2, e1) when full_exp_eq e1 (Int(bi1, Reg(1))) ->
-     	lazy(self#ast_exp_bool e2)
+        lazy(self#ast_exp_bool e2)
       | BinOp(EQ, e1, e2) when full_exp_eq e1 (Int(bi0, Reg(1))) ->
-     	lazy(self#ast_exp_bool (UnOp(NOT, e2)))
+        lazy(self#ast_exp_bool (UnOp(NOT, e2)))
       | BinOp(EQ, e2, e1) when full_exp_eq e1 (Int(bi0, Reg(1))) ->
-     	lazy(self#ast_exp_bool (UnOp(NOT, e2)))
+        lazy(self#ast_exp_bool (UnOp(NOT, e2)))
       | BinOp(EQ, e1, e2) ->
        (* These are predicates, which return boolean values. *)
         let t1 = Typecheck.infer_ast e1 in
         let t2 = Typecheck.infer_ast e2 in
         assert (t1 = t2);
         let sym, f =
-	  (* If we can print as bool, we can use iff.  Otherwise, we
-	     can use =. *)
-	  if t1 = Reg(1) then (
+          (* If we can print as bool, we can use iff.  Otherwise, we
+             can use =. *)
+          if t1 = Reg(1) then (
             try
               self#ast_exp_bool_base ~check:true e1;
               self#ast_exp_bool_base ~check:true e2;
@@ -586,17 +586,17 @@ object (self)
                with No_rule ->
                  "iff", self#ast_exp_bool)
           ) else
-	    "=", self#ast_exp_bv
+            "=", self#ast_exp_bv
         in
         lazy(
-	  pp "(";
-	  pp sym;
-	  space ();
-	  f e1;
-	  space ();
-	  f e2;
-	  pp ")";
-	  cut ();
+          pp "(";
+          pp sym;
+          space ();
+          f e1;
+          space ();
+          f e2;
+          pp ")";
+          cut ();
         )
       | BinOp((LT|LE|SLT|SLE) as op, e1, e2) ->
         (* These are predicates, which return boolean values. *)
@@ -604,92 +604,92 @@ object (self)
         let t2 = Typecheck.infer_ast e2 in
         assert (t1 = t2);
         let f,pf = match op with
-	  | LT -> "bvult", self#ast_exp
-	  | LE -> "bvule", self#ast_exp
-	  | SLT -> "bvslt", self#ast_exp
-	  | SLE -> "bvsle", self#ast_exp
-	  | _ -> assert false
+          | LT -> "bvult", self#ast_exp
+          | LE -> "bvule", self#ast_exp
+          | SLT -> "bvslt", self#ast_exp
+          | SLE -> "bvsle", self#ast_exp
+          | _ -> assert false
         in
         lazy(
-	  pp "(";
-	  pp f;
-	  space ();
-	  pf e1;
-	  space ();
-	  pf e2;
-	  pp ")";
-	  cut ();
+          pp "(";
+          pp f;
+          space ();
+          pf e1;
+          space ();
+          pf e2;
+          pp ")";
+          cut ();
         )
      (* Z3 does not treat xor as associative; they said they would
-	fix this on 3/28/2011. *)
+        fix this on 3/28/2011. *)
       | BinOp(XOR as bop, e1, e2) ->
-	let t = infer_ast e1 in
-	let t' = infer_ast e2 in
-    	if t <> t' then
-    	  wprintf "Type mismatch: %s" (Pp.ast_exp_to_string e);
-    	assert (t = t') ;
-    	let fname = match bop with
-    	  | XOR -> "xor"
-	  | _ -> assert false
-    	in
-	lazy(
-	  pc '(';
-	  pp fname;
-	  space ();
-	  self#ast_exp_bool e1;
-	  space ();
-	  self#ast_exp_bool e2;
-	  cut ();
-	  pc ')'
-	)
+        let t = infer_ast e1 in
+        let t' = infer_ast e2 in
+        if t <> t' then
+          wprintf "Type mismatch: %s" (Pp.ast_exp_to_string e);
+        assert (t = t') ;
+        let fname = match bop with
+          | XOR -> "xor"
+          | _ -> assert false
+        in
+        lazy(
+          pc '(';
+          pp fname;
+          space ();
+          self#ast_exp_bool e1;
+          space ();
+          self#ast_exp_bool e2;
+          cut ();
+          pc ')'
+        )
       | BinOp(OR, _, _) when parse_implies e <> None ->
-     	let e1, e2 = match parse_implies e with
-     	  | Some(e1, e2) -> e1, e2
-     	  | None -> assert false
-     	in
+        let e1, e2 = match parse_implies e with
+          | Some(e1, e2) -> e1, e2
+          | None -> assert false
+        in
         let pe1, pe2 = lazy (self#ast_exp_bool e1), lazy (self#ast_exp_bool e2) in
         lazy(
-     	  pp "(implies";
-     	  space ();
+          pp "(implies";
+          space ();
           Lazy.force pe1;
-     	  space ();
+          space ();
           Lazy.force pe2;
-     	  cut ();
-     	  pc ')';
+          cut ();
+          pc ')';
         )
       | BinOp((AND|OR(*|XOR*)) as bop, e1, e2) ->
-    	let t = infer_ast e1 in
-    	let t' = infer_ast e2 in
-    	if t <> t' then
-    	  wprintf "Type mismatch: %s" (Pp.ast_exp_to_string e);
-    	assert (t = t') ;
-    	let fname = match bop with
-    	  | AND -> "and"
-    	  | OR -> "or"
-    	  | XOR -> "xor"
-	  | _ -> assert false
-    	in
-	let oplist = opflatten e in
-	lazy(
-    	  pc '('; pp fname; 
-	  List.iter
-	    (fun e -> space (); self#ast_exp_bool e) oplist;
-	  pc ')';
-	)
+        let t = infer_ast e1 in
+        let t' = infer_ast e2 in
+        if t <> t' then
+          wprintf "Type mismatch: %s" (Pp.ast_exp_to_string e);
+        assert (t = t') ;
+        let fname = match bop with
+          | AND -> "and"
+          | OR -> "or"
+          | XOR -> "xor"
+          | _ -> assert false
+        in
+        let oplist = opflatten e in
+        lazy(
+          pc '('; pp fname; 
+          List.iter
+            (fun e -> space (); self#ast_exp_bool e) oplist;
+          pc ')';
+        )
       | Cast((CAST_LOW|CAST_HIGH|CAST_UNSIGNED|CAST_SIGNED),t, e1) ->
-     	let t1 = infer_ast e1 in
-     	let (bitsnew, bitsold) = (bits_of_width t, bits_of_width t1) in
-     	let delta = bitsnew - bitsold in
-     	if delta = 0 
-	then 
-	  lazy(self#ast_exp_bool e1) 
-	else 
-	  raise No_rule
+        let t1 = infer_ast e1 in
+        let (bitsnew, bitsold) = (bits_of_width t, bits_of_width t1) in
+        let delta = bitsnew - bitsold in
+        if delta = 0 
+        then 
+          lazy(self#ast_exp_bool e1) 
+        else 
+          raise No_rule
       | Var v ->
-	let name,st = VH.find ctx v in
-	(match st with
-	| BitVec -> raise No_rule
-	| Bool -> lazy(pp name))
+        let name,st = VH.find ctx v in
+        (match st with
+        | BitVec -> raise No_rule
+        | Bool -> lazy(pp name))
       | Let(v, e1, e2) -> self#letme v e1 e2 Bool
       | _ -> raise No_rule
       ) in
@@ -706,41 +706,41 @@ object (self)
       try
         self#tryit self#ast_exp_bool_base e
       with No_rule ->
-	self#bv_to_bool ~check:false e
+        self#bv_to_bool ~check:false e
     ) else (
       try
         self#tryit self#bv_to_bool e
       with No_rule ->
-	self#ast_exp_bool_base ~check:false e
+        self#ast_exp_bool_base ~check:false e
     )
 
   method forall = function
     | [] -> ()
     | v::vars ->
-	let var_type  (Var.V(_,_,t) as v) =
-	  self#var v; pp " : "; self#typ t
-	in
-	opn 2;
-	pp "FORALL (";space();
-	(* TODO: group by type *)
-	List.iter (fun v -> var_type v; pc ','; space()) vars;
-	var_type v;
-	pp "):";
-	cls();space();
+        let var_type  (Var.V(_,_,t) as v) =
+          self#var v; pp " : "; self#typ t
+        in
+        opn 2;
+        pp "FORALL (";space();
+        (* TODO: group by type *)
+        List.iter (fun v -> var_type v; pc ','; space()) vars;
+        var_type v;
+        pp "):";
+        cls();space();
 
   method exists = function
     | [] -> ()
     | v::vars ->
-	let var_type  (Var.V(_,_,t) as v) =
-	  self#var v; pp " : "; self#typ t
-	in
-	opn 2;
-	pp "EXISTS (";space();
-	  (* TODO: group by type *)
-	List.iter (fun v -> var_type v; pc ','; space()) vars;
-	var_type v;
-	pp "):";
-	cls();space();
+        let var_type  (Var.V(_,_,t) as v) =
+          self#var v; pp " : "; self#typ t
+        in
+        opn 2;
+        pp "EXISTS (";space();
+          (* TODO: group by type *)
+        List.iter (fun v -> var_type v; pc ','; space()) vars;
+        var_type v;
+        pp "):";
+        cls();space();
 
   method open_benchmark_with_logic logic =
     pc '(';
@@ -765,14 +765,14 @@ object (self)
     let has_mem e =
       let found_mem = ref false in
       let v = object(self)
-	inherit Ast_visitor.nop
-	method visit_exp = function
-	  | Load _
-	  | Store _ -> found_mem := true; SkipChildren
-	  | Var v when not (is_integer_type (Var.typ v)) -> 
+        inherit Ast_visitor.nop
+        method visit_exp = function
+          | Load _
+          | Store _ -> found_mem := true; SkipChildren
+          | Var v when not (is_integer_type (Var.typ v)) -> 
               found_mem := true; SkipChildren
-	  | _ when !found_mem -> SkipChildren
-	  | _ -> DoChildren	  
+          | _ when !found_mem -> SkipChildren
+          | _ -> DoChildren       
       end
       in
       ignore(Ast_visitor.exp_accept v e);

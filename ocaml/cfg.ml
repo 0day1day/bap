@@ -16,10 +16,14 @@ type bbid =
 
 let bbid_to_string = function
   | BB_Entry     -> "BB_Entry"
-  | BB_Exit	 -> "BB_Exit"
-  | BB_Indirect	 -> "BB_Indirect"
-  | BB_Error	 -> "BB_Error"
+  | BB_Exit      -> "BB_Exit"
+  | BB_Indirect  -> "BB_Indirect"
+  | BB_Error     -> "BB_Error"
   | BB n         -> "BB_"^string_of_int n
+
+let edge_direction = function
+  | Some(b, _) -> b
+  | None -> None
 
 module BBid =
 struct
@@ -27,9 +31,9 @@ struct
   let compare = compare
   let hash = function
     | BB_Entry     ->  -1
-    | BB_Exit	   ->  -2
+    | BB_Exit      ->  -2
     | BB_Indirect  ->  -3
-    | BB_Error	   ->  -4
+    | BB_Error     ->  -4
     | BB n         ->   n
   let equal = (=)
 end
@@ -40,20 +44,15 @@ module BM = Map.Make(BBid)
 
 
 
-module E =
-struct
-  type t = bool option
-  let compare = compare
-  let default = None
-end
-
-
-
 module type CFG =
 sig
-  include Graph.Builder.S with type G.V.label = bbid and type G.E.label = bool option
 
-  type lang
+  type stmt
+  type lang = stmt list
+  type exp
+
+  include Graph.Builder.S with type G.V.label = bbid and type G.E.label = (bool option * exp) option
+
 
   val find_vertex : G.t -> G.V.label -> G.V.t
   val find_label : G.t -> Type.label -> G.V.t
@@ -86,21 +85,31 @@ type ('a,'b,'c) pcfg =
 
 module type Language =
 sig
-  type t
-  val default : t
-  val join : t -> t -> t
-  val iter_labels : (label->unit) -> t -> unit
-  val to_string : t -> string
+  type stmt
+  type lang = stmt list
+  type exp
+  val default : lang
+  val join : lang -> lang -> lang
+  val iter_labels : (label->unit) -> lang -> unit
+  val to_string : lang -> string
+end
+
+module E(Lang: Language) =
+struct
+  type t = (bool option * Lang.exp) option
+  let compare = compare
+  let default = None
 end
 
 (* Begin persistent implementation *)
 module MakeP (Lang: Language) =
 struct
   (* A simple implementation for now... We can worry about optimizing later. *)
-  module G' = Graph.Persistent.Digraph.ConcreteBidirectionalLabeled(BBid)(E)
+  module G' = Graph.Persistent.Digraph.ConcreteBidirectionalLabeled(BBid)(E(Lang))
 
-  type lang = Lang.t
-
+  type lang = Lang.lang
+  type stmt = Lang.stmt
+  type exp = Lang.exp
 
 
   module G = struct
@@ -118,14 +127,14 @@ struct
       nextid : int
     }
 *)
-    type t = (G'.t, Lang.t BM.t, V.t LM.t) pcfg
+    type t = (G'.t, Lang.lang BM.t, V.t LM.t) pcfg
 
     let is_directed = true
 
 
     (* boring wrappers *)
 
-    let is_empty    	 x = G'.is_empty        x.g
+    let is_empty         x = G'.is_empty        x.g
     let nb_vertex        x = G'.nb_vertex       x.g
     let nb_edges         x = G'.nb_edges        x.g
     let out_degree       x = G'.out_degree      x.g
@@ -133,12 +142,12 @@ struct
     let mem_vertex       x = G'.mem_vertex      x.g
     let mem_edge         x = G'.mem_edge        x.g
     let mem_edge_e       x = G'.mem_edge_e      x.g
-    let find_edge        x = G'.find_edge	x.g
-    let find_all_edges   x = G'.find_all_edges	x.g
-    let succ	         x = G'.succ            x.g
-    let pred	         x = G'.pred            x.g
-    let succ_e	         x = G'.succ_e          x.g
-    let pred_e	         x = G'.pred_e          x.g
+    let find_edge        x = G'.find_edge       x.g
+    let find_all_edges   x = G'.find_all_edges  x.g
+    let succ             x = G'.succ            x.g
+    let pred             x = G'.pred            x.g
+    let succ_e           x = G'.succ_e          x.g
+    let pred_e           x = G'.pred_e          x.g
 
     let iter_vertex  x y = G'.iter_vertex x y.g
     let iter_edges   x y = G'.iter_edges  x y.g
@@ -165,10 +174,10 @@ struct
     (* Less boring wrappers *)
     let empty =
       {
-	g = G'.empty;
-	s = BM.empty;
-	l = LM.empty;
-	nextid = 0;
+        g = G'.empty;
+        s = BM.empty;
+        l = LM.empty;
+        nextid = 0;
       }
 
     let map_vertex f c =
@@ -262,11 +271,15 @@ module Make = MakeP
 
 module LangAST =
 struct
-  type t = Ast.stmt list
+  type lang = Ast.stmt list
+  type stmt = Ast.stmt
+  type exp = Ast.exp
   let default = []
   let join sl1 sl2 = match List.rev sl1 with
     | Ast.Jmp (e, _) :: sl1' when Ast.lab_of_exp e <> None -> List.append (List.rev sl1') sl2
-    | Ast.Jmp _ :: _ -> failwith "join: Joining BB with indirect jump not possible"
+    | (Ast.Jmp _ as jmp) :: sl1' ->
+      let s = Ast.Comment(Printf.sprintf "join: Removed resolved jump to single target: %s" (Pp.ast_stmt_to_string jmp), [Synthetic]) in
+      BatList.append (List.rev (s::sl1')) sl2
     | _ -> BatList.append sl1 sl2
   let iter_labels f =
     List.iter (function Ast.Label(l, _) -> f l  | _ -> () )
@@ -275,11 +288,15 @@ end
 
 module LangSSA =
 struct
-  type t = Ssa.stmt list
+  type lang = Ssa.stmt list
+  type stmt = Ssa.stmt
+  type exp = Ssa.exp
   let default = []
   let join sl1 sl2 = match List.rev sl1 with
-    | Ssa.Jmp (e, _) :: sl1' when Ssa.val_of_exp e <> None -> List.append (List.rev sl1') sl2
-    | Ssa.Jmp _ :: _ -> failwith "join: Joining BB with indirect not possible"
+    | Ssa.Jmp (e, _) :: sl1' when Ssa.lab_of_exp e <> None -> List.append (List.rev sl1') sl2
+    | (Ssa.Jmp _ as jmp) :: sl1' ->
+      let s = Ssa.Comment(Printf.sprintf "join: Removed resolved jump to single target: %s" (Pp.ssa_stmt_to_string jmp), [Synthetic]) in
+      BatList.append (List.rev (s::sl1')) sl2
     | _ -> BatList.append sl1 sl2
   let iter_labels f =
     (* optimization: assume labels are at the beginning *)
@@ -294,15 +311,18 @@ end
 module AST = Make(LangAST)
 module SSA = Make(LangSSA)
 
+type aststmtloc = AST.G.V.t * int
+type ssastmtloc = SSA.G.V.t * int
 
 module type CFG_PRIV =
 sig
   type lang
+  type exp
   module G' : Graph.Sig.G
 
   include Graph.Builder.S
     with type G.V.label = bbid
-    and type G.E.label = bool option
+    and type G.E.label = (bool option * exp) option
     and type G.t = (G'.t, lang BM.t, G'.V.t LM.t) pcfg
 
   val get_stmts  : G.t -> G.V.t -> lang
@@ -312,18 +332,29 @@ end
 
 module MkMap(A:CFG_PRIV)(B:CFG_PRIV) =
 struct
-  let map f ({nextid=n} as cfg) =
+  module VM = Map.Make(B.G.V)
+  module EM = Map.Make(B.G.E)
+  let map conv_stmts conv_exp ({nextid=n} as cfg) =
     let s = B.empty() in
     let t vertex = B.G.V.create (A.G.V.label vertex) in
-    let te e = B.G.E.create (t (A.G.E.src e)) (A.G.E.label e) (t (A.G.E.dst e)) in
-    let per_vertex v g =
+    let per_edge e (g, em) =
+      let new_lab = match A.G.E.label e with
+        | Some(b, e) -> Some(b, conv_exp e)
+        | None -> None
+      in
+      let e' = B.G.E.create (t (A.G.E.src e)) new_lab (t (A.G.E.dst e)) in
+      let em = EM.add e' e em in
+      B.add_edge_e g e', em
+    in
+    let per_vertex v (g, vm) =
       let v' = t v in
       let g = B.add_vertex g v' in
-      B.set_stmts g v' (f (A.get_stmts cfg v))
+      let vm = VM.add v' v vm in
+      B.set_stmts g v' (conv_stmts (A.get_stmts cfg v)), vm
     in
-    let s = A.G.fold_vertex per_vertex cfg s in
-    let s = A.G.fold_edges_e (fun e s -> B.add_edge_e s (te e)) cfg s in
-    { s with nextid = n}
+    let s, vm = A.G.fold_vertex per_vertex cfg (s, VM.empty) in
+    let s, em = A.G.fold_edges_e per_edge cfg (s, EM.empty) in
+    { s with nextid = n }, (fun v -> VM.find v vm), (fun e -> EM.find e em)
 end
 
 module M2ssa = MkMap(AST)(SSA)

@@ -1,5 +1,6 @@
 (** Pretty printing for CFGs. *)
 
+open Cfg
 
 module CS = Cfg.SSA
 module CA = Cfg.AST
@@ -30,57 +31,59 @@ sig
   val edge_attributes : E.t -> Graph.Graphviz.DotAttributes.edge list
 end
 
+let red = 0xff0000
+let green = 0x00ff00
+let blue = 0x0000ff
+let fill = 0xf5f5f5
+let linenum_color = "#b8b8b8"
 
 (* Just for convenience *)
 module DefAttrs =
 struct
   let graph_attributes _ = []
-  let default_vertex_attributes _ = [`Shape `Box]
+  let default_vertex_attributes _ = [`Shape `Box; `Style `Filled; `Fillcolor fill]
   let vertex_attributes _ = []
   let get_subgraph _ = None
-  let default_edge_attributes _ = []
+  let default_edge_attributes _ = [`Color blue]
   let edge_attributes _ = []
 end
 
-module DefAttributor =
+module type Cfg =
+sig
+  type exp
+  val exp_to_string : exp -> string
+  include Graph.Sig.G with type V.label = Cfg.bbid and type E.label = (bool option * exp) option
+end
+
+module DefAttributor(G:Cfg) =
 struct
   let vertex_attributes _ _ = []
   and edge_attributes _ _ = []
 end
 
-(* (\* FIXME: Instead of having two of these we should take the graph *)
-(*    module and type f accordingly *\) *)
-(* module FunSsaAttributor = *)
-(* struct *)
-(*   let f = ref (fun g v -> raise Not_found) *)
-(*   include DefAttributor *)
-(*   let vertex_attributes (g:'a) (v:'b) = try !f g v with Not_found -> [] *)
-(* end *)
+module EdgeColorAttributor(G:Cfg) =
+struct
+  let vertex_attributes _ _ = []
+  and edge_attributes _ e =
+    match Cfg.edge_direction (G.E.label e) with
+    | Some true -> [`Color green]
+    | Some false -> [`Color red]
+    | None -> []
+end
 
-(* module FunAstAttributor = *)
-(* struct *)
-(*   let f = ref (fun g v -> raise Not_found) *)
-(*   include DefAttributor *)
-(*   let vertex_attributes (g:'a) (v:'b) = try !f g v with Not_found -> [] *)
-(* end *)
-
-let edge_labels f e =
-  match f e with
-  | Some true -> [`Label "t"]
-  | Some false -> [`Label "f"]
-  | None -> []
-
-let edge_labels_ssa = edge_labels CS.G.E.label
-let edge_labels_ast = edge_labels CA.G.E.label
-
+module type Attributor =
+  functor (G:Cfg) ->
+    sig
+      val vertex_attributes: G.t -> G.V.t -> Graph.Graphviz.DotAttributes.vertex list
+      val edge_attributes: G.t -> G.E.t -> Graph.Graphviz.DotAttributes.edge list
+    end
 
 (** Makes a module suitable for use with Graph.Graphviz.Dot  for writting out
     a CFG. *)
 module MakeCfgPrinter
-  (G:Graph.Sig.G with type V.label = Cfg.bbid and type E.label = bool option)
-  (Printer:sig val print: G.t -> G.V.t -> string end)
-  (Attributor:sig val vertex_attributes: G.t -> G.V.t -> Graph.Graphviz.DotAttributes.vertex list ;;
-                  val edge_attributes: G.t -> G.E.t -> Graph.Graphviz.DotAttributes.edge list end)
+  (G:Cfg)
+  (Printer:sig val print: G.t -> (G.V.t -> string) * (G.E.t -> string) end)
+  (Attributor:Attributor)
   : (DOTTYG with type t = G.t and type V.t = G.V.t * G.t and type E.t =  G.E.t * G.t)
   =
 struct
@@ -94,13 +97,15 @@ struct
     let compare x y = G.V.compare (fst x) (fst y)
   end
   module E =
-  struct 
+  struct
     type t = G.E.t * G.t
     type label = G.E.label
     let label (e,g) = G.E.label e
     let src (e,g) = (G.E.src e, g)
     let dst (e,g) = (G.E.dst e, g)
   end
+
+  module Attributor = Attributor(G)
 
   let iter_edges_e f g =
     G.iter_edges_e (fun e -> f (e,g)) g
@@ -110,20 +115,24 @@ struct
 
   include DefAttrs
 
-  let printer = ref (fun _ -> failwith "Uninitialized printer")
+  let vprinter = ref (fun _ -> failwith "Uninitialized vertex printer")
+  let eprinter = ref (fun _ -> failwith "Uninitialized edge printer")
 
   let graph_attributes g =
     (* Use this as an initialization routine *)
-    printer := Printer.print g;
-    []
+    match Printer.print g with
+    | (vp, ep) ->
+      vprinter := vp;
+      eprinter := ep;
+      []
 
   let vertex_name (v,g) = Cfg.bbid_to_string (G.V.label v)
 
   let vertex_attributes (v,g) =
     (* FIXME: The Dot module really should be the one doing the escaping here *)
-    `Label (String.escaped(!printer v)) :: Attributor.vertex_attributes g v
+    `Label (String.escaped(!vprinter v)) :: Attributor.vertex_attributes g v
 
-  let edge_attributes ((e,g) as e') = (edge_labels E.label e') @ Attributor.edge_attributes g e
+  let edge_attributes (e,g) = (`Label (String.escaped(!eprinter e))) :: Attributor.edge_attributes g e
 
 end
 
@@ -144,9 +153,17 @@ struct
     Format.pp_print_flush ft ();
     let o = Buffer.contents buf in
     Buffer.clear buf;
-    o)
-
-  let edge_attributes = edge_labels_ssa
+    o),
+    (fun e ->
+      match CS.G.E.label e with
+      | Some (_, e) ->
+        pp#ssa_exp e;
+        Format.pp_print_flush ft ();
+        let o = Buffer.contents buf in
+        Buffer.clear buf;
+        o
+      | None -> ""
+    )
 end
 
 module PrintAstStmts =
@@ -164,9 +181,17 @@ struct
     Format.pp_print_flush ft ();
     let o = Buffer.contents buf in
     Buffer.clear buf;
-    o)
-
-  let edge_attributes = edge_labels_ast
+    o),
+    (fun e ->
+      match CA.G.E.label e with
+      | Some (_, e) ->
+        pp#ast_exp e;
+        Format.pp_print_flush ft ();
+        let o = Buffer.contents buf in
+        Buffer.clear buf;
+        o
+      | None -> ""
+    )
 end
 
 module PrintAstAsms =
@@ -178,12 +203,13 @@ struct
     if olds = "" then news
     else olds ^ "\n" ^ news
 
-  let print g b =
+  let print g =
+    (fun b ->
     let open Type in
     let stmts = CA.get_stmts g b in
     let out = List.fold_left (fun s stmt -> match stmt with
     | Ast.Label(Addr a, attrs) ->
-      let addrstr = Printf.sprintf "%#Lx" a in
+      let addrstr = Printf.sprintf "0x%s" (Big_int_convenience.(~%) a) in
       let newasmsstr = 
         try let newasms = BatList.find_map
               (function
@@ -195,18 +221,34 @@ struct
     | _ -> s) "" stmts in
     match out with
     | "" -> Cfg.bbid_to_string(CA.G.V.label b)
-    | _ -> out
-
-  let edge_attributes = edge_labels_ast
+    | _ -> out),
+    (fun e ->
+      match CA.G.E.label e with
+      | Some (Some b, _) ->
+        string_of_bool b
+      | Some (None, e) ->
+        Pp.ast_exp_to_string e
+      | _ -> ""
+    )
 end
 
-module SsaStmtsPrinter = MakeCfgPrinter (CS.G) (PrintSsaStmts) (DefAttributor)
+module CSG = struct
+  include CS.G
+  type exp = CS.exp
+  let exp_to_string = Pp.ssa_exp_to_string
+end
+module SsaStmtsPrinter = MakeCfgPrinter (CSG) (PrintSsaStmts) (EdgeColorAttributor)
 module SsaStmtsDot = Graph.Graphviz.Dot(SsaStmtsPrinter)
 
-module AstStmtsPrinter = MakeCfgPrinter (CA.G) (PrintAstStmts) (DefAttributor)
+module CAG = struct
+  include CA.G
+  type exp = CA.exp
+  let exp_to_string = Pp.ast_exp_to_string
+end
+module AstStmtsPrinter = MakeCfgPrinter (CAG) (PrintAstStmts) (EdgeColorAttributor)
 module AstStmtsDot = Graph.Graphviz.Dot (AstStmtsPrinter)
 
-module AstAsmsPrinter = MakeCfgPrinter (CA.G) (PrintAstAsms) (DefAttributor)
+module AstAsmsPrinter = MakeCfgPrinter (CAG) (PrintAstAsms) (EdgeColorAttributor)
 module AstAsmsDot = Graph.Graphviz.Dot (AstAsmsPrinter)
 
 module SsaBBidPrinter =
@@ -214,7 +256,6 @@ struct
   include CS.G
   include DefAttrs
   let vertex_name v = Cfg.bbid_to_string(CS.G.V.label v)
-  let edge_attributes = edge_labels_ssa
 end
 module SsaBBidDot = Graph.Graphviz.Dot(SsaBBidPrinter)
 
@@ -223,12 +264,11 @@ struct
   include CA.G
   include DefAttrs
   let vertex_name v = Cfg.bbid_to_string(CA.G.V.label v)
-  let edge_attributes = edge_labels_ast
 end
 module AstBBidDot = Graph.Graphviz.Dot(AstBBidPrinter)
 
-module SsaStmtsAttPrinter = MakeCfgPrinter (CS.G) (PrintSsaStmts) (DefAttributor)
+module SsaStmtsAttPrinter = MakeCfgPrinter (CSG) (PrintSsaStmts) (EdgeColorAttributor)
 module SsaStmtsAttDot = Graph.Graphviz.Dot(SsaStmtsAttPrinter)
 
-module AstStmtsAttPrinter = MakeCfgPrinter (CA.G) (PrintAstStmts) (DefAttributor)
+module AstStmtsAttPrinter = MakeCfgPrinter (CAG) (PrintAstStmts) (EdgeColorAttributor)
 module AstStmtsAttDot = Graph.Graphviz.Dot(AstStmtsAttPrinter)

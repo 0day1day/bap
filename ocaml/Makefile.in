@@ -7,6 +7,10 @@ export OCAML_COMPAT='c'
 
 export BAP_DIR=$(CURDIR)/..
 
+# Ignore warning about duplicate arch files.
+# The arch file in libtrace is part of the trace pack.
+export OCAMLFIND_IGNORE_DUPS_IN=$(CURDIR)
+
 # We can't use $(CPP) here because the default (cc -E) won't work on
 # .idl files.
 export CAMLIDLFLAGS = -prepro cpp
@@ -37,6 +41,7 @@ endif
 export SOURCES = \
 	debug.mli debug.ml \
 	BatListFull.ml \
+	worklist.mli worklist.ml \
 	util.mli util.ml \
 	big_int_convenience.ml \
 	dominator.ml \
@@ -53,7 +58,9 @@ export SOURCES = \
 	piqi/stmt_piqi.ml piqi/stmt_piqi_ext.ml \
 	piqi/ast_piqi.mli piqi/ast_piqi.ml \
 	ast_convenience.ml \
+	ssa_convenience.ml \
 	cfg.mli cfg.ml \
+	cfgDataflow.mli cfgDataflow.ml \
 	ast_visitor.mli ast_visitor.ml \
 	ssa_visitor.mli ssa_visitor.ml \
 	ast_mapper.mli ast_mapper.ml \
@@ -70,6 +77,9 @@ export SOURCES = \
 	debug_snippets.ml \
 	sccvn.mli sccvn.ml \
 	deadcode.mli deadcode.ml \
+	copy_prop.mli copy_prop.ml \
+	ast_cond_simplify.mli ast_cond_simplify.ml \
+	ssa_cond_simplify.mli ssa_cond_simplify.ml \
 	ssa_simp_misc.ml \
 	ssa_simp.ml \
 	formulap.ml \
@@ -79,6 +89,7 @@ export SOURCES = \
 	libbfd.idl \
 	libasmir.idl \
 	disasm_i386.ml \
+	arch.mli arch.ml \
 	disasm.ml \
 	$(LLVM_SRC) \
 	syscall_models.ml \
@@ -92,18 +103,21 @@ export SOURCES = \
 	asmir_vars.ml \
 	asmir_consts.ml \
 	asmir.mli asmir.ml \
+	hacks.ml \
+	coalesce.mli coalesce.ml \
+	vsa_ast.mli vsa_ast.ml \
+	vsa_ssa.mli vsa_ssa.ml \
+	asmir_disasm.mli asmir_disasm.ml \
 	func_boundary.mli func_boundary.ml \
 	asmir_rdisasm.mli asmir_rdisasm.ml \
+	switch_condition.mli switch_condition.ml \
 	grammar_private_scope.ml \
 	grammar.mly lexer.mll \
 	parser.ml \
 	tunegc.mli tunegc.ml \
 	input.mli input.ml \
 	to_c.ml \
-	vsa.ml \
-	hacks.ml \
 	symbeval.ml symbeval_search.ml \
-	coalesce.mli coalesce.ml \
 	structural_analysis.ml \
 	steensgard.mli steensgard.ml \
 	lnf.mli lnf.ml \
@@ -112,6 +126,7 @@ export SOURCES = \
 	lnf_havlak.mli lnf_havlak.ml \
 	lnf_reduced_havlak.mli lnf_reduced_havlak.ml \
 	lnf_sreedhar.mli lnf_sreedhar.ml \
+	lnf_interface.mli lnf_interface.ml \
 	unroll.mli unroll.ml \
 	fwp.mli fwp.ml \
 	ast_slice.ml \
@@ -182,8 +197,12 @@ libbfd.idl : bfdarch.idl
 bfdarch.idl:
 	echo '#include "config.h"' > /tmp/f.c
 	echo '#include <bfd.h>' >> /tmp/f.c
+	echo 'typedef unsigned long machine_t;' >> /tmp/f.c
+	echo 'const machine_t MACH_i386_i386 = bfd_mach_i386_i386;' >> /tmp/f.c
+	echo 'const machine_t MACH_i386_x86_64 = bfd_mach_x86_64;' >> /tmp/f.c
 	$(CPP) $(CPPFLAGS) -I$(LIBASMIR) /tmp/f.c | awk 'BEGIN { go=0; } /^enum bfd_architecture$$/ { go=1; } \
 		go && $$0 != "" { print; } \
+		/machine_t/ { print; } \
 		/};$$/ { go=0; }' > $@
 
 # You may also tell "make" at the command-line what kind of target to

@@ -1,9 +1,10 @@
 (** SSA simplifications
 
-This uses all supported simplifications to try to optimize as much as possible.
+    This uses all supported simplifications to try to optimize as much as possible.
 *)
 
-module D=Debug.Make(struct let name="Ssa_Simp" and default=`Debug end)
+module D=Debug.Make(struct let name="Ssa_simp" and default=`NoDebug end)
+open Cfg_ssa
 open D
 
 let simp_cfg ?(liveout=[]) ?(usedc=true) ?(usesccvn=true) ?(usemisc=true) cfg =
@@ -23,3 +24,8 @@ let simp_cfg ?(liveout=[]) ?(usedc=true) ?(usesccvn=true) ?(usemisc=true) cfg =
     cfgref := if !changed then Prune_unreachable.prune_unreachable_ssa !cfgref else !cfgref;
   done;
   !cfgref
+
+let simp_astcfg ?(liveout=[]) ?usedc ?usesccvn ?usemisc g =
+  let {ssacfg; to_ssavar} = Cfg_ssa.trans_cfg g in
+  let ssacfg = simp_cfg ?usedc ?usesccvn ?usemisc ~liveout:(List.map to_ssavar liveout) ssacfg in
+  Cfg_ssa.to_astcfg ssacfg

@@ -2,19 +2,20 @@
 
 open Ast
 open BatListFull
+open Big_int_convenience
 module D = Debug.Make(struct let name = "Asmir_rdisasm" and default=`NoDebug end)
 open D
 open Type
 
 let get_addr expr =
   match expr with
-  | Ast.Int (i, _) -> Some (Big_int_Z.int64_of_big_int i)
+  | Ast.Int (i, _) -> Some i
   | _ -> None
 
 let collect_some f l x =
-    match f x with
-    | Some i -> i :: l
-    | None -> l
+  match f x with
+  | Some i -> i :: l
+  | None -> l
 
 let addrt = Reg 32
 
@@ -68,17 +69,13 @@ let get_code_addrs stmts next =
      stack, and thus first in the stack. *)
   List.rev (get_code_addrs' stmts [])
 
-module Int64Set = Set.Make( 
-  struct
-    type t = Int64.t
-    let compare = Int64.compare
-  end)
+module BigIntSet = Set.Make(Big_int_convenience.OrderedType)
 
 type callback = addr -> addr -> stmt list -> bool
 let default _ _ _ = true
 
 let rdisasm_at ?(f=default) p startaddrs =
-  let seen = ref Int64Set.empty in
+  let seen = ref BigIntSet.empty in
   let out = ref [] in
   let outasm = ref "" in
   let stack = Stack.create () in
@@ -95,7 +92,7 @@ let rdisasm_at ?(f=default) p startaddrs =
   while not (Stack.is_empty stack) do
     let addr = Stack.pop stack in
     try
-      if Int64Set.mem addr !seen then (
+      if BigIntSet.mem addr !seen then (
         (* If we have already seen this address before, add a jump to
            it to preserve control flow. If the instruction before us
            is any type of jump, this is not necessary.*)
@@ -107,11 +104,11 @@ let rdisasm_at ?(f=default) p startaddrs =
           | _ -> true
         in
         if add_jump then
-          out := [Jmp(Int(Big_int_Z.big_int_of_int64 addr, addrt), [StrAttr "rdisasm"])] :: !out)
+          out := [Jmp(Int(addr, addrt), [StrAttr "rdisasm"])] :: !out)
       else (
         let (statements, next) = Asmir.asm_addr_to_bap p addr in
         let asm = Asmir.get_asm_instr_string p addr in
-        seen := Int64Set.add addr !seen;
+        seen := BigIntSet.add addr !seen;
         out := statements :: !out;
         outasm := !outasm ^ "; " ^ asm;
         numstmts := !numstmts + (List.length statements);
@@ -119,7 +116,7 @@ let rdisasm_at ?(f=default) p startaddrs =
         List.iter
           (fun x ->
             Stack.push x stack;
-            dprintf "Adding address %#Lx to the stack" x;
+            dprintf "Adding address %s to the stack" (~%x);
           )
           (get_code_addrs statements next))
     (*

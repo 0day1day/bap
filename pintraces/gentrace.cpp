@@ -24,13 +24,39 @@
 #include "pin_taint.h"
 #include "pin_misc.h"
 
+//#define DEBUG
+#ifdef DEBUG
+  #define dbg_printf(...) printf(__VA_ARGS__)
+#else
+  #define dbg_printf(...)
+#endif
+
+
+/*
+ * A useful set of macros that we can customize for different
+ * architectures as simply as possible.
+ */
+#ifdef ARCH_64
+  #define BFD_ARCH bfd_arch_i386
+  #define BFD_MACH bfd_mach_x86_64
+  #define STACK_OFFSET 8
+  #define MAX_ADDRESS "0xffffffffffffffff"
+  #define MEM_ACCESS qword
+#elif defined(ARCH_32)
+  #define BFD_ARCH bfd_arch_i386
+  #define BFD_MACH bfd_mach_i386_i386
+  #define STACK_OFFSET 4
+  #define MAX_ADDRESS "0xffffffff"
+  #define MEM_ACCESS dword
+#endif
+
 using namespace pintrace;
 using namespace SerializedTrace;
 
 const ADDRINT ehandler_fs_offset = 0;
 const ADDRINT ehandler_nptr_offset = 0;
 const ADDRINT ehandler_handler_offset = 4;
-const ADDRINT ehandler_invalid_ptr = 0xFFFFFFFF;
+const ADDRINT ehandler_invalid_ptr = ~0x0;
 const ADDRINT ehandler_size = 8;
 /** The offset esp has from when the exception is initially handled to
     when the handler is called. */
@@ -54,20 +80,20 @@ namespace WINDOWS {
 #endif
 
 /* Environment variables on windows
- * 
+ *
  * For a program that uses getenv, Windows does the following:
  *
  * 1. Call GetEnvironmentStringsW and set up an environment table.
  * 2. If using main (rather than wmain), WideCharToMultiByte is used
  * to convert to a multibyte environment table.
- * 
+ *
  * WideCharToMultiByte is implemented using a conversion table; we
  * don't handle control-flow taint, and thus we cannot really handle
  * tainting of environment variables :-/
  */
 
 /* Networking on windows
- * 
+ *
  * Winsock appears to communicate with a windows subsystem using a
  * lightweight procedure calling interface, e.g., something we don't
  * want to parse.  So, we catch sockets() by instrumenting the socket
@@ -140,15 +166,15 @@ KNOB<bool> LogAllSyscalls(KNOB_MODE_WRITEONCE, "pintool",
                           "Log system calls (even those unrelated to taint)");
 
 KNOB<bool> KnobTaintTracking(KNOB_MODE_WRITEONCE, "pintool",
-                             "taint-track", "true", 
+                             "taint-track", "true",
                              "Enable taint tracking");
 
 KNOB<bool> LogAllAfterTaint(KNOB_MODE_WRITEONCE, "pintool",
-                            "logall-after", "false", 
+                            "logall-after", "false",
                             "Log all (even untainted) instructions after the first tainted instruction");
 
 KNOB<bool> LogAllBeforeTaint(KNOB_MODE_WRITEONCE, "pintool",
-                             "logall-before", "false", 
+                             "logall-before", "false",
                              "Log all (even untainted) instructions before and after the first tainted instruction");
 
 // This option logs one instruction.  It then generates a fake
@@ -162,42 +188,42 @@ KNOB<bool> LogKeyFrames(KNOB_MODE_WRITEONCE, "pintool",
                         "Periodically output key frames containing important program values");
 
 KNOB<string> TaintedFiles(KNOB_MODE_APPEND, "pintool",
-                          "taint-files", "", 
+                          "taint-files", "",
                           "Consider the given files as being tainted");
 
 KNOB<bool> TaintedArgs(KNOB_MODE_WRITEONCE, "pintool",
-                       "taint-args", "false", 
+                       "taint-args", "false",
                        "Command-line arguments will be considered tainted");
 
 KNOB<bool> TaintedStdin(KNOB_MODE_WRITEONCE, "pintool",
-                        "taint-stdin", "false", 
+                        "taint-stdin", "false",
                         "Everything read from stdin will be considered tainted");
 
 KNOB<bool> TaintedNetwork(KNOB_MODE_WRITEONCE, "pintool",
-                          "taint-net", "false", 
+                          "taint-net", "false",
                           "Everything read from network sockets will be considered tainted");
 
 KNOB<bool> TaintedIndices(KNOB_MODE_WRITEONCE, "pintool",
-                          "taint-indices", "false", 
+                          "taint-indices", "false",
                           "Values loaded with tainted memory indices will be considered tainted");
 
-// FIXME: we should be able to specify more refined tainted 
+// FIXME: we should be able to specify more refined tainted
 // sources, e.g., that only the 5th argument should be considered
 // tainted
 KNOB<string> TaintedEnv(KNOB_MODE_APPEND, "pintool",
-                        "taint-env", "", 
+                        "taint-env", "",
                         "Environment variables to be considered tainted");
 
-KNOB<uint32_t> TaintStart(KNOB_MODE_WRITEONCE, "pintool",
-                          "taint-start", "0x0", 
+KNOB<ADDRINT> TaintStart(KNOB_MODE_WRITEONCE, "pintool",
+                          "taint-start", "0x0",
                           "All logged instructions will have higher addresses");
 
-KNOB<uint32_t> TaintEnd(KNOB_MODE_WRITEONCE, "pintool",
-                        "taint-end", "0xffffffff", 
+KNOB<ADDRINT> TaintEnd(KNOB_MODE_WRITEONCE, "pintool",
+                        "taint-end", MAX_ADDRESS,
                         "All logged instructions will have lower addresses");
 
 KNOB<string> FollowProgs(KNOB_MODE_APPEND, "pintool",
-                         "follow-progs", "", 
+                         "follow-progs", "",
                          "Follow the given program names if they are exec'd");
 
 KNOB<string> PivotFile(KNOB_MODE_WRITEONCE, "pintool",
@@ -221,7 +247,7 @@ KNOB<int> SkipTaints(KNOB_MODE_WRITEONCE, "pintool",
                      "Skip this many taint introductions");
 
 struct FrameBuf {
-    uint32_t addr;
+    ADDRINT addr;
     uint32_t tid;
     uint32_t insn_length;
 
@@ -257,17 +283,18 @@ enum RPassType { P_VALUE, P_REF, P_CONTEXT, P_FPX87 };
  * Given a register, decide how to pass it.
  */
 static RPassType howPass(REG r) {
+    dbg_printf("howPass r=%s\n", pin_register_name(r).c_str());
 
     if(REG_is_fr_for_get_context(r))
       return P_CONTEXT;
-    
+
     /* XMM and floating point registers can be passed by reference */
     if (REG_is_xmm(r) || REG_is_ymm(r) || REG_is_mm(r))
         return P_REF;
 
     if(REG_is_fr_or_x87(r))
         return P_FPX87;
-    
+
     // For now, let's just use context
     return P_CONTEXT;
 }
@@ -276,6 +303,7 @@ static RPassType howPass(REG r) {
  * Avoiding logging some addresses.
  */
 static bool dontLog(ADDRINT addr) {
+    dbg_printf("dontLog addr=0x%lx\n", addr);
 
     IMG i = IMG_FindByAddress(addr);
     if (IMG_Valid(i)) {
@@ -283,18 +311,18 @@ static bool dontLog(ADDRINT addr) {
         char tempbuf[BUFSIZE];
         char *tok = NULL;
         char *lasttok = NULL;
-    
+
         // Fill up the temporary buffer
         strncpy(tempbuf, IMG_Name(i).c_str(), BUFSIZE);
-    
+
         // We don't need a lock, since this is an instrumentation function (strtok is not re-entrant)
         strtok(tempbuf, "\\");
-    
+
         while ((tok = strtok(NULL, "\\")) != NULL) {
             // Just keep parsing...
             lasttok = tok;
         }
-    
+
         if (lasttok) {
             if (lasttok == string("uxtheme.dll")) {
                 return true;
@@ -391,7 +419,7 @@ bool g_taint_introduced;
 // True if the trigger address was resolved.
 bool g_trig_resolved;
 
-uint32_t g_trig_addr;
+ADDRINT g_trig_addr;
 
 // We use a signed integer because sometimes the countdown will be
 // decremented past zero.
@@ -407,7 +435,7 @@ PIN_LOCK lock;
 ValSpecRec values[MAX_VALUES_COUNT];
 
 // Address ranges
-uint32_t start_addr, end_addr;
+ADDRINT start_addr, end_addr;
 
 // Pivot set
 pivot_set ps;
@@ -449,6 +477,7 @@ ThreadInfo_t* NewThreadInfo(void) {
 
 /** Given a REG, return the number of bits in the reg */
 static uint32_t GetBitsOfReg(REG r) {
+    dbg_printf("GetBitsOfReg r=%s\n", pin_register_name(r).c_str());
     if (REG_is_gr8(r)) return 8;
     if (REG_is_gr16(r)) return 16;
     if (REG_is_gr32(r)) return 32;
@@ -470,8 +499,6 @@ static uint32_t GetBitsOfReg(REG r) {
         return 16;
         break;
 
-    case REG_INST_PTR:
-    case REG_EFLAGS:
     case REG_MXCSR:
         return 32;
         break;
@@ -509,6 +536,55 @@ static uint32_t GetBitsOfReg(REG r) {
         return 256;
         break;
 
+/*
+ * Handle any extra registers specific to an architecture
+ * and defines any ambiguous registers
+ * (E.g., REG_INST_PTR can be 64 or 32 based on the architecture)
+ */
+#if defined(ARCH_64)
+    case REG_EIP:
+    case REG_EFLAGS:
+        return 32;
+        break;
+
+    case REG_INST_PTR:
+    case REG_GFLAGS:
+    case REG_SEG_GS_BASE:
+    case REG_SEG_FS_BASE:
+        return 64;
+        break;
+
+    case REG_XMM8:
+    case REG_XMM9:
+    case REG_XMM10:
+    case REG_XMM11:
+    case REG_XMM12:
+    case REG_XMM13:
+    case REG_XMM14:
+    case REG_XMM15:
+        return 128;
+        break;
+
+    case REG_YMM8:
+    case REG_YMM9:
+    case REG_YMM10:
+    case REG_YMM11:
+    case REG_YMM12:
+    case REG_YMM13:
+    case REG_YMM14:
+    case REG_YMM15:
+        return 256;
+        break;
+
+#elif defined(ARCH_32)
+    case REG_INST_PTR:
+    case REG_GFLAGS:
+    case REG_SEG_GS_BASE:
+    case REG_SEG_FS_BASE:
+        return 32;
+        break;
+#endif
+
     default:
         break;
     }
@@ -519,11 +595,11 @@ static uint32_t GetBitsOfReg(REG r) {
     return -1;
 }
 
-static uint32_t GetByteSize(RegMem_t vtype) {
+static size_t GetByteSize(RegMem_t vtype) {
     return (vtype.size / 8);
 }
 
-static uint32_t GetBitSize(RegMem_t type) {
+static size_t GetBitSize(RegMem_t type) {
     return type.size;
 }
 
@@ -542,6 +618,7 @@ ADDRINT CheckTrigger()
 
 /** Reinstrument all images. XXX: Remove me. */
 VOID InstrumentIMG() {
+    dbg_printf("InstrumentIMG\n");
     PIN_LockClient();
     for (IMG i = APP_ImgHead(); IMG_Valid(i); i = IMG_Next(i)) {
         ModLoad(i, (void*)1);
@@ -551,6 +628,7 @@ VOID InstrumentIMG() {
 
 VOID Activate(CONTEXT *ctx)
 {
+    dbg_printf("Activate\n");
     cerr << "Activating logging" << endl;
     g_active = true;
     PIN_RemoveInstrumentation();
@@ -562,10 +640,11 @@ VOID Activate(CONTEXT *ctx)
     Note: It's important to NOT hold locks when calling this function.
     PIN_RemoveInstrumentation obtains the VM lock, which is only possible
     when no analysis functions/etc are executing.  If one is waiting for
-    one of our locks, this will cause a deadlock.  
+    one of our locks, this will cause a deadlock.
 */
 VOID TActivate()
 {
+    dbg_printf("TActivate\n");
     cerr << "Activating taint analysis " << endl;
     g_active = true; /* Any instruction could be logged because taint is
                         introduced. */
@@ -580,18 +659,22 @@ VOID TActivate()
 //
 ADDRINT CheckBuffer(UINT32 count)
 {
+  dbg_printf("CheckBuffer count=%d\n", count);
+
   return (g_bufidx + count) >= BUFFER_SIZE - FUDGE;
 }
 
 ADDRINT CheckBufferEx(BOOL cond, UINT32 count, UINT32 count2)
 {
+  dbg_printf("CheckBufferEx cond=%d, count=%d, count2=%d\n", cond, count, count2);
+
   return cond && ((g_bufidx + count + count2) >= BUFFER_SIZE - FUDGE);
 }
 
 // Callers must ensure mutual exclusion
 VOID FlushInstructions()
 {
-
+    dbg_printf("FlushInstructions\n");
     for(uint32_t i = 0; i < g_bufidx; i++) {
 
         frame fnew;
@@ -648,7 +731,7 @@ VOID FlushInstructions()
 
             // We're in trouble if we don't know the type.
             if(v.type.type != REGISTER && v.type.type != MEM) {
-                cerr << "v.type = " << v.type.type << endl;                
+                cerr << "v.type = " << v.type.type << endl;
                 assert(false);
             }
         }
@@ -666,6 +749,8 @@ VOID FlushInstructions()
 
 /* Add a PIN register to a value list. Helper function for FlushBuffer */
 VOID AddRegister(tagged_value_list *tol, const CONTEXT *ctx, REG r, THREADID threadid) {
+    dbg_printf("AddRegister r=%d, tid=%d\n", r, threadid);
+
     tol->mutable_value_source_tag()->set_thread_id(threadid);
     value_info *v = tol->mutable_value_list()->add_elem();
     v->mutable_operand_info_specific()->mutable_reg_operand()->set_name(REG_StringShort(r));
@@ -688,6 +773,7 @@ VOID AddRegister(tagged_value_list *tol, const CONTEXT *ctx, REG r, THREADID thr
 //
 VOID FlushBuffer(BOOL addKeyframe, const CONTEXT *ctx, THREADID threadid, BOOL needlock)
 {
+    dbg_printf("FlushBuffer\n");
 
     LLOG("Begin flushing buffer.\n");
 
@@ -708,15 +794,15 @@ VOID FlushBuffer(BOOL addKeyframe, const CONTEXT *ctx, THREADID threadid, BOOL n
 
         frame f;
         tagged_value_list *tol = f.mutable_key_frame()->mutable_tagged_value_lists()->add_elem();
-        AddRegister(tol, ctx, LEVEL_BASE::REG_EAX, threadid);
-        AddRegister(tol, ctx, LEVEL_BASE::REG_EBX, threadid);
-        AddRegister(tol, ctx, LEVEL_BASE::REG_ECX, threadid);
-        AddRegister(tol, ctx, LEVEL_BASE::REG_EDX, threadid);
-        AddRegister(tol, ctx, LEVEL_BASE::REG_ESI, threadid);
-        AddRegister(tol, ctx, LEVEL_BASE::REG_EDI, threadid);
-        AddRegister(tol, ctx, LEVEL_BASE::REG_ESP, threadid);
-        AddRegister(tol, ctx, LEVEL_BASE::REG_EBP, threadid);
-        AddRegister(tol, ctx, LEVEL_BASE::REG_EFLAGS, threadid);
+        AddRegister(tol, ctx, LEVEL_BASE::REG_GAX, threadid);
+        AddRegister(tol, ctx, LEVEL_BASE::REG_GBX, threadid);
+        AddRegister(tol, ctx, LEVEL_BASE::REG_GCX, threadid);
+        AddRegister(tol, ctx, LEVEL_BASE::REG_GDX, threadid);
+        AddRegister(tol, ctx, LEVEL_BASE::REG_GSI, threadid);
+        AddRegister(tol, ctx, LEVEL_BASE::REG_GDI, threadid);
+        AddRegister(tol, ctx, LEVEL_BASE::REG_STACK_PTR, threadid);
+        AddRegister(tol, ctx, LEVEL_BASE::REG_GBP, threadid);
+        AddRegister(tol, ctx, LEVEL_BASE::REG_GFLAGS, threadid);
         AddRegister(tol, ctx, LEVEL_BASE::REG_SEG_CS, threadid);
         AddRegister(tol, ctx, LEVEL_BASE::REG_SEG_DS, threadid);
         AddRegister(tol, ctx, LEVEL_BASE::REG_SEG_SS, threadid);
@@ -746,7 +832,7 @@ VOID FlushBuffer(BOOL addKeyframe, const CONTEXT *ctx, THREADID threadid, BOOL n
     }
 
 
-   
+    dbg_printf("End FlushBuffer\n");
     LLOG("End flushing buffer.\n");
 
 }
@@ -773,7 +859,7 @@ uint32_t AcceptWrapper(CONTEXT *ctx, AFUNPTR fp, THREADID tid, uint32_t s, void 
     ReleaseLock(&lock);
 
     return ret;
-			      
+
 }
 
 /** Wrapper for WSAConnect */
@@ -806,7 +892,7 @@ uint32_t WSAConnectWrapper(CONTEXT *ctx, AFUNPTR fp, THREADID tid, uint32_t s, v
     ReleaseLock(&lock);
 
     return ret;
-			      
+
 }
 
 /** Wrapper for connect */
@@ -832,14 +918,14 @@ uint32_t ConnectWrapper(CONTEXT *ctx, AFUNPTR fp, THREADID tid, uint32_t s, void
     // call GetLastError to find out what the root problem is,
     // so... we'll just assume the connection was successful.
     tracker->acceptHelper(s);
- 
+
     // } else {
     //    cerr << "connect error " << ret << endl;
     //  }
     ReleaseLock(&lock);
 
     return ret;
-			      
+
 }
 
 void BeforeRecv(THREADID tid, uint32_t s, char* buf) {
@@ -876,10 +962,10 @@ void AfterRecv(THREADID tid, int ret, char *f) {
     if (ti->recvStack.empty()) {
         cerr << "WARNING: Stack empty in AfterRecv(). Thread " << tid << endl;
     } else {
-  
+
         RecvInfo_t ri = ti->recvStack.top();
         ti->recvStack.pop();
-    
+
         if (ret != SOCKET_ERROR) {
             GetLock(&lock, tid+1);
             //cerr << "fd: " << ri.fd << endl;
@@ -893,13 +979,13 @@ void AfterRecv(THREADID tid, int ret, char *f) {
 
             FrameOption_t fo = tracker->recvHelper(ri.fd, ri.addr, numbytes);
             ReleaseLock(&lock);
-      
+
             if (fo.b) {
-	
+
                 if (!g_taint_introduced) {
                     TActivate();
                 }
-	
+
                 GetLock(&lock, tid+1);
                 g_twnew->add(fo.f);
                 ReleaseLock(&lock);
@@ -915,11 +1001,11 @@ void AfterRecv(THREADID tid, int ret, char *f) {
 void* GetEnvWWrap(CONTEXT *ctx, AFUNPTR fp, THREADID tid) {
     void *ret = NULL;
 
-    /* 
+    /*
        We must lock after the PIN_CallApplicationFunction call, since
        the called code is instrumented, and also tries to obtain the
-       lock. 
-     
+       lock.
+
        This probably is not a big deal, but theoretically the
        instrumented code in another thread could change the memory as
        we're reading it.  This seems pretty unlikely.  If we ever feel
@@ -951,11 +1037,11 @@ void* GetEnvAWrap(CONTEXT *ctx, AFUNPTR fp, THREADID tid) {
 
     cerr << "In a wrap " << endl;
 
-    /* 
+    /*
        We must lock after the PIN_CallApplicationFunction call, since
        the called code is instrumented, and also tries to obtain the
-       lock. 
-     
+       lock.
+
        This probably is not a big deal, but theoretically the
        instrumented code in another thread could change the memory as
        we're reading it.  This seems pretty unlikely.  If we ever feel
@@ -987,6 +1073,8 @@ void* GetEnvAWrap(CONTEXT *ctx, AFUNPTR fp, THREADID tid) {
  * executed when using -logone-after. It transfer control back to the
  * same instruction to log its operands after execution. */
 VOID PostInstruction(ADDRINT addr, CONTEXT *ctx) {
+    dbg_printf("PostInstruction addr=0x%lx\n", addr);
+
     g_exit_next = true;
     PIN_SetContextReg(ctx, REG_INST_PTR, addr);
     PIN_ExecuteAt(ctx);
@@ -1002,7 +1090,7 @@ VOID AppendBuffer(ADDRINT addr,
                   UINT32 rawbytes1,
                   UINT32 rawbytes2,
                   UINT32 rawbytes3,
-                   
+
                   /* Type contains the type of the operand. Location
                    * specifies the base address for memory operands.
                    * For registers, this holds the ID of the
@@ -1013,12 +1101,16 @@ VOID AppendBuffer(ADDRINT addr,
                    * with the same address (specified in location),
                    * but with different offsets (0, 1, 2, 3) in
                    * value.  Usage specifies how the operand is used
-                   * (read, write, etc.) */                   
+                   * (read, write, etc.) */
 
                   UINT32 values_count,
                   ...
                   )
 {
+    dbg_printf("AppendBuffer addr=0x%lx tid=%d isBranch=%d, insn_length=%d "
+               "rawbytes=%x %x %x %x\n", addr, tid, isBranch, insn_length,
+               rawbytes0, rawbytes1, rawbytes2, rawbytes3);
+
     va_list va;
     va_start(va, values_count);
 
@@ -1038,7 +1130,7 @@ VOID AppendBuffer(ADDRINT addr,
         // cerr << "Checkpoint: Executing code at " << addr;
         // if (IMG_Valid(i)) {
         //   cerr << " (" << IMG_Name(i) << ")";
-        // } 
+        // }
         cerr << " thread " << tid
              << "; " << g_counter << " instructions" << endl
              << "Code cache size is " << CODECACHE_CodeMemUsed() << endl
@@ -1046,23 +1138,23 @@ VOID AppendBuffer(ADDRINT addr,
     }
 
     LLOG("big thing\n");
-  
+
     GetLock(&lock, tid+1);
-  
+
     LLOG("got big thing\n");
 
     for (unsigned int i = 0; i < values_count; i++) {
         values[i].type.type = (RegMemEnum_t)va_arg(va, uint32_t);
         assert(valid_regmem_type(values[i].type));
-        
+
         values[i].type.size = va_arg(va, uint32_t);
-        values[i].loc = va_arg(va, uint32_t);
-        values[i].value.dword[0] = va_arg(va, uint32_t);			
-        values[i].usage = va_arg(va, uint32_t);				
+        values[i].loc = va_arg(va, ADDRINT);
+        values[i].value.MEM_ACCESS[0] = va_arg(va, ADDRINT);
+        values[i].usage = va_arg(va, uint32_t);
         if (tracker->isMem(values[i].type)) {
-            /* Add memory byte offset */					
-            values[i].loc += values[i].value.dword[0];			
-        } 		    
+            /* Add memory byte offset */
+            values[i].loc += values[i].value.MEM_ACCESS[0];
+        }
     }
 
     /* Perform taint propagation and checking */
@@ -1092,7 +1184,7 @@ VOID AppendBuffer(ADDRINT addr,
             cerr << "First logged instruction" << endl;
             firstLogged = false;
         }
-     
+
         if (has_taint && firstTaint) {
             cerr << "First tainted instruction" << endl;
             LOG("First tainted instruction.\n");
@@ -1100,35 +1192,35 @@ VOID AppendBuffer(ADDRINT addr,
         }
 
         // Mark everything as untainted
-        for (uint32_t i = 0 ; i < values_count ; i++) 
+        for (uint32_t i = 0 ; i < values_count ; i++)
             values[i].taint = 0;
-     
+
         // Set taint values from taint context
         tracker->setTaintContext(ti->delta);
 
         // Record pretaint (this goes in the log)
-        for (uint32_t i = 0 ; i < values_count ; i++) 
+        for (uint32_t i = 0 ; i < values_count ; i++)
             pretaint[i] = values[i].taint;
 
         // Did this instruction propagate taint?
         //propagated_taint = tracker->propagatedTaint(isBranch);
-      
+
         if (!isBranch)
             tracker->taintPropagation(ti->delta);
 
         // Taint checking
         abort = !tracker->taintChecking();
-         
+
         //} FIXME: it there a case where the instruction contains taint
         //  but we do not need to log it?
         //if (log || (has_taint && propagated_taint)) {
-   
+
         //cerr << "Logging instruction " << rawbytes0 << " " << rawbytes1 << endl;
 
         // Now, fill in the buffer with information
 
-	assert (g_bufidx < BUFFER_SIZE);
-      
+        assert (g_bufidx < BUFFER_SIZE);
+
         g_buffer[g_bufidx].addr = addr;
         g_buffer[g_bufidx].tid = tid;
         g_buffer[g_bufidx].insn_length = insn_length;
@@ -1141,40 +1233,42 @@ VOID AppendBuffer(ADDRINT addr,
         // tracker->printRegs();
 
         g_buffer[g_bufidx].values_count = values_count;
-  
-        //g_buffer[g_bufidx].valspecs[i].taint = values[i].taint;             
+
+        //g_buffer[g_bufidx].valspecs[i].taint = values[i].taint;
 
         // Values for floating point operations
         bool got_FP_state = false;
         FPSTATE fpState;
         void * fpValue;
         uint32_t s_i;
-        
+
         // Store information to the buffer
         for (unsigned int i = 0; i < values_count; i++) {
 
-            g_buffer[g_bufidx].valspecs[i].type = values[i].type;		
-            g_buffer[g_bufidx].valspecs[i].usage = values[i].usage;		
-            g_buffer[g_bufidx].valspecs[i].loc = values[i].loc;			
+            g_buffer[g_bufidx].valspecs[i].type = values[i].type;
+            g_buffer[g_bufidx].valspecs[i].usage = values[i].usage;
+            g_buffer[g_bufidx].valspecs[i].loc = values[i].loc;
             g_buffer[g_bufidx].valspecs[i].taint = pretaint[i];
-     
-            if(values[i].type.type == REGISTER) {						
-                       /*r = REG_FullRegName((REG) valspec##i##_loc);*/		
+
+            if(values[i].type.type == REGISTER) {
+                       /*r = REG_FullRegName((REG) valspec##i##_loc);*/
                 r = (REG)values[i].loc;
-       
-                /* Find how we should access the register value */             
-                switch(howPass(r)) {                                        
+
+                /* Find how we should access the register value */
+                switch(howPass(r)) {
                 case P_CONTEXT:
-                    g_buffer[g_bufidx].valspecs[i].value.dword[0] =
-                        PIN_GetContextReg(ctx, r);
+                      g_buffer[g_bufidx].valspecs[i].value.MEM_ACCESS[0] =
+                          PIN_GetContextReg(ctx, r);
                     break;
-         
+
                 case P_REF:
-                    pr = (LEVEL_VM::PIN_REGISTER*) values[i].value.dword[0];	
+                    dbg_printf("in AppendBuffer: getting register value.\n");
+                    pr = (LEVEL_VM::PIN_REGISTER*) values[i].value.MEM_ACCESS[0];
                     memcpy(&(g_buffer[g_bufidx].valspecs[i].value),
-                           pr,                                               
-                           sizeof(LEVEL_VM::PIN_REGISTER));                  
-                    break;                                                   
+                           pr,
+                           sizeof(LEVEL_VM::PIN_REGISTER));
+                    dbg_printf("in AppendBuffer: got register value %#Lx.\n", pr);
+                    break;
 
                 case P_FPX87:
                     if(!got_FP_state) {
@@ -1186,48 +1280,48 @@ VOID AppendBuffer(ADDRINT addr,
 
                     // Figure out which st register we are using
                     s_i = r - REG_ST_BASE;
-                    
+
                     if (s_i > 7) {
                         cerr << "Unknown FP register " << r << " at addr "
                              << addr << endl;
                         assert(false);
                     }
-                    
+
                     fpValue = (void *)&(fpState.fxsave_legacy._sts[s_i]);
-                                        
+
                     memcpy(&(g_buffer[g_bufidx].valspecs[i].value.flt[0]),
                            fpValue,
                            10); // FP are 80 bits = 10 bytes
                     break;
-                    
-                default:                                                   
-                    assert(false);                                           
-                    break;                                                   
-                }                                                              
+
+                default:
+                    assert(false);
+                    break;
+                }
             } else if(values[i].type.type == MEM) {
-                PIN_SafeCopy((VOID*) &(g_buffer[g_bufidx].valspecs[i].value),	
+                PIN_SafeCopy((VOID*) &(g_buffer[g_bufidx].valspecs[i].value),
                              (const VOID *)(g_buffer[g_bufidx].valspecs[i].loc),
                              GetByteSize(values[i].type));
             } else {
-                cerr << "Unknown operand type at addr "        
-                     << addr << endl;                                          
-                assert(false);                                                 
+                cerr << "Unknown operand type at addr "
+                     << addr << endl;
+                assert(false);
             }
-            
+
             //   cerr << "Building val specs now" << endl;
-   
+
         }
 
         //   cerr << "... done" << endl;
-   
+
         g_bufidx++;
     }
 
-   
+
     /* For a non-SEH exploit, stop if taint checking fails.  In an SEH
        exploit, we may want an exception to trigger (e.g., from
        returning to a bad address). */
-    if (abort && !SEHMode.Value()) { 
+    if (abort && !SEHMode.Value()) {
         pivot_set::iterator i;
         cerr << "Stack smashing detected! @" << addr << endl;
         cerr << "Exiting...." << endl;
@@ -1236,11 +1330,11 @@ VOID AppendBuffer(ADDRINT addr,
         /* Let's assume this was a ret for now and increment esp by
          * four.  Of course, this isn't correct in general.  XXX: Fix
          * this so it works for any last instruction. */
-        ADDRINT esp = PIN_GetContextReg(ctx, REG_STACK_PTR);
-        PIN_SetContextReg(ctx, REG_STACK_PTR, esp+4);
-     
+        ADDRINT gsp = PIN_GetContextReg(ctx, REG_STACK_PTR);
+        PIN_SetContextReg(ctx, REG_STACK_PTR, gsp + STACK_OFFSET);
+
         PIVOT_testpivot(ps, ctx, *tracker);
-     
+
         FlushBuffer(true, ctx, tid, false);
         Cleanup();
         exit(0);
@@ -1251,8 +1345,8 @@ VOID AppendBuffer(ADDRINT addr,
         Cleanup();
         exit(0);
     }
-   
-    ReleaseLock(&lock);  
+
+    ReleaseLock(&lock);
     LLOG("released big thing\n");
 
     va_end(va);
@@ -1263,23 +1357,23 @@ VOID AppendBuffer(ADDRINT addr,
 
 VOID InstrBlock(BBL bbl)
 {
-
+    dbg_printf("InstrBlock\n");
     // Now we need to get the values.
-  
+
     uint32_t valcount;
     uint32_t icount = BBL_NumIns(bbl);
-  
+
     // Used to temporarily store the values we obtain from the operands,
     // to faciliate further analysis for fast paths.
     TempOps_t opndvals[MAX_VALUES_COUNT];
-  
+
 
     // LOG("INS: BBL start.\n");
 
     if (g_active) {
 
         if (icount > BUFFER_SIZE) {
-            LOG("WARNING: Basic block too many instructions: " + 
+            LOG("WARNING: Basic block too many instructions: " +
                 decstr(icount) + "\n");
             assert(false);
         }
@@ -1385,7 +1479,7 @@ VOID InstrBlock(BBL bbl)
         IARGLIST arglist = IARGLIST_Alloc();
         IARGLIST arglist_helper = IARGLIST_Alloc();
         valcount = 0;
-      
+
         // The first few arguments to AppendBuffer.
         IARGLIST_AddArguments(arglist,
                               IARG_ADDRINT, INS_Address(ins),
@@ -1405,7 +1499,7 @@ VOID InstrBlock(BBL bbl)
 
         UINT sz = INS_Size(ins);
         assert(PIN_SafeCopy((void*)rawbytes_i, (const void*) INS_Address(ins), sz) == sz);
-      
+
         IARGLIST_AddArguments(arglist,
                               IARG_UINT32, rawbytes_i[0],
                               IARG_UINT32, rawbytes_i[1],
@@ -1459,10 +1553,10 @@ VOID InstrBlock(BBL bbl)
                 opndvals[valcount].taint = RD;
             if (INS_OperandWritten(ins, i))
                 opndvals[valcount].taint |= WR;
-	
+
             /* Handle register operands */
             if (INS_OperandIsReg(ins, i)) {
-         
+
                 REG r = INS_OperandReg(ins, i);
                 if(r == REG_INVALID()) {
                   cerr << "Warning: invalid register operand in " << INS_Disassemble(ins) << endl;
@@ -1482,7 +1576,7 @@ VOID InstrBlock(BBL bbl)
                 REG fullr = REG_FullRegName(r);
                 if (fullr != REG_INVALID() && fullr != r) {
                   /* We know the fuller register, so just use that! */
-                    //	      cerr << "partial " << REG_StringShort(r) << " full " << REG_StringShort(fullr) << endl;
+                    //        cerr << "partial " << REG_StringShort(r) << " full " << REG_StringShort(fullr) << endl;
                     opndvals[valcount].reg = fullr;
                     opndvals[valcount].type.type = REGISTER;
                     opndvals[valcount].type.size = GetBitsOfReg(fullr);
@@ -1526,10 +1620,10 @@ VOID InstrBlock(BBL bbl)
                     else
                         opndvals[valcount].taint = 0;
 
-                    valcount++;              
+                    valcount++;
 
                 }
-            } 	   
+            }
         }
 
         bool memRead = INS_IsMemoryRead(ins);
@@ -1539,21 +1633,21 @@ VOID InstrBlock(BBL bbl)
         // Value type of memory read.
         RegMem_t memReadTy = {NONE , 0};
         if (memRead || memRead2) {
-            memReadTy.size = (INS_MemoryReadSize(ins) * 8); 
+            memReadTy.size = (INS_MemoryReadSize(ins) * 8);
             memReadTy.type = MEM;
         }
         // Value type of memory write
         RegMem_t memWriteTy = {NONE , 0};
         if (memWrite) {
-            memWriteTy.size = (INS_MemoryWriteSize(ins) * 8); 
+            memWriteTy.size = (INS_MemoryWriteSize(ins) * 8);
             memWriteTy.type = MEM;
         }
-         
+
         // Insert the operand values we've previously identified into the arglist.
         for (unsigned int i = 0; i < valcount; i++) {
 
             // cerr << opndvals[i].type << " " << i << " " << valcount << endl;
-        
+
             // LOG("Adding: " + REG_StringShort((REG)opndvals[i].reg) + "\n");
 
             /*
@@ -1573,20 +1667,20 @@ VOID InstrBlock(BBL bbl)
                                          argument for contexts */
                                       IARG_PTR, 0,
                                       IARG_UINT32, opndvals[i].taint,
-                                      IARG_END);        
+                                      IARG_END);
                 break;
 
             case P_REF:
-                IARGLIST_AddArguments(arglist_helper, 
+                IARGLIST_AddArguments(arglist_helper,
                                       IARG_UINT32, (uint32_t)(opndvals[i].type.type),
                                       IARG_UINT32, opndvals[i].type.size,
                                       IARG_UINT32, opndvals[i].reg,
                                       /* Pass reference pointer */
                                       IARG_REG_CONST_REFERENCE, opndvals[i].reg,
                                       IARG_UINT32, opndvals[i].taint,
-                                      IARG_END);        
+                                      IARG_END);
                 break;
-              
+
             default:
                 cerr << "Unknown value passing method" << endl;
                 assert(false);
@@ -1600,11 +1694,11 @@ VOID InstrBlock(BBL bbl)
          * However, if some of a memory operand are not tainted, then
          * they could have changed.  Thus, we must break up memory
          * operands to make this explicit. */
-      
+
         if (memRead) {
-            uint32_t bytes = GetByteSize(memReadTy);
-        
-            for (uint32_t offset = 0; offset < bytes; offset++) {
+            size_t bytes = GetByteSize(memReadTy);
+
+            for (size_t offset = 0; offset < bytes; offset++) {
                 IARGLIST_AddArguments(arglist_helper,
                                       IARG_UINT32, (uint32_t)MEM,
                                       IARG_UINT32, 8, // one byte
@@ -1618,9 +1712,9 @@ VOID InstrBlock(BBL bbl)
         }
 
         if (memRead2) {
-            uint32_t bytes = GetByteSize(memReadTy);
+            size_t bytes = GetByteSize(memReadTy);
 
-            for (uint32_t offset = 0; offset < bytes; offset++) {        
+            for (size_t offset = 0; offset < bytes; offset++) {
                 IARGLIST_AddArguments(arglist_helper,
                                       IARG_UINT32, (uint32_t)MEM,
                                       IARG_UINT32, 8, // one byte
@@ -1634,10 +1728,10 @@ VOID InstrBlock(BBL bbl)
         }
 
         if (memWrite) {
-            uint32_t bytes = GetByteSize(memWriteTy);
+            size_t bytes = GetByteSize(memWriteTy);
 
-            for (uint32_t offset = 0; offset < bytes; offset++) {        
-          
+            for (size_t offset = 0; offset < bytes; offset++) {
+
                 IARGLIST_AddArguments(arglist_helper,
                                       IARG_UINT32, (uint32_t)MEM,
                                       IARG_UINT32, 8, // one byte
@@ -1664,7 +1758,7 @@ VOID InstrBlock(BBL bbl)
                 case REG_SEG_FS:
                     addreg = REG_SEG_FS_BASE;
                     break;
-	    
+
                 case REG_SEG_GS:
                     addreg = REG_SEG_GS_BASE;
                     break;
@@ -1675,13 +1769,13 @@ VOID InstrBlock(BBL bbl)
                 }
 
                 IARGLIST_AddArguments(arglist_helper,
-                                      IARG_UINT32, (uint32_t)REGISTER,
-                                      IARG_UINT32, 32, // Register size in bits
+                                      IARG_ADDRINT, (ADDRINT)REGISTER,
+                                      IARG_UINT32, GetBitsOfReg(addreg), // Register size in bits
                                       IARG_UINT32, addreg,
                                       //IARG_MEMORYWRITE_SIZE,
                                       IARG_PTR, 0,
                                       IARG_UINT32, 0,
-                                      IARG_END);	  
+                                      IARG_END);
                 valcount++;
             }
         }
@@ -1697,7 +1791,7 @@ VOID InstrBlock(BBL bbl)
             cerr << "Category: " << CATEGORY_StringShort(INS_Category(ins)) << endl;
         }
         assert(valcount < MAX_VALUES_COUNT);
-      
+
 
         IARGLIST_AddArguments(arglist,
                               IARG_UINT32, valcount,
@@ -1734,7 +1828,7 @@ VOID InstrBlock(BBL bbl)
                                IARG_END);
             }
         }
-      
+
         insLeft--;
 
         // Free the memory.
@@ -1744,12 +1838,13 @@ VOID InstrBlock(BBL bbl)
     }
 
     //LOG("INS: bbl ins end.\nINS: BBL end.\n");
-   
+
 
 }
 
 VOID InstrTrace(TRACE trace, VOID *v)
 {
+    dbg_printf("InstrTrace v=%p\n", v);
 
     /* Decide if we want to log this trace by examining the entrance address. */
     ADDRINT addr = TRACE_Address(trace);
@@ -1763,37 +1858,41 @@ VOID InstrTrace(TRACE trace, VOID *v)
 
 VOID ThreadEnd(THREADID threadid, CONTEXT *ctx, INT32 code, VOID *v)
 {
+    dbg_printf("ThreadEnd tid=%d, code=%d, v=%p\n", threadid, code, v);
+
     ThreadInfo_t *ti = NULL;
-  
+
     cerr << "Thread " << threadid << " ending" << endl;
 
     // Free thread-local data
     ti = GetThreadInfo();
-  
+
     delete ti;
 }
 
 VOID ThreadStart(THREADID threadid, CONTEXT *ctx, INT32 flags, VOID *v)
 {
+    dbg_printf("ThreadStart tid=%d, flags=0x%x, v=%p\n", threadid, flags, v);
+
     // Get the command line arguments before _start is called
     // This only works with Linux conventions in mind
     static int firstthread = true;
 
     LLOG("new thread\n");
-  
+
     NewThreadInfo();
 
     GetLock(&lock, threadid+1);
-  
+
     LOG("New thread starting\n");
     cerr << "Thread " << threadid << " starting" << endl;
 
     if (firstthread) {
         firstthread = false;
 #ifndef _WIN32 /* unix */
-        int argc = *(int*)(PIN_GetContextReg(ctx, LEVEL_BASE::REG_ESP));
-        char **argv = (char**) (PIN_GetContextReg(ctx, LEVEL_BASE::REG_ESP)+4);
-        char **env = (char**) (PIN_GetContextReg(ctx, LEVEL_BASE::REG_ESP)+(argc+1)*4);
+           int argc = *(int*)(PIN_GetContextReg(ctx, LEVEL_BASE::REG_STACK_PTR));
+        char **argv = (char**) (PIN_GetContextReg(ctx, LEVEL_BASE::REG_STACK_PTR) + STACK_OFFSET);
+        char **env = (char**) (PIN_GetContextReg(ctx, LEVEL_BASE::REG_STACK_PTR)+(argc+1) * STACK_OFFSET);
         std::vector<frame> frms = tracker->taintArgs(argc, argv);
         g_twnew->add<std::vector<frame> > (frms);
         frms = tracker->taintEnv(env);
@@ -1810,7 +1909,7 @@ VOID ThreadStart(THREADID threadid, CONTEXT *ctx, INT32 flags, VOID *v)
 #endif
     }
 
-    ReleaseLock(&lock);  
+    ReleaseLock(&lock);
 
 }
 
@@ -1820,7 +1919,7 @@ VOID ModLoad(IMG img, VOID *v)
     cerr << "This is modload()" << endl;
 
     const string &name = IMG_Name(img);
-  
+
     frame f;
     f.mutable_modload_frame()->set_module_name(name);
     f.mutable_modload_frame()->set_low_address(IMG_LowAddress(img));
@@ -1854,14 +1953,14 @@ VOID ModLoad(IMG img, VOID *v)
                  * disabled. */
 #ifdef USE_GETENVSTRINGS
                 RTN r;
-	       
+
                 /** The prototype for GetEnvironmentStrings[WA] */
                 PROTO proto = PROTO_Allocate( PIN_PARG(uint32_t), CALLINGSTD_STDCALL,
                                               "Windows API",
                                               PIN_PARG_END() );
-	       
+
                 r = RTN_FindByName(img, "GetEnvironmentStringsW");
-                if (r != RTN_Invalid()) {				    
+                if (r != RTN_Invalid()) {
                     RTN_ReplaceSignature(r, AFUNPTR(GetEnvWWrap),
                                          IARG_PROTOTYPE, proto,
                                          IARG_CONTEXT,
@@ -1873,7 +1972,7 @@ VOID ModLoad(IMG img, VOID *v)
                 }
 
                 r = RTN_FindByName(img, "GetEnvironmentStringsA");
-                if (r != RTN_Invalid()) {				    
+                if (r != RTN_Invalid()) {
                     RTN_ReplaceSignature(r, AFUNPTR(GetEnvAWrap),
                                          IARG_PROTOTYPE, proto,
                                          IARG_CONTEXT,
@@ -1884,10 +1983,10 @@ VOID ModLoad(IMG img, VOID *v)
                     cerr << "Warning: Error instrumenting GetEnvironmentStringsA()" << endl;
                 }
 
-	       
+
                 PROTO_Free(proto);
 #endif
-	       
+
             } else if (strncmp(wsDll, lasttok, BUFSIZE) == 0) {
                 /* Winsock */
                 RTN r;
@@ -1916,7 +2015,7 @@ VOID ModLoad(IMG img, VOID *v)
 
 
                     PROTO_Free(proto);
-					
+
                 } else {
                     cerr << "Couldn't find accept" << endl;
                 }
@@ -1943,7 +2042,7 @@ VOID ModLoad(IMG img, VOID *v)
 
 
                     PROTO_Free(proto);
-					
+
                 } else {
                     cerr << "Couldn't find connect" << endl;
                 }
@@ -1978,7 +2077,7 @@ VOID ModLoad(IMG img, VOID *v)
 
 
                     PROTO_Free(proto);
-					
+
                 } else {
                     cerr << "Couldn't find WSAConnect" << endl;
                 }
@@ -2053,8 +2152,8 @@ VOID ModLoad(IMG img, VOID *v)
 
                 } else {
                     cerr << "Couldn't find recvfrom" << endl;
-                }         
-         
+                }
+
                 r = RTN_FindByName(img, "WSARecv");
                 if (r != RTN_Invalid()) {
 
@@ -2157,11 +2256,13 @@ VOID ModLoad(IMG img, VOID *v)
         }
 
     }
-   
+
 }
 
 VOID SyscallEntry(THREADID tid, CONTEXT *ctx, SYSCALL_STANDARD std, VOID *v)
 {
+    dbg_printf("SyscallEntry tid=%d, v=%p\n", tid, v);
+
     ThreadInfo_t *ti = NULL;
     SyscallInfo_t si;
 
@@ -2170,7 +2271,7 @@ VOID SyscallEntry(THREADID tid, CONTEXT *ctx, SYSCALL_STANDARD std, VOID *v)
      * thread, and thus the thread local syscall stack does not need any
      * locking.
      */
-  
+
     // cerr << "syscall in " << PIN_GetSyscallNumber(ctx, std) << endl;
 
     ti = GetThreadInfo();
@@ -2191,6 +2292,7 @@ VOID SyscallEntry(THREADID tid, CONTEXT *ctx, SYSCALL_STANDARD std, VOID *v)
     for (int i = 0; i < MAX_SYSCALL_ARGS; i++)
         {
             if (i < PLAT_SYSCALL_ARGS) {
+                dbg_printf("Syscall argument %d: 0x%lx\n", i, PIN_GetSyscallArgument(ctx, std, i));
                 si.sf.mutable_syscall_frame()->mutable_argument_list()->add_elem(PIN_GetSyscallArgument(ctx, std, i));
             }
         }
@@ -2208,25 +2310,27 @@ VOID SyscallEntry(THREADID tid, CONTEXT *ctx, SYSCALL_STANDARD std, VOID *v)
     if (LogAllSyscalls.Value()) {
         g_twnew->add(si.sf);
     }
-  
+
     if (tracker->taintPreSC(si.sf.mutable_syscall_frame()->number(), (const uint64_t *) (si.sf.syscall_frame().argument_list().elem().data()), si.state)) {
         // Do we need to do anything here? ...
     }
-  
     ti->scStack.push(si);
-  
+
     //e:
 
     LLOG("releasing sysenter\n");
-    ReleaseLock(&lock);  
+    ReleaseLock(&lock);
     LLOG("really done with sysenter\n");
 }
 
 VOID SyscallExit(THREADID tid, CONTEXT *ctx, SYSCALL_STANDARD std, VOID *v)
 {
+    dbg_printf("SyscallExit tid=%d v=%p\n", tid, v);
+
     ThreadInfo_t *ti = NULL;
     SyscallInfo_t si;
-    uint32_t addr, length;
+    ADDRINT addr;
+    uint32_t length;
 
     /*
      * Synchronization note: We assume there is only one system call per
@@ -2238,14 +2342,14 @@ VOID SyscallExit(THREADID tid, CONTEXT *ctx, SYSCALL_STANDARD std, VOID *v)
     // if (!g_active) return;
 
     LLOG("sysexit\n");
- 
+
     ti = GetThreadInfo();
- 
+
     si = ti->scStack.top();
     ti->scStack.pop();
 
     GetLock(&lock, tid+1);
-  
+
     // Check to see if we need to introduce tainted bytes as a result of this
     // sytem call
     FrameOption_t fo = tracker->taintPostSC(PIN_GetSyscallReturn(ctx, std), (const uint64_t*) (si.sf.syscall_frame().argument_list().elem().data()), addr, length, si.state);
@@ -2261,7 +2365,7 @@ VOID SyscallExit(THREADID tid, CONTEXT *ctx, SYSCALL_STANDARD std, VOID *v)
     //printf("syscall out %d\n", si.sf.callno);
 
     LLOG("releasing sysexit\n");
-    ReleaseLock(&lock);  
+    ReleaseLock(&lock);
 
     // Untaint system call output registers (uses thread-local delta, so no lock needed)
     tracker->postSysCall(ti->delta);
@@ -2272,10 +2376,12 @@ VOID SyscallExit(THREADID tid, CONTEXT *ctx, SYSCALL_STANDARD std, VOID *v)
 
 VOID FollowParent(THREADID threadid, const CONTEXT* ctxt, VOID * arg)
 {
+    dbg_printf("FollowParent tid=%d arg=%p\n", threadid, arg);
+
     int i;
 
     LLOG("fparent\n");
-  
+
     GetLock(&lock, threadid+1);
     i = strlen(g_threadname);
     assert(i < BUFFER_SIZE);
@@ -2283,23 +2389,25 @@ VOID FollowParent(THREADID threadid, const CONTEXT* ctxt, VOID * arg)
 
     std::cerr << "Spawning parent: " << PIN_GetPid() << g_threadname << std::endl;
 
-    ReleaseLock(&lock);  
+    ReleaseLock(&lock);
 }
-  
+
 VOID ExceptionHandler(THREADID threadid, CONTEXT_CHANGE_REASON reason, const CONTEXT *from, CONTEXT *to, INT32 info, VOID *v) {
+
+    dbg_printf("ExceptionHandler tid=%d info=0x%x v=%p\n", threadid, info, v);
     /*
-      CONTEXT_CHANGE_REASON_FATALSIGNAL 	 Receipt of fatal Unix signal.
-      CONTEXT_CHANGE_REASON_SIGNAL 	 Receipt of handled Unix signal.
-      CONTEXT_CHANGE_REASON_SIGRETURN 	 Return from Unix signal handler.
-      CONTEXT_CHANGE_REASON_APC 	 Receipt of Windows APC.
-      CONTEXT_CHANGE_REASON_EXCEPTION 	 Receipt of Windows exception.
-      CONTEXT_CHANGE_REASON_CALLBACK 	 Receipt of Windows call-back.
+      CONTEXT_CHANGE_REASON_FATALSIGNAL          Receipt of fatal Unix signal.
+      CONTEXT_CHANGE_REASON_SIGNAL       Receipt of handled Unix signal.
+      CONTEXT_CHANGE_REASON_SIGRETURN    Return from Unix signal handler.
+      CONTEXT_CHANGE_REASON_APC          Receipt of Windows APC.
+      CONTEXT_CHANGE_REASON_EXCEPTION    Receipt of Windows exception.
+      CONTEXT_CHANGE_REASON_CALLBACK     Receipt of Windows call-back.
     */
 
     /*
       If there is a fatal exception, we should halt the trace as soon
       as possible, so we can exit.
-    
+
       Also, FlushInstructions() needs mutual exclusivity.
     */
 
@@ -2316,7 +2424,7 @@ VOID ExceptionHandler(THREADID threadid, CONTEXT_CHANGE_REASON reason, const CON
         f.mutable_exception_frame()->set_to_addr(PIN_GetContextReg(to, REG_INST_PTR));
     }
 
-    GetLock(&lock, threadid+1);  
+    GetLock(&lock, threadid+1);
     LLOG("got except lock!\n");
 
     // If we want the exception to be the last thing in the trace when
@@ -2342,7 +2450,7 @@ VOID ExceptionHandler(THREADID threadid, CONTEXT_CHANGE_REASON reason, const CON
 
             cerr << "old esp: " << old_esp << " new esp: " << new_esp
                  << " old eip: " << PIN_GetContextReg(from, REG_INST_PTR) << " new eip: " << PIN_GetContextReg(to, REG_INST_PTR) << endl;
-      
+
             /* The windows exception handler just pushed a bunch of crap
                onto the stack.  Although some of this is user controllable,
                we can untaint it for now, since we are mainly concerned with
@@ -2353,7 +2461,7 @@ VOID ExceptionHandler(THREADID threadid, CONTEXT_CHANGE_REASON reason, const CON
             }
 
             /* Try to find a tainted exception handler. */
-            ADDRINT eptr = PIN_GetContextReg(to, REG_SEG_FS_BASE) 
+            ADDRINT eptr = PIN_GetContextReg(to, REG_SEG_FS_BASE)
                 + ehandler_fs_offset;
 
             /* eptr points to the &(head of SEH). */
@@ -2378,33 +2486,33 @@ VOID ExceptionHandler(THREADID threadid, CONTEXT_CHANGE_REASON reason, const CON
                     ADDRINT hptr = eptr + ehandler_handler_offset;
 
                     /* hptr holds the address of the handler. */
-                    cerr << "SEH handler M[" << hptr 
+                    cerr << "SEH handler M[" << hptr
                          << "] = " << buf.handler
-                         << " (" << tracker->getMemTaint(hptr, pintrace::INVALIDREGMEM) 
+                         << " (" << tracker->getMemTaint(hptr, pintrace::INVALIDREGMEM)
                          << ")"
                          << endl;
 
                     eptr = buf.nptr;
-	
-                } else { 
+
+                } else {
                     cerr << "Unable to read from " << eptr << endl;
-                    break; 
+                    break;
                 }
 
             }
 
             ADDRINT esp = PIN_GetContextReg(to, REG_STACK_PTR);
-      
+
             /* The exception handling stuff will push a lot of data to the
                stack, so take account for that here. */
             PIN_SetContextReg(to, REG_STACK_PTR, esp-ehandler_esp_offset);
-      
+
             PIVOT_testpivot(ps, to, *tracker);
-      
+
             FlushBuffer(false, from, threadid, false);
             Cleanup();
             exit(1);
-      
+
         } else {
             cerr << "Ignoring exception!" << endl;
         }
@@ -2413,7 +2521,7 @@ VOID ExceptionHandler(THREADID threadid, CONTEXT_CHANGE_REASON reason, const CON
 #if 0
         cerr << "Received windows callback" << endl;
 #endif
-  
+
     } else {
         std::cerr << "Received other exception " << reason << endl;
     }
@@ -2424,34 +2532,36 @@ VOID ExceptionHandler(THREADID threadid, CONTEXT_CHANGE_REASON reason, const CON
 
 VOID FollowChild(THREADID threadid, const CONTEXT* ctxt, VOID * arg)
 {
+    dbg_printf("FollowChild tid=%d arg=%p\n", threadid, arg);
+
     int i;
 
     LLOG("follow child\n");
-  
+
     GetLock(&lock, threadid+1);
     i = strlen(g_threadname);
     assert(i < BUFFER_SIZE);
     g_threadname[i++] = 'c';
 
-    g_twnew = new TraceContainerWriter((g_threadname + KnobOut.Value()).c_str(), bfd_arch_i386, bfd_mach_i386_i386, default_frames_per_toc_entry, false);
-  
+    g_twnew = new TraceContainerWriter((g_threadname + KnobOut.Value()).c_str(), BFD_ARCH, BFD_MACH, default_frames_per_toc_entry, false);
+
     g_bufidx = 0;
     g_kfcount = 0;
-  
+
     g_logcount = 0;
     g_loglimit = KnobLogLimit.Value();
-  
+
     g_timer = clock();
     std::cerr << "Spawning child: " << PIN_GetPid() << g_threadname << std::endl;
     ReleaseLock(&lock);
-  
+
 }
 
 bool FollowExec(CHILD_PROCESS cp, VOID *v) {
-    bool follow = false;  
+    bool follow = false;
     int argc;
     const char * const * argv;
-  
+
     CHILD_PROCESS_GetCommandLine(cp, &argc, &argv);
     assert (argc >= 0);
     cerr << "Exec: ";
@@ -2459,7 +2569,7 @@ bool FollowExec(CHILD_PROCESS cp, VOID *v) {
         cerr << argv[i] << " ";
     }
     cerr << endl;
-  
+
     /* See if we should follow this */
     for (unsigned int i = 0; i < FollowProgs.NumberOfValues(); i++) {
         if (FollowProgs.Value(i) == argv[0]) {
@@ -2514,13 +2624,14 @@ INT32 Usage()
 
 int main(int argc, char *argv[])
 {
+    dbg_printf("Entered main.\n");
     stringstream ss;
-  
+
     cerr << hex;
 
     // A sanity check for AppendBuffer
-    assert(sizeof(RPassType) == sizeof(ADDRINT));
-  
+    //assert(sizeof(RPassType) == sizeof(ADDRINT));
+
     PIN_InitSymbols();
 
     if (PIN_Init(argc,argv))
@@ -2535,7 +2646,7 @@ int main(int argc, char *argv[])
 
         // Set trigger countdown to initial value.
         g_trig_countdown = KnobTrigCount.Value();
-      
+
     } else {
         g_usetrigger = false;
     }
@@ -2606,27 +2717,27 @@ int main(int argc, char *argv[])
     TRACE_AddInstrumentFunction(InstrTrace, 0);
     PIN_AddThreadStartFunction(ThreadStart, 0);
     PIN_AddThreadFiniFunction((THREAD_FINI_CALLBACK)ThreadEnd, 0);
-   
+
     PIN_AddContextChangeFunction(ExceptionHandler, 0);
-   
+
 #ifndef _WIN32
     PIN_AddForkFunction(FPOINT_AFTER_IN_CHILD, FollowChild, 0);
     PIN_AddForkFunction(FPOINT_AFTER_IN_PARENT, FollowParent, 0);
 #endif
     PIN_AddFollowChildProcessFunction(FollowExec, 0);
-   
+
     PIN_AddSyscallEntryFunction(SyscallEntry, 0);
     PIN_AddSyscallExitFunction(SyscallExit, 0);
-   
+
     PIN_AddFiniFunction(Fini, 0);
 
     ss << PIN_GetPid() << "-" << KnobOut.Value();
-   
-    g_twnew = new TraceContainerWriter(ss.str().c_str(), bfd_arch_i386, bfd_mach_i386_i386, default_frames_per_toc_entry, false);
+
+    g_twnew = new TraceContainerWriter(ss.str().c_str(), BFD_ARCH, BFD_MACH, default_frames_per_toc_entry, false);
 
     g_bufidx = 0;
     g_kfcount = 0;
-   
+
     g_logcount = 0;
     g_loglimit = KnobLogLimit.Value();
 
@@ -2635,7 +2746,7 @@ int main(int argc, char *argv[])
     g_timer = clock();
 
     g_exit_next = false;
-   
+
     start_addr = TaintStart.Value();
     end_addr = TaintEnd.Value();
 

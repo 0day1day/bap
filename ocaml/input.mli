@@ -4,6 +4,7 @@
     options.
 *)
 
+open Arch
 open Arg
 open Grammar_scope
 
@@ -18,11 +19,15 @@ val stream_speclist : (key * spec * doc) list
 val trace_speclist : (key * spec * doc) list
 
 (** Get the program as specified by the commandline. *)
-val get_program : unit -> Ast.program * Scope.t
+val get_program : unit -> Ast.program * Scope.t * arch option
 
-val get_stream_program : unit -> (Ast.program) Stream.t
+val get_stream_program : unit -> (Ast.program) Stream.t * arch option
 
 val init_ro : bool ref
 
 (* Rate to stream frames at *)
 val streamrate : int64 ref
+
+(** [get_arch (Some x)] returns [x], and [get_arch None] raises an
+    informational exception. *)
+val get_arch : arch option -> arch

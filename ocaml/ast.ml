@@ -16,8 +16,8 @@ open Big_int_convenience
 type var = Var.t
 
 type exp = 
-  | Load of (exp * exp * exp * typ)  (** Load(arr,idx,endian, t) *)
-  | Store of (exp * exp * exp * exp * typ)  (** Store(arr,idx,val, endian, t) *)
+  | Load of (exp * exp * exp * typ)  (** Load(arr,idx,endian,t) *)
+  | Store of (exp * exp * exp * exp * typ)  (** Store(arr,idx,val,endian,t) *)
   | BinOp of (binop_type * exp * exp)
   | UnOp of (unop_type * exp)
   | Var of var
@@ -35,7 +35,7 @@ type attrs = Type.attributes
 
 type stmt =
   | Move of (var * exp * attrs)  (** Assign the value on the right to the
-				      var on the left *)
+                                     var on the left *)
   | Jmp of (exp * attrs) (** Jump to a label/address *)
   | CJmp of (exp * exp * exp * attrs)
   (** Conditional jump. If e1 is true, jumps to e2, otherwise jumps to e3 *)
@@ -52,17 +52,27 @@ type program = stmt list
 
 (** Make an expression corresponding to the given label, for use as the
     target of a [Jmp]. *)
-let exp_of_lab = function
-  | Name s -> Lab s
-  | Addr a -> Int(big_int_of_int64 a, Reg 64)
+let exp_of_lab = 
+  let re = Str.regexp "^pc_\\(.*\\)+" in
+  function
+    (* VEX style pc_0x1234 labels *)
+    | Name s when Str.string_match re s 0 ->
+      Int(Util.big_int_of_string (Str.matched_group 1 s), Reg 64)
+    | Name s -> Lab s
+    | Addr a -> Int(a, Reg 64)
 
 (** If possible, make a label that would be refered to by the given
     expression. *)
-let lab_of_exp = function
-  | Lab s -> Some(Name s)
-  | Int(i, t) ->
-    Some(Addr(int64_of_big_int (Arithmetic.to_big_int (i,t))))
-  | _ -> None
+let lab_of_exp =
+  let re = Str.regexp "^pc_\\(.*\\)+" in
+  function
+    (* VEX style pc_0x1234 labels *)
+    | Lab s when Str.string_match re s 0 ->
+      Some(Addr(Util.big_int_of_string (Str.matched_group 1 s)))
+    | Lab s -> Some(Name s)
+    | Int(i, t) ->
+      Some(Addr(Arithmetic.to_big_int (i,t)))
+    | _ -> None
 
 (** False constant. (If convenient, refer to this rather than building your own.) *)
 let exp_false = Int(bi0, reg_1)
@@ -255,7 +265,7 @@ let quick_stmt_eq s1 s2 =
       true
     else if b2 & b3 & b4 & b5 then
       (* e1 and e2 are not physically equal.  But maybe their subexpressions
-	 are physically equal. *)
+         are physically equal. *)
       List.for_all2 quick_exp_eq l1 r1
     else
       false
@@ -291,7 +301,7 @@ match s with
 | _ -> false
 
 let is_syscall = function
-  | Special(("syscall"|"int 80"), _) -> true
+  | Special(("syscall"|"int 0x80"), _) -> true
   | _ -> false
 
 let full_stmts_eq s1 s2 =

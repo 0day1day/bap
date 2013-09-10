@@ -30,7 +30,7 @@ let build_graph vertex_spec_list =
   let g = G.G.create () in
   let rec add_edges (src,dl) = match dl with
     | [] -> ()
-    | dst::vl -> ignore(G.add_edge g src dst); add_edges (src,vl) in
+    | dst::vl -> ignore (G.add_edge g src dst); add_edges (src,vl) in
   List.iter add_edges vertex_spec_list; g;;
 
 (*

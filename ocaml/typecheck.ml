@@ -26,6 +26,15 @@ let is_integer_type = function
 
 let is_mem_type t = not (is_integer_type t)
 
+let index_type_of = function
+  | TMem it | Array (it, _) -> it
+  | Reg _ -> invalid_arg "index_type_of"
+
+let value_type_of = function
+  | TMem _ -> Reg 8
+  | Array (_, vt) -> vt
+  | Reg _ -> invalid_arg "value_type_of"
+
 let bits_of_width = function
   | Reg n -> n
   | _ -> invalid_arg "bits_of_width"
@@ -69,9 +78,9 @@ let rec infer_ast_internal check e =
     if check then (
       match infer_ast_internal true e with
       | Reg(oldn) ->
-	if (ns <= 0) then terror("Extract must extract at least one bit");
-	if l <% bi0 then terror("Lower bit index must be at least 0");
-	if h >% (big_int_of_int oldn) -% bi1 then terror("Upper bit index must be at most one less than the size of the original register")
+        if (ns <= 0) then terror("Extract must extract at least one bit");
+        if l <% bi0 then terror("Lower bit index must be at least 0");
+        if h >% (big_int_of_int oldn) -% bi1 then terror("Upper bit index must be at most one less than the size of the original register")
       | _ -> terror ("Extract expects Reg type")
     );
     nt
@@ -79,7 +88,7 @@ let rec infer_ast_internal check e =
     let lt, rt = infer_ast_internal check le, infer_ast_internal check re in
     let nt = match lt, rt with
       | Reg(lb), Reg(rb) ->
-	Reg(lb+rb)
+        Reg(lb+rb)
       | _ -> terror "Concat expects Reg type"
     in
     nt
@@ -150,7 +159,40 @@ and check_idx arr idx endian t =
 
   | _ -> terror "Indexing only allowed from array or mem."
 
+and check_cjmp_direct e =
+  if Ast.lab_of_exp e = None then terror "Conditional jump targets must be direct (to a constant address or label)"
+
 let infer_ast = infer_ast_internal false
+
+let rec infer_ssa = function
+  | Ssa.Int(_,t) -> t
+  | Ssa.Var v -> Var.typ v
+  | Ssa.Lab _ ->
+    (* FIXME: no type for labels yet *)
+    reg_64
+  | Ssa.Load(_,_,_,t)
+  | Ssa.Cast(_,t,_)
+  | Ssa.Unknown(_,t)
+    -> t
+  | Ssa.BinOp((EQ|NEQ|LT|LE|SLT|SLE),_,_)
+    -> reg_1
+  | Ssa.Ite(_,v,_)
+  | Ssa.BinOp(_,v,_)
+  | Ssa.Store(v,_,_,_,_)
+  | Ssa.UnOp(_,v) ->
+      infer_ssa v
+  | Ssa.Extract(h, l, v) ->
+      let n = ((h -% l) +% bi1) in
+      assert(n >=% bi1);
+      Reg(int_of_big_int n)
+  | Ssa.Concat(lv, rv) ->
+      (match infer_ssa lv, infer_ssa rv with
+      | Reg(lt), Reg(rt) -> Reg(lt + rt)
+      | _ -> failwith "infer_ssa")
+  | Ssa.Phi(x::_)
+    -> Var.typ x
+  | Ssa.Phi []
+    -> failwith "Empty phi has no type"
 
 let typecheck_expression e = ignore(infer_ast_internal true e)
 
@@ -174,7 +216,9 @@ let typecheck_stmt =
       let t2t = infer_te t2 in
       check_bool et;
       check_reg t1t;
-      check_reg t2t
+      check_reg t2t;
+      check_cjmp_direct t1;
+      check_cjmp_direct t2
     | Halt(e, _) ->
       let et = infer_te e in
       (* Can we return a memory? Does this make sense? *)

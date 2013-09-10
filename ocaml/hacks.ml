@@ -1,9 +1,11 @@
 (** Hacks *)
 
+open Arch
 open Ast
 open Ast_convenience
 open Ast_visitor
 open BatListFull
+open Big_int_convenience
 open Type
 open Util
 
@@ -14,9 +16,9 @@ open D
 let ra_final = Var.newvar "ra_final" reg_32
 and ra0 = Var.newvar "ra0" reg_32
 and (mem,sp,r_of) =
-  let d = Asmir.decls_for_arch Asmir.arch_i386 in
+  let d = Asmir.decls_for_arch X86_32 in
   (List.hd d,
-   List.find (fun v -> Var.name v = "R_ESP") d,
+   List.find (fun v -> Var.name v = "R_ESP_32") d,
    List.find (fun v -> Var.name v = "R_OF") d
   )
 
@@ -30,11 +32,11 @@ let ret_to_jmp ?(ra=ra_final) p =
     (fun i s -> match s with
       (* Old lifting of ret *)
      | Special("ret", _) ->
-	 a.(i) <- Jmp(Lab function_end, attrs);
-	 (match a.(i-1) with 
-	  | Jmp(t,at) -> a.(i-1) <- Move(ra, t, attrs@at)
-	  | _ -> failwith "expected Jmp before ret special"
-	 )
+         a.(i) <- Jmp(Lab function_end, attrs);
+         (match a.(i-1) with 
+          | Jmp(t,at) -> a.(i-1) <- Move(ra, t, attrs@at)
+          | _ -> failwith "expected Jmp before ret special"
+         )
      (* disasm_i386 lifting of ret *)
      | Jmp(t, attrs) when attrs = [StrAttr "ret"] ->
        a.(i) <- Jmp(Lab function_end, attrs)
@@ -49,7 +51,7 @@ let assert_noof p =
   let il = List.map
     (function
        | Move(v, e, a) as s when v == r_of ->
-	   [s; Assert(exp_not (Var v), attrs)]
+           [s; Assert(exp_not (Var v), attrs)]
        | s -> [s]
     ) p
   in
@@ -69,13 +71,13 @@ let remove_cycles cfg =
     let revstmts = List.rev (C.get_stmts cfg s) in
     let revstmts = match revstmts with
       | Jmp(t,_)::rest ->
-	  assert_false::rest
+          assert_false::rest
       | CJmp(c,t1,t2,attrs)::rest ->
-	(* e is the label we are REMOVING *)
-	(match l with
-	| Some true -> CJmp(c, Lab("BB_Error"), t2, a::attrs)
-	| Some false -> CJmp(c, t1, Lab("BB_Error"), a::attrs)
-	| None -> failwith "missing edge label from cjmp")
+        (* e is the label we are REMOVING *)
+        (match l with
+        | Some (Some true, _) -> CJmp(c, Lab("BB_Error"), t2, a::attrs)
+        | Some (Some false, _) -> CJmp(c, t1, Lab("BB_Error"), a::attrs)
+        | _ -> failwith "missing edge label from cjmp")
           ::rest
       | rest -> assert_false::rest
     in
@@ -93,9 +95,9 @@ let remove_cycles cfg =
     and setcolor v c = H.replace h (C.G.V.label v) c in
     let rec walk v edges=
       let walk_edge e edges =
-	let d = C.G.E.dst e in
-	if color d = White then walk d edges
-	else if color d = Gray then e::edges
+        let d = C.G.E.dst e in
+        if color d = White then walk d edges
+        else if color d = Gray then e::edges
         else edges
       in
       setcolor v Gray;
@@ -122,10 +124,10 @@ let repair_node g n =
     let tgt = match dst with
       | None -> indirect
       | Some l ->
-	  try (C.find_label g l)
-	  with Not_found ->
-	    wprintf "Jumping to unknown label: %s" (Pp.label_to_string l);
-	    error
+          try (C.find_label g l)
+          with Not_found ->
+            wprintf "Jumping to unknown label: %s" (Pp.label_to_string l);
+            error
       (* FIXME: should jumping to an unknown address be an error or indirect? *)
     in
     C.add_edge_e g (C.G.E.create v lab tgt)
@@ -135,8 +137,8 @@ let repair_node g n =
   let stmts = C.get_stmts g n in
   match List.rev stmts with
   | Jmp(t, _)::_ -> make_edge g n t
-  | CJmp(_,t,f,_)::_ -> let g = make_edge g n ~lab:true t in
-                     make_edge g n ~lab:false f
+  | CJmp(e,t,f,_)::_ -> let g = make_edge g n ~lab:(Some true, e) t in
+                        make_edge g n ~lab:(Some false, Ast_convenience.unop NOT e) f
   | Special _::_ -> C.add_edge g n error
   | Halt _::_ -> C.add_edge g n exit
   | _ -> (* It's probably fine.  That's why this is in hacks.ml. *) g
@@ -159,7 +161,7 @@ let uniqueify_labels p =
   let find_new_label l =
     let strl = match l with
       | Name(s) -> s
-      | Addr(a) -> Printf.sprintf "addr_%Lx" a
+      | Addr(a) -> Printf.sprintf "addr_%s" (~%a)
     in
     let n =
       try (Hashtbl.find lh strl)+1
@@ -182,17 +184,45 @@ let uniqueify_labels p =
   Ast_visitor.prog_accept renamelabels p
 
 module Rm(C: Cfg.CFG) = struct
+  (* Often error is only reachable through indirect.  If this is the
+     case and we remove indirect, then remove error as well *)
+  let remove_error_if_disconnected g =
+    let remove_error =
+      try C.G.in_degree g (C.G.V.create Cfg.BB_Error) = 0
+      with Invalid_argument _ (* not in graph *) -> false
+    in
+    if remove_error
+    then C.remove_vertex g (C.G.V.create Cfg.BB_Error)
+    else g
   let remove_indirect g =
-    C.remove_vertex g (C.G.V.create Cfg.BB_Indirect)
+    let g = C.remove_vertex g (C.G.V.create Cfg.BB_Indirect) in
+    remove_error_if_disconnected g
+  let exit_indirect g =
+    let exit = C.G.V.create Cfg.BB_Exit in
+    if not (C.G.mem_vertex g exit) then failwith "exit_indirect: No BB_Exit";
+    let swap_edge e g =
+      C.add_edge_e (C.remove_edge_e g e)
+        (C.G.E.create (C.G.E.src e) (C.G.E.label e) exit)
+    in
+    let g = C.G.fold_pred_e swap_edge g (C.G.V.create Cfg.BB_Indirect) g in
+    remove_indirect g
 end
 
 let ast_remove_indirect =
   let module Rm = Rm(Cfg.AST) in
   Rm.remove_indirect
 
+let ast_exit_indirect =
+  let module Rm = Rm(Cfg.AST) in
+  Rm.exit_indirect
+
 let ssa_remove_indirect =
   let module Rm = Rm(Cfg.SSA) in
   Rm.remove_indirect
+
+let ssa_exit_indirect =
+  let module Rm = Rm(Cfg.SSA) in
+  Rm.exit_indirect
 
 (** Replace unknown expressions with constant zero *)
 let replace_unknowns p =
@@ -254,3 +284,42 @@ let bberror_assume_false graph =
   let graph = List.fold_left reroute graph preds in
   let graph = C.add_edge graph assume exit in
   graph
+
+(** Add edges from all sinks (other than BB_Exit) to BB_Exit *)
+let add_sink_exit cfg =
+  let g,exiT = Cfg_ast.find_exit cfg in
+  C.G.fold_vertex (fun v g ->
+    if C.G.out_degree g v = 0 &&
+      not (C.G.V.equal v exiT)
+    then
+      let e = C.G.E.create v None exiT in
+      C.add_edge_e g e
+    else g
+  ) g g
+
+(** Replace occurences of needle with replacement in haystack *)
+let ast_replacer ?(eq=(==)) ~needle ~haystack ~replacement =
+  let v = object(self)
+    inherit Ast_visitor.nop
+    method visit_exp e =
+      if eq e needle
+      then ChangeTo replacement
+      else DoChildren
+  end in
+  Ast_visitor.exp_accept v haystack
+
+(** Replace occurences of needle with replacement in haystack *)
+let ssa_replacer ?(eq=(==)) ~needle ~haystack ~replacement =
+  let v = object(self)
+    inherit Ssa_visitor.nop
+    method visit_exp e =
+      if eq e needle
+      then ChangeTo replacement
+      else DoChildren
+  end in
+  Ssa_visitor.exp_accept v haystack
+
+let filter_specials =
+  List.filter (function
+    | Ast.Special _ -> false
+    | _ -> true)

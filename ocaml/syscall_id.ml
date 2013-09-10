@@ -8,7 +8,7 @@ open Cfg
 module D = Debug.Make(struct let name = "Syscall_id" and default=`NoDebug end)
 open D
 
-let syscall_reg = Disasm_i386.eax;;
+let syscall_reg = Disasm_i386.R32.eax;;
 
 module S = Big_int_convenience.BIS
 
@@ -26,8 +26,9 @@ module DFSPEC = struct
       | x, Top -> x
       | Set s1, Set s2 -> Set (S.union s1 s2)
   end
+  module O = GraphDataflow.NOOPTIONS
 
-  let transfer_function g n init =
+  let node_transfer_function _ g n init =
     let stmts = Cfg.AST.get_stmts g n in
     let process_stmt a s = match s with
       | Move(v, Int(i, t), _) when v=syscall_reg ->
@@ -45,7 +46,8 @@ module DFSPEC = struct
     (*                   m) *)
     (* in *)
     List.fold_left process_stmt init stmts
-  let s0 g =
+  let edge_transfer_function _ g e = Util.id
+  let s0 _ g =
     (* let check_v v a = *)
     (*   let stmts = Cfg.AST.get_stmts g v in *)
     (*   if List.exists is_syscall stmts then v::a *)
@@ -53,8 +55,8 @@ module DFSPEC = struct
     (* in *)
     (* Cfg.AST.G.fold_vertex check_v g [snd(Cfg_ast.find_error g)] *)
     snd(Cfg_ast.find_entry g)
-  let init _ = L.Set(S.empty)
-  let dir = GraphDataflow.Forward
+  let init _ _ = L.Set(S.empty)
+  let dir _ = GraphDataflow.Forward
 
 end
 

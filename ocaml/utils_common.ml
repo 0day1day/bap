@@ -7,6 +7,7 @@ module D=Debug.Make(struct let name = "Utils_common" and default=`NoDebug end)
 open D
 open Type
 open BatListFull
+open Big_int_convenience
 
 (* For solving predicates *)
 let rename_astexp f =
@@ -23,7 +24,7 @@ let optimize_cfg ?(usedc=true) ?(usesccvn=true) cfg post =
   let cfg = Hacks.remove_cycles cfg in
   let cfg = Prune_unreachable.prune_unreachable_ast cfg in
   let cfg = Coalesce.coalesce_ast cfg in
-  let {Cfg_ssa.cfg=cfg; to_ssavar=tossa} = Cfg_ssa.trans_cfg cfg in
+  let {Cfg_ssa.ssacfg=cfg; to_ssavar=tossa} = Cfg_ssa.trans_cfg cfg in
   let p = rename_astexp tossa post in
   let cfg =
     let vars = Formulap.freevars p in
@@ -57,7 +58,7 @@ let get_functions ?unroll ?names p =
           | None -> Some (n, ir, None))
       else None
     with ex ->
-      Printf.eprintf "Warning: problem with %s (0x%Lx-0x%Lx): %s\n" n s e (Printexc.to_string ex);
+      Printf.eprintf "Warning: problem with %s (0x%s-0x%s): %s\n" n (~%s) (~%e) (Printexc.to_string ex);
       None
   in
   BatList.filter_map do_function ranges

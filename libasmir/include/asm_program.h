@@ -60,8 +60,8 @@ extern "C"
 #endif
 
 
-extern asm_program_t *asmir_open_file(const char *filename, bfd_vma addr);
-extern asm_program_t* asmir_new_asmp_for_arch(enum bfd_architecture arch);
+extern asm_program_t *asmir_open_file(const char *filename, bfd_vma addr, const char *target);
+extern asm_program_t* asmir_new_asmp_for_arch(enum bfd_architecture arch, unsigned long mach);
 extern asm_program_t* asmir_trace_asmp_for_arch(enum bfd_architecture arch);
 extern void asmir_close(asm_program_t *p);
 extern bfd_byte *asmir_get_ptr_to_instr(asm_program_t *prog, bfd_vma addr);
@@ -75,6 +75,7 @@ extern void set_trace_bytes(void *bytes, size_t len, bfd_vma addr);
 // dissassemble an instruction and return the asm string
 extern char* asmir_string_of_insn(asm_program_t *prog, bfd_vma inst);
 extern enum bfd_architecture asmir_get_asmp_arch(asm_program_t *prog);
+extern unsigned long asmir_get_asmp_mach(asm_program_t *Program);
 
 
 // Argh, these functions are documented at

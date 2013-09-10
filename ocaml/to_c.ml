@@ -73,40 +73,40 @@ object(self)
     opn 2; 
     (match s with
      | Jmp(Lab l, _) ->
-	 pp "goto"; space (); pp l; pp ";"
+         pp "goto"; space (); pp l; pp ";"
      | Jmp _ ->
-	 failwith "Indirect jump not supported yet"
+         failwith "Indirect jump not supported yet"
      | CJmp(e1,e2,e3,_) ->
-	 pp "if("; self#format_exp e1; pp ")"; space (); pc '{';
-	 self#ast_stmt (Jmp(e2,[]));
-	 space(); pp "} else {"; space();
-	 self#ast_stmt (Jmp(e3,[]));
-	 space(); pc '}'
+         pp "if("; self#format_exp e1; pp ")"; space (); pc '{';
+         self#ast_stmt (Jmp(e2,[]));
+         space(); pp "} else {"; space();
+         self#ast_stmt (Jmp(e3,[]));
+         space(); pc '}'
      | Move(v,e,_) ->
-	 self#format_var v;
-	 pp " ="; space();
-	 self#ast_exp e;
-	 pc ';'
+         self#format_var v;
+         pp " ="; space();
+         self#ast_exp e;
+         pc ';'
      | Special(s,_)->
-	 pp special;
-	 pp "(\""; pp s; pp "\");"
+         pp special;
+         pp "(\""; pp s; pp "\");"
      | Label(l,_) ->
-	 (match l with 
-	 | Name s -> pp s; pc ':'
-	 | _ -> ()
-	 );
+         (match l with 
+         | Name s -> pp s; pc ':'
+         | _ -> ()
+         );
      | Comment(s,_) ->
-	 pp "/*"; pp s; pp "*/"
+         pp "/*"; pp s; pp "*/"
      | Assert(e,_) ->
-	 pp "assert(";
-	 self#ast_exp e;
-	 pp ");"
+         pp "assert(";
+         self#ast_exp e;
+         pp ");"
      | Assume(e,_) ->
          failwith "Assume statements can not be translated to C"
      | Halt(e,_) ->
-	 pp "exit(";
-	 self#ast_exp e;
-	 pp ");"
+         pp "exit(";
+         self#ast_exp e;
+         pp ");"
     );
     cls();
     newline ();
@@ -155,76 +155,76 @@ object(self)
     open_box 0;
     (match e with
        Let _ ->
-	 raise (Invalid_argument "Let's not supported. Try calling unlet first.")
+         raise (Invalid_argument "Let's not supported. Try calling unlet first.")
      | Ite(b, e1, e2) ->
-	 (* XXX: Needs testing *)
-	 lparen 50;
-	 self#ast_exp b;
-	 space ();
-	 pp "?";
-	 space ();
-	 self#ast_exp e1;
-	 space ();
-	 pp ":";
-	 space ();
-	 self#ast_exp e2;	 
-	 rparen 50
+         (* XXX: Needs testing *)
+         lparen 50;
+         self#ast_exp b;
+         space ();
+         pp "?";
+         space ();
+         self#ast_exp e1;
+         space ();
+         pp ":";
+         space ();
+         self#ast_exp e2;        
+         rparen 50
      | Extract _ ->
-	 self#ast_exp (rm_extract e)
+         self#ast_exp (rm_extract e)
      | Concat _ ->
-	 self#ast_exp (rm_concat e)
+         self#ast_exp (rm_concat e)
      | BinOp(b,e1,e2) ->
-	 let op_prec = match b with
-	   | OR                          -> 100
-	   | XOR                            -> 200
-	   | AND	                  -> 300
-	   | EQ | NEQ			  -> 400
-	   | LT | SLT | SLE | LE	          -> 500
-	   | LSHIFT | RSHIFT | ARSHIFT      -> 600
-	   | PLUS | MINUS		          -> 700
-	   | TIMES|DIVIDE|SDIVIDE|MOD|SMOD  -> 800
-	 in
-	 let child_prec = if op_prec <= 300 then 750 else op_prec in
-	 lparen op_prec;
-	 open_box 0;
-	 (* all our binops are left associative *)
-	 fe child_prec e1;
-	 space();
-	 pp (self#binop_to_string b);
-	 pp " ";
-	 fe (child_prec+1) e2;
-	 close_box();
-	 rparen op_prec;
-	 cut()
+         let op_prec = match b with
+           | OR                          -> 100
+           | XOR                            -> 200
+           | AND                          -> 300
+           | EQ | NEQ                     -> 400
+           | LT | SLT | SLE | LE                  -> 500
+           | LSHIFT | RSHIFT | ARSHIFT      -> 600
+           | PLUS | MINUS                         -> 700
+           | TIMES|DIVIDE|SDIVIDE|MOD|SMOD  -> 800
+         in
+         let child_prec = if op_prec <= 300 then 750 else op_prec in
+         lparen op_prec;
+         open_box 0;
+         (* all our binops are left associative *)
+         fe child_prec e1;
+         space();
+         pp (self#binop_to_string b);
+         pp " ";
+         fe (child_prec+1) e2;
+         close_box();
+         rparen op_prec;
+         cut()
      | UnOp(u,e) ->
-	 lparen 900;
-	 pp(unop_to_string u);
-	 fe 900 e;
-	 rparen 900
+         lparen 900;
+         pp(unop_to_string u);
+         fe 900 e;
+         rparen 900
      | Lab l ->
-	 pp "name("; pp l; pp ")"
+         pp "name("; pp l; pp ")"
      | Cast(ct,t,e) -> self#format_cast fe ct t e 
      | Unknown(u,t) ->
-	 pp "unknown \""; pp u; pp "\""; self#typ t
+         pp "unknown \""; pp u; pp "\""; self#typ t
      | Load(arr,idx,endian, t) ->
-	 pp mem_load; pc '('; cut();
-	 self#ast_exp arr; comma();
-	 self#ast_exp idx; comma();
-	 self#ast_exp endian; comma();
-	 self#typ t;
-	 pc ')'
+         pp mem_load; pc '('; cut();
+         self#ast_exp arr; comma();
+         self#ast_exp idx; comma();
+         self#ast_exp endian; comma();
+         self#typ t;
+         pc ')'
      | Store(arr,idx,vl, endian, t) ->
-	 pp mem_store; pc '('; cut();
-	 self#ast_exp arr; comma();
-	 self#ast_exp idx; comma();
-	 self#ast_exp vl; comma();
-	 self#ast_exp endian; comma();
-	 self#typ t;
-	 pc ')'
+         pp mem_store; pc '('; cut();
+         self#ast_exp arr; comma();
+         self#ast_exp idx; comma();
+         self#ast_exp vl; comma();
+         self#ast_exp endian; comma();
+         self#typ t;
+         pc ')'
      | Int(i,t) ->
-	 self#format_value (Int(i,t))
+         self#format_value (Int(i,t))
      | Var v ->
-	 self#format_var v
+         self#format_var v
     );
     cls()
 
@@ -265,88 +265,88 @@ object(self)
       pp_int vid )
     else
       let strings =
-	Stream.from (function
-		       | 0 -> Some name
-		       | 1 -> Some(name^"_"^string_of_int vid)
-		       | 2 -> Some(name^"__"^string_of_int vid)
-		       | n -> Some(name^"_"^string_of_int (n-2))
-		    )
+        Stream.from (function
+                       | 0 -> Some name
+                       | 1 -> Some(name^"_"^string_of_int vid)
+                       | 2 -> Some(name^"__"^string_of_int vid)
+                       | n -> Some(name^"_"^string_of_int (n-2))
+                    )
       in
       let rec pp_next() =
-	let s = Stream.next strings in
-	  try
-	    let var' = Hashtbl.find varctx s in
-	      if var == var' then pp s else
-		pp_next()
-	  with Not_found ->
-	    Hashtbl.add varctx s var;
-	    pp s
+        let s = Stream.next strings in
+          try
+            let var' = Hashtbl.find varctx s in
+              if var == var' then pp s else
+                pp_next()
+          with Not_found ->
+            Hashtbl.add varctx s var;
+            pp s
       in
-	pp_next()
+        pp_next()
 
 
   method format_value = function
     | Int(bi, Reg 1) when bi_is_one bi -> pp "1"
     | Int(bi, Reg 1) when bi_is_zero bi -> pp "0"
     | Int(x,t) -> 
-	(* No moding here, since the value should have been modded earlier,
-	   and if it wasn't, it's better not to hide it. *)
+        (* No moding here, since the value should have been modded earlier,
+           and if it wasn't, it's better not to hide it. *)
 
-	(* XXX: Ugh, can't print in hex for big ints yet anyway :-X *)
-	pp (string_of_big_int x);
-	(* pp (if 0L <= x && x < 10L *)
-	(*     then Int64.to_string x *)
-	(*     else Printf.sprintf "0x%LxLL" x) *)
+        (* XXX: Ugh, can't print in hex for big ints yet anyway :-X *)
+        pp (string_of_big_int x);
+        (* pp (if 0L <= x && x < 10L *)
+        (*     then Int64.to_string x *)
+        (*     else Printf.sprintf "0x%LxLL" x) *)
     | _ -> ()
 
 
   method format_cast fe  ct t e = 
     let to_signed_type_string t = 
       match t with
-	  Reg 1 -> "bool"
-	| Reg 8 -> "int8_t"
-	| Reg 16 -> "int16_t"
-	| Reg 32 -> "int32_t"
-	| Reg 64 -> "int64_t"
-	| _ -> raise (Invalid_argument "Invalid integral type")
+          Reg 1 -> "bool"
+        | Reg 8 -> "int8_t"
+        | Reg 16 -> "int16_t"
+        | Reg 32 -> "int32_t"
+        | Reg 64 -> "int64_t"
+        | _ -> raise (Invalid_argument "Invalid integral type")
     in
     let () = open_box 2 in (
-	match ct with
-	    CAST_LOW 
-	  | CAST_UNSIGNED ->
-	      (* this avoids warnings in visual studio 2005 *)
-	      (* FIXME: but it's wrong! *)
-	      if t = Reg(1) && ct = CAST_LOW then (
-		pp "(((";  self#format_exp e; 
-		pp ")&1) == 1)"
-	      ) else (
-		pp "("; self#format_typ  t; pp ")"; cut(); pp "(";
-		self#format_exp  e; pp ")"
-	      )
-		
-	  | CAST_SIGNED when is_integer_type t -> 
-	      let tstr = to_signed_type_string t in
-		pp "("; pp tstr; pp ")"; cut(); pp "(";
-		self#format_exp  e; pp ")"
-	  | CAST_HIGH  when is_integer_type t ->
-	      (* implements zhenkai's do_cast routine *)
-	      let dstlen = bits_of_width t in 
-	      (* let srctyp = Typecheck.infer_type None e in  *)
-	      let srctyp = Typecheck.infer_ast e in
-	      let srclen = bits_of_width srctyp in 
-	      let offset = srclen - dstlen in 
-	      let (mask:int64) = Int64.sub 
-		(Int64.shift_left 1L dstlen)
-		(Int64.one) in 
-		pp "("; self#format_typ t; pp ")"; space();
-		pp "("; space () ; pp "(";
-		pp "("; self#format_exp e; pp ")";
-		pp ">>"; pp (string_of_int offset); space ();
-		pp ")&"; Format.fprintf ft "0x%LX" mask;
-		(* pp (string_of_int mask); *)
-		pp ")"
-	  | CAST_HIGH 
-	  | CAST_SIGNED -> raise (Invalid_argument "Unhandled case")
+        match ct with
+            CAST_LOW 
+          | CAST_UNSIGNED ->
+              (* this avoids warnings in visual studio 2005 *)
+              (* FIXME: but it's wrong! *)
+              if t = Reg(1) && ct = CAST_LOW then (
+                pp "(((";  self#format_exp e; 
+                pp ")&1) == 1)"
+              ) else (
+                pp "("; self#format_typ  t; pp ")"; cut(); pp "(";
+                self#format_exp  e; pp ")"
+              )
+                
+          | CAST_SIGNED when is_integer_type t -> 
+              let tstr = to_signed_type_string t in
+                pp "("; pp tstr; pp ")"; cut(); pp "(";
+                self#format_exp  e; pp ")"
+          | CAST_HIGH  when is_integer_type t ->
+              (* implements zhenkai's do_cast routine *)
+              let dstlen = bits_of_width t in 
+              (* let srctyp = Typecheck.infer_type None e in  *)
+              let srctyp = Typecheck.infer_ast e in
+              let srclen = bits_of_width srctyp in 
+              let offset = srclen - dstlen in 
+              let (mask:int64) = Int64.sub 
+                (Int64.shift_left 1L dstlen)
+                (Int64.one) in 
+                pp "("; self#format_typ t; pp ")"; space();
+                pp "("; space () ; pp "(";
+                pp "("; self#format_exp e; pp ")";
+                pp ">>"; pp (string_of_int offset); space ();
+                pp ")&"; Format.fprintf ft "0x%LX" mask;
+                (* pp (string_of_int mask); *)
+                pp ")"
+          | CAST_HIGH 
+          | CAST_SIGNED -> raise (Invalid_argument "Unhandled case")
       ); close_box ()
 
 end

@@ -18,6 +18,9 @@ type bbid =
 (** Convert a bbid to a string. *)
 val bbid_to_string : bbid -> string
 
+(** Extract the direction taken from an edge *)
+val edge_direction : (bool option * 'a) option -> bool option
+
 module BBid :
 sig
   type t = bbid
@@ -35,9 +38,19 @@ module BM : Map.S with type key = BBid.t
 (** The type of a control flow graph *)
 module type CFG =
 sig
-  include Graph.Builder.S with type G.V.label = bbid and type G.E.label = bool option
 
-  type lang
+  type stmt
+  type lang = stmt list
+  type exp
+
+  include Graph.Builder.S with type G.V.label = bbid and type G.E.label = (bool option * exp) option
+(** Edge labels:
+    None -> unconditional edge
+    Some(None, e) -> indirect edge
+    Some(true, e) -> conditional true edge
+    Some(false, e) -> conditional false edge
+*)
+
 
   (** Finds a vertex by a bbid *)
   val find_vertex : G.t -> G.V.label -> G.V.t
@@ -81,16 +94,29 @@ sig
 end
 
 (** Control flow graph in which statements are in {!Ast.stmt} form. *)
-module AST : CFG with type lang = Ast.stmt list
+module AST : CFG with type stmt = Ast.stmt and type exp = Ast.exp
 
 (** Control flow graph in which statements are in {!Ssa.stmt} form.
     All variables are assigned at most one time in the program, and
     expressions do not contain subexpressions. *)
-module SSA : CFG with type lang = Ssa.stmt list
+module SSA : CFG with type stmt = Ssa.stmt and type exp = Ssa.exp
+
+(** {3 Location of statements in CFGs} *)
+
+(** Unique identifier for an AST CFG statement. [(v,n)] means the [n]th
+    (zero-indexed) statement in basic block [v]. *)
+type aststmtloc = AST.G.V.t * int
+
+(** Unique identifier for an SSA CFG statement. [(v,n)] means the [n]th
+    (zero-indexed) statement in basic block [v]. *)
+type ssastmtloc = SSA.G.V.t * int
 
 (** {3 Helper functions for CFG conversions} *)
 (* These are for cfg_ast.ml and cfg_ssa.ml to be able to translate without
-   breaking nextid. Poke Ivan if you think you need them for something else. *)
+   breaking nextid. *)
 
-val map_ast2ssa : (Ast.stmt list -> Ssa.stmt list) -> AST.G.t -> SSA.G.t
-val map_ssa2ast : (Ssa.stmt list -> Ast.stmt list) -> SSA.G.t -> AST.G.t
+val map_ast2ssa : (Ast.stmt list -> Ssa.stmt list) -> (AST.exp -> SSA.exp) -> AST.G.t -> SSA.G.t * (SSA.G.V.t -> AST.G.V.t) * (SSA.G.E.t -> AST.G.E.t)
+val map_ssa2ast : (Ssa.stmt list -> Ast.stmt list) -> (SSA.exp -> AST.exp) -> SSA.G.t -> AST.G.t * (AST.G.V.t -> SSA.G.V.t) * (AST.G.E.t -> SSA.G.E.t)
+
+
+

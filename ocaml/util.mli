@@ -3,6 +3,9 @@
     @author Ivan Jager
 *)
 
+(** The timeout exception, which is raised by [timeout]. *)
+exception Timeout
+
 (** The identity function *)
 val id : 'a -> 'a
 
@@ -281,6 +284,15 @@ sig
   val stop : unit -> unit
 end
 
+(** [timeout n f x] runs [f x] for [n] seconds.  If [f x] returns [v],
+    [timeout n f x] returns [v]. Otherwise [timeout n f x] raises
+    {!Timeout}. *)
+val timeout : secs:int -> f:('a -> 'b) -> x:'a -> 'b
+
+(** [timeout_option n f x] runs [f x] for [n] seconds. If [f x]
+    returns [v], [timeout_option n f x] returns [Some v].  Otherwise
+    [timeout_option n f x] returns [None]. *)
+val timeout_option : secs:int -> f:('a -> 'b) -> x:'a -> 'b option
 
 (** [print_separated_list printer sep l] converts [l] to a string by
     computing [printer e] for each element [e], and concatenating the

@@ -478,10 +478,10 @@ object(self)
           | l when (CA.G.V.label bb) = Cfg.BB_Indirect -> l
           | [] -> []
           | [x] -> [x]
-          | [x;y] when CA.G.E.label x = Some true
-                  && CA.G.E.label y = Some false -> [x;y]
-          | [y;x] when CA.G.E.label x = Some true
-                  && CA.G.E.label y = Some false -> [x;y]
+          | [x;y] when Cfg.edge_direction (CA.G.E.label x) = Some true
+                  && Cfg.edge_direction (CA.G.E.label y) = Some false -> [x;y]
+          | [y;x] when Cfg.edge_direction (CA.G.E.label x) = Some true
+                  && Cfg.edge_direction (CA.G.E.label y) = Some false -> [x;y]
           | _ -> failwith "invalid cfg")
       in
       let succllvmbbs = List.map get_llvmbb succbbs in

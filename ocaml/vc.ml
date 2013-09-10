@@ -33,7 +33,7 @@ let vc_astprog vc options prog post  = match vc with
   | CfgVc vc -> vc options (Cfg_ast.of_prog prog) post
   | SsaVc vc ->
     let cfg = Cfg_ast.of_prog prog in
-    let {Cfg_ssa.cfg=cfg; to_ssavar=tossa} = Cfg_ssa.trans_cfg cfg in
+    let {Cfg_ssa.ssacfg=cfg; to_ssavar=tossa} = Cfg_ssa.trans_cfg cfg in
     let post = rename_astexp tossa post in
     vc options cfg post
 
@@ -41,7 +41,7 @@ let vc_astcfg vc options prog post  = match vc with
   | AstVc vc -> vc options (Cfg_ast.to_prog prog) post
   | CfgVc vc -> vc options prog post
   | SsaVc vc ->
-    let {Cfg_ssa.cfg=cfg; to_ssavar=tossa} = Cfg_ssa.trans_cfg prog in
+    let {Cfg_ssa.ssacfg=cfg; to_ssavar=tossa} = Cfg_ssa.trans_cfg prog in
     let post = rename_astexp tossa post in
     vc options cfg post
 

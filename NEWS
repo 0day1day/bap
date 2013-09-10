@@ -1,3 +1,7 @@
+New in BAP 0.8:
+* Support for x86-64 lifting
+* Support for VSA-based CFG recovery
+
 New in BAP 0.7:
 * New function identification heuristics in get_functions for stripped binaries
 * Serialized output formats for easy parsing of BIL outside of BAP
@@ -19,7 +23,7 @@ New in BAP 0.5:
 
 * Aggressive dead code elimination
 * New trace format using google protobuf
-* LLVM-based JIT and regular compiler of BAP IL
+* LLVM-based JIT and regular compilation of BAP IL
 * BAP has zero wrong instructions on its x86 nightly tests (but still some unimplemented)
 
 New in BAP :

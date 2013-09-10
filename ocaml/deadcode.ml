@@ -43,6 +43,17 @@ let def_uses s =
   ignore (Ssa_visitor.stmt_accept vis s);
   (lv, !uses, liveout)
 
+(* return uses in e.  used for edge conditions *)
+let uses e =
+  let uses = ref [] in
+  let vis =  object(self)
+    inherit Ssa_visitor.nop
+    method visit_rvar v = uses := v :: !uses;
+      DoChildren
+  end
+  in
+  ignore (Ssa_visitor.exp_accept vis e);
+  !uses
 
 (* in SSA, a variable is live at its definition site iff its list of
    uses is not empty. Therefore, calculating live variables is really
@@ -69,10 +80,10 @@ let do_dce ?(globals=[]) graph =
     (fun bb ->
        let stmts = C.get_stmts graph bb in
        List.iter
-	 (fun s ->
-	    let site = (bb, s) in
+         (fun s ->
+            let site = (bb, s) in
             let defs, deps, liveout = def_uses s in
-            
+
             (* iterate over defs, updating maps *)
             List.iter
               (fun defd_var ->
@@ -83,13 +94,28 @@ let do_dce ?(globals=[]) graph =
                  ignore(usecount defd_var); (* Add 0 if needed *)
               )
               defs;
-            
+
             (* update usecounts mapping *)
             List.iter (fun v -> incr (usecount v)) deps;
-	    (* increment liveout vars by one, so they are never dead *)
+            (* increment liveout vars by one, so they are never dead *)
             List.iter (fun v -> incr (usecount v)) liveout;
-	 )
+         )
          stmts
+    )
+    graph;
+
+  (* also mark vars in edge conditions as live
+
+     XXX: should we do this in the visitor?
+  *)
+  C.G.iter_edges_e
+    (fun e ->
+
+      match C.G.E.label e with
+      | None -> ()
+      | Some (_, e) ->
+        let uses_e = uses e in
+        List.iter (fun v -> incr (usecount v)) uses_e
     )
     graph;
 
@@ -136,11 +162,11 @@ let do_dce ?(globals=[]) graph =
   let graph =
     BH.fold
       (fun bb () graph->
-	 let stmts = C.get_stmts graph bb in
-	 let stmts' =
+         let stmts = C.get_stmts graph bb in
+         let stmts' =
            List.filter (fun s -> not (Hashtbl.mem dead_sites (bb,s))) stmts
        in
-	 C.set_stmts graph bb stmts'
+         C.set_stmts graph bb stmts'
     )
     blocks_to_update
     graph
@@ -163,6 +189,12 @@ let do_dce ?(globals=[]) graph =
     the other is identical, they should both be dead (in SSA).
 *)
 let do_aggressive_dce ?(globals = []) graph =
+  
+  (* Make BB_Exit Live *)
+  let exitv = C.G.V.create Cfg.BB_Exit in
+  let exit_stmts = Ssa.Comment ("Live", [Type.Liveout])::(C.get_stmts graph exitv) in
+  let graph = C.set_stmts graph exitv exit_stmts in
+
   let gets (bb,snum) =
     let stmts = C.get_stmts graph bb in
     List.nth stmts snum
@@ -200,8 +232,8 @@ let do_aggressive_dce ?(globals = []) graph =
     (fun bb ->
       let stmts = C.get_stmts graph bb in
       let _ = List.fold_left
-	(fun snum s ->
-	  let site = (bb, snum) in
+        (fun snum s ->
+          let site = (bb, snum) in
           (match s with
           | Move(lv, _, a) ->
             assert(not (VH.mem var_to_defsite lv));
@@ -227,7 +259,7 @@ let do_aggressive_dce ?(globals = []) graph =
 
           snum+1
 
-	)
+        )
         0 stmts in ()
     )
     graph;
@@ -243,10 +275,10 @@ let do_aggressive_dce ?(globals = []) graph =
               let src = C.G.E.src e in
               let stmts = C.get_stmts graph src in
               match List.rev stmts with
-              | (CJmp _)::_ -> (src, (List.length stmts)-1) :: l
+              | (CJmp _ | Jmp _)::_ -> (src, (List.length stmts)-1) :: l
               | _ when C.G.V.label src = Cfg.BB_Entry -> l (* Everything is dependent on BB_Entry *)
-              | [] -> failwith (Printf.sprintf "Expected control-dependency to be a CJmp in %s (%s)!" (Cfg_ssa.v2s bb) (Cfg_ssa.v2s src))
-              | s::_ -> failwith (Printf.sprintf "Expected control-dependency to be a CJmp in %s (%s) %s!" (Cfg_ssa.v2s bb) (Cfg_ssa.v2s src) (Pp.ssa_stmt_to_string s))
+              | [] -> failwith (Printf.sprintf "Expected control-dependency to be a Jmp/CJmp in %s (%s)!" (Cfg_ssa.v2s bb) (Cfg_ssa.v2s src))
+              | s::_ -> failwith (Printf.sprintf "Expected control-dependency to be a Jmp/CJmp in %s (%s) %s!" (Cfg_ssa.v2s bb) (Cfg_ssa.v2s src) (Pp.ssa_stmt_to_string s))
             ) cdg bb []
         in Cfg.BH.add cdh (C.G.V.label bb) d;
         d)
@@ -272,12 +304,12 @@ let do_aggressive_dce ?(globals = []) graph =
       (fun bb ->
         let stmts = C.get_stmts graph bb in
         let _ = List.fold_left
-	  (fun snum s ->
-	    let site = (bb, snum) in
+          (fun snum s ->
+            let site = (bb, snum) in
             assert (not (Hashtbl.mem site_to_deps site));
             Hashtbl.add site_to_deps site (gen_deps site);
             snum+1
-	  )
+          )
           0 stmts in ()
       )
       graph
@@ -303,13 +335,6 @@ let do_aggressive_dce ?(globals = []) graph =
   (* Replace dead assignments with a comment.  Don't remove them,
      since this would change sites (e.g., removing statement number three
      would change the site of all statements after three *)
-  let check_path graph =
-    (* It would be nice if we could re-use the same path checker, but
-       we must modify the graph. *)
-    let module PC = Graph.Path.Check(Cfg.SSA.G) in
-    let pchecker = PC.create graph in
-    PC.check_path pchecker
-  in
   let graph = C.G.fold_vertex
     (fun bb graph ->
       let stmts = C.get_stmts graph bb in
@@ -337,51 +362,57 @@ let do_aggressive_dce ?(globals = []) graph =
                    [Live BB]
 
        If CJmp is dead, then there are no live statements that are
-       control-dependent on it.  So, we can change the CJmp to point
-       to the Dead BB which has a path to BB_Exit.  Since any live
+       control-dependent on it.  So, since BB_Exit is live, we cannot have
+       one branch able to reach it while the other cannot (as otherwise
+       the CJmp would be live). Thus we can change the CJmp to point to either
+       Dead BB which has a path to BB_Exit.  Since any live
        statement after the CJmp is not control-dependent on the CJmp,
        it will execute regardless of which branch is taken.
     *)
       let graph = match revnewstmts with
         | CJmp (_, t1, t2, attrs) as s::others when not (site_is_live (bb, (List.length revnewstmts)-1)) ->
-          has_changed := true;
-          dprintf "Dead cjmp: %s" (Pp.ssa_stmt_to_string s);
-          (* Which edge do we remove? Try removing one and see if we
-             can still reach BB_Exit. *)
-          let truee = List.find (fun e -> match C.G.E.label e with | Some(true) -> true | _ -> false) (C.G.succ_e graph bb) in
-          let falsee = List.find (fun e -> match C.G.E.label e with | Some(false) -> true | _ -> false) (C.G.succ_e graph bb) in
-          (* Remove true edge, check for reachability *)
-          let use_true, graph =
-            let graph = C.remove_edge_e graph truee in
-            if check_path graph bb (C.G.V.create Cfg.BB_Exit) then
-              false, graph
-            else
-              (* Add true edge back, remove false edge *)
-              let graph = C.add_edge_e graph truee in
-              let graph = C.remove_edge_e graph falsee in
-              let () = assert (check_path graph bb (C.G.V.create Cfg.BB_Exit)) in
-              true, graph
-          in
-          (* Replace CJmp with Jmp to t1 *)
-          let newstmts = List.rev
-            (Jmp ((if use_true then t1 else t2), attrs)::others) in
-          let graph = C.set_stmts graph bb newstmts in
-          (* Now fix the edges *)
-          let newdst = if use_true then C.G.E.dst truee else C.G.E.dst falsee in
-          let new_edge = C.G.E.create bb None newdst in
-          (* Remove all existing edges *)
-          let graph = C.G.fold_succ_e
-            (fun e graph -> C.remove_edge_e graph e) graph bb graph in
-          (* Add the new, unlabeled edge *)
-          let graph = C.add_edge_e graph new_edge in
-          graph
+          (try
+             dprintf "Dead cjmp at %s: %s" (Cfg_ssa.v2s bb) (Pp.ssa_stmt_to_string s);
+             let truee = List.find (fun e ->
+               match C.G.E.label e with
+               | Some(Some true, _) -> true 
+               | _ -> false)
+               (C.G.succ_e graph bb)
+             in
+             let falsee = List.find (fun e ->
+               match C.G.E.label e with
+               | Some(Some false, _) -> true
+               | _ -> false)
+               (C.G.succ_e graph bb)
+             in
+
+             (* We remove the true edge (this is arbitrary) *)
+             let graph = C.remove_edge_e graph truee in
+             
+             (* Replace CJmp with Jmp to t2 *)
+             let newstmts = List.rev (Jmp (t2, attrs)::others) in
+             let graph = C.set_stmts graph bb newstmts in
+             (* Now fix the edges *)
+             let newdst = C.G.E.dst falsee in
+             let new_edge = C.G.E.create bb None newdst in
+             (* Remove all existing edges *)
+             let graph = C.G.fold_succ_e
+               (fun e graph -> C.remove_edge_e graph e) graph bb graph in
+             (* Add the new, unlabeled edge *)
+             let graph = C.add_edge_e graph new_edge in
+             has_changed := true;
+             graph
+           with Not_found ->
+             (* There might be an unresolved edge from a 'je'
+                instruction or similar which could cause this to fail. *)
+             graph)
         | _ -> C.set_stmts graph bb (List.rev revnewstmts)
       in
       graph
-
+        
     )
     graph graph in
-
+  
   (* It's now safe to remove deadstmts *)
   let graph = if !has_changed then
       C.G.fold_vertex

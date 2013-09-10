@@ -71,7 +71,7 @@ struct
 
       in
       match sccs with
-      | [] -> failwith "loopinfo_from_havlak: impossible"
+      | [] -> []
       | _ -> List.sort compare (List.map (process_scc cfg) sccs)
     in
     f cfg

@@ -25,10 +25,7 @@ object
         visited first, so that this can be used to add the assigned
         variable to your context.
 
-	FIXME: would be nice to be able to add stmts... We may change this. *)
-
-  method visit_value : value -> value visit_action
-  (** Called when visiting a SSA value *)
+        FIXME: would be nice to be able to add stmts... We may change this. *)
 
   method visit_rvar : var -> var visit_action
   (** Called when visiting a refenenced variable. (IE: inside an expression) *)
@@ -48,9 +45,6 @@ val rvar_accept : #t -> var -> var
 
 (** Visit an assigned variable *)
 val avar_accept : #t -> var -> var
-
-(** Visit a value *)
-val value_accept : #t -> value -> value
 
 (** Visit an expression *)
 val exp_accept : #t -> exp -> exp

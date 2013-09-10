@@ -1,5 +1,6 @@
 (** Functions used by BAP library and tests *)
 
+open Arch
 open Ast
 open Big_int_Z
 open Big_int_convenience
@@ -8,11 +9,11 @@ open Pcre
 open Type
 open BatListFull
 
-exception RangeNotFound of int64 * int64
+exception RangeNotFound of Type.addr * Type.addr
 
 let leave_files = ref false;;
 let speclist = ["-leave-files", Arg.Set leave_files, 
-				"Don't remove files after test";];;
+                "Don't remove files after test";];;
 
 
 (** General system functions **)
@@ -27,7 +28,7 @@ let mkdir_and_ignore path = try Unix.mkdir path 0o640 with _ -> ();;
 let rm_and_ignore path =
   if(!leave_files) then () 
   else ((try if (Sys.is_directory(path)) then Unix.rmdir path with _ -> ());
-		try Sys.remove path with _ -> ());;
+        try Sys.remove path with _ -> ());;
 
 
 let rec rm_and_ignore_list paths =
@@ -54,10 +55,14 @@ let check_stp_path =
 
 (** pin helpers **)
 let pin_path = (*ref "../pin/";;*)
-  let path = try Sys.getenv("PIN_HOME") with Not_found -> "../pin/" in
+  let path = try Sys.getenv("PIN_HOME") with Not_found -> Sys.getcwd ()^"/../pin/" in
   ref path;;
 let pin = "pin";;
-let gentrace_path = "../pintraces/obj-ia32/";;
+let gentrace_path_64 = "../pintraces/obj-intel64/";;
+let gentrace_path_32 = "../pintraces/obj-ia32/";;
+let gentrace_path_of_arch = function
+  | X86_32 -> gentrace_path_32
+  | X86_64 -> gentrace_path_64
 let gentrace = "gentrace.so";;
 let pin_out_suffix = "-bap-pin-test.out";;
 
@@ -69,29 +74,55 @@ let rec find_pin_out files tag =
   | f::fs -> if (pmatch ~pat:(tag^pin_out_suffix) f) then f else find_pin_out fs tag;;
 
 
-let check_pin_setup _ =
-  (* Only do this if we are running in an x64 environment *)
+let check_pin_setup arch =
   let cat_arg = "/proc/sys/kernel/yama/ptrace_scope" in
   let foutput char_stream = 
     (match (Stream.next char_stream) with
     | '0' -> ()
     | _ -> skip_if true
       (cat_arg^
-	 " must contain 0 for pin to work.  As root, please execute $ echo 0 > "
+         " must contain 0 for pin to work.  As root, please execute $ echo 0 > "
        ^cat_arg))
   in
   (* Check if ptrace_scope has been turned off *)
   if (Sys.file_exists cat_arg) 
   then assert_command ~foutput ~verbose:true "cat" [cat_arg] else ();
-  (* Check environment variable for path to pin *)
-  let env_pin_path = try Sys.getenv "PIN_HOME" with _ -> "" in
-  if (env_pin_path <> "") then pin_path := env_pin_path;
   check_file(!pin_path^pin);
-  check_file(gentrace_path^gentrace);
+  let gentrace_path = gentrace_path_of_arch arch in
+  check_file(!pin_path^gentrace_path^gentrace)
 ;;
 
+(** Get architecture of binary *)
+let get_arch b =
+  let p = Asmir.open_program b in
+  Asmir.get_asmprogram_arch p
 
-(** Common functions across multipule tests **)
+let run_trace ?arch ?(tag="generic") ?(pin_args=[]) ?(pintool_args=[]) bin args =
+  check_file bin;
+  let arch = match arch with
+    | None -> get_arch bin
+    | Some arch -> arch
+  in
+  let gentrace_path = gentrace_path_of_arch arch in
+  (* Use sh -c "prog arg1 arg2 ..." so we can use redirections in args *)
+  let concatargs a b = a ^ " " ^ b in
+  let args =
+    pin_args
+    @ ["-t"; (!pin_path^gentrace_path^gentrace);
+       "-o"; tag^pin_out_suffix]
+    @ pintool_args
+    @ ["--"; bin]
+    @ args in
+  let sh_args = ["-c" ; !pin_path ^ pin ^ (List.fold_left concatargs "" args)] in
+  Printf.eprintf "sh_args: %s\n" (List.nth sh_args 1); flush stderr;
+  let exit_code = Unix.WEXITED(0) in
+  Traces.cleanup();
+  check_pin_setup arch;
+  assert_command ~exit_code "sh" sh_args;
+  find_pin_out (Array.to_list (Sys.readdir "./")) tag;;
+
+
+(** Common functions across multiple tests **)
 let rec find_funs ?(msg="") ranges names = match ranges with
   | [] -> assert_failure ("Could not find functions "^msg)
   | (n,s,e)::rs -> if (List.mem n names) then (s,e) else find_funs ~msg rs names;;
@@ -115,25 +146,25 @@ let inject_stmt prog start_addr asm stmt =
       assert_failure ("Could not find asmembly instruction "^asm_str^" in main")
     | s::[] -> 
       assert_failure ("Could not find asmembly instruction "^asm_str^" in main")
-	(* Match for the addr and label at the same time *)
+    (* Match for the addr and label at the same time *)
     | s::l::ss -> 
       match starta with
       | Some(a) -> (match s with
-	| Ast.Label(Type.Addr(addr),attrs) -> 
-	  if (addr = a) then inject_stmt_k ss None asm_str inj_stmt (l::s::k)
-	  else inject_stmt_k ss starta asm_str inj_stmt (l::s::k)
-	| _ -> inject_stmt_k (l::ss) starta asm_str inj_stmt (s::k)
+        | Ast.Label(Type.Addr(addr),attrs) -> 
+          if (addr = a) then inject_stmt_k ss None asm_str inj_stmt (l::s::k)
+          else inject_stmt_k ss starta asm_str inj_stmt (l::s::k)
+        | _ -> inject_stmt_k (l::ss) starta asm_str inj_stmt (s::k)
       )
-	  (* We are inside the desired block; find asm_str and inject inj_stmt *)
+          (* We are inside the desired block; find asm_str and inject inj_stmt *)
       | None -> (match s with
-	| Ast.Label(Type.Addr(addr),attrs) -> 
-	  (match attrs with
-	  | [Type.Asm(asm)] ->
-	    if (pmatch ~pat:asm_str asm) then (List.rev k)@(s::l::inj_stmt::ss)
-	    else inject_stmt_k ss starta asm_str inj_stmt (l::s::k)
-	  | _ -> inject_stmt_k ss starta asm_str inj_stmt (l::s::k)
-	  )
-	| _ -> inject_stmt_k (l::ss) starta asm_str inj_stmt (s::k)
+        | Ast.Label(Type.Addr(addr),attrs) -> 
+          (match attrs with
+          | [Type.Asm(asm)] ->
+            if (pmatch ~pat:asm_str asm) then (List.rev k)@(s::l::inj_stmt::ss)
+            else inject_stmt_k ss starta asm_str inj_stmt (l::s::k)
+          | _ -> inject_stmt_k ss starta asm_str inj_stmt (l::s::k)
+          )
+        | _ -> inject_stmt_k (l::ss) starta asm_str inj_stmt (s::k)
       )
   in
   inject_stmt_k prog (Some(start_addr)) asm stmt [];;
@@ -147,9 +178,9 @@ let check_bigint_answer e correct =
   | Int(int,_) -> if (int <>% correct)
     then 
       assert_failure 
-	("Final value in EAX " ^ (string_of_big_int int) 
-	 ^ " does not equal correct value "
-	 ^ (string_of_big_int correct))
+        ("Final value in EAX " ^ (string_of_big_int int) 
+         ^ " does not equal correct value "
+         ^ (string_of_big_int correct))
     else ()
   | _ -> assert_failure ("Final value in EAX is not an Ast.Int!");;
 
@@ -158,8 +189,8 @@ let check_eax ctx eax =
   Var.VarHash.iter 
     (fun k v ->
       match v with
-      | Symbeval.Symbolic e when k = Disasm_i386.eax ->
-	check_bigint_answer e eax
+      | Symbeval.Symbolic e when k = Disasm_i386.R32.eax ->
+        check_bigint_answer e eax
       | _ -> ()
     ) ctx.Symbeval.delta;;
 
@@ -179,10 +210,10 @@ let find_prog_chunk prog start_addr end_addr =
     | p::ps, Some a ->
       (match p with
       | Ast.Label(Addr(addr),attrs) when addr = a -> 
-	(* If this is the start address we are looking for begin recording 
-	   with accumulator k.  Set starta to None so that we know we are in
-	   the desired range *)
-	find_prog_chunk_k ps None enda (p::k)
+        (* If this is the start address we are looking for begin recording 
+           with accumulator k.  Set starta to None so that we know we are in
+           the desired range *)
+        find_prog_chunk_k ps None enda (p::k)
       | _ -> find_prog_chunk_k ps starta enda k)
     | p::ps, None ->
       (* Indicates we are inside desired block; return through end_addr *)
@@ -196,13 +227,13 @@ let find_prog_chunk prog start_addr end_addr =
 let summarize r =
   match r with 
   | RError(p,s) ->
-	Format.printf "Error: %s\n" ((string_of_path p) ^ "\n  " ^ s)
+        Format.printf "Error: %s\n" ((string_of_path p) ^ "\n  " ^ s)
   | RFailure (p,s) ->
-	Format.printf "Failure: %s\n" ((string_of_path p) ^ "\n  " ^ s)
+        Format.printf "Failure: %s\n" ((string_of_path p) ^ "\n  " ^ s)
   | RSkip (p,s) -> 
-	Format.printf "Skiped: %s\n" ((string_of_path p) ^ "\n  " ^ s)
+        Format.printf "Skiped: %s\n" ((string_of_path p) ^ "\n  " ^ s)
   | RTodo (p,s) -> 
-	Format.printf "Todo: %s\n" ((string_of_path p) ^ "\n  " ^ s)
+        Format.printf "Todo: %s\n" ((string_of_path p) ^ "\n  " ^ s)
   | RSuccess p -> ();;
 
 let rec summarize_results res =
@@ -210,8 +241,8 @@ let rec summarize_results res =
   | [] -> None
   | r::rs -> summarize r; summarize_results rs;;
 
-let backwards_taint prog =
-  let prog = Traces.concrete prog in
+let backwards_taint mode prog =
+  let prog = Traces.concrete mode prog in
 
   (* Flatten memory *)
   let prog = Flatten_mem.flatten_mem_program prog in

@@ -1,10 +1,10 @@
 (** Type declarations for BAP.
-    
+
     @author Ivan Jager
 *)
 
-(** Addresses are 64-bit integers *)
-type addr = int64
+(** Addresses are big_ints *)
+type addr = Big_int_Z.big_int
 
 (** Labels are program locations that can be jumped to. *)
 type label = 
@@ -24,6 +24,7 @@ and reg_16 = Reg 16
 and reg_32 = Reg 32
 and reg_64 = Reg 64
 and reg_128 = Reg 128
+and reg_256 = Reg 256
 
 (** [Array] memories can only be updated or accessed in terms of
     their element type, which is usually [Reg 8].  [TMem] memories
@@ -89,18 +90,21 @@ type context =
  }
 
 (** Attributes are extra information contained in a [stmt]. *)
-type attribute =
-  | Pos of pos
-  | Asm of string
-  | Address of addr
-  | Liveout
-  | StrAttr of string
-  | Context of context
-  | ThreadId of int
-  | ExnAttr of exn
-  | InitRO
-  | Synthetic
-  | SpecialBlock
+type attribute = 
+  | Pos of pos  (** The position of a statement in the source file *)
+  | Asm of string (** Assembly representation of the following IL code *)
+  | Address of addr (** The address corresponding to lifted IL. *)
+  | Liveout (** Statement should be considered live by deadcode elimination *)
+  | StrAttr of string (** Generic printable and parseable attribute *)
+  | NamedStrAttr of string * string (** Generic printable and parseable attribute *)
+  | Context of context         (** Information about the
+                                   instruction operands from a
+                                   trace. *)
+  | ThreadId of int (** Executed by a specific thread *)
+  | ExnAttr of exn (** Generic extensible attribute, but no parsing *)
+  | InitRO (** The memory in this assignment is stored in the binary *)
+  | Synthetic (** Operation was added by an analysis *)
+  | SpecialBlock (** Start of a special block *)
   | TaintIntro of int * string * int
 
 type attributes = attribute list
@@ -115,8 +119,8 @@ type 'a visit_action =
   | DoChildren      (** Continue exploring children of the current node. Changes to children will propagate up. *)
   | ChangeTo of 'a  (** Replace the current object with the specified one. *)
   | ChangeToAndDoChildren of 'a (** Replace the current object with
-				    the given one, and visit children
-				    of the {b replacement} object. *)
+                                    the given one, and visit children
+                                    of the {b replacement} object. *)
 
 (** Specifies whether generated VCs will be evaluated for
     satisfiability or validity. Alternatively, quantifiers can be

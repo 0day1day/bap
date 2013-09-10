@@ -93,22 +93,22 @@ let syscall cmd =
 
        (* Read any new data from stdout/stderr *)
        let rd timeout  =
-	 let rl,_,_ = select fdlist [] fdlist timeout in
-	 List.iter
-	   (fun fd ->
-	      let buffer = if fd=stdoutread then obuf else ebuf in
-	      try
-		while true do
-		  (match read fd buf 0 1 with
-		   | 1 ->
-		       Buffer.add_string buffer buf
-		   | 0 -> raise Exit
-		   | _ ->
-		       failwith "Assertion error");
-		done
-	      with Exit | Unix_error(EWOULDBLOCK,_,_) | Unix_error(EAGAIN,_,_) -> ()
-	   ) rl;
-(* 	 dprintf "Hmm: %d %d" (List.length rl) (List.length el); *)
+         let rl,_,_ = select fdlist [] fdlist timeout in
+         List.iter
+           (fun fd ->
+              let buffer = if fd=stdoutread then obuf else ebuf in
+              try
+                while true do
+                  (match read fd buf 0 1 with
+                   | 1 ->
+                       Buffer.add_string buffer buf
+                   | 0 -> raise Exit
+                   | _ ->
+                       failwith "Assertion error");
+                done
+              with Exit | Unix_error(EWOULDBLOCK,_,_) | Unix_error(EAGAIN,_,_) -> ()
+           ) rl;
+(*       dprintf "Hmm: %d %d" (List.length rl) (List.length el); *)
        in
 
        (* Do a read *)
@@ -117,8 +117,8 @@ let syscall cmd =
        (* Check if the process is dead yet *)
        let pid',estatus' = waitpid [WNOHANG] pid in
        if pid' = pid then begin
-	 wait := false;
-	 estatus := Some(estatus')
+         wait := false;
+         estatus := Some(estatus')
        end;
 
        (* Do another read, in case the process died *)
@@ -194,10 +194,10 @@ struct
         if in_path() = false then
           SmtError (Printf.sprintf "Solver program %s not in path" S.progname)
         else (
-	  let sout,serr,pstatus = syscall cmdline in
+          let sout,serr,pstatus = syscall cmdline in
 
-	  (* Turn the alarm off *)
-	  ignore(alarm 0);
+          (* Turn the alarm off *)
+          ignore(alarm 0);
 
           dprintf "Parsing result...";
           let r = S.parse_result ~getmodel sout serr pstatus in
@@ -205,8 +205,8 @@ struct
           r)
 
       with Alarm_signal(pid) ->
-	kill pid 9;
-	Timeout
+        kill pid 9;
+        Timeout
 
     let check_exp_validity ?timeout ?(remove=true) ?exists ?foralls f =
       let filename = write_formula ?exists ?foralls ~remove f in

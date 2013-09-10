@@ -1,39 +1,41 @@
 goal:bool = false
 addr 0x0 @asm "add    %eax,%ebx"
 label pc_0x0
-t:u32 = R_EBX:u32
-R_EBX:u32 = R_EBX:u32 + R_EAX:u32
-R_CF:bool = R_EBX:u32 < t:u32
-R_AF:bool = 0x10:u32 == (0x10:u32 & (R_EBX:u32 ^ t:u32 ^ R_EAX:u32))
-R_OF:bool = high:bool((t:u32 ^ ~R_EAX:u32) & (t:u32 ^ R_EBX:u32))
+T_t1:u32 = R_EBX_32:u32
+T_t2:u32 = R_EAX_32:u32
+R_EBX_32:u32 = R_EBX_32:u32 + T_t2:u32
+R_CF:bool = R_EBX_32:u32 < T_t1:u32
+R_OF:bool = high:bool((T_t1:u32 ^ ~T_t2:u32) & (T_t1:u32 ^ R_EBX_32:u32))
+R_AF:bool = 0x10:u32 == (0x10:u32 & (R_EBX_32:u32 ^ T_t1:u32 ^ T_t2:u32))
 R_PF:bool =
-  ~low:bool(R_EBX:u32 >> 7:u32 ^ R_EBX:u32 >> 6:u32 ^ R_EBX:u32 >> 5:u32 ^
-            R_EBX:u32 >> 4:u32 ^ R_EBX:u32 >> 3:u32 ^ R_EBX:u32 >> 2:u32 ^
-            R_EBX:u32 >> 1:u32 ^ R_EBX:u32)
-R_SF:bool = high:bool(R_EBX:u32)
-R_ZF:bool = 0:u32 == R_EBX:u32
+  ~low:bool(let T_acc:u32 := R_EBX_32:u32 >> 4:u32 ^ R_EBX_32:u32 in
+            let T_acc:u32 := T_acc:u32 >> 2:u32 ^ T_acc:u32 in
+            T_acc:u32 >> 1:u32 ^ T_acc:u32)
+R_SF:bool = high:bool(R_EBX_32:u32)
+R_ZF:bool = 0:u32 == R_EBX_32:u32
 addr 0x2 @asm "shl    %cl,%ebx"
 label pc_0x2
-tmpDEST:u32 = R_EBX:u32
-t1:u32 = R_EBX:u32 >> 0x20:u32 - (R_ECX:u32 & 0x1f:u32)
+T_origDEST:u32 = R_EBX_32:u32
+T_origCOUNT:u32 = R_ECX_32:u32 & 0x1f:u32
+R_EBX_32:u32 = R_EBX_32:u32 << (R_ECX_32:u32 & 0x1f:u32)
 R_CF:bool =
-  if (R_ECX:u32 & 0x1f:u32) == 0:u32 then R_CF:bool else low:bool(t1:u32)
-R_EBX:u32 = R_EBX:u32 << (R_ECX:u32 & 0x1f:u32)
+  if T_origCOUNT:u32 == 0:u32 then R_CF:bool else
+  low:bool(T_origDEST:u32 >> 0x20:u32 - T_origCOUNT:u32)
 R_OF:bool =
-  if (R_ECX:u32 & 0x1f:u32) == 0:u32 then R_OF:bool else
-  if (R_ECX:u32 & 0x1f:u32) == 1:u32 then high:bool(R_EBX:u32) ^ R_CF:bool
-  else unknown "OF <- undefined":bool
+  if T_origCOUNT:u32 == 0:u32 then R_OF:bool else
+  if T_origCOUNT:u32 == 1:u32 then high:bool(R_EBX_32:u32) ^ R_CF:bool else
+  unknown "OF undefined after shift":bool
 R_SF:bool =
-  if (R_ECX:u32 & 0x1f:u32) == 0:u32 then R_SF:bool else high:bool(R_EBX:u32)
+  if T_origCOUNT:u32 == 0:u32 then R_SF:bool else high:bool(R_EBX_32:u32)
 R_ZF:bool =
-  if (R_ECX:u32 & 0x1f:u32) == 0:u32 then R_ZF:bool else 0:u32 == R_EBX:u32
+  if T_origCOUNT:u32 == 0:u32 then R_ZF:bool else 0:u32 == R_EBX_32:u32
 R_PF:bool =
-  if (R_ECX:u32 & 0x1f:u32) == 0:u32 then R_PF:bool else
-  ~low:bool(R_EBX:u32 >> 7:u32 ^ R_EBX:u32 >> 6:u32 ^ R_EBX:u32 >> 5:u32 ^
-            R_EBX:u32 >> 4:u32 ^ R_EBX:u32 >> 3:u32 ^ R_EBX:u32 >> 2:u32 ^
-            R_EBX:u32 >> 1:u32 ^ R_EBX:u32)
+  if T_origCOUNT:u32 == 0:u32 then R_PF:bool else
+  ~low:bool(let T_acc_114:u32 := R_EBX_32:u32 >> 4:u32 ^ R_EBX_32:u32 in
+            let T_acc_114:u32 := T_acc_114:u32 >> 2:u32 ^ T_acc_114:u32 in
+            T_acc_114:u32 >> 1:u32 ^ T_acc_114:u32)
 R_AF:bool =
-  if (R_ECX:u32 & 0x1f:u32) == 0:u32 then R_AF:bool else
+  if T_origCOUNT:u32 == 0:u32 then R_AF:bool else
   unknown "AF undefined after shift":bool
 addr 0x4 @asm "jb     0x0000000000000008"
 label pc_0x4

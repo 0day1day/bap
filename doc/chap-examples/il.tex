@@ -20,7 +20,7 @@ should see something like:
 \verbatiminput{chap-examples/basic.il}
 
 You can see from this example that BAP IL is much more verbose than
-assembly; this is on purpose.  It might make BAP IL a little more
+assembly; this is intentional.  It might make BAP IL a little more
 tedious to read, but it makes writing analyses much simpler.  Let's go
 through some of the IL line by line to explain what is happening.
 
@@ -33,19 +33,27 @@ Note the label for pc\_0x0; any jump to address zero will go to to
 this label.
 
 \begin{verbatim}
-t:u32 = R_EBX:u32
+T_t1:u32 = R_EBX_32:u32
 \end{verbatim}
 Here we are saving the original value of \%ebx before it is modified.
 This original value will be used when computing flags.
 
 \begin{verbatim}
-R_EBX:u32 = R_EBX:u32 + R_EAX:u32
+T_t2:u32 = R_EAX_32:u32
+\end{verbatim}
+Here we are saving the original value of \%eax.  \%eax is not modified
+in this struction, but a temporary is used to avoid duplicating the
+operand in the IL.  Dupliation is a more serious problem for memory
+operands.
+
+\begin{verbatim}
+R_EBX_32:u32 = R_EBX_32:u32 + T_t2:u32
 \end{verbatim}
 This is the primary computation of the add instruction: adding \%eax
 to \%ebx.
 
 \begin{verbatim}
-R_CF:bool = R_EBX:u32 < t:u32
+R_CF:bool = R_EBX_32:u32 < T_t1:u32
 \end{verbatim}
 Here we explicitly compute the value of the carry flag.  After
 executing the add instruction, the carry flag is set if the resulting
@@ -54,9 +62,10 @@ saved in t).
 
 \begin{verbatim}
 R_OF:bool =
-  if (R_ECX:u32 & 0x1f:u32) == 0:u32 then R_OF:bool else
-  if (R_ECX:u32 & 0x1f:u32) == 1:u32 then high:bool(R_EBX:u32) ^ R_CF:bool
-  else unknown "OF <- undefined":bool
+  if T_origCOUNT:u32 == 0:u32 then R_OF:bool else
+  if T_origCOUNT:u32 == 1:u32 then high:bool(R_EBX_32:u32)
+    ^ R_CF:bool else
+  unknown "OF undefined after shift":bool
 \end{verbatim}
 Here we are explicitly computing the overflow flag after the shl
 instruction.  Note that the IL uses if then else expressions.  Also
@@ -101,7 +110,7 @@ Figure~\ref{fig:cfgsimp}.
 
 \begin{figure}[!p]
   \begin{center}
-    \includegraphics[height=3in]{chap-examples/cfg2.pdf}
+    \includegraphics[height=3in]{chap-examples/basiccfg.pdf}
   \end{center}
   \caption{Example Basic CFG}
   \label{fig:basiccfg}
@@ -109,7 +118,7 @@ Figure~\ref{fig:cfgsimp}.
 
 \begin{figure}[!p]
   \begin{center}
-    \includegraphics[height=.9\textheight]{chap-examples/cfg.pdf}
+    \includegraphics[height=.9\textheight]{chap-examples/ssacfg.pdf}
   \end{center}
   \caption{Example Detailed CFG}
   \label{fig:cfg}
@@ -124,16 +133,16 @@ Figure~\ref{fig:cfgsimp}.
 \end{figure}
 
 \begin{figure}[p]
-  \begin{center}
-    \includegraphics[height=.9\textheight]{chap-examples/ddg.pdf}
-  \end{center}
+  \centerbox{
+  \includegraphics[height=.9\textheight]{chap-examples/ddg.pdf}
+}
   \caption{Example DDG}
   \label{fig:ddg}
 \end{figure}
 
 \begin{figure}[p]
   \begin{center}
-    \includegraphics[height=.9\textheight]{chap-examples/cfg_simp.pdf}
+    \includegraphics[height=.9\textheight]{chap-examples/ssasimpcfg.pdf}
   \end{center}
   \caption{Example Simplified CFG}
   \label{fig:cfgsimp}
@@ -149,19 +158,24 @@ success.  We can do this by setting the goal variable to false at the
 beginning of the program, and setting it to true after the branch is
 taken.  Below is the modified IL that does this.
 
+\begin{centering}
+\begin{scriptsize}
 \verbatiminput{chap-examples/basic_mod.il}
+\end{scriptsize}
+\end{centering}
 
 To see if we take the jump, we can use topredicate with the post
 condition \cmdline{goal}: \cmdline{topredicate -q -il basic\_mod.il
   -stp-out /tmp/f -post goal -solve}.  This will create a VC, and then
 solve it using the \cmdline{stp} solver.  \cmdline{stp} returned
 \begin{verbatim}
-R_ECX_7 -> 0x3
-R_EAX_5 -> 0x20000000
-R_EBX_6 -> 0
+R_EAX_32_11 -> 20000000
+R_EBX_32_13 -> 0
+R_ECX_32_15 -> 3
 \end{verbatim}
 as a satisfying answer. Sure enough, $0x0 + 0x20000000 = 0x20000000$
-and $0x20000000 << 0x3$ sets the carry flag, so the program would take the jump.
+and $0x20000000 << 0x3$ sets the carry flag, so the program would take
+the jump.
 
 %%% Local Variables: 
 %%% mode: latex

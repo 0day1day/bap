@@ -19,15 +19,27 @@
    free variables which are assumed to be unique.
 
    The [lookup] function tries to find a matching (same operator and
-   congruent operants) expression in a hashtable (eid2vn). If none is present
-   it adds the expression with a new VN, thereby creating a new equivalence
-   class.
+   congruent operants) expression in a hashtable (eid2vn). If none is
+   present it adds the expression with a new VN, thereby creating a
+   new equivalence class.  The hashtable is cleared after each
+   iteration to avoid cycles.
 
-   The RPO algorithm works by calling [lookup] for each variable, updating
-   vn_h with the new VN, until it reaches a fixed point. At this point,
-   if two variables have the same VN, they are equivalent.
+   The RPO algorithm works by calling [lookup] for each variable,
+   updating vn_h with the new VN, until it reaches a fixed point. At
+   this point, if two variables have the same VN, they are equivalent.
 
-   The latice looks like this: Top -> HInt (constant) -> Hash (variable, corresponds to bottom in the CP lattice)
+   Algorithm modification: Our algorithm does a few optimizations that
+   require looking up the current value number of a variable.  Using
+   vn_h directly can result in non-termination, since at Phi
+   expressions it is *not* guaranteed that each var in the Phi has
+   been visited first.  Instead, we take a snapshot (vn_h_snapshot) of
+   vn_h after each iteration, and use this snapshot to look up each
+   variable's value number.  This can obviously increase the number of
+   iterations needed to reach a fix point.  TODO: Only use the
+   snapshot for values coming in through backedges.
+
+   The latice looks like this:
+   Top -> HInt (constant) -> Hash (variable, corresponds to bottom in the CP lattice)
 
 *)
 
@@ -43,7 +55,7 @@ module VH = Var.VarHash
 module C = Cfg.SSA
 module G = C.G
 
-module D = Debug.Make(struct let name = "SCCVN" and default=`NoDebug end)
+module D = Debug.Make(struct let name = "Sccvn" and default=`NoDebug end)
 open D
 
 module Dom = Dominator.Make(G)
@@ -51,17 +63,37 @@ module Dom = Dominator.Make(G)
 type vn = Top | Hash of Ssa.var | HInt of (big_int * typ)
 let top = Top
 type expid =
-  | Const of Ssa.value (* Except Var *)
+  | Ld of vn * vn * vn * typ
+  | St of vn * vn * vn * vn * typ
+  | Bin of binop_type * vn * vn
+  | Un of unop_type * vn
+  (* No vars *)
+  | Const of Ssa.exp (* Integers and labels *)
+  | Cst of cast_type * typ * vn
+  (* Unknowns are in Unique *)
   | It of vn * vn * vn
   | Ex of big_int * big_int * vn
   | Con of vn * vn
-  | Bin of binop_type * vn * vn
-  | Un of unop_type * vn
-  | Cst of cast_type * typ * vn
   | Unique of var (* for free variables and unknowns *)
-  | Ld of vn * vn * vn * typ
-  | St of vn * vn * vn * vn * typ
   | Ph of vn list
+
+let vn_to_string = function
+  | Top -> "T"
+  | Hash v -> "<"^Pp.var_to_string v^">"
+  | HInt(i,t) -> string_of_big_int i ^":"^ Pp.typ_to_string t
+
+let expid_to_string = function
+  | Ld(v1, v2, v3, t) -> Printf.sprintf "Ld(%s, %s, %s, %s)" (vn_to_string v1) (vn_to_string v2) (vn_to_string v3) (Pp.typ_to_string t)
+  | St(v1, v2, v3, v4, t) -> Printf.sprintf "St(%s, %s, %s, %s, %s)" (vn_to_string v1) (vn_to_string v2) (vn_to_string v3) (vn_to_string v4) (Pp.typ_to_string t)
+  | Bin(bt, v1, v2) -> Printf.sprintf "Bin(%s, %s, %s)" (Pp.binop_to_string bt) (vn_to_string v1) (vn_to_string v2)
+  | Un(ut, v) -> Printf.sprintf "Un(%s, %s)" (Pp.unop_to_string ut) (vn_to_string v)
+  | Const e -> Printf.sprintf "Const(%s)" (Pp.ssa_exp_to_string e)
+  | Cst(ct, t, v) -> Printf.sprintf "Cst(%s, %s, %s)" (Pp.ct_to_string ct) (Pp.typ_to_string t) (vn_to_string v)
+  | It(v1, v2, v3) -> Printf.sprintf "It(%s, %s, %s)" (vn_to_string v1) (vn_to_string v2) (vn_to_string v3)
+  | Ex(bi1, bi2, v) -> Printf.sprintf "Ex(%s, %s, %s)" (~% bi1) (~% bi2) (vn_to_string v)
+  | Con(v1, v2) -> Printf.sprintf "Con(%s, %s)" (vn_to_string v1) (vn_to_string v2)
+  | Unique v -> Printf.sprintf "Unique(%s)" (Pp.var_to_string v)
+  | Ph(vns) -> Printf.sprintf "Ph(%s)" (BatString.join ", " (List.map vn_to_string vns))
 
 let vn_compare vn1 vn2 = match vn1,vn2 with
   | Top,Top -> 0
@@ -82,77 +114,29 @@ let (==!) = vn_eq
 let (<=!) vn1 vn2 = vn_compare vn1 vn2 <= 0
 let (<>!) v1 v2 = not (vn_eq v1 v2)
 
-(* let expid_eq e1 e2 = *)
-(*   (\* values, vns, bops, uops, types, cts, vars, big ints *\) *)
-(*   let getnum = function *)
-(*     | Const _ -> 1 *)
-(*     | It _ -> 2 *)
-(*     | Ex _ -> 3 *)
-(*     | Con _ -> 4 *)
-(*     | Bin _ -> 5 *)
-(*     | Un _ -> 6 *)
-(*     | Cst _ -> 7 *)
-(*     | Unique _ -> 8 *)
-(*     | Ld _ -> 9 *)
-(*     | St _ -> 10 *)
-(*     | Ph _ -> 11 *)
-(*   in *)
-(*   let getargs = function *)
-(*     | Const(v) -> [v], [], [], [], [], [], [], [] *)
-(*     | It(vn1,vn2,vn3) -> [], [vn1;vn2;vn3], [], [], [], [], [], [] *)
-(*     | Ex(bi1,bi2,vn1) -> [], [vn1], [], [], [], [], [], [bi1;bi2] *)
-(*     | Con(vn1,vn2) -> [], [vn1;vn2], [], [], [], [], [], [] *)
-(*     | Bin(bop, vn1, vn2) -> [], [vn1; vn2], [bop], [], [], [], [], [] *)
-(*     | Un(uop, vn) -> [], [vn], [], [uop], [], [], [], [] *)
-(*     | Cst(ct, t, vn) -> [], [vn], [], [], [t], [ct], [], [] *)
-(*     | Unique(var) -> [], [], [], [], [], [], [var], [] *)
-(*     | Ld(vn1, vn2, vn3, t) -> [], [vn1; vn2; vn3], [], [], [t], [], [], [] *)
-(*     | St(vn1, vn2, vn3, vn4, t) -> [], [vn1; vn2; vn3; vn4], [], [], [t], [], [], [] *)
-(*     | Ph(vnlist) -> [], vnlist, [], [], [], [], [], [] *)
-(*   in *)
-(*   if (getnum e1) <> (getnum e2) then false *)
-(*   else ( *)
-(*     let l1,l2,l3,l4,l5,l6,l7,l8 = getargs e1 in *)
-(*     let r1,r2,r3,r4,r5,r6,r7,r8 = getargs e2 in *)
-(*     let phil = (List.length l2) == (List.length r2) in *)
-(*     let b1 = List.for_all2 (==) l1 r1 in *)
-(*     let b2 = if phil then List.for_all2 (==) l2 r2 else false in *)
-(*     let b3 = List.for_all2 (=) l3 r3 in *)
-(*     let b4 = List.for_all2 (=) l4 r4 in *)
-(*     let b5 = List.for_all2 (=) l5 r5 in *)
-(*     let b6 = List.for_all2 (=) l6 r6 in *)
-(*     let b7 = List.for_all2 (=) l7 r7 in *)
-(*     let b8 = List.for_all2 (==%) l8 r8 in *)
-(*     if b1 && b2 && b3 && b4 && b5 && b6 && b7 && b8 then *)
-(*       true *)
-(*     else if b3 && b4 && b5 && b6 && b7 && b8 then *)
-(*       (\* e1 and e2 are not physically equal.  But maybe the *)
-(*          subexpressions are structurally, but not physically, *)
-(*          equal. *\) *)
-(*       List.for_all2 Ssa.full_value_eq l1 r1 *)
-(*       && if phil then List.for_all2 vn_eq l2 r2 else false *)
-(*     else *)
-(*       false) *)
+let expid_eq e1 e2 = e1 = e2
 
 module EH =
   Hashtbl.Make(struct
-    type t = expid
-    let equal = (=)
-    and hash = Hashtbl.hash
-  end)
+                 type t = expid
+                 let equal = expid_eq
+                 and hash = Hashtbl.hash
+               end)
 
 type rpoinfo = { (* private to the SCCVN module *)
   vn_h : vn VH.t; (* maps vars to value numbers *)
-  eid2vn : vn EH.t; (* maps expids to value numbers *)
-  vn2eid : expid VH.t; (* inverse of eid2vn *)
-  (* vn2eid is expid VH.t rather than (vn, expid) Hashtbl.t, since top is
-     never used as a key, and the map from HInt is trivial. *)
+  vn_h_snapshot : vn VH.t ref;
+  eid2vn : vn EH.t; (* maps expids to value numbers,
+                       corresponds to hashtable in paper *)
 }
 
-let vn2eid info = function
+let rec vn2eid info = function
   | Top -> raise Not_found
   | HInt(i,t) -> Const(Int(i,t))
-  | Hash v -> VH.find info.vn2eid v
+  | Hash v -> let vn = VH.find !(info.vn_h_snapshot) v in
+              if vn = Hash v
+              then Unique v
+              else vn2eid info vn
 
 let hash_to_string = function
   | Top -> "T"
@@ -215,7 +199,6 @@ let add_const =
            HInt(i,t)
        | _ ->
            let v = Var.newvar name typ in
-           VH.add info.vn2eid v eid;
            Hash v
      in
      EH.add info.eid2vn eid h;
@@ -229,15 +212,16 @@ let get_expid info =
           add_const info v
       )
     | Var x -> (
-        try VH.find info.vn_h x
+        try VH.find !(info.vn_h_snapshot) x
         with Not_found ->
           failwith("get_expid: unknown var: "^Pp.var_to_string x)
       )
+    | _ -> failwith "SCCVN run with-out three address code"
   in
   fun var -> function
-    | Val(Var _ as v) ->
-        vn2eid info (vn v) 
-    | Val v -> Const v
+    | Var _ as e ->
+        vn2eid info (vn e)
+    | (Int _ | Lab _) as c -> Const c
     | Ite(c,v1,v2) -> It(vn c, vn v1, vn v2)
     | Extract(h,l,e) -> Ex(h,l, vn e)
     | Concat(le,re) -> Con(vn le, vn re)
@@ -349,10 +333,9 @@ let lookup ~opt info var exp =
       | Const(Var _) -> top
       | Const(Int(i,t)) -> HInt(i,t)
       | _ ->
-          let h = Hash var in
-          EH.add info.eid2vn eid h;
-          VH.add info.vn2eid var eid;
-          h
+        let h = Hash var in
+        EH.add info.eid2vn eid h;
+        h
   with Not_found -> (* no VNs for subexpressions yet *)
     top
       
@@ -369,8 +352,8 @@ let fold_postfix_component f g v i=
 let rpo ~opt cfg =
   let info = {
     vn_h = VH.create 57;
+    vn_h_snapshot = ref (VH.create 57);
     eid2vn = EH.create 57;
-    vn2eid = VH.create 57;
   }
   in
   (* Contrary to the paper, only assigned SSA variables should have
@@ -391,26 +374,25 @@ let rpo ~opt cfg =
       cfg (C.G.V.create Cfg.BB_Entry) []
   in
 
-  let () = (* add all other uninitialized vars as unique *)
+  let reset_tables () = (* add all other uninitialized vars as unique *)
+    EH.clear info.eid2vn;
     let vis = object
       inherit Ssa_visitor.nop
       method visit_rvar x =
-        if not(VH.mem info.vn_h x) then (
-          dprintf "Adding uninitialized variable %s" (Pp.var_to_string x);
-          let h = Hash x
-          and eid = Unique x in
-          VH.add info.vn_h x h;
-          VH.add info.vn2eid x eid;
-          EH.add info.eid2vn eid h;
-        );
+        dprintf "Adding uninitialized variable %s" (Pp.var_to_string x);
+        let h = Hash x
+        and eid = Unique x in
+        if VH.mem info.vn_h x = false then VH.add info.vn_h x h;
+        EH.add info.eid2vn eid h;
         DoChildren
     end
     in
     C.G.iter_vertex
     (fun b -> ignore(Ssa_visitor.stmts_accept vis (C.get_stmts cfg b)))
     cfg;
+    info.vn_h_snapshot := VH.copy info.vn_h;
   in
-  let vn x = 
+  let vn x =
     try VH.find info.vn_h x
     with Not_found -> failwith("vn: Unknown var: "^Pp.var_to_string x)
   in
@@ -419,6 +401,7 @@ let rpo ~opt cfg =
   let changed = ref true in
   while !changed do
     changed := false;
+    reset_tables ();
     dprintf "Starting iteration %d" !count;
     incr count;
     List.iter
@@ -428,7 +411,7 @@ let rpo ~opt cfg =
          if oldvn <>! temp (*&& temp <> top*) then (
            assert(temp <>! top); (* FIXME: prove this is always true *)
            changed := true;
-           dprintf "Updating %s -> %s (was %s)" (Pp.var_to_string v) (hash_to_string temp) (hash_to_string oldvn);
+           dprintf "Updating %s (%s) -> %s (was %s)" (Pp.var_to_string v) (Pp.ssa_exp_to_string e) (vn_to_string temp) (vn_to_string oldvn);
            VH.replace info.vn_h v temp
          ) )
       moves;
@@ -444,7 +427,7 @@ let rpo ~opt cfg =
         (fun (v,_) ->
            let h = vn v in
            let v2s = Pp.var_to_string in
-           pdebug (v2s v^" = "^hash_to_string h^" "^List.fold_left (fun s v -> s^v2s v^" ") "[" (hash2equiv h) ^"]"))
+           pdebug (v2s v^" = "^vn_to_string h^" "^List.fold_left (fun s v -> s^v2s v^" ") "[" (hash2equiv h) ^"]"))
         moves
     )
   in*)
@@ -519,27 +502,27 @@ let replacer ?(opt=true) cfg =
     inherit Ssa_visitor.nop
     val mutable pos = (C.G.V.create Cfg.BB_Entry, 0)
     method set_pos p = pos <- p
-    method visit_value = function
+    method visit_exp = function
       | Ssa.Var v ->
           (match hash_replacement pos (vn v) with
            | Some(Ssa.Var var) when v == var -> SkipChildren
            | Some v' ->
                changed := true;
-               dprintf "Replacing var %s with %s" (Pp.var_to_string v) (Pp.value_to_string v');
+               dprintf "Replacing var %s with %s" (Pp.var_to_string v) (Pp.ssa_exp_to_string v');
                ChangeTo v'
            | None -> SkipChildren
           )
-      | _  -> SkipChildren
+      | _  -> DoChildren
 
     method visit_stmt = function
-      | Ssa.Move(_,Val _, _) -> (* visit value will handle that properly *)
-          DoChildren
-      | Ssa.Move(v,e, a) -> (
+      | Ssa.Move(_, (Var _ | Lab _ | Int _), _) -> (* visit_exp will handle this *)
+        DoChildren
+      | Ssa.Move(v,e,a) -> (
           match hash_replacement pos (vn v) with
           | Some vl ->
               changed := true;
-              dprintf "Replacing exp %s with %s" (Pp.ssa_exp_to_string e) (Pp.value_to_string vl);
-              ChangeTo(Move(v, Val vl, a))
+              dprintf "Replacing exp %s with %s" (Pp.ssa_exp_to_string e) (Pp.ssa_exp_to_string vl);
+              ChangeTo(Move(v, vl, a))
           | None -> DoChildren
         )
       | _ -> DoChildren

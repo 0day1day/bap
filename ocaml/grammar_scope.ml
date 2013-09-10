@@ -25,7 +25,9 @@ module Scope = struct
 
   let create decls =
     let h = Hashtbl.create 5700 in
-    List.iter (fun v -> Hashtbl.add h (Var.name v) v) decls;
+    List.iter (fun v ->
+      if Hashtbl.mem h (Var.name v) then failwith (Printf.sprintf "Request to add two variables with conflicting names %s into the scope" (Var.name v));
+      Hashtbl.add h (Var.name v) v) decls;
     (h, Stack.create() )
 
   let empty_scope () : t = create []

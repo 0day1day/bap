@@ -24,10 +24,10 @@ typedef enum { UNKNOWN, SWITCHSTACK, MEMPIVOT } pivottype_t;
 bool operator<(const struct pivot_s &a, const struct pivot_s &b);
 
 typedef struct pivot_s {
-  uint64_t address; /** Gadget address. */
+  ADDRINT address; /** Gadget address. */
   pivottype_t t; /** Type of pivot. */
   REG base; /** Base register. */
-  uint64_t offset; /** Offset */
+  ADDRINT offset; /** Offset */
 } pivot_t;
 
 /** Sets of pivot objects */

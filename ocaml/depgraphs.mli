@@ -172,8 +172,8 @@ sig
       functions map definitions to their possible uses. *)
   val defuse :
     Cfg.AST.G.t ->
-    (location, LS.t Var.VarMap.t) Hashtbl.t *
-      (location -> Var.t -> LS.t)
+    (location, LS.t) Hashtbl.t *
+      (location -> LS.t)
 
 
 end

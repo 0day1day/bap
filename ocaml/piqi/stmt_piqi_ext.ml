@@ -23,6 +23,7 @@ let _special_piqtype = Piqirun_ext.find_piqtype "stmt/special"
 let _typ_piqtype = Piqirun_ext.find_piqtype "stmt/typ"
 let _reg_piqtype = Piqirun_ext.find_piqtype "stmt/reg"
 let _tmem_piqtype = Piqirun_ext.find_piqtype "stmt/tmem"
+let _bigint_piqtype = Piqirun_ext.find_piqtype "stmt/bigint"
 let _array_piqtype = Piqirun_ext.find_piqtype "stmt/array"
 let _label_piqtype = Piqirun_ext.find_piqtype "stmt/label"
 let _cast_type_piqtype = Piqirun_ext.find_piqtype "stmt/cast-type"
@@ -79,6 +80,7 @@ let parse_special ?opts x (format :Piqirun_ext.input_format) = let x_pb = Piqiru
 let parse_typ ?opts x (format :Piqirun_ext.input_format) = let x_pb = Piqirun_ext.convert _typ_piqtype format `pb x ?opts in let buf = Piqirun.init_from_string x_pb in Stmt_piqi.parse_typ buf
 let parse_reg ?opts x (format :Piqirun_ext.input_format) = let x_pb = Piqirun_ext.convert _reg_piqtype format `pb x ?opts in let buf = Piqirun.init_from_string x_pb in Stmt_piqi.parse_reg buf
 let parse_tmem ?opts x (format :Piqirun_ext.input_format) = let x_pb = Piqirun_ext.convert _tmem_piqtype format `pb x ?opts in let buf = Piqirun.init_from_string x_pb in Stmt_piqi.parse_tmem buf
+let parse_bigint ?opts x (format :Piqirun_ext.input_format) = let x_pb = Piqirun_ext.convert _bigint_piqtype format `pb x ?opts in let buf = Piqirun.init_from_string x_pb in Stmt_piqi.parse_bigint buf
 let parse_array ?opts x (format :Piqirun_ext.input_format) = let x_pb = Piqirun_ext.convert _array_piqtype format `pb x ?opts in let buf = Piqirun.init_from_string x_pb in Stmt_piqi.parse_array buf
 let parse_label ?opts x (format :Piqirun_ext.input_format) = let x_pb = Piqirun_ext.convert _label_piqtype format `pb x ?opts in let buf = Piqirun.init_from_string x_pb in Stmt_piqi.parse_label buf
 let parse_cast_type ?opts x (format :Piqirun_ext.input_format) = let x_pb = Piqirun_ext.convert _cast_type_piqtype format `pb x ?opts in let buf = Piqirun.init_from_string x_pb in Stmt_piqi.parse_cast_type buf
@@ -135,6 +137,7 @@ let gen_special ?opts x (format :Piqirun_ext.output_format) = let buf =  Stmt_pi
 let gen_typ ?opts x (format :Piqirun_ext.output_format) = let buf =  Stmt_piqi.gen_typ x in let x_pb = Piqirun.to_string buf in Piqirun_ext.convert _typ_piqtype `pb format x_pb ?opts
 let gen_reg ?opts x (format :Piqirun_ext.output_format) = let buf =  Stmt_piqi.gen_reg x in let x_pb = Piqirun.to_string buf in Piqirun_ext.convert _reg_piqtype `pb format x_pb ?opts
 let gen_tmem ?opts x (format :Piqirun_ext.output_format) = let buf =  Stmt_piqi.gen_tmem x in let x_pb = Piqirun.to_string buf in Piqirun_ext.convert _tmem_piqtype `pb format x_pb ?opts
+let gen_bigint ?opts x (format :Piqirun_ext.output_format) = let buf =  Stmt_piqi.gen_bigint x in let x_pb = Piqirun.to_string buf in Piqirun_ext.convert _bigint_piqtype `pb format x_pb ?opts
 let gen_array ?opts x (format :Piqirun_ext.output_format) = let buf =  Stmt_piqi.gen_array x in let x_pb = Piqirun.to_string buf in Piqirun_ext.convert _array_piqtype `pb format x_pb ?opts
 let gen_label ?opts x (format :Piqirun_ext.output_format) = let buf =  Stmt_piqi.gen_label x in let x_pb = Piqirun.to_string buf in Piqirun_ext.convert _label_piqtype `pb format x_pb ?opts
 let gen_cast_type ?opts x (format :Piqirun_ext.output_format) = let buf =  Stmt_piqi.gen_cast_type x in let x_pb = Piqirun.to_string buf in Piqirun_ext.convert _cast_type_piqtype `pb format x_pb ?opts
@@ -210,6 +213,8 @@ let print_reg x = Pervasives.print_endline (gen_reg x `piq)
  let prerr_reg x = Pervasives.prerr_endline (gen_reg x `piq)
 let print_tmem x = Pervasives.print_endline (gen_tmem x `piq)
  let prerr_tmem x = Pervasives.prerr_endline (gen_tmem x `piq)
+let print_bigint x = Pervasives.print_endline (gen_bigint x `piq)
+ let prerr_bigint x = Pervasives.prerr_endline (gen_bigint x `piq)
 let print_array x = Pervasives.print_endline (gen_array x `piq)
  let prerr_array x = Pervasives.prerr_endline (gen_array x `piq)
 let print_label x = Pervasives.print_endline (gen_label x `piq)
