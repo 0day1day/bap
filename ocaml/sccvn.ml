@@ -113,16 +113,17 @@ module EH =
 
 type rpoinfo = { (* private to the SCCVN module *)
   vn_h : vn VH.t; (* maps vars to value numbers *)
-  eid2vn : vn EH.t; (* maps expids to value numbers *)
-  vn2eid : expid VH.t; (* inverse of eid2vn *)
-  (* vn2eid is expid VH.t rather than (vn, expid) Hashtbl.t, since top is
-     never used as a key, and the map from HInt is trivial. *)
+  eid2vn : vn EH.t; (* maps expids to value numbers,
+                       corresponds to hashtable in paper *)
 }
 
-let vn2eid info = function
+let rec vn2eid info vn : expid = match vn with
   | Top -> raise Not_found
   | HInt(i,t) -> Const(Int(i,t))
-  | Hash v -> VH.find info.vn2eid v
+  | Hash v -> let vn = VH.find info.vn_h v in
+              if vn = Hash v
+              then Unique v
+              else vn2eid info vn
 
 let hash_to_string = function
   | Top -> "T"
@@ -185,7 +186,6 @@ let add_const =
            HInt(i,t)
        | _ ->
            let v = Var.newvar name typ in
-           VH.add info.vn2eid v eid;
            Hash v
      in
      EH.add info.eid2vn eid h;
@@ -320,10 +320,9 @@ let lookup ~opt info var exp =
       | Const(Var _) -> top
       | Const(Int(i,t)) -> HInt(i,t)
       | _ ->
-          let h = Hash var in
-          EH.add info.eid2vn eid h;
-          VH.add info.vn2eid var eid;
-          h
+        let h = Hash var in
+        EH.add info.eid2vn eid h;
+        h
   with Not_found -> (* no VNs for subexpressions yet *)
     top
       
@@ -341,7 +340,6 @@ let rpo ~opt cfg =
   let info = {
     vn_h = VH.create 57;
     eid2vn = EH.create 57;
-    vn2eid = VH.create 57;
   }
   in
   (* Contrary to the paper, only assigned SSA variables should have
@@ -362,18 +360,16 @@ let rpo ~opt cfg =
       cfg (C.G.V.create Cfg.BB_Entry) []
   in
 
-  let () = (* add all other uninitialized vars as unique *)
+  let reset_tables () = (* add all other uninitialized vars as unique *)
+    EH.reset info.eid2vn;
     let vis = object
       inherit Ssa_visitor.nop
       method visit_rvar x =
-        if not(VH.mem info.vn_h x) then (
-          dprintf "Adding uninitialized variable %s" (Pp.var_to_string x);
-          let h = Hash x
-          and eid = Unique x in
-          VH.add info.vn_h x h;
-          VH.add info.vn2eid x eid;
-          EH.add info.eid2vn eid h;
-        );
+        dprintf "Adding uninitialized variable %s" (Pp.var_to_string x);
+        let h = Hash x
+        and eid = Unique x in
+        if VH.mem info.vn_h x = false then VH.add info.vn_h x h;
+        EH.add info.eid2vn eid h;
         DoChildren
     end
     in
@@ -390,6 +386,7 @@ let rpo ~opt cfg =
   let changed = ref true in
   while !changed do
     changed := false;
+    reset_tables ();
     dprintf "Starting iteration %d" !count;
     incr count;
     List.iter
