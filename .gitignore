@@ -183,6 +183,8 @@ ounit/setup.data
 pin/
 pintraces/Makefile
 solvers/makefile.inc
+tests/.formula
+tests/C/*_64
 tests/C/bof1
 tests/C/recover-hard
 tests/C/recover-hard-opt
