@@ -166,6 +166,12 @@ x86_64*) ARCH_X64="true" ;;
 *) ARCH_X64="false" ;;
 esac
 
+# Build libtrace 32 dir iff we are x86-64 and have pin
+AC_SUBST(BUILD_LIBTRACE32)
+AS_IF([test x$HAVE_PIN = xtrue -a x$ARCH_X64 = xtrue],
+      [BUILD_LIBTRACE32="true"],
+      [BUILD_LIBTRACE32="false"])
+
 # Checks for header files.
 AC_HEADER_STDC
 AC_CHECK_HEADERS([fcntl.h stdint.h stdlib.h string.h unistd.h], ,
