@@ -122,7 +122,7 @@ And run configure.
 If using macports:
   CPPFLAGS="-I/opt/local/include/ -I$(opam config var lib)/camlidl" \
   INCDIRS="$(opam config var lib)/camlidl" \
-  LDFLAGS="-L/opt/local/lib -L/opt/local/lib/x86_64/" \
+  LDFLAGS="-L/opt/local/lib -L/opt/local/lib/x86_64/ -lintl" \
   ./configure
 
 If using homebrew:
