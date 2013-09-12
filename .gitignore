@@ -194,6 +194,7 @@ tests/C/unroll
 tests/Makefile
 tests/asm/nop
 tests/bap_test_suite
+tests/tainted_file
 utils/Makefile
 utils/backtaint
 utils/codegen
