@@ -1,6 +1,6 @@
 New in BAP 0.8:
 * Support for x86-64 lifting
-* Support for VSA-based CFG recovery
+* Support for VSA-based CFG recovery (beta)
 
 New in BAP 0.7:
 * New function identification heuristics in get_functions for stripped binaries
