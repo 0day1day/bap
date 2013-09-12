@@ -1,4 +1,4 @@
-(** $Id$
+(**
     Trace container implementation.
 
     Bugs:

@@ -1,5 +1,4 @@
-/** $Id$
- *
+/**
  * Copy one trace to another to test API.
  */
 

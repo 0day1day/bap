@@ -1,6 +1,5 @@
 (* Lexer for our IR language *)
 (* Author: David Brumley, Ivan Jager *)
-(* $Id$ *)
 
 {
  open Grammar;;               (* open the grammar for the tokens *)

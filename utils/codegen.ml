@@ -1,6 +1,4 @@
 (**
-   $Id$
-
    Code generation utility.
 *)
 

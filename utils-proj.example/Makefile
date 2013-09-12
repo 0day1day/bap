@@ -1,5 +1,4 @@
 # Project specific utils Makefile
-# $Id$
 
 # We need to tell the main utils Makefile to include our proj's ocaml
 export BAP_PROJ_OCAMLDIR=$(BAP_DIR)/../ocaml-proj

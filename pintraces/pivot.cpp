@@ -1,8 +1,6 @@
 /**
    @author Edward J. Schwartz
 
-   $Id$
-   
    This module contains code to test if various pivot gadgets will be
    effective.  A list of gadgets is given as input.  The target of each
    gadget is checked to see if it is tainted.  If so, that gadget is a

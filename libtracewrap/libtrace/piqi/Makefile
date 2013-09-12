@@ -1,4 +1,3 @@
-# $Id$
 # Piqi wrapper Makefile
 
 .PHONY: all clean tags

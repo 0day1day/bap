@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 
-# $Id$
 # Download and extract Pin
 
 set -x

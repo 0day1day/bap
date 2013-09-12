@@ -2,8 +2,6 @@
 #define __PIVOT_H
 /**
    @author Edward J. Schwartz
-
-   $Id$
 */
 
 #include "pin.H"

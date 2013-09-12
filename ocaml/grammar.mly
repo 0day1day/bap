@@ -1,7 +1,6 @@
 %{
 (* IR Grammer file *)
 (* Author: David Brumley, Ivan Jager *)
-(* $Id$ *)
 
 open Ast
 open Big_int_Z

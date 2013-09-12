@@ -1,5 +1,4 @@
-/** $Id$
- *
+/**
  * New c++ trace reader.  Tests c++ TraceContainerReader API.
  */
 

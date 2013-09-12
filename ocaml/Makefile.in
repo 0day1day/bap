@@ -1,5 +1,3 @@
-# $Id$
-
 .NOTPARALLEL:
 # Work around buggy Debian ocaml patch
 # See http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=678577

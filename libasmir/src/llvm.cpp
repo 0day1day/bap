@@ -1,4 +1,4 @@
-/** $Id$
+/**
  *
  *  Helper functions for llvm code generation
  *

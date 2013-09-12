@@ -7,8 +7,6 @@
 #include "arch.hpp"
 
 /**
- * $Id$
- *
  * A container for trace frames.  We do not use protobuffers because
  * protobuffers can not stream output (the whole trace would have to
  * be in memory before being written) or input (the whole trace would

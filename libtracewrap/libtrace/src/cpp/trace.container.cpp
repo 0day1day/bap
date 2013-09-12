@@ -1,6 +1,4 @@
 /**
- * $Id$
- *
  * Implementation of trace container.
  */
 
