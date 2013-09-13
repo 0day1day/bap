@@ -6,6 +6,8 @@ type arch =
 
 val arch_to_string : arch -> string
 
+val arch_of_string : string -> arch
+
 val type_of_arch : arch -> Type.typ
 
 val bits_of_arch : arch -> int
