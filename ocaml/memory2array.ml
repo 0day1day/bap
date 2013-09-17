@@ -7,8 +7,6 @@
 
 (* TODO: Handle different endianness.  Use the type of the array expression *)
 
-(* XXX: What should we do when there is a 1 bit access? *)
-
 module D = Debug.Make(struct let name="memory2array" and default=`Debug end)
 open D
 
@@ -27,32 +25,31 @@ let numelems t mt =
   if (bits mod elebits) <> 0 then failwith "Expected all memory accesses to be multiples of the element type";
   bits / elebits
 
-let split_load array index indextype valuetype accesstype endian bytenum =
-  let indexplus = BinOp(PLUS, index, Int(big_int_of_int bytenum, indextype)) in
-  let exp = Load(array, indexplus, endian, valuetype) in
-  let exp = Cast(CAST_UNSIGNED, accesstype, exp) in
-  let exp = exp_shl exp (Int(big_int_of_int (bytenum * (Typecheck.bits_of_width valuetype)), accesstype)) in
-  exp
+let split_load array index indextype valuetype accesstype endian num =
+  let indexplus = BinOp(PLUS, index, Int(big_int_of_int num, indextype)) in
+  Load(array, indexplus, endian, valuetype)
 
 let split_load_list array index indextype valuetype loadtype endian =
   (* XXX: remove me *)
   assert (endian === exp_false);
-  let nele = numelems loadtype valuetype in
+  let nelem = numelems loadtype valuetype in
   let mvar = Var_temp.nt "loadnorm" (Array(indextype, valuetype)) in
-  (Util.mapn (split_load (Var mvar) index indextype valuetype loadtype endian) (nele - 1), mvar)
+  let open BatPervasives in
+  let explist = map (split_load (Var mvar) index indextype valuetype loadtype endian) ((nelem - 1) --- 0) in
+  explist, mvar
 
 let split_loads array index loadtype endian =
   let t = Typecheck.infer_ast array in
   let indextype = Typecheck.index_type_of t in
   let valuetype = Typecheck.value_type_of t in
   let (singlereads, mvar) = split_load_list array index indextype valuetype loadtype endian in
-  let orexp = List.fold_left exp_or (List.hd singlereads) (List.tl singlereads) in
-  Let(mvar, array, orexp)
+  let exp = concat_explist singlereads in
+  Let(mvar, array, exp)
 
-let split_write array index indextype valuetype accesstype endian data bytenum =
-  let indexplus = BinOp(PLUS, index, Int(big_int_of_int bytenum, indextype)) in
-  let exp = exp_shr data (Int(big_int_of_int (bytenum * Typecheck.bits_of_width valuetype), accesstype)) in
-  let exp = Cast(CAST_LOW, valuetype, exp) in
+let split_write array index indextype valuetype accesstype endian data num =
+  let bits = Typecheck.bits_of_width valuetype in
+  let exp = extract (((num+1) * bits) - 1) (num*bits) data in
+  let indexplus = BinOp(PLUS, index, Int(big_int_of_int num, indextype)) in
   let exp = Store(array, indexplus, exp, endian, valuetype) in
   exp
 
@@ -61,16 +58,19 @@ let split_write_list array index indextype valuetype storetype endian data =
   let tempmemvar = Var_temp.nt "tempmem" (Array(indextype, valuetype)) in
   let tempvalvar = Var_temp.nt "tempval" storetype in
   let nelems = numelems storetype valuetype in
-  let singlewrites = Util.mapn (split_write (Var tempmemvar) index indextype valuetype storetype endian (Var tempvalvar)) (nelems - 2) in
-  (singlewrites @ [(split_write array index indextype valuetype storetype endian (Var tempvalvar) (nelems - 1))], tempmemvar, tempvalvar)
+  let open BatPervasives in
+  let singlewrites = map (split_write (Var tempmemvar) index indextype valuetype storetype endian (Var tempvalvar)) ((nelems - 1) --- 0) in
+  (singlewrites, tempmemvar, tempvalvar)
 
 let split_writes array index storetype endian data =
   let t = Typecheck.infer_ast array in
   let indextype = Typecheck.index_type_of t in
   let valuetype = Typecheck.value_type_of t in
   let (singlewrites, tempmemvar, tempvalvar) = split_write_list array index indextype valuetype storetype endian data in
-  let letexp = List.fold_left (fun expr new_expr -> Let(tempmemvar, new_expr, expr)) (Var tempmemvar) singlewrites in
-  Let(tempvalvar, data, letexp)
+  let open BatPervasives in
+  let letexp = fold (fun expr new_expr -> Let(tempmemvar, new_expr, expr)) (Var tempmemvar) singlewrites in
+  let letexp = Let(tempvalvar, data, letexp) in
+  Let(tempmemvar, array, letexp)
 
 
 class memory2array_visitor ?scope hash =
