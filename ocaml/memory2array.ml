@@ -25,53 +25,68 @@ let numelems t mt =
   if (bits mod elebits) <> 0 then failwith "Expected all memory accesses to be multiples of the element type";
   bits / elebits
 
-let split_load array index indextype valuetype accesstype endian num =
+let split_load array index indextype valuetype accesstype num =
   let indexplus = BinOp(PLUS, index, Int(big_int_of_int num, indextype)) in
-  Load(array, indexplus, endian, valuetype)
+  (* we are loading base values, so endian doesn't matter here *)
+  Load(array, indexplus, exp_false, valuetype)
 
-let split_load_list array index indextype valuetype loadtype endian =
-  (* XXX: remove me *)
-  assert (endian === exp_false);
+let split_load_list mvar index indextype valuetype loadtype endian =
   let nelem = numelems loadtype valuetype in
-  let mvar = Var_temp.nt "loadnorm" (Array(indextype, valuetype)) in
   let open BatPervasives in
-  let explist = map (split_load (Var mvar) index indextype valuetype loadtype endian) ((nelem - 1) --- 0) in
-  explist, mvar
+  let enum =
+    if endian
+    then 0 -- (nelem - 1) (* big *)
+    else ((nelem - 1) --- 0) (* little *)
+  in
+  let explist = map (split_load (Var mvar) index indextype valuetype loadtype) enum in
+  explist
 
 let split_loads array index loadtype endian =
   let t = Typecheck.infer_ast array in
   let indextype = Typecheck.index_type_of t in
   let valuetype = Typecheck.value_type_of t in
-  let (singlereads, mvar) = split_load_list array index indextype valuetype loadtype endian in
-  let exp = concat_explist singlereads in
+  let mvar = Var_temp.nt "loadnorm" (Array(indextype, valuetype)) in
+  (* build the expression for big and little endian *)
+  let f endian =
+    let reads = split_load_list mvar index indextype valuetype loadtype endian in
+    concat_explist reads
+  in
+  let exp = exp_ite endian (f true) (f false) in
   Let(mvar, array, exp)
 
-let split_write array index indextype valuetype accesstype endian data num =
+let split_write array index indextype valuetype accesstype data nelems endian num =
   let bits = Typecheck.bits_of_width valuetype in
   let exp = extract (((num+1) * bits) - 1) (num*bits) data in
-  let indexplus = BinOp(PLUS, index, Int(big_int_of_int num, indextype)) in
-  let exp = Store(array, indexplus, exp, endian, valuetype) in
+  let indexplus =
+    if endian
+    then index +* (Int(big_int_of_int (nelems - 1 - num), indextype))
+    else index +* (Int(big_int_of_int num, indextype))
+  in
+  (* we are writing base values, so endian doesn't matter here *)
+  let exp = Store(array, indexplus, exp, exp_false, valuetype) in
   exp
 
-let split_write_list array index indextype valuetype storetype endian data =
-  assert (endian === exp_false);
-  let tempmemvar = Var_temp.nt "tempmem" (Array(indextype, valuetype)) in
-  let tempvalvar = Var_temp.nt "tempval" storetype in
-  let nelems = numelems storetype valuetype in
+let split_write_list tempmemvar tempvalvar index indextype valuetype storetype nelems endian data =
   let open BatPervasives in
-  let singlewrites = map (split_write (Var tempmemvar) index indextype valuetype storetype endian (Var tempvalvar)) ((nelems - 1) --- 0) in
+  let singlewrites = map (split_write (Var tempmemvar) index indextype valuetype storetype (Var tempvalvar) nelems endian) ((nelems - 1) --- 0) in
   (singlewrites, tempmemvar, tempvalvar)
 
 let split_writes array index storetype endian data =
   let t = Typecheck.infer_ast array in
   let indextype = Typecheck.index_type_of t in
   let valuetype = Typecheck.value_type_of t in
-  let (singlewrites, tempmemvar, tempvalvar) = split_write_list array index indextype valuetype storetype endian data in
-  let open BatPervasives in
-  let letexp = fold (fun expr new_expr -> Let(tempmemvar, new_expr, expr)) (Var tempmemvar) singlewrites in
+  let nelems = numelems storetype valuetype in
+  let tempmemvar = Var_temp.nt "tempmem" (Array(indextype, valuetype)) in
+  let tempvalvar = Var_temp.nt "tempval" storetype in
+  let f endian =
+    let (singlewrites, tempmemvar, tempvalvar) = split_write_list tempmemvar tempvalvar index indextype valuetype storetype nelems endian data in
+    let open BatPervasives in
+    let letexp = fold (fun expr new_expr -> Let(tempmemvar, new_expr, expr)) (Var tempmemvar) singlewrites in
+    letexp
+  in
+  let letexp = exp_ite endian (f true) (f false) in
   let letexp = Let(tempvalvar, data, letexp) in
   Let(tempmemvar, array, letexp)
-
 
 class memory2array_visitor ?scope hash =
 
