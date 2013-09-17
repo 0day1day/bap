@@ -345,8 +345,9 @@ void protobuf_AssignDesc_stmt_2epiqi_2eproto() {
       ::google::protobuf::MessageFactory::generated_factory(),
       sizeof(typ));
   tmem_descriptor_ = file->message_type(12);
-  static const int tmem_offsets_[1] = {
+  static const int tmem_offsets_[2] = {
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(tmem, index_type_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(tmem, element_type_),
   };
   tmem_reflection_ =
     new ::google::protobuf::internal::GeneratedMessageReflection(
@@ -991,64 +992,65 @@ void protobuf_AddDesc_stmt_2epiqi_2eproto() {
     "attributes\":\n\007special\022\016\n\006string\030\001 \002(\t\022\037\n"
     "\nattributes\030\002 \002(\0132\013.attributes\">\n\003typ\022\013\n"
     "\003reg\030\001 \001(\021\022\023\n\004tmem\030\002 \001(\0132\005.tmem\022\025\n\005array"
-    "\030\003 \001(\0132\006.array\" \n\004tmem\022\030\n\nindex_type\030\001 \002"
-    "(\0132\004.typ\"=\n\005array\022\030\n\nindex_type\030\001 \002(\0132\004."
-    "typ\022\032\n\014element_type\030\002 \002(\0132\004.typ\"#\n\005label"
-    "\022\014\n\004name\030\001 \001(\t\022\014\n\004addr\030\002 \001(\022\"2\n\003var\022\014\n\004n"
-    "ame\030\001 \002(\t\022\n\n\002id\030\002 \002(\021\022\021\n\003typ\030\003 \002(\0132\004.typ"
-    "\"\261\001\n\tattribute\022\013\n\003asm\030\001 \001(\t\022\017\n\007address\030\002"
-    " \001(\022\022\031\n\007liveout\030\003 \001(\0132\010.liveout\022\017\n\007strat"
-    "tr\030\004 \001(\t\022\031\n\007context\030\005 \001(\0132\010.context\022\021\n\tt"
-    "hread_id\030\006 \001(\004\022\035\n\tsynthetic\030\007 \001(\0132\n.synt"
-    "hetic\022\r\n\005other\030\010 \001(\t\"&\n\nattributes\022\030\n\004el"
-    "em\030\001 \003(\0132\n.attribute\"\t\n\007liveout\"\013\n\tsynth"
-    "etic\"]\n\025operand_info_specific\022!\n\013mem_ope"
-    "rand\030\001 \001(\0132\014.mem_operand\022!\n\013reg_operand\030"
-    "\002 \001(\0132\014.reg_operand\"\033\n\013reg_operand\022\014\n\004na"
-    "me\030\001 \002(\t\"K\n\roperand_usage\022\014\n\004read\030\001 \002(\010\022"
-    "\017\n\007written\030\002 \002(\010\022\r\n\005index\030\003 \002(\010\022\014\n\004base\030"
-    "\004 \002(\010\"\036\n\013mem_operand\022\017\n\007address\030\001 \002(\022\"H\n"
-    "\ntaint_info\022\020\n\010no_taint\030\001 \001(\010\022\020\n\010taint_i"
-    "d\030\002 \001(\004\022\026\n\016taint_multiple\030\003 \001(\010\"\253\001\n\007cont"
-    "ext\0225\n\025operand_info_specific\030\001 \002(\0132\026.ope"
-    "rand_info_specific\022\022\n\nbit_length\030\002 \002(\021\022%"
-    "\n\roperand_usage\030\003 \002(\0132\016.operand_usage\022\037\n"
-    "\ntaint_info\030\004 \002(\0132\013.taint_info\022\r\n\005value\030"
-    "\005 \002(\t\"\244\002\n\003exp\022\023\n\004load\030\001 \001(\0132\005.load\022\025\n\005st"
-    "ore\030\002 \001(\0132\006.store\022\025\n\005binop\030\003 \001(\0132\006.binop"
-    "\022\023\n\004unop\030\004 \001(\0132\005.unop\022\021\n\003var\030\005 \001(\0132\004.var"
-    "\022\013\n\003lab\030\006 \001(\t\022\023\n\004inte\030\007 \001(\0132\005.inte\022\023\n\004ca"
-    "st\030\010 \001(\0132\005.cast\022\031\n\007let_exp\030\t \001(\0132\010.let_e"
-    "xp\022\031\n\007unknown\030\n \001(\0132\010.unknown\022\021\n\003ite\030\013 \001"
-    "(\0132\004.ite\022\031\n\007extract\030\014 \001(\0132\010.extract\022\027\n\006c"
-    "oncat\030\r \001(\0132\007.concat\"\\\n\004load\022\024\n\006memory\030\001"
-    " \002(\0132\004.exp\022\025\n\007address\030\002 \002(\0132\004.exp\022\024\n\006end"
-    "ian\030\003 \002(\0132\004.exp\022\021\n\003typ\030\004 \002(\0132\004.typ\"r\n\005st"
-    "ore\022\024\n\006memory\030\001 \002(\0132\004.exp\022\025\n\007address\030\002 \002"
-    "(\0132\004.exp\022\023\n\005value\030\003 \002(\0132\004.exp\022\024\n\006endian\030"
-    "\004 \002(\0132\004.exp\022\021\n\003typ\030\005 \002(\0132\004.typ\"P\n\005binop\022"
-    "\037\n\nbinop_type\030\001 \002(\0162\013.binop_type\022\022\n\004lexp"
-    "\030\002 \002(\0132\004.exp\022\022\n\004rexp\030\003 \002(\0132\004.exp\"8\n\004unop"
-    "\022\035\n\tunop_type\030\001 \002(\0162\n.unop_type\022\021\n\003exp\030\002"
-    " \002(\0132\004.exp\"&\n\004inte\022\013\n\003int\030\001 \002(\t\022\021\n\003typ\030\002"
-    " \002(\0132\004.typ\"P\n\004cast\022\035\n\tcast_type\030\001 \002(\0162\n."
-    "cast_type\022\026\n\010new_type\030\002 \002(\0132\004.typ\022\021\n\003exp"
-    "\030\003 \002(\0132\004.exp\"@\n\007let_exp\022\021\n\003var\030\001 \002(\0132\004.v"
-    "ar\022\020\n\002e1\030\002 \002(\0132\004.exp\022\020\n\002e2\030\003 \002(\0132\004.exp\","
-    "\n\007unknown\022\016\n\006string\030\001 \002(\t\022\021\n\003typ\030\002 \002(\0132\004"
-    ".typ\"K\n\003ite\022\027\n\tcondition\030\001 \002(\0132\004.exp\022\024\n\006"
-    "iftrue\030\002 \002(\0132\004.exp\022\025\n\007iffalse\030\003 \002(\0132\004.ex"
-    "p\"8\n\007extract\022\014\n\004hbit\030\001 \002(\021\022\014\n\004lbit\030\002 \002(\021"
-    "\022\021\n\003exp\030\003 \002(\0132\004.exp\",\n\006concat\022\020\n\002le\030\001 \002("
-    "\0132\004.exp\022\020\n\002re\030\002 \002(\0132\004.exp*L\n\tcast_type\022\021"
-    "\n\rcast_unsigned\020\001\022\017\n\013cast_signed\020\002\022\r\n\tca"
-    "st_high\020\003\022\014\n\010cast_low\020\004*\323\001\n\nbinop_type\022\010"
-    "\n\004plus\020\001\022\t\n\005minus\020\002\022\t\n\005times\020\003\022\n\n\006divide"
-    "\020\004\022\013\n\007sdivide\020\005\022\n\n\006modbop\020\006\022\010\n\004smod\020\007\022\n\n"
-    "\006lshift\020\010\022\n\n\006rshift\020\t\022\013\n\007arshift\020\n\022\n\n\006an"
-    "dbop\020\013\022\t\n\005orbop\020\014\022\007\n\003xor\020\r\022\006\n\002eq\020\016\022\007\n\003ne"
-    "q\020\017\022\006\n\002lt\020\020\022\006\n\002le\020\021\022\007\n\003slt\020\022\022\007\n\003sle\020\023*\037\n"
-    "\tunop_type\022\010\n\004uneg\020\001\022\010\n\004unot\020\002", 3270);
+    "\030\003 \001(\0132\006.array\"<\n\004tmem\022\030\n\nindex_type\030\001 \002"
+    "(\0132\004.typ\022\032\n\014element_type\030\002 \002(\0132\004.typ\"=\n\005"
+    "array\022\030\n\nindex_type\030\001 \002(\0132\004.typ\022\032\n\014eleme"
+    "nt_type\030\002 \002(\0132\004.typ\"#\n\005label\022\014\n\004name\030\001 \001"
+    "(\t\022\014\n\004addr\030\002 \001(\022\"2\n\003var\022\014\n\004name\030\001 \002(\t\022\n\n"
+    "\002id\030\002 \002(\021\022\021\n\003typ\030\003 \002(\0132\004.typ\"\261\001\n\tattribu"
+    "te\022\013\n\003asm\030\001 \001(\t\022\017\n\007address\030\002 \001(\022\022\031\n\007live"
+    "out\030\003 \001(\0132\010.liveout\022\017\n\007strattr\030\004 \001(\t\022\031\n\007"
+    "context\030\005 \001(\0132\010.context\022\021\n\tthread_id\030\006 \001"
+    "(\004\022\035\n\tsynthetic\030\007 \001(\0132\n.synthetic\022\r\n\005oth"
+    "er\030\010 \001(\t\"&\n\nattributes\022\030\n\004elem\030\001 \003(\0132\n.a"
+    "ttribute\"\t\n\007liveout\"\013\n\tsynthetic\"]\n\025oper"
+    "and_info_specific\022!\n\013mem_operand\030\001 \001(\0132\014"
+    ".mem_operand\022!\n\013reg_operand\030\002 \001(\0132\014.reg_"
+    "operand\"\033\n\013reg_operand\022\014\n\004name\030\001 \002(\t\"K\n\r"
+    "operand_usage\022\014\n\004read\030\001 \002(\010\022\017\n\007written\030\002"
+    " \002(\010\022\r\n\005index\030\003 \002(\010\022\014\n\004base\030\004 \002(\010\"\036\n\013mem"
+    "_operand\022\017\n\007address\030\001 \002(\022\"H\n\ntaint_info\022"
+    "\020\n\010no_taint\030\001 \001(\010\022\020\n\010taint_id\030\002 \001(\004\022\026\n\016t"
+    "aint_multiple\030\003 \001(\010\"\253\001\n\007context\0225\n\025opera"
+    "nd_info_specific\030\001 \002(\0132\026.operand_info_sp"
+    "ecific\022\022\n\nbit_length\030\002 \002(\021\022%\n\roperand_us"
+    "age\030\003 \002(\0132\016.operand_usage\022\037\n\ntaint_info\030"
+    "\004 \002(\0132\013.taint_info\022\r\n\005value\030\005 \002(\t\"\244\002\n\003ex"
+    "p\022\023\n\004load\030\001 \001(\0132\005.load\022\025\n\005store\030\002 \001(\0132\006."
+    "store\022\025\n\005binop\030\003 \001(\0132\006.binop\022\023\n\004unop\030\004 \001"
+    "(\0132\005.unop\022\021\n\003var\030\005 \001(\0132\004.var\022\013\n\003lab\030\006 \001("
+    "\t\022\023\n\004inte\030\007 \001(\0132\005.inte\022\023\n\004cast\030\010 \001(\0132\005.c"
+    "ast\022\031\n\007let_exp\030\t \001(\0132\010.let_exp\022\031\n\007unknow"
+    "n\030\n \001(\0132\010.unknown\022\021\n\003ite\030\013 \001(\0132\004.ite\022\031\n\007"
+    "extract\030\014 \001(\0132\010.extract\022\027\n\006concat\030\r \001(\0132"
+    "\007.concat\"\\\n\004load\022\024\n\006memory\030\001 \002(\0132\004.exp\022\025"
+    "\n\007address\030\002 \002(\0132\004.exp\022\024\n\006endian\030\003 \002(\0132\004."
+    "exp\022\021\n\003typ\030\004 \002(\0132\004.typ\"r\n\005store\022\024\n\006memor"
+    "y\030\001 \002(\0132\004.exp\022\025\n\007address\030\002 \002(\0132\004.exp\022\023\n\005"
+    "value\030\003 \002(\0132\004.exp\022\024\n\006endian\030\004 \002(\0132\004.exp\022"
+    "\021\n\003typ\030\005 \002(\0132\004.typ\"P\n\005binop\022\037\n\nbinop_typ"
+    "e\030\001 \002(\0162\013.binop_type\022\022\n\004lexp\030\002 \002(\0132\004.exp"
+    "\022\022\n\004rexp\030\003 \002(\0132\004.exp\"8\n\004unop\022\035\n\tunop_typ"
+    "e\030\001 \002(\0162\n.unop_type\022\021\n\003exp\030\002 \002(\0132\004.exp\"&"
+    "\n\004inte\022\013\n\003int\030\001 \002(\t\022\021\n\003typ\030\002 \002(\0132\004.typ\"P"
+    "\n\004cast\022\035\n\tcast_type\030\001 \002(\0162\n.cast_type\022\026\n"
+    "\010new_type\030\002 \002(\0132\004.typ\022\021\n\003exp\030\003 \002(\0132\004.exp"
+    "\"@\n\007let_exp\022\021\n\003var\030\001 \002(\0132\004.var\022\020\n\002e1\030\002 \002"
+    "(\0132\004.exp\022\020\n\002e2\030\003 \002(\0132\004.exp\",\n\007unknown\022\016\n"
+    "\006string\030\001 \002(\t\022\021\n\003typ\030\002 \002(\0132\004.typ\"K\n\003ite\022"
+    "\027\n\tcondition\030\001 \002(\0132\004.exp\022\024\n\006iftrue\030\002 \002(\013"
+    "2\004.exp\022\025\n\007iffalse\030\003 \002(\0132\004.exp\"8\n\007extract"
+    "\022\014\n\004hbit\030\001 \002(\021\022\014\n\004lbit\030\002 \002(\021\022\021\n\003exp\030\003 \002("
+    "\0132\004.exp\",\n\006concat\022\020\n\002le\030\001 \002(\0132\004.exp\022\020\n\002r"
+    "e\030\002 \002(\0132\004.exp*L\n\tcast_type\022\021\n\rcast_unsig"
+    "ned\020\001\022\017\n\013cast_signed\020\002\022\r\n\tcast_high\020\003\022\014\n"
+    "\010cast_low\020\004*\323\001\n\nbinop_type\022\010\n\004plus\020\001\022\t\n\005"
+    "minus\020\002\022\t\n\005times\020\003\022\n\n\006divide\020\004\022\013\n\007sdivid"
+    "e\020\005\022\n\n\006modbop\020\006\022\010\n\004smod\020\007\022\n\n\006lshift\020\010\022\n\n"
+    "\006rshift\020\t\022\013\n\007arshift\020\n\022\n\n\006andbop\020\013\022\t\n\005or"
+    "bop\020\014\022\007\n\003xor\020\r\022\006\n\002eq\020\016\022\007\n\003neq\020\017\022\006\n\002lt\020\020\022"
+    "\006\n\002le\020\021\022\007\n\003slt\020\022\022\007\n\003sle\020\023*\037\n\tunop_type\022\010"
+    "\n\004uneg\020\001\022\010\n\004unot\020\002", 3298);
   ::google::protobuf::MessageFactory::InternalRegisterGeneratedFile(
     "stmt.piqi.proto", &protobuf_RegisterTypes);
   program::default_instance_ = new program();
@@ -4851,6 +4853,7 @@ void typ::Swap(typ* other) {
 
 #ifndef _MSC_VER
 const int tmem::kIndexTypeFieldNumber;
+const int tmem::kElementTypeFieldNumber;
 #endif  // !_MSC_VER
 
 tmem::tmem()
@@ -4860,6 +4863,7 @@ tmem::tmem()
 
 void tmem::InitAsDefaultInstance() {
   index_type_ = const_cast< ::typ*>(&::typ::default_instance());
+  element_type_ = const_cast< ::typ*>(&::typ::default_instance());
 }
 
 tmem::tmem(const tmem& from)
@@ -4871,6 +4875,7 @@ tmem::tmem(const tmem& from)
 void tmem::SharedCtor() {
   _cached_size_ = 0;
   index_type_ = NULL;
+  element_type_ = NULL;
   ::memset(_has_bits_, 0, sizeof(_has_bits_));
 }
 
@@ -4881,6 +4886,7 @@ tmem::~tmem() {
 void tmem::SharedDtor() {
   if (this != default_instance_) {
     delete index_type_;
+    delete element_type_;
   }
 }
 
@@ -4909,6 +4915,9 @@ void tmem::Clear() {
     if (has_index_type()) {
       if (index_type_ != NULL) index_type_->::typ::Clear();
     }
+    if (has_element_type()) {
+      if (element_type_ != NULL) element_type_->::typ::Clear();
+    }
   }
   ::memset(_has_bits_, 0, sizeof(_has_bits_));
   mutable_unknown_fields()->Clear();
@@ -4926,6 +4935,20 @@ bool tmem::MergePartialFromCodedStream(
             ::google::protobuf::internal::WireFormatLite::WIRETYPE_LENGTH_DELIMITED) {
           DO_(::google::protobuf::internal::WireFormatLite::ReadMessageNoVirtual(
                input, mutable_index_type()));
+        } else {
+          goto handle_uninterpreted;
+        }
+        if (input->ExpectTag(18)) goto parse_element_type;
+        break;
+      }
+      
+      // required .typ element_type = 2;
+      case 2: {
+        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
+            ::google::protobuf::internal::WireFormatLite::WIRETYPE_LENGTH_DELIMITED) {
+         parse_element_type:
+          DO_(::google::protobuf::internal::WireFormatLite::ReadMessageNoVirtual(
+               input, mutable_element_type()));
         } else {
           goto handle_uninterpreted;
         }
@@ -4957,6 +4980,12 @@ void tmem::SerializeWithCachedSizes(
       1, this->index_type(), output);
   }
   
+  // required .typ element_type = 2;
+  if (has_element_type()) {
+    ::google::protobuf::internal::WireFormatLite::WriteMessageMaybeToArray(
+      2, this->element_type(), output);
+  }
+  
   if (!unknown_fields().empty()) {
     ::google::protobuf::internal::WireFormat::SerializeUnknownFields(
         unknown_fields(), output);
@@ -4970,6 +4999,13 @@ void tmem::SerializeWithCachedSizes(
     target = ::google::protobuf::internal::WireFormatLite::
       WriteMessageNoVirtualToArray(
         1, this->index_type(), target);
+  }
+  
+  // required .typ element_type = 2;
+  if (has_element_type()) {
+    target = ::google::protobuf::internal::WireFormatLite::
+      WriteMessageNoVirtualToArray(
+        2, this->element_type(), target);
   }
   
   if (!unknown_fields().empty()) {
@@ -4988,6 +5024,13 @@ int tmem::ByteSize() const {
       total_size += 1 +
         ::google::protobuf::internal::WireFormatLite::MessageSizeNoVirtual(
           this->index_type());
+    }
+    
+    // required .typ element_type = 2;
+    if (has_element_type()) {
+      total_size += 1 +
+        ::google::protobuf::internal::WireFormatLite::MessageSizeNoVirtual(
+          this->element_type());
     }
     
   }
@@ -5020,6 +5063,9 @@ void tmem::MergeFrom(const tmem& from) {
     if (from.has_index_type()) {
       mutable_index_type()->::typ::MergeFrom(from.index_type());
     }
+    if (from.has_element_type()) {
+      mutable_element_type()->::typ::MergeFrom(from.element_type());
+    }
   }
   mutable_unknown_fields()->MergeFrom(from.unknown_fields());
 }
@@ -5037,10 +5083,13 @@ void tmem::CopyFrom(const tmem& from) {
 }
 
 bool tmem::IsInitialized() const {
-  if ((_has_bits_[0] & 0x00000001) != 0x00000001) return false;
+  if ((_has_bits_[0] & 0x00000003) != 0x00000003) return false;
   
   if (has_index_type()) {
     if (!this->index_type().IsInitialized()) return false;
+  }
+  if (has_element_type()) {
+    if (!this->element_type().IsInitialized()) return false;
   }
   return true;
 }
@@ -5048,6 +5097,7 @@ bool tmem::IsInitialized() const {
 void tmem::Swap(tmem* other) {
   if (other != this) {
     std::swap(index_type_, other->index_type_);
+    std::swap(element_type_, other->element_type_);
     std::swap(_has_bits_[0], other->_has_bits_[0]);
     _unknown_fields_.Swap(&other->_unknown_fields_);
     std::swap(_cached_size_, other->_cached_size_);

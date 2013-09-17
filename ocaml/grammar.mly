@@ -80,7 +80,7 @@ let casttype_of_string = function
 %token CONCAT EXTRACT
 %token EQUAL EQUALEQUAL LT LE NOT ASSIGN 
 %token GT GE SGT SGE
-%token AT QUESTION
+%token AT QUESTION EXCLAMATION
 %token LCURLY RCURLY
 
 %start program expr
@@ -173,8 +173,8 @@ opttyp:
 
 typ:
 | styp {$1}
-| QUESTION styp { TMem $2 }
-| styp QUESTION styp { Array($3, $1) }
+| styp QUESTION styp { TMem ($1, $3) }
+| styp EXCLAMATION styp { Array($1, $3) }
 
 styp:
 | ID { typ_of_string $1 }

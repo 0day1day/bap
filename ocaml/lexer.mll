@@ -169,6 +169,7 @@ rule token = parse
   | ','          { COMMA } 
   | '@'          { AT }
   | '?'          { QUESTION }
+  | '!'          { EXCLAMATION }
   | '"'          { reset_string_buffer ();
                    scan_str lexbuf;
                    let s = get_stored_string () in

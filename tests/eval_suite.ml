@@ -32,15 +32,16 @@ let concrete_eval_setup _ =
 	that the result is -1. *)
 let concrete_eval_test (ranges, s, arch) = 
   (* i represents the change on the stack to the "wrong" value for function g *)
-  let memtype, sp = match arch with
+  let addrtype, sp = match arch with
     | X86_32 -> "u32", "R_ESP"
     | X86_64 -> "u64", "R_RSP"
   in
+  let memtype = addrtype ^ "?u8" in
   let i =
-    let a,_ = Parser.exp_from_string (sp ^ ":" ^ memtype) in
-    let e,_ = Parser.exp_from_string ("43:" ^ memtype) in
+    let a,_ = Parser.exp_from_string (sp ^ ":" ^ addrtype) in
+    let e,_ = Parser.exp_from_string ("43:" ^ addrtype) in
     let t = Typecheck.infer_ast e in
-    let m = match Parser.exp_from_string ("mem:?" ^ memtype) with
+    let m = match Parser.exp_from_string ("mem:" ^ memtype) with
       | Var(v), _ -> v
       | _ -> assert false
     in

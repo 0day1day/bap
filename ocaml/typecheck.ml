@@ -27,11 +27,11 @@ let is_integer_type = function
 let is_mem_type t = not (is_integer_type t)
 
 let index_type_of = function
-  | TMem it | Array (it, _) -> it
+  | TMem (it, _) | Array (it, _) -> it
   | Reg _ -> invalid_arg "index_type_of"
 
 let value_type_of = function
-  | TMem _ -> Reg 8
+  | TMem (_, vt) -> vt
   | Array (_, vt) -> vt
   | Reg _ -> invalid_arg "value_type_of"
 
@@ -153,10 +153,10 @@ and check_idx arr idx endian t =
   if not(is_integer_type ti) then terror "Index must be a register type";
   match ta with
   | Array(i,e) ->
-      check_subt ti i "Index type not suitable for indexing into this array. Index has type %s, but array has type %s.";
-      check_subt t e "Can't get a %s from array of %s";
-  | TMem i -> check_subt ti i "Index type not suitable for indexing into this array. Index has type %s, but the array has type %s.";
-
+    check_subt ti i "Index type not suitable for indexing into this array. Index has type %s, but array has type %s.";
+    check_subt t e "Can't get a %s from array of %s";
+  | TMem(i,e) ->
+    check_subt ti i "Index type not suitable for indexing into this array. Index has type %s, but the array has type %s.";
   | _ -> terror "Indexing only allowed from array or mem."
 
 and check_cjmp_direct e =

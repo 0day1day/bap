@@ -14,7 +14,7 @@ type label =
 (** The IR type of a BAP expression *)
 type typ =
   | Reg of int (** an N-bit bitvector (use 1 for booleans). *)
-  | TMem of typ (** Memory of given index type *)
+  | TMem of typ * typ (** Memory of given index type, element type. *)
   | Array of typ * typ (** Array of index type, element type. *)
 
 val reg_1 : typ

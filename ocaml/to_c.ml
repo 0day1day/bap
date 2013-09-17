@@ -250,7 +250,7 @@ object(self)
     | Reg 16 -> pp "uint16_t"
     | Reg 32 -> pp "uint32_t"
     | Reg 64 -> pp "uint64_t"
-    | TMem(Reg 32)-> pp "mem32_t"
+    | TMem(Reg 32, Reg 8)-> pp "mem32_t"
     | Array(t2, i) -> pp "mem_norm_t" (* array is normalized memory *) 
     | _ -> raise (Invalid_argument "Unsupported type")
 

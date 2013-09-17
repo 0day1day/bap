@@ -449,7 +449,7 @@ and o_gs = Oseg 5
 (* and eax_e = Var eax *)
 (* and edx_e = Var edx *)
 
-let mem = nmv "mem32" (TMem r32) "mem64" (TMem r64)
+let mem = nmv "mem32" (TMem (r32, r8)) "mem64" (TMem (r64, r8))
 
 (* 32-bit registers *)
 module R32 = struct

@@ -29,6 +29,11 @@
                .name index-type
                .type typ
         ]
+
+        .field [
+               .name element-type
+               .type typ
+        ]
 ]
 
 .alias [
