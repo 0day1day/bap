@@ -203,20 +203,20 @@ public final class StmtPiqi {
   
   public enum unop_type
       implements com.google.protobuf.ProtocolMessageEnum {
-    neg(0, 1),
-    not(1, 2),
+    uneg(0, 1),
+    unot(1, 2),
     ;
     
-    public static final int neg_VALUE = 1;
-    public static final int not_VALUE = 2;
+    public static final int uneg_VALUE = 1;
+    public static final int unot_VALUE = 2;
     
     
     public final int getNumber() { return value; }
     
     public static unop_type valueOf(int value) {
       switch (value) {
-        case 1: return neg;
-        case 2: return not;
+        case 1: return uneg;
+        case 2: return unot;
         default: return null;
       }
     }
@@ -247,7 +247,7 @@ public final class StmtPiqi {
     }
     
     private static final unop_type[] VALUES = {
-      neg, not, 
+      uneg, unot, 
     };
     
     public static unop_type valueOf(
@@ -21410,7 +21410,7 @@ public final class StmtPiqi {
     }
     
     private void initFields() {
-      unopType_ = StmtPiqi.unop_type.neg;
+      unopType_ = StmtPiqi.unop_type.uneg;
       exp_ = StmtPiqi.exp.getDefaultInstance();
     }
     private byte memoizedIsInitialized = -1;
@@ -21585,7 +21585,7 @@ public final class StmtPiqi {
       
       public Builder clear() {
         super.clear();
-        unopType_ = StmtPiqi.unop_type.neg;
+        unopType_ = StmtPiqi.unop_type.uneg;
         bitField0_ = (bitField0_ & ~0x00000001);
         if (expBuilder_ == null) {
           exp_ = StmtPiqi.exp.getDefaultInstance();
@@ -21735,7 +21735,7 @@ public final class StmtPiqi {
       private int bitField0_;
       
       // required .unop_type unop_type = 1;
-      private StmtPiqi.unop_type unopType_ = StmtPiqi.unop_type.neg;
+      private StmtPiqi.unop_type unopType_ = StmtPiqi.unop_type.uneg;
       public boolean hasUnopType() {
         return ((bitField0_ & 0x00000001) == 0x00000001);
       }
@@ -21753,7 +21753,7 @@ public final class StmtPiqi {
       }
       public Builder clearUnopType() {
         bitField0_ = (bitField0_ & ~0x00000001);
-        unopType_ = StmtPiqi.unop_type.neg;
+        unopType_ = StmtPiqi.unop_type.uneg;
         onChanged();
         return this;
       }
@@ -26580,8 +26580,8 @@ public final class StmtPiqi {
       "\020\004\022\013\n\007sdivide\020\005\022\n\n\006modbop\020\006\022\010\n\004smod\020\007\022\n\n" +
       "\006lshift\020\010\022\n\n\006rshift\020\t\022\013\n\007arshift\020\n\022\n\n\006an" +
       "dbop\020\013\022\t\n\005orbop\020\014\022\007\n\003xor\020\r\022\006\n\002eq\020\016\022\007\n\003ne",
-      "q\020\017\022\006\n\002lt\020\020\022\006\n\002le\020\021\022\007\n\003slt\020\022\022\007\n\003sle\020\023*\035\n" +
-      "\tunop_type\022\007\n\003neg\020\001\022\007\n\003not\020\002"
+      "q\020\017\022\006\n\002lt\020\020\022\006\n\002le\020\021\022\007\n\003slt\020\022\022\007\n\003sle\020\023*\037\n" +
+      "\tunop_type\022\010\n\004uneg\020\001\022\010\n\004unot\020\002"
     };
     com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
       new com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner() {

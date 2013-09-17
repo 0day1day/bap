@@ -127,12 +127,12 @@ inline bool binop_type_Parse(
     binop_type_descriptor(), name, value);
 }
 enum unop_type {
-  neg = 1,
-  not = 2
+  uneg = 1,
+  unot = 2
 };
 bool unop_type_IsValid(int value);
-const unop_type unop_type_MIN = neg;
-const unop_type unop_type_MAX = not;
+const unop_type unop_type_MIN = uneg;
+const unop_type unop_type_MAX = unot;
 const int unop_type_ARRAYSIZE = unop_type_MAX + 1;
 
 const ::google::protobuf::EnumDescriptor* unop_type_descriptor();

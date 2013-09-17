@@ -1047,8 +1047,8 @@ void protobuf_AddDesc_stmt_2epiqi_2eproto() {
     "\020\004\022\013\n\007sdivide\020\005\022\n\n\006modbop\020\006\022\010\n\004smod\020\007\022\n\n"
     "\006lshift\020\010\022\n\n\006rshift\020\t\022\013\n\007arshift\020\n\022\n\n\006an"
     "dbop\020\013\022\t\n\005orbop\020\014\022\007\n\003xor\020\r\022\006\n\002eq\020\016\022\007\n\003ne"
-    "q\020\017\022\006\n\002lt\020\020\022\006\n\002le\020\021\022\007\n\003slt\020\022\022\007\n\003sle\020\023*\035\n"
-    "\tunop_type\022\007\n\003neg\020\001\022\007\n\003not\020\002", 3268);
+    "q\020\017\022\006\n\002lt\020\020\022\006\n\002le\020\021\022\007\n\003slt\020\022\022\007\n\003sle\020\023*\037\n"
+    "\tunop_type\022\010\n\004uneg\020\001\022\010\n\004unot\020\002", 3270);
   ::google::protobuf::MessageFactory::InternalRegisterGeneratedFile(
     "stmt.piqi.proto", &protobuf_RegisterTypes);
   program::default_instance_ = new program();

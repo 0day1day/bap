@@ -11,8 +11,8 @@ let casttype_to_piqi : Type.cast_type -> Stmt_piqi.cast_type = function
   | CAST_LOW -> `cast_low
 
 let unop_to_piqi : Type.unop_type -> Stmt_piqi.unop_type = function
-  | NEG -> `neg
-  | NOT -> `not
+  | NEG -> `uneg
+  | NOT -> `unot
 
 let binop_to_piqi : Type.binop_type -> Stmt_piqi.binop_type = function
   | PLUS -> `plus

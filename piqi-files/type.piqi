@@ -100,8 +100,8 @@
 .enum [
       .name unop-type
 
-      .option [ .name neg .code 1 ]
-      .option [ .name not .code 2 ]
+      .option [ .name uneg .code 1 ]
+      .option [ .name unot .code 2 ]
 ]
 
 .record [
