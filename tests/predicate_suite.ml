@@ -1,4 +1,5 @@
 open Ast
+open Ast_convenience
 open Big_int_convenience
 open OUnit
 open Pcre
@@ -71,6 +72,38 @@ let basic_validity_setup () =
   let cfg = Cfg_ast.of_prog prog in
   let cfg = Prune_unreachable.prune_unreachable_ast cfg in
   cfg, m2actx;;
+
+let weird_memory_setup () =
+  let () = check () in
+  let m2actx = Memory2array.create_state () in
+  let m = Var.newvar "mem_awesome" (TMem(Reg 7, reg_16)) in
+  let le = Var.newvar "le" reg_32 in
+  let be = Var.newvar "be" reg_32 in
+  let e = Var.newvar "e" reg_32 in
+  let b = Var.newvar "b" reg_1 in
+  let eb = Var e ==* Int(bi64 0x00010002L, reg_32) in
+  let el = Var e ==* Int(bi64 0x00020001L, reg_32) in
+  let p =
+    Move(m, Store(Var m, Int(bi0, Reg 7), Int(bi1, reg_16), exp_false, reg_16), [])
+    :: Move(m, Store(Var m, Int(bi1, Reg 7), Int(bi2, reg_16), exp_false, reg_16), [])
+    :: Move(m, Store(Var m, Int(bi2, Reg 7), Int(bi3, reg_16), exp_false, reg_16), [])
+    :: Move(le, Load(Var m, Int(bi0, Reg 7), exp_false, reg_32), [])
+    :: Move(be, Load(Var m, Int(bi0, Reg 7), exp_true, reg_32), [])
+    :: Move(e, Load(Var m, Int(bi0, Reg 7), Var b, reg_32), [])
+    :: Assert(Var le ==* Int(bi64 0x00020001L, reg_32), [])
+    :: Assert(Var be ==* Int(bi64 0x00010002L, reg_32), [])
+    (* b=1 -> e is big endian *)
+    :: Assert((Var b <>* exp_true) |* eb, [])
+    (* b=0 -> e is little endian *)
+    :: Assert((Var b <>* exp_false) |* el, [])
+    :: []
+  in
+  let p = Memory2array.coerce_prog_state m2actx p in
+  typecheck p;
+  let cfg = Cfg_ast.of_prog p in
+  let cfg = Prune_unreachable.prune_unreachable_ast cfg in
+  cfg, m2actx;;
+
 
 (* A very basic test of assumption.  The goal of this test is to make
    sure that symbeval_search handles assumption failures correctly. *)
@@ -179,6 +212,12 @@ let suite = "Predicate" >:::
       (fun vc -> bracket
          assume_setup
          (valid_test "assume_validity_test" exp_true (Smtexec.Valid) vc)
+         predicate_stp_tear_down))
+  @
+    fold_vcs ("predicate_weird_memory_validity_test",
+      (fun vc -> bracket
+         weird_memory_setup
+         (valid_test "weird_memory_validity_test" exp_true (Smtexec.Valid) vc)
          predicate_stp_tear_down))
   @
     fold_vcs ("predicate_error_solve_test",

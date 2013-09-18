@@ -1,10 +1,12 @@
 open Arch
 open Ast
+open Ast_convenience
 open Big_int
 open Big_int_convenience
 open OUnit
 open Pcre
 open Test_common
+open Type
 
 let test_file = "C/test";;
 let il_file = "C/test.il";;
@@ -67,9 +69,25 @@ let concrete_eval_test (ranges, s, arch) =
 
 let concrete_eval_tear_down _ = rm_and_ignore il_file;;
 
+let array_test () =
+  let m = Var.newvar "mem_awesome" (TMem(Reg 7, reg_16)) in
+  let le = Var.newvar "le" reg_32 in
+  let be = Var.newvar "be" reg_32 in
+  let p =
+    Move(m, Store(Var m, Int(bi0, Reg 7), Int(bi1, reg_16), exp_false, reg_16), [])
+    :: Move(m, Store(Var m, Int(bi1, Reg 7), Int(bi2, reg_16), exp_false, reg_16), [])
+    :: Move(m, Store(Var m, Int(bi2, Reg 7), Int(bi3, reg_16), exp_false, reg_16), [])
+    :: Move(le, Load(Var m, Int(bi0, Reg 7), exp_false, reg_32), [])
+    :: Move(be, Load(Var m, Int(bi0, Reg 7), exp_true, reg_32), [])
+    :: Assert(Var le ==* Int(bi64 0x00020001L, reg_32), [])
+    :: Assert(Var be ==* Int(bi64 0x00010002L, reg_32), [])
+    :: []
+  in
+  ignore(Symbeval.concretely_execute p)
 
 let suite = "Eval" >:::
   [
-	"concrete_eval_test" >::
-	  (bracket concrete_eval_setup concrete_eval_test concrete_eval_tear_down);
+    "concrete_eval_test" >::
+      (bracket concrete_eval_setup concrete_eval_test concrete_eval_tear_down);
+    "array_test" >:: array_test;
   ]
