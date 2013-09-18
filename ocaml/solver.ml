@@ -652,7 +652,7 @@ List.iter (fun (n,s) -> Hashtbl.add solvers n s)
 
 (* XXX: Move me to unit test *)
 let memtest =
-  let mem = newvar "mem" (TMem reg_32) in
+  let mem = newvar "mem" (TMem (reg_32, reg_8)) in
   (* let store = Store(Var(mem), Int(42L, reg_32), Int(42L, reg_32), exp_false, reg_32) in *)
   let load = Load(Var(mem), Int(biconst 42, reg_32), exp_false, reg_32) in
   let test = BinOp(EQ, load, Int(biconst 42, reg_32)) in

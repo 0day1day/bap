@@ -27,6 +27,8 @@ type mem = Ast.exp AddrMap.t * Var.t (* addr -> val + initial name *)
 type addr = int64
 type instr = stmt
 type varid = Ast.exp
+(* XXX performance: We should add type to Symbolic so we can quickly
+   find element type *)
 type varval = Symbolic of Ast.exp | ConcreteMem of mem
 type label_kind = label
 type form_type = Equal | Rename
@@ -119,9 +121,12 @@ let conc2symb memory v =
   (* FIXME: a better symbolism for uninitialized memories *)
   let init = Var v in
   let addrt = Typecheck.index_type_of (Var.typ v) in
+  let et = Typecheck.value_type_of (Var.typ v) in
   pdebug "The point of no return" ;
   Symbolic (AddrMap.fold
-              (fun k v m -> Store (m,Int(big_int_of_int64 k,addrt),v,exp_false,reg_8))
+              (fun k v m ->
+                assert (Typecheck.infer_ast v = et);
+                Store (m,Int(big_int_of_int64 k,addrt),v,exp_false,et))
               memory init)
 
 let varval_to_exp = function
@@ -218,8 +223,6 @@ struct
 
   (* An assumption failed, so the program did not start *)
   exception AssumptionFailed of myctx
-
-  let byte_type = reg_8
 
   (* Lookup functions for basic contexts *)
   let inst_fetch sigma pc =
@@ -429,8 +432,9 @@ struct
                   Symbolic(Let(var, v1', v2'))
               | ConcreteMem _ -> v2)
       | Load (mem,ind,endian,t) ->
+        let et = Typecheck.value_type_of (Typecheck.infer_ast mem) in
         (match t with
-        | Reg 8 ->
+        | Reg _ when t = et ->
           (* This doesn't introduce any blowup on its own. *)
           let mem = eval_expr delta mem
           and ind = eval_expr delta ind
@@ -444,23 +448,24 @@ struct
         | _ -> failwith "not a loadable type"
         )
       | Store (mem,ind,value,endian,t) ->
-          let index = symb_to_exp (eval_expr delta ind)
-          and value = symb_to_exp (eval_expr delta value)
-          and endian = symb_to_exp (eval_expr delta endian) in
-            (match t with
-               | Reg 8 ->
-                   (* No blowup here. *)
-                   let mem = eval_expr delta mem in
-                     update_mem mem index value endian
-               | Reg _ ->
-                   (* Splitting blowup, but I don't know how to avoid this. *)
-                   eval_expr delta
-                     (Memory2array.split_writes mem index t endian value)
-               | Array _ ->
-                   failwith "storing array currently unsupported"
-               | _ ->
-                   failwith "not a storable type"
-            )
+        let index = symb_to_exp (eval_expr delta ind)
+        and value = symb_to_exp (eval_expr delta value)
+        and endian = symb_to_exp (eval_expr delta endian) in
+        let et = Typecheck.value_type_of (Typecheck.infer_ast mem) in
+        (match t with
+        | Reg _ when t = et  ->
+          (* No blowup here. *)
+          let mem = eval_expr delta mem in
+          update_mem mem index value endian
+        | Reg _ ->
+          (* Splitting blowup, but I don't know how to avoid this. *)
+          eval_expr delta
+            (Memory2array.split_writes mem index t endian value)
+        | Array _ ->
+          failwith "storing array currently unsupported"
+        | _ ->
+          failwith "not a storable type"
+        )
       | Unknown _ as u -> Symbolic u (*failwith "unknown value encountered"*)
     in
       eval expr
@@ -734,7 +739,10 @@ struct
   let rec update_mem mu pos value endian =
     (*pdebug "Update mem" ;*)
     match mu with
-      | Symbolic m -> Symbolic (Store(m,pos,value,endian,reg_8))
+      | Symbolic m ->
+        let et = Typecheck.value_type_of (Typecheck.infer_ast m) in
+        assert ((Typecheck.infer_ast value) = et);
+        Symbolic (Store(m,pos,value,endian,et))
       | ConcreteMem (m,v) ->
           match pos with
             | Int(p,t) ->
@@ -745,14 +753,16 @@ struct
     (*pdebug "Lookup mem" ;*)
     match mu, index with
       | ConcreteMem(m,v), Int(i,t) ->
-          (try AddrMap.find (normalize i t) m
-           with Not_found ->
-             Load(Var v, index, endian, reg_8)
-          (* FIXME: handle endian and type? *)
-          )
+        let et = Typecheck.value_type_of (Var.typ v) in
+        (try AddrMap.find (normalize i t) m
+         with Not_found ->
+           Load(Var v, index, endian, et)
+        )
       (* perhaps we should introduce a symbolic variable *)
-      | Symbolic mem, _ -> Load (mem,index,endian,reg_8)
-      | ConcreteMem(m,v),_ -> lookup_mem (conc2symb m v) index endian
+      | Symbolic mem, _ ->
+        let et = Typecheck.value_type_of (Typecheck.infer_ast mem) in
+        Load (mem,index,endian,et)
+      | ConcreteMem(m,v), _ -> lookup_mem (conc2symb m v) index endian
 
   include BuildMemLPrinters(BE)
 
@@ -807,10 +817,11 @@ struct
     (*pdebug "Lookup mem" ;*)
     match mu, index with
     | ConcreteMem(m,v), Int(i,t) ->
+      let et = Typecheck.value_type_of (Var.typ v) in
       (try AddrMap.find (normalize i t) m
        with Not_found ->
          wprintf "Uninitialized memory found at %s" (Pp.ast_exp_to_string index);
-         Int(bi0, reg_8)
+         Int(bi0, et)
       )
     | _ -> failwith "Symbolic memory or address in concrete evaluation"
 end

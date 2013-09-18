@@ -1454,17 +1454,28 @@ class tmem : public ::google::protobuf::Message {
   inline ::typ* mutable_index_type();
   inline ::typ* release_index_type();
   
+  // required .typ element_type = 2;
+  inline bool has_element_type() const;
+  inline void clear_element_type();
+  static const int kElementTypeFieldNumber = 2;
+  inline const ::typ& element_type() const;
+  inline ::typ* mutable_element_type();
+  inline ::typ* release_element_type();
+  
   // @@protoc_insertion_point(class_scope:tmem)
  private:
   inline void set_has_index_type();
   inline void clear_has_index_type();
+  inline void set_has_element_type();
+  inline void clear_has_element_type();
   
   ::google::protobuf::UnknownFieldSet _unknown_fields_;
   
   ::typ* index_type_;
+  ::typ* element_type_;
   
   mutable int _cached_size_;
-  ::google::protobuf::uint32 _has_bits_[(1 + 31) / 32];
+  ::google::protobuf::uint32 _has_bits_[(2 + 31) / 32];
   
   friend void  protobuf_AddDesc_stmt_2epiqi_2eproto();
   friend void protobuf_AssignDesc_stmt_2epiqi_2eproto();
@@ -5248,6 +5259,35 @@ inline ::typ* tmem::release_index_type() {
   clear_has_index_type();
   ::typ* temp = index_type_;
   index_type_ = NULL;
+  return temp;
+}
+
+// required .typ element_type = 2;
+inline bool tmem::has_element_type() const {
+  return (_has_bits_[0] & 0x00000002u) != 0;
+}
+inline void tmem::set_has_element_type() {
+  _has_bits_[0] |= 0x00000002u;
+}
+inline void tmem::clear_has_element_type() {
+  _has_bits_[0] &= ~0x00000002u;
+}
+inline void tmem::clear_element_type() {
+  if (element_type_ != NULL) element_type_->::typ::Clear();
+  clear_has_element_type();
+}
+inline const ::typ& tmem::element_type() const {
+  return element_type_ != NULL ? *element_type_ : *default_instance_->element_type_;
+}
+inline ::typ* tmem::mutable_element_type() {
+  set_has_element_type();
+  if (element_type_ == NULL) element_type_ = new ::typ;
+  return element_type_;
+}
+inline ::typ* tmem::release_element_type() {
+  clear_has_element_type();
+  ::typ* temp = element_type_;
+  element_type_ = NULL;
   return temp;
 }
 

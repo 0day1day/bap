@@ -25,8 +25,8 @@ let rec typ_to_string = function
   | Reg 32 -> "u32"
   | Reg 64 -> "u64"
   | Reg n -> Printf.sprintf "u%u" n
-  | TMem t -> "?" ^ typ_to_string t
-  | Array(idx,e) -> typ_to_string e ^ "?" ^ typ_to_string idx
+  | TMem (idx,e) -> typ_to_string idx ^ "?" ^ typ_to_string e
+  | Array(idx,e) -> typ_to_string idx ^ "!" ^ typ_to_string e
 
 
 let ct_to_string = function

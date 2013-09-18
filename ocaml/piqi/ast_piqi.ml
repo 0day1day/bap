@@ -37,7 +37,7 @@ let binop_to_piqi : Type.binop_type -> Stmt_piqi.binop_type = function
 
 let rec type_to_piqi : Type.typ -> Stmt_piqi.typ = function
   | Reg n -> `reg (n)
-  | TMem t -> `tmem ({Tmem.index_type=type_to_piqi t})
+  | TMem (t, t') -> `tmem ({Tmem.index_type=type_to_piqi t; element_type=type_to_piqi t';})
   | Array(t, t') -> `array ({Array.index_type=type_to_piqi t; element_type=type_to_piqi t';})
 
 let var_to_piqi (V.V(id, n, t)) : Stmt_piqi.var =

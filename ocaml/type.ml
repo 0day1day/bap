@@ -11,11 +11,10 @@ type label =
   | Name of string (** For named labels*)
   | Addr of addr (** For addresses. Cast REG_type as unsigned when comparing. *)
 
-
 (** The IR type of a BAP expression *)
 type typ =
   | Reg of int (** an N-bit bitvector (use 1 for booleans). *)
-  | TMem of typ (** Memory of given index type *)
+  | TMem of typ * typ (** Memory of given index type, element type. *)
   | Array of typ * typ (** Array of index type, element type. *)
 
 let reg_1 = Reg 1
