@@ -12,13 +12,29 @@ exception TypeError of string
 
 let terror s = raise(TypeError s)
 
-(* returns true if t1 is a subtype of t2 *)
-let subt t1 t2 =
+(* returns true if t1 equals t2 *)
+let eq t1 t2 =
   t1 = t2
 
-let check_subt t1 t2 f =
-  if not(subt t1 t2) then
-    terror (Printf.sprintf f (Pp.typ_to_string t1) (Pp.typ_to_string t2))
+(* returns true if t1 is a multiple of t2 *)
+let mult t1 t2 = match t1, t2 with
+  | Reg x, Reg y -> x mod y = 0
+  (* Does this make sense for anything besides Reg? *)
+  | _ -> false
+
+let check checkf errmsg t1 t2 =
+  if not (checkf t1 t2) then
+    terror (Printf.sprintf errmsg (Pp.typ_to_string t1) (Pp.typ_to_string t2))
+
+let check_eq t1 t2 f =
+  check eq f t1 t2
+
+let check_mult t1 t2 f =
+  check mult f t1 t2
+
+(* let check_eq t1 t2 f = *)
+(*   if not (eq t1 t2) then *)
+(*     terror (Printf.sprintf f (Pp.typ_to_string t1) (Pp.typ_to_string t2)) *)
 
 let is_integer_type = function
   | Reg _ -> true
@@ -119,13 +135,13 @@ let rec infer_ast_internal check e =
     if check then ignore(infer_ast_internal true e1);
     infer_ast_internal check e2
   | Load(arr,idx,endian, t) ->
-    if check then check_idx arr idx endian t;
+    if check then check_mem arr idx endian t;
     t
   | Store(arr,idx,vl, endian, t) ->
     if check then (
-      check_idx arr idx endian t;
+      check_mem arr idx endian t;
       let tv = infer_ast_internal true vl in
-      check_subt tv t "Can't store value with type %s as a %s";
+      check_eq tv t "Store of value with type %s performed using a Store of type %s";
     );
     infer_ast_internal false arr
 
@@ -145,7 +161,7 @@ and check_bool t =
   if t <> Reg 1 then
     terror (Printf.sprintf "Expected bool type, but got %s" (Pp.typ_to_string t))
 
-and check_idx arr idx endian t =
+and check_mem arr idx endian t =
   let ta = infer_ast_internal true arr
   and ti = infer_ast_internal true idx
   and te = infer_ast_internal true endian in
@@ -153,10 +169,11 @@ and check_idx arr idx endian t =
   if not(is_integer_type ti) then terror "Index must be a register type";
   match ta with
   | Array(i,e) ->
-    check_subt ti i "Index type not suitable for indexing into this array. Index has type %s, but array has type %s.";
-    check_subt t e "Can't get a %s from array of %s";
+    check_eq ti i "Index type not suitable for indexing into this array. Index has type %s, but array has type %s.";
+    check_eq t e "Can't get/put a %s from array with element type of %s";
   | TMem(i,e) ->
-    check_subt ti i "Index type not suitable for indexing into this array. Index has type %s, but the array has type %s.";
+    check_eq ti i "Index type not suitable for indexing into this array. Index has type %s, but the memory has type %s.";
+    check_mult t e "Can't get/put a %s from memory with element type of %s"
   | _ -> terror "Indexing only allowed from array or mem."
 
 and check_cjmp_direct e =
