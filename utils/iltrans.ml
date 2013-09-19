@@ -475,6 +475,8 @@ let speclist =
       "Compute and print use def chains")
   :: ("-defuse", uadd(AnalysisAstCfg defuse),
       "Compute and print def use chains")
+  :: ("-ret2jmp", uadd(TransformAst Hacks.ret_to_jmp),
+      "Hack to replace returns with a jump to the end of program.")
   :: Input.speclist
 
 let () = Tunegc.set_gc ()
