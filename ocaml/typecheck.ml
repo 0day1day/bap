@@ -19,8 +19,8 @@ let eq t1 t2 =
 (* returns true if t1 is a multiple of t2 *)
 let mult t1 t2 = match t1, t2 with
   | Reg x, Reg y -> x mod y = 0
-  (* Does this make sense for anything besides Reg? *)
-  | _ -> false
+  (* Can we do anything else for memory types? *)
+  | x, y -> eq x y
 
 let check checkf errmsg t1 t2 =
   if not (checkf t1 t2) then
