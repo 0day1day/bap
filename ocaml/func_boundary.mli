@@ -17,11 +17,10 @@ val start_addresses : asmprogram -> addr list
 
 (** [end_address_at p addr scheme] returns the identified end address
     of the function starting at [addr] in [p] using the CFG recovery
-    scheme [scheme]. 
-
-    XXX: This function should not return a cfg.
-*)
-val end_address_at : asmprogram -> addr -> scheme_type -> (Cfg.AST.G.t * addr) option
+    scheme [scheme]. Currently we set 30 seconds as the maximuim time
+    for building up the control flow graph. If timeout, the address 
+    would be None. *)
+val end_address_at : asmprogram -> addr -> scheme_type -> addr option
 
 (** [get_function_ranges p] finds functions using the symbol table,
     and if that fails, uses [start_addresses] to identify funtions. *)

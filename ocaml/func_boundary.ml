@@ -256,22 +256,22 @@ let post_process cfg =
   cfg_t
 
 let end_address_at p addr scheme =
-  (* XXX: This should be an option type *)
-  let maxaddress = ref bi0 in
-    let cfg =
-      match scheme with
-      | RECURSIVE_DESCENT -> Asmir_disasm.recursive_descent_at p addr
-      | VSA ->
-        try Util.timeout ~secs:30 ~f:(Asmir_disasm.vsa_at p) ~x:addr
-        with e -> raise e
-    in
-    Cfg.AST.G.iter_vertex (fun node ->
-      let stmts = Cfg.AST.get_stmts cfg node in
-      List.iter (function
-        | Ast.Label(Type.Addr l, _) -> if l >= !maxaddress then maxaddress := l
-        | _ -> ()
-      ) stmts
-    ) cfg;
-    let _, endaddress = Asmir.asm_addr_to_bap p !maxaddress in
-    let cfg_post_process = post_process cfg in
-    Some (cfg_post_process, endaddress)
+  let maxaddress = 
+    try (
+      let cfg =
+        match scheme with
+        | RECURSIVE_DESCENT -> Asmir_disasm.recursive_descent_at p addr
+        | VSA -> Util.timeout ~secs:30 ~f:(Asmir_disasm.vsa_at p) ~x:addr
+      in
+      let max = Cfg.AST.G.fold_vertex (fun v max ->
+        let stmts = Cfg.AST.get_stmts cfg v in
+        List.fold_left (fun m -> function
+          | Ast.Label(Type.Addr l, _) -> if l >= m then l else m
+          | _ -> m
+        ) max stmts
+      ) cfg bi0
+      in Some max
+    )
+    with e ->
+      None
+  in maxaddress
