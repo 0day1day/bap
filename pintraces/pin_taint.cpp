@@ -740,16 +740,19 @@ FrameOption_t TaintTracker::taintPostSC(const uint32_t bytes,
         addr = (ADDRINT)bytes;
         fd = args[4];
         length = args[1];
-        off_t offset;
-        assert (PIN_SafeCopy(&offset, (void*) args[5], sizeof(off_t)) == sizeof(off_t));
-        cerr << "Tainting " 
-             << length 
-             << " bytes from mmap of fd "
-             << fd
-             << " at offset "
-             << offset
-             << endl;
-        return introMemTaint(addr, length, fds[fd].name.c_str(), offset);
+
+        if ((int)addr != -1) {
+          off_t offset;
+          assert (PIN_SafeCopy(&offset, (void*) args[5], sizeof(off_t)) == sizeof(off_t));
+          cerr << "Tainting "
+               << length
+               << " bytes from mmap of fd "
+               << fd
+               << " at offset "
+               << offset
+               << endl;
+          return introMemTaint(addr, length, fds[fd].name.c_str(), offset);
+        }
         break;
       }
       case __NR_read:
@@ -757,12 +760,15 @@ FrameOption_t TaintTracker::taintPostSC(const uint32_t bytes,
         fd = args[0];
         addr = args[1];
         length = bytes;
-        cerr << "Tainting " 
-             << length 
-             << " bytes from read at " << addr << ", fd=" << args[0]
-             << endl;
+        if ((int)length != -1) {
+          cerr << "Tainting "
+               << length
+               << " bytes from read at " << addr << ", fd=" << args[0]
+               << endl;
 
-        return introMemTaintFromFd(fd, addr, length);
+          return introMemTaintFromFd(fd, addr, length);
+        }
+        break;
       }
       case __NR_lseek:
         if (bytes != UNIX_FAILURE) {
