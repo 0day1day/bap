@@ -537,3 +537,15 @@ let vsa_at_full =
   let module VSA = Make(VSA_SPEC)(FUNCFINDER_DUMB) in
   VSA.disasm_at
 let vsa_at a b = fst(vsa_at_full a b)
+
+type algorithm =
+  | Vsa
+  | Rd
+
+let recover = function
+  | Vsa -> vsa
+  | Rd -> recursive_descent
+
+let recover_at = function
+  | Vsa -> vsa_at
+  | Rd -> recursive_descent_at

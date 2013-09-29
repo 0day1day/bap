@@ -50,6 +50,12 @@ type vsaresult = {origssa: Cfg.SSA.G.t;
 val vsa_full : Asmir.asmprogram -> Cfg.AST.G.t * vsaresult option
 val vsa_at_full : Asmir.asmprogram -> addr -> Cfg.AST.G.t * vsaresult option
 
-
 val vsa : Asmir.asmprogram -> Cfg.AST.G.t
 val vsa_at : Asmir.asmprogram -> addr -> Cfg.AST.G.t
+
+type algorithm =
+  | Vsa
+  | Rd
+
+val recover : algorithm -> Asmir.asmprogram  -> Cfg.AST.G.t
+val recover_at : algorithm -> Asmir.asmprogram -> addr -> Cfg.AST.G.t

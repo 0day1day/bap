@@ -3,10 +3,6 @@ open Big_int_convenience
 module D = Debug.Make(struct let name = "Func_boundary" and default=`NoDebug end)
 open D
 
-type scheme_type = 
-  | RECURSIVE_DESCENT
-  | VSA
-
 (* This function checks to see if the sequence of assembly instructions
    at start_addr ends at end_addr. *)
 let rec liftable_asm_addr_to_bap p start_addr end_addr =
@@ -255,23 +251,11 @@ let post_process cfg =
   let cfg_t = Prune_unreachable.prune_unreachable_ast cfg_t in
   cfg_t
 
-let end_address_at p addr scheme =
-  let maxaddress = 
-    try (
-      let cfg =
-        match scheme with
-        | RECURSIVE_DESCENT -> Asmir_disasm.recursive_descent_at p addr
-        | VSA -> Util.timeout ~secs:30 ~f:(Asmir_disasm.vsa_at p) ~x:addr
-      in
-      let max = Cfg.AST.G.fold_vertex (fun v max ->
-        let stmts = Cfg.AST.get_stmts cfg v in
-        List.fold_left (fun m -> function
-          | Ast.Label(Type.Addr l, _) -> if l >= m then l else m
-          | _ -> m
-        ) max stmts
-      ) cfg bi0
-      in Some max
-    )
-    with e ->
-      None
-  in maxaddress
+let end_address_at cfg =
+  Cfg.AST.G.fold_vertex (fun v max ->
+    let stmts = Cfg.AST.get_stmts cfg v in
+    List.fold_left (fun m -> function
+      | Ast.Label(Type.Addr l, _) -> if l >= m then l else m
+      | _ -> m
+    ) max stmts
+  ) cfg bi0
