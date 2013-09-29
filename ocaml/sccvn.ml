@@ -28,16 +28,6 @@
    updating vn_h with the new VN, until it reaches a fixed point. At
    this point, if two variables have the same VN, they are equivalent.
 
-   Algorithm modification: Our algorithm does a few optimizations that
-   require looking up the current value number of a variable.  Using
-   vn_h directly can result in non-termination, since at Phi
-   expressions it is *not* guaranteed that each var in the Phi has
-   been visited first.  Instead, we take a snapshot (vn_h_snapshot) of
-   vn_h after each iteration, and use this snapshot to look up each
-   variable's value number.  This can obviously increase the number of
-   iterations needed to reach a fix point.  TODO: Only use the
-   snapshot for values coming in through backedges.
-
    The latice looks like this:
    Top -> HInt (constant) -> Hash (variable, corresponds to bottom in the CP lattice)
 
@@ -125,7 +115,6 @@ module EH =
 
 type rpoinfo = { (* private to the SCCVN module *)
   vn_h : vn VH.t; (* maps vars to value numbers *)
-  vn_h_snapshot : vn VH.t ref;
   eid2vn : vn EH.t; (* maps expids to value numbers,
                        corresponds to hashtable in paper *)
 }
@@ -133,7 +122,7 @@ type rpoinfo = { (* private to the SCCVN module *)
 let rec vn2eid info = function
   | Top -> raise Not_found
   | HInt(i,t) -> Const(Int(i,t))
-  | Hash v -> let vn = VH.find !(info.vn_h_snapshot) v in
+  | Hash v -> let vn = VH.find info.vn_h v in
               if vn = Hash v
               then Unique v
               else vn2eid info vn
@@ -212,7 +201,7 @@ let get_expid info =
           add_const info v
       )
     | Var x -> (
-        try VH.find !(info.vn_h_snapshot) x
+        try VH.find info.vn_h x
         with Not_found ->
           failwith("get_expid: unknown var: "^Pp.var_to_string x)
       )
@@ -352,7 +341,6 @@ let fold_postfix_component f g v i=
 let rpo ~opt cfg =
   let info = {
     vn_h = VH.create 57;
-    vn_h_snapshot = ref (VH.create 57);
     eid2vn = EH.create 57;
   }
   in
@@ -390,7 +378,6 @@ let rpo ~opt cfg =
     C.G.iter_vertex
     (fun b -> ignore(Ssa_visitor.stmts_accept vis (C.get_stmts cfg b)))
     cfg;
-    info.vn_h_snapshot := VH.copy info.vn_h;
   in
   let vn x =
     try VH.find info.vn_h x
