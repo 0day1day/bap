@@ -903,7 +903,6 @@ let check_delta state tid =
     !foundone
   in
   let check_mem mem_var cm addr v delta =
-    let addr64 = addr_to_int64 addr in
     if v.tnt || !checkall then (
       let tracebyte = get_int v.exp in
       let fix_state () =
@@ -915,11 +914,11 @@ let check_delta state tid =
         TraceConcrete.update_var delta mem_var newmem
       in
       try
-        match AddrMap.find addr64 cm with
+        match AddrMap.find addr cm with
         | Int(v, t) -> let evalbyte = fst (Arithmetic.to_val t v) in
                        let issymb = Hashtbl.mem global.symbolic addr in
                        if (tracebyte <>% evalbyte) && (not issymb) then (
-                         wprintf "Consistency error: Tainted memory value (address %Lx, value %s) present in trace does not match value %s in concrete evaluator" addr64 (~% tracebyte) (~% evalbyte);
+                         wprintf "Consistency error: Tainted memory value (address %s, value %s) present in trace does not match value %s in concrete evaluator" (~% addr) (~% tracebyte) (~% evalbyte);
                          fix_state ())
                        else delta
         | e when contains_unknown e -> delta
@@ -929,7 +928,7 @@ let check_delta state tid =
            dump, so we should not report an error unless the value is
            tainted. *)
         if v.tnt then (
-          wprintf "Consistency error: Tainted memory value (address %Lx, value %s) present in trace but missing in concrete evaluator" addr64 (~% tracebyte);
+          wprintf "Consistency error: Tainted memory value (address %s, value %s) present in trace but missing in concrete evaluator" (~% addr) (~% tracebyte);
           fix_state ())
         else delta
     ) else delta
@@ -1214,7 +1213,7 @@ let run_block arch ?(next_label = None) ?(transformf = (fun s _ -> [s])) state m
             Syscall_models.linux_syscall_to_il arch (int_of_big_int i)
           | _ -> failwith "Unexpected evaluation problem") in
         (* Hack: Remember the next pc; we will clobber this *)
-        let newpc = Int64.succ state.pc in
+        let newpc = succ_big_int state.pc in
         let newstate = List.fold_left
           (fun state stmt ->
 	    let isspecial = match stmt with Special _ -> true | _ -> false in
@@ -1238,7 +1237,7 @@ let run_block arch ?(next_label = None) ?(transformf = (fun s _ -> [s])) state m
         | TraceConcrete.AssertFailed _ as _e ->
 	  wprintf "failed assertion: %s" (Pp.ast_stmt_to_string stmt);
 	  (* raise e; *)
-	  let new_pc = Int64.succ state.pc in
+	  let new_pc = succ_big_int state.pc in
 	  eval_block {state with pc=new_pc}
     in
     try
@@ -1479,7 +1478,7 @@ let concrete_rerun file stmts =
      TaintConcrete.Halted(v, ctx) -> Printf.printf "Halted successfully\n"
    | TaintConcrete.AssertFailed ctx ->
        let stmt = TaintConcrete.inst_fetch ctx.sigma ctx.pc in
-       Printf.printf "Assertion failure at %Lx: %s\n" ctx.pc (Pp.ast_stmt_to_string stmt) ;
+       Printf.printf "Assertion failure at %s: %s\n" (~% (ctx.pc)) (Pp.ast_stmt_to_string stmt) ;
        clean_delta ctx.delta ;
        TaintConcrete.print_values ctx.delta;
        (* TaintConcrete.print_mem ctx.TaintConcrete.delta *)
@@ -1547,7 +1546,7 @@ struct
         let delta' = MemL.remove_var delta v in (* shouldn't matter because of dsa, but remove any old version anyway *)
         (delta', Form.add_to_formula pred constr Rename)
     in
-    {ctx with delta=delta'; pred=pred'; pc=Int64.succ pc}
+    {ctx with delta=delta'; pred=pred'; pc=succ_big_int pc}
 end
 
 (** Modules that convert user_init data to a FlexibleFormula's init

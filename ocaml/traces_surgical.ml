@@ -222,7 +222,7 @@ let run_and_subst_block arch state memv thread_map block =
     | TraceConcrete.AssertFailed _ as _e -> 
           wprintf "failed assertion: %s" (Pp.ast_stmt_to_string stmt);
           (* raise e; *)
-          let new_pc = Int64.succ state.pc in
+          let new_pc = succ_big_int state.pc in
           let next = TraceConcrete.inst_fetch state.sigma new_pc in
           eval_block {state with pc=new_pc} next
   in

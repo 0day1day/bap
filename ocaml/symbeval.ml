@@ -19,12 +19,13 @@ open D
 
 (* For now, we'll map every byte. Later it may be better to map larger
    values, but we'd lose precision wrt uninitialized memory. *)
-module AddrMap = Map.Make(Int64)
+module AddrMap = Map.Make(struct type t = Big_int_Z.big_int
+                                 let compare = Big_int_Z.compare_big_int
+end)
 
 type mem = Ast.exp AddrMap.t * Var.t (* addr -> val + initial name *)
 
 (* Some useful types *)
-type addr = int64
 type instr = stmt
 type varid = Ast.exp
 (* XXX performance: We should add type to Symbolic so we can quickly
@@ -126,7 +127,7 @@ let conc2symb memory v =
   Symbolic (AddrMap.fold
               (fun k v m ->
                 assert (Typecheck.infer_ast v = et);
-                Store (m,Int(big_int_of_int64 k,addrt),v,exp_false,et))
+                Store (m,Int(k,addrt),v,exp_false,et))
               memory init)
 
 let varval_to_exp = function
@@ -134,7 +135,7 @@ let varval_to_exp = function
   | ConcreteMem (m,v) -> symb_to_exp (conc2symb m v)
 
 (* Normalize a memory address, setting high bits to 0. *)
-let normalize i t = addr_to_int64 (Arithmetic.to_big_int (i,t))
+let normalize i t = Arithmetic.to_big_int (i,t)
 
 module type MemLookup =
 sig
@@ -257,7 +258,7 @@ struct
   (* Initializers *)
   let create_state form_init =
     let sigma : (addr, instr) Hashtbl.t = Hashtbl.create 32
-    and pc = Int64.zero
+    and pc = bi0
     and delta : MemL.t = MemL.create ()
     and lambda : (label_kind, addr) Hashtbl.t = Hashtbl.create 32 in
     {pred=(Form.init form_init); delta=delta; sigma=sigma; lambda=lambda; pc=pc}
@@ -274,7 +275,7 @@ struct
                | Label (lab,_) -> Hashtbl.add state.lambda lab pc
                | _ -> ()
             ) ;
-            Int64.succ pc
+            succ_big_int pc
          ) state.pc prog_stmts) in
     (* Add a halt to the end of the program *)
     Hashtbl.add state.sigma pc (Halt(exp_true, []))
@@ -483,7 +484,7 @@ struct
                               ^(Pp.ast_exp_to_string (symb_to_exp v)))
           | Some lab -> label_decode lambda lab
     in
-    let next_pc = Int64.succ pc in
+    let next_pc = succ_big_int pc in
     let eval = function
       | Move (v,e,_) ->
           let ev = eval_expr delta e in
@@ -547,7 +548,7 @@ struct
       eval_stmt state stmt
     with Failure str ->
       (prerr_endline ("Evaluation aborted at stmt No-"
-                      ^(Int64.to_string state.pc)
+                      ^(~% (state.pc))
                       ^"\nreason: "^str);
        if debug () then (print_values state.delta;
                          print_mem state.delta);
@@ -555,8 +556,8 @@ struct
        [])
       | Not_found ->
         (prerr_endline ("Evaluation aborted at stmt No-"
-                        ^(Int64.to_string state.pc)
-                        ^"\nreason: "^(Printf.sprintf "PC not found: %#Lx" state.pc));
+                        ^(~% (state.pc))
+                        ^"\nreason: "^(Printf.sprintf "PC not found: %s" (~% (state.pc))));
          if debug () then (print_values state.delta;
                            print_mem state.delta);
          (* print_endline ("Path predicate: "^(Pp.ast_exp_to_string (output_formula state.pred))); *)
@@ -700,8 +701,8 @@ struct
                print_endline ("memory " ^ (Var.name var)) ;
                AddrMap.iter
                  (fun i v ->
-                    print_endline((Printf.sprintf "%Lx" i)
-                           ^ " -> " ^ (Pp.ast_exp_to_string v))
+                    print_endline(~% i
+                                  ^ " -> " ^ (Pp.ast_exp_to_string v))
                  )
                  mem
            | _ -> ()
@@ -848,7 +849,7 @@ struct
         let delta' = MemL.remove_var delta v in 
         (delta', Form.add_to_formula pred constr Rename)
     in
-    {ctx with delta=delta'; pred=pred'; pc=Int64.succ pc}
+    {ctx with delta=delta'; pred=pred'; pc=succ_big_int pc}
 end
 
 (** Symbolic assigns are represented in delta *)
@@ -856,7 +857,7 @@ module StdAssign(MemL:MemLookup)(Form:FlexibleFormula) =
 struct
   open MemL
   let assign v ev ({delta=delta; pc=pc} as ctx) =
-    {ctx with delta=update_var delta v ev; pc=Int64.succ pc}
+    {ctx with delta=update_var delta v ev; pc=succ_big_int pc}
 end
 
 module DontEvalSymbLet =
@@ -1055,7 +1056,7 @@ let concretely_execute ?s ?(i=[]) p =
   let rec step ctx =
     let s = try Concrete.inst_fetch ctx.sigma ctx.pc
       with Not_found ->
-        failwith (Printf.sprintf "Fetching instruction %#Lx failed; you probably need to add a halt to the end of your program" ctx.pc)
+        failwith (Printf.sprintf "Fetching instruction %s failed; you probably need to add a halt to the end of your program" (~% (ctx.pc)))
     in
     dprintf "Executing: %s" (Pp.ast_stmt_to_string s);
     let nextctxs, haltvalue, finished = try Concrete.eval ctx, None, false with
@@ -1080,7 +1081,7 @@ let concretely_execute ?s ?(i=[]) p =
     | None ->
       (* Explicitly set pc to 0, since executing any init statements
          will (unintentionally) increment pc. *)
-      {ctx with pc = 0L}
+      {ctx with pc = bi0}
   in
   let ctx, v = step ctx in
   Concrete.print_values ctx.delta;

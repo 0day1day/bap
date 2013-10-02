@@ -1,6 +1,8 @@
 (** A module to try out search strategies on symbolic execution *)
 
 open Ast_convenience
+open Big_int_Z
+open Big_int_convenience
 module D = Debug.Make(struct let name = "SearchFSE" and default=`Debug end)
 open D
 
@@ -78,7 +80,7 @@ struct
           | Symbolic.AssumptionFailed {pred=pred} ->
               ([], pred :: predicates)
           | Symbolic.AssertFailed {pc=pc} ->
-              wprintf "failed assertion at %Ld\n" pc;
+              wprintf "failed assertion at %s\n" (~% pc);
               ([], predicates)  (* try other branches *)
         in
         let q = S.add_next_states q st d newstates in
@@ -201,7 +203,7 @@ let dfs_maxdepth_ast_program = MaxdepthDFSNaive.eval_ast_program
 let dfs_maxdepth_ast_program_fast = MaxdepthDFSFast.eval_ast_program
 
 
-module EdgeMap = Map.Make(struct type t = int64 * int64 let compare = compare end)
+module EdgeMap = Map.Make(struct type t = big_int * big_int let compare = compare end)
 
 (* DFS excluding paths that visit the same point more than N times. *)
 module MaxrepeatDFS = MakeSearch(
