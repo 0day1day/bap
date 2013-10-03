@@ -48,91 +48,89 @@ struct
   let edge_attributes _ = []
 end
 
-module type Cfg =
-sig
-  type exp
-  val exp_to_string : exp -> string
-  include Graph.Sig.G with type V.label = Cfg.bbid and type E.label = (bool option * exp) option
-end
-
-module DefAttributor(G:Cfg) =
+module DefAttributor(G:CFG) =
 struct
   let vertex_attributes _ _ = []
   and edge_attributes _ _ = []
 end
 
-module EdgeColorAttributor(G:Cfg) =
+module EdgeColorAttributor(G:CFG) =
 struct
   let vertex_attributes _ _ = []
   and edge_attributes _ e =
-    match Cfg.edge_direction (G.E.label e) with
+    match Cfg.edge_direction (G.G.E.label e) with
     | Some true -> [`Color green]
     | Some false -> [`Color red]
     | None -> []
 end
 
 module type Attributor =
-  functor (G:Cfg) ->
+  functor (G:CFG) ->
     sig
-      val vertex_attributes: G.t -> G.V.t -> Graph.Graphviz.DotAttributes.vertex list
-      val edge_attributes: G.t -> G.E.t -> Graph.Graphviz.DotAttributes.edge list
+      val vertex_attributes: G.G.t -> G.G.V.t -> Graph.Graphviz.DotAttributes.vertex list
+      val edge_attributes: G.G.t -> G.G.E.t -> Graph.Graphviz.DotAttributes.edge list
     end
 
 (** Makes a module suitable for use with Graph.Graphviz.Dot  for writting out
     a CFG. *)
 module MakeCfgPrinter
-  (G:Cfg)
-  (Printer:sig val print: G.t -> (G.V.t -> string) * (G.E.t -> string) end)
+  (G:CFG)
+  (Printer:sig val print: G.G.t -> (G.G.V.t -> string) * (G.G.E.t -> string) end)
   (Attributor:Attributor)
-  : (DOTTYG with type t = G.t and type V.t = G.V.t * G.t and type E.t =  G.E.t * G.t)
   =
 struct
-  type t = G.t
 
-  module V =
-  struct
-    type t = G.V.t * G.t
-    let hash (v,g) = G.V.hash v
-    let equal x y = G.V.equal (fst x) (fst y)
-    let compare x y = G.V.compare (fst x) (fst y)
-  end
-  module E =
-  struct
-    type t = G.E.t * G.t
-    type label = G.E.label
-    let label (e,g) = G.E.label e
-    let src (e,g) = (G.E.src e, g)
-    let dst (e,g) = (G.E.dst e, g)
-  end
+  include Graph.Graphviz.Dot(
+    struct
 
-  module Attributor = Attributor(G)
+      type t = G.G.t
 
-  let iter_edges_e f g =
-    G.iter_edges_e (fun e -> f (e,g)) g
+      module V =
+      struct
+        type t = G.G.V.t * G.G.t
+        let hash (v,g) = G.G.V.hash v
+        let equal x y = G.G.V.equal (fst x) (fst y)
+        let compare x y = G.G.V.compare (fst x) (fst y)
+      end
+      module E =
+      struct
+        type t = G.G.E.t * G.G.t
+        type label = G.G.E.label
+        let label (e,g) = G.G.E.label e
+        let src (e,g) = (G.G.E.src e, g)
+        let dst (e,g) = (G.G.E.dst e, g)
+      end
 
-  let iter_vertex f g =
-    G.iter_vertex (fun v -> f (v,g)) g
+      module Attributor = Attributor(G)
 
-  include DefAttrs
+      let iter_edges_e f g =
+        G.G.iter_edges_e (fun e -> f (e,g)) g
 
-  let vprinter = ref (fun _ -> failwith "Uninitialized vertex printer")
-  let eprinter = ref (fun _ -> failwith "Uninitialized edge printer")
+      let iter_vertex f g =
+        G.G.iter_vertex (fun v -> f (v,g)) g
 
-  let graph_attributes g =
-    (* Use this as an initialization routine *)
-    match Printer.print g with
-    | (vp, ep) ->
-      vprinter := vp;
-      eprinter := ep;
-      []
+      include DefAttrs
 
-  let vertex_name (v,g) = Cfg.bbid_to_string (G.V.label v)
+      let vprinter = ref (fun _ -> failwith "Uninitialized vertex printer")
+      let eprinter = ref (fun _ -> failwith "Uninitialized edge printer")
 
-  let vertex_attributes (v,g) =
-    (* FIXME: The Dot module really should be the one doing the escaping here *)
-    `Label (String.escaped(!vprinter v)) :: Attributor.vertex_attributes g v
+      let graph_attributes g =
+      (* Use this as an initialization routine *)
+        match Printer.print g with
+        | (vp, ep) ->
+          vprinter := vp;
+          eprinter := ep;
+          []
 
-  let edge_attributes (e,g) = (`Label (String.escaped(!eprinter e))) :: Attributor.edge_attributes g e
+      let vertex_name (v,g) = Cfg.bbid_to_string (G.G.V.label v)
+
+      let vertex_attributes (v,g) =
+      (* FIXME: The Dot module really should be the one doing the escaping here *)
+        `Label (String.escaped(!vprinter v)) :: Attributor.vertex_attributes g v
+
+      let edge_attributes (e,g) = (`Label (String.escaped(!eprinter e))) :: Attributor.edge_attributes g e
+
+    end)
 
 end
 
@@ -232,24 +230,11 @@ struct
     )
 end
 
-module CSG = struct
-  include CS.G
-  type exp = CS.exp
-  let exp_to_string = Pp.ssa_exp_to_string
-end
-module SsaStmtsPrinter = MakeCfgPrinter (CSG) (PrintSsaStmts) (EdgeColorAttributor)
-module SsaStmtsDot = Graph.Graphviz.Dot(SsaStmtsPrinter)
+module SsaStmtsDot = MakeCfgPrinter (CS) (PrintSsaStmts) (EdgeColorAttributor)
 
-module CAG = struct
-  include CA.G
-  type exp = CA.exp
-  let exp_to_string = Pp.ast_exp_to_string
-end
-module AstStmtsPrinter = MakeCfgPrinter (CAG) (PrintAstStmts) (EdgeColorAttributor)
-module AstStmtsDot = Graph.Graphviz.Dot (AstStmtsPrinter)
+module AstStmtsDot = MakeCfgPrinter (CA) (PrintAstStmts) (EdgeColorAttributor)
 
-module AstAsmsPrinter = MakeCfgPrinter (CAG) (PrintAstAsms) (EdgeColorAttributor)
-module AstAsmsDot = Graph.Graphviz.Dot (AstAsmsPrinter)
+module AstAsmsDot = MakeCfgPrinter (CA) (PrintAstAsms) (EdgeColorAttributor)
 
 module SsaBBidPrinter =
 struct
@@ -267,8 +252,6 @@ struct
 end
 module AstBBidDot = Graph.Graphviz.Dot(AstBBidPrinter)
 
-module SsaStmtsAttPrinter = MakeCfgPrinter (CSG) (PrintSsaStmts) (EdgeColorAttributor)
-module SsaStmtsAttDot = Graph.Graphviz.Dot(SsaStmtsAttPrinter)
+module SsaStmtsAttDot = MakeCfgPrinter (CS) (PrintSsaStmts) (EdgeColorAttributor)
 
-module AstStmtsAttPrinter = MakeCfgPrinter (CAG) (PrintAstStmts) (EdgeColorAttributor)
-module AstStmtsAttDot = Graph.Graphviz.Dot(AstStmtsAttPrinter)
+module AstStmtsAttDot = MakeCfgPrinter (CA) (PrintAstStmts) (EdgeColorAttributor)
