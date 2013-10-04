@@ -616,16 +616,6 @@ ADDRINT CheckTrigger()
     return --g_trig_countdown <= 0;
 }
 
-/** Reinstrument all images. XXX: Remove me. */
-VOID InstrumentIMG() {
-    dbg_printf("InstrumentIMG\n");
-    PIN_LockClient();
-    for (IMG i = APP_ImgHead(); IMG_Valid(i); i = IMG_Next(i)) {
-        ModLoad(i, (void*)1);
-    }
-    PIN_UnlockClient();
-}
-
 VOID Activate(CONTEXT *ctx)
 {
     dbg_printf("Activate\n");
@@ -650,7 +640,6 @@ VOID TActivate()
                         introduced. */
     g_taint_introduced = true; /* Taint is definitely introduced now. */
     PIN_RemoveInstrumentation();
-    InstrumentIMG();
 }
 
 //
@@ -1925,7 +1914,9 @@ VOID ModLoad(IMG img, VOID *v)
     f.mutable_modload_frame()->set_low_address(IMG_LowAddress(img));
     f.mutable_modload_frame()->set_high_address(IMG_HighAddress(img));
 
+    GetLock(&lock, 0);
     g_twnew->add(f);
+    ReleaseLock(&lock);
 
 #ifdef _WIN32
     // Try to find kernel32
