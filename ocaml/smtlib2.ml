@@ -56,6 +56,11 @@ class pp ?(opts=[]) ft =
   and flush = Format.pp_print_flush ft
   and cls = Format.pp_close_box ft in
   let var2s (Var.V(num,name,_)) =
+    let name =
+      if BatChar.is_letter name.[0]
+      then name
+      else "v"^name
+    in
     name^"_"^(string_of_int num)
   in
   let setoption = List.mem SetOptionProduceAssignments opts in
