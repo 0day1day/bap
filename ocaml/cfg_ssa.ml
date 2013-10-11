@@ -255,6 +255,8 @@ module ToTac = struct
       Label(label,a) :: revstmts
     | Comment(s,a) ->
       Comment(s,a)::revstmts
+    | Special(s,du,a) ->
+      Special(s,du,a)::revstmts
     | Assert(e,a) ->
       let (revstmts,v) = exp2tac ~revstmts e in
       Assert(v,a)::revstmts
@@ -553,6 +555,9 @@ let uninitialized cfg =
       | Jmp(e, _) -> f_e e
       | CJmp(e1, e2, e3, _) -> f_e e1; f_e e2; f_e e3
       | Label _ | Comment _ -> ()
+      | Special(_,{Var.defs = ds; Var.uses = us},_) ->
+        List.iter (add assnd) ds;
+        List.iter (add refd) us
     and f_e = function
       | Load(v1,v2,v3,_) -> f_e v1; f_e v2; f_e v3
       | Store(v1,v2,v3,v4,_) -> f_e v1; f_e v2; f_e v3; f_e v4
@@ -870,6 +875,7 @@ let rec exp2ast tm e =
 let stmt2ast tm e =
   let e2a = exp2ast tm in
   match e with
+    | Special(s,du,a) -> Ast.Special(s,Some du,a)
     | Jmp(t,a) -> Ast.Jmp(e2a t, a)
     | CJmp(c,tt,tf,a) -> Ast.CJmp(e2a c, e2a tt, e2a tf, a)
     | Label(l,a) -> Ast.Label(l,a)

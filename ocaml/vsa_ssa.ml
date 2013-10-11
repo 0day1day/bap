@@ -1272,6 +1272,12 @@ struct
         | Assert _ | Assume _ | Jmp _ | CJmp _ | Label _ | Comment _
         | Halt _ ->
             l
+        | Special(_,{Var.defs = ds},_) ->
+          let l = get_map l in
+          let update_map l v = match v with
+            | Var.V(_,_,Reg n) -> VM.add v (`Scalar (VS.top n)) l
+            | _ -> l (* Don't try to update memory, you have no idea what's happened *) in
+          Some (List.fold_left update_map l ds)
         | Move(v, e, _) ->
           let l = get_map l in
           try

@@ -134,7 +134,7 @@ let num_stmt = function
   | Assert _ -> 5
   | Assume _ -> 6
   | Comment _ -> 7
-  (* | Special _ -> 7 *)
+  | Special _ -> 8
 
 let getargs_stmt = function
     (* value, var, label, attr, string, exp *)
@@ -146,7 +146,7 @@ let getargs_stmt = function
   | Assert(e,a)
   | Assume(e,a) -> [e], [], [], [a], [], []
   | Comment(s,a) -> [], [], [], [a], [s], []
-  (* | Special(s,a) -> [], [], [], [a], [s] *)
+  | Special(s,{Var.defs = ds; Var.uses = us},a) -> [], List.append ds us, [], [a], [s], []
 
 (** quick_stmt_eq returns true if and only if the subexpressions in e1
     and e2 are *physically* equal. *)
@@ -200,7 +200,8 @@ let get_attrs = function
   | Halt(_,a)
   | Assert(_,a)
   | Assume(_,a)
-  | Comment(_,a) -> a
+  | Comment(_,a)
+  | Special(_,_,a) -> a
 
 let exp_true = Int(bi1, Reg 1)
 let exp_false = Int(bi0, Reg 1)

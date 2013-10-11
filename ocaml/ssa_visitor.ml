@@ -96,6 +96,9 @@ and rvar_accept visitor =
 and stmt_accept visitor = 
   let vischil = function 
       (* TODO: attributes? *)
+    | Special(s,{Var.uses = us; Var.defs = ds},a) ->
+      Special(s,{Var.uses = List.map (rvar_accept visitor) us;
+                 Var.defs = List.map (avar_accept visitor) ds},a)
     | Jmp(l, a) -> Jmp(exp_accept visitor l, a) 
     | CJmp(c, l1, l2, a) -> 
 	let c' = exp_accept visitor c in
