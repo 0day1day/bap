@@ -345,7 +345,7 @@ module VSA_SPEC = struct
 end
 
 module Make(D:DISASM)(F:FUNCID) = struct
-  let disasm_at p addr =
+  let disasm_at ?du:(du=None) p addr =
     let (tmp, entry) = Cfg_ast.create_entry (CA.empty()) in
     let (tmp, exit) = Cfg_ast.find_exit tmp in
     let (tmp, error) = Cfg_ast.find_error tmp in
@@ -413,12 +413,12 @@ module Make(D:DISASM)(F:FUNCID) = struct
               let dumb_translate cfg (s,l,e) =
                 let revstmts = match List.rev (CA.get_stmts cfg s) with
                   | CJmp _::_ -> failwith "Conditional function calls are not implemented"
-                  | Jmp _::tl as stmts -> List.map (function
+                  | Jmp _::tl as stmts -> let comments = List.map (function
                       | Label _ as s -> s
                       | Jmp(e, attrs) as s ->
                         Comment(Printf.sprintf "Function call/ret removed: %s" (Pp.ast_stmt_to_string s), NamedStrAttr("calltarget", Pp.ast_exp_to_string e)::attrs)
                       | s ->
-                        Comment(Printf.sprintf "Function call/ret removed: %s" (Pp.ast_stmt_to_string s), [])) stmts
+                        Comment(Printf.sprintf "Function call/ret removed: %s" (Pp.ast_stmt_to_string s), [])) stmts in (match du with | None -> comments | Some _ -> Special("function call", du, [])::comments)
                   | _ -> failwith "Unable to rewrite function call"
                 in
                 CA.set_stmts cfg s (List.rev revstmts)
@@ -515,7 +515,7 @@ module Make(D:DISASM)(F:FUNCID) = struct
 
       !c, !state
 
-  let disasm p = disasm_at p (Asmir.get_start_addr p)
+  let disasm ?du:(du=None) p = disasm_at ~du:du p (Asmir.get_start_addr p)
 end
 
 let recursive_descent =
@@ -533,19 +533,19 @@ let vsa_full =
   VSA.disasm
 let vsa a = fst(vsa_full a)
 
-let vsa_at_full =
+let vsa_at_full ?callsig:(du=None) =
   let module VSA = Make(VSA_SPEC)(FUNCFINDER_DUMB) in
-  VSA.disasm_at
-let vsa_at a b = fst(vsa_at_full a b)
+  VSA.disasm_at ~du:du
+let vsa_at ?callsig:(du=None) a b = fst(vsa_at_full ~callsig:du a b)
 
 type algorithm =
   | Vsa
   | Rd
 
 let recover = function
-  | Vsa -> vsa
+  | Vsa -> vsa 
   | Rd -> recursive_descent
 
 let recover_at = function
-  | Vsa -> vsa_at
+  | Vsa -> vsa_at ~callsig:None
   | Rd -> recursive_descent_at

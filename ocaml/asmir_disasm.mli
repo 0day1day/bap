@@ -35,8 +35,8 @@ module Make :
   functor (D:DISASM) ->
     functor (F:FUNCID) ->
 sig
-  val disasm_at : Asmir.asmprogram -> addr -> Cfg.AST.G.t * D.State.t
-  val disasm : Asmir.asmprogram -> Cfg.AST.G.t * D.State.t
+  val disasm_at : ?du:Var.defuse option -> Asmir.asmprogram -> addr -> Cfg.AST.G.t * D.State.t
+  val disasm : ?du:Var.defuse option -> Asmir.asmprogram -> Cfg.AST.G.t * D.State.t
 end
 
 val recursive_descent : Asmir.asmprogram -> Cfg.AST.G.t
@@ -47,11 +47,11 @@ type vsaresult = {origssa: Cfg.SSA.G.t;
                   vsa_in: Cfg.ssastmtloc -> Vsa_ssa.AbsEnv.t option;
                   vsa_out: Cfg.ssastmtloc -> Vsa_ssa.AbsEnv.t option;}
 
-val vsa_full : Asmir.asmprogram -> Cfg.AST.G.t * vsaresult option
-val vsa_at_full : Asmir.asmprogram -> addr -> Cfg.AST.G.t * vsaresult option
+val vsa_full : ?du:Var.defuse option -> Asmir.asmprogram -> Cfg.AST.G.t * vsaresult option
+val vsa_at_full : ?callsig:Var.defuse option -> Asmir.asmprogram -> addr -> Cfg.AST.G.t * vsaresult option
 
 val vsa : Asmir.asmprogram -> Cfg.AST.G.t
-val vsa_at : Asmir.asmprogram -> addr -> Cfg.AST.G.t
+val vsa_at : ?callsig:Var.defuse option -> Asmir.asmprogram -> addr -> Cfg.AST.G.t
 
 type algorithm =
   | Vsa
