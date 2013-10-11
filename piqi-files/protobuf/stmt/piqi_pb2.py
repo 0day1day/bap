@@ -11,7 +11,7 @@ from google.protobuf import descriptor_pb2
 DESCRIPTOR = descriptor.FileDescriptor(
   name='stmt.piqi.proto',
   package='',
-  serialized_pb='\n\x0fstmt.piqi.proto\"\x1e\n\x07program\x12\x13\n\x04\x65lem\x18\x01 \x03(\x0b\x32\x05.stmt\"\xeb\x01\n\x04stmt\x12\x13\n\x04move\x18\x01 \x01(\x0b\x32\x05.move\x12\x11\n\x03jmp\x18\x02 \x01(\x0b\x32\x04.jmp\x12\x13\n\x04\x63jmp\x18\x03 \x01(\x0b\x32\x05.cjmp\x12\x1f\n\nlabel_stmt\x18\x04 \x01(\x0b\x32\x0b.label_stmt\x12\x13\n\x04halt\x18\x05 \x01(\x0b\x32\x05.halt\x12!\n\x0b\x61ssert_stmt\x18\x06 \x01(\x0b\x32\x0c.assert_stmt\x12\x17\n\x06\x61ssume\x18\x07 \x01(\x0b\x32\x07.assume\x12\x19\n\x07\x63omment\x18\x08 \x01(\x0b\x32\x08.comment\x12\x19\n\x07special\x18\t \x01(\x0b\x32\x08.special\"M\n\x04move\x12\x11\n\x03var\x18\x01 \x02(\x0b\x32\x04.var\x12\x11\n\x03\x65xp\x18\x02 \x02(\x0b\x32\x04.exp\x12\x1f\n\nattributes\x18\x03 \x02(\x0b\x32\x0b.attributes\"9\n\x03jmp\x12\x11\n\x03\x65xp\x18\x01 \x02(\x0b\x32\x04.exp\x12\x1f\n\nattributes\x18\x02 \x02(\x0b\x32\x0b.attributes\"h\n\x04\x63jmp\x12\x12\n\x04\x63ond\x18\x01 \x02(\x0b\x32\x04.exp\x12\x14\n\x06iftrue\x18\x02 \x02(\x0b\x32\x04.exp\x12\x15\n\x07iffalse\x18\x03 \x02(\x0b\x32\x04.exp\x12\x1f\n\nattributes\x18\x04 \x02(\x0b\x32\x0b.attributes\"D\n\nlabel_stmt\x12\x15\n\x05label\x18\x01 \x02(\x0b\x32\x06.label\x12\x1f\n\nattributes\x18\x02 \x02(\x0b\x32\x0b.attributes\":\n\x04halt\x12\x11\n\x03\x65xp\x18\x01 \x02(\x0b\x32\x04.exp\x12\x1f\n\nattributes\x18\x02 \x02(\x0b\x32\x0b.attributes\"A\n\x0b\x61ssert_stmt\x12\x11\n\x03\x65xp\x18\x01 \x02(\x0b\x32\x04.exp\x12\x1f\n\nattributes\x18\x02 \x02(\x0b\x32\x0b.attributes\"<\n\x06\x61ssume\x12\x11\n\x03\x65xp\x18\x01 \x02(\x0b\x32\x04.exp\x12\x1f\n\nattributes\x18\x02 \x02(\x0b\x32\x0b.attributes\":\n\x07\x63omment\x12\x0e\n\x06string\x18\x01 \x02(\t\x12\x1f\n\nattributes\x18\x02 \x02(\x0b\x32\x0b.attributes\":\n\x07special\x12\x0e\n\x06string\x18\x01 \x02(\t\x12\x1f\n\nattributes\x18\x02 \x02(\x0b\x32\x0b.attributes\">\n\x03typ\x12\x0b\n\x03reg\x18\x01 \x01(\x11\x12\x13\n\x04tmem\x18\x02 \x01(\x0b\x32\x05.tmem\x12\x15\n\x05\x61rray\x18\x03 \x01(\x0b\x32\x06.array\"<\n\x04tmem\x12\x18\n\nindex_type\x18\x01 \x02(\x0b\x32\x04.typ\x12\x1a\n\x0c\x65lement_type\x18\x02 \x02(\x0b\x32\x04.typ\"=\n\x05\x61rray\x12\x18\n\nindex_type\x18\x01 \x02(\x0b\x32\x04.typ\x12\x1a\n\x0c\x65lement_type\x18\x02 \x02(\x0b\x32\x04.typ\"#\n\x05label\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0c\n\x04\x61\x64\x64r\x18\x02 \x01(\x12\"2\n\x03var\x12\x0c\n\x04name\x18\x01 \x02(\t\x12\n\n\x02id\x18\x02 \x02(\x11\x12\x11\n\x03typ\x18\x03 \x02(\x0b\x32\x04.typ\"\xb1\x01\n\tattribute\x12\x0b\n\x03\x61sm\x18\x01 \x01(\t\x12\x0f\n\x07\x61\x64\x64ress\x18\x02 \x01(\x12\x12\x19\n\x07liveout\x18\x03 \x01(\x0b\x32\x08.liveout\x12\x0f\n\x07strattr\x18\x04 \x01(\t\x12\x19\n\x07\x63ontext\x18\x05 \x01(\x0b\x32\x08.context\x12\x11\n\tthread_id\x18\x06 \x01(\x04\x12\x1d\n\tsynthetic\x18\x07 \x01(\x0b\x32\n.synthetic\x12\r\n\x05other\x18\x08 \x01(\t\"&\n\nattributes\x12\x18\n\x04\x65lem\x18\x01 \x03(\x0b\x32\n.attribute\"\t\n\x07liveout\"\x0b\n\tsynthetic\"]\n\x15operand_info_specific\x12!\n\x0bmem_operand\x18\x01 \x01(\x0b\x32\x0c.mem_operand\x12!\n\x0breg_operand\x18\x02 \x01(\x0b\x32\x0c.reg_operand\"\x1b\n\x0breg_operand\x12\x0c\n\x04name\x18\x01 \x02(\t\"K\n\roperand_usage\x12\x0c\n\x04read\x18\x01 \x02(\x08\x12\x0f\n\x07written\x18\x02 \x02(\x08\x12\r\n\x05index\x18\x03 \x02(\x08\x12\x0c\n\x04\x62\x61se\x18\x04 \x02(\x08\"\x1e\n\x0bmem_operand\x12\x0f\n\x07\x61\x64\x64ress\x18\x01 \x02(\x12\"H\n\ntaint_info\x12\x10\n\x08no_taint\x18\x01 \x01(\x08\x12\x10\n\x08taint_id\x18\x02 \x01(\x04\x12\x16\n\x0etaint_multiple\x18\x03 \x01(\x08\"\xab\x01\n\x07\x63ontext\x12\x35\n\x15operand_info_specific\x18\x01 \x02(\x0b\x32\x16.operand_info_specific\x12\x12\n\nbit_length\x18\x02 \x02(\x11\x12%\n\roperand_usage\x18\x03 \x02(\x0b\x32\x0e.operand_usage\x12\x1f\n\ntaint_info\x18\x04 \x02(\x0b\x32\x0b.taint_info\x12\r\n\x05value\x18\x05 \x02(\t\"\xa4\x02\n\x03\x65xp\x12\x13\n\x04load\x18\x01 \x01(\x0b\x32\x05.load\x12\x15\n\x05store\x18\x02 \x01(\x0b\x32\x06.store\x12\x15\n\x05\x62inop\x18\x03 \x01(\x0b\x32\x06.binop\x12\x13\n\x04unop\x18\x04 \x01(\x0b\x32\x05.unop\x12\x11\n\x03var\x18\x05 \x01(\x0b\x32\x04.var\x12\x0b\n\x03lab\x18\x06 \x01(\t\x12\x13\n\x04inte\x18\x07 \x01(\x0b\x32\x05.inte\x12\x13\n\x04\x63\x61st\x18\x08 \x01(\x0b\x32\x05.cast\x12\x19\n\x07let_exp\x18\t \x01(\x0b\x32\x08.let_exp\x12\x19\n\x07unknown\x18\n \x01(\x0b\x32\x08.unknown\x12\x11\n\x03ite\x18\x0b \x01(\x0b\x32\x04.ite\x12\x19\n\x07\x65xtract\x18\x0c \x01(\x0b\x32\x08.extract\x12\x17\n\x06\x63oncat\x18\r \x01(\x0b\x32\x07.concat\"\\\n\x04load\x12\x14\n\x06memory\x18\x01 \x02(\x0b\x32\x04.exp\x12\x15\n\x07\x61\x64\x64ress\x18\x02 \x02(\x0b\x32\x04.exp\x12\x14\n\x06\x65ndian\x18\x03 \x02(\x0b\x32\x04.exp\x12\x11\n\x03typ\x18\x04 \x02(\x0b\x32\x04.typ\"r\n\x05store\x12\x14\n\x06memory\x18\x01 \x02(\x0b\x32\x04.exp\x12\x15\n\x07\x61\x64\x64ress\x18\x02 \x02(\x0b\x32\x04.exp\x12\x13\n\x05value\x18\x03 \x02(\x0b\x32\x04.exp\x12\x14\n\x06\x65ndian\x18\x04 \x02(\x0b\x32\x04.exp\x12\x11\n\x03typ\x18\x05 \x02(\x0b\x32\x04.typ\"P\n\x05\x62inop\x12\x1f\n\nbinop_type\x18\x01 \x02(\x0e\x32\x0b.binop_type\x12\x12\n\x04lexp\x18\x02 \x02(\x0b\x32\x04.exp\x12\x12\n\x04rexp\x18\x03 \x02(\x0b\x32\x04.exp\"8\n\x04unop\x12\x1d\n\tunop_type\x18\x01 \x02(\x0e\x32\n.unop_type\x12\x11\n\x03\x65xp\x18\x02 \x02(\x0b\x32\x04.exp\"&\n\x04inte\x12\x0b\n\x03int\x18\x01 \x02(\t\x12\x11\n\x03typ\x18\x02 \x02(\x0b\x32\x04.typ\"P\n\x04\x63\x61st\x12\x1d\n\tcast_type\x18\x01 \x02(\x0e\x32\n.cast_type\x12\x16\n\x08new_type\x18\x02 \x02(\x0b\x32\x04.typ\x12\x11\n\x03\x65xp\x18\x03 \x02(\x0b\x32\x04.exp\"@\n\x07let_exp\x12\x11\n\x03var\x18\x01 \x02(\x0b\x32\x04.var\x12\x10\n\x02\x65\x31\x18\x02 \x02(\x0b\x32\x04.exp\x12\x10\n\x02\x65\x32\x18\x03 \x02(\x0b\x32\x04.exp\",\n\x07unknown\x12\x0e\n\x06string\x18\x01 \x02(\t\x12\x11\n\x03typ\x18\x02 \x02(\x0b\x32\x04.typ\"K\n\x03ite\x12\x17\n\tcondition\x18\x01 \x02(\x0b\x32\x04.exp\x12\x14\n\x06iftrue\x18\x02 \x02(\x0b\x32\x04.exp\x12\x15\n\x07iffalse\x18\x03 \x02(\x0b\x32\x04.exp\"8\n\x07\x65xtract\x12\x0c\n\x04hbit\x18\x01 \x02(\x11\x12\x0c\n\x04lbit\x18\x02 \x02(\x11\x12\x11\n\x03\x65xp\x18\x03 \x02(\x0b\x32\x04.exp\",\n\x06\x63oncat\x12\x10\n\x02le\x18\x01 \x02(\x0b\x32\x04.exp\x12\x10\n\x02re\x18\x02 \x02(\x0b\x32\x04.exp*L\n\tcast_type\x12\x11\n\rcast_unsigned\x10\x01\x12\x0f\n\x0b\x63\x61st_signed\x10\x02\x12\r\n\tcast_high\x10\x03\x12\x0c\n\x08\x63\x61st_low\x10\x04*\xd3\x01\n\nbinop_type\x12\x08\n\x04plus\x10\x01\x12\t\n\x05minus\x10\x02\x12\t\n\x05times\x10\x03\x12\n\n\x06\x64ivide\x10\x04\x12\x0b\n\x07sdivide\x10\x05\x12\n\n\x06modbop\x10\x06\x12\x08\n\x04smod\x10\x07\x12\n\n\x06lshift\x10\x08\x12\n\n\x06rshift\x10\t\x12\x0b\n\x07\x61rshift\x10\n\x12\n\n\x06\x61ndbop\x10\x0b\x12\t\n\x05orbop\x10\x0c\x12\x07\n\x03xor\x10\r\x12\x06\n\x02\x65q\x10\x0e\x12\x07\n\x03neq\x10\x0f\x12\x06\n\x02lt\x10\x10\x12\x06\n\x02le\x10\x11\x12\x07\n\x03slt\x10\x12\x12\x07\n\x03sle\x10\x13*\x1f\n\tunop_type\x12\x08\n\x04uneg\x10\x01\x12\x08\n\x04unot\x10\x02')
+  serialized_pb='\n\x0fstmt.piqi.proto\"\x1e\n\x07program\x12\x13\n\x04\x65lem\x18\x01 \x03(\x0b\x32\x05.stmt\"\xeb\x01\n\x04stmt\x12\x13\n\x04move\x18\x01 \x01(\x0b\x32\x05.move\x12\x11\n\x03jmp\x18\x02 \x01(\x0b\x32\x04.jmp\x12\x13\n\x04\x63jmp\x18\x03 \x01(\x0b\x32\x05.cjmp\x12\x1f\n\nlabel_stmt\x18\x04 \x01(\x0b\x32\x0b.label_stmt\x12\x13\n\x04halt\x18\x05 \x01(\x0b\x32\x05.halt\x12!\n\x0b\x61ssert_stmt\x18\x06 \x01(\x0b\x32\x0c.assert_stmt\x12\x17\n\x06\x61ssume\x18\x07 \x01(\x0b\x32\x07.assume\x12\x19\n\x07\x63omment\x18\x08 \x01(\x0b\x32\x08.comment\x12\x19\n\x07special\x18\t \x01(\x0b\x32\x08.special\"M\n\x04move\x12\x11\n\x03var\x18\x01 \x02(\x0b\x32\x04.var\x12\x11\n\x03\x65xp\x18\x02 \x02(\x0b\x32\x04.exp\x12\x1f\n\nattributes\x18\x03 \x02(\x0b\x32\x0b.attributes\"9\n\x03jmp\x12\x11\n\x03\x65xp\x18\x01 \x02(\x0b\x32\x04.exp\x12\x1f\n\nattributes\x18\x02 \x02(\x0b\x32\x0b.attributes\"h\n\x04\x63jmp\x12\x12\n\x04\x63ond\x18\x01 \x02(\x0b\x32\x04.exp\x12\x14\n\x06iftrue\x18\x02 \x02(\x0b\x32\x04.exp\x12\x15\n\x07iffalse\x18\x03 \x02(\x0b\x32\x04.exp\x12\x1f\n\nattributes\x18\x04 \x02(\x0b\x32\x0b.attributes\"D\n\nlabel_stmt\x12\x15\n\x05label\x18\x01 \x02(\x0b\x32\x06.label\x12\x1f\n\nattributes\x18\x02 \x02(\x0b\x32\x0b.attributes\":\n\x04halt\x12\x11\n\x03\x65xp\x18\x01 \x02(\x0b\x32\x04.exp\x12\x1f\n\nattributes\x18\x02 \x02(\x0b\x32\x0b.attributes\"A\n\x0b\x61ssert_stmt\x12\x11\n\x03\x65xp\x18\x01 \x02(\x0b\x32\x04.exp\x12\x1f\n\nattributes\x18\x02 \x02(\x0b\x32\x0b.attributes\"<\n\x06\x61ssume\x12\x11\n\x03\x65xp\x18\x01 \x02(\x0b\x32\x04.exp\x12\x1f\n\nattributes\x18\x02 \x02(\x0b\x32\x0b.attributes\":\n\x07\x63omment\x12\x0e\n\x06string\x18\x01 \x02(\t\x12\x1f\n\nattributes\x18\x02 \x02(\x0b\x32\x0b.attributes\"S\n\x07special\x12\x0e\n\x06string\x18\x01 \x02(\t\x12\x17\n\x06\x64\x65\x66use\x18\x02 \x01(\x0b\x32\x07.defuse\x12\x1f\n\nattributes\x18\x03 \x02(\x0b\x32\x0b.attributes\">\n\x03typ\x12\x0b\n\x03reg\x18\x01 \x01(\x11\x12\x13\n\x04tmem\x18\x02 \x01(\x0b\x32\x05.tmem\x12\x15\n\x05\x61rray\x18\x03 \x01(\x0b\x32\x06.array\"<\n\x04tmem\x12\x18\n\nindex_type\x18\x01 \x02(\x0b\x32\x04.typ\x12\x1a\n\x0c\x65lement_type\x18\x02 \x02(\x0b\x32\x04.typ\"=\n\x05\x61rray\x12\x18\n\nindex_type\x18\x01 \x02(\x0b\x32\x04.typ\x12\x1a\n\x0c\x65lement_type\x18\x02 \x02(\x0b\x32\x04.typ\"#\n\x05label\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0c\n\x04\x61\x64\x64r\x18\x02 \x01(\x12\"2\n\x03var\x12\x0c\n\x04name\x18\x01 \x02(\t\x12\n\n\x02id\x18\x02 \x02(\x11\x12\x11\n\x03typ\x18\x03 \x02(\x0b\x32\x04.typ\"\x1a\n\x04vars\x12\x12\n\x04\x65lem\x18\x01 \x03(\x0b\x32\x04.var\"2\n\x06\x64\x65\x66use\x12\x13\n\x04\x64\x65\x66s\x18\x01 \x02(\x0b\x32\x05.vars\x12\x13\n\x04uses\x18\x02 \x02(\x0b\x32\x05.vars\"\xb1\x01\n\tattribute\x12\x0b\n\x03\x61sm\x18\x01 \x01(\t\x12\x0f\n\x07\x61\x64\x64ress\x18\x02 \x01(\x12\x12\x19\n\x07liveout\x18\x03 \x01(\x0b\x32\x08.liveout\x12\x0f\n\x07strattr\x18\x04 \x01(\t\x12\x19\n\x07\x63ontext\x18\x05 \x01(\x0b\x32\x08.context\x12\x11\n\tthread_id\x18\x06 \x01(\x04\x12\x1d\n\tsynthetic\x18\x07 \x01(\x0b\x32\n.synthetic\x12\r\n\x05other\x18\x08 \x01(\t\"&\n\nattributes\x12\x18\n\x04\x65lem\x18\x01 \x03(\x0b\x32\n.attribute\"\t\n\x07liveout\"\x0b\n\tsynthetic\"]\n\x15operand_info_specific\x12!\n\x0bmem_operand\x18\x01 \x01(\x0b\x32\x0c.mem_operand\x12!\n\x0breg_operand\x18\x02 \x01(\x0b\x32\x0c.reg_operand\"\x1b\n\x0breg_operand\x12\x0c\n\x04name\x18\x01 \x02(\t\"K\n\roperand_usage\x12\x0c\n\x04read\x18\x01 \x02(\x08\x12\x0f\n\x07written\x18\x02 \x02(\x08\x12\r\n\x05index\x18\x03 \x02(\x08\x12\x0c\n\x04\x62\x61se\x18\x04 \x02(\x08\"\x1e\n\x0bmem_operand\x12\x0f\n\x07\x61\x64\x64ress\x18\x01 \x02(\x12\"H\n\ntaint_info\x12\x10\n\x08no_taint\x18\x01 \x01(\x08\x12\x10\n\x08taint_id\x18\x02 \x01(\x04\x12\x16\n\x0etaint_multiple\x18\x03 \x01(\x08\"\xab\x01\n\x07\x63ontext\x12\x35\n\x15operand_info_specific\x18\x01 \x02(\x0b\x32\x16.operand_info_specific\x12\x12\n\nbit_length\x18\x02 \x02(\x11\x12%\n\roperand_usage\x18\x03 \x02(\x0b\x32\x0e.operand_usage\x12\x1f\n\ntaint_info\x18\x04 \x02(\x0b\x32\x0b.taint_info\x12\r\n\x05value\x18\x05 \x02(\t\"\xa4\x02\n\x03\x65xp\x12\x13\n\x04load\x18\x01 \x01(\x0b\x32\x05.load\x12\x15\n\x05store\x18\x02 \x01(\x0b\x32\x06.store\x12\x15\n\x05\x62inop\x18\x03 \x01(\x0b\x32\x06.binop\x12\x13\n\x04unop\x18\x04 \x01(\x0b\x32\x05.unop\x12\x11\n\x03var\x18\x05 \x01(\x0b\x32\x04.var\x12\x0b\n\x03lab\x18\x06 \x01(\t\x12\x13\n\x04inte\x18\x07 \x01(\x0b\x32\x05.inte\x12\x13\n\x04\x63\x61st\x18\x08 \x01(\x0b\x32\x05.cast\x12\x19\n\x07let_exp\x18\t \x01(\x0b\x32\x08.let_exp\x12\x19\n\x07unknown\x18\n \x01(\x0b\x32\x08.unknown\x12\x11\n\x03ite\x18\x0b \x01(\x0b\x32\x04.ite\x12\x19\n\x07\x65xtract\x18\x0c \x01(\x0b\x32\x08.extract\x12\x17\n\x06\x63oncat\x18\r \x01(\x0b\x32\x07.concat\"\\\n\x04load\x12\x14\n\x06memory\x18\x01 \x02(\x0b\x32\x04.exp\x12\x15\n\x07\x61\x64\x64ress\x18\x02 \x02(\x0b\x32\x04.exp\x12\x14\n\x06\x65ndian\x18\x03 \x02(\x0b\x32\x04.exp\x12\x11\n\x03typ\x18\x04 \x02(\x0b\x32\x04.typ\"r\n\x05store\x12\x14\n\x06memory\x18\x01 \x02(\x0b\x32\x04.exp\x12\x15\n\x07\x61\x64\x64ress\x18\x02 \x02(\x0b\x32\x04.exp\x12\x13\n\x05value\x18\x03 \x02(\x0b\x32\x04.exp\x12\x14\n\x06\x65ndian\x18\x04 \x02(\x0b\x32\x04.exp\x12\x11\n\x03typ\x18\x05 \x02(\x0b\x32\x04.typ\"P\n\x05\x62inop\x12\x1f\n\nbinop_type\x18\x01 \x02(\x0e\x32\x0b.binop_type\x12\x12\n\x04lexp\x18\x02 \x02(\x0b\x32\x04.exp\x12\x12\n\x04rexp\x18\x03 \x02(\x0b\x32\x04.exp\"8\n\x04unop\x12\x1d\n\tunop_type\x18\x01 \x02(\x0e\x32\n.unop_type\x12\x11\n\x03\x65xp\x18\x02 \x02(\x0b\x32\x04.exp\"&\n\x04inte\x12\x0b\n\x03int\x18\x01 \x02(\t\x12\x11\n\x03typ\x18\x02 \x02(\x0b\x32\x04.typ\"P\n\x04\x63\x61st\x12\x1d\n\tcast_type\x18\x01 \x02(\x0e\x32\n.cast_type\x12\x16\n\x08new_type\x18\x02 \x02(\x0b\x32\x04.typ\x12\x11\n\x03\x65xp\x18\x03 \x02(\x0b\x32\x04.exp\"@\n\x07let_exp\x12\x11\n\x03var\x18\x01 \x02(\x0b\x32\x04.var\x12\x10\n\x02\x65\x31\x18\x02 \x02(\x0b\x32\x04.exp\x12\x10\n\x02\x65\x32\x18\x03 \x02(\x0b\x32\x04.exp\",\n\x07unknown\x12\x0e\n\x06string\x18\x01 \x02(\t\x12\x11\n\x03typ\x18\x02 \x02(\x0b\x32\x04.typ\"K\n\x03ite\x12\x17\n\tcondition\x18\x01 \x02(\x0b\x32\x04.exp\x12\x14\n\x06iftrue\x18\x02 \x02(\x0b\x32\x04.exp\x12\x15\n\x07iffalse\x18\x03 \x02(\x0b\x32\x04.exp\"8\n\x07\x65xtract\x12\x0c\n\x04hbit\x18\x01 \x02(\x11\x12\x0c\n\x04lbit\x18\x02 \x02(\x11\x12\x11\n\x03\x65xp\x18\x03 \x02(\x0b\x32\x04.exp\",\n\x06\x63oncat\x12\x10\n\x02le\x18\x01 \x02(\x0b\x32\x04.exp\x12\x10\n\x02re\x18\x02 \x02(\x0b\x32\x04.exp*L\n\tcast_type\x12\x11\n\rcast_unsigned\x10\x01\x12\x0f\n\x0b\x63\x61st_signed\x10\x02\x12\r\n\tcast_high\x10\x03\x12\x0c\n\x08\x63\x61st_low\x10\x04*\xd3\x01\n\nbinop_type\x12\x08\n\x04plus\x10\x01\x12\t\n\x05minus\x10\x02\x12\t\n\x05times\x10\x03\x12\n\n\x06\x64ivide\x10\x04\x12\x0b\n\x07sdivide\x10\x05\x12\n\n\x06modbop\x10\x06\x12\x08\n\x04smod\x10\x07\x12\n\n\x06lshift\x10\x08\x12\n\n\x06rshift\x10\t\x12\x0b\n\x07\x61rshift\x10\n\x12\n\n\x06\x61ndbop\x10\x0b\x12\t\n\x05orbop\x10\x0c\x12\x07\n\x03xor\x10\r\x12\x06\n\x02\x65q\x10\x0e\x12\x07\n\x03neq\x10\x0f\x12\x06\n\x02lt\x10\x10\x12\x06\n\x02le\x10\x11\x12\x07\n\x03slt\x10\x12\x12\x07\n\x03sle\x10\x13*\x1f\n\tunop_type\x12\x08\n\x04uneg\x10\x01\x12\x08\n\x04unot\x10\x02')
 
 _CAST_TYPE = descriptor.EnumDescriptor(
   name='cast_type',
@@ -38,8 +38,8 @@ _CAST_TYPE = descriptor.EnumDescriptor(
   ],
   containing_type=None,
   options=None,
-  serialized_start=2975,
-  serialized_end=3051,
+  serialized_start=3080,
+  serialized_end=3156,
 )
 
 
@@ -128,8 +128,8 @@ _BINOP_TYPE = descriptor.EnumDescriptor(
   ],
   containing_type=None,
   options=None,
-  serialized_start=3054,
-  serialized_end=3265,
+  serialized_start=3159,
+  serialized_end=3370,
 )
 
 
@@ -150,8 +150,8 @@ _UNOP_TYPE = descriptor.EnumDescriptor(
   ],
   containing_type=None,
   options=None,
-  serialized_start=3267,
-  serialized_end=3298,
+  serialized_start=3372,
+  serialized_end=3403,
 )
 
 
@@ -611,8 +611,15 @@ _SPECIAL = descriptor.Descriptor(
       is_extension=False, extension_scope=None,
       options=None),
     descriptor.FieldDescriptor(
-      name='attributes', full_name='special.attributes', index=1,
-      number=2, type=11, cpp_type=10, label=2,
+      name='defuse', full_name='special.defuse', index=1,
+      number=2, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    descriptor.FieldDescriptor(
+      name='attributes', full_name='special.attributes', index=2,
+      number=3, type=11, cpp_type=10, label=2,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -627,7 +634,7 @@ _SPECIAL = descriptor.Descriptor(
   is_extendable=False,
   extension_ranges=[],
   serialized_start=852,
-  serialized_end=910,
+  serialized_end=935,
 )
 
 
@@ -668,8 +675,8 @@ _TYP = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=912,
-  serialized_end=974,
+  serialized_start=937,
+  serialized_end=999,
 )
 
 
@@ -703,8 +710,8 @@ _TMEM = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=976,
-  serialized_end=1036,
+  serialized_start=1001,
+  serialized_end=1061,
 )
 
 
@@ -738,8 +745,8 @@ _ARRAY = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=1038,
-  serialized_end=1099,
+  serialized_start=1063,
+  serialized_end=1124,
 )
 
 
@@ -773,8 +780,8 @@ _LABEL = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=1101,
-  serialized_end=1136,
+  serialized_start=1126,
+  serialized_end=1161,
 )
 
 
@@ -815,8 +822,71 @@ _VAR = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=1138,
-  serialized_end=1188,
+  serialized_start=1163,
+  serialized_end=1213,
+)
+
+
+_VARS = descriptor.Descriptor(
+  name='vars',
+  full_name='vars',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    descriptor.FieldDescriptor(
+      name='elem', full_name='vars.elem', index=0,
+      number=1, type=11, cpp_type=10, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  extension_ranges=[],
+  serialized_start=1215,
+  serialized_end=1241,
+)
+
+
+_DEFUSE = descriptor.Descriptor(
+  name='defuse',
+  full_name='defuse',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    descriptor.FieldDescriptor(
+      name='defs', full_name='defuse.defs', index=0,
+      number=1, type=11, cpp_type=10, label=2,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    descriptor.FieldDescriptor(
+      name='uses', full_name='defuse.uses', index=1,
+      number=2, type=11, cpp_type=10, label=2,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  extension_ranges=[],
+  serialized_start=1243,
+  serialized_end=1293,
 )
 
 
@@ -892,8 +962,8 @@ _ATTRIBUTE = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=1191,
-  serialized_end=1368,
+  serialized_start=1296,
+  serialized_end=1473,
 )
 
 
@@ -920,8 +990,8 @@ _ATTRIBUTES = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=1370,
-  serialized_end=1408,
+  serialized_start=1475,
+  serialized_end=1513,
 )
 
 
@@ -941,8 +1011,8 @@ _LIVEOUT = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=1234,
-  serialized_end=1243,
+  serialized_start=1339,
+  serialized_end=1348,
 )
 
 
@@ -962,8 +1032,8 @@ _SYNTHETIC = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=1324,
-  serialized_end=1335,
+  serialized_start=1429,
+  serialized_end=1440,
 )
 
 
@@ -997,8 +1067,8 @@ _OPERAND_INFO_SPECIFIC = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=1434,
-  serialized_end=1527,
+  serialized_start=1539,
+  serialized_end=1632,
 )
 
 
@@ -1025,8 +1095,8 @@ _REG_OPERAND = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=1529,
-  serialized_end=1556,
+  serialized_start=1634,
+  serialized_end=1661,
 )
 
 
@@ -1074,8 +1144,8 @@ _OPERAND_USAGE = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=1558,
-  serialized_end=1633,
+  serialized_start=1663,
+  serialized_end=1738,
 )
 
 
@@ -1102,8 +1172,8 @@ _MEM_OPERAND = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=1635,
-  serialized_end=1665,
+  serialized_start=1740,
+  serialized_end=1770,
 )
 
 
@@ -1144,8 +1214,8 @@ _TAINT_INFO = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=1667,
-  serialized_end=1739,
+  serialized_start=1772,
+  serialized_end=1844,
 )
 
 
@@ -1200,8 +1270,8 @@ _CONTEXT = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=1742,
-  serialized_end=1913,
+  serialized_start=1847,
+  serialized_end=2018,
 )
 
 
@@ -1312,8 +1382,8 @@ _EXP = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=1916,
-  serialized_end=2208,
+  serialized_start=2021,
+  serialized_end=2313,
 )
 
 
@@ -1361,8 +1431,8 @@ _LOAD = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=2210,
-  serialized_end=2302,
+  serialized_start=2315,
+  serialized_end=2407,
 )
 
 
@@ -1417,8 +1487,8 @@ _STORE = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=2304,
-  serialized_end=2418,
+  serialized_start=2409,
+  serialized_end=2523,
 )
 
 
@@ -1459,8 +1529,8 @@ _BINOP = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=2420,
-  serialized_end=2500,
+  serialized_start=2525,
+  serialized_end=2605,
 )
 
 
@@ -1494,8 +1564,8 @@ _UNOP = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=2502,
-  serialized_end=2558,
+  serialized_start=2607,
+  serialized_end=2663,
 )
 
 
@@ -1529,8 +1599,8 @@ _INTE = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=2560,
-  serialized_end=2598,
+  serialized_start=2665,
+  serialized_end=2703,
 )
 
 
@@ -1571,8 +1641,8 @@ _CAST = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=2600,
-  serialized_end=2680,
+  serialized_start=2705,
+  serialized_end=2785,
 )
 
 
@@ -1613,8 +1683,8 @@ _LET_EXP = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=2682,
-  serialized_end=2746,
+  serialized_start=2787,
+  serialized_end=2851,
 )
 
 
@@ -1648,8 +1718,8 @@ _UNKNOWN = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=2748,
-  serialized_end=2792,
+  serialized_start=2853,
+  serialized_end=2897,
 )
 
 
@@ -1690,8 +1760,8 @@ _ITE = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=2794,
-  serialized_end=2869,
+  serialized_start=2899,
+  serialized_end=2974,
 )
 
 
@@ -1732,8 +1802,8 @@ _EXTRACT = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=2871,
-  serialized_end=2927,
+  serialized_start=2976,
+  serialized_end=3032,
 )
 
 
@@ -1767,8 +1837,8 @@ _CONCAT = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=2929,
-  serialized_end=2973,
+  serialized_start=3034,
+  serialized_end=3078,
 )
 
 _PROGRAM.fields_by_name['elem'].message_type = _STMT
@@ -1799,6 +1869,7 @@ _ASSERT_STMT.fields_by_name['attributes'].message_type = _ATTRIBUTES
 _ASSUME.fields_by_name['exp'].message_type = _EXP
 _ASSUME.fields_by_name['attributes'].message_type = _ATTRIBUTES
 _COMMENT.fields_by_name['attributes'].message_type = _ATTRIBUTES
+_SPECIAL.fields_by_name['defuse'].message_type = _DEFUSE
 _SPECIAL.fields_by_name['attributes'].message_type = _ATTRIBUTES
 _TYP.fields_by_name['tmem'].message_type = _TMEM
 _TYP.fields_by_name['array'].message_type = _ARRAY
@@ -1807,6 +1878,9 @@ _TMEM.fields_by_name['element_type'].message_type = _TYP
 _ARRAY.fields_by_name['index_type'].message_type = _TYP
 _ARRAY.fields_by_name['element_type'].message_type = _TYP
 _VAR.fields_by_name['typ'].message_type = _TYP
+_VARS.fields_by_name['elem'].message_type = _VAR
+_DEFUSE.fields_by_name['defs'].message_type = _VARS
+_DEFUSE.fields_by_name['uses'].message_type = _VARS
 _ATTRIBUTE.fields_by_name['liveout'].message_type = _LIVEOUT
 _ATTRIBUTE.fields_by_name['context'].message_type = _CONTEXT
 _ATTRIBUTE.fields_by_name['synthetic'].message_type = _SYNTHETIC
@@ -1872,6 +1946,8 @@ DESCRIPTOR.message_types_by_name['tmem'] = _TMEM
 DESCRIPTOR.message_types_by_name['array'] = _ARRAY
 DESCRIPTOR.message_types_by_name['label'] = _LABEL
 DESCRIPTOR.message_types_by_name['var'] = _VAR
+DESCRIPTOR.message_types_by_name['vars'] = _VARS
+DESCRIPTOR.message_types_by_name['defuse'] = _DEFUSE
 DESCRIPTOR.message_types_by_name['attribute'] = _ATTRIBUTE
 DESCRIPTOR.message_types_by_name['attributes'] = _ATTRIBUTES
 DESCRIPTOR.message_types_by_name['liveout'] = _LIVEOUT
@@ -1990,6 +2066,18 @@ class var(message.Message):
   DESCRIPTOR = _VAR
   
   # @@protoc_insertion_point(class_scope:var)
+
+class vars(message.Message):
+  __metaclass__ = reflection.GeneratedProtocolMessageType
+  DESCRIPTOR = _VARS
+  
+  # @@protoc_insertion_point(class_scope:vars)
+
+class defuse(message.Message):
+  __metaclass__ = reflection.GeneratedProtocolMessageType
+  DESCRIPTOR = _DEFUSE
+  
+  # @@protoc_insertion_point(class_scope:defuse)
 
 class attribute(message.Message):
   __metaclass__ = reflection.GeneratedProtocolMessageType

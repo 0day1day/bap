@@ -329,10 +329,11 @@ object (self)
         pp s;
         pp "*/";
         self#attrs a
-    | Ast.Special(s,a) ->
+    | Ast.Special(s,_,a) ->
         pp "special \"";
         pp s;
         pp "\"";
+        (* TODO: Come up with a nice display for defs/uses when present *)
         self#attrs a);
     cls();
 

@@ -9,6 +9,7 @@ open Big_int_Z
 open Big_int_convenience
 open BatListFull
 open Type
+open Var
 
 type var = Var.t
 
@@ -47,6 +48,7 @@ type stmt =
   | Halt of exp * attrs
   | Assert of exp * attrs
   | Assume of exp * attrs
+  | Special of string * defuse * attrs
   | Comment of string * attrs (** A comment to be ignored *)
   (* | Special of string * attrs (** A "special" statement. (does magic) *) *)
 

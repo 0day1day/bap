@@ -31,7 +31,7 @@ let ret_to_jmp ?(ra=ra_final) p =
   Array.iteri
     (fun i s -> match s with
       (* Old lifting of ret *)
-     | Special("ret", _) ->
+     | Special("ret", _, _) ->
          a.(i) <- Jmp(Lab function_end, attrs);
          (match a.(i-1) with 
           | Jmp(t,at) -> a.(i-1) <- Move(ra, t, attrs@at)

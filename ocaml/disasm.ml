@@ -11,5 +11,5 @@ let disasm_instr arch = Disasm_i386.disasm_instr (arch_to_x86_mode arch)
 let is_temp = Var_temp.is_temp
 
 let is_decode_error = function
-  | Ast.Special(s, _) when BatString.starts_with s "Unknown instruction" -> true
+  | Ast.Special(s, _, _) when BatString.starts_with s "Unknown instruction" -> true
   | _ -> false

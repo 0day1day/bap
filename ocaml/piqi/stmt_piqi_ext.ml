@@ -31,6 +31,8 @@ let _binop_type_piqtype = Piqirun_ext.find_piqtype "stmt/binop-type"
 let _unop_type_piqtype = Piqirun_ext.find_piqtype "stmt/unop-type"
 let _var_piqtype = Piqirun_ext.find_piqtype "stmt/var"
 let _lab_piqtype = Piqirun_ext.find_piqtype "stmt/lab"
+let _vars_piqtype = Piqirun_ext.find_piqtype "stmt/vars"
+let _defuse_piqtype = Piqirun_ext.find_piqtype "stmt/defuse"
 let _attribute_piqtype = Piqirun_ext.find_piqtype "stmt/attribute"
 let _attributes_piqtype = Piqirun_ext.find_piqtype "stmt/attributes"
 let _asm_piqtype = Piqirun_ext.find_piqtype "stmt/asm"
@@ -88,6 +90,8 @@ let parse_binop_type ?opts x (format :Piqirun_ext.input_format) = let x_pb = Piq
 let parse_unop_type ?opts x (format :Piqirun_ext.input_format) = let x_pb = Piqirun_ext.convert _unop_type_piqtype format `pb x ?opts in let buf = Piqirun.init_from_string x_pb in Stmt_piqi.parse_unop_type buf
 let parse_var ?opts x (format :Piqirun_ext.input_format) = let x_pb = Piqirun_ext.convert _var_piqtype format `pb x ?opts in let buf = Piqirun.init_from_string x_pb in Stmt_piqi.parse_var buf
 let parse_lab ?opts x (format :Piqirun_ext.input_format) = let x_pb = Piqirun_ext.convert _lab_piqtype format `pb x ?opts in let buf = Piqirun.init_from_string x_pb in Stmt_piqi.parse_lab buf
+let parse_vars ?opts x (format :Piqirun_ext.input_format) = let x_pb = Piqirun_ext.convert _vars_piqtype format `pb x ?opts in let buf = Piqirun.init_from_string x_pb in Stmt_piqi.parse_vars buf
+let parse_defuse ?opts x (format :Piqirun_ext.input_format) = let x_pb = Piqirun_ext.convert _defuse_piqtype format `pb x ?opts in let buf = Piqirun.init_from_string x_pb in Stmt_piqi.parse_defuse buf
 let parse_attribute ?opts x (format :Piqirun_ext.input_format) = let x_pb = Piqirun_ext.convert _attribute_piqtype format `pb x ?opts in let buf = Piqirun.init_from_string x_pb in Stmt_piqi.parse_attribute buf
 let parse_attributes ?opts x (format :Piqirun_ext.input_format) = let x_pb = Piqirun_ext.convert _attributes_piqtype format `pb x ?opts in let buf = Piqirun.init_from_string x_pb in Stmt_piqi.parse_attributes buf
 let parse_asm ?opts x (format :Piqirun_ext.input_format) = let x_pb = Piqirun_ext.convert _asm_piqtype format `pb x ?opts in let buf = Piqirun.init_from_string x_pb in Stmt_piqi.parse_asm buf
@@ -145,6 +149,8 @@ let gen_binop_type ?opts x (format :Piqirun_ext.output_format) = let buf =  Stmt
 let gen_unop_type ?opts x (format :Piqirun_ext.output_format) = let buf =  Stmt_piqi.gen_unop_type x in let x_pb = Piqirun.to_string buf in Piqirun_ext.convert _unop_type_piqtype `pb format x_pb ?opts
 let gen_var ?opts x (format :Piqirun_ext.output_format) = let buf =  Stmt_piqi.gen_var x in let x_pb = Piqirun.to_string buf in Piqirun_ext.convert _var_piqtype `pb format x_pb ?opts
 let gen_lab ?opts x (format :Piqirun_ext.output_format) = let buf =  Stmt_piqi.gen_lab x in let x_pb = Piqirun.to_string buf in Piqirun_ext.convert _lab_piqtype `pb format x_pb ?opts
+let gen_vars ?opts x (format :Piqirun_ext.output_format) = let buf =  Stmt_piqi.gen_vars x in let x_pb = Piqirun.to_string buf in Piqirun_ext.convert _vars_piqtype `pb format x_pb ?opts
+let gen_defuse ?opts x (format :Piqirun_ext.output_format) = let buf =  Stmt_piqi.gen_defuse x in let x_pb = Piqirun.to_string buf in Piqirun_ext.convert _defuse_piqtype `pb format x_pb ?opts
 let gen_attribute ?opts x (format :Piqirun_ext.output_format) = let buf =  Stmt_piqi.gen_attribute x in let x_pb = Piqirun.to_string buf in Piqirun_ext.convert _attribute_piqtype `pb format x_pb ?opts
 let gen_attributes ?opts x (format :Piqirun_ext.output_format) = let buf =  Stmt_piqi.gen_attributes x in let x_pb = Piqirun.to_string buf in Piqirun_ext.convert _attributes_piqtype `pb format x_pb ?opts
 let gen_asm ?opts x (format :Piqirun_ext.output_format) = let buf =  Stmt_piqi.gen_asm x in let x_pb = Piqirun.to_string buf in Piqirun_ext.convert _asm_piqtype `pb format x_pb ?opts
@@ -229,6 +235,10 @@ let print_var x = Pervasives.print_endline (gen_var x `piq)
  let prerr_var x = Pervasives.prerr_endline (gen_var x `piq)
 let print_lab x = Pervasives.print_endline (gen_lab x `piq)
  let prerr_lab x = Pervasives.prerr_endline (gen_lab x `piq)
+let print_vars x = Pervasives.print_endline (gen_vars x `piq)
+ let prerr_vars x = Pervasives.prerr_endline (gen_vars x `piq)
+let print_defuse x = Pervasives.print_endline (gen_defuse x `piq)
+ let prerr_defuse x = Pervasives.prerr_endline (gen_defuse x `piq)
 let print_attribute x = Pervasives.print_endline (gen_attribute x `piq)
  let prerr_attribute x = Pervasives.prerr_endline (gen_attribute x `piq)
 let print_attributes x = Pervasives.print_endline (gen_attributes x `piq)

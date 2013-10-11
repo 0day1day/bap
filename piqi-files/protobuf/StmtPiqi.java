@@ -7720,7 +7720,12 @@ public final class StmtPiqi {
     boolean hasString();
     String getString();
     
-    // required .attributes attributes = 2;
+    // optional .defuse defuse = 2;
+    boolean hasDefuse();
+    StmtPiqi.defuse getDefuse();
+    StmtPiqi.defuseOrBuilder getDefuseOrBuilder();
+    
+    // required .attributes attributes = 3;
     boolean hasAttributes();
     StmtPiqi.attributes getAttributes();
     StmtPiqi.attributesOrBuilder getAttributesOrBuilder();
@@ -7786,11 +7791,24 @@ public final class StmtPiqi {
       }
     }
     
-    // required .attributes attributes = 2;
-    public static final int ATTRIBUTES_FIELD_NUMBER = 2;
+    // optional .defuse defuse = 2;
+    public static final int DEFUSE_FIELD_NUMBER = 2;
+    private StmtPiqi.defuse defuse_;
+    public boolean hasDefuse() {
+      return ((bitField0_ & 0x00000002) == 0x00000002);
+    }
+    public StmtPiqi.defuse getDefuse() {
+      return defuse_;
+    }
+    public StmtPiqi.defuseOrBuilder getDefuseOrBuilder() {
+      return defuse_;
+    }
+    
+    // required .attributes attributes = 3;
+    public static final int ATTRIBUTES_FIELD_NUMBER = 3;
     private StmtPiqi.attributes attributes_;
     public boolean hasAttributes() {
-      return ((bitField0_ & 0x00000002) == 0x00000002);
+      return ((bitField0_ & 0x00000004) == 0x00000004);
     }
     public StmtPiqi.attributes getAttributes() {
       return attributes_;
@@ -7801,6 +7819,7 @@ public final class StmtPiqi {
     
     private void initFields() {
       string_ = "";
+      defuse_ = StmtPiqi.defuse.getDefaultInstance();
       attributes_ = StmtPiqi.attributes.getDefaultInstance();
     }
     private byte memoizedIsInitialized = -1;
@@ -7815,6 +7834,12 @@ public final class StmtPiqi {
       if (!hasAttributes()) {
         memoizedIsInitialized = 0;
         return false;
+      }
+      if (hasDefuse()) {
+        if (!getDefuse().isInitialized()) {
+          memoizedIsInitialized = 0;
+          return false;
+        }
       }
       if (!getAttributes().isInitialized()) {
         memoizedIsInitialized = 0;
@@ -7831,7 +7856,10 @@ public final class StmtPiqi {
         output.writeBytes(1, getStringBytes());
       }
       if (((bitField0_ & 0x00000002) == 0x00000002)) {
-        output.writeMessage(2, attributes_);
+        output.writeMessage(2, defuse_);
+      }
+      if (((bitField0_ & 0x00000004) == 0x00000004)) {
+        output.writeMessage(3, attributes_);
       }
       getUnknownFields().writeTo(output);
     }
@@ -7848,7 +7876,11 @@ public final class StmtPiqi {
       }
       if (((bitField0_ & 0x00000002) == 0x00000002)) {
         size += com.google.protobuf.CodedOutputStream
-          .computeMessageSize(2, attributes_);
+          .computeMessageSize(2, defuse_);
+      }
+      if (((bitField0_ & 0x00000004) == 0x00000004)) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeMessageSize(3, attributes_);
       }
       size += getUnknownFields().getSerializedSize();
       memoizedSerializedSize = size;
@@ -7966,6 +7998,7 @@ public final class StmtPiqi {
       }
       private void maybeForceBuilderInitialization() {
         if (com.google.protobuf.GeneratedMessage.alwaysUseFieldBuilders) {
+          getDefuseFieldBuilder();
           getAttributesFieldBuilder();
         }
       }
@@ -7977,12 +8010,18 @@ public final class StmtPiqi {
         super.clear();
         string_ = "";
         bitField0_ = (bitField0_ & ~0x00000001);
+        if (defuseBuilder_ == null) {
+          defuse_ = StmtPiqi.defuse.getDefaultInstance();
+        } else {
+          defuseBuilder_.clear();
+        }
+        bitField0_ = (bitField0_ & ~0x00000002);
         if (attributesBuilder_ == null) {
           attributes_ = StmtPiqi.attributes.getDefaultInstance();
         } else {
           attributesBuilder_.clear();
         }
-        bitField0_ = (bitField0_ & ~0x00000002);
+        bitField0_ = (bitField0_ & ~0x00000004);
         return this;
       }
       
@@ -8028,6 +8067,14 @@ public final class StmtPiqi {
         if (((from_bitField0_ & 0x00000002) == 0x00000002)) {
           to_bitField0_ |= 0x00000002;
         }
+        if (defuseBuilder_ == null) {
+          result.defuse_ = defuse_;
+        } else {
+          result.defuse_ = defuseBuilder_.build();
+        }
+        if (((from_bitField0_ & 0x00000004) == 0x00000004)) {
+          to_bitField0_ |= 0x00000004;
+        }
         if (attributesBuilder_ == null) {
           result.attributes_ = attributes_;
         } else {
@@ -8052,6 +8099,9 @@ public final class StmtPiqi {
         if (other.hasString()) {
           setString(other.getString());
         }
+        if (other.hasDefuse()) {
+          mergeDefuse(other.getDefuse());
+        }
         if (other.hasAttributes()) {
           mergeAttributes(other.getAttributes());
         }
@@ -8067,6 +8117,12 @@ public final class StmtPiqi {
         if (!hasAttributes()) {
           
           return false;
+        }
+        if (hasDefuse()) {
+          if (!getDefuse().isInitialized()) {
+            
+            return false;
+          }
         }
         if (!getAttributes().isInitialized()) {
           
@@ -8104,6 +8160,15 @@ public final class StmtPiqi {
               break;
             }
             case 18: {
+              StmtPiqi.defuse.Builder subBuilder = StmtPiqi.defuse.newBuilder();
+              if (hasDefuse()) {
+                subBuilder.mergeFrom(getDefuse());
+              }
+              input.readMessage(subBuilder, extensionRegistry);
+              setDefuse(subBuilder.buildPartial());
+              break;
+            }
+            case 26: {
               StmtPiqi.attributes.Builder subBuilder = StmtPiqi.attributes.newBuilder();
               if (hasAttributes()) {
                 subBuilder.mergeFrom(getAttributes());
@@ -8154,12 +8219,102 @@ public final class StmtPiqi {
         onChanged();
       }
       
-      // required .attributes attributes = 2;
+      // optional .defuse defuse = 2;
+      private StmtPiqi.defuse defuse_ = StmtPiqi.defuse.getDefaultInstance();
+      private com.google.protobuf.SingleFieldBuilder<
+          StmtPiqi.defuse, StmtPiqi.defuse.Builder, StmtPiqi.defuseOrBuilder> defuseBuilder_;
+      public boolean hasDefuse() {
+        return ((bitField0_ & 0x00000002) == 0x00000002);
+      }
+      public StmtPiqi.defuse getDefuse() {
+        if (defuseBuilder_ == null) {
+          return defuse_;
+        } else {
+          return defuseBuilder_.getMessage();
+        }
+      }
+      public Builder setDefuse(StmtPiqi.defuse value) {
+        if (defuseBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          defuse_ = value;
+          onChanged();
+        } else {
+          defuseBuilder_.setMessage(value);
+        }
+        bitField0_ |= 0x00000002;
+        return this;
+      }
+      public Builder setDefuse(
+          StmtPiqi.defuse.Builder builderForValue) {
+        if (defuseBuilder_ == null) {
+          defuse_ = builderForValue.build();
+          onChanged();
+        } else {
+          defuseBuilder_.setMessage(builderForValue.build());
+        }
+        bitField0_ |= 0x00000002;
+        return this;
+      }
+      public Builder mergeDefuse(StmtPiqi.defuse value) {
+        if (defuseBuilder_ == null) {
+          if (((bitField0_ & 0x00000002) == 0x00000002) &&
+              defuse_ != StmtPiqi.defuse.getDefaultInstance()) {
+            defuse_ =
+              StmtPiqi.defuse.newBuilder(defuse_).mergeFrom(value).buildPartial();
+          } else {
+            defuse_ = value;
+          }
+          onChanged();
+        } else {
+          defuseBuilder_.mergeFrom(value);
+        }
+        bitField0_ |= 0x00000002;
+        return this;
+      }
+      public Builder clearDefuse() {
+        if (defuseBuilder_ == null) {
+          defuse_ = StmtPiqi.defuse.getDefaultInstance();
+          onChanged();
+        } else {
+          defuseBuilder_.clear();
+        }
+        bitField0_ = (bitField0_ & ~0x00000002);
+        return this;
+      }
+      public StmtPiqi.defuse.Builder getDefuseBuilder() {
+        bitField0_ |= 0x00000002;
+        onChanged();
+        return getDefuseFieldBuilder().getBuilder();
+      }
+      public StmtPiqi.defuseOrBuilder getDefuseOrBuilder() {
+        if (defuseBuilder_ != null) {
+          return defuseBuilder_.getMessageOrBuilder();
+        } else {
+          return defuse_;
+        }
+      }
+      private com.google.protobuf.SingleFieldBuilder<
+          StmtPiqi.defuse, StmtPiqi.defuse.Builder, StmtPiqi.defuseOrBuilder> 
+          getDefuseFieldBuilder() {
+        if (defuseBuilder_ == null) {
+          defuseBuilder_ = new com.google.protobuf.SingleFieldBuilder<
+              StmtPiqi.defuse, StmtPiqi.defuse.Builder, StmtPiqi.defuseOrBuilder>(
+                  defuse_,
+                  getParentForChildren(),
+                  isClean());
+          defuse_ = null;
+        }
+        return defuseBuilder_;
+      }
+      
+      // required .attributes attributes = 3;
       private StmtPiqi.attributes attributes_ = StmtPiqi.attributes.getDefaultInstance();
       private com.google.protobuf.SingleFieldBuilder<
           StmtPiqi.attributes, StmtPiqi.attributes.Builder, StmtPiqi.attributesOrBuilder> attributesBuilder_;
       public boolean hasAttributes() {
-        return ((bitField0_ & 0x00000002) == 0x00000002);
+        return ((bitField0_ & 0x00000004) == 0x00000004);
       }
       public StmtPiqi.attributes getAttributes() {
         if (attributesBuilder_ == null) {
@@ -8178,7 +8333,7 @@ public final class StmtPiqi {
         } else {
           attributesBuilder_.setMessage(value);
         }
-        bitField0_ |= 0x00000002;
+        bitField0_ |= 0x00000004;
         return this;
       }
       public Builder setAttributes(
@@ -8189,12 +8344,12 @@ public final class StmtPiqi {
         } else {
           attributesBuilder_.setMessage(builderForValue.build());
         }
-        bitField0_ |= 0x00000002;
+        bitField0_ |= 0x00000004;
         return this;
       }
       public Builder mergeAttributes(StmtPiqi.attributes value) {
         if (attributesBuilder_ == null) {
-          if (((bitField0_ & 0x00000002) == 0x00000002) &&
+          if (((bitField0_ & 0x00000004) == 0x00000004) &&
               attributes_ != StmtPiqi.attributes.getDefaultInstance()) {
             attributes_ =
               StmtPiqi.attributes.newBuilder(attributes_).mergeFrom(value).buildPartial();
@@ -8205,7 +8360,7 @@ public final class StmtPiqi {
         } else {
           attributesBuilder_.mergeFrom(value);
         }
-        bitField0_ |= 0x00000002;
+        bitField0_ |= 0x00000004;
         return this;
       }
       public Builder clearAttributes() {
@@ -8215,11 +8370,11 @@ public final class StmtPiqi {
         } else {
           attributesBuilder_.clear();
         }
-        bitField0_ = (bitField0_ & ~0x00000002);
+        bitField0_ = (bitField0_ & ~0x00000004);
         return this;
       }
       public StmtPiqi.attributes.Builder getAttributesBuilder() {
-        bitField0_ |= 0x00000002;
+        bitField0_ |= 0x00000004;
         onChanged();
         return getAttributesFieldBuilder().getBuilder();
       }
@@ -11138,6 +11293,1168 @@ public final class StmtPiqi {
     }
     
     // @@protoc_insertion_point(class_scope:var)
+  }
+  
+  public interface varsOrBuilder
+      extends com.google.protobuf.MessageOrBuilder {
+    
+    // repeated .var elem = 1;
+    java.util.List<StmtPiqi.var> 
+        getElemList();
+    StmtPiqi.var getElem(int index);
+    int getElemCount();
+    java.util.List<? extends StmtPiqi.varOrBuilder> 
+        getElemOrBuilderList();
+    StmtPiqi.varOrBuilder getElemOrBuilder(
+        int index);
+  }
+  public static final class vars extends
+      com.google.protobuf.GeneratedMessage
+      implements varsOrBuilder {
+    // Use vars.newBuilder() to construct.
+    private vars(Builder builder) {
+      super(builder);
+    }
+    private vars(boolean noInit) {}
+    
+    private static final vars defaultInstance;
+    public static vars getDefaultInstance() {
+      return defaultInstance;
+    }
+    
+    public vars getDefaultInstanceForType() {
+      return defaultInstance;
+    }
+    
+    public static final com.google.protobuf.Descriptors.Descriptor
+        getDescriptor() {
+      return StmtPiqi.internal_static_vars_descriptor;
+    }
+    
+    protected com.google.protobuf.GeneratedMessage.FieldAccessorTable
+        internalGetFieldAccessorTable() {
+      return StmtPiqi.internal_static_vars_fieldAccessorTable;
+    }
+    
+    // repeated .var elem = 1;
+    public static final int ELEM_FIELD_NUMBER = 1;
+    private java.util.List<StmtPiqi.var> elem_;
+    public java.util.List<StmtPiqi.var> getElemList() {
+      return elem_;
+    }
+    public java.util.List<? extends StmtPiqi.varOrBuilder> 
+        getElemOrBuilderList() {
+      return elem_;
+    }
+    public int getElemCount() {
+      return elem_.size();
+    }
+    public StmtPiqi.var getElem(int index) {
+      return elem_.get(index);
+    }
+    public StmtPiqi.varOrBuilder getElemOrBuilder(
+        int index) {
+      return elem_.get(index);
+    }
+    
+    private void initFields() {
+      elem_ = java.util.Collections.emptyList();
+    }
+    private byte memoizedIsInitialized = -1;
+    public final boolean isInitialized() {
+      byte isInitialized = memoizedIsInitialized;
+      if (isInitialized != -1) return isInitialized == 1;
+      
+      for (int i = 0; i < getElemCount(); i++) {
+        if (!getElem(i).isInitialized()) {
+          memoizedIsInitialized = 0;
+          return false;
+        }
+      }
+      memoizedIsInitialized = 1;
+      return true;
+    }
+    
+    public void writeTo(com.google.protobuf.CodedOutputStream output)
+                        throws java.io.IOException {
+      getSerializedSize();
+      for (int i = 0; i < elem_.size(); i++) {
+        output.writeMessage(1, elem_.get(i));
+      }
+      getUnknownFields().writeTo(output);
+    }
+    
+    private int memoizedSerializedSize = -1;
+    public int getSerializedSize() {
+      int size = memoizedSerializedSize;
+      if (size != -1) return size;
+    
+      size = 0;
+      for (int i = 0; i < elem_.size(); i++) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeMessageSize(1, elem_.get(i));
+      }
+      size += getUnknownFields().getSerializedSize();
+      memoizedSerializedSize = size;
+      return size;
+    }
+    
+    private static final long serialVersionUID = 0L;
+    @java.lang.Override
+    protected java.lang.Object writeReplace()
+        throws java.io.ObjectStreamException {
+      return super.writeReplace();
+    }
+    
+    public static StmtPiqi.vars parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return newBuilder().mergeFrom(data).buildParsed();
+    }
+    public static StmtPiqi.vars parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return newBuilder().mergeFrom(data, extensionRegistry)
+               .buildParsed();
+    }
+    public static StmtPiqi.vars parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return newBuilder().mergeFrom(data).buildParsed();
+    }
+    public static StmtPiqi.vars parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return newBuilder().mergeFrom(data, extensionRegistry)
+               .buildParsed();
+    }
+    public static StmtPiqi.vars parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return newBuilder().mergeFrom(input).buildParsed();
+    }
+    public static StmtPiqi.vars parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return newBuilder().mergeFrom(input, extensionRegistry)
+               .buildParsed();
+    }
+    public static StmtPiqi.vars parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      Builder builder = newBuilder();
+      if (builder.mergeDelimitedFrom(input)) {
+        return builder.buildParsed();
+      } else {
+        return null;
+      }
+    }
+    public static StmtPiqi.vars parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      Builder builder = newBuilder();
+      if (builder.mergeDelimitedFrom(input, extensionRegistry)) {
+        return builder.buildParsed();
+      } else {
+        return null;
+      }
+    }
+    public static StmtPiqi.vars parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return newBuilder().mergeFrom(input).buildParsed();
+    }
+    public static StmtPiqi.vars parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return newBuilder().mergeFrom(input, extensionRegistry)
+               .buildParsed();
+    }
+    
+    public static Builder newBuilder() { return Builder.create(); }
+    public Builder newBuilderForType() { return newBuilder(); }
+    public static Builder newBuilder(StmtPiqi.vars prototype) {
+      return newBuilder().mergeFrom(prototype);
+    }
+    public Builder toBuilder() { return newBuilder(this); }
+    
+    @java.lang.Override
+    protected Builder newBuilderForType(
+        com.google.protobuf.GeneratedMessage.BuilderParent parent) {
+      Builder builder = new Builder(parent);
+      return builder;
+    }
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessage.Builder<Builder>
+       implements StmtPiqi.varsOrBuilder {
+      public static final com.google.protobuf.Descriptors.Descriptor
+          getDescriptor() {
+        return StmtPiqi.internal_static_vars_descriptor;
+      }
+      
+      protected com.google.protobuf.GeneratedMessage.FieldAccessorTable
+          internalGetFieldAccessorTable() {
+        return StmtPiqi.internal_static_vars_fieldAccessorTable;
+      }
+      
+      // Construct using StmtPiqi.vars.newBuilder()
+      private Builder() {
+        maybeForceBuilderInitialization();
+      }
+      
+      private Builder(BuilderParent parent) {
+        super(parent);
+        maybeForceBuilderInitialization();
+      }
+      private void maybeForceBuilderInitialization() {
+        if (com.google.protobuf.GeneratedMessage.alwaysUseFieldBuilders) {
+          getElemFieldBuilder();
+        }
+      }
+      private static Builder create() {
+        return new Builder();
+      }
+      
+      public Builder clear() {
+        super.clear();
+        if (elemBuilder_ == null) {
+          elem_ = java.util.Collections.emptyList();
+          bitField0_ = (bitField0_ & ~0x00000001);
+        } else {
+          elemBuilder_.clear();
+        }
+        return this;
+      }
+      
+      public Builder clone() {
+        return create().mergeFrom(buildPartial());
+      }
+      
+      public com.google.protobuf.Descriptors.Descriptor
+          getDescriptorForType() {
+        return StmtPiqi.vars.getDescriptor();
+      }
+      
+      public StmtPiqi.vars getDefaultInstanceForType() {
+        return StmtPiqi.vars.getDefaultInstance();
+      }
+      
+      public StmtPiqi.vars build() {
+        StmtPiqi.vars result = buildPartial();
+        if (!result.isInitialized()) {
+          throw newUninitializedMessageException(result);
+        }
+        return result;
+      }
+      
+      private StmtPiqi.vars buildParsed()
+          throws com.google.protobuf.InvalidProtocolBufferException {
+        StmtPiqi.vars result = buildPartial();
+        if (!result.isInitialized()) {
+          throw newUninitializedMessageException(
+            result).asInvalidProtocolBufferException();
+        }
+        return result;
+      }
+      
+      public StmtPiqi.vars buildPartial() {
+        StmtPiqi.vars result = new StmtPiqi.vars(this);
+        int from_bitField0_ = bitField0_;
+        if (elemBuilder_ == null) {
+          if (((bitField0_ & 0x00000001) == 0x00000001)) {
+            elem_ = java.util.Collections.unmodifiableList(elem_);
+            bitField0_ = (bitField0_ & ~0x00000001);
+          }
+          result.elem_ = elem_;
+        } else {
+          result.elem_ = elemBuilder_.build();
+        }
+        onBuilt();
+        return result;
+      }
+      
+      public Builder mergeFrom(com.google.protobuf.Message other) {
+        if (other instanceof StmtPiqi.vars) {
+          return mergeFrom((StmtPiqi.vars)other);
+        } else {
+          super.mergeFrom(other);
+          return this;
+        }
+      }
+      
+      public Builder mergeFrom(StmtPiqi.vars other) {
+        if (other == StmtPiqi.vars.getDefaultInstance()) return this;
+        if (elemBuilder_ == null) {
+          if (!other.elem_.isEmpty()) {
+            if (elem_.isEmpty()) {
+              elem_ = other.elem_;
+              bitField0_ = (bitField0_ & ~0x00000001);
+            } else {
+              ensureElemIsMutable();
+              elem_.addAll(other.elem_);
+            }
+            onChanged();
+          }
+        } else {
+          if (!other.elem_.isEmpty()) {
+            if (elemBuilder_.isEmpty()) {
+              elemBuilder_.dispose();
+              elemBuilder_ = null;
+              elem_ = other.elem_;
+              bitField0_ = (bitField0_ & ~0x00000001);
+              elemBuilder_ = 
+                com.google.protobuf.GeneratedMessage.alwaysUseFieldBuilders ?
+                   getElemFieldBuilder() : null;
+            } else {
+              elemBuilder_.addAllMessages(other.elem_);
+            }
+          }
+        }
+        this.mergeUnknownFields(other.getUnknownFields());
+        return this;
+      }
+      
+      public final boolean isInitialized() {
+        for (int i = 0; i < getElemCount(); i++) {
+          if (!getElem(i).isInitialized()) {
+            
+            return false;
+          }
+        }
+        return true;
+      }
+      
+      public Builder mergeFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws java.io.IOException {
+        com.google.protobuf.UnknownFieldSet.Builder unknownFields =
+          com.google.protobuf.UnknownFieldSet.newBuilder(
+            this.getUnknownFields());
+        while (true) {
+          int tag = input.readTag();
+          switch (tag) {
+            case 0:
+              this.setUnknownFields(unknownFields.build());
+              onChanged();
+              return this;
+            default: {
+              if (!parseUnknownField(input, unknownFields,
+                                     extensionRegistry, tag)) {
+                this.setUnknownFields(unknownFields.build());
+                onChanged();
+                return this;
+              }
+              break;
+            }
+            case 10: {
+              StmtPiqi.var.Builder subBuilder = StmtPiqi.var.newBuilder();
+              input.readMessage(subBuilder, extensionRegistry);
+              addElem(subBuilder.buildPartial());
+              break;
+            }
+          }
+        }
+      }
+      
+      private int bitField0_;
+      
+      // repeated .var elem = 1;
+      private java.util.List<StmtPiqi.var> elem_ =
+        java.util.Collections.emptyList();
+      private void ensureElemIsMutable() {
+        if (!((bitField0_ & 0x00000001) == 0x00000001)) {
+          elem_ = new java.util.ArrayList<StmtPiqi.var>(elem_);
+          bitField0_ |= 0x00000001;
+         }
+      }
+      
+      private com.google.protobuf.RepeatedFieldBuilder<
+          StmtPiqi.var, StmtPiqi.var.Builder, StmtPiqi.varOrBuilder> elemBuilder_;
+      
+      public java.util.List<StmtPiqi.var> getElemList() {
+        if (elemBuilder_ == null) {
+          return java.util.Collections.unmodifiableList(elem_);
+        } else {
+          return elemBuilder_.getMessageList();
+        }
+      }
+      public int getElemCount() {
+        if (elemBuilder_ == null) {
+          return elem_.size();
+        } else {
+          return elemBuilder_.getCount();
+        }
+      }
+      public StmtPiqi.var getElem(int index) {
+        if (elemBuilder_ == null) {
+          return elem_.get(index);
+        } else {
+          return elemBuilder_.getMessage(index);
+        }
+      }
+      public Builder setElem(
+          int index, StmtPiqi.var value) {
+        if (elemBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          ensureElemIsMutable();
+          elem_.set(index, value);
+          onChanged();
+        } else {
+          elemBuilder_.setMessage(index, value);
+        }
+        return this;
+      }
+      public Builder setElem(
+          int index, StmtPiqi.var.Builder builderForValue) {
+        if (elemBuilder_ == null) {
+          ensureElemIsMutable();
+          elem_.set(index, builderForValue.build());
+          onChanged();
+        } else {
+          elemBuilder_.setMessage(index, builderForValue.build());
+        }
+        return this;
+      }
+      public Builder addElem(StmtPiqi.var value) {
+        if (elemBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          ensureElemIsMutable();
+          elem_.add(value);
+          onChanged();
+        } else {
+          elemBuilder_.addMessage(value);
+        }
+        return this;
+      }
+      public Builder addElem(
+          int index, StmtPiqi.var value) {
+        if (elemBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          ensureElemIsMutable();
+          elem_.add(index, value);
+          onChanged();
+        } else {
+          elemBuilder_.addMessage(index, value);
+        }
+        return this;
+      }
+      public Builder addElem(
+          StmtPiqi.var.Builder builderForValue) {
+        if (elemBuilder_ == null) {
+          ensureElemIsMutable();
+          elem_.add(builderForValue.build());
+          onChanged();
+        } else {
+          elemBuilder_.addMessage(builderForValue.build());
+        }
+        return this;
+      }
+      public Builder addElem(
+          int index, StmtPiqi.var.Builder builderForValue) {
+        if (elemBuilder_ == null) {
+          ensureElemIsMutable();
+          elem_.add(index, builderForValue.build());
+          onChanged();
+        } else {
+          elemBuilder_.addMessage(index, builderForValue.build());
+        }
+        return this;
+      }
+      public Builder addAllElem(
+          java.lang.Iterable<? extends StmtPiqi.var> values) {
+        if (elemBuilder_ == null) {
+          ensureElemIsMutable();
+          super.addAll(values, elem_);
+          onChanged();
+        } else {
+          elemBuilder_.addAllMessages(values);
+        }
+        return this;
+      }
+      public Builder clearElem() {
+        if (elemBuilder_ == null) {
+          elem_ = java.util.Collections.emptyList();
+          bitField0_ = (bitField0_ & ~0x00000001);
+          onChanged();
+        } else {
+          elemBuilder_.clear();
+        }
+        return this;
+      }
+      public Builder removeElem(int index) {
+        if (elemBuilder_ == null) {
+          ensureElemIsMutable();
+          elem_.remove(index);
+          onChanged();
+        } else {
+          elemBuilder_.remove(index);
+        }
+        return this;
+      }
+      public StmtPiqi.var.Builder getElemBuilder(
+          int index) {
+        return getElemFieldBuilder().getBuilder(index);
+      }
+      public StmtPiqi.varOrBuilder getElemOrBuilder(
+          int index) {
+        if (elemBuilder_ == null) {
+          return elem_.get(index);  } else {
+          return elemBuilder_.getMessageOrBuilder(index);
+        }
+      }
+      public java.util.List<? extends StmtPiqi.varOrBuilder> 
+           getElemOrBuilderList() {
+        if (elemBuilder_ != null) {
+          return elemBuilder_.getMessageOrBuilderList();
+        } else {
+          return java.util.Collections.unmodifiableList(elem_);
+        }
+      }
+      public StmtPiqi.var.Builder addElemBuilder() {
+        return getElemFieldBuilder().addBuilder(
+            StmtPiqi.var.getDefaultInstance());
+      }
+      public StmtPiqi.var.Builder addElemBuilder(
+          int index) {
+        return getElemFieldBuilder().addBuilder(
+            index, StmtPiqi.var.getDefaultInstance());
+      }
+      public java.util.List<StmtPiqi.var.Builder> 
+           getElemBuilderList() {
+        return getElemFieldBuilder().getBuilderList();
+      }
+      private com.google.protobuf.RepeatedFieldBuilder<
+          StmtPiqi.var, StmtPiqi.var.Builder, StmtPiqi.varOrBuilder> 
+          getElemFieldBuilder() {
+        if (elemBuilder_ == null) {
+          elemBuilder_ = new com.google.protobuf.RepeatedFieldBuilder<
+              StmtPiqi.var, StmtPiqi.var.Builder, StmtPiqi.varOrBuilder>(
+                  elem_,
+                  ((bitField0_ & 0x00000001) == 0x00000001),
+                  getParentForChildren(),
+                  isClean());
+          elem_ = null;
+        }
+        return elemBuilder_;
+      }
+      
+      // @@protoc_insertion_point(builder_scope:vars)
+    }
+    
+    static {
+      defaultInstance = new vars(true);
+      defaultInstance.initFields();
+    }
+    
+    // @@protoc_insertion_point(class_scope:vars)
+  }
+  
+  public interface defuseOrBuilder
+      extends com.google.protobuf.MessageOrBuilder {
+    
+    // required .vars defs = 1;
+    boolean hasDefs();
+    StmtPiqi.vars getDefs();
+    StmtPiqi.varsOrBuilder getDefsOrBuilder();
+    
+    // required .vars uses = 2;
+    boolean hasUses();
+    StmtPiqi.vars getUses();
+    StmtPiqi.varsOrBuilder getUsesOrBuilder();
+  }
+  public static final class defuse extends
+      com.google.protobuf.GeneratedMessage
+      implements defuseOrBuilder {
+    // Use defuse.newBuilder() to construct.
+    private defuse(Builder builder) {
+      super(builder);
+    }
+    private defuse(boolean noInit) {}
+    
+    private static final defuse defaultInstance;
+    public static defuse getDefaultInstance() {
+      return defaultInstance;
+    }
+    
+    public defuse getDefaultInstanceForType() {
+      return defaultInstance;
+    }
+    
+    public static final com.google.protobuf.Descriptors.Descriptor
+        getDescriptor() {
+      return StmtPiqi.internal_static_defuse_descriptor;
+    }
+    
+    protected com.google.protobuf.GeneratedMessage.FieldAccessorTable
+        internalGetFieldAccessorTable() {
+      return StmtPiqi.internal_static_defuse_fieldAccessorTable;
+    }
+    
+    private int bitField0_;
+    // required .vars defs = 1;
+    public static final int DEFS_FIELD_NUMBER = 1;
+    private StmtPiqi.vars defs_;
+    public boolean hasDefs() {
+      return ((bitField0_ & 0x00000001) == 0x00000001);
+    }
+    public StmtPiqi.vars getDefs() {
+      return defs_;
+    }
+    public StmtPiqi.varsOrBuilder getDefsOrBuilder() {
+      return defs_;
+    }
+    
+    // required .vars uses = 2;
+    public static final int USES_FIELD_NUMBER = 2;
+    private StmtPiqi.vars uses_;
+    public boolean hasUses() {
+      return ((bitField0_ & 0x00000002) == 0x00000002);
+    }
+    public StmtPiqi.vars getUses() {
+      return uses_;
+    }
+    public StmtPiqi.varsOrBuilder getUsesOrBuilder() {
+      return uses_;
+    }
+    
+    private void initFields() {
+      defs_ = StmtPiqi.vars.getDefaultInstance();
+      uses_ = StmtPiqi.vars.getDefaultInstance();
+    }
+    private byte memoizedIsInitialized = -1;
+    public final boolean isInitialized() {
+      byte isInitialized = memoizedIsInitialized;
+      if (isInitialized != -1) return isInitialized == 1;
+      
+      if (!hasDefs()) {
+        memoizedIsInitialized = 0;
+        return false;
+      }
+      if (!hasUses()) {
+        memoizedIsInitialized = 0;
+        return false;
+      }
+      if (!getDefs().isInitialized()) {
+        memoizedIsInitialized = 0;
+        return false;
+      }
+      if (!getUses().isInitialized()) {
+        memoizedIsInitialized = 0;
+        return false;
+      }
+      memoizedIsInitialized = 1;
+      return true;
+    }
+    
+    public void writeTo(com.google.protobuf.CodedOutputStream output)
+                        throws java.io.IOException {
+      getSerializedSize();
+      if (((bitField0_ & 0x00000001) == 0x00000001)) {
+        output.writeMessage(1, defs_);
+      }
+      if (((bitField0_ & 0x00000002) == 0x00000002)) {
+        output.writeMessage(2, uses_);
+      }
+      getUnknownFields().writeTo(output);
+    }
+    
+    private int memoizedSerializedSize = -1;
+    public int getSerializedSize() {
+      int size = memoizedSerializedSize;
+      if (size != -1) return size;
+    
+      size = 0;
+      if (((bitField0_ & 0x00000001) == 0x00000001)) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeMessageSize(1, defs_);
+      }
+      if (((bitField0_ & 0x00000002) == 0x00000002)) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeMessageSize(2, uses_);
+      }
+      size += getUnknownFields().getSerializedSize();
+      memoizedSerializedSize = size;
+      return size;
+    }
+    
+    private static final long serialVersionUID = 0L;
+    @java.lang.Override
+    protected java.lang.Object writeReplace()
+        throws java.io.ObjectStreamException {
+      return super.writeReplace();
+    }
+    
+    public static StmtPiqi.defuse parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return newBuilder().mergeFrom(data).buildParsed();
+    }
+    public static StmtPiqi.defuse parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return newBuilder().mergeFrom(data, extensionRegistry)
+               .buildParsed();
+    }
+    public static StmtPiqi.defuse parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return newBuilder().mergeFrom(data).buildParsed();
+    }
+    public static StmtPiqi.defuse parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return newBuilder().mergeFrom(data, extensionRegistry)
+               .buildParsed();
+    }
+    public static StmtPiqi.defuse parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return newBuilder().mergeFrom(input).buildParsed();
+    }
+    public static StmtPiqi.defuse parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return newBuilder().mergeFrom(input, extensionRegistry)
+               .buildParsed();
+    }
+    public static StmtPiqi.defuse parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      Builder builder = newBuilder();
+      if (builder.mergeDelimitedFrom(input)) {
+        return builder.buildParsed();
+      } else {
+        return null;
+      }
+    }
+    public static StmtPiqi.defuse parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      Builder builder = newBuilder();
+      if (builder.mergeDelimitedFrom(input, extensionRegistry)) {
+        return builder.buildParsed();
+      } else {
+        return null;
+      }
+    }
+    public static StmtPiqi.defuse parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return newBuilder().mergeFrom(input).buildParsed();
+    }
+    public static StmtPiqi.defuse parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return newBuilder().mergeFrom(input, extensionRegistry)
+               .buildParsed();
+    }
+    
+    public static Builder newBuilder() { return Builder.create(); }
+    public Builder newBuilderForType() { return newBuilder(); }
+    public static Builder newBuilder(StmtPiqi.defuse prototype) {
+      return newBuilder().mergeFrom(prototype);
+    }
+    public Builder toBuilder() { return newBuilder(this); }
+    
+    @java.lang.Override
+    protected Builder newBuilderForType(
+        com.google.protobuf.GeneratedMessage.BuilderParent parent) {
+      Builder builder = new Builder(parent);
+      return builder;
+    }
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessage.Builder<Builder>
+       implements StmtPiqi.defuseOrBuilder {
+      public static final com.google.protobuf.Descriptors.Descriptor
+          getDescriptor() {
+        return StmtPiqi.internal_static_defuse_descriptor;
+      }
+      
+      protected com.google.protobuf.GeneratedMessage.FieldAccessorTable
+          internalGetFieldAccessorTable() {
+        return StmtPiqi.internal_static_defuse_fieldAccessorTable;
+      }
+      
+      // Construct using StmtPiqi.defuse.newBuilder()
+      private Builder() {
+        maybeForceBuilderInitialization();
+      }
+      
+      private Builder(BuilderParent parent) {
+        super(parent);
+        maybeForceBuilderInitialization();
+      }
+      private void maybeForceBuilderInitialization() {
+        if (com.google.protobuf.GeneratedMessage.alwaysUseFieldBuilders) {
+          getDefsFieldBuilder();
+          getUsesFieldBuilder();
+        }
+      }
+      private static Builder create() {
+        return new Builder();
+      }
+      
+      public Builder clear() {
+        super.clear();
+        if (defsBuilder_ == null) {
+          defs_ = StmtPiqi.vars.getDefaultInstance();
+        } else {
+          defsBuilder_.clear();
+        }
+        bitField0_ = (bitField0_ & ~0x00000001);
+        if (usesBuilder_ == null) {
+          uses_ = StmtPiqi.vars.getDefaultInstance();
+        } else {
+          usesBuilder_.clear();
+        }
+        bitField0_ = (bitField0_ & ~0x00000002);
+        return this;
+      }
+      
+      public Builder clone() {
+        return create().mergeFrom(buildPartial());
+      }
+      
+      public com.google.protobuf.Descriptors.Descriptor
+          getDescriptorForType() {
+        return StmtPiqi.defuse.getDescriptor();
+      }
+      
+      public StmtPiqi.defuse getDefaultInstanceForType() {
+        return StmtPiqi.defuse.getDefaultInstance();
+      }
+      
+      public StmtPiqi.defuse build() {
+        StmtPiqi.defuse result = buildPartial();
+        if (!result.isInitialized()) {
+          throw newUninitializedMessageException(result);
+        }
+        return result;
+      }
+      
+      private StmtPiqi.defuse buildParsed()
+          throws com.google.protobuf.InvalidProtocolBufferException {
+        StmtPiqi.defuse result = buildPartial();
+        if (!result.isInitialized()) {
+          throw newUninitializedMessageException(
+            result).asInvalidProtocolBufferException();
+        }
+        return result;
+      }
+      
+      public StmtPiqi.defuse buildPartial() {
+        StmtPiqi.defuse result = new StmtPiqi.defuse(this);
+        int from_bitField0_ = bitField0_;
+        int to_bitField0_ = 0;
+        if (((from_bitField0_ & 0x00000001) == 0x00000001)) {
+          to_bitField0_ |= 0x00000001;
+        }
+        if (defsBuilder_ == null) {
+          result.defs_ = defs_;
+        } else {
+          result.defs_ = defsBuilder_.build();
+        }
+        if (((from_bitField0_ & 0x00000002) == 0x00000002)) {
+          to_bitField0_ |= 0x00000002;
+        }
+        if (usesBuilder_ == null) {
+          result.uses_ = uses_;
+        } else {
+          result.uses_ = usesBuilder_.build();
+        }
+        result.bitField0_ = to_bitField0_;
+        onBuilt();
+        return result;
+      }
+      
+      public Builder mergeFrom(com.google.protobuf.Message other) {
+        if (other instanceof StmtPiqi.defuse) {
+          return mergeFrom((StmtPiqi.defuse)other);
+        } else {
+          super.mergeFrom(other);
+          return this;
+        }
+      }
+      
+      public Builder mergeFrom(StmtPiqi.defuse other) {
+        if (other == StmtPiqi.defuse.getDefaultInstance()) return this;
+        if (other.hasDefs()) {
+          mergeDefs(other.getDefs());
+        }
+        if (other.hasUses()) {
+          mergeUses(other.getUses());
+        }
+        this.mergeUnknownFields(other.getUnknownFields());
+        return this;
+      }
+      
+      public final boolean isInitialized() {
+        if (!hasDefs()) {
+          
+          return false;
+        }
+        if (!hasUses()) {
+          
+          return false;
+        }
+        if (!getDefs().isInitialized()) {
+          
+          return false;
+        }
+        if (!getUses().isInitialized()) {
+          
+          return false;
+        }
+        return true;
+      }
+      
+      public Builder mergeFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws java.io.IOException {
+        com.google.protobuf.UnknownFieldSet.Builder unknownFields =
+          com.google.protobuf.UnknownFieldSet.newBuilder(
+            this.getUnknownFields());
+        while (true) {
+          int tag = input.readTag();
+          switch (tag) {
+            case 0:
+              this.setUnknownFields(unknownFields.build());
+              onChanged();
+              return this;
+            default: {
+              if (!parseUnknownField(input, unknownFields,
+                                     extensionRegistry, tag)) {
+                this.setUnknownFields(unknownFields.build());
+                onChanged();
+                return this;
+              }
+              break;
+            }
+            case 10: {
+              StmtPiqi.vars.Builder subBuilder = StmtPiqi.vars.newBuilder();
+              if (hasDefs()) {
+                subBuilder.mergeFrom(getDefs());
+              }
+              input.readMessage(subBuilder, extensionRegistry);
+              setDefs(subBuilder.buildPartial());
+              break;
+            }
+            case 18: {
+              StmtPiqi.vars.Builder subBuilder = StmtPiqi.vars.newBuilder();
+              if (hasUses()) {
+                subBuilder.mergeFrom(getUses());
+              }
+              input.readMessage(subBuilder, extensionRegistry);
+              setUses(subBuilder.buildPartial());
+              break;
+            }
+          }
+        }
+      }
+      
+      private int bitField0_;
+      
+      // required .vars defs = 1;
+      private StmtPiqi.vars defs_ = StmtPiqi.vars.getDefaultInstance();
+      private com.google.protobuf.SingleFieldBuilder<
+          StmtPiqi.vars, StmtPiqi.vars.Builder, StmtPiqi.varsOrBuilder> defsBuilder_;
+      public boolean hasDefs() {
+        return ((bitField0_ & 0x00000001) == 0x00000001);
+      }
+      public StmtPiqi.vars getDefs() {
+        if (defsBuilder_ == null) {
+          return defs_;
+        } else {
+          return defsBuilder_.getMessage();
+        }
+      }
+      public Builder setDefs(StmtPiqi.vars value) {
+        if (defsBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          defs_ = value;
+          onChanged();
+        } else {
+          defsBuilder_.setMessage(value);
+        }
+        bitField0_ |= 0x00000001;
+        return this;
+      }
+      public Builder setDefs(
+          StmtPiqi.vars.Builder builderForValue) {
+        if (defsBuilder_ == null) {
+          defs_ = builderForValue.build();
+          onChanged();
+        } else {
+          defsBuilder_.setMessage(builderForValue.build());
+        }
+        bitField0_ |= 0x00000001;
+        return this;
+      }
+      public Builder mergeDefs(StmtPiqi.vars value) {
+        if (defsBuilder_ == null) {
+          if (((bitField0_ & 0x00000001) == 0x00000001) &&
+              defs_ != StmtPiqi.vars.getDefaultInstance()) {
+            defs_ =
+              StmtPiqi.vars.newBuilder(defs_).mergeFrom(value).buildPartial();
+          } else {
+            defs_ = value;
+          }
+          onChanged();
+        } else {
+          defsBuilder_.mergeFrom(value);
+        }
+        bitField0_ |= 0x00000001;
+        return this;
+      }
+      public Builder clearDefs() {
+        if (defsBuilder_ == null) {
+          defs_ = StmtPiqi.vars.getDefaultInstance();
+          onChanged();
+        } else {
+          defsBuilder_.clear();
+        }
+        bitField0_ = (bitField0_ & ~0x00000001);
+        return this;
+      }
+      public StmtPiqi.vars.Builder getDefsBuilder() {
+        bitField0_ |= 0x00000001;
+        onChanged();
+        return getDefsFieldBuilder().getBuilder();
+      }
+      public StmtPiqi.varsOrBuilder getDefsOrBuilder() {
+        if (defsBuilder_ != null) {
+          return defsBuilder_.getMessageOrBuilder();
+        } else {
+          return defs_;
+        }
+      }
+      private com.google.protobuf.SingleFieldBuilder<
+          StmtPiqi.vars, StmtPiqi.vars.Builder, StmtPiqi.varsOrBuilder> 
+          getDefsFieldBuilder() {
+        if (defsBuilder_ == null) {
+          defsBuilder_ = new com.google.protobuf.SingleFieldBuilder<
+              StmtPiqi.vars, StmtPiqi.vars.Builder, StmtPiqi.varsOrBuilder>(
+                  defs_,
+                  getParentForChildren(),
+                  isClean());
+          defs_ = null;
+        }
+        return defsBuilder_;
+      }
+      
+      // required .vars uses = 2;
+      private StmtPiqi.vars uses_ = StmtPiqi.vars.getDefaultInstance();
+      private com.google.protobuf.SingleFieldBuilder<
+          StmtPiqi.vars, StmtPiqi.vars.Builder, StmtPiqi.varsOrBuilder> usesBuilder_;
+      public boolean hasUses() {
+        return ((bitField0_ & 0x00000002) == 0x00000002);
+      }
+      public StmtPiqi.vars getUses() {
+        if (usesBuilder_ == null) {
+          return uses_;
+        } else {
+          return usesBuilder_.getMessage();
+        }
+      }
+      public Builder setUses(StmtPiqi.vars value) {
+        if (usesBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          uses_ = value;
+          onChanged();
+        } else {
+          usesBuilder_.setMessage(value);
+        }
+        bitField0_ |= 0x00000002;
+        return this;
+      }
+      public Builder setUses(
+          StmtPiqi.vars.Builder builderForValue) {
+        if (usesBuilder_ == null) {
+          uses_ = builderForValue.build();
+          onChanged();
+        } else {
+          usesBuilder_.setMessage(builderForValue.build());
+        }
+        bitField0_ |= 0x00000002;
+        return this;
+      }
+      public Builder mergeUses(StmtPiqi.vars value) {
+        if (usesBuilder_ == null) {
+          if (((bitField0_ & 0x00000002) == 0x00000002) &&
+              uses_ != StmtPiqi.vars.getDefaultInstance()) {
+            uses_ =
+              StmtPiqi.vars.newBuilder(uses_).mergeFrom(value).buildPartial();
+          } else {
+            uses_ = value;
+          }
+          onChanged();
+        } else {
+          usesBuilder_.mergeFrom(value);
+        }
+        bitField0_ |= 0x00000002;
+        return this;
+      }
+      public Builder clearUses() {
+        if (usesBuilder_ == null) {
+          uses_ = StmtPiqi.vars.getDefaultInstance();
+          onChanged();
+        } else {
+          usesBuilder_.clear();
+        }
+        bitField0_ = (bitField0_ & ~0x00000002);
+        return this;
+      }
+      public StmtPiqi.vars.Builder getUsesBuilder() {
+        bitField0_ |= 0x00000002;
+        onChanged();
+        return getUsesFieldBuilder().getBuilder();
+      }
+      public StmtPiqi.varsOrBuilder getUsesOrBuilder() {
+        if (usesBuilder_ != null) {
+          return usesBuilder_.getMessageOrBuilder();
+        } else {
+          return uses_;
+        }
+      }
+      private com.google.protobuf.SingleFieldBuilder<
+          StmtPiqi.vars, StmtPiqi.vars.Builder, StmtPiqi.varsOrBuilder> 
+          getUsesFieldBuilder() {
+        if (usesBuilder_ == null) {
+          usesBuilder_ = new com.google.protobuf.SingleFieldBuilder<
+              StmtPiqi.vars, StmtPiqi.vars.Builder, StmtPiqi.varsOrBuilder>(
+                  uses_,
+                  getParentForChildren(),
+                  isClean());
+          uses_ = null;
+        }
+        return usesBuilder_;
+      }
+      
+      // @@protoc_insertion_point(builder_scope:defuse)
+    }
+    
+    static {
+      defaultInstance = new defuse(true);
+      defaultInstance.initFields();
+    }
+    
+    // @@protoc_insertion_point(class_scope:defuse)
   }
   
   public interface attributeOrBuilder
@@ -26541,6 +27858,16 @@ public final class StmtPiqi {
     com.google.protobuf.GeneratedMessage.FieldAccessorTable
       internal_static_var_fieldAccessorTable;
   private static com.google.protobuf.Descriptors.Descriptor
+    internal_static_vars_descriptor;
+  private static
+    com.google.protobuf.GeneratedMessage.FieldAccessorTable
+      internal_static_vars_fieldAccessorTable;
+  private static com.google.protobuf.Descriptors.Descriptor
+    internal_static_defuse_descriptor;
+  private static
+    com.google.protobuf.GeneratedMessage.FieldAccessorTable
+      internal_static_defuse_fieldAccessorTable;
+  private static com.google.protobuf.Descriptors.Descriptor
     internal_static_attribute_descriptor;
   private static
     com.google.protobuf.GeneratedMessage.FieldAccessorTable
@@ -26680,68 +28007,71 @@ public final class StmtPiqi {
       "tributes\"<\n\006assume\022\021\n\003exp\030\001 \002(\0132\004.exp\022\037\n" +
       "\nattributes\030\002 \002(\0132\013.attributes\":\n\007commen",
       "t\022\016\n\006string\030\001 \002(\t\022\037\n\nattributes\030\002 \002(\0132\013." +
-      "attributes\":\n\007special\022\016\n\006string\030\001 \002(\t\022\037\n" +
-      "\nattributes\030\002 \002(\0132\013.attributes\">\n\003typ\022\013\n" +
-      "\003reg\030\001 \001(\021\022\023\n\004tmem\030\002 \001(\0132\005.tmem\022\025\n\005array" +
-      "\030\003 \001(\0132\006.array\"<\n\004tmem\022\030\n\nindex_type\030\001 \002" +
-      "(\0132\004.typ\022\032\n\014element_type\030\002 \002(\0132\004.typ\"=\n\005" +
-      "array\022\030\n\nindex_type\030\001 \002(\0132\004.typ\022\032\n\014eleme" +
-      "nt_type\030\002 \002(\0132\004.typ\"#\n\005label\022\014\n\004name\030\001 \001" +
-      "(\t\022\014\n\004addr\030\002 \001(\022\"2\n\003var\022\014\n\004name\030\001 \002(\t\022\n\n" +
-      "\002id\030\002 \002(\021\022\021\n\003typ\030\003 \002(\0132\004.typ\"\261\001\n\tattribu",
-      "te\022\013\n\003asm\030\001 \001(\t\022\017\n\007address\030\002 \001(\022\022\031\n\007live" +
-      "out\030\003 \001(\0132\010.liveout\022\017\n\007strattr\030\004 \001(\t\022\031\n\007" +
-      "context\030\005 \001(\0132\010.context\022\021\n\tthread_id\030\006 \001" +
-      "(\004\022\035\n\tsynthetic\030\007 \001(\0132\n.synthetic\022\r\n\005oth" +
-      "er\030\010 \001(\t\"&\n\nattributes\022\030\n\004elem\030\001 \003(\0132\n.a" +
-      "ttribute\"\t\n\007liveout\"\013\n\tsynthetic\"]\n\025oper" +
-      "and_info_specific\022!\n\013mem_operand\030\001 \001(\0132\014" +
-      ".mem_operand\022!\n\013reg_operand\030\002 \001(\0132\014.reg_" +
-      "operand\"\033\n\013reg_operand\022\014\n\004name\030\001 \002(\t\"K\n\r" +
-      "operand_usage\022\014\n\004read\030\001 \002(\010\022\017\n\007written\030\002",
-      " \002(\010\022\r\n\005index\030\003 \002(\010\022\014\n\004base\030\004 \002(\010\"\036\n\013mem" +
-      "_operand\022\017\n\007address\030\001 \002(\022\"H\n\ntaint_info\022" +
-      "\020\n\010no_taint\030\001 \001(\010\022\020\n\010taint_id\030\002 \001(\004\022\026\n\016t" +
-      "aint_multiple\030\003 \001(\010\"\253\001\n\007context\0225\n\025opera" +
-      "nd_info_specific\030\001 \002(\0132\026.operand_info_sp" +
-      "ecific\022\022\n\nbit_length\030\002 \002(\021\022%\n\roperand_us" +
-      "age\030\003 \002(\0132\016.operand_usage\022\037\n\ntaint_info\030" +
-      "\004 \002(\0132\013.taint_info\022\r\n\005value\030\005 \002(\t\"\244\002\n\003ex" +
-      "p\022\023\n\004load\030\001 \001(\0132\005.load\022\025\n\005store\030\002 \001(\0132\006." +
-      "store\022\025\n\005binop\030\003 \001(\0132\006.binop\022\023\n\004unop\030\004 \001",
-      "(\0132\005.unop\022\021\n\003var\030\005 \001(\0132\004.var\022\013\n\003lab\030\006 \001(" +
-      "\t\022\023\n\004inte\030\007 \001(\0132\005.inte\022\023\n\004cast\030\010 \001(\0132\005.c" +
-      "ast\022\031\n\007let_exp\030\t \001(\0132\010.let_exp\022\031\n\007unknow" +
-      "n\030\n \001(\0132\010.unknown\022\021\n\003ite\030\013 \001(\0132\004.ite\022\031\n\007" +
-      "extract\030\014 \001(\0132\010.extract\022\027\n\006concat\030\r \001(\0132" +
-      "\007.concat\"\\\n\004load\022\024\n\006memory\030\001 \002(\0132\004.exp\022\025" +
-      "\n\007address\030\002 \002(\0132\004.exp\022\024\n\006endian\030\003 \002(\0132\004." +
-      "exp\022\021\n\003typ\030\004 \002(\0132\004.typ\"r\n\005store\022\024\n\006memor" +
-      "y\030\001 \002(\0132\004.exp\022\025\n\007address\030\002 \002(\0132\004.exp\022\023\n\005" +
-      "value\030\003 \002(\0132\004.exp\022\024\n\006endian\030\004 \002(\0132\004.exp\022",
-      "\021\n\003typ\030\005 \002(\0132\004.typ\"P\n\005binop\022\037\n\nbinop_typ" +
-      "e\030\001 \002(\0162\013.binop_type\022\022\n\004lexp\030\002 \002(\0132\004.exp" +
-      "\022\022\n\004rexp\030\003 \002(\0132\004.exp\"8\n\004unop\022\035\n\tunop_typ" +
-      "e\030\001 \002(\0162\n.unop_type\022\021\n\003exp\030\002 \002(\0132\004.exp\"&" +
-      "\n\004inte\022\013\n\003int\030\001 \002(\t\022\021\n\003typ\030\002 \002(\0132\004.typ\"P" +
-      "\n\004cast\022\035\n\tcast_type\030\001 \002(\0162\n.cast_type\022\026\n" +
-      "\010new_type\030\002 \002(\0132\004.typ\022\021\n\003exp\030\003 \002(\0132\004.exp" +
-      "\"@\n\007let_exp\022\021\n\003var\030\001 \002(\0132\004.var\022\020\n\002e1\030\002 \002" +
-      "(\0132\004.exp\022\020\n\002e2\030\003 \002(\0132\004.exp\",\n\007unknown\022\016\n" +
-      "\006string\030\001 \002(\t\022\021\n\003typ\030\002 \002(\0132\004.typ\"K\n\003ite\022",
-      "\027\n\tcondition\030\001 \002(\0132\004.exp\022\024\n\006iftrue\030\002 \002(\013" +
-      "2\004.exp\022\025\n\007iffalse\030\003 \002(\0132\004.exp\"8\n\007extract" +
-      "\022\014\n\004hbit\030\001 \002(\021\022\014\n\004lbit\030\002 \002(\021\022\021\n\003exp\030\003 \002(" +
-      "\0132\004.exp\",\n\006concat\022\020\n\002le\030\001 \002(\0132\004.exp\022\020\n\002r" +
-      "e\030\002 \002(\0132\004.exp*L\n\tcast_type\022\021\n\rcast_unsig" +
-      "ned\020\001\022\017\n\013cast_signed\020\002\022\r\n\tcast_high\020\003\022\014\n" +
-      "\010cast_low\020\004*\323\001\n\nbinop_type\022\010\n\004plus\020\001\022\t\n\005" +
-      "minus\020\002\022\t\n\005times\020\003\022\n\n\006divide\020\004\022\013\n\007sdivid" +
-      "e\020\005\022\n\n\006modbop\020\006\022\010\n\004smod\020\007\022\n\n\006lshift\020\010\022\n\n" +
-      "\006rshift\020\t\022\013\n\007arshift\020\n\022\n\n\006andbop\020\013\022\t\n\005or",
-      "bop\020\014\022\007\n\003xor\020\r\022\006\n\002eq\020\016\022\007\n\003neq\020\017\022\006\n\002lt\020\020\022" +
-      "\006\n\002le\020\021\022\007\n\003slt\020\022\022\007\n\003sle\020\023*\037\n\tunop_type\022\010" +
-      "\n\004uneg\020\001\022\010\n\004unot\020\002"
+      "attributes\"S\n\007special\022\016\n\006string\030\001 \002(\t\022\027\n" +
+      "\006defuse\030\002 \001(\0132\007.defuse\022\037\n\nattributes\030\003 \002" +
+      "(\0132\013.attributes\">\n\003typ\022\013\n\003reg\030\001 \001(\021\022\023\n\004t" +
+      "mem\030\002 \001(\0132\005.tmem\022\025\n\005array\030\003 \001(\0132\006.array\"" +
+      "<\n\004tmem\022\030\n\nindex_type\030\001 \002(\0132\004.typ\022\032\n\014ele" +
+      "ment_type\030\002 \002(\0132\004.typ\"=\n\005array\022\030\n\nindex_" +
+      "type\030\001 \002(\0132\004.typ\022\032\n\014element_type\030\002 \002(\0132\004" +
+      ".typ\"#\n\005label\022\014\n\004name\030\001 \001(\t\022\014\n\004addr\030\002 \001(" +
+      "\022\"2\n\003var\022\014\n\004name\030\001 \002(\t\022\n\n\002id\030\002 \002(\021\022\021\n\003ty",
+      "p\030\003 \002(\0132\004.typ\"\032\n\004vars\022\022\n\004elem\030\001 \003(\0132\004.va" +
+      "r\"2\n\006defuse\022\023\n\004defs\030\001 \002(\0132\005.vars\022\023\n\004uses" +
+      "\030\002 \002(\0132\005.vars\"\261\001\n\tattribute\022\013\n\003asm\030\001 \001(\t" +
+      "\022\017\n\007address\030\002 \001(\022\022\031\n\007liveout\030\003 \001(\0132\010.liv" +
+      "eout\022\017\n\007strattr\030\004 \001(\t\022\031\n\007context\030\005 \001(\0132\010" +
+      ".context\022\021\n\tthread_id\030\006 \001(\004\022\035\n\tsynthetic" +
+      "\030\007 \001(\0132\n.synthetic\022\r\n\005other\030\010 \001(\t\"&\n\natt" +
+      "ributes\022\030\n\004elem\030\001 \003(\0132\n.attribute\"\t\n\007liv" +
+      "eout\"\013\n\tsynthetic\"]\n\025operand_info_specif" +
+      "ic\022!\n\013mem_operand\030\001 \001(\0132\014.mem_operand\022!\n",
+      "\013reg_operand\030\002 \001(\0132\014.reg_operand\"\033\n\013reg_" +
+      "operand\022\014\n\004name\030\001 \002(\t\"K\n\roperand_usage\022\014" +
+      "\n\004read\030\001 \002(\010\022\017\n\007written\030\002 \002(\010\022\r\n\005index\030\003" +
+      " \002(\010\022\014\n\004base\030\004 \002(\010\"\036\n\013mem_operand\022\017\n\007add" +
+      "ress\030\001 \002(\022\"H\n\ntaint_info\022\020\n\010no_taint\030\001 \001" +
+      "(\010\022\020\n\010taint_id\030\002 \001(\004\022\026\n\016taint_multiple\030\003" +
+      " \001(\010\"\253\001\n\007context\0225\n\025operand_info_specifi" +
+      "c\030\001 \002(\0132\026.operand_info_specific\022\022\n\nbit_l" +
+      "ength\030\002 \002(\021\022%\n\roperand_usage\030\003 \002(\0132\016.ope" +
+      "rand_usage\022\037\n\ntaint_info\030\004 \002(\0132\013.taint_i",
+      "nfo\022\r\n\005value\030\005 \002(\t\"\244\002\n\003exp\022\023\n\004load\030\001 \001(\013" +
+      "2\005.load\022\025\n\005store\030\002 \001(\0132\006.store\022\025\n\005binop\030" +
+      "\003 \001(\0132\006.binop\022\023\n\004unop\030\004 \001(\0132\005.unop\022\021\n\003va" +
+      "r\030\005 \001(\0132\004.var\022\013\n\003lab\030\006 \001(\t\022\023\n\004inte\030\007 \001(\013" +
+      "2\005.inte\022\023\n\004cast\030\010 \001(\0132\005.cast\022\031\n\007let_exp\030" +
+      "\t \001(\0132\010.let_exp\022\031\n\007unknown\030\n \001(\0132\010.unkno" +
+      "wn\022\021\n\003ite\030\013 \001(\0132\004.ite\022\031\n\007extract\030\014 \001(\0132\010" +
+      ".extract\022\027\n\006concat\030\r \001(\0132\007.concat\"\\\n\004loa" +
+      "d\022\024\n\006memory\030\001 \002(\0132\004.exp\022\025\n\007address\030\002 \002(\013" +
+      "2\004.exp\022\024\n\006endian\030\003 \002(\0132\004.exp\022\021\n\003typ\030\004 \002(",
+      "\0132\004.typ\"r\n\005store\022\024\n\006memory\030\001 \002(\0132\004.exp\022\025" +
+      "\n\007address\030\002 \002(\0132\004.exp\022\023\n\005value\030\003 \002(\0132\004.e" +
+      "xp\022\024\n\006endian\030\004 \002(\0132\004.exp\022\021\n\003typ\030\005 \002(\0132\004." +
+      "typ\"P\n\005binop\022\037\n\nbinop_type\030\001 \002(\0162\013.binop" +
+      "_type\022\022\n\004lexp\030\002 \002(\0132\004.exp\022\022\n\004rexp\030\003 \002(\0132" +
+      "\004.exp\"8\n\004unop\022\035\n\tunop_type\030\001 \002(\0162\n.unop_" +
+      "type\022\021\n\003exp\030\002 \002(\0132\004.exp\"&\n\004inte\022\013\n\003int\030\001" +
+      " \002(\t\022\021\n\003typ\030\002 \002(\0132\004.typ\"P\n\004cast\022\035\n\tcast_" +
+      "type\030\001 \002(\0162\n.cast_type\022\026\n\010new_type\030\002 \002(\013" +
+      "2\004.typ\022\021\n\003exp\030\003 \002(\0132\004.exp\"@\n\007let_exp\022\021\n\003",
+      "var\030\001 \002(\0132\004.var\022\020\n\002e1\030\002 \002(\0132\004.exp\022\020\n\002e2\030" +
+      "\003 \002(\0132\004.exp\",\n\007unknown\022\016\n\006string\030\001 \002(\t\022\021" +
+      "\n\003typ\030\002 \002(\0132\004.typ\"K\n\003ite\022\027\n\tcondition\030\001 " +
+      "\002(\0132\004.exp\022\024\n\006iftrue\030\002 \002(\0132\004.exp\022\025\n\007iffal" +
+      "se\030\003 \002(\0132\004.exp\"8\n\007extract\022\014\n\004hbit\030\001 \002(\021\022" +
+      "\014\n\004lbit\030\002 \002(\021\022\021\n\003exp\030\003 \002(\0132\004.exp\",\n\006conc" +
+      "at\022\020\n\002le\030\001 \002(\0132\004.exp\022\020\n\002re\030\002 \002(\0132\004.exp*L" +
+      "\n\tcast_type\022\021\n\rcast_unsigned\020\001\022\017\n\013cast_s" +
+      "igned\020\002\022\r\n\tcast_high\020\003\022\014\n\010cast_low\020\004*\323\001\n" +
+      "\nbinop_type\022\010\n\004plus\020\001\022\t\n\005minus\020\002\022\t\n\005time",
+      "s\020\003\022\n\n\006divide\020\004\022\013\n\007sdivide\020\005\022\n\n\006modbop\020\006" +
+      "\022\010\n\004smod\020\007\022\n\n\006lshift\020\010\022\n\n\006rshift\020\t\022\013\n\007ar" +
+      "shift\020\n\022\n\n\006andbop\020\013\022\t\n\005orbop\020\014\022\007\n\003xor\020\r\022" +
+      "\006\n\002eq\020\016\022\007\n\003neq\020\017\022\006\n\002lt\020\020\022\006\n\002le\020\021\022\007\n\003slt\020" +
+      "\022\022\007\n\003sle\020\023*\037\n\tunop_type\022\010\n\004uneg\020\001\022\010\n\004uno" +
+      "t\020\002"
     };
     com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
       new com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner() {
@@ -26833,7 +28163,7 @@ public final class StmtPiqi {
           internal_static_special_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_special_descriptor,
-              new java.lang.String[] { "String", "Attributes", },
+              new java.lang.String[] { "String", "Defuse", "Attributes", },
               StmtPiqi.special.class,
               StmtPiqi.special.Builder.class);
           internal_static_typ_descriptor =
@@ -26876,8 +28206,24 @@ public final class StmtPiqi {
               new java.lang.String[] { "Name", "Id", "Typ", },
               StmtPiqi.var.class,
               StmtPiqi.var.Builder.class);
-          internal_static_attribute_descriptor =
+          internal_static_vars_descriptor =
             getDescriptor().getMessageTypes().get(16);
+          internal_static_vars_fieldAccessorTable = new
+            com.google.protobuf.GeneratedMessage.FieldAccessorTable(
+              internal_static_vars_descriptor,
+              new java.lang.String[] { "Elem", },
+              StmtPiqi.vars.class,
+              StmtPiqi.vars.Builder.class);
+          internal_static_defuse_descriptor =
+            getDescriptor().getMessageTypes().get(17);
+          internal_static_defuse_fieldAccessorTable = new
+            com.google.protobuf.GeneratedMessage.FieldAccessorTable(
+              internal_static_defuse_descriptor,
+              new java.lang.String[] { "Defs", "Uses", },
+              StmtPiqi.defuse.class,
+              StmtPiqi.defuse.Builder.class);
+          internal_static_attribute_descriptor =
+            getDescriptor().getMessageTypes().get(18);
           internal_static_attribute_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_attribute_descriptor,
@@ -26885,7 +28231,7 @@ public final class StmtPiqi {
               StmtPiqi.attribute.class,
               StmtPiqi.attribute.Builder.class);
           internal_static_attributes_descriptor =
-            getDescriptor().getMessageTypes().get(17);
+            getDescriptor().getMessageTypes().get(19);
           internal_static_attributes_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_attributes_descriptor,
@@ -26893,7 +28239,7 @@ public final class StmtPiqi {
               StmtPiqi.attributes.class,
               StmtPiqi.attributes.Builder.class);
           internal_static_liveout_descriptor =
-            getDescriptor().getMessageTypes().get(18);
+            getDescriptor().getMessageTypes().get(20);
           internal_static_liveout_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_liveout_descriptor,
@@ -26901,7 +28247,7 @@ public final class StmtPiqi {
               StmtPiqi.liveout.class,
               StmtPiqi.liveout.Builder.class);
           internal_static_synthetic_descriptor =
-            getDescriptor().getMessageTypes().get(19);
+            getDescriptor().getMessageTypes().get(21);
           internal_static_synthetic_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_synthetic_descriptor,
@@ -26909,7 +28255,7 @@ public final class StmtPiqi {
               StmtPiqi.synthetic.class,
               StmtPiqi.synthetic.Builder.class);
           internal_static_operand_info_specific_descriptor =
-            getDescriptor().getMessageTypes().get(20);
+            getDescriptor().getMessageTypes().get(22);
           internal_static_operand_info_specific_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_operand_info_specific_descriptor,
@@ -26917,7 +28263,7 @@ public final class StmtPiqi {
               StmtPiqi.operand_info_specific.class,
               StmtPiqi.operand_info_specific.Builder.class);
           internal_static_reg_operand_descriptor =
-            getDescriptor().getMessageTypes().get(21);
+            getDescriptor().getMessageTypes().get(23);
           internal_static_reg_operand_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_reg_operand_descriptor,
@@ -26925,7 +28271,7 @@ public final class StmtPiqi {
               StmtPiqi.reg_operand.class,
               StmtPiqi.reg_operand.Builder.class);
           internal_static_operand_usage_descriptor =
-            getDescriptor().getMessageTypes().get(22);
+            getDescriptor().getMessageTypes().get(24);
           internal_static_operand_usage_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_operand_usage_descriptor,
@@ -26933,7 +28279,7 @@ public final class StmtPiqi {
               StmtPiqi.operand_usage.class,
               StmtPiqi.operand_usage.Builder.class);
           internal_static_mem_operand_descriptor =
-            getDescriptor().getMessageTypes().get(23);
+            getDescriptor().getMessageTypes().get(25);
           internal_static_mem_operand_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_mem_operand_descriptor,
@@ -26941,7 +28287,7 @@ public final class StmtPiqi {
               StmtPiqi.mem_operand.class,
               StmtPiqi.mem_operand.Builder.class);
           internal_static_taint_info_descriptor =
-            getDescriptor().getMessageTypes().get(24);
+            getDescriptor().getMessageTypes().get(26);
           internal_static_taint_info_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_taint_info_descriptor,
@@ -26949,7 +28295,7 @@ public final class StmtPiqi {
               StmtPiqi.taint_info.class,
               StmtPiqi.taint_info.Builder.class);
           internal_static_context_descriptor =
-            getDescriptor().getMessageTypes().get(25);
+            getDescriptor().getMessageTypes().get(27);
           internal_static_context_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_context_descriptor,
@@ -26957,7 +28303,7 @@ public final class StmtPiqi {
               StmtPiqi.context.class,
               StmtPiqi.context.Builder.class);
           internal_static_exp_descriptor =
-            getDescriptor().getMessageTypes().get(26);
+            getDescriptor().getMessageTypes().get(28);
           internal_static_exp_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_exp_descriptor,
@@ -26965,7 +28311,7 @@ public final class StmtPiqi {
               StmtPiqi.exp.class,
               StmtPiqi.exp.Builder.class);
           internal_static_load_descriptor =
-            getDescriptor().getMessageTypes().get(27);
+            getDescriptor().getMessageTypes().get(29);
           internal_static_load_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_load_descriptor,
@@ -26973,7 +28319,7 @@ public final class StmtPiqi {
               StmtPiqi.load.class,
               StmtPiqi.load.Builder.class);
           internal_static_store_descriptor =
-            getDescriptor().getMessageTypes().get(28);
+            getDescriptor().getMessageTypes().get(30);
           internal_static_store_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_store_descriptor,
@@ -26981,7 +28327,7 @@ public final class StmtPiqi {
               StmtPiqi.store.class,
               StmtPiqi.store.Builder.class);
           internal_static_binop_descriptor =
-            getDescriptor().getMessageTypes().get(29);
+            getDescriptor().getMessageTypes().get(31);
           internal_static_binop_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_binop_descriptor,
@@ -26989,7 +28335,7 @@ public final class StmtPiqi {
               StmtPiqi.binop.class,
               StmtPiqi.binop.Builder.class);
           internal_static_unop_descriptor =
-            getDescriptor().getMessageTypes().get(30);
+            getDescriptor().getMessageTypes().get(32);
           internal_static_unop_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_unop_descriptor,
@@ -26997,7 +28343,7 @@ public final class StmtPiqi {
               StmtPiqi.unop.class,
               StmtPiqi.unop.Builder.class);
           internal_static_inte_descriptor =
-            getDescriptor().getMessageTypes().get(31);
+            getDescriptor().getMessageTypes().get(33);
           internal_static_inte_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_inte_descriptor,
@@ -27005,7 +28351,7 @@ public final class StmtPiqi {
               StmtPiqi.inte.class,
               StmtPiqi.inte.Builder.class);
           internal_static_cast_descriptor =
-            getDescriptor().getMessageTypes().get(32);
+            getDescriptor().getMessageTypes().get(34);
           internal_static_cast_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_cast_descriptor,
@@ -27013,7 +28359,7 @@ public final class StmtPiqi {
               StmtPiqi.cast.class,
               StmtPiqi.cast.Builder.class);
           internal_static_let_exp_descriptor =
-            getDescriptor().getMessageTypes().get(33);
+            getDescriptor().getMessageTypes().get(35);
           internal_static_let_exp_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_let_exp_descriptor,
@@ -27021,7 +28367,7 @@ public final class StmtPiqi {
               StmtPiqi.let_exp.class,
               StmtPiqi.let_exp.Builder.class);
           internal_static_unknown_descriptor =
-            getDescriptor().getMessageTypes().get(34);
+            getDescriptor().getMessageTypes().get(36);
           internal_static_unknown_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_unknown_descriptor,
@@ -27029,7 +28375,7 @@ public final class StmtPiqi {
               StmtPiqi.unknown.class,
               StmtPiqi.unknown.Builder.class);
           internal_static_ite_descriptor =
-            getDescriptor().getMessageTypes().get(35);
+            getDescriptor().getMessageTypes().get(37);
           internal_static_ite_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_ite_descriptor,
@@ -27037,7 +28383,7 @@ public final class StmtPiqi {
               StmtPiqi.ite.class,
               StmtPiqi.ite.Builder.class);
           internal_static_extract_descriptor =
-            getDescriptor().getMessageTypes().get(36);
+            getDescriptor().getMessageTypes().get(38);
           internal_static_extract_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_extract_descriptor,
@@ -27045,7 +28391,7 @@ public final class StmtPiqi {
               StmtPiqi.extract.class,
               StmtPiqi.extract.Builder.class);
           internal_static_concat_descriptor =
-            getDescriptor().getMessageTypes().get(37);
+            getDescriptor().getMessageTypes().get(39);
           internal_static_concat_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_concat_descriptor,

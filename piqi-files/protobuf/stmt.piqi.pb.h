@@ -46,6 +46,8 @@ class tmem;
 class array;
 class label;
 class var;
+class vars;
+class defuse;
 class attribute;
 class attributes;
 class liveout;
@@ -1256,10 +1258,18 @@ class special : public ::google::protobuf::Message {
   inline ::std::string* mutable_string();
   inline ::std::string* release_string();
   
-  // required .attributes attributes = 2;
+  // optional .defuse defuse = 2;
+  inline bool has_defuse() const;
+  inline void clear_defuse();
+  static const int kDefuseFieldNumber = 2;
+  inline const ::defuse& defuse() const;
+  inline ::defuse* mutable_defuse();
+  inline ::defuse* release_defuse();
+  
+  // required .attributes attributes = 3;
   inline bool has_attributes() const;
   inline void clear_attributes();
-  static const int kAttributesFieldNumber = 2;
+  static const int kAttributesFieldNumber = 3;
   inline const ::attributes& attributes() const;
   inline ::attributes* mutable_attributes();
   inline ::attributes* release_attributes();
@@ -1268,16 +1278,19 @@ class special : public ::google::protobuf::Message {
  private:
   inline void set_has_string();
   inline void clear_has_string();
+  inline void set_has_defuse();
+  inline void clear_has_defuse();
   inline void set_has_attributes();
   inline void clear_has_attributes();
   
   ::google::protobuf::UnknownFieldSet _unknown_fields_;
   
   ::std::string* string_;
+  ::defuse* defuse_;
   ::attributes* attributes_;
   
   mutable int _cached_size_;
-  ::google::protobuf::uint32 _has_bits_[(2 + 31) / 32];
+  ::google::protobuf::uint32 _has_bits_[(3 + 31) / 32];
   
   friend void  protobuf_AddDesc_stmt_2epiqi_2eproto();
   friend void protobuf_AssignDesc_stmt_2epiqi_2eproto();
@@ -1780,6 +1793,185 @@ class var : public ::google::protobuf::Message {
   
   void InitAsDefaultInstance();
   static var* default_instance_;
+};
+// -------------------------------------------------------------------
+
+class vars : public ::google::protobuf::Message {
+ public:
+  vars();
+  virtual ~vars();
+  
+  vars(const vars& from);
+  
+  inline vars& operator=(const vars& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  
+  inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const {
+    return _unknown_fields_;
+  }
+  
+  inline ::google::protobuf::UnknownFieldSet* mutable_unknown_fields() {
+    return &_unknown_fields_;
+  }
+  
+  static const ::google::protobuf::Descriptor* descriptor();
+  static const vars& default_instance();
+  
+  void Swap(vars* other);
+  
+  // implements Message ----------------------------------------------
+  
+  vars* New() const;
+  void CopyFrom(const ::google::protobuf::Message& from);
+  void MergeFrom(const ::google::protobuf::Message& from);
+  void CopyFrom(const vars& from);
+  void MergeFrom(const vars& from);
+  void Clear();
+  bool IsInitialized() const;
+  
+  int ByteSize() const;
+  bool MergePartialFromCodedStream(
+      ::google::protobuf::io::CodedInputStream* input);
+  void SerializeWithCachedSizes(
+      ::google::protobuf::io::CodedOutputStream* output) const;
+  ::google::protobuf::uint8* SerializeWithCachedSizesToArray(::google::protobuf::uint8* output) const;
+  int GetCachedSize() const { return _cached_size_; }
+  private:
+  void SharedCtor();
+  void SharedDtor();
+  void SetCachedSize(int size) const;
+  public:
+  
+  ::google::protobuf::Metadata GetMetadata() const;
+  
+  // nested types ----------------------------------------------------
+  
+  // accessors -------------------------------------------------------
+  
+  // repeated .var elem = 1;
+  inline int elem_size() const;
+  inline void clear_elem();
+  static const int kElemFieldNumber = 1;
+  inline const ::var& elem(int index) const;
+  inline ::var* mutable_elem(int index);
+  inline ::var* add_elem();
+  inline const ::google::protobuf::RepeatedPtrField< ::var >&
+      elem() const;
+  inline ::google::protobuf::RepeatedPtrField< ::var >*
+      mutable_elem();
+  
+  // @@protoc_insertion_point(class_scope:vars)
+ private:
+  
+  ::google::protobuf::UnknownFieldSet _unknown_fields_;
+  
+  ::google::protobuf::RepeatedPtrField< ::var > elem_;
+  
+  mutable int _cached_size_;
+  ::google::protobuf::uint32 _has_bits_[(1 + 31) / 32];
+  
+  friend void  protobuf_AddDesc_stmt_2epiqi_2eproto();
+  friend void protobuf_AssignDesc_stmt_2epiqi_2eproto();
+  friend void protobuf_ShutdownFile_stmt_2epiqi_2eproto();
+  
+  void InitAsDefaultInstance();
+  static vars* default_instance_;
+};
+// -------------------------------------------------------------------
+
+class defuse : public ::google::protobuf::Message {
+ public:
+  defuse();
+  virtual ~defuse();
+  
+  defuse(const defuse& from);
+  
+  inline defuse& operator=(const defuse& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  
+  inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const {
+    return _unknown_fields_;
+  }
+  
+  inline ::google::protobuf::UnknownFieldSet* mutable_unknown_fields() {
+    return &_unknown_fields_;
+  }
+  
+  static const ::google::protobuf::Descriptor* descriptor();
+  static const defuse& default_instance();
+  
+  void Swap(defuse* other);
+  
+  // implements Message ----------------------------------------------
+  
+  defuse* New() const;
+  void CopyFrom(const ::google::protobuf::Message& from);
+  void MergeFrom(const ::google::protobuf::Message& from);
+  void CopyFrom(const defuse& from);
+  void MergeFrom(const defuse& from);
+  void Clear();
+  bool IsInitialized() const;
+  
+  int ByteSize() const;
+  bool MergePartialFromCodedStream(
+      ::google::protobuf::io::CodedInputStream* input);
+  void SerializeWithCachedSizes(
+      ::google::protobuf::io::CodedOutputStream* output) const;
+  ::google::protobuf::uint8* SerializeWithCachedSizesToArray(::google::protobuf::uint8* output) const;
+  int GetCachedSize() const { return _cached_size_; }
+  private:
+  void SharedCtor();
+  void SharedDtor();
+  void SetCachedSize(int size) const;
+  public:
+  
+  ::google::protobuf::Metadata GetMetadata() const;
+  
+  // nested types ----------------------------------------------------
+  
+  // accessors -------------------------------------------------------
+  
+  // required .vars defs = 1;
+  inline bool has_defs() const;
+  inline void clear_defs();
+  static const int kDefsFieldNumber = 1;
+  inline const ::vars& defs() const;
+  inline ::vars* mutable_defs();
+  inline ::vars* release_defs();
+  
+  // required .vars uses = 2;
+  inline bool has_uses() const;
+  inline void clear_uses();
+  static const int kUsesFieldNumber = 2;
+  inline const ::vars& uses() const;
+  inline ::vars* mutable_uses();
+  inline ::vars* release_uses();
+  
+  // @@protoc_insertion_point(class_scope:defuse)
+ private:
+  inline void set_has_defs();
+  inline void clear_has_defs();
+  inline void set_has_uses();
+  inline void clear_has_uses();
+  
+  ::google::protobuf::UnknownFieldSet _unknown_fields_;
+  
+  ::vars* defs_;
+  ::vars* uses_;
+  
+  mutable int _cached_size_;
+  ::google::protobuf::uint32 _has_bits_[(2 + 31) / 32];
+  
+  friend void  protobuf_AddDesc_stmt_2epiqi_2eproto();
+  friend void protobuf_AssignDesc_stmt_2epiqi_2eproto();
+  friend void protobuf_ShutdownFile_stmt_2epiqi_2eproto();
+  
+  void InitAsDefaultInstance();
+  static defuse* default_instance_;
 };
 // -------------------------------------------------------------------
 
@@ -5116,15 +5308,44 @@ inline ::std::string* special::release_string() {
   }
 }
 
-// required .attributes attributes = 2;
-inline bool special::has_attributes() const {
+// optional .defuse defuse = 2;
+inline bool special::has_defuse() const {
   return (_has_bits_[0] & 0x00000002u) != 0;
 }
-inline void special::set_has_attributes() {
+inline void special::set_has_defuse() {
   _has_bits_[0] |= 0x00000002u;
 }
-inline void special::clear_has_attributes() {
+inline void special::clear_has_defuse() {
   _has_bits_[0] &= ~0x00000002u;
+}
+inline void special::clear_defuse() {
+  if (defuse_ != NULL) defuse_->::defuse::Clear();
+  clear_has_defuse();
+}
+inline const ::defuse& special::defuse() const {
+  return defuse_ != NULL ? *defuse_ : *default_instance_->defuse_;
+}
+inline ::defuse* special::mutable_defuse() {
+  set_has_defuse();
+  if (defuse_ == NULL) defuse_ = new ::defuse;
+  return defuse_;
+}
+inline ::defuse* special::release_defuse() {
+  clear_has_defuse();
+  ::defuse* temp = defuse_;
+  defuse_ = NULL;
+  return temp;
+}
+
+// required .attributes attributes = 3;
+inline bool special::has_attributes() const {
+  return (_has_bits_[0] & 0x00000004u) != 0;
+}
+inline void special::set_has_attributes() {
+  _has_bits_[0] |= 0x00000004u;
+}
+inline void special::clear_has_attributes() {
+  _has_bits_[0] &= ~0x00000004u;
 }
 inline void special::clear_attributes() {
   if (attributes_ != NULL) attributes_->::attributes::Clear();
@@ -5547,6 +5768,97 @@ inline ::typ* var::release_typ() {
   clear_has_typ();
   ::typ* temp = typ_;
   typ_ = NULL;
+  return temp;
+}
+
+// -------------------------------------------------------------------
+
+// vars
+
+// repeated .var elem = 1;
+inline int vars::elem_size() const {
+  return elem_.size();
+}
+inline void vars::clear_elem() {
+  elem_.Clear();
+}
+inline const ::var& vars::elem(int index) const {
+  return elem_.Get(index);
+}
+inline ::var* vars::mutable_elem(int index) {
+  return elem_.Mutable(index);
+}
+inline ::var* vars::add_elem() {
+  return elem_.Add();
+}
+inline const ::google::protobuf::RepeatedPtrField< ::var >&
+vars::elem() const {
+  return elem_;
+}
+inline ::google::protobuf::RepeatedPtrField< ::var >*
+vars::mutable_elem() {
+  return &elem_;
+}
+
+// -------------------------------------------------------------------
+
+// defuse
+
+// required .vars defs = 1;
+inline bool defuse::has_defs() const {
+  return (_has_bits_[0] & 0x00000001u) != 0;
+}
+inline void defuse::set_has_defs() {
+  _has_bits_[0] |= 0x00000001u;
+}
+inline void defuse::clear_has_defs() {
+  _has_bits_[0] &= ~0x00000001u;
+}
+inline void defuse::clear_defs() {
+  if (defs_ != NULL) defs_->::vars::Clear();
+  clear_has_defs();
+}
+inline const ::vars& defuse::defs() const {
+  return defs_ != NULL ? *defs_ : *default_instance_->defs_;
+}
+inline ::vars* defuse::mutable_defs() {
+  set_has_defs();
+  if (defs_ == NULL) defs_ = new ::vars;
+  return defs_;
+}
+inline ::vars* defuse::release_defs() {
+  clear_has_defs();
+  ::vars* temp = defs_;
+  defs_ = NULL;
+  return temp;
+}
+
+// required .vars uses = 2;
+inline bool defuse::has_uses() const {
+  return (_has_bits_[0] & 0x00000002u) != 0;
+}
+inline void defuse::set_has_uses() {
+  _has_bits_[0] |= 0x00000002u;
+}
+inline void defuse::clear_has_uses() {
+  _has_bits_[0] &= ~0x00000002u;
+}
+inline void defuse::clear_uses() {
+  if (uses_ != NULL) uses_->::vars::Clear();
+  clear_has_uses();
+}
+inline const ::vars& defuse::uses() const {
+  return uses_ != NULL ? *uses_ : *default_instance_->uses_;
+}
+inline ::vars* defuse::mutable_uses() {
+  set_has_uses();
+  if (uses_ == NULL) uses_ = new ::vars;
+  return uses_;
+}
+inline ::vars* defuse::release_uses() {
+  clear_has_uses();
+  ::vars* temp = uses_;
+  uses_ = NULL;
   return temp;
 }
 

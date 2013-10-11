@@ -48,3 +48,6 @@ let renewvar (V(_,name,t)) = newvar name t
 let typ (V(_,_,t)) = t
 
 let name (V(_,n,_)) = n
+
+type defuse = {defs : t list;
+               uses : t list}

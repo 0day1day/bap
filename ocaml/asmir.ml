@@ -214,7 +214,7 @@ let asm_addr_to_bap {asmp=prog; arch; get_exec} addr =
         (Libasmir.asmir_string_of_insn prog (addr_to_int64 addr));
      DV.dprintf "disasm_instr %s: %s" (~%addr) s;
      let ir =
-       Special(Printf.sprintf "Unknown instruction at %s: %s " (~%addr) s, [])::[]
+       Special(Printf.sprintf "Unknown instruction at %s: %s " (~%addr) s, None, [])::[]
      in
      Disasm_i386.ToIR.add_labels addr ir,
      addr +% (big_int_of_int (Libasmir.asmir_get_instr_length prog (addr_to_int64 addr)))
@@ -455,22 +455,22 @@ module SerializedTrace = struct
           | `syscall_frame({Syscall_frame.number=callno;
                             Syscall_frame.address=addr;
                             Syscall_frame.thread_id=tid}) ->
-            [Special(Printf.sprintf "Syscall number %Ld at 0x%s by thread %Ld" callno (~%(frompiqi addr)) tid, [StrAttr "TraceKeep"]); Comment("All blocks must have two statements", [])]
+            [Special(Printf.sprintf "Syscall number %Ld at 0x%s by thread %Ld" callno (~%(frompiqi addr)) tid, None, [StrAttr "TraceKeep"]); Comment("All blocks must have two statements", [])]
           | `exception_frame({Exception_frame.exception_number=exceptno;
                               Exception_frame.thread_id=Some tid;
                               Exception_frame.from_addr=Some from_addr;
                               Exception_frame.to_addr=Some to_addr}) ->
-            [Special(Printf.sprintf "Exception number %Ld by thread %Ld at 0x%s to 0x%s" exceptno tid (~%(frompiqi from_addr)) (~%(frompiqi to_addr)), []);
+            [Special(Printf.sprintf "Exception number %Ld by thread %Ld at 0x%s to 0x%s" exceptno tid (~%(frompiqi from_addr)) (~%(frompiqi to_addr)), None, []);
              Comment("All blocks must have two statements", [])]
           | `exception_frame({Exception_frame.exception_number=exceptno}) ->
-            [Special(Printf.sprintf "Exception number %Ld" exceptno, []);
+            [Special(Printf.sprintf "Exception number %Ld" exceptno, None, []);
              Comment("All blocks must have two statements", [])]
           | `taint_intro_frame(f) ->
             [Comment("ReadSyscall", []); Comment("All blocks must have two statements", [])]
           | `modload_frame({Modload_frame.module_name=name;
                             Modload_frame.low_address=lowaddr;
                             Modload_frame.high_address=highaddr}) ->
-            [Special(Printf.sprintf "Loaded module '%s' at 0x%s to 0x%s" name (~%(frompiqi lowaddr)) (~%(frompiqi highaddr)), []); Comment("All blocks must have two statements", [])]
+            [Special(Printf.sprintf "Loaded module '%s' at 0x%s to 0x%s" name (~%(frompiqi lowaddr)) (~%(frompiqi highaddr)), None, []); Comment("All blocks must have two statements", [])]
           | `key_frame _ ->
       (* Implement key frame later *)
             []

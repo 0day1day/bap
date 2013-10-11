@@ -129,7 +129,8 @@ revstmtlist:
 stmt:
         | JMP expr attrs semi { Jmp($2, $3) }
         | CJMP expr COMMA expr COMMA expr attrs semi { CJmp($2, $4, $6, $7)  }
-        | SPECIAL STRING attrs semi { Special($2, $3)}
+        /* At some point, defuses should be printed and parsed */
+        | SPECIAL STRING attrs semi { Special($2, None, $3)}
         | lval ASSIGN expr attrs semi { Move($1, $3, $4) }
         | lval EQUAL expr attrs semi { Move($1, $3, $4) }
         | HALT expr attrs semi { Halt($2, $3) }

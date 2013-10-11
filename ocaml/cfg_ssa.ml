@@ -20,6 +20,7 @@ module C = Cfg.SSA
 module BH = Cfg.BH
 module CA = Cfg.AST
 module Dom = Dominator.Make(C.G)
+open Var
 
 let v2s n = bbid_to_string (C.G.V.label n)
 
@@ -144,8 +145,14 @@ let rec stmt2ssa ctx ctxmap ~(revstmts: stmt list) loc s =
       Label(label,a) :: revstmts
     | Ast.Comment(s,a) ->
       Comment(s,a)::revstmts
-    | Ast.Special(s,_) ->
-      raise (Invalid_argument("SSA: Impossible to handle specials. They should be replaced with their semantics. Special: "^s))
+    | Ast.Special(s,None,_) ->
+      raise (Invalid_argument("SSA: Impossible to handle specials without a defuse They should be replaced with their semantics. Special: "^s))
+    | Ast.Special(s,Some du,a) ->
+      List.iter (fun v ->
+        let nv = Var.renewvar v in
+        Ctx.extend ctx v nv (Some loc))
+      du.defs;
+      Special(s, du, a)::revstmts
     | Ast.Assert(e,a) ->
       let (revstmts,v) = exp2ssa ~revstmts e in
       Assert(v,a)::revstmts

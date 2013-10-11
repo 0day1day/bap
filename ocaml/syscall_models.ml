@@ -8,6 +8,9 @@ open Arch
 open Ast
 open Type
 
+module R32 = Disasm_i386.R32
+module R64 = Disasm_i386.R64
+
 (**
 
    We are going to index each system call model by the value of eax.
@@ -126,10 +129,14 @@ let linux_syscall_to_il arch rax =
       :: model
     | None ->
       let sys_name = linux_get_name arch rax in
-      let mode = match arch with
-        | X86_32 -> Disasm_i386.X86
-        | X86_64 -> Disasm_i386.X8664
+      let (mode, du) = match arch with
+        | X86_32 -> (Disasm_i386.X86, Some {
+          Var.uses = [R32.mem; R32.eax; R32.ebx; R32.ecx; R32.edx; R32.esi; R32.edi; R32.ebp];
+          Var.defs = [R32.mem; R32.eax]})
+        | X86_64 -> (Disasm_i386.X8664, Some {
+          Var.uses = [R64.mem; R64.rax; R64.rdi; R64.rsi; R64.rdx; R64.r10; R64.r8; R64.r9];
+          Var.defs = [R64.mem; R64.rax]})
       in
-      Special (sys_name, [])
+      Special (sys_name, du, [])
       :: Move(syscall_reg arch, Unknown("System call output", Disasm_i386.type_of_mode mode), [])
       :: []

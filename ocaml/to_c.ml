@@ -87,7 +87,8 @@ object(self)
          pp " ="; space();
          self#ast_exp e;
          pc ';'
-     | Special(s,_)->
+     | Special(s,_,_)->
+         (* TODO: should clobber defs, use uses *)
          pp special;
          pp "(\""; pp s; pp "\");"
      | Label(l,_) ->

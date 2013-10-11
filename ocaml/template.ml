@@ -49,7 +49,7 @@ struct
     val assume : (Ast.exp * Ast.attrs) -> process_stmt
     val comment : 'a -> process_stmt
     val label   : 'a -> process_stmt
-    val special : (string * Ast.attrs) -> process_stmt
+    val special : (string * Var.defuse option * Ast.attrs) -> process_stmt
   end
     
   module Make(Expr: Exprs)(Stmt: Stmts) = 
