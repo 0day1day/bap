@@ -345,7 +345,7 @@ module VSA_SPEC = struct
 end
 
 module Make(D:DISASM)(F:FUNCID) = struct
-  let disasm_at ?du:(du=None) p addr =
+  let disasm_at ?callsig:(du=None) p addr =
     let (tmp, entry) = Cfg_ast.create_entry (CA.empty()) in
     let (tmp, exit) = Cfg_ast.find_exit tmp in
     let (tmp, error) = Cfg_ast.find_error tmp in
@@ -515,7 +515,7 @@ module Make(D:DISASM)(F:FUNCID) = struct
 
       !c, !state
 
-  let disasm ?du:(du=None) p = disasm_at ~du:du p (Asmir.get_start_addr p)
+  let disasm ?callsig:(du=None) p = disasm_at ~callsig:du p (Asmir.get_start_addr p)
 end
 
 let recursive_descent =
@@ -528,14 +528,14 @@ let recursive_descent_at =
   RECURSIVE_DESCENT.disasm_at
 let recursive_descent_at a b = fst(recursive_descent_at a b)
 
-let vsa_full =
+let vsa_full ?callsig:(du=None) =
   let module VSA = Make(VSA_SPEC)(FUNCFINDER_DUMB) in
-  VSA.disasm
-let vsa a = fst(vsa_full a)
+  VSA.disasm ~callsig:du
+let vsa ?callsig:(du=None) a = fst(vsa_full ~callsig:du a)
 
 let vsa_at_full ?callsig:(du=None) =
   let module VSA = Make(VSA_SPEC)(FUNCFINDER_DUMB) in
-  VSA.disasm_at ~du:du
+  VSA.disasm_at ~callsig:du
 let vsa_at ?callsig:(du=None) a b = fst(vsa_at_full ~callsig:du a b)
 
 type algorithm =
@@ -543,7 +543,7 @@ type algorithm =
   | Rd
 
 let recover = function
-  | Vsa -> vsa 
+  | Vsa -> vsa ~callsig:None 
   | Rd -> recursive_descent
 
 let recover_at = function
