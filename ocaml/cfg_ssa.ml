@@ -148,11 +148,12 @@ let rec stmt2ssa ctx ctxmap ~(revstmts: stmt list) loc s =
     | Ast.Special(s,None,_) ->
       raise (Invalid_argument("SSA: Impossible to handle specials without a defuse They should be replaced with their semantics. Special: "^s))
     | Ast.Special(s,Some du,a) ->
-      List.iter (fun v ->
+      let duuse = List.map (Ctx.lookup ctx) du.uses in
+      let dudef = List.map (fun v ->
         let nv = Var.renewvar v in
-        Ctx.extend ctx v nv (Some loc))
-      du.defs;
-      Special(s, du, a)::revstmts
+        Ctx.extend ctx v nv (Some loc); nv)
+      du.defs in 
+      Special(s, {defs = dudef; uses = duuse}, a)::revstmts
     | Ast.Assert(e,a) ->
       let (revstmts,v) = exp2ssa ~revstmts e in
       Assert(v,a)::revstmts
