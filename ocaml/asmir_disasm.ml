@@ -418,7 +418,7 @@ module Make(D:DISASM)(F:FUNCID) = struct
                       | Jmp(e, attrs) as s ->
                         Comment(Printf.sprintf "Function call/ret removed: %s" (Pp.ast_stmt_to_string s), NamedStrAttr("calltarget", Pp.ast_exp_to_string e)::attrs)
                       | s ->
-                        Comment(Printf.sprintf "Function call/ret removed: %s" (Pp.ast_stmt_to_string s), [])) stmts in (match du with | None -> comments | Some _ -> Special("function call", du, [])::comments)
+                        Comment(Printf.sprintf "Function call/ret removed: %s" (Pp.ast_stmt_to_string s), [])) stmts in (match du with | None -> comments | Some _ -> List.append comments [Special("function call", du, [])])
                   | _ -> failwith "Unable to rewrite function call"
                 in
                 CA.set_stmts cfg s (List.rev revstmts)
