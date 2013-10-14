@@ -32,7 +32,7 @@ cdg.dot: basic.il
 test.il: test
 	../../utils/toil -bin $< -o $@
 
-basic.o: basic.s
+basic.o: basic.S
 	$(CC) -m32 -c $< -o $@
 
 basic.il: basic.o
