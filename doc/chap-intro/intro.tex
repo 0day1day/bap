@@ -92,24 +92,16 @@ analysis, such as:
 \paragraph{Binary Code is Complex.}
 
 \begin{figure}
+\centering
 \begin{minipage}{.4\linewidth}
-\begin{code}
-// instr dst,src
-1. add eax, ebx
-2. shl eax, edx
-3. jo target
-4. ....
-...
-target: ...
-\end{code}
+\lstinputlisting[basicstyle={\ttfamily \small},numbers=left]{chap-examples/basic.S}
 \end{minipage}
 \begin{minipage}[c]{.5\linewidth}
-\includegraphics[scale=.5]{fig/add-shl}
+\includegraphics[width=\linewidth]{fig/add-shl}
 \end{minipage}
-\caption{A three instruction x86 program, and its corresponding
-  control flow graph.  Note the logic for deciding when the jump on
-  overflow instruction (statement 3) is taken, when is often omitted
-  by other binary analysis platforms. }
+\caption{A simple x86 program, and its corresponding control flow
+  graph.  Note that the logic for deciding when the conditional jump
+  instruction (statement 3) is taken is quite complex. }
 \label{vine:shl-add}
 \end{figure}
 
@@ -123,23 +115,25 @@ For example, consider the basic program analysis problem of
 determining when the conditional jump is taken on line 3 of
 Figure~\ref{vine:shl-add}. In this example, all operands are 32-bit
 registers, and all arithmetic is therefore performed mod
-$2^{32}$. Instruction 1 computes the sum {\tt eax := eax+ebx} (mod
-$2^{32}$).  Instruction 2 computes {\tt eax = eax $\ll$ edx}.  Both
-instructions may set the overflow status register {\tt OF}. The {\tt
-  add} instruction will set the {\tt OF} flag if {\tt eax + ebx $\geq$
-  $2^{32}$}.  The {\tt shl} instruction will set the {\tt OF} flag if
-{\tt edx} is 1 \emph{and} the top two bits of {\tt eax} are not equal
-on line 2. The instruction on line 3 tests to see if {\tt OF} is set,
-and if so, jumps to {\tt target}, else executes the next sequential
-instruction. 
+$2^{32}$. Instruction 1 computes the sum {\tt ebx := ebx + eax} (mod
+$2^{32}$).  Instruction 2 computes {\tt ebx = ebx $\ll$ ecx}.  Both
+instructions may set the carry flag {\tt CF}. The {\tt add}
+instruction will set {\tt CF} if {\tt ebx + eax $\geq$ $2^{32}$}.  The
+{\tt shl} instruction will set the {\tt CF} flag to the last bit
+shifted out of \texttt{ebx} as long as the shift amount is non-zero.
+If the shift amount is zero, \texttt{CF} is not modified by the
+\texttt{shl} instruction. The instruction on line 3 tests to see if
+{\tt CF} is set, and if so, jumps to {\tt target}. Otherwise it
+executes the next sequential instruction.
 
 In order to determine when the jump on line 3 is taken, an analysis
 must reconstruct all side-effects of {\tt add} and {\tt shl}.  The
-proper control flow diagram is shown in Figure~\ref{vine:shl-add}.  As
-demonstrated by this three line program, even though a program may
-look simple, determining the effects may be complicated. An
-assembly-specific approach would require each analysis to reason about
-such complex semantics.
+proper control flow diagram is shown in Figure~\ref{vine:shl-add}.
+(The control flow graph inferred by \bap for this program is shown in
+Figure~\ref{fig:cfgsimp}.) As demonstrated by this program, even
+though a program may look simple, determining the side effects can be
+complicated. An assembly-specific approach would require each analysis
+to reason about such complex semantics.
 
 
 Worse, many architectures allow instruction prefixes, which can
