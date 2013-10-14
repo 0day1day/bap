@@ -15,8 +15,8 @@ ranksep=.25;
  6 -> 8 [color="#ff0000"];
  7 -> 9;
  8 -> 9;
- 9 -> 10 [color="#00ff00"];
- 9 -> 11 [color="#ff0000"];
+ 9 -> 11 [color="#00ff00"];
+ 9 -> 10 [color="#ff0000"];
  1 [label="EBX := EBX + EAX"];
  2 [label="if addition carried"];
  3 [label="CF := 1"];
@@ -26,6 +26,6 @@ ranksep=.25;
  7 [label="CF is unchanged"]; 
  8 [label="CF is the last bit shifted out of EBX"];
  9 [label="if CF == 1"];
- 10 [label="<next instruction>"];
  11 [label="<target instr>"];
+ 10 [label="<next instruction>"];
 }
