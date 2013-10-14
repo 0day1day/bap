@@ -345,7 +345,7 @@ module VSA_SPEC = struct
 end
 
 module Make(D:DISASM)(F:FUNCID) = struct
-  let disasm_at ?callsig:(du=None) p addr =
+  let disasm_at ?callsig:du p addr =
     let (tmp, entry) = Cfg_ast.create_entry (CA.empty()) in
     let (tmp, exit) = Cfg_ast.find_exit tmp in
     let (tmp, error) = Cfg_ast.find_error tmp in
@@ -413,12 +413,15 @@ module Make(D:DISASM)(F:FUNCID) = struct
               let dumb_translate cfg (s,l,e) =
                 let revstmts = match List.rev (CA.get_stmts cfg s) with
                   | CJmp _::_ -> failwith "Conditional function calls are not implemented"
-                  | Jmp _::tl as stmts -> let comments = List.map (function
+                  | Jmp _::tl as stmts ->
+                    let comments = List.map (function
                       | Label _ as s -> s
                       | Jmp(e, attrs) as s ->
                         Comment(Printf.sprintf "Function call/ret removed: %s" (Pp.ast_stmt_to_string s), NamedStrAttr("calltarget", Pp.ast_exp_to_string e)::attrs)
                       | s ->
-                        Comment(Printf.sprintf "Function call/ret removed: %s" (Pp.ast_stmt_to_string s), [])) stmts in (match du with | None -> comments | Some _ -> List.append comments [Special("function call", du, [])])
+                        Comment(Printf.sprintf "Function call/ret removed: %s" (Pp.ast_stmt_to_string s), [])) stmts
+                    in
+                    Special("function call", du, [])::comments
                   | _ -> failwith "Unable to rewrite function call"
                 in
                 CA.set_stmts cfg s (List.rev revstmts)
@@ -523,37 +526,37 @@ module Make(D:DISASM)(F:FUNCID) = struct
 
     c, state
 
-  let disasm ?callsig:(du=None) p = disasm_at ~callsig:du p (Asmir.get_start_addr p)
+  let disasm ?callsig p = disasm_at ?callsig p (Asmir.get_start_addr p)
 end
 
 let recursive_descent =
   let module RECURSIVE_DESCENT = Make(RECURSIVE_DESCENT_SPEC)(FUNCFINDER_DUMB) in
   RECURSIVE_DESCENT.disasm
-let recursive_descent a = fst(recursive_descent a)
+let recursive_descent ?callsig a = fst(recursive_descent ?callsig a)
 
 let recursive_descent_at =
   let module RECURSIVE_DESCENT = Make(RECURSIVE_DESCENT_SPEC)(FUNCFINDER_DUMB) in
   RECURSIVE_DESCENT.disasm_at
-let recursive_descent_at a b = fst(recursive_descent_at a b)
+let recursive_descent_at ?callsig a b = fst(recursive_descent_at ?callsig a b)
 
-let vsa_full ?callsig:(du=None) =
+let vsa_full =
   let module VSA = Make(VSA_SPEC)(FUNCFINDER_DUMB) in
-  VSA.disasm ~callsig:du
-let vsa ?callsig:(du=None) a = fst(vsa_full ~callsig:du a)
+  VSA.disasm
+let vsa ?callsig a = fst(vsa_full ?callsig a)
 
-let vsa_at_full ?callsig:(du=None) =
+let vsa_at_full ?callsig =
   let module VSA = Make(VSA_SPEC)(FUNCFINDER_DUMB) in
-  VSA.disasm_at ~callsig:du
-let vsa_at ?callsig:(du=None) a b = fst(vsa_at_full ~callsig:du a b)
+  VSA.disasm_at ?callsig
+let vsa_at ?callsig a b = fst(vsa_at_full ?callsig a b)
 
 type algorithm =
   | Vsa
   | Rd
 
-let recover = function
-  | Vsa -> vsa ~callsig:None 
-  | Rd -> recursive_descent
+let recover ?callsig = function
+  | Vsa -> vsa ?callsig
+  | Rd -> recursive_descent ?callsig
 
-let recover_at = function
-  | Vsa -> vsa_at ~callsig:None
-  | Rd -> recursive_descent_at
+let recover_at ?callsig = function
+  | Vsa -> vsa_at ?callsig
+  | Rd -> recursive_descent_at ?callsig

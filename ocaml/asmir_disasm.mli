@@ -35,27 +35,27 @@ module Make :
   functor (D:DISASM) ->
     functor (F:FUNCID) ->
 sig
-  val disasm_at : ?callsig:Var.defuse option -> Asmir.asmprogram -> addr -> Cfg.AST.G.t * D.State.t
-  val disasm : ?callsig:Var.defuse option -> Asmir.asmprogram -> Cfg.AST.G.t * D.State.t
+  val disasm_at : ?callsig:Var.defuse -> Asmir.asmprogram -> addr -> Cfg.AST.G.t * D.State.t
+  val disasm : ?callsig:Var.defuse -> Asmir.asmprogram -> Cfg.AST.G.t * D.State.t
 end
 
-val recursive_descent : Asmir.asmprogram -> Cfg.AST.G.t
-val recursive_descent_at : Asmir.asmprogram -> addr -> Cfg.AST.G.t
+val recursive_descent : ?callsig:Var.defuse -> Asmir.asmprogram -> Cfg.AST.G.t
+val recursive_descent_at : ?callsig:Var.defuse -> Asmir.asmprogram -> addr -> Cfg.AST.G.t
 
 type vsaresult = {origssa: Cfg.SSA.G.t;
                   optssa: Cfg.SSA.G.t;
                   vsa_in: Cfg.ssastmtloc -> Vsa_ssa.AbsEnv.t option;
                   vsa_out: Cfg.ssastmtloc -> Vsa_ssa.AbsEnv.t option;}
 
-val vsa_full : ?callsig:Var.defuse option -> Asmir.asmprogram -> Cfg.AST.G.t * vsaresult option
-val vsa_at_full : ?callsig:Var.defuse option -> Asmir.asmprogram -> addr -> Cfg.AST.G.t * vsaresult option
+val vsa_full : ?callsig:Var.defuse -> Asmir.asmprogram -> Cfg.AST.G.t * vsaresult option
+val vsa_at_full : ?callsig:Var.defuse -> Asmir.asmprogram -> addr -> Cfg.AST.G.t * vsaresult option
 
-val vsa : ?callsig:Var.defuse option -> Asmir.asmprogram -> Cfg.AST.G.t
-val vsa_at : ?callsig:Var.defuse option -> Asmir.asmprogram -> addr -> Cfg.AST.G.t
+val vsa : ?callsig:Var.defuse -> Asmir.asmprogram -> Cfg.AST.G.t
+val vsa_at : ?callsig:Var.defuse -> Asmir.asmprogram -> addr -> Cfg.AST.G.t
 
 type algorithm =
   | Vsa
   | Rd
 
-val recover : algorithm -> Asmir.asmprogram  -> Cfg.AST.G.t
-val recover_at : algorithm -> Asmir.asmprogram -> addr -> Cfg.AST.G.t
+val recover : ?callsig:Var.defuse -> algorithm -> Asmir.asmprogram  -> Cfg.AST.G.t
+val recover_at : ?callsig:Var.defuse -> algorithm -> Asmir.asmprogram -> addr -> Cfg.AST.G.t
