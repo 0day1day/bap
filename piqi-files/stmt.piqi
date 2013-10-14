@@ -178,6 +178,11 @@
         ]
 
         .field [
+               .type defuse
+               .optional
+        ]
+
+        .field [
                .type attributes
         ]
 ]

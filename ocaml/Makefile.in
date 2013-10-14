@@ -90,7 +90,6 @@ export SOURCES = \
 	arch.mli arch.ml \
 	disasm.ml \
 	$(LLVM_SRC) \
-	syscall_models.ml \
 	gcl.mli gcl.ml \
 	wp.mli wp.ml \
 	stp_grammar.mly stp_lexer.mll \
@@ -101,6 +100,7 @@ export SOURCES = \
 	asmir_vars.ml \
 	asmir_consts.ml \
 	asmir.mli asmir.ml \
+	syscall_models.ml \
 	hacks.ml \
 	coalesce.mli coalesce.ml \
 	vsa_ast.mli vsa_ast.ml \

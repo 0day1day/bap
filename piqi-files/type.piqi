@@ -132,6 +132,23 @@
        .type string
 ]
 
+.list [
+        .name vars
+        .type var
+]
+
+.record [
+        .name defuse
+        .field [
+                .name defs
+                .type vars
+        ]
+        .field [
+                .name uses
+                .type vars
+         ]
+]
+
 .variant [
         .name attribute
 

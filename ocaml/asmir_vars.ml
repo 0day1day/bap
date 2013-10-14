@@ -9,6 +9,11 @@ let full_regs = Disasm_i386.regs_full
 let x86_mem = Disasm_i386.R32.mem
 let x64_mem = Disasm_i386.R64.mem
 
+module X86 = struct
+  module R32 = Disasm_i386.R32
+  module R64 = Disasm_i386.R64
+end
+
 let mem_of_type = function
   | Type.Reg 32 -> x86_mem
   | Type.Reg 64 -> x64_mem

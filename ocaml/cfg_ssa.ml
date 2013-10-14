@@ -20,6 +20,7 @@ module C = Cfg.SSA
 module BH = Cfg.BH
 module CA = Cfg.AST
 module Dom = Dominator.Make(C.G)
+open Var
 
 let v2s n = bbid_to_string (C.G.V.label n)
 
@@ -144,8 +145,15 @@ let rec stmt2ssa ctx ctxmap ~(revstmts: stmt list) loc s =
       Label(label,a) :: revstmts
     | Ast.Comment(s,a) ->
       Comment(s,a)::revstmts
-    | Ast.Special(s,_) ->
-      raise (Invalid_argument("SSA: Impossible to handle specials. They should be replaced with their semantics. Special: "^s))
+    | Ast.Special(s,None,_) ->
+      raise (Invalid_argument("SSA: Impossible to handle specials without a defuse They should be replaced with their semantics. Special: "^s))
+    | Ast.Special(s,Some du,a) ->
+      let duuse = List.map (Ctx.lookup ctx) du.uses in
+      let dudef = List.map (fun v ->
+        let nv = Var.renewvar v in
+        Ctx.extend ctx v nv (Some loc); nv)
+      du.defs in 
+      Special(s, {defs = dudef; uses = duuse}, a)::revstmts
     | Ast.Assert(e,a) ->
       let (revstmts,v) = exp2ssa ~revstmts e in
       Assert(v,a)::revstmts
@@ -248,6 +256,8 @@ module ToTac = struct
       Label(label,a) :: revstmts
     | Comment(s,a) ->
       Comment(s,a)::revstmts
+    | Special(s,du,a) ->
+      Special(s,du,a)::revstmts
     | Assert(e,a) ->
       let (revstmts,v) = exp2tac ~revstmts e in
       Assert(v,a)::revstmts
@@ -546,6 +556,9 @@ let uninitialized cfg =
       | Jmp(e, _) -> f_e e
       | CJmp(e1, e2, e3, _) -> f_e e1; f_e e2; f_e e3
       | Label _ | Comment _ -> ()
+      | Special(_,{defs; uses},_) ->
+        List.iter (add assnd) defs;
+        List.iter (add refd) uses
     and f_e = function
       | Load(v1,v2,v3,_) -> f_e v1; f_e v2; f_e v3
       | Store(v1,v2,v3,v4,_) -> f_e v1; f_e v2; f_e v3; f_e v4
@@ -863,6 +876,7 @@ let rec exp2ast tm e =
 let stmt2ast tm e =
   let e2a = exp2ast tm in
   match e with
+    | Special(s,du,a) -> Ast.Special(s,Some du,a)
     | Jmp(t,a) -> Ast.Jmp(e2a t, a)
     | CJmp(c,tt,tf,a) -> Ast.CJmp(e2a c, e2a tt, e2a tf, a)
     | Label(l,a) -> Ast.Label(l,a)

@@ -248,6 +248,7 @@ let do_aggressive_dce ?(globals = []) graph =
           | Comment _
           | Assume _
           | Label _
+          | Special _
           | Jmp _ ->
 
             mark_site_as_initially_live site

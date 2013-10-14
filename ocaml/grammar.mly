@@ -7,6 +7,7 @@ open Big_int_Z
 open Grammar_scope
 open Grammar_private_scope
 open Type
+open Var
 
 let mk_attr lab string =
   match lab with
@@ -74,6 +75,7 @@ let casttype_of_string = function
 %token CJMP JMP LABEL ADDR ASSERT ASSUME HALT SPECIAL
 %token LET IN UNKNOWN WITH TRUE FALSE EBIG ELITTLE
 %token IF THEN ELSE
+%token DEFS USES
 %token PLUS MINUS  DIVIDE MOD SMOD TIMES 
 %token SDIVIDE LSHIFT RSHIFT ARSHIFT XOR NEQ
 %token SLT SLE AND OR 
@@ -129,7 +131,9 @@ revstmtlist:
 stmt:
         | JMP expr attrs semi { Jmp($2, $3) }
         | CJMP expr COMMA expr COMMA expr attrs semi { CJmp($2, $4, $6, $7)  }
-        | SPECIAL STRING attrs semi { Special($2, $3)}
+        /* At some point, defuses should be printed and parsed */
+        | SPECIAL STRING attrs semi { Special($2, None, $3)}
+        | SPECIAL du STRING attrs semi { Special($3, Some $2, $4)}
         | lval ASSIGN expr attrs semi { Move($1, $3, $4) }
         | lval EQUAL expr attrs semi { Move($1, $3, $4) }
         | HALT expr attrs semi { Halt($2, $3) }
@@ -162,10 +166,23 @@ attr:
 | AT ID STRING STRING { mk_attr2 $2 $3 $4 }
 | AT ID context { Context($3) }
 
+du:
+| DEFS lvals USES lvals { {defs=$2; uses=$2} }
+| DEFS lvals { {defs=$2; uses=[]} }
+| USES lvals { {defs=[]; uses=$2} }
+
+nonemptylvals:
+| lval COMMA nonemptylvals { $1 :: $3 }
+| lval { [$1] }
+
+lvals:
+| nonemptylvals { $1 }
+| { [] }
+
 lval:
-| ID opttyp { 
+| ID opttyp {
     Scope.get_lval (get_scope ()) $1 $2
-  } 
+}
 
 opttyp:
 | { None }

@@ -35,3 +35,7 @@ val compare : t -> t -> int
 module VarHash : Hashtbl.S with type key = t
 module VarMap : BatMap.S with type key = t
 module VarSet : BatSet.S with type elt = t
+
+(** Variable definition and use type. *)
+type defuse = {defs : t list;
+               uses : t list}

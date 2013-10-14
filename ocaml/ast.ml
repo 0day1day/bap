@@ -10,6 +10,7 @@
 
 open BatListFull
 open Type
+open Var
 open Big_int_Z
 open Big_int_convenience
 
@@ -44,7 +45,7 @@ type stmt =
   | Assert of (exp * attrs)
   | Assume of (exp * attrs)
   | Comment of (string * attrs) (** A comment to be ignored *)
-  | Special of (string * attrs) (** A "special" statement. (does magic) *)
+  | Special of (string * defuse option * attrs) (** A "special" statement. (does magic) *)
 
 type program = stmt list
 
@@ -247,9 +248,9 @@ let getargs_stmt = function
   | Halt(e,a)
   | Assert(e,a)
   | Assume(e,a) -> [e], [], [], [a], []
-  | Comment(s,a)
-  | Special(s,a) -> [], [], [], [a], [s]
-
+  | Special(s,Some {defs; uses},a) -> [], defs@uses, [], [a], [s]
+  | Special(s,None,a)
+  | Comment(s,a) -> [], [], [], [a], [s]
 (** quick_stmt_eq returns true if and only if the subexpressions in e1
     and e2 are *physically* equal. *)
 let quick_stmt_eq s1 s2 =
@@ -301,7 +302,7 @@ match s with
 | _ -> false
 
 let is_syscall = function
-  | Special(("syscall"|"int 0x80"), _) -> true
+  | Special(("syscall"|"int 0x80"), _, _) -> true
   | _ -> false
 
 let full_stmts_eq s1 s2 =
@@ -320,4 +321,4 @@ let get_attrs = function
   | Assert(_,a)
   | Assume(_,a)
   | Comment(_,a)
-  | Special(_,a) -> a
+  | Special(_,_,a) -> a

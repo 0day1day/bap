@@ -121,16 +121,15 @@ rule token = parse
   | "addr"       { ADDR }
   | "extract"    { EXTRACT }
   | "concat"     { CONCAT } 
- 
-(* if then else expressions *)
   | "if"         { IF }
   | "then"       { THEN }
   | "else"       { ELSE }  
-(* sugar *)
   | "true"       { TRUE }
   | "false"      { FALSE }
   | "e_big"      { EBIG }
   | "e_little"   { ELITTLE }
+  | "defs"       { DEFS }
+  | "uses"       { USES }
 (* id must come after all keywords *)
   | '{'          { LCURLY }
   | '}'          { RCURLY }

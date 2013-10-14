@@ -697,13 +697,13 @@ let remove_jumps =
 let is_loaded =
   let loaded = Str.regexp "^Loaded module " in
   function
-    | Ast.Special(s, attrs) when Str.string_match loaded s 0 -> true
+    | Ast.Special(s, _, _) when Str.string_match loaded s 0 -> true
     | _ -> false
 
 (** Remove 'Loaded module' specials *)
 let remove_loaded = 
   let rs = function
-    | Ast.Special(s, attrs) as sfull when is_loaded sfull 
+    | Ast.Special(s, _, attrs) as sfull when is_loaded sfull 
         -> Ast.Comment(s, attrs)
     | s -> s
   in
@@ -712,7 +712,7 @@ let remove_loaded =
 (** Removing all specials from the traces *)    
 let remove_specials =
   let no_specials = function
-    | Ast.Special(_, attrs) when not (List.mem (StrAttr "TraceKeep") attrs) 
+    | Ast.Special(_, _, attrs) when not (List.mem (StrAttr "TraceKeep") attrs) 
         -> false
     | _ -> true
   in

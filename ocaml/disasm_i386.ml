@@ -410,6 +410,10 @@ let regs_x86 : var list =
   @ List.map (fun {v64; v32} -> v32) shared_multi_regs
   @ Array.to_list (Array.sub ymms 0 8)
 
+let (r_8, r_9, r_10, r_11, r_12, r_13, r_14, r_15) = match Array.to_list nums with
+  | (r_8::r_9::r_10::r_11::r_12::r_13::r_14::r_15::[]) -> (r_8, r_9, r_10, r_11, r_12, r_13, r_14, r_15)
+  | _ -> failwith "Impossible, matching against a list of known size"
+
 let regs_x86_64 : var list =
   shared_regs
   @ List.map (fun {v64; v32} -> v64) (shared_multi_regs @ (Array.to_list nums))
@@ -475,6 +479,14 @@ module R64 = struct
   let rsi = rsi.v64
   let rdi = rdi.v64
   let mem = mem.v64
+  let r8 = r_8.v64
+  let r9 = r_9.v64
+  let r10 = r_10.v64
+  let r11 = r_11.v64
+  let r12 = r_12.v64
+  let r13 = r_13.v64
+  let r14 = r_14.v64
+  let r15 = r_15.v64
 end
 
 
@@ -2074,11 +2086,11 @@ let rec to_ir mode addr next ss pref has_rex has_vex =
     Move(rsp, rbp_e, [])
     ::to_ir mode addr next ss pref has_rex has_vex (Pop(t, o_rbp))
   | Interrupt3 ->
-    [Special("int3", [])]
+    [Special("int3", Some {Var.defs = []; Var.uses = []}, [])]
   | Interrupt(Oimm i) ->
-    [Special(Printf.sprintf "int 0x%s" (Util.big_int_to_hex i), [])]
+    [Special(Printf.sprintf "int 0x%s" (Util.big_int_to_hex i), None, [])]
   | Sysenter | Syscall ->
-    [Special("syscall", [])]
+    [Special("syscall", None, [])]
   (* Match everything exhaustively *)
   | Leave _ ->  unimplemented "to_ir: Leave"
   | Call _ ->  unimplemented "to_ir: Call"
