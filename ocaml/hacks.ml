@@ -323,3 +323,12 @@ let filter_specials =
   List.filter (function
     | Ast.Special _ -> false
     | _ -> true)
+
+let filter_calls_cfg =
+  let v = object(self)
+    inherit Ast_visitor.nop
+    method visit_stmt = function
+      | Ast.Special("function call", None, _) as s -> ChangeTo (Ast.Comment(Printf.sprintf "Removed call: %s" (Pp.ast_stmt_to_string s), []))
+      | _ -> SkipChildren
+  end in
+  Ast_visitor.cfg_accept v

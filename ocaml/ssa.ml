@@ -146,7 +146,7 @@ let getargs_stmt = function
   | Assert(e,a)
   | Assume(e,a) -> [e], [], [], [a], [], []
   | Comment(s,a) -> [], [], [], [a], [s], []
-  | Special(s,{Var.defs = ds; Var.uses = us},a) -> [], List.append ds us, [], [a], [s], []
+  | Special(s,{Var.defs; Var.uses},a) -> [], defs@uses, [], [a], [s], []
 
 (** quick_stmt_eq returns true if and only if the subexpressions in e1
     and e2 are *physically* equal. *)

@@ -8,8 +8,8 @@ open Arch
 open Ast
 open Type
 
-module R32 = Disasm_i386.R32
-module R64 = Disasm_i386.R64
+module R32 = Asmir_vars.X86.R32
+module R64 = Asmir_vars.X86.R64
 
 (**
 
@@ -22,13 +22,13 @@ module R64 = Disasm_i386.R64
 let x86_is_system_call = is_syscall
 
 let syscall_reg = function
-  | X86_32 -> Disasm_i386.R32.eax
-  | X86_64 -> Disasm_i386.R64.rax
+  | X86_32 -> R32.eax
+  | X86_64 -> R64.rax
 
 (* System call names - fill in as needed *)
 let linux_get_name arch syscall =
   match arch with
-  | X86_32 -> 
+  | X86_32 ->
     (match syscall with
     | 1 -> "exit"
     | 3 -> "read"
@@ -98,11 +98,11 @@ let linux_get_model arch syscall =
     | 1 ->
         (* exit *)
         (* Exit code is in ebx *)
-      Some(Halt(Var Disasm_i386.R32.ebx, [])
+      Some(Halt(Var R32.ebx, [])
            :: [])
     | 252 ->
       (* exit group *)
-      Some(Halt(Var Disasm_i386.R32.ebx, [])
+      Some(Halt(Var R32.ebx, [])
            :: [])
     | _ ->
        None
@@ -112,11 +112,11 @@ let linux_get_model arch syscall =
     | 60 ->
         (* exit *)
         (* Exit code is in rdi *)
-      Some(Halt(Var Disasm_i386.R64.rdi, [])
+      Some(Halt(Var R64.rdi, [])
            :: [])
     | 231 ->
       (* exit group *)
-      Some(Halt(Var Disasm_i386.R64.rdi, [])
+      Some(Halt(Var R64.rdi, [])
            :: [])
     | _ ->
        None

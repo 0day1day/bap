@@ -2,6 +2,7 @@
 
 open Type
 open Ssa
+open Var
 
 
 
@@ -96,11 +97,11 @@ and rvar_accept visitor =
 and stmt_accept visitor = 
   let vischil = function 
       (* TODO: attributes? *)
-    | Special(s,{Var.uses = us; Var.defs = ds},a) ->
-      Special(s,{Var.uses = List.map (rvar_accept visitor) us;
-                 Var.defs = List.map (avar_accept visitor) ds},a)
-    | Jmp(l, a) -> Jmp(exp_accept visitor l, a) 
-    | CJmp(c, l1, l2, a) -> 
+    | Special(s,{uses; defs},a) ->
+      Special(s,{uses = List.map (rvar_accept visitor) uses;
+                 defs = List.map (avar_accept visitor) defs},a)
+    | Jmp(l, a) -> Jmp(exp_accept visitor l, a)
+    | CJmp(c, l1, l2, a) ->
 	let c' = exp_accept visitor c in
 	let l1' = exp_accept visitor l1 in
 	let l2' = exp_accept visitor l2 in

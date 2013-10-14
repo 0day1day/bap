@@ -132,10 +132,8 @@ let attribute_to_piqi : Type.attribute -> Stmt_piqi.attribute = function
   | StrAttr s -> `strattr s
   | a -> `other (Pp.attr_to_string a)
 
-let omap f x = match x with | None -> None | Some x -> Some (f x)
-
-let defuse_to_piqi ({V.defs = ds; V.uses = us} : V.defuse) : Defuse.t =
-  {Defuse.defs = List.map var_to_piqi ds; Defuse.uses = List.map var_to_piqi us}
+let defuse_to_piqi ({V.defs; V.uses} : V.defuse) : Defuse.t =
+  {Defuse.defs = List.map var_to_piqi defs; Defuse.uses = List.map var_to_piqi uses}
 
 let attributes_to_piqi = List.map attribute_to_piqi
 
@@ -180,7 +178,7 @@ let stmt_to_piqi : Ast.stmt -> Stmt_piqi.stmt = function
     `comment({Comment.string=s; Comment.attributes=attrs})
   | Special(s, du, attrs) ->
     let attrs = attributes_to_piqi attrs in
-    let du = omap defuse_to_piqi du in
+    let du = BatOption.map defuse_to_piqi du in
     `special({Special.string=s; Special.defuse = du; Special.attributes=attrs})
 
 let prog_to_piqi = List.map stmt_to_piqi

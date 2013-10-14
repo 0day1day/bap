@@ -411,7 +411,7 @@ let regs_x86 : var list =
   @ Array.to_list (Array.sub ymms 0 8)
 
 let (r_8, r_9, r_10, r_11, r_12, r_13, r_14, r_15) = match Array.to_list nums with
-  | (r_8::r_9::r_10::r_11::r_12::r_13::r_14::r_15::_) -> (r_8, r_9, r_10, r_11, r_12, r_13, r_14, r_15)
+  | (r_8::r_9::r_10::r_11::r_12::r_13::r_14::r_15::[]) -> (r_8, r_9, r_10, r_11, r_12, r_13, r_14, r_15)
   | _ -> failwith "Impossible, matching against a list of known size"
 
 let regs_x86_64 : var list =

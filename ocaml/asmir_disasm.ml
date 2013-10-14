@@ -142,6 +142,9 @@ module VSA_SPEC = struct
       let edges = List.map (fun (e,x) -> assert (x = Indirect); e) indirect_edges in
 
       let cfg = Hacks.ast_exit_indirect (CA.copy g) in
+      (* XXX: Use a real calling convention to avoid filtering all
+         calls *)
+      let cfg = Hacks.filter_calls_cfg cfg in
       let cfg = Prune_unreachable.prune_unreachable_ast cfg in
       let cfg = Hacks.add_sink_exit cfg in
       (* Cfg_pp.AstStmtsDot.output_graph (open_out "vsacfg.dot") cfg; *)
@@ -154,7 +157,7 @@ module VSA_SPEC = struct
         Vsa_ssa.prepare_ssa_indirect ~vs ssacfg
       in
 
-      (* (\* Cfg_pp.SsaStmtsDot.output_graph (open_out "vsapre.dot") ssacfg; *\) *)
+      (* Cfg_pp.SsaStmtsDot.output_graph (open_out "vsapre.dot") ssacfg; *)
 
       (* (\* Do an initial optimization pass.  This is important so that *)
       (*    simplifycond_ssa can recognize syntactically equal *)
@@ -421,7 +424,10 @@ module Make(D:DISASM)(F:FUNCID) = struct
                       | s ->
                         Comment(Printf.sprintf "Function call/ret removed: %s" (Pp.ast_stmt_to_string s), [])) stmts
                     in
-                    Special("function call", du, [])::comments
+                    (match typ with
+                    | `Call ->
+                      Special("function call", du, [])::comments
+                    | `Ret -> comments)
                   | _ -> failwith "Unable to rewrite function call"
                 in
                 CA.set_stmts cfg s (List.rev revstmts)

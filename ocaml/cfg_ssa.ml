@@ -556,9 +556,9 @@ let uninitialized cfg =
       | Jmp(e, _) -> f_e e
       | CJmp(e1, e2, e3, _) -> f_e e1; f_e e2; f_e e3
       | Label _ | Comment _ -> ()
-      | Special(_,{Var.defs = ds; Var.uses = us},_) ->
-        List.iter (add assnd) ds;
-        List.iter (add refd) us
+      | Special(_,{defs; uses},_) ->
+        List.iter (add assnd) defs;
+        List.iter (add refd) uses
     and f_e = function
       | Load(v1,v2,v3,_) -> f_e v1; f_e v2; f_e v3
       | Store(v1,v2,v3,v4,_) -> f_e v1; f_e v2; f_e v3; f_e v4

@@ -248,9 +248,9 @@ let getargs_stmt = function
   | Halt(e,a)
   | Assert(e,a)
   | Assume(e,a) -> [e], [], [], [a], []
-  | Special(s,Some {defs = vs; uses = vs'},a) -> [], (List.append vs vs'), [], [a], [s]
-  | Comment(s,a)
-  | Special(s,None,a) -> [],[],[],[a],[s]
+  | Special(s,Some {defs; uses},a) -> [], defs@uses, [], [a], [s]
+  | Special(s,None,a)
+  | Comment(s,a) -> [], [], [], [a], [s]
 (** quick_stmt_eq returns true if and only if the subexpressions in e1
     and e2 are *physically* equal. *)
 let quick_stmt_eq s1 s2 =

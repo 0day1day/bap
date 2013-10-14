@@ -12,6 +12,8 @@ let recover_switch asmp (n,s,e) =
   | Some vsaresult ->
     let ssacfg, allgood = Switch_condition.add_switch_conditions_disasm vsaresult in
     assert_bool "CFG with switch conditions was not recovered (disasm interface)" allgood;
+    (* XXX: Use a real calling convention *)
+    let astcfg = Hacks.filter_calls_cfg astcfg in
     let ssacfg, allgood = Switch_condition.add_switch_conditions_ssacfg asmp (Cfg_ssa.of_astcfg astcfg) in
     assert_bool "CFG with switch conditions was not recovered (ssacfg interface)" allgood
 
