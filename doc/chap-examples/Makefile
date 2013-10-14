@@ -1,4 +1,4 @@
-PDFS=basiccfg.pdf ssacfg.pdf ssasimpcfg.pdf ddg.pdf cdg.pdf test.il
+PDFS=basiccfg.pdf ssacfg.pdf ssaconvcfg.pdf ssasimpcfg.pdf ddg.pdf cdg.pdf test.il
 DOTS=$(addsuffix .dot, $(basename $(PDFS)))
 TARGETS=$(PDFS) test.il
 
@@ -20,8 +20,11 @@ basiccfg.dot: basic.il
 ssacfg.dot: basic.il
 	../../utils/iltrans -il basic.il -to-ssa -pp-ssa $@
 
+ssaconvcfg.dot: basic.il
+	../../utils/iltrans -il basic.il -to-ssa -to-cfg -pp-ast-cfg $@
+
 ssasimpcfg.dot: basic.il
-	../../utils/iltrans -il basic.il -to-ssa -simp-ssa -pp-ssa $@
+	../../utils/iltrans -il basic.il -to-ssa -simp-ssa -to-cfg -pp-ast-cfg $@
 
 ddg.dot: basic.il
 	../../utils/iltrans -il basic.il -to-ssa -pp-ssa-ddg $@
