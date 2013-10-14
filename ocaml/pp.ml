@@ -101,14 +101,23 @@ class pp ft =
   and cls = F.pp_close_box ft in
   let comma () = pp ","; space() in
   let vctx = (VH.create 100, Hashtbl.create 100) in
+  let commalist f = function
+    | [] -> ()
+    | e::[] -> f e
+    | hd::others ->
+      f hd;
+      List.iter (fun e -> pc ','; space (); f e) others
+  in
 object (self)
 
 
-  method var v = 
+  method var v =
     if !output_varnums then
       pp (var_to_string v)
     else
       pp (var_to_string ~ctx:vctx v)
+
+  method vars = commalist self#var
 
   method typ t = pp (typ_to_string t)
 
@@ -145,6 +154,22 @@ object (self)
       pp "@taint_intro "; pp (string_of_int tid); pp ", "; pc '"';
       pp src_name; pp "\", "; pp (string_of_int offset)
 
+  method du {Var.defs; Var.uses} =
+    (match defs with
+    | _::_ ->
+      space ();
+      pp "defs";
+      space ();
+      self#vars defs
+    | _ -> ());
+
+    (match uses with
+    | _::_ ->
+      space ();
+      pp "uses";
+      space ();
+      self#vars uses
+    | _ -> ())
 
   method label = function
     | Name s -> pp "label "; pp s
@@ -329,11 +354,13 @@ object (self)
         pp s;
         pp "*/";
         self#attrs a
-    | Ast.Special(s,_,a) ->
-        pp "special \"";
+    | Ast.Special(s,du,a) ->
+        pp "special";
+        BatOption.may self#du du;
+        space ();
+        pc '"';
         pp s;
-        pp "\"";
-        (* TODO: Come up with a nice display for defs/uses when present *)
+        pc '"';
         self#attrs a);
     cls();
 
@@ -458,11 +485,13 @@ object (self)
         pp s;
         pp "*/";
         self#attrs a
-    | Ssa.Special(s,_,a) ->
-        pp "special \"";
+    | Ssa.Special(s,du,a) ->
+        pp "special";
+        self#du du;
+        space ();
+        pc '"';
         pp s;
-        pp "\"";
-        (* TODO: Come up with a nice display for defs/uses when present *)
+        pc '"';
         self#attrs a);
     cls()
 
