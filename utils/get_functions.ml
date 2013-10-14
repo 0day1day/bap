@@ -78,6 +78,8 @@ let lift_func (n,s,e) =
       | Vsa (cfg, None) -> cfg, None
     in
     let cfg = Hacks.ast_remove_indirect cfg in
+    (* XXX: Remove this by using proper calling conventions *)
+    let cfg = Hacks.filter_calls_cfg cfg in
     let cfg = Ast_cond_simplify.simplifycond_cfg cfg in
     let cfg = BatOption.map_default (fun n ->
       let cfg = Unroll.unroll_loops ~count:n cfg in
