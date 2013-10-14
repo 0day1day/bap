@@ -496,24 +496,32 @@ module Make(D:DISASM)(F:FUNCID) = struct
     in
     let c, state = iteration [(entry,None,exp_of_lab (Addr addr))] (c,D.State.init) in
 
-    if D.fixpoint = false then c, state
-    else
-      let continue = ref true in
-      let c = ref c in
-      let state = ref state in
-      let iter = ref 0 in
-      while !continue && !iter < 5 do
-        dprintf "Running cfg recovery until fixpoint: iteration %d" !iter;
-        let origc = !c in
-        let worklist = List.flatten (Hashtbl.fold (fun k (_,e,_) a -> e::a) edgeh []) in
-        let c',state' = iteration worklist (!c,!state) in
-        c := c';
-        state := state';
-        continue := origc <> !c;
-        incr iter;
-      done;
+    let c, state =
+      if D.fixpoint = false then c, state
+      else
+        let continue = ref true in
+        let c = ref c in
+        let state = ref state in
+        let iter = ref 0 in
+        while !continue && !iter < 5 do
+          dprintf "Running cfg recovery until fixpoint: iteration %d" !iter;
+          let origc = !c in
+          let worklist = List.flatten (Hashtbl.fold (fun k (_,e,_) a -> e::a) edgeh []) in
+          let c',state' = iteration worklist (!c,!state) in
+          c := c';
+          state := state';
+          continue := origc <> !c;
+          incr iter;
+        done;
+        !c, !state
+    in
 
-      !c, !state
+    (* Remove indirect if unused *)
+    let c = if CA.G.in_degree c indirect = 0 then CA.remove_vertex c indirect else c in
+    (* Remove error if unused *)
+    let c = if CA.G.in_degree c error = 0 then CA.remove_vertex c error else c in
+
+    c, state
 
   let disasm ?callsig:(du=None) p = disasm_at ~callsig:du p (Asmir.get_start_addr p)
 end
