@@ -9,11 +9,19 @@ open Grammar_private_scope
 open Type
 open Var
 
+let label_parse s =
+  if String.sub s 0 4 = "addr"
+     then Addr (Big_int_Z.big_int_of_string (String.sub s 5 (String.length s - 5)))
+     else if String.sub s 0 5 = "label"
+          then Name (String.sub s 6 (String.length s - 6))
+          else err "Unparsable label"
+
+
 let mk_attr lab string =
   match lab with
   | "asm" -> Asm string
   | "address" -> Address(Big_int_Z.big_int_of_string string)
-  | "target" -> Target(Big_int_Z.big_int_of_string string)
+  | "target" -> Target(label_parse string)
   | "set" when string = "liveout" -> Liveout
   | "set" when string = "initro" -> InitRO
   | "set" when string = "synthetic" -> Synthetic

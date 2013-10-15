@@ -93,7 +93,7 @@ type attribute =
   | Pos of pos  (** The position of a statement in the source file *)
   | Asm of string (** Assembly representation of the following IL code *)
   | Address of addr (** The address corresponding to lifted IL. *)
-  | Target of addr (** An address this insn may jump to (esp. function specials) *)
+  | Target of label (** An address this insn may jump to (esp. function specials) *)
   | Liveout (** Statement should be considered live by deadcode elimination *)
   | StrAttr of string (** Generic printable and parseable attribute *)
   | NamedStrAttr of string * string (** Generic printable and parseable attribute *)

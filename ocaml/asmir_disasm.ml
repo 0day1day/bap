@@ -416,7 +416,7 @@ module Make(D:DISASM)(F:FUNCID) = struct
               let dumb_translate cfg (s,l,e) =
                 let revstmts = match List.rev (CA.get_stmts cfg s) with
                   | CJmp _::_ -> failwith "Conditional function calls are not implemented"
-                  | Jmp _::tl as stmts ->
+                  | Jmp (te,_)::tl as stmts ->
                     let comments = List.map (function
                       | Label _ as s -> s
                       | Jmp(e, attrs) as s ->
@@ -424,9 +424,14 @@ module Make(D:DISASM)(F:FUNCID) = struct
                       | s ->
                         Comment(Printf.sprintf "Function call/ret removed: %s" (Pp.ast_stmt_to_string s), [])) stmts
                     in
+                    let tgt = (match te with
+                      | Int (a,_) -> [Target (Addr a)]
+                      | Lab s -> [Target (Name s)]
+                      | _ -> [])
+                    in
                     (match typ with
                     | `Call ->
-                      Special("function call", du, [])::comments
+                      Special("function call", du, tgt)::comments
                     | `Ret -> comments)
                   | _ -> failwith "Unable to rewrite function call"
                 in
