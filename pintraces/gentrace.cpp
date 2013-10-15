@@ -767,7 +767,7 @@ VOID FlushBuffer(BOOL addKeyframe, const CONTEXT *ctx, THREADID threadid, BOOL n
     LLOG("Begin flushing buffer.\n");
 
     if (needlock) {
-        GetLock(&lock, threadid+1);
+        PIN_GetLock(&lock, threadid+1);
     }
 
     FlushInstructions();
@@ -810,13 +810,13 @@ VOID FlushBuffer(BOOL addKeyframe, const CONTEXT *ctx, THREADID threadid, BOOL n
         LOG("Logged required number of instructions, quitting.\n");
         cerr << "Logged required number of instructions, quitting." << endl;
         Cleanup();
-        //ReleaseLock(&lock);
+        //PIN_ReleaseLock(&lock);
         // Never release lock
         //PIN_Detach();
         exit(0);
     } else {
         if (needlock) {
-            ReleaseLock(&lock);
+            PIN_ReleaseLock(&lock);
         }
     }
 
@@ -843,9 +843,9 @@ uint32_t AcceptWrapper(CONTEXT *ctx, AFUNPTR fp, THREADID tid, uint32_t s, void 
                                 PIN_PARG(int*), addrlen,
                                 PIN_PARG_END());
 
-    GetLock(&lock, tid+1);
+    PIN_GetLock(&lock, tid+1);
     tracker->acceptHelper(ret);
-    ReleaseLock(&lock);
+    PIN_ReleaseLock(&lock);
 
     return ret;
 
@@ -872,13 +872,13 @@ uint32_t WSAConnectWrapper(CONTEXT *ctx, AFUNPTR fp, THREADID tid, uint32_t s, v
                                 PIN_PARG(void*), arg7,
                                 PIN_PARG_END());
 
-    GetLock(&lock, tid+1);
+    PIN_GetLock(&lock, tid+1);
     if (ret != SOCKET_ERROR) {
         tracker->acceptHelper(s);
     } else {
         cerr << "WSAConnect error " << ret << endl;
     }
-    ReleaseLock(&lock);
+    PIN_ReleaseLock(&lock);
 
     return ret;
 
@@ -901,7 +901,7 @@ uint32_t ConnectWrapper(CONTEXT *ctx, AFUNPTR fp, THREADID tid, uint32_t s, void
                                 PIN_PARG(void*), arg3,
                                 PIN_PARG_END());
 
-    GetLock(&lock, tid+1);
+    PIN_GetLock(&lock, tid+1);
     //  if (ret != SOCKET_ERROR) {
     // Non-blocking sockets will return an "error".  However, we can't
     // call GetLastError to find out what the root problem is,
@@ -911,7 +911,7 @@ uint32_t ConnectWrapper(CONTEXT *ctx, AFUNPTR fp, THREADID tid, uint32_t s, void
     // } else {
     //    cerr << "connect error " << ret << endl;
     //  }
-    ReleaseLock(&lock);
+    PIN_ReleaseLock(&lock);
 
     return ret;
 
@@ -956,7 +956,7 @@ void AfterRecv(THREADID tid, int ret, char *f) {
         ti->recvStack.pop();
 
         if (ret != SOCKET_ERROR) {
-            GetLock(&lock, tid+1);
+            PIN_GetLock(&lock, tid+1);
             //cerr << "fd: " << ri.fd << endl;
 
             uint32_t numbytes = 0;
@@ -967,7 +967,7 @@ void AfterRecv(THREADID tid, int ret, char *f) {
             }
 
             FrameOption_t fo = tracker->recvHelper(ri.fd, ri.addr, numbytes);
-            ReleaseLock(&lock);
+            PIN_ReleaseLock(&lock);
 
             if (fo.b) {
 
@@ -975,9 +975,9 @@ void AfterRecv(THREADID tid, int ret, char *f) {
                     TActivate();
                 }
 
-                GetLock(&lock, tid+1);
+                PIN_GetLock(&lock, tid+1);
                 g_twnew->add(fo.f);
-                ReleaseLock(&lock);
+                PIN_ReleaseLock(&lock);
             }
         } else {
             cerr << "recv() error " << endl;
@@ -1008,13 +1008,13 @@ void* GetEnvWWrap(CONTEXT *ctx, AFUNPTR fp, THREADID tid) {
 
     LLOG("Getting lock in callback\n");
 
-    GetLock(&lock, tid+1);
+    PIN_GetLock(&lock, tid+1);
     LLOG("Got callback lock\n");
 
     std::vector<frame> frms = tracker->taintEnv(NULL, (wchar_t*) ret);
     g_twnew->add<std::vector<frame> > (frms);
 
-    ReleaseLock(&lock);
+    PIN_ReleaseLock(&lock);
     LLOG("Releasing callback lock\n");
 
     return ret;
@@ -1044,13 +1044,13 @@ void* GetEnvAWrap(CONTEXT *ctx, AFUNPTR fp, THREADID tid) {
 
     LLOG("Getting lock in callback\n");
 
-    GetLock(&lock, tid+1);
+    PIN_GetLock(&lock, tid+1);
     LLOG("Got callback lock\n");
 
     std::vector<frame> frms = tracker->taintEnv((char*) ret, NULL);
     g_twnew->add<std::vector<frame> > (frms);
 
-    ReleaseLock(&lock);
+    PIN_ReleaseLock(&lock);
     LLOG("Releasing callback lock\n");
 
     return ret;
@@ -1128,7 +1128,7 @@ VOID AppendBuffer(ADDRINT addr,
 
     LLOG("big thing\n");
 
-    GetLock(&lock, tid+1);
+    PIN_GetLock(&lock, tid+1);
 
     LLOG("got big thing\n");
 
@@ -1335,7 +1335,7 @@ VOID AppendBuffer(ADDRINT addr,
         exit(0);
     }
 
-    ReleaseLock(&lock);
+    PIN_ReleaseLock(&lock);
     LLOG("released big thing\n");
 
     va_end(va);
@@ -1871,7 +1871,7 @@ VOID ThreadStart(THREADID threadid, CONTEXT *ctx, INT32 flags, VOID *v)
 
     NewThreadInfo();
 
-    GetLock(&lock, threadid+1);
+    PIN_GetLock(&lock, threadid+1);
 
     LOG("New thread starting\n");
     cerr << "Thread " << threadid << " starting" << endl;
@@ -1898,7 +1898,7 @@ VOID ThreadStart(THREADID threadid, CONTEXT *ctx, INT32 flags, VOID *v)
 #endif
     }
 
-    ReleaseLock(&lock);
+    PIN_ReleaseLock(&lock);
 
 }
 
@@ -1914,9 +1914,9 @@ VOID ModLoad(IMG img, VOID *v)
     f.mutable_modload_frame()->set_low_address(IMG_LowAddress(img));
     f.mutable_modload_frame()->set_high_address(IMG_HighAddress(img));
 
-    GetLock(&lock, 0);
+    PIN_GetLock(&lock, 0);
     g_twnew->add(f);
-    ReleaseLock(&lock);
+    PIN_ReleaseLock(&lock);
 
 #ifdef _WIN32
     // Try to find kernel32
@@ -2291,7 +2291,7 @@ VOID SyscallEntry(THREADID tid, CONTEXT *ctx, SYSCALL_STANDARD std, VOID *v)
     // XXX: This should really be above g_active probably, but it seems
     // unlikely that it would cause a problem.  It's here because
     // FlushBuffer obtains a lock of it's own.
-    GetLock(&lock, tid+1);
+    PIN_GetLock(&lock, tid+1);
 
     // First we need to flush the buffer, so we can directly add the
     // syscall frame after the frame for the instruction that led to the
@@ -2310,7 +2310,7 @@ VOID SyscallEntry(THREADID tid, CONTEXT *ctx, SYSCALL_STANDARD std, VOID *v)
     //e:
 
     LLOG("releasing sysenter\n");
-    ReleaseLock(&lock);
+    PIN_ReleaseLock(&lock);
     LLOG("really done with sysenter\n");
 }
 
@@ -2339,7 +2339,7 @@ VOID SyscallExit(THREADID tid, CONTEXT *ctx, SYSCALL_STANDARD std, VOID *v)
     si = ti->scStack.top();
     ti->scStack.pop();
 
-    GetLock(&lock, tid+1);
+    PIN_GetLock(&lock, tid+1);
 
     // Check to see if we need to introduce tainted bytes as a result of this
     // sytem call
@@ -2356,7 +2356,7 @@ VOID SyscallExit(THREADID tid, CONTEXT *ctx, SYSCALL_STANDARD std, VOID *v)
     //printf("syscall out %d\n", si.sf.callno);
 
     LLOG("releasing sysexit\n");
-    ReleaseLock(&lock);
+    PIN_ReleaseLock(&lock);
 
     // Untaint system call output registers (uses thread-local delta, so no lock needed)
     tracker->postSysCall(ti->delta);
@@ -2373,14 +2373,14 @@ VOID FollowParent(THREADID threadid, const CONTEXT* ctxt, VOID * arg)
 
     LLOG("fparent\n");
 
-    GetLock(&lock, threadid+1);
+    PIN_GetLock(&lock, threadid+1);
     i = strlen(g_threadname);
     assert(i < BUFFER_SIZE);
     g_threadname[i++] = 'p';
 
     std::cerr << "Spawning parent: " << PIN_GetPid() << g_threadname << std::endl;
 
-    ReleaseLock(&lock);
+    PIN_ReleaseLock(&lock);
 }
 
 VOID ExceptionHandler(THREADID threadid, CONTEXT_CHANGE_REASON reason, const CONTEXT *from, CONTEXT *to, INT32 info, VOID *v) {
@@ -2415,7 +2415,7 @@ VOID ExceptionHandler(THREADID threadid, CONTEXT_CHANGE_REASON reason, const CON
         f.mutable_exception_frame()->set_to_addr(PIN_GetContextReg(to, REG_INST_PTR));
     }
 
-    GetLock(&lock, threadid+1);
+    PIN_GetLock(&lock, threadid+1);
     LLOG("got except lock!\n");
 
     // If we want the exception to be the last thing in the trace when
@@ -2518,7 +2518,7 @@ VOID ExceptionHandler(THREADID threadid, CONTEXT_CHANGE_REASON reason, const CON
     }
 
     LLOG("done handling exception\n");
-    ReleaseLock(&lock);
+    PIN_ReleaseLock(&lock);
 }
 
 VOID FollowChild(THREADID threadid, const CONTEXT* ctxt, VOID * arg)
@@ -2529,7 +2529,7 @@ VOID FollowChild(THREADID threadid, const CONTEXT* ctxt, VOID * arg)
 
     LLOG("follow child\n");
 
-    GetLock(&lock, threadid+1);
+    PIN_GetLock(&lock, threadid+1);
     i = strlen(g_threadname);
     assert(i < BUFFER_SIZE);
     g_threadname[i++] = 'c';
@@ -2544,7 +2544,7 @@ VOID FollowChild(THREADID threadid, const CONTEXT* ctxt, VOID * arg)
 
     g_timer = clock();
     std::cerr << "Spawning child: " << PIN_GetPid() << g_threadname << std::endl;
-    ReleaseLock(&lock);
+    PIN_ReleaseLock(&lock);
 
 }
 
@@ -2628,7 +2628,7 @@ int main(int argc, char *argv[])
     if (PIN_Init(argc,argv))
         return Usage();
 
-    InitLock(&lock);
+    PIN_InitLock(&lock);
 
     // Check if a trigger was specified.
     if (KnobTrigAddr.Value() != 0) {
