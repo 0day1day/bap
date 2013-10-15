@@ -6,7 +6,7 @@ small changes.
 
 *** Basic pre-requisites:
 
-* ocaml 3.12 or newer
+* ocaml v where 3.12 <= v < 4.01.00
 * camlidl
 * camomile
 * bfd
@@ -14,7 +14,7 @@ small changes.
 *** Basic installation ****
 
 To build BAP on x86, do the following:
-  $ ./autogen.sh (only if building from git)
+  $ ./autogen.sh (if building from git)
   $ ./configure
   $ make
 -- or to make all and run unit tests after --
@@ -75,7 +75,7 @@ now (./autogen && ./configure && make).
 On any other system, you will need to use a special command line that
 tells bap where opam packages are:
 
-  ./autogen.sh (if building from SVN)
+  ./autogen.sh # (if building from git)
   CPPFLAGS="-I/opt/local/include/ -I$(opam config var lib)/camlidl" \
   INCDIRS="$(opam config var lib)/camlidl" \
   LDFLAGS="-L/opt/local/lib -L/opt/local/lib/x86_64/" \
@@ -117,7 +117,7 @@ Install required opam packages:
 
 And run configure.
 
-  ./autogen.sh (if building from SVN)
+  ./autogen.sh # (if building from git)
 
 If using macports:
   CPPFLAGS="-I/opt/local/include/ -I$(opam config var lib)/camlidl" \
@@ -184,25 +184,9 @@ requires that the ocaml source files be built properly first.
 
 Build and run the unit tests tests:
 $ make test
+
 OR
 
 $ cd tests && make && ./bap_test_suite
 
 For verbose output, pass -verbose to bap_test_suite.
-
-
-*** Optional: Lift arm binaries ***
-
-BAP can lift little endian arm binaries.  For this to work, BAP needs
-to be linked to a version of the BFD library that supports arm.  On
-ubuntu, these are provided by the binutils-multiarch package.
-However, this package does not replace the default BFD libraries
-(which probably do not support arm).  You must also manually run:
-
-  $ cd /usr/lib && sudo rm libbfd.so libopcodes.so \
-  && sudo ln -s libbfd-2.21.0-multiarch.20110327.so libbfd.so \
-  && sudo ln -s libopcodes-2.21.0-multiarch.20110327.so libopcodes.so
-
-to point the default BFD libraries to the multiarch implementations.
-You will probably need to adjust the lib*-multiarch*so filenames to
-match those on your system.
