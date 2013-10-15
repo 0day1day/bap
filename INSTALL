@@ -14,7 +14,7 @@ small changes.
 *** Basic installation ****
 
 To build BAP on x86, do the following:
-  $ ./autogen.sh (if building from SVN)
+  $ ./autogen.sh (only if building from git)
   $ ./configure
   $ make
 -- or to make all and run unit tests after --
