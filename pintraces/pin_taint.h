@@ -10,8 +10,9 @@
 #include <set>
 #include <vector>
 #include <string.h>
-#include <unistd.h>
+#ifndef _WIN32
 #include <asm/unistd.h>
+#endif
 #include "pin_misc.h"
 #include "trace.container.hpp"
 

@@ -3,8 +3,6 @@
 #include "pin_syscalls.h"
 #include "winsyscalls.h"
 #include "trace.container.hpp"
-#ifndef _WIN32
-#endif
 #include <cassert>
 #include <sstream>
 
