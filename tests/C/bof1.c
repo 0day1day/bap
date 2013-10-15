@@ -20,12 +20,12 @@ int fd;
 
 int main(int argc, char *argv[])
 {
-    if (argc != 2) {
-        printf ("Usage: %s filename\n", argv[0]);
-        exit(-1);
-    }
   char buf[500];
   size_t count;
+  if (argc != 2) {
+        printf ("Usage: %s filename\n", argv[0]);
+        exit(-1);
+  }
   fd = open(argv[1], O_RDONLY);
   if(fd == -1) {
     perror("open");
