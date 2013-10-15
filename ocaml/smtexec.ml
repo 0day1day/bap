@@ -385,6 +385,18 @@ end
 
 module BOOLECTOR = Make(BOOLECTOR_INFO)
 
+module CVC4_INFO =
+struct
+  let solvername = "cvc4"
+  let progname = "cvc4"
+  let cmdstr f = "--lang smtlib2 " ^ f
+  let parse_result = BOOLECTOR_INFO.parse_result_builder solvername
+  let printer = ((new Smtlib2.pp_oc ~opts:[]) :> Formulap.fppf)
+  let streaming_printer = ((new Smtlib2.pp_oc ~opts:[]) :> Formulap.stream_fppf)
+end
+
+module CVC4 = Make(CVC4_INFO)
+
 let solvers = Hashtbl.create 10;;
 List.iter (fun s -> Hashtbl.add solvers s#solvername s)
   (
@@ -392,6 +404,7 @@ List.iter (fun s -> Hashtbl.add solvers s#solvername s)
     :: STPSMTLIB.si
     :: CVC3.si
     :: CVC3SMTLIB.si
+    :: CVC4.si
     :: YICES.si
     :: Z3.si
     :: BOOLECTOR.si
