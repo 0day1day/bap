@@ -127,6 +127,7 @@ object (self)
   method attr = function
     | Asm s -> pp "@asm \""; pp s; pp "\""
     | Address a -> printf "@address \"0x%s\"" (~%a);
+    | Target a -> printf "@target \"0x%s\"" (~%a);
     | Liveout -> pp "@set \"liveout\""
     | StrAttr s -> pp "@str \""; pp s; pc '\"'
     | NamedStrAttr (n, s) -> pp "@namedstr \""; pp n; pc '\"'; space (); pc '\"'; pp s; pc '\"'

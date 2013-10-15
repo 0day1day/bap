@@ -13,6 +13,7 @@ let mk_attr lab string =
   match lab with
   | "asm" -> Asm string
   | "address" -> Address(Big_int_Z.big_int_of_string string)
+  | "target" -> Target(Big_int_Z.big_int_of_string string)
   | "set" when string = "liveout" -> Liveout
   | "set" when string = "initro" -> InitRO
   | "set" when string = "synthetic" -> Synthetic
