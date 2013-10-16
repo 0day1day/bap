@@ -44,7 +44,7 @@ New in BAP 0.5:
 * LLVM-based JIT and regular compilation of BAP IL
 * BAP has zero wrong instructions on its x86 nightly tests (but still some unimplemented)
 
-New in BAP :
+New in older versions of BAP:
 
 * Temporaries introduced in SSA can be removed when converting back to the AST.
 * Added constant folding and algebraic simplifications to SCCVN.
