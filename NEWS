@@ -1,6 +1,24 @@
 New in BAP 0.8:
-* Support for x86-64 lifting
-* Support for VSA-based CFG recovery (beta)
+* Support for x86-64 lifting.
+
+  Most common usermode x86-64 instructions should be supported.  The
+  lifting architecture is selected automatically, so lifting x86-64
+  code should "just work".
+
+* A new CFG recovery framework.
+
+  This feature allows various algorithms to identify regions of binary
+  code to lift, rather than relying on linear dissasembly.  Iniital
+  CFG recovery algorithms include recursive descent and VSA.  The CFG
+  recovery framework is still in beta, and can be accessed using the
+  get_functions command.
+
+* Removal of libVEX.
+
+  BAP no longer relies on libVEX at all.  Previous versions of BAP
+  would lift unknown instructions to the VEX IL using libVEX, and then
+  convert the resulting VEX IL to BIL.  This feature was rarely used,
+  since BAP has support for most x86 instructions.
 
 New in BAP 0.7:
 * New function identification heuristics in get_functions for stripped binaries
