@@ -62,10 +62,6 @@ let tests =
     "mem_test", "asm/mem.o", Disasm_i386.R32.ecx, (32,bi0,bi 42,bi 42);
   ]
 
-let conv_test (x,y,z,(a,b,c,d)) =
-  let t = Big_int_Z.int64_of_big_int in
-  (x,y,z, (a, t b, t c, t d))
-
 let suite = "Vsa" >:::
-  List.map make_ast_test (List.map conv_test tests)
+  List.map make_ast_test tests
   @ List.map make_ssa_test tests

@@ -44,24 +44,12 @@ let mem_max = ref (Some(1 lsl 16))
 
 exception Unimplemented of string
 
-module I = Int64
-(* some operators to make this more readable *)
-let (&%) = I.logand
-let (|%) = I.logor
-let (^%) = I.logxor
-let (+%) = I.add
-let (-%) = I.sub
-let ( *%) = I.mul
-let (/%) = I.div
-let bnot = I.lognot
-
-let rec uint64_gcd x y =
-  if y = 0L then x
-  else uint64_gcd y (int64_urem x y)
-
-let uint64_lcm x y =
-  let m = x *% y in
-  m /% (uint64_gcd x y)
+let gcd x y =
+  if x = bi0 then y
+  else if y = bi0 then x
+  else Z.gcd x y
+let lcm = Z.lcm
+let rem = Z.erem
 
 let bits_of_width = Typecheck.bits_of_width
 let bits_of_exp e = bits_of_width (Typecheck.infer_ast e)
@@ -72,45 +60,40 @@ struct
 (* FIXME: some of these functions can return a stride of 1 for a singleton *)
 
   (** number of bits * unsigned stride * signed lower bound * signed upper bound *)
-  type t = int * int64 * int64 * int64
+  type t = int * big_int * big_int * big_int
 
   let is_empty (k,s,lb,ub) =
-    s = (-1L) && lb = 1L && ub = 0L
+    s = bim1 && lb = bi1 && ub = bi0
 
   let to_string ((k,s,lb,ub) as si) =
     if is_empty si then "[empty]"
-    else if not (debug ()) then Printf.sprintf "%Lu[%Ld,%Ld]" s lb ub
-    else Printf.sprintf "(%d)%Lu[%Ld,%Ld]" k s lb ub
+    else Printf.sprintf "%s%s[%s,%s]" (if debug () then "("^string_of_int k^")" else "") (~% s) (~% lb) (~% ub)
 
   let size (_,s,lb,ub) =
-    if s = 0L then 1L
-    else ((ub -% lb) /% s) +% 1L
+    if s = bi0 then bi1
+    else ((ub -% lb) /% s) +% bi1
 
   let highbit k =
-    if k = 1 then 1L else I.shift_left 1L (k-1)
+    if k = 1 then bi1 else bi1 <<% (k-1)
 
   (* Cast i as signed number *)
   let extend k i =
-    if k <> 64 then
-      let k' = 64-k in I.shift_right(I.shift_left i k') k'
-    else i
+    Arithmetic.to_sbig_int (i, Reg k)
 
   (* Set the irrelevant upper bits of i to 0 *)
   let trunc k i =
-    if k <> 64 then
-      let k' = 64-k in I.shift_right_logical(I.shift_left i k') k'
-    else i
+    Arithmetic.to_big_int (i, Reg k)
 
-  let maxi k = highbit k -% 1L
+  let maxi k = highbit k -% bi1
   let mini k = extend k (highbit k)
-  let top k = (k, 1L, mini k, maxi k)
-  let empty k = (k, (-1L), 1L, 0L)
+  let top k = (k, bi1, mini k, maxi k)
+  let empty k = (k, bim1, bi1, bi0)
 
   let rec upper k i s =
-    if s >= 1L then (
-    let offset = int64_urem i s in
+    if s >= bi1 then (
+    let offset = rem i s in
     let max = maxi k in
-    let maxoffset = int64_urem max s in
+    let maxoffset = rem max s in
     let o = if maxoffset >= offset then
         max -% (maxoffset -% offset)
       else
@@ -118,14 +101,14 @@ struct
     in
     if debug ()
     then (assert (o <= maxi k && o > maxi k -% s);
-          assert (int64_urem o s = int64_urem i s));
+          assert (rem o s = rem i s));
     o) else maxi k
 
   let rec lower k i s =
-    if s >= 1L then (
-    let offset = int64_urem i s in
+    if s >= bi1 then (
+    let offset = rem i s in
     let min = mini k in
-    let minoffset = int64_urem min s in
+    let minoffset = rem min s in
     let o = if offset >= minoffset then
         min +% (offset -% minoffset)
       else
@@ -133,7 +116,7 @@ struct
     in
     if debug ()
     then (assert (o >= mini k && o < mini k +% s);
-          assert (int64_urem o s = int64_urem i s));
+          assert (rem o s = rem i s));
     o) else mini k
 
   let remove_lower_bound (k,s,a,b) =
@@ -141,26 +124,26 @@ struct
   let remove_upper_bound (k,s,a,b) =
     (k,s,a,upper k a s)
 
-  let single k x = (k,0L,x,x)
+  let single k x = (k,bi0,x,x)
   let of_bap_int i t = single (bits_of_width t) (extend (bits_of_width t) i)
 
-  let above k x = (k, 1L, x +% 1L, maxi k)
-  let below k x = (k, 1L, mini k, x -% 1L)
+  let above k x = (k, bi1, x +% bi1, maxi k)
+  let below k x = (k, bi1, mini k, x -% bi1)
 
   (* These are hacks *)
-  let above_unsigned k x = (k, 1L, x +% 1L, maxi k)
-  let below_unsigned k x = (k, 1L, 0L, x -% 1L)
+  let above_unsigned k x = (k, bi1, x +% bi1, maxi k)
+  let below_unsigned k x = (k, bi1, bi0, x -% bi1)
 
-  let aboveeq k x = (k, 1L, x, maxi k)
-  let beloweq k x = (k, 1L, mini k, x)
+  let aboveeq k x = (k, bi1, x, maxi k)
+  let beloweq k x = (k, bi1, mini k, x)
 
   (* These are hacks *)
-  let aboveeq_unsigned k x = (k, 1L, x, maxi k)
-  let beloweq_unsigned k x = (k, 1L, 0L, x)
+  let aboveeq_unsigned k x = (k, bi1, x, maxi k)
+  let beloweq_unsigned k x = (k, bi1, bi0, x)
 
-  let zero k = single k 0L
-  let one k = single k 1L
-  let minus_one k = single k (-1L)
+  let zero k = single k bi0
+  let one k = single k bi1
+  let minus_one k = single k bim1
 
   (* XXX: Remove k argument *)
   let is_reduced k ((k',s,lb,ub) as si) =
@@ -169,8 +152,8 @@ struct
     assert(k>0 && k<=64);
     (lb >= mini k && ub <= maxi k) &&
       is_empty si ||
-      (if s = 0L then lb = ub
-       else lb < ub && let r1 = I.rem lb s and r2 = I.rem ub s in r1 = r2 || r2 -% r1 = s)
+      (if s = bi0 then lb = ub
+       else lb < ub && let r1 = rem lb s and r2 = rem ub s in r1 = r2 || r2 -% r1 = s)
 
   let check_reduced k si =
     if not(is_reduced k si)
@@ -182,8 +165,8 @@ struct
   (* XXX: Remove k argument *)
   let renorm k ((k',a,b,c) as si) =
     assert(k=k');
-    let si' = if b = c then (k,0L,b,b) else si in
-    let si' = if a < 0L || c < b then empty k else si' in
+    let si' = if b = c then (k,bi0,b,b) else si in
+    let si' = if a < bi0 || c < b then empty k else si' in
     check_reduced k si';
     si'
 
@@ -204,7 +187,7 @@ struct
     (* Overflow cases 2 and 4; see dissertation *)
     let lbunderflow = lb' < mini k
     and uboverflow = ub' > maxi k
-    and s = uint64_gcd s1 s2
+    and s = gcd s1 s2
     in
     let overflow = lbunderflow || uboverflow in
     match overflow with
@@ -226,30 +209,30 @@ struct
     assert(k=k');
     check_reduced k si;
     if lb <> extend k (highbit k) then
-      (k, s, I.neg ub, I.neg lb)
-    else if lb = ub then 
+      (k, s, Z.neg ub, Z.neg lb)
+    else if lb = ub then
       single k (mini k)
     else
       top k
   let neg = renormun neg
 
-  (** Subtractionf of strided intervals *)
+  (** Subtraction of strided intervals *)
   let sub k a b =
     add k a (neg k b)
   let sub = renormbin sub
 
   let minor k a b c d =
     let rec loop m =
-      let cont() = loop (I.shift_right_logical m 1) in
-        if m = 0L then a |% c
-        else if bnot a &% c &% m <> 0L then
-          let temp = (a |% m ) &% I.neg m in
-            if int64_ucompare temp b <= 0 then
+      let cont() = loop (m >>% 1) in
+        if m = bi0 then a |% c
+        else if Z.lognot a &% c &% m <> bi0 then
+          let temp = (a |% m ) &% Z.neg m in
+            if big_int_ucompare temp b <= 0 then
               temp |% c
             else cont()
-        else if a &% bnot c &% m  <> 0L then
-          let temp = (c +% m) &% I.neg m in
-            if int64_ucompare temp d <= 0 then
+        else if a &% Z.lognot c &% m  <> bi0 then
+          let temp = (c +% m) &% Z.neg m in
+            if big_int_ucompare temp d <= 0 then
               temp  |% a
             else cont()
         else
@@ -259,14 +242,14 @@ struct
 
   let maxor k a b c d =
     let rec loop m =
-      let cont() = loop (I.shift_right_logical m 1) in
-        if m = 0L then b |% d
-        else if b &% d &% m <> 0L then
-          let temp1 = (b -% m) |% (m -% 1L) in
-          let temp2 = (d -% m) |% (m -% 1L) in
-            if int64_ucompare temp1 a >= 0 then
+      let cont() = loop (m >>% 1) in
+        if m = bi0 then b |% d
+        else if b &% d &% m <> bi0 then
+          let temp1 = (b -% m) |% (m -% bi1) in
+          let temp2 = (d -% m) |% (m -% bi1) in
+            if big_int_ucompare temp1 a >= 0 then
               temp1 |% d
-            else if int64_ucompare temp2 c >= 0 then
+            else if big_int_ucompare temp2 c >= 0 then
               temp2 |% b
             else cont()
         else
@@ -275,9 +258,9 @@ struct
       loop (highbit k)
 
   let ntz x =
-    let y = I.neg x &% (x -% 1L) in
+    let y = Z.neg x &% (x -% bi1) in
     let rec bits n y =
-      if y = 0L then n else bits (n+1) (I.shift_right y 1)
+      if y = bi0 then n else bits (n+1) (y $>>% 1)
     in
       bits 0 y
 
@@ -287,27 +270,27 @@ struct
     assert (k=k' && k=k'');
     check_reduced2 k a b;
     let t = min (ntz s1) (ntz s2) in
-    let s' = I.shift_left 1L t in
-    let lowbits = (lb1 |% lb2) &% (s' -% 1L) in
-    let (lb', ub') = match (lb1 < 0L, ub1 < 0L, lb2 < 0L, ub2 < 0L) with
+    let s' = bi1 <<% t in
+    let lowbits = (lb1 |% lb2) &% (s' -% bi1) in
+    let (lb', ub') = match (lb1 < bi0, ub1 < bi0, lb2 < bi0, ub2 < bi0) with
       | (true, true, true, true)
       | (true, true, false, false)
       | (false, false, true, true)
       | (false, false, false, false) ->
           (minor k lb1 ub1 lb2 ub2, maxor k lb1 ub1 lb2 ub2)
       | (true, true, true, false) ->
-          (lb1, -1L)
+          (lb1, bim1)
       | (true, false, true, true) ->
-          (lb2, -1L)
+          (lb2, bim1)
       | (true, false, true, false) ->
-          (min lb1 lb2, maxor k 0L ub1 0L ub2)
+          (min lb1 lb2, maxor k bi0 ub1 bi0 ub2)
       | (true, false, false, false) ->
-          (minor k lb1 (-1L) lb2 ub2, maxor k 0L ub1 lb2 ub2)
+          (minor k lb1 (bim1) lb2 ub2, maxor k bi0 ub1 lb2 ub2)
       | (false, false, true, false) ->
-          (minor k lb1 ub1 lb2 (-1L), maxor k lb1 ub1 lb2 ub2)
+          (minor k lb1 ub1 lb2 (bim1), maxor k lb1 ub1 lb2 ub2)
       | _ -> failwith "Impossible: check_reduced prevents this"
     in
-    let highmask = bnot(s' -% 1L) in
+    let highmask = Z.lognot(s' -% bi1) in
       (k, s', (lb' &% highmask) |% lowbits, (ub' &% highmask) |% lowbits)
   let logor = renormbin logor
 
@@ -315,7 +298,7 @@ struct
   (** Bitwise NOT *)
   let lognot (_k:int) (k,s,l,u) =
     assert (_k = k);
-    (k, s, bnot u, bnot l)
+    (k, s, Z.lognot u, Z.lognot l)
   let lognot = renormun lognot
 
 
@@ -332,29 +315,29 @@ struct
     o (n(o (n x) y)) (n(o x (n y)))
   let logxor = renormbin logxor
 
-  (** FIXME: Signed or unsigned modulus? *)
+  (** unsigned modulus *)
   let modulus k (k',s1,a,b) (k'',s2,c,d) =
     assert(k=k' && k=k'');
-    if b = 0L then single k 0L
+    if b = bi0 then single k bi0
     else
-      (k, 1L, 0L, int64_umin b d)
+      (k, bi1, bi0, big_int_umin b d)
   let modulus = renormbin modulus
 
 (* XXX: Get rid of k *)
 (* shifting by more than k or by negative values
  * will be the same as shifting by k. *)
   let toshifts k =
-    let f x = if x > Int64.of_int k || x < 0L then k else Int64.to_int x in
+    let f x = if x > bi k || x < bi0 then k else Big_int_Z.int_of_big_int x in
       function
-        | (k',0L,x,y) ->
+        | (k',z,x,y) when z = bi0 ->
           assert(x=y);
           assert(k=k');
           let s = f x in
           (s,s)
         | (k',_s,x,y) ->
           assert(k=k');
-          if x < 0L then
-            if y >= 0L then
+          if x < bi0 then
+            if y >= bi0 then
               (* FIXME: using stride information could be useful here *)
               (0, k)
             else (k,k)
@@ -387,7 +370,7 @@ struct
     let l = BatList.reduce min shifts in
     let u = BatList.reduce max shifts in
 
-    let sign x = x >= 0L in
+    let sign x = x >= bi0 in
     let simpleshift =
     (* We have a simple shift if all shifts never change the sign of
        the value *)
@@ -397,20 +380,20 @@ struct
     in
 
     let s', l, u = match simpleshift, dir with
-      | true, `Rightshift -> int64_umax (Int64.shift_right_logical s1 z2) 1L, l, u
-      | true, `Leftshift -> int64_umax (Int64.shift_left s1 z1) 1L, l, u
-      | false, _ -> 1L, mini k, maxi k (* top *)
+      | true, `Rightshift -> big_int_umax (s1 >>% z2) bi1, l, u
+      | true, `Leftshift -> big_int_umax (s1 <<% z1) bi1, l, u
+      | false, _ -> bi1, mini k, maxi k (* top *)
     in
     renorm k (k,s',l,u)
 
   (** Logical right-shift *)
-  let rshift = mk_shift `Rightshift Int64.shift_right_logical
+  let rshift = mk_shift `Rightshift (>>%)
 
   (** Arithmetic right-shift *)
-  let arshift = mk_shift `Rightshift Int64.shift_right
+  let arshift = mk_shift `Rightshift ($>>%)
 
   (** Left shift *)
-  let lshift = mk_shift `Leftshift Int64.shift_left
+  let lshift = mk_shift `Leftshift (<<%)
 
   let cast_low tok ((k,s,a,b) as v) =
     assert (tok <= k);
@@ -431,7 +414,7 @@ struct
     if tok = k then v
     else (
       (* Shift right, then cast low *)
-      let v = rshift k v (single k (Int64.of_int(k - k))) in
+      let v = rshift k v (single k (bi (k - tok))) in
       cast_low tok v)
   let cast_high = renormun cast_high
 
@@ -450,7 +433,7 @@ struct
        however, a negative number is transformed into a (large) positive
        number.  *)
     let c x =
-      if x >= 0L then x
+      if x >= bi0 then x
       else trunc k x in
     let a' = c a
     and b' = c b in
@@ -463,7 +446,7 @@ struct
     let nb = (h-l)+1 in
     assert (h >= 0);
     assert (nb >= 0);
-    let x = if l <> 0 then rshift k (single k (Int64.of_int l)) x else x in
+    let x = if l <> 0 then rshift k (single k (bi l)) x else x in
     let x = if nb <> k then cast_low nb x else x in
     x
   let extract = renormtri extract
@@ -472,14 +455,14 @@ struct
     assert (k = k1 + k2);
     let x = cast_unsigned k x in
     let y = cast_unsigned k y in
-    let x = lshift k x (single k (Int64.of_int k2)) in
+    let x = lshift k x (single k (bi k2)) in
     logor k x y
   let concat = renormbin concat
 
   (* construct these only once *)
-  let yes = single 1 (-1L)
-  and no = single 1 0L
-  and maybe = (1, 1L, -1L, 0L)
+  let yes = single 1 bim1
+  and no = single 1 bi0
+  and maybe = (1, bi1, bim1, bi0)
 
   (* XXX: Remove k *)
   let eq k ((k',s1,a,b) as x) ((k'',s2,c,d) as y) =
@@ -490,9 +473,9 @@ struct
     else if b < c || d < a then
       no
     else
-      let s' = uint64_gcd s1 s2 in
-      let r1 = int64_urem a s'
-      and r2 = int64_urem c s' in
+      let s' = gcd s1 s2 in
+      let r1 = rem a s'
+      and r2 = rem c s' in
         if r1 = r2 then
           maybe
         else
@@ -504,22 +487,22 @@ struct
     if is_empty si1 then si2
     else if is_empty si2 then si1
     else
-    let s' = uint64_gcd s1 s2 in
-      if s' = 0L then
+    let s' = gcd s1 s2 in
+      if s' = bi0 then
         if a = b && c = d then
           let u = max a c
           and l = min a c in
             (k, u -% l, l, u)
         else failwith "union: strided interval not in reduced form"
       else
-        let r1 = I.rem a s' (* not right when s' is negative. *)
-        and r2 = I.rem c s' in
+        let r1 = rem a s' (* not right when s' is negative. *)
+        and r2 = rem c s' in
         let u = max b d
         and l = min a c in
-        if s' > 0L && r1 = r2 then
+        if s' > bi0 && r1 = r2 then
           (k, s', l, u)
         else
-          let s'' = uint64_gcd (Int64.abs (r1 -% r2)) s' in
+          let s'' = gcd (abs_big_int (r1 -% r2)) s' in
           (k, s'', l, u)
   let union = renormbin' union
 
@@ -529,18 +512,18 @@ struct
     else
     let l = max a c
     and u = min b d in
-    if s1 = 0L && s2 = 0L then
+    if s1 = bi0 && s2 = bi0 then
       if a = c then (k,s1,a,b) else (empty k)
-    else if s1 = 0L then
-      if int64_urem (c -% a) s2 = 0L && a >= c && a <= d then (k,s1,a,b) else (empty k)
-    else if s2 = 0L then
-      if int64_urem (c -% a) s1 = 0L && c >= a && c <= b then (k',s2,c,d) else (empty k)
+    else if s1 = bi0 then
+      if rem (c -% a) s2 = bi0 && a >= c && a <= d then (k,s1,a,b) else (empty k)
+    else if s2 = bi0 then
+      if rem (c -% a) s1 = bi0 && c >= a && c <= b then (k',s2,c,d) else (empty k)
     else (
-      let s' = uint64_lcm s1 s2 in
-      if int64_urem a s' = 0L && int64_urem c s' = 0L then
-        let l = l and u = u -% int64_urem u s' in
-        if u >= l then (k, s', l, u -% int64_urem u s') else empty k
-      else (k, 1L, l, u))
+      let s' = lcm s1 s2 in
+      if rem a s' = bi0 && rem c s' = bi0 then
+        let l = l and u = u -% (rem u s') in
+        if u >= l then (k, s', l, u -% (rem u s')) else empty k
+      else (k, bi1, l, u))
   let intersection = renormbin' intersection
 
   let widen ((k,s1,a,b) as si1) ((k',s2,c,d) as si2) =
@@ -550,10 +533,10 @@ struct
     else if k <> k' then failwith "widen: expected same bitwidth intervals"
     else
     (* dprintf "Widen: %s to %s" (to_string si1) (to_string si2); *)
-    let s' = uint64_gcd s1 s2 in
+    let s' = gcd s1 s2 in
     let l = if c < a then lower k a s' else a
     and u = if d > b then upper k b s' else b in
-    if s' = 0L then
+    if s' = bi0 then
       if a = b && c = d then
         (k, u -% l, l, u)
       else failwith "widen: strided interval not in reduced form"
@@ -693,7 +676,6 @@ struct
     | (_,([_] as vsg))  when Some vsg = annihilator ->
         BatOption.get annihilator
     | _ -> top k
-      
 
   let logand k = makeother SI.logand (minus_one k) (Some (zero k)) k
 
@@ -802,7 +784,7 @@ struct
     with Exit -> None
 
   let numconcrete vs =
-    fold (fun _ a -> a +% 1L) vs 0L
+    fold (fun _ a -> a +% bi1) vs bi0
 
   let binop_to_vs_function = function
     | PLUS -> add
@@ -842,9 +824,9 @@ end
 
 (** Abstract Store *)
 module MemStore = struct
-  type aloc = VS.region * int64
+  type aloc = VS.region * big_int
   module M1 = BatMap.Make(struct type t = VS.region let compare = Var.compare end)
-  module M2 = BatMap.Make(struct type t = int64 let compare = Int64.compare end)
+  module M2 = BatMap.Make(struct type t = big_int let compare = Big_int_Z.compare_big_int end)
 
   (** This implementation may change... *)
   type t = VS.t M2.t M1.t
@@ -860,7 +842,7 @@ module MemStore = struct
     p "Memory contents:\n";
     fold (fun (r,i) vs () ->
       let region = if r == VS.global then "$" else Pp.var_to_string r in
-      p (Printf.sprintf " %s[%#Lx] -> %s\n" region i (VS.to_string vs))) a ();
+      p (Printf.sprintf " %s[%s] -> %s\n" region (~% i) (VS.to_string vs))) a ();
     p "End contents.\n"
 
   let rec read_concrete k ?o ae (r,i) =
@@ -879,7 +861,7 @@ module MemStore = struct
           (* We read too few bytes: use concat
              XXX: Handle address wrap-around properly
           *)
-          let rest = read_concrete (k-w) ?o ae (r, i+%((Int64.of_int w)/%8L)) in
+          let rest = read_concrete (k-w) ?o ae (r, i+%((bi w)/% bi8)) in
           (* XXX: Endianness *)
           (* let () = dprintf "Concatenating %Ld %s and %s ->" i (VS.to_string rest) (VS.to_string v) in *)
           VS.concat k rest v)
@@ -951,18 +933,18 @@ module MemStore = struct
       | [(r, ((k,_,_,_) as o))] when o = SI.top k ->
         (* Set this entire region to Top *)
         M1.remove r ae
-      | [(r, (_,0L,x,y))] when x = y ->
+      | [(r, (_,z,x,y))] when x = y && z = bi0 ->
         write_concrete_strong k ae (r,x) vl
       | _ ->
         (match !mem_max with
         | Some m ->
-          if VS.size k addr > Int64.of_int m then top
+          if VS.size k addr > bi m then top
           else widen_mem (VS.fold (fun v a -> write_concrete_weak k a v vl) addr ae)
         | None -> widen_mem (VS.fold (fun v a -> write_concrete_weak k a v vl) addr ae))
 
   let write_intersection k ae addr vl =
     match addr with
-    | [(r, (_,0L,x,y))] when x = y ->
+    | [(r, (_,z,x,y))] when x = y && z = bi0 ->
       write_concrete_intersection k ae (r,x) vl
     | _ ->
       (* Since we don't know what location is getting the
@@ -973,36 +955,40 @@ module MemStore = struct
     if x == y then true
     else M1.equal (M2.equal (=)) x y
 
-  let merge_region f x y =
+  let merge_region ~inclusive ~f x y =
     if M2.equal (=) x y then x
     else
-      M2.merge (fun a v1 v2 -> match v1, v2 with
-      | Some v1, Some v2 ->
+      M2.merge (fun a v1 v2 -> match v1, v2, inclusive with
+      | Some v1, Some v2, _ ->
         (* Note: Value sets are not guaranteed to be the same width *)
-        (try Some (f v1 v2)
+        (try Some(f v1 v2)
          with Invalid_argument "bitwidth" -> None)
-      | Some _, None
-      | None, Some _ (*-> Some v*)
-      | None, None -> None) x y
+      | (Some _ as s), None, true
+      | None, (Some _ as s), true -> s
+      | Some _, None, false
+      | None, Some _, false -> None
+      | None, None, _ -> None) x y
 
-  let merge_mem f =
-    M1.merge (fun r v1 v2 -> match v1, v2 with
-    | Some v1, Some v2 -> Some (merge_region f v1 v2)
-    | Some _, None
-    | None, Some _ (* -> Some v*)
-    | None, None -> None)
+  let merge_mem ~inclusive ~f =
+    M1.merge (fun r v1 v2 -> match v1, v2, inclusive with
+    | Some v1, Some v2, _ -> Some (merge_region ~inclusive ~f v1 v2)
+    | (Some _ as s), None, true
+    | None, (Some _ as s), true -> s
+    | Some _, None, false
+    | None, Some _, false -> None
+    | None, None, _ -> None)
 
   let intersection (x:t) (y:t) =
     if equal x y then x
-    else merge_mem VS.intersection x y
+    else merge_mem ~inclusive:true ~f:VS.intersection x y
 
   let union (x:t) (y:t) =
     if equal x y then x
-    else widen_mem (merge_mem VS.union x y)
+    else merge_mem ~inclusive:false ~f:VS.union x y
 
   let widen (x:t) (y:t) =
     if equal x y then x
-    else merge_mem VS.widen x y
+    else merge_mem ~inclusive:true ~f:VS.widen x y
 
 end
 
@@ -1173,9 +1159,7 @@ struct
     let init_mem vm {initial_mem; mem} =
       let write_mem m (a,v) =
         DV.dprintf "Writing %#x to %s" (Char.code v) (~% a);
-        let v = Char.code v in
-        let a = Big_int_Z.int64_of_big_int a in
-        let v = Int64.of_int v in
+        let v = bi (Char.code v) in
         let index_bits = Typecheck.bits_of_width (Typecheck.index_type_of (Var.typ mem)) in
         let value_bits = Typecheck.bits_of_width (Typecheck.value_type_of (Var.typ mem)) in
         if value_bits <> 8
@@ -1209,7 +1193,7 @@ struct
       | Reg nbits -> (
         let new_vs = try (match e with
           | Int(i,t)->
-            VS.of_bap_int (int64_of_big_int i) t
+            VS.of_bap_int i t
           | Lab _ -> raise(Unimplemented "No VS for labels (should be a constant)")
           | Var v -> do_find l v
           | BinOp(op, x, y) ->
@@ -1327,7 +1311,7 @@ struct
           | _ -> failwith "impossible"
         in
         let vs_v = do_find l v in
-        let vs_c = vsf (bits_of_width t) (int64_of_big_int i) in
+        let vs_c = vsf (bits_of_width t) i in
         let vs_int = VS.intersection vs_v vs_c in
         dprintf "%s dst %s vs_v %s vs_c %s vs_int %s" (Pp.var_to_string v) (Cfg_ast.v2s (CFG.G.E.dst edge)) (VS.to_string vs_v) (VS.to_string vs_c) (VS.to_string vs_int);
         VM.add v (`Scalar vs_int) l
@@ -1367,7 +1351,7 @@ struct
           | _ -> failwith "impossible"
         in
         let vs_v = exp2vs ~o l le in
-        let vs_c = vsf (bits_of_width t) (int64_of_big_int i) in
+        let vs_c = vsf (bits_of_width t) i in
         let vs_int = VS.intersection vs_v vs_c in
         dprintf "%s dst %s vs_v %s vs_c %s vs_int %s" (Pp.ast_exp_to_string le) (Cfg_ast.v2s (CFG.G.E.dst edge)) (VS.to_string vs_v) (VS.to_string vs_c) (VS.to_string vs_int);
         let orig_mem = do_find_ae l m in
@@ -1379,7 +1363,7 @@ struct
         (* We can make a SI for equality, but not for not for
            inequality *)
         let vs_c =
-          let s = VS.of_bap_int (int64_of_big_int i) t in
+          let s = VS.of_bap_int i t in
           match bop with
           | EQ when i' = bi1 -> s
           | NEQ when i' = bi0 -> s

@@ -2,7 +2,7 @@
 
 module SI :
   sig
-    type t = int * int64 * int64 * int64
+    type t = int * Big_int_Z.big_int * Big_int_Z.big_int * Big_int_Z.big_int
     val is_empty : t -> bool
     val to_string : t -> string
   end
@@ -15,14 +15,14 @@ module VS :
     type t = address list
     val global : region
     val to_string : t -> string
-    val concrete : ?max:int -> t -> int64 list option
+    val concrete : ?max:int -> t -> Big_int_Z.big_int list option
   end
 (** Value sets *)
 
 module MemStore :
   sig
     module M1 : Map.S with type key = Var.t
-    module M2 : Map.S with type key = int64
+    module M2 : Map.S with type key = Big_int_Z.big_int
     type t = VS.t M2.t M1.t
 end
 (** Memories *)
