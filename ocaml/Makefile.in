@@ -103,8 +103,9 @@ export SOURCES = \
 	syscall_models.ml \
 	hacks.ml \
 	coalesce.mli coalesce.ml \
-	vsa_ast.mli vsa_ast.ml \
+	vsa.ml \
 	vsa_ssa.mli vsa_ssa.ml \
+	vsa_ast.mli vsa_ast.ml \
 	asmir_disasm.mli asmir_disasm.ml \
 	func_boundary.mli func_boundary.ml \
 	asmir_rdisasm.mli asmir_rdisasm.ml \
