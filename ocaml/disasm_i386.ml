@@ -2105,7 +2105,7 @@ let rec to_ir mode addr next ss pref has_rex has_vex =
 let add_labels ?(asm) a ir =
   let attr = match asm with None -> [] | Some s -> [Asm(s)] in
   Label(Addr a, attr)
-  ::Label(Name(Printf.sprintf "pc_0x%s" (~%a)),[])
+  ::Label(Name(Printf.sprintf "pc_0x%s" (Util.big_int_to_hex a)),[])
   ::ir
 
 end (* ToIR *)
