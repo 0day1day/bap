@@ -40,15 +40,9 @@ val exp2vs : AbsEnv.t -> Ast.exp -> VS.t
 (** Approximate an expression using value sets in an abstract
     environment *)
 
-type options = { initial_mem : (Type.addr * char) list;
-                 sp : Var.t;
-                 mem : Var.t;
-               }
-(** VSA options *)
-
 val vsa :
   ?nmeets:int ->
-  options ->
+  Vsa.options ->
   Cfg.AST.G.t ->
   (Cfg.AST.G.V.t * int -> AbsEnv.t option) *
     (Cfg.AST.G.V.t * int -> AbsEnv.t option)
@@ -60,8 +54,8 @@ val last_loc :
   Cfg.AST.G.V.t -> Cfg.AST.G.V.t * int
 (** Returns the last location in a basic block. *)
 
-val build_default_arch_options : Arch.arch -> options
+val build_default_arch_options : Arch.arch -> Vsa.options
 (** Build default options for arch*)
 
-val build_default_prog_options : Asmir.asmprogram -> options
+val build_default_prog_options : Asmir.asmprogram -> Vsa.options
 (** Build default options for program *)

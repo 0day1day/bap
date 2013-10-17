@@ -45,84 +45,8 @@ let bits_of_exp e = bits_of_width (Typecheck.infer_ast e)
 module SI = SI
 module VS = VS
 module MemStore = MemStore
-
-(** Abstract Environment *)
-module AbsEnv = struct
-
-  type value = [ `Scalar of VS.t | `Array of MemStore.t ]
-
-  (** This implementation may change *)
-  type t = value VM.t
-
-  let empty = VM.empty
-
-  let pp_value p = function
-    | `Scalar s -> VS.pp p s
-    | `Array a -> MemStore.pp p a
-
-  let value_to_string v =
-    let b = Buffer.create 57 in
-    let p = Buffer.add_string b in
-    pp_value p v;
-    Buffer.contents b
-
-  let pp p m =
-    VM.iter (fun k v ->
-      p ("\n " ^ (Pp.var_to_string k) ^ " -> ");
-      pp_value p v;
-    ) m
-
-  let to_string m =
-    let b = Buffer.create 57 in
-    let p = Buffer.add_string b in
-    pp p m;
-    Buffer.contents b
-
-  let value_equal x y = match x,y with
-    | (`Scalar x, `Scalar y) -> VS.equal x y
-    | (`Array x, `Array y) -> MemStore.equal x y
-    | _ -> failwith "value_equal"
-
-  let equal x y =
-    if x == y then true
-    else VM.equal (value_equal) x y
-
-  let do_find_vs_int ae v =
-    match VM.find v ae with
-    | `Scalar vs -> vs
-    | _ -> failwith "type mismatch"
-
-  let do_find_vs ae v =
-    try do_find_vs_int ae v
-    with Not_found -> VS.top (bits_of_width (Var.typ v))
-
-  let do_find_vs_opt ae v =
-    try Some(do_find_vs_int ae v )
-    with Not_found -> None
-
-  (* let astval2vs ae = function *)
-  (*   | Int(i,t) -> VS.of_bap_int (int64_of_big_int i) t *)
-  (*   | Lab _ -> raise(Unimplemented "No VS for labels (should be a constant)") *)
-  (*   | Var v -> do_find_vs ae v *)
-
-  let do_find_ae_int ae v =
-    match VM.find v ae with
-      | `Array ae -> ae
-      | _ -> failwith "type mismatch"
-
-  let do_find_ae ae v =
-    try do_find_ae_int ae v
-    with Not_found -> MemStore.top
-
-  let do_find_ae_opt ae v =
-    try Some(do_find_ae_int ae v)
-    with Not_found -> None
-end  (* module AE *)
-
-type options = { initial_mem : (addr * char) list;
-                 sp : Var.t;
-                 mem : Var.t;
-               }
+module AbsEnv = AbsEnv
+type options = Vsa.options
 
 (** This does most of VSA, except the loop handling and special dataflow *)
 module AlmostVSA =

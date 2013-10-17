@@ -43,15 +43,9 @@ val exp2vs : AbsEnv.t -> Ssa.exp -> VS.t
 val prepare_ssa_indirect : ?vs:Cfg.SSA.G.V.t list -> Cfg.SSA.G.t -> Cfg.SSA.G.t
 (** Prepare SSA CFG for resolving indirect jumps *)
 
-type options = { initial_mem : (Type.addr * char) list;
-                 sp : Var.t;
-                 mem : Var.t;
-               }
-(** VSA options *)
-
 val vsa :
   ?nmeets:int ->
-  options ->
+  Vsa.options ->
   Cfg.SSA.G.t ->
   (Cfg.SSA.G.V.t * int -> AbsEnv.t option) *
     (Cfg.SSA.G.V.t * int -> AbsEnv.t option)
@@ -63,8 +57,8 @@ val last_loc :
   Cfg.SSA.G.V.t -> Cfg.SSA.G.V.t * int
 (** Returns the last location in a basic block. *)
 
-val build_default_arch_options : Arch.arch -> options
+val build_default_arch_options : Arch.arch -> Vsa.options
 (** Build default options for arch *)
 
-val build_default_prog_options : Asmir.asmprogram -> options
+val build_default_prog_options : Asmir.asmprogram -> Vsa.options
 (** Build default options for program *)
