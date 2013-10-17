@@ -312,7 +312,7 @@ module VSA_SPEC = struct
                  BB_Entry.  The underlying assumption is that the memory
                  should be read only, so it couldn't have changed. *)
               dprintf "VSA mem hack";
-              do_read (Ssa.Var Disasm_i386.R32.mem) (CS.G.V.create Cfg.BB_Entry, 0)
+              do_read (Ssa.Var (Arch.mem_of_arch (Asmir.get_asmprogram_arch asmp))) (CS.G.V.create Cfg.BB_Entry, 0)
             | e ->
               add_indirect edge
             )
