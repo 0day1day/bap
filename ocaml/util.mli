@@ -246,6 +246,15 @@ val int64_to_binary : ?pad:int -> int64 -> string
 
 (** {3 Arithmetic [big_int] operations} *)
 
+(** Unsigned compare *)
+val big_int_ucompare : Big_int_Z.big_int -> Big_int_Z.big_int -> int
+
+(** Unsigned max *)
+val big_int_umax : Big_int_Z.big_int -> Big_int_Z.big_int -> Big_int_Z.big_int
+
+(** Unsigned min *)
+val big_int_umin : Big_int_Z.big_int -> Big_int_Z.big_int -> Big_int_Z.big_int
+
 (** Convert [big_int] to binary string for printing *)
 val big_int_to_binary : ?pad:int -> Big_int_Z.big_int -> string
 

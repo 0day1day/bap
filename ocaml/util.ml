@@ -396,6 +396,18 @@ let int64_to_binary ?pad n =
 
 (* end stuff that should be in Int64 *)
 
+let big_int_ucompare x y =
+  let z = Big_int_Z.zero_big_int in
+  if x < z && y >= z then 1
+  else if x >= z && y < z then -1
+  else Big_int_Z.compare_big_int x y
+
+let big_int_umax x y =
+  if big_int_ucompare x y > 0 then x else y
+
+let big_int_umin x y =
+  if big_int_ucompare x y < 0 then x else y
+
 let big_int_to_binary ?pad n = 
   let getb n = Big_int_Z.and_big_int n (big_int_of_int 1) in (* Get lsb *)
   let getrest n = Big_int_Z.shift_right_big_int n 1 in (* Get all but lsb *)

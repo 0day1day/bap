@@ -1,3 +1,4 @@
+open Big_int_convenience
 open OUnit
 module VM = Var.VarMap
 
@@ -42,23 +43,23 @@ let make_ssa_test (n, f, r, si) =
 
 let tests =
   [
-    "a_test", "asm/vsa-a.o", Disasm_i386.R32.ecx, (32,0L,1L,1L);
-    "a_test2", "asm/vsa-a2.o", Disasm_i386.R32.ecx, (32,0L,20L,20L);
-    "ae_test", "asm/vsa-ae.o", Disasm_i386.R32.ecx, (32,0L,1L,1L);
-    "ae_test2", "asm/vsa-ae2.o", Disasm_i386.R32.ecx, (32,0L,19L,19L);
-    "b_test", "asm/vsa-b.o", Disasm_i386.R32.ecx, (32,0L,20L,20L);
-    "be_test", "asm/vsa-be.o", Disasm_i386.R32.ecx, (32,0L,21L,21L);
-    "e_test", "asm/vsa-e.o", Disasm_i386.R32.ecx, (32,0L,1L,1L);
+    "a_test", "asm/vsa-a.o", Disasm_i386.R32.ecx, (32,bi0,bi1,bi1);
+    "a_test2", "asm/vsa-a2.o", Disasm_i386.R32.ecx, (32,bi0,bi 20,bi 20);
+    "ae_test", "asm/vsa-ae.o", Disasm_i386.R32.ecx, (32,bi0,bi1,bi1);
+    "ae_test2", "asm/vsa-ae2.o", Disasm_i386.R32.ecx, (32,bi0,bi 19,bi 19);
+    "b_test", "asm/vsa-b.o", Disasm_i386.R32.ecx, (32,bi0,bi 20,bi 20);
+    "be_test", "asm/vsa-be.o", Disasm_i386.R32.ecx, (32,bi0,bi 21,bi 21);
+    "e_test", "asm/vsa-e.o", Disasm_i386.R32.ecx, (32,bi0,bi1,bi1);
     (* We don't get exact results here, because the information
        propagates through a NEQ constraint, which we cannot represent in
        a SI *)
-    "e_test2", "asm/vsa-e2.o", Disasm_i386.R32.ecx, (32,1L,20L,21L);
-    "g_test", "asm/vsa-g.o", Disasm_i386.R32.ecx, (32,0L,1L,1L);
-    "ge_test", "asm/vsa-ge.o", Disasm_i386.R32.ecx, (32,0L,1L,1L);
-    "l_test", "asm/vsa-l.o", Disasm_i386.R32.ecx, (32,0L,20L,20L);
-    "le_test", "asm/vsa-le.o", Disasm_i386.R32.ecx, (32,0L,21L,21L);
-    "ne_test", "asm/vsa-ne.o", Disasm_i386.R32.ecx, (32,0L,20L,20L);
-    "mem_test", "asm/mem.o", Disasm_i386.R32.ecx, (32,0L,42L,42L);
+    "e_test2", "asm/vsa-e2.o", Disasm_i386.R32.ecx, (32,bi1,bi 20,bi 21);
+    "g_test", "asm/vsa-g.o", Disasm_i386.R32.ecx, (32,bi0,bi1,bi1);
+    "ge_test", "asm/vsa-ge.o", Disasm_i386.R32.ecx, (32,bi0,bi1,bi1);
+    "l_test", "asm/vsa-l.o", Disasm_i386.R32.ecx, (32,bi0,bi 20,bi 20);
+    "le_test", "asm/vsa-le.o", Disasm_i386.R32.ecx, (32,bi0,bi 21,bi 21);
+    "ne_test", "asm/vsa-ne.o", Disasm_i386.R32.ecx, (32,bi0,bi 20,bi 20);
+    "mem_test", "asm/mem.o", Disasm_i386.R32.ecx, (32,bi0,bi 42,bi 42);
   ]
 
 let suite = "Vsa" >:::

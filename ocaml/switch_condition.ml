@@ -66,15 +66,15 @@ let add_switch_conditions_int origssa optssa vsa_in =
         | Some x ->
           let cases =
             List.map (fun x ->
-              let newinte = Int(Big_int_Z.big_int_of_int64 x, Typecheck.infer_ssa indexe) in
+              let newinte = Int(x, Typecheck.infer_ssa indexe) in
               let newindexe = Hacks.ssa_replacer ~eq:(==) ~needle:leafe ~haystack:cpindexe ~replacement:newinte in
               dprintf "newindexe: %s" (Pp.ssa_exp_to_string newindexe);
               let newloade = Load(m, newindexe, e, t) in
-              dprintf "addr %Lx %s" x (Pp.ssa_exp_to_string newloade);
+              dprintf "addr %s %s" (~% x) (Pp.ssa_exp_to_string newloade);
               let vs' = Vsa_ssa.exp2vs vsa newloade in
               let conc = Vsa_ssa.VS.concrete ~max:1 vs' in
               match conc with
-              | Some (addr::[]) -> Some(bi64 addr, bi64 x)
+              | Some (addr::[]) -> Some(addr, x)
               | Some _ -> failwith "impossible"
               | None -> None
             ) x

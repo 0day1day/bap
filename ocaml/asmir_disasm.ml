@@ -259,7 +259,7 @@ module VSA_SPEC = struct
           dprintf "VSA resolved %s to %s" (Pp.ast_exp_to_string e) (Vsa_ssa.VS.to_string vs);
           (match Vsa_ssa.VS.concrete ~max:1024 vs with
           | Some x -> dprintf "VSA finished";
-            (edge, Addrs (List.map (fun a -> Addr (bi64 a)) x))
+            (edge, Addrs (List.map (fun a -> Addr a) x))
           | None -> wprintf "VSA disassembly failed to resolve %s/%s to a specific concrete set" (Pp.ast_exp_to_string e) (Vsa_ssa.VS.to_string vs);
             add_indirect edge)
         in
@@ -293,7 +293,6 @@ module VSA_SPEC = struct
 
             let do_read meme loc =
               let reads = List.map (fun a ->
-                let a = bi64 a in
                 let exp2vs = Vsa_ssa.exp2vs (BatOption.get (df_in loc)) in
                 let exp = Ssa.Load(meme, Ssa.Int(a, Typecheck.infer_ssa indexe), endian, t) in
                 let vs = exp2vs exp in
@@ -305,7 +304,7 @@ module VSA_SPEC = struct
                   failwith (Printf.sprintf "Unable to read from jump table at %s" (~% a))
               ) l
               in
-              (edge, Addrs (List.map (fun a -> Addr (bi64 a)) (List.flatten reads)))
+              (edge, Addrs (List.map (fun a -> Addr a) (List.flatten reads)))
             in
             (try do_read m ssaloc with
             | e when !vsa_mem_hack ->
@@ -313,7 +312,7 @@ module VSA_SPEC = struct
                  BB_Entry.  The underlying assumption is that the memory
                  should be read only, so it couldn't have changed. *)
               dprintf "VSA mem hack";
-              do_read (Ssa.Var Disasm_i386.R32.mem) (CS.G.V.create Cfg.BB_Entry, 0)
+              do_read (Ssa.Var (Arch.mem_of_arch (Asmir.get_asmprogram_arch asmp))) (CS.G.V.create Cfg.BB_Entry, 0)
             | e ->
               add_indirect edge
             )
