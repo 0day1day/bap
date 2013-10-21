@@ -8,7 +8,7 @@ New in BAP 0.8:
 * A new CFG recovery framework.
 
   This feature allows various algorithms to identify regions of binary
-  code to lift, rather than relying on linear dissasembly.  Iniital
+  code to lift, rather than relying on linear dissasembly.  Initial
   CFG recovery algorithms include recursive descent and VSA.  The CFG
   recovery framework is still in beta, and can be accessed using the
   get_functions command.
